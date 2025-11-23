@@ -1,0 +1,126 @@
+==== ERP AZUL — Reporte de APIs ====
+
+🔴 ERRORES (122):
+❌ C:\Users\1234\Desktop\erpmanual\app\api\catalogos\areas-fisicas\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\catalogos\areas-fisicas\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\catalogos\categorias\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\catalogos\categorias\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\catalogos\proveedores\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\catalogos\proveedores\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\debug\productos_locales\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\debug\productos_locales\route.js → Falta try/catch
+❌ C:\Users\1234\Desktop\erpmanual\app\api\debug\productos_locales\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\crear\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\crear\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\listar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\listar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\[id]\asignar-grupo\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\[id]\asignar-grupo\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\[id]\depositos\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\[id]\depositos\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\[id]\locales\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\[id]\locales\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\grupos\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\locales\listar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\locales\listar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\locales\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\locales\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\locales\[id]\grupo\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\locales\[id]\grupo\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\locales\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\locales\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\login\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\login\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\logout\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\logout\route.js → Falta try/catch
+❌ C:\Users\1234\Desktop\erpmanual\app\api\logout\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\me\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\me\route.js → Falta try/catch
+❌ C:\Users\1234\Desktop\erpmanual\app\api\me\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\plantilla\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\plantilla\route.js → Falta try/catch
+❌ C:\Users\1234\Desktop\erpmanual\app\api\plantilla\route.js → Falta NextResponse.json()
+❌ C:\Users\1234\Desktop\erpmanual\app\api\plantilla\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\crear\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\crear\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\editar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\editar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\eliminar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\eliminar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\obtener\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\productos\obtener\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\crear\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\crear\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\editar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\editar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\eliminar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\eliminar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\listar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\listar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\obtener\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\roles\obtener\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\ajustar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\ajustar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\importar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\importar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\limites\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\limites\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\listar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\listar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\nuevo\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\nuevo\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\obtener\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\stock_locales\obtener\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\test\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\test\route.js → Falta try/catch
+❌ C:\Users\1234\Desktop\erpmanual\app\api\test\route.js → Falta NextResponse.json()
+❌ C:\Users\1234\Desktop\erpmanual\app\api\test\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\crear\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\crear\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\editar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\editar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\eliminar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\eliminar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\listar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\listar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\obtener\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\obtener\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\pdf\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\pdf\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\pdf-recepcion\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias\pdf-recepcion\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\agregarItem\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\buscarProductos\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\buscarProductos\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\cancelar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\crear\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\crear\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\detalle\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\eliminarItem\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\enviar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\enviar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\locales\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\locales\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\recibir\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\sugeridos\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\transferencias-pos\sugeridos\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\crear\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\crear\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\editar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\editar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\eliminar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\eliminar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\listar\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\listar\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\listarLocales\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\listarLocales\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\listarRoles\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\listarRoles\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\obtener\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\obtener\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\reactivar\[id]\route.js → route.js fuera de /api
+❌ C:\Users\1234\Desktop\erpmanual\app\api\usuarios\reactivar\[id]\route.js → Respuesta sin formato estándar (ok, items, item, total, totalPages, error)
+

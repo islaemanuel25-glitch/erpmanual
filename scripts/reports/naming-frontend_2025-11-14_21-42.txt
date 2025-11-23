@@ -1,0 +1,9 @@
+==== ERP AZUL — Naming FRONTEND ====
+
+🔴 ERRORES (6):
+❌ [C:\Users\1234\Desktop\erpmanual\app\modulos\locales\editar\[id]\page.jsx] Variable/propiedad snake_case en frontend: es_deposito
+❌ [C:\Users\1234\Desktop\erpmanual\app\modulos\locales\editar\[id]\page.jsx] Variable/propiedad snake_case en frontend: snake_case
+❌ [C:\Users\1234\Desktop\erpmanual\app\modulos\stock_locales\page.jsx] Variable/propiedad snake_case en frontend: stock_locales
+❌ [C:\Users\1234\Desktop\erpmanual\app\modulos\stock_locales\page.jsx] Variable/propiedad snake_case en frontend: stock_locales
+❌ [C:\Users\1234\Desktop\erpmanual\app\modulos\stock_locales\page.jsx] Variable/propiedad snake_case en frontend: stock_locales
+❌ [C:\Users\1234\Desktop\erpmanual\app\modulos\stock_locales\page.jsx] Variable/propiedad snake_case en frontend: stock_locales

@@ -1,0 +1,50 @@
+{
+  "modulo": "usuarios",
+  "prismaModel": "usuario",
+
+  "skipReactivar": false,
+
+  "templates": {
+    "crear": {
+      "modulo": "usuario",
+      "extras": ["includeRolLocal"],
+      "preValidate": "    // bcrypt lo manejás en la API real; acá asumimos que llega password\n",
+      "createFields": [
+        { "name": "nombre",      "label": "Nombre",   "required": true },
+        { "name": "email",       "label": "Email",    "required": true, "parser": "String(body?.email ?? '').trim().toLowerCase()", "requiredCheck": "!email" },
+        { "name": "password",    "label": "Contraseña","required": true, "parser": "String(body?.password ?? '')", "requiredCheck": "!password", "toData": "await (await import('bcryptjs')).hash(password, 10)", "target": "passwordHash" },
+        { "name": "rolId",       "label": "Rol",      "required": true, "parser": "Number(body?.rolId)", "requiredCheck": "!rolId || Number.isNaN(rolId)" },
+        { "name": "localId",     "label": "Local",    "required": false, "parser": "body?.localId === '' || body?.localId === null || body?.localId === undefined ? null : Number(body?.localId)", "toData": "Number.isNaN(localId) ? null : localId" },
+        { "name": "activo",      "label": "Activo",   "required": false, "parser": "Boolean(body?.activo ?? true)" }
+      ]
+    },
+
+    "editar": {
+      "modulo": "usuario",
+      "extras": ["includeRolLocal"],
+      "updateChecks": [
+        { "name": "nombre", "validate": "const v = String(body.nombre).trim(); if (!v) return NextResponse.json({ ok:false, error:'Nombre requerido' }, { status:400 });", "toData": "String(body.nombre).trim()" },
+        { "name": "email",  "validate": "const v = String(body.email).trim().toLowerCase(); if (!v) return NextResponse.json({ ok:false, error:'Email requerido' }, { status:400 });", "toData": "String(body.email).trim().toLowerCase()" },
+        { "name": "password", "validate": "if (String(body.password).trim() !== '') { /* ok */ }", "toData": "String(body.password).trim() === '' ? undefined : await (await import('bcryptjs')).hash(String(body.password), 10)", "target": "passwordHash" },
+        { "name": "rolId",  "validate": "const v = Number(body.rolId); if (!v || Number.isNaN(v)) return NextResponse.json({ ok:false, error:'Rol inválido' }, { status:400 });", "toData": "Number(body.rolId)" },
+        { "name": "localId", "toData": "(body.localId === '' || body.localId === undefined || body.localId === null) ? null : (Number.isNaN(Number(body.localId)) ? null : Number(body.localId))" },
+        { "name": "activo", "toData": "Boolean(body.activo)" }
+      ]
+    },
+
+    "listar": {
+      "modulo": "usuario",
+      "extras": ["includeRolLocal"]
+    },
+
+    "obtener": {
+      "modulo": "usuario",
+      "extras": ["includeRolLocal"]
+    }
+  },
+
+  "relations": [
+    { "name": "listarRoles",   "prismaModel": "rol" },
+    { "name": "listarLocales", "prismaModel": "local" }
+  ]
+}

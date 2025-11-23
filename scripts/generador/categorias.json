@@ -1,0 +1,8 @@
+{
+  "modulo": "categorias",
+  "tabla": "Categoria",
+  "campos": {
+    "nombre": { "tipo": "string", "required": true },
+    "activo": { "tipo": "boolean", "default": true }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "requiredApiResponseKeys": [
+    "ok",
+    "items",
+    "item",
+    "total",
+    "totalPages",
+    "error"
+  ],
+
+  "allowedCamelCase": [
+    "id", "nombre", "descripcion", "email", "passwordHash", "rolId", "localId",
+    "direccion", "telefono", "codigoPostal", "ciudad", "provincia", "cuil",
+    "activo", "createdAt", "updatedAt",
+
+    "esDeposito", "grupoId", "creadoEnLocalId", "categoriaId", "proveedorId",
+    "areaFisicaId", "unidadMedida", "factorPack", "pesoKg", "volumenMl",
+    "precioCosto", "precioVenta", "margen", "precioSugerido", "ivaPorcentaje",
+    "fechaVencimiento", "redondeo100", "imagenUrl", "esCombo",
+
+    "productoId", "productoLocalId", "localId", "baseId",
+
+    "origenId", "destinoId", "estado", "fechaEnvio", "fechaRecepcion",
+    "creadaPor",
+
+    "stockMin", "stockMax", "cantidad", "recibido", "precioFinal",
+    "margenEspecial", "notas"
+  ],
+
+  "forbiddenSnakeCase": [
+    "es_deposito", "codigo_barra", "categoria_id", "proveedor_id",
+    "area_fisica_id", "unidad_medida", "factor_pack", "peso_kg",
+    "volumen_ml", "precio_costo", "precio_venta", "precio_sugerido",
+    "iva_porcentaje", "fecha_vencimiento", "redondeo_100", "imagen_url",
+    "es_combo"
+  ],
+
+  "requiredModuleFiles": [
+    "page.jsx",
+    "nuevo/page.jsx",
+    "editar/[id]/page.jsx",
+    "api/listar/route.js",
+    "api/obtener/route.js",
+    "api/crear/route.js",
+    "api/editar/[id]/route.js",
+    "api/eliminar/[id]/route.js",
+    "components/TablaModulo.jsx",
+    "components/ModalModulo.jsx",
+    "components/FormModulo.jsx",
+    "components/FiltrosModulo.jsx",
+    "components/ColumnManagerModulo.jsx"
+  ]
+}

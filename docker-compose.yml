@@ -1,0 +1,12 @@
+services:
+  db:
+    image: postgres:16
+    container_name: erpazul_db
+    environment:
+      POSTGRES_USER: erpazul
+      POSTGRES_PASSWORD: erpazul
+      POSTGRES_DB: erpazul
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data

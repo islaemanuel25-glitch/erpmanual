@@ -1,0 +1,28 @@
+==== ERP AZUL — Reporte de Carpetas Prohibidas ====
+
+🔴 ERRORES (24):
+❌ API "catalogos" → carpeta no permitida: "areas-fisicas"
+❌ API "catalogos" → carpeta no permitida: "categorias"
+❌ API "catalogos" → carpeta no permitida: "proveedores"
+❌ API "debug" → carpeta no permitida: "productos_locales"
+❌ API "grupos" → carpeta no permitida: "[id]"
+❌ API "locales" → carpeta no permitida: "[id]"
+❌ API "stock_locales" → carpeta no permitida: "ajustar"
+❌ API "stock_locales" → carpeta no permitida: "importar"
+❌ API "stock_locales" → carpeta no permitida: "limites"
+❌ API "stock_locales" → carpeta no permitida: "nuevo"
+❌ API "transferencias" → carpeta no permitida: "pdf"
+❌ API "transferencias" → carpeta no permitida: "pdf-recepcion"
+❌ API "transferencias-pos" → carpeta no permitida: "agregarItem"
+❌ API "transferencias-pos" → carpeta no permitida: "buscarProductos"
+❌ API "transferencias-pos" → carpeta no permitida: "cancelar"
+❌ API "transferencias-pos" → carpeta no permitida: "detalle"
+❌ API "transferencias-pos" → carpeta no permitida: "eliminarItem"
+❌ API "transferencias-pos" → carpeta no permitida: "enviar"
+❌ API "transferencias-pos" → carpeta no permitida: "locales"
+❌ API "transferencias-pos" → carpeta no permitida: "recibir"
+❌ API "transferencias-pos" → carpeta no permitida: "sugeridos"
+❌ API "usuarios" → carpeta no permitida: "listarLocales"
+❌ API "usuarios" → carpeta no permitida: "listarRoles"
+❌ API "usuarios" → carpeta no permitida: "reactivar"
+

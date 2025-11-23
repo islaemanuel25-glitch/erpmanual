@@ -1,0 +1,21 @@
+==== ERP AZUL — Naming APIs ====
+
+🔴 ERRORES (18):
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\grupos\listar\route.js] → Variable interna snake_case prohibida: nombre_asc
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\grupos\listar\route.js] → Variable interna snake_case prohibida: nombre_asc
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\locales\listar\route.js] → Propiedad snake_case en objeto JS: es_deposito
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\locales\listar\route.js] → Propiedad snake_case en objeto JS: es_deposito
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\locales\listar\route.js] → Propiedad snake_case en objeto JS: es_deposito
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\plantilla\route.js] → Variable interna snake_case prohibida: json_to_sheet
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\plantilla\route.js] → Variable interna snake_case prohibida: book_new
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js] → Propiedad snake_case en objeto JS: categoria_id
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js] → Propiedad snake_case en objeto JS: proveedor_id
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js] → Propiedad snake_case en objeto JS: area_fisica_id
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js] → Propiedad snake_case en objeto JS: codigo_barra
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js] → Propiedad snake_case en objeto JS: area_fisica
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js] → Propiedad snake_case en objeto JS: area_fisica
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js] → Propiedad snake_case en objeto JS: area_fisica
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\productos\listar\route.js] → Propiedad snake_case en objeto JS: codigo_barra
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\transferencias\pdf\[id]\route.js] → Propiedad snake_case en objeto JS: codigo_barra
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\transferencias\pdf-recepcion\route.js] → Propiedad snake_case en objeto JS: codigo_barra
+❌ [C:\Users\1234\Desktop\erpmanual\app\api\transferencias\pdf-recepcion\route.js] → Propiedad snake_case en objeto JS: transferencia_recepcion_

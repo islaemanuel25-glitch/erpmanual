@@ -1,0 +1,8 @@
+==== ERP AZUL — Reporte de Imports (2025-11-15_00-42-35) ====
+
+🔴 ERRORES (0):
+✔ Sin errores en imports absolutos.
+
+🟡 ADVERTENCIAS (0):
+✔ Sin advertencias.
+

@@ -1,0 +1,109 @@
+==== ERP AZUL — Reporte de estructura de módulos ====
+
+🔴 ERRORES (90):
+❌ [dashboard] Falta archivo obligatorio: nuevo/page.jsx
+❌ [dashboard] Falta archivo obligatorio: editar/[id]/page.jsx
+❌ [dashboard] Falta archivo obligatorio: api/listar/route.js
+❌ [dashboard] Falta archivo obligatorio: api/obtener/route.js
+❌ [dashboard] Falta archivo obligatorio: api/crear/route.js
+❌ [dashboard] Falta archivo obligatorio: api/editar/[id]/route.js
+❌ [dashboard] Falta archivo obligatorio: api/eliminar/[id]/route.js
+❌ [dashboard] Falta archivo obligatorio: components/TablaModulo.jsx
+❌ [dashboard] Falta archivo obligatorio: components/ModalModulo.jsx
+❌ [dashboard] Falta archivo obligatorio: components/FiltrosModulo.jsx
+❌ [dashboard] Falta archivo obligatorio: components/ColumnManagerModulo.jsx
+❌ [dashboard] Falta archivo obligatorio: components/FormModulo.jsx
+❌ [grupos] Falta archivo obligatorio: editar/[id]/page.jsx
+❌ [grupos] Falta archivo obligatorio: api/listar/route.js
+❌ [grupos] Falta archivo obligatorio: api/obtener/route.js
+❌ [grupos] Falta archivo obligatorio: api/crear/route.js
+❌ [grupos] Falta archivo obligatorio: api/editar/[id]/route.js
+❌ [grupos] Falta archivo obligatorio: api/eliminar/[id]/route.js
+❌ [grupos] Falta archivo obligatorio: components/TablaModulo.jsx
+❌ [grupos] Falta archivo obligatorio: components/ModalModulo.jsx
+❌ [grupos] Falta archivo obligatorio: components/FiltrosModulo.jsx
+❌ [grupos] Falta archivo obligatorio: components/ColumnManagerModulo.jsx
+❌ [grupos] Falta archivo obligatorio: components/FormModulo.jsx
+❌ [locales] Falta archivo obligatorio: nuevo/page.jsx
+❌ [locales] Falta archivo obligatorio: api/listar/route.js
+❌ [locales] Falta archivo obligatorio: api/obtener/route.js
+❌ [locales] Falta archivo obligatorio: api/crear/route.js
+❌ [locales] Falta archivo obligatorio: api/editar/[id]/route.js
+❌ [locales] Falta archivo obligatorio: api/eliminar/[id]/route.js
+❌ [locales] Falta archivo obligatorio: components/TablaModulo.jsx
+❌ [locales] Falta archivo obligatorio: components/ModalModulo.jsx
+❌ [locales] Falta archivo obligatorio: components/FiltrosModulo.jsx
+❌ [locales] Falta archivo obligatorio: components/ColumnManagerModulo.jsx
+❌ [locales] Falta archivo obligatorio: components/FormModulo.jsx
+❌ [productos] Falta archivo obligatorio: nuevo/page.jsx
+❌ [productos] Falta archivo obligatorio: api/listar/route.js
+❌ [productos] Falta archivo obligatorio: api/obtener/route.js
+❌ [productos] Falta archivo obligatorio: api/crear/route.js
+❌ [productos] Falta archivo obligatorio: api/editar/[id]/route.js
+❌ [productos] Falta archivo obligatorio: api/eliminar/[id]/route.js
+❌ [productos] Falta archivo obligatorio: components/TablaModulo.jsx
+❌ [productos] Falta archivo obligatorio: components/ModalModulo.jsx
+❌ [productos] Falta archivo obligatorio: components/FiltrosModulo.jsx
+❌ [productos] Falta archivo obligatorio: components/ColumnManagerModulo.jsx
+❌ [productos] Falta archivo obligatorio: components/FormModulo.jsx
+❌ [roles] Falta archivo obligatorio: api/listar/route.js
+❌ [roles] Falta archivo obligatorio: api/obtener/route.js
+❌ [roles] Falta archivo obligatorio: api/crear/route.js
+❌ [roles] Falta archivo obligatorio: api/editar/[id]/route.js
+❌ [roles] Falta archivo obligatorio: api/eliminar/[id]/route.js
+❌ [roles] Falta archivo obligatorio: components/TablaModulo.jsx
+❌ [roles] Falta archivo obligatorio: components/ModalModulo.jsx
+❌ [roles] Falta archivo obligatorio: components/FiltrosModulo.jsx
+❌ [roles] Falta archivo obligatorio: components/ColumnManagerModulo.jsx
+❌ [roles] Falta archivo obligatorio: components/FormModulo.jsx
+❌ [stock_locales] Falta archivo obligatorio: nuevo/page.jsx
+❌ [stock_locales] Falta archivo obligatorio: editar/[id]/page.jsx
+❌ [stock_locales] Falta archivo obligatorio: api/listar/route.js
+❌ [stock_locales] Falta archivo obligatorio: api/obtener/route.js
+❌ [stock_locales] Falta archivo obligatorio: api/crear/route.js
+❌ [stock_locales] Falta archivo obligatorio: api/editar/[id]/route.js
+❌ [stock_locales] Falta archivo obligatorio: api/eliminar/[id]/route.js
+❌ [stock_locales] Falta archivo obligatorio: components/TablaModulo.jsx
+❌ [stock_locales] Falta archivo obligatorio: components/ModalModulo.jsx
+❌ [stock_locales] Falta archivo obligatorio: components/FiltrosModulo.jsx
+❌ [stock_locales] Falta archivo obligatorio: components/ColumnManagerModulo.jsx
+❌ [stock_locales] Falta archivo obligatorio: components/FormModulo.jsx
+❌ [transferencias] Falta archivo obligatorio: nuevo/page.jsx
+❌ [transferencias] Falta archivo obligatorio: editar/[id]/page.jsx
+❌ [transferencias] Falta archivo obligatorio: api/listar/route.js
+❌ [transferencias] Falta archivo obligatorio: api/obtener/route.js
+❌ [transferencias] Falta archivo obligatorio: api/crear/route.js
+❌ [transferencias] Falta archivo obligatorio: api/editar/[id]/route.js
+❌ [transferencias] Falta archivo obligatorio: api/eliminar/[id]/route.js
+❌ [transferencias] Falta archivo obligatorio: components/TablaModulo.jsx
+❌ [transferencias] Falta archivo obligatorio: components/ModalModulo.jsx
+❌ [transferencias] Falta archivo obligatorio: components/FiltrosModulo.jsx
+❌ [transferencias] Falta archivo obligatorio: components/ColumnManagerModulo.jsx
+❌ [transferencias] Falta archivo obligatorio: components/FormModulo.jsx
+❌ [usuarios] Falta archivo obligatorio: nuevo/page.jsx
+❌ [usuarios] Falta archivo obligatorio: api/listar/route.js
+❌ [usuarios] Falta archivo obligatorio: api/obtener/route.js
+❌ [usuarios] Falta archivo obligatorio: api/crear/route.js
+❌ [usuarios] Falta archivo obligatorio: api/editar/[id]/route.js
+❌ [usuarios] Falta archivo obligatorio: api/eliminar/[id]/route.js
+❌ [usuarios] Falta archivo obligatorio: components/TablaModulo.jsx
+❌ [usuarios] Falta archivo obligatorio: components/ModalModulo.jsx
+❌ [usuarios] Falta archivo obligatorio: components/FiltrosModulo.jsx
+❌ [usuarios] Falta archivo obligatorio: components/ColumnManagerModulo.jsx
+❌ [usuarios] Falta archivo obligatorio: components/FormModulo.jsx
+
+🟡 ADVERTENCIAS (14):
+⚠️ [dashboard] Archivo fuera de estructura: "page.jsx"
+⚠️ [grupos] Archivo fuera de estructura: "page.jsx"
+⚠️ [grupos] Carpeta no estándar encontrada: "[id]"
+⚠️ [locales] Carpeta no estándar encontrada: "(acciones)"
+⚠️ [locales] Archivo fuera de estructura: "page.jsx"
+⚠️ [productos] Carpeta no estándar encontrada: "(acciones)"
+⚠️ [productos] Archivo fuera de estructura: "page.jsx"
+⚠️ [roles] Archivo fuera de estructura: "page.jsx"
+⚠️ [stock_locales] Archivo fuera de estructura: "page.jsx"
+⚠️ [transferencias] Carpeta no estándar encontrada: "nueva"
+⚠️ [transferencias] Archivo fuera de estructura: "page.jsx"
+⚠️ [transferencias] Carpeta no estándar encontrada: "[id]"
+⚠️ [usuarios] Carpeta no estándar encontrada: "(acciones)"
+⚠️ [usuarios] Archivo fuera de estructura: "page.jsx"

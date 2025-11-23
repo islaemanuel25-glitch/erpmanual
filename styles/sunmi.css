@@ -1,0 +1,89 @@
+/* ============================================================
+   ⭐ SUNMI ERP AZUL — ESTILOS GLOBALES
+   ============================================================ */
+
+/* Fondo general ERP */
+.sunmi-bg {
+    @apply bg-slate-900 text-slate-100;
+  }
+  
+  /* Tarjeta principal Sunmi */
+  .sunmi-card {
+    @apply rounded-2xl bg-slate-950/80 border border-slate-800
+           shadow-md p-4 mb-3 backdrop-blur-md;
+  }
+  
+  /* Header Sunmi — AMARILLO */
+  .sunmi-header-amber {
+    @apply bg-amber-400 text-slate-900 font-bold px-4 py-2 
+           text-[13px] tracking-wide uppercase shadow-md;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+  }
+  
+  /* Header Sunmi — CELESTE */
+  .sunmi-header-cyan {
+    @apply bg-cyan-400 text-slate-900 font-bold px-4 py-2 
+           text-[13px] tracking-wide uppercase shadow-md;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+  }
+  
+  /* Tabla Sunmi */
+  .sunmi-table thead {
+    @apply bg-slate-900 text-slate-400 border-b border-slate-800;
+  }
+  
+  .sunmi-table tbody tr {
+    @apply border-b border-slate-800;
+  }
+  
+  .sunmi-table tbody tr:hover {
+    @apply bg-slate-800/40;
+  }
+  
+  /* Input Sunmi */
+  .sunmi-input {
+    @apply bg-slate-900 border border-slate-700 text-slate-100 
+           rounded-lg px-2 py-1 text-[13px]
+           focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400;
+  }
+  
+  /* Botón Sunmi redondo */
+  .sunmi-btn {
+    @apply px-3 py-1 rounded-full text-[12px] font-semibold
+           shadow-md active:scale-95 transition;
+  }
+  
+  /* Botón celeste */
+  .sunmi-btn-cyan {
+    @apply bg-cyan-500 text-slate-900 hover:bg-cyan-600;
+  }
+  
+  /* Botón ámbar */
+  .sunmi-btn-amber {
+    @apply bg-amber-400 text-slate-900 hover:bg-amber-500;
+  }
+  
+  /* Botón rojo */
+  .sunmi-btn-red {
+    @apply bg-red-500 text-white hover:bg-red-600;
+  }
+  
+  /* Separador Sunmi */
+  .sunmi-separator {
+    @apply my-4 flex items-center gap-2;
+  }
+  
+  .sunmi-separator-line {
+    @apply flex-1 h-[3px] bg-gradient-to-r rounded-full;
+  }
+  
+  .sunmi-separator-amber {
+    @apply from-amber-400/40 via-amber-400/70 to-amber-400/40;
+  }
+  
+  .sunmi-separator-cyan {
+    @apply from-cyan-400/40 via-cyan-400/70 to-cyan-400/40;
+  }
+  

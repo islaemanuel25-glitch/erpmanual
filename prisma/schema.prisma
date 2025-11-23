@@ -1,0 +1,370 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Rol {
+  id        Int       @id @default(autoincrement())
+  nombre    String    @unique
+  permisos  Json      @default("[]")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  usuarios  Usuario[]
+}
+
+model Grupo {
+  id           Int             @id @default(autoincrement())
+  nombre       String          @unique
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  locales      GrupoDeposito[]
+  localesGrupo GrupoLocal[]
+  productos    ProductoBase[]
+}
+
+model GrupoDeposito {
+  id        Int      @id @default(autoincrement())
+  grupoId   Int
+  localId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  grupo     Grupo    @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  local     Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  @@unique([grupoId, localId], name: "grupodeposito_unique")
+}
+
+model GrupoLocal {
+  id        Int      @id @default(autoincrement())
+  grupoId   Int
+  localId   Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  grupo     Grupo    @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  local     Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  @@unique([grupoId, localId], name: "grupolocal_unique")
+}
+
+model Local {
+  id                    Int             @id @default(autoincrement())
+  nombre                String
+  tipo                  String          @default("local")
+  direccion             String?
+  telefono              String?
+  email                 String?
+  cuil                  String?
+  ciudad                String?
+  provincia             String?
+  codigoPostal          String?
+  activo                Boolean         @default(true)
+  es_deposito           Boolean         @default(false)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  grupoDepositos        GrupoDeposito[]
+  grupoLocales          GrupoLocal?
+  listasPrecio          ListaPrecio[]
+  productosCreados      ProductoBase[]  @relation("ProductoBaseCreador")
+  productos             ProductoLocal[]
+  stock                 StockLocal[]
+  transferenciasDestino Transferencia[] @relation("destino")
+  transferenciasOrigen  Transferencia[] @relation("origen")
+  usuarios              Usuario[]
+
+  posTransferenciasOrigen  PosTransferencia[] @relation("pos_origen")
+  posTransferenciasDestino PosTransferencia[] @relation("pos_destino")
+}
+
+model Usuario {
+  id           Int      @id @default(autoincrement())
+  nombre       String
+  email        String   @unique
+  passwordHash String
+  rolId        Int
+  localId      Int?
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  local        Local?   @relation(fields: [localId], references: [id])
+  rol          Rol      @relation(fields: [rolId], references: [id])
+
+  confirmaciones TransferenciaDetalle[]
+
+  posTransferencias PosTransferencia[]
+
+  @@map("Usuario")
+}
+
+model Categoria {
+  id        Int            @id @default(autoincrement())
+  nombre    String
+  activo    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  productos ProductoBase[]
+}
+
+model Proveedor {
+  id         Int            @id @default(autoincrement())
+  nombre     String
+  cuit       String?        @unique
+  telefono   String?
+  email      String?
+  direccion  String?
+  diaPedidos DiaPedido?
+  activo     Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  productos  ProductoBase[]
+}
+
+model AreaFisica {
+  id          Int            @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  tipo        String?
+  activo      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  productos   ProductoBase[]
+}
+
+model ProductoBase {
+  id                Int                   @id @default(autoincrement())
+  grupoId           Int
+  creadoEnLocalId   Int?
+  nombre            String
+  descripcion       String?
+  sku               String?
+  codigo_barra      String?
+  categoria_id      Int?
+  proveedor_id      Int?
+  area_fisica_id    Int?
+  unidad_medida     UnidadMedida
+  factor_pack       Int?
+  peso_kg           Decimal?              @db.Decimal(10, 3)
+  volumen_ml        Decimal?              @db.Decimal(10, 2)
+  precio_costo      Decimal               @db.Decimal(12, 2)
+  precio_venta      Decimal               @db.Decimal(12, 2)
+  margen            Decimal?              @db.Decimal(6, 2)
+  precio_sugerido   Decimal?              @db.Decimal(12, 2)
+  iva_porcentaje    Decimal?              @db.Decimal(5, 2)
+  fecha_vencimiento DateTime?
+  redondeo_100      Boolean               @default(false)
+  activo            Boolean               @default(true)
+  imagen_url        String?
+  es_combo          Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  area_fisica       AreaFisica?           @relation(fields: [area_fisica_id], references: [id])
+  categoria         Categoria?            @relation(fields: [categoria_id], references: [id])
+  creadoEnLocal     Local?                @relation("ProductoBaseCreador", fields: [creadoEnLocalId], references: [id])
+  grupo             Grupo                 @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  proveedor         Proveedor?            @relation(fields: [proveedor_id], references: [id])
+
+  preciosPorLista   ProductoListaPrecio[]
+  locales           ProductoLocal[]
+
+  @@unique([grupoId, codigo_barra])
+  @@index([grupoId])
+  @@index([creadoEnLocalId])
+  @@index([categoria_id])
+  @@index([proveedor_id])
+  @@index([area_fisica_id])
+}
+
+model ProductoLocal {
+  id           Int                    @id @default(autoincrement())
+  localId      Int
+  baseId       Int
+  nombre       String?
+  descripcion  String?
+  precio_costo Decimal?               @db.Decimal(12, 2)
+  precio_venta Decimal?               @db.Decimal(12, 2)
+  margen       Decimal?               @db.Decimal(6, 2)
+  activo       Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  base         ProductoBase           @relation(fields: [baseId], references: [id])
+  local        Local                  @relation(fields: [localId], references: [id])
+
+  stock        StockLocal[]
+  detalles     TransferenciaDetalle[]
+
+  posDetalles  PosTransferenciaDetalle[]
+
+  @@unique([localId, baseId])
+  @@index([localId])
+  @@index([baseId])
+}
+
+model StockLocal {
+  id         Int           @id @default(autoincrement())
+  localId    Int
+  productoId Int
+  cantidad   Decimal       @db.Decimal(12, 2)
+  stockMin   Decimal?      @db.Decimal(12, 2)
+  stockMax   Decimal?      @db.Decimal(12, 2)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  local      Local         @relation(fields: [localId], references: [id])
+  producto   ProductoLocal @relation(fields: [productoId], references: [id])
+
+  @@unique([localId, productoId])
+  @@index([localId])
+  @@index([productoId])
+}
+
+model ListaPrecio {
+  id             Int                   @id @default(autoincrement())
+  localId        Int
+  nombre         String
+  margen_default Decimal?              @db.Decimal(6, 2)
+  redondeo_100   Boolean               @default(false)
+  activo         Boolean               @default(true)
+  notas          String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  local          Local                 @relation(fields: [localId], references: [id], onDelete: Cascade)
+  productos      ProductoListaPrecio[]
+
+  @@unique([localId, nombre], name: "lista_unica_por_local")
+  @@index([localId])
+}
+
+model ProductoListaPrecio {
+  id              Int          @id @default(autoincrement())
+  listaPrecioId   Int
+  baseId          Int
+  precio_final    Decimal?     @db.Decimal(12, 2)
+  margen_especial Decimal?     @db.Decimal(6, 2)
+  activo          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  base            ProductoBase @relation(fields: [baseId], references: [id], onDelete: Cascade)
+  lista           ListaPrecio  @relation(fields: [listaPrecioId], references: [id], onDelete: Cascade)
+
+  @@unique([listaPrecioId, baseId], name: "precio_por_lista_y_producto")
+  @@index([listaPrecioId])
+  @@index([baseId])
+}
+
+model Transferencia {
+  id               Int                    @id @default(autoincrement())
+  origenId         Int
+  destinoId        Int
+  estado           String                 @default("Pendiente")
+  fechaEnvio       DateTime?
+  fechaRecepcion   DateTime?
+  creadaPor        Int?
+
+  tieneDiferencias Boolean                @default(false)
+
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  destino          Local                  @relation("destino", fields: [destinoId], references: [id])
+  origen           Local                  @relation("origen", fields: [origenId], references: [id])
+  detalle          TransferenciaDetalle[]
+
+  @@index([origenId])
+  @@index([destinoId])
+  @@index([estado])
+  @@index([createdAt])
+}
+
+model TransferenciaDetalle {
+  id                Int           @id @default(autoincrement())
+  transferenciaId   Int
+  productoId        Int
+  cantidad          Decimal       @db.Decimal(12, 2)
+  recibido          Decimal?      @db.Decimal(12, 2)
+  precioCosto       Decimal?      @db.Decimal(12, 2)
+
+  motivoDiferencia  String?
+  motivoPrincipal   String?       // ← AGREGADO
+  motivoDetalle     String?       // ← AGREGADO
+
+  confirmadoPorId   Int?
+  fechaRecepcion    DateTime?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  producto          ProductoLocal @relation(fields: [productoId], references: [id])
+  transferencia     Transferencia @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
+  confirmadoPor     Usuario?      @relation(fields: [confirmadoPorId], references: [id])
+
+  @@index([transferenciaId])
+  @@index([productoId])
+}
+
+enum DiaPedido {
+  Lunes
+  Martes
+  Miercoles
+  Jueves
+  Viernes
+  Sabado
+  Domingo
+}
+
+enum UnidadMedida {
+  unidad
+  pack
+  cajon
+  kg
+}
+
+model PosTransferencia {
+  id          Int                     @id @default(autoincrement())
+  origenId    Int
+  destinoId   Int
+  usuarioId   Int
+
+  estado      String                  @default("Borrador")
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  origen      Local                   @relation("pos_origen", fields: [origenId], references: [id])
+  destino     Local                   @relation("pos_destino", fields: [destinoId], references: [id])
+  usuario     Usuario                 @relation(fields: [usuarioId], references: [id])
+
+  detalles    PosTransferenciaDetalle[]
+
+  @@index([origenId])
+  @@index([destinoId])
+  @@index([usuarioId])
+  @@index([estado])
+}
+
+model PosTransferenciaDetalle {
+  id                 Int             @id @default(autoincrement())
+  posTransferenciaId Int
+  productoId         Int
+
+  sugerido           Decimal?        @db.Decimal(12, 2)
+  preparado          Decimal?        @db.Decimal(12, 2)
+  tipo               String          @default("sugerido")
+
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  pos                PosTransferencia @relation(fields: [posTransferenciaId], references: [id], onDelete: Cascade)
+  producto           ProductoLocal     @relation(fields: [productoId], references: [id])
+
+  @@index([posTransferenciaId])
+  @@index([productoId])
+  @@index([tipo])
+}
