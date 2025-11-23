@@ -36,13 +36,16 @@ const COLUMN_DEFAULTS = {
 };
 
 export default function TransferenciasPage() {
+  // 🔥 FECHAS INICIALIZADAS SIN FLASH
+  const hoy = new Date().toISOString().split("T")[0];
+
   const [items, setItems] = useState([]);
   const [estado, setEstado] = useState("");
   const [localId, setLocalId] = useState("");
   const [locales, setLocales] = useState([]);
 
-  const [fechaDesde, setFechaDesde] = useState("");
-  const [fechaHasta, setFechaHasta] = useState("");
+  const [fechaDesde, setFechaDesde] = useState(hoy);
+  const [fechaHasta, setFechaHasta] = useState(hoy);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -64,14 +67,8 @@ export default function TransferenciasPage() {
   const [openCols, setOpenCols] = useState(false);
   const [filaAbierta, setFilaAbierta] = useState(null);
 
-  // ==============================
-  // FECHAS POR DEFECTO = HOY
-  // ==============================
-  useEffect(() => {
-    const hoy = new Date().toISOString().split("T")[0];
-    setFechaDesde(hoy);
-    setFechaHasta(hoy);
-  }, []);
+  // 🔥 SE ELIMINÓ EL USEEFFECT QUE PROVOCABA EL FLASH
+  // (ya no es necesario porque las fechas están inicializadas correctamente)
 
   // ==============================
   // PERSISTENCIA DE COLUMNAS
