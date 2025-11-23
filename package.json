@@ -19,6 +19,7 @@
     "bcrypt": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "next": "16.0.1",
+    "pdf-lib": "^1.17.1",
     "pdfkit": "^0.17.2",
     "prisma": "^6.19.0",
     "react": "19.2.0",
