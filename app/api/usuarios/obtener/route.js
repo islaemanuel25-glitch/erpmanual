@@ -3,10 +3,9 @@ import prisma from "@/lib/prisma";
 
 export async function GET(req) {
   try {
-    // ✅ URL robusta (evita problemas en Edge / rutas relativas)
     const url = new URL(req.url, "http://localhost:3000");
-
     const id = Number(url.searchParams.get("id"));
+
     if (!id || Number.isNaN(id)) {
       return NextResponse.json(
         { ok: false, error: "ID inválido." },

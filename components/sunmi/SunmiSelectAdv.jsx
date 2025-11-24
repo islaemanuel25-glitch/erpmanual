@@ -23,9 +23,7 @@ export default function SunmiSelectAdv({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // -------------------------------------------
-  // FILTRAR SOLO CHILDREN VÁLIDOS <option>
-  // -------------------------------------------
+  // FILTRAR SOLO CHILDREN VÁLIDOS
   const optionList = Children.toArray(children).filter((c) =>
     isValidElement(c)
   );
@@ -75,7 +73,8 @@ export default function SunmiSelectAdv({
             <div
               key={idx}
               onClick={() => {
-                onChange({ target: { value: child.props.value } });
+                // 🔥 onChange recibe directamente el valor, no un event
+                onChange(child.props.value);
                 setOpen(false);
               }}
               className="
@@ -92,4 +91,9 @@ export default function SunmiSelectAdv({
       )}
     </div>
   );
+}
+
+/* 🔥 ESTA PARTE ERA LA QUE FALTABA */
+export function SunmiSelectOption({ value, children }) {
+  return <div value={value}>{children}</div>;
 }

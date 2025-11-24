@@ -1,7 +1,10 @@
+// Pegá acá el archivo que quieras trabajar del módulo POS Transferencias
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import Encabezado from "@/components/pos-transferencias/nueva/Encabezado";
 import TablaSugeridos from "@/components/pos-transferencias/nueva/TablaSugeridos";

@@ -10,7 +10,8 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: true,
-        roles,   // ✅ nombre correcto para el frontend
+        roles,
+        items: roles, // ✅ compat con front que espera items
       },
       { status: 200 }
     );

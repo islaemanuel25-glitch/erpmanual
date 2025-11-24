@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PERMISOS } from "@/lib/permisos";
 
-/**
- * ModalRol — Modal unificado para Crear/Editar roles
- * ✅ camelCase en frontend
- * ✅ snake_case en payload
- * ✅ permisos como array
- * ✅ estados limpios
- */
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import { PERMISOS } from "@/lib/permisos";
 
 export default function ModalRol({
   open,
@@ -17,48 +15,44 @@ export default function ModalRol({
   onSubmit,
   initialData = null,
 }) {
-  const inputClass =
-    "h-[36px] w-full px-3 rounded-md border border-gray-300 bg-white text-[13px] text-gray-800 focus:border-blue-500 focus:outline-none";
-
   const modalRef = useRef(null);
   const editMode = Boolean(initialData);
 
-  // -----------------------------------------------------
-  // ESTADO DEL FORM
-  // -----------------------------------------------------
   const [form, setForm] = useState({
     nombre: "",
     permisos: [],
   });
 
-  // -----------------------------------------------------
-  // RESET AL ABRIR
-  // -----------------------------------------------------
+  // Reset total al abrir
   useEffect(() => {
     if (!open) return;
 
+    // Reset scroll interno
     setTimeout(() => {
       if (modalRef.current) modalRef.current.scrollTop = 0;
-    }, 20);
+    }, 50);
 
-    if (editMode) {
-      setForm({
-        nombre: initialData.nombre || "",
-        permisos: Array.isArray(initialData.permisos)
-          ? initialData.permisos
-          : [],
-      });
-    } else {
+    // Nuevo rol → form vacío
+    if (!initialData) {
       setForm({
         nombre: "",
         permisos: [],
       });
+      return;
     }
-  }, [open, editMode, initialData]);
 
-  // -----------------------------------------------------
-  // HANDLERS
-  // -----------------------------------------------------
+    // Editar rol
+    setForm({
+      nombre: initialData.nombre || "",
+      permisos: Array.isArray(initialData.permisos)
+        ? initialData.permisos
+        : [],
+    });
+  }, [open, initialData]);
+
+  const setField = (key, value) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
   const togglePermiso = (p) => {
     setForm((prev) => ({
       ...prev,
@@ -68,12 +62,16 @@ export default function ModalRol({
     }));
   };
 
-  const setAdmin = () => {
-    setForm((prev) => ({ ...prev, permisos: ["*"] }));
+  const setAdmin = () => setForm((prev) => ({ ...prev, permisos: ["*"] }));
+
+  const validar = () => {
+    if (!String(form.nombre).trim()) return "Completá el nombre del rol.";
+    return null;
   };
 
-  const handleSubmit = () => {
-    if (!form.nombre.trim()) return alert("Completá el nombre del rol");
+  const handleSubmitInternal = () => {
+    const err = validar();
+    if (err) return alert(err);
 
     const payload = {
       nombre: form.nombre.trim(),
@@ -83,111 +81,114 @@ export default function ModalRol({
     onSubmit(payload);
   };
 
-  const labelHumano = (permiso) => {
-    const [mod, act] = permiso.split(".");
-    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-    return `${cap(mod)} · ${act ? cap(act) : ""}`.trim();
-  };
-
-  // -----------------------------------------------------
-  // UI
-  // -----------------------------------------------------
-  const visible = open
-    ? "opacity-100 pointer-events-auto"
-    : "opacity-0 pointer-events-none";
+  if (!open) return null;
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-3 transition-opacity duration-150 ${visible}`}
+      className="
+        fixed inset-0 z-[9999]
+        bg-black/60 backdrop-blur-sm
+        flex items-center justify-center
+        p-3
+      "
     >
-      <div className="w-[95%] max-w-xl bg-white rounded-xl shadow-xl overflow-hidden">
-        {/* HEADER */}
-        <div className="px-5 py-3 border-b flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            {editMode ? "Editar rol" : "Nuevo rol"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded-md border bg-gray-50 hover:bg-gray-100"
-          >
-            Cerrar
-          </button>
-        </div>
-
-        {/* BODY */}
-        <div
-          ref={modalRef}
-          className="p-5 max-h-[65vh] overflow-y-auto space-y-4"
-        >
-          {/* Nombre */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] text-gray-600">Nombre *</label>
-            <input
-              className={inputClass}
-              value={form.nombre}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, nombre: e.target.value }))
-              }
-              placeholder="Ej: Administrador"
-            />
-          </div>
-
-          {/* Permisos */}
+      <div
+        className="
+          w-[95%] max-w-xl
+          rounded-2xl 
+          overflow-hidden
+        "
+      >
+        {/* CARD SUNMI */}
+        <SunmiCard>
+          {/* HEADER + BOTÓN CERRAR */}
           <div className="flex items-center justify-between">
-            <label className="text-[12px] text-gray-600 font-medium">
-              Permisos
-            </label>
-            <button
-              type="button"
-              onClick={setAdmin}
-              className="px-3 py-1 border rounded-md text-sm"
-            >
-              Set Admin (*)
-            </button>
+            <SunmiHeader
+              title={editMode ? "Editar rol" : "Nuevo rol"}
+              color="amber"
+            />
+
+            <SunmiButton color="slate" onClick={onClose} size="sm">
+              Cerrar
+            </SunmiButton>
           </div>
 
-          {Object.entries(PERMISOS).map(([grupo, lista]) => (
-            <div
-              key={grupo}
-              className="mb-3 border rounded-md p-3 bg-gray-50"
-            >
-              <h3 className="text-sm font-semibold mb-2 capitalize">
-                {grupo}
-              </h3>
+          {/* SCROLL INTERNO */}
+          <div
+            ref={modalRef}
+            className="max-h-[65vh] overflow-y-auto px-2 pb-4 mt-2 space-y-4"
+          >
+            <SunmiSeparator label="Datos" color="amber" />
 
-              <div className="grid grid-cols-2 gap-2">
-                {lista.map((p) => (
-                  <label key={p} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.permisos.includes(p)}
-                      onChange={() => togglePermiso(p)}
-                    />
-                    {labelHumano(p)}
-                  </label>
-                ))}
-              </div>
+            {/* Nombre */}
+            <Field label="Nombre *">
+              <SunmiInput
+                value={form.nombre}
+                onChange={(e) => setField("nombre", e.target.value)}
+                placeholder="Ingresá el nombre del rol…"
+              />
+            </Field>
+
+            {/* Permisos */}
+            <SunmiSeparator label="Permisos" color="amber" />
+
+            <div className="flex justify-end">
+              <SunmiButton color="amber" size="sm" onClick={setAdmin}>
+                Set Admin (*)
+              </SunmiButton>
             </div>
-          ))}
-        </div>
 
-        {/* FOOTER */}
-        <div className="px-5 py-3 border-t flex items-center justify-end gap-2 bg-gray-50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md border bg-white hover:bg-gray-50"
-          >
-            Cancelar
-          </button>
+            {Object.entries(PERMISOS).map(([grupo, lista]) => (
+              <div
+                key={grupo}
+                className="bg-slate-900/70 border border-slate-700 rounded-xl p-3"
+              >
+                <h3 className="text-[13px] font-semibold mb-2 capitalize text-slate-200">
+                  {grupo}
+                </h3>
 
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
-          >
-            {editMode ? "Guardar cambios" : "Crear rol"}
-          </button>
-        </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {lista.map((p) => (
+                    <label
+                      key={p}
+                      className="flex items-center gap-2 text-[12px] text-slate-300"
+                    >
+                      <input
+                        type="checkbox"
+                        className="accent-amber-400 cursor-pointer"
+                        checked={form.permisos.includes(p)}
+                        onChange={() => togglePermiso(p)}
+                      />
+                      {p}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* FOOTER */}
+          <div className="flex justify-end gap-2 pt-2">
+            <SunmiButton color="slate" onClick={onClose}>
+              Cancelar
+            </SunmiButton>
+
+            <SunmiButton color="amber" onClick={handleSubmitInternal}>
+              {editMode ? "Guardar cambios" : "Crear rol"}
+            </SunmiButton>
+          </div>
+        </SunmiCard>
       </div>
+    </div>
+  );
+}
+
+// Mini componente Field igual al de usuarios
+function Field({ label, children }) {
+  return (
+    <div className="flex flex-col gap-1 px-1">
+      <label className="text-[11px] text-slate-400">{label}</label>
+      {children}
     </div>
   );
 }

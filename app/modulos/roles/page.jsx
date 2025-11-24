@@ -1,191 +1,292 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import FiltrosRoles from "@/components/roles/FiltrosRoles";
-import ColumnManagerRoles from "@/components/roles/ColumnManagerRoles";
-import TablaRoles from "@/components/roles/TablaRoles";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+
+import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
+import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+
 import ModalRol from "@/components/roles/ModalRol";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 export default function RolesPage() {
-  const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [filtros, setFiltros] = useState({
-    search: "",
-    activo: "",
-  });
+  // query params
+  const nuevo = searchParams.get("nuevo");
+  const editar = searchParams.get("editar");
 
-  const allColumns = [
-    { key: "nombre", label: "Nombre" },
-    { key: "permisos", label: "Permisos" },
-  ];
+  const modalOpen = nuevo || editar;
 
-  // ---------------------------------------
-  // 🔵 CORRECCIÓN: rolesCols (camelCase)
-  // ---------------------------------------
-  const [visibleCols, setVisibleCols] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("rolesCols");
-      if (saved) return JSON.parse(saved);
-    }
-    return allColumns.map((c) => c.key);
-  });
-
-  useEffect(() => {
-    localStorage.setItem("rolesCols", JSON.stringify(visibleCols));
-  }, [visibleCols]);
-
-  const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  const fetchRoles = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/roles/listar?page=${page}&q=${filtros.search || ""}`,
-        { credentials: "include" }
-      );
+  const [roles, setRoles] = useState([]);
+  const [search, setSearch] = useState("");
 
-      const data = await res.json();
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-      if (data.ok && Array.isArray(data.items)) {
-        setRows(data.items);
-        setTotalPages(data.totalPages || 1);
-      }
-    } catch (err) {
-      console.error("Error cargando roles:", err); // ✔️ FIX
-    }
-    setLoading(false);
+  const limpiarFiltros = () => {
+    setSearch("");
+    setPage(1);
   };
+
+  // ================================
+  // CARGAR ROL SI ESTAMOS EN EDITAR
+  // ================================
+  useEffect(() => {
+    if (!editar) {
+      setEditing(null);
+      return;
+    }
+
+    const loadRol = async () => {
+      try {
+        const res = await fetch(`/api/roles/obtener?id=${editar}`, {
+          credentials: "include",
+        });
+
+        const json = await res.json();
+
+        if (json.ok && json.item) {
+          setEditing(json.item);
+        } else {
+          setEditing(null);
+        }
+      } catch {
+        setEditing(null);
+      }
+    };
+
+    loadRol();
+  }, [editar]);
+
+  // ================================
+  // CARGAR LISTADO
+  // ================================
+  const fetchRoles = useCallback(async () => {
+    try {
+      const res = await fetch("/api/roles/listar", {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      const json = await res.json();
+
+      if (!json.ok || !Array.isArray(json.items)) {
+        setRoles([]);
+        setTotal(0);
+        return;
+      }
+
+      let lista = json.items;
+
+      // filtro search
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        lista = lista.filter((r) => r.nombre?.toLowerCase().includes(q));
+      }
+
+      setTotal(lista.length);
+
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE;
+
+      setRoles(lista.slice(from, to));
+    } catch {
+      setRoles([]);
+      setTotal(0);
+    }
+  }, [page, search]);
 
   useEffect(() => {
     fetchRoles();
-  }, [page, filtros]);
+  }, [fetchRoles]);
 
-  const handleSubmit = async (payload) => {
-    try {
-      const isEdit = Boolean(editing);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
-      const url = isEdit
-        ? `/api/roles/editar/${editing.id}`
-        : `/api/roles/crear`;
+  // ================================
+  // ACCIONES
+  // ================================
+  const handleEditar = (id) => router.push(`/modulos/roles?editar=${id}`);
 
-      const res = await fetch(url, {
-        credentials: "include",
-        method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      if (!data.ok) return alert(data.error || "Error guardando rol");
-
-      setModalOpen(false);
-      setEditing(null);
-      fetchRoles();
-    } catch (err) {
-      console.error("Error guardando rol:", err);
-    }
-  };
-
-  const handleEditar = async (id) => {
-    try {
-      const res = await fetch(`/api/roles/obtener?id=${id}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-
-      if (data.ok && data.item) {
-        setEditing(data.item);
-        setModalOpen(true);
-      } else {
-        alert(data.error || "No se pudo cargar el rol");
-      }
-    } catch (err) {
-      console.error("Error al editar rol:", err); // ✔️ FIX
-    }
-  };
+  const handleNuevo = () => router.push("/modulos/roles?nuevo=1");
 
   const handleEliminar = async (id) => {
     if (!confirm("¿Eliminar rol?")) return;
 
-    try {
-      const res = await fetch(`/api/roles/eliminar/${id}`, {
-        credentials: "include",
-        method: "DELETE",
-      });
-      const data = await res.json();
+    const res = await fetch(`/api/roles/eliminar/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
 
-      if (data.ok) {
-        fetchRoles();
-      } else {
-        alert(data.error || "Error eliminando rol");
-      }
-    } catch (err) {
-      console.error("Error eliminando rol:", err);
+    const json = await res.json();
+
+    if (!json.ok) {
+      alert(json.error || "❌ Error al eliminar rol");
+      return;
     }
+
+    alert("✅ Rol eliminado");
+    fetchRoles();
+  };
+
+  const handleCloseModal = () => {
+    router.push("/modulos/roles");
+  };
+
+  const handleSubmit = async (payload) => {
+    const isEdit = Boolean(editar);
+
+    const url = isEdit
+      ? `/api/roles/editar/${editar}`
+      : `/api/roles/crear`;
+
+    const res = await fetch(url, {
+      method: isEdit ? "PUT" : "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await res.json();
+
+    if (!json.ok) {
+      alert(json.error || "❌ Error al guardar");
+      return;
+    }
+
+    alert("✅ Guardado correctamente");
+
+    handleCloseModal();
+    fetchRoles();
   };
 
   return (
-    <div className="p-4 flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Roles</h1>
+    <div className="sunmi-bg w-full min-h-full p-4">
+      <SunmiCard>
+        <SunmiHeader title="Roles del sistema" color="amber" />
 
-      <FiltrosRoles
-        initial={filtros}
-        onChange={(f) => {
-          setFiltros(f);
-          setPage(1);
-        }}
-      />
+        {/* ====================== */}
+        {/* FILTROS */}
+        {/* ====================== */}
+        <SunmiSeparator label="Filtros" color="amber" />
 
-      <div className="flex items-center justify-end gap-2">
-        <ColumnManagerRoles
-          allColumns={allColumns}
-          visibleKeys={visibleCols}
-          onChange={setVisibleCols}
-        />
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
+          <div className="flex flex-col md:flex-row gap-3 flex-1">
+            <SunmiInput
+              placeholder="Buscar rol..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
 
-        <button
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-          }}
-          className="px-4 py-2 rounded-md bg-blue-600 text-white"
-        >
-          Nuevo rol
-        </button>
-      </div>
+          <div className="flex gap-2 justify-end">
+            <SunmiButton onClick={limpiarFiltros} color="slate">
+              Limpiar
+            </SunmiButton>
 
-      <div className="overflow-x-auto w-full border rounded-lg">
-        <TablaRoles
-          rows={rows}
-          columns={allColumns.filter((c) => visibleCols.includes(c.key))}
-          page={page}
-          totalPages={totalPages}
-          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
-          onPrev={() => setPage((p) => Math.max(1, p - 1))}
-          onEditar={handleEditar}
-          onEliminar={handleEliminar}
-        />
-      </div>
+            <SunmiButton onClick={handleNuevo} color="amber">
+              ＋ Nuevo
+            </SunmiButton>
+          </div>
+        </div>
 
+        {/* ====================== */}
+        {/* LISTADO */}
+        {/* ====================== */}
+        <SunmiSeparator label="Listado" color="amber" />
+
+        <div className="overflow-x-auto rounded-2xl border border-slate-800">
+          <SunmiTable>
+            <thead>
+              <tr className="bg-amber-400 text-slate-900 text-[12px] uppercase tracking-wide">
+                <th className="px-3 py-2 text-left">Rol</th>
+                <th className="px-3 py-2 text-left">Permisos</th>
+                <th className="px-3 py-2 text-right">Acciones</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {roles.length === 0 && (
+                <SunmiTableEmpty message="No hay roles para mostrar" />
+              )}
+
+              {roles.map((r) => (
+                <SunmiTableRow key={r.id}>
+                  <td className="px-3 py-2">
+                    <span className="text-[13px] font-medium">{r.nombre}</span>
+                  </td>
+
+                  <td className="px-3 py-2 text-[11px] text-slate-400">
+                    {Array.isArray(r.permisos) ? r.permisos.join(", ") : "—"}
+                  </td>
+
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex gap-3 justify-end text-[15px]">
+                      <button
+                        onClick={() => handleEditar(r.id)}
+                        className="text-amber-300 hover:text-amber-200"
+                      >
+                        ✏️
+                      </button>
+
+                      <button
+                        onClick={() => handleEliminar(r.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </SunmiTableRow>
+              ))}
+            </tbody>
+          </SunmiTable>
+        </div>
+
+        {/* PAGINACIÓN */}
+        <div className="flex justify-between pt-4 px-2">
+          <SunmiButton
+            color="slate"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            « Anterior
+          </SunmiButton>
+
+          <SunmiButton
+            color="slate"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente »
+          </SunmiButton>
+        </div>
+      </SunmiCard>
+
+      {/* ====================== */}
+      {/* MODAL */}
+      {/* ====================== */}
       <ModalRol
-        open={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditing(null);
-        }}
+        open={modalOpen ? true : false}
         initialData={editing}
+        onClose={handleCloseModal}
         onSubmit={handleSubmit}
       />
-
-      {loading && (
-        <div className="text-center text-gray-500 mt-4">Cargando...</div>
-      )}
     </div>
   );
 }

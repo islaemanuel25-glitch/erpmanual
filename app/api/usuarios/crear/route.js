@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import bcrypt from "bcrypt"; // ✅ unificado con seed.js (ANTES: bcrypt)
+import bcrypt from "bcrypt"; // ✅ unificado con seed.js
 
 export async function POST(req) {
   try {
@@ -11,7 +11,7 @@ export async function POST(req) {
     const password = String(body?.password ?? "");
     const rolId = Number(body?.rolId);
 
-    // ✅ localId: si viene 0 enviar 0, no null (antes: 0 → null)
+    // ✅ localId: null cuando viene vacío / inválido
     let localId = body?.localId;
     if (localId === "" || localId === undefined || localId === null) {
       localId = null;
@@ -48,7 +48,6 @@ export async function POST(req) {
       );
     }
 
-    // ✅ bcrypt unificado con el seed (ANTES: bcrypt → error)
     const passwordHash = await bcrypt.hash(password, 10);
 
     const creado = await prisma.usuario.create({
@@ -56,8 +55,8 @@ export async function POST(req) {
         nombre,
         email,
         passwordHash,
-        rolId, // ✅ sigue igual, necesario
-        localId, // ✅ ahora soporta 0 correctamente
+        rolId,
+        localId,
         activo: Boolean(activo),
       },
       include: { rol: true, local: true },

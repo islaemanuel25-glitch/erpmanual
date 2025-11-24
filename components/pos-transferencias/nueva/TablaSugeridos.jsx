@@ -1,5 +1,7 @@
 "use client";
 
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+
 export default function TablaSugeridos({
   datos,
   page,
@@ -49,21 +51,18 @@ export default function TablaSugeridos({
 
           {/* PAGE SIZE */}
           <span className="opacity-80">Mostrar:</span>
-          <select
-            className="
-              bg-slate-900 text-slate-100 
-              border border-slate-700 
-              rounded-lg px-2 py-1 
-              text-[11px]
-              focus:border-amber-500 focus:ring-1 focus:ring-amber-500
-            "
+
+          <SunmiSelectAdv
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="w-[85px]"
           >
             {[25, 50, 100, 150, 200].map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <SunmiSelectOption key={n} value={n}>
+                {n}
+              </SunmiSelectOption>
             ))}
-          </select>
+          </SunmiSelectAdv>
 
           {/* BTN PREV */}
           <button
@@ -117,45 +116,37 @@ export default function TablaSugeridos({
         {/* CATEGORÍAS */}
         <div className="flex items-center gap-2 text-[11px]">
           <span className="text-slate-400">Categorías</span>
-          <select
-            className="
-              bg-slate-800 
-              text-slate-100 
-              border border-slate-700 
-              rounded-lg px-2 py-1 
-              text-[11px]
-              focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400
-            "
+
+          <SunmiSelectAdv
             value={categoriaSeleccionada}
             onChange={(e) => onChangeCategoria?.(e.target.value)}
+            className="w-[140px]"
           >
-            <option value="todos">Todas</option>
+            <SunmiSelectOption value="todos">Todas</SunmiSelectOption>
             {categorias.map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <SunmiSelectOption key={c} value={c}>
+                {c}
+              </SunmiSelectOption>
             ))}
-          </select>
+          </SunmiSelectAdv>
         </div>
 
         {/* AREAS */}
         <div className="flex items-center gap-2 text-[11px]">
           <span className="text-slate-400">Áreas</span>
-          <select
-            className="
-              bg-slate-800 
-              text-slate-100 
-              border border-slate-700 
-              rounded-lg px-2 py-1 
-              text-[11px]
-              focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
-            "
+
+          <SunmiSelectAdv
             value={areaSeleccionada}
             onChange={(e) => onChangeArea?.(e.target.value)}
+            className="w-[140px]"
           >
-            <option value="todos">Todas</option>
+            <SunmiSelectOption value="todos">Todas</SunmiSelectOption>
             {areas.map((a) => (
-              <option key={a} value={a}>{a}</option>
+              <SunmiSelectOption key={a} value={a}>
+                {a}
+              </SunmiSelectOption>
             ))}
-          </select>
+          </SunmiSelectAdv>
         </div>
 
         {loading && (

@@ -1,7 +1,9 @@
 "use client";
 
-import UiTable from "@/components/UiTable";
-import { Pencil, Trash2 } from "lucide-react";
+import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
+import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+import SunmiButton from "@/components/sunmi/SunmiButton";
 
 export default function TablaRoles({
   rows,
@@ -13,58 +15,51 @@ export default function TablaRoles({
   onEditar,
   onEliminar,
 }) {
-  
-  const DEFINICIONES = {
-    nombre: {
-      titulo: "Nombre",
-      width: "min-w-40",
-    },
-
-    permisos: {
-      titulo: "Permisos",
-      width: "min-w-96",
-      render: (arr) =>
-        Array.isArray(arr)
-          ? arr.join(", ")
-          : "-",
-    },
-  };
-
-  const columnas = columns
-    .map((c) => {
-      const def = DEFINICIONES[c.key];
-      if (!def) return null;
-      return {
-        key: c.key,
-        titulo: def.titulo,
-        width: def.width,
-        render: def.render,
-      };
-    })
-    .filter(Boolean);
-
-  const acciones = (row) => (
-    <div className="flex gap-2">
-      <button onClick={() => onEditar(row.id)} className="text-blue-600">
-        <Pencil size={16} />
-      </button>
-      <button onClick={() => onEliminar(row.id)} className="text-red-600">
-        <Trash2 size={16} />
-      </button>
-    </div>
-  );
-
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <UiTable
-        columnas={columnas}
-        datos={rows}
-        page={page}
-        totalPages={totalPages}
-        onNext={onNext}
-        onPrev={onPrev}
-        accionesPersonalizadas={acciones}
-      />
-    </div>
+    <SunmiTable
+      page={page}
+      totalPages={totalPages}
+      onNext={onNext}
+      onPrev={onPrev}
+    >
+      <thead>
+        <tr>
+          {columns.map((c) => (
+            <th key={c.key}>{c.label}</th>
+          ))}
+          <th>Acciones</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {rows.length === 0 && (
+          <SunmiTableEmpty message="Sin roles cargados" />
+        )}
+
+        {rows.map((r) => (
+          <SunmiTableRow key={r.id}>
+            {columns.map((c) => (
+              <td key={c.key}>
+                {Array.isArray(r[c.key]) ? r[c.key].join(", ") : r[c.key]}
+              </td>
+            ))}
+            <td className="flex gap-2">
+              <SunmiButton
+                size="sm"
+                color="cyan"
+                label="Editar"
+                onClick={() => onEditar(r.id)}
+              />
+              <SunmiButton
+                size="sm"
+                color="red"
+                label="Eliminar"
+                onClick={() => onEliminar(r.id)}
+              />
+            </td>
+          </SunmiTableRow>
+        ))}
+      </tbody>
+    </SunmiTable>
   );
 }

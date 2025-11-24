@@ -3,10 +3,9 @@ import prisma from "@/lib/prisma";
 
 export async function PUT(req, context) {
   try {
-    // ✅ Next 15: params NO es async
-    const { id } = context.params;
-
+    const { id } = await context.params;   // ⬅️ FIX obligatorio
     const userId = Number(id);
+
     if (!userId || Number.isNaN(userId)) {
       return NextResponse.json(
         { ok: false, error: "ID inválido." },
@@ -16,14 +15,11 @@ export async function PUT(req, context) {
 
     const usuario = await prisma.usuario.update({
       where: { id: userId },
-      data: { activo: true }, // ✅ reactivar
+      data: { activo: true },
       include: { rol: true, local: true },
     });
 
-    return NextResponse.json(
-      { ok: true, usuario },
-      { status: 200 }
-    );
+    return NextResponse.json({ ok: true, usuario }, { status: 200 });
   } catch (e) {
     if (e?.code === "P2025") {
       return NextResponse.json(
@@ -31,6 +27,7 @@ export async function PUT(req, context) {
         { status: 404 }
       );
     }
+
     console.error("usuarios/reactivar", e);
     return NextResponse.json(
       { ok: false, error: "Error al reactivar usuario." },

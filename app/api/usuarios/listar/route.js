@@ -10,7 +10,7 @@ export async function GET(req) {
     const local = searchParams.get("local") || "";
     const activoFilter = searchParams.get("activo"); // "true" | "false" | null
 
-    // ✅ NO USAMOS paginación aquí (la hace el frontend)
+    // ✅ sin paginación en backend
     const where = {
       AND: [
         search
@@ -37,12 +37,11 @@ export async function GET(req) {
     return NextResponse.json(
       {
         ok: true,
-        usuarios,       // ✅ nombre correcto
+        usuarios,
         total: usuarios.length,
       },
       { status: 200 }
     );
-
   } catch (e) {
     console.error("❌ usuarios/listar", e);
     return NextResponse.json(

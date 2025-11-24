@@ -4,7 +4,8 @@ import bcrypt from "bcrypt"; // ✅ unificado con seed
 
 export async function PUT(req, context) {
   try {
-    const { id } = context.params; // ✅ no va await
+    // ⚠️ En Next 15 params es un Promise: hay que hacer await
+    const { id } = await context.params;
     const userId = Number(id);
 
     if (!userId || Number.isNaN(userId)) {
@@ -20,22 +21,24 @@ export async function PUT(req, context) {
     // ✅ NOMBRE
     if (body?.nombre !== undefined) {
       const nombre = String(body.nombre).trim();
-      if (!nombre)
+      if (!nombre) {
         return NextResponse.json(
           { ok: false, error: "Nombre requerido." },
           { status: 400 }
         );
+      }
       data.nombre = nombre;
     }
 
     // ✅ EMAIL
     if (body?.email !== undefined) {
       const email = String(body.email).trim().toLowerCase();
-      if (!email)
+      if (!email) {
         return NextResponse.json(
           { ok: false, error: "Email requerido." },
           { status: 400 }
         );
+      }
       data.email = email;
     }
 
@@ -56,7 +59,7 @@ export async function PUT(req, context) {
       data.rolId = rolId;
     }
 
-    // ✅ LOCAL — corregido como en la API crear
+    // ✅ LOCAL — igual lógica que en crear
     if (body?.localId !== undefined) {
       let localId = body.localId;
 

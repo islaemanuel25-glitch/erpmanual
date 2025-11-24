@@ -11,7 +11,8 @@ export async function GET() {
     return NextResponse.json(
       {
         ok: true,
-        locales,   // ✅ nombre correcto para tu frontend
+        locales,
+        items: locales, // ✅ compat con front que espera items
       },
       { status: 200 }
     );

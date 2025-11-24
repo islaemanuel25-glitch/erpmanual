@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 
 export async function DELETE(req, context) {
   try {
-    const { id } = context.params;          // ✅ corregido (sin await)
+    const { id } = await context.params;   // ⬅️ FIX obligatorio
     const userId = Number(id);
 
     if (!userId || Number.isNaN(userId)) {
@@ -13,7 +13,6 @@ export async function DELETE(req, context) {
       );
     }
 
-    // ✅ Verificar si existe
     const usuario = await prisma.usuario.findUnique({
       where: { id: userId },
       include: { rol: true },
@@ -26,7 +25,6 @@ export async function DELETE(req, context) {
       );
     }
 
-    // ✅ Protección: NO permitir eliminar Admin global
     if (usuario.rol?.nombre === "Admin") {
       return NextResponse.json(
         { ok: false, error: "No se puede eliminar el usuario administrador." },
@@ -34,17 +32,13 @@ export async function DELETE(req, context) {
       );
     }
 
-    // ✅ Desactivar
     const eliminado = await prisma.usuario.update({
       where: { id: userId },
       data: { activo: false },
       include: { rol: true, local: true },
     });
 
-    return NextResponse.json(
-      { ok: true, usuario: eliminado },
-      { status: 200 }
-    );
+    return NextResponse.json({ ok: true, usuario: eliminado }, { status: 200 });
   } catch (e) {
     if (e?.code === "P2025") {
       return NextResponse.json(
@@ -54,7 +48,6 @@ export async function DELETE(req, context) {
     }
 
     console.error("❌ usuarios/eliminar", e);
-
     return NextResponse.json(
       { ok: false, error: "Error al eliminar usuario." },
       { status: 500 }
