@@ -1,11 +1,23 @@
+// app/api/transferencias/pdf-recepcion/route.js
 import { NextResponse } from "next/server";
-import PDFDocument from "pdfkit";
 import prisma from "@/lib/prisma";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-export async function GET(req, { params }) {
+export async function GET(req) {
   try {
-    const transferenciaId = Number(params.id);
+    const { searchParams } = new URL(req.url);
+    const transferenciaId = Number(searchParams.get("id") || 0);
 
+    if (!transferenciaId) {
+      return NextResponse.json(
+        { ok: false, error: "ID inválido" },
+        { status: 400 }
+      );
+    }
+
+    // ===========================================================
+    // 🔥 Obtener transferencia
+    // ===========================================================
     const transferencia = await prisma.transferencia.findUnique({
       where: { id: transferenciaId },
       include: {
@@ -13,13 +25,7 @@ export async function GET(req, { params }) {
         destino: true,
         detalle: {
           include: {
-            producto: {
-              select: {
-                nombre: true,
-                codigo_barra: true,
-                base: { select: { precio_costo: true } }
-              }
-            }
+            producto: { include: { base: true } }
           }
         }
       }
@@ -32,85 +38,186 @@ export async function GET(req, { params }) {
       );
     }
 
-    const doc = new PDFDocument({ margin: 40 });
-    let buffers = [];
-    doc.on("data", buffers.push.bind(buffers));
 
-    doc.fontSize(20).text(`Recepción #${transferenciaId}`, { align: "center" });
-    doc.moveDown();
+    // ===========================================================
+    // 🔥 PDF CONFIG PRO
+    // ===========================================================
+    const pdf = await PDFDocument.create();
+    pdf.setTitle(`Recepción #${transferenciaId}`);
+    pdf.setAuthor("ERP Azul");
 
-    doc.fontSize(12).text(`Origen: ${transferencia.origen.nombre}`);
-    doc.text(`Destino: ${transferencia.destino.nombre}`);
-    doc.text(`Estado: ${transferencia.estado}`);
-    doc.text(
-      `Fecha Recepción: ${
-        transferencia.fechaRecepcion
-          ? new Date(transferencia.fechaRecepcion).toLocaleString()
-          : "-"
-      }`
+    const pageWidth = 595;
+    const pageHeight = 842;
+    const margin = 40;
+
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+    let page = pdf.addPage([pageWidth, pageHeight]);
+    let y = pageHeight - margin;
+
+    const draw = (text, x, y, size = 9, f = font) =>
+      page.drawText(String(text), { x, y, size, font: f });
+
+
+    // ===========================================================
+    // 🔥 ENCABEZADO
+    // ===========================================================
+    draw(`Recepción #${transferenciaId}`, margin, y, 18, bold);
+    y -= 28;
+
+    draw("Origen:", margin, y, 10, bold);
+    draw(transferencia.origen.nombre, margin + 80, y, 10);
+    y -= 14;
+
+    draw("Destino:", margin, y, 10, bold);
+    draw(transferencia.destino.nombre, margin + 80, y, 10);
+    y -= 14;
+
+    draw("Estado:", margin, y, 10, bold);
+    draw(transferencia.estado, margin + 80, y, 10);
+    y -= 14;
+
+    draw("Fecha recepción:", margin, y, 10, bold);
+    draw(
+      transferencia.fechaRecepcion
+        ? new Date(transferencia.fechaRecepcion).toLocaleString("es-AR")
+        : "-",
+      margin + 110,
+      y,
+      10
     );
-    doc.moveDown();
+    y -= 20;
 
-    doc.fontSize(14).text("Detalle de Recepción", { underline: true });
-    doc.moveDown(0.4);
+    // Línea
+    page.drawLine({
+      start: { x: margin, y },
+      end: { x: pageWidth - margin, y },
+      thickness: 1,
+      color: rgb(0.7, 0.7, 0.7)
+    });
+    y -= 18;
 
-    doc.fontSize(12);
-    doc.text("Producto", 40);
-    doc.text("Cod.", 200);
-    doc.text("Env.", 260);
-    doc.text("Rec.", 310);
-    doc.text("Motivo", 370);
-    doc.text("Subtotal", 480);
-    doc.moveDown(0.4);
 
+    // ===========================================================
+    // 🔥 COLUMNAS PRO RECEPCIÓN
+    // ===========================================================
+    const col = {
+      producto: margin,
+      cod: margin + 150,
+      enviado: margin + 240,
+      recibido: margin + 300,
+      motivo: margin + 360,
+      subt: margin + 445 // seguro, no se corta
+    };
+
+    draw("Producto", col.producto, y, 10, bold);
+    draw("Código", col.cod, y, 10, bold);
+    draw("Env.", col.enviado, y, 10, bold);
+    draw("Rec.", col.recibido, y, 10, bold);
+    draw("Motivo", col.motivo, y, 10, bold);
+    draw("Subtotal", col.subt, y, 10, bold);
+
+    y -= 14;
+
+    // Línea
+    page.drawLine({
+      start: { x: margin, y },
+      end: { x: pageWidth - margin, y },
+      thickness: 1,
+      color: rgb(0.7, 0.7, 0.7)
+    });
+    y -= 12;
+
+
+    // ===========================================================
+    // 🔥 DETALLE
+    // ===========================================================
     let total = 0;
+    let row = 0;
 
-    transferencia.detalle.forEach((d) => {
-      const nombre = d.producto?.nombre ?? "Producto";
+    for (const d of transferencia.detalle) {
+      const nombre = d.producto?.nombre ?? d.producto?.base?.nombre ?? "-";
       const codigo = d.producto?.codigo_barra ?? "-";
 
-      const enviado = Number(d.cantidad);
+      const enviado = Number(d.cantidad) || 0;
       const recibido = Number(d.recibido ?? enviado);
-
-      const motivo =
-        d.motivoPrincipal === "Otro"
-          ? d.motivoDetalle ?? "Otro"
-          : d.motivoPrincipal ?? "-";
-
       const costo =
         Number(d.precioCosto) ||
         Number(d.producto?.base?.precio_costo) ||
         0;
 
+      const motivo =
+        d.motivoPrincipal === "Otro"
+          ? d.motivoDetalle || "Otro"
+          : d.motivoPrincipal || "-";
+
       const subtotal = recibido * costo;
       total += subtotal;
 
-      doc.text(nombre, 40);
-      doc.text(codigo, 200);
-      doc.text(enviado.toString(), 260);
-      doc.text(recibido.toString(), 310);
-      doc.text(motivo, 370);
-      doc.text(`$${subtotal.toFixed(2)}`, 480);
+      // Fila gris
+      if (row % 2 === 0) {
+        page.drawRectangle({
+          x: margin - 5,
+          y: y - 1,
+          width: pageWidth - margin * 2 + 10,
+          height: 15,
+          color: rgb(0.96, 0.96, 0.96)
+        });
+      }
 
-      doc.moveDown(0.3);
+      draw(nombre.substring(0, 30), col.producto, y);
+      draw(codigo, col.cod, y);
+      draw(String(enviado), col.enviado, y);
+      draw(String(recibido), col.recibido, y);
+      draw(motivo.substring(0, 15), col.motivo, y);
+      draw(`$${subtotal.toFixed(2)}`, col.subt, y);
+
+      y -= 16;
+      row++;
+
+      if (y < margin + 80) {
+        page = pdf.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+      }
+    }
+
+
+    // ===========================================================
+    // 🔥 TOTAL — ABAJO + LÍNEA
+    // ===========================================================
+    const totalY = margin + 15;
+
+    // línea arriba del total
+    page.drawLine({
+      start: { x: margin, y: totalY + 20 },
+      end: { x: pageWidth - margin, y: totalY + 20 },
+      thickness: 1,
+      color: rgb(0.7, 0.7, 0.7)
     });
 
-    doc.moveDown();
-    doc.fontSize(13).text(`Total recibido: $${total.toFixed(2)}`, {
-      align: "right",
-    });
+    draw("TOTAL:", col.subt - 60, totalY, 14, bold);
+    draw(`$${total.toFixed(2)}`, col.subt, totalY, 14, bold);
 
-    doc.end();
 
-    return new NextResponse(Buffer.concat(buffers), {
+    // ===========================================================
+    // 🔥 OUTPUT
+    // ===========================================================
+    const bytes = await pdf.save();
+
+    return new NextResponse(bytes, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename=recepcion_${transferenciaId}.pdf`,
-      },
+        "Content-Disposition": `inline; filename=recepcion_${transferenciaId}.pdf`
+      }
     });
+
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    console.error("❌ Error PDF:", err);
+    return NextResponse.json(
+      { ok: false, error: err.message },
+      { status: 500 }
+    );
   }
 }

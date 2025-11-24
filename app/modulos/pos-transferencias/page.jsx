@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+
 export default function PosTransferenciasHomePage() {
   const router = useRouter();
 
@@ -41,7 +47,8 @@ export default function PosTransferenciasHomePage() {
 
         if (!jsonMe.ok || !jsonMe.user) {
           setError("No se pudo obtener el usuario actual");
-          return setLoading(false);
+          setLoading(false);
+          return;
         }
 
         setMe(jsonMe.user);
@@ -54,7 +61,8 @@ export default function PosTransferenciasHomePage() {
 
         if (!jsonOpt.ok) {
           setError(jsonOpt.error || "No se pudieron cargar las opciones");
-          return setLoading(false);
+          setLoading(false);
+          return;
         }
 
         setModo(jsonOpt.modo);
@@ -63,7 +71,7 @@ export default function PosTransferenciasHomePage() {
         // MODO DEPÓSITO
         // -------------------------
         if (jsonOpt.modo === "deposito") {
-          const origen = jsonOpt.origen || null; // 🔥 FIX
+          const origen = jsonOpt.origen || null;
           const destinos = jsonOpt.destinos || [];
 
           setOrigenDeposito(origen);
@@ -117,6 +125,8 @@ export default function PosTransferenciasHomePage() {
     if (!g) {
       setDepositosGrupo([]);
       setLocalesGrupo([]);
+      setOrigenIdAdmin("");
+      setDestinoIdAdmin("");
       return;
     }
 
@@ -166,130 +176,230 @@ export default function PosTransferenciasHomePage() {
   };
 
   // ========================================================
-  // UI
+  // ESTADOS SIMPLES
   // ========================================================
-  if (loading) return <div className="p-4">Cargando opciones...</div>;
-  if (error) return <div className="p-4 text-red-600">{error}</div>;
-
-  if (!me) return <div>No se encontró usuario</div>;
-
-  return (
-    <div className="p-4 space-y-4">
-      <h1 className="text-xl font-semibold">POS Transferencias</h1>
-
-      <div className="text-sm text-gray-600 mb-4">
-        Usuario: <strong>{me.nombre}</strong>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <span className="text-sm text-slate-300">Cargando opciones...</span>
       </div>
+    );
+  }
 
-      {/* =============================
-          DEPÓSITO
-      ============================= */}
-      {modo === "deposito" && origenDeposito && (
-        <div className="space-y-4 border rounded-lg p-4 bg-white shadow-sm">
-          <div>
-            <div className="text-xs text-gray-500 uppercase mb-1">
-              Depósito origen
-            </div>
-            <div className="text-sm font-medium">
-              {origenDeposito.nombre}
-            </div>
-          </div>
+  if (!me) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <span className="text-sm text-red-400">
+          No se encontró usuario actual.
+        </span>
+      </div>
+    );
+  }
 
-          <div>
-            <label className="text-xs mb-1 block text-gray-500">
-              Local destino
-            </label>
-            <select
-              className="border rounded px-2 py-1 text-sm w-full max-w-xs"
-              value={destinoIdDeposito}
-              onChange={(e) => setDestinoIdDeposito(e.target.value)}
-            >
-              <option value="">Seleccionar...</option>
-              {destinosDeposito.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+  // ========================================================
+  // UI SUNMI V2
+  // ========================================================
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
+        {/* VOLVER */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="
+            text-xs text-cyan-400 
+            hover:text-cyan-300 
+            flex items-center gap-1
+            transition
+          "
+        >
+          ← Volver
+        </button>
 
-          <button
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded"
-            disabled={!destinoIdDeposito}
-            onClick={iniciarTransferencia}
+        <SunmiCard>
+          <SunmiHeader
+            title="POS · Transferencias"
+            color="amber"
           >
-            Iniciar transferencia
-          </button>
-        </div>
-      )}
-
-      {/* =============================
-          ADMIN
-      ============================= */}
-      {modo === "admin" && (
-        <div className="space-y-4 border rounded-lg p-4 bg-white shadow-sm">
-          <div>
-            <label className="text-xs mb-1 block text-gray-500">Grupo</label>
-            <select
-              className="border rounded px-2 py-1 text-sm w-full max-w-xs"
-              value={grupoIdSel}
-              onChange={(e) => handleChangeGrupo(e.target.value)}
-            >
-              {grupos.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs mb-1 block text-gray-500">
-                Depósito origen
-              </label>
-              <select
-                className="border rounded px-2 py-1 text-sm w-full"
-                value={origenIdAdmin}
-                onChange={(e) => setOrigenIdAdmin(e.target.value)}
-              >
-                <option value="">Seleccionar...</option>
-                {depositosGrupo.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.nombre}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-[11px] mt-1">
+              <div className="text-slate-900/80">
+                Usuario:{" "}
+                <span className="font-semibold">
+                  {me?.nombre || "-"}
+                </span>
+              </div>
+              <div className="text-slate-900/70 mt-1 sm:mt-0">
+                Modo:{" "}
+                <span className="font-semibold">
+                  {modo === "deposito" ? "Depósito" : "Admin"}
+                </span>
+              </div>
             </div>
+          </SunmiHeader>
 
-            <div>
-              <label className="text-xs mb-1 block text-gray-500">
-                Local destino
-              </label>
-              <select
-                className="border rounded px-2 py-1 text-sm w-full"
-                value={destinoIdAdmin}
-                onChange={(e) => setDestinoIdAdmin(e.target.value)}
-              >
-                <option value="">Seleccionar...</option>
-                {localesGrupo.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.nombre}
-                  </option>
-                ))}
-              </select>
+          {/* ERROR DENTRO DE LA CARD */}
+          {error && (
+            <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">
+              {error}
             </div>
-          </div>
+          )}
 
-          <button
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded"
-            disabled={!origenIdAdmin || !destinoIdAdmin}
-            onClick={iniciarTransferencia}
-          >
-            Iniciar transferencia
-          </button>
-        </div>
-      )}
+          {/* =============================
+              MODO DEPÓSITO
+          ============================= */}
+          {modo === "deposito" && origenDeposito && (
+            <>
+              <SunmiSeparator label="Preparar transferencia desde Depósito" />
+
+              <div className="space-y-4 text-[13px]">
+                {/* RESUMEN ORIGEN */}
+                <div
+                  className="
+                    bg-slate-900/80 
+                    border border-slate-700 
+                    rounded-2xl 
+                    px-4 py-3
+                    flex flex-col sm:flex-row sm:items-center sm:justify-between
+                    gap-2
+                  "
+                >
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Depósito origen
+                    </div>
+                    <div className="text-[14px] font-semibold text-slate-100">
+                      {origenDeposito.nombre}
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400">
+                    Seleccioná el local destino y comenzá la sesión POS.
+                  </div>
+                </div>
+
+                {/* SELECT DESTINO SUNMI */}
+                <div className="space-y-1">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    Local destino
+                  </div>
+
+                  <SunmiSelectAdv
+                    value={destinoIdDeposito}
+                    placeholder="Seleccionar local destino"
+                    onChange={(value) => setDestinoIdDeposito(value)}
+                  >
+                    {destinosDeposito.map((l) => (
+                      <div key={l.id} value={String(l.id)}>
+                        {l.nombre}
+                      </div>
+                    ))}
+                  </SunmiSelectAdv>
+                </div>
+
+                {/* BOTÓN INICIAR */}
+                <div className="pt-2">
+                  <SunmiButton
+                    color="amber"
+                    disabled={!destinoIdDeposito}
+                    onClick={iniciarTransferencia}
+                  >
+                    Iniciar transferencia desde depósito
+                  </SunmiButton>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* =============================
+              MODO ADMIN
+          ============================= */}
+          {modo === "admin" && (
+            <>
+              <SunmiSeparator label="Preparar transferencia como Admin" />
+
+              <div className="space-y-4 text-[13px]">
+                {/* GRUPO */}
+                <div className="space-y-1">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    Grupo
+                  </div>
+
+                  <SunmiSelectAdv
+                    value={grupoIdSel}
+                    placeholder="Seleccionar grupo"
+                    onChange={(value) => handleChangeGrupo(value)}
+                  >
+                    {grupos.map((g) => (
+                      <div key={g.id} value={String(g.id)}>
+                        {g.nombre}
+                      </div>
+                    ))}
+                  </SunmiSelectAdv>
+                </div>
+
+                {/* ORIGEN / DESTINO */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* DEPÓSITO ORIGEN */}
+                  <div className="space-y-1">
+                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Depósito origen
+                    </div>
+
+                    <SunmiSelectAdv
+                      value={origenIdAdmin}
+                      placeholder="Seleccionar depósito"
+                      onChange={(value) => setOrigenIdAdmin(value)}
+                    >
+                      {depositosGrupo.map((d) => (
+                        <div key={d.id} value={String(d.id)}>
+                          {d.nombre}
+                        </div>
+                      ))}
+                    </SunmiSelectAdv>
+                  </div>
+
+                  {/* LOCAL DESTINO */}
+                  <div className="space-y-1">
+                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Local destino
+                    </div>
+
+                    <SunmiSelectAdv
+                      value={destinoIdAdmin}
+                      placeholder="Seleccionar local"
+                      onChange={(value) => setDestinoIdAdmin(value)}
+                    >
+                      {localesGrupo.map((l) => (
+                        <div key={l.id} value={String(l.id)}>
+                          {l.nombre}
+                        </div>
+                      ))}
+                    </SunmiSelectAdv>
+                  </div>
+                </div>
+
+                {/* BOTÓN INICIAR */}
+                <div className="pt-2">
+                  <SunmiButton
+                    color="cyan"
+                    disabled={!origenIdAdmin || !destinoIdAdmin}
+                    onClick={iniciarTransferencia}
+                  >
+                    Iniciar transferencia admin
+                  </SunmiButton>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* SI NO HAY MODO DEFINIDO */}
+          {!modo && (
+            <div className="text-[12px] text-slate-400">
+              No se configuró el modo de POS para este usuario.
+            </div>
+          )}
+        </SunmiCard>
+      </div>
     </div>
   );
 }
