@@ -7,14 +7,11 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-
-import SunmiTable from "@/components/sunmi/SunmiTable";
-import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
-import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
-
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
+import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import ModalLocal from "@/components/locales/ModalLocal";
+import SunmiTableLocales from "@/components/locales/SunmiTableLocales";
 
 const PAGE_SIZE = 10;
 
@@ -24,11 +21,9 @@ export default function LocalesPage() {
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");
-
   const modalOpen = nuevo || editar;
 
   const [editing, setEditing] = useState(null);
-
   const [locales, setLocales] = useState([]);
   const [search, setSearch] = useState("");
 
@@ -119,11 +114,8 @@ export default function LocalesPage() {
   // ================================
   // ACCIONES
   // ================================
-  const handleEditar = (id) =>
-    router.push(`/modulos/locales?editar=${id}`);
-
-  const handleNuevo = () =>
-    router.push("/modulos/locales?nuevo=1");
+  const handleEditar = (id) => router.push(`/modulos/locales?editar=${id}`);
+  const handleNuevo = () => router.push("/modulos/locales?nuevo=1");
 
   const handleEliminar = async (id) => {
     if (!confirm("¿Eliminar local?")) return;
@@ -173,24 +165,35 @@ export default function LocalesPage() {
     fetchLocales();
   };
 
+  // ================================
+  // COLUMNAS TABLA
+  // ================================
+  const columnas = [
+    { key: "nombre", titulo: "Local" },
+    { key: "tipo", titulo: "Tipo" },
+    { key: "ciudad", titulo: "Ciudad" },
+    {
+      key: "activo",
+      titulo: "Estado",
+      render: (value, row) => (
+        <SunmiBadgeEstado estado={row.activo ? "activo" : "inactivo"} />
+      ),
+    },
+  ];
+
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
         <SunmiHeader title="Locales" color="amber" />
 
-        {/* ====================== */}
-        {/* FILTROS */}
-        {/* ====================== */}
         <SunmiSeparator label="Filtros" color="amber" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
-          <div className="flex flex-col md:flex-row gap-3 flex-1">
-            <SunmiInput
-              placeholder="Buscar local..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+          <SunmiInput
+            placeholder="Buscar local..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
           <div className="flex gap-2 justify-end">
             <SunmiButton onClick={limpiarFiltros} color="slate">
@@ -203,98 +206,35 @@ export default function LocalesPage() {
           </div>
         </div>
 
-        {/* ====================== */}
-        {/* LISTADO */}
-        {/* ====================== */}
         <SunmiSeparator label="Listado" color="amber" />
 
-        <div className="overflow-x-auto rounded-2xl border border-slate-800">
-          <SunmiTable>
-            <thead>
-              <tr className="bg-amber-400 text-slate-900 text-[12px] uppercase tracking-wide">
-                <th className="px-3 py-2 text-left">Local</th>
-                <th className="px-3 py-2 text-left">Tipo</th>
-                <th className="px-3 py-2 text-left">Ciudad</th>
-                <th className="px-3 py-2 text-left">Estado</th>
-                <th className="px-3 py-2 text-right">Acciones</th>
-              </tr>
-            </thead>
+        <SunmiTableLocales
+          columnas={columnas}
+          datos={locales}
+          page={page}
+          totalPages={totalPages}
+          onPrev={() => setPage((p) => p - 1)}
+          onNext={() => setPage((p) => p + 1)}
+          accionesPersonalizadas={(row) => (
+            <div className="flex gap-3 justify-end text-[15px]">
+              <button
+                onClick={() => handleEditar(row.id)}
+                className="text-amber-300 hover:text-amber-200"
+              >
+                ✏️
+              </button>
 
-            <tbody>
-              {locales.length === 0 && (
-                <SunmiTableEmpty message="No hay locales para mostrar" />
-              )}
-
-              {locales.map((l) => (
-                <SunmiTableRow key={l.id}>
-                  <td className="px-3 py-2 text-[13px] font-medium">
-                    {l.nombre}
-                  </td>
-
-                  <td className="px-3 py-2 text-[12px] capitalize">
-                    {l.tipo}
-                  </td>
-
-                  <td className="px-3 py-2 text-[12px]">
-                    {l.ciudad}
-                  </td>
-
-                  <td className="px-3 py-2">
-                    {l.activo ? (
-                      <span className="px-2 py-[2px] text-[11px] rounded-full bg-green-200 text-green-800">
-                        Activo
-                      </span>
-                    ) : (
-                      <span className="px-2 py-[2px] text-[11px] rounded-full bg-red-300 text-red-900">
-                        Inactivo
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex gap-3 justify-end text-[15px]">
-                      <button
-                        onClick={() => handleEditar(l.id)}
-                        className="text-amber-300 hover:text-amber-200"
-                      >
-                        ✏️
-                      </button>
-
-                      <button
-                        onClick={() => handleEliminar(l.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </SunmiTableRow>
-              ))}
-            </tbody>
-          </SunmiTable>
-        </div>
-
-        {/* PAGINACIÓN */}
-        <div className="flex justify-between pt-4 px-2">
-          <SunmiButton
-            color="slate"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            « Anterior
-          </SunmiButton>
-
-          <SunmiButton
-            color="slate"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Siguiente »
-          </SunmiButton>
-        </div>
+              <button
+                onClick={() => handleEliminar(row.id)}
+                className="text-red-400 hover:text-red-300"
+              >
+                🗑️
+              </button>
+            </div>
+          )}
+        />
       </SunmiCard>
 
-      {/* MODAL */}
       <ModalLocal
         open={modalOpen ? true : false}
         initialData={editing}

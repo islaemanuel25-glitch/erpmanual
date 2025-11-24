@@ -1,35 +1,25 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
-import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 
 export default function ModalLocal({
-  open = false,
-  initialData = null,
+  open,
   onClose,
   onSubmit,
+  initialData = null,
 }) {
-  // ===============================
-  // 🔥 FIX FUNDAMENTAL
-  // ===============================
-  if (!open) return null;
-
   const modalRef = useRef(null);
-
-  const safe = (v) => (v === null || v === undefined ? "" : v);
 
   const editMode = Boolean(initialData);
 
-  // ===============================
-  // FORM CON TODOS TUS CAMPOS
-  // ===============================
   const [form, setForm] = useState({
     nombre: "",
     tipo: "",
@@ -43,146 +33,212 @@ export default function ModalLocal({
     activo: true,
   });
 
-  const update = (c, v) => setForm((f) => ({ ...f, [c]: v }));
+  const setField = (k, v) =>
+    setForm((prev) => ({
+      ...prev,
+      [k]: v,
+    }));
 
-  // ===============================
-  // CARGAR DATOS SI ESTAMOS EDITANDO
-  // ===============================
   useEffect(() => {
-    if (!editMode) return;
+    if (!open) return;
 
-    setForm({
-      nombre: safe(initialData.nombre),
-      tipo: safe(initialData.tipo),
-      direccion: safe(initialData.direccion),
-      telefono: safe(initialData.telefono),
-      email: safe(initialData.email),
-      cuil: safe(initialData.cuil),
-      ciudad: safe(initialData.ciudad),
-      provincia: safe(initialData.provincia),
-      codigoPostal: safe(initialData.codigoPostal),
-      activo: initialData.activo ?? true,
-    });
-  }, [editMode, initialData]);
+    // Reset scroll
+    setTimeout(() => {
+      if (modalRef.current) modalRef.current.scrollTop = 0;
+    }, 30);
 
-  // ===============================
-  // GUARDAR (Respeta tu lógica exacta)
-  // ===============================
-  const handleGuardar = () => {
-    if (!form.nombre.trim() || !form.tipo.trim()) {
-      alert("Completá nombre y tipo.");
+    if (!initialData) {
+      setForm({
+        nombre: "",
+        tipo: "",
+        direccion: "",
+        telefono: "",
+        email: "",
+        cuil: "",
+        ciudad: "",
+        provincia: "",
+        codigoPostal: "",
+        activo: true,
+      });
       return;
     }
+
+    setForm({
+      nombre: initialData.nombre || "",
+      tipo: initialData.tipo || "",
+      direccion: initialData.direccion || "",
+      telefono: initialData.telefono || "",
+      email: initialData.email || "",
+      cuil: initialData.cuil || "",
+      ciudad: initialData.ciudad || "",
+      provincia: initialData.provincia || "",
+      codigoPostal: initialData.codigoPostal || "",
+      activo: Boolean(initialData.activo),
+    });
+  }, [open, initialData]);
+
+  const validar = () => {
+    if (!String(form.nombre).trim()) return "Completá el nombre.";
+    if (!String(form.tipo).trim()) return "Seleccioná el tipo.";
+    return null;
+  };
+
+  const handleSubmit = () => {
+    const err = validar();
+    if (err) return alert(err);
 
     onSubmit(form);
   };
 
-  // ===============================
-  // CERRAR HACIENDO CLICK AFUERA
-  // ===============================
-  useEffect(() => {
-    const handler = (e) => {
-      if (modalRef.current && !modalRef.current.contains(e.target)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handler);
-
-    return () => {
-      document.removeEventListener("mousedown", handler);
-    };
-  }, [onClose]);
+  if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]">
-      <div
-        ref={modalRef}
-        className="sunmi-card max-w-lg w-full max-h-[90vh] overflow-y-auto"
-      >
-        {/* HEADER */}
-        <SunmiHeader
-          title={editMode ? "Editar Local" : "Nuevo Local"}
-          color="amber"
-        />
+    <div
+      className="
+        fixed inset-0 z-[9999]
+        bg-black/60 backdrop-blur-sm
+        flex items-center justify-center
+        p-3
+      "
+    >
+      <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
+        <SunmiCard>
+          {/* HEADER */}
+          <div className="flex items-center justify-between">
+            <SunmiHeader
+              title={editMode ? "Editar local" : "Nuevo local"}
+              color="amber"
+            />
 
-        <SunmiSeparator color="amber" />
+            <SunmiButton color="slate" onClick={onClose} size="sm">
+              Cerrar
+            </SunmiButton>
+          </div>
 
-        <div className="flex flex-col gap-3 p-3 text-[13px]">
-          <SunmiInput
-            label="Nombre"
-            value={form.nombre}
-            onChange={(e) => update("nombre", e.target.value)}
-          />
+          {/* CONTENIDO */}
+          <div
+            ref={modalRef}
+            className="
+              max-h-[65vh]
+              overflow-y-auto 
+              px-2 pb-4 mt-2 
+              space-y-4
+            "
+          >
+            <SunmiSeparator label="Datos" color="amber" />
 
-          <SunmiSelectAdv
-            label="Tipo"
-            value={form.tipo}
-            onChange={(v) => update("tipo", v)}
-            options={[
-              { value: "local", label: "Local" },
-              { value: "deposito", label: "Depósito" },
-            ]}
-          />
+            <Field label="Nombre *">
+              <SunmiInput
+                value={form.nombre}
+                onChange={(e) => setField("nombre", e.target.value)}
+                placeholder="Nombre del local…"
+              />
+            </Field>
 
-          <SunmiInput
-            label="Dirección"
-            value={form.direccion}
-            onChange={(e) => update("direccion", e.target.value)}
-          />
+            <Field label="Tipo *">
+              <SunmiSelectAdv
+                value={form.tipo}
+                onChange={(v) => setField("tipo", v)}
+              >
+                <SunmiSelectOption value="">
+                  Seleccionar tipo…
+                </SunmiSelectOption>
 
-          <SunmiInput
-            label="Teléfono"
-            value={form.telefono}
-            onChange={(e) => update("telefono", e.target.value)}
-          />
+                <SunmiSelectOption value="local">
+                  Local
+                </SunmiSelectOption>
 
-          <SunmiInput
-            label="Email"
-            value={form.email}
-            onChange={(e) => update("email", e.target.value)}
-          />
+                <SunmiSelectOption value="deposito">
+                  Depósito
+                </SunmiSelectOption>
+              </SunmiSelectAdv>
+            </Field>
 
-          <SunmiInput
-            label="CUIL"
-            value={form.cuil}
-            onChange={(e) => update("cuil", e.target.value)}
-          />
+            <Field label="Dirección">
+              <SunmiInput
+                value={form.direccion}
+                onChange={(e) => setField("direccion", e.target.value)}
+                placeholder="Dirección…"
+              />
+            </Field>
 
-          <SunmiInput
-            label="Ciudad"
-            value={form.ciudad}
-            onChange={(e) => update("ciudad", e.target.value)}
-          />
+            <Field label="Teléfono">
+              <SunmiInput
+                value={form.telefono}
+                onChange={(e) => setField("telefono", e.target.value)}
+                placeholder="Teléfono…"
+              />
+            </Field>
 
-          <SunmiInput
-            label="Provincia"
-            value={form.provincia}
-            onChange={(e) => update("provincia", e.target.value)}
-          />
+            <Field label="Email">
+              <SunmiInput
+                value={form.email}
+                onChange={(e) => setField("email", e.target.value)}
+                placeholder="Email…"
+              />
+            </Field>
 
-          <SunmiInput
-            label="Código Postal"
-            value={form.codigoPostal}
-            onChange={(e) => update("codigoPostal", e.target.value)}
-          />
+            <Field label="CUIL">
+              <SunmiInput
+                value={form.cuil}
+                onChange={(e) => setField("cuil", e.target.value)}
+                placeholder="CUIL…"
+              />
+            </Field>
 
-          <SunmiToggleEstado
-            label="Estado"
-            value={form.activo}
-            onChange={(v) => update("activo", v)}
-          />
+            <Field label="Ciudad">
+              <SunmiInput
+                value={form.ciudad}
+                onChange={(e) => setField("ciudad", e.target.value)}
+                placeholder="Ciudad…"
+              />
+            </Field>
 
-          <div className="flex justify-end gap-2 mt-4">
+            <Field label="Provincia">
+              <SunmiInput
+                value={form.provincia}
+                onChange={(e) => setField("provincia", e.target.value)}
+                placeholder="Provincia…"
+              />
+            </Field>
+
+            <Field label="Código Postal">
+              <SunmiInput
+                value={form.codigoPostal}
+                onChange={(e) => setField("codigoPostal", e.target.value)}
+                placeholder="Código Postal…"
+              />
+            </Field>
+
+            <Field label="Estado">
+              <SunmiToggleEstado
+                value={form.activo}
+                onChange={(v) => setField("activo", v)}
+              />
+            </Field>
+          </div>
+
+          {/* FOOTER */}
+          <div className="flex justify-end gap-2 pt-2">
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
 
-            <SunmiButton color="amber" onClick={handleGuardar}>
-              {editMode ? "Guardar cambios" : "Crear Local"}
+            <SunmiButton color="amber" onClick={handleSubmit}>
+              {editMode ? "Guardar cambios" : "Crear local"}
             </SunmiButton>
           </div>
-        </div>
+        </SunmiCard>
       </div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div className="flex flex-col gap-1 px-1">
+      <label className="text-[11px] text-slate-400">{label}</label>
+      {children}
     </div>
   );
 }
