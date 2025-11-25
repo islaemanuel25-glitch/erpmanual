@@ -73,68 +73,127 @@ export async function POST(req) {
 
       if (recibida !== enviada) tieneDiferencias = true;
 
-      // 1) SUMAR AL DESTINO
-      await prisma.stockLocal.upsert({
-        where: {
-          localId_productoId: {
-            localId: transferencia.destinoId,
-            productoId: d.productoId,
-          },
-        },
-        update: { cantidad: { increment: recibida } },
-        create: {
-          localId: transferencia.destinoId,
-          productoId: d.productoId,
-          cantidad: recibida,
-        },
-      });
+      // ============================================================
+      // 🟦 FACTOR DE CONVERSIÓN
+      // ============================================================
+      const factor = Number(d.producto.base.factor_pack || 1);
 
-      // 2) BUSCAR PRODUCTO DEL DEPÓSITO (ORIGEN)
-      let productoDeposito = await prisma.productoLocal.findUnique({
+      const recibidaBultos = recibida;             // depósito
+      const recibidaUnidades = recibida * factor;  // local
+
+      // ============================================================
+      // 🟦 BUSCAR PRODUCTO DEL DESTINO
+      // ============================================================
+      let productoDestino = await prisma.productoLocal.findUnique({
         where: {
           localId_baseId: {
-            localId: transferencia.origenId,
-            baseId: d.producto.base.id,   // ← FIX DEFINITIVO
+            localId: transferencia.destinoId,
+            baseId: d.producto.base.id,
           },
         },
       });
 
-      let productoIdOrigen = null;
-
-      if (productoDeposito) {
-        productoIdOrigen = productoDeposito.id;
-      } else {
-        const nuevo = await prisma.productoLocal.create({
+      if (!productoDestino) {
+        productoDestino = await prisma.productoLocal.create({
           data: {
-            localId: transferencia.origenId,
-            baseId: d.producto.base.id,  // ← FIX DEFINITIVO
-            nombre: d.producto.nombre || d.producto.base.nombre,
+            localId: transferencia.destinoId,
+            baseId: d.producto.base.id,
             precio_costo:
               d.producto.precio_costo || d.producto.base.precio_costo || 0,
             precio_venta:
               d.producto.precio_venta || d.producto.base.precio_venta || 0,
+            margen: d.producto.margen || d.producto.base.margen || 0,
+            activo: true,
           },
         });
-        productoIdOrigen = nuevo.id;
+
+        await prisma.stockLocal.create({
+          data: {
+            localId: transferencia.destinoId,
+            productoId: productoDestino.id,
+            cantidad: 0,
+            stockMin: 0,
+            stockMax: 0,
+          },
+        });
       }
 
-      // 3) DESCONTAR ORIGEN
+      // ============================================================
+      // 🟩 SUMAR UNIDADES AL LOCAL
+      // ============================================================
+      await prisma.stockLocal.upsert({
+        where: {
+          localId_productoId: {
+            localId: transferencia.destinoId,
+            productoId: productoDestino.id,
+          },
+        },
+        update: { cantidad: { increment: recibidaUnidades } },
+        create: {
+          localId: transferencia.destinoId,
+          productoId: productoDestino.id,
+          cantidad: recibidaUnidades,
+        },
+      });
+
+      // ============================================================
+      // 🟥 BUSCAR PRODUCTO ORIGEN (DEPÓSITO)
+      // ============================================================
+      let productoOrigen = await prisma.productoLocal.findUnique({
+        where: {
+          localId_baseId: {
+            localId: transferencia.origenId,
+            baseId: d.producto.base.id,
+          },
+        },
+      });
+
+      if (!productoOrigen) {
+        productoOrigen = await prisma.productoLocal.create({
+          data: {
+            localId: transferencia.origenId,
+            baseId: d.producto.base.id,
+            precio_costo:
+              d.producto.precio_costo || d.producto.base.precio_costo || 0,
+            precio_venta:
+              d.producto.precio_venta || d.producto.base.precio_venta || 0,
+            margen: d.producto.margen || d.producto.base.margen || 0,
+            activo: true,
+          },
+        });
+
+        await prisma.stockLocal.create({
+          data: {
+            localId: transferencia.origenId,
+            productoId: productoOrigen.id,
+            cantidad: 0,
+            stockMin: 0,
+            stockMax: 0,
+          },
+        });
+      }
+
+      // ============================================================
+      // 🟥 DESCONTAR BULTOS DEL DEPÓSITO
+      // ============================================================
       await prisma.stockLocal.upsert({
         where: {
           localId_productoId: {
             localId: transferencia.origenId,
-            productoId: productoIdOrigen,
+            productoId: productoOrigen.id,
           },
         },
-        update: { cantidad: { decrement: recibida } },
+        update: { cantidad: { decrement: recibidaBultos } },
         create: {
           localId: transferencia.origenId,
-          productoId: productoIdOrigen,
-          cantidad: -recibida,
+          productoId: productoOrigen.id,
+          cantidad: -recibidaBultos,
         },
       });
 
-      // 4) GUARDAR RECEPCIÓN
+      // ============================================================
+      // 🟨 GUARDAR RECEPCIÓN
+      // ============================================================
       await prisma.transferenciaDetalle.update({
         where: { id: d.id },
         data: {
@@ -145,7 +204,9 @@ export async function POST(req) {
       });
     }
 
-    // 5) ACTUALIZAR CABECERA
+    // ============================================================
+    // 🟩 CABECERA
+    // ============================================================
     await prisma.transferencia.update({
       where: { id: transferenciaId },
       data: {

@@ -22,6 +22,9 @@ export default function StockLocalesPage() {
 
   const [refrescar, setRefrescar] = useState(false);
 
+  // ============================================================
+  // CARGAR LOCALES
+  // ============================================================
   useEffect(() => {
     const fetchLocales = async () => {
       try {
@@ -53,6 +56,9 @@ export default function StockLocalesPage() {
     fetchLocales();
   }, []);
 
+  // ============================================================
+  // GUARDAR LOCAL EN LOCALSTORAGE
+  // ============================================================
   useEffect(() => {
     if (localSeleccionado) {
       localStorage.setItem("ultimoLocal", localSeleccionado);
@@ -74,6 +80,7 @@ export default function StockLocalesPage() {
     locales.find((l) => l.id === localSeleccionado) || {
       id: localSeleccionado,
       nombre: "Local",
+      esDeposito: false,
     };
 
   if (cargando) {
@@ -84,10 +91,13 @@ export default function StockLocalesPage() {
     );
   }
 
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
     <div className="p-4 sunmi-bg w-full min-h-screen flex flex-col gap-4">
 
-      {/* 🟦 CABECERA SUNMI */}
+      {/* CABECERA */}
       <div className="sunmi-card">
         <div className="sunmi-header-cyan">Stock de Locales</div>
 
@@ -111,17 +121,18 @@ export default function StockLocalesPage() {
         </div>
       </div>
 
-      {/* 🟦 FILTROS */}
+      {/* FILTROS */}
       <FiltrosStock
         localSeleccionado={localSeleccionado}
         onFiltroChange={setFiltro}
         onReset={() => setFiltro({})}
       />
 
-      {/* 🟦 TABLA */}
+      {/* TABLA DE STOCK */}
       <TablaStock
         localSeleccionado={localSeleccionado}
         localNombre={localActual.nombre}
+        localEsDeposito={localActual.esDeposito}
         filtro={filtro}
         page={page}
         setPage={setPage}
@@ -131,7 +142,7 @@ export default function StockLocalesPage() {
         onEditarLimites={abrirLimites}
       />
 
-      {/* 🟦 MODAL AJUSTE */}
+      {/* MODAL AJUSTE */}
       <ModalAjuste
         open={openAjuste}
         onClose={(changed) => {
@@ -142,7 +153,7 @@ export default function StockLocalesPage() {
         local={localActual}
       />
 
-      {/* 🟦 MODAL LIMITES */}
+      {/* MODAL LIMITES */}
       <ModalLimites
         open={openLimites}
         onClose={(changed) => {
@@ -152,6 +163,7 @@ export default function StockLocalesPage() {
         producto={productoLimites}
         local={localActual}
       />
+
     </div>
   );
 }

@@ -19,7 +19,6 @@ export async function POST(req) {
     const { permisos } = session;
     const esAdmin = Array.isArray(permisos) && permisos.includes("*");
 
-    // Solo admin puede importar masivamente
     if (!esAdmin && !permisos.includes("productos.importar")) {
       return NextResponse.json(
         { ok: false, error: "No tenés permisos para importar productos." },
@@ -41,6 +40,8 @@ export async function POST(req) {
 
     // ================================
     // 2) MAPEO camelCase → snake_case
+    // precioCosto = precio del bulto
+    // factorPack = unidades por bulto
     // ================================
     const productosBaseData = productos.map((p) => ({
       grupoId: p.grupoId,
@@ -55,17 +56,20 @@ export async function POST(req) {
       proveedor_id: p.proveedorId ?? null,
       area_fisica_id: p.areaFisicaId ?? null,
 
-      unidad_medida: p.unidadMedida,
-      factor_pack: p.factorPack ?? null,
+      unidad_medida: p.unidadMedida,       // cajon / pack / unidad
+      factor_pack: p.factorPack ?? null,   // unidades dentro del bulto
+
       peso_kg: p.pesoKg ?? null,
       volumen_ml: p.volumenMl ?? null,
 
-      precio_costo: Number(p.precioCosto),
-      precio_venta: Number(p.precioVenta),
+      precio_costo: Number(p.precioCosto), // 🚨 PRECIO DEL BULTO
+      precio_venta: Number(p.precioVenta), // precio del bulto (sugerido)
       margen: p.margen ?? null,
+
       precio_sugerido: p.precioSugerido ?? null,
       iva_porcentaje: p.ivaPorcentaje ?? null,
       fecha_vencimiento: p.fechaVencimiento ?? null,
+
       redondeo_100: p.redondeo100 ?? false,
       activo: p.activo ?? true,
 
@@ -93,14 +97,13 @@ export async function POST(req) {
 
     // ================================
     // 5) OBTENER LOCALES
-    // (Admin puede afectar a todos)
     // ================================
     const locales = await prisma.local.findMany({
       select: { id: true },
     });
 
     // ================================
-    // 6) CREAR PRODUCTOLOCAL
+    // 6) CREAR PRODUCTOLOCAL (precio del bulto)
     // ================================
     const productosLocalesData = [];
 
@@ -109,8 +112,8 @@ export async function POST(req) {
         productosLocalesData.push({
           baseId: b.id,
           localId: l.id,
-          precio_costo: b.precio_costo,
-          precio_venta: b.precio_venta,
+          precio_costo: b.precio_costo,  // 🚨 precio del bulto
+          precio_venta: b.precio_venta,  // precio del bulto
           margen: b.margen,
           activo: b.activo,
         });
@@ -123,7 +126,7 @@ export async function POST(req) {
     });
 
     // ================================
-    // 7) CREAR STOCK LOCAL
+    // 7) CREAR STOCK INICIAL = 0
     // ================================
     const productosLocales = await prisma.productoLocal.findMany({
       where: { baseId: { in: baseIds } },
@@ -133,7 +136,7 @@ export async function POST(req) {
     const stockData = productosLocales.map((pl) => ({
       localId: pl.localId,
       productoId: pl.id,
-      cantidad: 0,
+      cantidad: 0,     // 🚨 depósito = 0 bultos, local = 0 unidades
       stockMin: 0,
       stockMax: 0,
     }));

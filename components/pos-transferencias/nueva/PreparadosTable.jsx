@@ -11,6 +11,7 @@ export default function PreparadosTable({
   pageSize,
   onPageSizeChange,
   buscador,
+  loading = false,
 }) {
   return (
     <div
@@ -23,9 +24,7 @@ export default function PreparadosTable({
         text-[12px]
       "
     >
-      {/* =============================== */}
-      {/* 🟦 CABECERA CELESTE SUNMI */}
-      {/* =============================== */}
+      {/* CABECERA */}
       <div
         className="
           bg-[#22D3EE]
@@ -40,8 +39,6 @@ export default function PreparadosTable({
         </span>
 
         <div className="flex items-center gap-2 text-[11px]">
-
-          {/* PAGE SIZE */}
           <span className="opacity-80">Mostrar:</span>
           <select
             className="
@@ -58,7 +55,6 @@ export default function PreparadosTable({
             ))}
           </select>
 
-          {/* BTN PREV */}
           <button
             className="
               px-2 py-1 rounded-lg
@@ -77,7 +73,6 @@ export default function PreparadosTable({
 
           <span>{page} / {totalPages}</span>
 
-          {/* BTN NEXT */}
           <button
             className="
               px-2 py-1 rounded-lg
@@ -96,9 +91,7 @@ export default function PreparadosTable({
         </div>
       </div>
 
-      {/* =============================== */}
-      {/* 🔍 BUSCADOR MANUAL CELESTE */}
-      {/* =============================== */}
+      {/* BUSCADOR */}
       <div
         className="
           border-b border-slate-800 
@@ -109,9 +102,7 @@ export default function PreparadosTable({
         {buscador}
       </div>
 
-      {/* =============================== */}
       {/* TABLA */}
-      {/* =============================== */}
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead
@@ -126,13 +117,15 @@ export default function PreparadosTable({
               <th className="px-2 py-2 text-center w-[70px]">Tipo</th>
               <th className="px-2 py-2 text-center w-[80px]">Stock Dep.</th>
               <th className="px-2 py-2 text-center w-[80px]">Stock Local</th>
-              <th className="px-2 py-2 text-right w-[80px]">Preparado</th>
+              <th className="px-2 py-2 text-right w-[80px]">
+                Preparado (bultos)
+              </th>
               <th className="px-2 py-2 text-center w-[70px]">Acción</th>
             </tr>
           </thead>
 
           <tbody>
-            {datos.length === 0 && (
+            {datos.length === 0 && !loading && (
               <tr>
                 <td
                   colSpan={6}
@@ -173,21 +166,22 @@ export default function PreparadosTable({
                   )}
                 </td>
 
-                {/* STOCK DEPÓSITO */}
+                {/* STOCK DEPÓSITO (unidades o bultos según tu lógica actual) */}
                 <td className="px-2 py-2 text-center text-[11px] text-slate-300">
                   {p.stockActual}
                 </td>
 
-                {/* STOCK LOCAL */}
+                {/* STOCK LOCAL (unidades) */}
                 <td className="px-2 py-2 text-center text-[11px] text-slate-300">
                   {p.cantidadReal}
                 </td>
 
-                {/* INPUT PREPARADO */}
+                {/* INPUT PREPARADO (BULTOS) */}
                 <td className="px-2 py-2 text-right">
                   <input
                     type="number"
                     min={0}
+                    step={1}
                     className="
                       w-[80px]
                       bg-slate-900

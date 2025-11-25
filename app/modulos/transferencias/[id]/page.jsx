@@ -9,7 +9,6 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
-// Componentes nuevos
 import TransferenciaHeader from "@/components/transferencias/TransferenciaHeader";
 import TablaDetalleTransferencia from "@/components/transferencias/TablaDetalleTransferencia";
 import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
@@ -32,14 +31,27 @@ export default function TransferenciaDetallePage() {
 
   const [me, setMe] = useState(null);
 
-  // Cargar usuario
+  // Detecta cambios sin guardar
+  const [dirty, setDirty] = useState(false);
+
+  // Wrapper para marcar cambios como dirty
+  const setEditItemsDirty = (fn) => {
+    setDirty(true);
+    setEditItems(fn);
+  };
+
+  // ===============================
+  // Usuario
+  // ===============================
   const cargarUsuario = async () => {
     const res = await fetch("/api/me");
     const json = await res.json();
     if (json.ok) setMe(json.user);
   };
 
+  // ===============================
   // Cargar transferencia
+  // ===============================
   const cargar = async () => {
     try {
       setLoading(true);
@@ -62,7 +74,6 @@ export default function TransferenciaDetallePage() {
 
       setItem(json.item);
 
-      // Items editables
       setEditItems(
         json.item.items.map((d) => ({
           id: d.id,
@@ -75,6 +86,10 @@ export default function TransferenciaDetallePage() {
           motivoDetalle: d.motivoDetalle || "",
         }))
       );
+
+      // Al cargar, no hay cambios pendientes
+      setDirty(false);
+
     } catch (e) {
       console.error("Error cargando transferencia:", e);
       setError("Error al cargar transferencia");
@@ -88,7 +103,9 @@ export default function TransferenciaDetallePage() {
 
   if (!me) return <div className="p-4 text-slate-300">Cargando usuario...</div>;
 
+  // ===============================
   // Permisos
+  // ===============================
   const localId = me.localId || null;
   const esAdmin = me.esAdmin || me.permisos?.includes("*");
 
@@ -96,13 +113,16 @@ export default function TransferenciaDetallePage() {
 
   if (item) {
     const esDestino = localId && item.destino?.id === localId;
-    const estadoValido = item.estado === "Enviada" || item.estado === "Recibiendo";
+    const estadoValido =
+      item.estado === "Enviada" || item.estado === "Recibiendo";
     puedeRecibir = estadoValido && (esAdmin || esDestino);
   }
 
   const inputsHabilitados = puedeRecibir;
 
-  // Guardar recepción
+  // ===============================
+  // Guardar cambios
+  // ===============================
   const guardarCambios = async () => {
     try {
       setGuardando(true);
@@ -118,8 +138,10 @@ export default function TransferenciaDetallePage() {
             return;
           }
 
-          if (it.motivoPrincipal === "Otro" &&
-              (!it.motivoDetalle || it.motivoDetalle.trim() === "")) {
+          if (
+            it.motivoPrincipal === "Otro" &&
+            (!it.motivoDetalle || it.motivoDetalle.trim() === "")
+          ) {
             alert("Debés detallar motivo (Otro).");
             setGuardando(false);
             return;
@@ -139,6 +161,10 @@ export default function TransferenciaDetallePage() {
       if (!json.ok) throw new Error(json.error);
 
       await cargar();
+
+      // Cambios guardados → dirty false
+      setDirty(false);
+
     } catch (err) {
       alert("Error guardando: " + err.message);
     } finally {
@@ -146,8 +172,17 @@ export default function TransferenciaDetallePage() {
     }
   };
 
+  // ===============================
   // Confirmar recepción
+  // ===============================
   const confirmarRecepcion = async () => {
+
+    // BLOQUEAR si hay cambios sin guardar
+    if (dirty) {
+      alert("Tenés cambios sin guardar. Guardalos antes de confirmar.");
+      return;
+    }
+
     try {
       setConfirmando(true);
 
@@ -160,6 +195,7 @@ export default function TransferenciaDetallePage() {
       if (!json.ok) throw new Error(json.error);
 
       await cargar();
+
     } catch (err) {
       alert("Error confirmando: " + err.message);
     } finally {
@@ -167,14 +203,19 @@ export default function TransferenciaDetallePage() {
     }
   };
 
-  // Total
+  // ===============================
+  // Total transferencia
+  // ===============================
   const totalTransferencia = item
     ? item.items.reduce((acc, d) => acc + num(d.subtotal), 0)
     : 0;
 
+  // ===============================
+  // Render
+  // ===============================
   return (
     <div className="p-2 sm:p-4 max-w-6xl mx-auto space-y-3">
-      
+
       <div>
         <Link
           href="/modulos/transferencias"
@@ -187,12 +228,13 @@ export default function TransferenciaDetallePage() {
       <SunmiCard>
         <SunmiHeader title={`Transferencia #${id}`} color="amber" />
 
-        {loading && <div className="text-slate-300 text-sm px-2">Cargando...</div>}
+        {loading && (
+          <div className="text-slate-300 text-sm px-2">Cargando...</div>
+        )}
         {error && <div className="text-red-400 px-2">{error}</div>}
 
         {!loading && !error && item && (
           <>
-            {/* HEADER (los botones PDF ya están ahí) */}
             <TransferenciaHeader item={item} id={id} />
 
             <SunmiSeparator label="Detalle y recepción" color="amber" />
@@ -200,7 +242,7 @@ export default function TransferenciaDetallePage() {
             <TablaDetalleTransferencia
               item={item}
               editItems={editItems}
-              setEditItems={setEditItems}
+              setEditItems={setEditItemsDirty}
               inputsHabilitados={inputsHabilitados}
             />
 

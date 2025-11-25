@@ -1,25 +1,33 @@
 "use client";
 
 export default function SunmiBadgeEstado({ estado = "" }) {
+
+  // convertir boolean -> string estándar
+  const valor = typeof estado === "boolean"
+    ? (estado ? "activo" : "inactivo")
+    : (estado?.toString().toLowerCase() || "");
+
   const map = {
-    activo:   { label: "Activo", color: "bg-green-400 text-slate-900" },
-    inactivo: { label: "Inactivo", color: "bg-red-500 text-white" },
-    enviado:  { label: "Enviado", color: "bg-amber-400 text-slate-900" },
-    pendiente:{ label: "Pendiente", color: "bg-cyan-400 text-slate-900" },
-    recibido: { label: "Recibido", color: "bg-green-400 text-slate-900" },
-    error:    { label: "Error", color: "bg-red-500 text-white" },
+    activo: {
+      label: "Activo",
+      class: "bg-green-400 text-slate-900",
+    },
+    inactivo: {
+      label: "Inactivo",
+      class: "bg-red-400 text-slate-900",
+    },
   };
 
-  const badge = map[estado?.toLowerCase()] || {
-    label: estado || "—",
-    color: "bg-slate-600 text-white"
-  };
+  const data = map[valor] || map["inactivo"];
 
   return (
     <span
-      className={`px-2 py-[2px] text-[11px] rounded-md font-semibold tracking-wide ${badge.color}`}
+      className={`
+        px-2 py-[2px] rounded-full text-[11px] font-semibold
+        ${data.class}
+      `}
     >
-      {badge.label}
+      {data.label}
     </span>
   );
 }

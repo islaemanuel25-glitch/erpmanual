@@ -1,4 +1,3 @@
-// Pegá acá el archivo que quieras trabajar del módulo POS Transferencias
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -124,11 +123,26 @@ export default function NuevaTransferenciaPage() {
 
       if (j.ok) {
         setSugeridos(
-          j.items.map((s) => ({
-            ...s,
-            unidadPlural: unidadPlural(s.unidadMedida || "unidad"),
-            sugerido: Number(s.sugerido || 0),
-          }))
+          j.items.map((s) => {
+            // s.sugerido viene en UNIDADES (faltantes)
+            const factor = Number(s.factorPack || s.base?.factor_pack || 1);
+            const faltanUnidades = Number(s.sugerido || 0);
+
+            // 🔥 Convertimos a BULTOS
+            const sugeridoBultos =
+              factor > 1
+                ? Math.ceil(faltanUnidades / factor)
+                : faltanUnidades;
+
+            return {
+              ...s,
+              unidadPlural: unidadPlural(s.unidadMedida || "unidad"),
+              factorPack: factor,
+              faltanUnidades,
+              // A partir de acá, sugerido = BULTOS
+              sugerido: sugeridoBultos,
+            };
+          })
         );
       }
 
@@ -217,14 +231,14 @@ export default function NuevaTransferenciaPage() {
   }, [posId]);
 
   // ===============================
-  // 7. Editar sugerido
+  // 7. Editar sugerido (BULTOS)
   // ===============================
   const handleEditSugerido = (productoLocalDestinoId, valor) => {
-    const cantidad = Number(valor || 0);
+    const cantidadBultos = Number(valor || 0);
     setSugeridos((prev) =>
       prev.map((s) =>
         s.productoLocalDestinoId === productoLocalDestinoId
-          ? { ...s, sugerido: cantidad }
+          ? { ...s, sugerido: cantidadBultos }
           : s
       )
     );
@@ -232,6 +246,7 @@ export default function NuevaTransferenciaPage() {
 
   // ===============================
   // 8. Marcar preparado
+  //    → preparado = BULTOS
   // ===============================
   const handleMarcarPreparado = async (productoLocalOrigenId) => {
     if (!posId) return setError("POS no generado");
@@ -241,8 +256,8 @@ export default function NuevaTransferenciaPage() {
     );
     if (!s) return;
 
-    const cantidad = Number(s.sugerido || 0);
-    if (cantidad <= 0) return;
+    const cantidadBultos = Number(s.sugerido || 0);
+    if (cantidadBultos <= 0) return;
 
     const r = await fetch("/api/pos-transferencias/detalle/agregar", {
       method: "POST",
@@ -250,8 +265,8 @@ export default function NuevaTransferenciaPage() {
       body: JSON.stringify({
         posId,
         productoLocalId: productoLocalOrigenId,
-        sugerido: cantidad,
-        preparado: cantidad,
+        sugerido: cantidadBultos,
+        preparado: cantidadBultos,
         tipo: "sugerido",
       }),
     });
@@ -270,6 +285,7 @@ export default function NuevaTransferenciaPage() {
 
   // ===============================
   // 9. Agregar manual
+  //    → cantidad = 1 BULTO
   // ===============================
   const handleAgregarManual = async (p) => {
     if (!posId) return setError("POS no generado");
@@ -280,7 +296,7 @@ export default function NuevaTransferenciaPage() {
       body: JSON.stringify({
         posId,
         productoLocalId: p.productoLocalId,
-        cantidad: 1,
+        cantidad: 1, // 1 bulto
         tipo: "manual",
       }),
     });
@@ -293,20 +309,21 @@ export default function NuevaTransferenciaPage() {
 
   // ===============================
   // 10. Editar preparado
+  //     → preparado = BULTOS
   // ===============================
   const handleEditCantidad = async (detalleId, valor) => {
-    const cantidad = Number(valor || 0);
+    const cantidadBultos = Number(valor || 0);
 
     setItems((prev) =>
       prev.map((i) =>
-        i.detalleId === detalleId ? { ...i, preparado: cantidad } : i
+        i.detalleId === detalleId ? { ...i, preparado: cantidadBultos } : i
       )
     );
 
     const r = await fetch("/api/pos-transferencias/detalle/editar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ detalleId, preparado: cantidad }),
+      body: JSON.stringify({ detalleId, preparado: cantidadBultos }),
     });
 
     const j = await r.json();
@@ -481,11 +498,11 @@ export default function NuevaTransferenciaPage() {
           <PreparadosTable
             datos={items}
             onDesmarcar={handleQuitarPreparado}
+            onEditPreparado={handleEditCantidad}
             page={1}
             totalPages={1}
             onPrev={() => {}}
             onNext={() => {}}
-            onEditPreparado={handleEditCantidad}
             pageSize={50}
             onPageSizeChange={() => {}}
             loading={loadingDetalles}

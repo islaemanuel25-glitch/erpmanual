@@ -22,7 +22,6 @@ export async function POST(req) {
     const { permisos, localId: sessionLocalId } = session;
     const esAdmin = Array.isArray(permisos) && permisos.includes("*");
 
-    // Permiso mínimo para ajustar stock
     if (!esAdmin && !permisos.includes("stock.editar")) {
       return NextResponse.json(
         { ok: false, error: "No tenés permisos para ajustar stock." },
@@ -36,11 +35,12 @@ export async function POST(req) {
     const bodyLocalId = Number(body.localId || 0);
     const productoLocalId = Number(body.productoLocalId || 0);
 
-    const modo = String(body.modo || "ajuste"); // "ajuste" | "limites"
-    const tipo = String(body.tipo || "sumar");  // "sumar" | "restar"
+    const modo = String(body.modo || "ajuste");
+    const tipo = String(body.tipo || "sumar");
 
     const cantidad =
       body.cantidad !== undefined ? Number(body.cantidad) : null;
+
     const nuevoMin =
       body.nuevoMin !== undefined ? Number(body.nuevoMin) : null;
     const nuevoMax =
@@ -52,7 +52,6 @@ export async function POST(req) {
     let localId = 0;
 
     if (esAdmin && !sessionLocalId) {
-      // Admin global sin local → localId viene por body
       localId = bodyLocalId;
       if (!localId) {
         return NextResponse.json(
@@ -61,7 +60,6 @@ export async function POST(req) {
         );
       }
     } else {
-      // Usuario con local asociado (depósito o local)
       localId = Number(sessionLocalId || 0);
       if (!localId) {
         return NextResponse.json(
@@ -71,15 +69,25 @@ export async function POST(req) {
       }
     }
 
-    if (!productoLocalId) {
+    // ======================================================
+    // 3) SABER SI ES DEPÓSITO
+    // ======================================================
+    const local = await prisma.local.findUnique({
+      where: { id: localId },
+      select: { es_deposito: true },
+    });
+
+    if (!local) {
       return NextResponse.json(
-        { ok: false, error: "productoLocalId es requerido." },
-        { status: 400 }
+        { ok: false, error: "Local no encontrado" },
+        { status: 404 }
       );
     }
 
+    const esDeposito = local.es_deposito === true;
+
     // ======================================================
-    // 3) VALIDAR QUE EL PRODUCTO PERTENECE A ESE LOCAL
+    // 4) VALIDAR PRODUCTOLOCAL
     // ======================================================
     const prodLocal = await prisma.productoLocal.findUnique({
       where: { id: productoLocalId },
@@ -88,13 +96,13 @@ export async function POST(req) {
 
     if (!prodLocal || prodLocal.localId !== localId) {
       return NextResponse.json(
-        { ok: false, error: "Producto/local inválido." },
+        { ok: false, error: "Producto/local inválido" },
         { status: 404 }
       );
     }
 
     // ======================================================
-    // 4) OBTENER O CREAR REGISTRO DE STOCKLOCAL
+    // 5) OBTENER O CREAR STOCK
     // ======================================================
     let stock = await prisma.stockLocal.findUnique({
       where: { localId_productoId: { localId, productoId: productoLocalId } },
@@ -113,19 +121,24 @@ export async function POST(req) {
     }
 
     // ======================================================
-    // 5) MODO AJUSTE (sumar / restar cantidad)
+    // 6) MODO AJUSTE
     // ======================================================
     if (modo === "ajuste") {
       if (cantidad === null || Number.isNaN(cantidad)) {
         return NextResponse.json(
-          { ok: false, error: "Cantidad inválida." },
+          { ok: false, error: "Cantidad inválida" },
           { status: 400 }
         );
       }
 
       const actual = Number(stock.cantidad || 0);
+
+      // 🚩 DEPÓSITO NO CONVIERTE NADA
+      // 🚩 LOCALES YA TRABAJAN EN UNIDADES
+      const cantidadReal = cantidad;
+
       let nuevoStock =
-        tipo === "restar" ? actual - cantidad : actual + cantidad;
+        tipo === "restar" ? actual - cantidadReal : actual + cantidadReal;
 
       if (nuevoStock < 0) nuevoStock = 0;
 
@@ -148,7 +161,7 @@ export async function POST(req) {
     }
 
     // ======================================================
-    // 6) MODO LÍMITES (por compatibilidad, aunque tenés /limites)
+    // 7) MODO LIMITES
     // ======================================================
     if (modo === "limites") {
       const actualizado = await prisma.stockLocal.update({
@@ -173,11 +186,12 @@ export async function POST(req) {
     }
 
     return NextResponse.json(
-      { ok: false, error: "Modo inválido." },
+      { ok: false, error: "Modo inválido" },
       { status: 400 }
     );
+
   } catch (err) {
-    console.error("❌ ERROR AJUSTAR STOCK:", err);
+    console.error("❌ ERROR AJUSTAR:", err);
     return NextResponse.json(
       { ok: false, error: err.message },
       { status: 500 }

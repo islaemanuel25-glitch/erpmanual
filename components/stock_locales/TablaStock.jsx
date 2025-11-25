@@ -7,6 +7,7 @@ const PAGE_SIZE = 25;
 export default function TablaStock({
   localSeleccionado,
   localNombre,
+  localEsDeposito,
   filtro,
   page,
   setPage,
@@ -92,13 +93,14 @@ export default function TablaStock({
 
   const getUnidad = (p) => {
     const u = p.unidadMedida;
+    const f = Number(p.factorPack || 1);
 
     if (!u || u === "unidad") {
-      return p.factorPack > 1 ? `Pack x${p.factorPack}` : "Unidad";
+      return f > 1 ? `Pack x${f}` : "Unidad";
     }
 
-    if (u === "cajon") return p.factorPack > 1 ? `Cajón x${p.factorPack}` : "Cajón";
-    if (u === "pack") return p.factorPack > 1 ? `Pack x${p.factorPack}` : "Pack";
+    if (u === "cajon") return f > 1 ? `Cajón x${f}` : "Cajón";
+    if (u === "pack") return f > 1 ? `Pack x${f}` : "Pack";
     if (u === "kg") return "Kg";
     if (u === "lt") return "Litro";
 
@@ -123,9 +125,7 @@ export default function TablaStock({
       {loading && (
         <p className="text-slate-400 text-[13px] mt-3">Cargando stock...</p>
       )}
-      {error && (
-        <p className="text-red-400 text-[13px] mt-3">{error}</p>
-      )}
+      {error && <p className="text-red-400 text-[13px] mt-3">{error}</p>}
 
       <div className="overflow-x-auto mt-3">
         <table className="min-w-full text-[12px] sunmi-table">
@@ -146,7 +146,10 @@ export default function TablaStock({
           <tbody>
             {items.length === 0 && !loading && (
               <tr>
-                <td colSpan={9} className="px-2 py-3 text-center text-slate-500">
+                <td
+                  colSpan={9}
+                  className="px-2 py-3 text-center text-slate-500"
+                >
                   No hay productos para mostrar.
                 </td>
               </tr>
@@ -157,14 +160,25 @@ export default function TablaStock({
                 <td className="px-2 py-1">{p.nombre}</td>
                 <td className="px-2 py-1">{p.codigoBarra || "-"}</td>
                 <td className="px-2 py-1">{getUnidad(p)}</td>
+
                 <td className="px-2 py-1 text-right">{p.stock}</td>
                 <td className="px-2 py-1 text-right">{p.stockMin}</td>
                 <td className="px-2 py-1 text-right">{p.stockMax}</td>
+
+                {/* 🟦 COSTO */}
                 <td className="px-2 py-1 text-right">
-                  {Number(p.precioCosto || 0).toFixed(2)}
+                  {localEsDeposito
+                    ? `$ ${Number(p.precioCosto || 0).toFixed(2)}`
+                    : `$ ${Number(p.precioUnitario || 0).toFixed(2)}`}
                 </td>
+
+                {/* 🟦 PRECIO VENTA */}
                 <td className="px-2 py-1 text-right">
-                  {Number(p.precioVenta || 0).toFixed(2)}
+                  {localEsDeposito
+                    ? `$ ${Number(p.precioVenta || 0).toFixed(2)}`
+                    : `$ ${Number(
+                        p.precioVentaUnitario || p.precioVenta || 0
+                      ).toFixed(2)}`}
                 </td>
 
                 <td className="px-2 py-1 text-center">
