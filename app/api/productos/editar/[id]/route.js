@@ -34,10 +34,9 @@ export async function PUT(req, context) {
     const url = new URL(req.url);
     const localId = Number(url.searchParams.get("localId") || "0");
 
-    // payload camelCase
     const payload = await req.json();
 
-    // mapper → separa camelCase UI → snake_case DB
+    // separar base vs local con snake_case
     const { baseData, localData } = splitUiToDb(payload);
 
     // depósito o sin localId → edita BASE
@@ -47,10 +46,8 @@ export async function PUT(req, context) {
       where: { id: localId },
     });
 
-    // depósito → edita base
     if (local?.es_deposito) return await editarBase(baseId, baseData);
 
-    // local común → override
     return await editarOverride(baseId, localId, localData);
   } catch (e) {
     console.error("ERROR productos/editar:", e);
@@ -62,10 +59,9 @@ export async function PUT(req, context) {
 }
 
 /* ============================================================
-   EDITAR PRODUCTO BASE
+   EDITAR PRODUCTO BASE — FIX FINAL
    ============================================================ */
 async function editarBase(baseId, baseData) {
-  // baseData YA viene con snake_case desde splitUiToDb()
   const dataFinal = {
     nombre: baseData.nombre,
     descripcion: baseData.descripcion,
@@ -92,20 +88,12 @@ async function editarBase(baseId, baseData) {
 
     imagen_url: baseData.imagen_url,
     es_combo: baseData.es_combo,
+
+    // 🔥🔥🔥 FIX CORRECTO: asignar las FKs directamente
+    categoria_id: baseData.categoria_id ? Number(baseData.categoria_id) : null,
+    proveedor_id: baseData.proveedor_id ? Number(baseData.proveedor_id) : null,
+    area_fisica_id: baseData.area_fisica_id ? Number(baseData.area_fisica_id) : null,
   };
-
-  // Relaciones (splitUiToDb ya trae categoria_id, proveedor_id, area_fisica_id)
-  if (baseData.categoria_id)
-    dataFinal.categoria = { connect: { id: Number(baseData.categoria_id) } };
-  else dataFinal.categoria = { disconnect: true };
-
-  if (baseData.proveedor_id)
-    dataFinal.proveedor = { connect: { id: Number(baseData.proveedor_id) } };
-  else dataFinal.proveedor = { disconnect: true };
-
-  if (baseData.area_fisica_id)
-    dataFinal.area_fisica = { connect: { id: Number(baseData.area_fisica_id) } };
-  else dataFinal.area_fisica = { disconnect: true };
 
   const updated = await prisma.productoBase.update({
     where: { id: baseId },

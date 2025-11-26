@@ -7,7 +7,10 @@ export async function GET(req) {
     const session = getUsuarioSession(req);
 
     if (!session) {
-      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "No autenticado" },
+        { status: 401 }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -16,42 +19,51 @@ export async function GET(req) {
     const posId = Number(searchParams.get("posId") || 0);
 
     if (!destinoId || !posId) {
-      return NextResponse.json({ ok: false, error: "destinoId y posId requeridos" }, { status: 400 });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "destinoId y posId requeridos",
+        },
+        { status: 400 }
+      );
     }
 
     // ============================================================
-    // 1) Obtener baseIds ya preparados (DEL ORIGEN)
+    // 1) Obtener baseIds ya preparados
     // ============================================================
     const detalles = await prisma.posTransferenciaDetalle.findMany({
       where: { posTransferenciaId: posId },
       include: {
-        producto: { select: { baseId: true } }
-      }
+        producto: { select: { baseId: true } },
+      },
     });
 
-    const preparadosBaseIds = new Set(detalles.map(d => d.producto.baseId));
+    const preparadosBaseIds = new Set(detalles.map((d) => d.producto.baseId));
 
     // ============================================================
     // 2) Confirmar destino
     // ============================================================
     const destino = await prisma.local.findUnique({
       where: { id: destinoId },
-      select: { es_deposito: true }
+      select: { es_deposito: true },
     });
 
     if (!destino || destino.es_deposito) {
-      return NextResponse.json({ ok: false, error: "Destino inválido" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Destino inválido" },
+        { status: 400 }
+      );
     }
 
     // Buscar depósito del grupo
     const grupoLocal = await prisma.grupoLocal.findUnique({
       where: { localId: destinoId },
-      select: { grupoId: true }
+      select: { grupoId: true },
     });
 
     const grupoDeposito = await prisma.grupoDeposito.findFirst({
       where: { grupoId: grupoLocal.grupoId },
-      select: { localId: true }
+      select: { localId: true },
     });
 
     const depositoId = grupoDeposito.localId;
@@ -62,18 +74,22 @@ export async function GET(req) {
     const productosDestino = await prisma.productoLocal.findMany({
       where: { localId: destinoId },
       include: {
-        base: true,
+        base: {
+          include: {
+            categoria: { select: { nombre: true } },
+            area_fisica: { select: { nombre: true } },
+          },
+        },
         stock: {
           where: { localId: destinoId },
-          select: { cantidad: true, stockMin: true, stockMax: true }
-        }
-      }
+          select: { cantidad: true, stockMin: true, stockMax: true },
+        },
+      },
     });
 
     const items = [];
 
     for (const p of productosDestino) {
-      // 🔥 FILTRO POR baseId
       if (preparadosBaseIds.has(p.baseId)) continue;
 
       const base = p.base;
@@ -82,21 +98,19 @@ export async function GET(req) {
       const stockActualDestino = Number(stock.cantidad || 0);
       const stockMax = Number(stock.stockMax || 0);
 
-      const sugerido = stockMax > stockActualDestino
-        ? stockMax - stockActualDestino
-        : 0;
+      const sugerido =
+        stockMax > stockActualDestino ? stockMax - stockActualDestino : 0;
 
       if (sugerido <= 0) continue;
 
-      // Producto en depósito
       const origen = await prisma.productoLocal.findFirst({
         where: { baseId: p.baseId, localId: depositoId },
         include: {
           stock: {
             where: { localId: depositoId },
-            select: { cantidad: true }
-          }
-        }
+            select: { cantidad: true },
+          },
+        },
       });
 
       const stockActualOrigen = Number(origen?.stock?.[0]?.cantidad || 0);
@@ -109,6 +123,13 @@ export async function GET(req) {
         productoNombre: p.nombre || base.nombre,
         codigoBarra: base.codigo_barra || "",
 
+        // 💥 FIX DEFINITIVO: NUNCA null, siempre string real
+        categoriaNombre:
+          base?.categoria?.nombre?.trim() || "Sin categoría",
+
+        areaFisicaNombre:
+          base?.area_fisica?.nombre?.trim() || "Sin área",
+
         stockActualDestino,
         stockMin: Number(stock.stockMin || 0),
         stockMax,
@@ -118,7 +139,7 @@ export async function GET(req) {
 
         precioCosto: Number(p.precio_costo || base.precio_costo || 0),
         unidadMedida: base.unidad_medida,
-        factorPack: Number(base.factor_pack || 1)
+        factorPack: Number(base.factor_pack || 1),
       });
     }
 
@@ -126,11 +147,13 @@ export async function GET(req) {
       ok: true,
       items,
       total: items.length,
-      error: null
+      error: null,
     });
-
   } catch (err) {
     console.error("Error sugeridos POS:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Error interno" },
+      { status: 500 }
+    );
   }
 }

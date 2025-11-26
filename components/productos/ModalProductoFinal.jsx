@@ -10,26 +10,22 @@ export default function ModalProducto({
   initialData = null,
   localId,
 }) {
-  // ✅ Nunca desmontamos el modal (NO usar return null)
   const modalRef = useRef(null);
 
   const inputClass =
     "h-[36px] w-full px-3 rounded-md border border-gray-300 bg-white text-[13px] text-gray-800 focus:border-blue-500 focus:outline-none";
 
-  /** ✅ Conversión segura */
   const toNum = (v) => {
     if (v === "" || v === null || v === undefined) return "";
     const n = Number(v);
     return Number.isFinite(n) ? n : "";
   };
 
-  /** ✅ Redondeo a 100 */
   const roundUp100 = (n) => {
     if (!Number.isFinite(n) || n <= 0) return n;
     return Math.ceil(n / 100) * 100;
   };
 
-  /** ✅ Convertimos API → Form */
   const camelToForm = (o = {}) => ({
     nombre: o.nombre ?? "",
     descripcion: o.descripcion ?? "",
@@ -63,7 +59,7 @@ export default function ModalProducto({
     camelToForm(initialData || { unidad_medida: "unidad", redondeo_100: true })
   );
 
-  /** ✅ Cuando se abre el modal → resetear los datos (pero sin desmontar) */
+  /** ⭐ FIX: NO DESMONTAR EL MODAL */
   useEffect(() => {
     if (!open) return;
     setForm(
@@ -83,7 +79,6 @@ export default function ModalProducto({
   const costo = Number(form.precio_costo) || 0;
   const usarRedondeo = Boolean(form.redondeo_100);
 
-  /** ✅ Costo */
   const onChangeCosto = (val) => {
     if (val === "") return setField("precio_costo", "");
     let pc = Number(val);
@@ -96,7 +91,6 @@ export default function ModalProducto({
     } else setField("precio_costo", pc);
   };
 
-  /** ✅ Margen */
   const onChangeMargen = (val) => {
     if (val === "") return setField("margen", "");
     let m = Number(val);
@@ -107,7 +101,6 @@ export default function ModalProducto({
     setForm((p) => ({ ...p, margen: m, precio_venta: pv }));
   };
 
-  /** ✅ Venta */
   const onChangeVenta = (val) => {
     if (val === "") return setField("precio_venta", "");
     let pv = Number(val);
@@ -118,7 +111,6 @@ export default function ModalProducto({
     setForm((p) => ({ ...p, precio_venta: pv, margen: Number(m.toFixed(2)) }));
   };
 
-  /** ✅ Validación */
   const validar = () => {
     if (!String(form.nombre).trim()) return "Completá el nombre.";
     if (!form.unidad_medida) return "Seleccioná unidad.";
@@ -137,7 +129,6 @@ export default function ModalProducto({
     return null;
   };
 
-  /** ✅ Submit */
   const handleSubmit = () => {
     const err = validar();
     if (err) return alert(err);
@@ -184,9 +175,11 @@ export default function ModalProducto({
 
   return (
     <div
-      className={`fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-3 ${
-        open ? "block" : "hidden"
-      }`}
+      className={`
+        fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-3
+        transition-opacity duration-200
+        ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}
+      `}
     >
       <div className="w-[95%] max-w-4xl bg-white rounded-xl shadow-xl overflow-hidden">
         <div className="px-5 py-3 border-b flex items-center justify-between">
@@ -199,7 +192,10 @@ export default function ModalProducto({
           </button>
         </div>
 
-        <div ref={modalRef} className="p-5 max-h-[70vh] overflow-y-auto space-y-4">
+        <div
+          ref={modalRef}
+          className="p-5 max-h-[70vh] overflow-y-auto space-y-4"
+        >
           {/* IDENTIDAD */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nombre *">
@@ -440,7 +436,11 @@ export default function ModalProducto({
 /* SUBCOMPONENTES */
 function Field({ label, children, colSpan }) {
   return (
-    <div className={colSpan ? "md:col-span-2 flex flex-col gap-1" : "flex flex-col gap-1"}>
+    <div
+      className={
+        colSpan ? "md:col-span-2 flex flex-col gap-1" : "flex flex-col gap-1"
+      }
+    >
       <label className="text-[12px] text-gray-600">{label}</label>
       {children}
     </div>

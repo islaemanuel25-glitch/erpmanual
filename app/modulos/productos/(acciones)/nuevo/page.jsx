@@ -18,15 +18,15 @@ export default function NuevoProductoPage() {
   const [open, setOpen] = useState(true);
 
   // ============================
-  // Cargar catálogos
+  // Cargar catálogos (FIX)
   // ============================
   useEffect(() => {
     const cargar = async () => {
       try {
         const [cat, prov, area] = await Promise.all([
-          fetch("/api/catalogos/categorias", { credentials: "include" }).then((r) => r.json()),
-          fetch("/api/catalogos/proveedores", { credentials: "include" }).then((r) => r.json()),
-          fetch("/api/catalogos/areas-fisicas", { credentials: "include" }).then((r) => r.json()),
+          fetch("/api/categorias/listar", { credentials: "include" }).then(r => r.json()),
+          fetch("/api/proveedores/listar", { credentials: "include" }).then(r => r.json()),
+          fetch("/api/areas-fisicas/listar", { credentials: "include" }).then(r => r.json()),
         ]);
 
         setCatalogos({

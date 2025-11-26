@@ -41,7 +41,12 @@ export async function GET(req) {
     const productos = await prisma.productoLocal.findMany({
       where: whereBusqueda,
       include: {
-        base: true,
+        base: {
+          include: {
+            categoria: true,
+            area_fisica: true,
+          },
+        },
         stock: {
           where: { localId: origenId },
           select: { cantidad: true },
@@ -61,15 +66,17 @@ export async function GET(req) {
         nombre: productoLocal.nombre || base?.nombre || "",
         codigoBarra: base?.codigo_barra || "",
 
-        stockActual,                // ✔ solo informativo
+        stockActual,
         precioCosto: Number(
           productoLocal.precio_costo || base?.precio_costo || 0
         ),
+
         unidadMedida: base?.unidad_medida || "unidad",
         factorPack: Number(base?.factor_pack || 1),
 
-        // ❗ Se quitó cantidadReal porque causaba el bug
-        // cantidadReal: stockActual,
+        // 🔥 NECESARIOS PARA LOS FILTROS (null, no vacío)
+        categoriaNombre: base?.categoria?.nombre ?? null,
+        areaFisicaNombre: base?.area_fisica?.nombre ?? null,
       };
     });
 

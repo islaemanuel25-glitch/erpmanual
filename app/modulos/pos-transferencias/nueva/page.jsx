@@ -84,10 +84,7 @@ export default function NuevaTransferenciaPage() {
     if (!origenId || !destinoId) return;
 
     const iniciar = async () => {
-      const url = new URL(
-        "/api/pos-transferencias/nueva",
-        window.location.origin
-      );
+      const url = new URL("/api/pos-transferencias/nueva", window.location.origin);
       url.searchParams.set("origenId", origenId);
       url.searchParams.set("destinoId", destinoId);
 
@@ -111,10 +108,7 @@ export default function NuevaTransferenciaPage() {
     const cargar = async () => {
       setLoadingSug(true);
 
-      const url = new URL(
-        "/api/pos-transferencias/sugeridos",
-        window.location.origin
-      );
+      const url = new URL("/api/pos-transferencias/sugeridos", window.location.origin);
       url.searchParams.set("destinoId", destinoId);
       url.searchParams.set("posId", posId);
 
@@ -124,26 +118,23 @@ export default function NuevaTransferenciaPage() {
       if (j.ok) {
         setSugeridos(
           j.items.map((s) => {
-            // s.sugerido viene en UNIDADES (faltantes)
+            console.log("🔥 SUGERIDO RAW:", s); // ✔️ ACÁ EL FIX REAL
+        
             const factor = Number(s.factorPack || s.base?.factor_pack || 1);
-            const faltanUnidades = Number(s.sugerido || 0);
-
-            // 🔥 Convertimos a BULTOS
+            const faltanUnidades = Number(s.faltanUnidades || s.sugerido || 0);
+        
             const sugeridoBultos =
-              factor > 1
-                ? Math.ceil(faltanUnidades / factor)
-                : faltanUnidades;
-
+              factor > 1 ? Math.ceil(faltanUnidades / factor) : faltanUnidades;
+        
             return {
               ...s,
               unidadPlural: unidadPlural(s.unidadMedida || "unidad"),
               factorPack: factor,
               faltanUnidades,
-              // A partir de acá, sugerido = BULTOS
               sugerido: sugeridoBultos,
             };
           })
-        );
+        );        
       }
 
       setLoadingSug(false);
@@ -157,30 +148,40 @@ export default function NuevaTransferenciaPage() {
   // ===============================
   const categoriasOpciones = useMemo(() => {
     const set = new Set(
-      sugeridos
-        .map((s) => s.categoriaNombre)
-        .filter((x) => x && x.trim() !== "")
+      sugeridos.map((s) => {
+        return s.categoriaNombre
+          ? String(s.categoriaNombre).trim()
+          : "Sin categoría";
+      })
     );
     return Array.from(set);
-  }, [sugeridos]);
+  }, [sugeridos]);  
 
   const areasOpciones = useMemo(() => {
     const set = new Set(
-      sugeridos
-        .map((s) => s.areaFisicaNombre)
-        .filter((x) => x && x.trim() !== "")
+      sugeridos.map((s) => {
+        return s.areaFisicaNombre
+          ? String(s.areaFisicaNombre).trim()
+          : "Sin área";
+      })
     );
     return Array.from(set);
-  }, [sugeridos]);
+  }, [sugeridos]);  
 
+  // ==========================================
+  //  ⭐ FIX: FILTRADO REAL Y NORMALIZADO ⭐
+  // ==========================================
   const sugeridosFiltrados = useMemo(() => {
     return sugeridos.filter((s) => {
-      const okCat =
-        categoriaFiltro === "todos" ||
-        s.categoriaNombre === categoriaFiltro;
-      const okArea =
-        areaFiltro === "todos" ||
-        s.areaFisicaNombre === areaFiltro;
+      const cat = (s.categoriaNombre || "").trim().toLowerCase();
+      const area = (s.areaFisicaNombre || "").trim().toLowerCase();
+
+      const filtroCat = categoriaFiltro.trim().toLowerCase();
+      const filtroArea = areaFiltro.trim().toLowerCase();
+
+      const okCat = filtroCat === "todos" || cat === filtroCat;
+      const okArea = filtroArea === "todos" || area === filtroArea;
+
       return okCat && okArea;
     });
   }, [sugeridos, categoriaFiltro, areaFiltro]);
@@ -209,10 +210,7 @@ export default function NuevaTransferenciaPage() {
     const cargar = async () => {
       setLoadingDetalles(true);
 
-      const url = new URL(
-        "/api/pos-transferencias/detalle",
-        window.location.origin
-      );
+      const url = new URL("/api/pos-transferencias/detalle", window.location.origin);
       url.searchParams.set("posId", posId);
 
       const r = await fetch(url, { cache: "no-store" });
@@ -231,7 +229,7 @@ export default function NuevaTransferenciaPage() {
   }, [posId]);
 
   // ===============================
-  // 7. Editar sugerido (BULTOS)
+  // 7. Editar sugerido
   // ===============================
   const handleEditSugerido = (productoLocalDestinoId, valor) => {
     const cantidadBultos = Number(valor || 0);
@@ -246,14 +244,11 @@ export default function NuevaTransferenciaPage() {
 
   // ===============================
   // 8. Marcar preparado
-  //    → preparado = BULTOS
   // ===============================
   const handleMarcarPreparado = async (productoLocalOrigenId) => {
     if (!posId) return setError("POS no generado");
 
-    const s = sugeridos.find(
-      (x) => x.productoLocalOrigenId === productoLocalOrigenId
-    );
+    const s = sugeridos.find((x) => x.productoLocalOrigenId === productoLocalOrigenId);
     if (!s) return;
 
     const cantidadBultos = Number(s.sugerido || 0);
@@ -277,15 +272,12 @@ export default function NuevaTransferenciaPage() {
     upsertDetalle(j.item);
 
     setSugeridos((prev) =>
-      prev.filter(
-        (x) => x.productoLocalOrigenId !== productoLocalOrigenId
-      )
+      prev.filter((x) => x.productoLocalOrigenId !== productoLocalOrigenId)
     );
   };
 
   // ===============================
   // 9. Agregar manual
-  //    → cantidad = 1 BULTO
   // ===============================
   const handleAgregarManual = async (p) => {
     if (!posId) return setError("POS no generado");
@@ -296,7 +288,7 @@ export default function NuevaTransferenciaPage() {
       body: JSON.stringify({
         posId,
         productoLocalId: p.productoLocalId,
-        cantidad: 1, // 1 bulto
+        cantidad: 1,
         tipo: "manual",
       }),
     });
@@ -309,7 +301,6 @@ export default function NuevaTransferenciaPage() {
 
   // ===============================
   // 10. Editar preparado
-  //     → preparado = BULTOS
   // ===============================
   const handleEditCantidad = async (detalleId, valor) => {
     const cantidadBultos = Number(valor || 0);
@@ -355,15 +346,22 @@ export default function NuevaTransferenciaPage() {
       {
         productoLocalDestinoId: d.productoLocalId,
         productoLocalOrigenId: d.productoLocalId,
+    
         baseId: d.baseId,
         productoNombre: d.productoNombre,
         codigoBarra: d.codigoBarra,
+    
         stockActual: d.stockActual,
         cantidadReal: d.cantidadReal,
+    
         precioCosto: d.precioCosto,
         unidadMedida: d.unidadMedida,
         factorPack: d.factorPack,
         sugerido: d.sugerido,
+    
+        // 🔥 Recuperar categoría/área desde la estructura real
+        categoriaNombre: d.producto?.base?.categoria?.nombre || "Sin categoría",
+areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
       },
     ]);
   };
@@ -451,7 +449,7 @@ export default function NuevaTransferenciaPage() {
           POS – Preparación
         </h1>
 
-        {/* TARJETA GRANDE SUNMI */}
+        {/* TARJETA */}
         <div
           className="
             bg-slate-800/70 
@@ -525,7 +523,7 @@ export default function NuevaTransferenciaPage() {
             </div>
           )}
 
-          {/* BUTTON SEND */}
+          {/* ENVIAR */}
           <button
             disabled={enviando}
             onClick={enviarPOS}
