@@ -249,19 +249,20 @@ export default function ModalProducto({
             </Field>
 
             <Field label="Proveedor">
-              <select
-                className={inputClass}
-                value={form.proveedor_id}
-                onChange={(e) => setField("proveedor_id", e.target.value)}
-              >
-                <option value="">-</option>
-                {catalogos.PROVEEDORES?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </Field>
+  <select
+    className={inputClass}
+    value={form.proveedor_id}
+    onChange={(e) => setField("proveedor_id", Number(e.target.value))}
+  >
+    <option value="">-</option>
+    {catalogos.PROVEEDORES?.map((c) => (
+      <option key={c.id} value={c.id}>
+        {c.nombre}
+      </option>
+    ))}
+  </select>
+</Field>
+
 
             <Field label="Área física">
               <select

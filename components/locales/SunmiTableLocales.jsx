@@ -16,58 +16,51 @@ export default function SunmiTableLocales({
   onNext,
   accionesPersonalizadas,
 }) {
+  
+  // ==========================
+  // ARMAR HEADERS SUNMI
+  // ==========================
+  const headers = [
+    ...columnas.map((c) => c.titulo),
+    accionesPersonalizadas ? "Acciones" : null,
+  ].filter(Boolean);
+
   return (
     <div className="sunmi-card border border-slate-800 rounded-2xl shadow-md p-0 overflow-hidden bg-slate-950">
 
-      {/* HEADER SUNMI */}
       <SunmiHeader title="Locales" color="amber" />
 
       <SunmiSeparator label="Listado" color="amber" />
 
-      {/* TABLA SUNMI */}
       <div className="overflow-x-auto">
-        <SunmiTable>
-          <thead>
-            <tr className="bg-slate-900">
+        {/* 
+          ⛔ YA NO USAMOS <thead> / <tbody> manuales 
+          ✔ SunmiTable genera la estructura.
+        */}
+        <SunmiTable headers={headers}>
+
+          {/* NO HAY DATOS */}
+          {datos.length === 0 && (
+            <SunmiTableEmpty message="No hay locales para mostrar" />
+          )}
+
+          {/* FILAS */}
+          {datos.map((row, idx) => (
+            <SunmiTableRow key={idx}>
               {columnas.map((col) => (
-                <th
-                  key={col.key}
-                  className="text-left px-3 py-2 text-[12px] font-semibold uppercase tracking-wide"
-                >
-                  {col.titulo}
-                </th>
+                <td key={col.key} className="px-3 py-2 text-[12px]">
+                  {col.render ? col.render(row[col.key], row) : row[col.key]}
+                </td>
               ))}
 
+              {/* ACCIONES PERSONALIZADAS */}
               {accionesPersonalizadas && (
-                <th className="text-left px-3 py-2 text-[12px] font-semibold uppercase tracking-wide">
-                  Acciones
-                </th>
+                <td className="px-3 py-2 text-right text-[13px]">
+                  {accionesPersonalizadas(row)}
+                </td>
               )}
-            </tr>
-          </thead>
-
-          <tbody>
-            {datos.length === 0 && (
-              <SunmiTableEmpty message="No hay locales para mostrar" />
-            )}
-
-            {datos.map((row, idx) => (
-              <SunmiTableRow key={idx}>
-                {columnas.map((col) => (
-                  <td key={col.key} className="px-3 py-2 text-[12px]">
-                    {col.render ? col.render(row[col.key], row) : row[col.key]}
-                  </td>
-                ))}
-
-                {/* ACCIONES */}
-                {accionesPersonalizadas && (
-                  <td className="px-3 py-2 text-right text-[13px]">
-                    {accionesPersonalizadas(row)}
-                  </td>
-                )}
-              </SunmiTableRow>
-            ))}
-          </tbody>
+            </SunmiTableRow>
+          ))}
         </SunmiTable>
       </div>
 

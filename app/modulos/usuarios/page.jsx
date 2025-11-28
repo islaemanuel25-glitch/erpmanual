@@ -246,71 +246,78 @@ export default function UsuariosPage() {
         <SunmiSeparator label="Listado" color="amber" />
 
         <div className="overflow-x-auto rounded-2xl border border-slate-800">
-          <SunmiTable>
-            <thead>
-              <tr className="bg-amber-400 text-slate-900 text-[12px] uppercase tracking-wide">
-                <th className="px-3 py-2 text-left">Usuario</th>
-                <th className="px-3 py-2 text-left">Rol</th>
-                <th className="px-3 py-2 text-left">Local</th>
-                <th className="px-3 py-2 text-left">Estado</th>
-                <th className="px-3 py-2 text-right">Acciones</th>
-              </tr>
-            </thead>
+  <SunmiTable
+    headers={[
+      "Usuario",
+      "Rol",
+      "Local",
+      "Estado",
+      "Acciones",
+    ]}
+  >
+    {usuarios.length === 0 && (
+      <SunmiTableEmpty mensaje="No hay usuarios para mostrar" />
+    )}
 
-            <tbody>
-              {usuarios.length === 0 && (
-                <SunmiTableEmpty message="No hay usuarios para mostrar" />
-              )}
+    {usuarios.map((row) => (
+      <SunmiTableRow key={row.id}>
+        {/* Usuario */}
+        <td className="px-3 py-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-xs font-bold">
+              {row.nombre?.[0] ?? "?"}
+            </div>
 
-              {usuarios.map((row) => (
-                <SunmiTableRow key={row.id}>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-xs font-bold">
-                        {row.nombre?.[0] ?? "?"}
-                      </div>
+            <div className="flex flex-col">
+              <span className="text-[13px] font-medium">
+                {row.nombre}
+              </span>
+              <span className="text-[11px] text-slate-400">
+                {row.email}
+              </span>
+            </div>
+          </div>
+        </td>
 
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-medium">
-                          {row.nombre}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {row.email}
-                        </span>
-                      </div>
-                    </div>
-                  </td>
+        {/* Rol */}
+        <td className="px-3 py-2">
+          {row.rol?.nombre ?? "—"}
+        </td>
 
-                  <td className="px-3 py-2">{row.rol?.nombre ?? "—"}</td>
-                  <td className="px-3 py-2">{row.local?.nombre ?? "—"}</td>
+        {/* Local */}
+        <td className="px-3 py-2">
+          {row.local?.nombre ?? "—"}
+        </td>
 
-                  <td className="px-3 py-2">
-                    <SunmiBadgeEstado estado={row.activo ? "activo" : "inactivo"} />
-                  </td>
+        {/* Estado */}
+        <td className="px-3 py-2">
+          <SunmiBadgeEstado estado={row.activo} />
+        </td>
 
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex gap-3 justify-end text-[15px]">
-                      <button
-                        onClick={() =>
-                          router.push(`/modulos/usuarios?editar=${row.id}`)
-                        }
-                        className="text-amber-300 hover:text-amber-200"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleEliminar(row.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </SunmiTableRow>
-              ))}
-            </tbody>
-          </SunmiTable>
-        </div>
+        {/* Acciones */}
+        <td className="px-3 py-2 text-right">
+          <div className="flex gap-3 justify-end text-[15px]">
+            <button
+              onClick={() =>
+                router.push(`/modulos/usuarios?editar=${row.id}`)
+              }
+              className="text-amber-300 hover:text-amber-200"
+            >
+              ✏️
+            </button>
+            <button
+              onClick={() => handleEliminar(row.id)}
+              className="text-red-400 hover:text-red-300"
+            >
+              🗑️
+            </button>
+          </div>
+        </td>
+      </SunmiTableRow>
+    ))}
+  </SunmiTable>
+</div>
+
 
         <div className="flex justify-between pt-4 px-2">
           <SunmiButton

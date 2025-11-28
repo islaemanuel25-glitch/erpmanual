@@ -111,18 +111,21 @@ model Categoria {
 }
 
 model Proveedor {
-  id         Int            @id @default(autoincrement())
-  nombre     String
-  cuit       String?        @unique
-  telefono   String?
-  email      String?
-  direccion  String?
-  diaPedidos DiaPedido?
-  activo     Boolean        @default(true)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  productos  ProductoBase[]
+  id          Int            @id @default(autoincrement())
+  nombre      String
+  cuit        String?        @unique
+  telefono    String?
+  email       String?
+  direccion   String?
+
+  dias_pedido DiaPedido[]    @default([])
+
+  activo      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  productos   ProductoBase[]
 }
+
 
 model AreaFisica {
   id          Int            @id @default(autoincrement())

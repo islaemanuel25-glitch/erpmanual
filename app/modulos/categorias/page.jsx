@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -42,13 +42,13 @@ export default function CategoriasPage() {
   // MODAL
   // ============================================
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState("nuevo"); // "nuevo" | "editar"
+  const [modalMode, setModalMode] = useState("nuevo"); 
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
 
   // ============================================
-  // CARGAR LISTA
+  // CARGAR LISTA (REFORMADO)
   // ============================================
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -73,29 +73,28 @@ export default function CategoriasPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, estado, search, router]);
 
   // ============================================
-  // REACT AL CAMBIO DE FILTROS
+  // CAMBIO DE FILTROS → SOLO reset page
   // ============================================
   useEffect(() => {
     const delay = setTimeout(() => {
       setPage(1);
-      cargar();
-    }, 300); // debounce
+    }, 250);
 
     return () => clearTimeout(delay);
   }, [search, estado]);
 
   // ============================================
-  // REACT A CAMBIO DE PAGE
+  // CAMBIO DE PAGE → disparamos cargar()
   // ============================================
   useEffect(() => {
     cargar();
-  }, [page]);
+  }, [page, cargar]);
 
   // ============================================
-  // ABRIR MODALES
+  // MODALES
   // ============================================
   const abrirNuevo = () => {
     setModalMode("nuevo");
@@ -109,13 +108,9 @@ export default function CategoriasPage() {
     setModalOpen(true);
   };
 
-  const cerrarModal = () => {
-    setModalOpen(false);
-  };
+  const cerrarModal = () => setModalOpen(false);
 
-  const refrescar = () => {
-    cargar();
-  };
+  const refrescar = () => cargar();
 
   // ============================================
   // LIMPIAR FILTROS
@@ -141,10 +136,7 @@ export default function CategoriasPage() {
 
       const data = await res.json();
 
-      if (!data.ok) {
-        alert(data.error || "Error al eliminar");
-        return;
-      }
+      if (!data.ok) return alert(data.error || "Error al eliminar");
 
       cargar();
 
@@ -160,7 +152,6 @@ export default function CategoriasPage() {
   return (
     <div className="p-3 space-y-4">
 
-      {/* HEADER */}
       <SunmiHeader titulo="📁 Categorías" />
 
       <SunmiCard>
@@ -168,14 +159,12 @@ export default function CategoriasPage() {
         {/* ========= FILTROS ========= */}
         <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
 
-          {/* Buscador */}
           <SunmiInput
             placeholder="Buscar por nombre..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          {/* Estado */}
           <SunmiSelectAdv
             value={estado}
             onChange={(v) => setEstado(v)}
@@ -186,7 +175,6 @@ export default function CategoriasPage() {
             ]}
           />
 
-          {/* Botones */}
           <div className="flex gap-2">
             <SunmiButton
               variant="secondary"
@@ -223,19 +211,25 @@ export default function CategoriasPage() {
                   </td>
 
                   <td className="px-3 py-2 flex gap-3">
-                    <button
-                      className="text-amber-400 hover:underline"
+
+                    {/* EDITAR */}
+                    <SunmiButton
+                      variant="ghost"
+                      className="text-amber-400 px-2"
                       onClick={() => abrirEditar(item)}
                     >
                       Editar
-                    </button>
+                    </SunmiButton>
 
-                    <button
-                      className="text-red-400 hover:underline"
+                    {/* ELIMINAR */}
+                    <SunmiButton
+                      variant="danger"
+                      className="px-2"
                       onClick={() => eliminar(item.id)}
                     >
                       Eliminar
-                    </button>
+                    </SunmiButton>
+
                   </td>
                 </SunmiTableRow>
               ))
@@ -268,7 +262,6 @@ export default function CategoriasPage() {
         </div>
       </SunmiCard>
 
-      {/* ========= MODAL ========= */}
       <ModalCategoria
         open={modalOpen}
         mode={modalMode}

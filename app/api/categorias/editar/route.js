@@ -8,7 +8,7 @@ export async function PUT(req) {
     let { id, nombre, activo } = body;
 
     // ================================
-    // 🔍 Validación básica
+    // 🟠 Validación ID
     // ================================
     id = Number(id);
     if (!id) {
@@ -18,6 +18,9 @@ export async function PUT(req) {
       );
     }
 
+    // ================================
+    // 🟠 Validación nombre
+    // ================================
     if (!nombre || typeof nombre !== "string") {
       return NextResponse.json(
         { ok: false, error: "El nombre es requerido" },
@@ -34,10 +37,11 @@ export async function PUT(req) {
     }
 
     // ================================
-    // 🔍 Verificar que exista
+    // 🔍 Verificar existencia
     // ================================
     const categoria = await prisma.categoria.findUnique({
       where: { id },
+      select: { id: true },
     });
 
     if (!categoria) {
@@ -48,8 +52,7 @@ export async function PUT(req) {
     }
 
     // ================================
-    // 🔍 Duplicado case-insensitive
-    // Ignora la categoría actual
+    // 🔍 Duplicado ignorando la actual
     // ================================
     const duplicado = await prisma.categoria.findFirst({
       where: {
@@ -65,7 +68,7 @@ export async function PUT(req) {
     if (duplicado) {
       return NextResponse.json(
         { ok: false, error: "Ya existe otra categoría con ese nombre" },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
@@ -80,12 +83,15 @@ export async function PUT(req) {
       },
     });
 
-    return NextResponse.json({ ok: true, item: actualizada });
+    return NextResponse.json({
+      ok: true,
+      item: actualizada,
+    });
 
   } catch (e) {
-    console.error("ERROR /api/categorias/editar", e);
+    console.error("ERROR /api/categorias/editar:", e);
     return NextResponse.json(
-      { ok: false, error: "Error al editar categoría" },
+      { ok: false, error: "Error interno al editar categoría" },
       { status: 500 }
     );
   }

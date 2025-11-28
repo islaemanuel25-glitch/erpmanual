@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import FilaTransferencia from "./FilaTransferencia";
 
 const formatDate = (value) => {
@@ -14,36 +15,34 @@ export default function TablaTransferencias({
   filaAbierta,
   setFilaAbierta,
 }) {
+  // Armar headers dinámicos:
+  const headers = [
+    columns.id && "ID",
+    columns.origen && "Origen",
+    columns.destino && "Destino",
+    columns.estado && "Estado",
+    columns.recepcion && "Recepción",
+    columns.items && "Ítems",
+    columns.importe && "Importe",
+    columns.fechaEnvio && "Fecha envío",
+    columns.fechaRecepcion && "Fecha recepción",
+    columns.acciones && "",
+  ].filter(Boolean);
+
   return (
     <div className="w-full overflow-x-auto rounded-xl border border-slate-700 mx-1 mb-2">
-      <SunmiTable className="min-w-[1000px]">
-        <thead>
-          <tr>
-            {columns.id && <th>ID</th>}
-            {columns.origen && <th>Origen</th>}
-            {columns.destino && <th>Destino</th>}
-            {columns.estado && <th>Estado</th>}
-            {columns.recepcion && <th>Recepción</th>}
-            {columns.items && <th>Ítems</th>}
-            {columns.importe && <th>Importe</th>}
-            {columns.fechaEnvio && <th>Fecha envío</th>}
-            {columns.fechaRecepcion && <th>Fecha recepción</th>}
-            {columns.acciones && <th></th>}
-          </tr>
-        </thead>
-
-        <tbody>
-          {items.map((t) => (
+      <SunmiTable headers={headers} className="min-w-[1000px]">
+        {items.map((t) => (
+          <SunmiTableRow key={t.id}>
             <FilaTransferencia
-              key={t.id}
               t={t}
               columns={columns}
               filaAbierta={filaAbierta}
               setFilaAbierta={setFilaAbierta}
               formatDate={formatDate}
             />
-          ))}
-        </tbody>
+          </SunmiTableRow>
+        ))}
       </SunmiTable>
     </div>
   );

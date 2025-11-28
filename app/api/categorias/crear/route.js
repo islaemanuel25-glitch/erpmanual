@@ -7,6 +7,9 @@ export async function POST(req) {
     const body = await req.json();
     let { nombre, activo = true } = body;
 
+    // ================================
+    // 🟠 Validación nombre
+    // ================================
     if (!nombre || typeof nombre !== "string") {
       return NextResponse.json(
         { ok: false, error: "El nombre es requerido" },
@@ -23,9 +26,9 @@ export async function POST(req) {
       );
     }
 
-    // =====================================
-    // 🔍 Validar duplicado case-insensitive
-    // =====================================
+    // ================================
+    // 🔍 Duplicado case-insensitive
+    // ================================
     const existe = await prisma.categoria.findFirst({
       where: {
         nombre: {
@@ -39,23 +42,32 @@ export async function POST(req) {
     if (existe) {
       return NextResponse.json(
         { ok: false, error: "Ya existe una categoría con ese nombre" },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
-    // =====================================
-    // 🟢 Crear categoría
-    // =====================================
+    // ================================
+    // 🟢 Crear registro
+    // ================================
     const nueva = await prisma.categoria.create({
-      data: { nombre, activo: Boolean(activo) },
+      data: {
+        nombre,
+        activo: Boolean(activo),
+      },
     });
 
-    return NextResponse.json({ ok: true, item: nueva });
+    return NextResponse.json({
+      ok: true,
+      item: nueva,
+    });
 
   } catch (e) {
-    console.error("ERROR /api/categorias/crear", e);
+    console.error("ERROR /api/categorias/crear:", e);
     return NextResponse.json(
-      { ok: false, error: "Error al crear categoría" },
+      {
+        ok: false,
+        error: "Error interno al crear categoría",
+      },
       { status: 500 }
     );
   }

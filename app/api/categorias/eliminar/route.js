@@ -8,7 +8,7 @@ export async function POST(req) {
     const id = Number(body.id);
 
     // ================================
-    // 🔍 Validar ID
+    // 🟠 Validar ID
     // ================================
     if (!id) {
       return NextResponse.json(
@@ -33,7 +33,7 @@ export async function POST(req) {
     }
 
     // ================================
-    // 🔍 Verificar si tiene productos
+    // 🔍 Verificar uso en productos
     // ================================
     const enUso = await prisma.productoBase.findFirst({
       where: { categoria_id: id },
@@ -61,9 +61,9 @@ export async function POST(req) {
     return NextResponse.json({ ok: true });
 
   } catch (e) {
-    console.error("ERROR /api/categorias/eliminar", e);
+    console.error("ERROR /api/categorias/eliminar:", e);
     return NextResponse.json(
-      { ok: false, error: "Error al eliminar categoría" },
+      { ok: false, error: "Error interno al eliminar categoría" },
       { status: 500 }
     );
   }

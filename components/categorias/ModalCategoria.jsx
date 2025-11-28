@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
@@ -30,16 +31,16 @@ export default function ModalCategoria({
   // CARGA DATOS EN EDICIÓN
   // =========================
   useEffect(() => {
-    if (open) {
-      if (editMode && initialData) {
-        setForm({
-          nombre: initialData.nombre || "",
-          activo: Boolean(initialData.activo),
-        });
-      } else {
-        // NUEVO → SIEMPRE VACÍO (tu regla permanente)
-        setForm({ nombre: "", activo: true });
-      }
+    if (!open) return;
+
+    if (editMode && initialData) {
+      setForm({
+        nombre: initialData.nombre || "",
+        activo: Boolean(initialData.activo),
+      });
+    } else {
+      // NUEVO → VACÍO por regla del usuario
+      setForm({ nombre: "", activo: true });
     }
   }, [open, editMode, initialData]);
 
@@ -109,14 +110,13 @@ export default function ModalCategoria({
         p-4
       "
     >
-      <SunmiCard className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-0 overflow-hidden">
-        
-        {/* ================================ */}
-        {/* HEADER */}
-        {/* ================================ */}
-        <div className="bg-amber-400 text-slate-900 px-4 py-3 font-semibold text-lg">
-          {editMode ? "Editar categoría" : "Nueva categoría"}
-        </div>
+      {/* CARD SUNMI */}
+      <SunmiCard className="w-full max-w-md p-0 overflow-hidden">
+
+        {/* ===== HEADER ===== */}
+        <SunmiCardHeader
+          titulo={editMode ? "Editar categoría" : "Nueva categoría"}
+        />
 
         <div className="p-4 space-y-4">
 
@@ -147,7 +147,7 @@ export default function ModalCategoria({
 
           <SunmiSeparator />
 
-          {/* BOTONES */}
+          {/* Botones */}
           <div className="flex justify-end gap-3">
             <SunmiButton
               variant="secondary"
