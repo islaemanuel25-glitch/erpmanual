@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiPill from "@/components/sunmi/SunmiPill";
 
 export default function SelectorLocales({ value, onChange }) {
   const [locales, setLocales] = useState([]);
@@ -22,12 +25,12 @@ export default function SelectorLocales({ value, onChange }) {
     setLoading(false);
   };
 
-  // cargar locales una vez
+  // cargar una sola vez
   useEffect(() => {
     cargarLocales();
   }, []);
 
-  // verificar si el localId guardado existe realmente
+  // verificar si el localId guardado existe
   useEffect(() => {
     if (!value) return;
 
@@ -39,7 +42,7 @@ export default function SelectorLocales({ value, onChange }) {
         const data = await res.json();
 
         if (!data.ok) {
-          console.warn("⚠️ localId inválido encontrado → limpiando storage");
+          console.warn("⚠️ localId inválido → limpiando storage");
           localStorage.removeItem("productos_localId");
           onChange(0);
         }
@@ -51,30 +54,30 @@ export default function SelectorLocales({ value, onChange }) {
     verificar();
   }, [value, onChange]);
 
-  const handleSelect = (e) => {
-    const nuevo = Number(e.target.value);
+  const handleSelect = (v) => {
+    const nuevo = Number(v);
     onChange(nuevo);
     localStorage.setItem("productos_localId", String(nuevo));
   };
 
   return (
-    <div className="flex flex-col gap-1 w-full max-w-sm">
-      <label className="text-gray-700 text-sm font-medium">Local</label>
+    <div className="flex flex-col gap-2 w-full max-w-xs">
+      <label className="text-[12px] text-slate-400">Local</label>
 
-      <select
-        disabled={loading}
-        className="border rounded px-3 py-2 bg-white"
-        value={value}
+      <SunmiSelectAdv
+        value={String(value)}
         onChange={handleSelect}
+        placeholder="Seleccionar local…"
+        className="w-full"
       >
-        <option value={0}>Administración global</option>
+        <SunmiSelectOption value="0">Administración global</SunmiSelectOption>
 
         {locales.map((loc) => (
-          <option key={loc.id} value={loc.id}>
-            {loc.nombre} {loc.es_deposito ? "(Depósito)" : ""}
-          </option>
+          <SunmiSelectOption key={loc.id} value={String(loc.id)}>
+            {loc.nombre} {loc.es_deposito ? " (Depósito)" : ""}
+          </SunmiSelectOption>
         ))}
-      </select>
+      </SunmiSelectAdv>
     </div>
   );
 }

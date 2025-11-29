@@ -1,6 +1,12 @@
 "use client";
-import { useState, useRef, useEffect, Children, isValidElement } from "react";
-import { ChevronDown } from "lucide-react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  Children,
+  isValidElement,
+} from "react";
+import { ChevronDown, Check } from "lucide-react";
 
 export default function SunmiSelectAdv({
   value,
@@ -8,6 +14,7 @@ export default function SunmiSelectAdv({
   children,
   placeholder = "Seleccionar...",
   className = "",
+  multiple = false, // 🔥 ahora soporta multiple
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -20,7 +27,8 @@ export default function SunmiSelectAdv({
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // FILTRAR SOLO CHILDREN VÁLIDOS
@@ -28,15 +36,51 @@ export default function SunmiSelectAdv({
     isValidElement(c)
   );
 
-  // obtener texto actual
+  const isSelected = (v) => {
+    if (!multiple) return v == value;
+    return Array.isArray(value) && value.includes(v);
+  };
+
+  // TEXTO DEL BOTÓN
   const currentText = (() => {
-    const found = optionList.find((c) => c.props?.value == value);
-    return found ? found.props.children : placeholder;
+    if (multiple) {
+      if (!Array.isArray(value) || value.length === 0)
+        return placeholder;
+
+      if (value.length <= 2) {
+        return value.join(", ");
+      }
+
+      return `${value.length} seleccionados`;
+    }
+
+    const f = optionList.find((c) => c.props.value == value);
+    return f ? f.props.children : placeholder;
   })();
+
+  // HANDLER CLICK
+  const handleClick = (val) => {
+    if (!multiple) {
+      onChange(val);
+      setOpen(false);
+      return;
+    }
+
+    // MULTIPLE: gestionar arrays
+    let newArr = Array.isArray(value) ? [...value] : [];
+
+    if (newArr.includes(val)) {
+      newArr = newArr.filter((v) => v !== val);
+    } else {
+      newArr.push(val);
+    }
+
+    onChange(newArr);
+  };
 
   return (
     <div ref={ref} className={`relative w-full ${className}`}>
-      {/* CONTENEDOR VISUAL */}
+      {/* BOTÓN PRINCIPAL */}
       <button
         onClick={() => setOpen(!open)}
         className="
@@ -69,31 +113,37 @@ export default function SunmiSelectAdv({
             max-h-52 overflow-y-auto
           "
         >
-          {optionList.map((child, idx) => (
-            <div
-              key={idx}
-              onClick={() => {
-                // 🔥 onChange recibe directamente el valor, no un event
-                onChange(child.props.value);
-                setOpen(false);
-              }}
-              className="
-                px-4 py-2 text-sm cursor-pointer
-                text-slate-200
-                hover:bg-amber-500 hover:text-slate-900
-                transition-all
-              "
-            >
-              {child.props.children}
-            </div>
-          ))}
+          {optionList.map((child, idx) => {
+            const val = child.props.value;
+            const selected = isSelected(val);
+
+            return (
+              <div
+                key={idx}
+                onClick={() => handleClick(val)}
+                className={`
+                  px-4 py-2 text-sm cursor-pointer flex items-center gap-2
+                  ${selected ? "bg-amber-500 text-slate-900" : "text-slate-200"}
+                  hover:bg-amber-400 hover:text-slate-900
+                  transition-all
+                `}
+              >
+                {multiple && (
+                  <Check
+                    size={16}
+                    className={selected ? "opacity-100" : "opacity-0"}
+                  />
+                )}
+                {child.props.children}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-/* 🔥 ESTA PARTE ERA LA QUE FALTABA */
 export function SunmiSelectOption({ value, children }) {
   return <div value={value}>{children}</div>;
 }

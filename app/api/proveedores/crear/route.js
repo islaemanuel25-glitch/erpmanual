@@ -30,19 +30,33 @@ export async function POST(req) {
       );
     }
 
+    // 🔥 MAPEADOR FRONT → ENUM PRISMA
+    const mapDias = {
+      "Lunes": "Lunes",
+      "Martes": "Martes",
+      "Miércoles": "Miercoles",
+      "Jueves": "Jueves",
+      "Viernes": "Viernes",
+      "Sábado": "Sabado",
+      "Domingo": "Domingo",
+    };
+
+    const diasEnum = (dias_pedido || []).map(d => mapDias[d]);
+
     const item = await prisma.proveedor.create({
       data: {
-        nombre,
-        cuit,
-        telefono,
-        email,
-        direccion,
-        dias_pedido,
-        activo,
+        nombre: nombre.trim(),
+        cuit: cuit || null,
+        telefono: telefono || null,
+        email: email || null,
+        direccion: direccion || null,
+        dias_pedido: diasEnum,
+        activo: Boolean(activo),
       },
     });
 
     return NextResponse.json({ ok: true, item });
+
   } catch (e) {
     console.error("Error CREAR PROVEEDOR:", e);
     return NextResponse.json(

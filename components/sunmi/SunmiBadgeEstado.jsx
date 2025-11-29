@@ -1,11 +1,15 @@
 "use client";
 
-export default function SunmiBadgeEstado({ estado = "" }) {
-
-  // convertir boolean -> string estándar
-  const valor = typeof estado === "boolean"
-    ? (estado ? "activo" : "inactivo")
-    : (estado?.toString().toLowerCase() || "");
+export default function SunmiBadgeEstado({ value }) {
+  // Normalizar cualquier valor recibido:
+  // true, "activo", 1 → activo
+  // false, "inactivo", 0 → inactivo
+  const normalized =
+    typeof value === "boolean"
+      ? (value ? "activo" : "inactivo")
+      : value?.toString().toLowerCase() === "true"
+      ? "activo"
+      : value?.toString().toLowerCase();
 
   const map = {
     activo: {
@@ -18,7 +22,7 @@ export default function SunmiBadgeEstado({ estado = "" }) {
     },
   };
 
-  const data = map[valor] || map["inactivo"];
+  const data = map[normalized] || map["inactivo"];
 
   return (
     <span

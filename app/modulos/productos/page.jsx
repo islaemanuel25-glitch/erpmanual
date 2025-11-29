@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import FiltrosProductos from "@/components/productos/FiltrosProductos";
 import ColumnManager from "@/components/productos/ColumnManager";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
-import TablaProductos from "@/components/productos/TablaProductos";
+import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import SelectorLocales from "@/components/productos/SelectorLocales";
 
 export default function ProductosPage() {
@@ -76,9 +76,7 @@ export default function ProductosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  // ================================================
   // Cargar catálogos
-  // ================================================
   const fetchCatalogos = async () => {
     try {
       const [cat, prov, area] = await Promise.all([
@@ -97,9 +95,7 @@ export default function ProductosPage() {
     }
   };
 
-  // ================================================
   // Cargar productos
-  // ================================================
   const fetchProductos = async () => {
     setLoading(true);
     try {
@@ -137,9 +133,7 @@ export default function ProductosPage() {
     fetchProductos();
   }, [page, filtros, localId]);
 
-  // ================================================
   // Crear / Editar
-  // ================================================
   const handleSubmit = async (form) => {
     try {
       const isEdit = Boolean(editing);
@@ -170,9 +164,7 @@ export default function ProductosPage() {
     }
   };
 
-  // ================================================
   // Editar
-  // ================================================
   const handleEditar = async (id) => {
     try {
       const r = await fetch(`/api/productos/obtener?id=${id}&localId=${localId}`, {
@@ -190,9 +182,7 @@ export default function ProductosPage() {
     }
   };
 
-  // ================================================
   // Eliminar
-  // ================================================
   const handleEliminar = async (id) => {
     if (!confirm("¿Eliminar producto?")) return;
 
@@ -245,7 +235,7 @@ export default function ProductosPage() {
       </div>
 
       <div className="overflow-x-auto w-full border rounded-lg">
-        <TablaProductos
+        <SunmiTablaProductos
           rows={rows}
           columns={allColumns.filter((c) => visibleCols.includes(c.key))}
           page={page}

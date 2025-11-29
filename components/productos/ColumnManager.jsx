@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Settings2, Search } from "lucide-react";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
   const [open, setOpen] = useState(false);
@@ -21,6 +23,7 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
     const next = visibleKeys.includes(key)
       ? visibleKeys.filter((k) => k !== key)
       : [...visibleKeys, key];
+
     onChange(next);
   };
 
@@ -32,64 +35,78 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
 
   return (
     <div className="relative" ref={ref}>
-      {/* Botón (está a la derecha del header) */}
-      <button
+      {/* BOTÓN SUNMI */}
+      <SunmiButton
+        color="slate"
+        className="flex items-center gap-2"
         onClick={() => setOpen((v) => !v)}
-        className="h-[36px] px-3 rounded-md border bg-white text-gray-700 flex items-center gap-2 text-[14px] hover:bg-gray-50"
       >
         <Settings2 size={16} />
         Columnas
-      </button>
+      </SunmiButton>
 
-      {/* Dropdown: ANCLADO A LA DERECHA, ABRE HACIA LA IZQUIERDA */}
       {open && (
         <div
           className="
-            absolute right-0 mt-2 w-72
-            bg-white border rounded-xl shadow-xl z-[9999]
-            p-3
+            absolute right-0 mt-2 w-80 z-[9999]
+            bg-slate-900 border border-slate-700
+            rounded-2xl shadow-xl p-3
+            animate-fadeIn
           "
         >
-          <div className="relative mb-2">
-            <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
+          {/* BUSCADOR */}
+          <div className="mb-3">
+            <SunmiInput
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar columna…"
-              className="w-full h-8 pl-8 pr-2 rounded-md border text-[13px] focus:border-blue-500"
+              icon="search"
             />
           </div>
 
-          <p className="text-[12px] font-semibold text-gray-600 mb-2">Columnas visibles</p>
+          <p className="text-[12px] text-slate-400 px-1 mb-1">
+            Columnas visibles
+          </p>
 
+          {/* LISTA */}
           <div className="max-h-64 overflow-y-auto pr-1 space-y-2">
             {filtered.map((c) => (
               <label
                 key={c.key}
-                className="flex items-center justify-between gap-2 px-2 py-1 rounded-md hover:bg-gray-100 cursor-pointer text-sm"
-                title={c.key}
+                className="
+                  flex items-center justify-between gap-2
+                  px-2 py-2 rounded-lg
+                  bg-slate-800 hover:bg-slate-700
+                  cursor-pointer text-sm text-slate-200
+                "
               >
                 <span className="truncate">{c.label}</span>
+
                 <input
                   type="checkbox"
-                  className="w-4 h-4 accent-blue-600 cursor-pointer"
+                  className="w-4 h-4 accent-amber-400 cursor-pointer"
                   checked={visibleKeys.includes(c.key)}
                   onChange={() => toggle(c.key)}
                 />
               </label>
             ))}
+
             {filtered.length === 0 && (
-              <div className="text-xs text-gray-500 px-2 py-1">Sin resultados</div>
+              <div className="text-xs text-slate-500 px-2 py-1">
+                Sin resultados
+              </div>
             )}
           </div>
 
-          <div className="mt-3 flex justify-end">
-            <button
+          {/* BOTÓN CERRAR */}
+          <div className="mt-4 flex justify-end">
+            <SunmiButton
+              color="cyan"
               onClick={() => setOpen(false)}
-              className="h-8 px-3 rounded-md border bg-gray-50 text-[13px]"
+              className="px-4 py-1"
             >
               Cerrar
-            </button>
+            </SunmiButton>
           </div>
         </div>
       )}

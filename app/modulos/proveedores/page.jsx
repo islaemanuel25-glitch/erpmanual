@@ -12,6 +12,9 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+
+import SunmiPill from "@/components/sunmi/SunmiPill"; // 🔥 agregado para chips
 
 import ModalProveedor from "@/components/proveedores/ModalProveedor";
 
@@ -35,9 +38,9 @@ export default function ProveedoresPage() {
 
   const [editData, setEditData] = useState(null);
 
-  // ---------------------------------------------------------
+  // =========================================================
   // CARGAR LISTA
-  // ---------------------------------------------------------
+  // =========================================================
   const cargar = async () => {
     try {
       setLoading(true);
@@ -46,6 +49,7 @@ export default function ProveedoresPage() {
         `/api/proveedores/listar?search=${search}&estado=${estado}&page=${page}&pageSize=${PAGE_SIZE}`,
         { credentials: "include" }
       );
+
       const data = await res.json();
 
       if (data.ok) {
@@ -61,9 +65,9 @@ export default function ProveedoresPage() {
     cargar();
   }, [search, estado, page]);
 
-  // ---------------------------------------------------------
-  // ABRIR MODAL EDITAR
-  // ---------------------------------------------------------
+  // =========================================================
+  // CARGAR EDITAR
+  // =========================================================
   useEffect(() => {
     const loadEdit = async () => {
       if (!editarId) return;
@@ -71,23 +75,21 @@ export default function ProveedoresPage() {
       const res = await fetch(`/api/proveedores/obtener?id=${editarId}`, {
         credentials: "include",
       });
+
       const data = await res.json();
       if (data.ok) setEditData(data.item);
     };
     loadEdit();
   }, [editarId]);
 
-  // ---------------------------------------------------------
-  // CERRAR MODAL
-  // ---------------------------------------------------------
   const cerrarModal = () => {
     setEditData(null);
     router.push("/modulos/proveedores");
   };
 
-  // ---------------------------------------------------------
-  // CREAR PROVEEDOR
-  // ---------------------------------------------------------
+  // =========================================================
+  // CREAR
+  // =========================================================
   const crearProveedor = async (form) => {
     const res = await fetch("/api/proveedores/crear", {
       method: "POST",
@@ -100,14 +102,12 @@ export default function ProveedoresPage() {
     if (data.ok) {
       cerrarModal();
       cargar();
-    } else {
-      alert(data.error || "Error al crear proveedor");
-    }
+    } else alert(data.error || "Error al crear proveedor");
   };
 
-  // ---------------------------------------------------------
-  // GUARDAR EDICIÓN
-  // ---------------------------------------------------------
+  // =========================================================
+  // EDITAR
+  // =========================================================
   const guardarEdicion = async (form) => {
     const res = await fetch("/api/proveedores/editar", {
       method: "PUT",
@@ -120,14 +120,12 @@ export default function ProveedoresPage() {
     if (data.ok) {
       cerrarModal();
       cargar();
-    } else {
-      alert(data.error || "Error al editar proveedor");
-    }
+    } else alert(data.error || "Error al editar proveedor");
   };
 
-  // ---------------------------------------------------------
+  // =========================================================
   // ELIMINAR
-  // ---------------------------------------------------------
+  // =========================================================
   const eliminar = async (id) => {
     if (!confirm("¿Eliminar proveedor?")) return;
 
@@ -139,143 +137,185 @@ export default function ProveedoresPage() {
     });
 
     const data = await res.json();
-    if (data.ok) {
-      cargar();
-    } else {
-      alert(data.error || "No se pudo eliminar");
-    }
+    if (data.ok) cargar();
+    else alert(data.error || "No se pudo eliminar");
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <SunmiCard>
-      <SunmiHeader title="Proveedores" />
+    <div className="sunmi-bg w-full min-h-full p-4">
+      <SunmiCard>
+        <SunmiHeader title="Proveedores" color="amber" />
 
-      {/* ===================== */}
-      {/* FILTROS */}
-      {/* ===================== */}
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <SunmiInput
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar proveedor..."
-        />
+        <SunmiSeparator label="Filtros" color="amber" className="my-4" />
 
-        {/* Filtro Estado */}
-        <select
-          value={estado}
-          onChange={(e) => setEstado(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded-xl p-2 text-white"
-        >
-          <option value="activos">Activos</option>
-          <option value="todos">Todos</option>
-        </select>
+        {/* ===================== */}
+        {/* FILTROS */}
+        {/* ===================== */}
+        <div className="flex flex-col md:flex-row gap-4 px-2">
+          <div className="flex flex-col md:flex-row gap-3 flex-1">
+            <SunmiInput
+              placeholder="Buscar proveedor..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
 
-        <SunmiButton onClick={() => router.push("/modulos/proveedores?nuevo=1")}>
-          ＋ Nuevo
-        </SunmiButton>
-      </div>
+            <SunmiSelectAdv value={estado} onChange={setEstado}>
+              <SunmiSelectOption value="activos">Activos</SunmiSelectOption>
+              <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
+            </SunmiSelectAdv>
+          </div>
 
-      <SunmiSeparator className="my-4" />
+          <div className="flex gap-2 justify-end">
+            <SunmiButton
+              color="slate"
+              onClick={() => {
+                setSearch("");
+                setEstado("activos");
+                setPage(1);
+              }}
+            >
+              Limpiar
+            </SunmiButton>
 
-      {/* ===================== */}
-      {/* TABLA */}
-      {/* ===================== */}
-      <SunmiTable
-        headers={[
-          "Nombre",
-          "Teléfono",
-          "Email",
-          "CUIT",
-          "Estado",
-          "Acciones",
-        ]}
-      >
-        {loading ? (
-          <SunmiTableEmpty label="Cargando..." />
-        ) : items.length === 0 ? (
-          <SunmiTableEmpty label="Sin proveedores" />
-        ) : (
-          items.map((item) => (
-            <SunmiTableRow key={item.id}>
-              <td>{item.nombre}</td>
-              <td>{item.telefono || "-"}</td>
-              <td>{item.email || "-"}</td>
-              <td>{item.cuit || "-"}</td>
+            <SunmiButton
+              color="amber"
+              onClick={() => router.push("/modulos/proveedores?nuevo=1")}
+            >
+              ＋ Nuevo
+            </SunmiButton>
+          </div>
+        </div>
 
-              <td>
-                <SunmiBadgeEstado activo={item.activo} />
-              </td>
+        <SunmiSeparator label="Listado" color="amber" className="my-4" />
 
-              <td className="flex gap-2">
-                <SunmiButton
-                  size="sm"
-                  variant="secondary"
-                  onClick={() =>
-                    router.push(`/modulos/proveedores?editar=${item.id}`)
-                  }
-                >
-                  Editar
-                </SunmiButton>
+        {/* ===================== */}
+        {/* TABLA */}
+        {/* ===================== */}
+        <div className="overflow-x-auto rounded-2xl border border-slate-800">
+          <SunmiTable
+            headers={[
+              "Nombre",
+              "Teléfono",
+              "Email",
+              "CUIT",
+              "Días",
+              "Pedidos",   // 🔥 nueva columna
+              "Estado",
+              "Acciones",
+            ]}
+          >
+            {loading ? (
+              <SunmiTableEmpty label="Cargando..." />
+            ) : items.length === 0 ? (
+              <SunmiTableEmpty label="Sin proveedores" />
+            ) : (
+              items.map((item) => (
+                <SunmiTableRow key={item.id}>
+                  <td className="px-3 py-2">{item.nombre}</td>
+                  <td className="px-3 py-2">{item.telefono || "-"}</td>
+                  <td className="px-3 py-2">{item.email || "-"}</td>
+                  <td className="px-3 py-2">{item.cuit || "-"}</td>
 
-                <SunmiButton
-                  size="sm"
-                  variant="danger"
-                  onClick={() => eliminar(item.id)}
-                >
-                  Eliminar
-                </SunmiButton>
-              </td>
-            </SunmiTableRow>
-          ))
+                  {/* 🔥 DIAS EN CHIPS */}
+                  <td className="px-3 py-2">
+                    {item.dias_pedido?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {item.dias_pedido.map((d, i) => (
+                          <SunmiPill key={i}>{d}</SunmiPill>
+                        ))}
+                      </div>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+
+                  {/* 🔥 BOTÓN PEDIDOS */}
+                  <td className="px-3 py-2 text-center">
+                    <SunmiButton
+                      color="amber"
+                      size="sm"
+                      onClick={() =>
+                        router.push(`/modulos/pedidos?proveedorId=${item.id}`)
+                      }
+                    >
+                      Pedidos
+                    </SunmiButton>
+                  </td>
+
+                  {/* Estado */}
+                  <td className="px-3 py-2">
+                    <SunmiBadgeEstado value={item.activo} />
+                  </td>
+
+                  {/* Acciones */}
+                  <td className="px-3 py-2 text-right">
+                    <div className="flex gap-3 justify-end text-[15px]">
+                      <button
+                        onClick={() =>
+                          router.push(`/modulos/proveedores?editar=${item.id}`)
+                        }
+                        className="text-amber-300 hover:text-amber-200"
+                      >
+                        ✏️
+                      </button>
+
+                      <button
+                        onClick={() => eliminar(item.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </SunmiTableRow>
+              ))
+            )}
+          </SunmiTable>
+        </div>
+
+        {/* ===================== */}
+        {/* PAGINACIÓN */}
+        {/* ===================== */}
+        <div className="flex justify-between pt-4 px-2">
+          <SunmiButton
+            color="slate"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            « Anterior
+          </SunmiButton>
+
+          <SunmiButton
+            color="slate"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente »
+          </SunmiButton>
+        </div>
+
+        {/* ===================== */}
+        {/* MODAL */}
+        {/* ===================== */}
+        {nuevo && (
+          <ModalProveedor
+            open={true}
+            onClose={cerrarModal}
+            onSubmit={crearProveedor}
+          />
         )}
-      </SunmiTable>
 
-      {/* ===================== */}
-      {/* PAGINACIÓN */}
-      {/* ===================== */}
-      <div className="flex justify-center gap-3 mt-4">
-        <SunmiButton
-          variant="secondary"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => p - 1)}
-        >
-          « Anterior
-        </SunmiButton>
-
-        <span className="text-white">
-          {page} / {totalPages || 1}
-        </span>
-
-        <SunmiButton
-          variant="secondary"
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          Siguiente »
-        </SunmiButton>
-      </div>
-
-      {/* ===================== */}
-      {/* MODAL */}
-      {/* ===================== */}
-      {nuevo && (
-        <ModalProveedor
-          open={true}
-          onClose={cerrarModal}
-          onSubmit={crearProveedor}
-        />
-      )}
-
-      {editarId && editData && (
-        <ModalProveedor
-          open={true}
-          initialData={editData}
-          onClose={cerrarModal}
-          onSubmit={guardarEdicion}
-        />
-      )}
-    </SunmiCard>
+        {editarId && editData && (
+          <ModalProveedor
+            open={true}
+            initialData={editData}
+            onClose={cerrarModal}
+            onSubmit={guardarEdicion}
+          />
+        )}
+      </SunmiCard>
+    </div>
   );
 }

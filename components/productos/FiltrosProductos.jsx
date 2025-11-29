@@ -1,20 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSelectAdv, {
+  SunmiSelectOption,
+} from "@/components/sunmi/SunmiSelectAdv";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 export default function FiltrosProductos({ onChange, catalogos, initial }) {
   const [search, setSearch] = useState(initial.search || "");
   const [categoria, setCategoria] = useState(initial.categoria || "");
   const [proveedor, setProveedor] = useState(initial.proveedor || "");
   const [area, setArea] = useState(initial.area || "");
-
-  // ✅ ESTE ERA EL PROBLEMA — AHORA ESTÁ 100% CORRECTO
   const [activo, setActivo] = useState(initial.activo ?? "");
 
   const [open, setOpen] = useState(false);
 
-  // ✅ debounce 250ms
+  // ============================
+  // Debounce 250ms
+  // ============================
   useEffect(() => {
     const timeout = setTimeout(() => {
       onChange({ search, categoria, proveedor, area, activo });
@@ -32,103 +37,105 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-
-      {/* ✅ BARRA SUPERIOR */}
+    <div className="flex flex-col gap-4">
+      {/* ================================= */}
+      {/* BARRA PRINCIPAL */}
+      {/* ================================= */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-
-        {/* ✅ BUSCADOR */}
-        <div className="flex-1 relative">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-
-          <input
+        {/* BUSCADOR SUNMI */}
+        <div className="flex-1">
+          <SunmiInput
+            placeholder="Buscar producto, código o categoría..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar producto, código o categoría..."
-            className="w-full h-[38px] pl-10 pr-9 rounded-lg border border-gray-300 bg-white text-gray-700 text-[14px] focus:border-blue-500"
+            icon="search"
           />
-
-          {search.trim() !== "" && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X size={16} />
-            </button>
-          )}
         </div>
 
-        {/* ✅ BOTÓN MÁS FILTROS */}
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="h-[38px] px-4 rounded-lg border bg-white text-gray-700 flex items-center gap-2 text-[14px]"
+        {/* BOTÓN MÁS FILTROS */}
+        <SunmiButton
+          color="slate"
+          className="w-full md:w-auto"
+          onClick={() => setOpen(!open)}
         >
-          Más filtros
-          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
+          {open ? "Ocultar filtros" : "Más filtros"}
+        </SunmiButton>
       </div>
 
-      {/* ✅ PANEL AVANZADO */}
+      {/* ================================= */}
+      {/* PANEL DE FILTROS AVANZADOS */}
+      {/* ================================= */}
       {open && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 rounded-lg border bg-gray-50 shadow-sm animate-filters">
+        <div
+          className="
+            rounded-2xl p-4 
+            border border-slate-700 
+            bg-slate-900
+            shadow-md
+            animate-fadeIn
+          "
+        >
+          <SunmiSeparator label="Filtros avanzados" color="amber" />
 
-          {/* CATEGORÍA */}
-          <select
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
-            className="h-[36px] px-3 rounded-md border bg-white text-[13px]"
-          >
-            <option value="">Categoría...</option>
-            {catalogos.CATEGORIAS?.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
+            {/* CATEGORÍA */}
+            <SunmiSelectAdv
+              value={categoria}
+              onChange={setCategoria}
+              placeholder="Categoría..."
+            >
+              <SunmiSelectOption value="">Categoría...</SunmiSelectOption>
+              {catalogos.CATEGORIAS?.map((c) => (
+                <SunmiSelectOption key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </SunmiSelectOption>
+              ))}
+            </SunmiSelectAdv>
 
-          {/* PROVEEDOR */}
-          <select
-            value={proveedor}
-            onChange={(e) => setProveedor(e.target.value)}
-            className="h-[36px] px-3 rounded-md border bg-white text-[13px]"
-          >
-            <option value="">Proveedor...</option>
-            {catalogos.PROVEEDORES?.map((p) => (
-              <option key={p.id} value={p.id}>{p.nombre}</option>
-            ))}
-          </select>
+            {/* PROVEEDOR */}
+            <SunmiSelectAdv
+              value={proveedor}
+              onChange={setProveedor}
+              placeholder="Proveedor..."
+            >
+              <SunmiSelectOption value="">Proveedor...</SunmiSelectOption>
+              {catalogos.PROVEEDORES?.map((p) => (
+                <SunmiSelectOption key={p.id} value={String(p.id)}>
+                  {p.nombre}
+                </SunmiSelectOption>
+              ))}
+            </SunmiSelectAdv>
 
-          {/* ÁREA FÍSICA */}
-          <select
-            value={area}
-            onChange={(e) => setArea(e.target.value)}
-            className="h-[36px] px-3 rounded-md border bg-white text-[13px]"
-          >
-            <option value="">Área física...</option>
-            {catalogos.AREAS?.map((a) => (
-              <option key={a.id} value={a.id}>{a.nombre}</option>
-            ))}
-          </select>
+            {/* ÁREA FÍSICA */}
+            <SunmiSelectAdv
+              value={area}
+              onChange={setArea}
+              placeholder="Área física..."
+            >
+              <SunmiSelectOption value="">Área física...</SunmiSelectOption>
+              {catalogos.AREAS?.map((a) => (
+                <SunmiSelectOption key={a.id} value={String(a.id)}>
+                  {a.nombre}
+                </SunmiSelectOption>
+              ))}
+            </SunmiSelectAdv>
 
-          {/* ✅ ESTADO (CORREGIDO) */}
-          <select
-            value={activo}
-            onChange={(e) => setActivo(e.target.value)}
-            className="h-[36px] px-3 rounded-md border bg-white text-[13px]"
-          >
-            <option value="">Estado...</option>
-            <option value="true">Activo</option>
-            <option value="false">Inactivo</option>
-          </select>
+            {/* ESTADO */}
+            <SunmiSelectAdv
+              value={activo}
+              onChange={setActivo}
+              placeholder="Estado..."
+            >
+              <SunmiSelectOption value="">Estado...</SunmiSelectOption>
+              <SunmiSelectOption value="true">Activo</SunmiSelectOption>
+              <SunmiSelectOption value="false">Inactivo</SunmiSelectOption>
+            </SunmiSelectAdv>
 
-          {/* LIMPIAR */}
-          <button
-            onClick={limpiar}
-            className="h-[36px] px-3 rounded-md border bg-white text-[13px] text-gray-700"
-          >
-            Limpiar
-          </button>
+            {/* LIMPIAR */}
+            <SunmiButton color="cyan" onClick={limpiar}>
+              Limpiar
+            </SunmiButton>
+          </div>
         </div>
       )}
     </div>

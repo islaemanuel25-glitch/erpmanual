@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 
@@ -29,17 +30,15 @@ export default function ModalProveedor({
   });
 
   useEffect(() => {
-    if (initialData) {
-      setForm({
-        nombre: initialData.nombre || "",
-        cuit: initialData.cuit || "",
-        telefono: initialData.telefono || "",
-        email: initialData.email || "",
-        direccion: initialData.direccion || "",
-        dias_pedido: initialData.dias_pedido || [],
-        activo: initialData.activo ?? true,
-      });
-    } else {
+    if (!open) return;
+
+    // scroll top igual al de usuarios
+    setTimeout(() => {
+      if (modalRef.current) modalRef.current.scrollTop = 0;
+    }, 30);
+
+    // reset igual al de usuarios
+    if (!initialData) {
       setForm({
         nombre: "",
         cuit: "",
@@ -49,141 +48,173 @@ export default function ModalProveedor({
         dias_pedido: [],
         activo: true,
       });
+      return;
     }
-  }, [initialData, open]);
 
-  const handleChange = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    // cargar datos
+    setForm({
+      nombre: initialData.nombre || "",
+      cuit: initialData.cuit || "",
+      telefono: initialData.telefono || "",
+      email: initialData.email || "",
+      direccion: initialData.direccion || "",
+      dias_pedido: initialData.dias_pedido || [],
+      activo: Boolean(initialData.activo),
+    });
+  }, [open, initialData]);
+
+  const setField = (k, v) =>
+    setForm((prev) => ({
+      ...prev,
+      [k]: v,
+    }));
+
+  const validar = () => {
+    if (!String(form.nombre).trim()) return "Completá el nombre.";
+    return null;
   };
 
-  const diasOptions = [
-    "Lunes",
-    "Martes",
-    "Miercoles",
-    "Jueves",
-    "Viernes",
-    "Sabado",
-    "Domingo",
-  ].map((d) => ({ label: d, value: d }));
+  const handleSubmitInternal = () => {
+    const err = validar();
+    if (err) return alert(err);
 
-  const handleSubmit = () => {
-    if (!form.nombre.trim()) return alert("El nombre es obligatorio.");
-    onSubmit(form);
+    onSubmit({ ...form });
   };
 
   if (!open) return null;
 
+  const dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
   return (
-    <div className="fixed inset-0 bg-black/40 z-[9999] flex justify-center items-center p-2">
-      {/* CONTENEDOR MODAL */}
-      <div
-        ref={modalRef}
-        className="
-          bg-slate-900 border border-slate-800 rounded-2xl shadow-xl 
-          w-full max-w-xl 
-          flex flex-col 
-          max-h-[90vh]
-        "
-      >
-        {/* HEADER */}
-        <div className="p-4 border-b border-slate-800">
-          <SunmiHeader title={editMode ? "Editar proveedor" : "Nuevo proveedor"} />
-        </div>
-
-        {/* CONTENIDO SCROLLEABLE */}
-        <div className="p-4 overflow-y-auto flex flex-col gap-4">
-          {/* Nombre */}
-          <Field>
-            <SunmiInput
-              label="Nombre *"
-              value={form.nombre}
-              onChange={(e) => handleChange("nombre", e.target.value)}
+    <div
+      className="
+        fixed inset-0 z-[9999]
+        bg-black/60 backdrop-blur-sm
+        flex items-center justify-center
+        p-3
+      "
+    >
+      <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
+        <SunmiCard>
+          {/* HEADER */}
+          <div className="flex items-center justify-between">
+            <SunmiHeader
+              title={editMode ? "Editar proveedor" : "Nuevo proveedor"}
+              color="amber"
             />
-            <Help>Nombre comercial del proveedor.</Help>
-          </Field>
 
-          {/* CUIT */}
-          <Field>
-            <SunmiInput
-              label="CUIT"
-              value={form.cuit}
-              onChange={(e) => handleChange("cuit", e.target.value)}
-            />
-            <Help>CUIT opcional del proveedor.</Help>
-          </Field>
+            <SunmiButton color="slate" onClick={onClose} size="sm">
+              Cerrar
+            </SunmiButton>
+          </div>
 
-          {/* Teléfono */}
-          <Field>
-            <SunmiInput
-              label="Teléfono"
-              value={form.telefono}
-              onChange={(e) => handleChange("telefono", e.target.value)}
-            />
-            <Help>Número de contacto para pedidos o consultas.</Help>
-          </Field>
+          {/* CONTENIDO */}
+          <div
+            ref={modalRef}
+            className="
+              max-h-[65vh]
+              overflow-y-auto 
+              px-2 pb-4 mt-2 
+              space-y-4
+            "
+          >
+            <SunmiSeparator label="Datos" color="amber" />
 
-          {/* Email */}
-          <Field>
-            <SunmiInput
-              label="Email"
-              value={form.email}
-              onChange={(e) => handleChange("email", e.target.value)}
-            />
-            <Help>Email del proveedor.</Help>
-          </Field>
+            {/* Nombre */}
+            <Field label="Nombre *">
+              <SunmiInput
+                value={form.nombre}
+                onChange={(e) => setField("nombre", e.target.value)}
+                placeholder="Ingresá el nombre…"
+              />
+            </Field>
 
-          {/* Dirección */}
-          <Field>
-            <SunmiInput
-              label="Dirección"
-              value={form.direccion}
-              onChange={(e) => handleChange("direccion", e.target.value)}
-            />
-            <Help>Domicilio del proveedor.</Help>
-          </Field>
+            {/* CUIT */}
+            <Field label="CUIT">
+              <SunmiInput
+                value={form.cuit}
+                onChange={(e) => setField("cuit", e.target.value)}
+                placeholder="Ingresá el CUIT…"
+              />
+            </Field>
 
-          {/* DÍAS DE PEDIDO */}
-          <Field>
-            <SunmiSelectAdv
-              label="Días de pedido"
-              multiple
-              value={form.dias_pedido}
-              options={diasOptions}
-              onChange={(v) => handleChange("dias_pedido", v)}
-            />
-            <Help>
-              Seleccioná los días donde este proveedor recibe pedidos.
-            </Help>
-          </Field>
+            {/* Teléfono */}
+            <Field label="Teléfono">
+              <SunmiInput
+                value={form.telefono}
+                onChange={(e) => setField("telefono", e.target.value)}
+                placeholder="Ingresá el teléfono…"
+              />
+            </Field>
 
-          {/* ACTIVO */}
-          <Field>
-            <SunmiToggleEstado
-              label="Activo"
-              checked={form.activo}
-              onChange={(v) => handleChange("activo", v)}
-            />
-            <Help>Si está desactivado, no aparecerá en los listados.</Help>
-          </Field>
-        </div>
+            {/* Email */}
+            <Field label="Email">
+              <SunmiInput
+                type="email"
+                value={form.email}
+                onChange={(e) => setField("email", e.target.value)}
+                placeholder="Ingresá el email…"
+              />
+            </Field>
 
-        {/* FOOTER */}
-        <div className="p-4 border-t border-slate-800 flex justify-end gap-3">
-          <SunmiButton variant="secondary" onClick={onClose}>
-            Cancelar
-          </SunmiButton>
-          <SunmiButton onClick={handleSubmit}>Guardar</SunmiButton>
-        </div>
+            {/* Dirección */}
+            <Field label="Dirección">
+              <SunmiInput
+                value={form.direccion}
+                onChange={(e) => setField("direccion", e.target.value)}
+                placeholder="Ingresá la dirección…"
+              />
+            </Field>
+
+            {/* Días de pedido */}
+            <Field label="Días de pedido">
+              <SunmiSelectAdv
+                multiple
+                value={form.dias_pedido}
+                onChange={(v) => setField("dias_pedido", v)}
+              >
+                <SunmiSelectOption value="">
+                  Seleccionar días…
+                </SunmiSelectOption>
+
+                {dias.map((d) => (
+                  <SunmiSelectOption key={d} value={d}>
+                    {d}
+                  </SunmiSelectOption>
+                ))}
+              </SunmiSelectAdv>
+            </Field>
+
+            {/* Estado */}
+            <Field label="Estado">
+              <SunmiToggleEstado
+                value={form.activo}
+                onChange={(v) => setField("activo", v)}
+              />
+            </Field>
+          </div>
+
+          {/* FOOTER */}
+          <div className="flex justify-end gap-2 pt-2">
+            <SunmiButton color="slate" onClick={onClose}>
+              Cancelar
+            </SunmiButton>
+
+            <SunmiButton color="amber" onClick={handleSubmitInternal}>
+              {editMode ? "Guardar cambios" : "Crear proveedor"}
+            </SunmiButton>
+          </div>
+        </SunmiCard>
       </div>
     </div>
   );
 }
 
-/* SUBCOMPONENTES */
-function Field({ children }) {
-  return <div className="flex flex-col gap-1">{children}</div>;
-}
-
-function Help({ children }) {
-  return <p className="text-[11px] text-slate-400">{children}</p>;
+function Field({ label, children }) {
+  return (
+    <div className="flex flex-col gap-1 px-1">
+      <label className="text-[11px] text-slate-400">{label}</label>
+      {children}
+    </div>
+  );
 }

@@ -24,6 +24,16 @@ export async function GET(req) {
 
     const item = await prisma.proveedor.findUnique({
       where: { id },
+      select: {
+        id: true,
+        nombre: true,
+        cuit: true,
+        telefono: true,
+        email: true,
+        direccion: true,
+        dias_pedido: true,   // 🔥 EL CAMPO QUE FALTABA
+        activo: true,
+      },
     });
 
     if (!item) {
@@ -34,6 +44,7 @@ export async function GET(req) {
     }
 
     return NextResponse.json({ ok: true, item });
+
   } catch (e) {
     console.error("GET proveedor:", e);
     return NextResponse.json(

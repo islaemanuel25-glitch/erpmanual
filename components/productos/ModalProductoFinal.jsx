@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 export default function ModalProducto({
   open,
@@ -8,12 +15,8 @@ export default function ModalProducto({
   onSubmit,
   catalogos,
   initialData = null,
-  localId,
 }) {
   const modalRef = useRef(null);
-
-  const inputClass =
-    "h-[36px] w-full px-3 rounded-md border border-gray-300 bg-white text-[13px] text-gray-800 focus:border-blue-500 focus:outline-none";
 
   const toNum = (v) => {
     if (v === "" || v === null || v === undefined) return "";
@@ -59,7 +62,6 @@ export default function ModalProducto({
     camelToForm(initialData || { unidad_medida: "unidad", redondeo_100: true })
   );
 
-  /** ⭐ FIX: NO DESMONTAR EL MODAL */
   useEffect(() => {
     if (!open) return;
     setForm(
@@ -175,148 +177,125 @@ export default function ModalProducto({
 
   return (
     <div
-      className={`
-        fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-3
-        transition-opacity duration-200
-        ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}
-      `}
+      className={`fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-3 ${
+        open ? "block" : "hidden"
+      }`}
     >
-      <div className="w-[95%] max-w-4xl bg-white rounded-xl shadow-xl overflow-hidden">
-        <div className="px-5 py-3 border-b flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            {initialData ? "Editar producto" : "Nuevo producto"}
-          </h2>
-
-          <button onClick={onClose} className="px-3 py-1 rounded-md border">
+      <SunmiCard className="w-[95%] max-w-4xl">
+        <div className="flex items-center justify-between mb-3">
+          <SunmiHeader title={initialData ? "Editar producto" : "Nuevo producto"} color="amber" />
+          <SunmiButton color="cyan" onClick={onClose}>
             Cerrar
-          </button>
+          </SunmiButton>
         </div>
 
-        <div
-          ref={modalRef}
-          className="p-5 max-h-[70vh] overflow-y-auto space-y-4"
-        >
+        <div ref={modalRef} className="max-h-[70vh] overflow-y-auto space-y-4">
           {/* IDENTIDAD */}
+          <SunmiSeparator label="Identidad" color="amber" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nombre *">
-              <input
-                className={inputClass}
-                value={form.nombre}
-                onChange={(e) => setField("nombre", e.target.value)}
-              />
+              <SunmiInput value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} />
             </Field>
 
             <Field label="Código barras">
-              <input
-                className={inputClass}
-                value={form.codigo_barra}
-                onChange={(e) => setField("codigo_barra", e.target.value)}
-              />
+              <SunmiInput value={form.codigo_barra} onChange={(e) => setField("codigo_barra", e.target.value)} />
             </Field>
 
             <Field label="SKU">
-              <input
-                className={inputClass}
-                value={form.sku}
-                onChange={(e) => setField("sku", e.target.value)}
-              />
+              <SunmiInput value={form.sku} onChange={(e) => setField("sku", e.target.value)} />
             </Field>
 
             <Field label="Descripción" colSpan>
-              <input
-                className={inputClass}
-                value={form.descripcion}
-                onChange={(e) => setField("descripcion", e.target.value)}
-              />
+              <SunmiInput value={form.descripcion} onChange={(e) => setField("descripcion", e.target.value)} />
             </Field>
           </div>
 
           {/* CATÁLOGOS */}
+          <SunmiSeparator label="Catálogos" color="amber" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Categoría">
-              <select
-                className={inputClass}
-                value={form.categoria_id}
-                onChange={(e) => setField("categoria_id", e.target.value)}
+              <SunmiSelectAdv
+                value={form.categoria_id === "" ? "" : String(form.categoria_id)}
+                onChange={(v) =>
+                  setField("categoria_id", v === "" ? "" : Number(v))
+                }
               >
-                <option value="">-</option>
+                <SunmiSelectOption value="">-</SunmiSelectOption>
                 {catalogos.CATEGORIAS?.map((c) => (
-                  <option key={c.id} value={c.id}>
+                  <SunmiSelectOption key={c.id} value={String(c.id)}>
                     {c.nombre}
-                  </option>
+                  </SunmiSelectOption>
                 ))}
-              </select>
+              </SunmiSelectAdv>
             </Field>
 
             <Field label="Proveedor">
-  <select
-    className={inputClass}
-    value={form.proveedor_id}
-    onChange={(e) => setField("proveedor_id", Number(e.target.value))}
-  >
-    <option value="">-</option>
-    {catalogos.PROVEEDORES?.map((c) => (
-      <option key={c.id} value={c.id}>
-        {c.nombre}
-      </option>
-    ))}
-  </select>
-</Field>
-
+              <SunmiSelectAdv
+                value={form.proveedor_id === "" ? "" : String(form.proveedor_id)}
+                onChange={(v) =>
+                  setField("proveedor_id", v === "" ? "" : Number(v))
+                }
+              >
+                <SunmiSelectOption value="">-</SunmiSelectOption>
+                {catalogos.PROVEEDORES?.map((c) => (
+                  <SunmiSelectOption key={c.id} value={String(c.id)}>
+                    {c.nombre}
+                  </SunmiSelectOption>
+                ))}
+              </SunmiSelectAdv>
+            </Field>
 
             <Field label="Área física">
-              <select
-                className={inputClass}
-                value={form.area_fisica_id}
-                onChange={(e) => setField("area_fisica_id", e.target.value)}
+              <SunmiSelectAdv
+                value={form.area_fisica_id === "" ? "" : String(form.area_fisica_id)}
+                onChange={(v) =>
+                  setField("area_fisica_id", v === "" ? "" : Number(v))
+                }
               >
-                <option value="">-</option>
+                <SunmiSelectOption value="">-</SunmiSelectOption>
                 {catalogos.AREAS?.map((c) => (
-                  <option key={c.id} value={c.id}>
+                  <SunmiSelectOption key={c.id} value={String(c.id)}>
                     {c.nombre}
-                  </option>
+                  </SunmiSelectOption>
                 ))}
-              </select>
+              </SunmiSelectAdv>
             </Field>
           </div>
 
           {/* PRESENTACIÓN */}
+          <SunmiSeparator label="Presentación" color="amber" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Field label="Unidad *">
-              <select
-                className={inputClass}
+              <SunmiSelectAdv
                 value={form.unidad_medida}
-                onChange={(e) => setField("unidad_medida", e.target.value)}
+                onChange={(v) => setField("unidad_medida", v)}
               >
-                <option value="unidad">Unidad</option>
-                <option value="pack">Pack</option>
-                <option value="cajon">Cajón</option>
-                <option value="kg">Kg</option>
-              </select>
+                <SunmiSelectOption value="unidad">Unidad</SunmiSelectOption>
+                <SunmiSelectOption value="pack">Pack</SunmiSelectOption>
+                <SunmiSelectOption value="cajon">Cajón</SunmiSelectOption>
+                <SunmiSelectOption value="kg">Kg</SunmiSelectOption>
+              </SunmiSelectAdv>
             </Field>
 
             <Field label="Factor pack">
-              <input
+              <SunmiInput
                 type="number"
-                className={inputClass}
                 value={form.factor_pack}
                 onChange={(e) => setNumber("factor_pack", e.target.value)}
               />
             </Field>
 
             <Field label="Peso (kg)">
-              <input
+              <SunmiInput
                 type="number"
-                className={inputClass}
                 value={form.peso_kg}
                 onChange={(e) => setNumber("peso_kg", e.target.value)}
               />
             </Field>
 
             <Field label="Volumen (ml)">
-              <input
+              <SunmiInput
                 type="number"
-                className={inputClass}
                 value={form.volumen_ml}
                 onChange={(e) => setNumber("volumen_ml", e.target.value)}
               />
@@ -324,38 +303,35 @@ export default function ModalProducto({
           </div>
 
           {/* PRECIOS */}
+          <SunmiSeparator label="Precios" color="amber" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Field label="Costo *">
-              <input
+              <SunmiInput
                 type="number"
-                className={inputClass}
                 value={form.precio_costo}
                 onChange={(e) => onChangeCosto(e.target.value)}
               />
             </Field>
 
             <Field label="Margen %">
-              <input
+              <SunmiInput
                 type="number"
-                className={inputClass}
                 value={form.margen}
                 onChange={(e) => onChangeMargen(e.target.value)}
               />
             </Field>
 
             <Field label="Venta *">
-              <input
+              <SunmiInput
                 type="number"
-                className={inputClass}
                 value={form.precio_venta}
                 onChange={(e) => onChangeVenta(e.target.value)}
               />
             </Field>
 
             <Field label="IVA %">
-              <input
+              <SunmiInput
                 type="number"
-                className={inputClass}
                 value={form.iva_porcentaje}
                 onChange={(e) => setNumber("iva_porcentaje", e.target.value)}
               />
@@ -363,28 +339,26 @@ export default function ModalProducto({
           </div>
 
           {/* OTROS */}
+          <SunmiSeparator label="Otros" color="amber" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Precio sugerido">
-              <input
+              <SunmiInput
                 type="number"
-                className={inputClass}
                 value={form.precio_sugerido}
                 onChange={(e) => setNumber("precio_sugerido", e.target.value)}
               />
             </Field>
 
             <Field label="Fecha vencimiento">
-              <input
+              <SunmiInput
                 type="date"
-                className={inputClass}
                 value={form.fecha_vencimiento}
                 onChange={(e) => setField("fecha_vencimiento", e.target.value)}
               />
             </Field>
 
             <Field label="Imagen URL">
-              <input
-                className={inputClass}
+              <SunmiInput
                 value={form.imagen_url}
                 onChange={(e) => setField("imagen_url", e.target.value)}
               />
@@ -392,44 +366,48 @@ export default function ModalProducto({
           </div>
 
           {/* SWITCHES */}
+          <SunmiSeparator label="Opciones" color="amber" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Switch
-              checked={form.redondeo_100}
-              onChange={(v) => {
-                setField("redondeo_100", v);
-                if (v && form.precio_venta > 0)
-                  setField("precio_venta", roundUp100(Number(form.precio_venta)));
-              }}
-              label="Redondeo a $100"
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] text-slate-400">Redondeo a $100</label>
+              <SunmiToggleEstado
+                checked={form.redondeo_100}
+                onChange={(v) => {
+                  setField("redondeo_100", v);
+                  if (v && form.precio_venta > 0)
+                    setField("precio_venta", roundUp100(Number(form.precio_venta)));
+                }}
+              />
+            </div>
 
-            <Switch
-              checked={form.es_combo}
-              onChange={(v) => setField("es_combo", v)}
-              label="Es combo"
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] text-slate-400">Es combo</label>
+              <SunmiToggleEstado
+                checked={form.es_combo}
+                onChange={(v) => setField("es_combo", v)}
+              />
+            </div>
 
-            <Switch
-              checked={form.activo}
-              onChange={(v) => setField("activo", v)}
-              label="Activo"
-            />
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] text-slate-400">Activo</label>
+              <SunmiToggleEstado
+                checked={form.activo}
+                onChange={(v) => setField("activo", v)}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="px-5 py-3 border-t bg-gray-50 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 border rounded-md">
+        <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end gap-2">
+          <SunmiButton color="cyan" onClick={onClose}>
             Cancelar
-          </button>
+          </SunmiButton>
 
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 rounded-md bg-blue-600 text-white"
-          >
+          <SunmiButton color="amber" onClick={handleSubmit}>
             {initialData ? "Guardar cambios" : "Crear producto"}
-          </button>
+          </SunmiButton>
         </div>
-      </div>
+      </SunmiCard>
     </div>
   );
 }
@@ -437,27 +415,9 @@ export default function ModalProducto({
 /* SUBCOMPONENTES */
 function Field({ label, children, colSpan }) {
   return (
-    <div
-      className={
-        colSpan ? "md:col-span-2 flex flex-col gap-1" : "flex flex-col gap-1"
-      }
-    >
-      <label className="text-[12px] text-gray-600">{label}</label>
+    <div className={colSpan ? "md:col-span-2 flex flex-col gap-1" : "flex flex-col gap-1"}>
+      <label className="text-[12px] text-slate-400">{label}</label>
       {children}
     </div>
-  );
-}
-
-function Switch({ checked, onChange, label }) {
-  return (
-    <label className="flex items-center gap-2 select-none">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-4 h-4 accent-blue-600"
-      />
-      <span className="text-[13px]">{label}</span>
-    </label>
   );
 }

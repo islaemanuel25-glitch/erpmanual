@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
+import SunmiButton from "@/components/sunmi/SunmiButton";
 
 export default function UiTable({
   columnas = [],
@@ -11,12 +12,14 @@ export default function UiTable({
   onNext,
   onPrev,
   accionesPersonalizadas,
-  onSortChange
+  onSortChange,
 }) {
   const [sortBy, setSortBy] = useState(null);
   const [sortDir, setSortDir] = useState(null);
 
-  // ✅ Manejar click en encabezado
+  // ================================
+  // ORDENAMIENTO
+  // ================================
   const handleSort = (col) => {
     if (!onSortChange) return;
 
@@ -36,54 +39,58 @@ export default function UiTable({
     onSortChange(col.key, newDir);
   };
 
-  // ✅ Iconos de orden
   const renderSortIcon = (col) => {
-    if (sortBy !== col.key) {
-      return <ChevronUp size={14} className="opacity-30 inline-block -mb-1" />;
-    }
-    if (sortDir === "asc") {
-      return <ChevronUp size={14} className="inline-block -mb-1" />;
-    }
-    if (sortDir === "desc") {
-      return <ChevronDown size={14} className="inline-block -mb-1" />;
-    }
+    if (sortBy !== col.key)
+      return <ChevronUp size={14} className="opacity-30 -mb-1" />;
+
+    if (sortDir === "asc")
+      return <ChevronUp size={14} className="text-amber-400 -mb-1" />;
+
+    return <ChevronDown size={14} className="text-amber-400 -mb-1" />;
   };
 
-  // ✅ Normaliza los valores nulos o vacíos
+  // ================================
+  // RENDER SEGURO
+  // ================================
   const safeRender = (col, row) => {
     try {
       const valor = row[col.key];
+
       if (col.render) {
         const out = col.render(valor, row);
-        // Si el render devuelve null o undefined → mostramos “-”
-        if (out === null || out === undefined || out === "") {
-          return <span className="text-gray-400">-</span>;
-        }
+        if (out === null || out === undefined || out === "")
+          return <span className="text-slate-500">-</span>;
+
         return out;
       }
-      // Si no hay render personalizado
-      if (valor === null || valor === undefined || valor === "") {
-        return <span className="text-gray-400">-</span>;
-      }
+
+      if (valor === null || valor === undefined || valor === "")
+        return <span className="text-slate-500">-</span>;
+
       return valor;
     } catch {
-      return <span className="text-gray-400">-</span>;
+      return <span className="text-slate-500">-</span>;
     }
   };
 
+  // ================================
+  // UI SUNMI V2
+  // ================================
   return (
-    <div className="flex flex-col h-full w-full border border-gray-200 rounded-lg overflow-hidden bg-white">
-      {/* ✅ CONTENEDOR SCROLL */}
+    <div className="flex flex-col h-full w-full border border-slate-800 rounded-2xl overflow-hidden bg-slate-900 text-slate-200 text-[13px]">
+      
+      {/* SCROLL */}
       <div className="flex-1 overflow-auto">
-        <table className="min-w-full text-[13px] text-gray-800">
-          {/* ✅ ENCABEZADO */}
-          <thead className="sticky top-0 z-10 bg-[#eef2f6]">
-            <tr className="border-b border-[#c7d0dd]">
+        <table className="min-w-full">
+          
+          {/* HEADER AMARILLO */}
+          <thead className="sticky top-0 z-10 bg-amber-400 text-slate-900 shadow">
+            <tr>
               {columnas.map((col) => (
                 <th
                   key={col.key}
-                  className="px-3 py-2 text-left text-[12px] font-semibold text-gray-700 uppercase tracking-wide cursor-pointer select-none"
                   onClick={() => handleSort(col)}
+                  className="px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide cursor-pointer select-none"
                 >
                   <div className="flex items-center gap-1">
                     {col.titulo}
@@ -93,29 +100,33 @@ export default function UiTable({
               ))}
 
               {accionesPersonalizadas && (
-                <th className="px-3 py-2 text-left text-[12px] font-semibold text-gray-700 uppercase tracking-wide">
+                <th className="px-3 py-2 text-left text-[12px] font-semibold uppercase tracking-wide">
                   Acciones
                 </th>
               )}
             </tr>
           </thead>
 
-          {/* ✅ FILAS */}
+          {/* FILAS */}
           <tbody>
             {datos.length === 0 ? (
               <tr>
                 <td
                   colSpan={columnas.length + (accionesPersonalizadas ? 1 : 0)}
-                  className="text-center text-gray-500 py-6"
+                  className="text-center text-slate-400 py-6"
                 >
-                  No hay registros para mostrar
+                  Sin resultados
                 </td>
               </tr>
             ) : (
               datos.map((row, idx) => (
                 <tr
                   key={idx}
-                  className="h-[34px] border-b border-gray-200 hover:bg-gray-50 transition"
+                  className={`
+                    border-b border-slate-800
+                    ${idx % 2 === 0 ? "bg-slate-950" : "bg-slate-900"}
+                    hover:bg-amber-300 hover:text-slate-900 transition
+                  `}
                 >
                   {columnas.map((col) => (
                     <td key={col.key} className="px-3 py-2">
@@ -135,27 +146,27 @@ export default function UiTable({
         </table>
       </div>
 
-      {/* ✅ PAGINACIÓN */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-200 text-[13px]">
-        <button
+      {/* PAGINACIÓN SUNMI */}
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-950 border-t border-slate-800 text-[13px]">
+        <SunmiButton
+          color="slate"
           disabled={page <= 1}
           onClick={onPrev}
-          className="px-3 py-1 rounded border bg-white disabled:opacity-40 hover:bg-gray-100"
         >
-          Anterior
-        </button>
+          « Anterior
+        </SunmiButton>
 
-        <span className="text-gray-600">
+        <span className="text-slate-300">
           Página {page} / {totalPages}
         </span>
 
-        <button
+        <SunmiButton
+          color="slate"
           disabled={page >= totalPages}
           onClick={onNext}
-          className="px-3 py-1 rounded border bg-white disabled:opacity-40 hover:bg-gray-100"
         >
-          Siguiente
-        </button>
+          Siguiente »
+        </SunmiButton>
       </div>
     </div>
   );

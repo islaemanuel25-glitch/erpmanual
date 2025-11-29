@@ -41,6 +41,16 @@ export async function GET(req) {
       skip: (page - 1) * pageSize,
       take: pageSize,
       orderBy: { nombre: "asc" },
+      select: {
+        id: true,
+        nombre: true,
+        cuit: true,
+        telefono: true,
+        email: true,
+        direccion: true,
+        dias_pedido: true,   // 🔥 NECESARIO
+        activo: true,
+      },
     });
 
     return NextResponse.json({
