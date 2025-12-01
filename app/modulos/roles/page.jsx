@@ -43,7 +43,7 @@ export default function RolesPage() {
     setPage(1);
   };
 
-  // Cargar rol para edición
+  // Cargar rol en edición
   useEffect(() => {
     if (!editar) {
       setEditing(null);
@@ -170,7 +170,7 @@ export default function RolesPage() {
         {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-col md:flex-row gap-3 flex-1">
             <SunmiInput
               placeholder="Buscar rol..."
@@ -179,7 +179,7 @@ export default function RolesPage() {
             />
           </div>
 
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2">
             <SunmiButton onClick={limpiarFiltros} color="slate">
               Limpiar
             </SunmiButton>
@@ -232,7 +232,7 @@ export default function RolesPage() {
         {/* PAGINACIÓN */}
         <SunmiSeparator />
 
-        <div className="flex justify-between items-center px-2 pt-2">
+        <div className="flex justify-between gap-2">
           <SunmiButton
             color="slate"
             disabled={page <= 1}
