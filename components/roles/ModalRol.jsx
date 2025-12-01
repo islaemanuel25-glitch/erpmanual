@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
@@ -78,6 +78,7 @@ export default function ModalRol({
     <div
       className="
         fixed inset-0
+        z-[9999]
         flex items-center justify-center
       "
     >
@@ -89,8 +90,8 @@ export default function ModalRol({
             color="amber"
           />
 
-          {/* CONTENIDO */}
-          <div className="flex flex-col">
+          {/* CONTENIDO CON SCROLL FUNCIONAL */}
+          <div className="flex flex-col max-h-[65vh] overflow-y-auto">
 
             <SunmiSeparator label="Datos" color="amber" />
 
@@ -149,7 +150,6 @@ export default function ModalRol({
               {editMode ? "Guardar cambios" : "Crear rol"}
             </SunmiButton>
           </div>
-
         </SunmiCard>
       </div>
     </div>

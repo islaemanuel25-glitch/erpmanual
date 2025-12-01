@@ -21,6 +21,8 @@ import { Pencil, Trash2 } from "lucide-react";
 
 import ModalUsuario from "@/components/usuarios/ModalUsuario";
 
+const PAGE_SIZE = 25;
+
 export default function UsuariosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -40,11 +42,9 @@ export default function UsuariosPage() {
   const [rolFiltro, setRolFiltro] = useState("");
   const [localFiltro, setLocalFiltro] = useState("");
 
-  const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const limpiarFiltros = () => {
     setSearch("");
@@ -137,16 +137,15 @@ export default function UsuariosPage() {
 
       setTotal(lista.length);
 
-      // Corte por página
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize;
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE;
 
       setUsuarios(lista.slice(from, to));
     } catch (e) {
       setUsuarios([]);
       setTotal(0);
     }
-  }, [page, pageSize, search, rolFiltro, localFiltro]);
+  }, [page, search, rolFiltro, localFiltro]);
 
   useEffect(() => {
     fetchUsuarios();
@@ -194,18 +193,18 @@ export default function UsuariosPage() {
   };
 
   return (
-    <div className="sunmi-bg w-full min-h-full p-4">
+    <div className="w-full min-h-full">
       <SunmiCard>
         <SunmiCardHeader
-          title="Usuarios"
-          subtitle="Administrá los usuarios del sistema"
+          title="Usuarios del sistema"
+          subtitle="Gestioná los usuarios y sus permisos"
           color="amber"
         />
 
         {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-col md:flex-row gap-3 flex-1">
             <SunmiInput
               placeholder="Buscar usuario..."
@@ -232,7 +231,7 @@ export default function UsuariosPage() {
             </SunmiSelectAdv>
           </div>
 
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2">
             <SunmiButton onClick={limpiarFiltros} color="slate">
               Limpiar
             </SunmiButton>
@@ -249,33 +248,27 @@ export default function UsuariosPage() {
         {/* LISTADO */}
         <SunmiSeparator label="Listado" color="amber" />
 
-        <SunmiTable
-          headers={["Usuario", "Rol", "Local", "Estado", "Acciones"]}
-        >
+        <SunmiTable headers={["Usuario", "Rol", "Local", "Estado", "Acciones"]}>
           {usuarios.length === 0 ? (
             <SunmiTableEmpty message="No hay usuarios para mostrar" />
           ) : (
             usuarios.map((u) => (
               <SunmiTableRow key={u.id}>
-                <td className="px-2 py-1.5">
+                <td>
                   <SunmiUserCell nombre={u.nombre} email={u.email} />
                 </td>
 
-                <td className="px-2 py-1.5">
-                  {u.rol?.nombre ?? "—"}
-                </td>
+                <td>{u.rol?.nombre ?? "—"}</td>
 
-                <td className="px-2 py-1.5">
-                  {u.local?.nombre ?? "—"}
-                </td>
+                <td>{u.local?.nombre ?? "—"}</td>
 
-                <td className="px-2 py-1.5">
+                <td>
                   <div className="flex justify-center">
                     <SunmiBadgeEstado value={u.activo} />
                   </div>
                 </td>
 
-                <td className="px-2 py-1.5">
+                <td>
                   <div className="flex justify-end gap-1">
                     <SunmiButtonIcon
                       icon={Pencil}
@@ -285,6 +278,7 @@ export default function UsuariosPage() {
                         router.push(`/modulos/usuarios?editar=${u.id}`)
                       }
                     />
+
                     <SunmiButtonIcon
                       icon={Trash2}
                       color="red"
@@ -298,52 +292,25 @@ export default function UsuariosPage() {
           )}
         </SunmiTable>
 
+        {/* PAGINACIÓN */}
         <SunmiSeparator />
 
-        {/* PAGINACIÓN + SELECTOR FILAS */}
-        <div className="w-full flex flex-col md:flex-row items-center justify-between gap-3 px-2 pb-2">
-          {/* SELECTOR FILAS */}
-          <div className="flex items-center gap-2 text-sm">
-            <span>Filas:</span>
+        <div className="flex justify-between gap-2">
+          <SunmiButton
+            color="slate"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            « Anterior
+          </SunmiButton>
 
-            <SunmiSelectAdv
-              value={pageSize}
-              onChange={(v) => {
-                setPageSize(Number(v));
-                setPage(1);
-              }}
-            >
-              {[25, 50, 100, 200].map((opt) => (
-                <SunmiSelectOption key={opt} value={opt}>
-                  {opt}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
-          </div>
-
-          {/* INDICADOR */}
-          <div className="text-sm">
-            Página <strong>{page}</strong> de <strong>{totalPages}</strong>
-          </div>
-
-          {/* BOTONES PAGINACIÓN */}
-          <div className="flex items-center gap-2">
-            <SunmiButton
-              variant="ghost"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              Anterior
-            </SunmiButton>
-
-            <SunmiButton
-              variant="ghost"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Siguiente
-            </SunmiButton>
-          </div>
+          <SunmiButton
+            color="slate"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente »
+          </SunmiButton>
         </div>
       </SunmiCard>
 
