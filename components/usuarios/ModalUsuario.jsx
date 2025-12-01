@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, {
@@ -36,10 +36,12 @@ export default function ModalUsuario({
   useEffect(() => {
     if (!open) return;
 
+    // Siempre que se abre, scrollear arriba
     setTimeout(() => {
       if (modalRef.current) modalRef.current.scrollTop = 0;
     }, 30);
 
+    // Nuevo usuario → formulario limpio
     if (!initialData) {
       setForm({
         nombre: "",
@@ -52,6 +54,7 @@ export default function ModalUsuario({
       return;
     }
 
+    // Edición → precargar datos (sin password)
     setForm({
       nombre: initialData.nombre || "",
       email: initialData.email || "",
@@ -107,16 +110,13 @@ export default function ModalUsuario({
       <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
         <SunmiCard>
           {/* HEADER */}
-          <div className="flex items-center justify-between">
-            <SunmiHeader
-              title={editMode ? "Editar usuario" : "Nuevo usuario"}
-              color="amber"
-            />
-
-            <SunmiButton color="slate" onClick={onClose} size="sm">
+          <SunmiCardHeader
+            title={editMode ? "Editar usuario" : "Nuevo usuario"}
+          >
+            <SunmiButton color="slate" size="sm" onClick={onClose}>
               Cerrar
             </SunmiButton>
-          </div>
+          </SunmiCardHeader>
 
           {/* CONTENIDO */}
           <div
@@ -150,20 +150,22 @@ export default function ModalUsuario({
             </Field>
 
             {/* Contraseña */}
-            <Field
-              label={
-                editMode
-                  ? "Nueva contraseña (opcional)"
-                  : "Contraseña *"
-              }
-            >
-              <SunmiInput
-                type="password"
-                value={form.password}
-                onChange={(e) => setField("password", e.target.value)}
-                placeholder="Ingresá una contraseña…"
-              />
-            </Field>
+<Field
+  label={
+    editMode
+      ? "Nueva contraseña (opcional)"
+      : "Contraseña *"
+  }
+>
+  <SunmiInput
+    type="password"
+    value={form.password}
+    onChange={(e) => setField("password", e.target.value)}
+    placeholder="Ingresá una contraseña…"
+    autoComplete="new-password"   // ⬅️ ESTA LÍNEA ES LA QUE SOLUCIONA TODO
+  />
+</Field>
+
 
             {/* Rol */}
             <Field label="Rol *">

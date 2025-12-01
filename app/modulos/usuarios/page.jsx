@@ -13,6 +13,9 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiTableMaster from "@/components/sunmi/SunmiTableMaster";
 import ModalUsuario from "@/components/usuarios/ModalUsuario";
 
+// ✅ NUEVO COMPONENTE
+import CeldaUsuario from "@/components/usuarios/CeldaUsuario";
+
 export default function UsuariosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,9 +35,7 @@ export default function UsuariosPage() {
   const [rolFiltro, setRolFiltro] = useState("");
   const [localFiltro, setLocalFiltro] = useState("");
 
-  // 🟦 Nueva función: cantidad de filas por página
   const [pageSize, setPageSize] = useState(25);
-
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
@@ -122,8 +123,7 @@ export default function UsuariosPage() {
 
       // Filtros
       if (rolFiltro) lista = lista.filter((u) => u.rolId === Number(rolFiltro));
-      if (localFiltro)
-        lista = lista.filter((u) => u.localId === Number(localFiltro));
+      if (localFiltro) lista = lista.filter((u) => u.localId === Number(localFiltro));
 
       setTotal(lista.length);
 
@@ -138,17 +138,14 @@ export default function UsuariosPage() {
     }
   }, [page, pageSize, search, rolFiltro, localFiltro]);
 
-  // Ejecutar carga
   useEffect(() => {
     fetchUsuarios();
   }, [fetchUsuarios]);
 
-  // Resetear página al cambiar filtros
   useEffect(() => {
     setPage(1);
   }, [search, rolFiltro, localFiltro]);
 
-  // Abrir modal
   useEffect(() => {
     setModalOpen(Boolean(nuevo || editar));
   }, [nuevo, editar]);
@@ -250,18 +247,7 @@ export default function UsuariosPage() {
           rows={usuarios.map((u) => ({
             id: u.id,
 
-            usuario: (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-sm font-bold">
-                  {u.nombre?.[0]?.toUpperCase() ?? "?"}
-                </div>
-
-                <div className="flex flex-col">
-                  <span className="font-medium">{u.nombre ?? "Sin nombre"}</span>
-                  <span className="text-xs text-slate-400">{u.email ?? "Sin email"}</span>
-                </div>
-              </div>
-            ),
+            usuario: <CeldaUsuario nombre={u.nombre} email={u.email} />,
 
             rol: u.rol?.nombre ?? "—",
             local: u.local?.nombre ?? "—",
@@ -284,7 +270,6 @@ export default function UsuariosPage() {
               onClick: (row) => handleEliminar(row.id),
             },
           ]}
-          
 
           page={page}
           totalPages={totalPages}
@@ -299,7 +284,6 @@ export default function UsuariosPage() {
 
       </SunmiCard>
 
-      {/* MODAL */}
       <ModalUsuario
         open={modalOpen}
         onClose={closeModal}
