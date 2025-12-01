@@ -47,6 +47,7 @@ export default function UsuariosPage() {
     setPage(1);
   };
 
+  // Cargar roles y locales
   useEffect(() => {
     const cargar = async () => {
       try {
@@ -64,6 +65,7 @@ export default function UsuariosPage() {
     cargar();
   }, []);
 
+  // Cargar usuario en edición
   useEffect(() => {
     if (!editar) {
       setInitialData(null);
@@ -90,6 +92,7 @@ export default function UsuariosPage() {
     cargarUsuario();
   }, [editar]);
 
+  // Cargar listado
   const fetchUsuarios = useCallback(async () => {
     try {
       const res = await fetch("/api/usuarios/listar", {
@@ -107,6 +110,7 @@ export default function UsuariosPage() {
 
       let lista = json.usuarios;
 
+      // Busqueda
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         lista = lista.filter(
@@ -116,11 +120,13 @@ export default function UsuariosPage() {
         );
       }
 
+      // Filtros
       if (rolFiltro) lista = lista.filter((u) => u.rolId === Number(rolFiltro));
       if (localFiltro) lista = lista.filter((u) => u.localId === Number(localFiltro));
 
       setTotal(lista.length);
 
+      // Corte por página
       const from = (page - 1) * pageSize;
       const to = from + pageSize;
 
@@ -177,10 +183,11 @@ export default function UsuariosPage() {
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
+
+        {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
-
           <div className="flex flex-col md:flex-row gap-3 flex-1">
             <SunmiInput
               placeholder="Buscar usuario..."
@@ -219,9 +226,9 @@ export default function UsuariosPage() {
               ＋ Nuevo
             </SunmiButton>
           </div>
-
         </div>
 
+        {/* LISTADO */}
         <SunmiSeparator label="Listado" color="amber" />
 
         <SunmiTableMaster
@@ -234,10 +241,20 @@ export default function UsuariosPage() {
 
           rows={usuarios.map((u) => ({
             id: u.id,
-            usuario: <SunmiUserCell nombre={u.nombre} email={u.email} />,
+
+            usuario: (
+              <SunmiUserCell
+                nombre={u.nombre}
+                email={u.email}
+              />
+            ),
+
             rol: u.rol?.nombre ?? "—",
             local: u.local?.nombre ?? "—",
-            estado: <SunmiEstadoCell value={u.activo} />,
+
+            estado: (
+              <SunmiEstadoCell value={u.activo} />
+            ),
           }))}
 
           actions={[
