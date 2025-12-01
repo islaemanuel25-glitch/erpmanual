@@ -159,7 +159,7 @@ export default function RolesPage() {
   };
 
   return (
-    <div className="sunmi-bg w-full min-h-full p-4">
+    <div className="w-full min-h-full">
       <SunmiCard>
         <SunmiCardHeader
           title="Roles del sistema"
