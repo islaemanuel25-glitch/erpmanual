@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useUser } from "@/app/context/UserContext";
 import SidebarGroup from "./SidebarGroup";
 import SidebarMobile from "./SidebarMobile";
+import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 import {
   Home,
@@ -18,6 +19,7 @@ import {
 
 export default function SidebarPro() {
   const { perfil } = useUser();
+  const { theme } = useSunmiTheme();
 
   if (!perfil) return null;
 
@@ -103,17 +105,17 @@ export default function SidebarPro() {
       <SidebarMobile menu={menu} perfil={perfil} />
 
       <aside
-        className="
+        className={`
           hidden md:flex flex-col items-center
           w-16 min-w-16
 
-          bg-[#FACC15]                /* ⭐ Amarillo Sunmi */
-          border-r border-yellow-600  /* ⭐ Borde Sunmi */
+          ${theme.sidebar.bg}
+          ${theme.sidebar.border} border-r
           shadow-[2px_0_10px_rgba(0,0,0,0.45)]
-          
+
           py-4 gap-6
           z-40
-        "
+        `}
       >
         {menu.map((grupo) => (
           <SidebarGroup

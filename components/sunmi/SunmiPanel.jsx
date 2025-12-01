@@ -1,16 +1,19 @@
 "use client";
 
+import { useSunmiTheme } from "./SunmiThemeProvider";
+
 export default function SunmiPanel({
   children,
   className = "",
   noPadding = false,
 }) {
+  const { theme } = useSunmiTheme();
   const padding = noPadding ? "" : "p-4";
+  
   return (
     <div
       className={`
-        bg-slate-900/70 
-        border border-slate-800 
+        ${theme.card}
         rounded-2xl 
         ${padding} 
         ${className}

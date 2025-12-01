@@ -1,4 +1,10 @@
+"use client";
+
+import { useSunmiTheme } from "./SunmiThemeProvider";
+
 export default function SunmiTable({ headers = [], children }) {
+  const { theme } = useSunmiTheme();
+  
   return (
     <div className="overflow-x-auto">
       <table
@@ -10,7 +16,7 @@ export default function SunmiTable({ headers = [], children }) {
       >
         {/* ===== HEADER ===== */}
         {headers.length > 0 && (
-          <thead className="bg-amber-400 text-slate-900">
+          <thead className={theme.table?.header || "bg-amber-400 text-slate-900"}>
             <tr>
               {headers.map((h, i) => (
                 <th

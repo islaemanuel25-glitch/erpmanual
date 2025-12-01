@@ -1,9 +1,16 @@
 "use client";
 
+import { useSunmiTheme } from "./SunmiThemeProvider";
+
 export default function SunmiListCardItem({
   children,
   className = "",
 }) {
+  const { theme } = useSunmiTheme();
+  
+  // Usar color de borde del card para el separador
+  const separatorColor = theme.card.split(' ').find(c => c.startsWith('border-'))?.replace('border-', '') || 'slate-800';
+  
   return (
     <div
       className={`
@@ -14,11 +21,11 @@ export default function SunmiListCardItem({
       `}
     >
       {/* Separador soft Sunmi → super leve, theme-friendly */}
-      <div className="
+      <div className={`
         absolute -bottom-[1px] left-0 right-0
         h-[1px]
-        shadow-[0_1px_0_rgba(255,255,255,0.04)]
-      " />
+        bg-${separatorColor}/20
+      `} />
 
       {/* Contenido */}
       <div className="flex-1 truncate">

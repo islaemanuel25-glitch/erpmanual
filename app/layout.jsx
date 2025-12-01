@@ -1,5 +1,6 @@
 import "./globals.css";
 import { UserProvider } from "@/app/context/UserContext";
+import ThemeClientWrapper from "@/components/sunmi/ThemeClientWrapper";
 
 export const metadata = {
   title: "ERP Azul",
@@ -9,11 +10,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body className="h-screen w-screen overflow-hidden bg-slate-900 text-slate-100">
-        <UserProvider>
-          {children}
-        </UserProvider>
-      </body>
+      <ThemeClientWrapper>
+        <UserProvider>{children}</UserProvider>
+      </ThemeClientWrapper>
     </html>
   );
 }

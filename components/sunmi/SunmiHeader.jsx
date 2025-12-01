@@ -1,13 +1,20 @@
-export default function SunmiHeader({ title, color = "amber", children }) {
-  const cls =
-    color === "cyan"
-      ? "bg-cyan-400 text-slate-900"
-      : "bg-amber-400 text-slate-900";
+"use client";
 
+import { useSunmiTheme } from "./SunmiThemeProvider";
+
+export default function SunmiHeader({ title, color = "amber", children }) {
+  const { theme } = useSunmiTheme();
+  
+  const bgClass = color === "cyan" 
+    ? (theme.header.bg.includes('cyan') ? theme.header.bg : theme.header.bg.replace('amber', 'cyan'))
+    : theme.header.bg;
+  
   return (
     <div
       className={`
-        ${cls}
+        bg-gradient-to-r ${bgClass}
+        ${theme.header.border}
+        ${theme.header.text}
         rounded-xl 
         px-4 py-2 
         text-[13px]
@@ -16,6 +23,7 @@ export default function SunmiHeader({ title, color = "amber", children }) {
         uppercase
         shadow-md
         mb-2
+        border
       `}
     >
       {title}

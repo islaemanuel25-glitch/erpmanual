@@ -1,6 +1,16 @@
+"use client";
+
 import { ChevronDown } from "lucide-react";
+import { useSunmiTheme } from "./SunmiThemeProvider";
 
 export default function SunmiSelect({ className = "", children, ...props }) {
+  const { theme } = useSunmiTheme();
+  
+  // Extraer colores del theme
+  const bgColor = theme.card.split(' ').find(c => c.startsWith('bg-')) || 'bg-slate-950/60';
+  const borderColor = theme.card.split(' ').find(c => c.startsWith('border-')) || 'border-slate-700';
+  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-')) || 'text-slate-100';
+  
   return (
     <div className="relative w-full">
       <select
@@ -9,9 +19,9 @@ export default function SunmiSelect({ className = "", children, ...props }) {
           w-full 
           px-2.5 py-1.5              /* antes px-3 py-2 */
           rounded-md                 /* antes rounded-xl */
-          bg-slate-950/60 
-          border border-slate-700 
-          text-slate-100 
+          ${bgColor}
+          border ${borderColor}
+          ${textColor}
           text-[13px]                /* más compacto */
           appearance-none
           focus:outline-none

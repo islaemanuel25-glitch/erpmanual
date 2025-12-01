@@ -4,11 +4,13 @@ import { Bell, ChevronDown, LogOut } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@/app/context/UserContext";
+import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 export default function Header() {
   const pathname = usePathname();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
+  const { theme } = useSunmiTheme();
 
   const [open, setOpen] = useState(false);
 
@@ -44,16 +46,18 @@ export default function Header() {
 
   return (
     <header
-      className="
-        w-full h-16 px-6
-        bg-slate-900
-        border-b border-slate-800
-        flex justify-between items-center
+      className={`
+        w-full h-16 px-6 flex justify-between items-center
+        border-b
         shadow-[0_3px_8px_rgba(0,0,0,0.35)]
-      "
+        bg-gradient-to-r
+        ${theme.header.bg}
+        ${theme.header.border}
+        transition-colors duration-200
+      `}
     >
       {/* IZQUIERDA: TITULO */}
-      <h1 className="text-xl font-semibold text-slate-100 hidden md:block">
+      <h1 className={`text-xl font-semibold hidden md:block ${theme.header.text}`}>
         {titulo}
       </h1>
 
@@ -62,11 +66,11 @@ export default function Header() {
 
         {/* NOTIFICACIONES */}
         <Bell
-          className="
-            text-slate-400 
-            hover:text-yellow-400
+          className={`
+            ${theme.header.text}
+            hover:opacity-80
             transition cursor-pointer
-          "
+          `}
         />
 
         {/* USUARIO */}
@@ -77,35 +81,29 @@ export default function Header() {
           >
             {/* AVATAR */}
             <div
-              className="
-                w-9 h-9 rounded-full
-                bg-slate-800 
-                text-yellow-300
-                flex items-center justify-center
+              className={`
+                w-9 h-9 rounded-full flex items-center justify-center
                 text-[13px] font-bold
-                border border-slate-600
-                shadow-[0_0_6px_rgba(250,204,21,0.5)]
-                hover:shadow-[0_0_10px_rgba(250,204,21,0.7)]
-                transition
-              "
+                transition shadow-md
+                ${theme.card}
+              `}
             >
               {nombre[0]?.toUpperCase() || "?"}
             </div>
 
             {/* NOMBRE + ROL */}
             <div className="flex flex-col leading-tight">
-              <span className="text-[13px] text-slate-100 font-medium">
+              <span className={`text-[13px] font-medium ${theme.header.text}`}>
                 {nombre}
               </span>
 
               <span
-                className="
+                className={`
                   text-[11px] px-2 py-[1px]
-                  bg-yellow-500/15 
-                  text-yellow-400
-                  rounded-md border border-yellow-500/30
-                  w-fit
-                "
+                  rounded-md w-fit border
+                  ${theme.header.border}
+                  ${theme.header.text}
+                `}
               >
                 {rol}
               </span>
@@ -114,7 +112,7 @@ export default function Header() {
             <ChevronDown
               size={18}
               className={`
-                text-slate-400 transition-transform
+                ${theme.header.text} transition-transform
                 ${open ? "rotate-180" : ""}
               `}
             />
@@ -123,31 +121,31 @@ export default function Header() {
           {/* MENU DESPLEGABLE */}
           {open && (
             <div
-              className="
+              className={`
                 absolute right-0 mt-2 w-52
-                bg-slate-900
-                border border-slate-700
-                shadow-xl
                 rounded-md py-2 z-50
-              "
+                shadow-xl border
+                ${theme.card}
+                ${theme.header.border}
+              `}
             >
               <div className="px-4 py-1">
-                <p className="text-sm font-semibold text-slate-100">
+                <p className={`text-sm font-semibold ${theme.header.text}`}>
                   {nombre}
                 </p>
-                <p className="text-xs text-slate-400">{rol}</p>
+                <p className="text-xs opacity-70">{rol}</p>
               </div>
 
-              <div className="border-t border-slate-700 my-1" />
+              <div className={`border-t my-1 ${theme.header.border}`} />
 
               <button
                 onClick={logout}
-                className="
+                className={`
                   flex items-center gap-2 w-full text-left 
                   px-4 py-2 text-[13px]
                   text-red-400 hover:bg-red-500/10 
                   transition
-                "
+                `}
               >
                 <LogOut size={16} />
                 Cerrar sesión

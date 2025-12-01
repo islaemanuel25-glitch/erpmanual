@@ -1,9 +1,13 @@
 "use client";
 
+import { useSunmiTheme } from "./SunmiThemeProvider";
+
 export default function SunmiCardHeader({
   title = "",
   children, // botones opcionales
 }) {
+  const { theme } = useSunmiTheme();
+  
   return (
     <div
       className="
@@ -11,7 +15,7 @@ export default function SunmiCardHeader({
         mb-3 px-1
       "
     >
-      <h2 className="text-[15px] font-semibold text-slate-200 tracking-wide">
+      <h2 className={`text-[15px] font-semibold ${theme.layout.split(' ')[1] || 'text-slate-200'} tracking-wide`}>
         {title}
       </h2>
 

@@ -3,21 +3,24 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
+import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 export default function SidebarMobile({ menu, perfil }) {
   const [open, setOpen] = useState(false);
+  const { theme } = useSunmiTheme();
 
   return (
     <>
       {/* BOTÓN */}
       <button
         onClick={() => setOpen(true)}
-        className="
+        className={`
           md:hidden p-2 rounded-lg
-          bg-yellow-400 text-slate-900
+          ${theme.sidebar.bg} 
+          text-slate-900
           shadow-lg shadow-black/40
           fixed top-3 left-3 z-50
-        "
+        `}
       >
         <Menu size={22} />
       </button>
@@ -33,8 +36,8 @@ export default function SidebarMobile({ menu, perfil }) {
       <aside
         className={`
           fixed top-0 left-0 h-full w-64 
-          bg-[#FACC15]
-          border-r border-yellow-600
+          ${theme.sidebar.bg}
+          ${theme.sidebar.border} border-r
           shadow-xl shadow-black/60
           p-4 transform z-50
           transition-transform duration-300
@@ -59,13 +62,11 @@ export default function SidebarMobile({ menu, perfil }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="
-                    block py-2 pl-2 
-                    text-slate-900 font-medium
-                    hover:bg-yellow-300 
-                    rounded-md
-                    transition
-                  "
+                  className={`
+                    block py-2 pl-2 font-medium rounded-md transition
+                    text-slate-900
+                    ${theme.sidebar.hover}
+                  `}
                   onClick={() => setOpen(false)}
                 >
                   {item.label}

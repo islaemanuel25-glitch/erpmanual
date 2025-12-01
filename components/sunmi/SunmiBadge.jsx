@@ -1,6 +1,10 @@
 "use client";
 
+import { useSunmiTheme } from "./SunmiThemeProvider";
+
 export default function SunmiBadgeEstado({ estado }) {
+  const { theme } = useSunmiTheme();
+  
   // ACEPTA CUALQUIER FORMA — lo normalizamos acá
   const activo =
     estado === true ||
@@ -18,7 +22,7 @@ export default function SunmiBadgeEstado({ estado }) {
         rounded-full 
         text-[11px] 
         font-semibold
-        ${activo ? "bg-green-400 text-slate-900" : "bg-red-400 text-slate-900"}
+        ${activo ? theme.badgeActivo : theme.badgeInactivo}
       `}
     >
       {label}

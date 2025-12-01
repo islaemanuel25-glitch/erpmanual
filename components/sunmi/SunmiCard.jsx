@@ -1,9 +1,14 @@
+"use client";
+
+import { useSunmiTheme } from "./SunmiThemeProvider";
+
 export default function SunmiCard({ children, className = "" }) {
+  const { theme } = useSunmiTheme();
+  
   return (
     <div
       className={`
-        bg-slate-950/70
-        border border-slate-800
+        ${theme.card}
         rounded-xl
         shadow-md
         p-3           /* antes p-4 / p-6 */

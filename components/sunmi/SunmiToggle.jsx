@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useSunmiTheme } from "./SunmiThemeProvider";
 
 export default function SunmiToggle({
   value = false,
   onChange = () => {},
   label = "",
 }) {
+  const { theme } = useSunmiTheme();
   const [checked, setChecked] = useState(value);
 
   const toggle = () => {
@@ -14,6 +16,9 @@ export default function SunmiToggle({
     setChecked(newVal);
     onChange(newVal);
   };
+
+  // Extraer color de texto del layout
+  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-'))?.replace('text-slate-50', 'text-slate-300') || 'text-slate-300';
 
   return (
     <div
@@ -42,7 +47,7 @@ export default function SunmiToggle({
       </div>
 
       {label && (
-        <span className="text-[12px] text-slate-300">{label}</span>
+        <span className={`text-[12px] ${textColor}`}>{label}</span>
       )}
     </div>
   );

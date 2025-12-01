@@ -1,6 +1,10 @@
 "use client";
 
+import { useSunmiTheme } from "./SunmiThemeProvider";
+
 export default function SunmiBadgeEstado({ value }) {
+  const { theme } = useSunmiTheme();
+  
   // Normalizar valor para detectar estado activo
   const isActive =
     value === true ||
@@ -11,8 +15,8 @@ export default function SunmiBadgeEstado({ value }) {
     value === "Activo";
 
   const data = isActive
-    ? { label: "Activo", class: "bg-green-400 text-slate-900" }
-    : { label: "Inactivo", class: "bg-red-400 text-slate-900" };
+    ? { label: "Activo", class: theme.badgeActivo }
+    : { label: "Inactivo", class: theme.badgeInactivo };
 
   return (
     <span
