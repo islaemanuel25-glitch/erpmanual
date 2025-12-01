@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -112,19 +113,12 @@ export default function ModalUsuario({
     >
       <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
         <SunmiCard>
-          
-          {/* HEADER */}
-          <div className="flex items-center justify-between px-1 py-2">
-            <h2 className="text-[14px] font-semibold text-slate-200">
-              {editMode ? "Editar usuario" : "Nuevo usuario"}
-            </h2>
+          <SunmiCardHeader
+            title={editMode ? "Editar usuario" : "Nuevo usuario"}
+            subtitle={editMode ? "Actualizá los datos del usuario" : "Creá un nuevo usuario del sistema"}
+            color="amber"
+          />
 
-            <SunmiButton color="slate" size="sm" onClick={onClose}>
-              Cerrar
-            </SunmiButton>
-          </div>
-
-          {/* CONTENIDO */}
           <div
             ref={modalRef}
             className="max-h-[65vh] overflow-y-auto px-2 pb-4 mt-1 space-y-4"
@@ -163,7 +157,7 @@ export default function ModalUsuario({
                 value={form.password}
                 onChange={(e) => setField("password", e.target.value)}
                 placeholder="Ingresá una contraseña…"
-                autoComplete="new-password"  // 🔥 evita autocompletar del navegador
+                autoComplete="new-password"
               />
             </Field>
 
@@ -210,7 +204,6 @@ export default function ModalUsuario({
                 onChange={(v) => setField("activo", v)}
               />
             </Field>
-
           </div>
 
           {/* FOOTER */}
@@ -223,7 +216,6 @@ export default function ModalUsuario({
               {editMode ? "Guardar cambios" : "Crear usuario"}
             </SunmiButton>
           </div>
-
         </SunmiCard>
       </div>
     </div>

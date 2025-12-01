@@ -4,14 +4,20 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 import SunmiUserCell from "@/components/sunmi/SunmiUserCell";
-import SunmiEstadoCell from "@/components/sunmi/SunmiEstadoCell";
-import SunmiTableMaster from "@/components/sunmi/SunmiTableMaster";
+import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
+import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
+import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
+
+import { Pencil, Trash2 } from "lucide-react";
 
 import ModalUsuario from "@/components/usuarios/ModalUsuario";
 
@@ -51,8 +57,12 @@ export default function UsuariosPage() {
   useEffect(() => {
     const cargar = async () => {
       try {
-        const rRoles = await fetch("/api/usuarios/listarRoles", { credentials: "include" }).then((r) => r.json());
-        const rLocales = await fetch("/api/usuarios/listarLocales", { credentials: "include" }).then((r) => r.json());
+        const rRoles = await fetch("/api/usuarios/listarRoles", {
+          credentials: "include",
+        }).then((r) => r.json());
+        const rLocales = await fetch("/api/usuarios/listarLocales", {
+          credentials: "include",
+        }).then((r) => r.json());
 
         setRoles(rRoles.roles || []);
         setLocales(rLocales.locales || []);
@@ -90,7 +100,7 @@ export default function UsuariosPage() {
     };
 
     cargarUsuario();
-  }, [editar]);
+  }, [editar, router]);
 
   // Cargar listado
   const fetchUsuarios = useCallback(async () => {
@@ -110,7 +120,7 @@ export default function UsuariosPage() {
 
       let lista = json.usuarios;
 
-      // Busqueda
+      // Búsqueda
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         lista = lista.filter(
@@ -122,7 +132,8 @@ export default function UsuariosPage() {
 
       // Filtros
       if (rolFiltro) lista = lista.filter((u) => u.rolId === Number(rolFiltro));
-      if (localFiltro) lista = lista.filter((u) => u.localId === Number(localFiltro));
+      if (localFiltro)
+        lista = lista.filter((u) => u.localId === Number(localFiltro));
 
       setTotal(lista.length);
 
@@ -154,7 +165,9 @@ export default function UsuariosPage() {
   };
 
   const handleSubmit = async (form) => {
-    const url = editar ? `/api/usuarios/editar/${editar}` : `/api/usuarios/crear`;
+    const url = editar
+      ? `/api/usuarios/editar/${editar}`
+      : `/api/usuarios/crear`;
     const method = editar ? "PUT" : "POST";
 
     const res = await fetch(url, {
@@ -183,6 +196,11 @@ export default function UsuariosPage() {
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
+        <SunmiCardHeader
+          title="Usuarios"
+          subtitle="Administrá los usuarios del sistema"
+          color="amber"
+        />
 
         {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
@@ -231,53 +249,102 @@ export default function UsuariosPage() {
         {/* LISTADO */}
         <SunmiSeparator label="Listado" color="amber" />
 
-        <SunmiTableMaster
-          columns={[
-            { id: "usuario", label: "Usuario" },
-            { id: "rol", label: "Rol" },
-            { id: "local", label: "Local" },
-            { id: "estado", label: "Estado", align: "center" },
-          ]}
+        <SunmiTable
+          headers={["Usuario", "Rol", "Local", "Estado", "Acciones"]}
+        >
+          {usuarios.length === 0 ? (
+            <SunmiTableEmpty message="No hay usuarios para mostrar" />
+          ) : (
+            usuarios.map((u) => (
+              <SunmiTableRow key={u.id}>
+                <td className="px-2 py-1.5">
+                  <SunmiUserCell nombre={u.nombre} email={u.email} />
+                </td>
 
-          rows={usuarios.map((u) => ({
-            id: u.id,
+                <td className="px-2 py-1.5">
+                  {u.rol?.nombre ?? "—"}
+                </td>
 
-            usuario: (
-              <SunmiUserCell
-                nombre={u.nombre}
-                email={u.email}
-              />
-            ),
+                <td className="px-2 py-1.5">
+                  {u.local?.nombre ?? "—"}
+                </td>
 
-            rol: u.rol?.nombre ?? "—",
-            local: u.local?.nombre ?? "—",
+                <td className="px-2 py-1.5">
+                  <div className="flex justify-center">
+                    <SunmiBadgeEstado value={u.activo} />
+                  </div>
+                </td>
 
-            estado: (
-              <SunmiEstadoCell value={u.activo} />
-            ),
-          }))}
+                <td className="px-2 py-1.5">
+                  <div className="flex justify-end gap-1">
+                    <SunmiButtonIcon
+                      icon={Pencil}
+                      color="amber"
+                      size={16}
+                      onClick={() =>
+                        router.push(`/modulos/usuarios?editar=${u.id}`)
+                      }
+                    />
+                    <SunmiButtonIcon
+                      icon={Trash2}
+                      color="red"
+                      size={16}
+                      onClick={() => handleEliminar(u.id)}
+                    />
+                  </div>
+                </td>
+              </SunmiTableRow>
+            ))
+          )}
+        </SunmiTable>
 
-          actions={[
-            {
-              icon: "edit",
-              onClick: (row) => router.push(`/modulos/usuarios?editar=${row.id}`),
-            },
-            {
-              icon: "delete",
-              onClick: (row) => handleEliminar(row.id),
-            },
-          ]}
+        <SunmiSeparator />
 
-          page={page}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          onChangePageSize={(v) => {
-            setPageSize(v);
-            setPage(1);
-          }}
-          onPrev={() => setPage((p) => p - 1)}
-          onNext={() => setPage((p) => p + 1)}
-        />
+        {/* PAGINACIÓN + SELECTOR FILAS */}
+        <div className="w-full flex flex-col md:flex-row items-center justify-between gap-3 px-2 pb-2">
+          {/* SELECTOR FILAS */}
+          <div className="flex items-center gap-2 text-sm">
+            <span>Filas:</span>
+
+            <SunmiSelectAdv
+              value={pageSize}
+              onChange={(v) => {
+                setPageSize(Number(v));
+                setPage(1);
+              }}
+            >
+              {[25, 50, 100, 200].map((opt) => (
+                <SunmiSelectOption key={opt} value={opt}>
+                  {opt}
+                </SunmiSelectOption>
+              ))}
+            </SunmiSelectAdv>
+          </div>
+
+          {/* INDICADOR */}
+          <div className="text-sm">
+            Página <strong>{page}</strong> de <strong>{totalPages}</strong>
+          </div>
+
+          {/* BOTONES PAGINACIÓN */}
+          <div className="flex items-center gap-2">
+            <SunmiButton
+              variant="ghost"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Anterior
+            </SunmiButton>
+
+            <SunmiButton
+              variant="ghost"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Siguiente
+            </SunmiButton>
+          </div>
+        </div>
       </SunmiCard>
 
       <ModalUsuario
