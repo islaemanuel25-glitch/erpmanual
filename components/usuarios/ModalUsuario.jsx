@@ -3,12 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSelectAdv, {
-  SunmiSelectOption,
-} from "@/components/sunmi/SunmiSelectAdv";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 
@@ -21,7 +18,6 @@ export default function ModalUsuario({
   locales = [],
 }) {
   const modalRef = useRef(null);
-
   const editMode = Boolean(initialData);
 
   const [form, setForm] = useState({
@@ -33,16 +29,19 @@ export default function ModalUsuario({
     activo: true,
   });
 
+  // ================================
+  //   CARGA DE DATOS EN MODAL
+  // ================================
   useEffect(() => {
     if (!open) return;
 
-    // Siempre que se abre, scrollear arriba
+    // scroll top en cada apertura
     setTimeout(() => {
       if (modalRef.current) modalRef.current.scrollTop = 0;
     }, 30);
 
-    // Nuevo usuario → formulario limpio
     if (!initialData) {
+      // NUEVO USUARIO — limpia todo
       setForm({
         nombre: "",
         email: "",
@@ -54,7 +53,7 @@ export default function ModalUsuario({
       return;
     }
 
-    // Edición → precargar datos (sin password)
+    // EDICIÓN
     setForm({
       nombre: initialData.nombre || "",
       email: initialData.email || "",
@@ -65,11 +64,12 @@ export default function ModalUsuario({
     });
   }, [open, initialData]);
 
-  const setField = (k, v) =>
+  const setField = (k, v) => {
     setForm((prev) => ({
       ...prev,
       [k]: v,
     }));
+  };
 
   const validar = () => {
     if (!String(form.nombre).trim()) return "Completá el nombre.";
@@ -98,6 +98,9 @@ export default function ModalUsuario({
 
   if (!open) return null;
 
+  // ================================
+  //      RENDER DEL MODAL
+  // ================================
   return (
     <div
       className="
@@ -109,24 +112,22 @@ export default function ModalUsuario({
     >
       <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
         <SunmiCard>
+          
           {/* HEADER */}
-          <SunmiCardHeader
-            title={editMode ? "Editar usuario" : "Nuevo usuario"}
-          >
+          <div className="flex items-center justify-between px-1 py-2">
+            <h2 className="text-[14px] font-semibold text-slate-200">
+              {editMode ? "Editar usuario" : "Nuevo usuario"}
+            </h2>
+
             <SunmiButton color="slate" size="sm" onClick={onClose}>
               Cerrar
             </SunmiButton>
-          </SunmiCardHeader>
+          </div>
 
           {/* CONTENIDO */}
           <div
             ref={modalRef}
-            className="
-              max-h-[65vh]
-              overflow-y-auto 
-              px-2 pb-4 mt-2 
-              space-y-4
-            "
+            className="max-h-[65vh] overflow-y-auto px-2 pb-4 mt-1 space-y-4"
           >
             <SunmiSeparator label="Datos" color="amber" />
 
@@ -149,23 +150,22 @@ export default function ModalUsuario({
               />
             </Field>
 
-            {/* Contraseña */}
-<Field
-  label={
-    editMode
-      ? "Nueva contraseña (opcional)"
-      : "Contraseña *"
-  }
->
-  <SunmiInput
-    type="password"
-    value={form.password}
-    onChange={(e) => setField("password", e.target.value)}
-    placeholder="Ingresá una contraseña…"
-    autoComplete="new-password"   // ⬅️ ESTA LÍNEA ES LA QUE SOLUCIONA TODO
-  />
-</Field>
-
+            {/* Password */}
+            <Field
+              label={
+                editMode
+                  ? "Nueva contraseña (opcional)"
+                  : "Contraseña *"
+              }
+            >
+              <SunmiInput
+                type="password"
+                value={form.password}
+                onChange={(e) => setField("password", e.target.value)}
+                placeholder="Ingresá una contraseña…"
+                autoComplete="new-password"  // 🔥 evita autocompletar del navegador
+              />
+            </Field>
 
             {/* Rol */}
             <Field label="Rol *">
@@ -174,8 +174,9 @@ export default function ModalUsuario({
                 onChange={(v) => setField("rolId", v)}
               >
                 <SunmiSelectOption value="">
-                  Seleccionar rol…
+                  Seleccioná un rol…
                 </SunmiSelectOption>
+
                 {roles.map((r) => (
                   <SunmiSelectOption key={r.id} value={r.id}>
                     {r.nombre}
@@ -193,6 +194,7 @@ export default function ModalUsuario({
                 <SunmiSelectOption value="">
                   Sin local asignado
                 </SunmiSelectOption>
+
                 {locales.map((l) => (
                   <SunmiSelectOption key={l.id} value={l.id}>
                     {l.nombre}
@@ -208,10 +210,11 @@ export default function ModalUsuario({
                 onChange={(v) => setField("activo", v)}
               />
             </Field>
+
           </div>
 
           {/* FOOTER */}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 px-1">
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
@@ -220,6 +223,7 @@ export default function ModalUsuario({
               {editMode ? "Guardar cambios" : "Crear usuario"}
             </SunmiButton>
           </div>
+
         </SunmiCard>
       </div>
     </div>

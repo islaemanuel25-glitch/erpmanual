@@ -8,13 +8,12 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 
+import SunmiUserCell from "@/components/sunmi/SunmiUserCell";
+import SunmiEstadoCell from "@/components/sunmi/SunmiEstadoCell";
 import SunmiTableMaster from "@/components/sunmi/SunmiTableMaster";
-import ModalUsuario from "@/components/usuarios/ModalUsuario";
 
-// ✅ NUEVO COMPONENTE
-import CeldaUsuario from "@/components/usuarios/CeldaUsuario";
+import ModalUsuario from "@/components/usuarios/ModalUsuario";
 
 export default function UsuariosPage() {
   const router = useRouter();
@@ -48,7 +47,6 @@ export default function UsuariosPage() {
     setPage(1);
   };
 
-  // Cargar roles/locales
   useEffect(() => {
     const cargar = async () => {
       try {
@@ -66,7 +64,6 @@ export default function UsuariosPage() {
     cargar();
   }, []);
 
-  // Cargar usuario en edición
   useEffect(() => {
     if (!editar) {
       setInitialData(null);
@@ -93,7 +90,6 @@ export default function UsuariosPage() {
     cargarUsuario();
   }, [editar]);
 
-  // Cargar listado
   const fetchUsuarios = useCallback(async () => {
     try {
       const res = await fetch("/api/usuarios/listar", {
@@ -111,7 +107,6 @@ export default function UsuariosPage() {
 
       let lista = json.usuarios;
 
-      // Busqueda
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         lista = lista.filter(
@@ -121,13 +116,11 @@ export default function UsuariosPage() {
         );
       }
 
-      // Filtros
       if (rolFiltro) lista = lista.filter((u) => u.rolId === Number(rolFiltro));
       if (localFiltro) lista = lista.filter((u) => u.localId === Number(localFiltro));
 
       setTotal(lista.length);
 
-      // Corte por página
       const from = (page - 1) * pageSize;
       const to = from + pageSize;
 
@@ -178,20 +171,17 @@ export default function UsuariosPage() {
 
   const handleEliminar = async (id) => {
     if (!confirm("¿Eliminar usuario?")) return;
-    alert("Falta implementar eliminar en backend.");
+    alert("Eliminar no implementado aún.");
   };
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-
-        {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
 
           <div className="flex flex-col md:flex-row gap-3 flex-1">
-
             <SunmiInput
               placeholder="Buscar usuario..."
               value={search}
@@ -215,7 +205,6 @@ export default function UsuariosPage() {
                 </SunmiSelectOption>
               ))}
             </SunmiSelectAdv>
-
           </div>
 
           <div className="flex gap-2 justify-end">
@@ -233,7 +222,6 @@ export default function UsuariosPage() {
 
         </div>
 
-        {/* LISTADO */}
         <SunmiSeparator label="Listado" color="amber" />
 
         <SunmiTableMaster
@@ -246,24 +234,16 @@ export default function UsuariosPage() {
 
           rows={usuarios.map((u) => ({
             id: u.id,
-
-            usuario: <CeldaUsuario nombre={u.nombre} email={u.email} />,
-
+            usuario: <SunmiUserCell nombre={u.nombre} email={u.email} />,
             rol: u.rol?.nombre ?? "—",
             local: u.local?.nombre ?? "—",
-
-            estado: (
-              <div className="flex justify-center">
-                <SunmiBadgeEstado value={u.activo} />
-              </div>
-            ),
+            estado: <SunmiEstadoCell value={u.activo} />,
           }))}
 
           actions={[
             {
               icon: "edit",
-              onClick: (row) =>
-                router.push(`/modulos/usuarios?editar=${row.id}`),
+              onClick: (row) => router.push(`/modulos/usuarios?editar=${row.id}`),
             },
             {
               icon: "delete",
@@ -281,7 +261,6 @@ export default function UsuariosPage() {
           onPrev={() => setPage((p) => p - 1)}
           onNext={() => setPage((p) => p + 1)}
         />
-
       </SunmiCard>
 
       <ModalUsuario
