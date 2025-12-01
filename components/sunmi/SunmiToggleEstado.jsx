@@ -1,31 +1,43 @@
 "use client";
 
-export default function SunmiCardHeader({
-  title = "",
-  children, // botones opcionales
+export default function SunmiToggleEstado({
+  value = true,
+  onChange = () => {},
 }) {
+  // Normalizar valor del backend / formulario
+  const normalized =
+    value === true ||
+    value === 1 ||
+    value === "1" ||
+    value === "true" ||
+    value === "activo";
+
+  const toggle = () => {
+    onChange(!normalized);
+  };
+
   return (
     <div
-      className="
-        flex items-center justify-between
-        mb-2               /* antes mb-3 */
-        px-1               /* compacto */
-      "
+      className="flex items-center gap-2 cursor-pointer select-none"
+      onClick={toggle}
     >
-      <h2
-        className="
-          text-[14px]      /* antes 15px */
-          font-semibold
-          text-slate-200
-          leading-none      /* sin aire vertical */
-        "
+      {/* Switch */}
+      <div
+        className={`w-10 h-5 rounded-full transition-all ${
+          normalized ? "bg-green-400" : "bg-slate-600"
+        }`}
       >
-        {title}
-      </h2>
-
-      <div className="flex items-center gap-1.5">
-        {children}
+        <div
+          className={`w-5 h-5 bg-white rounded-full shadow transform transition-all ${
+            normalized ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
       </div>
+
+      {/* Texto */}
+      <span className="text-[12px] text-slate-300">
+        {normalized ? "Habilitado" : "Inactivo"}
+      </span>
     </div>
   );
 }

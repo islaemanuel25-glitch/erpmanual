@@ -1,31 +1,23 @@
 "use client";
 
 export default function SunmiButtonIcon({
+  icon: Icon,
   color = "amber",
-  children,
-  className = "",
-  ...props
+  size = 16,
+  onClick = () => {},
 }) {
-  const base = `
-    p-1
-    rounded-md
-    flex items-center justify-center
-    transition
-    text-[13px]
-  `;
-
-  const styles = {
-    amber: `${base} bg-slate-800 text-amber-400 hover:bg-slate-700`,
-    red:   `${base} bg-slate-800 text-red-400 hover:bg-slate-700`,
-    slate: `${base} bg-slate-800 text-slate-300 hover:bg-slate-700`,
+  const colors = {
+    amber: "text-amber-300 hover:text-amber-200",
+    red: "text-red-400 hover:text-red-300",
+    slate: "text-slate-400 hover:text-slate-200",
   };
 
   return (
     <button
-      {...props}
-      className={`${styles[color] || styles.amber} ${className}`}
+      onClick={onClick}
+      className={`p-1 rounded transition ${colors[color]}`}
     >
-      {children}
+      <Icon size={size} strokeWidth={2} />
     </button>
   );
 }

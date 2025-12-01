@@ -4,20 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
-
-import SunmiTable from "@/components/sunmi/SunmiTable";
-import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
-import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 
+import SunmiTableMaster from "@/components/sunmi/SunmiTableMaster";
 import ModalUsuario from "@/components/usuarios/ModalUsuario";
-
-const PAGE_SIZE = 10;
 
 export default function UsuariosPage() {
   const router = useRouter();
@@ -37,10 +31,14 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState("");
   const [rolFiltro, setRolFiltro] = useState("");
   const [localFiltro, setLocalFiltro] = useState("");
-  const [page, setPage] = useState(1);
 
+  // 🟦 Nueva función: cantidad de filas por página
+  const [pageSize, setPageSize] = useState(25);
+
+  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const limpiarFiltros = () => {
     setSearch("");
@@ -49,22 +47,15 @@ export default function UsuariosPage() {
     setPage(1);
   };
 
-  // --------------------------------------------------------
-  // CARGAR ROLES Y LOCALES
-  // --------------------------------------------------------
+  // Cargar roles/locales
   useEffect(() => {
     const cargar = async () => {
       try {
-        const rRoles = await fetch("/api/usuarios/listarRoles", {
-          credentials: "include",
-        }).then((r) => r.json());
+        const rRoles = await fetch("/api/usuarios/listarRoles", { credentials: "include" }).then((r) => r.json());
+        const rLocales = await fetch("/api/usuarios/listarLocales", { credentials: "include" }).then((r) => r.json());
 
-        const rLocales = await fetch("/api/usuarios/listarLocales", {
-          credentials: "include",
-        }).then((r) => r.json());
-
-        setRoles(Array.isArray(rRoles.roles) ? rRoles.roles : []);
-        setLocales(Array.isArray(rLocales.locales) ? rLocales.locales : []);
+        setRoles(rRoles.roles || []);
+        setLocales(rLocales.locales || []);
       } catch (e) {
         setRoles([]);
         setLocales([]);
@@ -74,9 +65,7 @@ export default function UsuariosPage() {
     cargar();
   }, []);
 
-  // --------------------------------------------------------
-  // CARGAR USUARIO EN MODO EDICIÓN
-  // --------------------------------------------------------
+  // Cargar usuario en edición
   useEffect(() => {
     if (!editar) {
       setInitialData(null);
@@ -92,7 +81,7 @@ export default function UsuariosPage() {
       const json = await res.json();
 
       if (!json.ok || !json.usuario) {
-        alert("❌ Usuario no encontrado");
+        alert("Usuario no encontrado");
         router.push("/modulos/usuarios");
         return;
       }
@@ -103,9 +92,7 @@ export default function UsuariosPage() {
     cargarUsuario();
   }, [editar]);
 
-  // --------------------------------------------------------
-  // CARGA LISTADO
-  // --------------------------------------------------------
+  // Cargar listado
   const fetchUsuarios = useCallback(async () => {
     try {
       const res = await fetch("/api/usuarios/listar", {
@@ -115,7 +102,7 @@ export default function UsuariosPage() {
 
       const json = await res.json();
 
-      if (!json.ok || !Array.isArray(json.usuarios)) {
+      if (!json.ok || !json.usuarios) {
         setUsuarios([]);
         setTotal(0);
         return;
@@ -123,6 +110,7 @@ export default function UsuariosPage() {
 
       let lista = json.usuarios;
 
+      // Busqueda
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         lista = lista.filter(
@@ -132,33 +120,35 @@ export default function UsuariosPage() {
         );
       }
 
+      // Filtros
       if (rolFiltro) lista = lista.filter((u) => u.rolId === Number(rolFiltro));
       if (localFiltro)
         lista = lista.filter((u) => u.localId === Number(localFiltro));
 
       setTotal(lista.length);
 
-      const from = (page - 1) * PAGE_SIZE;
-      const to = from + PAGE_SIZE;
+      // Corte por página
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize;
 
       setUsuarios(lista.slice(from, to));
     } catch (e) {
       setUsuarios([]);
       setTotal(0);
     }
-  }, [page, search, rolFiltro, localFiltro]);
+  }, [page, pageSize, search, rolFiltro, localFiltro]);
 
+  // Ejecutar carga
   useEffect(() => {
     fetchUsuarios();
   }, [fetchUsuarios]);
 
+  // Resetear página al cambiar filtros
   useEffect(() => {
     setPage(1);
   }, [search, rolFiltro, localFiltro]);
 
-  // --------------------------------------------------------
-  // ABRIR / CERRAR MODAL
-  // --------------------------------------------------------
+  // Abrir modal
   useEffect(() => {
     setModalOpen(Boolean(nuevo || editar));
   }, [nuevo, editar]);
@@ -168,10 +158,7 @@ export default function UsuariosPage() {
   };
 
   const handleSubmit = async (form) => {
-    const url = editar
-      ? `/api/usuarios/editar/${editar}`
-      : `/api/usuarios/crear`;
-
+    const url = editar ? `/api/usuarios/editar/${editar}` : `/api/usuarios/crear`;
     const method = editar ? "PUT" : "POST";
 
     const res = await fetch(url, {
@@ -184,7 +171,7 @@ export default function UsuariosPage() {
     const json = await res.json();
 
     if (!json.ok) {
-      alert(json.error || "❌ Error");
+      alert(json.error || "Error");
       return;
     }
 
@@ -192,16 +179,22 @@ export default function UsuariosPage() {
     fetchUsuarios();
   };
 
-  // --------------------------------------------------------
-  // RENDER PRINCIPAL
-  // --------------------------------------------------------
+  const handleEliminar = async (id) => {
+    if (!confirm("¿Eliminar usuario?")) return;
+    alert("Falta implementar eliminar en backend.");
+  };
+
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
+
+        {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
+
           <div className="flex flex-col md:flex-row gap-3 flex-1">
+
             <SunmiInput
               placeholder="Buscar usuario..."
               value={search}
@@ -225,6 +218,7 @@ export default function UsuariosPage() {
                 </SunmiSelectOption>
               ))}
             </SunmiSelectAdv>
+
           </div>
 
           <div className="flex gap-2 justify-end">
@@ -239,101 +233,70 @@ export default function UsuariosPage() {
               ＋ Nuevo
             </SunmiButton>
           </div>
+
         </div>
 
+        {/* LISTADO */}
         <SunmiSeparator label="Listado" color="amber" />
 
-        <div className="overflow-x-auto rounded-2xl border border-slate-800">
-  <SunmiTable
-    headers={[
-      "Usuario",
-      "Rol",
-      "Local",
-      "Estado",
-      "Acciones",
-    ]}
-  >
-    {usuarios.length === 0 && (
-      <SunmiTableEmpty mensaje="No hay usuarios para mostrar" />
-    )}
+        <SunmiTableMaster
+          columns={[
+            { id: "usuario", label: "Usuario" },
+            { id: "rol", label: "Rol" },
+            { id: "local", label: "Local" },
+            { id: "estado", label: "Estado", align: "center" },
+          ]}
 
-    {usuarios.map((row) => (
-      <SunmiTableRow key={row.id}>
-        {/* Usuario */}
-        <td className="px-3 py-2">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-xs font-bold">
-              {row.nombre?.[0] ?? "?"}
-            </div>
+          rows={usuarios.map((u) => ({
+            id: u.id,
 
-            <div className="flex flex-col">
-              <span className="text-[13px] font-medium">
-                {row.nombre}
-              </span>
-              <span className="text-[11px] text-slate-400">
-                {row.email}
-              </span>
-            </div>
-          </div>
-        </td>
+            usuario: (
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center text-sm font-bold">
+                  {u.nombre?.[0]?.toUpperCase() ?? "?"}
+                </div>
 
-        {/* Rol */}
-        <td className="px-3 py-2">
-          {row.rol?.nombre ?? "—"}
-        </td>
+                <div className="flex flex-col">
+                  <span className="font-medium">{u.nombre ?? "Sin nombre"}</span>
+                  <span className="text-xs text-slate-400">{u.email ?? "Sin email"}</span>
+                </div>
+              </div>
+            ),
 
-        {/* Local */}
-        <td className="px-3 py-2">
-          {row.local?.nombre ?? "—"}
-        </td>
+            rol: u.rol?.nombre ?? "—",
+            local: u.local?.nombre ?? "—",
 
-        {/* Estado */}
-        <td className="px-3 py-2">
-          <SunmiBadgeEstado estado={row.activo} />
-        </td>
+            estado: (
+              <div className="flex justify-center">
+                <SunmiBadgeEstado value={u.activo} />
+              </div>
+            ),
+          }))}
 
-        {/* Acciones */}
-        <td className="px-3 py-2 text-right">
-          <div className="flex gap-3 justify-end text-[15px]">
-            <button
-              onClick={() =>
-                router.push(`/modulos/usuarios?editar=${row.id}`)
-              }
-              className="text-amber-300 hover:text-amber-200"
-            >
-              ✏️
-            </button>
-            <button
-              onClick={() => handleEliminar(row.id)}
-              className="text-red-400 hover:text-red-300"
-            >
-              🗑️
-            </button>
-          </div>
-        </td>
-      </SunmiTableRow>
-    ))}
-  </SunmiTable>
-</div>
+          actions={[
+            {
+              icon: "edit",
+              onClick: (row) =>
+                router.push(`/modulos/usuarios?editar=${row.id}`),
+            },
+            {
+              icon: "delete",
+              onClick: (row) => handleEliminar(row.id),
+            },
+          ]}
+          
 
+          page={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onChangePageSize={(v) => {
+            setPageSize(v);
+            setPage(1);
+          }}
+          onPrev={() => setPage((p) => p - 1)}
+          onNext={() => setPage((p) => p + 1)}
+        />
 
-        <div className="flex justify-between pt-4 px-2">
-          <SunmiButton
-            color="slate"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            « Anterior
-          </SunmiButton>
-
-          <SunmiButton
-            color="slate"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Siguiente »
-          </SunmiButton>
-        </div>
       </SunmiCard>
 
       {/* MODAL */}

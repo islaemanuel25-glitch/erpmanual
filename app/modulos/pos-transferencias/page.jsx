@@ -217,6 +217,26 @@ export default function PosTransferenciasHomePage() {
         </button>
 
         <SunmiCard>
+          <SunmiHeader
+            title="POS · Transferencias"
+            color="amber"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-[11px] mt-1">
+              <div className="text-slate-900/80">
+                Usuario:{" "}
+                <span className="font-semibold">
+                  {me?.nombre || "-"}
+                </span>
+              </div>
+              <div className="text-slate-900/70 mt-1 sm:mt-0">
+                Modo:{" "}
+                <span className="font-semibold">
+                  {modo === "deposito" ? "Depósito" : "Admin"}
+                </span>
+              </div>
+            </div>
+          </SunmiHeader>
+
           {/* ERROR DENTRO DE LA CARD */}
           {error && (
             <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">

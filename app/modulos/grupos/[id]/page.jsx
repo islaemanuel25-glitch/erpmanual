@@ -74,6 +74,9 @@ export default function PageGrupo({ params }) {
           CARD 1 — DATOS BÁSICOS DEL GRUPO
       ============================================================ */}
       <div className="bg-white p-6 rounded-xl shadow-md border space-y-6">
+        <h1 className="text-xl font-bold text-gray-800">
+          Administrar Grupo #{grupo.id}
+        </h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           

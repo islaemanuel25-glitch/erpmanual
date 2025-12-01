@@ -178,6 +178,8 @@ export default function RolesPage() {
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
+        <SunmiHeader title="Roles del sistema" color="amber" />
+
         {/* ====================== */}
         {/* FILTROS */}
         {/* ====================== */}

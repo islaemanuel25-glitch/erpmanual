@@ -45,6 +45,7 @@ export default function NuevoGrupoPage() {
 
   return (
     <div className="p-6 max-w-xl mx-auto">
+      <h1 className="text-2xl font-semibold mb-6">Nuevo Grupo</h1>
 
       <div className="bg-white shadow rounded p-6 space-y-4">
 

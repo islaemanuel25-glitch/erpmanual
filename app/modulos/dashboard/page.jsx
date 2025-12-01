@@ -15,6 +15,7 @@ export default function DashboardPage() {
   return (
     <div className="p-4">
       <div className="flex justify-between mb-4">
+        <h1 className="text-xl font-semibold">Dashboard ERP Azul</h1>
         <button onClick={logout} className="text-sm underline">Salir</button>
       </div>
 
