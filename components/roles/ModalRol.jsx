@@ -85,9 +85,10 @@ export default function ModalRol({
   return (
     <div
       className="
-        fixed inset-0 z-[9999] 
-        bg-black/60 backdrop-blur-sm 
-        flex items-center justify-center p-3
+        fixed inset-0 z-[9999]
+        backdrop-blur-sm
+        flex items-center justify-center
+        p-3
       "
     >
       <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
@@ -123,11 +124,8 @@ export default function ModalRol({
 
             {/* PERMISOS */}
             {Object.entries(PERMISOS).map(([grupo, lista]) => (
-              <div
-                key={grupo}
-                className="bg-slate-900/70 border border-slate-700 rounded-xl p-3"
-              >
-                <h3 className="text-[13px] font-semibold mb-2 capitalize text-slate-200">
+              <div key={grupo} className="rounded-xl p-3">
+                <h3 className="text-[13px] font-semibold mb-2 capitalize">
                   {grupo}
                 </h3>
 
@@ -135,7 +133,7 @@ export default function ModalRol({
                   {lista.map((p) => (
                     <label
                       key={p}
-                      className="flex items-center gap-2 text-[12px] text-slate-300 cursor-pointer"
+                      className="flex items-center gap-2 text-[12px] cursor-pointer"
                     >
                       <SunmiToggle
                         value={form.permisos.includes(p)}
@@ -165,8 +163,8 @@ export default function ModalRol({
 
 function Field({ label, children }) {
   return (
-    <div className="flex flex-col gap-1 px-1">
-      <label className="text-[11px] text-slate-400">{label}</label>
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px]">{label}</label>
       {children}
     </div>
   );

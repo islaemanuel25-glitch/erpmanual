@@ -199,15 +199,15 @@ export default function RolesPage() {
           ) : (
             roles.map((r) => (
               <SunmiTableRow key={r.id}>
-                <td className="px-2 py-1.5">{r.nombre}</td>
+                <td>{r.nombre}</td>
 
-                <td className="px-2 py-1.5 text-[11px] text-slate-400">
+                <td>
                   {Array.isArray(r.permisos)
                     ? r.permisos.join(", ")
                     : "—"}
                 </td>
 
-                <td className="px-2 py-1.5">
+                <td>
                   <div className="flex justify-end gap-1">
                     <SunmiButtonIcon
                       icon={Pencil}
@@ -231,7 +231,8 @@ export default function RolesPage() {
 
         {/* PAGINACIÓN */}
         <SunmiSeparator />
-        <div className="flex justify-between pt-4 px-2">
+
+        <div className="flex justify-between items-center px-2 pt-2">
           <SunmiButton
             color="slate"
             disabled={page <= 1}
