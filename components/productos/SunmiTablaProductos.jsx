@@ -11,7 +11,7 @@ import { Pencil, Trash2 } from "lucide-react";
 
 export default function SunmiTablaProductos({
   rows,
-  columns,       // columnas visibles (camelCase)
+  columns,
   page,
   totalPages,
   onNext,
@@ -20,7 +20,6 @@ export default function SunmiTablaProductos({
   onEliminar,
   catalogos,
 }) {
-  // Diccionarios
   const CAT = Object.fromEntries(
     (catalogos?.CATEGORIAS ?? []).map((c) => [String(c.id), c.nombre])
   );
@@ -31,7 +30,6 @@ export default function SunmiTablaProductos({
     (catalogos?.AREAS ?? []).map((a) => [String(a.id), a.nombre])
   );
 
-  // Formato ARS
   const money = (v) => {
     if (v === null || v === undefined) return "-";
     const n = Number(v);
@@ -43,7 +41,6 @@ export default function SunmiTablaProductos({
     }).format(n);
   };
 
-  // Definiciones en camelCase igual que tu API
   const DEFINICIONES = {
     imagenUrl: {
       titulo: "Img",
@@ -145,7 +142,6 @@ export default function SunmiTablaProductos({
     },
   };
 
-  // Columnas visibles
   const columnas = columns
     .map((c) => {
       if (!DEFINICIONES[c.key]) return null;
@@ -159,58 +155,64 @@ export default function SunmiTablaProductos({
     .filter(Boolean);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-800">
-      {/* Header amarillo Sunmi */}
-      <div className="bg-[#FACC15] text-slate-900 font-semibold px-4 py-2 flex justify-between">
-        <span>Listado de productos</span>
-      </div>
-
-      {/* TABLA */}
+    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
       <SunmiTable headers={[...columnas.map((c) => c.titulo), "Acciones"]}>
         {rows.length === 0 ? (
-          <SunmiTableEmpty label="No hay productos" />
+          <SunmiTableEmpty label="No hay productos disponibles" />
         ) : (
           rows.map((row) => (
             <SunmiTableRow key={row.id}>
               {columnas.map((c) => (
                 <td
                   key={c.key}
-                  className="px-3 py-2 whitespace-nowrap text-[13px]"
+                  className="px-3 py-1.5 whitespace-nowrap text-[13px]"
                 >
-                  {c.render
-                    ? c.render(row[c.key], row)
-                    : row[c.key] ?? "-"}
+                  {c.render ? c.render(row[c.key], row) : row[c.key] ?? "-"}
                 </td>
               ))}
 
-              {/* Acciones */}
-              <td className="px-3 py-2 flex gap-3 text-right">
+              {/* ⭐ ACCIONES COMPACTAS */}
+              <td className="px-3 py-1.5 text-right flex gap-1 justify-end">
+
+                {/* EDITAR */}
                 <button
                   onClick={() => onEditar(row.id)}
-                  className="text-amber-300 hover:text-amber-200"
+                  className="
+                    w-[26px] h-[26px]
+                    flex items-center justify-center
+                    rounded-md
+                    bg-amber-400 text-slate-900
+                    hover:bg-amber-300
+                    transition
+                  "
                 >
-                  <Pencil size={16} />
+                  <Pencil size={14} />
                 </button>
 
+                {/* ELIMINAR */}
                 <button
                   onClick={() => onEliminar(row.id)}
-                  className="text-red-400 hover:text-red-300"
+                  className="
+                    w-[26px] h-[26px]
+                    flex items-center justify-center
+                    rounded-md
+                    bg-red-500 text-white
+                    hover:bg-red-400
+                    transition
+                  "
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={14} />
                 </button>
+
               </td>
             </SunmiTableRow>
           ))
         )}
       </SunmiTable>
 
-      {/* Paginación SUNMI */}
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-t border-slate-800">
-        <SunmiButton
-          color="slate"
-          disabled={page <= 1}
-          onClick={onPrev}
-        >
+      {/* PAGINACIÓN */}
+      <div className="flex items-center justify-between px-3 py-2 bg-slate-900">
+        <SunmiButton color="slate" disabled={page <= 1} onClick={onPrev}>
           « Anterior
         </SunmiButton>
 
@@ -218,11 +220,7 @@ export default function SunmiTablaProductos({
           Página {page} / {totalPages}
         </span>
 
-        <SunmiButton
-          color="slate"
-          disabled={page >= totalPages}
-          onClick={onNext}
-        >
+        <SunmiButton color="slate" disabled={page >= totalPages} onClick={onNext}>
           Siguiente »
         </SunmiButton>
       </div>

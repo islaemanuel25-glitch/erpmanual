@@ -7,49 +7,65 @@ import Link from "next/link";
 export default function SidebarMobile({ menu, perfil }) {
   const [open, setOpen] = useState(false);
 
-  const esAdmin =
-    Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
-
   return (
     <>
-      {/* BOTÓN HAMBURGUESA */}
+      {/* BOTÓN */}
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden p-2 bg-blue-700 text-white fixed top-3 left-3 rounded-lg z-50"
+        className="
+          md:hidden p-2 rounded-lg
+          bg-yellow-400 text-slate-900
+          shadow-lg shadow-black/40
+          fixed top-3 left-3 z-50
+        "
       >
         <Menu size={22} />
       </button>
 
-      {/* OVERLAY */}
       {open && (
         <div
-          className="sidebar-mobile-overlay open"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
           onClick={() => setOpen(false)}
         />
       )}
 
-      {/* PANEL MOBILE */}
-      <aside className={`sidebar-mobile-panel ${open ? "open" : ""}`}>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-white">Menú</h2>
+      {/* PANEL */}
+      <aside
+        className={`
+          fixed top-0 left-0 h-full w-64 
+          bg-[#FACC15]
+          border-r border-yellow-600
+          shadow-xl shadow-black/60
+          p-4 transform z-50
+          transition-transform duration-300
+          ${open ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
+        <div className="flex justify-between items-center mb-4 text-slate-900">
+          <h2 className="text-lg font-bold">Menú</h2>
           <button onClick={() => setOpen(false)}>
-            <X size={24} className="text-white" />
+            <X size={24} className="text-slate-900" />
           </button>
         </div>
 
-        {/* LISTA */}
-        <nav className="flex flex-col gap-4">
+        <nav className="flex flex-col gap-6">
           {menu.map((grupo) => (
             <div key={grupo.label}>
-              <h3 className="text-xs font-bold uppercase text-blue-200 mb-1">
+              <h3 className="text-xs font-bold uppercase text-slate-800">
                 {grupo.label}
               </h3>
 
               {grupo.items.map((item) => (
                 <Link
-                  href={item.href}
                   key={item.href}
-                  className="block py-2 pl-2 text-white hover:bg-blue-600 rounded"
+                  href={item.href}
+                  className="
+                    block py-2 pl-2 
+                    text-slate-900 font-medium
+                    hover:bg-yellow-300 
+                    rounded-md
+                    transition
+                  "
                   onClick={() => setOpen(false)}
                 >
                   {item.label}

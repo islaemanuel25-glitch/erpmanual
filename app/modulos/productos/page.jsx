@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+
 import FiltrosProductos from "@/components/productos/FiltrosProductos";
 import ColumnManager from "@/components/productos/ColumnManager";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
@@ -8,16 +14,20 @@ import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import SelectorLocales from "@/components/productos/SelectorLocales";
 
 export default function ProductosPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const nuevo = searchParams.get("nuevo");
+  const editarId = searchParams.get("editar");
+
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Local seleccionado
   const [localId, setLocalId] = useState(() => {
     if (typeof window !== "undefined") {
-      const saved = Number(localStorage.getItem("productosLocalId") || 1);
-      return saved > 0 ? saved : 1;
+      return Number(localStorage.getItem("productosLocalId") || 1);
     }
     return 1;
   });
@@ -75,14 +85,20 @@ export default function ProductosPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [loadingEditar, setLoadingEditar] = useState(false);
 
-  // Cargar catálogos
   const fetchCatalogos = async () => {
     try {
       const [cat, prov, area] = await Promise.all([
-        fetch("/api/catalogos/categorias", { credentials: "include" }).then((r) => r.json()),
-        fetch("/api/catalogos/proveedores", { credentials: "include" }).then((r) => r.json()),
-        fetch("/api/catalogos/areas-fisicas", { credentials: "include" }).then((r) => r.json()),
+        fetch("/api/catalogos/categorias", { credentials: "include" }).then((r) =>
+          r.json()
+        ),
+        fetch("/api/catalogos/proveedores", {
+          credentials: "include",
+        }).then((r) => r.json()),
+        fetch("/api/catalogos/areas-fisicas", {
+          credentials: "include",
+        }).then((r) => r.json()),
       ]);
 
       setCatalogos({
@@ -95,7 +111,6 @@ export default function ProductosPage() {
     }
   };
 
-  // Cargar productos
   const fetchProductos = async () => {
     setLoading(true);
     try {
@@ -133,7 +148,51 @@ export default function ProductosPage() {
     fetchProductos();
   }, [page, filtros, localId]);
 
-  // Crear / Editar
+  useEffect(() => {
+    if (nuevo === "1") {
+      setEditing(null);
+      setModalOpen(true);
+      return;
+    }
+
+    if (editarId) {
+      const idNum = Number(editarId);
+      if (!idNum) return;
+
+      const cargar = async () => {
+        try {
+          setLoadingEditar(true);
+          const r = await fetch(
+            `/api/productos/obtener?id=${idNum}&localId=${localId}`,
+            { credentials: "include" }
+          );
+          const data = await r.json();
+
+          if (data.ok) {
+            setEditing(data.item);
+            setModalOpen(true);
+          }
+        } catch (err) {
+          console.error("Error al editar:", err);
+        } finally {
+          setLoadingEditar(false);
+        }
+      };
+
+      cargar();
+      return;
+    }
+
+    setModalOpen(false);
+    setEditing(null);
+  }, [nuevo, editarId, localId]);
+
+  const cerrarModal = () => {
+    setModalOpen(false);
+    setEditing(null);
+    router.push("/modulos/productos");
+  };
+
   const handleSubmit = async (form) => {
     try {
       const isEdit = Boolean(editing);
@@ -156,33 +215,13 @@ export default function ProductosPage() {
         return;
       }
 
-      setModalOpen(false);
-      setEditing(null);
+      cerrarModal();
       fetchProductos();
     } catch (err) {
       console.error("Error guardando producto:", err);
     }
   };
 
-  // Editar
-  const handleEditar = async (id) => {
-    try {
-      const r = await fetch(`/api/productos/obtener?id=${id}&localId=${localId}`, {
-        credentials: "include",
-      });
-
-      const data = await r.json();
-
-      if (data.ok) {
-        setEditing(data.item);
-        setModalOpen(true);
-      }
-    } catch (err) {
-      console.error("Error al editar:", err);
-    }
-  };
-
-  // Eliminar
   const handleEliminar = async (id) => {
     if (!confirm("¿Eliminar producto?")) return;
 
@@ -201,73 +240,96 @@ export default function ProductosPage() {
     }
   };
 
+  const abrirNuevo = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("nuevo", "1");
+    params.delete("editar");
+    router.push(`/modulos/productos?${params.toString()}`);
+  };
+
+  const abrirEditar = (id) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("editar", String(id));
+    params.delete("nuevo");
+    router.push(`/modulos/productos?${params.toString()}`);
+  };
+
   return (
-    <div className="p-4 flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Productos</h1>
+    <div className="sunmi-bg w-full min-h-full p-2">
+      <SunmiCard>
+        <div className="flex flex-col gap-2">
 
-      <SelectorLocales value={localId} onChange={(v) => setLocalId(Number(v))} />
+          {/* ALCANCE */}
+          <SunmiSeparator label="Alcance" className="!my-1" />
 
-      <FiltrosProductos
-        initial={filtros}
-        catalogos={catalogos}
-        onChange={(f) => {
-          setPage(1);
-          setFiltros(f);
-        }}
-      />
+          <SelectorLocales
+            value={localId}
+            onChange={(v) => setLocalId(Number(v))}
+          />
 
-      <div className="flex items-center justify-end gap-2">
-        <ColumnManager
-          allColumns={allColumns}
-          visibleKeys={visibleCols}
-          onChange={setVisibleCols}
-        />
+          {/* FILTROS */}
+          <SunmiSeparator label="Filtros" className="!my-1" />
 
-        <button
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-          }}
-          className="px-4 py-2 rounded-md bg-blue-600 text-white"
-        >
-          Nuevo producto
-        </button>
-      </div>
+          <FiltrosProductos
+            initial={filtros}
+            catalogos={catalogos}
+            onChange={(f) => {
+              setPage(1);
+              setFiltros(f);
+            }}
+          />
 
-      <div className="overflow-x-auto w-full border rounded-lg">
-        <SunmiTablaProductos
-          rows={rows}
-          columns={allColumns.filter((c) => visibleCols.includes(c.key))}
-          page={page}
-          totalPages={totalPages}
-          onNext={() => setPage((p) => p + 1)}
-          onPrev={() => setPage((p) => Math.max(1, p - 1))}
-          onEditar={handleEditar}
-          onEliminar={handleEliminar}
-          catalogos={catalogos}
-        />
-      </div>
+          {/* ACCIONES */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full mt-1">
+            <ColumnManager
+              allColumns={allColumns}
+              visibleKeys={visibleCols}
+              onChange={setVisibleCols}
+            />
 
-      {/* Modal */}
-      <div className={modalOpen ? "block" : "hidden"}>
+            <SunmiButton color="amber" onClick={abrirNuevo}>
+              ＋ Nuevo producto
+            </SunmiButton>
+          </div>
+
+          {/* LISTADO */}
+          <SunmiSeparator label="Listado" className="!my-1" />
+
+          <div className="overflow-x-auto w-full mt-1">
+            <div className="rounded-lg border border-slate-800 overflow-hidden">
+              <SunmiTablaProductos
+                rows={rows}
+                columns={allColumns.filter((c) =>
+                  visibleCols.includes(c.key)
+                )}
+                page={page}
+                totalPages={totalPages}
+                onNext={() => setPage((p) => p + 1)}
+                onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                onEditar={abrirEditar}
+                onEliminar={handleEliminar}
+                catalogos={catalogos}
+                loading={loading || loadingEditar}
+              />
+            </div>
+          </div>
+
+          {(loading || loadingEditar) && (
+            <div className="text-center text-slate-400 text-xs mt-1">
+              Cargando...
+            </div>
+          )}
+        </div>
+
         <ModalProducto
           open={modalOpen}
-          onClose={() => {
-            setModalOpen(false);
-            setEditing(null);
-          }}
+          onClose={cerrarModal}
           onSubmit={handleSubmit}
           catalogos={catalogos}
           initialData={editing}
           localId={localId}
         />
-      </div>
-
-      {loading && (
-        <div className="text-center text-gray-500 mt-4">
-          Cargando...
-        </div>
-      )}
+      </SunmiCard>
     </div>
   );
 }

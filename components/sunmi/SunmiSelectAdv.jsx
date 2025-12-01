@@ -14,12 +14,11 @@ export default function SunmiSelectAdv({
   children,
   placeholder = "Seleccionar...",
   className = "",
-  multiple = false, // 🔥 ahora soporta multiple
+  multiple = false,
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  // cerrar cuando clickea afuera
   useEffect(() => {
     function handleClickOutside(e) {
       if (ref.current && !ref.current.contains(e.target)) {
@@ -27,11 +26,9 @@ export default function SunmiSelectAdv({
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // FILTRAR SOLO CHILDREN VÁLIDOS
   const optionList = Children.toArray(children).filter((c) =>
     isValidElement(c)
   );
@@ -41,16 +38,10 @@ export default function SunmiSelectAdv({
     return Array.isArray(value) && value.includes(v);
   };
 
-  // TEXTO DEL BOTÓN
   const currentText = (() => {
     if (multiple) {
-      if (!Array.isArray(value) || value.length === 0)
-        return placeholder;
-
-      if (value.length <= 2) {
-        return value.join(", ");
-      }
-
+      if (!Array.isArray(value) || value.length === 0) return placeholder;
+      if (value.length <= 2) return value.join(", ");
       return `${value.length} seleccionados`;
     }
 
@@ -58,7 +49,6 @@ export default function SunmiSelectAdv({
     return f ? f.props.children : placeholder;
   })();
 
-  // HANDLER CLICK
   const handleClick = (val) => {
     if (!multiple) {
       onChange(val);
@@ -66,34 +56,30 @@ export default function SunmiSelectAdv({
       return;
     }
 
-    // MULTIPLE: gestionar arrays
     let newArr = Array.isArray(value) ? [...value] : [];
-
-    if (newArr.includes(val)) {
-      newArr = newArr.filter((v) => v !== val);
-    } else {
-      newArr.push(val);
-    }
+    if (newArr.includes(val)) newArr = newArr.filter((v) => v !== val);
+    else newArr.push(val);
 
     onChange(newArr);
   };
 
   return (
     <div ref={ref} className={`relative w-full ${className}`}>
-      {/* BOTÓN PRINCIPAL */}
+      {/* BOTON */}
       <button
-        onClick={() => setOpen(!open)}
-        className="
-          w-full px-4 py-2 rounded-xl
-          bg-slate-950/60
-          border border-slate-700
-          text-slate-100 text-sm
-          shadow-inner flex items-center justify-between
-          focus:ring-2 focus:ring-amber-400
-          transition-all
-        "
-      >
-        <span>{currentText}</span>
+  onClick={() => setOpen(!open)}
+  className="
+    w-full px-3 py-1.5     /* reducido */
+    rounded-md
+    bg-slate-950/60
+    border border-slate-700
+    text-slate-100 text-[13px]
+    shadow-inner
+    flex items-center justify-between
+  "
+>
+
+        <span className="truncate">{currentText}</span>
         <ChevronDown
           size={16}
           className={`transition-transform ${
@@ -102,15 +88,18 @@ export default function SunmiSelectAdv({
         />
       </button>
 
-      {/* LISTA FLOTANTE */}
+      {/* LISTA */}
       {open && (
         <div
           className="
-            absolute left-0 right-0 mt-2 z-50
-            bg-slate-900 border border-slate-700 rounded-xl
-            shadow-[0_0_12px_rgba(0,0,0,0.45)]
-            animate-fadeIn
+            absolute left-0 right-0 mt-1 z-50
+            bg-slate-900 
+            border border-slate-700
+            rounded-md
+            shadow-lg
+            
             max-h-52 overflow-y-auto
+            text-[13px]
           "
         >
           {optionList.map((child, idx) => {
@@ -122,7 +111,7 @@ export default function SunmiSelectAdv({
                 key={idx}
                 onClick={() => handleClick(val)}
                 className={`
-                  px-4 py-2 text-sm cursor-pointer flex items-center gap-2
+                  px-3 py-2 cursor-pointer flex items-center gap-2
                   ${selected ? "bg-amber-500 text-slate-900" : "text-slate-200"}
                   hover:bg-amber-400 hover:text-slate-900
                   transition-all

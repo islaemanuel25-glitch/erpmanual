@@ -14,7 +14,6 @@ import {
   Users,
   Users2,
   Store,
-  ArrowRightLeft,
 } from "lucide-react";
 
 export default function SidebarPro() {
@@ -77,15 +76,12 @@ export default function SidebarPro() {
       items: [
         { label: "Stock Locales", href: "/modulos/stock_locales" },
         { label: "Faltantes", href: "/modulos/faltantes" },
-
-        // 🔥 POS TRANSFERENCIAS — NUEVO
         puede("pos.usar") || esAdmin
           ? {
               label: "POS Transferencias",
               href: "/modulos/pos-transferencias",
             }
           : null,
-
         { label: "Transferencias", href: "/modulos/transferencias" },
       ].filter(Boolean),
     },
@@ -104,11 +100,21 @@ export default function SidebarPro() {
 
   return (
     <>
-      {/* Mobile */}
       <SidebarMobile menu={menu} perfil={perfil} />
 
-      {/* Desktop */}
-      <aside className="sidebar-pro hidden md:flex">
+      <aside
+        className="
+          hidden md:flex flex-col items-center
+          w-16 min-w-16
+
+          bg-[#FACC15]                /* ⭐ Amarillo Sunmi */
+          border-r border-yellow-600  /* ⭐ Borde Sunmi */
+          shadow-[2px_0_10px_rgba(0,0,0,0.45)]
+          
+          py-4 gap-6
+          z-40
+        "
+      >
         {menu.map((grupo) => (
           <SidebarGroup
             key={grupo.key}

@@ -99,8 +99,6 @@ export default function StockLocalesPage() {
 
       {/* CABECERA */}
       <div className="sunmi-card">
-        <div className="sunmi-header-cyan">Stock de Locales</div>
-
         <div className="mt-3 flex flex-col gap-2">
           <span className="text-[13px] text-slate-400">Local seleccionado</span>
 

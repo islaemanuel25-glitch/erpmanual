@@ -1,15 +1,15 @@
-export default function SunmiCard({ children }) {
+export default function SunmiCard({ children, className = "" }) {
   return (
     <div
-      className="
-        sunmi-card 
-        bg-slate-950/80
+      className={`
+        bg-slate-950/70
         border border-slate-800
-        rounded-2xl 
-        shadow-xl 
-        p-4
-        backdrop-blur-md
-      "
+        rounded-xl
+        shadow-md
+        p-3           /* antes p-4 / p-6 */
+        backdrop-blur-sm
+        ${className}
+      `}
     >
       {children}
     </div>

@@ -226,8 +226,6 @@ export default function TransferenciaDetallePage() {
       </div>
 
       <SunmiCard>
-        <SunmiHeader title={`Transferencia #${id}`} color="amber" />
-
         {loading && (
           <div className="text-slate-300 text-sm px-2">Cargando...</div>
         )}

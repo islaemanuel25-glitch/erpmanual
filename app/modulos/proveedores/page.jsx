@@ -146,8 +146,6 @@ export default function ProveedoresPage() {
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-        <SunmiHeader title="Proveedores" color="amber" />
-
         <SunmiSeparator label="Filtros" color="amber" className="my-4" />
 
         {/* ===================== */}

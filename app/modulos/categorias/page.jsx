@@ -151,9 +151,6 @@ export default function CategoriasPage() {
   // ============================================
   return (
     <div className="p-3 space-y-4">
-
-      <SunmiHeader titulo="📁 Categorías" />
-
       <SunmiCard>
 
         {/* ========= FILTROS ========= */}

@@ -1,35 +1,31 @@
 "use client";
 
-export default function SunmiToggleEstado({
-  value = true,
-  onChange = () => {},
+export default function SunmiCardHeader({
+  title = "",
+  children, // botones opcionales
 }) {
-  const toggle = () => {
-    onChange(!value);
-  };
-
   return (
     <div
-      className="flex items-center gap-2 cursor-pointer select-none"
-      onClick={toggle}
+      className="
+        flex items-center justify-between
+        mb-2               /* antes mb-3 */
+        px-1               /* compacto */
+      "
     >
-      {/* Switch */}
-      <div
-        className={`w-10 h-5 rounded-full transition-all ${
-          value ? "bg-green-400" : "bg-slate-600"
-        }`}
+      <h2
+        className="
+          text-[14px]      /* antes 15px */
+          font-semibold
+          text-slate-200
+          leading-none      /* sin aire vertical */
+        "
       >
-        <div
-          className={`w-5 h-5 bg-white rounded-full shadow transform transition-all ${
-            value ? "translate-x-5" : "translate-x-0"
-          }`}
-        />
-      </div>
+        {title}
+      </h2>
 
-      {/* Texto */}
-      <span className="text-[12px] text-slate-300">
-        {value ? "Habilitado" : "Inactivo"}
-      </span>
+      <div className="flex items-center gap-1.5">
+        {children}
+      </div>
     </div>
   );
 }

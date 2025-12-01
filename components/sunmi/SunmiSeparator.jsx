@@ -1,19 +1,16 @@
-export default function SunmiSeparator({ label, color = "amber" }) {
-    return (
-      <div className="sunmi-separator">
-        <span className="text-[11px] uppercase tracking-wider font-semibold 
-                       text-slate-300">
-          {label}
-        </span>
-  
-        <div
-          className={`sunmi-separator-line ${
-            color === "cyan"
-              ? "sunmi-separator-cyan"
-              : "sunmi-separator-amber"
-          }`}
-        ></div>
-      </div>
-    );
-  }
-  
+export default function SunmiSeparator({ label, className = "" }) {
+  return (
+    <div
+      className={`
+        flex items-center gap-2
+        text-[12px] text-slate-400
+        my-2          /* antes my-4 o my-6 */
+        ${className}
+      `}
+    >
+      <div className="flex-1 h-px bg-slate-700/60" />
+      {label && <span className="whitespace-nowrap">{label}</span>}
+      <div className="flex-1 h-px bg-slate-700/60" />
+    </div>
+  );
+}

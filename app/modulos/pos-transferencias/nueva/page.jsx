@@ -444,11 +444,6 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
           ← Volver
         </button>
 
-        {/* TÍTULO */}
-        <h1 className="text-xl font-semibold tracking-tight">
-          POS – Preparación
-        </h1>
-
         {/* TARJETA */}
         <div
           className="

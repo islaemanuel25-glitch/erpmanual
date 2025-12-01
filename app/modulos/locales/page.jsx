@@ -184,8 +184,6 @@ export default function LocalesPage() {
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-        <SunmiHeader title="Locales" color="amber" />
-
         <SunmiSeparator label="Filtros" color="amber" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">

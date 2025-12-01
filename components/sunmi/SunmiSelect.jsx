@@ -6,28 +6,30 @@ export default function SunmiSelect({ className = "", children, ...props }) {
       <select
         {...props}
         className={`
-          w-full px-3 py-2 rounded-xl
+          w-full 
+          px-2.5 py-1.5              /* antes px-3 py-2 */
+          rounded-md                 /* antes rounded-xl */
           bg-slate-950/60 
           border border-slate-700 
-          text-slate-100 text-sm
-          shadow-inner
+          text-slate-100 
+          text-[13px]                /* más compacto */
           appearance-none
           focus:outline-none
-          focus:ring-2 focus:ring-amber-400
-          focus:border-amber-400
-          transition-all
+          focus:border-amber-400     /* sin ring gigante */
+          transition
           ${className}
         `}
       >
         {children}
       </select>
 
-      {/* Icono Sunmi flecha */}
+      {/* Flecha compacta */}
       <ChevronDown
-        size={16}
+        size={14}                    /* antes 16 */
         className="
-          absolute right-3 top-1/2 -translate-y-1/2 
-          text-amber-400 opacity-70 pointer-events-none
+          absolute right-2 top-1/2 -translate-y-1/2
+          text-amber-400 opacity-70 
+          pointer-events-none
         "
       />
     </div>
