@@ -17,21 +17,15 @@ export default function ModalRol({
   onSubmit,
   initialData = null,
 }) {
-  const modalRef = useRef(null);
-  const editMode = Boolean(initialData);
-
   const [form, setForm] = useState({
     nombre: "",
     permisos: [],
   });
 
-  // Reset al abrir
+  const editMode = Boolean(initialData);
+
   useEffect(() => {
     if (!open) return;
-
-    setTimeout(() => {
-      if (modalRef.current) modalRef.current.scrollTop = 0;
-    }, 30);
 
     if (!initialData) {
       setForm({
@@ -52,14 +46,13 @@ export default function ModalRol({
   const setField = (key, value) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const togglePermiso = (p) => {
+  const togglePermiso = (p) =>
     setForm((prev) => ({
       ...prev,
       permisos: prev.permisos.includes(p)
         ? prev.permisos.filter((x) => x !== p)
         : [...prev.permisos, p],
     }));
-  };
 
   const setAdmin = () =>
     setForm((prev) => ({ ...prev, permisos: ["*"] }));
@@ -84,22 +77,20 @@ export default function ModalRol({
   return (
     <div
       className="
-        fixed inset-0 z-[9999]
+        fixed inset-0
         flex items-center justify-center
       "
     >
-      {/* Contenedor neutro del modal */}
       <div className="w-full max-w-xl">
         <SunmiCard>
-
           <SunmiCardHeader
-            title={editMode ? "Editar rol" : "Nuevo rol"}
+            title={editMode ? 'Editar rol' : 'Nuevo rol'}
             subtitle="Configurá nombre y permisos"
             color="amber"
           />
 
-          {/* Contenido del modal */}
-          <div ref={modalRef} className="max-h-[65vh] overflow-y-auto">
+          {/* CONTENIDO */}
+          <div className="flex flex-col">
 
             <SunmiSeparator label="Datos" color="amber" />
 
@@ -114,14 +105,13 @@ export default function ModalRol({
 
             <SunmiSeparator label="Permisos" color="amber" />
 
-            {/* Botón de admin */}
             <div className="flex justify-end">
               <SunmiButton color="amber" size="sm" onClick={setAdmin}>
                 Set Admin (*)
               </SunmiButton>
             </div>
 
-            {/* PERMISOS — sin estilos visuales */}
+            {/* Permisos */}
             <div className="flex flex-col gap-2">
               {Object.entries(PERMISOS).map(([grupo, lista]) => (
                 <div key={grupo}>
@@ -149,11 +139,12 @@ export default function ModalRol({
 
           </div>
 
-          {/* Acciones */}
+          {/* ACCIONES */}
           <div className="flex justify-end gap-2">
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
+
             <SunmiButton color="amber" onClick={handleSubmit}>
               {editMode ? "Guardar cambios" : "Crear rol"}
             </SunmiButton>
@@ -166,7 +157,6 @@ export default function ModalRol({
 }
 
 function Field({ label, children }) {
-  // Solo layout, sin estilos visuales
   return (
     <div className="flex flex-col gap-1">
       <span>{label}</span>
