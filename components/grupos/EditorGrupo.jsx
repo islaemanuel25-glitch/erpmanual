@@ -1,64 +1,160 @@
-// components/grupos/EditorGrupo.jsx
-};
-const quitarDeposito = async (id) => {
-await apiRemoveDepositoFromGrupo(grupoId, id);
-await load();
-};
+"use client";
 
+import { useState, useEffect } from "react";
 
-const agregarLocal = async (id) => {
-await apiAddLocalToGrupo(grupoId, id);
-await load();
-};
-const quitarLocal = async (id) => {
-await apiRemoveLocalFromGrupo(grupoId, id);
-await load();
-};
+import SunmiPanel from "@/components/sunmi/SunmiPanel";
+import SunmiSection from "@/components/sunmi/SunmiSection";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
 
+import SunmiListCard from "@/components/sunmi/SunmiListCard";
+import SunmiListCardItem from "@/components/sunmi/SunmiListCardItem";
+import SunmiListCardRemove from "@/components/sunmi/SunmiListCardRemove";
 
-if (loading) return <div className="text-sm text-gray-500">Cargando…</div>;
+import SelectAgregarLocal from "@/components/grupos/SelectAgregarLocal";
+import SelectAgregarDeposito from "@/components/grupos/SelectAgregarDeposito";
 
+export default function EditorGrupo({ grupoId }) {
+  const [grupo, setGrupo] = useState(null);
+  const [nombre, setNombre] = useState("");
 
-return (
-<div className="space-y-8">
-<section className="space-y-3">
-<h2 className="text-lg font-semibold">Datos del grupo</h2>
-<form onSubmit={saveNombre} className="flex gap-2 max-w-xl">
-<input
-className="flex-1 border rounded-lg px-3 py-2"
-value={nombre}
-onChange={(e) => setNombre(e.target.value)}
-placeholder="Nombre del grupo"
-/>
-<button disabled={saving} className="px-4 py-2 rounded-lg bg-blue-600 text-white">
-{saving ? 'Guardando…' : 'Guardar'}
-</button>
-</form>
-</section>
+  const load = async () => {
+    const res = await fetch(`/api/grupos/${grupoId}`, { credentials: "include" });
+    const data = await res.json();
+    setGrupo(data);
+    setNombre(data.nombre || "");
+  };
 
+  useEffect(() => {
+    load();
+  }, [grupoId]);
 
-<section className="space-y-3">
-<div className="flex items-center justify-between">
-<h3 className="font-semibold">Depósitos del grupo</h3>
-<SelectAgregarDeposito
-opciones={(allDepositos || []).filter(d => !(depositos || []).some(x => x.id === d.id))}
-onSelect={agregarDeposito}
-/>
-</div>
-<TablaDepositos rows={depositos} onRemove={quitarDeposito} />
-</section>
+  const saveNombre = async (e) => {
+    e.preventDefault();
+    await fetch(`/api/grupos/${grupoId}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre }),
+    });
+    load();
+  };
 
+  if (!grupo) return "Cargando…";
 
-<section className="space-y-3">
-<div className="flex items-center justify-between">
-<h3 className="font-semibold">Locales del grupo</h3>
-<SelectAgregarLocal
-opciones={(allLocales || []).filter(l => !(locales || []).some(x => x.id === l.id))}
-onSelect={agregarLocal}
-/>
-</div>
-<TablaLocales rows={locales} onRemove={quitarLocal} />
-</section>
-</div>
-);
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
+
+      {/* ========== COLUMNA IZQUIERDA ========== */}
+      <div className="md:col-span-1 h-full">
+        <SunmiPanel title="Datos del grupo" className="h-full">
+          <SunmiSection>
+            <form onSubmit={saveNombre} className="flex items-center gap-2">
+              <SunmiInput
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                className="p-1 text-sm w-full"
+                placeholder="Nombre del grupo"
+              />
+
+              <SunmiButton
+                color="amber"
+                type="submit"
+                className="px-3 py-1 text-sm"
+              >
+                Guardar
+              </SunmiButton>
+            </form>
+          </SunmiSection>
+        </SunmiPanel>
+      </div>
+
+      {/* ========== COLUMNA DERECHA ========== */}
+      <div className="md:col-span-2 flex flex-col gap-3 h-full">
+
+        {/* PANEL: DEPÓSITOS */}
+        <SunmiPanel title="Depósitos" className="h-full">
+          <SunmiSection>
+            <SelectAgregarDeposito
+              onAgregar={async (localId) => {
+                await fetch(`/api/grupos/${grupoId}/depositos`, {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ localId }),
+                });
+                load();
+              }}
+              excluidos={(grupo.locales || []).map((d) => d.localId)}
+            />
+          </SunmiSection>
+
+          <div className="mt-1">
+            <SunmiListCard compact>
+              {(grupo.locales || []).map((d) => (
+                <SunmiListCardItem key={d.localId}>
+                  <span className="text-sm">{d.local.nombre}</span>
+
+                  <SunmiListCardRemove
+                    compact
+                    onClick={async () => {
+                      await fetch(`/api/grupos/${grupoId}/depositos`, {
+                        method: "DELETE",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ localId: d.localId }),
+                      });
+                      load();
+                    }}
+                  />
+                </SunmiListCardItem>
+              ))}
+            </SunmiListCard>
+          </div>
+        </SunmiPanel>
+
+        {/* PANEL: LOCALES */}
+        <SunmiPanel title="Locales" className="h-full">
+          <SunmiSection>
+            <SelectAgregarLocal
+              onAgregar={async (localId) => {
+                await fetch(`/api/grupos/${grupoId}/locales`, {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ localId }),
+                });
+                load();
+              }}
+              excluidos={(grupo.localesGrupo || []).map((lg) => lg.local.id)}
+            />
+          </SunmiSection>
+
+          <div className="mt-1">
+            <SunmiListCard compact>
+              {(grupo.localesGrupo || []).map((lg) => (
+                <SunmiListCardItem key={lg.local.id}>
+                  <span className="text-sm">{lg.local.nombre}</span>
+
+                  <SunmiListCardRemove
+                    compact
+                    onClick={async () => {
+                      await fetch(`/api/grupos/${grupoId}/locales`, {
+                        method: "DELETE",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ localId: lg.local.id }),
+                      });
+                      load();
+                    }}
+                  />
+                </SunmiListCardItem>
+              ))}
+            </SunmiListCard>
+          </div>
+        </SunmiPanel>
+
+      </div>
+    </div>
+  );
 }

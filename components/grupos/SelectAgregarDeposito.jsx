@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import SunmiButton from "@/components/sunmi/SunmiButton";
 
-export default function SelectAgregarDeposito({ onAgregar }) {
+export default function SelectAgregarDeposito({ onAgregar, excluidos = [] }) {
   const [depositos, setDepositos] = useState([]);
   const [selected, setSelected] = useState("");
 
@@ -13,8 +15,8 @@ export default function SelectAgregarDeposito({ onAgregar }) {
       });
       const data = await res.json();
       setDepositos(data.items || []);
-    } catch (error) {
-      console.error("Error cargando depósitos:", error);
+    } catch {
+      setDepositos([]);
     }
   };
 
@@ -28,27 +30,22 @@ export default function SelectAgregarDeposito({ onAgregar }) {
     setSelected("");
   };
 
-  return (
-    <div className="bg-white border rounded-lg shadow-sm p-4 flex flex-col md:flex-row gap-3 items-center max-w-lg">
-      <select
-        className="border rounded-md px-3 py-2 flex-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-        value={selected}
-        onChange={(e) => setSelected(e.target.value)}
-      >
-        <option value="">Seleccionar depósito...</option>
-        {depositos.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.nombre}
-          </option>
-        ))}
-      </select>
+  const disponibles = depositos.filter((d) => !excluidos.includes(d.id));
 
-      <button
-        onClick={agregar}
-        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-sm rounded-md shadow-sm transition"
-      >
-        + Agregar
-      </button>
+  return (
+    <div className="flex gap-2">
+      <SunmiSelectAdv value={selected} onChange={setSelected}>
+        <SunmiSelectOption value="">Seleccionar depósito…</SunmiSelectOption>
+        {disponibles.map((d) => (
+          <SunmiSelectOption key={d.id} value={d.id}>
+            {d.nombre}
+          </SunmiSelectOption>
+        ))}
+      </SunmiSelectAdv>
+
+      <SunmiButton color="amber" onClick={agregar}>
+        Agregar
+      </SunmiButton>
     </div>
   );
 }

@@ -4,16 +4,23 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
-import ModalLocal from "@/components/locales/ModalLocal";
-import SunmiTableLocales from "@/components/locales/SunmiTableLocales";
+import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
+import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
 
-const PAGE_SIZE = 10;
+import { Pencil, Trash2 } from "lucide-react";
+
+import ModalLocal from "@/components/locales/ModalLocal";
+
+const PAGE_SIZE = 25;
 
 export default function LocalesPage() {
   const router = useRouter();
@@ -21,11 +28,12 @@ export default function LocalesPage() {
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");
-  const modalOpen = nuevo || editar;
 
+  const [modalOpen, setModalOpen] = useState(Boolean(nuevo || editar));
   const [editing, setEditing] = useState(null);
   const [locales, setLocales] = useState([]);
   const [search, setSearch] = useState("");
+  const [activoFiltro, setActivoFiltro] = useState("");
 
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -33,12 +41,11 @@ export default function LocalesPage() {
 
   const limpiarFiltros = () => {
     setSearch("");
+    setActivoFiltro("");
     setPage(1);
   };
 
-  // ================================
-  // CARGAR LOCAL SI EDITAMOS
-  // ================================
+  // Cargar local en edición
   useEffect(() => {
     if (!editar) {
       setEditing(null);
@@ -66,9 +73,7 @@ export default function LocalesPage() {
     loadLocal();
   }, [editar]);
 
-  // ================================
-  // CARGAR LISTADO
-  // ================================
+  // Cargar listado
   const fetchLocales = useCallback(async () => {
     try {
       const res = await fetch("/api/locales", {
@@ -88,7 +93,13 @@ export default function LocalesPage() {
 
       if (search.trim()) {
         const q = search.toLowerCase();
-        lista = lista.filter((l) => l.nombre.toLowerCase().includes(q));
+        lista = lista.filter((l) => l.nombre?.toLowerCase().includes(q));
+      }
+
+      if (activoFiltro === "activo") {
+        lista = lista.filter((l) => l.activo === true);
+      } else if (activoFiltro === "inactivo") {
+        lista = lista.filter((l) => l.activo === false);
       }
 
       setTotal(lista.length);
@@ -101,7 +112,7 @@ export default function LocalesPage() {
       setLocales([]);
       setTotal(0);
     }
-  }, [page, search]);
+  }, [page, search, activoFiltro]);
 
   useEffect(() => {
     fetchLocales();
@@ -109,13 +120,23 @@ export default function LocalesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, activoFiltro]);
 
-  // ================================
-  // ACCIONES
-  // ================================
-  const handleEditar = (id) => router.push(`/modulos/locales?editar=${id}`);
-  const handleNuevo = () => router.push("/modulos/locales?nuevo=1");
+  useEffect(() => {
+    setModalOpen(Boolean(nuevo || editar));
+  }, [nuevo, editar]);
+
+  const handleCloseModal = () => {
+    router.push("/modulos/locales");
+  };
+
+  const handleNuevo = () => {
+    router.push("/modulos/locales?nuevo=1");
+  };
+
+  const handleEditar = (id) => {
+    router.push(`/modulos/locales?editar=${id}`);
+  };
 
   const handleEliminar = async (id) => {
     if (!confirm("¿Eliminar local?")) return;
@@ -128,15 +149,12 @@ export default function LocalesPage() {
     const json = await res.json();
 
     if (!json.ok) {
-      alert(json.error || "❌ Error al eliminar local");
+      alert(json.error || "Error al eliminar");
       return;
     }
 
-    alert("✅ Local eliminado");
     fetchLocales();
   };
-
-  const handleCloseModal = () => router.push("/modulos/locales");
 
   const handleSubmit = async (payload) => {
     const isEdit = Boolean(editar);
@@ -155,47 +173,48 @@ export default function LocalesPage() {
     const json = await res.json();
 
     if (!json.ok) {
-      alert(json.error || "❌ Error al guardar");
+      alert(json.error || "Error al guardar");
       return;
     }
-
-    alert("✅ Guardado correctamente");
 
     handleCloseModal();
     fetchLocales();
   };
 
-  // ================================
-  // COLUMNAS TABLA
-  // ================================
-  const columnas = [
-    { key: "nombre", titulo: "Local" },
-    { key: "tipo", titulo: "Tipo" },
-    { key: "ciudad", titulo: "Ciudad" },
-    {
-      key: "activo",
-      titulo: "Estado",
-      render: (value, row) => (
-        <SunmiBadgeEstado estado={row.activo ? "activo" : "inactivo"} />
-      ),
-    },
-  ];
+  const getTipoLabel = (tipo) => {
+    if (tipo === "deposito") return "Depósito";
+    if (tipo === "local") return "Local";
+    return tipo || "—";
+  };
 
   return (
-    <div className="sunmi-bg w-full min-h-full p-4">
+    <div className="w-full min-h-full">
       <SunmiCard>
-        <SunmiHeader title="Locales" color="amber" />
+        <SunmiCardHeader
+          title="Locales del sistema"
+          subtitle="Gestioná los locales y depósitos"
+          color="amber"
+        />
 
+        {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
-          <SunmiInput
-            placeholder="Buscar local..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex flex-col md:flex-row gap-3 flex-1">
+            <SunmiInput
+              placeholder="Buscar local..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
 
-          <div className="flex gap-2 justify-end">
+            <SunmiSelectAdv value={activoFiltro} onChange={setActivoFiltro}>
+              <SunmiSelectOption value="">Estado…</SunmiSelectOption>
+              <SunmiSelectOption value="activo">Activo</SunmiSelectOption>
+              <SunmiSelectOption value="inactivo">Inactivo</SunmiSelectOption>
+            </SunmiSelectAdv>
+          </div>
+
+          <div className="flex gap-2">
             <SunmiButton onClick={limpiarFiltros} color="slate">
               Limpiar
             </SunmiButton>
@@ -206,37 +225,73 @@ export default function LocalesPage() {
           </div>
         </div>
 
+        {/* LISTADO */}
         <SunmiSeparator label="Listado" color="amber" />
 
-        <SunmiTableLocales
-          columnas={columnas}
-          datos={locales}
-          page={page}
-          totalPages={totalPages}
-          onPrev={() => setPage((p) => p - 1)}
-          onNext={() => setPage((p) => p + 1)}
-          accionesPersonalizadas={(row) => (
-            <div className="flex gap-3 justify-end text-[15px]">
-              <button
-                onClick={() => handleEditar(row.id)}
-                className="text-amber-300 hover:text-amber-200"
-              >
-                ✏️
-              </button>
+        <SunmiTable headers={["Local", "Tipo", "Ciudad", "Estado", "Acciones"]}>
+          {locales.length === 0 ? (
+            <SunmiTableEmpty message="No hay locales para mostrar" />
+          ) : (
+            locales.map((l) => (
+              <SunmiTableRow key={l.id}>
+                <td>{l.nombre || "—"}</td>
 
-              <button
-                onClick={() => handleEliminar(row.id)}
-                className="text-red-400 hover:text-red-300"
-              >
-                🗑️
-              </button>
-            </div>
+                <td>{getTipoLabel(l.tipo)}</td>
+
+                <td>{l.ciudad || "—"}</td>
+
+                <td>
+                  <div className="flex justify-center">
+                    <SunmiBadgeEstado value={l.activo} />
+                  </div>
+                </td>
+
+                <td>
+                  <div className="flex justify-end gap-1">
+                    <SunmiButtonIcon
+                      icon={Pencil}
+                      color="amber"
+                      size={16}
+                      onClick={() => handleEditar(l.id)}
+                    />
+
+                    <SunmiButtonIcon
+                      icon={Trash2}
+                      color="red"
+                      size={16}
+                      onClick={() => handleEliminar(l.id)}
+                    />
+                  </div>
+                </td>
+              </SunmiTableRow>
+            ))
           )}
-        />
+        </SunmiTable>
+
+        {/* PAGINACIÓN */}
+        <SunmiSeparator />
+
+        <div className="flex justify-between gap-2">
+          <SunmiButton
+            color="slate"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            « Anterior
+          </SunmiButton>
+
+          <SunmiButton
+            color="slate"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente »
+          </SunmiButton>
+        </div>
       </SunmiCard>
 
       <ModalLocal
-        open={modalOpen ? true : false}
+        open={modalOpen}
         initialData={editing}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}

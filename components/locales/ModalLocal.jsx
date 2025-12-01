@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -16,8 +16,6 @@ export default function ModalLocal({
   onSubmit,
   initialData = null,
 }) {
-  const modalRef = useRef(null);
-
   const editMode = Boolean(initialData);
 
   const [form, setForm] = useState({
@@ -33,19 +31,8 @@ export default function ModalLocal({
     activo: true,
   });
 
-  const setField = (k, v) =>
-    setForm((prev) => ({
-      ...prev,
-      [k]: v,
-    }));
-
   useEffect(() => {
     if (!open) return;
-
-    // Reset scroll
-    setTimeout(() => {
-      if (modalRef.current) modalRef.current.scrollTop = 0;
-    }, 30);
 
     if (!initialData) {
       setForm({
@@ -77,9 +64,12 @@ export default function ModalLocal({
     });
   }, [open, initialData]);
 
+  const setField = (key, value) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
   const validar = () => {
-    if (!String(form.nombre).trim()) return "Completá el nombre.";
-    if (!String(form.tipo).trim()) return "Seleccioná el tipo.";
+    if (!form.nombre.trim()) return "Completá el nombre.";
+    if (!form.tipo.trim()) return "Seleccioná el tipo.";
     return null;
   };
 
@@ -95,38 +85,24 @@ export default function ModalLocal({
   return (
     <div
       className="
-        fixed inset-0 z-[9999]
-        bg-black/60 backdrop-blur-sm
+        fixed inset-0
+        z-[9999]
         flex items-center justify-center
-        p-3
       "
     >
-      <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
+      <div className="w-full max-w-xl">
         <SunmiCard>
-          {/* HEADER */}
-          <div className="flex items-center justify-between">
-            <SunmiHeader
-              title={editMode ? "Editar local" : "Nuevo local"}
-              color="amber"
-            />
+          <SunmiCardHeader
+            title={editMode ? "Editar local" : "Nuevo local"}
+            subtitle="Configurá los datos del local"
+            color="amber"
+          />
 
-            <SunmiButton color="slate" onClick={onClose} size="sm">
-              Cerrar
-            </SunmiButton>
-          </div>
-
-          {/* CONTENIDO */}
-          <div
-            ref={modalRef}
-            className="
-              max-h-[65vh]
-              overflow-y-auto 
-              px-2 pb-4 mt-2 
-              space-y-4
-            "
-          >
+          {/* CONTENIDO CON SCROLL */}
+          <div className="flex flex-col max-h-[65vh] overflow-y-auto">
             <SunmiSeparator label="Datos" color="amber" />
 
+            {/* Nombre */}
             <Field label="Nombre *">
               <SunmiInput
                 value={form.nombre}
@@ -135,6 +111,7 @@ export default function ModalLocal({
               />
             </Field>
 
+            {/* Tipo */}
             <Field label="Tipo *">
               <SunmiSelectAdv
                 value={form.tipo}
@@ -143,17 +120,16 @@ export default function ModalLocal({
                 <SunmiSelectOption value="">
                   Seleccionar tipo…
                 </SunmiSelectOption>
-
                 <SunmiSelectOption value="local">
                   Local
                 </SunmiSelectOption>
-
                 <SunmiSelectOption value="deposito">
                   Depósito
                 </SunmiSelectOption>
               </SunmiSelectAdv>
             </Field>
 
+            {/* Dirección */}
             <Field label="Dirección">
               <SunmiInput
                 value={form.direccion}
@@ -162,6 +138,7 @@ export default function ModalLocal({
               />
             </Field>
 
+            {/* Teléfono */}
             <Field label="Teléfono">
               <SunmiInput
                 value={form.telefono}
@@ -170,6 +147,7 @@ export default function ModalLocal({
               />
             </Field>
 
+            {/* Email */}
             <Field label="Email">
               <SunmiInput
                 value={form.email}
@@ -178,6 +156,7 @@ export default function ModalLocal({
               />
             </Field>
 
+            {/* CUIL */}
             <Field label="CUIL">
               <SunmiInput
                 value={form.cuil}
@@ -186,6 +165,7 @@ export default function ModalLocal({
               />
             </Field>
 
+            {/* Ciudad */}
             <Field label="Ciudad">
               <SunmiInput
                 value={form.ciudad}
@@ -194,6 +174,7 @@ export default function ModalLocal({
               />
             </Field>
 
+            {/* Provincia */}
             <Field label="Provincia">
               <SunmiInput
                 value={form.provincia}
@@ -202,6 +183,7 @@ export default function ModalLocal({
               />
             </Field>
 
+            {/* Código Postal */}
             <Field label="Código Postal">
               <SunmiInput
                 value={form.codigoPostal}
@@ -210,6 +192,9 @@ export default function ModalLocal({
               />
             </Field>
 
+            <SunmiSeparator label="Estado" color="amber" />
+
+            {/* Estado */}
             <Field label="Estado">
               <SunmiToggleEstado
                 value={form.activo}
@@ -218,8 +203,8 @@ export default function ModalLocal({
             </Field>
           </div>
 
-          {/* FOOTER */}
-          <div className="flex justify-end gap-2 pt-2">
+          {/* ACCIONES */}
+          <div className="flex justify-end gap-2">
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
@@ -236,8 +221,8 @@ export default function ModalLocal({
 
 function Field({ label, children }) {
   return (
-    <div className="flex flex-col gap-1 px-1">
-      <label className="text-[11px] text-slate-400">{label}</label>
+    <div className="flex flex-col gap-1">
+      <span>{label}</span>
       {children}
     </div>
   );

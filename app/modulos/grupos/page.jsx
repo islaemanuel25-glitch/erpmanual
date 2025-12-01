@@ -1,72 +1,155 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  PlusCircle,
-  Warehouse,
-  Store,
-  Settings,
-  Trash2,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiSelectAdv, {
+  SunmiSelectOption,
+} from "@/components/sunmi/SunmiSelectAdv";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
+
+import SunmiEntityCard from "@/components/sunmi/SunmiEntityCard";
+import SunmiSection from "@/components/sunmi/SunmiSection";
+import SunmiList from "@/components/sunmi/SunmiList";
+import SunmiListItem from "@/components/sunmi/SunmiListItem";
+import SunmiGrid from "@/components/sunmi/SunmiGrid";
+
+import { Pencil, Trash2 } from "lucide-react";
+
+import ModalGrupo from "@/components/grupos/ModalGrupo";
+
+const PAGE_SIZE = 25;
 
 export default function PageGrupos() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const nuevo = searchParams.get("nuevo");
+  const editar = searchParams.get("editar");
+
+  const [modalOpen, setModalOpen] = useState(Boolean(nuevo || editar));
+  const [editing, setEditing] = useState(null);
 
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
 
-  // ✅ Filtros (corregido naming)
   const [search, setSearch] = useState("");
   const [orden, setOrden] = useState("nombreAsc");
 
-  // ✅ Paginación
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const cargar = async () => {
+  const cargar = useCallback(async () => {
     try {
       setCargando(true);
 
       const params = new URLSearchParams({
         q: search,
         orden,
-        page,
+        page: String(page),
       });
 
-      const res = await fetch(`/api/grupos/listar?${params.toString()}`, { credentials: "include",
+      const res = await fetch(`/api/grupos/listar?${params.toString()}`, {
+        credentials: "include",
         cache: "no-store",
       });
+
       const data = await res.json();
 
-      if (!res.ok || !data.ok) throw new Error(data.error);
+      if (!res.ok || !data.ok) {
+        setItems([]);
+        setTotalPages(1);
+        return;
+      }
 
       setItems(data.items || []);
       setTotalPages(data.totalPages || 1);
     } catch {
-      alert("No se pudieron cargar los grupos");
+      setItems([]);
+      setTotalPages(1);
     } finally {
       setCargando(false);
     }
-  };
+  }, [search, orden, page]);
 
   useEffect(() => {
     cargar();
-  }, [search, orden, page]);
+  }, [cargar]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, orden]);
+
+  useEffect(() => {
+    setModalOpen(Boolean(nuevo || editar));
+  }, [nuevo, editar]);
+
+  // Cargar grupo en edición
+  useEffect(() => {
+    if (!editar) {
+      setEditing(null);
+      return;
+    }
+
+    const loadGrupo = async () => {
+      try {
+        const res = await fetch(`/api/grupos/${editar}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data) {
+          setEditing(data);
+        } else {
+          setEditing(null);
+        }
+      } catch {
+        setEditing(null);
+      }
+    };
+
+    loadGrupo();
+  }, [editar]);
+
+  const limpiarFiltros = () => {
+    setSearch("");
+    setOrden("nombreAsc");
+    setPage(1);
+  };
+
+  const handleCloseModal = () => {
+    router.push("/modulos/grupos");
+  };
+
+  const handleNuevo = () => {
+    router.push("/modulos/grupos?nuevo=1");
+  };
+
+  const handleEditar = (id) => {
+    router.push(`/modulos/grupos?editar=${id}`);
+  };
 
   const eliminar = async (id, nombre) => {
     if (!confirm(`¿Eliminar el grupo "${nombre}"?`)) return;
 
     try {
-      const res = await fetch(`/api/grupos/${id}`, { credentials: "include",
+      const res = await fetch(`/api/grupos/${id}`, {
+        credentials: "include",
         method: "DELETE",
       });
 
       const data = await res.json();
-      if (!data.ok) return alert(data.error);
+      if (!data.ok) {
+        alert(data.error || "Error al eliminar");
+        return;
+      }
 
       cargar();
     } catch {
@@ -74,141 +157,266 @@ export default function PageGrupos() {
     }
   };
 
+  const handleSubmit = async (payload) => {
+    const isEdit = Boolean(editar);
+    const { nombre, localesIds, depositosIds } = payload;
+
+    const url = isEdit ? `/api/grupos/${editar}` : `/api/grupos/crear`;
+
+    const res = await fetch(url, {
+      method: isEdit ? "PUT" : "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre }),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok || !json.ok) {
+      alert(json.error || "Error al guardar");
+      return;
+    }
+
+    const grupoId = isEdit ? editar : json.data.id;
+
+    // Obtener asignaciones actuales
+    let localesActuales = [];
+    let depositosActuales = [];
+
+    if (isEdit) {
+      try {
+        const resLocales = await fetch(`/api/grupos/${grupoId}/locales`, {
+          credentials: "include",
+        });
+        const dataLocales = await resLocales.json();
+        localesActuales = (dataLocales.data || []).map((l) => l.localId);
+
+        const resDepositos = await fetch(`/api/grupos/${grupoId}/depositos`, {
+          credentials: "include",
+        });
+        const dataDepositos = await resDepositos.json();
+        depositosActuales = (dataDepositos.data || []).map((d) => d.localId);
+      } catch {
+        // Continuar aunque falle
+      }
+    }
+
+    // Actualizar asignaciones de locales
+    if (Array.isArray(localesIds)) {
+      const nuevos = localesIds.filter((id) => !localesActuales.includes(id));
+      const quitar = localesActuales.filter((id) => !localesIds.includes(id));
+
+      for (const localId of nuevos) {
+        await fetch(`/api/grupos/${grupoId}/locales`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ localId }),
+        });
+      }
+
+      for (const localId of quitar) {
+        await fetch(`/api/grupos/${grupoId}/locales`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ localId }),
+        });
+      }
+    }
+
+    // Actualizar asignaciones de depósitos
+    if (Array.isArray(depositosIds)) {
+      const nuevos = depositosIds.filter(
+        (id) => !depositosActuales.includes(id)
+      );
+      const quitar = depositosActuales.filter(
+        (id) => !depositosIds.includes(id)
+      );
+
+      for (const localId of nuevos) {
+        await fetch(`/api/grupos/${grupoId}/depositos`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ localId }),
+        });
+      }
+
+      for (const localId of quitar) {
+        await fetch(`/api/grupos/${grupoId}/depositos`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ localId }),
+        });
+      }
+    }
+
+    handleCloseModal();
+    cargar();
+  };
+
   return (
-    <div className="p-4 md:p-6 space-y-8">
+    <div className="w-full min-h-full">
+      <SunmiCard>
+        <SunmiCardHeader
+          title="Grupos del sistema"
+          subtitle="Gestioná grupos de locales y depósitos"
+          color="amber"
+        />
 
-      {/* Título principal */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Grupos</h1>
-          <p className="text-gray-500">
-            Administrá grupos de locales y depósitos para tu ERP Azul.
-          </p>
+        {/* FILTROS */}
+        <SunmiSeparator label="Filtros" color="amber" />
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex flex-col md:flex-row gap-3 flex-1">
+            <SunmiInput
+              placeholder="Buscar grupo..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+
+            <SunmiSelectAdv value={orden} onChange={setOrden}>
+              <SunmiSelectOption value="nombreAsc">
+                Nombre (A → Z)
+              </SunmiSelectOption>
+              <SunmiSelectOption value="nombreDesc">
+                Nombre (Z → A)
+              </SunmiSelectOption>
+              <SunmiSelectOption value="depositosDesc">
+                Más depósitos
+              </SunmiSelectOption>
+              <SunmiSelectOption value="localesDesc">
+                Más locales
+              </SunmiSelectOption>
+            </SunmiSelectAdv>
+          </div>
+
+          <div className="flex gap-2">
+            <SunmiButton onClick={limpiarFiltros} color="slate">
+              Limpiar
+            </SunmiButton>
+
+            <SunmiButton onClick={handleNuevo} color="amber">
+              ＋ Nuevo
+            </SunmiButton>
+          </div>
         </div>
 
-        <button
-          onClick={() => router.push("/modulos/grupos/nuevo")}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2"
-        >
-          <PlusCircle size={20} />
-          Nuevo Grupo
-        </button>
-      </div>
+        {/* LISTADO */}
+        <SunmiSeparator label="Listado" color="amber" />
 
-      {/* Filtros */}
-      <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded shadow">
+        {cargando ? (
+          <div className="flex justify-center">Cargando grupos...</div>
+        ) : items.length === 0 ? (
+          <div className="flex justify-center">No hay grupos coincidentes.</div>
+        ) : (
+          <SunmiGrid minWidth={320} gap={16}>
+            {items.map((g) => {
+              const cantidadLocales = Array.isArray(g.localesGrupo)
+                ? g.localesGrupo.length
+                : 0;
+              const cantidadDepositos = Array.isArray(g.locales)
+                ? g.locales.length
+                : 0;
 
-        {/* Buscador */}
-        <div className="flex items-center w-full md:w-1/2 border rounded px-3 py-2 bg-gray-50">
-          <Search size={18} className="mr-2 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Buscar grupo por nombre..."
-            className="w-full bg-transparent outline-none"
-            value={search}
-            onChange={(e) => {
-              setPage(1);
-              setSearch(e.target.value);
-            }}
-          />
-        </div>
+              return (
+                <SunmiEntityCard
+                  key={g.id}
+                  title={g.nombre}
+                  subtitle={`${cantidadLocales} locales · ${cantidadDepositos} depósitos`}
+                  color="amber"
+                  actions={
+                    <>
+                      <SunmiButton
+                        color="amber"
+                        onClick={() =>
+                          router.push(`/modulos/grupos/${g.id}`)
+                        }
+                      >
+                        Administrar
+                      </SunmiButton>
 
-        {/* Orden - corregido naming */}
-        <select
-          className="border px-3 py-2 rounded w-full md:w-1/3"
-          value={orden}
-          onChange={(e) => {
-            setPage(1);
-            setOrden(e.target.value);
-          }}
-        >
-          <option value="nombreAsc">Nombre (A → Z)</option>
-          <option value="nombreDesc">Nombre (Z → A)</option>
-          <option value="depositosDesc">Más depósitos</option>
-          <option value="localesDesc">Más locales</option>
-        </select>
-      </div>
+                      <SunmiButtonIcon
+                        icon={Pencil}
+                        color="amber"
+                        size={16}
+                        onClick={() => handleEditar(g.id)}
+                      />
 
-      {/* Contenido */}
-      {cargando ? (
-        <div className="text-gray-600">Cargando grupos...</div>
-      ) : items.length === 0 ? (
-        <div className="text-gray-500 text-center border rounded p-6">
-          No hay grupos coincidentes.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {items.map((g) => (
-            <div
-              key={g.id}
-              className="border rounded-lg shadow-sm p-5 bg-white hover:shadow-md transition"
-            >
-              <h2 className="text-lg font-semibold text-gray-800">
-                {g.nombre}
-              </h2>
-
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Warehouse className="text-blue-600" size={20} />
-                  <span className="text-gray-700">
-                    Depósitos: <strong>{g.locales?.length || 0}</strong>
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Store className="text-green-600" size={20} />
-                  <span className="text-gray-700">
-                    Locales: <strong>{g.localesGrupo?.length || 0}</strong>
-                  </span>
-                </div>
-              </div>
-
-              {/* Acciones */}
-              <div className="flex justify-between mt-5">
-                <button
-                  onClick={() => router.push(`/modulos/grupos/${g.id}`)}
-                  className="bg-gray-700 hover:bg-gray-800 text-white px-3 py-2 rounded flex items-center gap-1"
+                      <SunmiButtonIcon
+                        icon={Trash2}
+                        color="red"
+                        size={16}
+                        onClick={() => eliminar(g.id, g.nombre)}
+                      />
+                    </>
+                  }
                 >
-                  <Settings size={18} />
-                  Administrar
-                </button>
+                  <SunmiSection title="Locales">
+                    {cantidadLocales === 0 ? (
+                      <div>No hay locales asignados</div>
+                    ) : (
+                      <SunmiList>
+                        {g.localesGrupo.map((lg) => (
+                          <SunmiListItem
+                            key={lg.local.id}
+                            label={lg.local.nombre}
+                          />
+                        ))}
+                      </SunmiList>
+                    )}
+                  </SunmiSection>
 
-                <button
-                  onClick={() => eliminar(g.id, g.nombre)}
-                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded flex items-center gap-1"
-                >
-                  <Trash2 size={18} />
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          ))}
+                  <SunmiSection title="Depósitos">
+                    {cantidadDepositos === 0 ? (
+                      <div>No hay depósitos asignados</div>
+                    ) : (
+                      <SunmiList>
+                        {g.locales.map((d) => (
+                          <SunmiListItem
+                            key={d.localId}
+                            label={d.local.nombre}
+                          />
+                        ))}
+                      </SunmiList>
+                    )}
+                  </SunmiSection>
+                </SunmiEntityCard>
+              );
+            })}
+          </SunmiGrid>
+        )}
+
+        {/* PAGINACIÓN */}
+        <SunmiSeparator />
+
+        <div className="flex justify-between gap-2">
+          <SunmiButton
+            color="slate"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            « Anterior
+          </SunmiButton>
+
+          <SunmiButton
+            color="slate"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente »
+          </SunmiButton>
         </div>
-      )}
+      </SunmiCard>
 
-      {/* Paginación */}
-      <div className="flex justify-center items-center gap-4 mt-6">
-
-        <button
-          disabled={page <= 1}
-          onClick={() => setPage((p) => p - 1)}
-          className="px-3 py-1 rounded border disabled:opacity-40"
-        >
-          <ChevronLeft size={18} />
-        </button>
-
-        <span className="text-gray-700">
-          Página {page} de {totalPages}
-        </span>
-
-        <button
-          disabled={page >= totalPages}
-          onClick={() => setPage((p) => p + 1)}
-          className="px-3 py-1 rounded border disabled:opacity-40"
-        >
-          <ChevronRight size={18} />
-        </button>
-      </div>
+      <ModalGrupo
+        open={modalOpen}
+        initialData={editing}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

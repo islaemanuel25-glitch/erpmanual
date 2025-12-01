@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+
 export default function NuevoGrupoPage() {
   const router = useRouter();
 
@@ -16,11 +22,10 @@ export default function NuevoGrupoPage() {
 
     setCreando(true);
     try {
-      const res = await fetch("/api/grupos/crear", { credentials: "include",
+      const res = await fetch("/api/grupos/crear", {
+        credentials: "include",
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        , headers: { "Content-Type": "application/json" }},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre }),
       });
 
@@ -32,7 +37,6 @@ export default function NuevoGrupoPage() {
         return;
       }
 
-      alert("Grupo creado correctamente");
       router.push(`/modulos/grupos/${data.data.id}`);
 
     } catch (e) {
@@ -44,28 +48,41 @@ export default function NuevoGrupoPage() {
   };
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">Nuevo Grupo</h1>
-
-      <div className="bg-white shadow rounded p-6 space-y-4">
-
-        <div className="space-y-2">
-          <label className="block font-medium">Nombre del Grupo</label>
-          <input
-            className="border px-3 py-2 rounded w-full"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: Zona Norte, Rosario, Locales Premium..."
+    <div className="w-full min-h-full flex justify-center">
+      <div className="w-full max-w-xl">
+        <SunmiCard>
+          <SunmiCardHeader
+            title="Nuevo Grupo"
+            color="amber"
           />
-        </div>
 
-        <button
-          onClick={crearGrupo}
-          disabled={creando}
-          className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-        >
-          {creando ? "Creando..." : "Crear Grupo"}
-        </button>
+          <SunmiSeparator label="Datos" color="amber" />
+
+          <div className="flex flex-col gap-2">
+            <SunmiInput
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej: Zona Norte, Rosario, Premium…"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 mt-3">
+            <SunmiButton
+              color="slate"
+              onClick={() => router.push("/modulos/grupos")}
+            >
+              Cancelar
+            </SunmiButton>
+
+            <SunmiButton
+              color="amber"
+              onClick={crearGrupo}
+              disabled={creando}
+            >
+              {creando ? "Creando…" : "Crear Grupo"}
+            </SunmiButton>
+          </div>
+        </SunmiCard>
       </div>
     </div>
   );
