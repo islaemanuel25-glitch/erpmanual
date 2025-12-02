@@ -1,14 +1,19 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { cn } from "@/lib/utils";
 
 export default function SunmiToggleEstado({
   value = true,
   onChange = () => {},
 }) {
   const { theme } = useSunmiTheme();
-  
-  // Normalizar valor del backend / formulario
+
+  const t = theme.toggle;
+  const badgeOn = theme.badgeActivo;
+  const badgeOff = theme.badgeInactivo;
+
+  // Normalizar valor que puede venir como string/number
   const normalized =
     value === true ||
     value === 1 ||
@@ -16,36 +21,49 @@ export default function SunmiToggleEstado({
     value === "true" ||
     value === "activo";
 
-  const toggle = () => {
-    onChange(!normalized);
-  };
-
-  // Usar badgeActivo para el estado activo
-  const activeBg = theme.badgeActivo.split(' ').find(c => c.startsWith('bg-')) || 'bg-green-400';
-  
-  // Extraer color de texto del layout
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-'))?.replace('text-slate-50', 'text-slate-300') || 'text-slate-300';
+  const toggle = () => onChange(!normalized);
 
   return (
     <div
       className="flex items-center gap-2 cursor-pointer select-none"
       onClick={toggle}
     >
-      {/* Switch */}
+      {/* TRACK */}
       <div
-        className={`w-10 h-5 rounded-full transition-all ${
-          normalized ? activeBg : "bg-slate-600"
-        }`}
+        className={cn(
+          `
+          w-10 h-5
+          rounded-full
+          transition-all
+        `,
+          normalized ? t.on : t.off
+        )}
       >
+        {/* THUMB */}
         <div
-          className={`w-5 h-5 bg-white rounded-full shadow transform transition-all ${
+          className={cn(
+            `
+            w-5 h-5
+            rounded-full
+            shadow
+            transition-all
+          `,
+            t.thumb,
             normalized ? "translate-x-5" : "translate-x-0"
-          }`}
+          )}
         />
       </div>
 
-      {/* Texto */}
-      <span className={`text-[12px] ${textColor}`}>
+      {/* LABEL */}
+      <span
+        className={cn(
+          `
+          text-[12px]
+        `,
+          normalized ? badgeOn.split(" ").find(c => c.startsWith("text-")) 
+                     : badgeOff.split(" ").find(c => c.startsWith("text-"))
+        )}
+      >
         {normalized ? "Habilitado" : "Inactivo"}
       </span>
     </div>

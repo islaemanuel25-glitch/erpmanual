@@ -1,25 +1,28 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { cn } from "@/lib/utils";
 
-export default function SunmiPill({ children }) {
+export default function SunmiPill({ children, className = "" }) {
   const { theme } = useSunmiTheme();
-  
-  // Usar color del header para el pill
-  const pillBg = theme.header.bg.includes('amber') ? 'bg-amber-400' : 'bg-cyan-400';
-  
+  const t = theme.pill;
+
   return (
     <span
-      className={`
-        inline-block 
-        px-1.5 py-[1px]            /* reducido */
-        rounded-md                 /* antes rounded-lg */
-        text-[10.5px]              /* fino, uniforme con badges */
+      className={cn(
+        `
+        inline-block
+        px-1.5 py-[1px]
+        rounded-md
+        text-[10.5px]
         font-semibold
-        ${pillBg} text-slate-900
-        leading-none               /* elimina altura fantasma */
+        leading-none
         whitespace-nowrap
-      `}
+        ${t.bg}
+        ${t.text}
+      `,
+        className
+      )}
     >
       {children}
     </span>

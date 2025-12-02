@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useUser } from "@/app/context/UserContext";
 import SidebarGroup from "./SidebarGroup";
 import SidebarMobile from "./SidebarMobile";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { cn } from "@/lib/utils";
 
 import {
   Home,
@@ -17,14 +17,12 @@ import {
   Store,
 } from "lucide-react";
 
-export default function SidebarPro() {
+export default function SidebarPro({ mode = "vertical" }) {
   const { perfil } = useUser();
-  const { theme } = useSunmiTheme();
 
   if (!perfil) return null;
 
   const [openGroup, setOpenGroup] = useState(null);
-
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
 
@@ -79,10 +77,7 @@ export default function SidebarPro() {
         { label: "Stock Locales", href: "/modulos/stock_locales" },
         { label: "Faltantes", href: "/modulos/faltantes" },
         puede("pos.usar") || esAdmin
-          ? {
-              label: "POS Transferencias",
-              href: "/modulos/pos-transferencias",
-            }
+          ? { label: "POS Transferencias", href: "/modulos/pos-transferencias" }
           : null,
         { label: "Transferencias", href: "/modulos/transferencias" },
       ].filter(Boolean),
@@ -100,22 +95,52 @@ export default function SidebarPro() {
     },
   ];
 
+  // ================================================
+  //   MODO HORIZONTAL (MENÚ EN LA PARTE SUPERIOR)
+  // ================================================
+  if (mode === "horizontal") {
+    return (
+      <nav
+        className="
+          hidden md:flex 
+          w-full h-14
+          bg-slate-950 border-b border-slate-800
+          items-center gap-6 px-4
+        "
+      >
+        {menu.map((grupo) => (
+          <SidebarGroup
+            key={grupo.key}
+            id={grupo.key}
+            icon={grupo.icon}
+            iconFilled={grupo.iconFilled}
+            label={grupo.label}
+            items={grupo.items}
+            perfil={perfil}
+            openGroup={openGroup}
+            setOpenGroup={setOpenGroup}
+            horizontal
+          />
+        ))}
+      </nav>
+    );
+  }
+
+  // ================================================
+  //   MODO VERTICAL (LATERAL) — EL DE SIEMPRE
+  // ================================================
   return (
     <>
       <SidebarMobile menu={menu} perfil={perfil} />
 
       <aside
-        className={`
-          hidden md:flex flex-col items-center
-          w-16 min-w-16
-
-          ${theme.sidebar.bg}
-          ${theme.sidebar.border} border-r
-          shadow-[2px_0_10px_rgba(0,0,0,0.45)]
-
-          py-4 gap-6
-          z-40
-        `}
+        className={cn(
+          "hidden md:flex flex-col items-center",
+          "w-16 min-w-16",
+          "bg-slate-950 border-r border-slate-800",
+          "shadow-[2px_0_10px_rgba(0,0,0,0.45)]",
+          "py-4 gap-6 z-40"
+        )}
       >
         {menu.map((grupo) => (
           <SidebarGroup

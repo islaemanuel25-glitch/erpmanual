@@ -1,32 +1,37 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { cn } from "@/lib/utils";
 
 export default function SunmiTable({ headers = [], children }) {
   const { theme } = useSunmiTheme();
-  
+  const t = theme.table;
+
   return (
     <div className="overflow-x-auto">
       <table
-        className="
-          w-full 
-          text-[12px]              /* más compacto */
-          table-fixed
-        "
+        className={cn(
+          `
+            w-full
+            text-[12px]          /* compacto */
+            table-fixed
+          `
+        )}
       >
-        {/* ===== HEADER ===== */}
+
+        {/* ========== HEADER ========== */}
         {headers.length > 0 && (
-          <thead className={theme.table?.header || "bg-amber-400 text-slate-900"}>
+          <thead className={cn(t.header)}>
             <tr>
               {headers.map((h, i) => (
                 <th
                   key={i}
-                  className="
-                    px-2 py-1.5        /* antes px-3 py-2 */
+                  className={cn(`
+                    px-2 py-1.5
                     text-left
                     font-semibold
                     whitespace-nowrap
-                  "
+                  `)}
                 >
                   {h}
                 </th>
@@ -35,14 +40,11 @@ export default function SunmiTable({ headers = [], children }) {
           </thead>
         )}
 
-        {/* ===== BODY ===== */}
-        <tbody
-          className="
-            divide-y divide-slate-800
-          "
-        >
+        {/* ========== BODY ========== */}
+        <tbody className={cn(`divide-y`, t.border)}>
           {children}
         </tbody>
+
       </table>
     </div>
   );

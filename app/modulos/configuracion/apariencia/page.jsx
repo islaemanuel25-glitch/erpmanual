@@ -3,18 +3,67 @@
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import LayoutPreview from "@/components/layout/LayoutPreview";
+
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { SUNMI_THEMES } from "@/lib/sunmiThemes";
 
 export default function AparienciaPage() {
-  const { themeKey, setThemeKey } = useSunmiTheme();
+  const { themeKey, setThemeKey, layoutMode, setLayoutMode } = useSunmiTheme();
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-6xl mx-auto">
+
       <SunmiHeader
         title="Apariencia del ERP"
-        subtitle="Elegí el theme visual. No se toca la lógica, solo la estética."
+        subtitle="Elegí layout y tema visual."
       />
+
+      {/* ============================
+          LAYOUT SELECTOR
+      ============================ */}
+      <h2 className="text-lg font-semibold mt-4 mb-2">Diseño del Layout</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        {/* LEFT */}
+        <div>
+          <LayoutPreview type="left" active={layoutMode === "sidebar-left"} />
+          <SunmiButton
+            className="mt-2 w-full"
+            onClick={() => setLayoutMode("sidebar-left")}
+          >
+            Sidebar Izquierda
+          </SunmiButton>
+        </div>
+
+        {/* TOP */}
+        <div>
+          <LayoutPreview type="top" active={layoutMode === "sidebar-top"} />
+          <SunmiButton
+            className="mt-2 w-full"
+            onClick={() => setLayoutMode("sidebar-top")}
+          >
+            Barra Superior
+          </SunmiButton>
+        </div>
+
+        {/* HIDDEN */}
+        <div>
+          <LayoutPreview type="hidden" active={layoutMode === "sidebar-hidden"} />
+          <SunmiButton
+            className="mt-2 w-full"
+            onClick={() => setLayoutMode("sidebar-hidden")}
+          >
+            Sin Sidebar
+          </SunmiButton>
+        </div>
+      </div>
+
+      {/* ============================
+          THEME SELECTOR
+      ============================ */}
+      <h2 className="text-lg font-semibold mt-8 mb-2">Themes Visuales</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {Object.values(SUNMI_THEMES).map((t) => (
@@ -26,9 +75,7 @@ export default function AparienciaPage() {
           >
             <div>
               <h2 className="text-sm font-semibold mb-1">{t.label}</h2>
-              <p className="text-xs text-slate-400 mb-3">
-                Vista rápida (colores, tarjetas, badges).
-              </p>
+              <p className="text-xs text-slate-400 mb-3">Vista rápida.</p>
 
               <div className="rounded-xl border border-dashed border-slate-700 p-3 text-xs">
                 <div className={`mb-2 rounded-lg border px-2 py-1 ${t.header.bg} ${t.header.border}`}>
@@ -50,7 +97,6 @@ export default function AparienciaPage() {
 
             <SunmiButton
               onClick={() => setThemeKey(t.key)}
-              variant={themeKey === t.key ? "primary" : "ghost"}
             >
               {themeKey === t.key ? "Theme aplicado" : "Aplicar theme"}
             </SunmiButton>

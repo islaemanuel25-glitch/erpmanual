@@ -1,11 +1,15 @@
 "use client";
 
-import { SunmiThemeProvider, useSunmiTheme } from "./SunmiThemeProvider";
+import { SunmiThemeProvider } from "./SunmiThemeProvider";
+import { SunmiLayoutProvider } from "./SunmiLayoutProvider";
+import { useSunmiTheme } from "./SunmiThemeProvider";
 
 export default function ThemeClientWrapper({ children }) {
   return (
     <SunmiThemeProvider>
-      <ThemeBody>{children}</ThemeBody>
+      <SunmiLayoutProvider>
+        <ThemeBody>{children}</ThemeBody>
+      </SunmiLayoutProvider>
     </SunmiThemeProvider>
   );
 }

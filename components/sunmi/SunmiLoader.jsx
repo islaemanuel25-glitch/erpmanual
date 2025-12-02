@@ -1,25 +1,27 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { cn } from "@/lib/utils";
 
-export default function SunmiLoader({ size = 20 }) {
+export default function SunmiLoader({ size = 20, className = "" }) {
   const { theme } = useSunmiTheme();
-  
-  // Usar color del header para el spinner
-  const spinnerColor = theme.header.bg.includes('amber') ? 'border-t-amber-400' : 'border-t-cyan-400';
-  const borderColor = theme.card.split(' ').find(c => c.startsWith('border-'))?.replace('border-', 'border-') || 'border-slate-700';
-  
+  const t = theme.loader;
+
   return (
-    <div className="flex justify-center py-2">    {/* antes py-4 */}
+    <div className="flex justify-center py-2">
       <div
-        className={`
-          animate-spin 
-          rounded-full 
-          ${borderColor}       /* antes border-2 */
-          ${spinnerColor}
-        `}
+        className={cn(
+          `
+          animate-spin
+          rounded-full
+          border-2
+        `,
+          t.border,
+          t.accent,
+          className
+        )}
         style={{
-          width: size,                  /* antes 28 by default */
+          width: size,
           height: size,
         }}
       />

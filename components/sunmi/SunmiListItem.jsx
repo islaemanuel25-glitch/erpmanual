@@ -1,6 +1,7 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { cn } from "@/lib/utils";
 
 export default function SunmiListItem({
   label,
@@ -12,39 +13,40 @@ export default function SunmiListItem({
   className = "",
 }) {
   const { theme } = useSunmiTheme();
-  
-  const base = `
-    flex items-center justify-between 
-    gap-3 py-2
-  `;
-
-  // Extraer colores del theme
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-')) || 'text-slate-100';
-  const hoverBg = theme.table?.row?.includes('hover:') ? theme.table.row : 'hover:bg-slate-900/70';
-  
-  const clickableCls = clickable
-    ? `cursor-pointer ${hoverBg}`
-    : "";
+  const t = theme.list;
 
   return (
     <div
-      className={`${base} ${clickableCls} ${className}`}
       onClick={clickable ? onClick : undefined}
+      className={cn(
+        `
+        flex items-center justify-between
+        gap-3 py-2
+        transition-all
+      `,
+        clickable && "cursor-pointer",
+        clickable && t.itemHover,
+        className
+      )}
     >
+      {/* IZQUIERDA */}
       <div className="flex items-start gap-2 min-w-0">
         {left && <div className="mt-[2px]">{left}</div>}
+
         <div className="flex flex-col min-w-0">
-          <span className={`text-[13px] ${textColor} truncate`}>
+          <span className={cn("text-[13px] truncate", theme.layout)}>
             {label}
           </span>
+
           {description && (
-            <span className="text-[11px] text-slate-400 truncate">
+            <span className={cn("text-[11px] truncate", t.description)}>
               {description}
             </span>
           )}
         </div>
       </div>
 
+      {/* DERECHA */}
       {right && (
         <div className="flex items-center gap-2 shrink-0">
           {right}
