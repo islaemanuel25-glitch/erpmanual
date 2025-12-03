@@ -24,37 +24,48 @@ export default function SunmiToggleEstado({
 
   const toggle = () => onChange(!normalized);
 
+  const trackWidth = ui.density.inputHeight * 1.6;
+  const trackHeight = ui.density.inputHeight * 0.7;
+  const thumbSize = ui.density.inputHeight * 0.7;
+  const thumbTranslate = ui.density.inputHeight * 0.9;
+
+  const textColor = normalized
+    ? badgeOn.split(" ").find((c) => c.startsWith("text-"))
+    : badgeOff.split(" ").find((c) => c.startsWith("text-"));
+
   return (
     <div
       className="flex items-center cursor-pointer select-none"
       onClick={toggle}
       style={{
-        gap: ui.gap,
+        gap: ui.spacing.sm,
         transform: `scale(${ui.scale})`,
       }}
     >
       {/* TRACK */}
       <div
         className={cn(
-          `rounded-full transition-all`,
+          `transition-all`,
           normalized ? t.on : t.off
         )}
         style={{
-          width: ui.density.inputHeight * 1.6,
-          height: ui.density.inputHeight * 0.7,
+          width: trackWidth,
+          height: trackHeight,
+          borderRadius: ui.rounded.full,
         }}
       >
         {/* THUMB */}
         <div
           className={cn(
-            `rounded-full shadow transition-all`,
+            `shadow transition-all`,
             t.thumb
           )}
           style={{
-            width: ui.density.inputHeight * 0.7,
-            height: ui.density.inputHeight * 0.7,
+            width: thumbSize,
+            height: thumbSize,
+            borderRadius: ui.rounded.full,
             transform: normalized
-              ? `translateX(${ui.density.inputHeight * 0.9}px)`
+              ? `translateX(${thumbTranslate}px)`
               : "translateX(0px)",
           }}
         />
@@ -62,13 +73,9 @@ export default function SunmiToggleEstado({
 
       {/* LABEL */}
       <span
-        className={
-          normalized
-            ? badgeOn.split(" ").find((c) => c.startsWith("text-"))
-            : badgeOff.split(" ").find((c) => c.startsWith("text-"))
-        }
+        className={textColor}
         style={{
-          fontSize: ui.font.fontSize,
+          fontSize: ui.font.base * ui.font.scaleMd,
           lineHeight: ui.font.lineHeight,
         }}
       >

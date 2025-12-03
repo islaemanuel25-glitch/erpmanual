@@ -18,17 +18,20 @@ export default function SunmiListCardRemove({ onClick }) {
       onClick={onClick}
       className={`
         flex items-center justify-center
-        rounded-md
         transition
         ${hoverBg}
       `}
       style={{
-        width: ui.density.iconSize + ui.gap * 2,
-        height: ui.density.iconSize + ui.gap * 2,
+        width: ui.density.iconSize + ui.spacing.xs * 2,
+        height: ui.density.iconSize + ui.spacing.xs * 2,
+        borderRadius: ui.rounded.sm,
         transform: `scale(${ui.scale})`,
       }}
     >
-      <X size={ui.density.iconSize} />
+      <X
+        size={ui.density.iconSize}
+        strokeWidth={ui.density.iconStrokeWidth}
+      />
     </button>
   );
 }

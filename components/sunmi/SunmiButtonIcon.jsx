@@ -18,13 +18,17 @@ export default function SunmiButtonIcon({
   return (
     <button
       onClick={onClick}
-      className={`rounded transition ${colors[color]}`}
+      className={`transition ${colors[color]}`}
       style={{
-        padding: ui.gap,
+        padding: ui.spacing.xs,
+        borderRadius: ui.rounded.sm,
         transform: `scale(${ui.scale})`,
       }}
     >
-      <Icon size={ui.density.iconSize} strokeWidth={2} />
+      <Icon
+        size={ui.density.iconSize}
+        strokeWidth={ui.density.iconStrokeWidth}
+      />
     </button>
   );
 }

@@ -17,21 +17,22 @@ export default function SunmiHeader({ title, color = "amber", children }) {
   return (
     <div
       className={`
-        bg-gradient-to-r ${bgClass}
+        bg-gradient-to-r 
+        ${bgClass}
         ${theme.header.border}
         ${theme.header.text}
-        rounded-xl 
-        shadow-md
         border
       `}
       style={{
-        padding: ui.spacingScale[ui.spacing],
-        marginBottom: ui.gap,
-        fontSize: ui.font.fontSize,
+        padding: ui.spacing.md,
+        marginBottom: ui.spacing.sm,
+        borderRadius: ui.rounded.lg,
+        boxShadow: ui.shadow.sm,
+        fontSize: ui.font.base * ui.font.scaleMd,
         lineHeight: ui.font.lineHeight,
-        letterSpacing: "0.04em",
+        letterSpacing: ui.font.letterSpacing,
         textTransform: "uppercase",
-        fontWeight: 700,
+        fontWeight: ui.font.weightBold,
         transform: `scale(${ui.scale})`,
       }}
     >

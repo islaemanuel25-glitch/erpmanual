@@ -25,9 +25,9 @@ export default function SunmiRow({
         ${className}
       `}
       style={{
-        gap: ui.gap,
-        paddingTop: ui.gap,
-        paddingBottom: ui.gap,
+        gap: ui.spacing.sm,
+        paddingTop: ui.spacing.sm,
+        paddingBottom: ui.spacing.sm,
         transform: `scale(${ui.scale})`,
       }}
     >
@@ -44,7 +44,7 @@ export default function SunmiRow({
       {right && (
         <div
           className="shrink-0 flex items-center"
-          style={{ gap: ui.gap }}
+          style={{ gap: ui.spacing.sm }}
         >
           {right}
         </div>

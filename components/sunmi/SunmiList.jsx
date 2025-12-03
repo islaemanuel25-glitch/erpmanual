@@ -19,7 +19,7 @@ export default function SunmiList({ children, className = "" }) {
         ${className}
       `}
       style={{
-        gap: ui.gap,
+        gap: ui.spacing.sm,
         transform: `scale(${ui.scale})`,
       }}
     >

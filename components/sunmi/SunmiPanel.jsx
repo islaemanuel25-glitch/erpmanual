@@ -15,11 +15,11 @@ export default function SunmiPanel({
     <div
       className={`
         ${theme.card}
-        rounded-2xl
         ${className}
       `}
       style={{
-        padding: noPadding ? 0 : ui.spacingScale[ui.spacing],
+        padding: noPadding ? 0 : ui.spacing.md,
+        borderRadius: ui.rounded.lg,
         transform: `scale(${ui.scale})`,
       }}
     >

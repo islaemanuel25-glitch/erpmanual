@@ -27,6 +27,7 @@ export default function SunmiSelectAdv({
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
+  // Cerrar al hacer click fuera
   useEffect(() => {
     function handleClickOutside(e) {
       if (ref.current && !ref.current.contains(e.target)) {
@@ -37,9 +38,7 @@ export default function SunmiSelectAdv({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const optionList = Children.toArray(children).filter((c) =>
-    isValidElement(c)
-  );
+  const optionList = Children.toArray(children).filter(isValidElement);
 
   const isSelected = (v) => {
     if (!multiple) return v == value;
@@ -66,7 +65,6 @@ export default function SunmiSelectAdv({
     let newArr = Array.isArray(value) ? [...value] : [];
     if (newArr.includes(val)) newArr = newArr.filter((v) => v !== val);
     else newArr.push(val);
-
     onChange(newArr);
   };
 
@@ -74,54 +72,57 @@ export default function SunmiSelectAdv({
     <div
       ref={ref}
       className={cn("relative w-full", className)}
-      style={{
-        transform: `scale(${ui.scale})`,
-      }}
+      style={{ transform: `scale(${ui.scale})` }}
     >
+      {/* BOTÓN PRINCIPAL */}
       <button
         onClick={() => setOpen(!open)}
         className={cn(
           `
-          w-full
-          flex items-center justify-between
-          rounded-md
-          shadow-inner transition-all
+          w-full flex items-center justify-between
           ${t.bg} ${t.border} ${t.text}
+          transition-all
         `
         )}
         style={{
-          padding: ui.gap,
+          paddingLeft: ui.spacing.sm,
+          paddingRight: ui.spacing.sm,
+          paddingTop: ui.spacing.xs,
+          paddingBottom: ui.spacing.xs,
           height: ui.density.selectHeight,
-          fontSize: ui.font.fontSize,
+          borderRadius: ui.rounded.md,
+          fontSize: ui.font.base * ui.font.scaleMd,
           lineHeight: ui.font.lineHeight,
         }}
       >
         <span className="truncate">{currentText}</span>
+
         <ChevronDown
           size={ui.density.iconSize}
+          strokeWidth={ui.density.iconStrokeWidth}
           className={cn(
-            `
-            transition-transform
-            ${t.icon}
-          `,
+            `transition-transform ${t.icon}`,
             open && "rotate-180"
           )}
         />
       </button>
 
+      {/* DROPDOWN */}
       {open && (
         <div
           className={cn(
             `
             absolute left-0 right-0 z-50
-            rounded-md border shadow-lg
-            max-h-52 overflow-y-auto
+            border shadow-lg
+            overflow-y-auto
             ${t.dropdownBg} ${t.border}
           `
           )}
           style={{
-            marginTop: ui.gap,
-            fontSize: ui.font.fontSize,
+            marginTop: ui.spacing.xs,
+            borderRadius: ui.rounded.md,
+            maxHeight: ui.density.dropdownMaxHeight,
+            fontSize: ui.font.base * ui.font.scaleMd,
             lineHeight: ui.font.lineHeight,
           }}
         >
@@ -135,19 +136,24 @@ export default function SunmiSelectAdv({
                 onClick={() => handleClick(val)}
                 className={cn(
                   `
-                  cursor-pointer flex items-center transition-all
+                  cursor-pointer flex items-center
+                  transition-all
                 `,
                   selected ? t.selected : t.text,
                   t.dropdownItemHover
                 )}
                 style={{
-                  padding: ui.gap,
-                  gap: ui.gap,
+                  paddingLeft: ui.spacing.sm,
+                  paddingRight: ui.spacing.sm,
+                  paddingTop: ui.spacing.xs,
+                  paddingBottom: ui.spacing.xs,
+                  gap: ui.spacing.sm,
                 }}
               >
                 {multiple && (
                   <Check
                     size={ui.density.iconSize}
+                    strokeWidth={ui.density.iconStrokeWidth}
                     className={selected ? "opacity-100" : "opacity-0"}
                   />
                 )}

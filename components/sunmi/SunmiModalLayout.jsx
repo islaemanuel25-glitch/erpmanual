@@ -29,15 +29,18 @@ export default function SunmiModalLayout({
         flex items-center justify-center
       "
       style={{
-        padding: ui.gap,
+        padding: ui.spacing.md,
         transform: `scale(${ui.scale})`,
       }}
     >
       <div className={`w-full ${maxWidth}`}>
         <SunmiCard>
+          {/* HEADER */}
           <div
             className="flex items-start justify-between"
-            style={{ gap: ui.gap }}
+            style={{
+              gap: ui.spacing.sm,
+            }}
           >
             <SunmiCardHeader
               title={title}
@@ -49,30 +52,35 @@ export default function SunmiModalLayout({
               <SunmiButton
                 variant="ghost"
                 onClick={onClose}
-                style={{ padding: ui.gap }}
+                style={{
+                  paddingLeft: ui.spacing.sm,
+                  paddingRight: ui.spacing.sm,
+                }}
               >
                 Cerrar
               </SunmiButton>
             )}
           </div>
 
+          {/* BODY */}
           <div
             className="flex flex-col overflow-y-auto"
             style={{
-              marginTop: ui.gap,
+              marginTop: ui.spacing.md,
               maxHeight: "65vh",
-              gap: ui.gap,
+              gap: ui.spacing.sm,
             }}
           >
             {children}
           </div>
 
+          {/* FOOTER */}
           {footer && (
             <div
               className="flex justify-end"
               style={{
-                marginTop: ui.gap,
-                gap: ui.gap,
+                marginTop: ui.spacing.md,
+                gap: ui.spacing.sm,
               }}
             >
               {footer}

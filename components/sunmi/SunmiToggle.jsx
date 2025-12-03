@@ -26,11 +26,16 @@ export default function SunmiToggle({
     onChange(newVal);
   };
 
+  const trackWidth = ui.density.inputHeight * 1.4;
+  const trackHeight = ui.density.inputHeight * 0.6;
+  const thumbSize = ui.density.inputHeight * 0.6;
+  const thumbTranslate = ui.density.inputHeight * 0.8;
+
   return (
     <div
       className="flex items-center cursor-pointer select-none"
       style={{
-        gap: ui.gap,
+        gap: ui.spacing.sm,
         transform: `scale(${ui.scale})`,
       }}
       onClick={toggle}
@@ -39,31 +44,32 @@ export default function SunmiToggle({
       <div
         className={cn(
           `
-          rounded-full
           transition-all
         `,
           checked ? t.on : t.off
         )}
         style={{
-          width: ui.density.inputHeight * 1.4,
-          height: ui.density.inputHeight * 0.6,
+          width: trackWidth,
+          height: trackHeight,
+          borderRadius: ui.rounded.full,
+          position: "relative",
         }}
       >
         {/* THUMB */}
         <div
           className={cn(
             `
-            rounded-full
             shadow
             transition-all
           `,
             t.thumb
           )}
           style={{
-            width: ui.density.inputHeight * 0.6,
-            height: ui.density.inputHeight * 0.6,
+            width: thumbSize,
+            height: thumbSize,
+            borderRadius: ui.rounded.full,
             transform: checked
-              ? `translateX(${ui.density.inputHeight * 0.8}px)`
+              ? `translateX(${thumbTranslate}px)`
               : "translateX(0px)",
           }}
         />
@@ -74,7 +80,7 @@ export default function SunmiToggle({
         <span
           className={theme.layout}
           style={{
-            fontSize: ui.font.fontSize,
+            fontSize: ui.font.base * ui.font.scaleMd,
             lineHeight: ui.font.lineHeight,
           }}
         >

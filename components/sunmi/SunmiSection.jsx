@@ -23,23 +23,25 @@ export default function SunmiSection({
     <section
       className={`flex flex-col ${className}`}
       style={{
-        gap: ui.gap,
+        gap: ui.spacing.md,
         transform: `scale(${ui.scale})`,
       }}
     >
       {title && (
         <div
           className="flex flex-col"
-          style={{ gap: ui.gap * 0.5 }}
+          style={{
+            gap: ui.spacing.xs,
+          }}
         >
           <div
             className="flex items-center justify-between"
-            style={{ gap: ui.gap }}
+            style={{ gap: ui.spacing.sm }}
           >
             <h3
               className={`font-semibold ${textColor}`}
               style={{
-                fontSize: ui.font.fontSize,
+                fontSize: ui.font.base * ui.font.scaleMd,
                 lineHeight: ui.font.lineHeight,
               }}
             >
@@ -51,7 +53,7 @@ export default function SunmiSection({
             <p
               className="text-slate-400"
               style={{
-                fontSize: `calc(${ui.font.fontSize} * 0.9)`,
+                fontSize: ui.font.base * ui.font.scaleSm,
                 lineHeight: ui.font.lineHeight,
               }}
             >
@@ -65,13 +67,17 @@ export default function SunmiSection({
 
       <div
         className="flex flex-col"
-        style={{ gap: ui.gap }}
+        style={{ gap: ui.spacing.sm }}
       >
         {children}
       </div>
 
       {footer && (
-        <div style={{ marginTop: ui.gap }}>
+        <div
+          style={{
+            marginTop: ui.spacing.sm,
+          }}
+        >
           {footer}
         </div>
       )}

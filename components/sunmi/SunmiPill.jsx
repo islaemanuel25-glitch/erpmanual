@@ -14,7 +14,6 @@ export default function SunmiPill({ children, className = "" }) {
       className={cn(
         `
         inline-block
-        rounded-md
         font-semibold
         whitespace-nowrap
         ${t.bg}
@@ -23,8 +22,12 @@ export default function SunmiPill({ children, className = "" }) {
         className
       )}
       style={{
-        padding: `${ui.gap} calc(${ui.gap} * 1.2)`,
-        fontSize: ui.font.fontSize,
+        paddingLeft: ui.spacing.sm,
+        paddingRight: ui.spacing.sm,
+        paddingTop: ui.spacing.xs,
+        paddingBottom: ui.spacing.xs,
+        borderRadius: ui.rounded.full,
+        fontSize: ui.font.base * ui.font.scaleSm,
         lineHeight: ui.font.lineHeight,
         transform: `scale(${ui.scale})`,
       }}

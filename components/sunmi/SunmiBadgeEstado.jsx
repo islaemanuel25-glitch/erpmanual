@@ -22,14 +22,14 @@ export default function SunmiBadgeEstado({ value }) {
   return (
     <span
       className={`
-        rounded-md
         font-semibold
         leading-none
         ${data.class}
       `}
       style={{
-        padding: `${ui.gap} calc(${ui.gap} * 1.2)`,
-        fontSize: ui.font.fontSize,
+        padding: `${ui.spacing.xs} ${ui.spacing.sm}`,
+        borderRadius: ui.rounded.sm,
+        fontSize: ui.font.base * ui.font.scaleSm,
         lineHeight: ui.font.lineHeight,
       }}
     >

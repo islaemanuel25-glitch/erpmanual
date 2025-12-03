@@ -21,25 +21,30 @@ export default function SunmiSelect({ className = "", children, ...props }) {
     "text-slate-100";
 
   return (
-    <div className="relative w-full" style={{ transform: `scale(${ui.scale})` }}>
+    <div
+      className="relative w-full"
+      style={{ transform: `scale(${ui.scale})` }}
+    >
       <select
         {...props}
         className={`
-          w-full 
-          rounded-md
+          w-full
           ${bgColor}
           border ${borderColor}
           ${textColor}
           appearance-none
           focus:outline-none
-          focus:border-amber-400
           transition
           ${className}
         `}
         style={{
-          padding: ui.gap,
+          paddingLeft: ui.spacing.sm,
+          paddingRight: ui.spacing.lg,
+          paddingTop: ui.spacing.xs,
+          paddingBottom: ui.spacing.xs,
           height: ui.density.selectHeight,
-          fontSize: ui.font.fontSize,
+          borderRadius: ui.rounded.md,
+          fontSize: ui.font.base * ui.font.scaleMd,
           lineHeight: ui.font.lineHeight,
         }}
       >
@@ -48,11 +53,15 @@ export default function SunmiSelect({ className = "", children, ...props }) {
 
       <ChevronDown
         size={ui.density.iconSize}
-        className="
-          absolute right-2 top-1/2 -translate-y-1/2
-          text-amber-400 opacity-70 
-          pointer-events-none
-        "
+        strokeWidth={ui.density.iconStrokeWidth}
+        style={{
+          position: "absolute",
+          right: ui.spacing.sm,
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: theme.input?.accentText || "rgba(255,200,0,0.7)",
+          pointerEvents: "none",
+        }}
       />
     </div>
   );

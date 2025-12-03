@@ -28,16 +28,17 @@ export default function SunmiButton({
     <button
       {...props}
       className={cn(
-        "rounded-md font-medium transition-all",
+        "transition-all font-medium",
         styles[variant],
         className
       )}
       style={{
         height: ui.density.buttonHeight,
-        fontSize: ui.font.fontSize,
+        paddingLeft: ui.spacing.sm,
+        paddingRight: ui.spacing.sm,
+        borderRadius: ui.rounded.md,
+        fontSize: ui.font.base * ui.font.scaleMd,
         lineHeight: ui.font.lineHeight,
-        paddingLeft: ui.gap,
-        paddingRight: ui.gap,
         transform: `scale(${ui.scale})`,
       }}
     >

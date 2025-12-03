@@ -20,9 +20,9 @@ export default function SunmiTableEmpty({ message = "Sin datos disponibles" }) {
         className={textColor}
         style={{
           textAlign: "center",
-          paddingTop: ui.gap,
-          paddingBottom: ui.gap,
-          fontSize: ui.font.fontSize,
+          paddingTop: ui.spacing.sm,
+          paddingBottom: ui.spacing.sm,
+          fontSize: ui.font.base * ui.font.scaleSm,
           lineHeight: ui.font.lineHeight,
           fontStyle: "italic",
         }}

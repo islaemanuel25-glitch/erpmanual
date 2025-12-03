@@ -19,15 +19,21 @@ export default function SunmiSeparator({ label, className = "" }) {
         className
       )}
       style={{
-        gap: ui.gap,
-        marginTop: ui.gap,
-        marginBottom: ui.gap,
-        fontSize: ui.font.fontSize,
+        gap: ui.spacing.sm,
+        marginTop: ui.spacing.md,
+        marginBottom: ui.spacing.md,
+        fontSize: ui.font.base * ui.font.scaleSm,
         lineHeight: ui.font.lineHeight,
         transform: `scale(${ui.scale})`,
       }}
     >
-      <div className={cn("flex-1 h-px", t.line)} />
+      <div
+        className={cn(t.line)}
+        style={{
+          flex: 1,
+          height: ui.border.widthThin,
+        }}
+      />
 
       {label && (
         <span className="whitespace-nowrap">
@@ -35,7 +41,13 @@ export default function SunmiSeparator({ label, className = "" }) {
         </span>
       )}
 
-      <div className={cn("flex-1 h-px", t.line)} />
+      <div
+        className={cn(t.line)}
+        style={{
+          flex: 1,
+          height: ui.border.widthThin,
+        }}
+      />
     </div>
   );
 }

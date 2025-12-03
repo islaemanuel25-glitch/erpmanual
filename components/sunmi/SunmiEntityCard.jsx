@@ -19,14 +19,23 @@ export default function SunmiEntityCard({
     <SunmiCard className={className}>
       <div
         className="flex items-start justify-between"
-        style={{ gap: ui.gap }}
+        style={{
+          gap: ui.spacing.sm,
+          transform: `scale(${ui.scale})`,
+        }}
       >
         <div
           className="flex items-start"
-          style={{ gap: ui.gap }}
+          style={{
+            gap: ui.spacing.sm,
+          }}
         >
           {icon && (
-            <div style={{ marginTop: ui.gap }}>
+            <div
+              style={{
+                marginTop: ui.spacing.xs,
+              }}
+            >
               {icon}
             </div>
           )}
@@ -41,7 +50,9 @@ export default function SunmiEntityCard({
         {actions && (
           <div
             className="flex items-center"
-            style={{ gap: ui.gap }}
+            style={{
+              gap: ui.spacing.xs,
+            }}
           >
             {actions}
           </div>
@@ -51,8 +62,8 @@ export default function SunmiEntityCard({
       <div
         className="flex flex-col"
         style={{
-          gap: ui.gap,
-          marginTop: ui.gap,
+          gap: ui.spacing.sm,
+          marginTop: ui.spacing.sm,
         }}
       >
         {children}

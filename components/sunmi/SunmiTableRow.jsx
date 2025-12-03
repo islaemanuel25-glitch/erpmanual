@@ -13,15 +13,13 @@ export default function SunmiTableRow({ children, selected = false, onClick }) {
     <tr
       onClick={onClick}
       className={cn(
-        `
-        transition-colors
-      `,
+        `transition-colors`,
         onClick && "cursor-pointer",
         selected ? t.selected : t.row
       )}
       style={{
         height: ui.density.tableRowHeight,
-        fontSize: ui.font.fontSize,
+        fontSize: ui.font.base * ui.font.scaleSm,
         lineHeight: ui.font.lineHeight,
         transform: `scale(${ui.scale})`,
       }}

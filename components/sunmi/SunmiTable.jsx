@@ -12,7 +12,9 @@ export default function SunmiTable({ headers = [], children }) {
   return (
     <div
       className="overflow-x-auto"
-      style={{ transform: `scale(${ui.scale})` }}
+      style={{
+        transform: `scale(${ui.scale})`,
+      }}
     >
       <table
         className={cn(`
@@ -20,7 +22,7 @@ export default function SunmiTable({ headers = [], children }) {
           table-fixed
         `)}
         style={{
-          fontSize: ui.font.fontSize,
+          fontSize: ui.font.base * ui.font.scaleMd,
           lineHeight: ui.font.lineHeight,
         }}
       >
@@ -36,7 +38,10 @@ export default function SunmiTable({ headers = [], children }) {
                     whitespace-nowrap
                   `)}
                   style={{
-                    padding: ui.gap,
+                    paddingLeft: ui.spacing.sm,
+                    paddingRight: ui.spacing.sm,
+                    paddingTop: ui.spacing.xs,
+                    paddingBottom: ui.spacing.xs,
                   }}
                 >
                   {h}
@@ -49,7 +54,7 @@ export default function SunmiTable({ headers = [], children }) {
         <tbody
           className={cn(`divide-y`, t.border)}
           style={{
-            fontSize: ui.font.fontSize,
+            fontSize: ui.font.base * ui.font.scaleSm,
             lineHeight: ui.font.lineHeight,
           }}
         >

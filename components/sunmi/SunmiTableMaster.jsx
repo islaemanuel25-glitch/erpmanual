@@ -8,8 +8,8 @@ import SunmiTableEmpty from "./SunmiTableEmpty";
 import SunmiSeparator from "./SunmiSeparator";
 import SunmiSelectAdv, { SunmiSelectOption } from "./SunmiSelectAdv";
 import SunmiButton from "./SunmiButton";
-
 import SunmiButtonIcon from "./SunmiButtonIcon";
+
 import { Pencil, Trash2 } from "lucide-react";
 
 export default function SunmiTableMaster({
@@ -36,7 +36,7 @@ export default function SunmiTableMaster({
     <div
       className="w-full flex flex-col"
       style={{
-        gap: ui.gap,
+        gap: ui.spacing.md,
         transform: `scale(${ui.scale})`,
       }}
     >
@@ -48,9 +48,7 @@ export default function SunmiTableMaster({
       >
         {loading && <SunmiTableEmpty message="Cargando..." />}
 
-        {!loading && noRows && (
-          <SunmiTableEmpty message={emptyMessage} />
-        )}
+        {!loading && noRows && <SunmiTableEmpty message={emptyMessage} />}
 
         {!loading &&
           !noRows &&
@@ -60,8 +58,11 @@ export default function SunmiTableMaster({
                 <td
                   key={col.id}
                   style={{
-                    padding: ui.gap,
-                    fontSize: ui.font.fontSize,
+                    paddingLeft: ui.spacing.sm,
+                    paddingRight: ui.spacing.sm,
+                    paddingTop: ui.spacing.xs,
+                    paddingBottom: ui.spacing.xs,
+                    fontSize: ui.font.base * ui.font.scaleSm,
                     lineHeight: ui.font.lineHeight,
                   }}
                 >
@@ -72,13 +73,16 @@ export default function SunmiTableMaster({
               {actions.length > 0 && (
                 <td
                   style={{
-                    padding: ui.gap,
+                    paddingLeft: ui.spacing.sm,
+                    paddingRight: ui.spacing.sm,
                     textAlign: "right",
                   }}
                 >
                   <div
                     className="flex justify-end"
-                    style={{ gap: ui.gap * 0.5 }}
+                    style={{
+                      gap: ui.spacing.xs,
+                    }}
                   >
                     {actions.map((act, i) => (
                       <SunmiButtonIcon
@@ -103,13 +107,18 @@ export default function SunmiTableMaster({
 
       <SunmiSeparator />
 
+      {/* FOOTER */}
       <div
         className="w-full flex flex-col md:flex-row items-center justify-between"
-        style={{ gap: ui.gap }}
+        style={{ gap: ui.spacing.md }}
       >
+        {/* FILAS POR PÁGINA */}
         <div
           className="flex items-center"
-          style={{ gap: ui.gap, fontSize: ui.font.fontSize }}
+          style={{
+            gap: ui.spacing.sm,
+            fontSize: ui.font.base * ui.font.scaleSm,
+          }}
         >
           <span>Filas:</span>
 
@@ -125,18 +134,20 @@ export default function SunmiTableMaster({
           </SunmiSelectAdv>
         </div>
 
+        {/* PAGINADOR TEXTO */}
         <div
           style={{
-            fontSize: ui.font.fontSize,
+            fontSize: ui.font.base * ui.font.scaleMd,
             lineHeight: ui.font.lineHeight,
           }}
         >
           Página <strong>{page}</strong> de <strong>{totalPages}</strong>
         </div>
 
+        {/* BOTONES PAGINADOR */}
         <div
           className="flex items-center"
-          style={{ gap: ui.gap }}
+          style={{ gap: ui.spacing.sm }}
         >
           <SunmiButton
             variant="ghost"

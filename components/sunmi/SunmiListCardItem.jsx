@@ -22,8 +22,8 @@ export default function SunmiListCardItem({
         className
       )}
       style={{
-        paddingTop: ui.gap,
-        paddingBottom: ui.gap,
+        paddingTop: ui.spacing.xs,
+        paddingBottom: ui.spacing.xs,
         transform: `scale(${ui.scale})`,
       }}
     >
@@ -31,19 +31,19 @@ export default function SunmiListCardItem({
         className={cn(
           `
           absolute left-0 right-0
-          h-[1px]
         `,
           t.separator
         )}
         style={{
-          bottom: ui.gap * -0.5,
+          height: ui.border.widthThin,
+          bottom: ui.spacing.xs * -0.5,
         }}
       />
 
       <div
         className="flex-1 truncate"
         style={{
-          fontSize: ui.font.fontSize,
+          fontSize: ui.font.base * ui.font.scaleSm,
           lineHeight: ui.font.lineHeight,
         }}
       >

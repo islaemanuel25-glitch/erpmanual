@@ -14,8 +14,7 @@ export default function SunmiInput({ className = "", ...props }) {
       {...props}
       className={cn(
         `
-        w-full 
-        rounded-md
+        w-full
         outline-none
         transition-all
         ${t.bg}
@@ -27,9 +26,13 @@ export default function SunmiInput({ className = "", ...props }) {
         className
       )}
       style={{
-        padding: `${ui.gap}`,
+        paddingLeft: ui.spacing.sm,
+        paddingRight: ui.spacing.sm,
+        paddingTop: ui.spacing.xs,
+        paddingBottom: ui.spacing.xs,
         height: ui.density.inputHeight,
-        fontSize: ui.font.fontSize,
+        borderRadius: ui.rounded.md,
+        fontSize: ui.font.base * ui.font.scaleMd,
         lineHeight: ui.font.lineHeight,
         transform: `scale(${ui.scale})`,
       }}

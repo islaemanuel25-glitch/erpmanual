@@ -11,13 +11,13 @@ export default function SunmiCard({ children, className = "" }) {
     <div
       className={`
         ${theme.card}
-        rounded-xl
-        shadow-md
         backdrop-blur-sm
         ${className}
       `}
       style={{
-        padding: ui.spacingScale[ui.spacing],
+        padding: ui.spacing.md,
+        borderRadius: ui.rounded.lg,
+        boxShadow: ui.shadow.sm,
         transform: `scale(${ui.scale})`,
       }}
     >

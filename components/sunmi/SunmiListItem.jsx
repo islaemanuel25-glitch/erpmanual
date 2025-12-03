@@ -30,19 +30,19 @@ export default function SunmiListItem({
         className
       )}
       style={{
-        gap: ui.gap,
-        paddingTop: ui.gap,
-        paddingBottom: ui.gap,
+        gap: ui.spacing.sm,
+        paddingTop: ui.spacing.sm,
+        paddingBottom: ui.spacing.sm,
         transform: `scale(${ui.scale})`,
       }}
     >
       {/* IZQUIERDA */}
       <div
         className="flex items-start min-w-0"
-        style={{ gap: ui.gap }}
+        style={{ gap: ui.spacing.sm }}
       >
         {left && (
-          <div style={{ marginTop: ui.gap * 0.2 }}>
+          <div style={{ marginTop: ui.spacing.xs * 0.5 }}>
             {left}
           </div>
         )}
@@ -51,7 +51,7 @@ export default function SunmiListItem({
           <span
             className={cn("truncate", theme.layout)}
             style={{
-              fontSize: ui.font.fontSize,
+              fontSize: ui.font.base * ui.font.scaleMd,
               lineHeight: ui.font.lineHeight,
             }}
           >
@@ -62,7 +62,7 @@ export default function SunmiListItem({
             <span
               className={cn("truncate", t.description)}
               style={{
-                fontSize: `calc(${ui.font.fontSize} * 0.9)`,
+                fontSize: ui.font.base * ui.font.scaleSm,
                 lineHeight: ui.font.lineHeight,
                 opacity: 0.8,
               }}
@@ -77,7 +77,7 @@ export default function SunmiListItem({
       {right && (
         <div
           className="flex items-center shrink-0"
-          style={{ gap: ui.gap }}
+          style={{ gap: ui.spacing.sm }}
         >
           {right}
         </div>

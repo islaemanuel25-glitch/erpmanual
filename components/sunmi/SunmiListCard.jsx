@@ -9,7 +9,7 @@ export default function SunmiListCard({ children, className = "" }) {
     <div
       className={`flex flex-col ${className}`}
       style={{
-        gap: ui.gap,
+        gap: ui.spacing.sm,
         transform: `scale(${ui.scale})`,
       }}
     >

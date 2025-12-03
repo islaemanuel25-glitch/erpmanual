@@ -15,7 +15,7 @@ export default function SunmiUserCell({ nombre = "", email = "" }) {
     <div
       className="flex items-center"
       style={{
-        gap: ui.gap,
+        gap: ui.spacing.sm,
         transform: `scale(${ui.scale})`,
       }}
     >
@@ -23,7 +23,6 @@ export default function SunmiUserCell({ nombre = "", email = "" }) {
       <div
         className={cn(
           `
-          rounded-full
           flex items-center justify-center
           font-bold
         `,
@@ -33,7 +32,8 @@ export default function SunmiUserCell({ nombre = "", email = "" }) {
         style={{
           width: ui.density.avatarSize,
           height: ui.density.avatarSize,
-          fontSize: ui.font.fontSize,
+          borderRadius: ui.rounded.full,
+          fontSize: ui.font.base * ui.font.scaleMd,
           lineHeight: ui.font.lineHeight,
         }}
       >
@@ -45,7 +45,7 @@ export default function SunmiUserCell({ nombre = "", email = "" }) {
         <span
           className={cn("truncate font-medium", theme.layout)}
           style={{
-            fontSize: ui.font.fontSize,
+            fontSize: ui.font.base * ui.font.scaleMd,
             lineHeight: ui.font.lineHeight,
           }}
         >
@@ -55,7 +55,7 @@ export default function SunmiUserCell({ nombre = "", email = "" }) {
         <span
           className={cn("truncate", t.email)}
           style={{
-            fontSize: `calc(${ui.font.fontSize} * 0.9)`,
+            fontSize: ui.font.base * ui.font.scaleSm,
             opacity: 0.85,
           }}
         >

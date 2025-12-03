@@ -9,7 +9,9 @@ export default function SunmiEstadoCell({ value }) {
   return (
     <div
       className="flex justify-center"
-      style={{ transform: `scale(${ui.scale})` }}
+      style={{
+        transform: `scale(${ui.scale})`,
+      }}
     >
       <SunmiBadgeEstado value={value} />
     </div>

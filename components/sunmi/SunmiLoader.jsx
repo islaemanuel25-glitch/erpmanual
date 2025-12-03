@@ -14,14 +14,16 @@ export default function SunmiLoader({ size = 20, className = "" }) {
   return (
     <div
       className="flex justify-center"
-      style={{ paddingTop: ui.gap, paddingBottom: ui.gap }}
+      style={{
+        paddingTop: ui.spacing.sm,
+        paddingBottom: ui.spacing.sm,
+        transform: `scale(${ui.scale})`,
+      }}
     >
       <div
         className={cn(
           `
           animate-spin
-          rounded-full
-          border-2
         `,
           t.border,
           t.accent,
@@ -30,6 +32,8 @@ export default function SunmiLoader({ size = 20, className = "" }) {
         style={{
           width: finalSize,
           height: finalSize,
+          borderRadius: ui.rounded.full,
+          borderWidth: ui.border.widthThin,
         }}
       />
     </div>
