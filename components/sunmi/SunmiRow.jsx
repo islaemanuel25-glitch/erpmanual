@@ -1,5 +1,7 @@
 "use client";
 
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+
 export default function SunmiRow({
   left,
   right,
@@ -7,6 +9,8 @@ export default function SunmiRow({
   align = "center",
   className = "",
 }) {
+  const { ui } = useUIConfig();
+
   const alignCls =
     align === "start"
       ? "items-start"
@@ -17,10 +21,15 @@ export default function SunmiRow({
   return (
     <div
       className={`
-        flex ${alignCls} justify-between 
-        gap-3 py-1
+        flex ${alignCls} justify-between
         ${className}
       `}
+      style={{
+        gap: ui.gap,
+        paddingTop: ui.gap,
+        paddingBottom: ui.gap,
+        transform: `scale(${ui.scale})`,
+      }}
     >
       <div className="flex-1 min-w-0">
         {left}
@@ -33,7 +42,10 @@ export default function SunmiRow({
       )}
 
       {right && (
-        <div className="shrink-0 flex items-center gap-2">
+        <div
+          className="shrink-0 flex items-center"
+          style={{ gap: ui.gap }}
+        >
           {right}
         </div>
       )}

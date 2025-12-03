@@ -6,22 +6,31 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import LayoutPreview from "@/components/layout/LayoutPreview";
 
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+
+import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+
 import { SUNMI_THEMES } from "@/lib/sunmiThemes";
 
 export default function AparienciaPage() {
   const { themeKey, setThemeKey, layoutMode, setLayoutMode } = useSunmiTheme();
+  const { ui, updateUIConfig } = useUIConfig();
+
+  const cambio = (prop, val) => {
+    updateUIConfig({ [prop]: val });
+  };
 
   return (
     <div className="max-w-6xl mx-auto">
 
+      {/* ============================ HEADER ============================ */}
       <SunmiHeader
         title="Apariencia del ERP"
-        subtitle="Elegí layout y tema visual."
+        subtitle="Elegí layout, theme y configuración visual."
       />
 
-      {/* ============================
-          LAYOUT SELECTOR
-      ============================ */}
+      {/* ============================ LAYOUT SELECTOR ============================ */}
       <h2 className="text-lg font-semibold mt-4 mb-2">Diseño del Layout</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -60,9 +69,7 @@ export default function AparienciaPage() {
         </div>
       </div>
 
-      {/* ============================
-          THEME SELECTOR
-      ============================ */}
+      {/* ============================ THEME SELECTOR ============================ */}
       <h2 className="text-lg font-semibold mt-8 mb-2">Themes Visuales</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -102,6 +109,73 @@ export default function AparienciaPage() {
             </SunmiButton>
           </SunmiCard>
         ))}
+      </div>
+
+      {/* ================================================================
+          🔥 NUEVA SECCIÓN: CONFIGURACIÓN AVANZADA DE UI
+      ================================================================ */}
+      <h2 className="text-lg font-semibold mt-8 mb-2">Configuración Avanzada</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* Tamaño de letra */}
+        <div>
+          <SunmiSeparator label="Tamaño de letra" />
+          <SunmiSelect
+            value={ui.fontSize}
+            onChange={(v) => cambio("fontSize", v)}
+            options={[
+              { label: "XS", value: "xs" },
+              { label: "SM", value: "sm" },
+              { label: "MD", value: "md" },
+              { label: "LG", value: "lg" },
+            ]}
+          />
+        </div>
+
+        {/* Spacing */}
+        <div>
+          <SunmiSeparator label="Espaciado global" />
+          <SunmiSelect
+            value={ui.spacing}
+            onChange={(v) => cambio("spacing", v)}
+            options={[
+              { label: "XS", value: "xs" },
+              { label: "SM", value: "sm" },
+              { label: "MD", value: "md" },
+              { label: "LG", value: "lg" },
+            ]}
+          />
+        </div>
+
+        {/* Densidad */}
+        <div>
+          <SunmiSeparator label="Densidad" />
+          <SunmiSelect
+            value={ui.density}
+            onChange={(v) => cambio("density", v)}
+            options={[
+              { label: "Compacta", value: "compact" },
+              { label: "Cómoda", value: "comfortable" },
+              { label: "Espaciosa", value: "spacious" },
+            ]}
+          />
+        </div>
+
+        {/* Escala */}
+        <div>
+          <SunmiSeparator label="Escala global" />
+          <SunmiSelect
+            value={ui.scale}
+            onChange={(v) => cambio("scale", Number(v))}
+            options={[
+              { label: "90%", value: 0.9 },
+              { label: "100%", value: 1 },
+              { label: "110%", value: 1.1 },
+            ]}
+          />
+        </div>
+
       </div>
     </div>
   );

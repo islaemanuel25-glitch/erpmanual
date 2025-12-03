@@ -1,10 +1,12 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { cn } from "@/lib/utils";
 
 export default function SunmiPill({ children, className = "" }) {
   const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   const t = theme.pill;
 
   return (
@@ -12,17 +14,20 @@ export default function SunmiPill({ children, className = "" }) {
       className={cn(
         `
         inline-block
-        px-1.5 py-[1px]
         rounded-md
-        text-[10.5px]
         font-semibold
-        leading-none
         whitespace-nowrap
         ${t.bg}
         ${t.text}
       `,
         className
       )}
+      style={{
+        padding: `${ui.gap} calc(${ui.gap} * 1.2)`,
+        fontSize: ui.font.fontSize,
+        lineHeight: ui.font.lineHeight,
+        transform: `scale(${ui.scale})`,
+      }}
     >
       {children}
     </span>

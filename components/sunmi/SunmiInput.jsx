@@ -1,20 +1,21 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { cn } from "@/lib/utils";
 
 export default function SunmiInput({ className = "", ...props }) {
   const { theme } = useSunmiTheme();
-  const t = theme.input; // shortcut
+  const { ui } = useUIConfig();
+  const t = theme.input;
 
   return (
     <input
       {...props}
       className={cn(
         `
-        px-2 py-1.5              /* tamaño compacto */
-        w-full rounded-md
-        text-[13px]
+        w-full 
+        rounded-md
         outline-none
         transition-all
         ${t.bg}
@@ -25,6 +26,13 @@ export default function SunmiInput({ className = "", ...props }) {
       `,
         className
       )}
+      style={{
+        padding: `${ui.gap}`,
+        height: ui.density.inputHeight,
+        fontSize: ui.font.fontSize,
+        lineHeight: ui.font.lineHeight,
+        transform: `scale(${ui.scale})`,
+      }}
     />
   );
 }

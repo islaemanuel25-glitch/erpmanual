@@ -1,5 +1,7 @@
 "use client";
 
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+
 import SunmiTable from "./SunmiTable";
 import SunmiTableRow from "./SunmiTableRow";
 import SunmiTableEmpty from "./SunmiTableEmpty";
@@ -28,40 +30,56 @@ export default function SunmiTableMaster({
   emptyMessage = "No hay datos para mostrar",
 }) {
   const noRows = !rows || rows.length === 0;
+  const { ui } = useUIConfig();
 
   return (
-    <div className="w-full flex flex-col gap-4">
-
-      {/* TABLA */}
+    <div
+      className="w-full flex flex-col"
+      style={{
+        gap: ui.gap,
+        transform: `scale(${ui.scale})`,
+      }}
+    >
       <SunmiTable
         headers={[
           ...columns.map((c) => c.label),
           ...(actions.length > 0 ? ["Acciones"] : []),
         ]}
       >
-        {/* LOADER */}
         {loading && <SunmiTableEmpty message="Cargando..." />}
 
-        {/* SIN FILAS */}
         {!loading && noRows && (
           <SunmiTableEmpty message={emptyMessage} />
         )}
 
-        {/* FILAS */}
-        {!loading && !noRows &&
+        {!loading &&
+          !noRows &&
           rows.map((row, idx) => (
             <SunmiTableRow key={row.id ?? idx}>
-              {/* COLUMNAS */}
               {columns.map((col) => (
-                <td key={col.id} className="px-2 py-1.5">
+                <td
+                  key={col.id}
+                  style={{
+                    padding: ui.gap,
+                    fontSize: ui.font.fontSize,
+                    lineHeight: ui.font.lineHeight,
+                  }}
+                >
                   {row[col.id] ?? "—"}
                 </td>
               ))}
 
-              {/* ACCIONES */}
               {actions.length > 0 && (
-                <td className="px-2 py-1.5 text-right">
-                  <div className="flex justify-end gap-1">
+                <td
+                  style={{
+                    padding: ui.gap,
+                    textAlign: "right",
+                  }}
+                >
+                  <div
+                    className="flex justify-end"
+                    style={{ gap: ui.gap * 0.5 }}
+                  >
                     {actions.map((act, i) => (
                       <SunmiButtonIcon
                         key={i}
@@ -73,7 +91,6 @@ export default function SunmiTableMaster({
                             : Pencil
                         }
                         color={act.icon === "delete" ? "red" : "amber"}
-                        size={16}
                         onClick={() => act.onClick(row)}
                       />
                     ))}
@@ -84,13 +101,16 @@ export default function SunmiTableMaster({
           ))}
       </SunmiTable>
 
-      {/* PAGINACIÓN + SELECTOR */}
       <SunmiSeparator />
 
-      <div className="w-full flex flex-col md:flex-row items-center justify-between gap-3">
-
-        {/* SELECTOR FILAS */}
-        <div className="flex items-center gap-2 text-sm">
+      <div
+        className="w-full flex flex-col md:flex-row items-center justify-between"
+        style={{ gap: ui.gap }}
+      >
+        <div
+          className="flex items-center"
+          style={{ gap: ui.gap, fontSize: ui.font.fontSize }}
+        >
           <span>Filas:</span>
 
           <SunmiSelectAdv
@@ -105,13 +125,19 @@ export default function SunmiTableMaster({
           </SunmiSelectAdv>
         </div>
 
-        {/* INDICADOR */}
-        <div className="text-sm">
+        <div
+          style={{
+            fontSize: ui.font.fontSize,
+            lineHeight: ui.font.lineHeight,
+          }}
+        >
           Página <strong>{page}</strong> de <strong>{totalPages}</strong>
         </div>
 
-        {/* BOTONES PAGINACIÓN */}
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center"
+          style={{ gap: ui.gap }}
+        >
           <SunmiButton
             variant="ghost"
             disabled={page <= 1}
@@ -128,7 +154,6 @@ export default function SunmiTableMaster({
             Siguiente
           </SunmiButton>
         </div>
-
       </div>
     </div>
   );

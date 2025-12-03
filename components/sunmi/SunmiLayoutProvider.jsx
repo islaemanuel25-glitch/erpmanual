@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { SUNMI_LAYOUTS, DEFAULT_SUNMI_LAYOUT_KEY } from "@/lib/sunmiLayouts";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 const SunmiLayoutContext = createContext({
   layoutKey: DEFAULT_SUNMI_LAYOUT_KEY,
@@ -15,9 +16,9 @@ export function useSunmiLayout() {
 const STORAGE_KEY = "erp-sunmi-layout";
 
 export function SunmiLayoutProvider({ children }) {
+  const { ui } = useUIConfig();
   const [layoutKey, setLayoutKeyState] = useState(DEFAULT_SUNMI_LAYOUT_KEY);
 
-  // recuperar de localStorage
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -36,7 +37,13 @@ export function SunmiLayoutProvider({ children }) {
   };
 
   return (
-    <SunmiLayoutContext.Provider value={{ layoutKey, setLayoutKey }}>
+    <SunmiLayoutContext.Provider
+      value={{
+        layoutKey,
+        setLayoutKey,
+        ui, // expuesto también aquí para layouts reactivos
+      }}
+    >
       {children}
     </SunmiLayoutContext.Provider>
   );

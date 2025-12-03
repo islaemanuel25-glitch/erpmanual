@@ -1,11 +1,14 @@
 "use client";
 
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+
 export default function SunmiButtonIcon({
   icon: Icon,
   color = "amber",
-  size = 16,
   onClick = () => {},
 }) {
+  const { ui } = useUIConfig();
+
   const colors = {
     amber: "text-amber-300 hover:text-amber-200",
     red: "text-red-400 hover:text-red-300",
@@ -15,9 +18,13 @@ export default function SunmiButtonIcon({
   return (
     <button
       onClick={onClick}
-      className={`p-1 rounded transition ${colors[color]}`}
+      className={`rounded transition ${colors[color]}`}
+      style={{
+        padding: ui.gap,
+        transform: `scale(${ui.scale})`,
+      }}
     >
-      <Icon size={size} strokeWidth={2} />
+      <Icon size={ui.density.iconSize} strokeWidth={2} />
     </button>
   );
 }

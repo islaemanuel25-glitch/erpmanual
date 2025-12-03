@@ -2,27 +2,33 @@
 
 import { X } from "lucide-react";
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiListCardRemove({ onClick }) {
   const { theme } = useSunmiTheme();
-  
-  // Usar hover del table row o un hover genérico basado en el card
-  const hoverBg = theme.table?.row?.includes('hover:') 
-    ? theme.table.row.split(' ').find(c => c.startsWith('hover:')) 
-    : 'hover:bg-slate-800/50';
-  
+  const { ui } = useUIConfig();
+
+  const hoverBg =
+    theme.table?.row?.includes("hover:")
+      ? theme.table.row.split(" ").find((c) => c.startsWith("hover:"))
+      : "hover:bg-slate-800/50";
+
   return (
     <button
       onClick={onClick}
       className={`
-        w-6 h-6
         flex items-center justify-center
         rounded-md
-        ${hoverBg}
         transition
+        ${hoverBg}
       `}
+      style={{
+        width: ui.density.iconSize + ui.gap * 2,
+        height: ui.density.iconSize + ui.gap * 2,
+        transform: `scale(${ui.scale})`,
+      }}
     >
-      <X size={14} />
+      <X size={ui.density.iconSize} />
     </button>
   );
 }

@@ -1,16 +1,20 @@
 "use client";
 
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+
 export default function SunmiGrid({
   children,
   className = "",
-  minWidth = 260, // ancho mínimo de cada card
+  minWidth = 260,
   gap = 16,
 }) {
-  // Usamos CSS grid auto-fill con minmax
+  const { ui } = useUIConfig();
+
   const style = {
     display: "grid",
     gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))`,
-    gap: `${gap}px`,
+    gap: ui.gap,
+    transform: `scale(${ui.scale})`,
   };
 
   return (

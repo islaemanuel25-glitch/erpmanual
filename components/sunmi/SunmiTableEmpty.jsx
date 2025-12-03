@@ -1,24 +1,31 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiTableEmpty({ message = "Sin datos disponibles" }) {
   const { theme } = useSunmiTheme();
-  
-  // Usar color de texto secundario del layout o un color neutro
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-'))?.replace('text-slate-50', 'text-slate-500') || 'text-slate-500';
-  
+  const { ui } = useUIConfig();
+
+  const textColor =
+    theme.layout
+      .split(" ")
+      .find((c) => c.startsWith("text-"))
+      ?.replace("text-slate-50", "text-slate-500") || "text-slate-500";
+
   return (
-    <tr>
+    <tr style={{ transform: `scale(${ui.scale})` }}>
       <td
         colSpan={50}
-        className={`
-          text-center 
-          py-3                 /* antes py-6 */
-          ${textColor}
-          text-[12px]          /* ahora igual que la tabla */
-          italic
-        `}
+        className={textColor}
+        style={{
+          textAlign: "center",
+          paddingTop: ui.gap,
+          paddingBottom: ui.gap,
+          fontSize: ui.font.fontSize,
+          lineHeight: ui.font.lineHeight,
+          fontStyle: "italic",
+        }}
       >
         {message}
       </td>

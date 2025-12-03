@@ -1,6 +1,7 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { cn } from "@/lib/utils";
 
 export default function SunmiToggleEstado({
@@ -8,12 +9,12 @@ export default function SunmiToggleEstado({
   onChange = () => {},
 }) {
   const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
 
   const t = theme.toggle;
   const badgeOn = theme.badgeActivo;
   const badgeOff = theme.badgeInactivo;
 
-  // Normalizar valor que puede venir como string/number
   const normalized =
     value === true ||
     value === 1 ||
@@ -25,44 +26,51 @@ export default function SunmiToggleEstado({
 
   return (
     <div
-      className="flex items-center gap-2 cursor-pointer select-none"
+      className="flex items-center cursor-pointer select-none"
       onClick={toggle}
+      style={{
+        gap: ui.gap,
+        transform: `scale(${ui.scale})`,
+      }}
     >
       {/* TRACK */}
       <div
         className={cn(
-          `
-          w-10 h-5
-          rounded-full
-          transition-all
-        `,
+          `rounded-full transition-all`,
           normalized ? t.on : t.off
         )}
+        style={{
+          width: ui.density.inputHeight * 1.6,
+          height: ui.density.inputHeight * 0.7,
+        }}
       >
         {/* THUMB */}
         <div
           className={cn(
-            `
-            w-5 h-5
-            rounded-full
-            shadow
-            transition-all
-          `,
-            t.thumb,
-            normalized ? "translate-x-5" : "translate-x-0"
+            `rounded-full shadow transition-all`,
+            t.thumb
           )}
+          style={{
+            width: ui.density.inputHeight * 0.7,
+            height: ui.density.inputHeight * 0.7,
+            transform: normalized
+              ? `translateX(${ui.density.inputHeight * 0.9}px)`
+              : "translateX(0px)",
+          }}
         />
       </div>
 
       {/* LABEL */}
       <span
-        className={cn(
-          `
-          text-[12px]
-        `,
-          normalized ? badgeOn.split(" ").find(c => c.startsWith("text-")) 
-                     : badgeOff.split(" ").find(c => c.startsWith("text-"))
-        )}
+        className={
+          normalized
+            ? badgeOn.split(" ").find((c) => c.startsWith("text-"))
+            : badgeOff.split(" ").find((c) => c.startsWith("text-"))
+        }
+        style={{
+          fontSize: ui.font.fontSize,
+          lineHeight: ui.font.lineHeight,
+        }}
       >
         {normalized ? "Habilitado" : "Inactivo"}
       </span>

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { SUNMI_THEMES, DEFAULT_SUNMI_THEME_KEY } from "@/lib/sunmiThemes";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 const SunmiThemeContext = createContext({
   themeKey: DEFAULT_SUNMI_THEME_KEY,
@@ -19,10 +20,11 @@ const STORAGE_THEME = "erp-sunmi-theme";
 const STORAGE_LAYOUT = "erp-sunmi-layout";
 
 export function SunmiThemeProvider({ children }) {
+  const { ui } = useUIConfig(); // ← integración final
+
   const [themeKey, setThemeKeyState] = useState(DEFAULT_SUNMI_THEME_KEY);
   const [layoutMode, setLayoutModeState] = useState("sidebar-left");
 
-  // ===== LOAD STORED VALUES =====
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem(STORAGE_THEME);
@@ -40,7 +42,6 @@ export function SunmiThemeProvider({ children }) {
     }
   }, []);
 
-  // ===== SETTERS =====
   const setThemeKey = (key) => {
     if (!SUNMI_THEMES[key]) return;
     setThemeKeyState(key);
@@ -56,6 +57,7 @@ export function SunmiThemeProvider({ children }) {
     themeKey,
     layoutMode,
     theme: SUNMI_THEMES[themeKey],
+    ui,                       // ← ahora el theme provider expone UIConfig junto al theme
     setThemeKey,
     setLayoutMode,
   };

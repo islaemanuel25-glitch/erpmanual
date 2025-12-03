@@ -2,6 +2,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiEntityCard({
   title,
@@ -12,12 +13,20 @@ export default function SunmiEntityCard({
   children,
   className = "",
 }) {
+  const { ui } = useUIConfig();
+
   return (
     <SunmiCard className={className}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+      <div
+        className="flex items-start justify-between"
+        style={{ gap: ui.gap }}
+      >
+        <div
+          className="flex items-start"
+          style={{ gap: ui.gap }}
+        >
           {icon && (
-            <div className="mt-[2px]">
+            <div style={{ marginTop: ui.gap }}>
               {icon}
             </div>
           )}
@@ -30,13 +39,22 @@ export default function SunmiEntityCard({
         </div>
 
         {actions && (
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center"
+            style={{ gap: ui.gap }}
+          >
             {actions}
           </div>
         )}
       </div>
 
-      <div className="mt-3 flex flex-col gap-4">
+      <div
+        className="flex flex-col"
+        style={{
+          gap: ui.gap,
+          marginTop: ui.gap,
+        }}
+      >
         {children}
       </div>
     </SunmiCard>

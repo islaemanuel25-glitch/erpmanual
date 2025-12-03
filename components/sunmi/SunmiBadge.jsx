@@ -1,11 +1,12 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiBadgeEstado({ estado }) {
   const { theme } = useSunmiTheme();
-  
-  // ACEPTA CUALQUIER FORMA — lo normalizamos acá
+  const { ui } = useUIConfig();
+
   const activo =
     estado === true ||
     estado === 1 ||
@@ -18,12 +19,15 @@ export default function SunmiBadgeEstado({ estado }) {
   return (
     <span
       className={`
-        px-2 py-0.5 
         rounded-full 
-        text-[11px] 
         font-semibold
         ${activo ? theme.badgeActivo : theme.badgeInactivo}
       `}
+      style={{
+        padding: `${ui.gap} ${ui.gap}`,
+        fontSize: ui.font.fontSize,
+        lineHeight: ui.font.lineHeight,
+      }}
     >
       {label}
     </span>

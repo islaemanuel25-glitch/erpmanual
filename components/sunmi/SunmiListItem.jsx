@@ -1,6 +1,7 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { cn } from "@/lib/utils";
 
 export default function SunmiListItem({
@@ -13,6 +14,7 @@ export default function SunmiListItem({
   className = "",
 }) {
   const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   const t = theme.list;
 
   return (
@@ -21,25 +23,50 @@ export default function SunmiListItem({
       className={cn(
         `
         flex items-center justify-between
-        gap-3 py-2
         transition-all
       `,
         clickable && "cursor-pointer",
         clickable && t.itemHover,
         className
       )}
+      style={{
+        gap: ui.gap,
+        paddingTop: ui.gap,
+        paddingBottom: ui.gap,
+        transform: `scale(${ui.scale})`,
+      }}
     >
       {/* IZQUIERDA */}
-      <div className="flex items-start gap-2 min-w-0">
-        {left && <div className="mt-[2px]">{left}</div>}
+      <div
+        className="flex items-start min-w-0"
+        style={{ gap: ui.gap }}
+      >
+        {left && (
+          <div style={{ marginTop: ui.gap * 0.2 }}>
+            {left}
+          </div>
+        )}
 
         <div className="flex flex-col min-w-0">
-          <span className={cn("text-[13px] truncate", theme.layout)}>
+          <span
+            className={cn("truncate", theme.layout)}
+            style={{
+              fontSize: ui.font.fontSize,
+              lineHeight: ui.font.lineHeight,
+            }}
+          >
             {label}
           </span>
 
           {description && (
-            <span className={cn("text-[11px] truncate", t.description)}>
+            <span
+              className={cn("truncate", t.description)}
+              style={{
+                fontSize: `calc(${ui.font.fontSize} * 0.9)`,
+                lineHeight: ui.font.lineHeight,
+                opacity: 0.8,
+              }}
+            >
               {description}
             </span>
           )}
@@ -48,7 +75,10 @@ export default function SunmiListItem({
 
       {/* DERECHA */}
       {right && (
-        <div className="flex items-center gap-2 shrink-0">
+        <div
+          className="flex items-center shrink-0"
+          style={{ gap: ui.gap }}
+        >
           {right}
         </div>
       )}

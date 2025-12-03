@@ -1,14 +1,19 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiHeader({ title, color = "amber", children }) {
   const { theme } = useSunmiTheme();
-  
-  const bgClass = color === "cyan" 
-    ? (theme.header.bg.includes('cyan') ? theme.header.bg : theme.header.bg.replace('amber', 'cyan'))
-    : theme.header.bg;
-  
+  const { ui } = useUIConfig();
+
+  const bgClass =
+    color === "cyan"
+      ? theme.header.bg.includes("cyan")
+        ? theme.header.bg
+        : theme.header.bg.replace("amber", "cyan")
+      : theme.header.bg;
+
   return (
     <div
       className={`
@@ -16,15 +21,19 @@ export default function SunmiHeader({ title, color = "amber", children }) {
         ${theme.header.border}
         ${theme.header.text}
         rounded-xl 
-        px-4 py-2 
-        text-[13px]
-        font-bold
-        tracking-wide
-        uppercase
         shadow-md
-        mb-2
         border
       `}
+      style={{
+        padding: ui.spacingScale[ui.spacing],
+        marginBottom: ui.gap,
+        fontSize: ui.font.fontSize,
+        lineHeight: ui.font.lineHeight,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        fontWeight: 700,
+        transform: `scale(${ui.scale})`,
+      }}
     >
       {title}
       {children}

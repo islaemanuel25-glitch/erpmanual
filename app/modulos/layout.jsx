@@ -9,16 +9,14 @@ export default function ModulosLayout({ children }) {
   const router = useRouter();
   const { perfil, cargando } = useUser();
 
-  // 🔐 Redirección a login
+  // 🔐 Redirección si no está logueado
   useEffect(() => {
     if (!cargando && !perfil) {
       router.replace("/login");
     }
   }, [cargando, perfil, router]);
 
-  if (cargando) return null;
-  if (!perfil) return null;
+  if (cargando || !perfil) return null;
 
-  // 🟦 Ahora SI usamos el LayoutBase Sunmi V2 completo
   return <LayoutBase>{children}</LayoutBase>;
 }
