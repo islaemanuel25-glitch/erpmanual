@@ -1,22 +1,32 @@
 "use client";
 
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "./useSunmiAnimation";
 
-export default function SunmiGrid({
-  children,
-  className = "",
-}) {
+export default function SunmiGrid({ children, className = "", minWidth = 260 }) {
   const { ui } = useUIConfig();
-
-  const style = {
-    display: "grid",
-    gridTemplateColumns: `repeat(auto-fill, minmax(${ui.density.cardMinWidth}px, 1fr))`,
-    gap: ui.spacing.md,
-    transform: `scale(${ui.scale})`,
-  };
+  const { fade } = useSunmiAnimation();
 
   return (
-    <div style={style} className={className}>
+    <div
+      className={className}
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))`,
+        gap: ui.gap,
+        transform: `scale(${ui.scale})`,
+        animation: `fadeIn ${fade.duration}ms ease`,
+      }}
+    >
+      <style>
+        {`
+        @keyframes fadeIn {
+          from { opacity: ${fade.from}; }
+          to { opacity: 1; }
+        }
+      `}
+      </style>
+
       {children}
     </div>
   );

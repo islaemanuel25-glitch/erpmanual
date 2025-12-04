@@ -3,10 +3,12 @@
 import { ChevronDown } from "lucide-react";
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "./useSunmiAnimation";
 
 export default function SunmiSelect({ className = "", children, ...props }) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
+  const { focus } = useSunmiAnimation();
 
   const bgColor =
     theme.card.split(" ").find((c) => c.startsWith("bg-")) ||
@@ -21,31 +23,34 @@ export default function SunmiSelect({ className = "", children, ...props }) {
     "text-slate-100";
 
   return (
-    <div
-      className="relative w-full"
-      style={{ transform: `scale(${ui.scale})` }}
-    >
+    <div className="relative w-full" style={{ transform: `scale(${ui.scale})` }}>
       <select
         {...props}
         className={`
-          w-full
+          w-full 
+          rounded-md
           ${bgColor}
           border ${borderColor}
           ${textColor}
           appearance-none
           focus:outline-none
-          transition
+          transition-all
           ${className}
         `}
         style={{
-          paddingLeft: ui.spacing.sm,
-          paddingRight: ui.spacing.lg,
-          paddingTop: ui.spacing.xs,
-          paddingBottom: ui.spacing.xs,
+          padding: ui.gap,
           height: ui.density.selectHeight,
-          borderRadius: ui.rounded.md,
-          fontSize: ui.font.base * ui.font.scaleMd,
+          fontSize: ui.font.fontSize,
           lineHeight: ui.font.lineHeight,
+          transitionProperty: "border-color, transform, opacity",
+          transitionDuration: `${focus.duration}ms`,
+          transitionTimingFunction: focus.easing,
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.transform = `scale(${ui.scale * focus.scale})`;
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.transform = `scale(${ui.scale})`;
         }}
       >
         {children}
@@ -53,15 +58,11 @@ export default function SunmiSelect({ className = "", children, ...props }) {
 
       <ChevronDown
         size={ui.density.iconSize}
-        strokeWidth={ui.density.iconStrokeWidth}
-        style={{
-          position: "absolute",
-          right: ui.spacing.sm,
-          top: "50%",
-          transform: "translateY(-50%)",
-          color: theme.input?.accentText || "rgba(255,200,0,0.7)",
-          pointerEvents: "none",
-        }}
+        className="
+          absolute right-2 top-1/2 -translate-y-1/2
+          text-amber-400 opacity-70 
+          pointer-events-none
+        "
       />
     </div>
   );

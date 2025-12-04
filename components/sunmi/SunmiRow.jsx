@@ -1,6 +1,7 @@
 "use client";
 
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "./useSunmiAnimation";
 
 export default function SunmiRow({
   left,
@@ -10,6 +11,7 @@ export default function SunmiRow({
   className = "",
 }) {
   const { ui } = useUIConfig();
+  const { fade, hover } = useSunmiAnimation();
 
   const alignCls =
     align === "start"
@@ -20,32 +22,32 @@ export default function SunmiRow({
 
   return (
     <div
-      className={`
-        flex ${alignCls} justify-between
-        ${className}
-      `}
+      className={`flex ${alignCls} justify-between ${className}`}
       style={{
-        gap: ui.spacing.sm,
-        paddingTop: ui.spacing.sm,
-        paddingBottom: ui.spacing.sm,
+        gap: ui.gap,
+        paddingTop: ui.gap,
+        paddingBottom: ui.gap,
         transform: `scale(${ui.scale})`,
+        animation: `rowFade ${fade.duration}ms ease`,
+        transitionDuration: `${hover.duration}ms`,
+        transitionTimingFunction: hover.easing,
       }}
     >
-      <div className="flex-1 min-w-0">
-        {left}
-      </div>
+      <style>
+        {`
+        @keyframes rowFade {
+          from { opacity: ${fade.from}; }
+          to { opacity: 1; }
+        }
+        `}
+      </style>
 
-      {center && (
-        <div className="flex-1 min-w-0 text-center">
-          {center}
-        </div>
-      )}
+      <div className="flex-1 min-w-0">{left}</div>
+
+      {center && <div className="flex-1 min-w-0 text-center">{center}</div>}
 
       {right && (
-        <div
-          className="shrink-0 flex items-center"
-          style={{ gap: ui.spacing.sm }}
-        >
+        <div className="shrink-0 flex items-center" style={{ gap: ui.gap }}>
           {right}
         </div>
       )}

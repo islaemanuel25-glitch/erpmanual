@@ -12,12 +12,14 @@ export default function Avanzado() {
   return (
     <div className="flex flex-col gap-6">
 
-      {/* Redondeo global */}
+      {/* ========================= */}
+      {/* REDONDEO GLOBAL REAL      */}
+      {/* ========================= */}
       <div>
         <SunmiSeparator label="Redondeo global" />
         <SunmiSelect
-          value={ui.rounded?.selected || "md"}
-          onChange={(v) => cambio("rounded", { ...ui.rounded, selected: v })}
+          value={ui.rounded}
+          onChange={(v) => cambio("rounded", v)}
           options={[
             { label: "SM", value: "sm" },
             { label: "MD", value: "md" },
@@ -27,19 +29,10 @@ export default function Avanzado() {
         />
       </div>
 
-      {/* Otros ajustes */}
-      <div>
-        <SunmiSeparator label="Velocidad de animaciones" />
-        <SunmiSelect
-          value={ui.animSpeed || "normal"}
-          onChange={(v) => cambio("animSpeed", v)}
-          options={[
-            { label: "Rápidas", value: "fast" },
-            { label: "Normales", value: "normal" },
-            { label: "Lentas", value: "slow" },
-          ]}
-        />
-      </div>
+      {/* ========================= */}
+      {/* ANIM SPEED — NO EXISTE    */}
+      {/* LO SACAMOS POR COMPLETO   */}
+      {/* ========================= */}
 
     </div>
   );

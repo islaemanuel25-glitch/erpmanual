@@ -2,14 +2,13 @@
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "./useSunmiAnimation";
 import { cn } from "@/lib/utils";
 
-export default function SunmiToggleEstado({
-  value = true,
-  onChange = () => {},
-}) {
+export default function SunmiToggleEstado({ value = true, onChange = () => {} }) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
+  const { hover, focus } = useSunmiAnimation();
 
   const t = theme.toggle;
   const badgeOn = theme.badgeActivo;
@@ -24,58 +23,44 @@ export default function SunmiToggleEstado({
 
   const toggle = () => onChange(!normalized);
 
-  const trackWidth = ui.density.inputHeight * 1.6;
-  const trackHeight = ui.density.inputHeight * 0.7;
-  const thumbSize = ui.density.inputHeight * 0.7;
-  const thumbTranslate = ui.density.inputHeight * 0.9;
-
-  const textColor = normalized
-    ? badgeOn.split(" ").find((c) => c.startsWith("text-"))
-    : badgeOff.split(" ").find((c) => c.startsWith("text-"));
-
   return (
     <div
       className="flex items-center cursor-pointer select-none"
       onClick={toggle}
       style={{
-        gap: ui.spacing.sm,
+        gap: ui.gap,
         transform: `scale(${ui.scale})`,
+        transitionDuration: `${focus.duration}ms`,
+        transitionTimingFunction: focus.easing,
       }}
     >
-      {/* TRACK */}
       <div
-        className={cn(
-          `transition-all`,
-          normalized ? t.on : t.off
-        )}
+        className={cn("rounded-full transition-all", normalized ? t.on : t.off)}
         style={{
-          width: trackWidth,
-          height: trackHeight,
-          borderRadius: ui.rounded.full,
+          width: ui.density.inputHeight * 1.6,
+          height: ui.density.inputHeight * 0.7,
         }}
       >
-        {/* THUMB */}
         <div
-          className={cn(
-            `shadow transition-all`,
-            t.thumb
-          )}
+          className={cn("rounded-full shadow transition-all", t.thumb)}
           style={{
-            width: thumbSize,
-            height: thumbSize,
-            borderRadius: ui.rounded.full,
+            width: ui.density.inputHeight * 0.7,
+            height: ui.density.inputHeight * 0.7,
             transform: normalized
-              ? `translateX(${thumbTranslate}px)`
-              : "translateX(0px)",
+              ? `translateX(${ui.density.inputHeight * 0.9}px)`
+              : "translateX(0)",
           }}
         />
       </div>
 
-      {/* LABEL */}
       <span
-        className={textColor}
+        className={
+          normalized
+            ? badgeOn.split(" ").find((c) => c.startsWith("text-"))
+            : badgeOff.split(" ").find((c) => c.startsWith("text-"))
+        }
         style={{
-          fontSize: ui.font.base * ui.font.scaleMd,
+          fontSize: ui.font.fontSize,
           lineHeight: ui.font.lineHeight,
         }}
       >

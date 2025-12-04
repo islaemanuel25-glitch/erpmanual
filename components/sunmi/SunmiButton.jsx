@@ -2,6 +2,7 @@
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "@/components/sunmi/useSunmiAnimation";
 import { cn } from "@/lib/utils";
 
 export default function SunmiButton({
@@ -12,6 +13,7 @@ export default function SunmiButton({
 }) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
+  const { hover, focus } = useSunmiAnimation();
 
   const styles = {
     primary: `${theme.button.primary.bg} ${theme.button.primary.text} ${theme.button.primary.hover}`,
@@ -28,18 +30,46 @@ export default function SunmiButton({
     <button
       {...props}
       className={cn(
-        "transition-all font-medium",
+        `
+        rounded-md 
+        font-medium 
+        outline-none
+        select-none
+      `,
         styles[variant],
         className
       )}
       style={{
         height: ui.density.buttonHeight,
-        paddingLeft: ui.spacing.sm,
-        paddingRight: ui.spacing.sm,
-        borderRadius: ui.rounded.md,
-        fontSize: ui.font.base * ui.font.scaleMd,
+
+        fontSize: ui.font.fontSize,
         lineHeight: ui.font.lineHeight,
+
+        paddingLeft: ui.gap,
+        paddingRight: ui.gap,
+
         transform: `scale(${ui.scale})`,
+
+        // ANIMACIONES CENTRALIZADAS
+        transitionProperty: "background-color, transform, opacity",
+        transitionDuration: `${hover.duration}ms`,
+        transitionTimingFunction: hover.easing,
+      }}
+
+      // ANIMACIÓN HOVER
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = `scale(${ui.scale * hover.scale})`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = `scale(${ui.scale})`;
+      }}
+
+      // ANIMACIÓN FOCUS
+      onFocus={(e) => {
+        e.currentTarget.style.transform = `scale(${ui.scale * focus.scale})`;
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.transform = `scale(${ui.scale})`;
       }}
     >
       {children}

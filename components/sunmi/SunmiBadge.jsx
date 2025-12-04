@@ -25,6 +25,7 @@ export default function SunmiBadge({ children, estado }) {
         borderRadius: ui.rounded.sm,
         fontSize: ui.font.base * ui.font.scaleMd,
         lineHeight: ui.font.lineHeight,
+        transform: `scale(${ui.scale})`,
       }}
     >
       {children ?? (activo ? "Activo" : "Inactivo")}

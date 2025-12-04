@@ -21,6 +21,8 @@ const DEFAULT_CONFIG = {
     scaleSm: 0.92,
     scaleMd: 1,
     scaleLg: 1.12,
+    letterSpacing: "0.04em",
+    weightBold: 700,
   },
 
   // ======================================
@@ -76,7 +78,11 @@ const DEFAULT_CONFIG = {
     buttonHeight: 36,
     tableRowHeight: 34,
     iconSize: 18,
+    iconStrokeWidth: 2,
     avatarSize: 32,
+    cardMinWidth: 260,
+    dropdownMaxHeight: 208,
+    modalMaxHeight: 520,
   },
 
   // ======================================

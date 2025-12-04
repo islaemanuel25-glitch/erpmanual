@@ -3,6 +3,7 @@
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "./useSunmiAnimation";
 
 export default function SunmiEntityCard({
   title,
@@ -14,45 +15,46 @@ export default function SunmiEntityCard({
   className = "",
 }) {
   const { ui } = useUIConfig();
+  const { slide } = useSunmiAnimation();
 
   return (
     <SunmiCard className={className}>
       <div
         className="flex items-start justify-between"
         style={{
-          gap: ui.spacing.sm,
-          transform: `scale(${ui.scale})`,
+          gap: ui.gap,
+          transform: `translateY(${slide.offsetY}px)`,
+          animation: `entitySlide ${slide.duration}ms ease forwards`,
         }}
       >
+        <style>
+          {`
+          @keyframes entitySlide {
+            from {
+              opacity: 0.3;
+              transform: translateY(${slide.offsetY}px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}
+        </style>
+
         <div
           className="flex items-start"
-          style={{
-            gap: ui.spacing.sm,
-          }}
+          style={{ gap: ui.gap }}
         >
-          {icon && (
-            <div
-              style={{
-                marginTop: ui.spacing.xs,
-              }}
-            >
-              {icon}
-            </div>
-          )}
+          {icon && <div style={{ marginTop: ui.gap }}>{icon}</div>}
 
-          <SunmiCardHeader
-            title={title}
-            subtitle={subtitle}
-            color={color}
-          />
+          <SunmiCardHeader title={title} subtitle={subtitle} color={color} />
         </div>
 
         {actions && (
           <div
             className="flex items-center"
-            style={{
-              gap: ui.spacing.xs,
-            }}
+            style={{ gap: ui.gap }}
           >
             {actions}
           </div>
@@ -62,8 +64,8 @@ export default function SunmiEntityCard({
       <div
         className="flex flex-col"
         style={{
-          gap: ui.spacing.sm,
-          marginTop: ui.spacing.sm,
+          gap: ui.gap,
+          marginTop: ui.gap,
         }}
       >
         {children}

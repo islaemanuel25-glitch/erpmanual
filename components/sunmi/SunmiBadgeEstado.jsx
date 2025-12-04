@@ -31,6 +31,7 @@ export default function SunmiBadgeEstado({ value }) {
         borderRadius: ui.rounded.sm,
         fontSize: ui.font.base * ui.font.scaleSm,
         lineHeight: ui.font.lineHeight,
+        transform: `scale(${ui.scale})`,
       }}
     >
       {data.label}

@@ -1,86 +1,67 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "./useSunmiAnimation";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
-export default function SunmiToggle({
-  value = false,
-  onChange = () => {},
-  label = "",
-}) {
+export default function SunmiToggle({ value = false, onChange = () => {}, label }) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
+  const { hover, focus } = useSunmiAnimation();
   const t = theme.toggle;
 
   const [checked, setChecked] = useState(value);
 
-  useEffect(() => {
-    setChecked(value);
-  }, [value]);
+  useEffect(() => setChecked(value), [value]);
 
   const toggle = () => {
-    const newVal = !checked;
-    setChecked(newVal);
-    onChange(newVal);
+    const v = !checked;
+    setChecked(v);
+    onChange(v);
   };
-
-  const trackWidth = ui.density.inputHeight * 1.4;
-  const trackHeight = ui.density.inputHeight * 0.6;
-  const thumbSize = ui.density.inputHeight * 0.6;
-  const thumbTranslate = ui.density.inputHeight * 0.8;
 
   return (
     <div
       className="flex items-center cursor-pointer select-none"
-      style={{
-        gap: ui.spacing.sm,
-        transform: `scale(${ui.scale})`,
-      }}
       onClick={toggle}
+      style={{
+        gap: ui.gap,
+        transform: `scale(${ui.scale})`,
+        transitionDuration: `${focus.duration}ms`,
+        transitionTimingFunction: focus.easing,
+      }}
     >
       {/* TRACK */}
       <div
         className={cn(
-          `
-          transition-all
-        `,
+          "rounded-full transition-all",
           checked ? t.on : t.off
         )}
         style={{
-          width: trackWidth,
-          height: trackHeight,
-          borderRadius: ui.rounded.full,
-          position: "relative",
+          width: ui.density.inputHeight * 1.4,
+          height: ui.density.inputHeight * 0.6,
         }}
       >
         {/* THUMB */}
         <div
-          className={cn(
-            `
-            shadow
-            transition-all
-          `,
-            t.thumb
-          )}
+          className={cn("rounded-full shadow transition-all", t.thumb)}
           style={{
-            width: thumbSize,
-            height: thumbSize,
-            borderRadius: ui.rounded.full,
+            width: ui.density.inputHeight * 0.6,
+            height: ui.density.inputHeight * 0.6,
             transform: checked
-              ? `translateX(${thumbTranslate}px)`
-              : "translateX(0px)",
+              ? `translateX(${ui.density.inputHeight * 0.8}px)`
+              : "translateX(0)",
           }}
         />
       </div>
 
-      {/* LABEL */}
       {label && (
         <span
           className={theme.layout}
           style={{
-            fontSize: ui.font.base * ui.font.scaleMd,
+            fontSize: ui.font.fontSize,
             lineHeight: ui.font.lineHeight,
           }}
         >

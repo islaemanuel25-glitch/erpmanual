@@ -2,42 +2,52 @@
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "./useSunmiAnimation";
 
-export default function SunmiCardHeader({
-  title = "",
-  children,
-}) {
+export default function SunmiHeader({ title, color = "amber", children }) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
+  const { slide } = useSunmiAnimation();
 
   return (
     <div
-      className="flex items-center justify-between"
+      className={`
+        bg-gradient-to-r ${theme.header.bg}
+        ${theme.header.border}
+        ${theme.header.text}
+        rounded-xl
+        shadow-md
+        border
+      `}
       style={{
-        marginBottom: ui.spacing.sm,
-        paddingLeft: ui.spacing.sm,
-        paddingRight: ui.spacing.sm,
-        transform: `scale(${ui.scale})`,
+        padding: ui.spacingScale[ui.spacing],
+        marginBottom: ui.gap,
+        fontSize: ui.font.fontSize,
+        lineHeight: ui.font.lineHeight,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        fontWeight: 700,
+        transform: `translateY(${slide.offsetY}px)`,
+        animation: `headerSlide ${slide.duration}ms ease forwards`,
       }}
     >
-      <h2
-        className={`font-semibold tracking-wide ${theme.text}`}
-        style={{
-          fontSize: ui.font.base * ui.font.scaleLg,
-          lineHeight: ui.font.lineHeight,
-        }}
-      >
-        {title}
-      </h2>
+      <style>
+        {`
+        @keyframes headerSlide {
+          from {
+            opacity: 0.3;
+            transform: translateY(${slide.offsetY}px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}
+      </style>
 
-      <div
-        className="flex items-center"
-        style={{
-          gap: ui.spacing.xs,
-        }}
-      >
-        {children}
-      </div>
+      {title}
+      {children}
     </div>
   );
 }

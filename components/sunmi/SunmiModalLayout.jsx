@@ -1,10 +1,10 @@
 "use client";
 
-import { useUIConfig } from "@/components/providers/UIConfigProvider";
-
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiAnimation } from "./useSunmiAnimation";
 
 export default function SunmiModalLayout({
   open,
@@ -18,6 +18,7 @@ export default function SunmiModalLayout({
   showCloseButton = true,
 }) {
   const { ui } = useUIConfig();
+  const { modal, fade } = useSunmiAnimation();
 
   if (!open) return null;
 
@@ -27,20 +28,35 @@ export default function SunmiModalLayout({
         fixed inset-0
         z-[9999]
         flex items-center justify-center
+        backdrop-blur-sm
       "
       style={{
-        padding: ui.spacing.md,
+        padding: ui.gap,
         transform: `scale(${ui.scale})`,
+        animation: `
+          modalFade ${modal.duration}ms ease,
+          modalZoom ${modal.duration}ms ease
+        `,
       }}
     >
+      <style>
+        {`
+        @keyframes modalFade {
+          from { opacity: ${fade.from}; }
+          to { opacity: 1; }
+        }
+        @keyframes modalZoom {
+          from { transform: scale(${modal.scale}); }
+          to { transform: scale(1); }
+        }
+      `}
+      </style>
+
       <div className={`w-full ${maxWidth}`}>
         <SunmiCard>
-          {/* HEADER */}
           <div
             className="flex items-start justify-between"
-            style={{
-              gap: ui.spacing.sm,
-            }}
+            style={{ gap: ui.gap }}
           >
             <SunmiCardHeader
               title={title}
@@ -52,35 +68,30 @@ export default function SunmiModalLayout({
               <SunmiButton
                 variant="ghost"
                 onClick={onClose}
-                style={{
-                  paddingLeft: ui.spacing.sm,
-                  paddingRight: ui.spacing.sm,
-                }}
+                style={{ padding: ui.gap }}
               >
                 Cerrar
               </SunmiButton>
             )}
           </div>
 
-          {/* BODY */}
           <div
             className="flex flex-col overflow-y-auto"
             style={{
-              marginTop: ui.spacing.md,
-              maxHeight: "65vh",
-              gap: ui.spacing.sm,
+              marginTop: ui.gap,
+              maxHeight: ui.density.modalMaxHeight ?? "65vh",
+              gap: ui.gap,
             }}
           >
             {children}
           </div>
 
-          {/* FOOTER */}
           {footer && (
             <div
               className="flex justify-end"
               style={{
-                marginTop: ui.spacing.md,
-                gap: ui.spacing.sm,
+                marginTop: ui.gap,
+                gap: ui.gap,
               }}
             >
               {footer}
