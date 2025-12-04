@@ -23,10 +23,7 @@ export default function SunmiListItem({
     <div
       onClick={clickable ? onClick : undefined}
       className={cn(
-        `
-        flex items-center justify-between
-        transition-all
-      `,
+        "flex items-center justify-between transition-all",
         clickable && "cursor-pointer",
         clickable && t.itemHover,
         className
@@ -40,24 +37,22 @@ export default function SunmiListItem({
         transitionTimingFunction: hover.easing,
       }}
       onMouseEnter={(e) => {
-        if (clickable) e.currentTarget.style.transform = `scale(${ui.scale * hover.scale})`;
+        if (clickable)
+          e.currentTarget.style.transform = `scale(${ui.scale * hover.scale})`;
       }}
       onMouseLeave={(e) => {
         if (clickable) e.currentTarget.style.transform = `scale(${ui.scale})`;
       }}
     >
-      <div
-        className="flex items-start min-w-0"
-        style={{ gap: ui.gap }}
-      >
+      <div className="flex items-start min-w-0" style={{ gap: ui.gap }}>
         {left && <div style={{ marginTop: ui.gap * 0.2 }}>{left}</div>}
 
         <div className="flex flex-col min-w-0">
           <span
             className={cn("truncate font-medium", theme.layout)}
             style={{
-              fontSize: ui.font.fontSize,
-              lineHeight: ui.font.lineHeight,
+              fontSize: ui.fontSize,
+              lineHeight: `${ui.fontLineHeight}px`,
             }}
           >
             {label}
@@ -67,7 +62,7 @@ export default function SunmiListItem({
             <span
               className={cn("truncate", t.description)}
               style={{
-                fontSize: `calc(${ui.font.fontSize} * 0.9)`,
+                fontSize: ui.fontSizeSm,
                 opacity: 0.8,
               }}
             >
@@ -78,10 +73,7 @@ export default function SunmiListItem({
       </div>
 
       {right && (
-        <div
-          className="flex items-center shrink-0"
-          style={{ gap: ui.gap }}
-        >
+        <div className="flex items-center shrink-0" style={{ gap: ui.gap }}>
           {right}
         </div>
       )}

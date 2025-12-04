@@ -3,27 +3,29 @@
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
-export default function SunmiTableEmpty({ message = "Sin datos disponibles" }) {
+export default function SunmiTableEmpty({
+  message = "Sin datos disponibles",
+}) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
 
-  const textColor =
+  const color =
     theme.layout
       .split(" ")
-      .find((c) => c.startsWith("text-"))
-      ?.replace("text-slate-50", "text-slate-500") || "text-slate-500";
+      .find((c) => c.startsWith("text-")) || "text-slate-500";
 
   return (
     <tr style={{ transform: `scale(${ui.scale})` }}>
       <td
-        colSpan={50}
-        className={textColor}
+        colSpan={999}
+        className={color}
         style={{
           textAlign: "center",
-          paddingTop: ui.spacing.sm,
-          paddingBottom: ui.spacing.sm,
-          fontSize: ui.font.base * ui.font.scaleSm,
-          lineHeight: ui.font.lineHeight,
+          paddingTop: ui.spacingScale.sm,
+          paddingBottom: ui.spacingScale.sm,
+          fontSize: ui.fontSizeSm || ui.fontSize,
+          lineHeight: `${ui.fontLineHeight}px`,
+          opacity: 0.8,
           fontStyle: "italic",
         }}
       >

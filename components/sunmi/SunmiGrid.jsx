@@ -2,30 +2,35 @@
 
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { useSunmiAnimation } from "./useSunmiAnimation";
+import { cn } from "@/lib/utils";
 
-export default function SunmiGrid({ children, className = "", minWidth = 260 }) {
+export default function SunmiGrid({
+  children,
+  className = "",
+  minWidth,
+}) {
   const { ui } = useUIConfig();
   const { fade } = useSunmiAnimation();
 
+  const width = minWidth || ui.cardMinWidth;
+
   return (
     <div
-      className={className}
+      className={cn(className)}
       style={{
         display: "grid",
-        gridTemplateColumns: `repeat(auto-fill, minmax(${minWidth}px, 1fr))`,
+        gridTemplateColumns: `repeat(auto-fill, minmax(${width}px, 1fr))`,
         gap: ui.gap,
         transform: `scale(${ui.scale})`,
-        animation: `fadeIn ${fade.duration}ms ease`,
+        animation: `fadeGrid ${fade.duration}ms ${ui.animations.easing}`,
       }}
     >
-      <style>
-        {`
-        @keyframes fadeIn {
+      <style>{`
+        @keyframes fadeGrid {
           from { opacity: ${fade.from}; }
           to { opacity: 1; }
         }
-      `}
-      </style>
+      `}</style>
 
       {children}
     </div>

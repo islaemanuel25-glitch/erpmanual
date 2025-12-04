@@ -23,20 +23,18 @@ export default function SunmiSelectAdv({
 }) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
-  const { focus, hover } = useSunmiAnimation();
+  const { focus } = useSunmiAnimation();
   const t = theme.select;
 
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    const fn = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
   }, []);
 
   const options = Children.toArray(children).filter(isValidElement);
@@ -50,8 +48,8 @@ export default function SunmiSelectAdv({
       if (value.length <= 2) return value.join(", ");
       return `${value.length} seleccionados`;
     }
-    const f = options.find((c) => c.props.value == value);
-    return f ? f.props.children : placeholder;
+    const found = options.find((c) => c.props.value == value);
+    return found ? found.props.children : placeholder;
   })();
 
   const toggleValue = (val) => {
@@ -60,50 +58,41 @@ export default function SunmiSelectAdv({
       setOpen(false);
       return;
     }
-
-    let newArr = Array.isArray(value) ? [...value] : [];
-    if (newArr.includes(val)) newArr = newArr.filter((v) => v !== val);
-    else newArr.push(val);
-    onChange(newArr);
+    let arr = Array.isArray(value) ? [...value] : [];
+    if (arr.includes(val)) arr = arr.filter((v) => v !== val);
+    else arr.push(val);
+    onChange(arr);
   };
 
   return (
     <div
       ref={ref}
-      className={cn("relative w-full", className)}
+      className={cn("relative", className)}
       style={{ transform: `scale(${ui.scale})` }}
     >
-      {/* BOTÓN PRINCIPAL */}
       <button
         onClick={() => setOpen(!open)}
         className={cn(
           `
-          w-full flex items-center justify-between
-          rounded-md
-          shadow-inner
-          transition-all
-          ${t.bg} ${t.border} ${t.text}
-        `
+            flex items-center justify-between
+            transition-all
+            ${t.bg} ${t.border} ${t.text}
+          `
         )}
         style={{
           padding: ui.gap,
-          height: ui.density.selectHeight,
-          fontSize: ui.font.fontSize,
-          lineHeight: ui.font.lineHeight,
-          transitionDuration: `${focus.duration}ms`,
-          transitionTimingFunction: focus.easing,
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.transform = `scale(${ui.scale * focus.scale})`;
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.transform = `scale(${ui.scale})`;
+          height: ui.selectHeight,
+          fontSize: ui.fontSize,
+          lineHeight: `${ui.fontLineHeight}px`,
+          borderRadius: ui.roundedScale[ui.rounded],
+          transitionDuration: `${ui.animations.duration}ms`,
+          transitionTimingFunction: ui.animations.easing,
         }}
       >
         <span className="truncate">{currentText}</span>
 
         <ChevronDown
-          size={ui.density.iconSize}
+          size={ui.iconSize}
           className={cn(
             `transition-transform ${t.icon}`,
             open && "rotate-180"
@@ -111,38 +100,39 @@ export default function SunmiSelectAdv({
         />
       </button>
 
-      {/* LISTA DESPLEGABLE */}
       {open && (
         <div
           className={cn(
             `
-            absolute left-0 right-0 z-50
-            rounded-md border shadow-lg
-            max-h-56 overflow-y-auto
-            ${t.dropdownBg} ${t.border}
-          `
+              absolute left-0 right-0 z-50
+              rounded-b
+              border shadow-lg
+              overflow-y-auto
+              ${t.dropdownBg} ${t.border}
+            `
           )}
           style={{
+            maxHeight: ui.dropdownMaxHeight,
             marginTop: ui.gap,
-            fontSize: ui.font.fontSize,
-            lineHeight: ui.font.lineHeight,
-            transitionDuration: `${hover.duration}ms`,
-            transitionTimingFunction: hover.easing,
+            fontSize: ui.fontSize,
+            lineHeight: `${ui.fontLineHeight}px`,
+            transitionDuration: `${ui.animations.duration}ms`,
+            transitionTimingFunction: ui.animations.easing,
           }}
         >
-          {options.map((child, idx) => {
+          {options.map((child, i) => {
             const val = child.props.value;
             const selected = isSelected(val);
 
             return (
               <div
-                key={idx}
+                key={i}
                 onClick={() => toggleValue(val)}
                 className={cn(
                   `
-                  cursor-pointer flex items-center
-                  transition-all
-                `,
+                    cursor-pointer flex items-center
+                    transition-all
+                  `,
                   selected ? t.selected : t.text,
                   t.dropdownItemHover
                 )}
@@ -153,7 +143,7 @@ export default function SunmiSelectAdv({
               >
                 {multiple && (
                   <Check
-                    size={ui.density.iconSize}
+                    size={ui.iconSize}
                     className={selected ? "opacity-100" : "opacity-0"}
                   />
                 )}

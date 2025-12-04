@@ -5,13 +5,14 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@/app/context/UserContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function Header() {
   const pathname = usePathname();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
-
   const { theme, themeKey, setThemeKey } = useSunmiTheme();
+  const { ui } = useUIConfig();
 
   const [open, setOpen] = useState(false);
 
@@ -45,127 +46,152 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // 🔥 FIX PRINCIPAL — usar ui.density
+  const headerHeight = ui.density.inputHeight * 1.8;
+
   return (
     <header
       className={`
-        w-full h-16 px-6 flex justify-between items-center
-        shadow-[0_3px_8px_rgba(0,0,0,0.35)]
-        bg-gradient-to-r ${theme.header.bg}
-        border-b ${theme.header.border}
+        flex items-center justify-between
+        border-b
+        ${theme.header.bg}
+        ${theme.header.border}
+        ${theme.header.text}
       `}
+      style={{
+        height: headerHeight,
+        paddingInline: ui.spacingScale[ui.spacing],
+        boxShadow: ui.shadows.lg,
+      }}
     >
-      <h1 className={`text-xl font-semibold hidden md:block ${theme.header.text}`}>
+      <h1
+        className="hidden md:block font-semibold"
+        style={{
+          fontSize: ui.font.sizes.lg.fontSize,
+          lineHeight: ui.font.sizes.lg.lineHeight,
+        }}
+      >
         {titulo}
       </h1>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center" style={{ gap: ui.gap }}>
+        <Bell size={ui.density.iconSize} className="cursor-pointer" style={{ opacity: 0.8 }} />
 
-        <Bell
-          className={`
-            text-slate-400 
-            hover:text-yellow-400
-            transition cursor-pointer
-          `}
-        />
-
-        {/* SELECTOR DE TEMA */}
         <select
           onChange={(e) => setThemeKey(e.target.value)}
           value={themeKey}
-          className="
-            bg-slate-800 
-            border border-slate-600 
-            text-slate-200 
-            text-[12px]
-            rounded-md 
-            px-2 py-1
-            focus:outline-none 
+          className={`
+            ${theme.navbar?.bg || "bg-slate-900"}
+            ${theme.navbar?.text || "text-slate-200"}
+            ${theme.navbar?.border || "border-slate-700"}
+            border
+            focus:outline-none
             cursor-pointer
-          "
+          `}
+          style={{
+            fontSize: ui.font.sizes.sm.fontSize,
+            paddingInline: ui.spacingScale.xs,
+            paddingBlock: ui.spacingScale.xs / 2,
+            borderRadius: ui.roundedScale[ui.rounded],
+          }}
         >
           <option value="sunmiDark">Dark</option>
           <option value="sunmiDarkCompact">Compact</option>
           <option value="sunmiLight">Light</option>
         </select>
 
-        {/* USUARIO */}
         <div className="relative" ref={menuRef}>
           <div
             onClick={() => setOpen(!open)}
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="flex items-center cursor-pointer select-none"
+            style={{ gap: ui.gap / 2 }}
           >
             <div
-              className="
-                w-9 h-9 rounded-full
-                bg-slate-800 
-                text-yellow-300
+              className={`
                 flex items-center justify-center
-                text-[13px] font-bold
-                border border-slate-600
-                shadow-[0_0_6px_rgba(250,204,21,0.5)]
-                hover:shadow-[0_0_10px_rgba(250,204,21,0.7)]
-                transition
-              "
+                border
+                ${theme.userCell?.avatarBg || "bg-slate-800"}
+                ${theme.userCell?.avatarText || "text-yellow-300"}
+              `}
+              style={{
+                width: ui.density.avatarSize,
+                height: ui.density.avatarSize,
+                borderRadius: ui.roundedScale.full,
+                fontSize: ui.font.sizes.sm.fontSize,
+                fontWeight: ui.font.weightBold,
+                boxShadow: ui.shadows.sm,
+              }}
             >
               {nombre[0]?.toUpperCase() || "?"}
             </div>
 
-            <div className="flex flex-col leading-tight">
-              <span className="text-[13px] text-slate-100 font-medium">
+            <div className="flex flex-col" style={{ lineHeight: 1.1 }}>
+              <span style={{ fontSize: ui.font.sizes.sm.fontSize, fontWeight: 500 }}>
                 {nombre}
               </span>
 
               <span
-                className="
-                  text-[11px] px-2 py-[1px]
-                  bg-yellow-500/15 
-                  text-yellow-400
-                  rounded-md border border-yellow-500/30
-                  w-fit
-                "
+                className="bg-yellow-500/15 text-yellow-400 border border-yellow-500/30"
+                style={{
+                  fontSize: ui.font.sizes.xs.fontSize,
+                  paddingInline: ui.spacingScale.xs,
+                  paddingBlock: ui.spacingScale.xs / 3,
+                  borderRadius: ui.roundedScale[ui.rounded],
+                  width: "fit-content",
+                }}
               >
                 {rol}
               </span>
             </div>
 
             <ChevronDown
-              size={18}
-              className={`
-                text-slate-400 transition-transform
-                ${open ? "rotate-180" : ""}
-              `}
+              size={ui.density.iconSize}
+              className={open ? "rotate-180 transition-transform" : "transition-transform"}
+              style={{ opacity: 0.8 }}
             />
           </div>
 
           {open && (
             <div
-              className={`
-                absolute right-0 mt-2 w-52
-                bg-slate-900
-                border border-slate-700
-                shadow-xl
-                rounded-md py-2 z-50
-              `}
+              className={theme.card}
+              style={{
+                position: "absolute",
+                right: 0,
+                marginTop: ui.spacingScale.xs,
+                width: 220,
+                borderRadius: ui.roundedScale[ui.rounded],
+                boxShadow: ui.shadows.lg,
+                paddingBlock: ui.spacingScale.xs,
+              }}
             >
-              <div className="px-4 py-1">
-                <p className="text-sm font-semibold text-slate-100">
-                  {nombre}
-                </p>
-                <p className="text-xs text-slate-400">{rol}</p>
+              <div
+                style={{
+                  paddingInline: ui.spacingScale[ui.spacing],
+                  paddingBlock: ui.spacingScale.xs,
+                }}
+              >
+                <p style={{ fontSize: ui.font.sizes.sm.fontSize, fontWeight: 600 }}>{nombre}</p>
+                <p style={{ fontSize: ui.font.sizes.xs.fontSize, opacity: 0.7 }}>{rol}</p>
               </div>
 
-              <div className="border-t border-slate-700 my-1" />
+              <div
+                style={{
+                  borderTop: `${ui.borders.thin}px solid rgba(148,163,184,0.4)`,
+                  marginBlock: ui.spacingScale.xs,
+                }}
+              />
 
               <button
                 onClick={logout}
-                className="
-                  flex items-center gap-2 w-full text-left 
-                  px-4 py-2 text-[13px]
-                  text-red-400 hover:bg-red-500/10 
-                  transition
-                "
+                className="flex items-center w-full text-left text-red-400"
+                style={{
+                  gap: ui.gap / 2,
+                  paddingInline: ui.spacingScale[ui.spacing],
+                  paddingBlock: ui.spacingScale.xs,
+                  fontSize: ui.font.sizes.sm.fontSize,
+                }}
               >
-                <LogOut size={16} />
+                <LogOut size={ui.density.iconSize} />
                 Cerrar sesión
               </button>
             </div>

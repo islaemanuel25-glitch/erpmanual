@@ -3,51 +3,73 @@
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { useSunmiAnimation } from "./useSunmiAnimation";
+import { cn } from "@/lib/utils";
 
-export default function SunmiHeader({ title, color = "amber", children }) {
+export default function SunmiCardHeader({
+  title,
+  subtitle = "",
+  color = "amber",
+  className = "",
+}) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
   const { slide } = useSunmiAnimation();
 
   return (
     <div
-      className={`
-        bg-gradient-to-r ${theme.header.bg}
+      className={cn(
+        `
+        border 
+        bg-gradient-to-r 
+        ${theme.header.bg}
         ${theme.header.border}
         ${theme.header.text}
-        rounded-xl
-        shadow-md
-        border
-      `}
+      `,
+        className
+      )}
       style={{
         padding: ui.spacingScale[ui.spacing],
         marginBottom: ui.gap,
-        fontSize: ui.font.fontSize,
-        lineHeight: ui.font.lineHeight,
-        letterSpacing: "0.04em",
+        borderRadius: ui.roundedScale[ui.rounded],
+        fontSize: ui.fontSize,
+        lineHeight: `${ui.fontLineHeight}px`,
+        letterSpacing: `${ui.fontLetterSpacing}em`,
+        fontWeight: ui.fontWeightBold,
         textTransform: "uppercase",
-        fontWeight: 700,
-        transform: `translateY(${slide.offsetY}px)`,
-        animation: `headerSlide ${slide.duration}ms ease forwards`,
+        transform: `translateY(${ui.animations.slideOffsetY}px)`,
+        animation: `headerSlide ${ui.animations.slideDuration}ms ${ui.animations.easing} forwards`,
       }}
     >
-      <style>
-        {`
+      <style>{`
         @keyframes headerSlide {
           from {
-            opacity: 0.3;
-            transform: translateY(${slide.offsetY}px);
+            opacity: ${ui.animations.fadeFrom};
+            transform: translateY(${ui.animations.slideOffsetY}px);
           }
           to {
             opacity: 1;
             transform: translateY(0);
           }
         }
-      `}
-      </style>
+      `}</style>
 
-      {title}
-      {children}
+      <div>{title}</div>
+
+      {subtitle && (
+        <div
+          className={theme.header.text}
+          style={{
+            opacity: 0.85,
+            fontSize: ui.fontSizeSm,
+            lineHeight: `${ui.fontLineHeight}px`,
+            marginTop: ui.gap / 2,
+            textTransform: "none",
+            fontWeight: 400,
+          }}
+        >
+          {subtitle}
+        </div>
+      )}
     </div>
   );
 }

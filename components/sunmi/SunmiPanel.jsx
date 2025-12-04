@@ -2,6 +2,7 @@
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { cn } from "@/lib/utils";
 
 export default function SunmiPanel({
   children,
@@ -13,13 +14,12 @@ export default function SunmiPanel({
 
   return (
     <div
-      className={`
-        ${theme.card}
-        ${className}
-      `}
+      className={cn(theme.card, className)}
       style={{
-        padding: noPadding ? 0 : ui.spacing.md,
-        borderRadius: ui.rounded.lg,
+        padding: noPadding ? 0 : ui.spacingScale[ui.spacing],
+        borderRadius: ui.roundedScale[ui.rounded],
+        boxShadow: ui.shadowSm,
+        backdropFilter: `blur(${ui.cardShadowBlur}px)`,
         transform: `scale(${ui.scale})`,
       }}
     >

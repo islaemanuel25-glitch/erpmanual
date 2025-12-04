@@ -1,19 +1,23 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { useSunmiAnimation } from "./useSunmiAnimation";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
 
-export default function SunmiToggle({ value = false, onChange = () => {}, label }) {
+export default function SunmiToggle({
+  value = false,
+  onChange = () => {},
+  label,
+  variant = "sunmi",
+}) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
-  const { hover, focus } = useSunmiAnimation();
+  const { focus } = useSunmiAnimation();
   const t = theme.toggle;
 
   const [checked, setChecked] = useState(value);
-
   useEffect(() => setChecked(value), [value]);
 
   const toggle = () => {
@@ -22,6 +26,24 @@ export default function SunmiToggle({ value = false, onChange = () => {}, label 
     onChange(v);
   };
 
+  const calc = (() => {
+    const h = ui.inputHeight;
+
+    if (variant === "compact") {
+      const trackWidth = h * 1.6;
+      const trackHeight = h * 0.6;
+      const thumb = h * 0.55;
+      const offset = trackWidth - thumb - ui.gap * 0.5;
+      return { trackWidth, trackHeight, thumb, offset };
+    }
+
+    const trackWidth = h * 1.8;
+    const trackHeight = h * 0.7;
+    const thumb = h * 0.65;
+    const offset = trackWidth - thumb - ui.gap;
+    return { trackWidth, trackHeight, thumb, offset };
+  })();
+
   return (
     <div
       className="flex items-center cursor-pointer select-none"
@@ -29,30 +51,27 @@ export default function SunmiToggle({ value = false, onChange = () => {}, label 
       style={{
         gap: ui.gap,
         transform: `scale(${ui.scale})`,
-        transitionDuration: `${focus.duration}ms`,
-        transitionTimingFunction: focus.easing,
+        transitionDuration: `${ui.animations.duration}ms`,
+        transitionTimingFunction: ui.animations.easing,
       }}
     >
-      {/* TRACK */}
       <div
-        className={cn(
-          "rounded-full transition-all",
-          checked ? t.on : t.off
-        )}
+        className={cn("rounded-full transition-all", checked ? t.on : t.off)}
         style={{
-          width: ui.density.inputHeight * 1.4,
-          height: ui.density.inputHeight * 0.6,
+          width: calc.trackWidth,
+          height: calc.trackHeight,
+          borderRadius: calc.trackHeight,
         }}
       >
-        {/* THUMB */}
         <div
-          className={cn("rounded-full shadow transition-all", t.thumb)}
+          className={cn("shadow transition-all", t.thumb)}
           style={{
-            width: ui.density.inputHeight * 0.6,
-            height: ui.density.inputHeight * 0.6,
+            width: calc.thumb,
+            height: calc.thumb,
+            borderRadius: calc.thumb,
             transform: checked
-              ? `translateX(${ui.density.inputHeight * 0.8}px)`
-              : "translateX(0)",
+              ? `translateX(${calc.offset}px)`
+              : "translateX(0px)",
           }}
         />
       </div>
@@ -61,8 +80,8 @@ export default function SunmiToggle({ value = false, onChange = () => {}, label 
         <span
           className={theme.layout}
           style={{
-            fontSize: ui.font.fontSize,
-            lineHeight: ui.font.lineHeight,
+            fontSize: ui.fontSize,
+            lineHeight: `${ui.fontLineHeight}px`,
           }}
         >
           {label}

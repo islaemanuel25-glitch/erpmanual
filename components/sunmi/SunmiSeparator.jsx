@@ -13,31 +13,43 @@ export default function SunmiSeparator({ label, className = "" }) {
 
   return (
     <div
-      className={cn(`flex items-center ${t.text}`, className)}
+      className={cn("flex items-center", t.text, className)}
       style={{
         gap: ui.gap,
         marginTop: ui.gap,
         marginBottom: ui.gap,
-        fontSize: ui.font.fontSize,
-        lineHeight: ui.font.lineHeight,
+        fontSize: ui.fontSize,
+        lineHeight: `${ui.fontLineHeight}px`,
         transform: `scale(${ui.scale})`,
-        animation: `sepFade ${fade.duration}ms ease`,
+        animation: `sepFade ${fade.duration}ms ${ui.animations.easing}`,
       }}
     >
-      <style>
-        {`
+      <style>{`
         @keyframes sepFade {
           from { opacity: ${fade.from}; }
           to { opacity: 1; }
         }
-        `}
-      </style>
+      `}</style>
 
-      <div className={cn("flex-1 h-[1px]", t.line)} />
+      <div
+        className={cn(t.line)}
+        style={{
+          height: ui.borderThin,
+          flexGrow: 1,
+        }}
+      />
 
-      {label && <span className="whitespace-nowrap">{label}</span>}
+      {label && (
+        <span className="whitespace-nowrap">{label}</span>
+      )}
 
-      <div className={cn("flex-1 h-[1px]", t.line)} />
+      <div
+        className={cn(t.line)}
+        style={{
+          height: ui.borderThin,
+          flexGrow: 1,
+        }}
+      />
     </div>
   );
 }

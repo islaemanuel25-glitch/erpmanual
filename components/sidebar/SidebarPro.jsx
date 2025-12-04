@@ -32,6 +32,9 @@ export default function SidebarPro({ mode = "vertical" }) {
     return permisos.includes(perm);
   };
 
+  // ============================================================
+  // MENÚ COMPLETO (CON CONFIGURACIÓN AGREGADA)
+  // ============================================================
   const menu = [
     {
       key: "inicio",
@@ -93,10 +96,26 @@ export default function SidebarPro({ mode = "vertical" }) {
         { label: "Roles", href: "/modulos/roles" },
       ],
     },
+
+    // ============================================================
+    // NUEVO GRUPO EN EL MENÚ → CONFIGURACIÓN
+    // ============================================================
+    {
+      key: "configuracion",
+      label: "Configuración",
+      icon: Layers,
+      iconFilled: Layers3,
+      items: [
+        { label: "Configuración General", href: "/modulos/configuracion" },
+        { label: "Apariencia", href: "/modulos/configuracion/apariencia" },
+        { label: "Builder Apariencia", href: "/modulos/configuracion/apariencia/builder" },
+        { label: "Tamaños", href: "/modulos/configuracion/tamanos" },
+      ],
+    },
   ];
 
   // ================================================
-  //   MODO HORIZONTAL (MENÚ EN LA PARTE SUPERIOR)
+  //   MODO HORIZONTAL
   // ================================================
   if (mode === "horizontal") {
     return (
@@ -127,7 +146,7 @@ export default function SidebarPro({ mode = "vertical" }) {
   }
 
   // ================================================
-  //   MODO VERTICAL (LATERAL) — EL DE SIEMPRE
+  //   MODO VERTICAL
   // ================================================
   return (
     <>

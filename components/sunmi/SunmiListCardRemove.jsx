@@ -4,29 +4,23 @@ import { X } from "lucide-react";
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { useSunmiAnimation } from "./useSunmiAnimation";
+import { cn } from "@/lib/utils";
 
-export default function SunmiListCardRemove({ onClick }) {
+export default function SunmiListCardRemove({ onClick, className = "" }) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
   const { hover } = useSunmiAnimation();
 
-  const hoverBg =
-    theme.table?.row?.includes("hover:")
-      ? theme.table.row.split(" ").find((c) => c.startsWith("hover:"))
-      : "hover:bg-slate-800/50";
+  const color = theme.list.remove || "text-slate-300";
 
   return (
     <button
       onClick={onClick}
-      className={`
-        flex items-center justify-center
-        rounded-md
-        transition-all
-        ${hoverBg}
-      `}
+      className={cn("flex items-center justify-center transition-all", className)}
       style={{
-        width: ui.density.iconSize + ui.gap * 2,
-        height: ui.density.iconSize + ui.gap * 2,
+        width: ui.iconSize + ui.gap * 2,
+        height: ui.iconSize + ui.gap * 2,
+        borderRadius: ui.roundedScale[ui.rounded],
         transform: `scale(${ui.scale})`,
         transitionDuration: `${hover.duration}ms`,
         transitionTimingFunction: hover.easing,
@@ -38,7 +32,7 @@ export default function SunmiListCardRemove({ onClick }) {
         e.currentTarget.style.transform = `scale(${ui.scale})`;
       }}
     >
-      <X size={ui.density.iconSize} />
+      <X size={ui.iconSize} className={color} />
     </button>
   );
 }

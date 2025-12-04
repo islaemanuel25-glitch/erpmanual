@@ -4,6 +4,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { useSunmiAnimation } from "./useSunmiAnimation";
+import { cn } from "@/lib/utils";
 
 export default function SunmiEntityCard({
   title,
@@ -23,32 +24,36 @@ export default function SunmiEntityCard({
         className="flex items-start justify-between"
         style={{
           gap: ui.gap,
-          transform: `translateY(${slide.offsetY}px)`,
-          animation: `entitySlide ${slide.duration}ms ease forwards`,
+          transform: `translateY(${ui.animations.slideOffsetY}px)`,
+          animation: `entitySlide ${ui.animations.slideDuration}ms ${ui.animations.easing} forwards`,
         }}
       >
-        <style>
-          {`
+        <style>{`
           @keyframes entitySlide {
             from {
-              opacity: 0.3;
-              transform: translateY(${slide.offsetY}px);
+              opacity: ${ui.animations.fadeFrom};
+              transform: translateY(${ui.animations.slideOffsetY}px);
             }
             to {
               opacity: 1;
               transform: translateY(0);
             }
           }
-        `}
-        </style>
+        `}</style>
 
         <div
           className="flex items-start"
           style={{ gap: ui.gap }}
         >
-          {icon && <div style={{ marginTop: ui.gap }}>{icon}</div>}
+          {icon && (
+            <div style={{ marginTop: ui.gap }}>{icon}</div>
+          )}
 
-          <SunmiCardHeader title={title} subtitle={subtitle} color={color} />
+          <SunmiCardHeader
+            title={title}
+            subtitle={subtitle}
+            color={color}
+          />
         </div>
 
         {actions && (

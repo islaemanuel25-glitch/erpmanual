@@ -5,10 +5,14 @@ import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { useSunmiAnimation } from "./useSunmiAnimation";
 import { cn } from "@/lib/utils";
 
-export default function SunmiToggleEstado({ value = true, onChange = () => {} }) {
+export default function SunmiToggleEstado({
+  value = true,
+  onChange = () => {},
+  variant = "sunmi",
+}) {
   const { theme } = useSunmiTheme();
   const { ui } = useUIConfig();
-  const { hover, focus } = useSunmiAnimation();
+  const { focus } = useSunmiAnimation();
 
   const t = theme.toggle;
   const badgeOn = theme.badgeActivo;
@@ -23,6 +27,24 @@ export default function SunmiToggleEstado({ value = true, onChange = () => {} })
 
   const toggle = () => onChange(!normalized);
 
+  const calc = (() => {
+    const h = ui.inputHeight;
+
+    if (variant === "compact") {
+      const trackWidth = h * 1.6;
+      const trackHeight = h * 0.6;
+      const thumb = h * 0.55;
+      const offset = trackWidth - thumb - ui.gap * 0.5;
+      return { trackWidth, trackHeight, thumb, offset };
+    }
+
+    const trackWidth = h * 1.8;
+    const trackHeight = h * 0.7;
+    const thumb = h * 0.65;
+    const offset = trackWidth - thumb - ui.gap;
+    return { trackWidth, trackHeight, thumb, offset };
+  })();
+
   return (
     <div
       className="flex items-center cursor-pointer select-none"
@@ -30,25 +52,27 @@ export default function SunmiToggleEstado({ value = true, onChange = () => {} })
       style={{
         gap: ui.gap,
         transform: `scale(${ui.scale})`,
-        transitionDuration: `${focus.duration}ms`,
-        transitionTimingFunction: focus.easing,
+        transitionDuration: `${ui.animations.duration}ms`,
+        transitionTimingFunction: ui.animations.easing,
       }}
     >
       <div
         className={cn("rounded-full transition-all", normalized ? t.on : t.off)}
         style={{
-          width: ui.density.inputHeight * 1.6,
-          height: ui.density.inputHeight * 0.7,
+          width: calc.trackWidth,
+          height: calc.trackHeight,
+          borderRadius: calc.trackHeight,
         }}
       >
         <div
-          className={cn("rounded-full shadow transition-all", t.thumb)}
+          className={cn("shadow transition-all", t.thumb)}
           style={{
-            width: ui.density.inputHeight * 0.7,
-            height: ui.density.inputHeight * 0.7,
+            width: calc.thumb,
+            height: calc.thumb,
+            borderRadius: calc.thumb,
             transform: normalized
-              ? `translateX(${ui.density.inputHeight * 0.9}px)`
-              : "translateX(0)",
+              ? `translateX(${calc.offset}px)`
+              : "translateX(0px)",
           }}
         />
       </div>
@@ -60,8 +84,8 @@ export default function SunmiToggleEstado({ value = true, onChange = () => {} })
             : badgeOff.split(" ").find((c) => c.startsWith("text-"))
         }
         style={{
-          fontSize: ui.font.fontSize,
-          lineHeight: ui.font.lineHeight,
+          fontSize: ui.fontSize,
+          lineHeight: `${ui.fontLineHeight}px`,
         }}
       >
         {normalized ? "Habilitado" : "Inactivo"}

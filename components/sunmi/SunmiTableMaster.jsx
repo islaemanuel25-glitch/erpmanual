@@ -34,9 +34,9 @@ export default function SunmiTableMaster({
 
   return (
     <div
-      className="w-full flex flex-col"
+      className="flex flex-col"
       style={{
-        gap: ui.spacing.md,
+        gap: ui.gap,
         transform: `scale(${ui.scale})`,
       }}
     >
@@ -58,12 +58,12 @@ export default function SunmiTableMaster({
                 <td
                   key={col.id}
                   style={{
-                    paddingLeft: ui.spacing.sm,
-                    paddingRight: ui.spacing.sm,
-                    paddingTop: ui.spacing.xs,
-                    paddingBottom: ui.spacing.xs,
-                    fontSize: ui.font.base * ui.font.scaleSm,
-                    lineHeight: ui.font.lineHeight,
+                    paddingLeft: ui.spacingScale.sm,
+                    paddingRight: ui.spacingScale.sm,
+                    paddingTop: ui.spacingScale.xs,
+                    paddingBottom: ui.spacingScale.xs,
+                    fontSize: ui.fontSizeSm || ui.fontSize,
+                    lineHeight: `${ui.fontLineHeight}px`,
                   }}
                 >
                   {row[col.id] ?? "—"}
@@ -73,16 +73,14 @@ export default function SunmiTableMaster({
               {actions.length > 0 && (
                 <td
                   style={{
-                    paddingLeft: ui.spacing.sm,
-                    paddingRight: ui.spacing.sm,
+                    paddingLeft: ui.spacingScale.sm,
+                    paddingRight: ui.spacingScale.sm,
                     textAlign: "right",
                   }}
                 >
                   <div
                     className="flex justify-end"
-                    style={{
-                      gap: ui.spacing.xs,
-                    }}
+                    style={{ gap: ui.spacingScale.xs }}
                   >
                     {actions.map((act, i) => (
                       <SunmiButtonIcon
@@ -109,15 +107,17 @@ export default function SunmiTableMaster({
 
       {/* FOOTER */}
       <div
-        className="w-full flex flex-col md:flex-row items-center justify-between"
-        style={{ gap: ui.spacing.md }}
+        className="flex flex-col md:flex-row items-center justify-between"
+        style={{
+          gap: ui.gap,
+        }}
       >
         {/* FILAS POR PÁGINA */}
         <div
           className="flex items-center"
           style={{
-            gap: ui.spacing.sm,
-            fontSize: ui.font.base * ui.font.scaleSm,
+            gap: ui.gap,
+            fontSize: ui.fontSizeSm || ui.fontSize,
           }}
         >
           <span>Filas:</span>
@@ -137,18 +137,15 @@ export default function SunmiTableMaster({
         {/* PAGINADOR TEXTO */}
         <div
           style={{
-            fontSize: ui.font.base * ui.font.scaleMd,
-            lineHeight: ui.font.lineHeight,
+            fontSize: ui.fontSize,
+            lineHeight: `${ui.fontLineHeight}px`,
           }}
         >
           Página <strong>{page}</strong> de <strong>{totalPages}</strong>
         </div>
 
         {/* BOTONES PAGINADOR */}
-        <div
-          className="flex items-center"
-          style={{ gap: ui.spacing.sm }}
-        >
+        <div className="flex items-center" style={{ gap: ui.gap }}>
           <SunmiButton
             variant="ghost"
             disabled={page <= 1}

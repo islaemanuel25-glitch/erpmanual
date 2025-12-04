@@ -4,91 +4,59 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 const STORAGE_KEY = "erp-ui-config";
 
+// ============================================================
+//  SUNMI UI V3 — CONFIG OFICIAL ANIDADA
+// ============================================================
 const DEFAULT_CONFIG = {
-  // ======================================
-  // ESCALA GLOBAL
-  // ======================================
+
   scale: 1,
 
-  // ======================================
-  // TIPOGRAFÍA
-  // ======================================
   font: {
-    base: 13, // reemplaza fontSize
+    fontSize: "13px",
     lineHeight: "16px",
-
-    scaleXs: 0.85,
-    scaleSm: 0.92,
-    scaleMd: 1,
-    scaleLg: 1.12,
     letterSpacing: "0.04em",
     weightBold: 700,
+
+    sizes: {
+      xs: { fontSize: "11px", lineHeight: "14px" },
+      sm: { fontSize: "12px", lineHeight: "15px" },
+      md: { fontSize: "13px", lineHeight: "16px" },
+      lg: { fontSize: "15px", lineHeight: "18px" },
+    },
   },
 
-  // ======================================
-  // ESPACIADO
-  // ======================================
-  spacing: {
+  gap: 8,
+
+  spacing: "md",
+
+  spacingScale: {
     xs: 4,
     sm: 8,
     md: 12,
     lg: 16,
   },
 
-  // para componentes antiguos que usan spacingScale
-  spacingScale: {
-    xs: "4px",
-    sm: "8px",
-    md: "12px",
-    lg: "16px",
-  },
+  rounded: "md",
 
-  // ======================================
-  // BORDES
-  // ======================================
-  rounded: {
+  roundedScale: {
     sm: 4,
     md: 8,
     lg: 12,
     full: 9999,
   },
 
-  border: {
-    widthThin: "1px",
-    widthMd: "2px",
+  borders: {
+    thin: 1,
+    md: 2,
   },
 
-  // ======================================
-  // SHADOW — ESTÁNDAR PARA COMPONENTES SUNMI
-  // ======================================
-  shadow: {
+  shadows: {
     none: "none",
     xs: "0 0 2px rgba(0,0,0,0.20)",
     sm: "0 0 4px rgba(0,0,0,0.25)",
     md: "0 0 8px rgba(0,0,0,0.30)",
     lg: "0 0 12px rgba(0,0,0,0.35)",
-  },
 
-  // ======================================
-  // DENSIDAD
-  // ======================================
-  density: {
-    inputHeight: 32,
-    selectHeight: 32,
-    buttonHeight: 36,
-    tableRowHeight: 34,
-    iconSize: 18,
-    iconStrokeWidth: 2,
-    avatarSize: 32,
-    cardMinWidth: 260,
-    dropdownMaxHeight: 208,
-    modalMaxHeight: 520,
-  },
-
-  // ======================================
-  // SOMBRAS AVANZADAS (builder interno)
-  // ======================================
-  shadows: {
     cardBlur: 12,
     cardSpread: -2,
     cardOffsetY: 2,
@@ -105,14 +73,50 @@ const DEFAULT_CONFIG = {
     layoutOffsetY: 2,
   },
 
-  // ======================================
-  // ANIMACIONES
-  // ======================================
+  density: {
+    inputHeight: 32,
+    selectHeight: 32,
+    buttonHeight: 36,
+    tableRowHeight: 34,
+    iconSize: 18,
+    iconStrokeWidth: 2,
+    avatarSize: 32,
+
+    cardMinWidth: 260,
+    dropdownMaxHeight: 208,
+    modalMaxHeight: 520,
+  },
+
+  animSpeed: "normal",
+
+  animSpeedMultipliers: {
+    fast: 0.7,
+    normal: 1,
+    slow: 1.3,
+  },
+
   animations: {
     duration: 160,
     easing: "ease",
+
     hoverScale: 1.02,
     hoverDuration: 120,
+
+    focusScale: 1.03,
+    focusDuration: 140,
+
+    fadeFrom: 0.85,
+    fadeDuration: 150,
+
+    slideOffsetY: 6,
+    slideDuration: 150,
+
+    modalScale: 0.96,
+    modalBackdropBlur: 4,
+    modalDuration: 160,
+
+    tableFade: 0.92,
+    tableSlideY: 4,
   },
 };
 
@@ -133,7 +137,51 @@ export function UIConfigProvider({ children }) {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        setUI(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+
+        setUI({
+          ...DEFAULT_CONFIG,
+          ...parsed,
+
+          font: {
+            ...DEFAULT_CONFIG.font,
+            ...(parsed.font || {}),
+            sizes: {
+              ...DEFAULT_CONFIG.font.sizes,
+              ...(parsed.font?.sizes || {}),
+            },
+          },
+
+          spacingScale: {
+            ...DEFAULT_CONFIG.spacingScale,
+            ...(parsed.spacingScale || {}),
+          },
+
+          roundedScale: {
+            ...DEFAULT_CONFIG.roundedScale,
+            ...(parsed.roundedScale || {}),
+          },
+
+          borders: {
+            ...DEFAULT_CONFIG.borders,
+            ...(parsed.bborders || {}),
+          },
+
+          shadows: {
+            ...DEFAULT_CONFIG.shadows,
+            ...(parsed.shadows || {}),
+          },
+
+          density: {
+            ...DEFAULT_CONFIG.density,
+            ...(parsed.density || {}),
+          },
+
+          animations: {
+            ...DEFAULT_CONFIG.animations,
+            ...(parsed.animations || {}),
+          },
+        });
       }
     } catch {}
   }, []);

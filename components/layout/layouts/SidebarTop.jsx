@@ -4,10 +4,12 @@ import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import SidebarPro from "@/components/sidebar/SidebarPro";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SidebarTop({ children }) {
   const pathname = usePathname();
   const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
 
   const titulo =
     pathname.includes("usuarios")
@@ -27,42 +29,55 @@ export default function SidebarTop({ children }) {
       : "Panel";
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden">
-      {/* HEADER SUPERIOR (LO DE SIEMPRE) */}
+    <div className="flex flex-col" style={{ minHeight: "100vh" }}>
       <Header />
 
-      {/* BARRA DE NAVEGACIÓN SUPERIOR (DESKTOP) */}
       <div
         className={`
-          hidden md:flex items-center gap-4
-          h-12 px-4
+          hidden md:flex items-center
           border-b
           ${theme.navbar?.bg || "bg-slate-900"}
           ${theme.navbar?.border || "border-slate-800"}
         `}
+        style={{
+          height: ui.inputHeight * 1.4,
+          paddingInline: ui.spacingScale[ui.spacing],
+          gap: ui.gap,
+        }}
       >
         <span
-          className={`
-            text-sm font-semibold
-            ${theme.navbar?.text || "text-slate-200"}
-          `}
+          className={theme.navbar?.text || "text-slate-200"}
+          style={{
+            fontSize: ui.fontSize,
+            fontWeight: 600,
+          }}
         >
           {titulo}
         </span>
 
-        {/* MENÚ HORIZONTAL */}
         <div className="flex-1 flex items-center">
           <SidebarPro mode="horizontal" />
         </div>
       </div>
 
-      {/* TÍTULO EN MOBILE (SIN MENÚ ARRIBA POR AHORA) */}
-      <div className="md:hidden px-4 py-3 text-xl font-semibold">
+      <div
+        className="md:hidden"
+        style={{
+          paddingInline: ui.spacingScale[ui.spacing],
+          paddingBlock: ui.spacingScale.sm,
+          fontSize: ui.fontSizeLg,
+          fontWeight: 600,
+        }}
+      >
         {titulo}
       </div>
 
-      {/* CONTENIDO */}
-      <main className="flex-1 p-4 overflow-auto">
+      <main
+        className="flex-1 overflow-auto"
+        style={{
+          padding: ui.spacingScale[ui.spacing],
+        }}
+      >
         {children}
       </main>
     </div>

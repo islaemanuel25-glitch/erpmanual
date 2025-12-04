@@ -17,13 +17,11 @@ export default function SunmiTable({ headers = [], children }) {
       }}
     >
       <table
-        className={cn(`
-          w-full
-          table-fixed
-        `)}
+        className={cn("table-fixed")}
         style={{
-          fontSize: ui.font.base * ui.font.scaleMd,
-          lineHeight: ui.font.lineHeight,
+          width: "100%",
+          fontSize: ui.fontSize,
+          lineHeight: `${ui.fontLineHeight}px`,
         }}
       >
         {headers.length > 0 && (
@@ -32,16 +30,12 @@ export default function SunmiTable({ headers = [], children }) {
               {headers.map((h, i) => (
                 <th
                   key={i}
-                  className={cn(`
-                    text-left
-                    font-semibold
-                    whitespace-nowrap
-                  `)}
+                  className={cn("text-left font-semibold whitespace-nowrap")}
                   style={{
-                    paddingLeft: ui.spacing.sm,
-                    paddingRight: ui.spacing.sm,
-                    paddingTop: ui.spacing.xs,
-                    paddingBottom: ui.spacing.xs,
+                    paddingLeft: ui.spacingScale[ui.spacing],
+                    paddingRight: ui.spacingScale[ui.spacing],
+                    paddingTop: ui.spacingScale.xs,
+                    paddingBottom: ui.spacingScale.xs,
                   }}
                 >
                   {h}
@@ -52,10 +46,10 @@ export default function SunmiTable({ headers = [], children }) {
         )}
 
         <tbody
-          className={cn(`divide-y`, t.border)}
+          className={cn("divide-y", t.border)}
           style={{
-            fontSize: ui.font.base * ui.font.scaleSm,
-            lineHeight: ui.font.lineHeight,
+            fontSize: ui.fontSizeSm || ui.fontSize,
+            lineHeight: `${ui.fontLineHeight}px`,
           }}
         >
           {children}

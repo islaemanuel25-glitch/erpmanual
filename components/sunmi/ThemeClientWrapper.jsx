@@ -2,7 +2,10 @@
 
 import { SunmiThemeProvider } from "./SunmiThemeProvider";
 import { SunmiLayoutProvider } from "./SunmiLayoutProvider";
-import { UIConfigProvider, useUIConfig } from "@/components/providers/UIConfigProvider";
+import {
+  UIConfigProvider,
+  useUIConfig,
+} from "@/components/providers/UIConfigProvider";
 import { useSunmiTheme } from "./SunmiThemeProvider";
 
 export default function ThemeClientWrapper({ children }) {
@@ -23,11 +26,11 @@ function ThemeBody({ children }) {
 
   return (
     <body
-      className={`h-screen w-screen overflow-hidden ${theme.layout}`}
+      className={theme.layout}
       style={{
-        transform: `scale(${ui.scale})`,
-        fontSize: ui.font.fontSize,
-        lineHeight: ui.font.lineHeight,
+        minHeight: "100vh",
+        fontSize: ui.fontSize,
+        lineHeight: `${ui.fontLineHeight}px`,
       }}
     >
       {children}

@@ -13,32 +13,25 @@ export default function SunmiListCardItem({ children, className = "" }) {
 
   return (
     <div
-      className={cn(
-        `
-        flex items-center justify-between
-        relative
-      `,
-        className
-      )}
+      className={cn("flex items-center justify-between relative", className)}
       style={{
         paddingTop: ui.gap,
         paddingBottom: ui.gap,
         transform: `scale(${ui.scale})`,
-        animation: `fadeCard ${fade.duration}ms ease`,
+        animation: `fadeCard ${fade.duration}ms ${ui.animations.easing}`,
       }}
     >
-      <style>
-        {`
+      <style>{`
         @keyframes fadeCard {
           from { opacity: ${fade.from}; }
           to { opacity: 1; }
         }
-        `}
-      </style>
+      `}</style>
 
       <div
-        className={cn("absolute left-0 right-0 h-[1px]", t.separator)}
+        className={cn("absolute left-0 right-0", t.separator)}
         style={{
+          height: ui.borderThin,
           bottom: ui.gap * -0.5,
         }}
       />
@@ -46,8 +39,8 @@ export default function SunmiListCardItem({ children, className = "" }) {
       <div
         className="flex-1 truncate"
         style={{
-          fontSize: ui.font.fontSize,
-          lineHeight: ui.font.lineHeight,
+          fontSize: ui.fontSize,
+          lineHeight: `${ui.fontLineHeight}px`,
         }}
       >
         {children}
