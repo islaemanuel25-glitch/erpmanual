@@ -1,12 +1,15 @@
 "use client";
 
 import { SunmiThemeProvider, useSunmiTheme } from "./SunmiThemeProvider";
+import { UIConfigProvider } from "@/components/providers/UIConfigProvider";
 
 export default function ThemeClientWrapper({ children }) {
   return (
-    <SunmiThemeProvider>
-      <ThemeBody>{children}</ThemeBody>
-    </SunmiThemeProvider>
+    <UIConfigProvider>
+      <SunmiThemeProvider>
+        <ThemeBody>{children}</ThemeBody>
+      </SunmiThemeProvider>
+    </UIConfigProvider>
   );
 }
 
