@@ -4,7 +4,6 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 const LayoutModeContext = createContext({
   layoutMode: "sidebar-left",
-  setLayoutMode: () => {},
 });
 
 export function LayoutModeProvider({ children }) {
@@ -22,23 +21,8 @@ export function LayoutModeProvider({ children }) {
     }
   }, []);
 
-  // Función para actualizar layoutMode y localStorage
-  const setLayoutMode = (mode) => {
-    if (!["sidebar-left", "sidebar-top"].includes(mode)) {
-      return;
-    }
-    setLayoutModeState(mode);
-    try {
-      localStorage.setItem("erp-layout-mode", mode);
-      // Disparar evento personalizado para sincronizar entre tabs
-      window.dispatchEvent(new StorageEvent("storage", {
-        key: "erp-layout-mode",
-        newValue: mode,
-      }));
-    } catch (e) {
-      // Ignorar errores de localStorage
-    }
-  };
+  // layoutMode is now passive/internal - no setter exposed
+  // It defaults to "sidebar-left" and only changes internally for legacy "sidebar-top" mode
 
   // Escuchar cambios desde otras tabs
   useEffect(() => {
@@ -55,7 +39,7 @@ export function LayoutModeProvider({ children }) {
   }, []);
 
   return (
-    <LayoutModeContext.Provider value={{ layoutMode, setLayoutMode }}>
+    <LayoutModeContext.Provider value={{ layoutMode }}>
       {children}
     </LayoutModeContext.Provider>
   );

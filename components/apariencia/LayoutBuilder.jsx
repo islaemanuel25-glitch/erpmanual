@@ -8,7 +8,7 @@ import { useUIConfig } from "@/components/providers/UIConfigProvider";
 const STORAGE_KEY = "erp-layout-profile";
 
 const DEFAULT_PROFILE = {
-  sidebarPosition: "left",   // left | right | hidden | floating
+  sidebarPosition: "left",   // left | right | top | hidden | floating
   navbarPosition: "top",     // top | bottom | hidden
   contentWidth: "normal",    // normal | wide | full
   contentMode: "table",      // table | cards | mixed
@@ -78,6 +78,16 @@ export default function LayoutBuilder() {
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [saved, setSaved] = useState(false);
 
+  // Helper function to apply layout profile changes
+  function applyLayoutProfile(updated) {
+    try {
+      window.localStorage.setItem("erp-layout-profile", JSON.stringify(updated));
+      window.dispatchEvent(new Event("erp-layout-profile-updated"));
+    } catch (e) {
+      console.error("Error saving layout profile:", e);
+    }
+  }
+
   // Cargar profile guardado
   useEffect(() => {
     try {
@@ -92,48 +102,52 @@ export default function LayoutBuilder() {
   }, []);
 
   const updateProfile = (partial) => {
-    setProfile((prev) => ({
-      ...prev,
+    const newProfile = {
+      ...profile,
       ...partial,
       saved: false,
-    }));
+    };
+    setProfile(newProfile);
     setSaved(false);
+    applyLayoutProfile(newProfile);
   };
 
   const applyPreset = (presetKey) => {
     const preset = LAYOUT_PRESETS.find((p) => p.key === presetKey);
     if (!preset) return;
-    const merged = {
+    const newProfile = {
       ...profile,
       ...preset.profile,
       presetKey,
     };
-    setProfile(merged);
+    setProfile(newProfile);
     setSaved(false);
+    applyLayoutProfile(newProfile);
   };
 
   const handleSave = () => {
+    const profileToSave = {
+      sidebarPosition: profile.sidebarPosition,
+      navbarPosition: profile.navbarPosition,
+      contentWidth: profile.contentWidth,
+      contentMode: profile.contentMode,
+      presetKey: profile.presetKey,
+    };
     try {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          sidebarPosition: profile.sidebarPosition,
-          navbarPosition: profile.navbarPosition,
-          contentWidth: profile.contentWidth,
-          contentMode: profile.contentMode,
-          presetKey: profile.presetKey,
-        })
-      );
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profileToSave));
       setSaved(true);
+      applyLayoutProfile(profileToSave);
     } catch (e) {
       console.error("Error guardando layout profile:", e);
     }
   };
 
   const handleReset = () => {
-    setProfile(DEFAULT_PROFILE);
+    const newProfile = DEFAULT_PROFILE;
+    setProfile(newProfile);
     try {
       window.localStorage.removeItem(STORAGE_KEY);
+      applyLayoutProfile(newProfile);
     } catch (e) {
       console.error("Error reseteando layout profile:", e);
     }
@@ -185,13 +199,14 @@ export default function LayoutBuilder() {
         {/* ------------------- Sidebar ------------------- */}
         <SunmiSeparator label="Posición del sidebar" color="amber" />
         <p className="text-xs opacity-80 mb-2">
-          Define si el sidebar va a la izquierda, derecha, oculto o como panel
-          flotante (pensado para futuro).
+          Define si el sidebar va a la izquierda, derecha, arriba, oculto o como panel
+          flotante.
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
           {[
             { key: "left", label: "Izquierda" },
             { key: "right", label: "Derecha" },
+            { key: "top", label: "Arriba" },
             { key: "hidden", label: "Oculto" },
             { key: "floating", label: "Flotante" },
           ].map((opt) => {
@@ -347,6 +362,13 @@ export default function LayoutBuilder() {
             {profile.navbarPosition === "top" && (
               <div className="w-full h-8 bg-slate-800 border-b border-slate-700 flex items-center px-2 text-[10px] text-slate-200">
                 Navbar (top)
+              </div>
+            )}
+
+            {/* Sidebar top (legacy mode) */}
+            {profile.sidebarPosition === "top" && (
+              <div className="w-full h-6 bg-yellow-400/80 border-b border-yellow-600 flex items-center justify-center text-[9px] text-slate-900">
+                Sidebar (top)
               </div>
             )}
 

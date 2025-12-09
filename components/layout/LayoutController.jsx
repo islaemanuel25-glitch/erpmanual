@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { useLayoutMode } from "@/components/providers/LayoutModeProvider";
 import SidebarPro from "@/components/sidebar/SidebarPro";
+import SidebarTop from "@/components/sidebar/SidebarTop";
 import Header from "@/components/Header";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 const STORAGE_KEY = "erp-layout-profile";
 
 const DEFAULT_PROFILE = {
-  sidebarPosition: "left",   // left | right | hidden | floating
+  sidebarPosition: "left",   // left | right | top | hidden | floating
   navbarPosition: "top",     // top | bottom | hidden
   contentWidth: "normal",    // normal | wide | full
   contentMode: "table",      // table | cards | mixed (hoy solo para futuro)
@@ -56,60 +57,85 @@ export default function LayoutController({ children }) {
 
   const { sidebarPosition, navbarPosition, contentWidth } = layoutProfile;
 
-  // Helper para envolver el contenido con maxWidth según contentWidth
-  const renderContent = (children) => {
-    let maxWidth = "100%";
-    if (contentWidth === "normal") maxWidth = "1120px";
-    if (contentWidth === "wide") maxWidth = "1440px";
-
-    return (
-      <main
-        className="flex-1 min-h-0 overflow-auto transition-colors duration-200"
-        style={{
-          backgroundColor: "var(--sunmi-bg)",
-          color: "var(--sunmi-text)",
-          padding: ui.helpers.spacing("lg"),
-        }}
-      >
-        <div style={{ maxWidth, margin: "0 auto" }}>{children}</div>
-      </main>
-    );
+  // Calcular maxWidth según contentWidth
+  const getMaxWidth = () => {
+    if (contentWidth === "normal") return "1120px";
+    if (contentWidth === "wide") return "1440px";
+    return "100%";
   };
 
-  // 🔹 MODO SIDEBAR SUPERIOR (usa SidebarTop dentro de Header)
-  if (layoutMode === "sidebar-top") {
+  const maxWidth = getMaxWidth();
+
+  // Check if we should use legacy top mode
+  // This happens if: 1) layoutProfile.sidebarPosition === "top", OR 2) layoutMode === "sidebar-top" (legacy)
+  const overrideTopMode = sidebarPosition === "top" || layoutMode === "sidebar-top";
+
+  // 🔹 MODO SIDEBAR SUPERIOR (legacy mode - SidebarTop dentro de Header)
+  if (overrideTopMode) {
     return (
       <div className="flex flex-col h-full w-full overflow-hidden">
-        {navbarPosition === "top" && <Header />}
-        {renderContent(children)}
-        {navbarPosition === "bottom" && <Header />}
+        {navbarPosition === "top" && <Header position="top" />}
+        <SidebarTop />
+        <main
+          className="flex-1 min-h-0 overflow-auto transition-colors duration-200"
+          style={{
+            backgroundColor: "var(--sunmi-bg)",
+            color: "var(--sunmi-text)",
+            padding: ui.helpers.spacing("lg"),
+          }}
+        >
+          {children}
+        </main>
+        {navbarPosition === "bottom" && <Header position="bottom" />}
         {/* navbarPosition === "hidden" → no renderiza Header */}
       </div>
     );
   }
 
-  // 🔹 MODO SIDEBAR IZQUIERDO (DEFAULT ORIGINAL) + VARIANTES DEL PROFILE
+  // 🔹 NEW PROFESSIONAL LAYOUT ARCHITECTURE (Notion/Linear-style)
+  // Three independent layers: HEADER | LAYOUT ROW | FLOATING ELEMENTS
   return (
-    <div className="relative flex h-full w-full overflow-hidden">
-      {/* Sidebar a la izquierda */}
-      {sidebarPosition === "left" && <SidebarPro />}
+    <div className="layout-root flex flex-col h-full w-full relative overflow-hidden">
+      {/* Layer 1: HEADER (top) */}
+      {navbarPosition === "top" && <Header position="top" />}
 
-      {/* Contenedor central */}
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        {navbarPosition === "top" && <Header />}
-        {renderContent(children)}
-        {navbarPosition === "bottom" && <Header />}
-        {/* navbarPosition === "hidden" → no Header */}
+      {/* Layer 2: LAYOUT ROW (sidebar left/right + content) */}
+      <div className="layout-row flex flex-row flex-1 w-full justify-center relative">
+        <div className="layout-inner flex flex-row h-full w-full" style={{ maxWidth }}>
+          {/* Sidebar a la izquierda - alineado con contenido */}
+          {sidebarPosition === "left" && <SidebarPro position="left" />}
+
+          {/* Contenido principal */}
+          <main
+            className="layout-content flex-1 min-h-0 overflow-auto transition-colors duration-200"
+            style={{
+              backgroundColor: "var(--sunmi-bg)",
+              color: "var(--sunmi-text)",
+              padding: ui.helpers.spacing("lg"),
+            }}
+          >
+            {children}
+          </main>
+
+          {/* Sidebar a la derecha - alineado con contenido */}
+          {sidebarPosition === "right" && <SidebarPro position="right" />}
+        </div>
       </div>
 
-      {/* Sidebar a la derecha */}
-      {sidebarPosition === "right" && <SidebarPro />}
+      {/* Layer 3: HEADER (bottom) */}
+      {navbarPosition === "bottom" && <Header position="bottom" />}
 
-      {/* Sidebar flotante */}
+      {/* Layer 4: FLOATING ELEMENTS (floating sidebar) */}
       {sidebarPosition === "floating" && (
-        <div className="absolute left-2 top-16 z-40 shadow-xl">
-          <SidebarPro />
-        </div>
+        <SidebarPro
+          position="floating"
+          style={{
+            position: "absolute",
+            top: ui.helpers.spacing("xl"),
+            right: ui.helpers.spacing("xl"),
+            zIndex: 40,
+          }}
+        />
       )}
 
       {/* sidebarPosition === "hidden" → no SidebarPro */}

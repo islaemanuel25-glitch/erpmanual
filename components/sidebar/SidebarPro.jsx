@@ -12,7 +12,7 @@ import sidebarItems from "./sidebarItems";
 import sidebarGroups from "./sidebarGroups";
 import { useUser } from "@/app/context/UserContext";
 
-export default function SidebarPro() {
+export default function SidebarPro({ position = "left" }) {
   const pathname = usePathname();
   const { sidebarMode, sidebarGroup } = useSidebarConfig();
   const { ui } = useUIConfig();
@@ -27,9 +27,9 @@ export default function SidebarPro() {
     ? parseInt(ui.helpers.controlHeight()) * 3.5
     : parseInt(ui.helpers.controlHeight()) * 1.2;
 
-  const sidebarStyle = {
+  // Estilos base
+  const baseSidebarStyle = {
     width: `${sidebarWidth}px`,
-    height: "100%",
     paddingTop: ui.helpers.spacing("lg"),
     paddingBottom: ui.helpers.spacing("lg"),
     gap: ui.helpers.spacing("lg"),
@@ -41,20 +41,44 @@ export default function SidebarPro() {
       : {}),
   };
 
+  // Estilos según posición
+  const getSidebarStyle = () => {
+    if (position === "floating") {
+      return {
+        ...baseSidebarStyle,
+        backgroundColor: "var(--sunmi-sidebar-bg)",
+        borderColor: "var(--sunmi-sidebar-border)",
+        borderWidth: "1px",
+        borderRadius: ui.helpers.radius("lg"),
+        boxShadow: "0 6px 22px rgba(0,0,0,0.35)",
+        padding: ui.helpers.spacing("lg"),
+        height: "auto",
+      };
+    }
+    
+    // left o right
+    return {
+      ...baseSidebarStyle,
+      height: "100%",
+      backgroundColor: "var(--sunmi-sidebar-bg)",
+      borderColor: "var(--sunmi-sidebar-border)",
+      ...(position === "left"
+        ? { borderRightWidth: ui.helpers.line() }
+        : { borderLeftWidth: ui.helpers.line() }),
+    };
+  };
+
+  const sidebarStyle = getSidebarStyle();
+
   // Modo agrupado
   if (isGrouped) {
     return (
       <div
         className={cn(
-          "h-full flex flex-col border-r",
+          position === "floating" ? "flex flex-col" : "h-full flex flex-col",
           showText ? "items-stretch" : "items-center"
         )}
-        style={{
-          ...sidebarStyle,
-          backgroundColor: "var(--sunmi-sidebar-bg)",
-          borderColor: "var(--sunmi-sidebar-border)",
-          borderRightWidth: "1px",
-        }}
+        style={sidebarStyle}
       >
         {sidebarGroups.map((group) => (
           <SidebarGroup
@@ -77,15 +101,10 @@ export default function SidebarPro() {
   return (
     <div
       className={cn(
-        "h-full flex flex-col border-r",
+        position === "floating" ? "flex flex-col" : "h-full flex flex-col",
         showText ? "items-stretch" : "items-center"
       )}
-      style={{
-        ...sidebarStyle,
-        backgroundColor: "var(--sunmi-sidebar-bg)",
-        borderColor: "var(--sunmi-sidebar-border)",
-        borderRightWidth: "1px",
-      }}
+      style={sidebarStyle}
     >
       {sidebarItems.map((item) => (
         <SidebarItemFlat key={item.href} item={item} />

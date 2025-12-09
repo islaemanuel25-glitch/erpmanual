@@ -9,7 +9,6 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
-import { useLayoutMode } from "@/components/providers/LayoutModeProvider";
 import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
 
 // ===============================
@@ -83,18 +82,6 @@ const VISUAL_PRESETS = [
   },
 ];
 
-const LAYOUT_OPTIONS = [
-  {
-    id: "sidebar-left",
-    label: "Sidebar izquierda",
-    description: "Menú a la izquierda, contenido a la derecha.",
-  },
-  {
-    id: "sidebar-top",
-    label: "Sidebar arriba",
-    description: "Menú en la parte superior, contenido abajo.",
-  },
-];
 
 // OJO: esto debe coincidir con tus keys reales de SUNMI_THEMES
 const THEME_OPTIONS = [
@@ -107,12 +94,10 @@ export default function AparienciaPage() {
   const { ui, tamanoNivel, setTamanoNivel } = useUIConfig();
   const { themeKey, setThemeKey, theme } = useSunmiTheme();
 
-  const { layoutMode, setLayoutMode } = useLayoutMode();
   const { sidebarMode, setSidebarMode, sidebarGroup, setSidebarGroup } =
     useSidebarConfig();
 
   const handleSelectTamano = (key) => setTamanoNivel(key);
-  const handleSelectLayout = (id) => setLayoutMode(id);
   const handleSelectTheme = (key) => setThemeKey(key);
   const handleSelectSidebarMode = (mode) => setSidebarMode(mode);
   const handleSelectSidebarGroup = (group) => setSidebarGroup(group);
@@ -215,56 +200,6 @@ export default function AparienciaPage() {
                     <div className="h-2 rounded bg-slate-700/60" />
                     <div className="h-2 rounded bg-slate-700/60" />
                   </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ================= LAYOUT ================= */}
-        <SunmiSeparator label="Layout del ERP" color="amber" />
-
-        <p className="text-xs mb-3 opacity-80">
-          Elegí cómo se posiciona el sidebar en el sistema. El valor se guarda
-          en el navegador y puede ser usado por el LayoutController.
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-          {LAYOUT_OPTIONS.map((opt) => {
-            const isActive = opt.id === layoutMode;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => handleSelectLayout(opt.id)}
-                className={`text-left rounded-lg border p-2 transition ${
-                  isActive
-                    ? "border-amber-400 ring-2 ring-amber-300/60"
-                    : "border-slate-700 hover:border-amber-300/60"
-                }`}
-              >
-                <div className="text-[11px] uppercase opacity-70 mb-1">
-                  Layout
-                </div>
-                <div className="font-semibold text-sm mb-1">{opt.label}</div>
-                <div className="text-[11px] opacity-80 mb-2">
-                  {opt.description}
-                </div>
-
-                {/* Preview esquemático */}
-                <div className="border border-slate-700 rounded-md overflow-hidden text-[10px]">
-                  {opt.id === "sidebar-left" && (
-                    <div className="flex h-16">
-                      <div className="w-1/4 bg-slate-800/80" />
-                      <div className="flex-1 bg-slate-900/80" />
-                    </div>
-                  )}
-                  {opt.id === "sidebar-top" && (
-                    <div className="flex flex-col h-16">
-                      <div className="h-1/3 bg-slate-800/80" />
-                      <div className="flex-1 bg-slate-900/80" />
-                    </div>
-                  )}
                 </div>
               </button>
             );

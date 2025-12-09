@@ -8,7 +8,7 @@ import { useLayoutMode } from "@/components/providers/LayoutModeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import SidebarTop from "@/components/sidebar/SidebarTop";
 
-export default function Header() {
+export default function Header({ position = "top" }) {
   const pathname = usePathname();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
@@ -16,6 +16,9 @@ export default function Header() {
   const { ui } = useUIConfig();
 
   const [open, setOpen] = useState(false);
+
+  // Si position es "hidden", no renderizar
+  if (position === "hidden") return null;
 
   const nombre = perfil?.nombre || "Usuario";
   const rol = perfil?.rol || "-";
@@ -53,13 +56,23 @@ export default function Header() {
   const iconSize = parseInt(ui.helpers.icon(1.125));
   const chevronSize = parseInt(ui.helpers.icon(1.125));
 
+  const isBottom = position === "bottom";
+
   return (
     <header
-      className="w-full flex items-center justify-between border-b shadow-md"
+      className="w-full flex items-center justify-between"
       style={{
         background: "var(--sunmi-header-bg)",
         borderColor: "var(--sunmi-header-border)",
-        borderBottomWidth: ui.helpers.line(),
+        ...(isBottom
+          ? {
+              borderTopWidth: ui.helpers.line(),
+              boxShadow: "0 -2px 6px rgba(0,0,0,0.25)",
+            }
+          : {
+              borderBottomWidth: ui.helpers.line(),
+              boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            }),
         height: headerHeight,
         paddingLeft: ui.helpers.spacing("lg"),
         paddingRight: ui.helpers.spacing("lg"),
