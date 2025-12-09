@@ -1,44 +1,64 @@
 "use client";
 
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+
 export default function Encabezado({ origen, destino, me }) {
+  const { ui } = useUIConfig();
+
   return (
     <div
-      className="
-        bg-slate-900
-        border border-slate-800
-        rounded-2xl 
-        p-4 
-        shadow-md
-        text-[12px]
-        mb-4
-      "
+      className="bg-slate-900 border border-slate-800 shadow-md"
+      style={{
+        borderRadius: ui.helpers.radius("xl"),
+        padding: ui.helpers.spacing("lg"),
+        fontSize: ui.helpers.font("xs"),
+        marginBottom: ui.helpers.spacing("lg"),
+      }}
     >
 
       {/* =============================== */}
       {/* 🔶 TITULO POS */}
       {/* =============================== */}
-      <div className="flex items-center justify-between mb-4">
-
+      <div
+        className="flex items-center justify-between"
+        style={{
+          marginBottom: ui.helpers.spacing("lg"),
+        }}
+      >
         {/* ICONO POS */}
-        <div className="flex items-center gap-3">
+        <div
+          className="flex items-center"
+          style={{
+            gap: ui.helpers.spacing("md"),
+          }}
+        >
           <div
-            className="
-              h-11 w-11 
-              rounded-2xl 
-              bg-amber-400 
-              flex items-center justify-center
-              text-slate-900 font-black text-[13px]
-              shadow-[0_0_10px_rgba(250,204,21,0.6)]
-            "
+            className="bg-amber-400 flex items-center justify-center text-slate-900 font-black shadow-[0_0_10px_rgba(250,204,21,0.6)]"
+            style={{
+              height: parseInt(ui.helpers.controlHeight()) * 1.4,
+              width: parseInt(ui.helpers.controlHeight()) * 1.4,
+              borderRadius: ui.helpers.radius("xl"),
+              fontSize: ui.helpers.font("sm"),
+            }}
           >
             POS
           </div>
 
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+            <div
+              className="uppercase tracking-wide text-slate-400"
+              style={{
+                fontSize: ui.helpers.font("xs"),
+              }}
+            >
               Sesión de preparación
             </div>
-            <div className="text-[15px] font-semibold text-slate-100">
+            <div
+              className="font-semibold text-slate-100"
+              style={{
+                fontSize: ui.helpers.font("lg"),
+              }}
+            >
               Transferencia de mercadería
             </div>
           </div>
@@ -46,14 +66,14 @@ export default function Encabezado({ origen, destino, me }) {
 
         {/* ESTADO */}
         <span
-          className="
-            px-3 py-1 
-            text-[10px] font-semibold 
-            rounded-full 
-            bg-emerald-500/20 
-            text-emerald-300 
-            border border-emerald-400/40
-          "
+          className="font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40"
+          style={{
+            paddingLeft: ui.helpers.spacing("md"),
+            paddingRight: ui.helpers.spacing("md"),
+            paddingTop: ui.helpers.spacing("xs"),
+            paddingBottom: ui.helpers.spacing("xs"),
+            fontSize: ui.helpers.font("xs"),
+          }}
         >
           ● POS activa
         </span>
@@ -62,20 +82,55 @@ export default function Encabezado({ origen, destino, me }) {
       {/* =============================== */}
       {/* 🔶 ORIGEN → DESTINO */}
       {/* =============================== */}
-      <div className="flex items-center justify-center mb-4">
-        <span className="text-[13px] text-slate-100 font-semibold">
+      <div
+        className="flex items-center justify-center"
+        style={{
+          marginBottom: ui.helpers.spacing("lg"),
+        }}
+      >
+        <span
+          className="text-slate-100 font-semibold"
+          style={{
+            fontSize: ui.helpers.font("sm"),
+          }}
+        >
           {origen?.nombre || "-"}
         </span>
 
-        <div className="mx-3 flex items-center">
-          <div className="w-10 h-[2px] bg-amber-500/40 relative overflow-hidden rounded-full">
+        <div
+          className="flex items-center"
+          style={{
+            marginLeft: ui.helpers.spacing("md"),
+            marginRight: ui.helpers.spacing("md"),
+          }}
+        >
+          <div
+            className="bg-amber-500/40 relative overflow-hidden rounded-full"
+            style={{
+              width: parseInt(ui.helpers.controlHeight()) * 1.25,
+              height: parseInt(ui.helpers.spacing("xs")) * 0.5,
+            }}
+          >
             <div className="absolute inset-0 bg-amber-400 animate-[pulseLine_1.4s_linear_infinite]"></div>
           </div>
 
-          <span className="ml-2 text-amber-400 text-[16px]">→</span>
+          <span
+            className="text-amber-400"
+            style={{
+              marginLeft: ui.helpers.spacing("sm"),
+              fontSize: ui.helpers.font("lg"),
+            }}
+          >
+            →
+          </span>
         </div>
 
-        <span className="text-[13px] text-slate-100 font-semibold">
+        <span
+          className="text-slate-100 font-semibold"
+          style={{
+            fontSize: ui.helpers.font("sm"),
+          }}
+        >
           {destino?.nombre || "-"}
         </span>
       </div>
@@ -83,24 +138,52 @@ export default function Encabezado({ origen, destino, me }) {
       {/* =============================== */}
       {/* 🧊 TARJETAS RESUMEN */}
       {/* =============================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-
+      <div
+        className="grid grid-cols-1 sm:grid-cols-3"
+        style={{
+          gap: ui.helpers.spacing("md"),
+        }}
+      >
         {/* ORIGEN */}
         <div
-          className="
-            bg-slate-800 
-            rounded-xl 
-            px-4 py-3 
-            shadow-inner
-            border border-slate-700
-          "
+          className="bg-slate-800 shadow-inner border border-slate-700"
+          style={{
+            borderRadius: ui.helpers.radius("xl"),
+            paddingLeft: ui.helpers.spacing("lg"),
+            paddingRight: ui.helpers.spacing("lg"),
+            paddingTop: ui.helpers.spacing("md"),
+            paddingBottom: ui.helpers.spacing("md"),
+          }}
         >
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">
+          <span
+            className="uppercase tracking-wide text-slate-400"
+            style={{
+              fontSize: ui.helpers.font("xs"),
+            }}
+          >
             Origen
           </span>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-amber-400 text-[13px]">🏬</span>
-            <span className="text-[13px] text-slate-100 font-medium truncate">
+          <div
+            className="flex items-center"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+              marginTop: ui.helpers.spacing("xs"),
+            }}
+          >
+            <span
+              className="text-amber-400"
+              style={{
+                fontSize: ui.helpers.font("sm"),
+              }}
+            >
+              🏬
+            </span>
+            <span
+              className="text-slate-100 font-medium truncate"
+              style={{
+                fontSize: ui.helpers.font("sm"),
+              }}
+            >
               {origen?.nombre || "-"}
             </span>
           </div>
@@ -108,20 +191,44 @@ export default function Encabezado({ origen, destino, me }) {
 
         {/* DESTINO */}
         <div
-          className="
-            bg-slate-800 
-            rounded-xl 
-            px-4 py-3 
-            shadow-inner
-            border border-slate-700
-          "
+          className="bg-slate-800 shadow-inner border border-slate-700"
+          style={{
+            borderRadius: ui.helpers.radius("xl"),
+            paddingLeft: ui.helpers.spacing("lg"),
+            paddingRight: ui.helpers.spacing("lg"),
+            paddingTop: ui.helpers.spacing("md"),
+            paddingBottom: ui.helpers.spacing("md"),
+          }}
         >
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">
+          <span
+            className="uppercase tracking-wide text-slate-400"
+            style={{
+              fontSize: ui.helpers.font("xs"),
+            }}
+          >
             Destino
           </span>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-amber-400 text-[13px]">📦</span>
-            <span className="text-[13px] text-slate-100 font-medium truncate">
+          <div
+            className="flex items-center"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+              marginTop: ui.helpers.spacing("xs"),
+            }}
+          >
+            <span
+              className="text-amber-400"
+              style={{
+                fontSize: ui.helpers.font("sm"),
+              }}
+            >
+              📦
+            </span>
+            <span
+              className="text-slate-100 font-medium truncate"
+              style={{
+                fontSize: ui.helpers.font("sm"),
+              }}
+            >
               {destino?.nombre || "-"}
             </span>
           </div>
@@ -129,20 +236,44 @@ export default function Encabezado({ origen, destino, me }) {
 
         {/* USUARIO */}
         <div
-          className="
-            bg-slate-800 
-            rounded-xl 
-            px-4 py-3 
-            shadow-inner
-            border border-slate-700
-          "
+          className="bg-slate-800 shadow-inner border border-slate-700"
+          style={{
+            borderRadius: ui.helpers.radius("xl"),
+            paddingLeft: ui.helpers.spacing("lg"),
+            paddingRight: ui.helpers.spacing("lg"),
+            paddingTop: ui.helpers.spacing("md"),
+            paddingBottom: ui.helpers.spacing("md"),
+          }}
         >
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">
+          <span
+            className="uppercase tracking-wide text-slate-400"
+            style={{
+              fontSize: ui.helpers.font("xs"),
+            }}
+          >
             Usuario
           </span>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-amber-400 text-[13px]">👤</span>
-            <span className="text-[13px] text-slate-100 font-medium truncate">
+          <div
+            className="flex items-center"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+              marginTop: ui.helpers.spacing("xs"),
+            }}
+          >
+            <span
+              className="text-amber-400"
+              style={{
+                fontSize: ui.helpers.font("sm"),
+              }}
+            >
+              👤
+            </span>
+            <span
+              className="text-slate-100 font-medium truncate"
+              style={{
+                fontSize: ui.helpers.font("sm"),
+              }}
+            >
               {me?.nombre || "Usuario"}
             </span>
           </div>

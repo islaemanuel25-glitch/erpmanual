@@ -8,6 +8,7 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function ModalCategoria({
   open,
@@ -24,6 +25,7 @@ export default function ModalCategoria({
     activo: true,
   });
 
+  const { ui } = useUIConfig();
   const [loading, setLoading] = useState(false);
   const editMode = mode === "editar";
 
@@ -102,27 +104,41 @@ export default function ModalCategoria({
 
   return (
     <div
-      className="
-        fixed inset-0 z-50 
-        bg-black/50 
-        backdrop-blur-sm 
-        flex items-center justify-center
-        p-4
-      "
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center"
+      style={{
+        padding: ui.helpers.spacing("lg"),
+      }}
     >
       {/* CARD SUNMI */}
-      <SunmiCard className="w-full max-w-md p-0 overflow-hidden">
+      <SunmiCard className="w-full max-w-md overflow-hidden" style={{ padding: 0 }}>
 
         {/* ===== HEADER ===== */}
         <SunmiCardHeader
           titulo={editMode ? "Editar categoría" : "Nueva categoría"}
         />
 
-        <div className="p-4 space-y-4">
-
+        <div
+          style={{
+            padding: ui.helpers.spacing("lg"),
+            gap: ui.helpers.spacing("lg"),
+          }}
+        >
           {/* Nombre */}
-          <div>
-            <label className="text-sm text-slate-300">Nombre</label>
+          <div
+            style={{
+              marginBottom: ui.helpers.spacing("lg"),
+            }}
+          >
+            <label
+              className="text-slate-300"
+              style={{
+                fontSize: ui.helpers.font("sm"),
+                marginBottom: ui.helpers.spacing("xs"),
+                display: "block",
+              }}
+            >
+              Nombre
+            </label>
             <SunmiInput
               value={form.nombre}
               onChange={(e) =>
@@ -135,8 +151,21 @@ export default function ModalCategoria({
           <SunmiSeparator />
 
           {/* Estado */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-300">Activo</span>
+          <div
+            className="flex items-center justify-between"
+            style={{
+              marginTop: ui.helpers.spacing("lg"),
+              marginBottom: ui.helpers.spacing("lg"),
+            }}
+          >
+            <span
+              className="text-slate-300"
+              style={{
+                fontSize: ui.helpers.font("sm"),
+              }}
+            >
+              Activo
+            </span>
             <SunmiToggleEstado
               value={form.activo}
               onChange={(v) =>
@@ -148,7 +177,13 @@ export default function ModalCategoria({
           <SunmiSeparator />
 
           {/* Botones */}
-          <div className="flex justify-end gap-3">
+          <div
+            className="flex justify-end"
+            style={{
+              marginTop: ui.helpers.spacing("lg"),
+              gap: ui.helpers.spacing("md"),
+            }}
+          >
             <SunmiButton
               variant="secondary"
               onClick={onClose}

@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { Settings2 } from "lucide-react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
+  const { ui } = useUIConfig();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef(null);
@@ -32,6 +34,10 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
       c.key.toLowerCase().includes(q.toLowerCase())
   );
 
+  const buttonSize = parseInt(ui.helpers.controlHeight());
+  const iconSize = parseInt(ui.helpers.icon(1));
+  const dropdownWidth = parseInt(ui.helpers.controlHeight()) * 9;
+
   return (
     <div className="relative" ref={ref}>
       {/* BOTÓN MINI SUNMI V2 */}
@@ -39,18 +45,25 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
         variant="icon"
         color="slate"
         onClick={() => setOpen((v) => !v)}
-        className="h-8 w-8 flex items-center justify-center rounded-xl"
+        className="flex items-center justify-center"
+        style={{
+          height: buttonSize,
+          width: buttonSize,
+          borderRadius: ui.helpers.radius("xl"),
+        }}
       >
-        <Settings2 size={16} />
+        <Settings2 size={iconSize} />
       </SunmiButton>
 
       {open && (
         <div
-          className="
-            absolute right-0 mt-2 w-72 z-[9999]
-            bg-slate-900 border border-slate-700
-            rounded-xl p-3
-          "
+          className="absolute right-0 z-[9999] bg-slate-900 border border-slate-700"
+          style={{
+            marginTop: ui.helpers.spacing("sm"),
+            width: dropdownWidth,
+            borderRadius: ui.helpers.radius("xl"),
+            padding: ui.helpers.spacing("md"),
+          }}
         >
           {/* BUSCADOR */}
           <SunmiInput
@@ -60,22 +73,41 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
             icon="search"
           />
 
-          <p className="text-[12px] text-slate-400 mt-3 mb-2 px-1">
+          <p
+            className="text-slate-400"
+            style={{
+              fontSize: ui.helpers.font("xs"),
+              marginTop: ui.helpers.spacing("md"),
+              marginBottom: ui.helpers.spacing("sm"),
+              paddingLeft: ui.helpers.spacing("xs"),
+              paddingRight: ui.helpers.spacing("xs"),
+            }}
+          >
             Columnas visibles
           </p>
 
           {/* LISTADO */}
-          <div className="max-h-56 overflow-y-auto pr-1 space-y-1">
+          <div
+            className="overflow-y-auto"
+            style={{
+              maxHeight: parseInt(ui.helpers.controlHeight()) * 3.5,
+              paddingRight: ui.helpers.spacing("xs"),
+              gap: ui.helpers.spacing("xs"),
+            }}
+          >
             {filtered.map((c) => (
               <label
                 key={c.key}
-                className="
-                  flex items-center justify-between
-                  px-2 py-2 rounded-lg
-                  bg-slate-800 hover:bg-slate-700
-                  cursor-pointer
-                  text-sm text-slate-200
-                "
+                className="flex items-center justify-between bg-slate-800 hover:bg-slate-700 cursor-pointer text-slate-200"
+                style={{
+                  paddingLeft: ui.helpers.spacing("sm"),
+                  paddingRight: ui.helpers.spacing("sm"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                  borderRadius: ui.helpers.radius("lg"),
+                  fontSize: ui.helpers.font("sm"),
+                  marginBottom: ui.helpers.spacing("xs"),
+                }}
               >
                 <span className="truncate">{c.label}</span>
 
@@ -83,15 +115,26 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
                   type="checkbox"
                   checked={visibleKeys.includes(c.key)}
                   onChange={() => toggle(c.key)}
-                  className="
-                    w-4 h-4 cursor-pointer accent-amber-300
-                  "
+                  className="cursor-pointer accent-amber-300"
+                  style={{
+                    width: parseInt(ui.helpers.icon(1)),
+                    height: parseInt(ui.helpers.icon(1)),
+                  }}
                 />
               </label>
             ))}
 
             {filtered.length === 0 && (
-              <div className="text-xs text-slate-500 px-2 py-1">
+              <div
+                className="text-slate-500"
+                style={{
+                  fontSize: ui.helpers.font("xs"),
+                  paddingLeft: ui.helpers.spacing("sm"),
+                  paddingRight: ui.helpers.spacing("sm"),
+                  paddingTop: ui.helpers.spacing("xs"),
+                  paddingBottom: ui.helpers.spacing("xs"),
+                }}
+              >
                 Sin resultados
               </div>
             )}

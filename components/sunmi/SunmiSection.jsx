@@ -1,7 +1,7 @@
 "use client";
 
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiSection({
   title,
@@ -11,34 +11,68 @@ export default function SunmiSection({
   noSeparator = false,
   className = "",
 }) {
-  const { theme } = useSunmiTheme();
-  
-  // Extraer color de texto del layout
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-')) || 'text-slate-100';
+  const { ui } = useUIConfig();
   
   return (
-    <section className={`flex flex-col gap-3 ${className}`}>
+    <section
+      className={`flex flex-col ${className}`}
+      style={{
+        gap: ui.helpers.spacing("md"),
+      }}
+    >
       {title && (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className={`text-[13px] font-semibold ${textColor}`}>
+        <div
+          className="flex flex-col"
+          style={{
+            gap: ui.helpers.spacing("xs"),
+          }}
+        >
+          <div
+            className="flex items-center justify-between"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
+            <h3
+              className="font-semibold"
+              style={{
+                color: "var(--sunmi-text)",
+                fontSize: ui.helpers.font("sm"),
+              }}
+            >
               {title}
             </h3>
           </div>
           {description && (
-            <p className="text-[11px] text-slate-400">{description}</p>
+            <p
+              style={{
+                color: "#94a3b8", // slate-400
+                fontSize: ui.helpers.font("xs"),
+              }}
+            >
+              {description}
+            </p>
           )}
         </div>
       )}
 
       {!noSeparator && <SunmiSeparator />}
 
-      <div className="flex flex-col gap-2">
+      <div
+        className="flex flex-col"
+        style={{
+          gap: ui.helpers.spacing("sm"),
+        }}
+      >
         {children}
       </div>
 
       {footer && (
-        <div className="mt-1">
+        <div
+          style={{
+            marginTop: ui.helpers.spacing("xs"),
+          }}
+        >
           {footer}
         </div>
       )}

@@ -6,6 +6,7 @@ import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function TablaProductos({
   rows,
@@ -18,6 +19,8 @@ export default function TablaProductos({
   onEliminar,
   catalogos,
 }) {
+  const { ui } = useUIConfig();
+  
   // Diccionarios
   const CAT = Object.fromEntries(
     (catalogos?.CATEGORIAS ?? []).map((c) => [String(c.id), c.nombre])
@@ -41,6 +44,7 @@ export default function TablaProductos({
   };
 
   // Definiciones Sunmi V2 (camelCase)
+  const imageSize = parseInt(ui.helpers.icon(3));
   const DEFINICIONES = {
     imagenUrl: {
       titulo: "Imagen",
@@ -48,10 +52,23 @@ export default function TablaProductos({
         row.imagenUrl ? (
           <img
             src={row.imagenUrl}
-            className="w-12 h-12 rounded-md object-cover border border-slate-700"
+            className="object-cover border border-slate-700"
+            style={{
+              width: imageSize,
+              height: imageSize,
+              borderRadius: ui.helpers.radius("md"),
+            }}
           />
         ) : (
-          <div className="w-12 h-12 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center text-xs text-slate-500">
+          <div
+            className="bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500"
+            style={{
+              width: imageSize,
+              height: imageSize,
+              borderRadius: ui.helpers.radius("md"),
+              fontSize: ui.helpers.font("xs"),
+            }}
+          >
             -
           </div>
         ),
@@ -142,7 +159,12 @@ export default function TablaProductos({
     .filter(Boolean);
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
+    <div
+      className="border border-slate-800 bg-slate-900 overflow-hidden"
+      style={{
+        borderRadius: ui.helpers.radius("xl"),
+      }}
+    >
       <SunmiTable
         headers={[...colsVisibles.map((c) => c.titulo), "Acciones"]}
       >
@@ -152,24 +174,52 @@ export default function TablaProductos({
           rows.map((row) => (
             <SunmiTableRow key={row.id}>
               {colsVisibles.map((c) => (
-                <td key={c.key} className="px-3 py-2 text-[13px]">
+                <td
+                  key={c.key}
+                  style={{
+                    paddingLeft: ui.helpers.spacing("md"),
+                    paddingRight: ui.helpers.spacing("md"),
+                    paddingTop: ui.helpers.spacing("sm"),
+                    paddingBottom: ui.helpers.spacing("sm"),
+                    fontSize: ui.helpers.font("sm"),
+                  }}
+                >
                   {c.render ? c.render(row[c.key], row) : row[c.key] ?? "-"}
                 </td>
               ))}
 
               {/* ACCIONES */}
-              <td className="px-3 py-2 text-right">
-                <div className="flex justify-end gap-3">
+              <td
+                className="text-right"
+                style={{
+                  paddingLeft: ui.helpers.spacing("md"),
+                  paddingRight: ui.helpers.spacing("md"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                }}
+              >
+                <div
+                  className="flex justify-end"
+                  style={{
+                    gap: ui.helpers.spacing("md"),
+                  }}
+                >
                   <button
                     onClick={() => onEditar(row.id)}
-                    className="text-amber-300 hover:text-amber-200 text-[15px]"
+                    className="text-amber-300 hover:text-amber-200"
+                    style={{
+                      fontSize: ui.helpers.font("lg"),
+                    }}
                   >
                     ✏️
                   </button>
 
                   <button
                     onClick={() => onEliminar(row.id)}
-                    className="text-red-400 hover:text-red-300 text-[15px]"
+                    className="text-red-400 hover:text-red-300"
+                    style={{
+                      fontSize: ui.helpers.font("lg"),
+                    }}
                   >
                     🗑️
                   </button>
@@ -181,7 +231,12 @@ export default function TablaProductos({
       </SunmiTable>
 
       {/* PAGINACIÓN */}
-      <div className="flex justify-between p-3 border-t border-slate-800">
+      <div
+        className="flex justify-between border-t border-slate-800"
+        style={{
+          padding: ui.helpers.spacing("md"),
+        }}
+      >
         <SunmiButton
           color="slate"
           disabled={page <= 1}

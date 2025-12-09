@@ -5,12 +5,17 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@/app/context/UserContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { useLayoutMode } from "@/components/providers/LayoutModeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import SidebarTop from "@/components/sidebar/SidebarTop";
 
 export default function Header() {
   const pathname = usePathname();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
   const { theme } = useSunmiTheme();
+  const { layoutMode } = useLayoutMode();
+  const { ui } = useUIConfig();
 
   const [open, setOpen] = useState(false);
 
@@ -34,6 +39,7 @@ export default function Header() {
       ? "POS"
       : "Panel";
 
+  // Close menu on outside click
   useEffect(() => {
     const handler = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -44,111 +50,138 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const headerHeight = ui.helpers.controlHeight();
+  const avatarSize = parseInt(headerHeight) * 0.9;
+  const iconSize = parseInt(ui.helpers.icon(1.125));
+  const chevronSize = parseInt(ui.helpers.icon(1.125));
+
   return (
     <header
-      className={`
-        w-full h-16 px-6 flex justify-between items-center
-        border-b
-        shadow-[0_3px_8px_rgba(0,0,0,0.35)]
-        bg-gradient-to-r
-        ${theme.header.bg}
-        ${theme.header.border}
-        transition-colors duration-200
-      `}
+      className={`w-full flex items-center justify-between border-b shadow-md bg-gradient-to-r ${theme.header.bg} ${theme.header.border}`}
+      style={{
+        height: headerHeight,
+        paddingLeft: ui.helpers.spacing("lg"),
+        paddingRight: ui.helpers.spacing("lg"),
+        borderBottomWidth: ui.helpers.line(),
+      }}
     >
-      {/* IZQUIERDA: TITULO */}
-      <h1 className={`text-xl font-semibold hidden md:block ${theme.header.text}`}>
+      {/* --- SI LAYOUT ES TOP, AQUI VA EL MENÚ --- */}
+      {layoutMode === "sidebar-top" && (
+        <div
+          className="flex items-center"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+            marginRight: ui.helpers.spacing("lg"),
+          }}
+        >
+          <SidebarTop />
+        </div>
+      )}
+
+      {/* --- TITULO --- */}
+      <h1
+        className={`font-semibold hidden md:block ${theme.header.text}`}
+        style={{
+          fontSize: ui.helpers.font("lg"),
+        }}
+      >
         {titulo}
       </h1>
 
-      {/* DERECHA */}
-      <div className="flex items-center gap-6">
-
-        {/* NOTIFICACIONES */}
+      {/* --- DERECHA --- */}
+      <div
+        className="flex items-center"
+        style={{
+          gap: parseInt(ui.helpers.spacing("lg")) * 1.5,
+        }}
+      >
         <Bell
-          className={`
-            ${theme.header.text}
-            hover:opacity-80
-            transition cursor-pointer
-          `}
+          className={`${theme.header.text} cursor-pointer`}
+          size={iconSize}
         />
 
-        {/* USUARIO */}
+        {/* Perfil */}
         <div className="relative" ref={menuRef}>
           <div
             onClick={() => setOpen(!open)}
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="flex items-center cursor-pointer"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
           >
-            {/* AVATAR */}
             <div
-              className={`
-                w-9 h-9 rounded-full flex items-center justify-center
-                text-[13px] font-bold
-                transition shadow-md
-                ${theme.card}
-              `}
+              className={`rounded-full flex items-center justify-center font-bold ${theme.card}`}
+              style={{
+                width: avatarSize,
+                height: avatarSize,
+                borderRadius: ui.helpers.radius("full"),
+                fontSize: ui.helpers.font("sm"),
+              }}
             >
-              {nombre[0]?.toUpperCase() || "?"}
+              {nombre[0]}
             </div>
 
-            {/* NOMBRE + ROL */}
-            <div className="flex flex-col leading-tight">
-              <span className={`text-[13px] font-medium ${theme.header.text}`}>
+            <div
+              className="flex flex-col"
+              style={{
+                lineHeight: 1.2,
+              }}
+            >
+              <span
+                className={theme.header.text}
+                style={{
+                  fontSize: ui.helpers.font("sm"),
+                }}
+              >
                 {nombre}
               </span>
-
               <span
-                className={`
-                  text-[11px] px-2 py-[1px]
-                  rounded-md w-fit border
-                  ${theme.header.border}
-                  ${theme.header.text}
-                `}
+                className={`border ${theme.header.text} ${theme.header.border}`}
+                style={{
+                  fontSize: ui.helpers.font("xs"),
+                  paddingLeft: ui.helpers.spacing("sm"),
+                  paddingRight: ui.helpers.spacing("sm"),
+                  paddingTop: ui.helpers.spacing("xs"),
+                  paddingBottom: ui.helpers.spacing("xs"),
+                  borderRadius: ui.helpers.radius("md"),
+                  borderWidth: ui.helpers.line(),
+                }}
               >
                 {rol}
               </span>
             </div>
 
             <ChevronDown
-              size={18}
-              className={`
-                ${theme.header.text} transition-transform
-                ${open ? "rotate-180" : ""}
-              `}
+              size={chevronSize}
+              className={`${theme.header.text} transition-transform ${open ? "rotate-180" : ""}`}
             />
           </div>
 
-          {/* MENU DESPLEGABLE */}
           {open && (
             <div
-              className={`
-                absolute right-0 mt-2 w-52
-                rounded-md py-2 z-50
-                shadow-xl border
-                ${theme.card}
-                ${theme.header.border}
-              `}
+              className={`absolute right-0 shadow-xl border ${theme.card} ${theme.header.border}`}
+              style={{
+                marginTop: ui.helpers.spacing("sm"),
+                width: parseInt(ui.helpers.controlHeight()) * 14.5,
+                paddingTop: ui.helpers.spacing("sm"),
+                paddingBottom: ui.helpers.spacing("sm"),
+                borderRadius: ui.helpers.radius("md"),
+                borderWidth: ui.helpers.line(),
+              }}
             >
-              <div className="px-4 py-1">
-                <p className={`text-sm font-semibold ${theme.header.text}`}>
-                  {nombre}
-                </p>
-                <p className="text-xs opacity-70">{rol}</p>
-              </div>
-
-              <div className={`border-t my-1 ${theme.header.border}`} />
-
               <button
                 onClick={logout}
-                className={`
-                  flex items-center gap-2 w-full text-left 
-                  px-4 py-2 text-[13px]
-                  text-red-400 hover:bg-red-500/10 
-                  transition
-                `}
+                className="flex items-center text-red-400 hover:bg-red-500/10"
+                style={{
+                  gap: ui.helpers.spacing("sm"),
+                  paddingLeft: ui.helpers.spacing("lg"),
+                  paddingRight: ui.helpers.spacing("lg"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                  fontSize: ui.helpers.font("sm"),
+                }}
               >
-                <LogOut size={16} />
-                Cerrar sesión
+                <LogOut size={parseInt(ui.helpers.icon(1))} /> Cerrar sesión
               </button>
             </div>
           )}

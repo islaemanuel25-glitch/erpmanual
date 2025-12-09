@@ -8,6 +8,7 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 
 import { Pencil, Trash2 } from "lucide-react";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiTablaProductos({
   rows,
@@ -20,6 +21,7 @@ export default function SunmiTablaProductos({
   onEliminar,
   catalogos,
 }) {
+  const { ui } = useUIConfig();
   const CAT = Object.fromEntries(
     (catalogos?.CATEGORIAS ?? []).map((c) => [String(c.id), c.nombre])
   );
@@ -45,17 +47,32 @@ export default function SunmiTablaProductos({
     imagenUrl: {
       titulo: "Img",
       className: "w-16",
-      render: (_, row) =>
-        row.imagenUrl ? (
+      render: (_, row) => {
+        const imageSize = parseInt(ui.helpers.icon(3));
+        return row.imagenUrl ? (
           <img
             src={row.imagenUrl}
-            className="w-12 h-12 rounded-md object-cover border border-slate-700"
+            className="object-cover border border-slate-700"
+            style={{
+              width: imageSize,
+              height: imageSize,
+              borderRadius: ui.helpers.radius("md"),
+            }}
           />
         ) : (
-          <div className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-md flex items-center justify-center text-xs text-slate-500">
+          <div
+            className="bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500"
+            style={{
+              width: imageSize,
+              height: imageSize,
+              borderRadius: ui.helpers.radius("md"),
+              fontSize: ui.helpers.font("xs"),
+            }}
+          >
             -
           </div>
-        ),
+        );
+      },
     },
 
     codigoBarra: { titulo: "Código" },
@@ -154,8 +171,16 @@ export default function SunmiTablaProductos({
     })
     .filter(Boolean);
 
+  const buttonSize = parseInt(ui.helpers.icon(1.5));
+  const iconSize = parseInt(ui.helpers.icon(0.875));
+
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+    <div
+      className="overflow-hidden border border-slate-800 bg-slate-900"
+      style={{
+        borderRadius: ui.helpers.radius("xl"),
+      }}
+    >
       <SunmiTable headers={[...columnas.map((c) => c.titulo), "Acciones"]}>
         {rows.length === 0 ? (
           <SunmiTableEmpty label="No hay productos disponibles" />
@@ -165,43 +190,54 @@ export default function SunmiTablaProductos({
               {columnas.map((c) => (
                 <td
                   key={c.key}
-                  className="px-3 py-1.5 whitespace-nowrap text-[13px]"
+                  className="whitespace-nowrap"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("md"),
+                    paddingRight: ui.helpers.spacing("md"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                    fontSize: ui.helpers.font("sm"),
+                  }}
                 >
                   {c.render ? c.render(row[c.key], row) : row[c.key] ?? "-"}
                 </td>
               ))}
 
               {/* ⭐ ACCIONES COMPACTAS */}
-              <td className="px-3 py-1.5 text-right flex gap-1 justify-end">
-
+              <td
+                className="text-right flex justify-end"
+                style={{
+                  paddingLeft: ui.helpers.spacing("md"),
+                  paddingRight: ui.helpers.spacing("md"),
+                  paddingTop: ui.helpers.spacing("xs"),
+                  paddingBottom: ui.helpers.spacing("xs"),
+                  gap: ui.helpers.spacing("xs"),
+                }}
+              >
                 {/* EDITAR */}
                 <button
                   onClick={() => onEditar(row.id)}
-                  className="
-                    w-[26px] h-[26px]
-                    flex items-center justify-center
-                    rounded-md
-                    bg-amber-400 text-slate-900
-                    hover:bg-amber-300
-                    transition
-                  "
+                  className="flex items-center justify-center bg-amber-400 text-slate-900 hover:bg-amber-300 transition"
+                  style={{
+                    width: buttonSize,
+                    height: buttonSize,
+                    borderRadius: ui.helpers.radius("md"),
+                  }}
                 >
-                  <Pencil size={14} />
+                  <Pencil size={iconSize} />
                 </button>
 
                 {/* ELIMINAR */}
                 <button
                   onClick={() => onEliminar(row.id)}
-                  className="
-                    w-[26px] h-[26px]
-                    flex items-center justify-center
-                    rounded-md
-                    bg-red-500 text-white
-                    hover:bg-red-400
-                    transition
-                  "
+                  className="flex items-center justify-center bg-red-500 text-white hover:bg-red-400 transition"
+                  style={{
+                    width: buttonSize,
+                    height: buttonSize,
+                    borderRadius: ui.helpers.radius("md"),
+                  }}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={iconSize} />
                 </button>
 
               </td>
@@ -211,12 +247,25 @@ export default function SunmiTablaProductos({
       </SunmiTable>
 
       {/* PAGINACIÓN */}
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-900">
+      <div
+        className="flex items-center justify-between bg-slate-900"
+        style={{
+          paddingLeft: ui.helpers.spacing("md"),
+          paddingRight: ui.helpers.spacing("md"),
+          paddingTop: ui.helpers.spacing("sm"),
+          paddingBottom: ui.helpers.spacing("sm"),
+        }}
+      >
         <SunmiButton color="slate" disabled={page <= 1} onClick={onPrev}>
           « Anterior
         </SunmiButton>
 
-        <span className="text-slate-300 text-sm">
+        <span
+          className="text-slate-300"
+          style={{
+            fontSize: ui.helpers.font("sm"),
+          }}
+        >
           Página {page} / {totalPages}
         </span>
 

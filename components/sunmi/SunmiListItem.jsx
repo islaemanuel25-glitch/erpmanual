@@ -1,6 +1,6 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiListItem({
   label,
@@ -11,34 +11,55 @@ export default function SunmiListItem({
   clickable = false,
   className = "",
 }) {
-  const { theme } = useSunmiTheme();
-  
-  const base = `
-    flex items-center justify-between 
-    gap-3 py-2
-  `;
-
-  // Extraer colores del theme
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-')) || 'text-slate-100';
-  const hoverBg = theme.table?.row?.includes('hover:') ? theme.table.row : 'hover:bg-slate-900/70';
-  
-  const clickableCls = clickable
-    ? `cursor-pointer ${hoverBg}`
-    : "";
+  const { ui } = useUIConfig();
 
   return (
     <div
-      className={`${base} ${clickableCls} ${className}`}
+      className={`flex items-center justify-between ${clickable ? "cursor-pointer" : ""} ${className}`}
       onClick={clickable ? onClick : undefined}
+      style={{
+        gap: ui.helpers.spacing("md"),
+        paddingTop: ui.helpers.spacing("sm"),
+        paddingBottom: ui.helpers.spacing("sm"),
+        backgroundColor: "transparent",
+        transition: clickable ? "background-color 0.2s" : "none",
+      }}
+      onMouseEnter={(e) => {
+        if (clickable) {
+          e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (clickable) {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }
+      }}
     >
-      <div className="flex items-start gap-2 min-w-0">
-        {left && <div className="mt-[2px]">{left}</div>}
+      <div
+        className="flex items-start min-w-0"
+        style={{
+          gap: ui.helpers.spacing("sm"),
+        }}
+      >
+        {left && <div style={{ marginTop: "2px" }}>{left}</div>}
         <div className="flex flex-col min-w-0">
-          <span className={`text-[13px] ${textColor} truncate`}>
+          <span
+            className="truncate"
+            style={{
+              color: "var(--sunmi-text)",
+              fontSize: ui.helpers.font("sm"),
+            }}
+          >
             {label}
           </span>
           {description && (
-            <span className="text-[11px] text-slate-400 truncate">
+            <span
+              className="truncate"
+              style={{
+                color: "#94a3b8", // slate-400
+                fontSize: ui.helpers.font("xs"),
+              }}
+            >
               {description}
             </span>
           )}
@@ -46,7 +67,12 @@ export default function SunmiListItem({
       </div>
 
       {right && (
-        <div className="flex items-center gap-2 shrink-0">
+        <div
+          className="flex items-center shrink-0"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
           {right}
         </div>
       )}

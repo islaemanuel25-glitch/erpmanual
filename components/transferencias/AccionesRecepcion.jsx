@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function AccionesRecepcion({
   puedeRecibir,
@@ -9,10 +10,20 @@ export default function AccionesRecepcion({
   confirmando,
   guardarCambios,
 }) {
+  const { ui } = useUIConfig();
+  
   if (!puedeRecibir) return null;
 
   return (
-    <div className="flex justify-end gap-3 px-2 pb-3">
+    <div
+      className="flex justify-end"
+      style={{
+        gap: ui.helpers.spacing("md"),
+        paddingLeft: ui.helpers.spacing("sm"),
+        paddingRight: ui.helpers.spacing("sm"),
+        paddingBottom: ui.helpers.spacing("md"),
+      }}
+    >
       <SunmiButton
         variant="outline"
         size="sm"

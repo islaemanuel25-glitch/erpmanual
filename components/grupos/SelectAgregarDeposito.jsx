@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SelectAgregarDeposito({ onAgregar, excluidos = [] }) {
+  const { ui } = useUIConfig();
   const [depositos, setDepositos] = useState([]);
   const [selected, setSelected] = useState("");
 
@@ -33,7 +35,12 @@ export default function SelectAgregarDeposito({ onAgregar, excluidos = [] }) {
   const disponibles = depositos.filter((d) => !excluidos.includes(d.id));
 
   return (
-    <div className="flex gap-2">
+    <div
+      className="flex"
+      style={{
+        gap: ui.helpers.spacing("sm"),
+      }}
+    >
       <SunmiSelectAdv value={selected} onChange={setSelected}>
         <SunmiSelectOption value="">Seleccionar depósito…</SunmiSelectOption>
         {disponibles.map((d) => (

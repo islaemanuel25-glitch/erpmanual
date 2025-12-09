@@ -6,6 +6,7 @@ import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiTableUsuarios({
   columnas = [],
@@ -16,8 +17,16 @@ export default function SunmiTableUsuarios({
   onNext,
   accionesPersonalizadas,
 }) {
+  const { ui } = useUIConfig();
+
   return (
-    <div className="sunmi-card border border-slate-800 rounded-2xl shadow-md p-0 overflow-hidden bg-slate-950">
+    <div
+      className="sunmi-card border border-slate-800 shadow-md overflow-hidden bg-slate-950"
+      style={{
+        borderRadius: ui.helpers.radius("xl"),
+        padding: 0,
+      }}
+    >
 
       {/* HEADER SUNMI */}
       <SunmiHeader title="Usuarios" color="amber" />
@@ -32,14 +41,30 @@ export default function SunmiTableUsuarios({
               {columnas.map((col) => (
                 <th
                   key={col.key}
-                  className="text-left px-3 py-2 text-[12px] font-semibold uppercase tracking-wide"
+                  className="text-left font-semibold uppercase tracking-wide"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("md"),
+                    paddingRight: ui.helpers.spacing("md"),
+                    paddingTop: ui.helpers.spacing("sm"),
+                    paddingBottom: ui.helpers.spacing("sm"),
+                    fontSize: ui.helpers.font("xs"),
+                  }}
                 >
                   {col.titulo}
                 </th>
               ))}
 
               {accionesPersonalizadas && (
-                <th className="text-left px-3 py-2 text-[12px] font-semibold uppercase tracking-wide">
+                <th
+                  className="text-left font-semibold uppercase tracking-wide"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("md"),
+                    paddingRight: ui.helpers.spacing("md"),
+                    paddingTop: ui.helpers.spacing("sm"),
+                    paddingBottom: ui.helpers.spacing("sm"),
+                    fontSize: ui.helpers.font("xs"),
+                  }}
+                >
                   Acciones
                 </th>
               )}
@@ -52,13 +77,30 @@ export default function SunmiTableUsuarios({
             {datos.map((row, idx) => (
               <SunmiTableRow key={idx}>
                 {columnas.map((col) => (
-                  <td key={col.key} className="px-3 py-2 text-[12px]">
+                  <td
+                    key={col.key}
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                      fontSize: ui.helpers.font("xs"),
+                    }}
+                  >
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>
                 ))}
 
                 {accionesPersonalizadas && (
-                  <td className="px-3 py-2 text-[12px]">
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                      fontSize: ui.helpers.font("xs"),
+                    }}
+                  >
                     {accionesPersonalizadas(row)}
                   </td>
                 )}
@@ -69,7 +111,15 @@ export default function SunmiTableUsuarios({
       </div>
 
       {/* PAGINACIÓN SUNMI */}
-      <div className="flex justify-between items-center px-4 py-2 border-t border-slate-800 bg-slate-900">
+      <div
+        className="flex justify-between items-center border-t border-slate-800 bg-slate-900"
+        style={{
+          paddingLeft: ui.helpers.spacing("lg"),
+          paddingRight: ui.helpers.spacing("lg"),
+          paddingTop: ui.helpers.spacing("sm"),
+          paddingBottom: ui.helpers.spacing("sm"),
+        }}
+      >
         <SunmiButton
           color="slate"
           size="sm"
@@ -79,7 +129,12 @@ export default function SunmiTableUsuarios({
           ◀ Anterior
         </SunmiButton>
 
-        <span className="text-[12px] text-slate-300">
+        <span
+          className="text-slate-300"
+          style={{
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
           Página {page} / {totalPages}
         </span>
 

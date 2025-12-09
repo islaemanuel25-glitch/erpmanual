@@ -1,24 +1,25 @@
 "use client";
 
-import { SunmiThemeProvider, useSunmiTheme } from "./SunmiThemeProvider";
-import { UIConfigProvider } from "@/components/providers/UIConfigProvider";
+import { SunmiThemeProvider } from "./SunmiThemeProvider";
 
 export default function ThemeClientWrapper({ children }) {
   return (
-    <UIConfigProvider>
-      <SunmiThemeProvider>
-        <ThemeBody>{children}</ThemeBody>
-      </SunmiThemeProvider>
-    </UIConfigProvider>
+    <SunmiThemeProvider>
+      <ThemeBody>{children}</ThemeBody>
+    </SunmiThemeProvider>
   );
 }
 
 function ThemeBody({ children }) {
-  const { theme } = useSunmiTheme();
-
   return (
-    <body className={`h-screen w-screen overflow-hidden ${theme.layout}`}>
+    <div
+      className="min-h-screen w-full"
+      style={{
+        backgroundColor: "var(--sunmi-bg)",
+        color: "var(--sunmi-text)",
+      }}
+    >
       {children}
-    </body>
+    </div>
   );
 }

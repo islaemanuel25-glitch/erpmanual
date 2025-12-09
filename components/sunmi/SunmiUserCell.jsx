@@ -1,24 +1,54 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
-export default function SunmiUserCell({ nombre = "", email = "" }) {
-  const { theme } = useSunmiTheme();
+export default function SunmiUserCell({ nombre = "", email = "", color = "amber" }) {
+  const { ui } = useUIConfig();
   const inicial = nombre?.[0]?.toUpperCase() ?? "?";
 
   // Usar color del header para el avatar (amber o cyan según theme)
-  const avatarBg = theme.header.bg.includes('amber') ? 'bg-amber-400' : 'bg-cyan-400';
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-')) || 'text-slate-100';
+  const avatarBg = color === "cyan" ? "#22d3ee" : "#fbbf24"; // cyan-400 : amber-400
+
+  const avatarSize = parseInt(ui.helpers.icon(2));
 
   return (
-    <div className="flex items-center gap-2">
-      <div className={`w-8 h-8 rounded-full ${avatarBg} text-slate-900 flex items-center justify-center text-sm font-bold`}>
+    <div
+      className="flex items-center"
+      style={{
+        gap: ui.helpers.spacing("sm"),
+      }}
+    >
+      <div
+        className="rounded-full flex items-center justify-center font-bold"
+        style={{
+          backgroundColor: avatarBg,
+          color: "#0f172a", // slate-900
+          width: avatarSize,
+          height: avatarSize,
+          fontSize: ui.helpers.font("sm"),
+        }}
+      >
         {inicial}
       </div>
 
       <div className="flex flex-col">
-        <span className={`font-medium ${textColor}`}>{nombre || "Sin nombre"}</span>
-        <span className="text-xs text-slate-400">{email || "Sin email"}</span>
+        <span
+          className="font-medium"
+          style={{
+            color: "var(--sunmi-text)",
+            fontSize: ui.helpers.font("sm"),
+          }}
+        >
+          {nombre || "Sin nombre"}
+        </span>
+        <span
+          style={{
+            color: "#94a3b8", // slate-400
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
+          {email || "Sin email"}
+        </span>
       </div>
     </div>
   );

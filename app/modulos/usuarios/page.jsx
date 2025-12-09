@@ -20,12 +20,14 @@ import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
 import { Pencil, Trash2 } from "lucide-react";
 
 import ModalUsuario from "@/components/usuarios/ModalUsuario";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 const PAGE_SIZE = 25;
 
 export default function UsuariosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { ui } = useUIConfig();
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");
@@ -204,8 +206,18 @@ export default function UsuariosPage() {
         {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-col md:flex-row gap-3 flex-1">
+        <div
+          className="flex flex-col md:flex-row md:items-center md:justify-between"
+          style={{
+            gap: ui.helpers.spacing("md"),
+          }}
+        >
+          <div
+            className="flex flex-col md:flex-row flex-1"
+            style={{
+              gap: ui.helpers.spacing("md"),
+            }}
+          >
             <SunmiInput
               placeholder="Buscar usuario..."
               value={search}
@@ -231,7 +243,12 @@ export default function UsuariosPage() {
             </SunmiSelectAdv>
           </div>
 
-          <div className="flex gap-2">
+          <div
+            className="flex"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton onClick={limpiarFiltros} color="slate">
               Limpiar
             </SunmiButton>
@@ -269,11 +286,16 @@ export default function UsuariosPage() {
                 </td>
 
                 <td>
-                  <div className="flex justify-end gap-1">
+                  <div
+                    className="flex justify-end"
+                    style={{
+                      gap: ui.helpers.spacing("xs"),
+                    }}
+                  >
                     <SunmiButtonIcon
                       icon={Pencil}
                       color="amber"
-                      size={16}
+                      size={parseInt(ui.helpers.icon(1))}
                       onClick={() =>
                         router.push(`/modulos/usuarios?editar=${u.id}`)
                       }
@@ -282,7 +304,7 @@ export default function UsuariosPage() {
                     <SunmiButtonIcon
                       icon={Trash2}
                       color="red"
-                      size={16}
+                      size={parseInt(ui.helpers.icon(1))}
                       onClick={() => handleEliminar(u.id)}
                     />
                   </div>
@@ -295,7 +317,12 @@ export default function UsuariosPage() {
         {/* PAGINACIÓN */}
         <SunmiSeparator />
 
-        <div className="flex justify-between gap-2">
+        <div
+          className="flex justify-between"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
           <SunmiButton
             color="slate"
             disabled={page <= 1}

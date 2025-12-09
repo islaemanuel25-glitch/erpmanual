@@ -12,10 +12,14 @@ import ColumnManager from "@/components/productos/ColumnManager";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import SelectorLocales from "@/components/productos/SelectorLocales";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 export default function ProductosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { ui } = useUIConfig();
+  const { theme } = useSunmiTheme();
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -255,12 +259,28 @@ export default function ProductosPage() {
   };
 
   return (
-    <div className="sunmi-bg w-full min-h-full p-2">
+    <div
+      className="sunmi-bg w-full min-h-full"
+      style={{
+        padding: ui.helpers.spacing("sm"),
+      }}
+    >
       <SunmiCard>
-        <div className="flex flex-col gap-2">
-
+        <div
+          className="flex flex-col"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
           {/* ALCANCE */}
-          <SunmiSeparator label="Alcance" className="!my-1" />
+          <SunmiSeparator
+            label="Alcance"
+            className=""
+            style={{
+              marginTop: ui.helpers.spacing("xs"),
+              marginBottom: ui.helpers.spacing("xs"),
+            }}
+          />
 
           <SelectorLocales
             value={localId}
@@ -268,7 +288,14 @@ export default function ProductosPage() {
           />
 
           {/* FILTROS */}
-          <SunmiSeparator label="Filtros" className="!my-1" />
+          <SunmiSeparator
+            label="Filtros"
+            className=""
+            style={{
+              marginTop: ui.helpers.spacing("xs"),
+              marginBottom: ui.helpers.spacing("xs"),
+            }}
+          />
 
           <FiltrosProductos
             initial={filtros}
@@ -280,7 +307,13 @@ export default function ProductosPage() {
           />
 
           {/* ACCIONES */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full mt-1">
+          <div
+            className="flex flex-col md:flex-row items-center justify-between w-full"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+              marginTop: ui.helpers.spacing("xs"),
+            }}
+          >
             <ColumnManager
               allColumns={allColumns}
               visibleKeys={visibleCols}
@@ -293,10 +326,28 @@ export default function ProductosPage() {
           </div>
 
           {/* LISTADO */}
-          <SunmiSeparator label="Listado" className="!my-1" />
+          <SunmiSeparator
+            label="Listado"
+            className=""
+            style={{
+              marginTop: ui.helpers.spacing("xs"),
+              marginBottom: ui.helpers.spacing("xs"),
+            }}
+          />
 
-          <div className="overflow-x-auto w-full mt-1">
-            <div className="rounded-lg border border-slate-800 overflow-hidden">
+          <div
+            className="overflow-x-auto w-full"
+            style={{
+              marginTop: ui.helpers.spacing("xs"),
+            }}
+          >
+            <div
+              className="border border-slate-800 overflow-hidden"
+              style={{
+                borderRadius: ui.helpers.radius("lg"),
+                borderWidth: ui.helpers.line(),
+              }}
+            >
               <SunmiTablaProductos
                 rows={rows}
                 columns={allColumns.filter((c) =>
@@ -315,7 +366,13 @@ export default function ProductosPage() {
           </div>
 
           {(loading || loadingEditar) && (
-            <div className="text-center text-slate-400 text-xs mt-1">
+            <div
+              className="text-center text-slate-400"
+              style={{
+                marginTop: ui.helpers.spacing("xs"),
+                fontSize: ui.helpers.font("xs"),
+              }}
+            >
               Cargando...
             </div>
           )}

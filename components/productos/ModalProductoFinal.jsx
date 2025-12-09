@@ -8,6 +8,7 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function ModalProducto({
   open,
@@ -16,6 +17,7 @@ export default function ModalProducto({
   catalogos,
   initialData = null,
 }) {
+  const { ui } = useUIConfig();
   const modalRef = useRef(null);
 
   const toNum = (v) => {
@@ -177,22 +179,49 @@ export default function ModalProducto({
 
   return (
     <div
-      className={`fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-3 ${
+      className={`fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center ${
         open ? "block" : "hidden"
       }`}
+      style={{
+        padding: ui.helpers.spacing("md"),
+      }}
     >
-      <SunmiCard className="w-[95%] max-w-4xl">
-        <div className="flex items-center justify-between mb-3">
+      <SunmiCard
+        style={{
+          width: "95%",
+          maxWidth: parseInt(ui.helpers.controlHeight()) * 12,
+        }}
+      >
+        <div
+          className="flex items-center justify-between"
+          style={{
+            marginBottom: ui.helpers.spacing("md"),
+          }}
+        >
           <SunmiHeader title={initialData ? "Editar producto" : "Nuevo producto"} color="amber" />
           <SunmiButton color="cyan" onClick={onClose}>
             Cerrar
           </SunmiButton>
         </div>
 
-        <div ref={modalRef} className="max-h-[70vh] overflow-y-auto space-y-4">
+        <div
+          ref={modalRef}
+          className="overflow-y-auto"
+          className="flex flex-col"
+          style={{
+            maxHeight: ui.helpers.modalMaxHeight,
+            gap: ui.helpers.spacing("lg"),
+          }}
+        >
           {/* IDENTIDAD */}
           <SunmiSeparator label="Identidad" color="amber" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            className="grid grid-cols-1 md:grid-cols-2"
+            style={{
+              gap: ui.helpers.spacing("lg"),
+              marginBottom: ui.helpers.spacing("lg"),
+            }}
+          >
             <Field label="Nombre *">
               <SunmiInput value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} />
             </Field>
@@ -212,7 +241,13 @@ export default function ModalProducto({
 
           {/* CATÁLOGOS */}
           <SunmiSeparator label="Catálogos" color="amber" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div
+            className="grid grid-cols-1 md:grid-cols-3"
+            style={{
+              gap: ui.helpers.spacing("lg"),
+              marginBottom: ui.helpers.spacing("lg"),
+            }}
+          >
             <Field label="Categoría">
               <SunmiSelectAdv
                 value={form.categoria_id === "" ? "" : String(form.categoria_id)}
@@ -264,7 +299,13 @@ export default function ModalProducto({
 
           {/* PRESENTACIÓN */}
           <SunmiSeparator label="Presentación" color="amber" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div
+            className="grid grid-cols-1 md:grid-cols-4"
+            style={{
+              gap: ui.helpers.spacing("lg"),
+              marginBottom: ui.helpers.spacing("lg"),
+            }}
+          >
             <Field label="Unidad *">
               <SunmiSelectAdv
                 value={form.unidad_medida}
@@ -304,7 +345,13 @@ export default function ModalProducto({
 
           {/* PRECIOS */}
           <SunmiSeparator label="Precios" color="amber" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div
+            className="grid grid-cols-1 md:grid-cols-4"
+            style={{
+              gap: ui.helpers.spacing("lg"),
+              marginBottom: ui.helpers.spacing("lg"),
+            }}
+          >
             <Field label="Costo *">
               <SunmiInput
                 type="number"
@@ -340,7 +387,13 @@ export default function ModalProducto({
 
           {/* OTROS */}
           <SunmiSeparator label="Otros" color="amber" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div
+            className="grid grid-cols-1 md:grid-cols-3"
+            style={{
+              gap: ui.helpers.spacing("lg"),
+              marginBottom: ui.helpers.spacing("lg"),
+            }}
+          >
             <Field label="Precio sugerido">
               <SunmiInput
                 type="number"
@@ -367,9 +420,27 @@ export default function ModalProducto({
 
           {/* SWITCHES */}
           <SunmiSeparator label="Opciones" color="amber" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] text-slate-400">Redondeo a $100</label>
+          <div
+            className="grid grid-cols-1 md:grid-cols-3"
+            style={{
+              gap: ui.helpers.spacing("lg"),
+              marginBottom: ui.helpers.spacing("lg"),
+            }}
+          >
+            <div
+              className="flex flex-col"
+              style={{
+                gap: ui.helpers.spacing("xs"),
+              }}
+            >
+              <label
+                className="text-slate-400"
+                style={{
+                  fontSize: ui.helpers.font("xs"),
+                }}
+              >
+                Redondeo a $100
+              </label>
               <SunmiToggleEstado
                 checked={form.redondeo_100}
                 onChange={(v) => {
@@ -380,16 +451,40 @@ export default function ModalProducto({
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] text-slate-400">Es combo</label>
+            <div
+              className="flex flex-col"
+              style={{
+                gap: ui.helpers.spacing("xs"),
+              }}
+            >
+              <label
+                className="text-slate-400"
+                style={{
+                  fontSize: ui.helpers.font("xs"),
+                }}
+              >
+                Es combo
+              </label>
               <SunmiToggleEstado
                 checked={form.es_combo}
                 onChange={(v) => setField("es_combo", v)}
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] text-slate-400">Activo</label>
+            <div
+              className="flex flex-col"
+              style={{
+                gap: ui.helpers.spacing("xs"),
+              }}
+            >
+              <label
+                className="text-slate-400"
+                style={{
+                  fontSize: ui.helpers.font("xs"),
+                }}
+              >
+                Activo
+              </label>
               <SunmiToggleEstado
                 checked={form.activo}
                 onChange={(v) => setField("activo", v)}
@@ -398,7 +493,14 @@ export default function ModalProducto({
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end gap-2">
+        <div
+          className="border-t border-slate-800 flex justify-end"
+          style={{
+            marginTop: ui.helpers.spacing("lg"),
+            paddingTop: ui.helpers.spacing("lg"),
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
           <SunmiButton color="cyan" onClick={onClose}>
             Cancelar
           </SunmiButton>
@@ -414,9 +516,22 @@ export default function ModalProducto({
 
 /* SUBCOMPONENTES */
 function Field({ label, children, colSpan }) {
+  const { ui } = useUIConfig();
   return (
-    <div className={colSpan ? "md:col-span-2 flex flex-col gap-1" : "flex flex-col gap-1"}>
-      <label className="text-[12px] text-slate-400">{label}</label>
+    <div
+      className={colSpan ? "md:col-span-2 flex flex-col" : "flex flex-col"}
+      style={{
+        gap: ui.helpers.spacing("xs"),
+      }}
+    >
+      <label
+        className="text-slate-400"
+        style={{
+          fontSize: ui.helpers.font("xs"),
+        }}
+      >
+        {label}
+      </label>
       {children}
     </div>
   );

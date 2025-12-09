@@ -7,8 +7,10 @@ import SunmiSelectAdv, {
 } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function FiltrosProductos({ onChange, catalogos, initial }) {
+  const { ui } = useUIConfig();
   const [search, setSearch] = useState(initial.search || "");
   const [categoria, setCategoria] = useState(initial.categoria || "");
   const [proveedor, setProveedor] = useState(initial.proveedor || "");
@@ -37,11 +39,21 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      className="flex flex-col"
+      style={{
+        gap: ui.helpers.spacing("lg"),
+      }}
+    >
       {/* ================================= */}
       {/* BARRA PRINCIPAL */}
       {/* ================================= */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div
+        className="flex flex-col md:flex-row md:items-center md:justify-between"
+        style={{
+          gap: ui.helpers.spacing("md"),
+        }}
+      >
         {/* BUSCADOR SUNMI */}
         <div className="flex-1">
           <SunmiInput
@@ -67,17 +79,21 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
       {/* ================================= */}
       {open && (
         <div
-          className="
-            rounded-2xl p-4 
-            border border-slate-700 
-            bg-slate-900
-            shadow-md
-            animate-fadeIn
-          "
+          className="border border-slate-700 bg-slate-900 shadow-md animate-fadeIn"
+          style={{
+            borderRadius: ui.helpers.radius("xl"),
+            padding: ui.helpers.spacing("lg"),
+          }}
         >
           <SunmiSeparator label="Filtros avanzados" color="amber" />
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
+          <div
+            className="grid grid-cols-1 md:grid-cols-5"
+            style={{
+              gap: ui.helpers.spacing("lg"),
+              marginTop: ui.helpers.spacing("lg"),
+            }}
+          >
             {/* CATEGORÍA */}
             <SunmiSelectAdv
               value={categoria}

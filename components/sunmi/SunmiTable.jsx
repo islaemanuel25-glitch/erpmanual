@@ -1,32 +1,36 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiTable({ headers = [], children }) {
-  const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   
   return (
     <div className="overflow-x-auto">
       <table
-        className="
-          w-full 
-          text-[12px]              /* más compacto */
-          table-fixed
-        "
+        className="w-full table-fixed"
+        style={{
+          fontSize: ui.helpers.font("xs"),
+        }}
       >
         {/* ===== HEADER ===== */}
         {headers.length > 0 && (
-          <thead className={theme.table?.header || "bg-amber-400 text-slate-900"}>
+          <thead
+            style={{
+              backgroundColor: "var(--sunmi-table-header-bg)",
+            }}
+          >
             <tr>
               {headers.map((h, i) => (
                 <th
                   key={i}
-                  className="
-                    px-2 py-1.5        /* antes px-3 py-2 */
-                    text-left
-                    font-semibold
-                    whitespace-nowrap
-                  "
+                  className="text-left font-semibold whitespace-nowrap"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("sm"),
+                    paddingBottom: ui.helpers.spacing("sm"),
+                  }}
                 >
                   {h}
                 </th>
@@ -36,11 +40,7 @@ export default function SunmiTable({ headers = [], children }) {
         )}
 
         {/* ===== BODY ===== */}
-        <tbody
-          className="
-            divide-y divide-slate-800
-          "
-        >
+        <tbody className="divide-y divide-slate-800">
           {children}
         </tbody>
       </table>

@@ -8,9 +8,11 @@ import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function PosTransferenciasHomePage() {
   const router = useRouter();
+  const { ui } = useUIConfig();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -201,17 +203,22 @@ export default function PosTransferenciasHomePage() {
   // ========================================================
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
-      <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
+      <div
+        className="max-w-4xl mx-auto"
+        style={{
+          padding: ui.helpers.spacing("md"),
+        }}
+      >
         {/* VOLVER */}
         <button
           type="button"
           onClick={() => router.back()}
-          className="
-            text-xs text-cyan-400 
-            hover:text-cyan-300 
-            flex items-center gap-1
-            transition
-          "
+          className="text-cyan-400 hover:text-cyan-300 flex items-center transition"
+          style={{
+            fontSize: ui.helpers.font("xs"),
+            gap: ui.helpers.spacing("xs"),
+            marginBottom: ui.helpers.spacing("md"),
+          }}
         >
           ← Volver
         </button>
@@ -221,14 +228,25 @@ export default function PosTransferenciasHomePage() {
             title="POS · Transferencias"
             color="amber"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-[11px] mt-1">
+            <div
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between"
+              style={{
+                fontSize: ui.helpers.font("xs"),
+                marginTop: ui.helpers.spacing("xs"),
+              }}
+            >
               <div className="text-slate-900/80">
                 Usuario:{" "}
                 <span className="font-semibold">
                   {me?.nombre || "-"}
                 </span>
               </div>
-              <div className="text-slate-900/70 mt-1 sm:mt-0">
+              <div
+                className="text-slate-900/70"
+                style={{
+                  marginTop: ui.helpers.spacing("xs"),
+                }}
+              >
                 Modo:{" "}
                 <span className="font-semibold">
                   {modo === "deposito" ? "Depósito" : "Admin"}
@@ -239,7 +257,18 @@ export default function PosTransferenciasHomePage() {
 
           {/* ERROR DENTRO DE LA CARD */}
           {error && (
-            <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">
+            <div
+              className="text-red-400 bg-red-900/20 border border-red-500/40"
+              style={{
+                marginBottom: ui.helpers.spacing("md"),
+                fontSize: ui.helpers.font("xs"),
+                paddingLeft: ui.helpers.spacing("md"),
+                paddingRight: ui.helpers.spacing("md"),
+                paddingTop: ui.helpers.spacing("sm"),
+                paddingBottom: ui.helpers.spacing("sm"),
+                borderRadius: ui.helpers.radius("lg"),
+              }}
+            >
               {error}
             </div>
           )}
@@ -251,35 +280,70 @@ export default function PosTransferenciasHomePage() {
             <>
               <SunmiSeparator label="Preparar transferencia desde Depósito" />
 
-              <div className="space-y-4 text-[13px]">
+              <div
+                className="flex flex-col"
+                style={{
+                  gap: ui.helpers.spacing("lg"),
+                  fontSize: ui.helpers.font("sm"),
+                }}
+              >
                 {/* RESUMEN ORIGEN */}
                 <div
-                  className="
-                    bg-slate-900/80 
-                    border border-slate-700 
-                    rounded-2xl 
-                    px-4 py-3
-                    flex flex-col sm:flex-row sm:items-center sm:justify-between
-                    gap-2
-                  "
+                  className="bg-slate-900/80 border border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between"
+                  style={{
+                    borderRadius: ui.helpers.radius("xl"),
+                    paddingLeft: ui.helpers.spacing("lg"),
+                    paddingRight: ui.helpers.spacing("lg"),
+                    paddingTop: ui.helpers.spacing("md"),
+                    paddingBottom: ui.helpers.spacing("md"),
+                    gap: ui.helpers.spacing("sm"),
+                    marginBottom: ui.helpers.spacing("lg"),
+                  }}
                 >
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    <div
+                      className="uppercase tracking-wide text-slate-400"
+                      style={{
+                        fontSize: ui.helpers.font("xs"),
+                      }}
+                    >
                       Depósito origen
                     </div>
-                    <div className="text-[14px] font-semibold text-slate-100">
+                    <div
+                      className="font-semibold text-slate-100"
+                      style={{
+                        fontSize: ui.helpers.font("base"),
+                      }}
+                    >
                       {origenDeposito.nombre}
                     </div>
                   </div>
 
-                  <div className="text-[11px] text-slate-400">
+                  <div
+                    className="text-slate-400"
+                    style={{
+                      fontSize: ui.helpers.font("xs"),
+                    }}
+                  >
                     Seleccioná el local destino y comenzá la sesión POS.
                   </div>
                 </div>
 
                 {/* SELECT DESTINO SUNMI */}
-                <div className="space-y-1">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                <div
+                  className="flex flex-col"
+                  style={{
+                    gap: ui.helpers.spacing("xs"),
+                    marginBottom: ui.helpers.spacing("lg"),
+                  }}
+                >
+                  <div
+                    className="uppercase tracking-wide text-slate-400"
+                    style={{
+                      fontSize: ui.helpers.font("xs"),
+                      marginBottom: ui.helpers.spacing("xs"),
+                    }}
+                  >
                     Local destino
                   </div>
 
@@ -297,7 +361,11 @@ export default function PosTransferenciasHomePage() {
                 </div>
 
                 {/* BOTÓN INICIAR */}
-                <div className="pt-2">
+                <div
+                  style={{
+                    paddingTop: ui.helpers.spacing("sm"),
+                  }}
+                >
                   <SunmiButton
                     color="amber"
                     disabled={!destinoIdDeposito}
@@ -317,10 +385,28 @@ export default function PosTransferenciasHomePage() {
             <>
               <SunmiSeparator label="Preparar transferencia como Admin" />
 
-              <div className="space-y-4 text-[13px]">
+              <div
+                className="flex flex-col"
+                style={{
+                  gap: ui.helpers.spacing("lg"),
+                  fontSize: ui.helpers.font("sm"),
+                }}
+              >
                 {/* GRUPO */}
-                <div className="space-y-1">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                <div
+                  className="flex flex-col"
+                  style={{
+                    gap: ui.helpers.spacing("xs"),
+                    marginBottom: ui.helpers.spacing("lg"),
+                  }}
+                >
+                  <div
+                    className="uppercase tracking-wide text-slate-400"
+                    style={{
+                      fontSize: ui.helpers.font("xs"),
+                      marginBottom: ui.helpers.spacing("xs"),
+                    }}
+                  >
                     Grupo
                   </div>
 
@@ -338,10 +424,27 @@ export default function PosTransferenciasHomePage() {
                 </div>
 
                 {/* ORIGEN / DESTINO */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div
+                  className="grid grid-cols-1 md:grid-cols-2"
+                  style={{
+                    gap: ui.helpers.spacing("lg"),
+                    marginBottom: ui.helpers.spacing("lg"),
+                  }}
+                >
                   {/* DEPÓSITO ORIGEN */}
-                  <div className="space-y-1">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                  <div
+                    className="flex flex-col"
+                    style={{
+                      gap: ui.helpers.spacing("xs"),
+                    }}
+                  >
+                    <div
+                      className="uppercase tracking-wide text-slate-400"
+                      style={{
+                        fontSize: ui.helpers.font("xs"),
+                        marginBottom: ui.helpers.spacing("xs"),
+                      }}
+                    >
                       Depósito origen
                     </div>
 
@@ -359,8 +462,19 @@ export default function PosTransferenciasHomePage() {
                   </div>
 
                   {/* LOCAL DESTINO */}
-                  <div className="space-y-1">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                  <div
+                    className="flex flex-col"
+                    style={{
+                      gap: ui.helpers.spacing("xs"),
+                    }}
+                  >
+                    <div
+                      className="uppercase tracking-wide text-slate-400"
+                      style={{
+                        fontSize: ui.helpers.font("xs"),
+                        marginBottom: ui.helpers.spacing("xs"),
+                      }}
+                    >
                       Local destino
                     </div>
 
@@ -379,7 +493,11 @@ export default function PosTransferenciasHomePage() {
                 </div>
 
                 {/* BOTÓN INICIAR */}
-                <div className="pt-2">
+                <div
+                  style={{
+                    paddingTop: ui.helpers.spacing("sm"),
+                  }}
+                >
                   <SunmiButton
                     color="cyan"
                     disabled={!origenIdAdmin || !destinoIdAdmin}
@@ -394,7 +512,12 @@ export default function PosTransferenciasHomePage() {
 
           {/* SI NO HAY MODO DEFINIDO */}
           {!modo && (
-            <div className="text-[12px] text-slate-400">
+            <div
+              className="text-slate-400"
+              style={{
+                fontSize: ui.helpers.font("xs"),
+              }}
+            >
               No se configuró el modo de POS para este usuario.
             </div>
           )}

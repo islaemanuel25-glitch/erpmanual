@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function BuscadorManual({
   texto,
@@ -10,6 +11,7 @@ export default function BuscadorManual({
   resultados,
   onAgregar,
 }) {
+  const { ui } = useUIConfig();
   const [focusIndex, setFocusIndex] = useState(-1);
 
   const lastTimeRef = useRef(Date.now());
@@ -138,9 +140,20 @@ export default function BuscadorManual({
   // RENDER SUNMI
   // ===================================================
   return (
-    <div className="relative w-full mb-3">
-
-      <div className="text-[11px] uppercase tracking-wide text-cyan-400 mb-1 pl-1">
+    <div
+      className="relative w-full"
+      style={{
+        marginBottom: ui.helpers.spacing("md"),
+      }}
+    >
+      <div
+        className="uppercase tracking-wide text-cyan-400"
+        style={{
+          fontSize: ui.helpers.font("xs"),
+          marginBottom: ui.helpers.spacing("xs"),
+          paddingLeft: ui.helpers.spacing("xs"),
+        }}
+      >
         Buscar · Escanear · Hablar
       </div>
 
@@ -148,18 +161,14 @@ export default function BuscadorManual({
         <button
           type="button"
           onClick={iniciarVoz}
-          className="
-            absolute right-2 top-1/2 -translate-y-1/2
-            h-8 w-8 rounded-full
-            bg-slate-800
-            border border-cyan-500
-            flex items-center justify-center
-            text-cyan-300 text-[16px]
-            hover:bg-slate-700 
-            active:scale-95
-            transition
-            shadow-[0_0_8px_rgba(34,211,238,0.35)]
-          "
+          className="absolute top-1/2 -translate-y-1/2 bg-slate-800 border border-cyan-500 flex items-center justify-center text-cyan-300 hover:bg-slate-700 active:scale-95 transition shadow-[0_0_8px_rgba(34,211,238,0.35)]"
+          style={{
+            right: ui.helpers.spacing("sm"),
+            height: parseInt(ui.helpers.controlHeight()),
+            width: parseInt(ui.helpers.controlHeight()),
+            borderRadius: ui.helpers.radius("full"),
+            fontSize: ui.helpers.font("lg"),
+          }}
         >
           🎤
         </button>
@@ -167,59 +176,67 @@ export default function BuscadorManual({
         <input
           type="text"
           placeholder="Buscar producto o decirlo..."
-          className="
-            pl-10 pr-12 py-2 w-full
-            bg-slate-900 text-slate-100
-            border border-cyan-500/40
-            rounded-xl shadow-inner
-            text-[13px]
-            focus:outline-none 
-            focus:ring-2 focus:ring-cyan-400 
-            focus:border-cyan-400
-            transition-all
-          "
+          className="w-full bg-slate-900 text-slate-100 border border-cyan-500/40 shadow-inner focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition-all"
+          style={{
+            paddingLeft: parseInt(ui.helpers.spacing("lg")) * 2.5,
+            paddingRight: parseInt(ui.helpers.spacing("lg")) * 3,
+            paddingTop: ui.helpers.spacing("sm"),
+            paddingBottom: ui.helpers.spacing("sm"),
+            borderRadius: ui.helpers.radius("xl"),
+            fontSize: ui.helpers.font("sm"),
+          }}
           value={texto}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
         />
 
-        <span className="
-          absolute left-3 top-1/2 -translate-y-1/2 
-          text-[15px] text-cyan-400
-        ">
+        <span
+          className="absolute top-1/2 -translate-y-1/2 text-cyan-400"
+          style={{
+            left: ui.helpers.spacing("md"),
+            fontSize: ui.helpers.font("lg"),
+          }}
+        >
           🔍
         </span>
       </div>
 
       {loading && (
-        <div className="text-[12px] text-cyan-300 mt-1 animate-pulse">
+        <div
+          className="text-cyan-300 animate-pulse"
+          style={{
+            fontSize: ui.helpers.font("xs"),
+            marginTop: ui.helpers.spacing("xs"),
+          }}
+        >
           Buscando...
         </div>
       )}
 
       {!loading && resultados.length > 0 && texto.trim() !== "" && (
         <div
-          className="
-            absolute top-[60px] left-0 right-0 
-            bg-slate-900 
-            border border-cyan-500/40 
-            rounded-xl shadow-xl 
-            max-h-64 overflow-auto z-50
-            animate-[fadeIn_0.2s_ease]
-          "
+          className="absolute left-0 right-0 bg-slate-900 border border-cyan-500/40 shadow-xl overflow-auto z-50 animate-[fadeIn_0.2s_ease]"
+          style={{
+            top: parseInt(ui.helpers.controlHeight()) * 2.5,
+            borderRadius: ui.helpers.radius("xl"),
+            maxHeight: parseInt(ui.helpers.controlHeight()) * 8,
+          }}
         >
           {resultados.slice(0, 30).map((p, idx) => (
             <div
               key={p.productoLocalId}
-              className={`
-                px-3 py-2 cursor-pointer text-[13px] 
-                ${
-                  idx === focusIndex
-                    ? "bg-cyan-600/20 border-l-4 border-cyan-400"
-                    : "hover:bg-cyan-500/10"
-                }
-                transition-all
-              `}
+              className={`cursor-pointer transition-all ${
+                idx === focusIndex
+                  ? "bg-cyan-600/20 border-l-4 border-cyan-400"
+                  : "hover:bg-cyan-500/10"
+              }`}
+              style={{
+                paddingLeft: ui.helpers.spacing("md"),
+                paddingRight: ui.helpers.spacing("md"),
+                paddingTop: ui.helpers.spacing("sm"),
+                paddingBottom: ui.helpers.spacing("sm"),
+                fontSize: ui.helpers.font("sm"),
+              }}
               onMouseEnter={() => setFocusIndex(idx)}
               onClick={() => {
                 beep();
@@ -231,7 +248,12 @@ export default function BuscadorManual({
               <div className="text-slate-100 font-medium">{p.nombre}</div>
 
               {p.codigoBarra && (
-                <div className="text-[11px] text-slate-400">
+                <div
+                  className="text-slate-400"
+                  style={{
+                    fontSize: ui.helpers.font("xs"),
+                  }}
+                >
                   Código: {p.codigoBarra}
                 </div>
               )}
@@ -241,7 +263,13 @@ export default function BuscadorManual({
       )}
 
       {!loading && texto.trim() !== "" && resultados.length === 0 && (
-        <div className="text-[12px] text-slate-400 mt-1">
+        <div
+          className="text-slate-400"
+          style={{
+            fontSize: ui.helpers.font("xs"),
+            marginTop: ui.helpers.spacing("xs"),
+          }}
+        >
           No se encontraron productos.
         </div>
       )}

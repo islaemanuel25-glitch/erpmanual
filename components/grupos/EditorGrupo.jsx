@@ -13,8 +13,10 @@ import SunmiListCardRemove from "@/components/sunmi/SunmiListCardRemove";
 
 import SelectAgregarLocal from "@/components/grupos/SelectAgregarLocal";
 import SelectAgregarDeposito from "@/components/grupos/SelectAgregarDeposito";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function EditorGrupo({ grupoId }) {
+  const { ui } = useUIConfig();
   const [grupo, setGrupo] = useState(null);
   const [nombre, setNombre] = useState("");
 
@@ -43,24 +45,44 @@ export default function EditorGrupo({ grupoId }) {
   if (!grupo) return "Cargando…";
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
-
+    <div
+      className="grid grid-cols-1 md:grid-cols-3 items-stretch"
+      style={{
+        gap: ui.helpers.spacing("md"),
+      }}
+    >
       {/* ========== COLUMNA IZQUIERDA ========== */}
       <div className="md:col-span-1 h-full">
         <SunmiPanel title="Datos del grupo" className="h-full">
           <SunmiSection>
-            <form onSubmit={saveNombre} className="flex items-center gap-2">
+            <form
+              onSubmit={saveNombre}
+              className="flex items-center"
+              style={{
+                gap: ui.helpers.spacing("sm"),
+              }}
+            >
               <SunmiInput
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                className="p-1 text-sm w-full"
+                className="w-full"
+                style={{
+                  padding: ui.helpers.spacing("xs"),
+                  fontSize: ui.helpers.font("sm"),
+                }}
                 placeholder="Nombre del grupo"
               />
 
               <SunmiButton
                 color="amber"
                 type="submit"
-                className="px-3 py-1 text-sm"
+                style={{
+                  paddingLeft: ui.helpers.spacing("md"),
+                  paddingRight: ui.helpers.spacing("md"),
+                  paddingTop: ui.helpers.spacing("xs"),
+                  paddingBottom: ui.helpers.spacing("xs"),
+                  fontSize: ui.helpers.font("sm"),
+                }}
               >
                 Guardar
               </SunmiButton>
@@ -70,7 +92,12 @@ export default function EditorGrupo({ grupoId }) {
       </div>
 
       {/* ========== COLUMNA DERECHA ========== */}
-      <div className="md:col-span-2 flex flex-col gap-3 h-full">
+      <div
+        className="md:col-span-2 flex flex-col h-full"
+        style={{
+          gap: ui.helpers.spacing("md"),
+        }}
+      >
 
         {/* PANEL: DEPÓSITOS */}
         <SunmiPanel title="Depósitos" className="h-full">
@@ -89,11 +116,21 @@ export default function EditorGrupo({ grupoId }) {
             />
           </SunmiSection>
 
-          <div className="mt-1">
+          <div
+            style={{
+              marginTop: ui.helpers.spacing("xs"),
+            }}
+          >
             <SunmiListCard compact>
               {(grupo.locales || []).map((d) => (
                 <SunmiListCardItem key={d.localId}>
-                  <span className="text-sm">{d.local.nombre}</span>
+                  <span
+                    style={{
+                      fontSize: ui.helpers.font("sm"),
+                    }}
+                  >
+                    {d.local.nombre}
+                  </span>
 
                   <SunmiListCardRemove
                     compact
@@ -130,11 +167,21 @@ export default function EditorGrupo({ grupoId }) {
             />
           </SunmiSection>
 
-          <div className="mt-1">
+          <div
+            style={{
+              marginTop: ui.helpers.spacing("xs"),
+            }}
+          >
             <SunmiListCard compact>
               {(grupo.localesGrupo || []).map((lg) => (
                 <SunmiListCardItem key={lg.local.id}>
-                  <span className="text-sm">{lg.local.nombre}</span>
+                  <span
+                    style={{
+                      fontSize: ui.helpers.font("sm"),
+                    }}
+                  >
+                    {lg.local.nombre}
+                  </span>
 
                   <SunmiListCardRemove
                     compact

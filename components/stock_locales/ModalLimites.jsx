@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function ModalLimites({ open, onClose, producto, local }) {
+  const { ui } = useUIConfig();
   const [minimo, setMinimo] = useState("");
   const [maximo, setMaximo] = useState("");
 
@@ -45,29 +47,53 @@ export default function ModalLimites({ open, onClose, producto, local }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      style={{
+        padding: ui.helpers.spacing("lg"),
+      }}
+    >
       <div className="sunmi-card relative w-full max-w-md">
-
         {/* HEADER */}
         <div className="sunmi-header-amber flex items-center justify-between">
           <span>Límites de stock</span>
           <button className="text-slate-900" onClick={() => onClose(false)}>
-            <X size={18} />
+            <X size={parseInt(ui.helpers.icon(1.125))} />
           </button>
         </div>
 
-        <div className="mt-4">
-          <p className="text-slate-300 text-[13px]">
+        <div
+          style={{
+            marginTop: ui.helpers.spacing("lg"),
+          }}
+        >
+          <p
+            className="text-slate-300"
+            style={{
+              fontSize: ui.helpers.font("sm"),
+            }}
+          >
             Producto: <strong className="text-slate-100">{producto.nombre}</strong>
           </p>
 
-          <p className="text-slate-300 text-[13px] mt-1">
+          <p
+            className="text-slate-300"
+            style={{
+              fontSize: ui.helpers.font("sm"),
+              marginTop: ui.helpers.spacing("xs"),
+            }}
+          >
             Local: <strong className="text-slate-100">{local.nombre}</strong>
           </p>
 
           {/* Inputs */}
-          <div className="flex flex-col gap-3 mt-4">
-
+          <div
+            className="flex flex-col"
+            style={{
+              gap: ui.helpers.spacing("md"),
+              marginTop: ui.helpers.spacing("lg"),
+            }}
+          >
             {/* Min */}
             <input
               type="number"
@@ -89,7 +115,13 @@ export default function ModalLimites({ open, onClose, producto, local }) {
 
           {/* Botón guardar */}
           <button
-            className="sunmi-btn sunmi-btn-cyan w-full mt-5 py-2 text-[13px] font-bold"
+            className="sunmi-btn sunmi-btn-cyan w-full font-bold"
+            style={{
+              marginTop: parseInt(ui.helpers.spacing("lg")) * 1.25,
+              paddingTop: ui.helpers.spacing("sm"),
+              paddingBottom: ui.helpers.spacing("sm"),
+              fontSize: ui.helpers.font("sm"),
+            }}
             onClick={guardar}
           >
             Guardar límites

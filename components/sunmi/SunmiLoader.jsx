@@ -1,26 +1,29 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
-export default function SunmiLoader({ size = 20 }) {
-  const { theme } = useSunmiTheme();
+export default function SunmiLoader({ size = 20, color = "amber" }) {
+  const { ui } = useUIConfig();
   
-  // Usar color del header para el spinner
-  const spinnerColor = theme.header.bg.includes('amber') ? 'border-t-amber-400' : 'border-t-cyan-400';
-  const borderColor = theme.card.split(' ').find(c => c.startsWith('border-'))?.replace('border-', 'border-') || 'border-slate-700';
+  const loaderSize = size || parseInt(ui.helpers.icon(1.25));
+  const spinnerColor = color === "cyan" ? "#22d3ee" : "#fbbf24"; // cyan-400 : amber-400
   
   return (
-    <div className="flex justify-center py-2">    {/* antes py-4 */}
+    <div
+      className="flex justify-center"
+      style={{
+        paddingTop: ui.helpers.spacing("sm"),
+        paddingBottom: ui.helpers.spacing("sm"),
+      }}
+    >
       <div
-        className={`
-          animate-spin 
-          rounded-full 
-          ${borderColor}       /* antes border-2 */
-          ${spinnerColor}
-        `}
+        className="animate-spin rounded-full"
         style={{
-          width: size,                  /* antes 28 by default */
-          height: size,
+          width: loaderSize,
+          height: loaderSize,
+          borderWidth: ui.helpers.line(),
+          borderColor: "var(--sunmi-card-border)",
+          borderTopColor: spinnerColor,
         }}
       />
     </div>

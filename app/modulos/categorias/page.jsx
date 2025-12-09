@@ -16,11 +16,12 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import ModalCategoria from "@/components/categorias/ModalCategoria";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function CategoriasPage() {
-
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { ui } = useUIConfig();
 
   // ============================================
   // FILTROS + PAGINACIÓN
@@ -150,12 +151,20 @@ export default function CategoriasPage() {
   // RENDER
   // ============================================
   return (
-    <div className="p-3 space-y-4">
+    <div
+      style={{
+        padding: ui.helpers.spacing("md"),
+      }}
+    >
       <SunmiCard>
-
         {/* ========= FILTROS ========= */}
-        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-
+        <div
+          className="grid grid-cols-1 md:grid-cols-3"
+          style={{
+            padding: ui.helpers.spacing("lg"),
+            gap: ui.helpers.spacing("md"),
+          }}
+        >
           <SunmiInput
             placeholder="Buscar por nombre..."
             value={search}
@@ -172,7 +181,12 @@ export default function CategoriasPage() {
             ]}
           />
 
-          <div className="flex gap-2">
+          <div
+            className="flex"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton
               variant="secondary"
               className="w-full"
@@ -191,7 +205,12 @@ export default function CategoriasPage() {
 
         {/* ========= TABLA ========= */}
         {loading ? (
-          <div className="p-6 flex justify-center">
+          <div
+            className="flex justify-center"
+            style={{
+              padding: parseInt(ui.helpers.spacing("lg")) * 1.5,
+            }}
+          >
             <SunmiLoader />
           </div>
         ) : (
@@ -201,18 +220,46 @@ export default function CategoriasPage() {
             ) : (
               items.map((item) => (
                 <SunmiTableRow key={item.id}>
-                  <td className="px-3 py-2">{item.nombre}</td>
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
+                    {item.nombre}
+                  </td>
 
-                  <td className="px-3 py-2">
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
                     <SunmiBadgeEstado estado={item.activo} />
                   </td>
 
-                  <td className="px-3 py-2 flex gap-3">
-
+                  <td
+                    className="flex"
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                      gap: ui.helpers.spacing("md"),
+                    }}
+                  >
                     {/* EDITAR */}
                     <SunmiButton
                       variant="ghost"
-                      className="text-amber-400 px-2"
+                      className="text-amber-400"
+                      style={{
+                        paddingLeft: ui.helpers.spacing("sm"),
+                        paddingRight: ui.helpers.spacing("sm"),
+                      }}
                       onClick={() => abrirEditar(item)}
                     >
                       Editar
@@ -221,12 +268,14 @@ export default function CategoriasPage() {
                     {/* ELIMINAR */}
                     <SunmiButton
                       variant="danger"
-                      className="px-2"
+                      style={{
+                        paddingLeft: ui.helpers.spacing("sm"),
+                        paddingRight: ui.helpers.spacing("sm"),
+                      }}
                       onClick={() => eliminar(item.id)}
                     >
                       Eliminar
                     </SunmiButton>
-
                   </td>
                 </SunmiTableRow>
               ))
@@ -237,7 +286,12 @@ export default function CategoriasPage() {
         <SunmiSeparator />
 
         {/* ========= PAGINACIÓN ========= */}
-        <div className="p-4 flex justify-between">
+        <div
+          className="flex justify-between"
+          style={{
+            padding: ui.helpers.spacing("lg"),
+          }}
+        >
           <SunmiButton
             variant="secondary"
             disabled={page <= 1}
@@ -246,7 +300,12 @@ export default function CategoriasPage() {
             ← Anterior
           </SunmiButton>
 
-          <span className="text-slate-400 text-sm self-center">
+          <span
+            className="text-slate-400 self-center"
+            style={{
+              fontSize: ui.helpers.font("sm"),
+            }}
+          >
             Página {page} de {totalPages}
           </span>
 

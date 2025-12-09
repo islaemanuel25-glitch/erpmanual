@@ -1,12 +1,12 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiToggleEstado({
   value = true,
   onChange = () => {},
 }) {
-  const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   
   // Normalizar valor del backend / formulario
   const normalized =
@@ -20,32 +20,45 @@ export default function SunmiToggleEstado({
     onChange(!normalized);
   };
 
-  // Usar badgeActivo para el estado activo
-  const activeBg = theme.badgeActivo.split(' ').find(c => c.startsWith('bg-')) || 'bg-green-400';
-  
-  // Extraer color de texto del layout
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-'))?.replace('text-slate-50', 'text-slate-300') || 'text-slate-300';
+  const trackHeight = parseInt(ui.helpers.controlHeight()) * 0.5;
+  const thumbSize = trackHeight * 0.9;
+  const trackWidth = trackHeight * 2;
+  const translateX = normalized ? trackWidth - thumbSize - 2 : 2;
 
   return (
     <div
-      className="flex items-center gap-2 cursor-pointer select-none"
+      className="flex items-center cursor-pointer select-none"
       onClick={toggle}
+      style={{
+        gap: ui.helpers.spacing("sm"),
+      }}
     >
       {/* Switch */}
       <div
-        className={`w-10 h-5 rounded-full transition-all ${
-          normalized ? activeBg : "bg-slate-600"
-        }`}
+        className="rounded-full transition-all"
+        style={{
+          backgroundColor: normalized ? "var(--sunmi-badge-activo-bg)" : "#475569", // slate-600
+          width: trackWidth,
+          height: trackHeight,
+        }}
       >
         <div
-          className={`w-5 h-5 bg-white rounded-full shadow transform transition-all ${
-            normalized ? "translate-x-5" : "translate-x-0"
-          }`}
+          className="bg-white rounded-full shadow transform transition-all"
+          style={{
+            width: thumbSize,
+            height: thumbSize,
+            transform: `translateX(${translateX}px)`,
+          }}
         />
       </div>
 
       {/* Texto */}
-      <span className={`text-[12px] ${textColor}`}>
+      <span
+        style={{
+          color: "var(--sunmi-text)",
+          fontSize: ui.helpers.font("xs"),
+        }}
+      >
         {normalized ? "Habilitado" : "Inactivo"}
       </span>
     </div>

@@ -12,6 +12,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiListCard from "@/components/sunmi/SunmiListCard";
 import SunmiListCardItem from "@/components/sunmi/SunmiListCardItem";
 import SunmiListCardRemove from "@/components/sunmi/SunmiListCardRemove";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function ModalGrupo({
   open,
@@ -19,6 +20,7 @@ export default function ModalGrupo({
   onSubmit,
   initialData = null,
 }) {
+  const { ui } = useUIConfig();
   const editMode = Boolean(initialData);
 
   const [form, setForm] = useState({ nombre: "" });
@@ -161,7 +163,12 @@ export default function ModalGrupo({
           />
 
           {/* CONTENIDO SCROLLEABLE */}
-          <div className="flex flex-col max-h-[65vh] overflow-y-auto">
+          <div
+            className="flex flex-col overflow-y-auto"
+            style={{
+              maxHeight: "65vh",
+            }}
+          >
 
             {/* Datos */}
             <SunmiSeparator label="Datos" color="amber" />
@@ -177,7 +184,12 @@ export default function ModalGrupo({
             {/* LOCALES */}
             <SunmiSeparator label="Locales" color="amber" />
 
-            <div className="flex gap-2">
+            <div
+              className="flex"
+              style={{
+                gap: ui.helpers.spacing("sm"),
+              }}
+            >
               <SunmiSelectAdv
                 value={localSeleccionado}
                 onChange={setLocalSeleccionado}
@@ -213,7 +225,12 @@ export default function ModalGrupo({
             {/* DEPÓSITOS */}
             <SunmiSeparator label="Depósitos" color="amber" />
 
-            <div className="flex gap-2">
+            <div
+              className="flex"
+              style={{
+                gap: ui.helpers.spacing("sm"),
+              }}
+            >
               <SunmiSelectAdv
                 value={depositoSeleccionado}
                 onChange={setDepositoSeleccionado}
@@ -248,7 +265,13 @@ export default function ModalGrupo({
           </div>
 
           {/* ACCIONES */}
-          <div className="flex justify-end gap-2 mt-2">
+          <div
+            className="flex justify-end"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+              marginTop: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
@@ -264,8 +287,14 @@ export default function ModalGrupo({
 }
 
 function Field({ label, children }) {
+  const { ui } = useUIConfig();
   return (
-    <div className="flex flex-col gap-1">
+    <div
+      className="flex flex-col"
+      style={{
+        gap: ui.helpers.spacing("xs"),
+      }}
+    >
       <span>{label}</span>
       {children}
     </div>

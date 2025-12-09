@@ -1,9 +1,9 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiBadgeEstado({ value }) {
-  const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   
   // Normalizar valor para detectar estado activo
   const isActive =
@@ -14,22 +14,24 @@ export default function SunmiBadgeEstado({ value }) {
     value === "activo" ||
     value === "Activo";
 
-  const data = isActive
-    ? { label: "Activo", class: theme.badgeActivo }
-    : { label: "Inactivo", class: theme.badgeInactivo };
+  const label = isActive ? "Activo" : "Inactivo";
 
   return (
     <span
-      className={`
-        px-1.5 py-[1px]
-        rounded-md
-        text-[10.5px]
-        font-semibold
-        leading-none
-        ${data.class}
-      `}
+      style={{
+        backgroundColor: isActive ? "var(--sunmi-badge-activo-bg)" : "var(--sunmi-badge-inactivo-bg)",
+        color: isActive ? "var(--sunmi-badge-activo-text)" : "var(--sunmi-badge-inactivo-text)",
+        paddingLeft: ui.helpers.spacing("sm"),
+        paddingRight: ui.helpers.spacing("sm"),
+        paddingTop: ui.helpers.spacing("xs"),
+        paddingBottom: ui.helpers.spacing("xs"),
+        borderRadius: ui.helpers.radius("md"),
+        fontSize: ui.helpers.font("xs"),
+        fontWeight: 600,
+        lineHeight: 1,
+      }}
     >
-      {data.label}
+      {label}
     </span>
   );
 }

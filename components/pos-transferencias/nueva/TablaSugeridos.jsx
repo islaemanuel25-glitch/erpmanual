@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function TablaSugeridos({
   datos,
@@ -20,38 +21,50 @@ export default function TablaSugeridos({
   onChangeCategoria,
   onChangeArea,
 }) {
+  const { ui } = useUIConfig();
+
   return (
     <div
-      className="
-        rounded-2xl 
-        bg-slate-900 
-        border border-slate-800 
-        shadow-md
-        overflow-hidden
-        text-[12px]
-      "
+      className="bg-slate-900 border border-slate-800 shadow-md overflow-hidden"
+      style={{
+        borderRadius: ui.helpers.radius("xl"),
+        fontSize: ui.helpers.font("xs"),
+      }}
     >
       {/* HEADER */}
       <div
-        className="
-          bg-[#FACC15]
-          text-slate-900 
-          px-4 py-2 
-          flex items-center justify-between
-          shadow-[0_0_12px_rgba(250,204,21,0.45)]
-        "
+        className="bg-[#FACC15] text-slate-900 flex items-center justify-between shadow-[0_0_12px_rgba(250,204,21,0.45)]"
+        style={{
+          paddingLeft: ui.helpers.spacing("lg"),
+          paddingRight: ui.helpers.spacing("lg"),
+          paddingTop: ui.helpers.spacing("sm"),
+          paddingBottom: ui.helpers.spacing("sm"),
+        }}
       >
-        <span className="font-bold text-xs uppercase tracking-wide">
+        <span
+          className="font-bold uppercase tracking-wide"
+          style={{
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
           Productos sugeridos
         </span>
 
-        <div className="flex items-center gap-2 text-[11px]">
+        <div
+          className="flex items-center"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
           <span className="opacity-80">Mostrar:</span>
 
           <SunmiSelectAdv
             value={pageSize}
             onChange={(v) => onPageSizeChange(Number(v))}
-            className="w-[85px]"
+            style={{
+              width: parseInt(ui.helpers.controlHeight()) * 2.5,
+            }}
           >
             {[25, 50, 100, 150, 200].map((n) => (
               <SunmiSelectOption key={n} value={n}>
@@ -61,35 +74,37 @@ export default function TablaSugeridos({
           </SunmiSelectAdv>
 
           <button
-            className="
-              px-2 py-1 rounded-lg 
-              bg-slate-900 text-slate-200 
-              border border-slate-700 
-              disabled:opacity-30
-              hover:bg-slate-800/60 
-              active:scale-95 
-              transition
-            "
+            className="bg-slate-900 text-slate-200 border border-slate-700 disabled:opacity-30 hover:bg-slate-800/60 active:scale-95 transition"
+            style={{
+              paddingLeft: ui.helpers.spacing("sm"),
+              paddingRight: ui.helpers.spacing("sm"),
+              paddingTop: ui.helpers.spacing("xs"),
+              paddingBottom: ui.helpers.spacing("xs"),
+              borderRadius: ui.helpers.radius("lg"),
+            }}
             onClick={onPrev}
             disabled={page <= 1}
           >
             ←
           </button>
 
-          <span className="text-[11px]">
+          <span
+            style={{
+              fontSize: ui.helpers.font("xs"),
+            }}
+          >
             {page} / {totalPages}
           </span>
 
           <button
-            className="
-              px-2 py-1 rounded-lg 
-              bg-slate-900 text-slate-200 
-              border border-slate-700 
-              disabled:opacity-30
-              hover:bg-slate-800/60 
-              active:scale-95 
-              transition
-            "
+            className="bg-slate-900 text-slate-200 border border-slate-700 disabled:opacity-30 hover:bg-slate-800/60 active:scale-95 transition"
+            style={{
+              paddingLeft: ui.helpers.spacing("sm"),
+              paddingRight: ui.helpers.spacing("sm"),
+              paddingTop: ui.helpers.spacing("xs"),
+              paddingBottom: ui.helpers.spacing("xs"),
+              borderRadius: ui.helpers.radius("lg"),
+            }}
             onClick={onNext}
             disabled={page >= totalPages}
           >
@@ -100,21 +115,31 @@ export default function TablaSugeridos({
 
       {/* FILTROS */}
       <div
-        className="
-          px-3 py-2 
-          bg-slate-900 
-          border-b border-slate-800 
-          flex flex-wrap gap-4
-        "
+        className="bg-slate-900 border-b border-slate-800 flex flex-wrap"
+        style={{
+          paddingLeft: ui.helpers.spacing("md"),
+          paddingRight: ui.helpers.spacing("md"),
+          paddingTop: ui.helpers.spacing("sm"),
+          paddingBottom: ui.helpers.spacing("sm"),
+          gap: ui.helpers.spacing("lg"),
+        }}
       >
         {/* CATEGORÍAS */}
-        <div className="flex items-center gap-2 text-[11px]">
+        <div
+          className="flex items-center"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
           <span className="text-slate-400">Categorías</span>
 
           <SunmiSelectAdv
             value={categoriaSeleccionada}
             onChange={(v) => onChangeCategoria?.(v)}
-            className="w-[140px]"
+            style={{
+              width: parseInt(ui.helpers.controlHeight()) * 4,
+            }}
           >
             <SunmiSelectOption value="todos">Todas</SunmiSelectOption>
             {categorias.map((c) => (
@@ -126,13 +151,21 @@ export default function TablaSugeridos({
         </div>
 
         {/* AREAS */}
-        <div className="flex items-center gap-2 text-[11px]">
+        <div
+          className="flex items-center"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
           <span className="text-slate-400">Áreas</span>
 
           <SunmiSelectAdv
             value={areaSeleccionada}
             onChange={(v) => onChangeArea?.(v)}
-            className="w-[140px]"
+            style={{
+              width: parseInt(ui.helpers.controlHeight()) * 4,
+            }}
           >
             <SunmiSelectOption value="todos">Todas</SunmiSelectOption>
             {areas.map((a) => (
@@ -144,7 +177,12 @@ export default function TablaSugeridos({
         </div>
 
         {loading && (
-          <span className="ml-auto text-[11px] text-slate-500 animate-pulse">
+          <span
+            className="ml-auto text-slate-500 animate-pulse"
+            style={{
+              fontSize: ui.helpers.font("xs"),
+            }}
+          >
             Cargando sugeridos...
           </span>
         )}
@@ -152,20 +190,69 @@ export default function TablaSugeridos({
 
       {/* TABLA */}
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
-          <thead
-            className="
-              bg-slate-900
-              border-b border-slate-800
-              text-slate-400
-            "
-          >
+        <table
+          className="w-full"
+          style={{
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
+          <thead className="bg-slate-900 border-b border-slate-800 text-slate-400">
             <tr>
-              <th className="px-3 py-2 text-left">Producto</th>
-              <th className="px-2 py-2 text-left">Código</th>
-              <th className="px-2 py-2 text-left">Presentación</th>
-              <th className="px-2 py-2 text-right">Sugerido (bultos)</th>
-              <th className="px-2 py-2 text-center">Acción</th>
+              <th
+                className="text-left"
+                style={{
+                  paddingLeft: ui.helpers.spacing("md"),
+                  paddingRight: ui.helpers.spacing("md"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                }}
+              >
+                Producto
+              </th>
+              <th
+                className="text-left"
+                style={{
+                  paddingLeft: ui.helpers.spacing("sm"),
+                  paddingRight: ui.helpers.spacing("sm"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                }}
+              >
+                Código
+              </th>
+              <th
+                className="text-left"
+                style={{
+                  paddingLeft: ui.helpers.spacing("sm"),
+                  paddingRight: ui.helpers.spacing("sm"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                }}
+              >
+                Presentación
+              </th>
+              <th
+                className="text-right"
+                style={{
+                  paddingLeft: ui.helpers.spacing("sm"),
+                  paddingRight: ui.helpers.spacing("sm"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                }}
+              >
+                Sugerido (bultos)
+              </th>
+              <th
+                className="text-center"
+                style={{
+                  paddingLeft: ui.helpers.spacing("sm"),
+                  paddingRight: ui.helpers.spacing("sm"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                }}
+              >
+                Acción
+              </th>
             </tr>
           </thead>
 
@@ -174,10 +261,14 @@ export default function TablaSugeridos({
               <tr>
                 <td
                   colSpan={5}
-                  className="
-                    px-3 py-4 text-center 
-                    text-slate-500 text-[11px]
-                  "
+                  className="text-center text-slate-500"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("md"),
+                    paddingRight: ui.helpers.spacing("md"),
+                    paddingTop: parseInt(ui.helpers.spacing("lg")) * 1.5,
+                    paddingBottom: parseInt(ui.helpers.spacing("lg")) * 1.5,
+                    fontSize: ui.helpers.font("xs"),
+                  }}
                 >
                   No hay productos sugeridos.
                 </td>
@@ -192,24 +283,37 @@ export default function TablaSugeridos({
               return (
                 <tr
                   key={p.productoLocalDestinoId}
-                  className="
-                    border-t border-slate-800
-                    hover:bg-slate-800/60
-                    transition
-                  "
+                  className="border-t border-slate-800 hover:bg-slate-800/60 transition"
                 >
                   {/* PRODUCTO */}
-                  <td className="px-3 py-2">
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
                     <div className="flex flex-col">
                       <span className="text-slate-100 font-medium">
                         {p.productoNombre}
                       </span>
-                      <span className="text-[11px] text-slate-500">
+                      <span
+                        className="text-slate-500"
+                        style={{
+                          fontSize: ui.helpers.font("xs"),
+                        }}
+                      >
                         {p.categoriaNombre || "Sin categoría"} ·{" "}
                         {p.areaFisicaNombre || "Sin área"}
                       </span>
                       {factor > 1 && (
-                        <span className="text-[11px] text-slate-500">
+                        <span
+                          className="text-slate-500"
+                          style={{
+                            fontSize: ui.helpers.font("xs"),
+                          }}
+                        >
                           Faltan aprox. {unidadesAprox} uds
                         </span>
                       )}
@@ -217,34 +321,56 @@ export default function TablaSugeridos({
                   </td>
 
                   {/* CODIGO */}
-                  <td className="px-2 py-2 text-[11px] text-slate-400">
+                  <td
+                    className="text-slate-400"
+                    style={{
+                      paddingLeft: ui.helpers.spacing("sm"),
+                      paddingRight: ui.helpers.spacing("sm"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                      fontSize: ui.helpers.font("xs"),
+                    }}
+                  >
                     {p.codigoBarra || "-"}
                   </td>
 
                   {/* PRESENTACIÓN */}
-                  <td className="px-2 py-2 text-[11px] text-slate-300">
+                  <td
+                    className="text-slate-300"
+                    style={{
+                      paddingLeft: ui.helpers.spacing("sm"),
+                      paddingRight: ui.helpers.spacing("sm"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                      fontSize: ui.helpers.font("xs"),
+                    }}
+                  >
                     {factor > 1
                       ? `${p.unidadMedida} x ${factor}`
                       : p.unidadMedida}
                   </td>
 
                   {/* INPUT SUGERIDO */}
-                  <td className="px-2 py-2 text-right">
+                  <td className="text-right" style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("sm"),
+                    paddingBottom: ui.helpers.spacing("sm"),
+                  }}>
                     <input
                       type="number"
                       min={0}
                       step={1}
-                      className="
-                        w-[80px]
-                        bg-slate-900
-                        border border-slate-700 
-                        rounded-lg px-2 py-1 
-                        text-right text-cyan-300
-                        text-[12px]
-                        focus:border-cyan-400 
-                        focus:ring-1 focus:ring-cyan-400
-                        transition
-                      "
+                      className="bg-slate-900 border border-slate-700 text-right text-cyan-300 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
+                      style={{
+                        width: parseInt(ui.helpers.controlHeight()) * 2.5,
+                        borderRadius: ui.helpers.radius("lg"),
+                        paddingLeft: ui.helpers.spacing("sm"),
+                        paddingRight: ui.helpers.spacing("sm"),
+                        paddingTop: ui.helpers.spacing("xs"),
+                        paddingBottom: ui.helpers.spacing("xs"),
+                        fontSize: ui.helpers.font("xs"),
+                      }}
                       value={p.sugerido}
                       onChange={(e) =>
                         onEditSugerido(
@@ -256,19 +382,23 @@ export default function TablaSugeridos({
                   </td>
 
                   {/* BOTÓN PREP. */}
-                  <td className="px-2 py-2 text-center">
+                  <td className="text-center" style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("sm"),
+                    paddingBottom: ui.helpers.spacing("sm"),
+                  }}>
                     <button
                       onClick={() => onMarcarPreparado(p.productoLocalOrigenId)}
-                      className="
-                        px-3 py-1 rounded-full 
-                        text-[11px] font-semibold
-                        bg-cyan-400 
-                        hover:bg-cyan-500 
-                        active:bg-cyan-600
-                        text-slate-900 
-                        shadow-[0_0_8px_rgba(45,212,191,0.4)]
-                        active:scale-95 transition
-                      "
+                      className="font-semibold bg-cyan-400 hover:bg-cyan-500 active:bg-cyan-600 text-slate-900 shadow-[0_0_8px_rgba(45,212,191,0.4)] active:scale-95 transition"
+                      style={{
+                        paddingLeft: ui.helpers.spacing("md"),
+                        paddingRight: ui.helpers.spacing("md"),
+                        paddingTop: ui.helpers.spacing("xs"),
+                        paddingBottom: ui.helpers.spacing("xs"),
+                        borderRadius: ui.helpers.radius("full"),
+                        fontSize: ui.helpers.font("xs"),
+                      }}
                     >
                       Prep.
                     </button>

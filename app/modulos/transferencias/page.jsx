@@ -12,6 +12,8 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 
 import ColumnSettingsModal from "@/components/transferencias/ColumnSettingsModal";
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 const ESTADOS = [
   { value: "", label: "Todos" },
@@ -36,6 +38,9 @@ const COLUMN_DEFAULTS = {
 };
 
 export default function TransferenciasPage() {
+  const { ui } = useUIConfig();
+  const { theme } = useSunmiTheme();
+  
   // 🔥 FECHAS INICIALIZADAS SIN FLASH
   const hoy = new Date().toISOString().split("T")[0];
 
@@ -140,11 +145,20 @@ export default function TransferenciasPage() {
   const next = () => setPage((p) => Math.min(totalPages, p + 1));
 
   return (
-    <div className="p-2 sm:p-4 max-w-6xl mx-auto">
-      
+    <div
+      className="max-w-6xl mx-auto"
+      style={{
+        padding: ui.helpers.spacing("sm"),
+      }}
+    >
       <SunmiCard>
         <SunmiHeader title="Transferencias" color="amber">
-          <div className="text-xs sm:text-sm text-slate-200">
+          <div
+            className="text-slate-200"
+            style={{
+              fontSize: ui.helpers.font("sm"),
+            }}
+          >
             Historial de transferencias entre Depósito y Locales
           </div>
         </SunmiHeader>
@@ -154,15 +168,38 @@ export default function TransferenciasPage() {
         ======================= */}
         <SunmiSeparator label="Filtros" color="amber" />
 
-        <div className="grid sm:grid-cols-3 gap-3 px-2 pb-2">
-
+        <div
+          className="grid sm:grid-cols-3"
+          style={{
+            gap: ui.helpers.spacing("md"),
+            paddingLeft: ui.helpers.spacing("sm"),
+            paddingRight: ui.helpers.spacing("sm"),
+            paddingBottom: ui.helpers.spacing("sm"),
+          }}
+        >
           {/* ESTADO */}
           <div>
-            <label className="text-slate-100 text-xs mb-1 block">Estado</label>
+            <label
+              className="text-slate-100 block"
+              style={{
+                fontSize: ui.helpers.font("xs"),
+                marginBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Estado
+            </label>
             <select
               value={estado}
               onChange={(e) => { setEstado(e.target.value); setPage(1); }}
-              className="px-2 py-1 w-full rounded bg-slate-900/60 border border-slate-600 text-slate-100 text-sm"
+              className="w-full rounded bg-slate-900/60 border border-slate-600 text-slate-100"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+                borderRadius: ui.helpers.radius("md"),
+                fontSize: ui.helpers.font("sm"),
+              }}
             >
               {ESTADOS.map((e) => (
                 <option key={e.value} value={e.value}>{e.label}</option>
@@ -172,11 +209,27 @@ export default function TransferenciasPage() {
 
           {/* LOCAL */}
           <div>
-            <label className="text-slate-100 text-xs mb-1 block">Local</label>
+            <label
+              className="text-slate-100 block"
+              style={{
+                fontSize: ui.helpers.font("xs"),
+                marginBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Local
+            </label>
             <select
               value={localId}
               onChange={(e) => { setLocalId(e.target.value); setPage(1); }}
-              className="px-2 py-1 w-full rounded bg-slate-900/60 border border-slate-600 text-slate-100 text-sm"
+              className="w-full rounded bg-slate-900/60 border border-slate-600 text-slate-100"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+                borderRadius: ui.helpers.radius("md"),
+                fontSize: ui.helpers.font("sm"),
+              }}
             >
               <option value="">Todos</option>
               {locales.map((l) => (
@@ -189,7 +242,15 @@ export default function TransferenciasPage() {
 
           {/* DESDE */}
           <div>
-            <label className="text-slate-100 text-xs mb-1 block">Desde</label>
+            <label
+              className="text-slate-100 block"
+              style={{
+                fontSize: ui.helpers.font("xs"),
+                marginBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Desde
+            </label>
             <SunmiInput
               type="date"
               value={fechaDesde}
@@ -199,7 +260,15 @@ export default function TransferenciasPage() {
 
           {/* HASTA */}
           <div>
-            <label className="text-slate-100 text-xs mb-1 block">Hasta</label>
+            <label
+              className="text-slate-100 block"
+              style={{
+                fontSize: ui.helpers.font("xs"),
+                marginBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Hasta
+            </label>
             <SunmiInput
               type="date"
               value={fechaHasta}
@@ -218,7 +287,13 @@ export default function TransferenciasPage() {
         {/* ======================
             LISTADO + BOTÓN DE COLUMNAS
         ======================= */}
-        <div className="flex items-center justify-between px-2">
+        <div
+          className="flex items-center justify-between"
+          style={{
+            paddingLeft: ui.helpers.spacing("sm"),
+            paddingRight: ui.helpers.spacing("sm"),
+          }}
+        >
           <SunmiSeparator label="Listado" color="amber" />
 
           <SunmiButton
@@ -243,8 +318,23 @@ export default function TransferenciasPage() {
         {/* ======================
             TOTAL GLOBAL
         ======================= */}
-        <SunmiCard className="mx-1 mt-3 bg-slate-950/60 border border-slate-700">
-          <div className="text-slate-300 text-sm px-3 py-2 flex justify-between">
+        <SunmiCard
+          className="bg-slate-950/60 border border-slate-700"
+          style={{
+            marginLeft: ui.helpers.spacing("xs"),
+            marginTop: ui.helpers.spacing("md"),
+          }}
+        >
+          <div
+            className="text-slate-300 flex justify-between"
+            style={{
+              fontSize: ui.helpers.font("sm"),
+              paddingLeft: ui.helpers.spacing("md"),
+              paddingRight: ui.helpers.spacing("md"),
+              paddingTop: ui.helpers.spacing("sm"),
+              paddingBottom: ui.helpers.spacing("sm"),
+            }}
+          >
             <span className="font-semibold">Importe total transferido:</span>
             <span className="text-amber-300 font-bold">
               ${Number(totalCostoGlobal).toFixed(2)}
@@ -255,11 +345,23 @@ export default function TransferenciasPage() {
         {/* ======================
             PAGINACIÓN
         ======================= */}
-        <div className="flex justify-between items-center px-2 pb-2 text-xs sm:text-sm text-slate-200">
-          
+        <div
+          className="flex justify-between items-center text-slate-200"
+          style={{
+            paddingLeft: ui.helpers.spacing("sm"),
+            paddingRight: ui.helpers.spacing("sm"),
+            paddingBottom: ui.helpers.spacing("sm"),
+            fontSize: ui.helpers.font("sm"),
+          }}
+        >
           <div>Página {page} de {totalPages}</div>
 
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton size="xs" variant="outline" onClick={prev} disabled={page <= 1}>
               Anterior
             </SunmiButton>

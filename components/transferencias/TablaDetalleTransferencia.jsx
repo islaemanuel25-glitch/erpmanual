@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 function num(v) {
   const n = Number(v);
@@ -13,21 +14,111 @@ export default function TablaDetalleTransferencia({
   setEditItems,
   inputsHabilitados,
 }) {
+  const { ui } = useUIConfig();
+  
   if (!item) return null;
 
   return (
-    <div className="overflow-auto rounded-2xl border border-slate-700 mx-1 mb-2">
+    <div
+      className="overflow-auto border border-slate-700"
+      style={{
+        borderRadius: ui.helpers.radius("xl"),
+        marginLeft: ui.helpers.spacing("xs"),
+        marginRight: ui.helpers.spacing("xs"),
+        marginBottom: ui.helpers.spacing("sm"),
+      }}
+    >
       <SunmiTable>
         <thead>
           <tr>
-            <th className="px-2 py-1 text-left">Producto</th>
-            <th className="px-2 py-1 text-left">Código</th>
-            <th className="px-2 py-1 text-right">Enviada</th>
-            <th className="px-2 py-1 text-right">Recibida</th>
-            <th className="px-2 py-1 text-left">Motivo</th>
-            <th className="px-2 py-1 text-left">Detalle</th>
-            <th className="px-2 py-1 text-right">Costo</th>
-            <th className="px-2 py-1 text-right">Subtotal</th>
+            <th
+              className="text-left"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Producto
+            </th>
+            <th
+              className="text-left"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Código
+            </th>
+            <th
+              className="text-right"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Enviada
+            </th>
+            <th
+              className="text-right"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Recibida
+            </th>
+            <th
+              className="text-left"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Motivo
+            </th>
+            <th
+              className="text-left"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Detalle
+            </th>
+            <th
+              className="text-right"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Costo
+            </th>
+            <th
+              className="text-right"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+              }}
+            >
+              Subtotal
+            </th>
           </tr>
         </thead>
 
@@ -46,13 +137,49 @@ export default function TablaDetalleTransferencia({
 
             return (
               <tr key={d.id} className={`border-t border-slate-800 ${bg}`}>
-                <td className="px-2 py-1">{d.nombre}</td>
-                <td className="px-2 py-1">{d.codigoBarra || "-"}</td>
+                <td
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
+                  {d.nombre}
+                </td>
+                <td
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
+                  {d.codigoBarra || "-"}
+                </td>
 
-                <td className="px-2 py-1 text-right">{enviada}</td>
+                <td
+                  className="text-right"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
+                  {enviada}
+                </td>
 
                 {/* CANTIDAD RECIBIDA */}
-                <td className="px-2 py-1 text-right">
+                <td
+                  className="text-right"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
                   {inputsHabilitados ? (
                     <input
                       type="number"
@@ -68,7 +195,15 @@ export default function TablaDetalleTransferencia({
 
                         setEditItems(copia);
                       }}
-                      className="w-16 px-1 py-[2px] rounded bg-slate-800 border border-slate-600 text-slate-100 text-right"
+                      className="bg-slate-800 border border-slate-600 text-slate-100 text-right"
+                      style={{
+                        width: parseInt(ui.helpers.controlHeight()) * 2,
+                        paddingLeft: ui.helpers.spacing("xs"),
+                        paddingRight: ui.helpers.spacing("xs"),
+                        paddingTop: parseInt(ui.helpers.spacing("xs")) * 0.5,
+                        paddingBottom: parseInt(ui.helpers.spacing("xs")) * 0.5,
+                        borderRadius: ui.helpers.radius("md"),
+                      }}
                     />
                   ) : (
                     recibido
@@ -76,7 +211,14 @@ export default function TablaDetalleTransferencia({
                 </td>
 
                 {/* MOTIVO */}
-                <td className="px-2 py-1">
+                <td
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
                   {inputsHabilitados ? (
                     num(edit.recibido) !== enviada ? (
                       <select
@@ -91,7 +233,16 @@ export default function TablaDetalleTransferencia({
 
                           setEditItems(copia);
                         }}
-                        className="px-1 py-[2px] rounded bg-slate-800 border border-slate-600 text-slate-100 w-40 text-sm"
+                        className="bg-slate-800 border border-slate-600 text-slate-100"
+                        style={{
+                          paddingLeft: ui.helpers.spacing("xs"),
+                          paddingRight: ui.helpers.spacing("xs"),
+                          paddingTop: parseInt(ui.helpers.spacing("xs")) * 0.5,
+                          paddingBottom: parseInt(ui.helpers.spacing("xs")) * 0.5,
+                          borderRadius: ui.helpers.radius("md"),
+                          width: parseInt(ui.helpers.controlHeight()) * 5,
+                          fontSize: ui.helpers.font("sm"),
+                        }}
                       >
                         <option value="">Seleccionar…</option>
                         <option value="Faltante">Faltante</option>
@@ -107,7 +258,14 @@ export default function TablaDetalleTransferencia({
                 </td>
 
                 {/* DETALLE */}
-                <td className="px-2 py-1">
+                <td
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
                   {inputsHabilitados &&
                   edit.motivoPrincipal === "Otro" &&
                   num(edit.recibido) !== enviada ? (
@@ -119,7 +277,16 @@ export default function TablaDetalleTransferencia({
                         copia[idx].motivoDetalle = e.target.value;
                         setEditItems(copia);
                       }}
-                      className="w-48 px-2 py-[2px] rounded bg-slate-800 border border-slate-600 text-slate-100 text-sm"
+                      className="bg-slate-800 border border-slate-600 text-slate-100"
+                      style={{
+                        width: parseInt(ui.helpers.controlHeight()) * 6,
+                        paddingLeft: ui.helpers.spacing("sm"),
+                        paddingRight: ui.helpers.spacing("sm"),
+                        paddingTop: parseInt(ui.helpers.spacing("xs")) * 0.5,
+                        paddingBottom: parseInt(ui.helpers.spacing("xs")) * 0.5,
+                        borderRadius: ui.helpers.radius("md"),
+                        fontSize: ui.helpers.font("sm"),
+                      }}
                       placeholder="Detalle..."
                     />
                   ) : (
@@ -127,11 +294,27 @@ export default function TablaDetalleTransferencia({
                   )}
                 </td>
 
-                <td className="px-2 py-1 text-right">
+                <td
+                  className="text-right"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
                   ${num(d.precioCosto).toFixed(2)}
                 </td>
 
-                <td className="px-2 py-1 text-right">
+                <td
+                  className="text-right"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
                   ${num(d.subtotal).toFixed(2)}
                 </td>
               </tr>

@@ -1,20 +1,21 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiCard({ children, className = "" }) {
-  const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   
   return (
     <div
-      className={`
-        ${theme.card}
-        rounded-xl
-        shadow-md
-        p-3           /* antes p-4 / p-6 */
-        backdrop-blur-sm
-        ${className}
-      `}
+      className={`shadow-md backdrop-blur-sm ${className}`}
+      style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
+        borderRadius: ui.helpers.radius("xl"),
+        padding: ui.helpers.spacing("md"),
+        color: "var(--sunmi-card-text)",
+      }}
     >
       {children}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 const PAGE_SIZE = 25;
 
@@ -16,6 +17,7 @@ export default function TablaStock({
   onAjustar,
   onEditarLimites,
 }) {
+  const { ui } = useUIConfig();
   const [items, setItems] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -107,11 +109,21 @@ export default function TablaStock({
     return u.charAt(0).toUpperCase() + u.slice(1);
   };
 
+  // ============================================
+  // ACÁ EMPIEZA EL COMPONENTE VISUAL (NO CAMBIADO)
+  // ============================================
+
   if (!localSeleccionado) {
     return (
       <div className="sunmi-card">
         <div className="sunmi-header-cyan">Stock</div>
-        <p className="text-slate-400 text-sm mt-3">
+        <p
+          className="text-slate-400"
+          style={{
+            fontSize: ui.helpers.font("sm"),
+            marginTop: ui.helpers.spacing("md"),
+          }}
+        >
           Seleccioná un local para ver el stock.
         </p>
       </div>
@@ -123,23 +135,66 @@ export default function TablaStock({
       <div className="sunmi-header-cyan">Stock del Local</div>
 
       {loading && (
-        <p className="text-slate-400 text-[13px] mt-3">Cargando stock...</p>
+        <p
+          className="text-slate-400"
+          style={{
+            fontSize: ui.helpers.font("sm"),
+            marginTop: ui.helpers.spacing("md"),
+          }}
+        >
+          Cargando stock...
+        </p>
       )}
-      {error && <p className="text-red-400 text-[13px] mt-3">{error}</p>}
+      {error && (
+        <p
+          className="text-red-400"
+          style={{
+            fontSize: ui.helpers.font("sm"),
+            marginTop: ui.helpers.spacing("md"),
+          }}
+        >
+          {error}
+        </p>
+      )}
 
-      <div className="overflow-x-auto mt-3">
-        <table className="min-w-full text-[12px] sunmi-table">
+      <div
+        className="overflow-x-auto"
+        style={{
+          marginTop: ui.helpers.spacing("md"),
+        }}
+      >
+        <table
+          className="min-w-full sunmi-table"
+          style={{
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
           <thead>
             <tr>
-              <th className="px-2 py-1 text-left">Producto</th>
-              <th className="px-2 py-1 text-left">Código</th>
-              <th className="px-2 py-1 text-left">Unidad</th>
-              <th className="px-2 py-1 text-right">Stock</th>
-              <th className="px-2 py-1 text-right">Mín</th>
-              <th className="px-2 py-1 text-right">Máx</th>
-              <th className="px-2 py-1 text-right">Costo</th>
-              <th className="px-2 py-1 text-right">Venta</th>
-              <th className="px-2 py-1 text-center">Acciones</th>
+              {[
+                "Producto",
+                "Código",
+                "Unidad",
+                "Stock",
+                "Mín",
+                "Máx",
+                "Costo",
+                "Venta",
+                "Acciones",
+              ].map((h) => (
+                <th
+                  key={h}
+                  className="text-left"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
 
@@ -148,7 +203,13 @@ export default function TablaStock({
               <tr>
                 <td
                   colSpan={9}
-                  className="px-2 py-3 text-center text-slate-500"
+                  className="text-center text-slate-500"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("md"),
+                    paddingBottom: ui.helpers.spacing("md"),
+                  }}
                 >
                   No hay productos para mostrar.
                 </td>
@@ -157,23 +218,52 @@ export default function TablaStock({
 
             {items.map((p) => (
               <tr key={p.id} className="hover:bg-slate-800/40">
-                <td className="px-2 py-1">{p.nombre}</td>
-                <td className="px-2 py-1">{p.codigoBarra || "-"}</td>
-                <td className="px-2 py-1">{getUnidad(p)}</td>
+                {/* PRODUCTO */}
+                <td
+                  style={{
+                    paddingLeft: ui.helpers.spacing("sm"),
+                    paddingRight: ui.helpers.spacing("sm"),
+                    paddingTop: ui.helpers.spacing("xs"),
+                    paddingBottom: ui.helpers.spacing("xs"),
+                  }}
+                >
+                  {p.nombre}
+                </td>
 
-                <td className="px-2 py-1 text-right">{p.stock}</td>
-                <td className="px-2 py-1 text-right">{p.stockMin}</td>
-                <td className="px-2 py-1 text-right">{p.stockMax}</td>
+                {/* CÓDIGO */}
+                <td style={{ padding: ui.helpers.spacing("xs") }}>
+                  {p.codigoBarra || "-"}
+                </td>
 
-                {/* 🟦 COSTO */}
-                <td className="px-2 py-1 text-right">
+                {/* UNIDAD */}
+                <td style={{ padding: ui.helpers.spacing("xs") }}>
+                  {getUnidad(p)}
+                </td>
+
+                {/* STOCK */}
+                <td className="text-right" style={{ padding: ui.helpers.spacing("xs") }}>
+                  {p.stock}
+                </td>
+
+                {/* MIN */}
+                <td className="text-right" style={{ padding: ui.helpers.spacing("xs") }}>
+                  {p.stockMin}
+                </td>
+
+                {/* MAX */}
+                <td className="text-right" style={{ padding: ui.helpers.spacing("xs") }}>
+                  {p.stockMax}
+                </td>
+
+                {/* COSTO */}
+                <td className="text-right" style={{ padding: ui.helpers.spacing("xs") }}>
                   {localEsDeposito
                     ? `$ ${Number(p.precioCosto || 0).toFixed(2)}`
                     : `$ ${Number(p.precioUnitario || 0).toFixed(2)}`}
                 </td>
 
-                {/* 🟦 PRECIO VENTA */}
-                <td className="px-2 py-1 text-right">
+                {/* PRECIO VENTA */}
+                <td className="text-right" style={{ padding: ui.helpers.spacing("xs") }}>
                   {localEsDeposito
                     ? `$ ${Number(p.precioVenta || 0).toFixed(2)}`
                     : `$ ${Number(
@@ -181,17 +271,37 @@ export default function TablaStock({
                       ).toFixed(2)}`}
                 </td>
 
-                <td className="px-2 py-1 text-center">
-                  <div className="flex justify-center gap-1">
+                {/* ACCIONES */}
+                <td className="text-center" style={{ padding: ui.helpers.spacing("xs") }}>
+                  <div
+                    className="flex justify-center"
+                    style={{
+                      gap: ui.helpers.spacing("xs"),
+                    }}
+                  >
                     <button
-                      className="sunmi-btn sunmi-btn-cyan text-[11px] px-2 py-1"
+                      className="sunmi-btn sunmi-btn-cyan"
+                      style={{
+                        fontSize: ui.helpers.font("xs"),
+                        paddingLeft: ui.helpers.spacing("sm"),
+                        paddingRight: ui.helpers.spacing("sm"),
+                        paddingTop: ui.helpers.spacing("xs"),
+                        paddingBottom: ui.helpers.spacing("xs"),
+                      }}
                       onClick={() => onAjustar(p)}
                     >
                       Ajustar
                     </button>
 
                     <button
-                      className="sunmi-btn sunmi-btn-amber text-[11px] px-2 py-1"
+                      className="sunmi-btn sunmi-btn-amber"
+                      style={{
+                        fontSize: ui.helpers.font("xs"),
+                        paddingLeft: ui.helpers.spacing("sm"),
+                        paddingRight: ui.helpers.spacing("sm"),
+                        paddingTop: ui.helpers.spacing("xs"),
+                        paddingBottom: ui.helpers.spacing("xs"),
+                      }}
                       onClick={() => onEditarLimites(p)}
                     >
                       Límites
@@ -205,14 +315,31 @@ export default function TablaStock({
       </div>
 
       {/* PAGINACIÓN */}
-      <div className="flex items-center justify-between mt-4 text-[12px] text-slate-400">
+      <div
+        className="flex items-center justify-between text-slate-400"
+        style={{
+          marginTop: ui.helpers.spacing("lg"),
+          fontSize: ui.helpers.font("xs"),
+        }}
+      >
         <div>
           Total: <strong className="text-slate-200">{total}</strong> productos
         </div>
 
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
           <button
-            className="sunmi-btn bg-slate-800 text-slate-200 disabled:opacity-40 px-3 py-1"
+            className="sunmi-btn bg-slate-800 text-slate-200 disabled:opacity-40"
+            style={{
+              paddingLeft: ui.helpers.spacing("md"),
+              paddingRight: ui.helpers.spacing("md"),
+              paddingTop: ui.helpers.spacing("xs"),
+              paddingBottom: ui.helpers.spacing("xs"),
+            }}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
           >
@@ -224,7 +351,13 @@ export default function TablaStock({
           </span>
 
           <button
-            className="sunmi-btn bg-slate-800 text-slate-200 disabled:opacity-40 px-3 py-1"
+            className="sunmi-btn bg-slate-800 text-slate-200 disabled:opacity-40"
+            style={{
+              paddingLeft: ui.helpers.spacing("md"),
+              paddingRight: ui.helpers.spacing("md"),
+              paddingTop: ui.helpers.spacing("xs"),
+              paddingBottom: ui.helpers.spacing("xs"),
+            }}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
           >

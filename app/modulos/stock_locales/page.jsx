@@ -5,8 +5,10 @@ import FiltrosStock from "@/components/stock_locales/FiltrosStock";
 import TablaStock from "@/components/stock_locales/TablaStock";
 import ModalAjuste from "@/components/stock_locales/ModalAjuste";
 import ModalLimites from "@/components/stock_locales/ModalLimites";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function StockLocalesPage() {
+  const { ui } = useUIConfig();
   const [locales, setLocales] = useState([]);
   const [localSeleccionado, setLocalSeleccionado] = useState(null);
 
@@ -85,7 +87,12 @@ export default function StockLocalesPage() {
 
   if (cargando) {
     return (
-      <div className="p-4 sunmi-bg min-h-screen">
+      <div
+        className="sunmi-bg min-h-screen"
+        style={{
+          padding: ui.helpers.spacing("lg"),
+        }}
+      >
         <p className="text-slate-400">Cargando módulo de stock...</p>
       </div>
     );
@@ -95,14 +102,32 @@ export default function StockLocalesPage() {
   // RENDER
   // ============================================================
   return (
-    <div className="p-4 sunmi-bg w-full min-h-screen flex flex-col gap-4">
-
+    <div
+      className="sunmi-bg w-full min-h-screen flex flex-col"
+      style={{
+        padding: ui.helpers.spacing("lg"),
+        gap: ui.helpers.spacing("lg"),
+      }}
+    >
       {/* CABECERA */}
       <div className="sunmi-card">
         <div className="sunmi-header-cyan">Stock de Locales</div>
 
-        <div className="mt-3 flex flex-col gap-2">
-          <span className="text-[13px] text-slate-400">Local seleccionado</span>
+        <div
+          className="flex flex-col"
+          style={{
+            marginTop: ui.helpers.spacing("md"),
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
+          <span
+            className="text-slate-400"
+            style={{
+              fontSize: ui.helpers.font("sm"),
+            }}
+          >
+            Local seleccionado
+          </span>
 
           <select
             className="sunmi-input"

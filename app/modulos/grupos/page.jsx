@@ -22,12 +22,14 @@ import SunmiGrid from "@/components/sunmi/SunmiGrid";
 import { Pencil, Trash2 } from "lucide-react";
 
 import ModalGrupo from "@/components/grupos/ModalGrupo";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 const PAGE_SIZE = 25;
 
 export default function PageGrupos() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { ui } = useUIConfig();
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");
@@ -269,8 +271,18 @@ export default function PageGrupos() {
         {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-col md:flex-row gap-3 flex-1">
+        <div
+          className="flex flex-col md:flex-row md:items-center md:justify-between"
+          style={{
+            gap: ui.helpers.spacing("md"),
+          }}
+        >
+          <div
+            className="flex flex-col md:flex-row flex-1"
+            style={{
+              gap: ui.helpers.spacing("md"),
+            }}
+          >
             <SunmiInput
               placeholder="Buscar grupo..."
               value={search}
@@ -293,7 +305,12 @@ export default function PageGrupos() {
             </SunmiSelectAdv>
           </div>
 
-          <div className="flex gap-2">
+          <div
+            className="flex"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton onClick={limpiarFiltros} color="slate">
               Limpiar
             </SunmiButton>
@@ -341,14 +358,14 @@ export default function PageGrupos() {
                       <SunmiButtonIcon
                         icon={Pencil}
                         color="amber"
-                        size={16}
+                        size={parseInt(ui.helpers.icon(1))}
                         onClick={() => handleEditar(g.id)}
                       />
 
                       <SunmiButtonIcon
                         icon={Trash2}
                         color="red"
-                        size={16}
+                        size={parseInt(ui.helpers.icon(1))}
                         onClick={() => eliminar(g.id, g.nombre)}
                       />
                     </>
@@ -392,7 +409,12 @@ export default function PageGrupos() {
         {/* PAGINACIÓN */}
         <SunmiSeparator />
 
-        <div className="flex justify-between gap-2">
+        <div
+          className="flex justify-between"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
           <SunmiButton
             color="slate"
             disabled={page <= 1}

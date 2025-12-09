@@ -6,6 +6,7 @@ import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiTableLocales({
   columnas = [],
@@ -16,6 +17,7 @@ export default function SunmiTableLocales({
   onNext,
   accionesPersonalizadas,
 }) {
+  const { ui } = useUIConfig();
   
   // ==========================
   // ARMAR HEADERS SUNMI
@@ -26,7 +28,13 @@ export default function SunmiTableLocales({
   ].filter(Boolean);
 
   return (
-    <div className="sunmi-card border border-slate-800 rounded-2xl shadow-md p-0 overflow-hidden bg-slate-950">
+    <div
+      className="sunmi-card border border-slate-800 shadow-md overflow-hidden bg-slate-950"
+      style={{
+        borderRadius: ui.helpers.radius("xl"),
+        padding: 0,
+      }}
+    >
 
       <SunmiHeader title="Locales" color="amber" />
 
@@ -48,14 +56,32 @@ export default function SunmiTableLocales({
           {datos.map((row, idx) => (
             <SunmiTableRow key={idx}>
               {columnas.map((col) => (
-                <td key={col.key} className="px-3 py-2 text-[12px]">
+                <td
+                  key={col.key}
+                  style={{
+                    paddingLeft: ui.helpers.spacing("md"),
+                    paddingRight: ui.helpers.spacing("md"),
+                    paddingTop: ui.helpers.spacing("sm"),
+                    paddingBottom: ui.helpers.spacing("sm"),
+                    fontSize: ui.helpers.font("xs"),
+                  }}
+                >
                   {col.render ? col.render(row[col.key], row) : row[col.key]}
                 </td>
               ))}
 
               {/* ACCIONES PERSONALIZADAS */}
               {accionesPersonalizadas && (
-                <td className="px-3 py-2 text-right text-[13px]">
+                <td
+                  className="text-right"
+                  style={{
+                    paddingLeft: ui.helpers.spacing("md"),
+                    paddingRight: ui.helpers.spacing("md"),
+                    paddingTop: ui.helpers.spacing("sm"),
+                    paddingBottom: ui.helpers.spacing("sm"),
+                    fontSize: ui.helpers.font("sm"),
+                  }}
+                >
                   {accionesPersonalizadas(row)}
                 </td>
               )}
@@ -65,7 +91,15 @@ export default function SunmiTableLocales({
       </div>
 
       {/* PAGINACIÓN */}
-      <div className="flex justify-between items-center px-4 py-2 border-t border-slate-800 bg-slate-900">
+      <div
+        className="flex justify-between items-center border-t border-slate-800 bg-slate-900"
+        style={{
+          paddingLeft: ui.helpers.spacing("lg"),
+          paddingRight: ui.helpers.spacing("lg"),
+          paddingTop: ui.helpers.spacing("sm"),
+          paddingBottom: ui.helpers.spacing("sm"),
+        }}
+      >
         <SunmiButton
           color="slate"
           size="sm"
@@ -75,7 +109,12 @@ export default function SunmiTableLocales({
           ◀ Anterior
         </SunmiButton>
 
-        <span className="text-[12px] text-slate-300">
+        <span
+          className="text-slate-300"
+          style={{
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
           Página {page} / {totalPages}
         </span>
 

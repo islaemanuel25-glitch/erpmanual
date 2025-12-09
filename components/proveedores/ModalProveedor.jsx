@@ -9,6 +9,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function ModalProveedor({
   open,
@@ -16,6 +17,7 @@ export default function ModalProveedor({
   onSubmit,
   initialData = null,
 }) {
+  const { ui } = useUIConfig();
   const modalRef = useRef(null);
   const editMode = Boolean(initialData);
 
@@ -87,14 +89,19 @@ export default function ModalProveedor({
 
   return (
     <div
-      className="
-        fixed inset-0 z-[9999]
-        bg-black/60 backdrop-blur-sm
-        flex items-center justify-center
-        p-3
-      "
+      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center"
+      style={{
+        padding: ui.helpers.spacing("md"),
+      }}
     >
-      <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
+      <div
+        className="overflow-hidden"
+        style={{
+          width: "95%",
+          maxWidth: parseInt(ui.helpers.controlHeight()) * 10,
+          borderRadius: ui.helpers.radius("xl"),
+        }}
+      >
         <SunmiCard>
           {/* HEADER */}
           <div className="flex items-center justify-between">
@@ -111,12 +118,16 @@ export default function ModalProveedor({
           {/* CONTENIDO */}
           <div
             ref={modalRef}
-            className="
-              max-h-[65vh]
-              overflow-y-auto 
-              px-2 pb-4 mt-2 
-              space-y-4
-            "
+            className="overflow-y-auto"
+            className="flex flex-col"
+            style={{
+              maxHeight: ui.helpers.modalMaxHeight,
+              paddingLeft: ui.helpers.spacing("sm"),
+              paddingRight: ui.helpers.spacing("sm"),
+              paddingBottom: ui.helpers.spacing("lg"),
+              marginTop: ui.helpers.spacing("sm"),
+              gap: ui.helpers.spacing("lg"),
+            }}
           >
             <SunmiSeparator label="Datos" color="amber" />
 
@@ -195,7 +206,13 @@ export default function ModalProveedor({
           </div>
 
           {/* FOOTER */}
-          <div className="flex justify-end gap-2 pt-2">
+          <div
+            className="flex justify-end"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+              paddingTop: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
@@ -211,9 +228,25 @@ export default function ModalProveedor({
 }
 
 function Field({ label, children }) {
+  const { ui } = useUIConfig();
   return (
-    <div className="flex flex-col gap-1 px-1">
-      <label className="text-[11px] text-slate-400">{label}</label>
+    <div
+      className="flex flex-col"
+      style={{
+        gap: ui.helpers.spacing("xs"),
+        paddingLeft: ui.helpers.spacing("xs"),
+        paddingRight: ui.helpers.spacing("xs"),
+        marginBottom: ui.helpers.spacing("lg"),
+      }}
+    >
+      <label
+        className="text-slate-400"
+        style={{
+          fontSize: ui.helpers.font("xs"),
+        }}
+      >
+        {label}
+      </label>
       {children}
     </div>
   );

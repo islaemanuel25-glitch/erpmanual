@@ -1,19 +1,43 @@
 "use client";
 
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function TransferenciaHeader({ item, id }) {
+  const { ui } = useUIConfig();
+  
   if (!item) return null;
 
   return (
-    <div className="space-y-2">
-
+    <div
+      className="flex flex-col"
+      style={{
+        gap: ui.helpers.spacing("sm"),
+      }}
+    >
       {/* BOTONES PDF */}
-      <div className="flex gap-2 px-2 py-2">
+      <div
+        className="flex"
+        style={{
+          gap: ui.helpers.spacing("sm"),
+          paddingLeft: ui.helpers.spacing("sm"),
+          paddingRight: ui.helpers.spacing("sm"),
+          paddingTop: ui.helpers.spacing("sm"),
+          paddingBottom: ui.helpers.spacing("sm"),
+        }}
+      >
         <a
           href={`/api/transferencias/pdf?id=${id}`}
           target="_blank"
-          className="px-3 py-1 bg-amber-400 text-slate-900 rounded text-sm font-semibold shadow"
+          className="bg-amber-400 text-slate-900 font-semibold shadow"
+          style={{
+            paddingLeft: ui.helpers.spacing("md"),
+            paddingRight: ui.helpers.spacing("md"),
+            paddingTop: ui.helpers.spacing("xs"),
+            paddingBottom: ui.helpers.spacing("xs"),
+            borderRadius: ui.helpers.radius("md"),
+            fontSize: ui.helpers.font("sm"),
+          }}
         >
           📄 PDF Envío
         </a>
@@ -21,7 +45,15 @@ export default function TransferenciaHeader({ item, id }) {
         <a
           href={`/api/transferencias/pdf-recepcion?id=${id}`}
           target="_blank"
-          className="px-3 py-1 bg-cyan-400 text-slate-900 rounded text-sm font-semibold shadow"
+          className="bg-cyan-400 text-slate-900 font-semibold shadow"
+          style={{
+            paddingLeft: ui.helpers.spacing("md"),
+            paddingRight: ui.helpers.spacing("md"),
+            paddingTop: ui.helpers.spacing("xs"),
+            paddingBottom: ui.helpers.spacing("xs"),
+            borderRadius: ui.helpers.radius("md"),
+            fontSize: ui.helpers.font("sm"),
+          }}
         >
           📄 PDF Recepción
         </a>
@@ -29,8 +61,17 @@ export default function TransferenciaHeader({ item, id }) {
 
       <SunmiSeparator label="Datos generales" color="amber" />
 
-      <div className="border border-slate-700 rounded-2xl p-3 grid gap-3 md:grid-cols-2 bg-slate-900/50 mx-1 text-sm">
-        
+      <div
+        className="border border-slate-700 grid md:grid-cols-2 bg-slate-900/50"
+        style={{
+          borderRadius: ui.helpers.radius("xl"),
+          padding: ui.helpers.spacing("md"),
+          gap: ui.helpers.spacing("md"),
+          marginLeft: ui.helpers.spacing("xs"),
+          marginRight: ui.helpers.spacing("xs"),
+          fontSize: ui.helpers.font("sm"),
+        }}
+      >
         <div>
           <div className="font-semibold text-slate-100">Origen</div>
           <div className="text-slate-100">{item.origen.nombre}</div>
@@ -68,7 +109,16 @@ export default function TransferenciaHeader({ item, id }) {
 
         <div>
           <div className="font-semibold text-slate-100">Estado</div>
-          <div className="inline-flex px-2 py-1 rounded border border-slate-600 bg-slate-900/70 text-slate-100">
+          <div
+            className="inline-flex border border-slate-600 bg-slate-900/70 text-slate-100"
+            style={{
+              paddingLeft: ui.helpers.spacing("sm"),
+              paddingRight: ui.helpers.spacing("sm"),
+              paddingTop: ui.helpers.spacing("xs"),
+              paddingBottom: ui.helpers.spacing("xs"),
+              borderRadius: ui.helpers.radius("md"),
+            }}
+          >
             {item.estado}
           </div>
         </div>

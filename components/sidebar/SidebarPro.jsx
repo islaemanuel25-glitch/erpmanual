@@ -1,136 +1,95 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@/app/context/UserContext";
-import SidebarGroup from "./SidebarGroup";
-import SidebarMobile from "./SidebarMobile";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
-
-import {
-  Home,
-  Package,
-  Package2,
-  Layers,
-  Layers3,
-  Users,
-  Users2,
-  Store,
-} from "lucide-react";
+import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import SidebarGroup from "./SidebarGroup";
+import SidebarItemFlat from "./SidebarItemFlat";
+import sidebarItems from "./sidebarItems";
+import sidebarGroups from "./sidebarGroups";
+import { useUser } from "@/app/context/UserContext";
 
 export default function SidebarPro() {
-  const { perfil } = useUser();
+  const pathname = usePathname();
   const { theme } = useSunmiTheme();
-
-  if (!perfil) return null;
-
+  const { sidebarMode, sidebarGroup } = useSidebarConfig();
+  const { ui } = useUIConfig();
+  const { perfil } = useUser();
   const [openGroup, setOpenGroup] = useState(null);
 
-  const permisos = perfil?.permisos || [];
-  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+  const showText = sidebarMode === "icons-text";
+  const isGrouped = sidebarGroup === "grouped";
+  
+  // Anchos dinámicos basados en UIConfig
+  const sidebarWidth = showText
+    ? parseInt(ui.helpers.controlHeight()) * 3.5
+    : parseInt(ui.helpers.controlHeight()) * 1.2;
 
-  const puede = (perm) => {
-    if (esAdmin) return true;
-    if (!Array.isArray(permisos)) return false;
-    return permisos.includes(perm);
+  const sidebarStyle = {
+    width: `${sidebarWidth}px`,
+    height: "100%",
+    paddingTop: ui.helpers.spacing("lg"),
+    paddingBottom: ui.helpers.spacing("lg"),
+    gap: ui.helpers.spacing("lg"),
+    ...(showText
+      ? {
+          paddingLeft: ui.helpers.spacing("sm"),
+          paddingRight: ui.helpers.spacing("sm"),
+        }
+      : {}),
   };
 
-  const menu = [
-    {
-      key: "inicio",
-      label: "Inicio",
-      icon: Home,
-      iconFilled: Home,
-      items: [{ label: "Dashboard", href: "/modulos/dashboard" }],
-    },
+  const borderClass = theme.sidebar?.border
+    ? `border-r ${theme.sidebar.border}`
+    : "border-r border-slate-800";
 
-    {
-      key: "productos",
-      label: "Productos",
-      icon: Package,
-      iconFilled: Package2,
-      items: [
-        { label: "Productos", href: "/modulos/productos" },
-        { label: "Nuevo Producto", href: "/modulos/productos/nuevo" },
-        { label: "Categorías", href: "/modulos/categorias" },
-        { label: "Combos", href: "/modulos/combos" },
-        { label: "Áreas Físicas", href: "/modulos/areas" },
-      ],
-    },
-
-    {
-      key: "estructura",
-      label: "Locales & Grupos",
-      icon: Store,
-      iconFilled: Store,
-      items: [
-        { label: "Locales", href: "/modulos/locales" },
-        { label: "Nuevo Local", href: "/modulos/locales/nuevo" },
-        { label: "Grupos", href: "/modulos/grupos" },
-        { label: "Nuevo Grupo", href: "/modulos/grupos/nuevo" },
-      ],
-    },
-
-    {
-      key: "stock",
-      label: "Stock y Depósito",
-      icon: Layers,
-      iconFilled: Layers3,
-      items: [
-        { label: "Stock Locales", href: "/modulos/stock_locales" },
-        { label: "Faltantes", href: "/modulos/faltantes" },
-        puede("pos.usar") || esAdmin
-          ? {
-              label: "POS Transferencias",
-              href: "/modulos/pos-transferencias",
-            }
-          : null,
-        { label: "Transferencias", href: "/modulos/transferencias" },
-      ].filter(Boolean),
-    },
-
-    {
-      key: "usuarios",
-      label: "Usuarios",
-      icon: Users,
-      iconFilled: Users2,
-      items: [
-        { label: "Usuarios", href: "/modulos/usuarios" },
-        { label: "Roles", href: "/modulos/roles" },
-      ],
-    },
-  ];
-
-  return (
-    <>
-      <SidebarMobile menu={menu} perfil={perfil} />
-
-      <aside
-        className={`
-          hidden md:flex flex-col items-center
-          w-16 min-w-16
-
-          ${theme.sidebar.bg}
-          ${theme.sidebar.border} border-r
-          shadow-[2px_0_10px_rgba(0,0,0,0.45)]
-
-          py-4 gap-6
-          z-40
-        `}
+  // Modo agrupado
+  if (isGrouped) {
+    return (
+      <div
+        className={cn(
+          "h-full flex flex-col",
+          theme.sidebar?.bg ?? "bg-slate-900",
+          borderClass,
+          showText ? "items-stretch" : "items-center"
+        )}
+        style={sidebarStyle}
       >
-        {menu.map((grupo) => (
+        {sidebarGroups.map((group) => (
           <SidebarGroup
-            key={grupo.key}
-            id={grupo.key}
-            icon={grupo.icon}
-            iconFilled={grupo.iconFilled}
-            label={grupo.label}
-            items={grupo.items}
+            key={group.id}
+            id={group.id}
+            icon={group.icon}
+            iconFilled={group.iconFilled}
+            label={group.label}
+            items={group.items}
             perfil={perfil}
             openGroup={openGroup}
             setOpenGroup={setOpenGroup}
           />
         ))}
-      </aside>
-    </>
+      </div>
+    );
+  }
+
+  // Modo plano
+  return (
+    <div
+      className={cn(
+        "h-full flex flex-col",
+        theme.sidebar?.bg ?? "bg-slate-900",
+        borderClass,
+        showText ? "items-stretch" : "items-center"
+      )}
+      style={sidebarStyle}
+    >
+      {sidebarItems.map((item) => (
+        <SidebarItemFlat key={item.href} item={item} />
+      ))}
+    </div>
   );
 }

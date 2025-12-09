@@ -5,6 +5,9 @@ import SidebarIcon from "./SidebarIcon";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { cn } from "@/lib/utils";
 
 export default function SidebarGroup({
   id,
@@ -19,6 +22,8 @@ export default function SidebarGroup({
   const pathname = usePathname();
   const panelRef = useRef(null);
   const { theme } = useSunmiTheme();
+  const { sidebarMode } = useSidebarConfig();
+  const showText = sidebarMode === "icons-text";
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
@@ -46,29 +51,62 @@ export default function SidebarGroup({
     return () => document.removeEventListener("mousedown", handler);
   }, [abierto]);
 
+  const { ui } = useUIConfig();
+
   return (
-    <div className="relative flex flex-col items-center w-full">
+    <div className={cn("relative flex flex-col", showText ? "items-stretch w-full" : "items-center w-full")}>
       <button
         onClick={() => setOpenGroup(abierto ? null : id)}
-        className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${theme.sidebar.hover}`}
+        className={cn("flex items-center transition", theme.sidebar.hover)}
+        style={{
+          borderRadius: ui.helpers.radius("xl"),
+          ...(showText
+            ? {
+                paddingLeft: ui.helpers.spacing("md"),
+                paddingRight: ui.helpers.spacing("md"),
+                paddingTop: ui.helpers.spacing("sm"),
+                paddingBottom: ui.helpers.spacing("sm"),
+                gap: ui.helpers.spacing("md"),
+                width: "100%",
+              }
+            : {
+                justifyContent: "center",
+                width: parseInt(ui.helpers.controlHeight()) * 1.2,
+                height: parseInt(ui.helpers.controlHeight()) * 1.2,
+              }),
+        }}
       >
         <SidebarIcon Icon={icon} IconFilled={iconFilled} active={abierto || activo} />
+        {showText && (
+          <span
+            className={cn("font-medium", theme.sidebar?.text ?? "text-slate-200")}
+            style={{
+              fontSize: ui.helpers.font("sm"),
+            }}
+          >
+            {label}
+          </span>
+        )}
       </button>
 
       {abierto && (
         <div
           ref={panelRef}
-          className={`
-            absolute left-14 top-0
-            ${theme.sidebar.dropdownBg}
-            ${theme.sidebar.dropdownBorder} border
-            rounded-xl
-            shadow-xl shadow-black/50 
-            p-3 w-48 
-            z-50
-          `}
+          className={`absolute top-0 z-50 ${theme.sidebar.dropdownBg} ${theme.sidebar.dropdownBorder} border shadow-xl shadow-black/50`}
+          style={{
+            left: showText ? parseInt(ui.helpers.controlHeight()) * 1.5 : parseInt(ui.helpers.controlHeight()) * 1.2,
+            borderRadius: ui.helpers.radius("xl"),
+            padding: ui.helpers.spacing("md"),
+            width: parseInt(ui.helpers.controlHeight()) * 12,
+          }}
         >
-          <h3 className={`${theme.sidebar.dropdownHeading} text-xs font-bold mb-2 uppercase tracking-wide`}>
+          <h3
+            className={`${theme.sidebar.dropdownHeading} font-bold uppercase tracking-wide`}
+            style={{
+              fontSize: ui.helpers.font("xs"),
+              marginBottom: ui.helpers.spacing("sm"),
+            }}
+          >
             {label}
           </h3>
 
@@ -76,11 +114,15 @@ export default function SidebarGroup({
             <Link
               key={item.href}
               href={item.href}
-              className={`
-                block text-sm px-2 py-1.5 rounded-md transition
-                ${theme.sidebar.dropdownItem}
-                ${theme.sidebar.dropdownItemHover}
-              `}
+              className={`block transition ${theme.sidebar.dropdownItem} ${theme.sidebar.dropdownItemHover}`}
+              style={{
+                fontSize: ui.helpers.font("sm"),
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("sm"),
+                paddingBottom: ui.helpers.spacing("sm"),
+                borderRadius: ui.helpers.radius("md"),
+              }}
               onClick={() => setOpenGroup(null)}
             >
               {item.label}

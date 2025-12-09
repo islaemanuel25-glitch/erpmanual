@@ -1,25 +1,32 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { Children } from "react";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiList({
   children,
   className = "",
 }) {
-  const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   
-  // Usar color de borde del card para el divider
-  const dividerColor = theme.card.split(' ').find(c => c.startsWith('border-'))?.replace('border-', 'divide-') || 'divide-slate-800/80';
+  const childrenArray = Children.toArray(children);
   
   return (
-    <div
-      className={`
-        flex flex-col 
-        divide-y ${dividerColor}
-        ${className}
-      `}
-    >
-      {children}
+    <div className={`flex flex-col ${className}`}>
+      {childrenArray.map((child, idx) => (
+        <div key={idx}>
+          {child}
+          {idx < childrenArray.length - 1 && (
+            <div
+              style={{
+                borderTopColor: "var(--sunmi-card-border)",
+                borderTopWidth: "1px",
+                opacity: 0.8,
+              }}
+            />
+          )}
+        </div>
+      ))}
     </div>
   );
 }

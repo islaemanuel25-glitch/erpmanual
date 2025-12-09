@@ -7,7 +7,7 @@ import {
   isValidElement,
 } from "react";
 import { ChevronDown, Check } from "lucide-react";
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiSelectAdv({
   value,
@@ -17,7 +17,7 @@ export default function SunmiSelectAdv({
   className = "",
   multiple = false,
 }) {
-  const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -65,30 +65,28 @@ export default function SunmiSelectAdv({
     onChange(newArr);
   };
 
-  // Extraer colores del theme
-  const bgColor = theme.card.split(' ').find(c => c.startsWith('bg-')) || 'bg-slate-950/60';
-  const borderColor = theme.card.split(' ').find(c => c.startsWith('border-')) || 'border-slate-700';
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-')) || 'text-slate-100';
-  const dropdownBg = theme.card.split(' ').find(c => c.startsWith('bg-'))?.replace('/70', '').replace('/60', '') || 'bg-slate-900';
-
   return (
     <div ref={ref} className={`relative w-full ${className}`}>
       {/* BOTON */}
       <button
         onClick={() => setOpen(!open)}
-        className={`
-          w-full px-3 py-1.5     /* reducido */
-          rounded-md
-          ${bgColor}
-          border ${borderColor}
-          ${textColor} text-[13px]
-          shadow-inner
-          flex items-center justify-between
-        `}
+        className="w-full shadow-inner flex items-center justify-between"
+        style={{
+          backgroundColor: "var(--sunmi-card-bg)",
+          borderColor: "var(--sunmi-card-border)",
+          borderWidth: "1px",
+          color: "var(--sunmi-text)",
+          paddingLeft: ui.helpers.spacing("md"),
+          paddingRight: ui.helpers.spacing("md"),
+          paddingTop: ui.helpers.spacing("sm"),
+          paddingBottom: ui.helpers.spacing("sm"),
+          borderRadius: ui.helpers.radius("md"),
+          fontSize: ui.helpers.font("sm"),
+        }}
       >
         <span className="truncate">{currentText}</span>
         <ChevronDown
-          size={16}
+          size={parseInt(ui.helpers.icon(1))}
           className={`transition-transform ${
             open ? "rotate-180 text-amber-400" : "text-amber-300"
           }`}
@@ -98,15 +96,16 @@ export default function SunmiSelectAdv({
       {/* LISTA */}
       {open && (
         <div
-          className={`
-            absolute left-0 right-0 mt-1 z-50
-            ${dropdownBg}
-            border ${borderColor}
-            rounded-md
-            shadow-lg
-            max-h-52 overflow-y-auto
-            text-[13px]
-          `}
+          className="absolute left-0 right-0 z-50 border shadow-lg overflow-y-auto"
+          style={{
+            backgroundColor: "var(--sunmi-card-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
+            marginTop: ui.helpers.spacing("xs"),
+            borderRadius: ui.helpers.radius("md"),
+            maxHeight: "208px",
+            fontSize: ui.helpers.font("sm"),
+          }}
         >
           {optionList.map((child, idx) => {
             const val = child.props.value;
@@ -116,16 +115,32 @@ export default function SunmiSelectAdv({
               <div
                 key={idx}
                 onClick={() => handleClick(val)}
-                className={`
-                  px-3 py-2 cursor-pointer flex items-center gap-2
-                  ${selected ? "bg-amber-500 text-slate-900" : textColor}
-                  hover:bg-amber-400 hover:text-slate-900
-                  transition-all
-                `}
+                className="cursor-pointer flex items-center transition-all"
+                style={{
+                  backgroundColor: selected ? "#f59e0b" : "transparent", // amber-500
+                  color: selected ? "#0f172a" : "var(--sunmi-text)", // slate-900 : theme text
+                  paddingLeft: ui.helpers.spacing("md"),
+                  paddingRight: ui.helpers.spacing("md"),
+                  paddingTop: ui.helpers.spacing("sm"),
+                  paddingBottom: ui.helpers.spacing("sm"),
+                  gap: ui.helpers.spacing("sm"),
+                }}
+                onMouseEnter={(e) => {
+                  if (!selected) {
+                    e.currentTarget.style.backgroundColor = "#fbbf24"; // amber-400
+                    e.currentTarget.style.color = "#0f172a"; // slate-900
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!selected) {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.color = "var(--sunmi-text)";
+                  }
+                }}
               >
                 {multiple && (
                   <Check
-                    size={16}
+                    size={parseInt(ui.helpers.icon(1))}
                     className={selected ? "opacity-100" : "opacity-0"}
                   />
                 )}

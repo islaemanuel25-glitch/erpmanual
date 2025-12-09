@@ -18,12 +18,14 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import { Pencil, Trash2 } from "lucide-react";
 
 import ModalRol from "@/components/roles/ModalRol";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 const PAGE_SIZE = 25;
 
 export default function RolesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { ui } = useUIConfig();
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");
@@ -170,8 +172,18 @@ export default function RolesPage() {
         {/* FILTROS */}
         <SunmiSeparator label="Filtros" color="amber" />
 
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-col md:flex-row gap-3 flex-1">
+        <div
+          className="flex flex-col md:flex-row md:items-center md:justify-between"
+          style={{
+            gap: ui.helpers.spacing("md"),
+          }}
+        >
+          <div
+            className="flex flex-col md:flex-row flex-1"
+            style={{
+              gap: ui.helpers.spacing("md"),
+            }}
+          >
             <SunmiInput
               placeholder="Buscar rol..."
               value={search}
@@ -179,7 +191,12 @@ export default function RolesPage() {
             />
           </div>
 
-          <div className="flex gap-2">
+          <div
+            className="flex"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton onClick={limpiarFiltros} color="slate">
               Limpiar
             </SunmiButton>
@@ -208,18 +225,23 @@ export default function RolesPage() {
                 </td>
 
                 <td>
-                  <div className="flex justify-end gap-1">
+                  <div
+                    className="flex justify-end"
+                    style={{
+                      gap: ui.helpers.spacing("xs"),
+                    }}
+                  >
                     <SunmiButtonIcon
                       icon={Pencil}
                       color="amber"
-                      size={16}
+                      size={parseInt(ui.helpers.icon(1))}
                       onClick={() => handleEditar(r.id)}
                     />
 
                     <SunmiButtonIcon
                       icon={Trash2}
                       color="red"
-                      size={16}
+                      size={parseInt(ui.helpers.icon(1))}
                       onClick={() => handleEliminar(r.id)}
                     />
                   </div>
@@ -232,7 +254,12 @@ export default function RolesPage() {
         {/* PAGINACIÓN */}
         <SunmiSeparator />
 
-        <div className="flex justify-between gap-2">
+        <div
+          className="flex justify-between"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
           <SunmiButton
             color="slate"
             disabled={page <= 1}

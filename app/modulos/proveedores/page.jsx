@@ -17,12 +17,16 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import SunmiPill from "@/components/sunmi/SunmiPill"; // 🔥 agregado para chips
 
 import ModalProveedor from "@/components/proveedores/ModalProveedor";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 const PAGE_SIZE = 10;
 
 export default function ProveedoresPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { ui } = useUIConfig();
+  const { theme } = useSunmiTheme();
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -144,15 +148,40 @@ export default function ProveedoresPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="sunmi-bg w-full min-h-full p-4">
+    <div
+      className="sunmi-bg w-full min-h-full"
+      style={{
+        padding: ui.helpers.spacing("lg"),
+      }}
+    >
       <SunmiCard>
-        <SunmiSeparator label="Filtros" color="amber" className="my-4" />
+        <SunmiSeparator
+          label="Filtros"
+          color="amber"
+          className=""
+          style={{
+            marginTop: ui.helpers.spacing("lg"),
+            marginBottom: ui.helpers.spacing("lg"),
+          }}
+        />
 
         {/* ===================== */}
         {/* FILTROS */}
         {/* ===================== */}
-        <div className="flex flex-col md:flex-row gap-4 px-2">
-          <div className="flex flex-col md:flex-row gap-3 flex-1">
+        <div
+          className="flex flex-col md:flex-row"
+          style={{
+            gap: ui.helpers.spacing("lg"),
+            paddingLeft: ui.helpers.spacing("sm"),
+            paddingRight: ui.helpers.spacing("sm"),
+          }}
+        >
+          <div
+            className="flex flex-col md:flex-row flex-1"
+            style={{
+              gap: ui.helpers.spacing("md"),
+            }}
+          >
             <SunmiInput
               placeholder="Buscar proveedor..."
               value={search}
@@ -165,7 +194,12 @@ export default function ProveedoresPage() {
             </SunmiSelectAdv>
           </div>
 
-          <div className="flex gap-2 justify-end">
+          <div
+            className="flex justify-end"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton
               color="slate"
               onClick={() => {
@@ -186,12 +220,26 @@ export default function ProveedoresPage() {
           </div>
         </div>
 
-        <SunmiSeparator label="Listado" color="amber" className="my-4" />
+        <SunmiSeparator
+          label="Listado"
+          color="amber"
+          className=""
+          style={{
+            marginTop: ui.helpers.spacing("lg"),
+            marginBottom: ui.helpers.spacing("lg"),
+          }}
+        />
 
         {/* ===================== */}
         {/* TABLA */}
         {/* ===================== */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-800">
+        <div
+          className="overflow-x-auto border border-slate-800"
+          style={{
+            borderRadius: ui.helpers.radius("xl"),
+            borderWidth: ui.helpers.line(),
+          }}
+        >
           <SunmiTable
             headers={[
               "Nombre",
@@ -211,15 +259,63 @@ export default function ProveedoresPage() {
             ) : (
               items.map((item) => (
                 <SunmiTableRow key={item.id}>
-                  <td className="px-3 py-2">{item.nombre}</td>
-                  <td className="px-3 py-2">{item.telefono || "-"}</td>
-                  <td className="px-3 py-2">{item.email || "-"}</td>
-                  <td className="px-3 py-2">{item.cuit || "-"}</td>
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
+                    {item.nombre}
+                  </td>
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
+                    {item.telefono || "-"}
+                  </td>
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
+                    {item.email || "-"}
+                  </td>
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
+                    {item.cuit || "-"}
+                  </td>
 
                   {/* 🔥 DIAS EN CHIPS */}
-                  <td className="px-3 py-2">
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
                     {item.dias_pedido?.length ? (
-                      <div className="flex flex-wrap gap-1">
+                      <div
+                        className="flex flex-wrap"
+                        style={{
+                          gap: ui.helpers.spacing("xs"),
+                        }}
+                      >
                         {item.dias_pedido.map((d, i) => (
                           <SunmiPill key={i}>{d}</SunmiPill>
                         ))}
@@ -230,7 +326,15 @@ export default function ProveedoresPage() {
                   </td>
 
                   {/* 🔥 BOTÓN PEDIDOS */}
-                  <td className="px-3 py-2 text-center">
+                  <td
+                    className="text-center"
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
                     <SunmiButton
                       color="amber"
                       size="sm"
@@ -243,13 +347,34 @@ export default function ProveedoresPage() {
                   </td>
 
                   {/* Estado */}
-                  <td className="px-3 py-2">
+                  <td
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
                     <SunmiBadgeEstado value={item.activo} />
                   </td>
 
                   {/* Acciones */}
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex gap-3 justify-end text-[15px]">
+                  <td
+                    className="text-right"
+                    style={{
+                      paddingLeft: ui.helpers.spacing("md"),
+                      paddingRight: ui.helpers.spacing("md"),
+                      paddingTop: ui.helpers.spacing("sm"),
+                      paddingBottom: ui.helpers.spacing("sm"),
+                    }}
+                  >
+                    <div
+                      className="flex justify-end"
+                      style={{
+                        gap: ui.helpers.spacing("md"),
+                        fontSize: ui.helpers.font("base"),
+                      }}
+                    >
                       <button
                         onClick={() =>
                           router.push(`/modulos/proveedores?editar=${item.id}`)
@@ -276,7 +401,14 @@ export default function ProveedoresPage() {
         {/* ===================== */}
         {/* PAGINACIÓN */}
         {/* ===================== */}
-        <div className="flex justify-between pt-4 px-2">
+        <div
+          className="flex justify-between"
+          style={{
+            paddingTop: ui.helpers.spacing("lg"),
+            paddingLeft: ui.helpers.spacing("sm"),
+            paddingRight: ui.helpers.spacing("sm"),
+          }}
+        >
           <SunmiButton
             color="slate"
             disabled={page <= 1}

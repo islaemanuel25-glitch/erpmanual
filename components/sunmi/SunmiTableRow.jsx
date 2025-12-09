@@ -1,21 +1,31 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiTableRow({ children, selected = false, onClick }) {
-  const { theme } = useSunmiTheme();
-  
-  const hoverClass = theme.table?.row || "hover:bg-slate-800/40";
-  const selectedClass = selected ? (theme.table?.row?.replace('hover:', '') || "bg-slate-800") : "";
+  const { ui } = useUIConfig();
   
   return (
     <tr
       onClick={onClick}
-      className={`
-        text-[12px]
-        ${onClick ? "cursor-pointer" : ""}
-        ${selected ? selectedClass : hoverClass}
-      `}
+      className={onClick ? "cursor-pointer" : ""}
+      style={{
+        fontSize: ui.helpers.font("xs"),
+        backgroundColor: selected ? "var(--sunmi-table-row-bg)" : "transparent",
+        ...(onClick && !selected ? {
+          transition: "background-color 0.2s",
+        } : {}),
+      }}
+      onMouseEnter={(e) => {
+        if (onClick && !selected) {
+          e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (onClick && !selected) {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }
+      }}
     >
       {children}
     </tr>

@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiToggle({
   value = false,
   onChange = () => {},
   label = "",
 }) {
-  const { theme } = useSunmiTheme();
+  const { ui } = useUIConfig();
   const [checked, setChecked] = useState(value);
 
   const toggle = () => {
@@ -17,37 +17,48 @@ export default function SunmiToggle({
     onChange(newVal);
   };
 
-  // Extraer color de texto del layout
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-'))?.replace('text-slate-50', 'text-slate-300') || 'text-slate-300';
+  const trackHeight = parseInt(ui.helpers.controlHeight()) * 0.4;
+  const thumbSize = trackHeight * 0.9;
+  const trackWidth = trackHeight * 2;
+  const translateX = checked ? trackWidth - thumbSize - 2 : 2;
 
   return (
     <div
-      className="flex items-center gap-2 cursor-pointer select-none"
+      className="flex items-center cursor-pointer select-none"
       onClick={toggle}
+      style={{
+        gap: ui.helpers.spacing("sm"),
+      }}
     >
       {/* TRACK */}
       <div
-        className={`
-          w-8 h-4                 /* antes w-10 h-5 */
-          rounded-full
-          transition-all
-          ${checked ? "bg-amber-400" : "bg-slate-600"}
-        `}
+        className="rounded-full transition-all"
+        style={{
+          backgroundColor: checked ? "#fbbf24" : "#475569", // amber-400 : slate-600
+          width: trackWidth,
+          height: trackHeight,
+        }}
       >
         {/* THUMB */}
         <div
-          className={`
-            w-4 h-4               /* antes w-5 h-5 */
-            bg-white rounded-full
-            shadow
-            transform transition-all
-            ${checked ? "translate-x-4" : "translate-x-0"}
-          `}
+          className="bg-white rounded-full shadow transform transition-all"
+          style={{
+            width: thumbSize,
+            height: thumbSize,
+            transform: `translateX(${translateX}px)`,
+          }}
         />
       </div>
 
       {label && (
-        <span className={`text-[12px] ${textColor}`}>{label}</span>
+        <span
+          style={{
+            color: "var(--sunmi-text)",
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
+          {label}
+        </span>
       )}
     </div>
   );

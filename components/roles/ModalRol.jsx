@@ -10,6 +10,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggle from "@/components/sunmi/SunmiToggle";
 
 import { PERMISOS } from "@/lib/permisos";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function ModalRol({
   open,
@@ -17,6 +18,7 @@ export default function ModalRol({
   onSubmit,
   initialData = null,
 }) {
+  const { ui } = useUIConfig();
   const [form, setForm] = useState({
     nombre: "",
     permisos: [],
@@ -91,8 +93,12 @@ export default function ModalRol({
           />
 
           {/* CONTENIDO CON SCROLL FUNCIONAL */}
-          <div className="flex flex-col max-h-[65vh] overflow-y-auto">
-
+          <div
+            className="flex flex-col overflow-y-auto"
+            style={{
+              maxHeight: "65vh",
+            }}
+          >
             <SunmiSeparator label="Datos" color="amber" />
 
             {/* Nombre */}
@@ -113,17 +119,35 @@ export default function ModalRol({
             </div>
 
             {/* Permisos */}
-            <div className="flex flex-col gap-2">
+            <div
+              className="flex flex-col"
+              style={{
+                gap: ui.helpers.spacing("sm"),
+              }}
+            >
               {Object.entries(PERMISOS).map(([grupo, lista]) => (
                 <div key={grupo}>
-                  <div className="flex flex-col gap-1">
+                  <div
+                    className="flex flex-col"
+                    style={{
+                      gap: ui.helpers.spacing("xs"),
+                    }}
+                  >
                     <span>{grupo}</span>
 
-                    <div className="flex flex-col gap-1">
+                    <div
+                      className="flex flex-col"
+                      style={{
+                        gap: ui.helpers.spacing("xs"),
+                      }}
+                    >
                       {lista.map((p) => (
                         <label
                           key={p}
-                          className="flex items-center gap-2 cursor-pointer"
+                          className="flex items-center cursor-pointer"
+                          style={{
+                            gap: ui.helpers.spacing("sm"),
+                          }}
                         >
                           <SunmiToggle
                             value={form.permisos.includes(p)}
@@ -141,7 +165,12 @@ export default function ModalRol({
           </div>
 
           {/* ACCIONES */}
-          <div className="flex justify-end gap-2">
+          <div
+            className="flex justify-end"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
@@ -157,8 +186,14 @@ export default function ModalRol({
 }
 
 function Field({ label, children }) {
+  const { ui } = useUIConfig();
   return (
-    <div className="flex flex-col gap-1">
+    <div
+      className="flex flex-col"
+      style={{
+        gap: ui.helpers.spacing("xs"),
+      }}
+    >
       <span>{label}</span>
       {children}
     </div>

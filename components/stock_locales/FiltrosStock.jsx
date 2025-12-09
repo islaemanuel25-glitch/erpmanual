@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function FiltrosStock({
   localSeleccionado,
   onFiltroChange,
   onReset,
 }) {
+  const { ui } = useUIConfig();
   const [q, setQ] = useState("");
   const [categoria, setCategoria] = useState("");
   const [proveedor, setProveedor] = useState("");
@@ -36,7 +38,16 @@ export default function FiltrosStock({
     }, 200);
 
     return () => clearTimeout(debounceRef.current);
-  }, [q, categoria, proveedor, area, conStock, sinStock, faltantes, onFiltroChange]);
+  }, [
+    q,
+    categoria,
+    proveedor,
+    area,
+    conStock,
+    sinStock,
+    faltantes,
+    onFiltroChange,
+  ]);
 
   // 🔄 Reset filtros
   const resetFiltros = () => {
@@ -52,20 +63,48 @@ export default function FiltrosStock({
 
   return (
     <div className="sunmi-card">
-
       {/* HEADER */}
       <div className="sunmi-header-cyan">Filtros</div>
 
-      <div className="mt-3 flex flex-col gap-3">
-
+      <div
+        className="flex flex-col"
+        style={{
+          marginTop: ui.helpers.spacing("md"),
+          gap: ui.helpers.spacing("md"),
+        }}
+      >
         {/* 🔍 Buscador */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-2 w-full h-[38px]">
-            <Search size={16} className="text-slate-400" />
+        <div
+          className="flex items-center"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
+          <div
+            className="flex items-center bg-slate-900 border border-slate-700 w-full"
+            style={{
+              borderRadius: ui.helpers.radius("lg"),
+              paddingLeft: ui.helpers.spacing("sm"),
+              paddingRight: ui.helpers.spacing("sm"),
+              height: parseInt(ui.helpers.controlHeight()) * 1.2,
+            }}
+          >
+            <Search
+              size={parseInt(ui.helpers.icon(1))}
+              className="text-slate-400"
+            />
+
             <input
               type="text"
               placeholder="Buscar por nombre o código…"
-              className="bg-transparent px-2 py-1 w-full outline-none text-[13px] text-slate-100"
+              className="bg-transparent w-full outline-none text-slate-100"
+              style={{
+                paddingLeft: ui.helpers.spacing("sm"),
+                paddingRight: ui.helpers.spacing("sm"),
+                paddingTop: ui.helpers.spacing("xs"),
+                paddingBottom: ui.helpers.spacing("xs"),
+                fontSize: ui.helpers.font("sm"),
+              }}
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -73,16 +112,28 @@ export default function FiltrosStock({
 
           <button
             onClick={resetFiltros}
-            className="sunmi-btn sunmi-btn-red h-[38px]"
+            className="sunmi-btn sunmi-btn-red"
+            style={{
+              height: parseInt(ui.helpers.controlHeight()) * 1.2,
+            }}
           >
             Limpiar
           </button>
         </div>
 
         {/* 🧩 Selectores */}
-        <div className="grid grid-cols-3 gap-2">
+        <div
+          className="grid grid-cols-3"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+          }}
+        >
           <select
-            className="sunmi-input text-[12px] h-[34px]"
+            className="sunmi-input"
+            style={{
+              fontSize: ui.helpers.font("xs"),
+              height: parseInt(ui.helpers.controlHeight()) * 1.1,
+            }}
             value={categoria}
             onChange={(e) => setCategoria(e.target.value)}
           >
@@ -90,7 +141,11 @@ export default function FiltrosStock({
           </select>
 
           <select
-            className="sunmi-input text-[12px] h-[34px]"
+            className="sunmi-input"
+            style={{
+              fontSize: ui.helpers.font("xs"),
+              height: parseInt(ui.helpers.controlHeight()) * 1.1,
+            }}
             value={proveedor}
             onChange={(e) => setProveedor(e.target.value)}
           >
@@ -98,7 +153,11 @@ export default function FiltrosStock({
           </select>
 
           <select
-            className="sunmi-input text-[12px] h-[34px]"
+            className="sunmi-input"
+            style={{
+              fontSize: ui.helpers.font("xs"),
+              height: parseInt(ui.helpers.controlHeight()) * 1.1,
+            }}
             value={area}
             onChange={(e) => setArea(e.target.value)}
           >
@@ -107,8 +166,19 @@ export default function FiltrosStock({
         </div>
 
         {/* ✔ Checkboxes */}
-        <div className="grid grid-cols-3 gap-2 text-[12px] text-slate-300">
-          <label className="flex items-center gap-1">
+        <div
+          className="grid grid-cols-3 text-slate-300"
+          style={{
+            gap: ui.helpers.spacing("sm"),
+            fontSize: ui.helpers.font("xs"),
+          }}
+        >
+          <label
+            className="flex items-center"
+            style={{
+              gap: ui.helpers.spacing("xs"),
+            }}
+          >
             <input
               type="checkbox"
               checked={conStock}
@@ -118,7 +188,12 @@ export default function FiltrosStock({
             Con stock
           </label>
 
-          <label className="flex items-center gap-1">
+          <label
+            className="flex items-center"
+            style={{
+              gap: ui.helpers.spacing("xs"),
+            }}
+          >
             <input
               type="checkbox"
               checked={sinStock}
@@ -128,7 +203,12 @@ export default function FiltrosStock({
             Sin stock
           </label>
 
-          <label className="flex items-center gap-1">
+          <label
+            className="flex items-center"
+            style={{
+              gap: ui.helpers.spacing("xs"),
+            }}
+          >
             <input
               type="checkbox"
               checked={faltantes}

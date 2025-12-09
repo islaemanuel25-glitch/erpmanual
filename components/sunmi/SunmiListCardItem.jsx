@@ -1,31 +1,31 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SunmiListCardItem({
   children,
   className = "",
 }) {
-  const { theme } = useSunmiTheme();
-  
-  // Usar color de borde del card para el separador
-  const separatorColor = theme.card.split(' ').find(c => c.startsWith('border-'))?.replace('border-', '') || 'slate-800';
+  const { ui } = useUIConfig();
   
   return (
     <div
-      className={`
-        flex items-center justify-between
-        py-2
-        relative
-        ${className}
-      `}
+      className={`flex items-center justify-between relative ${className}`}
+      style={{
+        paddingTop: ui.helpers.spacing("sm"),
+        paddingBottom: ui.helpers.spacing("sm"),
+      }}
     >
       {/* Separador soft Sunmi → super leve, theme-friendly */}
-      <div className={`
-        absolute -bottom-[1px] left-0 right-0
-        h-[1px]
-        bg-${separatorColor}/20
-      `} />
+      <div
+        className="absolute left-0 right-0"
+        style={{
+          backgroundColor: "var(--sunmi-card-border)",
+          opacity: 0.2,
+          bottom: `-${ui.helpers.line()}`,
+          height: ui.helpers.line(),
+        }}
+      />
 
       {/* Contenido */}
       <div className="flex-1 truncate">

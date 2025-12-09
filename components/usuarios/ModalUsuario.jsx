@@ -11,6 +11,7 @@ import SunmiSelectAdv, {
 } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function ModalUsuario({
   open,
@@ -20,6 +21,7 @@ export default function ModalUsuario({
   roles = [],
   locales = [],
 }) {
+  const { ui } = useUIConfig();
   const editMode = Boolean(initialData);
 
   const [form, setForm] = useState({
@@ -101,8 +103,12 @@ export default function ModalUsuario({
           />
 
           {/* CONTENIDO CON SCROLL */}
-          <div className="flex flex-col max-h-[65vh] overflow-y-auto">
-
+          <div
+            className="flex flex-col overflow-y-auto"
+            style={{
+              maxHeight: "65vh",
+            }}
+          >
             <SunmiSeparator label="Datos" color="amber" />
 
             {/* Nombre */}
@@ -184,7 +190,12 @@ export default function ModalUsuario({
           </div>
 
           {/* ACCIONES */}
-          <div className="flex justify-end gap-2">
+          <div
+            className="flex justify-end"
+            style={{
+              gap: ui.helpers.spacing("sm"),
+            }}
+          >
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
@@ -200,8 +211,14 @@ export default function ModalUsuario({
 }
 
 function Field({ label, children }) {
+  const { ui } = useUIConfig();
   return (
-    <div className="flex flex-col gap-1">
+    <div
+      className="flex flex-col"
+      style={{
+        gap: ui.helpers.spacing("xs"),
+      }}
+    >
       <span>{label}</span>
       {children}
     </div>

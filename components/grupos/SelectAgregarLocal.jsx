@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SelectAgregarLocal({ onAgregar, excluidos = [] }) {
+  const { ui } = useUIConfig();
   const [locales, setLocales] = useState([]);
   const [selected, setSelected] = useState("");
 
@@ -33,7 +35,12 @@ export default function SelectAgregarLocal({ onAgregar, excluidos = [] }) {
   const disponibles = locales.filter((l) => !excluidos.includes(l.id));
 
   return (
-    <div className="flex gap-2">
+    <div
+      className="flex"
+      style={{
+        gap: ui.helpers.spacing("sm"),
+      }}
+    >
       <SunmiSelectAdv value={selected} onChange={setSelected}>
         <SunmiSelectOption value="">Seleccionar local…</SunmiSelectOption>
         {disponibles.map((l) => (
