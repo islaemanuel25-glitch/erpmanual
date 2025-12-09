@@ -21,13 +21,10 @@ export default function SidebarItemFlat({ item, isHorizontal = false }) {
   return (
     <Link
       href={item.href}
-      className={cn(
-        "flex items-center transition-colors flex-shrink-0",
-        active
-          ? "text-amber-400 bg-slate-800"
-          : "text-slate-400 hover:text-white hover:bg-slate-800"
-      )}
+      className="flex items-center transition-colors flex-shrink-0"
       style={{
+        backgroundColor: active ? "var(--sunmi-table-row-bg)" : "transparent",
+        color: active ? "var(--sunmi-header-text)" : "var(--sunmi-sidebar-text)",
         borderRadius: ui.helpers.radius("md"),
         ...(showText
           ? {
@@ -41,6 +38,18 @@ export default function SidebarItemFlat({ item, isHorizontal = false }) {
               padding: ui.helpers.spacing("sm"),
               justifyContent: "center",
             }),
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+          e.currentTarget.style.filter = "brightness(1.1)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.backgroundColor = "transparent";
+          e.currentTarget.style.filter = "brightness(1)";
+        }
       }}
       title={!showText ? item.label : undefined}
     >

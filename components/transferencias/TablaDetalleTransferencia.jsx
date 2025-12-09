@@ -20,8 +20,10 @@ export default function TablaDetalleTransferencia({
 
   return (
     <div
-      className="overflow-auto border border-slate-700"
+      className="overflow-auto border"
       style={{
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
         borderRadius: ui.helpers.radius("xl"),
         marginLeft: ui.helpers.spacing("xs"),
         marginRight: ui.helpers.spacing("xs"),
@@ -130,13 +132,21 @@ export default function TablaDetalleTransferencia({
 
             const diff = recibido - enviada;
 
-            let bg = "bg-slate-900";
-            if (diff !== 0) bg = "bg-amber-800/40";
-            if (diff < 0) bg = "bg-red-800/40";
-            if (diff === 0) bg = "bg-emerald-800/30";
+            let bgColor = "var(--sunmi-card-bg)";
+            if (diff !== 0) bgColor = "rgba(146,64,14,0.4)"; // amber-800/40
+            if (diff < 0) bgColor = "rgba(153,27,27,0.4)"; // red-800/40
+            if (diff === 0) bgColor = "rgba(6,78,59,0.3)"; // emerald-800/30
 
             return (
-              <tr key={d.id} className={`border-t border-slate-800 ${bg}`}>
+              <tr
+                key={d.id}
+                className="border-t"
+                style={{
+                  borderTopColor: "var(--sunmi-card-border)",
+                  borderTopWidth: "1px",
+                  backgroundColor: bgColor,
+                }}
+              >
                 <td
                   style={{
                     paddingLeft: ui.helpers.spacing("sm"),
@@ -195,8 +205,12 @@ export default function TablaDetalleTransferencia({
 
                         setEditItems(copia);
                       }}
-                      className="bg-slate-800 border border-slate-600 text-slate-100 text-right"
+                      className="border text-right"
                       style={{
+                        backgroundColor: "var(--sunmi-table-row-bg)",
+                        borderColor: "var(--sunmi-card-border)",
+                        borderWidth: "1px",
+                        color: "var(--sunmi-text)",
                         width: parseInt(ui.helpers.controlHeight()) * 2,
                         paddingLeft: ui.helpers.spacing("xs"),
                         paddingRight: ui.helpers.spacing("xs"),
@@ -233,8 +247,12 @@ export default function TablaDetalleTransferencia({
 
                           setEditItems(copia);
                         }}
-                        className="bg-slate-800 border border-slate-600 text-slate-100"
+                        className="border"
                         style={{
+                          backgroundColor: "var(--sunmi-table-row-bg)",
+                          borderColor: "var(--sunmi-card-border)",
+                          borderWidth: "1px",
+                          color: "var(--sunmi-text)",
                           paddingLeft: ui.helpers.spacing("xs"),
                           paddingRight: ui.helpers.spacing("xs"),
                           paddingTop: parseInt(ui.helpers.spacing("xs")) * 0.5,
@@ -277,8 +295,12 @@ export default function TablaDetalleTransferencia({
                         copia[idx].motivoDetalle = e.target.value;
                         setEditItems(copia);
                       }}
-                      className="bg-slate-800 border border-slate-600 text-slate-100"
+                      className="border"
                       style={{
+                        backgroundColor: "var(--sunmi-card-bg)",
+                        borderColor: "var(--sunmi-card-border)",
+                        borderWidth: "1px",
+                        color: "var(--sunmi-text)",
                         width: parseInt(ui.helpers.controlHeight()) * 6,
                         paddingLeft: ui.helpers.spacing("sm"),
                         paddingRight: ui.helpers.spacing("sm"),

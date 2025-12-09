@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import SidebarGroup from "./SidebarGroup";
@@ -15,7 +14,6 @@ import { useUser } from "@/app/context/UserContext";
 
 export default function SidebarPro() {
   const pathname = usePathname();
-  const { theme } = useSunmiTheme();
   const { sidebarMode, sidebarGroup } = useSidebarConfig();
   const { ui } = useUIConfig();
   const { perfil } = useUser();
@@ -43,21 +41,20 @@ export default function SidebarPro() {
       : {}),
   };
 
-  const borderClass = theme.sidebar?.border
-    ? `border-r ${theme.sidebar.border}`
-    : "border-r border-slate-800";
-
   // Modo agrupado
   if (isGrouped) {
     return (
       <div
         className={cn(
-          "h-full flex flex-col",
-          theme.sidebar?.bg ?? "bg-slate-900",
-          borderClass,
+          "h-full flex flex-col border-r",
           showText ? "items-stretch" : "items-center"
         )}
-        style={sidebarStyle}
+        style={{
+          ...sidebarStyle,
+          backgroundColor: "var(--sunmi-sidebar-bg)",
+          borderColor: "var(--sunmi-sidebar-border)",
+          borderRightWidth: "1px",
+        }}
       >
         {sidebarGroups.map((group) => (
           <SidebarGroup
@@ -80,12 +77,15 @@ export default function SidebarPro() {
   return (
     <div
       className={cn(
-        "h-full flex flex-col",
-        theme.sidebar?.bg ?? "bg-slate-900",
-        borderClass,
+        "h-full flex flex-col border-r",
         showText ? "items-stretch" : "items-center"
       )}
-      style={sidebarStyle}
+      style={{
+        ...sidebarStyle,
+        backgroundColor: "var(--sunmi-sidebar-bg)",
+        borderColor: "var(--sunmi-sidebar-border)",
+        borderRightWidth: "1px",
+      }}
     >
       {sidebarItems.map((item) => (
         <SidebarItemFlat key={item.href} item={item} />

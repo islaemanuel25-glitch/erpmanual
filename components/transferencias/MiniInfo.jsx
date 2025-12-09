@@ -12,7 +12,14 @@ export default function MiniInfo({ t }) {
 
   return (
     <div
-      className="bg-slate-900/80 border border-slate-700 animate-fade text-slate-200 shadow-inner"
+      className="border animate-fade shadow-inner"
+      style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        opacity: 0.9,
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
+        color: "var(--sunmi-text)",
+      }}
       style={{
         borderRadius: ui.helpers.radius("xl"),
         padding: ui.helpers.spacing("lg"),
@@ -34,8 +41,17 @@ export default function MiniInfo({ t }) {
             gap: ui.helpers.spacing("sm"),
           }}
         >
-          <span className="font-semibold text-slate-100">Fecha envío:</span>
-          <span className="text-slate-200">{formatDateTime(t.fechaEnvio)}</span>
+          <span
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Fecha envío:
+          </span>
+          <span style={{ color: "var(--sunmi-text)", opacity: 0.9 }}>
+            {formatDateTime(t.fechaEnvio)}
+          </span>
         </div>
 
         {/* Fecha recepción */}
@@ -45,8 +61,17 @@ export default function MiniInfo({ t }) {
             gap: ui.helpers.spacing("sm"),
           }}
         >
-          <span className="font-semibold text-slate-100">Fecha recepción:</span>
-          <span className="text-slate-200">{formatDateTime(t.fechaRecepcion)}</span>
+          <span
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Fecha recepción:
+          </span>
+          <span style={{ color: "var(--sunmi-text)", opacity: 0.9 }}>
+            {formatDateTime(t.fechaRecepcion)}
+          </span>
         </div>
 
         {/* Ítems */}
@@ -56,8 +81,17 @@ export default function MiniInfo({ t }) {
             gap: ui.helpers.spacing("sm"),
           }}
         >
-          <span className="font-semibold text-slate-100">Ítems:</span>
-          <span className="text-slate-200">{t.cantidadItems}</span>
+          <span
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Ítems:
+          </span>
+          <span style={{ color: "var(--sunmi-text)", opacity: 0.9 }}>
+            {t.cantidadItems}
+          </span>
         </div>
 
         {/* Costo total */}
@@ -67,8 +101,20 @@ export default function MiniInfo({ t }) {
             gap: ui.helpers.spacing("sm"),
           }}
         >
-          <span className="font-semibold text-slate-100">Costo total:</span>
-          <span className="text-amber-200 font-semibold">
+          <span
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Costo total:
+          </span>
+          <span
+            className="font-semibold"
+            style={{
+              color: "#fde047", // amber-200
+            }}
+          >
             ${Number(t.totalCosto || 0).toFixed(2)}
           </span>
         </div>
@@ -80,11 +126,32 @@ export default function MiniInfo({ t }) {
             gap: ui.helpers.spacing("sm"),
           }}
         >
-          <span className="font-semibold text-slate-100">Diferencias:</span>
+          <span
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Diferencias:
+          </span>
           {t.tieneDiferencias ? (
-            <span className="text-red-400 font-semibold">Sí</span>
+            <span
+              className="font-semibold"
+              style={{
+                color: "#f87171", // red-400
+              }}
+            >
+              Sí
+            </span>
           ) : (
-            <span className="text-emerald-400 font-semibold">No</span>
+            <span
+              className="font-semibold"
+              style={{
+                color: "#34d399", // emerald-400
+              }}
+            >
+              No
+            </span>
           )}
         </div>
       </div>

@@ -81,8 +81,11 @@ export default function FiltrosStock({
           }}
         >
           <div
-            className="flex items-center bg-slate-900 border border-slate-700 w-full"
+            className="flex items-center border w-full"
             style={{
+              backgroundColor: "var(--sunmi-card-bg)",
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
               borderRadius: ui.helpers.radius("lg"),
               paddingLeft: ui.helpers.spacing("sm"),
               paddingRight: ui.helpers.spacing("sm"),
@@ -91,14 +94,18 @@ export default function FiltrosStock({
           >
             <Search
               size={parseInt(ui.helpers.icon(1))}
-              className="text-slate-400"
+              style={{
+                color: "var(--sunmi-text)",
+                opacity: 0.7,
+              }}
             />
 
             <input
               type="text"
               placeholder="Buscar por nombre o código…"
-              className="bg-transparent w-full outline-none text-slate-100"
+              className="bg-transparent w-full outline-none"
               style={{
+                color: "var(--sunmi-text)",
                 paddingLeft: ui.helpers.spacing("sm"),
                 paddingRight: ui.helpers.spacing("sm"),
                 paddingTop: ui.helpers.spacing("xs"),
@@ -167,8 +174,10 @@ export default function FiltrosStock({
 
         {/* ✔ Checkboxes */}
         <div
-          className="grid grid-cols-3 text-slate-300"
+          className="grid grid-cols-3"
           style={{
+            color: "var(--sunmi-text)",
+            opacity: 0.8,
             gap: ui.helpers.spacing("sm"),
             fontSize: ui.helpers.font("xs"),
           }}

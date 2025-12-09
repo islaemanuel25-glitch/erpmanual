@@ -21,15 +21,19 @@ export default function ColumnSettingsModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade"
+      className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 animate-fade"
       style={{
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
         padding: ui.helpers.spacing("lg"),
       }}
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-700 shadow-2xl overflow-hidden"
+        className="border shadow-2xl overflow-hidden"
         style={{
+          backgroundColor: "var(--sunmi-card-bg)",
+          borderColor: "var(--sunmi-card-border)",
+          borderWidth: "1px",
           borderRadius: ui.helpers.radius("xl"),
           padding: parseInt(ui.helpers.spacing("lg")) * 1.25,
           width: "100%",
@@ -47,16 +51,18 @@ export default function ColumnSettingsModal({
         >
           <div>
             <h2
-              className="text-slate-100 font-semibold"
+              className="font-semibold"
               style={{
+                color: "var(--sunmi-text)",
                 fontSize: ui.helpers.font("lg"),
               }}
             >
               Configurar columnas
             </h2>
             <p
-              className="text-slate-400"
               style={{
+                color: "var(--sunmi-text)",
+                opacity: 0.7,
                 fontSize: ui.helpers.font("xs"),
                 marginTop: ui.helpers.spacing("xs"),
               }}
@@ -67,11 +73,20 @@ export default function ColumnSettingsModal({
 
           <button
             onClick={onClose}
-            className="text-slate-300 hover:text-amber-300 leading-none"
+            className="leading-none"
             style={{
+              color: "var(--sunmi-text)",
+              opacity: 0.8,
               fontSize: ui.helpers.font("lg"),
               paddingLeft: ui.helpers.spacing("sm"),
               paddingRight: ui.helpers.spacing("sm"),
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#fcd34d"; // amber-300
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--sunmi-text)";
+              e.currentTarget.style.opacity = "0.8";
             }}
             aria-label="Cerrar"
           >
@@ -91,8 +106,11 @@ export default function ColumnSettingsModal({
           {Object.entries(columns).map(([key, value]) => (
             <label
               key={key}
-              className="flex items-center justify-between bg-slate-800 border border-slate-700 hover:border-amber-400/70 transition"
+              className="flex items-center justify-between border transition"
               style={{
+                backgroundColor: "var(--sunmi-table-row-bg)",
+                borderColor: "var(--sunmi-card-border)",
+                borderWidth: "1px",
                 gap: ui.helpers.spacing("md"),
                 paddingLeft: ui.helpers.spacing("md"),
                 paddingRight: ui.helpers.spacing("md"),
@@ -100,10 +118,16 @@ export default function ColumnSettingsModal({
                 paddingBottom: ui.helpers.spacing("sm"),
                 borderRadius: ui.helpers.radius("lg"),
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "rgba(251,191,36,0.7)"; // amber-400/70
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--sunmi-card-border)";
+              }}
             >
               <span
-                className="text-slate-200"
                 style={{
+                  color: "var(--sunmi-text)",
                   fontSize: ui.helpers.font("sm"),
                 }}
               >
@@ -147,14 +171,24 @@ export default function ColumnSettingsModal({
         >
           <button
             onClick={onClose}
-            className="bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600"
+            className="border"
             style={{
+              backgroundColor: "var(--sunmi-table-row-bg)",
+              color: "var(--sunmi-text)",
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
               paddingLeft: ui.helpers.spacing("lg"),
               paddingRight: ui.helpers.spacing("lg"),
               paddingTop: ui.helpers.spacing("sm"),
               paddingBottom: ui.helpers.spacing("sm"),
               borderRadius: ui.helpers.radius("lg"),
               fontSize: ui.helpers.font("sm"),
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.filter = "brightness(1.15)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.filter = "brightness(1)";
             }}
           >
             Cerrar

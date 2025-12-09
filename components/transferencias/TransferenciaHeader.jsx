@@ -29,7 +29,11 @@ export default function TransferenciaHeader({ item, id }) {
         <a
           href={`/api/transferencias/pdf?id=${id}`}
           target="_blank"
-          className="bg-amber-400 text-slate-900 font-semibold shadow"
+          className="font-semibold shadow"
+          style={{
+            backgroundColor: "#fbbf24", // amber-400
+            color: "#0f172a", // slate-900
+          }}
           style={{
             paddingLeft: ui.helpers.spacing("md"),
             paddingRight: ui.helpers.spacing("md"),
@@ -45,7 +49,11 @@ export default function TransferenciaHeader({ item, id }) {
         <a
           href={`/api/transferencias/pdf-recepcion?id=${id}`}
           target="_blank"
-          className="bg-cyan-400 text-slate-900 font-semibold shadow"
+          className="font-semibold shadow"
+          style={{
+            backgroundColor: "#22d3ee", // cyan-400
+            color: "#0f172a", // slate-900
+          }}
           style={{
             paddingLeft: ui.helpers.spacing("md"),
             paddingRight: ui.helpers.spacing("md"),
@@ -62,7 +70,13 @@ export default function TransferenciaHeader({ item, id }) {
       <SunmiSeparator label="Datos generales" color="amber" />
 
       <div
-        className="border border-slate-700 grid md:grid-cols-2 bg-slate-900/50"
+        className="border grid md:grid-cols-2"
+        style={{
+          backgroundColor: "var(--sunmi-card-bg)",
+          opacity: 0.8,
+          borderColor: "var(--sunmi-card-border)",
+          borderWidth: "1px",
+        }}
         style={{
           borderRadius: ui.helpers.radius("xl"),
           padding: ui.helpers.spacing("md"),
@@ -73,33 +87,54 @@ export default function TransferenciaHeader({ item, id }) {
         }}
       >
         <div>
-          <div className="font-semibold text-slate-100">Origen</div>
-          <div className="text-slate-100">{item.origen.nombre}</div>
+          <div
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Origen
+          </div>
+          <div style={{ color: "var(--sunmi-text)" }}>{item.origen.nombre}</div>
         </div>
 
         <div>
-          <div className="font-semibold text-slate-100">Destino</div>
-          <div className="text-slate-100">{item.destino.nombre}</div>
+          <div
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Destino
+          </div>
+          <div style={{ color: "var(--sunmi-text)" }}>{item.destino.nombre}</div>
         </div>
 
         <div>
-          <div className="font-semibold text-slate-100">Fechas</div>
+          <div
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Fechas
+          </div>
 
-          <div className="text-slate-100">
+          <div style={{ color: "var(--sunmi-text)" }}>
             Creada:{" "}
             {item.fechaCreada
               ? new Date(item.fechaCreada).toLocaleString()
               : "-"}
           </div>
 
-          <div className="text-slate-100">
+          <div style={{ color: "var(--sunmi-text)" }}>
             Envío:{" "}
             {item.fechaEnvio
               ? new Date(item.fechaEnvio).toLocaleString()
               : "-"}
           </div>
 
-          <div className="text-slate-100">
+          <div style={{ color: "var(--sunmi-text)" }}>
             Recepción:{" "}
             {item.fechaRecepcion
               ? new Date(item.fechaRecepcion).toLocaleString()
@@ -108,9 +143,23 @@ export default function TransferenciaHeader({ item, id }) {
         </div>
 
         <div>
-          <div className="font-semibold text-slate-100">Estado</div>
           <div
-            className="inline-flex border border-slate-600 bg-slate-900/70 text-slate-100"
+            className="font-semibold"
+            style={{
+              color: "var(--sunmi-text)",
+            }}
+          >
+            Estado
+          </div>
+          <div
+            className="inline-flex border"
+            style={{
+              backgroundColor: "var(--sunmi-card-bg)",
+              opacity: 0.7,
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
+              color: "var(--sunmi-text)",
+            }}
             style={{
               paddingLeft: ui.helpers.spacing("sm"),
               paddingRight: ui.helpers.spacing("sm"),

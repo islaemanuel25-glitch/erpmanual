@@ -1,6 +1,8 @@
 // components/pos-transferencias/nueva/FiltrosDeposito.jsx
 "use client";
 
+import { useUIConfig } from "@/components/providers/UIConfigProvider";
+
 export default function FiltrosDeposito({
   areaId,
   categoriaId,
@@ -10,16 +12,51 @@ export default function FiltrosDeposito({
   onCategoriaChange,
   onLimpiar,
 }) {
+  const { ui } = useUIConfig();
+  
   return (
-    <div className="border rounded bg-white shadow-sm p-3">
-      <h2 className="font-semibold text-[15px] mb-2">
+    <div
+      className="border shadow-sm"
+      style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
+        borderRadius: ui.helpers.radius("md"),
+        padding: ui.helpers.spacing("md"),
+      }}
+    >
+      <h2
+        className="font-semibold"
+        style={{
+          fontSize: ui.helpers.font("lg"),
+          marginBottom: ui.helpers.spacing("sm"),
+          color: "var(--sunmi-text)",
+        }}
+      >
         Filtros del depósito (ordenan sugeridos)
       </h2>
 
-      <div className="flex flex-wrap gap-3 mb-3">
+      <div
+        className="flex flex-wrap"
+        style={{
+          gap: ui.helpers.spacing("md"),
+          marginBottom: ui.helpers.spacing("md"),
+        }}
+      >
         {/* Área física */}
         <select
-          className="h-[32px] border rounded px-2 text-sm"
+          className="border"
+          style={{
+            height: ui.helpers.controlHeight(),
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
+            borderRadius: ui.helpers.radius("md"),
+            paddingLeft: ui.helpers.spacing("sm"),
+            paddingRight: ui.helpers.spacing("sm"),
+            fontSize: ui.helpers.font("sm"),
+            backgroundColor: "var(--sunmi-card-bg)",
+            color: "var(--sunmi-text)",
+          }}
           value={areaId}
           onChange={(e) => onAreaChange(Number(e.target.value))}
         >
@@ -33,7 +70,18 @@ export default function FiltrosDeposito({
 
         {/* Categoría */}
         <select
-          className="h-[32px] border rounded px-2 text-sm"
+          className="border"
+          style={{
+            height: ui.helpers.controlHeight(),
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
+            borderRadius: ui.helpers.radius("md"),
+            paddingLeft: ui.helpers.spacing("sm"),
+            paddingRight: ui.helpers.spacing("sm"),
+            fontSize: ui.helpers.font("sm"),
+            backgroundColor: "var(--sunmi-card-bg)",
+            color: "var(--sunmi-text)",
+          }}
           value={categoriaId}
           onChange={(e) => onCategoriaChange(Number(e.target.value))}
         >
@@ -47,8 +95,25 @@ export default function FiltrosDeposito({
 
         {/* Limpiar */}
         <button
-          className="h-[32px] px-3 bg-gray-100 rounded text-xs"
+          className="border"
+          style={{
+            height: ui.helpers.controlHeight(),
+            paddingLeft: ui.helpers.spacing("md"),
+            paddingRight: ui.helpers.spacing("md"),
+            backgroundColor: "var(--sunmi-table-row-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
+            borderRadius: ui.helpers.radius("md"),
+            fontSize: ui.helpers.font("xs"),
+            color: "var(--sunmi-text)",
+          }}
           onClick={onLimpiar}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.filter = "brightness(1.15)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.filter = "brightness(1)";
+          }}
         >
           Limpiar filtros
         </button>

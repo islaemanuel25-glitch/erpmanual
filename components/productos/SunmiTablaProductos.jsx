@@ -52,8 +52,10 @@ export default function SunmiTablaProductos({
         return row.imagenUrl ? (
           <img
             src={row.imagenUrl}
-            className="object-cover border border-slate-700"
+            className="object-cover border"
             style={{
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
               width: imageSize,
               height: imageSize,
               borderRadius: ui.helpers.radius("md"),
@@ -61,8 +63,13 @@ export default function SunmiTablaProductos({
           />
         ) : (
           <div
-            className="bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500"
+            className="border flex items-center justify-center"
             style={{
+              backgroundColor: "var(--sunmi-table-row-bg)",
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
+              color: "var(--sunmi-text)",
+              opacity: 0.5,
               width: imageSize,
               height: imageSize,
               borderRadius: ui.helpers.radius("md"),
@@ -176,8 +183,11 @@ export default function SunmiTablaProductos({
 
   return (
     <div
-      className="overflow-hidden border border-slate-800 bg-slate-900"
+      className="overflow-hidden border"
       style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
         borderRadius: ui.helpers.radius("xl"),
       }}
     >
@@ -217,11 +227,19 @@ export default function SunmiTablaProductos({
                 {/* EDITAR */}
                 <button
                   onClick={() => onEditar(row.id)}
-                  className="flex items-center justify-center bg-amber-400 text-slate-900 hover:bg-amber-300 transition"
+                  className="flex items-center justify-center transition"
                   style={{
+                    backgroundColor: "#fbbf24", // amber-400
+                    color: "#0f172a", // slate-900
                     width: buttonSize,
                     height: buttonSize,
                     borderRadius: ui.helpers.radius("md"),
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#fcd34d"; // amber-300
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#fbbf24"; // amber-400
                   }}
                 >
                   <Pencil size={iconSize} />
@@ -230,11 +248,19 @@ export default function SunmiTablaProductos({
                 {/* ELIMINAR */}
                 <button
                   onClick={() => onEliminar(row.id)}
-                  className="flex items-center justify-center bg-red-500 text-white hover:bg-red-400 transition"
+                  className="flex items-center justify-center transition"
                   style={{
+                    backgroundColor: "#ef4444", // red-500
+                    color: "#ffffff", // white
                     width: buttonSize,
                     height: buttonSize,
                     borderRadius: ui.helpers.radius("md"),
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f87171"; // red-400
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#ef4444"; // red-500
                   }}
                 >
                   <Trash2 size={iconSize} />
@@ -248,8 +274,9 @@ export default function SunmiTablaProductos({
 
       {/* PAGINACIÓN */}
       <div
-        className="flex items-center justify-between bg-slate-900"
+        className="flex items-center justify-between"
         style={{
+          backgroundColor: "var(--sunmi-card-bg)",
           paddingLeft: ui.helpers.spacing("md"),
           paddingRight: ui.helpers.spacing("md"),
           paddingTop: ui.helpers.spacing("sm"),
@@ -261,8 +288,9 @@ export default function SunmiTablaProductos({
         </SunmiButton>
 
         <span
-          className="text-slate-300"
           style={{
+            color: "var(--sunmi-text)",
+            opacity: 0.8,
             fontSize: ui.helpers.font("sm"),
           }}
         >

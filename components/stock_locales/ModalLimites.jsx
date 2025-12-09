@@ -48,8 +48,9 @@ export default function ModalLimites({ open, onClose, producto, local }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      className="fixed inset-0 flex items-center justify-center z-50"
       style={{
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
         padding: ui.helpers.spacing("lg"),
       }}
     >
@@ -57,7 +58,12 @@ export default function ModalLimites({ open, onClose, producto, local }) {
         {/* HEADER */}
         <div className="sunmi-header-amber flex items-center justify-between">
           <span>Límites de stock</span>
-          <button className="text-slate-900" onClick={() => onClose(false)}>
+          <button
+            style={{
+              color: "#0f172a", // slate-900
+            }}
+            onClick={() => onClose(false)}
+          >
             <X size={parseInt(ui.helpers.icon(1.125))} />
           </button>
         </div>
@@ -68,22 +74,28 @@ export default function ModalLimites({ open, onClose, producto, local }) {
           }}
         >
           <p
-            className="text-slate-300"
             style={{
+              color: "var(--sunmi-text)",
+              opacity: 0.8,
               fontSize: ui.helpers.font("sm"),
             }}
           >
-            Producto: <strong className="text-slate-100">{producto.nombre}</strong>
+            Producto:{" "}
+            <strong style={{ color: "var(--sunmi-text)" }}>
+              {producto.nombre}
+            </strong>
           </p>
 
           <p
-            className="text-slate-300"
             style={{
+              color: "var(--sunmi-text)",
+              opacity: 0.8,
               fontSize: ui.helpers.font("sm"),
               marginTop: ui.helpers.spacing("xs"),
             }}
           >
-            Local: <strong className="text-slate-100">{local.nombre}</strong>
+            Local:{" "}
+            <strong style={{ color: "var(--sunmi-text)" }}>{local.nombre}</strong>
           </p>
 
           {/* Inputs */}

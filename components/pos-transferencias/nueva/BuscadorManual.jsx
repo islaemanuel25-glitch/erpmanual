@@ -147,8 +147,9 @@ export default function BuscadorManual({
       }}
     >
       <div
-        className="uppercase tracking-wide text-cyan-400"
+        className="uppercase tracking-wide"
         style={{
+          color: "#22d3ee", // cyan-400
           fontSize: ui.helpers.font("xs"),
           marginBottom: ui.helpers.spacing("xs"),
           paddingLeft: ui.helpers.spacing("xs"),
@@ -161,13 +162,24 @@ export default function BuscadorManual({
         <button
           type="button"
           onClick={iniciarVoz}
-          className="absolute top-1/2 -translate-y-1/2 bg-slate-800 border border-cyan-500 flex items-center justify-center text-cyan-300 hover:bg-slate-700 active:scale-95 transition shadow-[0_0_8px_rgba(34,211,238,0.35)]"
+          className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center active:scale-95 transition"
           style={{
+            backgroundColor: "var(--sunmi-table-row-bg)",
+            borderColor: "#06b6d4", // cyan-500
+            borderWidth: "1px",
+            color: "#67e8f9", // cyan-300
+            boxShadow: "0 0 8px rgba(34,211,238,0.35)",
             right: ui.helpers.spacing("sm"),
             height: parseInt(ui.helpers.controlHeight()),
             width: parseInt(ui.helpers.controlHeight()),
             borderRadius: ui.helpers.radius("full"),
             fontSize: ui.helpers.font("lg"),
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.filter = "brightness(1.15)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.filter = "brightness(1)";
           }}
         >
           🎤
@@ -176,8 +188,12 @@ export default function BuscadorManual({
         <input
           type="text"
           placeholder="Buscar producto o decirlo..."
-          className="w-full bg-slate-900 text-slate-100 border border-cyan-500/40 shadow-inner focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400 transition-all"
+          className="w-full shadow-inner focus:outline-none transition-all"
           style={{
+            backgroundColor: "var(--sunmi-card-bg)",
+            color: "var(--sunmi-text)",
+            borderColor: "rgba(6,182,212,0.4)", // cyan-500/40
+            borderWidth: "1px",
             paddingLeft: parseInt(ui.helpers.spacing("lg")) * 2.5,
             paddingRight: parseInt(ui.helpers.spacing("lg")) * 3,
             paddingTop: ui.helpers.spacing("sm"),
@@ -185,14 +201,23 @@ export default function BuscadorManual({
             borderRadius: ui.helpers.radius("xl"),
             fontSize: ui.helpers.font("sm"),
           }}
+          onFocus={(e) => {
+            e.target.style.borderColor = "#22d3ee"; // cyan-400
+            e.target.style.boxShadow = "0 0 0 2px rgba(34,211,238,0.2)";
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = "rgba(6,182,212,0.4)";
+            e.target.style.boxShadow = "none";
+          }}
           value={texto}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
         />
 
         <span
-          className="absolute top-1/2 -translate-y-1/2 text-cyan-400"
+          className="absolute top-1/2 -translate-y-1/2"
           style={{
+            color: "#22d3ee", // cyan-400
             left: ui.helpers.spacing("md"),
             fontSize: ui.helpers.font("lg"),
           }}
@@ -203,8 +228,9 @@ export default function BuscadorManual({
 
       {loading && (
         <div
-          className="text-cyan-300 animate-pulse"
+          className="animate-pulse"
           style={{
+            color: "#67e8f9", // cyan-300
             fontSize: ui.helpers.font("xs"),
             marginTop: ui.helpers.spacing("xs"),
           }}
@@ -215,8 +241,11 @@ export default function BuscadorManual({
 
       {!loading && resultados.length > 0 && texto.trim() !== "" && (
         <div
-          className="absolute left-0 right-0 bg-slate-900 border border-cyan-500/40 shadow-xl overflow-auto z-50 animate-[fadeIn_0.2s_ease]"
+          className="absolute left-0 right-0 border shadow-xl overflow-auto z-50 animate-[fadeIn_0.2s_ease]"
           style={{
+            backgroundColor: "var(--sunmi-card-bg)",
+            borderColor: "rgba(6,182,212,0.4)", // cyan-500/40
+            borderWidth: "1px",
             top: parseInt(ui.helpers.controlHeight()) * 2.5,
             borderRadius: ui.helpers.radius("xl"),
             maxHeight: parseInt(ui.helpers.controlHeight()) * 8,
@@ -225,19 +254,25 @@ export default function BuscadorManual({
           {resultados.slice(0, 30).map((p, idx) => (
             <div
               key={p.productoLocalId}
-              className={`cursor-pointer transition-all ${
-                idx === focusIndex
-                  ? "bg-cyan-600/20 border-l-4 border-cyan-400"
-                  : "hover:bg-cyan-500/10"
-              }`}
+              className="cursor-pointer transition-all"
               style={{
+                backgroundColor: idx === focusIndex ? "rgba(8,145,178,0.2)" : "transparent", // cyan-600/20
+                borderLeftWidth: idx === focusIndex ? "4px" : "0px",
+                borderLeftColor: idx === focusIndex ? "#22d3ee" : "transparent", // cyan-400
                 paddingLeft: ui.helpers.spacing("md"),
                 paddingRight: ui.helpers.spacing("md"),
                 paddingTop: ui.helpers.spacing("sm"),
                 paddingBottom: ui.helpers.spacing("sm"),
                 fontSize: ui.helpers.font("sm"),
               }}
-              onMouseEnter={() => setFocusIndex(idx)}
+              onMouseEnter={() => {
+                setFocusIndex(idx);
+              }}
+              onMouseLeave={() => {
+                if (idx === focusIndex) {
+                  // Mantener el estilo si está enfocado
+                }
+              }}
               onClick={() => {
                 beep();
                 onAgregar(p);
@@ -245,12 +280,20 @@ export default function BuscadorManual({
                 setFocusIndex(-1);
               }}
             >
-              <div className="text-slate-100 font-medium">{p.nombre}</div>
+              <div
+                className="font-medium"
+                style={{
+                  color: "var(--sunmi-text)",
+                }}
+              >
+                {p.nombre}
+              </div>
 
               {p.codigoBarra && (
                 <div
-                  className="text-slate-400"
                   style={{
+                    color: "var(--sunmi-text)",
+                    opacity: 0.7,
                     fontSize: ui.helpers.font("xs"),
                   }}
                 >
@@ -264,8 +307,9 @@ export default function BuscadorManual({
 
       {!loading && texto.trim() !== "" && resultados.length === 0 && (
         <div
-          className="text-slate-400"
           style={{
+            color: "var(--sunmi-text)",
+            opacity: 0.7,
             fontSize: ui.helpers.font("xs"),
             marginTop: ui.helpers.spacing("xs"),
           }}

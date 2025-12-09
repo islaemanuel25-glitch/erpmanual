@@ -40,7 +40,12 @@ export default function SunmiTable({ headers = [], children }) {
         )}
 
         {/* ===== BODY ===== */}
-        <tbody className="divide-y divide-slate-800">
+        <tbody
+          style={{
+            borderTopColor: "var(--sunmi-card-border)",
+            borderTopWidth: "1px",
+          }}
+        >
           {children}
         </tbody>
       </table>

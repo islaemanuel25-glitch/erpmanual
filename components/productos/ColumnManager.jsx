@@ -57,8 +57,11 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
 
       {open && (
         <div
-          className="absolute right-0 z-[9999] bg-slate-900 border border-slate-700"
+          className="absolute right-0 z-[9999] border"
           style={{
+            backgroundColor: "var(--sunmi-card-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
             marginTop: ui.helpers.spacing("sm"),
             width: dropdownWidth,
             borderRadius: ui.helpers.radius("xl"),
@@ -74,8 +77,9 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
           />
 
           <p
-            className="text-slate-400"
             style={{
+              color: "var(--sunmi-text)",
+              opacity: 0.7,
               fontSize: ui.helpers.font("xs"),
               marginTop: ui.helpers.spacing("md"),
               marginBottom: ui.helpers.spacing("sm"),
@@ -98,8 +102,10 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
             {filtered.map((c) => (
               <label
                 key={c.key}
-                className="flex items-center justify-between bg-slate-800 hover:bg-slate-700 cursor-pointer text-slate-200"
+                className="flex items-center justify-between cursor-pointer"
                 style={{
+                  backgroundColor: "var(--sunmi-table-row-bg)",
+                  color: "var(--sunmi-text)",
                   paddingLeft: ui.helpers.spacing("sm"),
                   paddingRight: ui.helpers.spacing("sm"),
                   paddingTop: ui.helpers.spacing("sm"),
@@ -107,6 +113,12 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
                   borderRadius: ui.helpers.radius("lg"),
                   fontSize: ui.helpers.font("sm"),
                   marginBottom: ui.helpers.spacing("xs"),
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.filter = "brightness(1.15)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.filter = "brightness(1)";
                 }}
               >
                 <span className="truncate">{c.label}</span>
@@ -126,8 +138,9 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
 
             {filtered.length === 0 && (
               <div
-                className="text-slate-500"
                 style={{
+                  color: "var(--sunmi-text)",
+                  opacity: 0.5,
                   fontSize: ui.helpers.font("xs"),
                   paddingLeft: ui.helpers.spacing("sm"),
                   paddingRight: ui.helpers.spacing("sm"),

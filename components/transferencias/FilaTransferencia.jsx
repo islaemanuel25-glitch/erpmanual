@@ -21,7 +21,18 @@ export default function FilaTransferencia({
   return (
     <>
       <tr
-        className="border-t border-slate-800 cursor-pointer hover:bg-slate-800/40"
+        className="border-t cursor-pointer"
+        style={{
+          borderTopColor: "var(--sunmi-card-border)",
+          borderTopWidth: "1px",
+          backgroundColor: "transparent",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }}
         onClick={toggleFila}
       >
         {columns.id && <td>{t.id}</td>}
@@ -31,7 +42,9 @@ export default function FilaTransferencia({
             {t.origenNombre}
             {t.origenEsDeposito && (
               <span
-                className="text-amber-300"
+                style={{
+                  color: "#fcd34d", // amber-300
+                }}
                 style={{
                   fontSize: ui.helpers.font("xs"),
                   marginLeft: ui.helpers.spacing("xs"),
@@ -48,7 +61,13 @@ export default function FilaTransferencia({
         {columns.estado && (
           <td>
             <span
-              className="inline-flex bg-slate-800 border border-slate-600 rounded-full text-slate-100"
+              className="inline-flex border rounded-full"
+              style={{
+                backgroundColor: "var(--sunmi-table-row-bg)",
+                borderColor: "var(--sunmi-card-border)",
+                borderWidth: "1px",
+                color: "var(--sunmi-text)",
+              }}
               style={{
                 paddingLeft: ui.helpers.spacing("sm"),
                 paddingRight: ui.helpers.spacing("sm"),
@@ -66,7 +85,10 @@ export default function FilaTransferencia({
           <td>
             {t.estado !== "Recibida" ? (
               <span
-                className="text-slate-500"
+                style={{
+                  color: "var(--sunmi-text)",
+                  opacity: 0.6,
+                }}
                 style={{
                   fontSize: ui.helpers.font("xs"),
                 }}
@@ -75,7 +97,13 @@ export default function FilaTransferencia({
               </span>
             ) : t.tieneDiferencias ? (
               <span
-                className="inline-flex bg-red-900/40 border border-red-600 text-red-300 rounded-full"
+                className="inline-flex border rounded-full"
+                style={{
+                  backgroundColor: "rgba(127,29,29,0.4)", // red-900/40
+                  borderColor: "#dc2626", // red-600
+                  borderWidth: "1px",
+                  color: "#fca5a5", // red-300
+                }}
                 style={{
                   paddingLeft: ui.helpers.spacing("sm"),
                   paddingRight: ui.helpers.spacing("sm"),
@@ -88,7 +116,13 @@ export default function FilaTransferencia({
               </span>
             ) : (
               <span
-                className="inline-flex bg-emerald-900/40 border border-emerald-600 text-emerald-300 rounded-full"
+                className="inline-flex border rounded-full"
+                style={{
+                  backgroundColor: "rgba(6,78,59,0.4)", // emerald-900/40
+                  borderColor: "#059669", // emerald-600
+                  borderWidth: "1px",
+                  color: "#6ee7b7", // emerald-300
+                }}
                 style={{
                   paddingLeft: ui.helpers.spacing("sm"),
                   paddingRight: ui.helpers.spacing("sm"),

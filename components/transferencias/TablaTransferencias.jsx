@@ -34,7 +34,11 @@ export default function TablaTransferencias({
 
   return (
     <div
-      className="w-full overflow-x-auto border border-slate-700"
+      className="w-full overflow-x-auto border"
+      style={{
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
+      }}
       style={{
         borderRadius: ui.helpers.radius("xl"),
         marginLeft: ui.helpers.spacing("xs"),

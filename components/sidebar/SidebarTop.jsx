@@ -6,7 +6,6 @@ import { useState } from "react";
 
 import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import sidebarGroups from "./sidebarGroups";
 import sidebarItems from "./sidebarItems";
 import SidebarGroupTop from "./SidebarGroupTop";
@@ -18,7 +17,6 @@ export default function SidebarTop() {
   const pathname = usePathname();
   const { sidebarGroup, sidebarMode } = useSidebarConfig();
   const { ui } = useUIConfig();
-  const { theme } = useSunmiTheme();
   const { perfil } = useUser();
 
   const showText = sidebarMode === "icons-text";

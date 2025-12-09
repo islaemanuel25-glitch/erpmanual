@@ -4,7 +4,6 @@ import { Bell, ChevronDown, LogOut } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@/app/context/UserContext";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useLayoutMode } from "@/components/providers/LayoutModeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import SidebarTop from "@/components/sidebar/SidebarTop";
@@ -13,7 +12,6 @@ export default function Header() {
   const pathname = usePathname();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
-  const { theme } = useSunmiTheme();
   const { layoutMode } = useLayoutMode();
   const { ui } = useUIConfig();
 
@@ -57,12 +55,14 @@ export default function Header() {
 
   return (
     <header
-      className={`w-full flex items-center justify-between border-b shadow-md bg-gradient-to-r ${theme.header.bg} ${theme.header.border}`}
+      className="w-full flex items-center justify-between border-b shadow-md"
       style={{
+        background: "var(--sunmi-header-bg)",
+        borderColor: "var(--sunmi-header-border)",
+        borderBottomWidth: ui.helpers.line(),
         height: headerHeight,
         paddingLeft: ui.helpers.spacing("lg"),
         paddingRight: ui.helpers.spacing("lg"),
-        borderBottomWidth: ui.helpers.line(),
       }}
     >
       {/* --- SI LAYOUT ES TOP, AQUI VA EL MENÚ --- */}
@@ -80,8 +80,9 @@ export default function Header() {
 
       {/* --- TITULO --- */}
       <h1
-        className={`font-semibold hidden md:block ${theme.header.text}`}
+        className="font-semibold hidden md:block"
         style={{
+          color: "var(--sunmi-header-text)",
           fontSize: ui.helpers.font("lg"),
         }}
       >
@@ -96,7 +97,10 @@ export default function Header() {
         }}
       >
         <Bell
-          className={`${theme.header.text} cursor-pointer`}
+          className="cursor-pointer"
+          style={{
+            color: "var(--sunmi-header-text)",
+          }}
           size={iconSize}
         />
 
@@ -110,8 +114,12 @@ export default function Header() {
             }}
           >
             <div
-              className={`rounded-full flex items-center justify-center font-bold ${theme.card}`}
+              className="rounded-full flex items-center justify-center font-bold"
               style={{
+                backgroundColor: "var(--sunmi-card-bg)",
+                borderColor: "var(--sunmi-card-border)",
+                borderWidth: "1px",
+                color: "var(--sunmi-card-text)",
                 width: avatarSize,
                 height: avatarSize,
                 borderRadius: ui.helpers.radius("full"),
@@ -128,16 +136,18 @@ export default function Header() {
               }}
             >
               <span
-                className={theme.header.text}
                 style={{
+                  color: "var(--sunmi-header-text)",
                   fontSize: ui.helpers.font("sm"),
                 }}
               >
                 {nombre}
               </span>
               <span
-                className={`border ${theme.header.text} ${theme.header.border}`}
+                className="border"
                 style={{
+                  color: "var(--sunmi-header-text)",
+                  borderColor: "var(--sunmi-header-border)",
                   fontSize: ui.helpers.font("xs"),
                   paddingLeft: ui.helpers.spacing("sm"),
                   paddingRight: ui.helpers.spacing("sm"),
@@ -153,20 +163,26 @@ export default function Header() {
 
             <ChevronDown
               size={chevronSize}
-              className={`${theme.header.text} transition-transform ${open ? "rotate-180" : ""}`}
+              className="transition-transform"
+              style={{
+                color: "var(--sunmi-header-text)",
+                transform: open ? "rotate(180deg)" : "rotate(0deg)",
+              }}
             />
           </div>
 
           {open && (
             <div
-              className={`absolute right-0 shadow-xl border ${theme.card} ${theme.header.border}`}
+              className="absolute right-0 shadow-xl border"
               style={{
+                backgroundColor: "var(--sunmi-card-bg)",
+                borderColor: "var(--sunmi-header-border)",
+                borderWidth: ui.helpers.line(),
                 marginTop: ui.helpers.spacing("sm"),
                 width: parseInt(ui.helpers.controlHeight()) * 14.5,
                 paddingTop: ui.helpers.spacing("sm"),
                 paddingBottom: ui.helpers.spacing("sm"),
                 borderRadius: ui.helpers.radius("md"),
-                borderWidth: ui.helpers.line(),
               }}
             >
               <button

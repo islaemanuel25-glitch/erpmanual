@@ -8,7 +8,7 @@ export default function SunmiInput({ className = "", ...props }) {
   return (
     <input
       {...props}
-      className={`w-full placeholder-slate-500 border outline-none transition ${className}`}
+      className={`w-full border outline-none transition ${className}`}
       style={{
         backgroundColor: "var(--sunmi-card-bg)",
         color: "var(--sunmi-text)",

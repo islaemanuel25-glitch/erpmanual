@@ -79,8 +79,11 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
       {/* ================================= */}
       {open && (
         <div
-          className="border border-slate-700 bg-slate-900 shadow-md animate-fadeIn"
+          className="border shadow-md animate-fadeIn"
           style={{
+            backgroundColor: "var(--sunmi-card-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
             borderRadius: ui.helpers.radius("xl"),
             padding: ui.helpers.spacing("lg"),
           }}

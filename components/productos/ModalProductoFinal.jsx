@@ -179,10 +179,11 @@ export default function ModalProducto({
 
   return (
     <div
-      className={`fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center ${
+      className={`fixed inset-0 z-[9999] flex items-center justify-center ${
         open ? "block" : "hidden"
       }`}
       style={{
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
         padding: ui.helpers.spacing("md"),
       }}
     >
@@ -206,8 +207,7 @@ export default function ModalProducto({
 
         <div
           ref={modalRef}
-          className="overflow-y-auto"
-          className="flex flex-col"
+          className="overflow-y-auto flex flex-col"
           style={{
             maxHeight: ui.helpers.modalMaxHeight,
             gap: ui.helpers.spacing("lg"),
@@ -434,15 +434,16 @@ export default function ModalProducto({
               }}
             >
               <label
-                className="text-slate-400"
                 style={{
+                  color: "var(--sunmi-text)",
+                  opacity: 0.7,
                   fontSize: ui.helpers.font("xs"),
                 }}
               >
                 Redondeo a $100
               </label>
               <SunmiToggleEstado
-                checked={form.redondeo_100}
+                value={form.redondeo_100}
                 onChange={(v) => {
                   setField("redondeo_100", v);
                   if (v && form.precio_venta > 0)
@@ -458,15 +459,16 @@ export default function ModalProducto({
               }}
             >
               <label
-                className="text-slate-400"
                 style={{
+                  color: "var(--sunmi-text)",
+                  opacity: 0.7,
                   fontSize: ui.helpers.font("xs"),
                 }}
               >
                 Es combo
               </label>
               <SunmiToggleEstado
-                checked={form.es_combo}
+                value={form.es_combo}
                 onChange={(v) => setField("es_combo", v)}
               />
             </div>
@@ -478,15 +480,16 @@ export default function ModalProducto({
               }}
             >
               <label
-                className="text-slate-400"
                 style={{
+                  color: "var(--sunmi-text)",
+                  opacity: 0.7,
                   fontSize: ui.helpers.font("xs"),
                 }}
               >
                 Activo
               </label>
               <SunmiToggleEstado
-                checked={form.activo}
+                value={form.activo}
                 onChange={(v) => setField("activo", v)}
               />
             </div>
@@ -494,8 +497,10 @@ export default function ModalProducto({
         </div>
 
         <div
-          className="border-t border-slate-800 flex justify-end"
+          className="border-t flex justify-end"
           style={{
+            borderTopColor: "var(--sunmi-card-border)",
+            borderTopWidth: "1px",
             marginTop: ui.helpers.spacing("lg"),
             paddingTop: ui.helpers.spacing("lg"),
             gap: ui.helpers.spacing("sm"),
@@ -525,8 +530,9 @@ function Field({ label, children, colSpan }) {
       }}
     >
       <label
-        className="text-slate-400"
         style={{
+          color: "var(--sunmi-text)",
+          opacity: 0.7,
           fontSize: ui.helpers.font("xs"),
         }}
       >

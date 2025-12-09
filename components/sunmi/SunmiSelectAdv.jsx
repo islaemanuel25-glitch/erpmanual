@@ -87,9 +87,11 @@ export default function SunmiSelectAdv({
         <span className="truncate">{currentText}</span>
         <ChevronDown
           size={parseInt(ui.helpers.icon(1))}
-          className={`transition-transform ${
-            open ? "rotate-180 text-amber-400" : "text-amber-300"
-          }`}
+          className="transition-transform"
+          style={{
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            color: open ? "#fbbf24" : "#fcd34d", // amber-400 : amber-300
+          }}
         />
       </button>
 

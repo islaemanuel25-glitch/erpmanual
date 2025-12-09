@@ -9,7 +9,14 @@ export default function TablaLocales({ items, onQuitar }) {
   if (!items || items.length === 0) {
     return (
       <div
-        className="bg-gray-50 text-gray-500 border text-center"
+        className="border text-center"
+        style={{
+          backgroundColor: "var(--sunmi-card-bg)",
+          color: "var(--sunmi-text)",
+          opacity: 0.6,
+          borderColor: "var(--sunmi-card-border)",
+          borderWidth: "1px",
+        }}
         style={{
           borderRadius: ui.helpers.radius("md"),
           padding: ui.helpers.spacing("lg"),
@@ -22,7 +29,12 @@ export default function TablaLocales({ items, onQuitar }) {
 
   return (
     <div
-      className="overflow-x-auto bg-white shadow-sm border"
+      className="overflow-x-auto shadow-sm border"
+      style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
+      }}
       style={{
         borderRadius: ui.helpers.radius("lg"),
       }}
@@ -33,7 +45,12 @@ export default function TablaLocales({ items, onQuitar }) {
           fontSize: ui.helpers.font("sm"),
         }}
       >
-        <thead className="bg-gray-100 text-gray-700">
+        <thead
+          style={{
+            backgroundColor: "var(--sunmi-table-header-bg)",
+            color: "var(--sunmi-text)",
+          }}
+        >
           <tr>
             <th
               className="text-left"
@@ -75,7 +92,18 @@ export default function TablaLocales({ items, onQuitar }) {
           {items.map((r) => (
             <tr
               key={r.local.id}
-              className="border-t hover:bg-green-50 transition-colors"
+              className="border-t transition-colors"
+              style={{
+                borderTopColor: "var(--sunmi-card-border)",
+                borderTopWidth: "1px",
+                backgroundColor: "transparent",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
             >
               <td
                 style={{
@@ -88,7 +116,10 @@ export default function TablaLocales({ items, onQuitar }) {
                 {r.local.id}
               </td>
               <td
-                className="font-medium text-gray-800"
+                className="font-medium"
+                style={{
+                  color: "var(--sunmi-text)",
+                }}
                 style={{
                   paddingLeft: ui.helpers.spacing("lg"),
                   paddingRight: ui.helpers.spacing("lg"),

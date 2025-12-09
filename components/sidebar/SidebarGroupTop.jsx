@@ -4,7 +4,6 @@ import Link from "next/link";
 import SidebarIcon from "./SidebarIcon";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { cn } from "@/lib/utils";
@@ -21,7 +20,6 @@ export default function SidebarGroupTop({
 }) {
   const pathname = usePathname();
   const panelRef = useRef(null);
-  const { theme } = useSunmiTheme();
   const { sidebarMode } = useSidebarConfig();
   const { ui } = useUIConfig();
   const showText = sidebarMode === "icons-text";
@@ -56,13 +54,10 @@ export default function SidebarGroupTop({
     <div className="relative flex-shrink-0">
       <button
         onClick={() => setOpenGroup(abierto ? null : id)}
-        className={cn(
-          "flex items-center transition",
-          activo || abierto
-            ? "text-amber-400 bg-slate-800"
-            : "text-slate-400 hover:text-white hover:bg-slate-800"
-        )}
+        className="flex items-center transition"
         style={{
+          backgroundColor: activo || abierto ? "var(--sunmi-table-row-bg)" : "transparent",
+          color: activo || abierto ? "var(--sunmi-header-text)" : "var(--sunmi-sidebar-text)",
           borderRadius: ui.helpers.radius("md"),
           ...(showText
             ? {
@@ -77,11 +72,23 @@ export default function SidebarGroupTop({
                 justifyContent: "center",
               }),
         }}
+        onMouseEnter={(e) => {
+          if (!activo && !abierto) {
+            e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+            e.currentTarget.style.filter = "brightness(1.1)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!activo && !abierto) {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.filter = "brightness(1)";
+          }
+        }}
       >
         <SidebarIcon Icon={icon} IconFilled={iconFilled} active={abierto || activo} />
         {showText && (
           <span
-            className={cn("font-medium", theme.sidebar?.text ?? "text-slate-200")}
+            className="font-medium"
             style={{
               fontSize: ui.helpers.font("sm"),
             }}
@@ -94,12 +101,11 @@ export default function SidebarGroupTop({
       {abierto && (
         <div
           ref={panelRef}
-          className={cn(
-            "absolute left-0 top-full z-50 shadow-xl shadow-black/50 border",
-            theme.sidebar.dropdownBg,
-            theme.sidebar.dropdownBorder
-          )}
+          className="absolute left-0 top-full z-50 shadow-xl shadow-black/50 border"
           style={{
+            backgroundColor: "var(--sunmi-card-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
             marginTop: ui.helpers.spacing("sm"),
             minWidth: parseInt(ui.helpers.controlHeight()) * 11.25,
             borderRadius: ui.helpers.radius("xl"),
@@ -107,8 +113,9 @@ export default function SidebarGroupTop({
           }}
         >
           <h3
-            className={cn("font-bold uppercase tracking-wide", theme.sidebar.dropdownHeading)}
+            className="font-bold uppercase tracking-wide"
             style={{
+              color: "var(--sunmi-sidebar-text)",
               fontSize: ui.helpers.font("xs"),
               marginBottom: ui.helpers.spacing("sm"),
             }}
@@ -122,22 +129,26 @@ export default function SidebarGroupTop({
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  "block transition",
-                  activeItem
-                    ? "bg-slate-700 text-amber-300"
-                    : cn(
-                        theme.sidebar.dropdownItem,
-                        theme.sidebar.dropdownItemHover
-                      )
-                )}
+                className="block transition"
                 style={{
+                  backgroundColor: activeItem ? "var(--sunmi-table-row-bg)" : "transparent",
+                  color: activeItem ? "var(--sunmi-header-text)" : "var(--sunmi-text)",
                   fontSize: ui.helpers.font("sm"),
                   paddingLeft: ui.helpers.spacing("sm"),
                   paddingRight: ui.helpers.spacing("sm"),
                   paddingTop: ui.helpers.spacing("sm"),
                   paddingBottom: ui.helpers.spacing("sm"),
                   borderRadius: ui.helpers.radius("md"),
+                }}
+                onMouseEnter={(e) => {
+                  if (!activeItem) {
+                    e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!activeItem) {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }
                 }}
                 onClick={() => setOpenGroup(null)}
               >

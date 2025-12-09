@@ -4,7 +4,6 @@ import Link from "next/link";
 import SidebarIcon from "./SidebarIcon";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { cn } from "@/lib/utils";
@@ -21,7 +20,6 @@ export default function SidebarGroup({
 }) {
   const pathname = usePathname();
   const panelRef = useRef(null);
-  const { theme } = useSunmiTheme();
   const { sidebarMode } = useSidebarConfig();
   const showText = sidebarMode === "icons-text";
 
@@ -57,8 +55,9 @@ export default function SidebarGroup({
     <div className={cn("relative flex flex-col", showText ? "items-stretch w-full" : "items-center w-full")}>
       <button
         onClick={() => setOpenGroup(abierto ? null : id)}
-        className={cn("flex items-center transition", theme.sidebar.hover)}
+        className="flex items-center transition"
         style={{
+          backgroundColor: "transparent",
           borderRadius: ui.helpers.radius("xl"),
           ...(showText
             ? {
@@ -75,12 +74,21 @@ export default function SidebarGroup({
                 height: parseInt(ui.helpers.controlHeight()) * 1.2,
               }),
         }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "var(--sunmi-sidebar-bg)";
+          e.currentTarget.style.filter = "brightness(0.9)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "transparent";
+          e.currentTarget.style.filter = "brightness(1)";
+        }}
       >
         <SidebarIcon Icon={icon} IconFilled={iconFilled} active={abierto || activo} />
         {showText && (
           <span
-            className={cn("font-medium", theme.sidebar?.text ?? "text-slate-200")}
+            className="font-medium"
             style={{
+              color: "var(--sunmi-sidebar-text)",
               fontSize: ui.helpers.font("sm"),
             }}
           >
@@ -92,8 +100,11 @@ export default function SidebarGroup({
       {abierto && (
         <div
           ref={panelRef}
-          className={`absolute top-0 z-50 ${theme.sidebar.dropdownBg} ${theme.sidebar.dropdownBorder} border shadow-xl shadow-black/50`}
+          className="absolute top-0 z-50 border shadow-xl shadow-black/50"
           style={{
+            backgroundColor: "var(--sunmi-card-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
             left: showText ? parseInt(ui.helpers.controlHeight()) * 1.5 : parseInt(ui.helpers.controlHeight()) * 1.2,
             borderRadius: ui.helpers.radius("xl"),
             padding: ui.helpers.spacing("md"),
@@ -101,8 +112,9 @@ export default function SidebarGroup({
           }}
         >
           <h3
-            className={`${theme.sidebar.dropdownHeading} font-bold uppercase tracking-wide`}
+            className="font-bold uppercase tracking-wide"
             style={{
+              color: "var(--sunmi-sidebar-text)",
               fontSize: ui.helpers.font("xs"),
               marginBottom: ui.helpers.spacing("sm"),
             }}
@@ -114,14 +126,21 @@ export default function SidebarGroup({
             <Link
               key={item.href}
               href={item.href}
-              className={`block transition ${theme.sidebar.dropdownItem} ${theme.sidebar.dropdownItemHover}`}
+              className="block transition"
               style={{
+                color: "var(--sunmi-text)",
                 fontSize: ui.helpers.font("sm"),
                 paddingLeft: ui.helpers.spacing("sm"),
                 paddingRight: ui.helpers.spacing("sm"),
                 paddingTop: ui.helpers.spacing("sm"),
                 paddingBottom: ui.helpers.spacing("sm"),
                 borderRadius: ui.helpers.radius("md"),
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
               }}
               onClick={() => setOpenGroup(null)}
             >

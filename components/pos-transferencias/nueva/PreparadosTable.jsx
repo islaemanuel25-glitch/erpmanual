@@ -19,7 +19,12 @@ export default function PreparadosTable({
 
   return (
     <div
-      className="bg-slate-900 border border-slate-800 shadow-md overflow-hidden"
+      className="border shadow-md overflow-hidden"
+      style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
+      }}
       style={{
         borderRadius: ui.helpers.radius("xl"),
         fontSize: ui.helpers.font("xs"),
@@ -27,7 +32,12 @@ export default function PreparadosTable({
     >
       {/* CABECERA */}
       <div
-        className="bg-[#22D3EE] text-slate-900 flex items-center justify-between shadow-[0_0_12px_rgba(34,211,238,0.45)]"
+        className="flex items-center justify-between"
+        style={{
+          backgroundColor: "#22D3EE", // cyan-400
+          color: "#0f172a", // slate-900
+          boxShadow: "0 0 12px rgba(34,211,238,0.45)",
+        }}
         style={{
           paddingLeft: ui.helpers.spacing("lg"),
           paddingRight: ui.helpers.spacing("lg"),
@@ -53,7 +63,21 @@ export default function PreparadosTable({
         >
           <span className="opacity-80">Mostrar:</span>
           <select
-            className="bg-slate-900 text-slate-100 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+            className="border"
+            style={{
+              backgroundColor: "var(--sunmi-card-bg)",
+              color: "var(--sunmi-text)",
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = "#06b6d4"; // cyan-500
+              e.target.style.boxShadow = "0 0 0 1px rgba(6,182,212,0.3)";
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = "var(--sunmi-card-border)";
+              e.target.style.boxShadow = "none";
+            }}
             style={{
               borderRadius: ui.helpers.radius("lg"),
               paddingLeft: ui.helpers.spacing("sm"),
@@ -71,7 +95,21 @@ export default function PreparadosTable({
           </select>
 
           <button
-            className="bg-slate-900 text-slate-200 border border-slate-700 disabled:opacity-30 hover:bg-slate-800/60 active:scale-95 transition"
+            className="border disabled:opacity-30 active:scale-95 transition"
+            style={{
+              backgroundColor: "var(--sunmi-card-bg)",
+              color: "var(--sunmi-text)",
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
+            }}
+            onMouseEnter={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.filter = "brightness(1.15)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.filter = "brightness(1)";
+            }}
             style={{
               paddingLeft: ui.helpers.spacing("sm"),
               paddingRight: ui.helpers.spacing("sm"),
@@ -88,13 +126,25 @@ export default function PreparadosTable({
           <span>{page} / {totalPages}</span>
 
           <button
-            className="bg-slate-900 text-slate-200 border border-slate-700 disabled:opacity-30 hover:bg-slate-800/60 active:scale-95 transition"
+            className="border disabled:opacity-30 active:scale-95 transition"
             style={{
+              backgroundColor: "var(--sunmi-card-bg)",
+              color: "var(--sunmi-text)",
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
               paddingLeft: ui.helpers.spacing("sm"),
               paddingRight: ui.helpers.spacing("sm"),
               paddingTop: ui.helpers.spacing("xs"),
               paddingBottom: ui.helpers.spacing("xs"),
               borderRadius: ui.helpers.radius("lg"),
+            }}
+            onMouseEnter={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.filter = "brightness(1.15)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.filter = "brightness(1)";
             }}
             onClick={onNext}
             disabled={page >= totalPages}
@@ -106,8 +156,11 @@ export default function PreparadosTable({
 
       {/* BUSCADOR */}
       <div
-        className="border-b border-slate-800 bg-slate-900"
+        className="border-b"
         style={{
+          backgroundColor: "var(--sunmi-card-bg)",
+          borderBottomColor: "var(--sunmi-card-border)",
+          borderBottomWidth: "1px",
           paddingLeft: ui.helpers.spacing("md"),
           paddingRight: ui.helpers.spacing("md"),
           paddingTop: ui.helpers.spacing("md"),
@@ -125,7 +178,16 @@ export default function PreparadosTable({
             fontSize: ui.helpers.font("xs"),
           }}
         >
-          <thead className="bg-slate-900 border-b border-slate-800 text-slate-400">
+          <thead
+            className="border-b"
+            style={{
+              backgroundColor: "var(--sunmi-table-header-bg)",
+              borderBottomColor: "var(--sunmi-card-border)",
+              borderBottomWidth: "1px",
+              color: "var(--sunmi-text)",
+              opacity: 0.7,
+            }}
+          >
             <tr>
               <th
                 className="text-left"
@@ -206,7 +268,11 @@ export default function PreparadosTable({
               <tr>
                 <td
                   colSpan={6}
-                  className="text-center text-slate-500"
+                  className="text-center"
+                  style={{
+                    color: "var(--sunmi-text)",
+                    opacity: 0.6,
+                  }}
                   style={{
                     paddingLeft: ui.helpers.spacing("md"),
                     paddingRight: ui.helpers.spacing("md"),
@@ -223,7 +289,18 @@ export default function PreparadosTable({
             {datos.map((p) => (
               <tr
                 key={p.detalleId}
-                className="border-t border-slate-800 hover:bg-slate-800/60 transition"
+                className="border-t transition"
+                style={{
+                  borderTopColor: "var(--sunmi-card-border)",
+                  borderTopWidth: "1px",
+                  backgroundColor: "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
               >
                 {/* PRODUCTO */}
                 <td
@@ -236,7 +313,10 @@ export default function PreparadosTable({
                 >
                   <div className="flex flex-col">
                     <span
-                      className="font-medium text-slate-100"
+                      className="font-medium"
+                      style={{
+                        color: "var(--sunmi-text)",
+                      }}
                       style={{
                         fontSize: ui.helpers.font("xs"),
                       }}
@@ -244,7 +324,10 @@ export default function PreparadosTable({
                       {p.productoNombre}
                     </span>
                     <span
-                      className="text-slate-500"
+                      style={{
+                        color: "var(--sunmi-text)",
+                        opacity: 0.6,
+                      }}
                       style={{
                         fontSize: ui.helpers.font("xs"),
                       }}
@@ -256,7 +339,11 @@ export default function PreparadosTable({
 
                 {/* TIPO */}
                 <td
-                  className="text-center text-slate-300"
+                  className="text-center"
+                  style={{
+                    color: "var(--sunmi-text)",
+                    opacity: 0.8,
+                  }}
                   style={{
                     paddingLeft: ui.helpers.spacing("sm"),
                     paddingRight: ui.helpers.spacing("sm"),
@@ -266,16 +353,32 @@ export default function PreparadosTable({
                   }}
                 >
                   {p.tipo === "manual" ? (
-                    <span className="text-cyan-400 font-semibold">Manual</span>
+                    <span
+                      className="font-semibold"
+                      style={{
+                        color: "#22d3ee", // cyan-400
+                      }}
+                    >
+                      Manual
+                    </span>
                   ) : (
-                    <span className="text-amber-400 font-semibold">Sug.</span>
+                    <span
+                      className="font-semibold"
+                      style={{
+                        color: "#fbbf24", // amber-400
+                      }}
+                    >
+                      Sug.
+                    </span>
                   )}
                 </td>
 
                 {/* STOCK DEPÓSITO */}
                 <td
-                  className="text-center text-slate-300"
+                  className="text-center"
                   style={{
+                    color: "var(--sunmi-text)",
+                    opacity: 0.8,
                     paddingLeft: ui.helpers.spacing("sm"),
                     paddingRight: ui.helpers.spacing("sm"),
                     paddingTop: ui.helpers.spacing("sm"),
@@ -288,8 +391,10 @@ export default function PreparadosTable({
 
                 {/* STOCK LOCAL */}
                 <td
-                  className="text-center text-slate-300"
+                  className="text-center"
                   style={{
+                    color: "var(--sunmi-text)",
+                    opacity: 0.8,
                     paddingLeft: ui.helpers.spacing("sm"),
                     paddingRight: ui.helpers.spacing("sm"),
                     paddingTop: ui.helpers.spacing("sm"),
@@ -311,7 +416,21 @@ export default function PreparadosTable({
                     type="number"
                     min={0}
                     step={1}
-                    className="bg-slate-900 border border-slate-700 text-right text-cyan-300 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
+                    className="border text-right transition"
+                    style={{
+                      backgroundColor: "var(--sunmi-card-bg)",
+                      borderColor: "var(--sunmi-card-border)",
+                      borderWidth: "1px",
+                      color: "#67e8f9", // cyan-300
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#22d3ee"; // cyan-400
+                      e.target.style.boxShadow = "0 0 0 1px rgba(34,211,238,0.3)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "var(--sunmi-card-border)";
+                      e.target.style.boxShadow = "none";
+                    }}
                     style={{
                       width: parseInt(ui.helpers.controlHeight()) * 2.5,
                       borderRadius: ui.helpers.radius("lg"),
@@ -337,7 +456,24 @@ export default function PreparadosTable({
                 }}>
                   <button
                     onClick={() => onDesmarcar(p.detalleId)}
-                    className="font-semibold bg-red-500 hover:bg-red-600 active:bg-red-700 text-white shadow-[0_0_8px_rgba(255,0,0,0.45)] active:scale-95 transition"
+                    className="font-semibold active:scale-95 transition"
+                    style={{
+                      backgroundColor: "#ef4444", // red-500
+                      color: "#ffffff", // white
+                      boxShadow: "0 0 8px rgba(255,0,0,0.45)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#dc2626"; // red-600
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "#ef4444"; // red-500
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.backgroundColor = "#b91c1c"; // red-700
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.backgroundColor = "#ef4444"; // red-500
+                    }}
                     style={{
                       paddingLeft: ui.helpers.spacing("md"),
                       paddingRight: ui.helpers.spacing("md"),

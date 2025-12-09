@@ -21,7 +21,12 @@ export default function SunmiTableUsuarios({
 
   return (
     <div
-      className="sunmi-card border border-slate-800 shadow-md overflow-hidden bg-slate-950"
+      className="sunmi-card border shadow-md overflow-hidden"
+      style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
+      }}
       style={{
         borderRadius: ui.helpers.radius("xl"),
         padding: 0,
@@ -37,7 +42,11 @@ export default function SunmiTableUsuarios({
       <div className="overflow-x-auto">
         <SunmiTable>
           <thead>
-            <tr className="bg-slate-900">
+            <tr
+              style={{
+                backgroundColor: "var(--sunmi-table-header-bg)",
+              }}
+            >
               {columnas.map((col) => (
                 <th
                   key={col.key}
@@ -112,7 +121,12 @@ export default function SunmiTableUsuarios({
 
       {/* PAGINACIÓN SUNMI */}
       <div
-        className="flex justify-between items-center border-t border-slate-800 bg-slate-900"
+        className="flex justify-between items-center border-t"
+        style={{
+          backgroundColor: "var(--sunmi-card-bg)",
+          borderTopColor: "var(--sunmi-card-border)",
+          borderTopWidth: "1px",
+        }}
         style={{
           paddingLeft: ui.helpers.spacing("lg"),
           paddingRight: ui.helpers.spacing("lg"),
@@ -130,7 +144,10 @@ export default function SunmiTableUsuarios({
         </SunmiButton>
 
         <span
-          className="text-slate-300"
+          style={{
+            color: "var(--sunmi-text)",
+            opacity: 0.8,
+          }}
           style={{
             fontSize: ui.helpers.font("xs"),
           }}

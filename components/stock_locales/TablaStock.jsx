@@ -118,8 +118,9 @@ export default function TablaStock({
       <div className="sunmi-card">
         <div className="sunmi-header-cyan">Stock</div>
         <p
-          className="text-slate-400"
           style={{
+            color: "var(--sunmi-text)",
+            opacity: 0.7,
             fontSize: ui.helpers.font("sm"),
             marginTop: ui.helpers.spacing("md"),
           }}
@@ -136,8 +137,9 @@ export default function TablaStock({
 
       {loading && (
         <p
-          className="text-slate-400"
           style={{
+            color: "var(--sunmi-text)",
+            opacity: 0.7,
             fontSize: ui.helpers.font("sm"),
             marginTop: ui.helpers.spacing("md"),
           }}
@@ -203,8 +205,10 @@ export default function TablaStock({
               <tr>
                 <td
                   colSpan={9}
-                  className="text-center text-slate-500"
+                  className="text-center"
                   style={{
+                    color: "var(--sunmi-text)",
+                    opacity: 0.6,
                     paddingLeft: ui.helpers.spacing("sm"),
                     paddingRight: ui.helpers.spacing("sm"),
                     paddingTop: ui.helpers.spacing("md"),
@@ -217,7 +221,18 @@ export default function TablaStock({
             )}
 
             {items.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-800/40">
+              <tr
+                key={p.id}
+                style={{
+                  backgroundColor: "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
                 {/* PRODUCTO */}
                 <td
                   style={{
@@ -316,14 +331,20 @@ export default function TablaStock({
 
       {/* PAGINACIÓN */}
       <div
-        className="flex items-center justify-between text-slate-400"
+        className="flex items-center justify-between"
         style={{
+          color: "var(--sunmi-text)",
+          opacity: 0.7,
           marginTop: ui.helpers.spacing("lg"),
           fontSize: ui.helpers.font("xs"),
         }}
       >
         <div>
-          Total: <strong className="text-slate-200">{total}</strong> productos
+          Total:{" "}
+          <strong style={{ color: "var(--sunmi-text)", opacity: 1 }}>
+            {total}
+          </strong>{" "}
+          productos
         </div>
 
         <div
@@ -333,8 +354,10 @@ export default function TablaStock({
           }}
         >
           <button
-            className="sunmi-btn bg-slate-800 text-slate-200 disabled:opacity-40"
+            className="sunmi-btn disabled:opacity-40"
             style={{
+              backgroundColor: "var(--sunmi-table-row-bg)",
+              color: "var(--sunmi-text)",
               paddingLeft: ui.helpers.spacing("md"),
               paddingRight: ui.helpers.spacing("md"),
               paddingTop: ui.helpers.spacing("xs"),
@@ -346,13 +369,20 @@ export default function TablaStock({
             ◀
           </button>
 
-          <span className="text-slate-300">
+          <span
+            style={{
+              color: "var(--sunmi-text)",
+              opacity: 0.8,
+            }}
+          >
             Página {page} de {totalPages}
           </span>
 
           <button
-            className="sunmi-btn bg-slate-800 text-slate-200 disabled:opacity-40"
+            className="sunmi-btn disabled:opacity-40"
             style={{
+              backgroundColor: "var(--sunmi-table-row-bg)",
+              color: "var(--sunmi-text)",
               paddingLeft: ui.helpers.spacing("md"),
               paddingRight: ui.helpers.spacing("md"),
               paddingTop: ui.helpers.spacing("xs"),

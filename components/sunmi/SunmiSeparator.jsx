@@ -7,8 +7,9 @@ export default function SunmiSeparator({ label, className = "" }) {
   
   return (
     <div
-      className={`flex items-center text-slate-400 ${className}`}
+      className={`flex items-center ${className}`}
       style={{
+        color: "#94a3b8", // slate-400
         gap: ui.helpers.spacing("sm"),
         marginTop: ui.helpers.spacing("sm"),
         marginBottom: ui.helpers.spacing("sm"),

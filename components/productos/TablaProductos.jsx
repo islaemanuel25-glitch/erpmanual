@@ -52,8 +52,10 @@ export default function TablaProductos({
         row.imagenUrl ? (
           <img
             src={row.imagenUrl}
-            className="object-cover border border-slate-700"
+            className="object-cover border"
             style={{
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
               width: imageSize,
               height: imageSize,
               borderRadius: ui.helpers.radius("md"),
@@ -61,8 +63,13 @@ export default function TablaProductos({
           />
         ) : (
           <div
-            className="bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500"
+            className="border flex items-center justify-center"
             style={{
+              backgroundColor: "var(--sunmi-table-row-bg)",
+              borderColor: "var(--sunmi-card-border)",
+              borderWidth: "1px",
+              color: "var(--sunmi-text)",
+              opacity: 0.5,
               width: imageSize,
               height: imageSize,
               borderRadius: ui.helpers.radius("md"),
@@ -160,8 +167,11 @@ export default function TablaProductos({
 
   return (
     <div
-      className="border border-slate-800 bg-slate-900 overflow-hidden"
+      className="border overflow-hidden"
       style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
         borderRadius: ui.helpers.radius("xl"),
       }}
     >
@@ -206,9 +216,15 @@ export default function TablaProductos({
                 >
                   <button
                     onClick={() => onEditar(row.id)}
-                    className="text-amber-300 hover:text-amber-200"
                     style={{
+                      color: "#fcd34d", // amber-300
                       fontSize: ui.helpers.font("lg"),
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "#fde047"; // amber-200
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "#fcd34d"; // amber-300
                     }}
                   >
                     ✏️
@@ -216,9 +232,15 @@ export default function TablaProductos({
 
                   <button
                     onClick={() => onEliminar(row.id)}
-                    className="text-red-400 hover:text-red-300"
                     style={{
+                      color: "#f87171", // red-400
                       fontSize: ui.helpers.font("lg"),
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "#fca5a5"; // red-300
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "#f87171"; // red-400
                     }}
                   >
                     🗑️
@@ -232,8 +254,10 @@ export default function TablaProductos({
 
       {/* PAGINACIÓN */}
       <div
-        className="flex justify-between border-t border-slate-800"
+        className="flex justify-between border-t"
         style={{
+          borderTopColor: "var(--sunmi-card-border)",
+          borderTopWidth: "1px",
           padding: ui.helpers.spacing("md"),
         }}
       >

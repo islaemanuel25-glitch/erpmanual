@@ -104,7 +104,10 @@ export default function ModalCategoria({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center"
+      className="fixed inset-0 z-50 backdrop-blur-sm flex items-center justify-center"
+      style={{
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+      }}
       style={{
         padding: ui.helpers.spacing("lg"),
       }}
@@ -130,7 +133,10 @@ export default function ModalCategoria({
             }}
           >
             <label
-              className="text-slate-300"
+              style={{
+                color: "var(--sunmi-text)",
+                opacity: 0.8,
+              }}
               style={{
                 fontSize: ui.helpers.font("sm"),
                 marginBottom: ui.helpers.spacing("xs"),
@@ -159,7 +165,10 @@ export default function ModalCategoria({
             }}
           >
             <span
-              className="text-slate-300"
+              style={{
+                color: "var(--sunmi-text)",
+                opacity: 0.8,
+              }}
               style={{
                 fontSize: ui.helpers.font("sm"),
               }}

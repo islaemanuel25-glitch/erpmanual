@@ -7,8 +7,11 @@ export default function Encabezado({ origen, destino, me }) {
 
   return (
     <div
-      className="bg-slate-900 border border-slate-800 shadow-md"
+      className="border shadow-md"
       style={{
+        backgroundColor: "var(--sunmi-card-bg)",
+        borderColor: "var(--sunmi-card-border)",
+        borderWidth: "1px",
         borderRadius: ui.helpers.radius("xl"),
         padding: ui.helpers.spacing("lg"),
         fontSize: ui.helpers.font("xs"),
@@ -33,8 +36,11 @@ export default function Encabezado({ origen, destino, me }) {
           }}
         >
           <div
-            className="bg-amber-400 flex items-center justify-center text-slate-900 font-black shadow-[0_0_10px_rgba(250,204,21,0.6)]"
+            className="flex items-center justify-center font-black"
             style={{
+              backgroundColor: "#fbbf24", // amber-400
+              color: "#0f172a", // slate-900
+              boxShadow: "0 0 10px rgba(250,204,21,0.6)",
               height: parseInt(ui.helpers.controlHeight()) * 1.4,
               width: parseInt(ui.helpers.controlHeight()) * 1.4,
               borderRadius: ui.helpers.radius("xl"),
@@ -46,7 +52,11 @@ export default function Encabezado({ origen, destino, me }) {
 
           <div>
             <div
-              className="uppercase tracking-wide text-slate-400"
+              className="uppercase tracking-wide"
+              style={{
+                color: "var(--sunmi-text)",
+                opacity: 0.7,
+              }}
               style={{
                 fontSize: ui.helpers.font("xs"),
               }}
@@ -54,7 +64,10 @@ export default function Encabezado({ origen, destino, me }) {
               Sesión de preparación
             </div>
             <div
-              className="font-semibold text-slate-100"
+              className="font-semibold"
+              style={{
+                color: "var(--sunmi-text)",
+              }}
               style={{
                 fontSize: ui.helpers.font("lg"),
               }}
@@ -66,7 +79,13 @@ export default function Encabezado({ origen, destino, me }) {
 
         {/* ESTADO */}
         <span
-          className="font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40"
+          className="font-semibold rounded-full border"
+          style={{
+            backgroundColor: "rgba(16,185,129,0.2)", // emerald-500/20
+            color: "#6ee7b7", // emerald-300
+            borderColor: "rgba(52,211,153,0.4)", // emerald-400/40
+            borderWidth: "1px",
+          }}
           style={{
             paddingLeft: ui.helpers.spacing("md"),
             paddingRight: ui.helpers.spacing("md"),
@@ -89,7 +108,10 @@ export default function Encabezado({ origen, destino, me }) {
         }}
       >
         <span
-          className="text-slate-100 font-semibold"
+          className="font-semibold"
+          style={{
+            color: "var(--sunmi-text)",
+          }}
           style={{
             fontSize: ui.helpers.font("sm"),
           }}
@@ -105,17 +127,27 @@ export default function Encabezado({ origen, destino, me }) {
           }}
         >
           <div
-            className="bg-amber-500/40 relative overflow-hidden rounded-full"
+            className="relative overflow-hidden rounded-full"
+            style={{
+              backgroundColor: "rgba(245,158,11,0.4)", // amber-500/40
+            }}
             style={{
               width: parseInt(ui.helpers.controlHeight()) * 1.25,
               height: parseInt(ui.helpers.spacing("xs")) * 0.5,
             }}
           >
-            <div className="absolute inset-0 bg-amber-400 animate-[pulseLine_1.4s_linear_infinite]"></div>
+            <div
+              className="absolute inset-0 animate-[pulseLine_1.4s_linear_infinite]"
+              style={{
+                backgroundColor: "#fbbf24", // amber-400
+              }}
+            ></div>
           </div>
 
           <span
-            className="text-amber-400"
+            style={{
+              color: "#fbbf24", // amber-400
+            }}
             style={{
               marginLeft: ui.helpers.spacing("sm"),
               fontSize: ui.helpers.font("lg"),
@@ -126,7 +158,10 @@ export default function Encabezado({ origen, destino, me }) {
         </div>
 
         <span
-          className="text-slate-100 font-semibold"
+          className="font-semibold"
+          style={{
+            color: "var(--sunmi-text)",
+          }}
           style={{
             fontSize: ui.helpers.font("sm"),
           }}
@@ -146,7 +181,12 @@ export default function Encabezado({ origen, destino, me }) {
       >
         {/* ORIGEN */}
         <div
-          className="bg-slate-800 shadow-inner border border-slate-700"
+          className="shadow-inner border"
+          style={{
+            backgroundColor: "var(--sunmi-table-row-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
+          }}
           style={{
             borderRadius: ui.helpers.radius("xl"),
             paddingLeft: ui.helpers.spacing("lg"),
@@ -156,7 +196,11 @@ export default function Encabezado({ origen, destino, me }) {
           }}
         >
           <span
-            className="uppercase tracking-wide text-slate-400"
+            className="uppercase tracking-wide"
+            style={{
+              color: "var(--sunmi-text)",
+              opacity: 0.7,
+            }}
             style={{
               fontSize: ui.helpers.font("xs"),
             }}
@@ -171,7 +215,9 @@ export default function Encabezado({ origen, destino, me }) {
             }}
           >
             <span
-              className="text-amber-400"
+              style={{
+              color: "#fbbf24", // amber-400
+            }}
               style={{
                 fontSize: ui.helpers.font("sm"),
               }}
@@ -179,7 +225,10 @@ export default function Encabezado({ origen, destino, me }) {
               🏬
             </span>
             <span
-              className="text-slate-100 font-medium truncate"
+              className="font-medium truncate"
+              style={{
+                color: "var(--sunmi-text)",
+              }}
               style={{
                 fontSize: ui.helpers.font("sm"),
               }}
@@ -191,7 +240,12 @@ export default function Encabezado({ origen, destino, me }) {
 
         {/* DESTINO */}
         <div
-          className="bg-slate-800 shadow-inner border border-slate-700"
+          className="shadow-inner border"
+          style={{
+            backgroundColor: "var(--sunmi-table-row-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
+          }}
           style={{
             borderRadius: ui.helpers.radius("xl"),
             paddingLeft: ui.helpers.spacing("lg"),
@@ -201,7 +255,11 @@ export default function Encabezado({ origen, destino, me }) {
           }}
         >
           <span
-            className="uppercase tracking-wide text-slate-400"
+            className="uppercase tracking-wide"
+            style={{
+              color: "var(--sunmi-text)",
+              opacity: 0.7,
+            }}
             style={{
               fontSize: ui.helpers.font("xs"),
             }}
@@ -216,7 +274,9 @@ export default function Encabezado({ origen, destino, me }) {
             }}
           >
             <span
-              className="text-amber-400"
+              style={{
+              color: "#fbbf24", // amber-400
+            }}
               style={{
                 fontSize: ui.helpers.font("sm"),
               }}
@@ -224,7 +284,10 @@ export default function Encabezado({ origen, destino, me }) {
               📦
             </span>
             <span
-              className="text-slate-100 font-medium truncate"
+              className="font-medium truncate"
+              style={{
+                color: "var(--sunmi-text)",
+              }}
               style={{
                 fontSize: ui.helpers.font("sm"),
               }}
@@ -236,7 +299,12 @@ export default function Encabezado({ origen, destino, me }) {
 
         {/* USUARIO */}
         <div
-          className="bg-slate-800 shadow-inner border border-slate-700"
+          className="shadow-inner border"
+          style={{
+            backgroundColor: "var(--sunmi-table-row-bg)",
+            borderColor: "var(--sunmi-card-border)",
+            borderWidth: "1px",
+          }}
           style={{
             borderRadius: ui.helpers.radius("xl"),
             paddingLeft: ui.helpers.spacing("lg"),
@@ -246,7 +314,11 @@ export default function Encabezado({ origen, destino, me }) {
           }}
         >
           <span
-            className="uppercase tracking-wide text-slate-400"
+            className="uppercase tracking-wide"
+            style={{
+              color: "var(--sunmi-text)",
+              opacity: 0.7,
+            }}
             style={{
               fontSize: ui.helpers.font("xs"),
             }}
@@ -261,7 +333,9 @@ export default function Encabezado({ origen, destino, me }) {
             }}
           >
             <span
-              className="text-amber-400"
+              style={{
+              color: "#fbbf24", // amber-400
+            }}
               style={{
                 fontSize: ui.helpers.font("sm"),
               }}
@@ -269,7 +343,10 @@ export default function Encabezado({ origen, destino, me }) {
               👤
             </span>
             <span
-              className="text-slate-100 font-medium truncate"
+              className="font-medium truncate"
+              style={{
+                color: "var(--sunmi-text)",
+              }}
               style={{
                 fontSize: ui.helpers.font("sm"),
               }}

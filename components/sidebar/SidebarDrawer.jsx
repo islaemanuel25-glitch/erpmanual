@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 import { cn } from "@/lib/utils";
@@ -12,7 +11,6 @@ import sidebarGroups from "./sidebarGroups";
 
 export default function SidebarDrawer({ onClose }) {
   const pathname = usePathname();
-  const { theme } = useSunmiTheme();
   const { sidebarMode, sidebarGroup } = useSidebarConfig();
   const { ui } = useUIConfig();
 
@@ -24,31 +22,28 @@ export default function SidebarDrawer({ onClose }) {
 
   return (
     <div
-      className={cn(
-        "h-full flex flex-col shadow-xl",
-        theme.sidebar?.bg ?? "bg-slate-900",
-        theme.sidebar?.text ?? "text-slate-200"
-      )}
+      className="h-full flex flex-col shadow-xl"
       style={{
+        backgroundColor: "var(--sunmi-sidebar-bg)",
+        color: "var(--sunmi-sidebar-text)",
         width: `${drawerWidth}px`,
       }}
     >
       {/* HEADER */}
       <div
-        className={cn(
-          "flex items-center justify-between border-b",
-          theme.sidebar?.border ? `border-b ${theme.sidebar.border}` : "border-b border-slate-700"
-        )}
+        className="flex items-center justify-between border-b"
         style={{
+          borderBottomColor: "var(--sunmi-sidebar-border)",
+          borderBottomWidth: ui.helpers.line(),
           paddingLeft: ui.helpers.spacing("lg"),
           paddingRight: ui.helpers.spacing("lg"),
           height: ui.helpers.controlHeight(),
-          borderBottomWidth: ui.helpers.line(),
         }}
       >
         <span
-          className={cn("font-semibold", theme.sidebar?.text ?? "text-slate-200")}
+          className="font-semibold"
           style={{
+            color: "var(--sunmi-sidebar-text)",
             fontSize: ui.helpers.font("base"),
           }}
         >
@@ -56,14 +51,17 @@ export default function SidebarDrawer({ onClose }) {
         </span>
         <button
           onClick={onClose}
-          className={cn(
-            "transition",
-            theme.sidebar?.text ?? "text-slate-200",
-            "hover:bg-slate-700"
-          )}
+          className="transition"
           style={{
+            color: "var(--sunmi-sidebar-text)",
             padding: ui.helpers.spacing("xs"),
             borderRadius: ui.helpers.radius("sm"),
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
           }}
         >
           <X size={iconSize} />
@@ -88,11 +86,10 @@ export default function SidebarDrawer({ onClose }) {
               }}
             >
               <h3
-                className={cn(
-                  "font-bold uppercase tracking-wide",
-                  theme.sidebar?.text ?? "text-slate-400"
-                )}
+                className="font-bold uppercase tracking-wide"
                 style={{
+                  color: "var(--sunmi-sidebar-text)",
+                  opacity: 0.7,
                   fontSize: ui.helpers.font("xs"),
                   paddingLeft: ui.helpers.spacing("lg"),
                   paddingRight: ui.helpers.spacing("lg"),
@@ -111,22 +108,26 @@ export default function SidebarDrawer({ onClose }) {
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
-                    className={cn(
-                      "flex items-center transition-colors",
-                      active
-                        ? "bg-amber-500 text-black"
-                        : cn(
-                            theme.sidebar?.text ?? "text-slate-200",
-                            "hover:bg-slate-700"
-                          )
-                    )}
+                    className="flex items-center transition-colors"
                     style={{
+                      backgroundColor: active ? "var(--sunmi-header-text)" : "transparent",
+                      color: active ? "#0f172a" : "var(--sunmi-sidebar-text)",
                       gap: ui.helpers.spacing("sm"),
                       paddingLeft: ui.helpers.spacing("lg"),
                       paddingRight: ui.helpers.spacing("lg"),
                       paddingTop: ui.helpers.spacing("sm"),
                       paddingBottom: ui.helpers.spacing("sm"),
                       fontSize: ui.helpers.font("sm"),
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }
                     }}
                   >
                     <Icon size={iconSize} />
@@ -147,22 +148,26 @@ export default function SidebarDrawer({ onClose }) {
                 key={item.href}
                 href={item.href}
                 onClick={onClose}
-                className={cn(
-                  "flex items-center transition-colors",
-                  active
-                    ? "bg-amber-500 text-black"
-                    : cn(
-                        theme.sidebar?.text ?? "text-slate-200",
-                        "hover:bg-slate-700"
-                      )
-                )}
+                className="flex items-center transition-colors"
                 style={{
+                  backgroundColor: active ? "var(--sunmi-header-text)" : "transparent",
+                  color: active ? "#0f172a" : "var(--sunmi-sidebar-text)",
                   gap: ui.helpers.spacing("sm"),
                   paddingLeft: ui.helpers.spacing("lg"),
                   paddingRight: ui.helpers.spacing("lg"),
                   paddingTop: ui.helpers.spacing("sm"),
                   paddingBottom: ui.helpers.spacing("sm"),
                   fontSize: ui.helpers.font("sm"),
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.backgroundColor = "var(--sunmi-table-row-bg)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }
                 }}
               >
                 <Icon size={iconSize} />

@@ -3,21 +3,21 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function SidebarMobile({ menu, perfil }) {
   const { ui } = useUIConfig();
   const [open, setOpen] = useState(false);
-  const { theme } = useSunmiTheme();
 
   return (
     <>
       {/* BOTÓN */}
       <button
         onClick={() => setOpen(true)}
-        className={`md:hidden ${theme.sidebar.bg} text-slate-900 shadow-lg shadow-black/40 fixed z-50`}
+        className="md:hidden shadow-lg shadow-black/40 fixed z-50"
         style={{
+          backgroundColor: "var(--sunmi-sidebar-bg)",
+          color: "var(--sunmi-sidebar-text)",
           padding: ui.helpers.spacing("sm"),
           borderRadius: ui.helpers.radius("lg"),
           top: ui.helpers.spacing("md"),
@@ -36,15 +36,19 @@ export default function SidebarMobile({ menu, perfil }) {
 
       {/* PANEL */}
       <aside
-        className={`fixed top-0 left-0 h-full ${theme.sidebar.bg} ${theme.sidebar.border} border-r shadow-xl shadow-black/60 transform z-50 transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed top-0 left-0 h-full border-r shadow-xl shadow-black/60 transform z-50 transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}
         style={{
+          backgroundColor: "var(--sunmi-sidebar-bg)",
+          borderColor: "var(--sunmi-sidebar-border)",
+          borderRightWidth: "1px",
           width: parseInt(ui.helpers.controlHeight()) * 8,
           padding: ui.helpers.spacing("lg"),
         }}
       >
         <div
-          className="flex justify-between items-center text-slate-900"
+          className="flex justify-between items-center"
           style={{
+            color: "var(--sunmi-sidebar-text)",
             marginBottom: ui.helpers.spacing("lg"),
           }}
         >
@@ -57,7 +61,7 @@ export default function SidebarMobile({ menu, perfil }) {
             Menú
           </h2>
           <button onClick={() => setOpen(false)}>
-            <X size={parseInt(ui.helpers.icon(1.5))} className="text-slate-900" />
+            <X size={parseInt(ui.helpers.icon(1.5))} style={{ color: "var(--sunmi-sidebar-text)" }} />
           </button>
         </div>
 
@@ -70,8 +74,10 @@ export default function SidebarMobile({ menu, perfil }) {
           {menu.map((grupo) => (
             <div key={grupo.label}>
               <h3
-                className="font-bold uppercase text-slate-800"
+                className="font-bold uppercase"
                 style={{
+                  color: "var(--sunmi-sidebar-text)",
+                  opacity: 0.8,
                   fontSize: ui.helpers.font("xs"),
                   marginBottom: ui.helpers.spacing("sm"),
                 }}
@@ -83,12 +89,21 @@ export default function SidebarMobile({ menu, perfil }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`block font-medium transition text-slate-900 ${theme.sidebar.hover}`}
+                  className="block font-medium transition"
                   style={{
+                    color: "var(--sunmi-sidebar-text)",
                     paddingTop: ui.helpers.spacing("sm"),
                     paddingBottom: ui.helpers.spacing("sm"),
                     paddingLeft: ui.helpers.spacing("sm"),
                     borderRadius: ui.helpers.radius("md"),
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--sunmi-sidebar-bg)";
+                    e.currentTarget.style.filter = "brightness(0.9)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.filter = "brightness(1)";
                   }}
                   onClick={() => setOpen(false)}
                 >

@@ -89,7 +89,10 @@ export default function ModalProveedor({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center"
+      className="fixed inset-0 z-[9999] backdrop-blur-sm flex items-center justify-center"
+      style={{
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
+      }}
       style={{
         padding: ui.helpers.spacing("md"),
       }}
@@ -240,8 +243,9 @@ function Field({ label, children }) {
       }}
     >
       <label
-        className="text-slate-400"
         style={{
+          color: "var(--sunmi-text)",
+          opacity: 0.7,
           fontSize: ui.helpers.font("xs"),
         }}
       >
