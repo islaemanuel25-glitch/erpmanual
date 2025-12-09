@@ -152,6 +152,20 @@ function buildHelpers(config) {
 
     // Grosor de líneas (separadores, bordes finos)
     line: () => `${config.lineThickness * config.scale}px`,
+
+    // Ancho máximo de contenido (normal, wide, full)
+    contentMaxWidth: (key) => {
+      const baseWidths = {
+        normal: 1120,
+        wide: 1440,
+        full: null, // null = 100%
+      };
+      const baseWidth = baseWidths[key];
+      if (baseWidth === null) return "100%";
+      // Escalar según el preset
+      const scaledWidth = baseWidth * config.scale;
+      return `${scaledWidth}px`;
+    },
   };
 }
 
