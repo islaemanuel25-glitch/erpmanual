@@ -68,30 +68,6 @@ html, body {
          text-[13px] text-gray-700 shadow-sm w-full;
 }
 
-/* ==================================================
-   ⭐ SIDEBAR PRO — ESTILO PREMIUM
-   ================================================== */
-:root {
-  --sidebar-width: 64px;
-  --sidebar-bg: #2563eb; /* azul 600 */
-}
-
-.sidebar-pro {
-  width: var(--sidebar-width);
-  background: var(--sidebar-bg);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 12px;
-  gap: 8px;
-}
-
-@media (max-width: 767px) {
-  .sidebar-pro {
-    display: none !important;
-  }
-}
-
 .sidebar-icon {
   opacity: 0.8;
   transition: opacity 0.15s ease-out;
