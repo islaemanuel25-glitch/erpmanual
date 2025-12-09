@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLayoutMode } from "@/components/providers/LayoutModeProvider";
 import SidebarPro from "@/components/sidebar/SidebarPro";
 import SidebarTop from "@/components/sidebar/SidebarTop";
@@ -24,25 +24,25 @@ export default function LayoutController({ children }) {
   const [layoutProfile, setLayoutProfile] = useState(DEFAULT_PROFILE);
 
   // Cargar profile inicial + escuchar cambios del Builder
-  useEffect(() => {
-    const loadProfile = () => {
-      try {
-        const raw = window.localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setLayoutProfile({
-            ...DEFAULT_PROFILE,
-            ...parsed,
-          });
-        } else {
-          setLayoutProfile(DEFAULT_PROFILE);
-        }
-      } catch (e) {
-        console.error("Error leyendo layout profile:", e);
+  const loadProfile = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setLayoutProfile({
+          ...DEFAULT_PROFILE,
+          ...parsed,
+        });
+      } else {
         setLayoutProfile(DEFAULT_PROFILE);
       }
-    };
+    } catch (e) {
+      console.error("Error leyendo layout profile:", e);
+      setLayoutProfile(DEFAULT_PROFILE);
+    }
+  }, []);
 
+  useEffect(() => {
     loadProfile();
 
     const handler = () => {
@@ -53,18 +53,33 @@ export default function LayoutController({ children }) {
     return () => {
       window.removeEventListener("erp-layout-profile-updated", handler);
     };
-  }, []);
+  }, [loadProfile]);
 
   const { sidebarPosition, navbarPosition, contentWidth } = layoutProfile;
 
-  // Calcular maxWidth según contentWidth
-  const getMaxWidth = () => {
-    if (contentWidth === "normal") return "1120px";
-    if (contentWidth === "wide") return "1440px";
-    return "100%";
-  };
+  // Calcular maxWidth según contentWidth usando UIConfig
+  const maxWidth = useMemo(() => {
+    return ui.helpers.contentMaxWidth(contentWidth);
+  }, [contentWidth, ui]);
 
-  const maxWidth = getMaxWidth();
+  // Sincronizar layoutMode cuando sidebarPosition === "top"
+  useEffect(() => {
+    if (sidebarPosition === "top") {
+      try {
+        localStorage.setItem("erp-layout-mode", "sidebar-top");
+        // El LayoutModeProvider escuchará el cambio de storage automáticamente
+      } catch (e) {
+        console.error("Error sincronizando layoutMode:", e);
+      }
+    } else if (sidebarPosition !== "top" && layoutMode === "sidebar-top") {
+      // Resetear a sidebar-left si ya no es top
+      try {
+        localStorage.setItem("erp-layout-mode", "sidebar-left");
+      } catch (e) {
+        console.error("Error reseteando layoutMode:", e);
+      }
+    }
+  }, [sidebarPosition, layoutMode]);
 
   // Modo legacy TOP (SidebarTop encima del contenido)
   const overrideTopMode =
@@ -103,11 +118,15 @@ export default function LayoutController({ children }) {
       {/* FILA PRINCIPAL: sidebar left/right + contenido centrado */}
       <div className="layout-row flex flex-row flex-1 w-full justify-center relative">
         <div
-          className="layout-inner flex flex-row h-full w-full"
+          className="layout-inner flex flex-row h-full w-full transition-all duration-300"
           style={{ maxWidth }}
         >
           {/* Sidebar izquierda */}
-          {sidebarPosition === "left" && <SidebarPro position="left" />}
+          {sidebarPosition === "left" && (
+            <div className="transition-all duration-300">
+              <SidebarPro position="left" />
+            </div>
+          )}
 
           {/* Contenido */}
           <main
@@ -122,7 +141,11 @@ export default function LayoutController({ children }) {
           </main>
 
           {/* Sidebar derecha */}
-          {sidebarPosition === "right" && <SidebarPro position="right" />}
+          {sidebarPosition === "right" && (
+            <div className="transition-all duration-300">
+              <SidebarPro position="right" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -132,7 +155,7 @@ export default function LayoutController({ children }) {
       {/* SIDEBAR FLOTANTE (overlay real) */}
       {sidebarPosition === "floating" && (
         <div
-          className="pointer-events-none absolute z-40"
+          className="pointer-events-none fixed z-40 transition-all duration-300"
           style={{
             top: ui.helpers.spacing("xl"),
             right: ui.helpers.spacing("xl"),

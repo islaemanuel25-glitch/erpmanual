@@ -4,21 +4,21 @@ import { Bell, ChevronDown, LogOut } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@/app/context/UserContext";
-import { useLayoutMode } from "@/components/providers/LayoutModeProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
-import SidebarTop from "@/components/sidebar/SidebarTop";
 
 export default function Header({ position = "top" }) {
+  // Validar position prop
+  const validPosition = ["top", "bottom", "hidden"].includes(position) ? position : "top";
+  
   const pathname = usePathname();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
-  const { layoutMode } = useLayoutMode();
   const { ui } = useUIConfig();
 
   const [open, setOpen] = useState(false);
 
   // Si position es "hidden", no renderizar
-  if (position === "hidden") return null;
+  if (validPosition === "hidden") return null;
 
   const nombre = perfil?.nombre || "Usuario";
   const rol = perfil?.rol || "-";
@@ -56,7 +56,7 @@ export default function Header({ position = "top" }) {
   const iconSize = parseInt(ui.helpers.icon(1.125));
   const chevronSize = parseInt(ui.helpers.icon(1.125));
 
-  const isBottom = position === "bottom";
+  const isBottom = validPosition === "bottom";
 
   return (
     <header
@@ -78,19 +78,6 @@ export default function Header({ position = "top" }) {
         paddingRight: ui.helpers.spacing("lg"),
       }}
     >
-      {/* --- SI LAYOUT ES TOP, AQUI VA EL MENÚ --- */}
-      {layoutMode === "sidebar-top" && (
-        <div
-          className="flex items-center"
-          style={{
-            gap: ui.helpers.spacing("sm"),
-            marginRight: ui.helpers.spacing("lg"),
-          }}
-        >
-          <SidebarTop />
-        </div>
-      )}
-
       {/* --- TITULO --- */}
       <h1
         className="font-semibold hidden md:block"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,11 @@ export default function SidebarPro({ position = "left", style = {} }) {
 
   const showText = sidebarMode === "icons-text";
   const isGrouped = sidebarGroup === "grouped";
+
+  // Filtrado de permisos (igual que SidebarTop)
+  const esAdmin = Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
+  const puede = (perm) => (esAdmin ? true : perm && perfil.permisos.includes(perm));
+  const filtrarVisibles = (items) => esAdmin ? items : items.filter((i) => puede(i.permiso));
 
   // Anchos dinámicos basados en UIConfig
   const sidebarWidth = showText
@@ -44,8 +49,10 @@ export default function SidebarPro({ position = "left", style = {} }) {
   // Estilos internos según posición
   const getInternalStyle = () => {
     if (position === "floating") {
+      const xlSpacing = parseInt(ui.helpers.spacing("xl"));
       return {
         ...baseSidebarStyle,
+        position: "fixed",
         backgroundColor: "var(--sunmi-sidebar-bg)",
         borderColor: "var(--sunmi-sidebar-border)",
         borderWidth: "1px",
@@ -53,6 +60,7 @@ export default function SidebarPro({ position = "left", style = {} }) {
         boxShadow: "0 6px 22px rgba(0,0,0,0.35)",
         padding: ui.helpers.spacing("lg"),
         height: "auto",
+        maxHeight: `calc(100vh - ${xlSpacing * 2}px)`,
       };
     }
 
@@ -63,16 +71,37 @@ export default function SidebarPro({ position = "left", style = {} }) {
       backgroundColor: "var(--sunmi-sidebar-bg)",
       borderColor: "var(--sunmi-sidebar-border)",
       ...(position === "left"
-        ? { borderRightWidth: ui.helpers.line() }
-        : { borderLeftWidth: ui.helpers.line() }),
+        ? { 
+            borderRightWidth: ui.helpers.line(),
+            borderLeftWidth: 0,
+          }
+        : { 
+            borderLeftWidth: ui.helpers.line(),
+            borderRightWidth: 0,
+          }),
     };
   };
 
-  // Merge: interno + style externo (Opción A)
-  const sidebarStyle = {
-    ...getInternalStyle(),
-    ...style,
-  };
+  // Merge: interno + style externo (protege estilos críticos para floating)
+  const internalStyle = getInternalStyle();
+  const sidebarStyle = useMemo(() => {
+    if (position === "floating") {
+      // Para floating, proteger estilos críticos (position, top, right, zIndex)
+      const protectedKeys = ["position", "top", "right", "left", "bottom", "zIndex"];
+      const safeStyle = Object.fromEntries(
+        Object.entries(style).filter(([key]) => !protectedKeys.includes(key))
+      );
+      return {
+        ...internalStyle,
+        ...safeStyle,
+      };
+    }
+    // Para left/right, permitir merge completo
+    return {
+      ...internalStyle,
+      ...style,
+    };
+  }, [internalStyle, style, position]);
 
   const containerClasses = cn(
     position === "floating" ? "flex flex-col" : "h-full flex flex-col",
@@ -83,19 +112,23 @@ export default function SidebarPro({ position = "left", style = {} }) {
   if (isGrouped) {
     return (
       <div className={containerClasses} style={sidebarStyle}>
-        {sidebarGroups.map((group) => (
-          <SidebarGroup
-            key={group.id}
-            id={group.id}
-            icon={group.icon}
-            iconFilled={group.iconFilled}
-            label={group.label}
-            items={group.items}
-            perfil={perfil}
-            openGroup={openGroup}
-            setOpenGroup={setOpenGroup}
-          />
-        ))}
+        {sidebarGroups.map((group) => {
+          const visibles = filtrarVisibles(group.items);
+          if (visibles.length === 0) return null;
+          return (
+            <SidebarGroup
+              key={group.id}
+              id={group.id}
+              icon={group.icon}
+              iconFilled={group.iconFilled}
+              label={group.label}
+              items={visibles}
+              perfil={perfil}
+              openGroup={openGroup}
+              setOpenGroup={setOpenGroup}
+            />
+          );
+        })}
       </div>
     );
   }
@@ -103,7 +136,7 @@ export default function SidebarPro({ position = "left", style = {} }) {
   // Modo plano
   return (
     <div className={containerClasses} style={sidebarStyle}>
-      {sidebarItems.map((item) => (
+      {filtrarVisibles(sidebarItems).map((item) => (
         <SidebarItemFlat key={item.href} item={item} />
       ))}
     </div>

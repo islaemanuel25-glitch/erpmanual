@@ -53,7 +53,7 @@ export default function ThemeClientWrapper({ children }) {
 function ThemeBody({ children }) {
   return (
     <div
-      className="min-h-screen w-full"
+      className="h-full w-full"
       style={{
         backgroundColor: "var(--sunmi-bg)",
         color: "var(--sunmi-text)",
