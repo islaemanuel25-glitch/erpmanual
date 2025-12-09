@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   Settings,
   Palette,
+  LayoutDashboard,
 } from "lucide-react";
 
 // Estructura de grupos para el menú agrupado
@@ -54,6 +55,7 @@ export const sidebarGroups = [
     items: [
       { href: "/modulos/proveedores", label: "Proveedores", icon: Building2 },
       { href: "/modulos/apariencia", label: "Apariencia", icon: Palette },
+      { href: "/modulos/apariencia/layout-builder", label: "Layout Builder", icon: LayoutDashboard, permiso: "*" },
       { href: "/modulos/configuracion", label: "Configuración", icon: Settings },
     ],
   },
