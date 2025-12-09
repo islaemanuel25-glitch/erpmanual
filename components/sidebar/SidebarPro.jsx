@@ -12,7 +12,7 @@ import sidebarItems from "./sidebarItems";
 import sidebarGroups from "./sidebarGroups";
 import { useUser } from "@/app/context/UserContext";
 
-export default function SidebarPro({ position = "left" }) {
+export default function SidebarPro({ position = "left", style = {} }) {
   const pathname = usePathname();
   const { sidebarMode, sidebarGroup } = useSidebarConfig();
   const { ui } = useUIConfig();
@@ -21,13 +21,13 @@ export default function SidebarPro({ position = "left" }) {
 
   const showText = sidebarMode === "icons-text";
   const isGrouped = sidebarGroup === "grouped";
-  
+
   // Anchos dinámicos basados en UIConfig
   const sidebarWidth = showText
     ? parseInt(ui.helpers.controlHeight()) * 3.5
     : parseInt(ui.helpers.controlHeight()) * 1.2;
 
-  // Estilos base
+  // Estilos base comunes
   const baseSidebarStyle = {
     width: `${sidebarWidth}px`,
     paddingTop: ui.helpers.spacing("lg"),
@@ -41,8 +41,8 @@ export default function SidebarPro({ position = "left" }) {
       : {}),
   };
 
-  // Estilos según posición
-  const getSidebarStyle = () => {
+  // Estilos internos según posición
+  const getInternalStyle = () => {
     if (position === "floating") {
       return {
         ...baseSidebarStyle,
@@ -55,8 +55,8 @@ export default function SidebarPro({ position = "left" }) {
         height: "auto",
       };
     }
-    
-    // left o right
+
+    // left | right (sidebar estructural)
     return {
       ...baseSidebarStyle,
       height: "100%",
@@ -68,18 +68,21 @@ export default function SidebarPro({ position = "left" }) {
     };
   };
 
-  const sidebarStyle = getSidebarStyle();
+  // Merge: interno + style externo (Opción A)
+  const sidebarStyle = {
+    ...getInternalStyle(),
+    ...style,
+  };
+
+  const containerClasses = cn(
+    position === "floating" ? "flex flex-col" : "h-full flex flex-col",
+    showText ? "items-stretch" : "items-center"
+  );
 
   // Modo agrupado
   if (isGrouped) {
     return (
-      <div
-        className={cn(
-          position === "floating" ? "flex flex-col" : "h-full flex flex-col",
-          showText ? "items-stretch" : "items-center"
-        )}
-        style={sidebarStyle}
-      >
+      <div className={containerClasses} style={sidebarStyle}>
         {sidebarGroups.map((group) => (
           <SidebarGroup
             key={group.id}
@@ -99,13 +102,7 @@ export default function SidebarPro({ position = "left" }) {
 
   // Modo plano
   return (
-    <div
-      className={cn(
-        position === "floating" ? "flex flex-col" : "h-full flex flex-col",
-        showText ? "items-stretch" : "items-center"
-      )}
-      style={sidebarStyle}
-    >
+    <div className={containerClasses} style={sidebarStyle}>
       {sidebarItems.map((item) => (
         <SidebarItemFlat key={item.href} item={item} />
       ))}

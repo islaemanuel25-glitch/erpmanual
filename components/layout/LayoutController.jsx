@@ -66,16 +66,17 @@ export default function LayoutController({ children }) {
 
   const maxWidth = getMaxWidth();
 
-  // Check if we should use legacy top mode
-  // This happens if: 1) layoutProfile.sidebarPosition === "top", OR 2) layoutMode === "sidebar-top" (legacy)
-  const overrideTopMode = sidebarPosition === "top" || layoutMode === "sidebar-top";
+  // Modo legacy TOP (SidebarTop encima del contenido)
+  const overrideTopMode =
+    sidebarPosition === "top" || layoutMode === "sidebar-top";
 
-  // 🔹 MODO SIDEBAR SUPERIOR (legacy mode - SidebarTop dentro de Header)
   if (overrideTopMode) {
     return (
       <div className="flex flex-col h-full w-full overflow-hidden">
         {navbarPosition === "top" && <Header position="top" />}
+
         <SidebarTop />
+
         <main
           className="flex-1 min-h-0 overflow-auto transition-colors duration-200"
           style={{
@@ -86,26 +87,29 @@ export default function LayoutController({ children }) {
         >
           {children}
         </main>
+
         {navbarPosition === "bottom" && <Header position="bottom" />}
-        {/* navbarPosition === "hidden" → no renderiza Header */}
+        {/* navbarPosition === "hidden" → no Header */}
       </div>
     );
   }
 
-  // 🔹 NEW PROFESSIONAL LAYOUT ARCHITECTURE (Notion/Linear-style)
-  // Three independent layers: HEADER | LAYOUT ROW | FLOATING ELEMENTS
+  // Layout profesional: HEADER (top/bottom) + ROW (sidebar+contenido) + OVERLAYS
   return (
     <div className="layout-root flex flex-col h-full w-full relative overflow-hidden">
-      {/* Layer 1: HEADER (top) */}
+      {/* HEADER TOP */}
       {navbarPosition === "top" && <Header position="top" />}
 
-      {/* Layer 2: LAYOUT ROW (sidebar left/right + content) */}
+      {/* FILA PRINCIPAL: sidebar left/right + contenido centrado */}
       <div className="layout-row flex flex-row flex-1 w-full justify-center relative">
-        <div className="layout-inner flex flex-row h-full w-full" style={{ maxWidth }}>
-          {/* Sidebar a la izquierda - alineado con contenido */}
+        <div
+          className="layout-inner flex flex-row h-full w-full"
+          style={{ maxWidth }}
+        >
+          {/* Sidebar izquierda */}
           {sidebarPosition === "left" && <SidebarPro position="left" />}
 
-          {/* Contenido principal */}
+          {/* Contenido */}
           <main
             className="layout-content flex-1 min-h-0 overflow-auto transition-colors duration-200"
             style={{
@@ -117,25 +121,27 @@ export default function LayoutController({ children }) {
             {children}
           </main>
 
-          {/* Sidebar a la derecha - alineado con contenido */}
+          {/* Sidebar derecha */}
           {sidebarPosition === "right" && <SidebarPro position="right" />}
         </div>
       </div>
 
-      {/* Layer 3: HEADER (bottom) */}
+      {/* HEADER BOTTOM */}
       {navbarPosition === "bottom" && <Header position="bottom" />}
 
-      {/* Layer 4: FLOATING ELEMENTS (floating sidebar) */}
+      {/* SIDEBAR FLOTANTE (overlay real) */}
       {sidebarPosition === "floating" && (
-        <SidebarPro
-          position="floating"
+        <div
+          className="pointer-events-none absolute z-40"
           style={{
-            position: "absolute",
             top: ui.helpers.spacing("xl"),
             right: ui.helpers.spacing("xl"),
-            zIndex: 40,
           }}
-        />
+        >
+          <div className="pointer-events-auto">
+            <SidebarPro position="floating" />
+          </div>
+        </div>
       )}
 
       {/* sidebarPosition === "hidden" → no SidebarPro */}
