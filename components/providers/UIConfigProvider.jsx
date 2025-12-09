@@ -31,7 +31,6 @@ const BASE_CONFIG = {
     xl: 16,
   },
   density: {
-    // altura total del componente (inputs, botones, selects)
     compact: 30,
     normal: 36,
     comfortable: 44,
@@ -135,42 +134,35 @@ const PRESETS = {
 // ======================================================
 function buildHelpers(config) {
   return {
-    // Tamaño tipográfico
     font: (key) => `${config.fontSizes[key]}px`,
 
-    // Espaciado dinámico
     spacing: (key) => `${config.spacingScale[key]}px`,
 
-    // Radio de borde
     radius: (key) => `${config.radius[key]}px`,
 
-    // Altura estándar para controles
     controlHeight: () => `${config.density}px`,
 
-    // Tamaño de íconos escalado correctamente
     icon: (factor = 1) => `${config.iconBase * factor * config.scale}px`,
 
-    // Grosor de líneas (separadores, bordes finos)
     line: () => `${config.lineThickness * config.scale}px`,
 
-    // Ancho máximo de contenido (normal, wide, full)
+    // ======================================================
+    // ✔ MAX-WIDTH REAL — NO ESCALADO
+    //    (Normal, Wide y Full SIEMPRE se ven distintos)
+    // ======================================================
     contentMaxWidth: (key) => {
-      const baseWidths = {
-        normal: 1120,
-        wide: 1440,
-        full: null, // null = 100%
+      const widths = {
+        normal: "1100px",
+        wide: "1400px",
+        full: "100%",
       };
-      const baseWidth = baseWidths[key];
-      if (baseWidth === null) return "100%";
-      // Escalar según el preset
-      const scaledWidth = baseWidth * config.scale;
-      return `${scaledWidth}px`;
+      return widths[key] ?? "1100px";
     },
   };
 }
 
 // ======================================================
-// Construcción del UI final (preset + base + helpers)
+// Construcción final del UI según preset
 // ======================================================
 function buildUIConfig(presetKey) {
   const preset = PRESETS[presetKey] ?? PRESETS["normal"];
@@ -178,7 +170,6 @@ function buildUIConfig(presetKey) {
   const config = {
     scale: preset.scale,
 
-    // Tipografías escaladas
     fontSizes: {
       xs: BASE_CONFIG.fontSizes.xs * preset.fontScale,
       sm: BASE_CONFIG.fontSizes.sm * preset.fontScale,
@@ -187,7 +178,6 @@ function buildUIConfig(presetKey) {
       xl: BASE_CONFIG.fontSizes.xl * preset.fontScale,
     },
 
-    // Espaciado escalado
     spacingScale: {
       xs: BASE_CONFIG.spacingScale.xs * preset.spacingScale,
       sm: BASE_CONFIG.spacingScale.sm * preset.spacingScale,
@@ -196,24 +186,20 @@ function buildUIConfig(presetKey) {
       xl: BASE_CONFIG.spacingScale.xl * preset.spacingScale,
     },
 
-    // Densidad
     density: preset.density,
 
-    // Radios escalados
     radius: {
       sm: BASE_CONFIG.radius.sm * preset.radiusScale,
       md: BASE_CONFIG.radius.md * preset.radiusScale,
       lg: BASE_CONFIG.radius.lg * preset.radiusScale,
       xl: BASE_CONFIG.radius.xl * preset.radiusScale,
-      full: BASE_CONFIG.radius.full, // full no se escala
+      full: BASE_CONFIG.radius.full,
     },
 
-    // Base fija
     lineThickness: BASE_CONFIG.lineThickness,
     iconBase: BASE_CONFIG.iconBase,
   };
 
-  // Agregar helpers
   config.helpers = buildHelpers(config);
 
   return config;

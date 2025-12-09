@@ -13,8 +13,8 @@ const DEFAULT_PROFILE = {
   sidebarPosition: "left",   // left | right | top | hidden | floating
   navbarPosition: "top",     // top | bottom | hidden
   contentWidth: "normal",    // normal | wide | full
-  contentMode: "table",      // table | cards | mixed (hoy solo para futuro)
-  presetKey: "default",
+  contentMode: "table",      // (futuro)
+  presetKey: "default",      // (futuro)
 };
 
 export default function LayoutController({ children }) {
@@ -23,16 +23,12 @@ export default function LayoutController({ children }) {
 
   const [layoutProfile, setLayoutProfile] = useState(DEFAULT_PROFILE);
 
-  // Cargar profile inicial + escuchar cambios del Builder
   const loadProfile = useCallback(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        setLayoutProfile({
-          ...DEFAULT_PROFILE,
-          ...parsed,
-        });
+        setLayoutProfile({ ...DEFAULT_PROFILE, ...parsed });
       } else {
         setLayoutProfile(DEFAULT_PROFILE);
       }
@@ -44,47 +40,40 @@ export default function LayoutController({ children }) {
 
   useEffect(() => {
     loadProfile();
-
-    const handler = () => {
-      loadProfile();
-    };
-
+    const handler = () => loadProfile();
     window.addEventListener("erp-layout-profile-updated", handler);
-    return () => {
-      window.removeEventListener("erp-layout-profile-updated", handler);
-    };
+    return () => window.removeEventListener("erp-layout-profile-updated", handler);
   }, [loadProfile]);
 
   const { sidebarPosition, navbarPosition, contentWidth } = layoutProfile;
 
-  // Calcular maxWidth según contentWidth usando UIConfig
   const maxWidth = useMemo(() => {
     return ui.helpers.contentMaxWidth(contentWidth);
   }, [contentWidth, ui]);
 
-  // Sincronizar layoutMode cuando sidebarPosition === "top"
+  // altura del header para offsets coherentes (floating)
+  const headerHeight = ui.helpers.controlHeight();
+  const overlayTop =
+    navbarPosition === "top"
+      ? `calc(${headerHeight} + ${ui.helpers.spacing("md")})`
+      : ui.helpers.spacing("xl");
+
   useEffect(() => {
-    if (sidebarPosition === "top") {
-      try {
+    try {
+      if (sidebarPosition === "top") {
         localStorage.setItem("erp-layout-mode", "sidebar-top");
-        // El LayoutModeProvider escuchará el cambio de storage automáticamente
-      } catch (e) {
-        console.error("Error sincronizando layoutMode:", e);
-      }
-    } else if (sidebarPosition !== "top" && layoutMode === "sidebar-top") {
-      // Resetear a sidebar-left si ya no es top
-      try {
+      } else if (sidebarPosition !== "top" && layoutMode === "sidebar-top") {
         localStorage.setItem("erp-layout-mode", "sidebar-left");
-      } catch (e) {
-        console.error("Error reseteando layoutMode:", e);
       }
+    } catch (e) {
+      console.error("Error sincronizando layoutMode:", e);
     }
   }, [sidebarPosition, layoutMode]);
 
-  // Modo legacy TOP (SidebarTop encima del contenido)
   const overrideTopMode =
     sidebarPosition === "top" || layoutMode === "sidebar-top";
 
+  // ============================ LAYOUT TOP ============================
   if (overrideTopMode) {
     return (
       <div className="flex flex-col h-full w-full overflow-hidden">
@@ -104,31 +93,30 @@ export default function LayoutController({ children }) {
         </main>
 
         {navbarPosition === "bottom" && <Header position="bottom" />}
-        {/* navbarPosition === "hidden" → no Header */}
       </div>
     );
   }
 
-  // Layout profesional: HEADER (top/bottom) + ROW (sidebar+contenido) + OVERLAYS
+  // ======================== LAYOUT PROFESIONAL ========================
   return (
-    <div className="layout-root flex flex-col h-full w-full relative overflow-hidden">
+    <div className="layout-root flex flex-col h-full w-full relative overflow-visible">
       {/* HEADER TOP */}
       {navbarPosition === "top" && <Header position="top" />}
 
-      {/* FILA PRINCIPAL: sidebar left/right + contenido centrado */}
-      <div className="layout-row flex flex-row flex-1 w-full justify-center relative">
+      {/* FILA PRINCIPAL */}
+      <div className="layout-row flex flex-row flex-1 min-h-0 w-full justify-center relative">
         <div
-          className="layout-inner flex flex-row h-full w-full transition-all duration-300"
+          className="layout-inner flex flex-row w-full min-h-0 transition-all duration-300"
           style={{ maxWidth }}
         >
           {/* Sidebar izquierda */}
           {sidebarPosition === "left" && (
-            <div className="transition-all duration-300">
+            <div className="transition-all duration-300 min-h-0">
               <SidebarPro position="left" />
             </div>
           )}
 
-          {/* Contenido */}
+          {/* CONTENIDO */}
           <main
             className="layout-content flex-1 min-h-0 overflow-auto transition-colors duration-200"
             style={{
@@ -142,7 +130,7 @@ export default function LayoutController({ children }) {
 
           {/* Sidebar derecha */}
           {sidebarPosition === "right" && (
-            <div className="transition-all duration-300">
+            <div className="transition-all duration-300 min-h-0">
               <SidebarPro position="right" />
             </div>
           )}
@@ -152,12 +140,12 @@ export default function LayoutController({ children }) {
       {/* HEADER BOTTOM */}
       {navbarPosition === "bottom" && <Header position="bottom" />}
 
-      {/* SIDEBAR FLOTANTE (overlay real) */}
+      {/* SIDEBAR FLOTANTE */}
       {sidebarPosition === "floating" && (
         <div
           className="pointer-events-none fixed z-40 transition-all duration-300"
           style={{
-            top: ui.helpers.spacing("xl"),
+            top: overlayTop,
             right: ui.helpers.spacing("xl"),
           }}
         >
@@ -166,8 +154,6 @@ export default function LayoutController({ children }) {
           </div>
         </div>
       )}
-
-      {/* sidebarPosition === "hidden" → no SidebarPro */}
     </div>
   );
 }

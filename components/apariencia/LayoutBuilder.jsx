@@ -392,11 +392,12 @@ export default function LayoutBuilder() {
                   className="h-full mx-auto bg-slate-900 rounded-md border border-slate-700 flex flex-col"
                   style={{
                     maxWidth:
-                      profile.contentWidth === "normal"
-                        ? "70%"
-                        : profile.contentWidth === "wide"
-                        ? "90%"
-                        : "100%",
+  profile.contentWidth === "normal"
+    ? "60%"
+    : profile.contentWidth === "wide"
+    ? "85%"
+    : "100%",
+
                   }}
                 >
                   <div className="h-6 border-b border-slate-800 flex items-center px-2 text-[9px] text-slate-300">

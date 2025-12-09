@@ -8,8 +8,10 @@ import { useUIConfig } from "@/components/providers/UIConfigProvider";
 
 export default function Header({ position = "top" }) {
   // Validar position prop
-  const validPosition = ["top", "bottom", "hidden"].includes(position) ? position : "top";
-  
+  const validPosition = ["top", "bottom", "hidden"].includes(position)
+    ? position
+    : "top";
+
   const pathname = usePathname();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
@@ -52,7 +54,7 @@ export default function Header({ position = "top" }) {
   }, []);
 
   const headerHeight = ui.helpers.controlHeight();
-  const avatarSize = parseInt(headerHeight) * 0.9;
+  const avatarSize = parseInt(headerHeight);
   const iconSize = parseInt(ui.helpers.icon(1.125));
   const chevronSize = parseInt(ui.helpers.icon(1.125));
 
@@ -60,7 +62,7 @@ export default function Header({ position = "top" }) {
 
   return (
     <header
-      className="w-full flex items-center justify-between"
+      className="w-full flex items-center justify-between sticky top-0 z-30"
       style={{
         background: "var(--sunmi-header-bg)",
         borderColor: "var(--sunmi-header-border)",
@@ -120,8 +122,8 @@ export default function Header({ position = "top" }) {
                 borderColor: "var(--sunmi-card-border)",
                 borderWidth: "1px",
                 color: "var(--sunmi-card-text)",
-                width: avatarSize,
-                height: avatarSize,
+                width: avatarSize * 0.9,
+                height: avatarSize * 0.9,
                 borderRadius: ui.helpers.radius("full"),
                 fontSize: ui.helpers.font("sm"),
               }}

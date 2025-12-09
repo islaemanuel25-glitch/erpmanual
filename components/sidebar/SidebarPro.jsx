@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebarConfig } from "@/components/providers/SidebarConfigProvider";
 import { useUIConfig } from "@/components/providers/UIConfigProvider";
@@ -13,7 +11,6 @@ import sidebarGroups from "./sidebarGroups";
 import { useUser } from "@/app/context/UserContext";
 
 export default function SidebarPro({ position = "left", style = {} }) {
-  const pathname = usePathname();
   const { sidebarMode, sidebarGroup } = useSidebarConfig();
   const { ui } = useUIConfig();
   const { perfil } = useUser();
@@ -22,17 +19,14 @@ export default function SidebarPro({ position = "left", style = {} }) {
   const showText = sidebarMode === "icons-text";
   const isGrouped = sidebarGroup === "grouped";
 
-  // Filtrado de permisos (igual que SidebarTop)
   const esAdmin = Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
   const puede = (perm) => (esAdmin ? true : perm && perfil.permisos.includes(perm));
   const filtrarVisibles = (items) => esAdmin ? items : items.filter((i) => puede(i.permiso));
 
-  // Anchos dinámicos basados en UIConfig
   const sidebarWidth = showText
     ? parseInt(ui.helpers.controlHeight()) * 3.5
     : parseInt(ui.helpers.controlHeight()) * 1.2;
 
-  // Estilos base comunes
   const baseSidebarStyle = {
     width: `${sidebarWidth}px`,
     paddingTop: ui.helpers.spacing("lg"),
@@ -46,13 +40,13 @@ export default function SidebarPro({ position = "left", style = {} }) {
       : {}),
   };
 
-  // Estilos internos según posición
+  // ===== Estilos internos según posición =====
   const getInternalStyle = () => {
     if (position === "floating") {
       const xlSpacing = parseInt(ui.helpers.spacing("xl"));
       return {
         ...baseSidebarStyle,
-        position: "fixed",
+        // ❌ Se elimina position: fixed (lo maneja LayoutController)
         backgroundColor: "var(--sunmi-sidebar-bg)",
         borderColor: "var(--sunmi-sidebar-border)",
         borderWidth: "1px",
@@ -64,43 +58,35 @@ export default function SidebarPro({ position = "left", style = {} }) {
       };
     }
 
-    // left | right (sidebar estructural)
+    // left | right
     return {
       ...baseSidebarStyle,
       height: "100%",
       backgroundColor: "var(--sunmi-sidebar-bg)",
       borderColor: "var(--sunmi-sidebar-border)",
       ...(position === "left"
-        ? { 
+        ? {
             borderRightWidth: ui.helpers.line(),
             borderLeftWidth: 0,
           }
-        : { 
+        : {
             borderLeftWidth: ui.helpers.line(),
             borderRightWidth: 0,
           }),
     };
   };
 
-  // Merge: interno + style externo (protege estilos críticos para floating)
   const internalStyle = getInternalStyle();
+
   const sidebarStyle = useMemo(() => {
     if (position === "floating") {
-      // Para floating, proteger estilos críticos (position, top, right, zIndex)
       const protectedKeys = ["position", "top", "right", "left", "bottom", "zIndex"];
       const safeStyle = Object.fromEntries(
         Object.entries(style).filter(([key]) => !protectedKeys.includes(key))
       );
-      return {
-        ...internalStyle,
-        ...safeStyle,
-      };
+      return { ...internalStyle, ...safeStyle };
     }
-    // Para left/right, permitir merge completo
-    return {
-      ...internalStyle,
-      ...style,
-    };
+    return { ...internalStyle, ...style };
   }, [internalStyle, style, position]);
 
   const containerClasses = cn(
@@ -108,7 +94,6 @@ export default function SidebarPro({ position = "left", style = {} }) {
     showText ? "items-stretch" : "items-center"
   );
 
-  // Modo agrupado
   if (isGrouped) {
     return (
       <div className={containerClasses} style={sidebarStyle}>
@@ -133,7 +118,6 @@ export default function SidebarPro({ position = "left", style = {} }) {
     );
   }
 
-  // Modo plano
   return (
     <div className={containerClasses} style={sidebarStyle}>
       {filtrarVisibles(sidebarItems).map((item) => (

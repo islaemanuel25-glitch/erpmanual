@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
@@ -11,7 +10,6 @@ import sidebarItems from "./sidebarItems";
 import SidebarGroupTop from "./SidebarGroupTop";
 import SidebarItemFlat from "./SidebarItemFlat";
 import { useUser } from "@/app/context/UserContext";
-import { ChevronDown } from "lucide-react";
 
 export default function SidebarTop() {
   const pathname = usePathname();
@@ -22,12 +20,17 @@ export default function SidebarTop() {
   const showText = sidebarMode === "icons-text";
   const grouped = sidebarGroup === "grouped";
 
-  // Estado para controlar el dropdown de cada grupo
   const [openGroup, setOpenGroup] = useState(null);
 
-  const esAdmin = Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
-  const puede = (perm) => (esAdmin ? true : perm && perfil.permisos.includes(perm));
-  const filtrarVisibles = (items) => esAdmin ? items : items.filter((i) => puede(i.permiso));
+  const esAdmin =
+    Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
+  const puede = (perm) =>
+    esAdmin ? true : perm && perfil.permisos.includes(perm);
+  const filtrarVisibles = (items) =>
+    esAdmin ? items : items.filter((i) => puede(i.permiso));
+
+  // Altura coherente con controlHeight
+  const barHeight = ui.helpers.controlHeight();
 
   // ---- MODO AGRUPADO ----
   if (grouped) {
@@ -36,7 +39,7 @@ export default function SidebarTop() {
         className="flex items-center overflow-x-auto no-scrollbar"
         style={{
           gap: ui.helpers.spacing("lg"),
-          height: ui.helpers.controlHeight(),
+          height: barHeight,
           paddingLeft: ui.helpers.spacing("md"),
           paddingRight: ui.helpers.spacing("md"),
         }}
@@ -68,7 +71,7 @@ export default function SidebarTop() {
       className="flex items-center overflow-x-auto no-scrollbar"
       style={{
         gap: ui.helpers.spacing("md"),
-        height: ui.helpers.controlHeight(),
+        height: barHeight,
         paddingLeft: ui.helpers.spacing("md"),
         paddingRight: ui.helpers.spacing("md"),
       }}
