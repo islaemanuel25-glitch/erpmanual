@@ -11,10 +11,7 @@ export async function POST(req) {
   try {
     const session = getUsuarioSession(req);
     if (!session) {
-      return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
-      );
+      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -24,34 +21,22 @@ export async function POST(req) {
     const items = Array.isArray(body?.items) ? body.items : null;
 
     if (!proveedorId) {
-      return NextResponse.json(
-        { ok: false, error: "proveedorId requerido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "proveedorId requerido" }, { status: 400 });
     }
 
-    if (!["MANUAL", "AUMENTO", "XLSX", "SCAN"].includes(metodo)) {
-      return NextResponse.json(
-        { ok: false, error: "metodo inválido" },
-        { status: 400 }
-      );
+    if (!["MANUAL", "AUMENTO", "XLSX", "SCAN", "REGLAS", "PEGADO"].includes(metodo)) {
+      return NextResponse.json({ ok: false, error: "metodo inválido" }, { status: 400 });
     }
 
-    if (pricingMode !== "KEEP_VENTA" && pricingMode !== "RECALC_BY_MARGIN") {
-      return NextResponse.json(
-        { ok: false, error: "pricingMode inválido" },
-        { status: 400 }
-      );
+    if (!["KEEP_VENTA", "RECALC_BY_MARGIN", "SET_VENTA"].includes(pricingMode)) {
+      return NextResponse.json({ ok: false, error: "pricingMode inválido" }, { status: 400 });
     }
 
-    if (!items) {
-      return NextResponse.json(
-        { ok: false, error: "items inválido" },
-        { status: 400 }
-      );
+    if (!items || items.length === 0) {
+      return NextResponse.json({ ok: false, error: "items inválido" }, { status: 400 });
     }
 
-    await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const update = await tx.precioUpdate.create({
         data: {
           grupoId: Number(session.grupoId),
@@ -62,6 +47,7 @@ export async function POST(req) {
         },
       });
 
+      let applied = 0;
       for (const item of items) {
         const productoBaseId = toNumber(item?.productoBaseId);
         const costoAnterior = toNumber(item?.costoAnterior);
@@ -79,13 +65,21 @@ export async function POST(req) {
           throw new Error("Item inválido");
         }
 
-        await tx.productoBase.update({
-          where: { id: productoBaseId },
+        const updated = await tx.productoBase.updateMany({
+          where: {
+            id: productoBaseId,
+            grupoId: Number(session.grupoId),
+            proveedor_id: proveedorId,
+          },
           data: {
             precio_costo: costoNuevo,
             precio_venta: ventaNueva,
           },
         });
+
+        if (updated.count === 0) {
+          throw new Error(`Producto ${productoBaseId} fuera de alcance`);
+        }
 
         await tx.precioUpdateItem.create({
           data: {
@@ -97,15 +91,21 @@ export async function POST(req) {
             ventaNueva,
           },
         });
+
+        applied += 1;
       }
+
+      return { updateId: update.id, applied };
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      message: `Actualización aplicada: ${result.applied} productos.`,
+      updateId: result.updateId,
+      applied: result.applied,
+    });
   } catch (e) {
     console.error("ERROR productos/precios/apply:", e);
-    return NextResponse.json(
-      { ok: false, error: "Error interno" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: e?.message || "Error interno" }, { status: 500 });
   }
 }
