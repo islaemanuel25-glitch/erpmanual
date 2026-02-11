@@ -10,7 +10,6 @@ export async function GET(req) {
     const local = searchParams.get("local") || "";
     const activoFilter = searchParams.get("activo"); // "true" | "false" | null
 
-    // ✅ sin paginación en backend
     const where = {
       AND: [
         search
@@ -31,15 +30,20 @@ export async function GET(req) {
     const usuarios = await prisma.usuario.findMany({
       where,
       orderBy: { id: "desc" },
-      include: { rol: true, local: true },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        activo: true,
+        rolId: true,
+        localId: true,
+        rol: { select: { id: true, nombre: true } },
+        local: { select: { id: true, nombre: true } },
+      },
     });
 
     return NextResponse.json(
-      {
-        ok: true,
-        usuarios,
-        total: usuarios.length,
-      },
+      { ok: true, usuarios, total: usuarios.length },
       { status: 200 }
     );
   } catch (e) {

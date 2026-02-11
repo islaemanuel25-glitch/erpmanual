@@ -18,7 +18,6 @@ export default function SunmiTableUsuarios({
 }) {
   return (
     <div className="sunmi-card border border-slate-800 rounded-2xl shadow-md p-0 overflow-hidden bg-slate-950">
-
       {/* HEADER SUNMI */}
       <SunmiHeader title="Usuarios" color="amber" />
 
@@ -47,10 +46,12 @@ export default function SunmiTableUsuarios({
           </thead>
 
           <tbody>
-            {datos.length === 0 && <SunmiTableEmpty message="No hay usuarios para mostrar" />}
+            {datos.length === 0 && (
+              <SunmiTableEmpty message="No hay usuarios para mostrar" />
+            )}
 
-            {datos.map((row, idx) => (
-              <SunmiTableRow key={idx}>
+            {datos.map((row) => (
+              <SunmiTableRow key={row.id ?? `${row.email ?? "row"}-${row.nombre ?? ""}`}>
                 {columnas.map((col) => (
                   <td key={col.key} className="px-3 py-2 text-[12px]">
                     {col.render ? col.render(row[col.key], row) : row[col.key]}

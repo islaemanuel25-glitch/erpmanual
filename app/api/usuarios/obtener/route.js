@@ -3,8 +3,8 @@ import prisma from "@/lib/prisma";
 
 export async function GET(req) {
   try {
-    const url = new URL(req.url, "http://localhost:3000");
-    const id = Number(url.searchParams.get("id"));
+    const { searchParams } = new URL(req.url);
+    const id = Number(searchParams.get("id"));
 
     if (!id || Number.isNaN(id)) {
       return NextResponse.json(
@@ -25,10 +25,7 @@ export async function GET(req) {
       );
     }
 
-    return NextResponse.json(
-      { ok: true, usuario },
-      { status: 200 }
-    );
+    return NextResponse.json({ ok: true, usuario }, { status: 200 });
   } catch (e) {
     console.error("usuarios/obtener", e);
     return NextResponse.json(

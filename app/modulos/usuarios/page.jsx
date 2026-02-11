@@ -120,6 +120,12 @@ export default function UsuariosPage() {
 
       let lista = json.usuarios;
 
+      // DEBUG mínimo: mirá qué IDs trae realmente
+      console.log(
+        "USUARIOS (5):",
+        lista.slice(0, 5).map((u) => ({ id: u.id, email: u.email, nombre: u.nombre }))
+      );
+
       // Búsqueda
       if (search.trim()) {
         const q = search.trim().toLowerCase();
@@ -132,8 +138,7 @@ export default function UsuariosPage() {
 
       // Filtros
       if (rolFiltro) lista = lista.filter((u) => u.rolId === Number(rolFiltro));
-      if (localFiltro)
-        lista = lista.filter((u) => u.localId === Number(localFiltro));
+      if (localFiltro) lista = lista.filter((u) => u.localId === Number(localFiltro));
 
       setTotal(lista.length);
 
@@ -164,9 +169,7 @@ export default function UsuariosPage() {
   };
 
   const handleSubmit = async (form) => {
-    const url = editar
-      ? `/api/usuarios/editar/${editar}`
-      : `/api/usuarios/crear`;
+    const url = editar ? `/api/usuarios/editar/${editar}` : `/api/usuarios/crear`;
     const method = editar ? "PUT" : "POST";
 
     const res = await fetch(url, {
@@ -187,9 +190,36 @@ export default function UsuariosPage() {
     fetchUsuarios();
   };
 
-  const handleEliminar = async (id) => {
+  // ✅ elimina por id si es válido; si no, fallback por email (endpoint ya existe)
+  const handleEliminar = async (u) => {
     if (!confirm("¿Eliminar usuario?")) return;
-    alert("Eliminar no implementado aún.");
+
+    const idNum = Number(u?.id);
+    const canUseId = Number.isFinite(idNum) && idNum > 0;
+
+    try {
+      const url = canUseId
+        ? `/api/usuarios/eliminar/${idNum}`
+        : `/api/usuarios/eliminarPorEmail`;
+
+      const res = await fetch(url, {
+        method: canUseId ? "DELETE" : "POST",
+        credentials: "include",
+        headers: canUseId ? undefined : { "Content-Type": "application/json" },
+        body: canUseId ? undefined : JSON.stringify({ email: u?.email }),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json?.ok) {
+        alert(json?.error || "No se pudo eliminar el usuario.");
+        return;
+      }
+
+      fetchUsuarios();
+    } catch (e) {
+      alert("Error de red al eliminar usuario.");
+    }
   };
 
   return (
@@ -253,7 +283,7 @@ export default function UsuariosPage() {
             <SunmiTableEmpty message="No hay usuarios para mostrar" />
           ) : (
             usuarios.map((u) => (
-              <SunmiTableRow key={u.id}>
+              <SunmiTableRow key={u.id ?? u.email}>
                 <td>
                   <SunmiUserCell nombre={u.nombre} email={u.email} />
                 </td>
@@ -274,16 +304,14 @@ export default function UsuariosPage() {
                       icon={Pencil}
                       color="amber"
                       size={16}
-                      onClick={() =>
-                        router.push(`/modulos/usuarios?editar=${u.id}`)
-                      }
+                      onClick={() => router.push(`/modulos/usuarios?editar=${u.id}`)}
                     />
 
                     <SunmiButtonIcon
                       icon={Trash2}
                       color="red"
                       size={16}
-                      onClick={() => handleEliminar(u.id)}
+                      onClick={() => handleEliminar(u)}
                     />
                   </div>
                 </td>
