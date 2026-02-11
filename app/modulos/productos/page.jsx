@@ -273,6 +273,10 @@ export default function ProductosPage() {
     router.push(`/modulos/productos?${params.toString()}`);
   };
 
+  const abrirActualizacionPrecios = () => {
+    router.push("/modulos/productos/actualizacion-precios");
+  };
+
   const abrirEditar = (id) => {
     if (!id || id === 0 || id === "0" || Number.isNaN(Number(id))) {
       alert("Error: ID de producto inválido");
@@ -312,9 +316,14 @@ export default function ProductosPage() {
 
           {/* ACCIONES */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full mt-1">
-            <SunmiButton color="amber" onClick={abrirNuevo}>
-              ＋ Nuevo producto
-            </SunmiButton>
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+              <SunmiButton color="amber" onClick={abrirNuevo}>
+                ＋ Nuevo producto
+              </SunmiButton>
+              <SunmiButton color="cyan" onClick={abrirActualizacionPrecios}>
+                Actualización de precios
+              </SunmiButton>
+            </div>
 
             <ColumnManager
               allColumns={allColumns}
