@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { inheritDepositoProductsToLocal } from "@/lib/grupos";
 
 // GET → obtener locales del grupo
 export async function GET(req, context) {
@@ -69,10 +70,24 @@ export async function POST(req, context) {
       );
     }
 
-    const creado = await prisma.grupoLocal.create({
-      data: { grupoId, localId: Number(localId) },
-      include: { local: true },
+    // ✅ Crear GrupoLocal y heredar productos en transacción
+    const resultado = await prisma.$transaction(async (tx) => {
+      const creado = await tx.grupoLocal.create({
+        data: { grupoId, localId: Number(localId) },
+        include: { local: true },
+      });
+
+      // Heredar productos del depósito (NO crítico: no hace rollback si falla)
+      try {
+        await inheritDepositoProductsToLocal(tx, grupoId, Number(localId));
+      } catch (e) {
+        console.warn(`⚠️ No se pudieron heredar productos: ${e.message}`);
+      }
+
+      return creado;
     });
+
+    const creado = resultado;
 
     // mapear snake → camel
     const data = {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { RefreshCw } from "lucide-react";
 
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiSection from "@/components/sunmi/SunmiSection";
@@ -17,6 +18,7 @@ import SelectAgregarDeposito from "@/components/grupos/SelectAgregarDeposito";
 export default function EditorGrupo({ grupoId }) {
   const [grupo, setGrupo] = useState(null);
   const [nombre, setNombre] = useState("");
+  const [sincronizando, setSincronizando] = useState(false);
 
   const load = async () => {
     const res = await fetch(`/api/grupos/${grupoId}`, { credentials: "include" });
@@ -38,6 +40,40 @@ export default function EditorGrupo({ grupoId }) {
       body: JSON.stringify({ nombre }),
     });
     load();
+  };
+
+  const sincronizarProductos = async () => {
+    if (!confirm("¿Sincronizar catálogo del depósito a todos los locales del grupo?")) {
+      return;
+    }
+
+    setSincronizando(true);
+    try {
+      const res = await fetch(`/api/grupos/${grupoId}/sync-productos`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      const json = await res.json();
+
+      if (json.ok) {
+        const { productoLocalCreated, stockCreated, productosBase, locales } = json.data;
+        alert(
+          `✅ Sincronización completada:\n` +
+          `- ${productosBase} productos base\n` +
+          `- ${locales} locales\n` +
+          `- ${productoLocalCreated} ProductoLocal creados\n` +
+          `- ${stockCreated} StockLocal creados`
+        );
+      } else {
+        alert(`❌ Error: ${json.error || "Error al sincronizar productos"}`);
+      }
+    } catch (error) {
+      console.error("Error sincronizando productos:", error);
+      alert("❌ Error de red al sincronizar productos");
+    } finally {
+      setSincronizando(false);
+    }
   };
 
   if (!grupo) return "Cargando…";
@@ -65,6 +101,24 @@ export default function EditorGrupo({ grupoId }) {
                 Guardar
               </SunmiButton>
             </form>
+          </SunmiSection>
+
+          <SunmiSection className="mt-3">
+            <SunmiButton
+              color="cyan"
+              onClick={sincronizarProductos}
+              disabled={sincronizando}
+              className="w-full flex items-center justify-center gap-2"
+            >
+              <RefreshCw
+                size={16}
+                className={sincronizando ? "animate-spin" : ""}
+              />
+              {sincronizando ? "Sincronizando..." : "Sincronizar catálogo"}
+            </SunmiButton>
+            <p className="text-xs text-slate-400 mt-2">
+              Sincroniza todos los productos del depósito a todos los locales del grupo
+            </p>
           </SunmiSection>
         </SunmiPanel>
       </div>

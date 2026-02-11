@@ -115,12 +115,21 @@ export async function POST(req) {
 
     let detalle;
 
+    // Inferir unidades desde factorPack
+    const factorPack = Number(productoLocal.base.factor_pack || 1);
+    const unidadSugerida = body.sugeridoUnidad && (body.sugeridoUnidad === "BULTO" || body.sugeridoUnidad === "UNIDAD")
+      ? body.sugeridoUnidad
+      : (factorPack > 1 ? "BULTO" : "UNIDAD");
+    const unidadPreparada = body.unidadPreparada && (body.unidadPreparada === "BULTO" || body.unidadPreparada === "UNIDAD")
+      ? body.unidadPreparada
+      : unidadSugerida;
+
     if (existente) {
       detalle = await prisma.posTransferenciaDetalle.update({
         where: { id: existente.id },
         data: {
           preparado: Number(existente.preparado || 0) + cantidad,
-          ...(tipo === "sugerido" ? { sugerido: cantidad } : {}),
+          ...(tipo === "sugerido" ? { sugerido: cantidad, unidadSugerida, unidadPreparada } : { unidadPreparada }),
         },
       });
     } else {
@@ -131,6 +140,8 @@ export async function POST(req) {
           sugerido: tipo === "sugerido" ? cantidad : 0,
           preparado: cantidad,
           tipo,
+          unidadSugerida,
+          unidadPreparada,
         },
       });
     }
@@ -158,6 +169,8 @@ export async function POST(req) {
       sugerido: Number(detalle.sugerido || 0),
       preparado: Number(detalle.preparado || 0),
       tipo: detalle.tipo,
+      unidadSugerida: detalle.unidadSugerida,
+      unidadPreparada: detalle.unidadPreparada,
     };
 
     return NextResponse.json({

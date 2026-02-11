@@ -164,7 +164,7 @@ export default function TablaSugeridos({
               <th className="px-3 py-2 text-left">Producto</th>
               <th className="px-2 py-2 text-left">Código</th>
               <th className="px-2 py-2 text-left">Presentación</th>
-              <th className="px-2 py-2 text-right">Sugerido (bultos)</th>
+              <th className="px-2 py-2 text-right">Sugerido</th>
               <th className="px-2 py-2 text-center">Acción</th>
             </tr>
           </thead>
@@ -185,9 +185,11 @@ export default function TablaSugeridos({
             )}
 
             {datos.map((p) => {
-              const factor = Number(p.factorPack || 1);
-              const unidadesAprox =
-                factor > 1 ? p.sugerido * factor : p.sugerido;
+              // Compatibilidad: usar nuevos campos si existen, sino calcular
+              const sugeridoCantidad = p.sugeridoCantidad ?? p.sugerido ?? 0;
+              const sugeridoUnidad = p.sugeridoUnidad ?? (p.factorPack > 1 ? "BULTO" : "UNIDAD");
+              const faltanteUnidades = p.faltanteUnidades ?? p.faltanUnidades ?? 0;
+              const factorPack = Number(p.factorPack || 1);
 
               return (
                 <tr
@@ -208,11 +210,6 @@ export default function TablaSugeridos({
                         {p.categoriaNombre || "Sin categoría"} ·{" "}
                         {p.areaFisicaNombre || "Sin área"}
                       </span>
-                      {factor > 1 && (
-                        <span className="text-[11px] text-slate-500">
-                          Faltan aprox. {unidadesAprox} uds
-                        </span>
-                      )}
                     </div>
                   </td>
 
@@ -223,36 +220,75 @@ export default function TablaSugeridos({
 
                   {/* PRESENTACIÓN */}
                   <td className="px-2 py-2 text-[11px] text-slate-300">
-                    {factor > 1
-                      ? `${p.unidadMedida} x ${factor}`
+                    {factorPack > 1
+                      ? `${p.unidadMedida} x ${factorPack}`
                       : p.unidadMedida}
                   </td>
 
-                  {/* INPUT SUGERIDO */}
+                  {/* INPUT SUGERIDO CON UNIDAD CLARA */}
                   <td className="px-2 py-2 text-right">
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      className="
-                        w-[80px]
-                        bg-slate-900
-                        border border-slate-700 
-                        rounded-lg px-2 py-1 
-                        text-right text-cyan-300
-                        text-[12px]
-                        focus:border-cyan-400 
-                        focus:ring-1 focus:ring-cyan-400
-                        transition
-                      "
-                      value={p.sugerido}
-                      onChange={(e) =>
-                        onEditSugerido(
-                          p.productoLocalDestinoId,
-                          Number(e.target.value)
-                        )
-                      }
-                    />
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          className="
+                            w-[80px]
+                            bg-slate-900
+                            border border-slate-700 
+                            rounded-lg px-2 py-1 
+                            text-right text-cyan-300
+                            text-[12px]
+                            focus:border-cyan-400 
+                            focus:ring-1 focus:ring-cyan-400
+                            transition
+                          "
+                          value={sugeridoCantidad}
+                          onChange={(e) =>
+                            onEditSugerido(
+                              p.productoLocalDestinoId,
+                              Number(e.target.value),
+                              sugeridoUnidad // Mantener unidad actual
+                            )
+                          }
+                        />
+                        {(p.modoEnvio === "MIXTO" && factorPack > 1) ? (
+                          <select
+                            className="
+                              bg-slate-900
+                              border border-slate-700 
+                              rounded-lg px-1 py-1 
+                              text-[10px] text-slate-300
+                              focus:border-cyan-400 
+                              focus:ring-1 focus:ring-cyan-400
+                            "
+                            value={sugeridoUnidad}
+                            onChange={(e) =>
+                              onEditSugerido(
+                                p.productoLocalDestinoId,
+                                sugeridoCantidad,
+                                e.target.value
+                              )
+                            }
+                          >
+                            <option value="BULTO">bultos</option>
+                            <option value="UNIDAD">uds</option>
+                          </select>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">
+                            {sugeridoUnidad === "BULTO" ? "bultos" : "uds"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {sugeridoUnidad === "BULTO" ? (
+                          <span className="text-slate-500">
+                            (faltan {faltanteUnidades} uds · factor {factorPack})
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
                   </td>
 
                   {/* BOTÓN PREP. */}

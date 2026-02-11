@@ -19,6 +19,12 @@ export async function POST(req) {
       body.sugerido !== undefined ? Number(body.sugerido) : undefined;
     const preparado =
       body.preparado !== undefined ? Number(body.preparado) : undefined;
+    const unidadSugerida = body.unidadSugerida && (body.unidadSugerida === "BULTO" || body.unidadSugerida === "UNIDAD")
+      ? body.unidadSugerida
+      : undefined;
+    const unidadPreparada = body.unidadPreparada && (body.unidadPreparada === "BULTO" || body.unidadPreparada === "UNIDAD")
+      ? body.unidadPreparada
+      : undefined;
 
     if (!detalleId) {
       return NextResponse.json(
@@ -75,6 +81,14 @@ export async function POST(req) {
       data.preparado = preparado;
     }
 
+    if (unidadSugerida !== undefined) {
+      data.unidadSugerida = unidadSugerida;
+    }
+
+    if (unidadPreparada !== undefined) {
+      data.unidadPreparada = unidadPreparada;
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { ok: false, error: "No hay cambios para aplicar" },
@@ -112,6 +126,8 @@ export async function POST(req) {
       tipo: updated.tipo,
       sugerido: Number(updated.sugerido || 0),
       preparado: Number(updated.preparado || 0),
+      unidadSugerida: updated.unidadSugerida,
+      unidadPreparada: updated.unidadPreparada,
       productoNombre: productoLocal?.nombre || base?.nombre || "",
       codigoBarra: base?.codigo_barra || "",
       stockActual,

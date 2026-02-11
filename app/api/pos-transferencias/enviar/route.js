@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { toUnidades, validarEnvio } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -59,20 +60,53 @@ export async function POST(req) {
     }
 
     // --------------------------------------------------
-    // Preparar ítems válidos
+    // Preparar ítems válidos (cantidadRaw + unidadEnviada)
+    // Nota: TransferenciaDetalle.cantidad se guarda en la unidad indicada por unidadEnviada.
+    //       La conversión a UNIDADES se hace en confirmar-recepcion para actualizar StockLocal.
     // --------------------------------------------------
     const items = pos.detalles
       .map((detalle) => {
         const cantidadPreparada = Number(detalle.preparado || 0);
         const cantidadSugerida = Number(detalle.sugerido || 0);
-        const cantidad =
+        const cantidadRaw =
           cantidadPreparada > 0 ? cantidadPreparada : cantidadSugerida;
 
-        if (!cantidad || cantidad <= 0) return null;
+        if (!cantidadRaw || cantidadRaw <= 0) return null;
+
+        const base = detalle.producto?.base;
+        const factorPack = Number(base?.factor_pack || 1);
+
+        const modoEnvio =
+          base?.modo_envio ||
+          (base?.unidad_medida === "cajon" ? "SOLO_BULTO" : "MIXTO");
+
+        // Unidad usada (BULTO/UNIDAD) queda persistida en TransferenciaDetalle.unidadEnviada
+        const unidadPreparada =
+          detalle.unidadPreparada || detalle.unidadSugerida || "BULTO";
+
+        // Validar según modo_envio
+        const validacion = validarEnvio({
+          modoEnvio,
+          unidadElegida: unidadPreparada,
+        });
+        if (!validacion.ok) {
+          throw new Error(
+            `Producto ${base?.nombre || "N/A"}: ${validacion.error}`
+          );
+        }
+
+        // Solo para validar coherencia (no se guarda en transferencia)
+        // Esto asegura que si alguien elige BULTO con factor 1, la conversión no rompe.
+        toUnidades({
+          cantidad: cantidadRaw,
+          unidad: unidadPreparada,
+          factorPack,
+        });
 
         return {
           detalle,
-          cantidad,
+          cantidadRaw, // Cantidad original (bultos o unidades, según unidadEnviada)
+          unidadEnviada: unidadPreparada, // "BULTO" | "UNIDAD"
           baseId: detalle.producto?.baseId,
           productoLocalOrigen: detalle.producto,
         };
@@ -111,42 +145,37 @@ export async function POST(req) {
           create: {
             localId: pos.destinoId,
             baseId: item.baseId,
-            nombre:
-              item.productoLocalOrigen?.nombre || base?.nombre || "",
+            nombre: item.productoLocalOrigen?.nombre || base?.nombre || "",
             descripcion:
-              item.productoLocalOrigen?.descripcion ||
-              base?.descripcion ||
-              "",
+              item.productoLocalOrigen?.descripcion || base?.descripcion || "",
             precio_costo:
-              item.productoLocalOrigen?.precio_costo ||
-              base?.precio_costo,
+              item.productoLocalOrigen?.precio_costo || base?.precio_costo,
             precio_venta:
-              item.productoLocalOrigen?.precio_venta ||
-              base?.precio_venta,
+              item.productoLocalOrigen?.precio_venta || base?.precio_venta,
           },
         });
 
         detallesTransferencia.push({
           productoId: productoLocalDestino.id,
-          cantidad: item.cantidad,
+          cantidad: item.cantidadRaw, // 👈 IMPORTANTE: en unidad indicada por unidadEnviada
+          unidadEnviada: item.unidadEnviada, // "BULTO" | "UNIDAD"
         });
       }
 
       if (!detallesTransferencia.length) {
-        throw new Error("No se generaron detalles válidos para la transferencia");
+        throw new Error(
+          "No se generaron detalles válidos para la transferencia"
+        );
       }
 
-      // --------------------------------------------------
-      // CREAR TRANSFERENCIA REAL (ACÁ ESTÁ EL CAMBIO)
-      // --------------------------------------------------
       const nuevaTransferencia = await tx.transferencia.create({
         data: {
           origenId: pos.origenId,
           destinoId: pos.destinoId,
           creadaPor: pos.usuarioId,
 
-          estado: "Enviada",        // 🔥 ANTES: Pendiente
-          fechaEnvio: new Date(),   // 🔥 NUEVO CAMPO
+          estado: "Enviada",
+          fechaEnvio: new Date(),
 
           detalle: {
             create: detallesTransferencia,
@@ -155,7 +184,6 @@ export async function POST(req) {
         include: { detalle: true },
       });
 
-      // MARCAR POS COMO ENVIADA
       await tx.posTransferencia.update({
         where: { id: pos.id },
         data: { estado: "Enviado" },

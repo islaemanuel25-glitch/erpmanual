@@ -118,6 +118,8 @@ export async function GET(req) {
 
         sugerido,
         preparado,
+        unidadSugerida: detalle.unidadSugerida || "BULTO",
+        unidadPreparada: detalle.unidadPreparada || detalle.unidadSugerida || "BULTO",
 
         productoNombre: productoLocal?.nombre || base?.nombre || "",
         codigoBarra: base?.codigo_barra || "",
@@ -133,6 +135,8 @@ export async function GET(req) {
         ),
         unidadMedida: base?.unidad_medida || "unidad",
         factorPack: Number(base?.factor_pack || 1),
+        modoEnvio: base?.modo_envio || (base?.unidad_medida === "cajon" ? "SOLO_BULTO" : "MIXTO"),
+        modoStock: base?.modo_stock || "BULTO",
       };
     });
 

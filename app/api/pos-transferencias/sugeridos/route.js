@@ -61,10 +61,24 @@ export async function GET(req) {
       select: { grupoId: true },
     });
 
+    if (!grupoLocal) {
+      return NextResponse.json(
+        { ok: false, error: "El local destino no pertenece a ningún grupo" },
+        { status: 400 }
+      );
+    }
+
     const grupoDeposito = await prisma.grupoDeposito.findFirst({
       where: { grupoId: grupoLocal.grupoId },
       select: { localId: true },
     });
+
+    if (!grupoDeposito) {
+      return NextResponse.json(
+        { ok: false, error: "No se encontró depósito para el grupo del local destino" },
+        { status: 400 }
+      );
+    }
 
     const depositoId = grupoDeposito.localId;
 
@@ -87,6 +101,32 @@ export async function GET(req) {
       },
     });
 
+    // ============================================================
+    // 4) Obtener TODOS los ProductoLocal del depósito en una sola query
+    // ============================================================
+    const productosOrigen = await prisma.productoLocal.findMany({
+      where: { localId: depositoId },
+      include: {
+        stock: {
+          where: { localId: depositoId },
+          select: { cantidad: true },
+        },
+      },
+    });
+
+    // Armar Map<baseId, { productoLocalOrigenId, stockActualOrigen }>
+    const origenMap = new Map();
+    for (const origen of productosOrigen) {
+      const stockActualOrigen = Number(origen.stock?.[0]?.cantidad || 0);
+      origenMap.set(origen.baseId, {
+        productoLocalOrigenId: origen.id,
+        stockActualOrigen,
+      });
+    }
+
+    // ============================================================
+    // 5) Procesar productos destino y calcular sugeridos
+    // ============================================================
     const items = [];
 
     for (const p of productosDestino) {
@@ -98,26 +138,38 @@ export async function GET(req) {
       const stockActualDestino = Number(stock.cantidad || 0);
       const stockMax = Number(stock.stockMax || 0);
 
-      const sugerido =
-        stockMax > stockActualDestino ? stockMax - stockActualDestino : 0;
+      // Calcular faltante en unidades
+      const faltanteUnidades = stockMax > stockActualDestino ? stockMax - stockActualDestino : 0;
 
-      if (sugerido <= 0) continue;
+      if (faltanteUnidades <= 0) continue;
 
-      const origen = await prisma.productoLocal.findFirst({
-        where: { baseId: p.baseId, localId: depositoId },
-        include: {
-          stock: {
-            where: { localId: depositoId },
-            select: { cantidad: true },
-          },
-        },
-      });
+      // Aplicar modo_pedido
+      const modoPedido = base.modo_pedido || "BULTO";
+      const factorPack = Number(base.factor_pack || 1);
+      let sugeridoCantidad;
+      let sugeridoUnidad;
 
-      const stockActualOrigen = Number(origen?.stock?.[0]?.cantidad || 0);
+      if (modoPedido === "BULTO" && factorPack > 1) {
+        // Por bulto: ceil(faltanteUnidades / factor)
+        sugeridoCantidad = Math.ceil(faltanteUnidades / factorPack);
+        sugeridoUnidad = "BULTO";
+      } else {
+        // Por unidad: faltanteUnidades
+        sugeridoCantidad = faltanteUnidades;
+        sugeridoUnidad = "UNIDAD";
+      }
+
+      if (sugeridoCantidad <= 0) continue;
+
+      // Obtener datos del origen desde el Map (sin query adicional)
+      const origenData = origenMap.get(p.baseId) || {
+        productoLocalOrigenId: null,
+        stockActualOrigen: 0,
+      };
 
       items.push({
         productoLocalDestinoId: p.id,
-        productoLocalOrigenId: origen?.id || null,
+        productoLocalOrigenId: origenData.productoLocalOrigenId,
 
         baseId: p.baseId,
         productoNombre: p.nombre || base.nombre,
@@ -134,12 +186,22 @@ export async function GET(req) {
         stockMin: Number(stock.stockMin || 0),
         stockMax,
 
-        stockActualOrigen,
-        sugerido,
+        stockActualOrigen: origenData.stockActualOrigen,
+        
+        // Campos nuevos (claridad)
+        sugeridoCantidad,
+        sugeridoUnidad,
+        faltanteUnidades,
+        factorPack,
+        modoEnvio: base.modo_envio || (base.unidad_medida === "cajon" ? "SOLO_BULTO" : "MIXTO"),
+        modoStock: base.modo_stock || "BULTO",
+
+        // Campo legacy (compatibilidad)
+        sugerido: sugeridoCantidad,
 
         precioCosto: Number(p.precio_costo || base.precio_costo || 0),
         unidadMedida: base.unidad_medida,
-        factorPack: Number(base.factor_pack || 1),
+        modoPedido: base.modo_pedido || "BULTO",
       });
     }
 

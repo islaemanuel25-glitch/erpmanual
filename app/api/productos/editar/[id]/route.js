@@ -70,6 +70,20 @@ export async function PUT(req, context) {
 /* ============================================================
    EDITAR PRODUCTO BASE — FIX FINAL
    ============================================================ */
+// Validar modo_pedido según unidad_medida y factor_pack
+function validarModoPedido(modoPedido, unidadMedida, factorPack) {
+  // Si unidad_medida es unidad o factor_pack es null/1, forzar UNIDAD
+  if (unidadMedida === "unidad" || !factorPack || factorPack <= 1) {
+    return "UNIDAD";
+  }
+  // Si es pack/cajon y factor > 1, puede ser BULTO o UNIDAD
+  if (modoPedido === "BULTO" || modoPedido === "UNIDAD") {
+    return modoPedido;
+  }
+  // Default: BULTO si tiene factor > 1
+  return "BULTO";
+}
+
 async function editarBase(baseId, baseData) {
   const dataFinal = {
     nombre: baseData.nombre,
@@ -79,6 +93,7 @@ async function editarBase(baseId, baseData) {
 
     unidad_medida: baseData.unidad_medida,
     factor_pack: baseData.factor_pack,
+    modo_pedido: validarModoPedido(baseData.modo_pedido, baseData.unidad_medida, baseData.factor_pack),
 
     peso_kg: baseData.peso_kg,
     volumen_ml: baseData.volumen_ml,
@@ -104,11 +119,43 @@ async function editarBase(baseId, baseData) {
     area_fisica_id: baseData.area_fisica_id ? Number(baseData.area_fisica_id) : null,
   };
 
-  const updated = await prisma.productoBase.update({
-    where: { id: baseId },
-    data: dataFinal,
-    include: { locales: true },
-  });
+  // Agregar modo_envio y modo_stock solo si están disponibles (después de migración)
+  if (baseData.modo_envio !== undefined) {
+    dataFinal.modo_envio = baseData.modo_envio;
+  } else if (baseData.unidad_medida === "cajon") {
+    dataFinal.modo_envio = "SOLO_BULTO";
+  } else {
+    dataFinal.modo_envio = "MIXTO";
+  }
+
+  if (baseData.modo_stock !== undefined) {
+    dataFinal.modo_stock = baseData.modo_stock;
+  } else {
+    dataFinal.modo_stock = "BULTO";
+  }
+
+  let updated;
+  try {
+    updated = await prisma.productoBase.update({
+      where: { id: baseId },
+      data: dataFinal,
+      include: { locales: true },
+    });
+  } catch (e) {
+    // Si falla porque los campos modo_envio/modo_stock no existen (migración no ejecutada),
+    // intentar sin esos campos
+    if (e.message?.includes("modo_envio") || e.message?.includes("modo_stock")) {
+      delete dataFinal.modo_envio;
+      delete dataFinal.modo_stock;
+      updated = await prisma.productoBase.update({
+        where: { id: baseId },
+        data: dataFinal,
+        include: { locales: true },
+      });
+    } else {
+      throw e;
+    }
+  }
 
   // sincronizar precioCosto/activo en overrides
   await syncFromBaseToLocales(baseId, {

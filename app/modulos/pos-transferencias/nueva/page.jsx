@@ -118,20 +118,21 @@ export default function NuevaTransferenciaPage() {
       if (j.ok) {
         setSugeridos(
           j.items.map((s) => {
-            console.log("🔥 SUGERIDO RAW:", s); // ✔️ ACÁ EL FIX REAL
-        
-            const factor = Number(s.factorPack || s.base?.factor_pack || 1);
-            const faltanUnidades = Number(s.faltanUnidades || s.sugerido || 0);
-        
-            const sugeridoBultos =
-              factor > 1 ? Math.ceil(faltanUnidades / factor) : faltanUnidades;
+            // Usar nuevos campos del endpoint con compatibilidad hacia atrás
+            const sugeridoCantidad = s.sugeridoCantidad ?? s.sugerido ?? 0;
+            const sugeridoUnidad = s.sugeridoUnidad ?? (s.factorPack > 1 ? "BULTO" : "UNIDAD");
+            const faltanteUnidades = s.faltanteUnidades ?? s.faltanUnidades ?? 0;
+            const factorPack = s.factorPack ?? 1;
         
             return {
               ...s,
               unidadPlural: unidadPlural(s.unidadMedida || "unidad"),
-              factorPack: factor,
-              faltanUnidades,
-              sugerido: sugeridoBultos,
+              factorPack,
+              faltanteUnidades,
+              faltanUnidades: faltanteUnidades, // Mantener por compatibilidad
+              sugeridoCantidad,
+              sugeridoUnidad,
+              sugerido: sugeridoCantidad, // Mantener por compatibilidad
             };
           })
         );        
@@ -231,12 +232,17 @@ export default function NuevaTransferenciaPage() {
   // ===============================
   // 7. Editar sugerido
   // ===============================
-  const handleEditSugerido = (productoLocalDestinoId, valor) => {
-    const cantidadBultos = Number(valor || 0);
+  const handleEditSugerido = (productoLocalDestinoId, valor, unidad) => {
+    const cantidad = Number(valor || 0);
     setSugeridos((prev) =>
       prev.map((s) =>
         s.productoLocalDestinoId === productoLocalDestinoId
-          ? { ...s, sugerido: cantidadBultos }
+          ? { 
+              ...s, 
+              sugeridoCantidad: cantidad, // Cantidad editada
+              sugeridoUnidad: unidad || s.sugeridoUnidad || (s.factorPack > 1 ? "BULTO" : "UNIDAD"), // Mantener o actualizar unidad
+              sugerido: cantidad, // Alias para compatibilidad
+            }
           : s
       )
     );
@@ -251,19 +257,24 @@ export default function NuevaTransferenciaPage() {
     const s = sugeridos.find((x) => x.productoLocalOrigenId === productoLocalOrigenId);
     if (!s) return;
 
-    const cantidadBultos = Number(s.sugerido || 0);
-    if (cantidadBultos <= 0) return;
+    // Usar sugeridoCantidad y sugeridoUnidad del estado
+    const sugeridoCantidad = Number(s.sugeridoCantidad ?? s.sugerido ?? 0);
+    const sugeridoUnidad = s.sugeridoUnidad ?? (s.factorPack > 1 ? "BULTO" : "UNIDAD");
+    
+    if (sugeridoCantidad <= 0) return;
 
     const r = await fetch("/api/pos-transferencias/detalle/agregar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        posId,
-        productoLocalId: productoLocalOrigenId,
-        sugerido: cantidadBultos,
-        preparado: cantidadBultos,
-        tipo: "sugerido",
-      }),
+        body: JSON.stringify({
+          posId,
+          productoLocalId: productoLocalOrigenId,
+          sugerido: sugeridoCantidad,
+          preparado: sugeridoCantidad,
+          sugeridoUnidad, // Incluir unidad explícitamente
+          unidadPreparada: sugeridoUnidad, // Incluir unidad preparada
+          tipo: "sugerido",
+        }),
     });
 
     const j = await r.json();
@@ -302,19 +313,26 @@ export default function NuevaTransferenciaPage() {
   // ===============================
   // 10. Editar preparado
   // ===============================
-  const handleEditCantidad = async (detalleId, valor) => {
-    const cantidadBultos = Number(valor || 0);
+  const handleEditCantidad = async (detalleId, valor, unidad) => {
+    const cantidad = Number(valor || 0);
+    const unidadPreparada = unidad || "BULTO";
 
     setItems((prev) =>
       prev.map((i) =>
-        i.detalleId === detalleId ? { ...i, preparado: cantidadBultos } : i
+        i.detalleId === detalleId 
+          ? { ...i, preparado: cantidad, unidadPreparada } 
+          : i
       )
     );
 
     const r = await fetch("/api/pos-transferencias/detalle/editar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ detalleId, preparado: cantidadBultos }),
+      body: JSON.stringify({ 
+        detalleId, 
+        preparado: cantidad,
+        unidadPreparada 
+      }),
     });
 
     const j = await r.json();

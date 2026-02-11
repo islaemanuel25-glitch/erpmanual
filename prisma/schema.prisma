@@ -151,6 +151,9 @@ model ProductoBase {
   area_fisica_id    Int?
   unidad_medida     UnidadMedida
   factor_pack       Int?
+  modo_pedido       ModoPedido            @default(BULTO)
+  modo_envio        ModoEnvio?
+  modo_stock        ModoStock             @default(BULTO)
   peso_kg           Decimal?              @db.Decimal(10, 3)
   volumen_ml        Decimal?              @db.Decimal(10, 2)
   precio_costo      Decimal               @db.Decimal(12, 2)
@@ -294,6 +297,7 @@ model TransferenciaDetalle {
   cantidad          Decimal       @db.Decimal(12, 2)
   recibido          Decimal?      @db.Decimal(12, 2)
   precioCosto       Decimal?      @db.Decimal(12, 2)
+  unidadEnviada     ModoPedido?   // BULTO o UNIDAD según cómo se envió
 
   motivoDiferencia  String?
   motivoPrincipal   String?       // ← AGREGADO
@@ -330,6 +334,22 @@ enum UnidadMedida {
   kg
 }
 
+enum ModoPedido {
+  BULTO
+  UNIDAD
+}
+
+enum ModoEnvio {
+  SOLO_BULTO
+  MIXTO
+  SOLO_UNIDAD
+}
+
+enum ModoStock {
+  BULTO
+  UNIDAD
+}
+
 model PosTransferencia {
   id          Int                     @id @default(autoincrement())
   origenId    Int
@@ -360,6 +380,8 @@ model PosTransferenciaDetalle {
   sugerido           Decimal?        @db.Decimal(12, 2)
   preparado          Decimal?        @db.Decimal(12, 2)
   tipo               String          @default("sugerido")
+  unidadSugerida     ModoPedido      @default(BULTO)
+  unidadPreparada    ModoPedido?     // BULTO o UNIDAD según cómo se preparó
 
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt

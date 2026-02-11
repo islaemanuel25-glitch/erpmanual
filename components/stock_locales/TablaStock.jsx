@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fromUnidades } from "@/lib/conversiones/stock";
 
 const PAGE_SIZE = 25;
 
@@ -91,7 +92,8 @@ export default function TablaStock({
     return () => (cancelado = true);
   }, [localSeleccionado, JSON.stringify(filtro), page, refrescar]);
 
-  const getUnidad = (p) => {
+  // Unidad para DEPÓSITO: muestra unidad_medida + factor_pack
+  const getUnidadDeposito = (p) => {
     const u = p.unidadMedida;
     const f = Number(p.factorPack || 1);
 
@@ -105,6 +107,27 @@ export default function TablaStock({
     if (u === "lt") return "Litro";
 
     return u.charAt(0).toUpperCase() + u.slice(1);
+  };
+
+  // Unidad para LOCAL: siempre "Unidad" (o "Kg" si unidad_medida = kg)
+  const getUnidadLocal = (p) => {
+    const u = p.unidadMedida;
+    if (u === "kg") return "Kg";
+    return "Unidad";
+  };
+
+  // Presentación del depósito para mostrar en local (texto chico)
+  const getPresentacionDeposito = (p) => {
+    const u = p.unidadMedida;
+    const f = Number(p.factorPack || 1);
+
+    if (f <= 1) return null;
+
+    if (u === "pack") return `Pack x${f}`;
+    if (u === "cajon") return `Cajón x${f}`;
+    if (u === "unidad") return `Pack x${f}`;
+
+    return null;
   };
 
   if (!localSeleccionado) {
@@ -155,13 +178,47 @@ export default function TablaStock({
               </tr>
             )}
 
-            {items.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-800/40">
-                <td className="px-2 py-1">{p.nombre}</td>
-                <td className="px-2 py-1">{p.codigoBarra || "-"}</td>
-                <td className="px-2 py-1">{getUnidad(p)}</td>
+            {items.map((p) => {
+              const presentacionDep = getPresentacionDeposito(p);
+              return (
+                <tr key={p.id} className="hover:bg-slate-800/40">
+                  <td className="px-2 py-1">{p.nombre}</td>
+                  <td className="px-2 py-1">{p.codigoBarra || "-"}</td>
+                  <td className="px-2 py-1">
+                    {localEsDeposito ? (
+                      getUnidadDeposito(p)
+                    ) : (
+                      <div className="flex flex-col">
+                        <span>{getUnidadLocal(p)}</span>
+                        {presentacionDep && (
+                          <span className="text-[10px] text-slate-500">
+                            Presentación dep: {presentacionDep}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
 
-                <td className="px-2 py-1 text-right">{p.stock}</td>
+                <td className="px-2 py-1 text-right">
+                  {localEsDeposito && p.modoStock === "BULTO" && p.factorPack > 1 ? (
+                    (() => {
+                      const { bultos, sueltas } = fromUnidades({
+                        unidades: Number(p.stock || 0),
+                        factorPack: p.factorPack,
+                      });
+                      return (
+                        <span>
+                          {bultos > 0 && <strong>{bultos} bultos</strong>}
+                          {bultos > 0 && sueltas > 0 && " + "}
+                          {sueltas > 0 && `${sueltas} uds`}
+                          {bultos === 0 && sueltas === 0 && "0"}
+                        </span>
+                      );
+                    })()
+                  ) : (
+                    <span>{p.stock} uds</span>
+                  )}
+                </td>
                 <td className="px-2 py-1 text-right">{p.stockMin}</td>
                 <td className="px-2 py-1 text-right">{p.stockMax}</td>
 
@@ -199,7 +256,8 @@ export default function TablaStock({
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

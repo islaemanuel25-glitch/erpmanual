@@ -1,5 +1,7 @@
+// app/api/locales/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { inheritDepositoProductsToLocal } from "@/lib/grupos";
 
 // ========================================================
 // GET /api/locales  → listar todos
@@ -56,7 +58,7 @@ export async function POST(req) {
       provincia = null,
       codigoPostal = null,
       activo = true,
-      es_deposito = false,
+      es_deposito = false, // (se ignora: se deriva de tipo)
       grupoId = null,
     } = body;
 
@@ -67,52 +69,63 @@ export async function POST(req) {
       );
     }
 
-    // ✅ 1) Crear el local
-    const nuevoLocal = await prisma.local.create({
-      data: {
-        nombre: nombre.trim(),
-        tipo: tipo === "deposito" ? "deposito" : "local",
-        direccion,
-        telefono,
-        email,
-        cuil,
-        ciudad,
-        provincia,
-        codigoPostal,
-        activo,
-        es_deposito: tipo === "deposito",
-      },
+    // ✅ Crear local + asignación a grupo + herencia dentro de una transacción
+    const resultado = await prisma.$transaction(async (tx) => {
+      // 1) Crear local
+      const nuevoLocal = await tx.local.create({
+        data: {
+          nombre: nombre.trim(),
+          tipo: tipo === "deposito" ? "deposito" : "local",
+          direccion,
+          telefono,
+          email,
+          cuil,
+          ciudad,
+          provincia,
+          codigoPostal,
+          activo,
+          es_deposito: tipo === "deposito",
+        },
+      });
+
+      let finalGroupId = grupoId ? Number(grupoId) : null;
+
+      // 2) Si NO viene grupoId → crear grupo automático
+      if (!finalGroupId) {
+        const autoGroup = await tx.grupo.create({
+          data: { nombre: `Grupo ${nuevoLocal.nombre}` },
+        });
+        finalGroupId = autoGroup.id;
+      }
+
+      // 3) Asignar el local al grupo correspondiente
+      if (nuevoLocal.es_deposito) {
+        await tx.grupoDeposito.create({
+          data: {
+            grupoId: finalGroupId,
+            localId: nuevoLocal.id,
+          },
+        });
+      } else {
+        await tx.grupoLocal.create({
+          data: {
+            grupoId: finalGroupId,
+            localId: nuevoLocal.id,
+          },
+        });
+
+        // 4) Heredar productos del depósito (NO crítico: no hace rollback si falla)
+        try {
+          await inheritDepositoProductsToLocal(tx, finalGroupId, nuevoLocal.id);
+        } catch (e) {
+          console.warn(`⚠️ No se pudieron heredar productos: ${e.message}`);
+        }
+      }
+
+      return { nuevoLocal, finalGroupId };
     });
 
-    let finalGroupId = grupoId ? Number(grupoId) : null;
-
-    // ✅ 2) Si NO viene grupoId → crear grupo automático
-    if (!finalGroupId) {
-      const autoGroup = await prisma.grupo.create({
-        data: {
-          nombre: `Grupo ${nuevoLocal.nombre}`,
-        },
-      });
-
-      finalGroupId = autoGroup.id;
-    }
-
-    // ✅ 3) Asignar el local al grupo correspondiente
-    if (nuevoLocal.es_deposito) {
-      await prisma.grupoDeposito.create({
-        data: {
-          grupoId: finalGroupId,
-          localId: nuevoLocal.id,
-        },
-      });
-    } else {
-      await prisma.grupoLocal.create({
-        data: {
-          grupoId: finalGroupId,
-          localId: nuevoLocal.id,
-        },
-      });
-    }
+    const { nuevoLocal, finalGroupId } = resultado;
 
     return NextResponse.json({
       ok: true,

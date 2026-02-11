@@ -16,6 +16,18 @@ export async function POST(req) {
     const sugerido = Number(body.sugerido || 0);
     const preparado = Number(body.preparado || 0);
     const tipo = body.tipo === "manual" ? "manual" : "sugerido";
+    
+    // Leer unidades del body
+    let unidadSugerida = body.sugeridoUnidad;
+    let unidadPreparada = body.unidadPreparada || body.sugeridoUnidad;
+    
+    if (!unidadSugerida || (unidadSugerida !== "BULTO" && unidadSugerida !== "UNIDAD")) {
+      unidadSugerida = null; // Se calculará después de obtener el producto
+    }
+    
+    if (!unidadPreparada || (unidadPreparada !== "BULTO" && unidadPreparada !== "UNIDAD")) {
+      unidadPreparada = null; // Se calculará después de obtener el producto
+    }
 
     if (!posId || !productoLocalDestinoId) {
       return NextResponse.json({ ok: false, error: "posId y productoLocalId requeridos" }, { status: 400 });
@@ -54,6 +66,17 @@ export async function POST(req) {
     if (!productoOrigen)
       return NextResponse.json({ ok: false, error: "El depósito no tiene este producto" }, { status: 400 });
 
+    // Inferir unidades si no vinieron en el body
+    const factorPack = Number(productoOrigen.base.factor_pack || 1);
+    
+    if (!unidadSugerida || (unidadSugerida !== "BULTO" && unidadSugerida !== "UNIDAD")) {
+      unidadSugerida = factorPack > 1 ? "BULTO" : "UNIDAD";
+    }
+    
+    if (!unidadPreparada || (unidadPreparada !== "BULTO" && unidadPreparada !== "UNIDAD")) {
+      unidadPreparada = unidadSugerida; // Usar misma unidad que sugerido
+    }
+
     // Verificar que no exista
     const existente = await prisma.posTransferenciaDetalle.findFirst({
       where: {
@@ -72,7 +95,9 @@ export async function POST(req) {
         productoId: productoOrigen.id,
         sugerido,
         preparado,
-        tipo
+        tipo,
+        unidadSugerida,
+        unidadPreparada
       }
     });
 
@@ -85,6 +110,8 @@ export async function POST(req) {
         tipo,
         sugerido,
         preparado,
+        unidadSugerida: detalle.unidadSugerida,
+        unidadPreparada: detalle.unidadPreparada,
 
         productoNombre: productoDestino.nombre || productoDestino.base.nombre,
         codigoBarra: productoDestino.base.codigo_barra,

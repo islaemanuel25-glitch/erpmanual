@@ -56,17 +56,33 @@ export default function ModalProducto({
     activo: Boolean(o.activo ?? true),
     imagen_url: o.imagen_url ?? o.imagenUrl ?? "",
     es_combo: Boolean(o.es_combo ?? o.esCombo ?? false),
+    modo_pedido: o.modo_pedido ?? o.modoPedido ?? null,
+    modo_envio: o.modo_envio ?? o.modoEnvio ?? null,
+    modo_stock: o.modo_stock ?? o.modoStock ?? null,
   });
 
-  const [form, setForm] = useState(
-    camelToForm(initialData || { unidad_medida: "unidad", redondeo_100: true })
-  );
+  // Calcular modo_pedido default según unidad_medida y factor_pack
+  const calcularModoPedidoDefault = (data) => {
+    if (!data) return "BULTO";
+    const unidad = data.unidad_medida ?? data.unidadMedida ?? "unidad";
+    const factor = data.factor_pack ?? data.factorPack ?? null;
+    if (unidad === "unidad" || !factor || factor <= 1) {
+      return "UNIDAD";
+    }
+    return data.modo_pedido ?? data.modoPedido ?? "BULTO";
+  };
+
+  const [form, setForm] = useState(() => {
+    const initial = initialData || { unidad_medida: "unidad", redondeo_100: true };
+    const modoPedido = calcularModoPedidoDefault(initial);
+    return camelToForm({ ...initial, modo_pedido: modoPedido });
+  });
 
   useEffect(() => {
     if (!open) return;
-    setForm(
-      camelToForm(initialData || { unidad_medida: "unidad", redondeo_100: true })
-    );
+    const initial = initialData || { unidad_medida: "unidad", redondeo_100: true };
+    const modoPedido = calcularModoPedidoDefault(initial);
+    setForm(camelToForm({ ...initial, modo_pedido: modoPedido }));
     setTimeout(() => modalRef.current?.scrollTo(0, 0), 30);
   }, [open, initialData]);
 
@@ -170,6 +186,9 @@ export default function ModalProducto({
       activo: Boolean(p.activo),
       imagen_url: p.imagen_url || null,
       es_combo: Boolean(p.es_combo),
+      modo_pedido: p.modo_pedido || "BULTO",
+      modo_envio: p.modo_envio || (p.unidad_medida === "cajon" ? "SOLO_BULTO" : "MIXTO"),
+      modo_stock: p.modo_stock || "BULTO",
     };
 
     onSubmit(payload);
@@ -268,7 +287,15 @@ export default function ModalProducto({
             <Field label="Unidad *">
               <SunmiSelectAdv
                 value={form.unidad_medida}
-                onChange={(v) => setField("unidad_medida", v)}
+                onChange={(v) => {
+                  setField("unidad_medida", v);
+                  // Si cambia a unidad o factor <= 1, forzar UNIDAD
+                  if (v === "unidad" || !form.factor_pack || form.factor_pack <= 1) {
+                    setField("modo_pedido", "UNIDAD");
+                  } else if (!form.modo_pedido || form.modo_pedido === "") {
+                    setField("modo_pedido", "BULTO");
+                  }
+                }}
               >
                 <SunmiSelectOption value="unidad">Unidad</SunmiSelectOption>
                 <SunmiSelectOption value="pack">Pack</SunmiSelectOption>
@@ -281,7 +308,16 @@ export default function ModalProducto({
               <SunmiInput
                 type="number"
                 value={form.factor_pack}
-                onChange={(e) => setNumber("factor_pack", e.target.value)}
+                onChange={(e) => {
+                  setNumber("factor_pack", e.target.value);
+                  // Si factor <= 1, forzar UNIDAD
+                  const factor = Number(e.target.value);
+                  if (!factor || factor <= 1) {
+                    setField("modo_pedido", "UNIDAD");
+                  } else if (!form.modo_pedido || form.modo_pedido === "") {
+                    setField("modo_pedido", "BULTO");
+                  }
+                }}
               />
             </Field>
 
@@ -395,6 +431,32 @@ export default function ModalProducto({
                 onChange={(v) => setField("activo", v)}
               />
             </div>
+          </div>
+
+          {/* REPOSICIÓN AUTOMÁTICA */}
+          <SunmiSeparator label="Reposición automática" color="amber" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Modo de pedido">
+              <SunmiSelectAdv
+                value={form.modo_pedido || "BULTO"}
+                onChange={(v) => setField("modo_pedido", v)}
+                disabled={
+                  form.unidad_medida === "unidad" ||
+                  !form.factor_pack ||
+                  form.factor_pack <= 1
+                }
+              >
+                <SunmiSelectOption value="BULTO">Por bulto</SunmiSelectOption>
+                <SunmiSelectOption value="UNIDAD">Por unidad</SunmiSelectOption>
+              </SunmiSelectAdv>
+              {(form.unidad_medida === "unidad" ||
+                !form.factor_pack ||
+                form.factor_pack <= 1) && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Solo disponible para pack/cajón con factor &gt; 1
+                </p>
+              )}
+            </Field>
           </div>
         </div>
 

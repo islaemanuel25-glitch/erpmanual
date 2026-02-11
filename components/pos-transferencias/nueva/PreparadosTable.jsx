@@ -176,28 +176,53 @@ export default function PreparadosTable({
                   {p.cantidadReal}
                 </td>
 
-                {/* INPUT PREPARADO (BULTOS) */}
+                {/* INPUT PREPARADO CON SELECTOR DE UNIDAD */}
                 <td className="px-2 py-2 text-right">
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    className="
-                      w-[80px]
-                      bg-slate-900
-                      border border-slate-700 
-                      rounded-lg px-2 py-1 
-                      text-right text-[12px]
-                      text-cyan-300
-                      focus:border-cyan-400 
-                      focus:ring-1 focus:ring-cyan-400
-                      transition
-                    "
-                    value={p.preparado}
-                    onChange={(e) =>
-                      onEditPreparado(p.detalleId, Number(e.target.value))
-                    }
-                  />
+                  <div className="flex items-center justify-end gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      className="
+                        w-[80px]
+                        bg-slate-900
+                        border border-slate-700 
+                        rounded-lg px-2 py-1 
+                        text-right text-[12px]
+                        text-cyan-300
+                        focus:border-cyan-400 
+                        focus:ring-1 focus:ring-cyan-400
+                        transition
+                      "
+                      value={p.preparado}
+                      onChange={(e) =>
+                        onEditPreparado(p.detalleId, Number(e.target.value), p.unidadPreparada || p.unidadSugerida || "BULTO")
+                      }
+                    />
+                    {(p.modoEnvio === "MIXTO" && p.factorPack > 1) ? (
+                      <select
+                        className="
+                          bg-slate-900
+                          border border-slate-700 
+                          rounded-lg px-1 py-1 
+                          text-[10px] text-slate-300
+                          focus:border-cyan-400 
+                          focus:ring-1 focus:ring-cyan-400
+                        "
+                        value={p.unidadPreparada || p.unidadSugerida || "BULTO"}
+                        onChange={(e) =>
+                          onEditPreparado(p.detalleId, p.preparado, e.target.value)
+                        }
+                      >
+                        <option value="BULTO">bultos</option>
+                        <option value="UNIDAD">uds</option>
+                      </select>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">
+                        {(p.unidadPreparada || p.unidadSugerida || "BULTO") === "BULTO" ? "bultos" : "uds"}
+                      </span>
+                    )}
+                  </div>
                 </td>
 
                 {/* BTN QUITAR */}

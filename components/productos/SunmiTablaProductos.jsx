@@ -50,6 +50,7 @@ export default function SunmiTablaProductos({
           <img
             src={row.imagenUrl}
             className="w-12 h-12 rounded-md object-cover border border-slate-700"
+            alt=""
           />
         ) : (
           <div className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-md flex items-center justify-center text-xs text-slate-500">
@@ -154,11 +155,14 @@ export default function SunmiTablaProductos({
     })
     .filter(Boolean);
 
+  const headers = [...columnas.map((c) => c.titulo), "Acciones"];
+  const colSpan = headers.length;
+
   return (
     <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
-      <SunmiTable headers={[...columnas.map((c) => c.titulo), "Acciones"]}>
+      <SunmiTable headers={headers}>
         {rows.length === 0 ? (
-          <SunmiTableEmpty label="No hay productos disponibles" />
+          <SunmiTableEmpty message="No hay productos disponibles" colSpan={colSpan} />
         ) : (
           rows.map((row) => (
             <SunmiTableRow key={row.id}>
@@ -171,17 +175,12 @@ export default function SunmiTablaProductos({
                 </td>
               ))}
 
-              {/* ⭐ ACCIONES COMPACTAS */}
               <td className="px-3 py-1.5 text-right flex gap-1 justify-end">
-
-                {/* EDITAR */}
                 <button
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (onEditar && row.id) {
-                      onEditar(row.id);
-                    }
+                    if (onEditar && row.id) onEditar(row.id);
                   }}
                   className="
                     w-[26px] h-[26px]
@@ -192,11 +191,12 @@ export default function SunmiTablaProductos({
                     transition
                     cursor-pointer
                   "
+                  type="button"
+                  aria-label="Editar"
                 >
                   <Pencil size={14} />
                 </button>
 
-                {/* ELIMINAR */}
                 <button
                   onClick={() => onEliminar(row.id)}
                   className="
@@ -207,17 +207,17 @@ export default function SunmiTablaProductos({
                     hover:bg-red-400
                     transition
                   "
+                  type="button"
+                  aria-label="Eliminar"
                 >
                   <Trash2 size={14} />
                 </button>
-
               </td>
             </SunmiTableRow>
           ))
         )}
       </SunmiTable>
 
-      {/* PAGINACIÓN */}
       <div className="flex items-center justify-between px-3 py-2 bg-slate-900">
         <SunmiButton color="slate" disabled={page <= 1} onClick={onPrev}>
           « Anterior
