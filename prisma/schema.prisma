@@ -393,3 +393,48 @@ model PosTransferenciaDetalle {
   @@index([productoId])
   @@index([tipo])
 }
+
+enum PrecioUpdateMetodo {
+  MANUAL
+  AUMENTO
+  XLSX
+  SCAN
+}
+
+enum PrecioUpdatePricingMode {
+  KEEP_VENTA
+  RECALC_BY_MARGIN
+  SET_VENTA
+}
+
+model PrecioUpdate {
+  id          Int                     @id @default(autoincrement())
+  grupoId     Int
+  proveedorId Int?
+  usuarioId   Int?
+  metodo      PrecioUpdateMetodo
+  pricingMode PrecioUpdatePricingMode
+  createdAt   DateTime                @default(now())
+
+  items PrecioUpdateItem[]
+
+  @@index([grupoId])
+  @@index([proveedorId])
+}
+
+model PrecioUpdateItem {
+  id             Int      @id @default(autoincrement())
+  precioUpdateId Int
+  productoBaseId Int
+
+  costoAnterior Decimal  @db.Decimal(12,2)
+  costoNuevo    Decimal  @db.Decimal(12,2)
+  ventaAnterior Decimal  @db.Decimal(12,2)
+  ventaNueva    Decimal  @db.Decimal(12,2)
+
+  createdAt DateTime @default(now())
+
+  update PrecioUpdate @relation(fields: [precioUpdateId], references: [id], onDelete: Cascade)
+
+  @@index([productoBaseId])
+}
