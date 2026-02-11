@@ -397,6 +397,8 @@ model PosTransferenciaDetalle {
 enum PrecioUpdateMetodo {
   MANUAL
   AUMENTO
+  REGLAS
+  PEGADO
   XLSX
   SCAN
 }
