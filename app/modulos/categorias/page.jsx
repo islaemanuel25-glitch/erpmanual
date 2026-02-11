@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -18,7 +17,6 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import ModalCategoria from "@/components/categorias/ModalCategoria";
 
 export default function CategoriasPage() {
-
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -42,7 +40,7 @@ export default function CategoriasPage() {
   // MODAL
   // ============================================
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState("nuevo"); 
+  const [modalMode, setModalMode] = useState("nuevo");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
 
   // ============================================
@@ -53,23 +51,39 @@ export default function CategoriasPage() {
       setLoading(true);
 
       const params = new URLSearchParams();
-      params.set("page", page);
-      params.set("pageSize", pageSize);
+      params.set("page", String(page));
+      params.set("pageSize", String(pageSize));
       params.set("estado", estado);
       if (search.trim()) params.set("search", search.trim());
 
       router.replace(`/modulos/categorias?${params.toString()}`);
 
       const res = await fetch(`/api/categorias/listar?${params.toString()}`);
-      const data = await res.json();
 
-      if (data.ok) {
-        setItems(data.items || []);
-        setTotalPages(data.totalPages || 1);
+      // ✅ Sesión vencida / no autenticado
+      if (res.status === 401) {
+        setItems([]);
+        setTotalPages(1);
+        router.replace("/login");
+        return;
       }
 
+      const data = await res.json();
+
+      if (!data?.ok) {
+        setItems([]);
+        setTotalPages(1);
+        alert(data?.error || "Error al cargar categorías");
+        return;
+      }
+
+      setItems(data.items || []);
+      setTotalPages(data.totalPages || 1);
     } catch (e) {
       console.error("Error cargando categorías:", e);
+      setItems([]);
+      setTotalPages(1);
+      alert("Error al cargar categorías");
     } finally {
       setLoading(false);
     }
@@ -134,12 +148,16 @@ export default function CategoriasPage() {
         body: JSON.stringify({ id }),
       });
 
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
       const data = await res.json();
 
-      if (!data.ok) return alert(data.error || "Error al eliminar");
+      if (!data?.ok) return alert(data?.error || "Error al eliminar");
 
       cargar();
-
     } catch (e) {
       console.error("Error eliminando:", e);
       alert("Error al eliminar categoría");
@@ -152,10 +170,8 @@ export default function CategoriasPage() {
   return (
     <div className="p-3 space-y-4">
       <SunmiCard>
-
         {/* ========= FILTROS ========= */}
         <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-
           <SunmiInput
             placeholder="Buscar por nombre..."
             value={search}
@@ -173,11 +189,7 @@ export default function CategoriasPage() {
           />
 
           <div className="flex gap-2">
-            <SunmiButton
-              variant="secondary"
-              className="w-full"
-              onClick={limpiar}
-            >
+            <SunmiButton variant="secondary" className="w-full" onClick={limpiar}>
               Limpiar
             </SunmiButton>
 
@@ -204,12 +216,10 @@ export default function CategoriasPage() {
                   <td className="px-3 py-2">{item.nombre}</td>
 
                   <td className="px-3 py-2">
-                    <SunmiBadgeEstado estado={item.activo} />
+                    <SunmiBadgeEstado value={item.activo} />
                   </td>
 
                   <td className="px-3 py-2 flex gap-3">
-
-                    {/* EDITAR */}
                     <SunmiButton
                       variant="ghost"
                       className="text-amber-400 px-2"
@@ -218,7 +228,6 @@ export default function CategoriasPage() {
                       Editar
                     </SunmiButton>
 
-                    {/* ELIMINAR */}
                     <SunmiButton
                       variant="danger"
                       className="px-2"
@@ -226,7 +235,6 @@ export default function CategoriasPage() {
                     >
                       Eliminar
                     </SunmiButton>
-
                   </td>
                 </SunmiTableRow>
               ))
@@ -250,10 +258,7 @@ export default function CategoriasPage() {
             Página {page} de {totalPages}
           </span>
 
-          <SunmiButton
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
+          <SunmiButton disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
             Siguiente →
           </SunmiButton>
         </div>

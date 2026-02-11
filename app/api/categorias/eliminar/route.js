@@ -1,15 +1,21 @@
 // app/api/categorias/eliminar/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getUsuarioSession } from "@/lib/auth";
 
 export async function POST(req) {
   try {
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const id = Number(body.id);
 
-    // ================================
-    // 🟠 Validar ID
-    // ================================
     if (!id) {
       return NextResponse.json(
         { ok: false, error: "ID inválido" },
@@ -17,9 +23,6 @@ export async function POST(req) {
       );
     }
 
-    // ================================
-    // 🔍 Verificar que exista
-    // ================================
     const categoria = await prisma.categoria.findUnique({
       where: { id },
       select: { id: true },
@@ -32,9 +35,6 @@ export async function POST(req) {
       );
     }
 
-    // ================================
-    // 🔍 Verificar uso en productos
-    // ================================
     const enUso = await prisma.productoBase.findFirst({
       where: { categoria_id: id },
       select: { id: true },
@@ -42,24 +42,14 @@ export async function POST(req) {
 
     if (enUso) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "La categoría tiene productos asociados y no se puede eliminar.",
-        },
+        { ok: false, error: "La categoría tiene productos asociados y no se puede eliminar." },
         { status: 400 }
       );
     }
 
-    // ================================
-    // 🗑 Eliminar
-    // ================================
-    await prisma.categoria.delete({
-      where: { id },
-    });
+    await prisma.categoria.delete({ where: { id } });
 
     return NextResponse.json({ ok: true });
-
   } catch (e) {
     console.error("ERROR /api/categorias/eliminar:", e);
     return NextResponse.json(

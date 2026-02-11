@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { mergeBaseLocalToUi, splitUiToDb } from "@/lib/mappers/producto";
+import { getUsuarioSession } from "@/lib/auth";
 
 // Sincronizar precioCosto/activo a overrides
 async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
@@ -21,6 +22,14 @@ async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
 
 export async function PUT(req, context) {
   try {
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
     const { id } = await context.params;
     const baseId = Number(id);
 

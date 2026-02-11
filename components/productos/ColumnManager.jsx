@@ -47,9 +47,10 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
       {open && (
         <div
           className="
-            absolute right-0 mt-2 w-72 z-[9999]
+            absolute right-0 mt-2 w-56 z-[9999]
             bg-slate-900 border border-slate-700
             rounded-xl p-3
+            shadow-xl
           "
         >
           {/* BUSCADOR */}

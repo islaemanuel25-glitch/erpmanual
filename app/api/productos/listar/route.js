@@ -3,11 +3,20 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
+import { getUsuarioSession } from "@/lib/auth";
 
 const PAGE_SIZE = 25;
 
 export async function GET(req) {
   try {
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, items: [], total: 0, totalPages: 1, error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
 
     // localId requerido

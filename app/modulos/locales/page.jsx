@@ -60,12 +60,30 @@ export default function LocalesPage() {
 
         const json = await res.json();
 
-        if (json.ok && json.data) {
-          setEditing(json.data);
+        console.log("🔍 API response:", json);
+
+        if (json.ok && json.item) {
+          // Mapear campos de snake_case a camelCase si es necesario
+          const local = json.item;
+          setEditing({
+            id: local.id,
+            nombre: local.nombre || "",
+            tipo: local.tipo || "",
+            direccion: local.direccion || "",
+            telefono: local.telefono || "",
+            email: local.email || "",
+            cuil: local.cuil || "",
+            ciudad: local.ciudad || "",
+            provincia: local.provincia || "",
+            codigoPostal: local.codigoPostal || local.codigo_postal || "",
+            activo: Boolean(local.activo),
+          });
         } else {
+          console.error("❌ Error cargando local:", json.error);
           setEditing(null);
         }
-      } catch {
+      } catch (err) {
+        console.error("❌ Error en fetch:", err);
         setEditing(null);
       }
     };

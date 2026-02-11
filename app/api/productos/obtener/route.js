@@ -2,9 +2,18 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { getUsuarioSession } from "@/lib/auth";
 
 export async function GET(req) {
   try {
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, item: null, error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
     const url = new URL(req.url);
 
     // ✅ ID

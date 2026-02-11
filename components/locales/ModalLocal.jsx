@@ -50,17 +50,25 @@ export default function ModalLocal({
       return;
     }
 
+    console.log("🔍 ModalLocal - initialData recibido:", initialData);
+    
     setForm({
       nombre: initialData.nombre || "",
       tipo: initialData.tipo || "",
-      direccion: initialData.direccion || "",
-      telefono: initialData.telefono || "",
-      email: initialData.email || "",
-      cuil: initialData.cuil || "",
-      ciudad: initialData.ciudad || "",
-      provincia: initialData.provincia || "",
-      codigoPostal: initialData.codigoPostal || "",
-      activo: Boolean(initialData.activo),
+      direccion: initialData.direccion || null || "",
+      telefono: initialData.telefono || null || "",
+      email: initialData.email || null || "",
+      cuil: initialData.cuil || null || "",
+      ciudad: initialData.ciudad || null || "",
+      provincia: initialData.provincia || null || "",
+      codigoPostal: initialData.codigoPostal || initialData.codigo_postal || "",
+      activo: Boolean(initialData.activo ?? true),
+    });
+    
+    console.log("🔍 ModalLocal - form seteado:", {
+      nombre: initialData.nombre || "",
+      tipo: initialData.tipo || "",
+      activo: Boolean(initialData.activo ?? true),
     });
   }, [open, initialData]);
 

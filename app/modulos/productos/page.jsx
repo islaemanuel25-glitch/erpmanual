@@ -89,16 +89,21 @@ export default function ProductosPage() {
 
   const fetchCatalogos = async () => {
     try {
+      const [catRes, provRes, areaRes] = await Promise.all([
+        fetch("/api/catalogos/categorias", { credentials: "include" }),
+        fetch("/api/catalogos/proveedores", { credentials: "include" }),
+        fetch("/api/catalogos/areas-fisicas", { credentials: "include" }),
+      ]);
+
+      if (catRes.status === 401 || provRes.status === 401 || areaRes.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
       const [cat, prov, area] = await Promise.all([
-        fetch("/api/catalogos/categorias", { credentials: "include" }).then((r) =>
-          r.json()
-        ),
-        fetch("/api/catalogos/proveedores", {
-          credentials: "include",
-        }).then((r) => r.json()),
-        fetch("/api/catalogos/areas-fisicas", {
-          credentials: "include",
-        }).then((r) => r.json()),
+        catRes.json(),
+        provRes.json(),
+        areaRes.json(),
       ]);
 
       setCatalogos({
@@ -127,6 +132,11 @@ export default function ProductosPage() {
       const res = await fetch(`/api/productos/listar?${params.toString()}`, {
         credentials: "include",
       });
+
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
 
       const data = await res.json();
 
@@ -166,6 +176,12 @@ export default function ProductosPage() {
             `/api/productos/obtener?id=${idNum}&localId=${localId}`,
             { credentials: "include" }
           );
+
+          if (r.status === 401) {
+            router.replace("/login");
+            return;
+          }
+
           const data = await r.json();
 
           if (data.ok) {
@@ -208,6 +224,11 @@ export default function ProductosPage() {
         body: JSON.stringify(form),
       });
 
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
       const data = await res.json();
 
       if (!data.ok) {
@@ -231,6 +252,11 @@ export default function ProductosPage() {
         method: "DELETE",
       });
 
+      if (r.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
       const data = await r.json();
 
       if (data.ok) fetchProductos();
@@ -248,10 +274,15 @@ export default function ProductosPage() {
   };
 
   const abrirEditar = (id) => {
+    if (!id || id === 0 || id === "0" || Number.isNaN(Number(id))) {
+      alert("Error: ID de producto inválido");
+      return;
+    }
+    const idNum = Number(id);
     const params = new URLSearchParams(searchParams.toString());
-    params.set("editar", String(id));
+    params.set("editar", String(idNum));
     params.delete("nuevo");
-    router.push(`/modulos/productos?${params.toString()}`);
+    router.replace(`/modulos/productos?${params.toString()}`);
   };
 
   return (
@@ -281,15 +312,15 @@ export default function ProductosPage() {
 
           {/* ACCIONES */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full mt-1">
+            <SunmiButton color="amber" onClick={abrirNuevo}>
+              ＋ Nuevo producto
+            </SunmiButton>
+
             <ColumnManager
               allColumns={allColumns}
               visibleKeys={visibleCols}
               onChange={setVisibleCols}
             />
-
-            <SunmiButton color="amber" onClick={abrirNuevo}>
-              ＋ Nuevo producto
-            </SunmiButton>
           </div>
 
           {/* LISTADO */}

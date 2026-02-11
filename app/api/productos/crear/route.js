@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getGrupoIdDeLocal, getLocalesDeGrupo } from "@/lib/grupos";
+import { getUsuarioSession } from "@/lib/auth";
 
 export async function POST(req) {
   try {
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
     const url = new URL(req.url);
     const localId = Number(url.searchParams.get("localId") || 0);
     const body = await req.json();

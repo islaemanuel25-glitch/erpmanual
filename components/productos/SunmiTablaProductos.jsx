@@ -176,7 +176,13 @@ export default function SunmiTablaProductos({
 
                 {/* EDITAR */}
                 <button
-                  onClick={() => onEditar(row.id)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onEditar && row.id) {
+                      onEditar(row.id);
+                    }
+                  }}
                   className="
                     w-[26px] h-[26px]
                     flex items-center justify-center
@@ -184,6 +190,7 @@ export default function SunmiTablaProductos({
                     bg-amber-400 text-slate-900
                     hover:bg-amber-300
                     transition
+                    cursor-pointer
                   "
                 >
                   <Pencil size={14} />

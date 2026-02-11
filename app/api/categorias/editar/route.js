@@ -1,15 +1,37 @@
 // app/api/categorias/editar/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getUsuarioSession } from "@/lib/auth";
+
+// Helper para parsear booleanos robustamente
+function parseBoolean(value, defaultValue = null) {
+  if (value === undefined || value === null) return defaultValue;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (v === "true" || v === "1" || v === "si" || v === "yes") return true;
+    if (v === "false" || v === "0" || v === "no") return false;
+  }
+  return defaultValue;
+}
 
 export async function PUT(req) {
   try {
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     let { id, nombre, activo } = body;
+    
+    // Debug: log del valor recibido
+    console.log("🔍 EDITAR - activo recibido:", activo, "tipo:", typeof activo);
 
-    // ================================
-    // 🟠 Validación ID
-    // ================================
     id = Number(id);
     if (!id) {
       return NextResponse.json(
@@ -18,9 +40,6 @@ export async function PUT(req) {
       );
     }
 
-    // ================================
-    // 🟠 Validación nombre
-    // ================================
     if (!nombre || typeof nombre !== "string") {
       return NextResponse.json(
         { ok: false, error: "El nombre es requerido" },
@@ -36,12 +55,9 @@ export async function PUT(req) {
       );
     }
 
-    // ================================
-    // 🔍 Verificar existencia
-    // ================================
     const categoria = await prisma.categoria.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, activo: true },
     });
 
     if (!categoria) {
@@ -51,9 +67,6 @@ export async function PUT(req) {
       );
     }
 
-    // ================================
-    // 🔍 Duplicado ignorando la actual
-    // ================================
     const duplicado = await prisma.categoria.findFirst({
       where: {
         id: { not: id },
@@ -72,14 +85,18 @@ export async function PUT(req) {
       );
     }
 
-    // ================================
-    // 🟢 Actualizar
-    // ================================
+    // Parsear activo: si viene undefined/null, mantener el valor actual
+    const activoParsed = activo !== undefined && activo !== null 
+      ? parseBoolean(activo, categoria.activo)
+      : categoria.activo;
+    
+    console.log("🔍 EDITAR - activo actual:", categoria.activo, "activo parseado:", activoParsed);
+
     const actualizada = await prisma.categoria.update({
       where: { id },
       data: {
         nombre,
-        activo: Boolean(activo),
+        activo: activoParsed,
       },
     });
 
@@ -87,7 +104,6 @@ export async function PUT(req) {
       ok: true,
       item: actualizada,
     });
-
   } catch (e) {
     console.error("ERROR /api/categorias/editar:", e);
     return NextResponse.json(

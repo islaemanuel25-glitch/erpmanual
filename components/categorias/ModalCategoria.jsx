@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
@@ -11,11 +12,13 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 
 export default function ModalCategoria({
   open,
-  mode,              // "nuevo" | "editar"
+  mode, // "nuevo" | "editar"
   initialData = null,
   onClose,
   onSaved,
 }) {
+  const router = useRouter();
+
   // =========================
   // FORM STATE
   // =========================
@@ -56,9 +59,7 @@ export default function ModalCategoria({
 
       setLoading(true);
 
-      const url = editMode
-        ? "/api/categorias/editar"
-        : "/api/categorias/crear";
+      const url = editMode ? "/api/categorias/editar" : "/api/categorias/crear";
 
       const payload = editMode
         ? {
@@ -71,22 +72,31 @@ export default function ModalCategoria({
             activo: form.activo,
           };
 
+      // Debug: log del payload
+      console.log("🔍 MODAL - payload enviado:", payload, "activo tipo:", typeof payload.activo);
+
       const res = await fetch(url, {
         method: editMode ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
+      // ✅ Sesión vencida / no autenticado
+      if (res.status === 401) {
+        onClose?.();
+        router.replace("/login");
+        return;
+      }
+
       const data = await res.json();
 
-      if (!data.ok) {
-        alert(data.error || "Error");
+      if (!data?.ok) {
+        alert(data?.error || "Error");
         return;
       }
 
       onSaved?.();
       onClose?.();
-
     } catch (e) {
       console.error("Error guardando categoría:", e);
       alert("Error guardando categoría");
@@ -110,56 +120,39 @@ export default function ModalCategoria({
         p-4
       "
     >
-      {/* CARD SUNMI */}
       <SunmiCard className="w-full max-w-md p-0 overflow-hidden">
-
-        {/* ===== HEADER ===== */}
         <SunmiCardHeader
           titulo={editMode ? "Editar categoría" : "Nueva categoría"}
         />
 
         <div className="p-4 space-y-4">
-
-          {/* Nombre */}
           <div>
             <label className="text-sm text-slate-300">Nombre</label>
             <SunmiInput
               value={form.nombre}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, nombre: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
               placeholder="Ingresar nombre"
             />
           </div>
 
           <SunmiSeparator />
 
-          {/* Estado */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-slate-300">Activo</span>
             <SunmiToggleEstado
               value={form.activo}
-              onChange={(v) =>
-                setForm((f) => ({ ...f, activo: v }))
-              }
+              onChange={(v) => setForm((f) => ({ ...f, activo: v }))}
             />
           </div>
 
           <SunmiSeparator />
 
-          {/* Botones */}
           <div className="flex justify-end gap-3">
-            <SunmiButton
-              variant="secondary"
-              onClick={onClose}
-            >
+            <SunmiButton variant="secondary" onClick={onClose}>
               Cancelar
             </SunmiButton>
 
-            <SunmiButton
-              onClick={handleSubmit}
-              disabled={loading}
-            >
+            <SunmiButton onClick={handleSubmit} disabled={loading}>
               {loading ? "Guardando..." : "Guardar"}
             </SunmiButton>
           </div>
