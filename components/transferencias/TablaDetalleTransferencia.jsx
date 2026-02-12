@@ -18,7 +18,7 @@ export default function TablaDetalleTransferencia({
   if (!item) return null;
 
   return (
-    <div className="overflow-auto rounded-2xl border border-slate-700 mx-1 mb-2">
+    <div className="overflow-x-auto rounded-2xl border border-slate-800 mx-1 mb-2">
       <SunmiTable>
         <thead>
           <tr>

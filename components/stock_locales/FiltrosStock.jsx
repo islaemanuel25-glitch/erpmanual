@@ -77,7 +77,7 @@ export default function FiltrosStock({
         </div>
 
         {/* 🧩 Selectores */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <SunmiSelect
             value={categoria}
             onChange={(e) => setCategoria(e.target.value)}
@@ -101,7 +101,7 @@ export default function FiltrosStock({
         </div>
 
         {/* ✔ Checkboxes */}
-        <div className="grid grid-cols-3 gap-2 text-[12px] text-slate-300">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[12px] text-slate-300">
           <label className="flex items-center gap-1">
             <input
               type="checkbox"
