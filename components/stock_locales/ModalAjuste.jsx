@@ -102,7 +102,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                 {/* Bultos + Sueltas */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-slate-400 text-[11px] mb-1 block">
+                    <label className="text-[11px] text-slate-400 mb-1 block">
                       Bultos
                     </label>
                     <SunmiInput
@@ -114,7 +114,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                     />
                   </div>
                   <div>
-                    <label className="text-slate-400 text-[11px] mb-1 block">
+                    <label className="text-[11px] text-slate-400 mb-1 block">
                       Sueltas
                     </label>
                     <SunmiInput
@@ -140,7 +140,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
               <>
                 {/* Solo unidades */}
                 <div>
-                  <label className="text-slate-400 text-[11px] mb-1 block">
+                  <label className="text-[11px] text-slate-400 mb-1 block">
                     Cantidad (unidades)
                   </label>
                   <SunmiInput

@@ -103,7 +103,7 @@ export default function StockLocalesPage() {
         <div className="sunmi-header-cyan">Stock de Locales</div>
 
         <div className="mt-3 flex flex-col gap-2">
-          <span className="text-[13px] text-slate-400">Local seleccionado</span>
+          <label className="text-[11px] text-slate-400 mb-1 block">Local seleccionado</label>
 
           <SunmiSelect
             value={localSeleccionado ?? ""}
