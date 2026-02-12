@@ -12,7 +12,7 @@ export default function SunmiButton({ color = "cyan", children, ...props }) {
     amber: `${base} bg-amber-400 text-slate-900 hover:bg-amber-300`,
     red:   `${base} bg-red-500 text-white hover:bg-red-400`,
     cyan:  `${base} bg-cyan-500 text-slate-900 hover:bg-cyan-400`,
-    slate: `${base} bg-slate-600 text-slate-100 hover:bg-slate-500`,
+    slate: `${base} bg-slate-600 hover:bg-slate-500 active:bg-slate-700 text-white`,
   };
 
   return (
