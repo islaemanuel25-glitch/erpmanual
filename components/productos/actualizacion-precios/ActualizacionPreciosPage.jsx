@@ -11,6 +11,7 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiRow from "@/components/sunmi/SunmiRow";
 import SelectorGrupoActivo from "@/components/grupo/SelectorGrupoActivo";
+import * as XLSX from 'xlsx';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -286,7 +287,7 @@ export default function ActualizacionPreciosPage() {
     setSuccessMsg("");
     setLoadingExcel(true);
     try {
-      const XLSX = (await import("xlsx")).default;
+
 
       const data = await fetchProductos(excelProveedorId);
       if (!data) {
@@ -341,7 +342,7 @@ export default function ActualizacionPreciosPage() {
     setSuccessMsg("");
     setLoadingExcel(true);
     try {
-      const XLSX = (await import("xlsx")).default;
+
 
       // Parsear archivo
       const buffer = await file.arrayBuffer();
