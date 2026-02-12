@@ -16,6 +16,8 @@ export default function LayoutBase({ children }) {
       ? "Roles"
       : pathname.includes("locales")
       ? "Locales"
+      : pathname.includes("proveedores")
+      ? "Proveedores"
       : pathname.includes("productos")
       ? "Productos"
       : pathname.includes("stock")

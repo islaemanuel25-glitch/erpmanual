@@ -26,7 +26,9 @@ function parsePastedRows(text) {
     .filter(Boolean);
 
   return lines.map((line) => {
-    const [codigo, nombre, costo, venta] = line.split(/[|;\t]/).map((t) => t?.trim() || "");
+    const [codigo, nombre, costo, venta] = line
+      .split(/[|;\t]/)
+      .map((t) => t?.trim() || "");
     return {
       codigo_barra: codigo || null,
       nombre: nombre || null,
@@ -72,13 +74,25 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
+    const grupoId = Number(session.grupoId);
+    if (!grupoId || grupoId <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "Seleccioná un grupo activo para trabajar." },
+        { status: 400 }
+      );
+    }
+
     const body = await req.json();
     const proveedorId = toNumber(body?.proveedorId);
     const pricingMode = body?.pricingMode;
     const metodo = body?.metodo || "AUMENTO";
 
-    if (!proveedorId) {
-      return NextResponse.json({ ok: false, error: "proveedorId requerido" }, { status: 400 });
+    // Validación dura (evita proveedorId 0 / null)
+    if (proveedorId == null || proveedorId <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "Seleccioná un proveedor válido." },
+        { status: 400 }
+      );
     }
 
     if (!["KEEP_VENTA", "RECALC_BY_MARGIN", "SET_VENTA"].includes(pricingMode)) {
@@ -91,7 +105,7 @@ export async function POST(req) {
 
     const productos = await prisma.productoBase.findMany({
       where: {
-        grupoId: Number(session.grupoId),
+        grupoId,
         proveedor_id: proveedorId,
       },
       select: {
@@ -107,7 +121,52 @@ export async function POST(req) {
       orderBy: { id: "asc" },
     });
 
-    const manualMap = new Map((Array.isArray(body?.manualEdits) ? body.manualEdits : []).map((it) => [Number(it.productoBaseId), it]));
+    // ✅ UX: mensaje útil si no hay productos (normalmente es data)
+    if (!productos.length) {
+      const proveedor = await prisma.proveedor.findFirst({
+        where: { id: proveedorId },
+        select: { id: true, nombre: true },
+      });
+
+      // Chequeos rápidos de diagnóstico (sin romper performance: son 2 count)
+      const totalProveedorEnDB = await prisma.productoBase.count({
+        where: { proveedor_id: proveedorId },
+      });
+
+      const totalGrupoEnDB = await prisma.productoBase.count({
+        where: { grupoId },
+      });
+
+      const proveedorLabel = proveedor?.nombre ? `${proveedor.nombre} (#${proveedorId})` : `#${proveedorId}`;
+
+      let hint = `No se encontraron productos para el proveedor ${proveedorLabel} en este grupo.`;
+
+      // Si hay productos con ese proveedor en DB, pero no en tu grupo => problema grupoId
+      if (totalProveedorEnDB > 0) {
+        hint += ` Hay ${totalProveedorEnDB} productos en la DB con proveedor_id=${proveedorId}, pero ninguno coincide con tu grupoId=${grupoId}.`;
+      } else {
+        // Si no hay ninguno en DB con ese proveedor => proveedor_id no asignado a productos
+        hint += ` No hay productos en la DB con proveedor_id=${proveedorId}. Probablemente falta asignar proveedor a los productos.`;
+      }
+
+      // Contexto extra: si tu grupo tiene productos en general
+      hint += ` (Productos en tu grupoId=${grupoId}: ${totalGrupoEnDB}).`;
+
+      return NextResponse.json({
+        ok: true,
+        items: [],
+        summary: { total: 0, metodo, pricingMode },
+        alertas: { criticas: 0, advertencias: 0 },
+        hint, // <- esto lo podés mostrar en UI si querés
+      });
+    }
+
+    const manualMap = new Map(
+      (Array.isArray(body?.manualEdits) ? body.manualEdits : []).map((it) => [
+        Number(it.productoBaseId),
+        it,
+      ])
+    );
     const rules = Array.isArray(body?.rules) ? body.rules : [];
     const pastedRows = metodo === "PEGADO" ? parsePastedRows(body?.pastedText) : [];
 
@@ -145,7 +204,9 @@ export async function POST(req) {
         const match = byBarcode || byName;
         if (match) {
           if (match.costoNuevo !== null) costoNuevo = Number(match.costoNuevo);
-          if (pricingMode === "SET_VENTA" && match.ventaNueva !== null) ventaNueva = Number(match.ventaNueva);
+          if (pricingMode === "SET_VENTA" && match.ventaNueva !== null) {
+            ventaNueva = Number(match.ventaNueva);
+          }
         }
       }
 

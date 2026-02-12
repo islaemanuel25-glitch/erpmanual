@@ -9,8 +9,16 @@ export async function GET(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
+    const grupoId = Number(session.grupoId);
+    if (!grupoId || grupoId <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "Seleccioná un grupo activo para trabajar." },
+        { status: 400 }
+      );
+    }
+
     const updates = await prisma.precioUpdate.findMany({
-      where: { grupoId: Number(session.grupoId) },
+      where: { grupoId },
       orderBy: { createdAt: "desc" },
       take: 100,
       include: {

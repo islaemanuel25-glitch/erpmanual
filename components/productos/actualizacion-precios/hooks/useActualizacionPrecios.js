@@ -27,13 +27,15 @@ export default function useActualizacionPrecios(router) {
 
   const selectedItems = useMemo(() => {
     const set = new Set(selectedIds);
-    return preview.filter((it) => set.has(String(it.productoBaseId))).map((it) => ({
-      productoBaseId: it.productoBaseId,
-      costoAnterior: it.costoAnterior,
-      costoNuevo: it.costoNuevo,
-      ventaAnterior: it.ventaAnterior,
-      ventaNueva: it.ventaNueva,
-    }));
+    return preview
+      .filter((it) => set.has(String(it.productoBaseId)))
+      .map((it) => ({
+        productoBaseId: it.productoBaseId,
+        costoAnterior: it.costoAnterior,
+        costoNuevo: it.costoNuevo,
+        ventaAnterior: it.ventaAnterior,
+        ventaNueva: it.ventaNueva,
+      }));
   }, [preview, selectedIds]);
 
   const parseServerError = async (res, fallbackText) => {
@@ -45,6 +47,9 @@ export default function useActualizacionPrecios(router) {
     }
   };
 
+  // -------------------------
+  // PREVIEW
+  // -------------------------
   const runPreview = async (body) => {
     setErrorMsg("");
     setSuccessMsg("");
@@ -70,12 +75,16 @@ export default function useActualizacionPrecios(router) {
 
       const data = await res.json();
       const items = Array.isArray(data?.items) ? data.items : [];
+
       setPreview(items);
       setSelectedIds(new Set(items.map((it) => String(it.productoBaseId))));
       setSummary(data?.summary || null);
       setAlertas(data?.alertas || { criticas: 0, advertencias: 0 });
 
-      if (!items.length) {
+      // 👉 NUEVO: mostrar hint si viene
+      if (data?.hint) {
+        setSuccessMsg(data.hint);
+      } else if (!items.length) {
         setSuccessMsg("No hay productos para actualizar con los criterios elegidos.");
       }
     } catch (err) {
@@ -86,12 +95,21 @@ export default function useActualizacionPrecios(router) {
     }
   };
 
+  // -------------------------
+  // APPLY
+  // -------------------------
   const runApply = async ({ proveedorId, metodo, pricingMode }) => {
     setErrorMsg("");
     setSuccessMsg("");
 
     if (!selectedItems.length) {
       setErrorMsg("Seleccioná al menos un producto para aplicar.");
+      return;
+    }
+
+    const prov = Number(proveedorId);
+    if (!Number.isFinite(prov) || prov <= 0) {
+      setErrorMsg("Seleccioná un proveedor válido.");
       return;
     }
 
@@ -102,7 +120,7 @@ export default function useActualizacionPrecios(router) {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          proveedorId: Number(proveedorId),
+          proveedorId: prov,
           metodo,
           pricingMode,
           items: selectedItems,
@@ -130,6 +148,9 @@ export default function useActualizacionPrecios(router) {
     }
   };
 
+  // -------------------------
+  // HISTORY
+  // -------------------------
   const loadHistory = async () => {
     setLoadingHistory(true);
     try {
@@ -165,6 +186,9 @@ export default function useActualizacionPrecios(router) {
     }
   };
 
+  // -------------------------
+  // SELECCIÓN
+  // -------------------------
   const toggleOne = (id, checked) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);

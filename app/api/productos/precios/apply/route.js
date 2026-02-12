@@ -14,13 +14,22 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
+    const grupoId = Number(session.grupoId);
+    if (!grupoId || grupoId <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "Seleccioná un grupo activo para trabajar." },
+        { status: 400 }
+      );
+    }
+
     const body = await req.json();
     const proveedorId = toNumber(body?.proveedorId);
     const metodo = body?.metodo;
     const pricingMode = body?.pricingMode;
     const items = Array.isArray(body?.items) ? body.items : null;
 
-    if (!proveedorId) {
+    // FIX: validar explícito (null / NaN / <= 0)
+    if (proveedorId == null || proveedorId <= 0) {
       return NextResponse.json({ ok: false, error: "proveedorId requerido" }, { status: 400 });
     }
 
@@ -39,7 +48,7 @@ export async function POST(req) {
     const result = await prisma.$transaction(async (tx) => {
       const update = await tx.precioUpdate.create({
         data: {
-          grupoId: Number(session.grupoId),
+          grupoId,
           proveedorId,
           metodo,
           pricingMode,
@@ -68,7 +77,7 @@ export async function POST(req) {
         const updated = await tx.productoBase.updateMany({
           where: {
             id: productoBaseId,
-            grupoId: Number(session.grupoId),
+            grupoId,
             proveedor_id: proveedorId,
           },
           data: {

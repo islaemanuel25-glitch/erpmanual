@@ -52,6 +52,7 @@ export default function SidebarPro() {
         { label: "Productos", href: "/modulos/productos" },
         { label: "Nuevo Producto", href: "/modulos/productos/nuevo" },
         { label: "Categorías", href: "/modulos/categorias" },
+        { label: "Proveedores", href: "/modulos/proveedores" },
         { label: "Combos", href: "/modulos/combos" },
         { label: "Áreas Físicas", href: "/modulos/areas" },
       ],

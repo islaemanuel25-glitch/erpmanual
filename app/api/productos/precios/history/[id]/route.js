@@ -9,6 +9,14 @@ export async function GET(req, { params }) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
+    const grupoId = Number(session.grupoId);
+    if (!grupoId || grupoId <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "Seleccioná un grupo activo para trabajar." },
+        { status: 400 }
+      );
+    }
+
     const id = Number(params?.id || 0);
     if (!id) {
       return NextResponse.json({ ok: false, error: "id inválido" }, { status: 400 });
@@ -17,7 +25,7 @@ export async function GET(req, { params }) {
     const update = await prisma.precioUpdate.findFirst({
       where: {
         id,
-        grupoId: Number(session.grupoId),
+        grupoId,
       },
       include: {
         items: {

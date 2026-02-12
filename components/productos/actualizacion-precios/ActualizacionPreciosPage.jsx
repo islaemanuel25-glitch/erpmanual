@@ -11,6 +11,7 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 import PreviewPreciosTable from "./PreviewPreciosTable";
 import useActualizacionPrecios, { METODOS } from "./hooks/useActualizacionPrecios";
+import SelectorGrupoActivo from "@/components/grupo/SelectorGrupoActivo";
 
 const INITIAL_FORM = {
   proveedorId: "",
@@ -125,7 +126,8 @@ export default function ActualizacionPreciosPage() {
     }
 
     const body = {
-      proveedorId: Number(form.proveedorId),
+      // FIX: evitar Number("") => 0. Igual ya validamos arriba, pero queda blindado.
+      proveedorId: form.proveedorId ? Number(form.proveedorId) : null,
       metodo: form.metodo,
       pricingMode: form.pricingMode,
     };
@@ -173,7 +175,8 @@ export default function ActualizacionPreciosPage() {
     }
 
     await runApply({
-      proveedorId: form.proveedorId,
+      // FIX: mantener consistente con preview (number)
+      proveedorId: Number(form.proveedorId),
       metodo: form.metodo,
       pricingMode: form.pricingMode,
     });
@@ -187,13 +190,19 @@ export default function ActualizacionPreciosPage() {
             <h1 className="text-sm md:text-base font-semibold text-slate-100">
               Actualización de Precios por Proveedor
             </h1>
-            <SunmiButton color="cyan" onClick={() => router.push("/modulos/productos")}>
+            <SunmiButton
+              color="cyan"
+              onClick={() => router.push("/modulos/productos")}
+            >
               Volver a productos
             </SunmiButton>
           </div>
 
           <div className="grid grid-cols-2 gap-2 max-w-[340px]">
-            <SunmiButton color={tab === "carga" ? "amber" : "cyan"} onClick={() => setTab("carga")}>
+            <SunmiButton
+              color={tab === "carga" ? "amber" : "cyan"}
+              onClick={() => setTab("carga")}
+            >
               Carga + Preview
             </SunmiButton>
             <SunmiButton
@@ -206,17 +215,24 @@ export default function ActualizacionPreciosPage() {
 
           {tab === "carga" ? (
             <>
+              <SelectorGrupoActivo />
               <SunmiSeparator label="Paso 1 · Alcance" className="!my-0" />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
                 <div>
-                  <label className="text-xs text-slate-300 mb-1 block">Proveedor</label>
+                  <label className="text-xs text-slate-300 mb-1 block">
+                    Proveedor
+                  </label>
                   <SunmiSelect
                     value={form.proveedorId}
-                    onChange={(e) => updateField("proveedorId", e.target.value)}
+                    onChange={(e) =>
+                      updateField("proveedorId", e.target.value)
+                    }
                     disabled={loadingProveedores || loadingPreview || loadingApply}
                   >
-                    <option value="">{loadingProveedores ? "Cargando..." : "Seleccionar"}</option>
+                    <option value="">
+                      {loadingProveedores ? "Cargando..." : "Seleccionar"}
+                    </option>
                     {proveedores.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.nombre}
@@ -226,20 +242,28 @@ export default function ActualizacionPreciosPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 mb-1 block">Modo de precios</label>
+                  <label className="text-xs text-slate-300 mb-1 block">
+                    Modo de precios
+                  </label>
                   <SunmiSelect
                     value={form.pricingMode}
-                    onChange={(e) => updateField("pricingMode", e.target.value)}
+                    onChange={(e) =>
+                      updateField("pricingMode", e.target.value)
+                    }
                     disabled={loadingPreview || loadingApply}
                   >
                     <option value="KEEP_VENTA">Mantener precio de venta</option>
-                    <option value="RECALC_BY_MARGIN">Recalcular por margen</option>
+                    <option value="RECALC_BY_MARGIN">
+                      Recalcular por margen
+                    </option>
                     <option value="SET_VENTA">Venta enviada por método</option>
                   </SunmiSelect>
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-300 mb-1 block">Método</label>
+                  <label className="text-xs text-slate-300 mb-1 block">
+                    Método
+                  </label>
                   <SunmiSelect
                     value={form.metodo}
                     onChange={(e) => updateField("metodo", e.target.value)}
@@ -258,10 +282,14 @@ export default function ActualizacionPreciosPage() {
               {form.metodo === METODOS.AUMENTO ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-slate-300 mb-1 block">Tipo de aumento</label>
+                    <label className="text-xs text-slate-300 mb-1 block">
+                      Tipo de aumento
+                    </label>
                     <SunmiSelect
                       value={form.increaseKind}
-                      onChange={(e) => updateField("increaseKind", e.target.value)}
+                      onChange={(e) =>
+                        updateField("increaseKind", e.target.value)
+                      }
                       disabled={loadingPreview || loadingApply}
                     >
                       <option value="PCT">Porcentaje (%)</option>
@@ -270,12 +298,16 @@ export default function ActualizacionPreciosPage() {
                   </div>
 
                   <div>
-                    <label className="text-xs text-slate-300 mb-1 block">Valor</label>
+                    <label className="text-xs text-slate-300 mb-1 block">
+                      Valor
+                    </label>
                     <SunmiInput
                       type="number"
                       step="0.01"
                       value={form.increaseValue}
-                      onChange={(e) => updateField("increaseValue", e.target.value)}
+                      onChange={(e) =>
+                        updateField("increaseValue", e.target.value)
+                      }
                       placeholder="Ej: 10"
                       disabled={loadingPreview || loadingApply}
                     />
@@ -318,7 +350,9 @@ export default function ActualizacionPreciosPage() {
                   <textarea
                     className="w-full min-h-[120px] rounded-md bg-slate-900 border border-slate-700 p-2 text-xs text-slate-100"
                     value={form.manualRowsText}
-                    onChange={(e) => updateField("manualRowsText", e.target.value)}
+                    onChange={(e) =>
+                      updateField("manualRowsText", e.target.value)
+                    }
                     placeholder='[{"productoBaseId":12,"costoNuevo":1000,"ventaNueva":1300}]'
                   />
                 </div>
@@ -346,7 +380,8 @@ export default function ActualizacionPreciosPage() {
 
               {summary ? (
                 <div className="rounded-md border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs text-slate-200">
-                  Total preview: {summary.total ?? 0} · Críticas: {alertas.criticas ?? 0} · Advertencias:{" "}
+                  Total preview: {summary.total ?? 0} · Críticas:{" "}
+                  {alertas.criticas ?? 0} · Advertencias:{" "}
                   {alertas.advertencias ?? 0}
                 </div>
               ) : null}
@@ -354,7 +389,9 @@ export default function ActualizacionPreciosPage() {
           ) : (
             <>
               <SunmiSeparator label="Historial" className="!my-0" />
-              {loadingHistory ? <div className="text-xs text-slate-400">Cargando...</div> : null}
+              {loadingHistory ? (
+                <div className="text-xs text-slate-400">Cargando...</div>
+              ) : null}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                 <div className="rounded-md border border-slate-800 overflow-hidden">
                   <table className="w-full text-xs">
@@ -384,9 +421,13 @@ export default function ActualizacionPreciosPage() {
                 </div>
 
                 <div className="rounded-md border border-slate-800 p-2">
-                  <div className="text-xs text-slate-200 font-medium mb-2">Detalle</div>
+                  <div className="text-xs text-slate-200 font-medium mb-2">
+                    Detalle
+                  </div>
                   {!historyDetail ? (
-                    <div className="text-xs text-slate-400">Seleccioná una fila del historial.</div>
+                    <div className="text-xs text-slate-400">
+                      Seleccioná una fila del historial.
+                    </div>
                   ) : (
                     <div className="text-xs text-slate-300 space-y-1">
                       <div>Update ID: {historyDetail.id}</div>
