@@ -21,13 +21,13 @@ export default function ColumnSettingsModal({
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-md shadow-2xl max-h-[80vh] overflow-hidden"
+        className="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-md shadow-2xl max-h-[80vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-slate-100 text-lg font-semibold">
+            <h2 className="text-lg font-semibold">
               Configurar columnas
             </h2>
             <p className="text-slate-400 text-xs mt-1">

@@ -478,7 +478,7 @@ export default function ModalProducto({
 function Field({ label, children, colSpan }) {
   return (
     <div className={colSpan ? "md:col-span-2 flex flex-col gap-1" : "flex flex-col gap-1"}>
-      <label className="text-[12px] text-slate-400">{label}</label>
+      <label className="text-[11px] text-slate-400 mb-1 block">{label}</label>
       {children}
     </div>
   );

@@ -500,7 +500,7 @@ export default function ActualizacionPreciosPage() {
         <div className="flex flex-col gap-3">
           {/* Header */}
           <div className="flex items-center justify-between gap-2">
-            <h1 className="text-sm md:text-base font-semibold text-slate-100">
+            <h1 className="text-sm md:text-base font-semibold">
               Actualizacion de Precios
             </h1>
             <SunmiButton

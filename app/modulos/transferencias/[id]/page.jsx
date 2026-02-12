@@ -245,7 +245,7 @@ export default function TransferenciaDetallePage() {
               inputsHabilitados={inputsHabilitados}
             />
 
-            <SunmiCard className="mx-1 mb-3 bg-slate-950/60 border border-slate-700">
+            <SunmiCard className="mx-1 mb-3">
               <div className="px-3 py-2 text-sm flex justify-between text-slate-300">
                 <span className="font-semibold">Total de la transferencia:</span>
                 <span className="text-amber-300 font-bold">

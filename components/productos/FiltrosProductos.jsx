@@ -69,7 +69,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
         <div
           className="
             rounded-2xl p-4 
-            border border-slate-700 
+            border border-slate-800
             bg-slate-900
             shadow-md
             animate-fadeIn

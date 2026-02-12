@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSelect from "@/components/sunmi/SunmiSelect";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
@@ -124,7 +125,7 @@ export default function SelectorGrupoActivo({ onGrupoChanged }) {
   }
 
   return (
-    <div className="rounded-md border border-slate-700 bg-slate-900/50 p-3 space-y-2">
+    <SunmiCard className="space-y-2">
       <div className="text-xs font-semibold text-slate-200">Grupo activo</div>
 
       <div className="flex gap-2 items-end">
@@ -169,7 +170,7 @@ export default function SelectorGrupoActivo({ onGrupoChanged }) {
           {successMsg}
         </div>
       )}
-    </div>
+    </SunmiCard>
   );
 }
 

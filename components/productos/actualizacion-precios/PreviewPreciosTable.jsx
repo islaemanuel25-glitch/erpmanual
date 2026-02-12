@@ -64,12 +64,12 @@ export default function PreviewPreciosTable({
                   onChange={(e) => onToggleOne(key, e.target.checked)}
                 />
               </td>
-              <td className="px-2 py-2 text-slate-100 align-top">{item.nombre || "-"}</td>
+              <td className="px-2 py-2 align-top">{item.nombre || "-"}</td>
               <td className="px-2 py-2 text-slate-300 align-top">{formatMoney(item.costoAnterior)}</td>
-              <td className="px-2 py-2 text-slate-100 align-top">{formatMoney(item.costoNuevo)}</td>
-              <td className="px-2 py-2 text-slate-100 align-top">{pct.toFixed(2)}%</td>
+              <td className="px-2 py-2 align-top">{formatMoney(item.costoNuevo)}</td>
+              <td className="px-2 py-2 align-top">{pct.toFixed(2)}%</td>
               <td className="px-2 py-2 text-slate-300 align-top">{formatMoney(item.ventaAnterior)}</td>
-              <td className="px-2 py-2 text-slate-100 align-top">{formatMoney(item.ventaNueva)}</td>
+              <td className="px-2 py-2 align-top">{formatMoney(item.ventaNueva)}</td>
               <td className="px-2 py-2 text-xs text-amber-200 align-top">
                 {alertas.length ? alertas.join(" · ") : "-"}
               </td>

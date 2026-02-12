@@ -1,18 +1,10 @@
 "use client";
 
+import SunmiCard from "@/components/sunmi/SunmiCard";
+
 export default function Encabezado({ origen, destino, me }) {
   return (
-    <div
-      className="
-        bg-slate-900
-        border border-slate-800
-        rounded-2xl 
-        p-4 
-        shadow-md
-        text-[12px]
-        mb-4
-      "
-    >
+    <SunmiCard className="p-4 text-[12px] mb-4">
 
       {/* =============================== */}
       {/* 🔶 TITULO POS */}
@@ -38,7 +30,7 @@ export default function Encabezado({ origen, destino, me }) {
             <div className="text-[11px] uppercase tracking-wide text-slate-400">
               Sesión de preparación
             </div>
-            <div className="text-[15px] font-semibold text-slate-100">
+            <div className="text-[15px] font-semibold">
               Transferencia de mercadería
             </div>
           </div>
@@ -63,7 +55,7 @@ export default function Encabezado({ origen, destino, me }) {
       {/* 🔶 ORIGEN → DESTINO */}
       {/* =============================== */}
       <div className="flex items-center justify-center mb-4">
-        <span className="text-[13px] text-slate-100 font-semibold">
+        <span className="text-[13px] font-semibold">
           {origen?.nombre || "-"}
         </span>
 
@@ -75,7 +67,7 @@ export default function Encabezado({ origen, destino, me }) {
           <span className="ml-2 text-amber-400 text-[16px]">→</span>
         </div>
 
-        <span className="text-[13px] text-slate-100 font-semibold">
+        <span className="text-[13px] font-semibold">
           {destino?.nombre || "-"}
         </span>
       </div>
@@ -92,7 +84,7 @@ export default function Encabezado({ origen, destino, me }) {
             rounded-xl 
             px-4 py-3 
             shadow-inner
-            border border-slate-700
+            border border-slate-800
           "
         >
           <span className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -100,7 +92,7 @@ export default function Encabezado({ origen, destino, me }) {
           </span>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-amber-400 text-[13px]">🏬</span>
-            <span className="text-[13px] text-slate-100 font-medium truncate">
+            <span className="text-[13px] font-medium truncate">
               {origen?.nombre || "-"}
             </span>
           </div>
@@ -113,7 +105,7 @@ export default function Encabezado({ origen, destino, me }) {
             rounded-xl 
             px-4 py-3 
             shadow-inner
-            border border-slate-700
+            border border-slate-800
           "
         >
           <span className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -121,7 +113,7 @@ export default function Encabezado({ origen, destino, me }) {
           </span>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-amber-400 text-[13px]">📦</span>
-            <span className="text-[13px] text-slate-100 font-medium truncate">
+            <span className="text-[13px] font-medium truncate">
               {destino?.nombre || "-"}
             </span>
           </div>
@@ -134,7 +126,7 @@ export default function Encabezado({ origen, destino, me }) {
             rounded-xl 
             px-4 py-3 
             shadow-inner
-            border border-slate-700
+            border border-slate-800
           "
         >
           <span className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -142,7 +134,7 @@ export default function Encabezado({ origen, destino, me }) {
           </span>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-amber-400 text-[13px]">👤</span>
-            <span className="text-[13px] text-slate-100 font-medium truncate">
+            <span className="text-[13px] font-medium truncate">
               {me?.nombre || "Usuario"}
             </span>
           </div>
@@ -159,6 +151,6 @@ export default function Encabezado({ origen, destino, me }) {
           100% { transform: translateX(100%); opacity: 0.3; }
         }
       `}</style>
-    </div>
+    </SunmiCard>
   );
 }

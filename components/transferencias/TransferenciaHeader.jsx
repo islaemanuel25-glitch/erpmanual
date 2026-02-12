@@ -1,5 +1,6 @@
 "use client";
 
+import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 export default function TransferenciaHeader({ item, id }) {
@@ -29,36 +30,36 @@ export default function TransferenciaHeader({ item, id }) {
 
       <SunmiSeparator label="Datos generales" />
 
-      <div className="border border-slate-700 rounded-2xl p-3 grid gap-3 md:grid-cols-2 bg-slate-900/50 mx-1 text-sm">
-        
+      <SunmiCard className="grid gap-3 md:grid-cols-2 mx-1 text-sm">
+
         <div>
-          <div className="font-semibold text-slate-100">Origen</div>
-          <div className="text-slate-100">{item.origen.nombre}</div>
+          <div className="font-semibold">Origen</div>
+          <div>{item.origen.nombre}</div>
         </div>
 
         <div>
-          <div className="font-semibold text-slate-100">Destino</div>
-          <div className="text-slate-100">{item.destino.nombre}</div>
+          <div className="font-semibold">Destino</div>
+          <div>{item.destino.nombre}</div>
         </div>
 
         <div>
-          <div className="font-semibold text-slate-100">Fechas</div>
+          <div className="font-semibold">Fechas</div>
 
-          <div className="text-slate-100">
+          <div>
             Creada:{" "}
             {item.fechaCreada
               ? new Date(item.fechaCreada).toLocaleString()
               : "-"}
           </div>
 
-          <div className="text-slate-100">
+          <div>
             Envío:{" "}
             {item.fechaEnvio
               ? new Date(item.fechaEnvio).toLocaleString()
               : "-"}
           </div>
 
-          <div className="text-slate-100">
+          <div>
             Recepción:{" "}
             {item.fechaRecepcion
               ? new Date(item.fechaRecepcion).toLocaleString()
@@ -67,13 +68,13 @@ export default function TransferenciaHeader({ item, id }) {
         </div>
 
         <div>
-          <div className="font-semibold text-slate-100">Estado</div>
-          <div className="inline-flex px-2 py-1 rounded border border-slate-600 bg-slate-900/70 text-slate-100">
+          <div className="font-semibold">Estado</div>
+          <div className="inline-flex px-2 py-1 rounded bg-slate-800 text-slate-200">
             {item.estado}
           </div>
         </div>
 
-      </div>
+      </SunmiCard>
     </div>
   );
 }

@@ -241,7 +241,7 @@ export default function TransferenciasPage() {
         {/* ======================
             TOTAL GLOBAL
         ======================= */}
-        <SunmiCard className="mx-1 mt-3 bg-slate-950/60 border border-slate-700">
+        <SunmiCard className="mx-1 mt-3">
           <div className="text-slate-300 text-sm px-3 py-2 flex justify-between">
             <span className="font-semibold">Importe total transferido:</span>
             <span className="text-amber-300 font-bold">

@@ -36,7 +36,7 @@ export default function FilaTransferencia({
 
         {columns.estado && (
           <td>
-            <span className="inline-flex px-2 py-[2px] text-[11px] bg-slate-800 border border-slate-600 rounded-full text-slate-100">
+            <span className="inline-flex px-2 py-[2px] text-[11px] bg-slate-800 border border-slate-700 rounded-full text-slate-200">
               {t.estado}
             </span>
           </td>

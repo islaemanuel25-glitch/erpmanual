@@ -66,7 +66,7 @@ export default function TablaSugeridos({
             className="
               px-2 py-1 rounded-lg 
               bg-slate-900 text-slate-200 
-              border border-slate-700 
+              border border-slate-800 
               disabled:opacity-30
               hover:bg-slate-800/60 
               active:scale-95 
@@ -86,7 +86,7 @@ export default function TablaSugeridos({
             className="
               px-2 py-1 rounded-lg 
               bg-slate-900 text-slate-200 
-              border border-slate-700 
+              border border-slate-800 
               disabled:opacity-30
               hover:bg-slate-800/60 
               active:scale-95 
@@ -205,7 +205,7 @@ export default function TablaSugeridos({
                   {/* PRODUCTO */}
                   <td className="px-3 py-2">
                     <div className="flex flex-col">
-                      <span className="text-slate-100 font-medium">
+                      <span className="font-medium">
                         {p.productoNombre}
                       </span>
                       <span className="text-[11px] text-slate-500">

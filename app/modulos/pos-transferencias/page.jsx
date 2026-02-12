@@ -255,9 +255,9 @@ export default function PosTransferenciasHomePage() {
                 {/* RESUMEN ORIGEN */}
                 <div
                   className="
-                    bg-slate-900/80 
-                    border border-slate-700 
-                    rounded-2xl 
+                    bg-slate-900/80
+                    border border-slate-800
+                    rounded-2xl
                     px-4 py-3
                     flex flex-col sm:flex-row sm:items-center sm:justify-between
                     gap-2
@@ -267,7 +267,7 @@ export default function PosTransferenciasHomePage() {
                     <div className="text-[11px] uppercase tracking-wide text-slate-400">
                       Depósito origen
                     </div>
-                    <div className="text-[14px] font-semibold text-slate-100">
+                    <div className="text-[14px] font-semibold">
                       {origenDeposito.nombre}
                     </div>
                   </div>

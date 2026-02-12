@@ -30,7 +30,7 @@ export default function TablaTransferencias({
   ].filter(Boolean);
 
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-slate-700 mx-1 mb-2">
+    <div className="w-full overflow-x-auto rounded-xl border border-slate-800 mx-1 mb-2">
       <SunmiTable headers={headers} className="min-w-[1000px]">
         {items.map((t) => (
           <SunmiTableRow key={t.id}>
