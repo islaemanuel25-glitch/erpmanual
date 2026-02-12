@@ -14,8 +14,7 @@ export default function AccionesRecepcion({
   return (
     <div className="flex justify-end gap-3 px-2 pb-3">
       <SunmiButton
-        variant="outline"
-        size="sm"
+        color="slate"
         disabled={guardando}
         onClick={guardarCambios}
       >
@@ -23,7 +22,6 @@ export default function AccionesRecepcion({
       </SunmiButton>
 
       <SunmiButton
-        size="sm"
         disabled={confirmando}
         onClick={confirmarRecepcion}
       >

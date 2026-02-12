@@ -209,7 +209,7 @@ export default function CategoriasPage() {
         ) : (
           <SunmiTable headers={["Nombre", "Estado", "Acciones"]}>
             {items.length === 0 ? (
-              <SunmiTableEmpty mensaje="No hay categorías" />
+              <SunmiTableEmpty message="No hay categorías" colSpan={3} />
             ) : (
               items.map((item) => (
                 <SunmiTableRow key={item.id}>
@@ -221,7 +221,7 @@ export default function CategoriasPage() {
 
                   <td className="px-3 py-2 flex gap-3">
                     <SunmiButton
-                      variant="ghost"
+                      color="slate"
                       className="text-amber-400 px-2"
                       onClick={() => abrirEditar(item)}
                     >
@@ -229,7 +229,7 @@ export default function CategoriasPage() {
                     </SunmiButton>
 
                     <SunmiButton
-                      variant="danger"
+                      color="red"
                       className="px-2"
                       onClick={() => eliminar(item.id)}
                     >
@@ -247,7 +247,7 @@ export default function CategoriasPage() {
         {/* ========= PAGINACIÓN ========= */}
         <div className="p-4 flex justify-between">
           <SunmiButton
-            variant="secondary"
+            color="slate"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >

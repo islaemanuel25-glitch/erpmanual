@@ -36,7 +36,6 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
     <div className="relative" ref={ref}>
       {/* BOTÓN MINI SUNMI V2 */}
       <SunmiButton
-        variant="icon"
         color="slate"
         onClick={() => setOpen((v) => !v)}
         className="h-8 w-8 flex items-center justify-center rounded-xl"

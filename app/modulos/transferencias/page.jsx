@@ -221,8 +221,7 @@ export default function TransferenciasPage() {
           <SunmiSeparator label="Listado" />
 
           <SunmiButton
-            size="xs"
-            variant="outline"
+            color="slate"
             onClick={() => setOpenCols(true)}
           >
             ⚙️ Columnas

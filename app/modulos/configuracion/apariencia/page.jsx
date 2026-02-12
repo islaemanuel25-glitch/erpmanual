@@ -50,7 +50,7 @@ export default function AparienciaPage() {
 
             <SunmiButton
               onClick={() => setThemeKey(t.key)}
-              variant={themeKey === t.key ? "primary" : "ghost"}
+              color={themeKey === t.key ? "cyan" : "slate"}
             >
               {themeKey === t.key ? "Theme aplicado" : "Aplicar theme"}
             </SunmiButton>

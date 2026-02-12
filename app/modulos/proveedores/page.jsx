@@ -232,8 +232,6 @@ export default function ProveedoresPage() {
                   {/* 🔥 BOTÓN PEDIDOS */}
                   <td className="px-3 py-2 text-center">
                     <SunmiButton
-                     
-                      size="sm"
                       onClick={() =>
                         router.push(`/modulos/pedidos?proveedorId=${item.id}`)
                       }
