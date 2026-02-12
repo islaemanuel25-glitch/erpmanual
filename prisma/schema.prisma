@@ -78,6 +78,8 @@ model Local {
 
   posTransferenciasOrigen  PosTransferencia[] @relation("pos_origen")
   posTransferenciasDestino PosTransferencia[] @relation("pos_destino")
+
+  ventas Venta[]
 }
 
 model Usuario {
@@ -97,6 +99,8 @@ model Usuario {
   confirmaciones TransferenciaDetalle[]
 
   posTransferencias PosTransferencia[]
+
+  ventas Venta[]
 
   @@map("Usuario")
 }
@@ -177,6 +181,7 @@ model ProductoBase {
 
   preciosPorLista   ProductoListaPrecio[]
   locales           ProductoLocal[]
+  ventaDetalles     VentaDetalle[]
 
   @@unique([grupoId, codigo_barra])
   @@index([grupoId])
@@ -438,5 +443,48 @@ model PrecioUpdateItem {
 
   update PrecioUpdate @relation(fields: [precioUpdateId], references: [id], onDelete: Cascade)
 
+  @@index([productoBaseId])
+}
+
+// ---------------------------------------------------------------------------
+// POS VENTAS
+// ---------------------------------------------------------------------------
+
+model Venta {
+  id           Int            @id @default(autoincrement())
+  localId      Int
+  vendedorId   Int
+  numero       Int
+  fecha        DateTime       @default(now())
+  subtotal     Decimal        @db.Decimal(12, 2)
+  comision     Decimal        @default(0) @db.Decimal(12, 2)
+  descuento    Decimal        @default(0) @db.Decimal(12, 2)
+  total        Decimal        @db.Decimal(12, 2)
+  formaPago    String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  local        Local          @relation(fields: [localId], references: [id])
+  vendedor     Usuario        @relation(fields: [vendedorId], references: [id])
+  detalles     VentaDetalle[]
+
+  @@index([localId])
+  @@index([fecha])
+}
+
+model VentaDetalle {
+  id              Int          @id @default(autoincrement())
+  ventaId         Int
+  productoBaseId  Int
+  nombre          String
+  precio          Decimal      @db.Decimal(12, 2)
+  cantidad        Int
+  subtotal        Decimal      @db.Decimal(12, 2)
+  createdAt       DateTime     @default(now())
+
+  venta           Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoBase    ProductoBase @relation(fields: [productoBaseId], references: [id])
+
+  @@index([ventaId])
   @@index([productoBaseId])
 }

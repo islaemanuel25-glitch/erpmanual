@@ -1,0 +1,101 @@
+"use client";
+
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiTable from "@/components/sunmi/SunmiTable";
+
+function formatPrecio(n) {
+  return Number(n).toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+export default function CarritoVenta({
+  items,
+  onCantidadChange,
+  onEliminar,
+  onLimpiar,
+  subtotal,
+}) {
+  if (items.length === 0) {
+    return (
+      <SunmiCard className="p-3">
+        <SunmiSeparator label="Carrito" className="!mt-0 !mb-2" />
+        <div className="text-sm text-slate-500 text-center py-6">
+          No hay productos en el carrito.
+        </div>
+      </SunmiCard>
+    );
+  }
+
+  return (
+    <SunmiCard className="p-3">
+      <div className="flex items-center justify-between mb-2">
+        <SunmiSeparator label="Carrito" className="!mt-0 !mb-0 flex-1" />
+        <SunmiButton
+          color="red"
+          onClick={onLimpiar}
+          className="!text-xs !py-1 !px-2"
+        >
+          Limpiar
+        </SunmiButton>
+      </div>
+
+      <div className="overflow-x-auto">
+        <SunmiTable
+          headers={["Producto", "Cant.", "P. Unit.", "Subtotal", ""]}
+        >
+          {items.map((item, idx) => (
+            <tr
+              key={item.productoBaseId}
+              className="bg-slate-950 hover:bg-slate-900 animate-fade-in"
+            >
+              <td className="px-2 py-1.5 truncate max-w-[160px] text-sm">
+                {item.nombre}
+              </td>
+              <td className="px-2 py-1.5 w-20">
+                <SunmiInput
+                  type="number"
+                  min={1}
+                  max={item.stockMax || 9999}
+                  value={item.cantidad}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1;
+                    onCantidadChange(idx, Math.max(1, val));
+                  }}
+                  className="!text-center !py-1"
+                />
+              </td>
+              <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm">
+                $ {formatPrecio(item.precio)}
+              </td>
+              <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm font-medium">
+                $ {formatPrecio(item.precio * item.cantidad)}
+              </td>
+              <td className="px-2 py-1.5 text-center">
+                <button
+                  onClick={() => onEliminar(idx)}
+                  className="text-red-400 hover:text-red-300 text-lg leading-none"
+                  title="Eliminar"
+                >
+                  x
+                </button>
+              </td>
+            </tr>
+          ))}
+        </SunmiTable>
+      </div>
+
+      {/* Subtotal */}
+      <div className="flex justify-end mt-3 px-2">
+        <div className="text-right">
+          <span className="text-sm text-slate-400 mr-3">SUBTOTAL</span>
+          <span className="text-lg font-bold">$ {formatPrecio(subtotal)}</span>
+        </div>
+      </div>
+    </SunmiCard>
+  );
+}
