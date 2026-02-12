@@ -75,7 +75,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
             animate-fadeIn
           "
         >
-          <SunmiSeparator label="Filtros avanzados" color="amber" />
+          <SunmiSeparator label="Filtros avanzados" />
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
             {/* CATEGORÍA */}

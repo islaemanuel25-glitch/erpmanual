@@ -189,7 +189,7 @@ export default function CategoriasPage() {
           />
 
           <div className="flex gap-2">
-            <SunmiButton variant="secondary" className="w-full" onClick={limpiar}>
+            <SunmiButton color="slate" className="w-full" onClick={limpiar}>
               Limpiar
             </SunmiButton>
 

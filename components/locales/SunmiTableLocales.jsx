@@ -30,7 +30,7 @@ export default function SunmiTableLocales({
 
       <SunmiHeader title="Locales" color="amber" />
 
-      <SunmiSeparator label="Listado" color="amber" />
+      <SunmiSeparator label="Listado" />
 
       <div className="overflow-x-auto">
         {/* 

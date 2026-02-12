@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function ModalLimites({ open, onClose, producto, local }) {
   const [minimo, setMinimo] = useState("");
@@ -69,18 +70,16 @@ export default function ModalLimites({ open, onClose, producto, local }) {
           <div className="flex flex-col gap-3 mt-4">
 
             {/* Min */}
-            <input
+            <SunmiInput
               type="number"
-              className="sunmi-input"
               placeholder="Stock mínimo"
               value={minimo}
               onChange={(e) => setMinimo(e.target.value)}
             />
 
             {/* Max */}
-            <input
+            <SunmiInput
               type="number"
-              className="sunmi-input"
               placeholder="Stock máximo"
               value={maximo}
               onChange={(e) => setMaximo(e.target.value)}

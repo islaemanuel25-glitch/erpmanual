@@ -27,7 +27,7 @@ export default function TransferenciaHeader({ item, id }) {
         </a>
       </div>
 
-      <SunmiSeparator label="Datos generales" color="amber" />
+      <SunmiSeparator label="Datos generales" />
 
       <div className="border border-slate-700 rounded-2xl p-3 grid gap-3 md:grid-cols-2 bg-slate-900/50 mx-1 text-sm">
         

@@ -215,7 +215,7 @@ export default function LocalesPage() {
         />
 
         {/* FILTROS */}
-        <SunmiSeparator label="Filtros" color="amber" />
+        <SunmiSeparator label="Filtros" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-col md:flex-row gap-3 flex-1">
@@ -244,7 +244,7 @@ export default function LocalesPage() {
         </div>
 
         {/* LISTADO */}
-        <SunmiSeparator label="Listado" color="amber" />
+        <SunmiSeparator label="Listado" />
 
         <SunmiTable headers={["Local", "Tipo", "Ciudad", "Estado", "Acciones"]}>
           {locales.length === 0 ? (

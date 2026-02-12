@@ -11,6 +11,7 @@ import SunmiSelect from "@/components/sunmi/SunmiSelect";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import FiltrosProductos from "@/components/productos/FiltrosProductos";
 import ColumnManager from "@/components/productos/ColumnManager";
@@ -628,9 +629,7 @@ export default function ProductosPage() {
               </div>
 
               {(loading || loadingEditar) && (
-                <div className="text-center text-slate-400 text-xs mt-1">
-                  Cargando...
-                </div>
+                <SunmiLoader />
               )}
             </>
           )}

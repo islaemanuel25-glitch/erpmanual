@@ -1,6 +1,8 @@
 // components/pos-transferencias/nueva/FiltrosDeposito.jsx
 "use client";
 
+import SunmiSelect from "@/components/sunmi/SunmiSelect";
+
 export default function FiltrosDeposito({
   areaId,
   categoriaId,
@@ -18,8 +20,7 @@ export default function FiltrosDeposito({
 
       <div className="flex flex-wrap gap-3 mb-3">
         {/* Área física */}
-        <select
-          className="h-[32px] border rounded px-2 text-sm"
+        <SunmiSelect
           value={areaId}
           onChange={(e) => onAreaChange(Number(e.target.value))}
         >
@@ -29,11 +30,10 @@ export default function FiltrosDeposito({
               {a.nombre}
             </option>
           ))}
-        </select>
+        </SunmiSelect>
 
         {/* Categoría */}
-        <select
-          className="h-[32px] border rounded px-2 text-sm"
+        <SunmiSelect
           value={categoriaId}
           onChange={(e) => onCategoriaChange(Number(e.target.value))}
         >
@@ -43,7 +43,7 @@ export default function FiltrosDeposito({
               {c.nombre}
             </option>
           ))}
-        </select>
+        </SunmiSelect>
 
         {/* Limpiar */}
         <button

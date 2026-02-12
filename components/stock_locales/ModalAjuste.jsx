@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
 
 export default function ModalAjuste({ open, onClose, producto, local }) {
@@ -103,9 +105,8 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                     <label className="text-slate-400 text-[11px] mb-1 block">
                       Bultos
                     </label>
-                    <input
+                    <SunmiInput
                       type="number"
-                      className="sunmi-input"
                       placeholder="0"
                       min={0}
                       value={bultos}
@@ -116,9 +117,8 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                     <label className="text-slate-400 text-[11px] mb-1 block">
                       Sueltas
                     </label>
-                    <input
+                    <SunmiInput
                       type="number"
-                      className="sunmi-input"
                       placeholder="0"
                       min={0}
                       max={factorPack - 1}
@@ -143,9 +143,8 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                   <label className="text-slate-400 text-[11px] mb-1 block">
                     Cantidad (unidades)
                   </label>
-                  <input
+                  <SunmiInput
                     type="number"
-                    className="sunmi-input"
                     placeholder="0"
                     min={0}
                     value={sueltas || bultos}
@@ -159,14 +158,13 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
             )}
 
             {/* Tipo */}
-            <select
-              className="sunmi-input"
+            <SunmiSelect
               value={tipo}
               onChange={(e) => setTipo(e.target.value)}
             >
               <option value="sumar">Sumar</option>
               <option value="restar">Restar</option>
-            </select>
+            </SunmiSelect>
 
             {/* Motivo */}
             <textarea

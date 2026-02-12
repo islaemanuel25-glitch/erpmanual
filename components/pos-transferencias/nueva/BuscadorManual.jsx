@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function BuscadorManual({
   texto,
@@ -164,20 +165,9 @@ export default function BuscadorManual({
           🎤
         </button>
 
-        <input
+        <SunmiInput
           type="text"
           placeholder="Buscar producto o decirlo..."
-          className="
-            pl-10 pr-12 py-2 w-full
-            bg-slate-900 text-slate-100
-            border border-cyan-500/40
-            rounded-xl shadow-inner
-            text-[13px]
-            focus:outline-none 
-            focus:ring-2 focus:ring-cyan-400 
-            focus:border-cyan-400
-            transition-all
-          "
           value={texto}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}

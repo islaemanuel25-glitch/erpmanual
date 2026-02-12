@@ -164,7 +164,7 @@ export default function ModalGrupo({
           <div className="flex flex-col max-h-[65vh] overflow-y-auto">
 
             {/* Datos */}
-            <SunmiSeparator label="Datos" color="amber" />
+            <SunmiSeparator label="Datos" />
             <Field label="Nombre *">
               <SunmiInput
                 value={form.nombre}
@@ -175,7 +175,7 @@ export default function ModalGrupo({
             </Field>
 
             {/* LOCALES */}
-            <SunmiSeparator label="Locales" color="amber" />
+            <SunmiSeparator label="Locales" />
 
             <div className="flex gap-2">
               <SunmiSelectAdv
@@ -211,7 +211,7 @@ export default function ModalGrupo({
             </SunmiListCard>
 
             {/* DEPÓSITOS */}
-            <SunmiSeparator label="Depósitos" color="amber" />
+            <SunmiSeparator label="Depósitos" />
 
             <div className="flex gap-2">
               <SunmiSelectAdv

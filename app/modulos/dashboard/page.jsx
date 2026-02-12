@@ -1,11 +1,12 @@
 "use client";
 
 import { useUser } from "@/app/context/UserContext";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 export default function DashboardPage() {
   const { perfil, cargando, logout } = useUser();
 
-  if (cargando) return <p className="p-4">Cargando...</p>;
+  if (cargando) return <div className="p-4"><SunmiLoader /></div>;
 
   if (!perfil) {
     if (typeof window !== "undefined") window.location.href = "/login";

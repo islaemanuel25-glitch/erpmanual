@@ -168,7 +168,7 @@ export default function RolesPage() {
         />
 
         {/* FILTROS */}
-        <SunmiSeparator label="Filtros" color="amber" />
+        <SunmiSeparator label="Filtros" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-col md:flex-row gap-3 flex-1">
@@ -191,7 +191,7 @@ export default function RolesPage() {
         </div>
 
         {/* LISTADO */}
-        <SunmiSeparator label="Listado" color="amber" />
+        <SunmiSeparator label="Listado" />
 
         <SunmiTable headers={["Rol", "Permisos", "Acciones"]}>
           {roles.length === 0 ? (

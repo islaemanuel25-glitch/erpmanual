@@ -93,7 +93,7 @@ export default function ModalRol({
           {/* CONTENIDO CON SCROLL FUNCIONAL */}
           <div className="flex flex-col max-h-[65vh] overflow-y-auto">
 
-            <SunmiSeparator label="Datos" color="amber" />
+            <SunmiSeparator label="Datos" />
 
             {/* Nombre */}
             <Field label="Nombre *">
@@ -104,10 +104,10 @@ export default function ModalRol({
               />
             </Field>
 
-            <SunmiSeparator label="Permisos" color="amber" />
+            <SunmiSeparator label="Permisos" />
 
             <div className="flex justify-end">
-              <SunmiButton color="amber" size="sm" onClick={setAdmin}>
+              <SunmiButton color="amber" onClick={setAdmin}>
                 Set Admin (*)
               </SunmiButton>
             </div>

@@ -267,7 +267,7 @@ export default function PageGrupos() {
         />
 
         {/* FILTROS */}
-        <SunmiSeparator label="Filtros" color="amber" />
+        <SunmiSeparator label="Filtros" />
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-col md:flex-row gap-3 flex-1">
@@ -305,7 +305,7 @@ export default function PageGrupos() {
         </div>
 
         {/* LISTADO */}
-        <SunmiSeparator label="Listado" color="amber" />
+        <SunmiSeparator label="Listado" />
 
         {cargando ? (
           <div className="flex justify-center">Cargando grupos...</div>

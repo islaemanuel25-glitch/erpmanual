@@ -122,12 +122,12 @@ export default function ModalCategoria({
     >
       <SunmiCard className="w-full max-w-md p-0 overflow-hidden">
         <SunmiCardHeader
-          titulo={editMode ? "Editar categoría" : "Nueva categoría"}
+          title={editMode ? "Editar categoría" : "Nueva categoría"}
         />
 
         <div className="p-4 space-y-4">
           <div>
-            <label className="text-sm text-slate-300">Nombre</label>
+            <label className="text-[11px] text-slate-400 mb-1 block">Nombre</label>
             <SunmiInput
               value={form.nombre}
               onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
@@ -138,7 +138,7 @@ export default function ModalCategoria({
           <SunmiSeparator />
 
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-300">Activo</span>
+            <span className="text-[11px] text-slate-400">Activo</span>
             <SunmiToggleEstado
               value={form.activo}
               onChange={(v) => setForm((f) => ({ ...f, activo: v }))}
@@ -148,7 +148,7 @@ export default function ModalCategoria({
           <SunmiSeparator />
 
           <div className="flex justify-end gap-3">
-            <SunmiButton variant="secondary" onClick={onClose}>
+            <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
 

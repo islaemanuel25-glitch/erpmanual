@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function FiltrosStock({
   localSeleccionado,
@@ -60,16 +61,12 @@ export default function FiltrosStock({
 
         {/* 🔍 Buscador */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-2 w-full h-[38px]">
-            <Search size={16} className="text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre o código…"
-              className="bg-transparent px-2 py-1 w-full outline-none text-[13px] text-slate-100"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
+          <SunmiInput
+            type="text"
+            placeholder="Buscar por nombre o código…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
 
           <button
             onClick={resetFiltros}
@@ -81,29 +78,26 @@ export default function FiltrosStock({
 
         {/* 🧩 Selectores */}
         <div className="grid grid-cols-3 gap-2">
-          <select
-            className="sunmi-input text-[12px] h-[34px]"
+          <SunmiSelect
             value={categoria}
             onChange={(e) => setCategoria(e.target.value)}
           >
             <option value="">Categoría</option>
-          </select>
+          </SunmiSelect>
 
-          <select
-            className="sunmi-input text-[12px] h-[34px]"
+          <SunmiSelect
             value={proveedor}
             onChange={(e) => setProveedor(e.target.value)}
           >
             <option value="">Proveedor</option>
-          </select>
+          </SunmiSelect>
 
-          <select
-            className="sunmi-input text-[12px] h-[34px]"
+          <SunmiSelect
             value={area}
             onChange={(e) => setArea(e.target.value)}
           >
             <option value="">Área física</option>
-          </select>
+          </SunmiSelect>
         </div>
 
         {/* ✔ Checkboxes */}

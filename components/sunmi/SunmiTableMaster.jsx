@@ -113,7 +113,7 @@ export default function SunmiTableMaster({
         {/* BOTONES PAGINACIÓN */}
         <div className="flex items-center gap-2">
           <SunmiButton
-            variant="ghost"
+            color="slate"
             disabled={page <= 1}
             onClick={onPrev}
           >
@@ -121,7 +121,7 @@ export default function SunmiTableMaster({
           </SunmiButton>
 
           <SunmiButton
-            variant="ghost"
+            color="slate"
             disabled={page >= totalPages}
             onClick={onNext}
           >

@@ -56,7 +56,7 @@ export default function NuevoGrupoPage() {
             color="amber"
           />
 
-          <SunmiSeparator label="Datos" color="amber" />
+          <SunmiSeparator label="Datos" />
 
           <div className="flex flex-col gap-2">
             <SunmiInput

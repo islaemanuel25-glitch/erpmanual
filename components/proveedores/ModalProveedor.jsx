@@ -103,7 +103,7 @@ export default function ModalProveedor({
               color="amber"
             />
 
-            <SunmiButton color="slate" onClick={onClose} size="sm">
+            <SunmiButton color="slate" onClick={onClose}>
               Cerrar
             </SunmiButton>
           </div>
@@ -118,7 +118,7 @@ export default function ModalProveedor({
               space-y-4
             "
           >
-            <SunmiSeparator label="Datos" color="amber" />
+            <SunmiSeparator label="Datos" />
 
             {/* Nombre */}
             <Field label="Nombre *">

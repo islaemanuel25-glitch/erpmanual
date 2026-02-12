@@ -76,7 +76,7 @@ export default function FilaTransferencia({
               href={`/modulos/transferencias/${t.id}`}
               onClick={(e) => e.stopPropagation()} // evita abrir/cerrar fila
             >
-              <SunmiButton size="xs">Ver</SunmiButton>
+              <SunmiButton color="cyan">Ver</SunmiButton>
             </Link>
           </td>
         )}

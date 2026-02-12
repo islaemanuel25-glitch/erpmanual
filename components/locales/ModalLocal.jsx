@@ -108,7 +108,7 @@ export default function ModalLocal({
 
           {/* CONTENIDO CON SCROLL */}
           <div className="flex flex-col max-h-[65vh] overflow-y-auto">
-            <SunmiSeparator label="Datos" color="amber" />
+            <SunmiSeparator label="Datos" />
 
             {/* Nombre */}
             <Field label="Nombre *">
@@ -200,7 +200,7 @@ export default function ModalLocal({
               />
             </Field>
 
-            <SunmiSeparator label="Estado" color="amber" />
+            <SunmiSeparator label="Estado" />
 
             {/* Estado */}
             <Field label="Estado">

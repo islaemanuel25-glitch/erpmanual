@@ -1,5 +1,8 @@
 "use client";
 
+import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+
 export default function PreparadosTable({
   datos = [],
   onDesmarcar,
@@ -40,20 +43,14 @@ export default function PreparadosTable({
 
         <div className="flex items-center gap-2 text-[11px]">
           <span className="opacity-80">Mostrar:</span>
-          <select
-            className="
-              bg-slate-900 text-slate-100 
-              border border-slate-700 
-              rounded-lg px-2 py-1 text-[11px]
-              focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500
-            "
+          <SunmiSelect
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
           >
             {[25, 50, 100, 150, 200].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
-          </select>
+          </SunmiSelect>
 
           <button
             className="
@@ -179,36 +176,17 @@ export default function PreparadosTable({
                 {/* INPUT PREPARADO CON SELECTOR DE UNIDAD */}
                 <td className="px-2 py-2 text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <input
+                    <SunmiInput
                       type="number"
                       min={0}
                       step={1}
-                      className="
-                        w-[80px]
-                        bg-slate-900
-                        border border-slate-700 
-                        rounded-lg px-2 py-1 
-                        text-right text-[12px]
-                        text-cyan-300
-                        focus:border-cyan-400 
-                        focus:ring-1 focus:ring-cyan-400
-                        transition
-                      "
                       value={p.preparado}
                       onChange={(e) =>
                         onEditPreparado(p.detalleId, Number(e.target.value), p.unidadPreparada || p.unidadSugerida || "BULTO")
                       }
                     />
                     {(p.modoEnvio === "MIXTO" && p.factorPack > 1) ? (
-                      <select
-                        className="
-                          bg-slate-900
-                          border border-slate-700 
-                          rounded-lg px-1 py-1 
-                          text-[10px] text-slate-300
-                          focus:border-cyan-400 
-                          focus:ring-1 focus:ring-cyan-400
-                        "
+                      <SunmiSelect
                         value={p.unidadPreparada || p.unidadSugerida || "BULTO"}
                         onChange={(e) =>
                           onEditPreparado(p.detalleId, p.preparado, e.target.value)
@@ -216,7 +194,7 @@ export default function PreparadosTable({
                       >
                         <option value="BULTO">bultos</option>
                         <option value="UNIDAD">uds</option>
-                      </select>
+                      </SunmiSelect>
                     ) : (
                       <span className="text-[10px] text-slate-400">
                         {(p.unidadPreparada || p.unidadSugerida || "BULTO") === "BULTO" ? "bultos" : "uds"}

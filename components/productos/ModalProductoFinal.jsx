@@ -210,7 +210,7 @@ export default function ModalProducto({
 
         <div ref={modalRef} className="max-h-[70vh] overflow-y-auto space-y-4">
           {/* IDENTIDAD */}
-          <SunmiSeparator label="Identidad" color="amber" />
+          <SunmiSeparator label="Identidad" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nombre *">
               <SunmiInput value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} />
@@ -230,7 +230,7 @@ export default function ModalProducto({
           </div>
 
           {/* CATÁLOGOS */}
-          <SunmiSeparator label="Catálogos" color="amber" />
+          <SunmiSeparator label="Catálogos" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Categoría">
               <SunmiSelectAdv
@@ -282,7 +282,7 @@ export default function ModalProducto({
           </div>
 
           {/* PRESENTACIÓN */}
-          <SunmiSeparator label="Presentación" color="amber" />
+          <SunmiSeparator label="Presentación" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Field label="Unidad *">
               <SunmiSelectAdv
@@ -339,7 +339,7 @@ export default function ModalProducto({
           </div>
 
           {/* PRECIOS */}
-          <SunmiSeparator label="Precios" color="amber" />
+          <SunmiSeparator label="Precios" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Field label="Costo *">
               <SunmiInput
@@ -375,7 +375,7 @@ export default function ModalProducto({
           </div>
 
           {/* OTROS */}
-          <SunmiSeparator label="Otros" color="amber" />
+          <SunmiSeparator label="Otros" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Precio sugerido">
               <SunmiInput
@@ -402,7 +402,7 @@ export default function ModalProducto({
           </div>
 
           {/* SWITCHES */}
-          <SunmiSeparator label="Opciones" color="amber" />
+          <SunmiSeparator label="Opciones" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-[12px] text-slate-400">Redondeo a $100</label>
@@ -434,7 +434,7 @@ export default function ModalProducto({
           </div>
 
           {/* REPOSICIÓN AUTOMÁTICA */}
-          <SunmiSeparator label="Reposición automática" color="amber" />
+          <SunmiSeparator label="Reposición automática" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Modo de pedido">
               <SunmiSelectAdv

@@ -8,6 +8,7 @@ import Link from "next/link";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import TransferenciaHeader from "@/components/transferencias/TransferenciaHeader";
 import TablaDetalleTransferencia from "@/components/transferencias/TablaDetalleTransferencia";
@@ -227,7 +228,7 @@ export default function TransferenciaDetallePage() {
 
       <SunmiCard>
         {loading && (
-          <div className="text-slate-300 text-sm px-2">Cargando...</div>
+          <SunmiLoader />
         )}
         {error && <div className="text-red-400 px-2">{error}</div>}
 
@@ -235,7 +236,7 @@ export default function TransferenciaDetallePage() {
           <>
             <TransferenciaHeader item={item} id={id} />
 
-            <SunmiSeparator label="Detalle y recepción" color="amber" />
+            <SunmiSeparator label="Detalle y recepción" />
 
             <TablaDetalleTransferencia
               item={item}

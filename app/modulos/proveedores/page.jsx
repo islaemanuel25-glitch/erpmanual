@@ -146,7 +146,7 @@ export default function ProveedoresPage() {
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-        <SunmiSeparator label="Filtros" color="amber" className="my-4" />
+        <SunmiSeparator label="Filtros" className="my-4" />
 
         {/* ===================== */}
         {/* FILTROS */}
@@ -186,7 +186,7 @@ export default function ProveedoresPage() {
           </div>
         </div>
 
-        <SunmiSeparator label="Listado" color="amber" className="my-4" />
+        <SunmiSeparator label="Listado" className="my-4" />
 
         {/* ===================== */}
         {/* TABLA */}

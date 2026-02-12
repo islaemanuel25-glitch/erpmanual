@@ -1,6 +1,8 @@
 "use client";
 
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function TablaSugeridos({
   datos,
@@ -229,21 +231,10 @@ export default function TablaSugeridos({
                   <td className="px-2 py-2 text-right">
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-1">
-                        <input
+                        <SunmiInput
                           type="number"
                           min={0}
                           step={1}
-                          className="
-                            w-[80px]
-                            bg-slate-900
-                            border border-slate-700 
-                            rounded-lg px-2 py-1 
-                            text-right text-cyan-300
-                            text-[12px]
-                            focus:border-cyan-400 
-                            focus:ring-1 focus:ring-cyan-400
-                            transition
-                          "
                           value={sugeridoCantidad}
                           onChange={(e) =>
                             onEditSugerido(
@@ -254,15 +245,7 @@ export default function TablaSugeridos({
                           }
                         />
                         {(p.modoEnvio === "MIXTO" && factorPack > 1) ? (
-                          <select
-                            className="
-                              bg-slate-900
-                              border border-slate-700 
-                              rounded-lg px-1 py-1 
-                              text-[10px] text-slate-300
-                              focus:border-cyan-400 
-                              focus:ring-1 focus:ring-cyan-400
-                            "
+                          <SunmiSelect
                             value={sugeridoUnidad}
                             onChange={(e) =>
                               onEditSugerido(
@@ -274,7 +257,7 @@ export default function TablaSugeridos({
                           >
                             <option value="BULTO">bultos</option>
                             <option value="UNIDAD">uds</option>
-                          </select>
+                          </SunmiSelect>
                         ) : (
                           <span className="text-[10px] text-slate-400">
                             {sugeridoUnidad === "BULTO" ? "bultos" : "uds"}

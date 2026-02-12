@@ -21,7 +21,7 @@ export default function SunmiTableUsuarios({
       {/* HEADER SUNMI */}
       <SunmiHeader title="Usuarios" color="amber" />
 
-      <SunmiSeparator label="Listado" color="amber" />
+      <SunmiSeparator label="Listado" />
 
       {/* TABLA SUNMI */}
       <div className="overflow-x-auto">

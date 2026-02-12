@@ -9,6 +9,7 @@ import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSelect from "@/components/sunmi/SunmiSelect";
 
 import ColumnSettingsModal from "@/components/transferencias/ColumnSettingsModal";
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
@@ -152,31 +153,29 @@ export default function TransferenciasPage() {
         {/* ======================
             FILTROS
         ======================= */}
-        <SunmiSeparator label="Filtros" color="amber" />
+        <SunmiSeparator label="Filtros" />
 
         <div className="grid sm:grid-cols-3 gap-3 px-2 pb-2">
 
           {/* ESTADO */}
           <div>
-            <label className="text-slate-100 text-xs mb-1 block">Estado</label>
-            <select
+            <label className="text-[11px] text-slate-400 mb-1 block">Estado</label>
+            <SunmiSelect
               value={estado}
               onChange={(e) => { setEstado(e.target.value); setPage(1); }}
-              className="px-2 py-1 w-full rounded bg-slate-900/60 border border-slate-600 text-slate-100 text-sm"
             >
               {ESTADOS.map((e) => (
                 <option key={e.value} value={e.value}>{e.label}</option>
               ))}
-            </select>
+            </SunmiSelect>
           </div>
 
           {/* LOCAL */}
           <div>
-            <label className="text-slate-100 text-xs mb-1 block">Local</label>
-            <select
+            <label className="text-[11px] text-slate-400 mb-1 block">Local</label>
+            <SunmiSelect
               value={localId}
               onChange={(e) => { setLocalId(e.target.value); setPage(1); }}
-              className="px-2 py-1 w-full rounded bg-slate-900/60 border border-slate-600 text-slate-100 text-sm"
             >
               <option value="">Todos</option>
               {locales.map((l) => (
@@ -184,12 +183,12 @@ export default function TransferenciasPage() {
                   {l.nombre} {l.esDeposito ? "(Depósito)" : ""}
                 </option>
               ))}
-            </select>
+            </SunmiSelect>
           </div>
 
           {/* DESDE */}
           <div>
-            <label className="text-slate-100 text-xs mb-1 block">Desde</label>
+            <label className="text-[11px] text-slate-400 mb-1 block">Desde</label>
             <SunmiInput
               type="date"
               value={fechaDesde}
@@ -199,7 +198,7 @@ export default function TransferenciasPage() {
 
           {/* HASTA */}
           <div>
-            <label className="text-slate-100 text-xs mb-1 block">Hasta</label>
+            <label className="text-[11px] text-slate-400 mb-1 block">Hasta</label>
             <SunmiInput
               type="date"
               value={fechaHasta}
@@ -208,7 +207,7 @@ export default function TransferenciasPage() {
           </div>
 
           <div className="flex items-end">
-            <SunmiButton size="sm" variant="outline" onClick={quitarFiltros}>
+            <SunmiButton color="slate" onClick={quitarFiltros}>
               Quitar filtros
             </SunmiButton>
           </div>
@@ -219,7 +218,7 @@ export default function TransferenciasPage() {
             LISTADO + BOTÓN DE COLUMNAS
         ======================= */}
         <div className="flex items-center justify-between px-2">
-          <SunmiSeparator label="Listado" color="amber" />
+          <SunmiSeparator label="Listado" />
 
           <SunmiButton
             size="xs"
@@ -260,11 +259,11 @@ export default function TransferenciasPage() {
           <div>Página {page} de {totalPages}</div>
 
           <div className="flex items-center gap-2">
-            <SunmiButton size="xs" variant="outline" onClick={prev} disabled={page <= 1}>
+            <SunmiButton color="slate" onClick={prev} disabled={page <= 1}>
               Anterior
             </SunmiButton>
 
-            <SunmiButton size="xs" variant="outline" onClick={next} disabled={page >= totalPages}>
+            <SunmiButton color="slate" onClick={next} disabled={page >= totalPages}>
               Siguiente
             </SunmiButton>
           </div>
