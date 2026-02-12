@@ -103,7 +103,7 @@ export default function ModalLocal({
           <SunmiCardHeader
             title={editMode ? "Editar local" : "Nuevo local"}
             subtitle="Configurá los datos del local"
-            color="amber"
+           
           />
 
           {/* CONTENIDO CON SCROLL */}
@@ -217,7 +217,7 @@ export default function ModalLocal({
               Cancelar
             </SunmiButton>
 
-            <SunmiButton color="amber" onClick={handleSubmit}>
+            <SunmiButton onClick={handleSubmit}>
               {editMode ? "Guardar cambios" : "Crear local"}
             </SunmiButton>
           </div>

@@ -228,7 +228,7 @@ export default function UsuariosPage() {
         <SunmiCardHeader
           title="Usuarios del sistema"
           subtitle="Gestioná los usuarios y sus permisos"
-          color="amber"
+         
         />
 
         {/* FILTROS */}
@@ -268,7 +268,7 @@ export default function UsuariosPage() {
 
             <SunmiButton
               onClick={() => router.push("/modulos/usuarios?nuevo=1")}
-              color="amber"
+             
             >
               ＋ Nuevo
             </SunmiButton>
@@ -302,7 +302,7 @@ export default function UsuariosPage() {
                   <div className="flex justify-end gap-1">
                     <SunmiButtonIcon
                       icon={Pencil}
-                      color="amber"
+                     
                       size={16}
                       onClick={() => router.push(`/modulos/usuarios?editar=${u.id}`)}
                     />

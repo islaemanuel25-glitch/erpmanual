@@ -100,7 +100,7 @@ export default function ModalProveedor({
           <div className="flex items-center justify-between">
             <SunmiHeader
               title={editMode ? "Editar proveedor" : "Nuevo proveedor"}
-              color="amber"
+             
             />
 
             <SunmiButton color="slate" onClick={onClose}>
@@ -200,7 +200,7 @@ export default function ModalProveedor({
               Cancelar
             </SunmiButton>
 
-            <SunmiButton color="amber" onClick={handleSubmitInternal}>
+            <SunmiButton onClick={handleSubmitInternal}>
               {editMode ? "Guardar cambios" : "Crear proveedor"}
             </SunmiButton>
           </div>

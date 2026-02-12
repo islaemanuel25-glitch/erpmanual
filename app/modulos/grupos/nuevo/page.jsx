@@ -53,7 +53,7 @@ export default function NuevoGrupoPage() {
         <SunmiCard>
           <SunmiCardHeader
             title="Nuevo Grupo"
-            color="amber"
+           
           />
 
           <SunmiSeparator label="Datos" />
@@ -75,7 +75,7 @@ export default function NuevoGrupoPage() {
             </SunmiButton>
 
             <SunmiButton
-              color="amber"
+             
               onClick={crearGrupo}
               disabled={creando}
             >

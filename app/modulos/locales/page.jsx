@@ -211,7 +211,7 @@ export default function LocalesPage() {
         <SunmiCardHeader
           title="Locales del sistema"
           subtitle="Gestioná los locales y depósitos"
-          color="amber"
+         
         />
 
         {/* FILTROS */}
@@ -237,7 +237,7 @@ export default function LocalesPage() {
               Limpiar
             </SunmiButton>
 
-            <SunmiButton onClick={handleNuevo} color="amber">
+            <SunmiButton onClick={handleNuevo}>
               ＋ Nuevo
             </SunmiButton>
           </div>
@@ -268,7 +268,7 @@ export default function LocalesPage() {
                   <div className="flex justify-end gap-1">
                     <SunmiButtonIcon
                       icon={Pencil}
-                      color="amber"
+                     
                       size={16}
                       onClick={() => handleEditar(l.id)}
                     />

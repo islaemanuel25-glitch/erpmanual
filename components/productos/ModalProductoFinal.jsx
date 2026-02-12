@@ -202,7 +202,7 @@ export default function ModalProducto({
     >
       <SunmiCard className="w-[95%] max-w-4xl">
         <div className="flex items-center justify-between mb-3">
-          <SunmiHeader title={initialData ? "Editar producto" : "Nuevo producto"} color="amber" />
+          <SunmiHeader title={initialData ? "Editar producto" : "Nuevo producto"} />
           <SunmiButton color="cyan" onClick={onClose}>
             Cerrar
           </SunmiButton>
@@ -465,7 +465,7 @@ export default function ModalProducto({
             Cancelar
           </SunmiButton>
 
-          <SunmiButton color="amber" onClick={handleSubmit}>
+          <SunmiButton onClick={handleSubmit}>
             {initialData ? "Guardar cambios" : "Crear producto"}
           </SunmiButton>
         </div>

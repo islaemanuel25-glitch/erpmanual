@@ -263,7 +263,7 @@ export default function PageGrupos() {
         <SunmiCardHeader
           title="Grupos del sistema"
           subtitle="Gestioná grupos de locales y depósitos"
-          color="amber"
+         
         />
 
         {/* FILTROS */}
@@ -298,7 +298,7 @@ export default function PageGrupos() {
               Limpiar
             </SunmiButton>
 
-            <SunmiButton onClick={handleNuevo} color="amber">
+            <SunmiButton onClick={handleNuevo}>
               ＋ Nuevo
             </SunmiButton>
           </div>
@@ -326,11 +326,11 @@ export default function PageGrupos() {
                   key={g.id}
                   title={g.nombre}
                   subtitle={`${cantidadLocales} locales · ${cantidadDepositos} depósitos`}
-                  color="amber"
+                 
                   actions={
                     <>
                       <SunmiButton
-                        color="amber"
+                       
                         onClick={() =>
                           router.push(`/modulos/grupos/${g.id}`)
                         }
@@ -340,7 +340,7 @@ export default function PageGrupos() {
 
                       <SunmiButtonIcon
                         icon={Pencil}
-                        color="amber"
+                       
                         size={16}
                         onClick={() => handleEditar(g.id)}
                       />

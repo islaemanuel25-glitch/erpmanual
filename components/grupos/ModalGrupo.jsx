@@ -157,7 +157,7 @@ export default function ModalGrupo({
           <SunmiCardHeader
             title={editMode ? "Editar grupo" : "Nuevo grupo"}
             subtitle="Configurá el grupo y sus asignaciones"
-            color="amber"
+           
           />
 
           {/* CONTENIDO SCROLLEABLE */}
@@ -192,7 +192,7 @@ export default function ModalGrupo({
                   ))}
               </SunmiSelectAdv>
 
-              <SunmiButton color="amber" onClick={agregarLocal}>
+              <SunmiButton onClick={agregarLocal}>
                 Agregar
               </SunmiButton>
             </div>
@@ -228,7 +228,7 @@ export default function ModalGrupo({
                   ))}
               </SunmiSelectAdv>
 
-              <SunmiButton color="amber" onClick={agregarDeposito}>
+              <SunmiButton onClick={agregarDeposito}>
                 Agregar
               </SunmiButton>
             </div>
@@ -253,7 +253,7 @@ export default function ModalGrupo({
               Cancelar
             </SunmiButton>
 
-            <SunmiButton color="amber" onClick={handleSubmit}>
+            <SunmiButton onClick={handleSubmit}>
               {editMode ? "Guardar cambios" : "Crear grupo"}
             </SunmiButton>
           </div>

@@ -97,7 +97,7 @@ export default function ModalUsuario({
           <SunmiCardHeader
             title={editMode ? "Editar usuario" : "Nuevo usuario"}
             subtitle="Configurá los datos del usuario"
-            color="amber"
+           
           />
 
           {/* CONTENIDO CON SCROLL */}
@@ -189,7 +189,7 @@ export default function ModalUsuario({
               Cancelar
             </SunmiButton>
 
-            <SunmiButton color="amber" onClick={handleSubmit}>
+            <SunmiButton onClick={handleSubmit}>
               {editMode ? "Guardar cambios" : "Crear usuario"}
             </SunmiButton>
           </div>

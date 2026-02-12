@@ -164,7 +164,7 @@ export default function RolesPage() {
         <SunmiCardHeader
           title="Roles del sistema"
           subtitle="Gestioná los roles y sus permisos"
-          color="amber"
+         
         />
 
         {/* FILTROS */}
@@ -184,7 +184,7 @@ export default function RolesPage() {
               Limpiar
             </SunmiButton>
 
-            <SunmiButton onClick={handleNuevo} color="amber">
+            <SunmiButton onClick={handleNuevo}>
               ＋ Nuevo
             </SunmiButton>
           </div>
@@ -211,7 +211,7 @@ export default function RolesPage() {
                   <div className="flex justify-end gap-1">
                     <SunmiButtonIcon
                       icon={Pencil}
-                      color="amber"
+                     
                       size={16}
                       onClick={() => handleEditar(r.id)}
                     />

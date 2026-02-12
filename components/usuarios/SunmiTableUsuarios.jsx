@@ -19,7 +19,7 @@ export default function SunmiTableUsuarios({
   return (
     <div className="sunmi-card border border-slate-800 rounded-2xl shadow-md p-0 overflow-hidden bg-slate-950">
       {/* HEADER SUNMI */}
-      <SunmiHeader title="Usuarios" color="amber" />
+      <SunmiHeader title="Usuarios" />
 
       <SunmiSeparator label="Listado" />
 

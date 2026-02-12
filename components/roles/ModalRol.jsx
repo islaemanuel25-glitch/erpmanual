@@ -87,7 +87,7 @@ export default function ModalRol({
           <SunmiCardHeader
             title={editMode ? 'Editar rol' : 'Nuevo rol'}
             subtitle="Configurá nombre y permisos"
-            color="amber"
+           
           />
 
           {/* CONTENIDO CON SCROLL FUNCIONAL */}
@@ -107,7 +107,7 @@ export default function ModalRol({
             <SunmiSeparator label="Permisos" />
 
             <div className="flex justify-end">
-              <SunmiButton color="amber" onClick={setAdmin}>
+              <SunmiButton onClick={setAdmin}>
                 Set Admin (*)
               </SunmiButton>
             </div>
@@ -146,7 +146,7 @@ export default function ModalRol({
               Cancelar
             </SunmiButton>
 
-            <SunmiButton color="amber" onClick={handleSubmit}>
+            <SunmiButton onClick={handleSubmit}>
               {editMode ? "Guardar cambios" : "Crear rol"}
             </SunmiButton>
           </div>

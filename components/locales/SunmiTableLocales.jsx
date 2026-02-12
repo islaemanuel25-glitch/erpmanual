@@ -28,7 +28,7 @@ export default function SunmiTableLocales({
   return (
     <div className="sunmi-card border border-slate-800 rounded-2xl shadow-md p-0 overflow-hidden bg-slate-950">
 
-      <SunmiHeader title="Locales" color="amber" />
+      <SunmiHeader title="Locales" />
 
       <SunmiSeparator label="Listado" />
 

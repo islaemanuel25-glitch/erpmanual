@@ -144,7 +144,7 @@ export default function TransferenciasPage() {
     <div className="p-2 sm:p-4 max-w-6xl mx-auto">
       
       <SunmiCard>
-        <SunmiHeader title="Transferencias" color="amber">
+        <SunmiHeader title="Transferencias">
           <div className="text-xs sm:text-sm text-slate-200">
             Historial de transferencias entre Depósito y Locales
           </div>
