@@ -1,0 +1,99 @@
+# Modulo: Productos
+
+## Ubicacion
+- UI: `app/modulos/productos/page.jsx`
+- APIs: `app/api/productos/`
+- Componentes: `components/productos/`
+
+## Descripcion
+Catalogo centralizado de productos por grupo. Cada ProductoBase se replica como ProductoLocal en cada local del grupo, permitiendo overrides de precio por local.
+
+## Funcionalidad principal
+- Listado paginado con filtros (categoria, proveedor, area, estado, busqueda)
+- Crear producto (replica automaticamente a locales del grupo)
+- Editar producto (base o override local)
+- Eliminar producto (solo si no tiene movimientos)
+- Gestion de columnas visibles (persistido en localStorage)
+- Selector de local para ver precios/stock especificos
+
+## Dependencias
+
+### Usa
+- Categorias (categoria_id)
+- Proveedores (proveedor_id)
+- Areas Fisicas (area_fisica_id)
+- Grupos (grupoId)
+- Locales (localId, creadoEnLocalId)
+
+### Usado por
+- Stock Locales (ProductoLocal → StockLocal)
+- Transferencias (TransferenciaDetalle → ProductoLocal)
+- POS Transferencias (PosTransferenciaDetalle → ProductoLocal)
+- Actualizacion de Precios (precio_costo, precio_venta)
+
+## APIs
+
+### Consume
+- `GET /api/catalogos/categorias`
+- `GET /api/catalogos/proveedores`
+- `GET /api/catalogos/areas-fisicas`
+
+### Expone
+- `GET /api/productos/listar?localId=&q=&categoriaId=&proveedorId=&areaFisicaId=&activo=&page=`
+- `GET /api/productos/obtener?id=&localId=`
+- `POST /api/productos/crear`
+- `PUT /api/productos/editar/[id]?localId=`
+- `DELETE /api/productos/eliminar/[id]`
+
+## Componentes principales
+- `TablaProductos` / `SunmiTablaProductos`: Tabla principal con acciones inline
+- `FiltrosProductos`: Barra de filtros
+- `ModalProductoFinal`: Modal de crear/editar
+- `SelectorLocales`: Selector de local activo
+- `ColumnManager`: Gestor de columnas visibles
+
+## Estado y hooks
+- Estado local con `useState`
+- Filtros y columnas persistidos en localStorage
+
+## Permisos requeridos
+- `productos.ver`
+- `productos.crear`
+- `productos.editar`
+- `productos.eliminar`
+
+## Modelo de datos
+
+```prisma
+model ProductoBase {
+  id              Int       @id @default(autoincrement())
+  grupoId         Int
+  nombre          String
+  descripcion     String?
+  sku             String?
+  codigo_barra    String?
+  categoria_id    Int?
+  proveedor_id    Int?
+  area_fisica_id  Int?
+  unidad_medida   UnidadMedida
+  factor_pack     Int?
+  precio_costo    Decimal   @db.Decimal(12, 2)
+  precio_venta    Decimal   @db.Decimal(12, 2)
+  margen          Decimal?  @db.Decimal(6, 2)
+  activo          Boolean   @default(true)
+  // ... mas campos
+  @@unique([grupoId, codigo_barra])
+}
+
+model ProductoLocal {
+  id            Int       @id @default(autoincrement())
+  localId       Int
+  baseId        Int
+  nombre        String?   // override
+  precio_costo  Decimal?  // override
+  precio_venta  Decimal?  // override
+  margen        Decimal?  // override
+  activo        Boolean   @default(true)
+  @@unique([localId, baseId])
+}
+```
