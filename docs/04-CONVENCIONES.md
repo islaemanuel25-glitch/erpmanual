@@ -121,3 +121,23 @@ Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDig
 - `UserContext` para datos de sesion globales
 - `localStorage` para preferencias (tema, columnas visibles, local seleccionado)
 - No se usa Redux ni Zustand
+
+## Estilos UI (ver docs/05-GUIA-ESTILOS-UI.md)
+
+### Labels
+- Estilo estandar: `text-[11px] text-slate-400 mb-1 block`
+
+### Colores
+- NO hardcodear colores (`bg-slate-900`, `text-slate-100`, etc)
+- Usar componentes Sunmi que respetan el sistema de themes
+- Bordes: `border-slate-800`
+
+### Feedback
+- Toast para mensajes (`showSuccess`, `showError` de SunmiToast)
+- NO usar `alert()`
+
+### Responsive
+- Mobile-first
+- Breakpoints: sm (640px), md (768px), lg (1024px)
+- Tablas: siempre en `overflow-x-auto`
+- Grids: siempre con breakpoint (`grid-cols-1 md:grid-cols-3`)
