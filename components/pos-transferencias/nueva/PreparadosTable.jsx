@@ -1,6 +1,6 @@
 "use client";
 
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function PreparadosTable({
@@ -43,14 +43,14 @@ export default function PreparadosTable({
 
         <div className="flex items-center gap-2 text-[11px]">
           <span className="opacity-80">Mostrar:</span>
-          <SunmiSelect
+          <SunmiSelectAdv
             value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            onChange={(val) => onPageSizeChange(Number(val))}
           >
             {[25, 50, 100, 150, 200].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
-          </SunmiSelect>
+          </SunmiSelectAdv>
 
           <button
             className="
@@ -186,15 +186,15 @@ export default function PreparadosTable({
                       }
                     />
                     {(p.modoEnvio === "MIXTO" && p.factorPack > 1) ? (
-                      <SunmiSelect
+                      <SunmiSelectAdv
                         value={p.unidadPreparada || p.unidadSugerida || "BULTO"}
-                        onChange={(e) =>
-                          onEditPreparado(p.detalleId, p.preparado, e.target.value)
+                        onChange={(val) =>
+                          onEditPreparado(p.detalleId, p.preparado, val)
                         }
                       >
                         <option value="BULTO">bultos</option>
                         <option value="UNIDAD">uds</option>
-                      </SunmiSelect>
+                      </SunmiSelectAdv>
                     ) : (
                       <span className="text-[10px] text-slate-400">
                         {(p.unidadPreparada || p.unidadSugerida || "BULTO") === "BULTO" ? "bultos" : "uds"}

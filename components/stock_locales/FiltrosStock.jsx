@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function FiltrosStock({
@@ -78,26 +78,26 @@ export default function FiltrosStock({
 
         {/* 🧩 Selectores */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <SunmiSelect
+          <SunmiSelectAdv
             value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
+            onChange={(val) => setCategoria(val)}
           >
             <option value="">Categoría</option>
-          </SunmiSelect>
+          </SunmiSelectAdv>
 
-          <SunmiSelect
+          <SunmiSelectAdv
             value={proveedor}
-            onChange={(e) => setProveedor(e.target.value)}
+            onChange={(val) => setProveedor(val)}
           >
             <option value="">Proveedor</option>
-          </SunmiSelect>
+          </SunmiSelectAdv>
 
-          <SunmiSelect
+          <SunmiSelectAdv
             value={area}
-            onChange={(e) => setArea(e.target.value)}
+            onChange={(val) => setArea(val)}
           >
             <option value="">Área física</option>
-          </SunmiSelect>
+          </SunmiSelectAdv>
         </div>
 
         {/* ✔ Checkboxes */}

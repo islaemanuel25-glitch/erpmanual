@@ -9,7 +9,7 @@ import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
 import ColumnSettingsModal from "@/components/transferencias/ColumnSettingsModal";
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
@@ -160,22 +160,22 @@ export default function TransferenciasPage() {
           {/* ESTADO */}
           <div>
             <label className="text-[11px] text-slate-400 mb-1 block">Estado</label>
-            <SunmiSelect
+            <SunmiSelectAdv
               value={estado}
-              onChange={(e) => { setEstado(e.target.value); setPage(1); }}
+              onChange={(val) => { setEstado(val); setPage(1); }}
             >
               {ESTADOS.map((e) => (
                 <option key={e.value} value={e.value}>{e.label}</option>
               ))}
-            </SunmiSelect>
+            </SunmiSelectAdv>
           </div>
 
           {/* LOCAL */}
           <div>
             <label className="text-[11px] text-slate-400 mb-1 block">Local</label>
-            <SunmiSelect
+            <SunmiSelectAdv
               value={localId}
-              onChange={(e) => { setLocalId(e.target.value); setPage(1); }}
+              onChange={(val) => { setLocalId(val); setPage(1); }}
             >
               <option value="">Todos</option>
               {locales.map((l) => (
@@ -183,7 +183,7 @@ export default function TransferenciasPage() {
                   {l.nombre} {l.esDeposito ? "(Depósito)" : ""}
                 </option>
               ))}
-            </SunmiSelect>
+            </SunmiSelectAdv>
           </div>
 
           {/* DESDE */}

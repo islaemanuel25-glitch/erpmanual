@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
 
@@ -158,13 +158,13 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
             )}
 
             {/* Tipo */}
-            <SunmiSelect
+            <SunmiSelectAdv
               value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
+              onChange={(val) => setTipo(val)}
             >
               <option value="sumar">Sumar</option>
               <option value="restar">Restar</option>
-            </SunmiSelect>
+            </SunmiSelectAdv>
 
             {/* Motivo */}
             <textarea

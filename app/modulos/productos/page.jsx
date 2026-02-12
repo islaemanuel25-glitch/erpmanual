@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
@@ -647,9 +647,9 @@ export default function ProductosPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 px-1">
                 <div>
                   <label className="text-[11px] text-slate-400 mb-1 block">Local</label>
-                  <SunmiSelect
+                  <SunmiSelectAdv
                     value={expLocalId}
-                    onChange={(e) => setExpLocalId(e.target.value)}
+                    onChange={(val) => setExpLocalId(val)}
                   >
                     <option value="">Todos</option>
                     {locales.map((l) => (
@@ -657,33 +657,33 @@ export default function ProductosPage() {
                         {l.nombre} {l.es_deposito ? "(Depósito)" : ""}
                       </option>
                     ))}
-                  </SunmiSelect>
+                  </SunmiSelectAdv>
                 </div>
 
                 <div>
                   <label className="text-[11px] text-slate-400 mb-1 block">Proveedor</label>
-                  <SunmiSelect
+                  <SunmiSelectAdv
                     value={expProveedorId}
-                    onChange={(e) => setExpProveedorId(e.target.value)}
+                    onChange={(val) => setExpProveedorId(val)}
                   >
                     <option value="">Todos</option>
                     {catalogos.PROVEEDORES.map((p) => (
                       <option key={p.id} value={p.id}>{p.nombre}</option>
                     ))}
-                  </SunmiSelect>
+                  </SunmiSelectAdv>
                 </div>
 
                 <div>
                   <label className="text-[11px] text-slate-400 mb-1 block">Categoría</label>
-                  <SunmiSelect
+                  <SunmiSelectAdv
                     value={expCategoriaId}
-                    onChange={(e) => setExpCategoriaId(e.target.value)}
+                    onChange={(val) => setExpCategoriaId(val)}
                   >
                     <option value="">Todas</option>
                     {catalogos.CATEGORIAS.map((c) => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
-                  </SunmiSelect>
+                  </SunmiSelectAdv>
                 </div>
               </div>
 
@@ -707,10 +707,10 @@ export default function ProductosPage() {
                   <label className="text-[11px] text-slate-400 mb-1 block">
                     Importar a local <span className="text-red-400">*</span>
                   </label>
-                  <SunmiSelect
+                  <SunmiSelectAdv
                     value={impLocalId}
-                    onChange={(e) => {
-                      setImpLocalId(e.target.value);
+                    onChange={(val) => {
+                      setImpLocalId(val);
                       resetImport();
                     }}
                   >
@@ -720,24 +720,24 @@ export default function ProductosPage() {
                         {l.nombre} {l.es_deposito ? "(Depósito)" : ""}
                       </option>
                     ))}
-                  </SunmiSelect>
+                  </SunmiSelectAdv>
                 </div>
 
                 <div>
                   <label className="text-[11px] text-slate-400 mb-1 block">
                     Modo de importación
                   </label>
-                  <SunmiSelect
+                  <SunmiSelectAdv
                     value={impModo}
-                    onChange={(e) => {
-                      setImpModo(e.target.value);
+                    onChange={(val) => {
+                      setImpModo(val);
                       resetImport();
                     }}
                   >
                     <option value="crear">Solo crear nuevos</option>
                     <option value="actualizar">Solo actualizar existentes</option>
                     <option value="crear_actualizar">Crear + Actualizar</option>
-                  </SunmiSelect>
+                  </SunmiSelectAdv>
                 </div>
               </div>
 

@@ -1,7 +1,6 @@
 "use client";
 
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function TablaSugeridos({
@@ -245,19 +244,19 @@ export default function TablaSugeridos({
                           }
                         />
                         {(p.modoEnvio === "MIXTO" && factorPack > 1) ? (
-                          <SunmiSelect
+                          <SunmiSelectAdv
                             value={sugeridoUnidad}
-                            onChange={(e) =>
+                            onChange={(val) =>
                               onEditSugerido(
                                 p.productoLocalDestinoId,
                                 sugeridoCantidad,
-                                e.target.value
+                                val
                               )
                             }
                           >
                             <option value="BULTO">bultos</option>
                             <option value="UNIDAD">uds</option>
-                          </SunmiSelect>
+                          </SunmiSelectAdv>
                         ) : (
                           <span className="text-[10px] text-slate-400">
                             {sugeridoUnidad === "BULTO" ? "bultos" : "uds"}

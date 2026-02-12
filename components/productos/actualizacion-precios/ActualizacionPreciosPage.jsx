@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiRow from "@/components/sunmi/SunmiRow";
@@ -546,9 +546,9 @@ export default function ActualizacionPreciosPage() {
                   <label className="text-[11px] text-slate-400 mb-1 block">
                     Proveedor
                   </label>
-                  <SunmiSelect
+                  <SunmiSelectAdv
                     value={proveedorId}
-                    onChange={(e) => setProveedorId(e.target.value)}
+                    onChange={(val) => setProveedorId(val)}
                     disabled={loadingProveedores || loadingProductos}
                   >
                     <option value="">
@@ -561,7 +561,7 @@ export default function ActualizacionPreciosPage() {
                         {p.nombre}
                       </option>
                     ))}
-                  </SunmiSelect>
+                  </SunmiSelectAdv>
                 </div>
                 <SunmiButton
                   color="amber"
@@ -679,9 +679,9 @@ export default function ActualizacionPreciosPage() {
                     <label className="text-[11px] text-slate-400 mb-1 block">
                       Proveedor
                     </label>
-                    <SunmiSelect
+                    <SunmiSelectAdv
                       value={excelProveedorId}
-                      onChange={(e) => setExcelProveedorId(e.target.value)}
+                      onChange={(val) => setExcelProveedorId(val)}
                       disabled={loadingProveedores || loadingExcel}
                     >
                       <option value="">
@@ -694,7 +694,7 @@ export default function ActualizacionPreciosPage() {
                           {p.nombre}
                         </option>
                       ))}
-                    </SunmiSelect>
+                    </SunmiSelectAdv>
                   </div>
                 }
                 right={

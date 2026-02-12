@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
 export default function SelectorGrupoActivo({ onGrupoChanged }) {
@@ -130,9 +130,9 @@ export default function SelectorGrupoActivo({ onGrupoChanged }) {
 
       <div className="flex gap-2 items-end">
         <div className="flex-1">
-          <SunmiSelect
+          <SunmiSelectAdv
             value={selectedGrupoId}
-            onChange={(e) => setSelectedGrupoId(e.target.value)}
+            onChange={(val) => setSelectedGrupoId(val)}
             disabled={applying}
           >
             <option value="">Seleccionar grupo...</option>
@@ -141,7 +141,7 @@ export default function SelectorGrupoActivo({ onGrupoChanged }) {
                 {g.nombre}
               </option>
             ))}
-          </SunmiSelect>
+          </SunmiSelectAdv>
         </div>
 
         <SunmiButton

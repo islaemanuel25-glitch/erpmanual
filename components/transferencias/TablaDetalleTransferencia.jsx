@@ -1,7 +1,7 @@
 "use client";
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
 function num(v) {
@@ -80,13 +80,13 @@ export default function TablaDetalleTransferencia({
                 <td className="px-2 py-1">
                   {inputsHabilitados ? (
                     num(edit.recibido) !== enviada ? (
-                      <SunmiSelect
+                      <SunmiSelectAdv
                         value={edit.motivoPrincipal}
-                        onChange={(e) => {
+                        onChange={(val) => {
                           const copia = [...editItems];
-                          copia[idx].motivoPrincipal = e.target.value;
+                          copia[idx].motivoPrincipal = val;
 
-                          if (e.target.value !== "Otro") {
+                          if (val !== "Otro") {
                             copia[idx].motivoDetalle = "";
                           }
 
@@ -97,7 +97,7 @@ export default function TablaDetalleTransferencia({
                         <option value="Faltante">Faltante</option>
                         <option value="Producto dañado">Producto dañado</option>
                         <option value="Otro">Otro (especificar)</option>
-                      </SunmiSelect>
+                      </SunmiSelectAdv>
                     ) : (
                       "-"
                     )

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import SunmiSelect from "@/components/sunmi/SunmiSelect";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import FiltrosStock from "@/components/stock_locales/FiltrosStock";
 import TablaStock from "@/components/stock_locales/TablaStock";
 import ModalAjuste from "@/components/stock_locales/ModalAjuste";
@@ -105,10 +105,10 @@ export default function StockLocalesPage() {
         <div className="mt-3 flex flex-col gap-2">
           <label className="text-[11px] text-slate-400 mb-1 block">Local seleccionado</label>
 
-          <SunmiSelect
+          <SunmiSelectAdv
             value={localSeleccionado ?? ""}
-            onChange={(e) => {
-              setLocalSeleccionado(Number(e.target.value));
+            onChange={(val) => {
+              setLocalSeleccionado(Number(val));
               setPage(1);
             }}
           >
@@ -117,7 +117,7 @@ export default function StockLocalesPage() {
                 {l.nombre}
               </option>
             ))}
-          </SunmiSelect>
+          </SunmiSelectAdv>
         </div>
       </div>
 
