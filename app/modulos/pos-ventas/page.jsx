@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
@@ -19,10 +20,19 @@ export default function PosVentasPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  // Selector de local (para admin padre)
+  const [locales, setLocales] = useState([]);
+  const [localSeleccionado, setLocalSeleccionado] = useState(null);
+
   // Carrito
   const [carrito, setCarrito] = useState([]);
   const [formaPago, setFormaPago] = useState("efectivo");
   const [cobrando, setCobrando] = useState(false);
+
+  // Local activo efectivo
+  const localActual = localSeleccionado || me?.localId || null;
+  const localNombre =
+    locales.find((l) => l.id === localActual)?.nombre || "";
 
   // ---------------------------------------------------------------------------
   // Cargar datos del usuario
@@ -38,6 +48,10 @@ export default function PosVentasPage() {
         const data = await res.json();
         if (data.ok && data.user) {
           setMe(data.user);
+          // Si tiene local fijo, usarlo directamente
+          if (data.user.localId) {
+            setLocalSeleccionado(data.user.localId);
+          }
         } else {
           setErrorMsg("No se pudo obtener el usuario actual.");
         }
@@ -50,6 +64,27 @@ export default function PosVentasPage() {
     };
     cargar();
   }, [router]);
+
+  // ---------------------------------------------------------------------------
+  // Cargar locales disponibles (para admin padre)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!me) return;
+    const cargarLocales = async () => {
+      try {
+        const res = await fetch("/api/locales/opciones", {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setLocales(data.items || []);
+        }
+      } catch (err) {
+        console.error("Error cargando locales:", err);
+      }
+    };
+    cargarLocales();
+  }, [me]);
 
   // ---------------------------------------------------------------------------
   // Agregar producto al carrito
@@ -123,11 +158,24 @@ export default function PosVentasPage() {
   );
 
   // ---------------------------------------------------------------------------
+  // Cambiar local (admin) - limpiar carrito al cambiar
+  // ---------------------------------------------------------------------------
+  const handleCambiarLocal = (val) => {
+    const id = Number(val);
+    if (id && id !== localSeleccionado) {
+      setLocalSeleccionado(id);
+      setCarrito([]);
+      setErrorMsg("");
+      setSuccessMsg("");
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // Cobrar y finalizar
   // ---------------------------------------------------------------------------
   const handleCobrar = async ({ formaPago: fp, comision, total }) => {
-    if (!me?.localId) {
-      setErrorMsg("No se detecto un local asignado al usuario.");
+    if (!localActual) {
+      setErrorMsg("No se detecto un local para operar.");
       return;
     }
 
@@ -146,7 +194,7 @@ export default function PosVentasPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          localId: me.localId,
+          localId: localActual,
           formaPago: fp,
           descuento: 0,
           comision,
@@ -192,21 +240,83 @@ export default function PosVentasPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Render
+  // Admin padre sin local seleccionado: mostrar selector
+  // ---------------------------------------------------------------------------
+  const esAdmin = me?.esAdmin && !me?.localId;
+
+  if (esAdmin && !localSeleccionado) {
+    return (
+      <div className="sunmi-bg w-full min-h-full p-2">
+        <div className="max-w-md mx-auto mt-10">
+          <SunmiCard className="p-4">
+            <SunmiSeparator
+              label="Seleccionar local para operar POS"
+              className="!mt-0 !mb-3"
+            />
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] text-slate-400 mb-1 block">
+                  Local
+                </label>
+                <SunmiSelectAdv
+                  value=""
+                  placeholder="Seleccionar local..."
+                  onChange={handleCambiarLocal}
+                >
+                  {locales.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.nombre} {l.esDeposito ? "(Deposito)" : ""}
+                    </option>
+                  ))}
+                </SunmiSelectAdv>
+              </div>
+              <SunmiButton
+                color="slate"
+                onClick={() => router.push("/modulos")}
+              >
+                Volver
+              </SunmiButton>
+            </div>
+          </SunmiCard>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render principal
   // ---------------------------------------------------------------------------
   return (
     <div className="sunmi-bg w-full min-h-full p-2">
       <div className="max-w-7xl mx-auto space-y-3">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-sm md:text-base font-semibold">
-            POS Ventas
-          </h1>
-          <div className="flex items-center gap-2">
-            {me && (
-              <span className="text-xs text-slate-400">
-                {me.nombre}
+          <div>
+            <h1 className="text-xl font-bold">POS Ventas</h1>
+            <div className="text-sm text-slate-400">
+              Local:{" "}
+              <span className="text-amber-400">
+                {localNombre || "Sin local"}
               </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Selector de local para admin */}
+            {esAdmin && (
+              <SunmiSelectAdv
+                value={String(localSeleccionado || "")}
+                onChange={handleCambiarLocal}
+                className="!w-48"
+              >
+                {locales.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.nombre}
+                  </option>
+                ))}
+              </SunmiSelectAdv>
+            )}
+            {me && (
+              <span className="text-xs text-slate-400">{me.nombre}</span>
             )}
             <SunmiButton
               color="slate"
@@ -234,7 +344,7 @@ export default function PosVentasPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* COLUMNA IZQUIERDA - Buscador */}
           <BuscadorProductos
-            localId={me?.localId}
+            localId={localActual}
             onAgregar={handleAgregar}
           />
 
