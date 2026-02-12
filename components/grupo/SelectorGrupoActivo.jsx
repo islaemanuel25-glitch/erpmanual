@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import SunmiSelect from "@/components/sunmi/SunmiSelect";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
-export default function SelectorGrupoActivo() {
+export default function SelectorGrupoActivo({ onGrupoChanged }) {
   const router = useRouter();
 
   const [esAdmin, setEsAdmin] = useState(false);
@@ -95,13 +95,12 @@ export default function SelectorGrupoActivo() {
       const data = await res.json();
 
       if (data.ok) {
-        setSuccessMsg("Grupo activo actualizado correctamente.");
+        setSuccessMsg("✓ Grupo activo actualizado correctamente");
         setGrupoActivoId(Number(selectedGrupoId));
 
-        // Refrescar página después de 1 segundo para que los endpoints usen el nuevo grupo
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+        if (onGrupoChanged) {
+          onGrupoChanged(Number(selectedGrupoId));
+        }
       } else {
         setSuccessMsg(`Error: ${data.error || "Error al actualizar grupo activo"}`);
       }

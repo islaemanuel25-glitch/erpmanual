@@ -234,6 +234,8 @@ export async function POST(req) {
       return {
         productoBaseId: p.id,
         nombre: p.nombre,
+        codigoBarra: p.codigo_barra || null,
+        margen: p.margen !== null ? Number(p.margen) : null,
         costoAnterior,
         costoNuevo,
         ventaAnterior,

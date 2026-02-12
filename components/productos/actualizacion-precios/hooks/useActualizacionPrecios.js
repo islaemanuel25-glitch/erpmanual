@@ -48,6 +48,20 @@ export default function useActualizacionPrecios(router) {
   };
 
   // -------------------------
+  // LIMPIAR ESTADO AL CAMBIAR GRUPO
+  // -------------------------
+  const resetState = () => {
+    setPreview([]);
+    setSummary(null);
+    setAlertas({ criticas: 0, advertencias: 0 });
+    setSelectedIds(new Set());
+    setHistory([]);
+    setHistoryDetail(null);
+    setErrorMsg("");
+    setSuccessMsg("");
+  };
+
+  // -------------------------
   // PREVIEW
   // -------------------------
   const runPreview = async (body) => {
@@ -81,7 +95,7 @@ export default function useActualizacionPrecios(router) {
       setSummary(data?.summary || null);
       setAlertas(data?.alertas || { criticas: 0, advertencias: 0 });
 
-      // 👉 NUEVO: mostrar hint si viene
+      // Mostrar hint si viene
       if (data?.hint) {
         setSuccessMsg(data.hint);
       } else if (!items.length) {
@@ -227,5 +241,6 @@ export default function useActualizacionPrecios(router) {
     loadHistoryDetail,
     toggleOne,
     toggleAll,
+    resetState,
   };
 }
