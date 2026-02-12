@@ -3,21 +3,52 @@ import prisma from "@/lib/prisma";
 import { mergeBaseLocalToUi, splitUiToDb } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 
-// Sincronizar precioCosto/activo a overrides
+// Sincronizar precioCosto/activo a overrides, recalculando precio_venta por margen
 async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
-  const data = {};
-  if (precioCosto !== undefined && precioCosto !== null) {
-    data.precio_costo = Number(precioCosto);
-  }
-  if (activo !== undefined) {
-    data.activo = Boolean(activo);
-  }
-  if (Object.keys(data).length === 0) return;
+  if (precioCosto === undefined && activo === undefined) return;
 
-  await prisma.productoLocal.updateMany({
-    where: { baseId },
-    data,
+  const base = await prisma.productoBase.findUnique({
+    where: { id: baseId },
+    select: { margen: true, redondeo_100: true },
   });
+
+  if (!base) return;
+
+  const locales = await prisma.productoLocal.findMany({
+    where: { baseId },
+  });
+
+  for (const local of locales) {
+    const data = {};
+
+    if (precioCosto !== undefined && precioCosto !== null) {
+      const costo = Number(precioCosto);
+      data.precio_costo = costo;
+
+      const margen = local.margen !== null && local.margen !== undefined
+        ? Number(local.margen)
+        : (base.margen !== null && base.margen !== undefined ? Number(base.margen) : 0);
+
+      let venta = costo * (1 + margen / 100);
+
+      if (base.redondeo_100) {
+        venta = Math.round(venta / 100) * 100;
+      }
+
+      data.precio_venta = venta;
+    }
+
+    if (activo !== undefined) {
+      data.activo = Boolean(activo);
+    }
+
+    if (Object.keys(data).length === 0) continue;
+
+    await prisma.productoLocal.update({
+      where: { id: local.id },
+      data,
+    });
+  }
 }
 
 export async function PUT(req, context) {
