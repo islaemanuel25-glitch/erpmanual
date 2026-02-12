@@ -167,6 +167,8 @@ export default function ActualizacionPreciosPage() {
           ventaActual: p.ventaAnterior,
           margen: p.margen ?? 0,
           pct: "",
+          compraNueva: "",
+          editadoPor: null,
         }))
       );
     } catch (err) {
@@ -185,24 +187,61 @@ export default function ActualizacionPreciosPage() {
       return;
     }
     setErrorMsg("");
-    setFilas((prev) => prev.map((f) => ({ ...f, pct: globalPct })));
+    setFilas((prev) =>
+      prev.map((f) => {
+        const cn = calcCompraNueva(f.compraActual, globalPct);
+        return {
+          ...f,
+          pct: globalPct,
+          compraNueva: cn != null ? String(round2(cn)) : "",
+          editadoPor: "porcentaje",
+        };
+      })
+    );
   };
 
   // Editar % de una fila individual
   const handlePctChange = (idx, value) => {
     setFilas((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], pct: value };
+      const f = next[idx];
+      const cn = calcCompraNueva(f.compraActual, value);
+      next[idx] = {
+        ...f,
+        pct: value,
+        compraNueva: cn != null ? String(round2(cn)) : "",
+        editadoPor: value === "" ? null : "porcentaje",
+      };
       return next;
     });
   };
 
-  // Productos con cambios reales (% distinto de vacio y de 0)
+  // Editar precio directo de una fila
+  const handlePrecioDirectoChange = (idx, value) => {
+    setFilas((prev) => {
+      const next = [...prev];
+      const f = next[idx];
+      const precio = parseFloat(value);
+      let pct = "";
+      if (!isNaN(precio) && f.compraActual > 0) {
+        pct = String(round2(((precio - f.compraActual) / f.compraActual) * 100));
+      }
+      next[idx] = {
+        ...f,
+        compraNueva: value,
+        pct,
+        editadoPor: value === "" ? null : "precio",
+      };
+      return next;
+    });
+  };
+
+  // Productos con cambios reales
   const itemsConCambios = useMemo(
     () =>
       filas.filter((f) => {
-        const p = parseFloat(f.pct);
-        return !isNaN(p) && p !== 0;
+        const cn = parseFloat(f.compraNueva);
+        return !isNaN(cn) && cn > 0 && cn !== f.compraActual;
       }),
     [filas]
   );
@@ -218,7 +257,7 @@ export default function ActualizacionPreciosPage() {
     }
 
     const items = itemsConCambios.map((f) => {
-      const cn = calcCompraNueva(f.compraActual, f.pct);
+      const cn = parseFloat(f.compraNueva);
       const vn = calcVentaNueva(cn, f.margen);
       return {
         productoBaseId: f.productoBaseId,
@@ -611,8 +650,10 @@ export default function ActualizacionPreciosPage() {
                     ]}
                   >
                     {filas.map((f, idx) => {
-                      const cn = calcCompraNueva(f.compraActual, f.pct);
-                      const vn = calcVentaNueva(cn, f.margen);
+                      const cn = parseFloat(f.compraNueva);
+                      const vn = !isNaN(cn) ? calcVentaNueva(cn, f.margen) : null;
+                      const isPct = f.editadoPor === "porcentaje";
+                      const isPrecio = f.editadoPor === "precio";
                       return (
                         <tr
                           key={f.productoBaseId}
@@ -633,10 +674,20 @@ export default function ActualizacionPreciosPage() {
                                 handlePctChange(idx, e.target.value)
                               }
                               placeholder="%"
+                              className={isPct ? "!border-amber-400/60" : ""}
                             />
                           </td>
-                          <td className="px-2 py-1.5 text-right whitespace-nowrap">
-                            {cn != null ? formatPrecio(cn) : "\u2014"}
+                          <td className="px-2 py-1.5 w-28">
+                            <SunmiInput
+                              type="number"
+                              step="0.01"
+                              value={f.compraNueva}
+                              onChange={(e) =>
+                                handlePrecioDirectoChange(idx, e.target.value)
+                              }
+                              placeholder="$"
+                              className={isPrecio ? "!border-cyan-400/60" : ""}
+                            />
                           </td>
                           <td className="px-2 py-1.5 text-right whitespace-nowrap">
                             {formatPrecio(f.ventaActual)}
