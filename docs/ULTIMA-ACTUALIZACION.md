@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-13 01:35
+**Fecha:** 2026-02-13 01:58
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- optimizar UI POS Ventas, eliminar duplicaciones, responsive mobile POS Ventas, Agregar selector de local para admin padre en POS Ventas
-- Archivos: 6 nuevos (6 total)
+- feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts, optimizar UI POS Ventas, eliminar duplicaciones, responsive mobile POS Ventas
+- Archivos: 10 nuevos (10 total)
 
 ### configuracion
 - optimizar UI POS Ventas, eliminar duplicaciones, Fix props inválidas en componentes Sunmi: variant/size en SunmiButton, mensaje en SunmiTableEmpty
@@ -42,7 +42,7 @@
 
 ### proveedores
 - Fix props inválidas en componentes Sunmi: variant/size en SunmiButton, mensaje en SunmiTableEmpty, Remover color="amber" hardcodeado de componentes Sunmi (usar theme por defecto), Corregir inconsistencias de componentes Sunmi en toda la app
-- Archivos: 2 modificados (2 total)
+- Archivos: 1 modificados (1 total)
 
 ### roles
 - Remover color="amber" hardcodeado de componentes Sunmi (usar theme por defecto), Corregir inconsistencias de componentes Sunmi en toda la app
@@ -58,8 +58,12 @@
 
 
 ## Archivos nuevos desde última sincronización
+- app/api/pos-ventas/favoritos/route.js
 - app/modulos/pos-ventas/page.jsx
 - components/pos-ventas/BuscadorProductos.jsx
+- components/pos-ventas/ModalPagoEfectivo.jsx
+- components/pos-ventas/ModalTicket.jsx
+- components/pos-ventas/ProductosFavoritos.jsx
 - components/pos-ventas/CarritoVenta.jsx
 - components/pos-ventas/FormaPago.jsx
 - app/api/pos-ventas/buscar-producto/route.js
