@@ -9,6 +9,7 @@ import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import {
   Home,
   ShoppingCart,
+  BarChart3,
   Package,
   Package2,
   Layers,
@@ -52,6 +53,18 @@ export default function SidebarPro() {
           iconFilled: ShoppingCart,
           items: [
             { label: "POS Ventas", href: "/modulos/pos-ventas" },
+          ],
+        }
+      : null,
+
+    esAdmin
+      ? {
+          key: "reportes",
+          label: "Reportes",
+          icon: BarChart3,
+          iconFilled: BarChart3,
+          items: [
+            { label: "Reportes Ventas", href: "/modulos/reportes-ventas" },
           ],
         }
       : null,
