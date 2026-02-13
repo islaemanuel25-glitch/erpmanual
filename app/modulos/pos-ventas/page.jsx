@@ -18,6 +18,7 @@ import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
 import HistorialDia from "@/components/pos-ventas/HistorialDia";
+import { ClipboardList } from "lucide-react";
 
 export default function PosVentasPage() {
   const router = useRouter();
@@ -48,6 +49,9 @@ export default function PosVentasPage() {
   // Turno de caja
   const [turnoActual, setTurnoActual] = useState(undefined); // undefined=cargando, null=sin turno, object=turno
   const [mostrarCierre, setMostrarCierre] = useState(false);
+
+  // Historial
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
 
   // Modales
   const [modalEfectivo, setModalEfectivo] = useState(null); // { total, formaPago }
@@ -141,7 +145,7 @@ export default function PosVentasPage() {
       // No interceptar si esta escribiendo en un input
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       // No interceptar si hay modal abierto
-      if (modalEfectivo || modalTicket || modalDescuento || modalCliente) return;
+      if (modalEfectivo || modalTicket || modalDescuento || modalCliente || mostrarHistorial) return;
 
       switch (e.key) {
         case "F1":
@@ -175,7 +179,7 @@ export default function PosVentasPage() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket, modalDescuento, modalCliente]);
+  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket, modalDescuento, modalCliente, mostrarHistorial]);
 
   // ---------------------------------------------------------------------------
   // Agregar producto al carrito
@@ -499,7 +503,7 @@ export default function PosVentasPage() {
   return (
     <div className="sunmi-bg w-full min-h-full p-2 lg:p-3 pb-24 lg:pb-3">
       <div className="max-w-7xl mx-auto space-y-2 lg:space-y-3">
-        {/* Header compacto */}
+        {/* Header compacto con stats inline */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-sm text-amber-400 font-medium truncate">
@@ -518,13 +522,22 @@ export default function PosVentasPage() {
                 ))}
               </SunmiSelectAdv>
             )}
+            <div className="hidden sm:block border-l border-slate-700 pl-3 ml-1">
+              <StatsDelDia localId={localActual} />
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {me && (
-              <span className="text-xs text-slate-400 hidden sm:inline">{me.nombre}</span>
+              <span className="text-xs text-slate-400 hidden lg:inline">{me.nombre}</span>
             )}
-        
-
+            <button
+              onClick={() => setMostrarHistorial(true)}
+              className="text-[11px] bg-slate-700/60 hover:bg-slate-600/60 text-slate-300 px-2 py-1 rounded transition-colors flex items-center gap-1"
+              title="Historial de ventas"
+            >
+              <ClipboardList size={14} />
+              <span className="hidden sm:inline">Historial</span>
+            </button>
             {turnoActual && (
               <button
                 onClick={() => setMostrarCierre(true)}
@@ -543,6 +556,11 @@ export default function PosVentasPage() {
           </div>
         </div>
 
+        {/* Stats mobile - solo visible en pantalla chica */}
+        <div className="sm:hidden">
+          <StatsDelDia localId={localActual} />
+        </div>
+
         {/* Mensajes */}
         {errorMsg && (
           <div className="rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
@@ -555,29 +573,12 @@ export default function PosVentasPage() {
           </div>
         )}
 
-        {/* Stats del dia */}
-        <StatsDelDia localId={localActual} />
-
-        {/* Layout responsive */}
+        {/* Layout responsive - sin historial inline */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-3">
           <div className="flex flex-col gap-2 lg:gap-3">
             <BuscadorProductos
               localId={localActual}
               onAgregar={handleAgregar}
-            />
-            {/* Historial del dia */}
-            <HistorialDia
-              localId={localActual}
-              onReimprimir={async (venta) => {
-                const { default: imprimirTicketTermico } = await import(
-                  "@/lib/pos-ventas/imprimirTicketTermico"
-                );
-                imprimirTicketTermico({
-                  ...venta,
-                  vendedor: me?.nombre || "-",
-                  localNombre,
-                });
-              }}
             />
           </div>
 
@@ -650,6 +651,24 @@ export default function PosVentasPage() {
           venta={modalTicket}
           onOpcion={handleOpcionTicket}
           onCerrar={handleCerrarTicket}
+        />
+      )}
+
+      {/* Modal historial */}
+      {mostrarHistorial && (
+        <HistorialDia
+          localId={localActual}
+          onCerrar={() => setMostrarHistorial(false)}
+          onReimprimir={async (venta) => {
+            const { default: imprimirTicketTermico } = await import(
+              "@/lib/pos-ventas/imprimirTicketTermico"
+            );
+            imprimirTicketTermico({
+              ...venta,
+              vendedor: me?.nombre || "-",
+              localNombre,
+            });
+          }}
         />
       )}
 

@@ -11,7 +11,7 @@ function formatPrecio(n) {
   });
 }
 
-export default function HistorialDia({ localId, onReimprimir }) {
+export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
   const [ventas, setVentas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detalle, setDetalle] = useState(null);
@@ -40,12 +40,10 @@ export default function HistorialDia({ localId, onReimprimir }) {
   const totalVendido = ventas.reduce((s, v) => s + Number(v.total), 0);
 
   return (
-    <>
-      <SunmiCard className="p-2 lg:p-3 flex flex-col">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-semibold text-slate-300">
-            Ventas hoy ({ventas.length})
-          </span>
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <SunmiCard className="w-full max-w-lg p-4 my-4">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-bold">Ventas del dia</h2>
           <button
             onClick={cargar}
             className="text-[11px] text-cyan-400 hover:text-cyan-300"
@@ -56,30 +54,34 @@ export default function HistorialDia({ localId, onReimprimir }) {
 
         {/* Resumen */}
         {ventas.length > 0 && (
-          <div className="bg-slate-800/60 p-2 rounded-lg text-center mb-2">
-            <span className="text-xs text-slate-400">Total del dia: </span>
-            <span className="text-sm font-bold text-amber-400">
-              ${formatPrecio(totalVendido)}
-            </span>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="bg-slate-800/60 p-2 rounded-lg text-center">
+              <div className="text-[10px] text-slate-400">Ventas</div>
+              <div className="text-lg font-bold text-cyan-400">{ventas.length}</div>
+            </div>
+            <div className="bg-slate-800/60 p-2 rounded-lg text-center">
+              <div className="text-[10px] text-slate-400">Total</div>
+              <div className="text-lg font-bold text-amber-400">
+                ${formatPrecio(totalVendido)}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Lista */}
-        <div className="flex-1 overflow-y-auto space-y-1 max-h-60 lg:max-h-80">
+        {/* Lista de ventas */}
+        <div className="space-y-1 max-h-96 overflow-y-auto">
           {loading ? (
-            <div className="text-xs text-slate-500 text-center py-4">
-              Cargando...
-            </div>
+            <div className="text-center py-8 text-slate-400">Cargando...</div>
           ) : ventas.length === 0 ? (
-            <div className="text-xs text-slate-500 text-center py-4">
-              Sin ventas aun
+            <div className="text-center py-8 text-slate-500">
+              No hay ventas registradas hoy
             </div>
           ) : (
             ventas.map((v) => (
               <div
                 key={v.id}
                 onClick={() => setDetalle(v)}
-                className="bg-slate-800/40 p-2 rounded-lg cursor-pointer hover:bg-slate-700/60 transition-colors"
+                className="bg-slate-900/50 p-2 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors"
               >
                 <div className="flex justify-between items-center">
                   <div>
@@ -104,11 +106,18 @@ export default function HistorialDia({ localId, onReimprimir }) {
             ))
           )}
         </div>
+
+        {/* Boton cerrar */}
+        <div className="mt-4">
+          <SunmiButton color="slate" onClick={onCerrar} className="w-full">
+            Cerrar
+          </SunmiButton>
+        </div>
       </SunmiCard>
 
       {/* Modal detalle */}
       {detalle && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
           <SunmiCard className="w-full max-w-md p-4">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-bold">Ticket #{detalle.numero}</h3>
@@ -196,6 +205,6 @@ export default function HistorialDia({ localId, onReimprimir }) {
           </SunmiCard>
         </div>
       )}
-    </>
+    </div>
   );
 }

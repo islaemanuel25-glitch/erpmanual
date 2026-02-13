@@ -9,7 +9,10 @@ function formatPrecio(n) {
   });
 }
 
-export default function StatsDelDia({ localId }) {
+/**
+ * Hook que carga stats del dia y actualiza cada 30s.
+ */
+export function useStatsDelDia(localId) {
   const [stats, setStats] = useState({ ventas: 0, total: 0, items: 0 });
 
   useEffect(() => {
@@ -33,22 +36,26 @@ export default function StatsDelDia({ localId }) {
     return () => clearInterval(interval);
   }, [localId]);
 
+  return stats;
+}
+
+/**
+ * Componente compacto inline para mostrar stats en el header.
+ */
+export default function StatsDelDia({ localId }) {
+  const stats = useStatsDelDia(localId);
+
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <div className="bg-slate-800/60 p-2 rounded-lg text-center">
-        <div className="text-[10px] text-slate-400">Ventas</div>
-        <div className="text-lg font-bold text-cyan-400">{stats.ventas}</div>
-      </div>
-      <div className="bg-slate-800/60 p-2 rounded-lg text-center">
-        <div className="text-[10px] text-slate-400">Total</div>
-        <div className="text-lg font-bold text-amber-400">
-          ${formatPrecio(stats.total)}
-        </div>
-      </div>
-      <div className="bg-slate-800/60 p-2 rounded-lg text-center">
-        <div className="text-[10px] text-slate-400">Items</div>
-        <div className="text-lg font-bold text-emerald-400">{stats.items}</div>
-      </div>
+    <div className="flex items-center gap-3 text-[11px]">
+      <span className="text-slate-400">
+        <span className="text-cyan-400 font-semibold">{stats.ventas}</span> ventas
+      </span>
+      <span className="text-slate-400">
+        $<span className="text-amber-400 font-semibold">{formatPrecio(stats.total)}</span>
+      </span>
+      <span className="text-slate-400 hidden sm:inline">
+        <span className="text-emerald-400 font-semibold">{stats.items}</span> items
+      </span>
     </div>
   );
 }
