@@ -1,8 +1,20 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-13 18:56
+**Fecha:** 2026-02-13 19:44
 
 ## Módulos modificados recientemente
+
+### categorias
+- feat: agregar selector de local a clientes, categorias, proveedores y actualizacion-precios
+- Archivos: 1 modificados (1 total)
+
+### proveedores
+- feat: agregar selector de local a clientes, categorias, proveedores y actualizacion-precios
+- Archivos: 1 modificados (1 total)
+
+### productos
+- feat: agregar selector de local a clientes, categorias, proveedores y actualizacion-precios
+- Archivos: 1 modificados (1 total)
 
 ### configuracion
 - feat: crear modulo Clientes con ABM y busqueda, feat: crear modulo Reportes de Ventas con analisis de rentabilidad, feat: agregar POS Ventas al menú lateral de navegación
