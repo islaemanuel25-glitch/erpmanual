@@ -17,6 +17,9 @@ export default function CarritoVenta({
   onEliminar,
   onLimpiar,
   subtotal,
+  descuento = 0,
+  descuentoInfo = null,
+  onAbrirDescuento,
 }) {
   if (items.length === 0) {
     return (
@@ -34,12 +37,26 @@ export default function CarritoVenta({
         <span className="text-sm font-semibold text-slate-300">
           Carrito ({items.length})
         </span>
-        <button
-          onClick={onLimpiar}
-          className="text-xs text-red-400 hover:text-red-300"
-        >
-          Limpiar
-        </button>
+        <div className="flex items-center gap-3">
+          {onAbrirDescuento && (
+            <button
+              onClick={onAbrirDescuento}
+              className={`text-xs ${
+                descuento > 0
+                  ? "text-emerald-400 hover:text-emerald-300 font-medium"
+                  : "text-amber-400 hover:text-amber-300"
+              }`}
+            >
+              {descuento > 0 ? `Desc. -$${formatPrecio(descuento)}` : "Descuento"}
+            </button>
+          )}
+          <button
+            onClick={onLimpiar}
+            className="text-xs text-red-400 hover:text-red-300"
+          >
+            Limpiar
+          </button>
+        </div>
       </div>
 
       {/* MOBILE: lista compacta */}

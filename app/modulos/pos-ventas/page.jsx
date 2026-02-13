@@ -12,6 +12,9 @@ import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
 import FormaPago, { COMISION_PCT } from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
+import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
+import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
+import HistorialDia from "@/components/pos-ventas/HistorialDia";
 
 export default function PosVentasPage() {
   const router = useRouter();
@@ -29,6 +32,11 @@ export default function PosVentasPage() {
   const [carrito, setCarrito] = useState([]);
   const [formaPago, setFormaPago] = useState("efectivo");
   const [cobrando, setCobrando] = useState(false);
+
+  // Descuento
+  const [descuento, setDescuento] = useState(0);
+  const [descuentoInfo, setDescuentoInfo] = useState(null); // { tipo, valor }
+  const [modalDescuento, setModalDescuento] = useState(false);
 
   // Modales
   const [modalEfectivo, setModalEfectivo] = useState(null); // { total, comision, formaPago }
@@ -102,7 +110,7 @@ export default function PosVentasPage() {
       // No interceptar si esta escribiendo en un input
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       // No interceptar si hay modal abierto
-      if (modalEfectivo || modalTicket) return;
+      if (modalEfectivo || modalTicket || modalDescuento) return;
 
       switch (e.key) {
         case "F1":
@@ -136,7 +144,7 @@ export default function PosVentasPage() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket]);
+  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket, modalDescuento]);
 
   // ---------------------------------------------------------------------------
   // Agregar producto al carrito
@@ -195,6 +203,8 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   const handleLimpiar = useCallback(() => {
     setCarrito([]);
+    setDescuento(0);
+    setDescuentoInfo(null);
     setErrorMsg("");
     setSuccessMsg("");
   }, []);
@@ -208,8 +218,23 @@ export default function PosVentasPage() {
   );
 
   const tieneComision = ["mercadopago", "debito", "credito"].includes(formaPago);
-  const comision = tieneComision ? subtotal * (COMISION_PCT / 100) : 0;
-  const total = subtotal + comision;
+  const comision = tieneComision ? (subtotal - descuento) * (COMISION_PCT / 100) : 0;
+  const total = subtotal - descuento + comision;
+
+  // ---------------------------------------------------------------------------
+  // Descuento
+  // ---------------------------------------------------------------------------
+  const handleAplicarDescuento = (montoDescuento, tipo, valor) => {
+    setDescuento(montoDescuento);
+    setDescuentoInfo({ tipo, valor });
+    setModalDescuento(false);
+  };
+
+  const handleQuitarDescuento = () => {
+    setDescuento(0);
+    setDescuentoInfo(null);
+    setModalDescuento(false);
+  };
 
   // ---------------------------------------------------------------------------
   // Cambiar local (admin) - limpiar carrito al cambiar
@@ -282,7 +307,7 @@ export default function PosVentasPage() {
         body: JSON.stringify({
           localId: localActual,
           formaPago: datos.formaPago,
-          descuento: 0,
+          descuento,
           comision: datos.comision,
           items: carrito.map((item) => ({
             productoBaseId: item.productoBaseId,
@@ -310,7 +335,7 @@ export default function PosVentasPage() {
           })),
           subtotal,
           comision: datos.comision,
-          descuento: 0,
+          descuento,
           total: datos.total,
           formaPago: datos.formaPago,
           vendedor: me?.nombre || "-",
@@ -325,6 +350,8 @@ export default function PosVentasPage() {
         // Limpiar carrito
         setCarrito([]);
         setFormaPago("efectivo");
+        setDescuento(0);
+        setDescuentoInfo(null);
         setDatosPagoEfectivo(null);
       } else {
         setErrorMsg(data.error || "Error al registrar la venta.");
@@ -472,12 +499,31 @@ export default function PosVentasPage() {
           </div>
         )}
 
+        {/* Stats del dia */}
+        <StatsDelDia localId={localActual} />
+
         {/* Layout responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-3">
-          <BuscadorProductos
-            localId={localActual}
-            onAgregar={handleAgregar}
-          />
+          <div className="flex flex-col gap-2 lg:gap-3">
+            <BuscadorProductos
+              localId={localActual}
+              onAgregar={handleAgregar}
+            />
+            {/* Historial del dia */}
+            <HistorialDia
+              localId={localActual}
+              onReimprimir={async (venta) => {
+                const { default: imprimirTicketTermico } = await import(
+                  "@/lib/pos-ventas/imprimirTicketTermico"
+                );
+                imprimirTicketTermico({
+                  ...venta,
+                  vendedor: me?.nombre || "-",
+                  localNombre,
+                });
+              }}
+            />
+          </div>
 
           <div className="flex flex-col gap-2 lg:gap-3">
             <CarritoVenta
@@ -486,10 +532,14 @@ export default function PosVentasPage() {
               onEliminar={handleEliminar}
               onLimpiar={handleLimpiar}
               subtotal={subtotal}
+              descuento={descuento}
+              descuentoInfo={descuentoInfo}
+              onAbrirDescuento={() => setModalDescuento(true)}
             />
 
             <FormaPago
               subtotal={subtotal}
+              descuento={descuento}
               formaPago={formaPago}
               onFormaPagoChange={setFormaPago}
               onCobrar={handleCobrar}
@@ -504,6 +554,17 @@ export default function PosVentasPage() {
           F1: Buscar | F2: Efectivo | F3: MP | F4: Debito | F5: Credito | F10: Cobrar
         </div>
       </div>
+
+      {/* Modal descuento */}
+      {modalDescuento && (
+        <ModalDescuento
+          subtotal={subtotal}
+          descuentoActual={descuentoInfo}
+          onAplicar={handleAplicarDescuento}
+          onQuitar={handleQuitarDescuento}
+          onCancelar={() => setModalDescuento(false)}
+        />
+      )}
 
       {/* Modal pago efectivo */}
       {modalEfectivo && (

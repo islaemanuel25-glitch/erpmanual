@@ -21,6 +21,7 @@ function formatPrecio(n) {
 
 export default function FormaPago({
   subtotal,
+  descuento = 0,
   formaPago,
   onFormaPagoChange,
   onCobrar,
@@ -29,8 +30,9 @@ export default function FormaPago({
 }) {
   const forma = FORMAS_PAGO.find((f) => f.key === formaPago);
   const tieneComision = forma?.tieneComision || false;
-  const comision = tieneComision ? subtotal * (COMISION_PCT / 100) : 0;
-  const total = subtotal + comision;
+  const base = subtotal - descuento;
+  const comision = tieneComision ? base * (COMISION_PCT / 100) : 0;
+  const total = base + comision;
 
   return (
     <SunmiCard className="p-2 lg:p-3">
@@ -47,6 +49,16 @@ export default function FormaPago({
           </SunmiButton>
         ))}
       </div>
+
+      {/* Descuento */}
+      {descuento > 0 && (
+        <div className="mt-2 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-center">
+          Descuento:{" "}
+          <span className="font-semibold text-emerald-300">
+            -${formatPrecio(descuento)}
+          </span>
+        </div>
+      )}
 
       {/* Comision */}
       {tieneComision && subtotal > 0 && (
