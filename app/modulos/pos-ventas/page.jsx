@@ -9,7 +9,9 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
-import FormaPago from "@/components/pos-ventas/FormaPago";
+import FormaPago, { COMISION_PCT } from "@/components/pos-ventas/FormaPago";
+import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
+import ModalTicket from "@/components/pos-ventas/ModalTicket";
 
 export default function PosVentasPage() {
   const router = useRouter();
@@ -27,6 +29,11 @@ export default function PosVentasPage() {
   const [carrito, setCarrito] = useState([]);
   const [formaPago, setFormaPago] = useState("efectivo");
   const [cobrando, setCobrando] = useState(false);
+
+  // Modales
+  const [modalEfectivo, setModalEfectivo] = useState(null); // { total, comision, formaPago }
+  const [modalTicket, setModalTicket] = useState(null); // venta data para ticket
+  const [datosPagoEfectivo, setDatosPagoEfectivo] = useState(null); // { pagaCon, vuelto }
 
   // Local activo efectivo
   const localActual = localSeleccionado || me?.localId || null;
@@ -86,6 +93,50 @@ export default function PosVentasPage() {
     };
     cargarLocales();
   }, [me]);
+
+  // ---------------------------------------------------------------------------
+  // Shortcuts de teclado
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const handleShortcut = (e) => {
+      // No interceptar si esta escribiendo en un input
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      // No interceptar si hay modal abierto
+      if (modalEfectivo || modalTicket) return;
+
+      switch (e.key) {
+        case "F1":
+          e.preventDefault();
+          document.getElementById("buscar-producto")?.focus();
+          break;
+        case "F2":
+          e.preventDefault();
+          setFormaPago("efectivo");
+          break;
+        case "F3":
+          e.preventDefault();
+          setFormaPago("mercadopago");
+          break;
+        case "F4":
+          e.preventDefault();
+          setFormaPago("debito");
+          break;
+        case "F5":
+          e.preventDefault();
+          setFormaPago("credito");
+          break;
+        case "F10":
+          e.preventDefault();
+          if (carrito.length > 0 && !cobrando) {
+            iniciarCobro();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket]);
 
   // ---------------------------------------------------------------------------
   // Agregar producto al carrito
@@ -149,12 +200,16 @@ export default function PosVentasPage() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Subtotal
+  // Subtotal y totales
   // ---------------------------------------------------------------------------
   const subtotal = carrito.reduce(
     (acc, item) => acc + item.precio * item.cantidad,
     0
   );
+
+  const tieneComision = ["mercadopago", "debito", "credito"].includes(formaPago);
+  const comision = tieneComision ? subtotal * (COMISION_PCT / 100) : 0;
+  const total = subtotal + comision;
 
   // ---------------------------------------------------------------------------
   // Cambiar local (admin) - limpiar carrito al cambiar
@@ -170,9 +225,41 @@ export default function PosVentasPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // Cobrar y finalizar
+  // Iniciar cobro: si es efectivo → mostrar modal, sino → cobrar directo
   // ---------------------------------------------------------------------------
-  const handleCobrar = async ({ formaPago: fp, comision, total }) => {
+  const iniciarCobro = () => {
+    if (formaPago === "efectivo") {
+      setModalEfectivo({ total, comision, formaPago });
+    } else {
+      ejecutarCobro({ formaPago, comision, total });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Cobrar desde FormaPago (redirige a iniciarCobro)
+  // ---------------------------------------------------------------------------
+  const handleCobrar = ({ formaPago: fp, comision: com, total: tot }) => {
+    if (fp === "efectivo") {
+      setModalEfectivo({ total: tot, comision: com, formaPago: fp });
+    } else {
+      ejecutarCobro({ formaPago: fp, comision: com, total: tot });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Confirmar pago efectivo desde modal
+  // ---------------------------------------------------------------------------
+  const handleConfirmarEfectivo = ({ pagaCon, vuelto }) => {
+    setDatosPagoEfectivo({ pagaCon, vuelto });
+    const datos = modalEfectivo;
+    setModalEfectivo(null);
+    ejecutarCobro(datos, { pagaCon, vuelto });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Ejecutar cobro real (API)
+  // ---------------------------------------------------------------------------
+  const ejecutarCobro = async (datos, pagoEfectivo = null) => {
     if (!localActual) {
       setErrorMsg("No se detecto un local para operar.");
       return;
@@ -194,9 +281,9 @@ export default function PosVentasPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           localId: localActual,
-          formaPago: fp,
+          formaPago: datos.formaPago,
           descuento: 0,
-          comision,
+          comision: datos.comision,
           items: carrito.map((item) => ({
             productoBaseId: item.productoBaseId,
             nombre: item.nombre,
@@ -213,9 +300,32 @@ export default function PosVentasPage() {
 
       const data = await res.json();
       if (data.ok) {
-        setSuccessMsg(data.message || "Venta registrada correctamente.");
+        // Preparar datos del ticket
+        const ventaTicket = {
+          numero: data.numero,
+          items: carrito.map((item) => ({
+            nombre: item.nombre,
+            precio: item.precio,
+            cantidad: item.cantidad,
+          })),
+          subtotal,
+          comision: datos.comision,
+          descuento: 0,
+          total: datos.total,
+          formaPago: datos.formaPago,
+          vendedor: me?.nombre || "-",
+          localNombre,
+          pagaCon: pagoEfectivo?.pagaCon || null,
+          vuelto: pagoEfectivo?.vuelto || null,
+        };
+
+        // Mostrar modal de ticket
+        setModalTicket(ventaTicket);
+
+        // Limpiar carrito
         setCarrito([]);
         setFormaPago("efectivo");
+        setDatosPagoEfectivo(null);
       } else {
         setErrorMsg(data.error || "Error al registrar la venta.");
       }
@@ -225,6 +335,34 @@ export default function PosVentasPage() {
     } finally {
       setCobrando(false);
     }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Manejar opcion de ticket post-venta
+  // ---------------------------------------------------------------------------
+  const handleOpcionTicket = async (opcion) => {
+    if (!modalTicket) return;
+
+    if (opcion === "termica") {
+      const { default: imprimirTicketTermico } = await import(
+        "@/lib/pos-ventas/imprimirTicketTermico"
+      );
+      imprimirTicketTermico(modalTicket);
+    } else if (opcion === "pdf") {
+      const { default: generarTicketPDF } = await import(
+        "@/lib/pos-ventas/generarTicketPDF"
+      );
+      generarTicketPDF(modalTicket);
+    }
+
+    setModalTicket(null);
+    setSuccessMsg(`Venta #${modalTicket.numero} registrada correctamente.`);
+  };
+
+  const handleCerrarTicket = () => {
+    const numero = modalTicket?.numero;
+    setModalTicket(null);
+    setSuccessMsg(`Venta #${numero} registrada correctamente.`);
   };
 
   // ---------------------------------------------------------------------------
@@ -288,13 +426,12 @@ export default function PosVentasPage() {
   return (
     <div className="sunmi-bg w-full min-h-full p-2 lg:p-3 pb-24 lg:pb-3">
       <div className="max-w-7xl mx-auto space-y-2 lg:space-y-3">
-        {/* Header compacto - sin duplicar titulo del layout */}
+        {/* Header compacto */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-sm text-amber-400 font-medium truncate">
               {localNombre || "Sin local"}
             </span>
-            {/* Selector de local para admin */}
             {esAdmin && (
               <SunmiSelectAdv
                 value={String(localSeleccionado || "")}
@@ -335,15 +472,13 @@ export default function PosVentasPage() {
           </div>
         )}
 
-        {/* Layout responsive: 1 col mobile, 2 col desktop */}
+        {/* Layout responsive */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-3">
-          {/* COLUMNA IZQUIERDA - Buscador */}
           <BuscadorProductos
             localId={localActual}
             onAgregar={handleAgregar}
           />
 
-          {/* COLUMNA DERECHA - Carrito + Pago */}
           <div className="flex flex-col gap-2 lg:gap-3">
             <CarritoVenta
               items={carrito}
@@ -363,7 +498,30 @@ export default function PosVentasPage() {
             />
           </div>
         </div>
+
+        {/* Shortcuts ayuda - solo desktop */}
+        <div className="hidden lg:block text-[10px] text-slate-500 text-center">
+          F1: Buscar | F2: Efectivo | F3: MP | F4: Debito | F5: Credito | F10: Cobrar
+        </div>
       </div>
+
+      {/* Modal pago efectivo */}
+      {modalEfectivo && (
+        <ModalPagoEfectivo
+          total={modalEfectivo.total}
+          onConfirmar={handleConfirmarEfectivo}
+          onCancelar={() => setModalEfectivo(null)}
+        />
+      )}
+
+      {/* Modal ticket post-venta */}
+      {modalTicket && (
+        <ModalTicket
+          venta={modalTicket}
+          onOpcion={handleOpcionTicket}
+          onCerrar={handleCerrarTicket}
+        />
+      )}
     </div>
   );
 }

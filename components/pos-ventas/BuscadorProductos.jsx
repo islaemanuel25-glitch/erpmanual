@@ -3,15 +3,18 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import ProductosFavoritos from "./ProductosFavoritos";
 
 export default function BuscadorProductos({ localId, onAgregar }) {
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
   const [resultados, setResultados] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [escuchando, setEscuchando] = useState(false);
   const debounceRef = useRef(null);
   const lastKeyTime = useRef(0);
   const scanBuffer = useRef("");
+  const recognitionRef = useRef(null);
 
   // Autofocus al montar
   useEffect(() => {
@@ -43,6 +46,39 @@ export default function BuscadorProductos({ localId, onAgregar }) {
     },
     [localId]
   );
+
+  // Busqueda por voz
+  const iniciarVoz = () => {
+    const SpeechRecognition =
+      typeof window !== "undefined" &&
+      (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    if (!SpeechRecognition) return;
+
+    if (escuchando && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setEscuchando(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "es-AR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setEscuchando(true);
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setQuery(transcript);
+      buscar(transcript);
+      setEscuchando(false);
+    };
+    recognition.onerror = () => setEscuchando(false);
+    recognition.onend = () => setEscuchando(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
 
   // Deteccion de scanner: Enter rapido (<200ms entre teclas)
   const handleKeyDown = (e) => {
@@ -106,21 +142,57 @@ export default function BuscadorProductos({ localId, onAgregar }) {
     inputRef.current?.focus();
   };
 
+  // Verificar soporte de voz
+  const soportaVoz =
+    typeof window !== "undefined" &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
   return (
     <SunmiCard className="p-2 lg:p-3">
-      <SunmiInput
-        ref={inputRef}
-        type="text"
-        placeholder="Codigo o nombre del producto..."
-        value={query}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        className="w-full text-base min-h-12 lg:min-h-10 !py-2"
-        autoFocus
-      />
+      {/* Favoritos */}
+      <ProductosFavoritos localId={localId} onAgregar={handleAgregar} />
+
+      {/* Input con boton de voz */}
+      <div className="relative">
+        <SunmiInput
+          ref={inputRef}
+          id="buscar-producto"
+          type="text"
+          placeholder="Codigo o nombre del producto..."
+          value={query}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          className={`w-full text-base min-h-12 lg:min-h-10 !py-2 ${soportaVoz ? "!pr-12" : ""}`}
+          autoFocus
+        />
+        {soportaVoz && (
+          <button
+            onClick={iniciarVoz}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
+              escuchando
+                ? "bg-red-500 animate-pulse text-white"
+                : "bg-slate-700 hover:bg-slate-600 text-slate-300"
+            }`}
+            title="Buscar por voz"
+            type="button"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" x2="12" y1="19" y2="22" />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {loading && (
         <div className="text-xs text-slate-400 mt-2">Buscando...</div>
+      )}
+
+      {escuchando && (
+        <div className="text-xs text-red-400 mt-2 animate-pulse">
+          Escuchando...
+        </div>
       )}
 
       {/* Resultados */}
@@ -151,7 +223,7 @@ export default function BuscadorProductos({ localId, onAgregar }) {
         </div>
       )}
 
-      {!loading && query.trim() && resultados.length === 0 && (
+      {!loading && !escuchando && query.trim() && resultados.length === 0 && (
         <div className="text-xs text-slate-500 mt-2">
           No se encontraron productos.
         </div>
