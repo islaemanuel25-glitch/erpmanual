@@ -8,6 +8,7 @@ import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 import {
   Home,
+  ShoppingCart,
   Package,
   Package2,
   Layers,
@@ -42,6 +43,18 @@ export default function SidebarPro() {
       iconFilled: Home,
       items: [{ label: "Dashboard", href: "/modulos/dashboard" }],
     },
+
+    puede("pos.usar") || esAdmin
+      ? {
+          key: "pos-ventas",
+          label: "POS Ventas",
+          icon: ShoppingCart,
+          iconFilled: ShoppingCart,
+          items: [
+            { label: "POS Ventas", href: "/modulos/pos-ventas" },
+          ],
+        }
+      : null,
 
     {
       key: "productos",
@@ -99,7 +112,7 @@ export default function SidebarPro() {
         { label: "Roles", href: "/modulos/roles" },
       ],
     },
-  ];
+  ].filter(Boolean);
 
   return (
     <>
