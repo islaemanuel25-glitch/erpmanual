@@ -10,7 +10,6 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import useLocalSelector from "@/hooks/useLocalSelector";
 import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
-import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -24,7 +23,6 @@ export default function ReportesVentasPage() {
     perfil,
     locales,
     localSeleccionado,
-    localNombre,
     esAdminSinLocal,
     cargandoLocales,
     handleCambiarLocal,
@@ -107,26 +105,18 @@ export default function ReportesVentasPage() {
   return (
     <div className="p-2 lg:p-3 space-y-3 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div>
-          <h1 className="text-xl font-bold">Reportes de Ventas</h1>
-          <p className="text-sm text-slate-400">
-            Analisis de ventas, comisiones y rentabilidad
-          </p>
-        </div>
-        <SelectorLocalCompacto
-          locales={locales}
-          localSeleccionado={localSeleccionado}
-          localNombre={localNombre}
-          onChange={handleCambiarLocal}
-        />
+      <div>
+        <h1 className="text-xl font-bold">Reportes de Ventas</h1>
+        <p className="text-sm text-slate-400">
+          Analisis de ventas, comisiones y rentabilidad
+        </p>
       </div>
 
       {/* Filtros */}
-      <SunmiCard className="p-3">
+      <SunmiCard className="p-3 overflow-visible">
         <SunmiSeparator label="Filtros" />
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 relative">
           <div>
             <label className="text-[11px] text-slate-400 mb-1 block">
               Desde
