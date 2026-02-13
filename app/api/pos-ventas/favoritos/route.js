@@ -45,10 +45,15 @@ export async function GET(req) {
       LIMIT 10
     `;
 
-    return NextResponse.json({
-      ok: true,
-      items: favoritos || [],
-    });
+    // Convertir BigInt a Number para evitar error de serialización
+    const items = (favoritos || []).map((f) => ({
+      ...f,
+      id: Number(f.id),
+      total_vendido: Number(f.total_vendido),
+      precio_venta: f.precio_venta ? Number(f.precio_venta) : null,
+    }));
+
+    return NextResponse.json({ ok: true, items });
   } catch (error) {
     console.error("Error obteniendo favoritos:", error);
     return NextResponse.json(
