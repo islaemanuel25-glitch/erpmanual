@@ -1,5 +1,32 @@
 # Changelog
 
+## [2026-02-13] - Sistema de Auto-documentación
+
+### Agregado
+- scripts/update-docs.js — Script de auto-documentación que analiza git log y actualiza docs
+- docs/modulos/pos-ventas.md — Documentación del módulo POS Ventas
+- docs/ULTIMA-ACTUALIZACION.md — Registro de última actualización del proyecto
+
+## [2026-02-13] - Módulo POS Ventas
+
+### Agregado
+- Módulo POS Ventas completo (MVP)
+- Búsqueda de productos por código/nombre
+- Carrito de venta con edición de cantidades
+- Formas de pago: Efectivo, MercadoPago, Débito, Crédito
+- Cálculo automático de comisiones (7%)
+- Descuento de stock en tiempo real
+- Selector de local para admin padre
+- API /api/pos-ventas/crear
+- API /api/pos-ventas/buscar-producto
+- Componentes: BuscadorProductos, CarritoVenta, FormaPago
+
+### Pendiente (Fase 2)
+- Búsqueda por voz
+- Impresión de tickets (térmico + PDF)
+- Turnos y arqueo de caja
+- Historial de ventas
+
 ## [2025-02-13] - Estandarizacion UI Sunmi
 
 ### Agregado
