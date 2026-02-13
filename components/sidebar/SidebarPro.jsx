@@ -10,6 +10,7 @@ import {
   Home,
   ShoppingCart,
   BarChart3,
+  ContactRound,
   Package,
   Package2,
   Layers,
@@ -68,6 +69,14 @@ export default function SidebarPro() {
           ],
         }
       : null,
+
+    {
+      key: "clientes",
+      label: "Clientes",
+      icon: ContactRound,
+      iconFilled: ContactRound,
+      items: [{ label: "Clientes", href: "/modulos/clientes" }],
+    },
 
     {
       key: "productos",
