@@ -247,7 +247,7 @@ export default function PosVentasPage() {
   if (esAdmin && !localSeleccionado) {
     return (
       <div className="sunmi-bg w-full min-h-full p-2">
-        <div className="max-w-md mx-auto mt-10">
+        <div className="max-w-md mx-auto mt-10 px-2">
           <SunmiCard className="p-4">
             <SunmiSeparator
               label="Seleccionar local para operar POS"
@@ -262,6 +262,7 @@ export default function PosVentasPage() {
                   value=""
                   placeholder="Seleccionar local..."
                   onChange={handleCambiarLocal}
+                  className="w-full"
                 >
                   {locales.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -273,6 +274,7 @@ export default function PosVentasPage() {
               <SunmiButton
                 color="slate"
                 onClick={() => router.push("/modulos")}
+                className="w-full lg:w-auto"
               >
                 Volver
               </SunmiButton>
@@ -287,12 +289,12 @@ export default function PosVentasPage() {
   // Render principal
   // ---------------------------------------------------------------------------
   return (
-    <div className="sunmi-bg w-full min-h-full p-2">
-      <div className="max-w-7xl mx-auto space-y-3">
+    <div className="sunmi-bg w-full min-h-full p-2 lg:p-4 pb-4">
+      <div className="max-w-7xl mx-auto space-y-2 lg:space-y-3">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <h1 className="text-xl font-bold">POS Ventas</h1>
+            <h1 className="text-lg lg:text-xl font-bold">POS Ventas</h1>
             <div className="text-sm text-slate-400">
               Local:{" "}
               <span className="text-amber-400">
@@ -306,7 +308,7 @@ export default function PosVentasPage() {
               <SunmiSelectAdv
                 value={String(localSeleccionado || "")}
                 onChange={handleCambiarLocal}
-                className="!w-48"
+                className="!w-36 lg:!w-48"
               >
                 {locales.map((l) => (
                   <option key={l.id} value={l.id}>
@@ -316,7 +318,7 @@ export default function PosVentasPage() {
               </SunmiSelectAdv>
             )}
             {me && (
-              <span className="text-xs text-slate-400">{me.nombre}</span>
+              <span className="text-xs text-slate-400 hidden sm:inline">{me.nombre}</span>
             )}
             <SunmiButton
               color="slate"
@@ -340,8 +342,8 @@ export default function PosVentasPage() {
           </div>
         )}
 
-        {/* Layout 2 columnas */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Layout responsive: 1 col mobile, 2 col desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-3">
           {/* COLUMNA IZQUIERDA - Buscador */}
           <BuscadorProductos
             localId={localActual}
@@ -349,7 +351,7 @@ export default function PosVentasPage() {
           />
 
           {/* COLUMNA DERECHA - Carrito + Pago */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 lg:gap-3">
             <CarritoVenta
               items={carrito}
               onCantidadChange={handleCantidadChange}

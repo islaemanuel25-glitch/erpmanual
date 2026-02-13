@@ -37,14 +37,14 @@ export default function FormaPago({
     <SunmiCard className="p-3">
       <SunmiSeparator label="Forma de pago" className="!mt-0 !mb-2" />
 
-      {/* Botones de forma de pago */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Botones de forma de pago: 2x2 en mobile, 4 en fila en desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {FORMAS_PAGO.map((fp) => (
           <SunmiButton
             key={fp.key}
             color={formaPago === fp.key ? "amber" : "cyan"}
             onClick={() => onFormaPagoChange(fp.key)}
-            className="!py-2"
+            className="min-h-14 lg:min-h-10 text-base lg:text-sm !py-2"
           >
             {fp.label}
           </SunmiButton>
@@ -62,24 +62,24 @@ export default function FormaPago({
       )}
 
       {/* Total */}
-      <div className="mt-4 text-center">
-        <div className="text-xs text-slate-400 uppercase tracking-wide">
+      <div className="mt-4 text-center lg:text-right">
+        <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
           Total a cobrar
         </div>
-        <div className="text-3xl font-bold text-amber-400 mt-1">
+        <div className="text-4xl lg:text-2xl font-bold text-amber-400">
           $ {formatPrecio(total)}
         </div>
       </div>
 
-      {/* Boton cobrar */}
-      <div className="mt-4">
+      {/* Boton cobrar: sticky en mobile */}
+      <div className="mt-4 lg:relative fixed bottom-0 left-0 right-0 lg:bottom-auto bg-slate-950 lg:bg-transparent p-3 lg:p-0 border-t lg:border-0 border-slate-700 z-10">
         <SunmiButton
           color="amber"
           onClick={() => onCobrar({ formaPago, comision, total })}
           disabled={cobrando || disabled || !formaPago || subtotal <= 0}
-          className="!w-full !py-3 !text-lg !font-bold"
+          className="!w-full min-h-20 lg:min-h-12 !text-2xl lg:!text-lg !font-bold"
         >
-          {cobrando ? "Procesando..." : "COBRAR Y FINALIZAR"}
+          {cobrando ? "Procesando..." : `COBRAR $${formatPrecio(total)}`}
         </SunmiButton>
       </div>
     </SunmiCard>

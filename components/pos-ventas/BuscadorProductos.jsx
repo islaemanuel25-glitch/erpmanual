@@ -115,11 +115,12 @@ export default function BuscadorProductos({ localId, onAgregar }) {
       <SunmiInput
         ref={inputRef}
         type="text"
-        placeholder="Escanear codigo o buscar por nombre..."
+        placeholder="Codigo o nombre..."
         value={query}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        className="!text-base !py-2.5"
+        className="w-full text-lg lg:text-base min-h-14 lg:min-h-10 !py-2.5"
+        autoFocus
       />
 
       {loading && (
@@ -128,11 +129,12 @@ export default function BuscadorProductos({ localId, onAgregar }) {
 
       {/* Resultados */}
       {resultados.length > 0 && (
-        <div className="mt-2 flex flex-col gap-1 max-h-[50vh] overflow-y-auto">
+        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
           {resultados.map((p) => (
             <div
               key={p.productoBaseId}
-              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 transition"
+              onClick={() => handleAgregar(p)}
+              className="flex items-center justify-between gap-2 px-3 py-3 lg:py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 active:bg-slate-600/60 transition cursor-pointer"
             >
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{p.nombre}</div>
@@ -151,8 +153,11 @@ export default function BuscadorProductos({ localId, onAgregar }) {
                 </div>
                 <SunmiButton
                   color="cyan"
-                  onClick={() => handleAgregar(p)}
-                  className="!text-xs !py-0.5 !px-2 mt-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAgregar(p);
+                  }}
+                  className="!text-xs !py-1 !px-3 mt-1 w-full sm:w-auto"
                 >
                   + Agregar
                 </SunmiButton>

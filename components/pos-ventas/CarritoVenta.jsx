@@ -44,7 +44,51 @@ export default function CarritoVenta({
         </SunmiButton>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* MOBILE: cards apiladas */}
+      <div className="block lg:hidden space-y-2">
+        {items.map((item, idx) => (
+          <div
+            key={item.productoBaseId}
+            className="p-3 rounded-lg bg-slate-800/60 animate-fade-in"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <div className="flex-1 min-w-0 mr-2">
+                <div className="font-semibold text-sm truncate">{item.nombre}</div>
+                <div className="text-xs text-slate-400">
+                  $ {formatPrecio(item.precio)} c/u
+                </div>
+              </div>
+              <button
+                onClick={() => onEliminar(idx)}
+                className="text-red-400 hover:text-red-300 active:text-red-200 text-lg leading-none min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
+                title="Eliminar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400">Cant:</span>
+              <SunmiInput
+                type="number"
+                min={1}
+                max={item.stockMax || 9999}
+                value={item.cantidad}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 1;
+                  onCantidadChange(idx, Math.max(1, val));
+                }}
+                className="w-20 !text-center !py-1.5 text-base"
+              />
+              <span className="ml-auto font-bold text-amber-400">
+                $ {formatPrecio(item.precio * item.cantidad)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* DESKTOP: tabla normal */}
+      <div className="hidden lg:block overflow-x-auto">
         <SunmiTable
           headers={["Producto", "Cant.", "P. Unit.", "Subtotal", ""]}
         >
@@ -81,7 +125,7 @@ export default function CarritoVenta({
                   className="text-red-400 hover:text-red-300 text-lg leading-none"
                   title="Eliminar"
                 >
-                  x
+                  ✕
                 </button>
               </td>
             </tr>
@@ -93,7 +137,7 @@ export default function CarritoVenta({
       <div className="flex justify-end mt-3 px-2">
         <div className="text-right">
           <span className="text-sm text-slate-400 mr-3">SUBTOTAL</span>
-          <span className="text-lg font-bold">$ {formatPrecio(subtotal)}</span>
+          <span className="text-xl lg:text-lg font-bold">$ {formatPrecio(subtotal)}</span>
         </div>
       </div>
     </SunmiCard>
