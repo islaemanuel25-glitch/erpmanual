@@ -25,7 +25,7 @@ export default function ProductosFavoritos({ localId, onAgregar }) {
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {favoritos.map((p) => (
           <button
-            key={p.productoBaseId}
+            key={p.id}
             onClick={() => onAgregar(p)}
             className="bg-slate-800 hover:bg-slate-700 active:bg-amber-600/30 rounded-lg px-3 py-2 text-left transition-colors shrink-0 min-w-0"
           >
@@ -33,7 +33,7 @@ export default function ProductosFavoritos({ localId, onAgregar }) {
               {p.nombre}
             </div>
             <div className="text-[11px] text-amber-400">
-              ${Number(p.precioVenta).toLocaleString("es-AR")}
+              ${Number(p.precio_venta || p.precioVenta).toLocaleString("es-AR")}
             </div>
           </button>
         ))}
