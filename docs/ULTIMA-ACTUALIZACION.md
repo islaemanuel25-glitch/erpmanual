@@ -1,16 +1,20 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-13 00:59
+**Fecha:** 2026-02-13 01:35
 
 ## Módulos modificados recientemente
+
+### pos-ventas
+- optimizar UI POS Ventas, eliminar duplicaciones, responsive mobile POS Ventas, Agregar selector de local para admin padre en POS Ventas
+- Archivos: 6 nuevos (6 total)
+
+### configuracion
+- optimizar UI POS Ventas, eliminar duplicaciones, Fix props inválidas en componentes Sunmi: variant/size en SunmiButton, mensaje en SunmiTableEmpty
+- Archivos: 2 modificados (2 total)
 
 ### locales
 - Agregar selector de local para admin padre en POS Ventas, Remover color="amber" hardcodeado de componentes Sunmi (usar theme por defecto), Corregir inconsistencias de componentes Sunmi en toda la app
 - Archivos: 1 nuevos, 3 modificados (4 total)
-
-### pos-ventas
-- Agregar selector de local para admin padre en POS Ventas, Crear modulo POS Ventas (MVP Fase 1)
-- Archivos: 6 nuevos (6 total)
 
 ### productos
 - Permitir editar porcentaje y precio directo en actualizacion de precios, Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos, Eliminar colores hardcodeados y respetar sistema de themes Sunmi
@@ -36,10 +40,6 @@
 - Fix props inválidas en componentes Sunmi: variant/size en SunmiButton, mensaje en SunmiTableEmpty, Corregir inconsistencias de componentes Sunmi en toda la app
 - Archivos: 1 modificados (1 total)
 
-### configuracion
-- Fix props inválidas en componentes Sunmi: variant/size en SunmiButton, mensaje en SunmiTableEmpty
-- Archivos: 1 modificados (1 total)
-
 ### proveedores
 - Fix props inválidas en componentes Sunmi: variant/size en SunmiButton, mensaje en SunmiTableEmpty, Remover color="amber" hardcodeado de componentes Sunmi (usar theme por defecto), Corregir inconsistencias de componentes Sunmi en toda la app
 - Archivos: 2 modificados (2 total)
@@ -58,13 +58,13 @@
 
 
 ## Archivos nuevos desde última sincronización
-- app/api/locales/opciones/route.js
 - app/modulos/pos-ventas/page.jsx
-- app/api/pos-ventas/buscar-producto/route.js
-- app/api/pos-ventas/crear/route.js
 - components/pos-ventas/BuscadorProductos.jsx
 - components/pos-ventas/CarritoVenta.jsx
 - components/pos-ventas/FormaPago.jsx
+- app/api/pos-ventas/buscar-producto/route.js
+- app/api/pos-ventas/crear/route.js
+- app/api/locales/opciones/route.js
 - app/api/productos/export/route.js
 - app/api/productos/import/apply/route.js
 - app/api/productos/import/preview/route.js
