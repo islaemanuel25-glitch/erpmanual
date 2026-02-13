@@ -14,8 +14,8 @@ export default function PantallaSeleccionLocal({
   const router = useRouter();
 
   return (
-    <div className="sunmi-bg w-full min-h-full flex items-center justify-center p-4">
-      <SunmiCard className="w-full max-w-md p-4">
+    <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[9999] overflow-y-auto">
+      <SunmiCard className="w-full max-w-md my-4 relative z-[10000] p-4">
         <div className="text-center mb-4">
           <p className="text-sm text-slate-400 mt-1">{titulo}</p>
         </div>
