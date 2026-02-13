@@ -1,40 +1,40 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-13 08:56
+**Fecha:** 2026-02-13 09:19
 
 ## Módulos modificados recientemente
+
+### configuracion
+- feat: agregar POS Ventas al menú lateral de navegación, optimizar UI POS Ventas, eliminar duplicaciones
+- Archivos: 2 modificados (2 total)
 
 ### pos-ventas
 - refactor: eliminar ProductosFavoritos y corregir keys en CarritoVenta, fix: corregir key y campo precio en ProductosFavoritos, fix: convertir BigInt a Number en API favoritos para evitar error de serialización
 - Archivos: 22 nuevos (22 total)
-
-### configuracion
-- optimizar UI POS Ventas, eliminar duplicaciones
-- Archivos: 1 modificados (1 total)
 
 ### locales
 - Agregar selector de local para admin padre en POS Ventas
 - Archivos: 1 nuevos (1 total)
 
 ### productos
-- Permitir editar porcentaje y precio directo en actualizacion de precios, Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos, Eliminar colores hardcodeados y respetar sistema de themes Sunmi
-- Archivos: 6 modificados (6 total)
+- Permitir editar porcentaje y precio directo en actualizacion de precios, Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos
+- Archivos: 2 modificados (2 total)
 
 ### stock
-- Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos, Mejorar responsive mobile: grids adaptativos y overflow-x en tablas
+- Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos
 - Archivos: 3 modificados (3 total)
 
 ### transferencias
-- Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos, Mejorar responsive mobile: grids adaptativos y overflow-x en tablas, Eliminar colores hardcodeados y respetar sistema de themes Sunmi
-- Archivos: 8 modificados (8 total)
+- Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos
+- Archivos: 2 modificados (2 total)
 
 ### grupos
-- Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos, Eliminar colores hardcodeados y respetar sistema de themes Sunmi
+- Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos
 - Archivos: 1 modificados (1 total)
 
 ### pos-transferencias
-- Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos, Eliminar colores hardcodeados y respetar sistema de themes Sunmi
-- Archivos: 5 modificados (5 total)
+- Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos
+- Archivos: 3 modificados (3 total)
 
 
 ## Archivos nuevos desde última sincronización
