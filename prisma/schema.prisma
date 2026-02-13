@@ -24,6 +24,7 @@ model Grupo {
   locales      GrupoDeposito[]
   localesGrupo GrupoLocal[]
   productos    ProductoBase[]
+  clientes     Cliente[]
 }
 
 model GrupoDeposito {
@@ -447,6 +448,28 @@ model PrecioUpdateItem {
 }
 
 // ---------------------------------------------------------------------------
+// CLIENTES
+// ---------------------------------------------------------------------------
+
+model Cliente {
+  id          Int      @id @default(autoincrement())
+  grupoId     Int
+  nombre      String
+  documento   String?
+  telefono    String?
+  email       String?
+  direccion   String?
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  grupo       Grupo    @relation(fields: [grupoId], references: [id])
+  ventas      Venta[]
+
+  @@index([grupoId])
+  @@index([nombre])
+}
+
 // POS VENTAS
 // ---------------------------------------------------------------------------
 
@@ -454,6 +477,7 @@ model Venta {
   id           Int            @id @default(autoincrement())
   localId      Int
   vendedorId   Int
+  clienteId    Int?
   numero       Int
   fecha        DateTime       @default(now())
   subtotal     Decimal        @db.Decimal(12, 2)
@@ -466,10 +490,12 @@ model Venta {
 
   local        Local          @relation(fields: [localId], references: [id])
   vendedor     Usuario        @relation(fields: [vendedorId], references: [id])
+  cliente      Cliente?       @relation(fields: [clienteId], references: [id])
   detalles     VentaDetalle[]
 
   @@index([localId])
   @@index([fecha])
+  @@index([clienteId])
 }
 
 model VentaDetalle {

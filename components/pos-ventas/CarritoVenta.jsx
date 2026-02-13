@@ -20,6 +20,8 @@ export default function CarritoVenta({
   descuento = 0,
   descuentoInfo = null,
   onAbrirDescuento,
+  clienteSeleccionado = null,
+  onAbrirCliente,
 }) {
   if (items.length === 0) {
     return (
@@ -38,6 +40,18 @@ export default function CarritoVenta({
           Carrito ({items.length})
         </span>
         <div className="flex items-center gap-3">
+          {onAbrirCliente && (
+            <button
+              onClick={onAbrirCliente}
+              className={`text-xs ${
+                clienteSeleccionado
+                  ? "text-cyan-400 hover:text-cyan-300 font-medium"
+                  : "text-cyan-400 hover:text-cyan-300"
+              }`}
+            >
+              {clienteSeleccionado ? clienteSeleccionado.nombre : "Cliente"}
+            </button>
+          )}
           {onAbrirDescuento && (
             <button
               onClick={onAbrirDescuento}

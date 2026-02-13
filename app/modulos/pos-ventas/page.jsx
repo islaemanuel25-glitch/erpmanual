@@ -13,6 +13,7 @@ import FormaPago, { COMISION_PCT } from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
+import ModalCliente from "@/components/pos-ventas/ModalCliente";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
 import HistorialDia from "@/components/pos-ventas/HistorialDia";
 
@@ -32,6 +33,10 @@ export default function PosVentasPage() {
   const [carrito, setCarrito] = useState([]);
   const [formaPago, setFormaPago] = useState("efectivo");
   const [cobrando, setCobrando] = useState(false);
+
+  // Cliente
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+  const [modalCliente, setModalCliente] = useState(false);
 
   // Descuento
   const [descuento, setDescuento] = useState(0);
@@ -110,7 +115,7 @@ export default function PosVentasPage() {
       // No interceptar si esta escribiendo en un input
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       // No interceptar si hay modal abierto
-      if (modalEfectivo || modalTicket || modalDescuento) return;
+      if (modalEfectivo || modalTicket || modalDescuento || modalCliente) return;
 
       switch (e.key) {
         case "F1":
@@ -144,7 +149,7 @@ export default function PosVentasPage() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket, modalDescuento]);
+  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket, modalDescuento, modalCliente]);
 
   // ---------------------------------------------------------------------------
   // Agregar producto al carrito
@@ -205,6 +210,7 @@ export default function PosVentasPage() {
     setCarrito([]);
     setDescuento(0);
     setDescuentoInfo(null);
+    setClienteSeleccionado(null);
     setErrorMsg("");
     setSuccessMsg("");
   }, []);
@@ -244,6 +250,7 @@ export default function PosVentasPage() {
     if (id && id !== localSeleccionado) {
       setLocalSeleccionado(id);
       setCarrito([]);
+      setClienteSeleccionado(null);
       setErrorMsg("");
       setSuccessMsg("");
     }
@@ -306,6 +313,7 @@ export default function PosVentasPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           localId: localActual,
+          clienteId: clienteSeleccionado?.id || null,
           formaPago: datos.formaPago,
           descuento,
           comision: datos.comision,
@@ -339,6 +347,7 @@ export default function PosVentasPage() {
           total: datos.total,
           formaPago: datos.formaPago,
           vendedor: me?.nombre || "-",
+          cliente: clienteSeleccionado?.nombre || "Consumidor Final",
           localNombre,
           pagaCon: pagoEfectivo?.pagaCon || null,
           vuelto: pagoEfectivo?.vuelto || null,
@@ -352,6 +361,7 @@ export default function PosVentasPage() {
         setFormaPago("efectivo");
         setDescuento(0);
         setDescuentoInfo(null);
+        setClienteSeleccionado(null);
         setDatosPagoEfectivo(null);
       } else {
         setErrorMsg(data.error || "Error al registrar la venta.");
@@ -535,6 +545,8 @@ export default function PosVentasPage() {
               descuento={descuento}
               descuentoInfo={descuentoInfo}
               onAbrirDescuento={() => setModalDescuento(true)}
+              clienteSeleccionado={clienteSeleccionado}
+              onAbrirCliente={() => setModalCliente(true)}
             />
 
             <FormaPago
@@ -554,6 +566,17 @@ export default function PosVentasPage() {
           F1: Buscar | F2: Efectivo | F3: MP | F4: Debito | F5: Credito | F10: Cobrar
         </div>
       </div>
+
+      {/* Modal cliente */}
+      {modalCliente && (
+        <ModalCliente
+          onSeleccionar={(cliente) => {
+            setClienteSeleccionado(cliente);
+            setModalCliente(false);
+          }}
+          onCerrar={() => setModalCliente(false)}
+        />
+      )}
 
       {/* Modal descuento */}
       {modalDescuento && (
