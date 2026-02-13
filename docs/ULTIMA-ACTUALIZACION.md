@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-13 03:03
+**Fecha:** 2026-02-13 04:24
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- feat: POS Ventas Fase 3 - descuentos, stats del dia, historial, fix: usar $queryRaw en API favoritos POS Ventas, feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts
-- Archivos: 15 nuevos (15 total)
+- fix: convertir BigInt a Number en API favoritos para evitar error de serialización, feat: POS Ventas Fase 4 - Sistema de turnos de caja con apertura, cierre y arqueo, feat: agregar modelo Cliente y selector en POS Ventas
+- Archivos: 22 nuevos (22 total)
 
 ### configuracion
 - optimizar UI POS Ventas, eliminar duplicaciones, Fix props inválidas en componentes Sunmi: variant/size en SunmiButton, mensaje en SunmiTableEmpty
@@ -58,21 +58,28 @@
 
 
 ## Archivos nuevos desde última sincronización
+- app/api/pos-ventas/favoritos/route.js
+- app/api/pos-ventas/crear/route.js
+- app/api/pos-ventas/turnos/abrir/route.js
+- app/api/pos-ventas/turnos/actual/route.js
+- app/api/pos-ventas/turnos/cerrar/route.js
+- app/api/pos-ventas/turnos/resumen/route.js
+- app/modulos/pos-ventas/page.jsx
+- components/pos-ventas/ModalAperturaTurno.jsx
+- components/pos-ventas/ModalCierreTurno.jsx
+- components/pos-ventas/CarritoVenta.jsx
+- components/pos-ventas/ModalCliente.jsx
 - app/api/pos-ventas/historial-dia/route.js
 - app/api/pos-ventas/stats-dia/route.js
-- app/modulos/pos-ventas/page.jsx
-- components/pos-ventas/CarritoVenta.jsx
 - components/pos-ventas/FormaPago.jsx
 - components/pos-ventas/HistorialDia.jsx
 - components/pos-ventas/ModalDescuento.jsx
 - components/pos-ventas/StatsDelDia.jsx
-- app/api/pos-ventas/favoritos/route.js
 - components/pos-ventas/BuscadorProductos.jsx
 - components/pos-ventas/ModalPagoEfectivo.jsx
 - components/pos-ventas/ModalTicket.jsx
 - components/pos-ventas/ProductosFavoritos.jsx
 - app/api/pos-ventas/buscar-producto/route.js
-- app/api/pos-ventas/crear/route.js
 - app/api/locales/opciones/route.js
 
 ## Acción recomendada
