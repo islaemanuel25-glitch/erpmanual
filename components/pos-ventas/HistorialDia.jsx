@@ -149,12 +149,6 @@ export default function HistorialDia({ localId, onReimprimir }) {
                   </span>
                 </div>
               )}
-              {Number(detalle.comision) > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Comision</span>
-                  <span>+${formatPrecio(Number(detalle.comision))}</span>
-                </div>
-              )}
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
                 <span className="text-amber-400">
@@ -180,7 +174,6 @@ export default function HistorialDia({ localId, onReimprimir }) {
                         cantidad: d.cantidad,
                       })),
                       subtotal: Number(detalle.subtotal),
-                      comision: Number(detalle.comision),
                       descuento: Number(detalle.descuento),
                       total: Number(detalle.total),
                       formaPago: detalle.formaPago,

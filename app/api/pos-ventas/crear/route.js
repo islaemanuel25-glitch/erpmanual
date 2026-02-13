@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 
+const COMISION_PCT = 7;
+
 export async function POST(req) {
   try {
     const session = getUsuarioSession(req);
@@ -13,7 +15,7 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const { localId, clienteId, turnoId, formaPago, descuento, comision, items } = body;
+    const { localId, clienteId, turnoId, formaPago, descuento, items } = body;
 
     // Validaciones
     if (!localId) {
@@ -62,8 +64,7 @@ export async function POST(req) {
       0
     );
     const descuentoVal = Number(descuento) || 0;
-    const comisionVal = Number(comision) || 0;
-    const total = subtotal - descuentoVal + comisionVal;
+    const total = subtotal - descuentoVal; // Lo que paga el cliente (SIN comision)
 
     if (total <= 0) {
       return NextResponse.json(
@@ -71,6 +72,36 @@ export async function POST(req) {
         { status: 400 }
       );
     }
+
+    // Comision bancaria: solo para pagos digitales
+    const tieneComision = ["mercadopago", "debito", "credito"].includes(formaPago);
+    const comisionBancaria = tieneComision ? total * (COMISION_PCT / 100) : 0;
+    const netoRecibido = total - comisionBancaria;
+
+    // Obtener precios de costo de cada producto
+    const productoBaseIds = items.map((i) => i.productoBaseId);
+    const productosBase = await prisma.productoBase.findMany({
+      where: { id: { in: productoBaseIds } },
+      select: { id: true, precio_costo: true },
+    });
+    const costosMap = {};
+    productosBase.forEach((p) => {
+      costosMap[p.id] = Number(p.precio_costo) || 0;
+    });
+
+    // Calcular costo total y detalle con ganancia
+    let costoTotal = 0;
+    const itemsConCosto = items.map((item) => {
+      const precioCosto = costosMap[item.productoBaseId] || 0;
+      const subtotalItem = item.precio * item.cantidad;
+      const costoItem = precioCosto * item.cantidad;
+      const ganancia = subtotalItem - costoItem;
+      costoTotal += costoItem;
+      return { ...item, precioCosto, subtotalItem, ganancia };
+    });
+
+    const gananciaBruta = total - costoTotal;
+    const gananciaNeta = netoRecibido - costoTotal;
 
     // Transaccion: crear venta + descontar stock
     const venta = await prisma.$transaction(async (tx) => {
@@ -91,17 +122,23 @@ export async function POST(req) {
           turnoId: turnoId || null,
           numero,
           subtotal,
-          comision: comisionVal,
           descuento: descuentoVal,
           total,
+          comisionBancaria,
+          netoRecibido,
+          costoTotal,
+          gananciaBruta,
+          gananciaNeta,
           formaPago,
           detalles: {
-            create: items.map((item) => ({
+            create: itemsConCosto.map((item) => ({
               productoBaseId: item.productoBaseId,
               nombre: item.nombre,
               precio: item.precio,
+              precioCosto: item.precioCosto,
               cantidad: item.cantidad,
-              subtotal: item.precio * item.cantidad,
+              subtotal: item.subtotalItem,
+              ganancia: item.ganancia,
             })),
           },
         },

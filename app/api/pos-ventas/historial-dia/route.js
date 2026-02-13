@@ -38,7 +38,6 @@ export async function GET(req) {
         numero: true,
         fecha: true,
         subtotal: true,
-        comision: true,
         descuento: true,
         total: true,
         formaPago: true,

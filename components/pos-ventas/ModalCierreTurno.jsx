@@ -118,17 +118,31 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
           </div>
         </div>
 
-        {/* Desglose digital */}
+        {/* Desglose digital + comisiones */}
         {Number(resumen.totalDigital) > 0 && (
-          <div className="bg-slate-800/40 p-2 rounded-lg mb-4 text-xs text-slate-400 flex justify-around">
-            {Number(resumen.desglose.mercadopago) > 0 && (
-              <span>MP: ${formatPrecio(resumen.desglose.mercadopago)}</span>
+          <div className="bg-slate-800/40 p-2 rounded-lg mb-4 space-y-1">
+            <div className="text-xs text-slate-400 flex justify-around">
+              {Number(resumen.desglose.mercadopago) > 0 && (
+                <span>MP: ${formatPrecio(resumen.desglose.mercadopago)}</span>
+              )}
+              {Number(resumen.desglose.debito) > 0 && (
+                <span>Debito: ${formatPrecio(resumen.desglose.debito)}</span>
+              )}
+              {Number(resumen.desglose.credito) > 0 && (
+                <span>Credito: ${formatPrecio(resumen.desglose.credito)}</span>
+              )}
+            </div>
+            {Number(resumen.totalComision) > 0 && (
+              <div className="text-xs text-slate-500 flex justify-between border-t border-slate-700 pt-1 mt-1">
+                <span>Comision bancaria:</span>
+                <span className="text-red-400">-${formatPrecio(resumen.totalComision)}</span>
+              </div>
             )}
-            {Number(resumen.desglose.debito) > 0 && (
-              <span>Debito: ${formatPrecio(resumen.desglose.debito)}</span>
-            )}
-            {Number(resumen.desglose.credito) > 0 && (
-              <span>Credito: ${formatPrecio(resumen.desglose.credito)}</span>
+            {Number(resumen.netoDigital) > 0 && (
+              <div className="text-xs flex justify-between">
+                <span className="text-slate-400">Neto digital:</span>
+                <span className="text-amber-300 font-semibold">${formatPrecio(resumen.netoDigital)}</span>
+              </div>
             )}
           </div>
         )}

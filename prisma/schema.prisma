@@ -483,11 +483,15 @@ model Venta {
   turnoId      Int?
   numero       Int
   fecha        DateTime       @default(now())
-  subtotal     Decimal        @db.Decimal(12, 2)
-  comision     Decimal        @default(0) @db.Decimal(12, 2)
-  descuento    Decimal        @default(0) @db.Decimal(12, 2)
-  total        Decimal        @db.Decimal(12, 2)
-  formaPago    String
+  subtotal          Decimal        @db.Decimal(12, 2)
+  descuento         Decimal        @default(0) @db.Decimal(12, 2)
+  total             Decimal        @db.Decimal(12, 2)
+  comisionBancaria  Decimal        @default(0) @db.Decimal(12, 2)
+  netoRecibido      Decimal        @default(0) @db.Decimal(12, 2)
+  costoTotal        Decimal        @default(0) @db.Decimal(12, 2)
+  gananciaBruta     Decimal        @default(0) @db.Decimal(12, 2)
+  gananciaNeta      Decimal        @default(0) @db.Decimal(12, 2)
+  formaPago         String
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -509,8 +513,10 @@ model VentaDetalle {
   productoBaseId  Int
   nombre          String
   precio          Decimal      @db.Decimal(12, 2)
+  precioCosto     Decimal      @default(0) @db.Decimal(12, 2)
   cantidad        Int
   subtotal        Decimal      @db.Decimal(12, 2)
+  ganancia        Decimal      @default(0) @db.Decimal(12, 2)
   createdAt       DateTime     @default(now())
 
   venta           Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)

@@ -9,7 +9,7 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
-import FormaPago, { COMISION_PCT } from "@/components/pos-ventas/FormaPago";
+import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
@@ -50,7 +50,7 @@ export default function PosVentasPage() {
   const [mostrarCierre, setMostrarCierre] = useState(false);
 
   // Modales
-  const [modalEfectivo, setModalEfectivo] = useState(null); // { total, comision, formaPago }
+  const [modalEfectivo, setModalEfectivo] = useState(null); // { total, formaPago }
   const [modalTicket, setModalTicket] = useState(null); // venta data para ticket
   const [datosPagoEfectivo, setDatosPagoEfectivo] = useState(null); // { pagaCon, vuelto }
 
@@ -249,9 +249,7 @@ export default function PosVentasPage() {
     0
   );
 
-  const tieneComision = ["mercadopago", "debito", "credito"].includes(formaPago);
-  const comision = tieneComision ? (subtotal - descuento) * (COMISION_PCT / 100) : 0;
-  const total = subtotal - descuento + comision;
+  const total = subtotal - descuento;
 
   // ---------------------------------------------------------------------------
   // Descuento
@@ -287,20 +285,20 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   const iniciarCobro = () => {
     if (formaPago === "efectivo") {
-      setModalEfectivo({ total, comision, formaPago });
+      setModalEfectivo({ total, formaPago });
     } else {
-      ejecutarCobro({ formaPago, comision, total });
+      ejecutarCobro({ formaPago, total });
     }
   };
 
   // ---------------------------------------------------------------------------
   // Cobrar desde FormaPago (redirige a iniciarCobro)
   // ---------------------------------------------------------------------------
-  const handleCobrar = ({ formaPago: fp, comision: com, total: tot }) => {
+  const handleCobrar = ({ formaPago: fp, total: tot }) => {
     if (fp === "efectivo") {
-      setModalEfectivo({ total: tot, comision: com, formaPago: fp });
+      setModalEfectivo({ total: tot, formaPago: fp });
     } else {
-      ejecutarCobro({ formaPago: fp, comision: com, total: tot });
+      ejecutarCobro({ formaPago: fp, total: tot });
     }
   };
 
@@ -343,7 +341,6 @@ export default function PosVentasPage() {
           turnoId: turnoActual?.id || null,
           formaPago: datos.formaPago,
           descuento,
-          comision: datos.comision,
           items: carrito.map((item) => ({
             productoBaseId: item.productoBaseId,
             nombre: item.nombre,
@@ -369,7 +366,6 @@ export default function PosVentasPage() {
             cantidad: item.cantidad,
           })),
           subtotal,
-          comision: datos.comision,
           descuento,
           total: datos.total,
           formaPago: datos.formaPago,
@@ -527,6 +523,8 @@ export default function PosVentasPage() {
             {me && (
               <span className="text-xs text-slate-400 hidden sm:inline">{me.nombre}</span>
             )}
+        
+
             {turnoActual && (
               <button
                 onClick={() => setMostrarCierre(true)}

@@ -31,8 +31,9 @@ export default function FormaPago({
   const forma = FORMAS_PAGO.find((f) => f.key === formaPago);
   const tieneComision = forma?.tieneComision || false;
   const base = subtotal - descuento;
-  const comision = tieneComision ? base * (COMISION_PCT / 100) : 0;
-  const total = base + comision;
+  const total = base; // Cliente paga subtotal - descuento, SIN comision
+  const comisionBancaria = tieneComision ? base * (COMISION_PCT / 100) : 0;
+  const netoRecibido = total - comisionBancaria;
 
   return (
     <SunmiCard className="p-2 lg:p-3">
@@ -60,13 +61,14 @@ export default function FormaPago({
         </div>
       )}
 
-      {/* Comision */}
+      {/* Comision bancaria - info interna para el vendedor */}
       {tieneComision && subtotal > 0 && (
-        <div className="mt-2 px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-center">
-          Comision {COMISION_PCT}%:{" "}
-          <span className="font-semibold text-amber-300">
-            +${formatPrecio(comision)}
+        <div className="mt-2 px-2 py-1.5 rounded-lg bg-slate-700/40 border border-slate-600/30 text-xs text-center text-slate-400">
+          Comision bancaria {COMISION_PCT}%:{" "}
+          <span className="font-semibold text-slate-300">
+            -${formatPrecio(comisionBancaria)}
           </span>
+          <span className="ml-1 text-[10px]">(neto: ${formatPrecio(netoRecibido)})</span>
         </div>
       )}
 
@@ -84,7 +86,7 @@ export default function FormaPago({
       <div className="mt-3">
         <SunmiButton
           color="amber"
-          onClick={() => onCobrar({ formaPago, comision, total })}
+          onClick={() => onCobrar({ formaPago, total })}
           disabled={cobrando || disabled || !formaPago || subtotal <= 0}
           className="!w-full min-h-16 lg:min-h-12 !text-xl lg:!text-lg !font-bold"
         >
