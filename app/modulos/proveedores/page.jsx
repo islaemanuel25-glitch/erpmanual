@@ -17,12 +17,25 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import SunmiPill from "@/components/sunmi/SunmiPill"; // 🔥 agregado para chips
 
 import ModalProveedor from "@/components/proveedores/ModalProveedor";
+import useLocalSelector from "@/hooks/useLocalSelector";
+import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
+import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
 
 const PAGE_SIZE = 10;
 
 export default function ProveedoresPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const {
+    perfil,
+    locales,
+    localSeleccionado,
+    localNombre,
+    esAdminSinLocal,
+    cargandoLocales,
+    handleCambiarLocal,
+  } = useLocalSelector();
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -143,9 +156,38 @@ export default function ProveedoresPage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  if (cargandoLocales) {
+    return (
+      <div className="sunmi-bg w-full min-h-full p-4 flex justify-center items-center">
+        <span className="text-sm text-slate-400">Cargando...</span>
+      </div>
+    );
+  }
+
+  if (esAdminSinLocal && !localSeleccionado) {
+    return (
+      <PantallaSeleccionLocal
+        locales={locales}
+        onSeleccionar={handleCambiarLocal}
+      />
+    );
+  }
+
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
+        {/* ========= SELECTOR LOCAL ========= */}
+        {locales.length > 1 && (
+          <div className="px-2 pt-2">
+            <SelectorLocalCompacto
+              locales={locales}
+              localSeleccionado={localSeleccionado}
+              localNombre={localNombre}
+              onChange={handleCambiarLocal}
+            />
+          </div>
+        )}
+
         <SunmiSeparator label="Filtros" className="my-4" />
 
         {/* ===================== */}

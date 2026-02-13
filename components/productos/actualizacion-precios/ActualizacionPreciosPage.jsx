@@ -11,6 +11,9 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiRow from "@/components/sunmi/SunmiRow";
 import SelectorGrupoActivo from "@/components/grupo/SelectorGrupoActivo";
+import useLocalSelector from "@/hooks/useLocalSelector";
+import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
+import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
 import * as XLSX from 'xlsx';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +53,17 @@ function round2(n) {
 
 export default function ActualizacionPreciosPage() {
   const router = useRouter();
+
+  const {
+    perfil,
+    locales,
+    localSeleccionado,
+    localNombre,
+    esAdminSinLocal,
+    cargandoLocales,
+    handleCambiarLocal,
+    refrescarLocales,
+  } = useLocalSelector();
 
   // Estado compartido
   const [tab, setTab] = useState("proveedor");
@@ -528,20 +542,39 @@ export default function ActualizacionPreciosPage() {
     setErrorMsg("");
     setSuccessMsg("");
     setGlobalPct("");
+    refrescarLocales();
   };
 
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
+  if (esAdminSinLocal && !localSeleccionado && !cargandoLocales) {
+    return (
+      <PantallaSeleccionLocal
+        locales={locales}
+        onSeleccionar={handleCambiarLocal}
+        volverUrl="/modulos/productos"
+      />
+    );
+  }
+
   return (
     <div className="sunmi-bg w-full min-h-full p-2">
       <SunmiCard>
         <div className="flex flex-col gap-3">
           {/* Header */}
           <div className="flex items-center justify-between gap-2">
-            <h1 className="text-sm md:text-base font-semibold">
-              Actualizacion de Precios
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-sm md:text-base font-semibold">
+                Actualizacion de Precios
+              </h1>
+              <SelectorLocalCompacto
+                locales={locales}
+                localSeleccionado={localSeleccionado}
+                localNombre={localNombre}
+                onChange={handleCambiarLocal}
+              />
+            </div>
             <SunmiButton
               color="cyan"
               onClick={() => router.push("/modulos/productos")}

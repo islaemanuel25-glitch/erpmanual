@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@/app/context/UserContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -10,9 +9,20 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
+import useLocalSelector from "@/hooks/useLocalSelector";
+import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
+import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
 
 export default function ClientesPage() {
-  const { perfil } = useUser();
+  const {
+    perfil,
+    locales,
+    localSeleccionado,
+    localNombre,
+    esAdminSinLocal,
+    cargandoLocales,
+    handleCambiarLocal,
+  } = useLocalSelector();
 
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
@@ -78,17 +88,34 @@ export default function ClientesPage() {
     );
   });
 
-  if (!perfil) return null;
+  if (!perfil || cargandoLocales) return null;
+
+  if (esAdminSinLocal && !localSeleccionado) {
+    return (
+      <PantallaSeleccionLocal
+        locales={locales}
+        onSeleccionar={handleCambiarLocal}
+      />
+    );
+  }
 
   return (
     <div className="p-2 lg:p-3 space-y-3 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold">Clientes</h1>
-          <p className="text-sm text-slate-400">
-            Gestion de clientes del sistema
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-xl font-bold">Clientes</h1>
+            <p className="text-sm text-slate-400">
+              Gestion de clientes del sistema
+            </p>
+          </div>
+          <SelectorLocalCompacto
+            locales={locales}
+            localSeleccionado={localSeleccionado}
+            localNombre={localNombre}
+            onChange={handleCambiarLocal}
+          />
         </div>
         <SunmiButton color="amber" onClick={handleNuevo}>
           + Nuevo Cliente
