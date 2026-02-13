@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-13 01:58
+**Fecha:** 2026-02-13 02:36
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts, optimizar UI POS Ventas, eliminar duplicaciones, responsive mobile POS Ventas
+- fix: usar $queryRaw en API favoritos POS Ventas, feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts, optimizar UI POS Ventas, eliminar duplicaciones
 - Archivos: 10 nuevos (10 total)
 
 ### configuracion
@@ -18,7 +18,7 @@
 
 ### productos
 - Permitir editar porcentaje y precio directo en actualizacion de precios, Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos, Eliminar colores hardcodeados y respetar sistema de themes Sunmi
-- Archivos: 3 nuevos, 7 modificados (10 total)
+- Archivos: 6 modificados (6 total)
 
 ### stock
 - Reemplazar todos los SunmiSelect por SunmiSelectAdv en 11 archivos, Mejorar responsive mobile: grids adaptativos y overflow-x en tablas, Estandarizar labels de inputs/selects a text-[11px] text-slate-400 mb-1 block
@@ -69,9 +69,6 @@
 - app/api/pos-ventas/buscar-producto/route.js
 - app/api/pos-ventas/crear/route.js
 - app/api/locales/opciones/route.js
-- app/api/productos/export/route.js
-- app/api/productos/import/apply/route.js
-- app/api/productos/import/preview/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

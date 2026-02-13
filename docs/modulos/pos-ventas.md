@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-02-13 01:58
+**Última actualización:** 2026-02-13 02:36
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,12 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-02-13: fix: usar $queryRaw en API favoritos POS Ventas
+- 2026-02-13: feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts
+- 2026-02-13: optimizar UI POS Ventas, eliminar duplicaciones
+- 2026-02-13: responsive mobile POS Ventas
+- 2026-02-12: Agregar selector de local para admin padre en POS Ventas
+- 2026-02-12: Crear modulo POS Ventas (MVP Fase 1)
 - 2026-02-13: feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts
 - 2026-02-13: optimizar UI POS Ventas, eliminar duplicaciones
 - 2026-02-13: responsive mobile POS Ventas
