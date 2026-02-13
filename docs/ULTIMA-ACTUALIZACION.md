@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-13 02:36
+**Fecha:** 2026-02-13 03:03
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- fix: usar $queryRaw en API favoritos POS Ventas, feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts, optimizar UI POS Ventas, eliminar duplicaciones
-- Archivos: 10 nuevos (10 total)
+- feat: POS Ventas Fase 3 - descuentos, stats del dia, historial, fix: usar $queryRaw en API favoritos POS Ventas, feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts
+- Archivos: 15 nuevos (15 total)
 
 ### configuracion
 - optimizar UI POS Ventas, eliminar duplicaciones, Fix props inválidas en componentes Sunmi: variant/size en SunmiButton, mensaje en SunmiTableEmpty
@@ -58,14 +58,19 @@
 
 
 ## Archivos nuevos desde última sincronización
-- app/api/pos-ventas/favoritos/route.js
+- app/api/pos-ventas/historial-dia/route.js
+- app/api/pos-ventas/stats-dia/route.js
 - app/modulos/pos-ventas/page.jsx
+- components/pos-ventas/CarritoVenta.jsx
+- components/pos-ventas/FormaPago.jsx
+- components/pos-ventas/HistorialDia.jsx
+- components/pos-ventas/ModalDescuento.jsx
+- components/pos-ventas/StatsDelDia.jsx
+- app/api/pos-ventas/favoritos/route.js
 - components/pos-ventas/BuscadorProductos.jsx
 - components/pos-ventas/ModalPagoEfectivo.jsx
 - components/pos-ventas/ModalTicket.jsx
 - components/pos-ventas/ProductosFavoritos.jsx
-- components/pos-ventas/CarritoVenta.jsx
-- components/pos-ventas/FormaPago.jsx
 - app/api/pos-ventas/buscar-producto/route.js
 - app/api/pos-ventas/crear/route.js
 - app/api/locales/opciones/route.js
