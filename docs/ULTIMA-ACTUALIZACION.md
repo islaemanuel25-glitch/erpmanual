@@ -1,37 +1,25 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-13 11:03
+**Fecha:** 2026-02-13 16:01
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- fix: corregir sistema de comisiones - comision bancaria como costo interno, refactor: eliminar ProductosFavoritos y corregir keys en CarritoVenta, fix: corregir key y campo precio en ProductosFavoritos
-- Archivos: 22 nuevos (22 total)
+- refactor: limpiar layout POS - historial a modal, stats en header, fix: corregir sistema de comisiones - comision bancaria como costo interno, refactor: eliminar ProductosFavoritos y corregir keys en CarritoVenta
+- Archivos: 16 nuevos, 5 modificados (21 total)
 
 ### configuracion
 - feat: agregar POS Ventas al menú lateral de navegación, optimizar UI POS Ventas, eliminar duplicaciones
 - Archivos: 2 modificados (2 total)
 
-### locales
-- Agregar selector de local para admin padre en POS Ventas
-- Archivos: 1 nuevos (1 total)
-
-### productos
-- Permitir editar porcentaje y precio directo en actualizacion de precios
-- Archivos: 1 modificados (1 total)
-
 
 ## Archivos nuevos desde última sincronización
-- app/api/pos-ventas/crear/route.js
+- components/pos-ventas/HistorialDia.jsx
+- components/pos-ventas/StatsDelDia.jsx
 - app/api/pos-ventas/historial-dia/route.js
 - app/api/pos-ventas/turnos/resumen/route.js
-- app/modulos/pos-ventas/page.jsx
-- components/pos-ventas/FormaPago.jsx
-- components/pos-ventas/HistorialDia.jsx
 - components/pos-ventas/ModalCierreTurno.jsx
 - app/api/pos-ventas/favoritos/route.js
-- components/pos-ventas/BuscadorProductos.jsx
-- components/pos-ventas/CarritoVenta.jsx
 - components/pos-ventas/ProductosFavoritos.jsx
 - app/api/pos-ventas/turnos/abrir/route.js
 - app/api/pos-ventas/turnos/actual/route.js
@@ -40,11 +28,8 @@
 - components/pos-ventas/ModalCliente.jsx
 - app/api/pos-ventas/stats-dia/route.js
 - components/pos-ventas/ModalDescuento.jsx
-- components/pos-ventas/StatsDelDia.jsx
 - components/pos-ventas/ModalPagoEfectivo.jsx
 - components/pos-ventas/ModalTicket.jsx
-- app/api/pos-ventas/buscar-producto/route.js
-- app/api/locales/opciones/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

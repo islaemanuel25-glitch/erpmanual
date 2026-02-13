@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-02-13 11:03
+**Última actualización:** 2026-02-13 16:01
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,18 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-02-13: refactor: limpiar layout POS - historial a modal, stats en header
+- 2026-02-13: fix: corregir sistema de comisiones - comision bancaria como costo interno
+- 2026-02-13: refactor: eliminar ProductosFavoritos y corregir keys en CarritoVenta
+- 2026-02-13: fix: corregir key y campo precio en ProductosFavoritos
+- 2026-02-13: fix: convertir BigInt a Number en API favoritos para evitar error de serialización
+- 2026-02-13: feat: POS Ventas Fase 4 - Sistema de turnos de caja con apertura, cierre y arqueo
+- 2026-02-13: feat: agregar modelo Cliente y selector en POS Ventas
+- 2026-02-13: feat: POS Ventas Fase 3 - descuentos, stats del dia, historial
+- 2026-02-13: fix: usar $queryRaw en API favoritos POS Ventas
+- 2026-02-13: feat: POS Ventas Fase 2 - voz, vuelto, impresion, favoritos, shortcuts
+- 2026-02-13: optimizar UI POS Ventas, eliminar duplicaciones
+- 2026-02-13: responsive mobile POS Ventas
 - 2026-02-13: fix: corregir sistema de comisiones - comision bancaria como costo interno
 - 2026-02-13: refactor: eliminar ProductosFavoritos y corregir keys en CarritoVenta
 - 2026-02-13: fix: corregir key y campo precio en ProductosFavoritos
