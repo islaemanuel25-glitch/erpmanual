@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@/app/context/UserContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -9,6 +8,9 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import useLocalSelector from "@/hooks/useLocalSelector";
+import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
+import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -18,9 +20,17 @@ function formatPrecio(n) {
 }
 
 export default function ReportesVentasPage() {
-  const { perfil } = useUser();
+  const {
+    perfil,
+    locales,
+    localSeleccionado,
+    localNombre,
+    esAdminSinLocal,
+    cargandoLocales,
+    handleCambiarLocal,
+  } = useLocalSelector();
+
   const esAdmin = perfil?.esAdmin;
-  const localUsuario = perfil?.localId;
 
   // Filtros
   const [fechaDesde, setFechaDesde] = useState("");
@@ -31,37 +41,19 @@ export default function ReportesVentasPage() {
   // Datos
   const [reporte, setReporte] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [locales, setLocales] = useState([]);
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    // Fechas por defecto: hoy
     const hoy = new Date().toISOString().split("T")[0];
     setFechaDesde(hoy);
     setFechaHasta(hoy);
-
-    // Cargar locales
-    const cargarLocales = async () => {
-      try {
-        const res = await fetch("/api/locales/opciones", {
-          credentials: "include",
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setLocales(data.items || []);
-        }
-      } catch (error) {
-        console.error("Error cargando locales:", error);
-      }
-    };
-    cargarLocales();
   }, []);
 
   useEffect(() => {
-    if (localUsuario) {
-      setLocalId(String(localUsuario));
+    if (localSeleccionado) {
+      setLocalId(String(localSeleccionado));
     }
-  }, [localUsuario]);
+  }, [localSeleccionado]);
 
   const cargarReporte = async () => {
     if (!fechaDesde || !fechaHasta) {
@@ -101,16 +93,33 @@ export default function ReportesVentasPage() {
     }
   };
 
-  if (!perfil) return null;
+  if (!perfil || cargandoLocales) return null;
+
+  if (esAdminSinLocal && !localSeleccionado) {
+    return (
+      <PantallaSeleccionLocal
+        locales={locales}
+        onSeleccionar={handleCambiarLocal}
+      />
+    );
+  }
 
   return (
     <div className="p-2 lg:p-3 space-y-3 max-w-7xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold">Reportes de Ventas</h1>
-        <p className="text-sm text-slate-400">
-          Analisis de ventas, comisiones y rentabilidad
-        </p>
+      <div className="flex items-center gap-3">
+        <div>
+          <h1 className="text-xl font-bold">Reportes de Ventas</h1>
+          <p className="text-sm text-slate-400">
+            Analisis de ventas, comisiones y rentabilidad
+          </p>
+        </div>
+        <SelectorLocalCompacto
+          locales={locales}
+          localSeleccionado={localSeleccionado}
+          localNombre={localNombre}
+          onChange={handleCambiarLocal}
+        />
       </div>
 
       {/* Filtros */}
