@@ -13,7 +13,7 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const { localId, clienteId, formaPago, descuento, comision, items } = body;
+    const { localId, clienteId, turnoId, formaPago, descuento, comision, items } = body;
 
     // Validaciones
     if (!localId) {
@@ -88,6 +88,7 @@ export async function POST(req) {
           localId,
           vendedorId: session.id,
           clienteId: clienteId || null,
+          turnoId: turnoId || null,
           numero,
           subtotal,
           comision: comisionVal,

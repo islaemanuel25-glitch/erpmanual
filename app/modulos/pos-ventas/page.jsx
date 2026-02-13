@@ -14,6 +14,8 @@ import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
 import ModalCliente from "@/components/pos-ventas/ModalCliente";
+import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
+import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
 import HistorialDia from "@/components/pos-ventas/HistorialDia";
 
@@ -42,6 +44,10 @@ export default function PosVentasPage() {
   const [descuento, setDescuento] = useState(0);
   const [descuentoInfo, setDescuentoInfo] = useState(null); // { tipo, valor }
   const [modalDescuento, setModalDescuento] = useState(false);
+
+  // Turno de caja
+  const [turnoActual, setTurnoActual] = useState(undefined); // undefined=cargando, null=sin turno, object=turno
+  const [mostrarCierre, setMostrarCierre] = useState(false);
 
   // Modales
   const [modalEfectivo, setModalEfectivo] = useState(null); // { total, comision, formaPago }
@@ -106,6 +112,26 @@ export default function PosVentasPage() {
     };
     cargarLocales();
   }, [me]);
+
+  // ---------------------------------------------------------------------------
+  // Verificar turno abierto
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!localActual || !me) return;
+    const verificarTurno = async () => {
+      try {
+        const res = await fetch(
+          `/api/pos-ventas/turnos/actual?localId=${localActual}`,
+          { credentials: "include" }
+        );
+        const data = await res.json();
+        setTurnoActual(data.ok && data.turno ? data.turno : null);
+      } catch {
+        setTurnoActual(null);
+      }
+    };
+    verificarTurno();
+  }, [localActual, me]);
 
   // ---------------------------------------------------------------------------
   // Shortcuts de teclado
@@ -314,6 +340,7 @@ export default function PosVentasPage() {
         body: JSON.stringify({
           localId: localActual,
           clienteId: clienteSeleccionado?.id || null,
+          turnoId: turnoActual?.id || null,
           formaPago: datos.formaPago,
           descuento,
           comision: datos.comision,
@@ -414,6 +441,19 @@ export default function PosVentasPage() {
   }
 
   // ---------------------------------------------------------------------------
+  // Sin turno abierto: modal apertura de caja
+  // ---------------------------------------------------------------------------
+  if (localActual && me && turnoActual === null) {
+    return (
+      <ModalAperturaTurno
+        localId={localActual}
+        vendedorNombre={me?.nombre || "-"}
+        onApertura={(turno) => setTurnoActual(turno)}
+      />
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Admin padre sin local seleccionado: pantalla de seleccion
   // ---------------------------------------------------------------------------
   if (esAdmin && !localSeleccionado) {
@@ -486,6 +526,14 @@ export default function PosVentasPage() {
           <div className="flex items-center gap-2 shrink-0">
             {me && (
               <span className="text-xs text-slate-400 hidden sm:inline">{me.nombre}</span>
+            )}
+            {turnoActual && (
+              <button
+                onClick={() => setMostrarCierre(true)}
+                className="text-[11px] bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2 py-1 rounded transition-colors"
+              >
+                Cerrar Turno
+              </button>
             )}
             <SunmiButton
               color="slate"
@@ -604,6 +652,18 @@ export default function PosVentasPage() {
           venta={modalTicket}
           onOpcion={handleOpcionTicket}
           onCerrar={handleCerrarTicket}
+        />
+      )}
+
+      {/* Modal cierre de turno */}
+      {mostrarCierre && turnoActual && (
+        <ModalCierreTurno
+          turno={turnoActual}
+          onCerrar={() => setMostrarCierre(false)}
+          onCerrado={() => {
+            setMostrarCierre(false);
+            setTurnoActual(null);
+          }}
         />
       )}
     </div>
