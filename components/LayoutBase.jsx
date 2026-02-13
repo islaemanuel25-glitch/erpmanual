@@ -24,6 +24,10 @@ export default function LayoutBase({ children }) {
       ? "Stock"
       : pathname.includes("transferencias")
       ? "Transferencias"
+      : pathname.includes("pos-ventas")
+      ? "POS Ventas"
+      : pathname.includes("pos-transferencias")
+      ? "POS Transferencias"
       : pathname.includes("pos")
       ? "POS"
       : "Panel";

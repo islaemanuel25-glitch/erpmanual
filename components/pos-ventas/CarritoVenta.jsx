@@ -1,9 +1,7 @@
 "use client";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 
 function formatPrecio(n) {
@@ -22,9 +20,8 @@ export default function CarritoVenta({
 }) {
   if (items.length === 0) {
     return (
-      <SunmiCard className="p-3">
-        <SunmiSeparator label="Carrito" className="!mt-0 !mb-2" />
-        <div className="text-sm text-slate-500 text-center py-6">
+      <SunmiCard className="p-2 lg:p-3">
+        <div className="text-sm text-slate-500 text-center py-4">
           No hay productos en el carrito.
         </div>
       </SunmiCard>
@@ -32,56 +29,56 @@ export default function CarritoVenta({
   }
 
   return (
-    <SunmiCard className="p-3">
+    <SunmiCard className="p-2 lg:p-3">
       <div className="flex items-center justify-between mb-2">
-        <SunmiSeparator label="Carrito" className="!mt-0 !mb-0 flex-1" />
-        <SunmiButton
-          color="red"
+        <span className="text-sm font-semibold text-slate-300">
+          Carrito ({items.length})
+        </span>
+        <button
           onClick={onLimpiar}
-          className="!text-xs !py-1 !px-2"
+          className="text-xs text-red-400 hover:text-red-300"
         >
           Limpiar
-        </SunmiButton>
+        </button>
       </div>
 
-      {/* MOBILE: cards apiladas */}
-      <div className="block lg:hidden space-y-2">
+      {/* MOBILE: lista compacta */}
+      <div className="block lg:hidden space-y-1">
         {items.map((item, idx) => (
           <div
             key={item.productoBaseId}
-            className="p-3 rounded-lg bg-slate-800/60 animate-fade-in"
+            className="p-2 rounded-lg bg-slate-800/60 animate-fade-in"
           >
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1 min-w-0 mr-2">
-                <div className="font-semibold text-sm truncate">{item.nombre}</div>
-                <div className="text-xs text-slate-400">
-                  $ {formatPrecio(item.precio)} c/u
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm truncate">{item.nombre}</div>
+                <div className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                  <span>${formatPrecio(item.precio)}</span>
+                  <span>x</span>
+                  <SunmiInput
+                    type="number"
+                    min={1}
+                    max={item.stockMax || 9999}
+                    value={item.cantidad}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 1;
+                      onCantidadChange(idx, Math.max(1, val));
+                    }}
+                    className="w-16 !text-center !py-1 text-sm"
+                  />
                 </div>
               </div>
-              <button
-                onClick={() => onEliminar(idx)}
-                className="text-red-400 hover:text-red-300 active:text-red-200 text-lg leading-none min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
-                title="Eliminar"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Cant:</span>
-              <SunmiInput
-                type="number"
-                min={1}
-                max={item.stockMax || 9999}
-                value={item.cantidad}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value) || 1;
-                  onCantidadChange(idx, Math.max(1, val));
-                }}
-                className="w-20 !text-center !py-1.5 text-base"
-              />
-              <span className="ml-auto font-bold text-amber-400">
-                $ {formatPrecio(item.precio * item.cantidad)}
-              </span>
+              <div className="text-right shrink-0">
+                <div className="text-sm font-bold text-amber-400">
+                  ${formatPrecio(item.precio * item.cantidad)}
+                </div>
+                <button
+                  onClick={() => onEliminar(idx)}
+                  className="text-xs text-red-400 mt-1"
+                >
+                  Quitar
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -134,10 +131,10 @@ export default function CarritoVenta({
       </div>
 
       {/* Subtotal */}
-      <div className="flex justify-end mt-3 px-2">
+      <div className="flex justify-end mt-2 px-1">
         <div className="text-right">
-          <span className="text-sm text-slate-400 mr-3">SUBTOTAL</span>
-          <span className="text-xl lg:text-lg font-bold">$ {formatPrecio(subtotal)}</span>
+          <span className="text-xs text-slate-400 mr-2">SUBTOTAL</span>
+          <span className="text-lg font-bold">$ {formatPrecio(subtotal)}</span>
         </div>
       </div>
     </SunmiCard>

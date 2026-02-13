@@ -3,8 +3,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 export default function BuscadorProductos({ localId, onAgregar }) {
   const inputRef = useRef(null);
@@ -109,17 +107,15 @@ export default function BuscadorProductos({ localId, onAgregar }) {
   };
 
   return (
-    <SunmiCard className="p-3">
-      <SunmiSeparator label="Buscar producto" className="!mt-0 !mb-2" />
-
+    <SunmiCard className="p-2 lg:p-3">
       <SunmiInput
         ref={inputRef}
         type="text"
-        placeholder="Codigo o nombre..."
+        placeholder="Codigo o nombre del producto..."
         value={query}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        className="w-full text-lg lg:text-base min-h-14 lg:min-h-10 !py-2.5"
+        className="w-full text-base min-h-12 lg:min-h-10 !py-2"
         autoFocus
       />
 
@@ -129,12 +125,12 @@ export default function BuscadorProductos({ localId, onAgregar }) {
 
       {/* Resultados */}
       {resultados.length > 0 && (
-        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
+        <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
           {resultados.map((p) => (
             <div
               key={p.productoBaseId}
               onClick={() => handleAgregar(p)}
-              className="flex items-center justify-between gap-2 px-3 py-3 lg:py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 active:bg-slate-600/60 transition cursor-pointer"
+              className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 active:bg-slate-600/60 transition cursor-pointer"
             >
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{p.nombre}</div>
@@ -145,22 +141,10 @@ export default function BuscadorProductos({ localId, onAgregar }) {
                   <span>Stock: {p.stock}</span>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <div className="text-sm font-semibold text-amber-400">
-                  ${Number(p.precioVenta).toLocaleString("es-AR", {
-                    minimumFractionDigits: 2,
-                  })}
-                </div>
-                <SunmiButton
-                  color="cyan"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAgregar(p);
-                  }}
-                  className="!text-xs !py-1 !px-3 mt-1 w-full sm:w-auto"
-                >
-                  + Agregar
-                </SunmiButton>
+              <div className="text-sm font-semibold text-amber-400 shrink-0">
+                ${Number(p.precioVenta).toLocaleString("es-AR", {
+                  minimumFractionDigits: 2,
+                })}
               </div>
             </div>
           ))}
