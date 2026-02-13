@@ -3,8 +3,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import ProductosFavoritos from "./ProductosFavoritos";
-
 export default function BuscadorProductos({ localId, onAgregar }) {
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -149,9 +147,6 @@ export default function BuscadorProductos({ localId, onAgregar }) {
 
   return (
     <SunmiCard className="p-2 lg:p-3">
-      {/* Favoritos */}
-      <ProductosFavoritos localId={localId} onAgregar={handleAgregar} />
-
       {/* Input con boton de voz */}
       <div className="relative">
         <SunmiInput

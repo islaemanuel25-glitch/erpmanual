@@ -77,7 +77,7 @@ export default function CarritoVenta({
       <div className="block lg:hidden space-y-1">
         {items.map((item, idx) => (
           <div
-            key={item.productoBaseId}
+            key={`${item.productoBaseId}-${idx}`}
             className="p-2 rounded-lg bg-slate-800/60 animate-fade-in"
           >
             <div className="flex items-start gap-2">
@@ -122,7 +122,7 @@ export default function CarritoVenta({
         >
           {items.map((item, idx) => (
             <tr
-              key={item.productoBaseId}
+              key={`${item.productoBaseId}-${idx}`}
               className="bg-slate-950 hover:bg-slate-900 animate-fade-in"
             >
               <td className="px-2 py-1.5 truncate max-w-[160px] text-sm">
