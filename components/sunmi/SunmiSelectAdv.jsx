@@ -27,9 +27,11 @@ export default function SunmiSelectAdv({
         setOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [open]);
 
   const optionList = Children.toArray(children).filter((c) =>
     isValidElement(c)
@@ -72,7 +74,7 @@ export default function SunmiSelectAdv({
   const dropdownBg = theme.card.split(' ').find(c => c.startsWith('bg-'))?.replace('/70', '').replace('/60', '') || 'bg-slate-900';
 
   return (
-    <div ref={ref} className={`relative w-full ${className}`}>
+    <div ref={ref} className={`relative w-full ${open ? "z-[100]" : ""} ${className}`}>
       {/* BOTON */}
       <button
         onClick={() => setOpen(!open)}
@@ -99,7 +101,7 @@ export default function SunmiSelectAdv({
       {open && (
         <div
           className={`
-            absolute left-0 right-0 mt-1 z-50
+            absolute left-0 right-0 mt-1 z-[100]
             ${dropdownBg}
             border ${borderColor}
             rounded-md
