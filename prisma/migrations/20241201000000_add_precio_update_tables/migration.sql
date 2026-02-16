@@ -43,3 +43,4 @@ CREATE INDEX "PrecioUpdateItem_productoBaseId_idx" ON "PrecioUpdateItem"("produc
 -- AddForeignKey
 ALTER TABLE "PrecioUpdateItem" ADD CONSTRAINT "PrecioUpdateItem_precioUpdateId_fkey" FOREIGN KEY ("precioUpdateId") REFERENCES "PrecioUpdate"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+

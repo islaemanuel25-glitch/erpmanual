@@ -1,0 +1,658 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
+import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
+
+export default function ClienteDetallePage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const clienteId = Number(params.id);
+  const localId = Number(searchParams.get("localId"));
+
+  const [cliente, setCliente] = useState(null);
+  const [tab, setTab] = useState("datos");
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (!localId) {
+      setErrorMsg("Seleccioná un local");
+      setLoading(false);
+      return;
+    }
+
+    const cargarCliente = async () => {
+      setLoading(true);
+      setErrorMsg("");
+      try {
+        const res = await fetch(`/api/clientes/${clienteId}?localId=${localId}`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setCliente(data.cliente);
+        } else {
+          setErrorMsg(data.error || "Error cargando cliente");
+        }
+      } catch (error) {
+        console.error("Error cargando cliente:", error);
+        setErrorMsg("Error de conexión");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarCliente();
+  }, [clienteId, localId]);
+
+  if (loading) {
+    return (
+      <div className="p-2 lg:p-3 max-w-5xl mx-auto">
+        <div className="text-center py-8 text-slate-400">Cargando...</div>
+      </div>
+    );
+  }
+
+  if (errorMsg || !cliente) {
+    return (
+      <div className="p-2 lg:p-3 max-w-5xl mx-auto">
+        <SunmiCard className="p-4">
+          <div className="text-center text-red-400">{errorMsg || "Cliente no encontrado"}</div>
+          <div className="mt-4 flex justify-center">
+            <SunmiButton color="slate" onClick={() => router.push("/modulos/clientes")}>
+              Volver
+            </SunmiButton>
+          </div>
+        </SunmiCard>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-2 lg:p-3 max-w-5xl mx-auto space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold">Cliente: {cliente.nombre}</h1>
+          <p className="text-sm text-slate-400">Detalle del cliente</p>
+        </div>
+        <div className="flex gap-2">
+          <SunmiButton
+            color="cyan"
+            onClick={() => {
+              router.push(`/modulos/clientes?localId=${localId}&editar=${clienteId}`);
+            }}
+          >
+            Editar
+          </SunmiButton>
+          <SunmiButton color="slate" onClick={() => router.push(`/modulos/clientes?localId=${localId}`)}>
+            Volver
+          </SunmiButton>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <SunmiCard className="p-3">
+        <div className="flex gap-2 border-b border-slate-700">
+          <button
+            onClick={() => setTab("datos")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              tab === "datos"
+                ? "text-cyan-400 border-b-2 border-cyan-400"
+                : "text-slate-400 hover:text-slate-300"
+            }`}
+          >
+            Datos
+          </button>
+          <button
+            onClick={() => setTab("ventas")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              tab === "ventas"
+                ? "text-cyan-400 border-b-2 border-cyan-400"
+                : "text-slate-400 hover:text-slate-300"
+            }`}
+          >
+            Ventas
+          </button>
+          <button
+            onClick={() => setTab("cuenta-corriente")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              tab === "cuenta-corriente"
+                ? "text-cyan-400 border-b-2 border-cyan-400"
+                : "text-slate-400 hover:text-slate-300"
+            }`}
+          >
+            Cuenta Corriente
+          </button>
+        </div>
+      </SunmiCard>
+
+      {/* Tab Content */}
+      {tab === "datos" && <TabDatos cliente={cliente} />}
+      {tab === "ventas" && <TabVentas clienteId={clienteId} localId={localId} />}
+      {tab === "cuenta-corriente" && (
+        <TabCuentaCorriente cliente={cliente} localId={localId} />
+      )}
+    </div>
+  );
+}
+
+// Tab Datos
+function TabDatos({ cliente }) {
+  return (
+    <SunmiCard className="p-4">
+      <SunmiSeparator label="Información del Cliente" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <label className="text-[11px] text-slate-400 mb-1 block">Nombre</label>
+          <div className="text-sm font-medium">{cliente.nombre}</div>
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-400 mb-1 block">Estado</label>
+          <SunmiBadgeEstado value={cliente.activo} />
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-400 mb-1 block">Documento</label>
+          <div className="text-sm font-mono">{cliente.documento || "-"}</div>
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-400 mb-1 block">Teléfono</label>
+          <div className="text-sm font-mono">{cliente.telefono || "-"}</div>
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-400 mb-1 block">Email</label>
+          <div className="text-sm">{cliente.email || "-"}</div>
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-400 mb-1 block">Dirección</label>
+          <div className="text-sm">{cliente.direccion || "-"}</div>
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-400 mb-1 block">Límite de crédito</label>
+          <div className="text-sm font-mono">
+            {cliente.limiteCredito != null
+              ? `$${Number(cliente.limiteCredito).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : "Sin límite"}
+          </div>
+        </div>
+        <div>
+          <label className="text-[11px] text-slate-400 mb-1 block">Descuento %</label>
+          <div className="text-sm font-mono">
+            {cliente.descuentoPorcentaje != null
+              ? `${Number(cliente.descuentoPorcentaje)}%`
+              : "Sin descuento"}
+          </div>
+        </div>
+      </div>
+
+      {/* Etiquetas */}
+      {cliente.tags && cliente.tags.length > 0 && (
+        <div className="mt-4">
+          <label className="text-[11px] text-slate-400 mb-1 block">Etiquetas</label>
+          <div className="flex flex-wrap gap-1">
+            {cliente.tags.map((tag) => (
+              <span
+                key={tag.id}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+              >
+                {tag.nombre}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Observaciones */}
+      {cliente.observaciones && (
+        <div className="mt-4">
+          <label className="text-[11px] text-slate-400 mb-1 block">Observaciones</label>
+          <div className="text-sm text-slate-300 bg-slate-900/50 p-3 rounded-lg">
+            {cliente.observaciones}
+          </div>
+        </div>
+      )}
+    </SunmiCard>
+  );
+}
+
+// Tab Ventas
+function TabVentas({ clienteId, localId }) {
+  const [ventas, setVentas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    const cargarVentas = async () => {
+      if (!localId) {
+        setErrorMsg("Seleccioná un local");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setErrorMsg("");
+      try {
+        const res = await fetch(`/api/clientes/${clienteId}/ventas?localId=${localId}`, {
+          credentials: "include",
+        });
+
+        if (res.status === 401) {
+          setErrorMsg("No autenticado");
+          return;
+        }
+
+        const data = await res.json();
+
+        if (data.ok) {
+          setVentas(data.items || []);
+        } else {
+          setErrorMsg(data.error || "Error cargando ventas");
+        }
+      } catch (error) {
+        console.error("Error cargando ventas:", error);
+        setErrorMsg("Error de conexión");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarVentas();
+  }, [clienteId, localId]);
+
+  const formatFecha = (fechaStr) => {
+    try {
+      const fecha = new Date(fechaStr);
+      return fecha.toLocaleDateString("es-AR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return fechaStr;
+    }
+  };
+
+  const formatPrecio = (n) => {
+    return Number(n).toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  return (
+    <SunmiCard className="p-4">
+      <SunmiSeparator label="Historial de Ventas" />
+      {loading ? (
+        <div className="text-center py-8 text-slate-400">Cargando ventas...</div>
+      ) : errorMsg ? (
+        <div className="text-center py-8 text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+          {errorMsg}
+        </div>
+      ) : ventas.length === 0 ? (
+        <div className="text-center py-8 text-slate-500">Sin ventas registradas</div>
+      ) : (
+        <div className="overflow-x-auto mt-3">
+          <SunmiTable headers={["Fecha", "Ticket", "Total", "Local"]} className="text-xs">
+            {ventas.map((venta) => (
+              <SunmiTableRow key={venta.id}>
+                <td className="px-2 py-1.5 text-sm">{formatFecha(venta.fecha)}</td>
+                <td className="px-2 py-1.5 font-mono text-sm">#{venta.numero}</td>
+                <td className="px-2 py-1.5 font-mono text-sm text-emerald-400">
+                  ${formatPrecio(venta.total)}
+                </td>
+                <td className="px-2 py-1.5 text-sm">{venta.localNombre}</td>
+              </SunmiTableRow>
+            ))}
+          </SunmiTable>
+        </div>
+      )}
+    </SunmiCard>
+  );
+}
+
+// Tab Cuenta Corriente
+function TabCuentaCorriente({ cliente, localId }) {
+  const [movimientos, setMovimientos] = useState([]);
+  const [saldo, setSaldo] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Sub-modales
+  const [mostrarPago, setMostrarPago] = useState(false);
+  const [mostrarAjuste, setMostrarAjuste] = useState(false);
+
+  // Form pago
+  const [montoPago, setMontoPago] = useState("");
+  const [notaPago, setNotaPago] = useState("");
+  const [guardandoPago, setGuardandoPago] = useState(false);
+
+  // Form ajuste
+  const [montoAjuste, setMontoAjuste] = useState("");
+  const [direccionAjuste, setDireccionAjuste] = useState("DEBITO");
+  const [notaAjuste, setNotaAjuste] = useState("");
+  const [guardandoAjuste, setGuardandoAjuste] = useState(false);
+
+  const cargarCC = async () => {
+    if (!localId) {
+      setErrorMsg("Seleccioná un local para ver la cuenta corriente.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch(`/api/clientes/${cliente.id}/cuenta-corriente?localId=${localId}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setMovimientos(data.items || []);
+        setSaldo(data.saldo || 0);
+      } else {
+        setErrorMsg(data.error || "Error cargando cuenta corriente");
+      }
+    } catch (error) {
+      console.error("Error cargando CC:", error);
+      setErrorMsg("Error de conexión");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarCC();
+  }, [cliente.id, localId]);
+
+  const handleRegistrarPago = async () => {
+    const monto = Number(montoPago);
+    if (!monto || monto <= 0) return;
+
+    setGuardandoPago(true);
+    try {
+      const res = await fetch(
+        `/api/clientes/${cliente.id}/cuenta-corriente/pagos?localId=${localId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ monto, nota: notaPago || null }),
+        }
+      );
+      const data = await res.json();
+      if (data.ok) {
+        setMostrarPago(false);
+        setMontoPago("");
+        setNotaPago("");
+        cargarCC();
+      } else {
+        setErrorMsg(data.error || "Error registrando pago");
+      }
+    } catch (error) {
+      console.error("Error registrando pago:", error);
+      setErrorMsg("Error de conexión");
+    } finally {
+      setGuardandoPago(false);
+    }
+  };
+
+  const handleRegistrarAjuste = async () => {
+    const monto = Number(montoAjuste);
+    if (!monto || monto <= 0) return;
+
+    setGuardandoAjuste(true);
+    try {
+      const res = await fetch(
+        `/api/clientes/${cliente.id}/cuenta-corriente/ajustes?localId=${localId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            monto,
+            direccion: direccionAjuste,
+            nota: notaAjuste || null,
+          }),
+        }
+      );
+      const data = await res.json();
+      if (data.ok) {
+        setMostrarAjuste(false);
+        setMontoAjuste("");
+        setNotaAjuste("");
+        setDireccionAjuste("DEBITO");
+        cargarCC();
+      } else {
+        setErrorMsg(data.error || "Error registrando ajuste");
+      }
+    } catch (error) {
+      console.error("Error registrando ajuste:", error);
+      setErrorMsg("Error de conexión");
+    } finally {
+      setGuardandoAjuste(false);
+    }
+  };
+
+  const formatFecha = (fechaStr) => {
+    try {
+      const fecha = new Date(fechaStr);
+      return fecha.toLocaleDateString("es-AR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return fechaStr;
+    }
+  };
+
+  const formatPrecio = (n) =>
+    Number(n).toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const tipoLabel = { VENTA: "Venta", PAGO: "Pago", AJUSTE: "Ajuste" };
+
+  return (
+    <SunmiCard className="p-4">
+      <SunmiSeparator label="Cuenta Corriente" />
+
+      {/* Saldo */}
+      <div
+        className={`rounded-lg px-4 py-3 mt-4 text-center font-bold text-lg ${
+          saldo > 0
+            ? "bg-red-500/15 text-red-400 border border-red-500/30"
+            : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+        }`}
+      >
+        Saldo: ${formatPrecio(saldo)}
+        <span className="text-xs font-normal ml-2">
+          {saldo > 0 ? "(debe)" : saldo < 0 ? "(a favor)" : "(sin deuda)"}
+        </span>
+      </div>
+
+      {/* Botones de acción */}
+      <div className="flex gap-2 mt-4">
+        <SunmiButton
+          color="amber"
+          onClick={() => {
+            setMostrarPago(!mostrarPago);
+            setMostrarAjuste(false);
+            setErrorMsg("");
+          }}
+          className="flex-1"
+        >
+          Registrar Pago
+        </SunmiButton>
+        <SunmiButton
+          color="cyan"
+          onClick={() => {
+            setMostrarAjuste(!mostrarAjuste);
+            setMostrarPago(false);
+            setErrorMsg("");
+          }}
+          className="flex-1"
+        >
+          Ajuste
+        </SunmiButton>
+      </div>
+
+      {/* Form Pago */}
+      {mostrarPago && (
+        <div className="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+          <div className="space-y-2">
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">Monto</label>
+              <SunmiInput
+                type="number"
+                value={montoPago}
+                onChange={(e) => setMontoPago(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">Nota (opcional)</label>
+              <SunmiInput
+                type="text"
+                value={notaPago}
+                onChange={(e) => setNotaPago(e.target.value)}
+                placeholder="Nota del pago..."
+              />
+            </div>
+            <div className="flex gap-2">
+              <SunmiButton
+                color="amber"
+                onClick={handleRegistrarPago}
+                disabled={!montoPago || guardandoPago}
+                className="flex-1"
+              >
+                {guardandoPago ? "Guardando..." : "Registrar"}
+              </SunmiButton>
+              <SunmiButton
+                color="slate"
+                onClick={() => {
+                  setMostrarPago(false);
+                  setMontoPago("");
+                  setNotaPago("");
+                }}
+              >
+                Cancelar
+              </SunmiButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Form Ajuste */}
+      {mostrarAjuste && (
+        <div className="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+          <div className="space-y-2">
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">Monto</label>
+              <SunmiInput
+                type="number"
+                value={montoAjuste}
+                onChange={(e) => setMontoAjuste(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">Dirección</label>
+              <select
+                value={direccionAjuste}
+                onChange={(e) => setDireccionAjuste(e.target.value)}
+                className="w-full h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+              >
+                <option value="DEBITO">Débito</option>
+                <option value="CREDITO">Crédito</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">Nota (opcional)</label>
+              <SunmiInput
+                type="text"
+                value={notaAjuste}
+                onChange={(e) => setNotaAjuste(e.target.value)}
+                placeholder="Nota del ajuste..."
+              />
+            </div>
+            <div className="flex gap-2">
+              <SunmiButton
+                color="cyan"
+                onClick={handleRegistrarAjuste}
+                disabled={!montoAjuste || guardandoAjuste}
+                className="flex-1"
+              >
+                {guardandoAjuste ? "Guardando..." : "Registrar"}
+              </SunmiButton>
+              <SunmiButton
+                color="slate"
+                onClick={() => {
+                  setMostrarAjuste(false);
+                  setMontoAjuste("");
+                  setNotaAjuste("");
+                  setDireccionAjuste("DEBITO");
+                }}
+              >
+                Cancelar
+              </SunmiButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="mt-4 text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+          {errorMsg}
+        </div>
+      )}
+
+      {/* Movimientos */}
+      {loading ? (
+        <div className="text-center py-8 text-slate-400 mt-4">Cargando movimientos...</div>
+      ) : movimientos.length === 0 ? (
+        <div className="text-center py-8 text-slate-500 mt-4">Sin movimientos</div>
+      ) : (
+        <div className="overflow-x-auto mt-4">
+          <SunmiTable
+            headers={["Fecha", "Tipo", "Monto", "Nota"]}
+            className="text-xs"
+          >
+            {movimientos.map((mov) => (
+              <SunmiTableRow key={mov.id}>
+                <td className="px-2 py-1.5 text-sm">{formatFecha(mov.createdAt)}</td>
+                <td className="px-2 py-1.5 text-sm">{tipoLabel[mov.tipo] || mov.tipo}</td>
+                <td
+                  className={`px-2 py-1.5 font-mono text-sm ${
+                    mov.tipo === "PAGO" || mov.direccion === "CREDITO"
+                      ? "text-emerald-400"
+                      : "text-red-400"
+                  }`}
+                >
+                  {mov.direccion === "CREDITO" ? "+" : "-"}${formatPrecio(mov.monto)}
+                </td>
+                <td className="px-2 py-1.5 text-sm">{mov.nota || "-"}</td>
+              </SunmiTableRow>
+            ))}
+          </SunmiTable>
+        </div>
+      )}
+    </SunmiCard>
+  );
+}
+

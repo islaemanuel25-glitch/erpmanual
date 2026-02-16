@@ -53,6 +53,12 @@ export default function PosVentasPage() {
   // Historial
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
 
+  // Info crédito cliente (fiado)
+  const [creditoInfo, setCreditoInfo] = useState(null); // { limiteCredito, saldoActual }
+
+  // Breakdown de última venta
+  const [ultimoBreakdown, setUltimoBreakdown] = useState(null);
+
   // Modales
   const [modalEfectivo, setModalEfectivo] = useState(null); // { total, formaPago }
   const [modalTicket, setModalTicket] = useState(null); // venta data para ticket
@@ -138,6 +144,37 @@ export default function PosVentasPage() {
   }, [localActual, me]);
 
   // ---------------------------------------------------------------------------
+  // Cargar info crédito cuando hay cliente + fiado
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (formaPago !== "fiado" || !clienteSeleccionado || !localActual) {
+      setCreditoInfo(null);
+      return;
+    }
+    let cancelado = false;
+    const cargar = async () => {
+      try {
+        const [resCliente, resCC] = await Promise.all([
+          fetch(`/api/clientes/${clienteSeleccionado.id}?localId=${localActual}`, { credentials: "include" }),
+          fetch(`/api/clientes/${clienteSeleccionado.id}/cuenta-corriente?localId=${localActual}`, { credentials: "include" }),
+        ]);
+        const dataCliente = await resCliente.json();
+        const dataCC = await resCC.json();
+        if (cancelado) return;
+        setCreditoInfo({
+          limiteCredito: dataCliente.ok ? dataCliente.cliente?.limiteCredito ?? null : null,
+          saldoActual: dataCC.ok ? dataCC.saldo || 0 : 0,
+        });
+      } catch (err) {
+        console.error("Error cargando info crédito:", err);
+        if (!cancelado) setCreditoInfo(null);
+      }
+    };
+    cargar();
+    return () => { cancelado = true; };
+  }, [formaPago, clienteSeleccionado, localActual]);
+
+  // ---------------------------------------------------------------------------
   // Shortcuts de teclado
   // ---------------------------------------------------------------------------
   useEffect(() => {
@@ -167,6 +204,10 @@ export default function PosVentasPage() {
         case "F5":
           e.preventDefault();
           setFormaPago("credito");
+          break;
+        case "F6":
+          e.preventDefault();
+          setFormaPago("fiado");
           break;
         case "F10":
           e.preventDefault();
@@ -241,6 +282,8 @@ export default function PosVentasPage() {
     setDescuento(0);
     setDescuentoInfo(null);
     setClienteSeleccionado(null);
+    setCreditoInfo(null);
+    setUltimoBreakdown(null);
     setErrorMsg("");
     setSuccessMsg("");
   }, []);
@@ -294,9 +337,59 @@ export default function PosVentasPage() {
   };
 
   // ---------------------------------------------------------------------------
+  // Verificar límite de crédito para fiado
+  // ---------------------------------------------------------------------------
+  const verificarLimiteCredito = async (fp, tot) => {
+    if (fp !== "fiado" || !clienteSeleccionado) return true;
+
+    try {
+      const [resCliente, resCC, resLocal] = await Promise.all([
+        fetch(`/api/clientes/${clienteSeleccionado.id}?localId=${localActual}`, { credentials: "include" }),
+        fetch(`/api/clientes/${clienteSeleccionado.id}/cuenta-corriente?localId=${localActual}`, { credentials: "include" }),
+        fetch(`/api/locales/${localActual}`, { credentials: "include" }),
+      ]);
+
+      const dataCliente = await resCliente.json();
+      const dataCC = await resCC.json();
+      const dataLocal = await resLocal.json();
+
+      const limiteCredito = dataCliente.ok ? dataCliente.cliente?.limiteCredito : null;
+      if (limiteCredito == null) return true;
+
+      const saldo = dataCC.ok ? dataCC.saldo || 0 : 0;
+      const nuevoTotal = saldo + tot;
+      const limite = Number(limiteCredito);
+
+      if (nuevoTotal > limite) {
+        const politica = dataLocal.ok ? dataLocal.item?.politicaLimiteCredito : "ADVERTIR";
+
+        if (politica === "BLOQUEAR") {
+          setErrorMsg(`Límite de crédito excedido. Saldo actual: $${saldo.toFixed(2)}, límite: $${limite.toFixed(2)}`);
+          return false;
+        }
+
+        // ADVERTIR
+        return confirm(`El cliente excede su límite de crédito ($${limite.toFixed(2)}). Saldo actual: $${saldo.toFixed(2)}. ¿Confirmar igual?`);
+      }
+    } catch (err) {
+      console.error("Error verificando límite de crédito:", err);
+    }
+
+    return true;
+  };
+
+  // ---------------------------------------------------------------------------
   // Iniciar cobro: si es efectivo → mostrar modal, sino → cobrar directo
   // ---------------------------------------------------------------------------
-  const iniciarCobro = () => {
+  const iniciarCobro = async () => {
+    if (formaPago === "fiado" && !clienteSeleccionado) {
+      setErrorMsg("Para venta fiado debés seleccionar un cliente.");
+      return;
+    }
+    if (formaPago === "fiado") {
+      const ok = await verificarLimiteCredito(formaPago, total);
+      if (!ok) return;
+    }
     if (formaPago === "efectivo") {
       setModalEfectivo({ total, formaPago });
     } else {
@@ -307,7 +400,15 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   // Cobrar desde FormaPago (redirige a iniciarCobro)
   // ---------------------------------------------------------------------------
-  const handleCobrar = ({ formaPago: fp, total: tot }) => {
+  const handleCobrar = async ({ formaPago: fp, total: tot }) => {
+    if (fp === "fiado" && !clienteSeleccionado) {
+      setErrorMsg("Para venta fiado debés seleccionar un cliente.");
+      return;
+    }
+    if (fp === "fiado") {
+      const ok = await verificarLimiteCredito(fp, tot);
+      if (!ok) return;
+    }
     if (fp === "efectivo") {
       setModalEfectivo({ total: tot, formaPago: fp });
     } else {
@@ -341,6 +442,7 @@ export default function PosVentasPage() {
 
     setErrorMsg("");
     setSuccessMsg("");
+    setUltimoBreakdown(null);
     setCobrando(true);
 
     try {
@@ -353,6 +455,7 @@ export default function PosVentasPage() {
           clienteId: clienteSeleccionado?.id || null,
           turnoId: turnoActual?.id || null,
           formaPago: datos.formaPago,
+          esFiado: datos.formaPago === "fiado",
           descuento,
           items: carrito.map((item) => ({
             productoBaseId: item.productoBaseId,
@@ -370,6 +473,10 @@ export default function PosVentasPage() {
 
       const data = await res.json();
       if (data.ok) {
+        // Guardar breakdown del backend (si existe)
+        const bd = data.breakdown || null;
+        setUltimoBreakdown(bd);
+
         // Preparar datos del ticket
         const ventaTicket = {
           numero: data.numero,
@@ -378,9 +485,11 @@ export default function PosVentasPage() {
             precio: item.precio,
             cantidad: item.cantidad,
           })),
-          subtotal,
-          descuento,
-          total: datos.total,
+          subtotal: bd ? bd.subtotal : subtotal,
+          descuento: bd ? bd.descuentoTotal : descuento,
+          descuentoAutomatico: bd ? bd.descuentoAutomatico : 0,
+          descuentoManual: bd ? bd.descuentoManual : descuento,
+          total: bd ? bd.total : datos.total,
           formaPago: datos.formaPago,
           vendedor: me?.nombre || "-",
           cliente: clienteSeleccionado?.nombre || "Consumidor Final",
@@ -571,6 +680,28 @@ export default function PosVentasPage() {
           </div>
         </div>
 
+        {/* Info crédito cliente (fiado) */}
+        {formaPago === "fiado" && clienteSeleccionado && creditoInfo && (
+          <div className="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-200">
+            {creditoInfo.limiteCredito == null ? (
+              <span>Cliente sin límite de crédito</span>
+            ) : (
+              (() => {
+                const disp = Number(creditoInfo.limiteCredito) - Number(creditoInfo.saldoActual);
+                const fmt = (v) => v.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return (
+                  <span className="flex flex-wrap gap-x-4 gap-y-1">
+                    <span>Saldo: <strong>${fmt(Number(creditoInfo.saldoActual))}</strong></span>
+                    <span>Límite: <strong>${fmt(Number(creditoInfo.limiteCredito))}</strong></span>
+                    <span>Disponible: <strong>${fmt(Math.max(0, disp))}</strong></span>
+                    {disp < 0 && <span className="text-red-400">Excedido por: <strong>${fmt(Math.abs(disp))}</strong></span>}
+                  </span>
+                );
+              })()
+            )}
+          </div>
+        )}
+
         {/* Stats mobile - solo visible en pantalla chica */}
         <div className="sm:hidden">
           <StatsDelDia localId={localActual} />
@@ -585,6 +716,30 @@ export default function PosVentasPage() {
         {successMsg && (
           <div className="rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
             {successMsg}
+          </div>
+        )}
+        {ultimoBreakdown && (
+          <div className="rounded-md border border-slate-600/50 bg-slate-800/50 px-3 py-2 text-xs text-slate-300 space-y-1">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span className="font-mono">${Number(ultimoBreakdown.subtotal).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            {ultimoBreakdown.descuentoAutomatico > 0 && (
+              <div className="flex justify-between text-emerald-400">
+                <span>Descuento automatico</span>
+                <span className="font-mono">-${Number(ultimoBreakdown.descuentoAutomatico).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            {ultimoBreakdown.descuentoManual > 0 && (
+              <div className="flex justify-between text-emerald-400">
+                <span>Descuento manual</span>
+                <span className="font-mono">-${Number(ultimoBreakdown.descuentoManual).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-amber-400 border-t border-slate-600/50 pt-1">
+              <span>Total</span>
+              <span className="font-mono">${Number(ultimoBreakdown.total).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
           </div>
         )}
 
@@ -625,7 +780,7 @@ export default function PosVentasPage() {
 
         {/* Shortcuts ayuda - solo desktop */}
         <div className="hidden lg:block text-[10px] text-slate-500 text-center">
-          F1: Buscar | F2: Efectivo | F3: MP | F4: Debito | F5: Credito | F10: Cobrar
+          F1: Buscar | F2: Efectivo | F3: MP | F4: Debito | F5: Credito | F6: Fiado | F10: Cobrar
         </div>
       </div>
 

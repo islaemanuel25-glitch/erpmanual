@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { resolveGrupo } from "@/lib/grupos";
 
 export async function GET(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
-      return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
-      );
+    // localId opcional: permite buscar por grupoId solo (admin sin local)
+    const scope = await resolveGrupo(req, false);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
+    const { grupoId, localId } = scope;
 
     const q = req.nextUrl.searchParams.get("q");
 
@@ -18,30 +17,25 @@ export async function GET(req) {
       return NextResponse.json({ ok: true, items: [] });
     }
 
-    // Obtener grupoId del usuario
-    let grupoId = session.grupoId;
-    if (!grupoId && session.localId) {
-      const gl = await prisma.grupoLocal.findFirst({
-        where: { localId: session.localId },
-        select: { grupoId: true },
-      });
-      grupoId = gl?.grupoId;
-    }
+    // Construir where: siempre por grupoId, localId opcional
+    const where = {
+      grupoId,
+      activo: true,
+      OR: [
+        { nombre: { contains: q, mode: "insensitive" } },
+        { documento: { contains: q } },
+        { telefono: { contains: q } },
+        { email: { contains: q, mode: "insensitive" } },
+      ],
+    };
 
-    if (!grupoId) {
-      return NextResponse.json({ ok: true, items: [] });
+    // Si hay localId, filtrar por localId también (scope más específico)
+    if (localId) {
+      where.localId = localId;
     }
 
     const clientes = await prisma.cliente.findMany({
-      where: {
-        grupoId,
-        activo: true,
-        OR: [
-          { nombre: { contains: q, mode: "insensitive" } },
-          { documento: { contains: q } },
-          { telefono: { contains: q } },
-        ],
-      },
+      where,
       take: 20,
       orderBy: { nombre: "asc" },
     });

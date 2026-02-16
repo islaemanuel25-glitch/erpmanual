@@ -18,6 +18,7 @@ import {
   Users,
   Users2,
   Store,
+  Settings,
 } from "lucide-react";
 
 export default function SidebarPro() {
@@ -133,6 +134,14 @@ export default function SidebarPro() {
         { label: "Usuarios", href: "/modulos/usuarios" },
         { label: "Roles", href: "/modulos/roles" },
       ],
+    },
+
+    {
+      key: "configuracion",
+      label: "Configuración",
+      icon: Settings,
+      iconFilled: Settings,
+      items: [{ label: "Configuración", href: "/modulos/configuracion/apariencia" }],
     },
   ].filter(Boolean);
 

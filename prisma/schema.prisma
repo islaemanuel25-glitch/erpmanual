@@ -25,6 +25,7 @@ model Grupo {
   localesGrupo GrupoLocal[]
   productos    ProductoBase[]
   clientes     Cliente[]
+  movimientosCC MovimientoCuenta[]
 }
 
 model GrupoDeposito {
@@ -64,6 +65,7 @@ model Local {
   codigoPostal          String?
   activo                Boolean         @default(true)
   es_deposito           Boolean         @default(false)
+  politicaLimiteCredito String          @default("ADVERTIR")
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -82,6 +84,9 @@ model Local {
 
   ventas Venta[]
   turnos Turno[]
+  clientes Cliente[]
+  tagsCliente TagCliente[]
+  movimientosCC MovimientoCuenta[]
 }
 
 model Usuario {
@@ -456,20 +461,80 @@ model PrecioUpdateItem {
 model Cliente {
   id          Int      @id @default(autoincrement())
   grupoId     Int
+  localId     Int?
   nombre      String
   documento   String?
   telefono    String?
   email       String?
   direccion   String?
+  observaciones String?
+  limiteCredito Decimal? @db.Decimal(12,2)
+  descuentoPorcentaje Decimal? @db.Decimal(5,2)
   activo      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   grupo       Grupo    @relation(fields: [grupoId], references: [id])
+  local       Local?   @relation(fields: [localId], references: [id])
   ventas      Venta[]
+  tags        ClienteTag[]
+  movimientosCC MovimientoCuenta[]
 
   @@index([grupoId])
+  @@index([localId])
+  @@index([grupoId, localId])
   @@index([nombre])
+}
+
+model TagCliente {
+  id        Int          @id @default(autoincrement())
+  localId   Int
+  nombre    String
+  descuentoPorcentaje Decimal? @db.Decimal(5,2)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  local     Local        @relation(fields: [localId], references: [id], onDelete: Cascade)
+  clientes  ClienteTag[]
+
+  @@unique([localId, nombre])
+  @@index([localId])
+}
+
+model ClienteTag {
+  clienteId Int
+  tagId     Int
+
+  cliente   Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tag       TagCliente  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([clienteId, tagId])
+  @@index([clienteId])
+  @@index([tagId])
+}
+
+model MovimientoCuenta {
+  id         Int      @id @default(autoincrement())
+  grupoId    Int
+  localId    Int
+  clienteId  Int
+  tipo       String   // "VENTA" | "PAGO" | "AJUSTE"
+  direccion  String   // "DEBITO" | "CREDITO"
+  monto      Decimal  @db.Decimal(12, 2)
+  ventaId    Int?
+  nota       String?
+  createdAt  DateTime @default(now())
+
+  grupo      Grupo    @relation(fields: [grupoId], references: [id])
+  local      Local    @relation(fields: [localId], references: [id])
+  cliente    Cliente  @relation(fields: [clienteId], references: [id])
+  venta      Venta?   @relation(fields: [ventaId], references: [id])
+
+  @@unique([ventaId])
+  @@index([grupoId, localId, clienteId])
+  @@index([clienteId])
+  @@index([localId])
+  @@index([createdAt])
 }
 
 // POS VENTAS
@@ -492,6 +557,7 @@ model Venta {
   gananciaBruta     Decimal        @default(0) @db.Decimal(12, 2)
   gananciaNeta      Decimal        @default(0) @db.Decimal(12, 2)
   formaPago         String
+  esFiado           Boolean        @default(false)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -500,6 +566,7 @@ model Venta {
   cliente      Cliente?       @relation(fields: [clienteId], references: [id])
   turno        Turno?         @relation(fields: [turnoId], references: [id])
   detalles     VentaDetalle[]
+  movimientoCC MovimientoCuenta[]
 
   @@index([localId])
   @@index([fecha])

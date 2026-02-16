@@ -233,3 +233,25 @@ input:-webkit-autofill:active {
   -webkit-text-fill-color: #e2e8f0 !important;
   transition: background-color 9999s ease-in-out 0s !important;
 }
+
+/* ============================= */
+/* Scrollbar global ERP Azul */
+/* ============================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a; /* slate-900 */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b; /* slate-800 */
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155; /* slate-700 */
+}

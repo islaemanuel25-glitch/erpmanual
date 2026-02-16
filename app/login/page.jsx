@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useUser } from "@/app/context/UserContext";
 
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+
 export default function LoginPage() {
   const { refrescar } = useUser();
 
@@ -19,9 +23,10 @@ export default function LoginPage() {
     setCargando(true);
 
     try {
-      const r = await fetch("/api/login", { credentials: "include",
+      const r = await fetch("/api/login", {
+        credentials: "include",
         method: "POST",
-        headers: { "Content-Type": "application/json" , headers: { "Content-Type": "application/json" }},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
@@ -42,42 +47,55 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="w-full h-full grid place-items-center bg-gray-100">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm bg-white p-6 rounded-2xl shadow"
-      >
-        <h1 className="text-xl font-semibold mb-4 text-center">
-          Iniciar sesión
-        </h1>
+    <main className="min-h-screen w-full grid place-items-center p-4">
+      <SunmiCard className="w-full max-w-sm p-4">
+        <form onSubmit={onSubmit} className="space-y-3">
+          <div className="text-center">
+            <h1 className="text-xl font-semibold">Iniciar sesión</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Accedé al sistema con tu usuario
+            </p>
+          </div>
 
-        <label className="text-sm">Email</label>
-        <input
-          className="w-full border rounded p-2 mb-3"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoFocus
-        />
+          <div>
+            <label className="text-[11px] text-slate-400 mb-1 block">
+              Email
+            </label>
+            <SunmiInput
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus
+            />
+          </div>
 
-        <label className="text-sm">Contraseña</label>
-        <input
-          className="w-full border rounded p-2 mb-3"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          <div>
+            <label className="text-[11px] text-slate-400 mb-1 block">
+              Contraseña
+            </label>
+            <SunmiInput
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
 
-        {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+          {error && (
+            <div className="text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+              {error}
+            </div>
+          )}
 
-        <button
-          type="submit"
-          disabled={cargando}
-          className="w-full bg-blue-600 text-white py-2 rounded-lg"
-        >
-          {cargando ? "Ingresando..." : "Ingresar"}
-        </button>
-      </form>
+          <SunmiButton
+            type="submit"
+            disabled={cargando}
+            color="amber"
+            className="w-full"
+          >
+            {cargando ? "Ingresando..." : "Ingresar"}
+          </SunmiButton>
+        </form>
+      </SunmiCard>
     </main>
   );
 }

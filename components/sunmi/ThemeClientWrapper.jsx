@@ -15,9 +15,9 @@ function ThemeBody({ children }) {
   const { theme } = useSunmiTheme();
 
   return (
-    <body className={`h-screen w-screen overflow-hidden ${theme.layout}`}>
+    <div className={`min-h-screen w-full overflow-x-hidden ${theme.layout}`}>
       {children}
       <SunmiToaster />
-    </body>
+    </div>
   );
 }

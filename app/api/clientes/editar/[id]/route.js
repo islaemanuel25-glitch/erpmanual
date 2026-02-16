@@ -12,7 +12,7 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const body = await req.json();
-    const { nombre, documento, telefono, email, direccion, observaciones } = body;
+    const { nombre, documento, telefono, email, direccion, observaciones, limiteCredito, descuentoPorcentaje } = body;
 
     const clienteExistente = await prisma.cliente.findFirst({
       where: { id: Number(id), localId, grupoId },
@@ -41,21 +41,31 @@ export async function PUT(req, { params }) {
       );
     }
 
+    const limiteVal = limiteCredito !== "" && limiteCredito != null ? Number(limiteCredito) : null;
+    const descuentoVal = descuentoPorcentaje !== "" && descuentoPorcentaje != null ? Number(descuentoPorcentaje) : null;
+
+    const dataCompleta = {
+      nombre: nombre.trim(),
+      documento: documento?.trim() || null,
+      telefono: telefono?.trim() || null,
+      email: email?.trim() || null,
+      direccion: direccion?.trim() || null,
+      observaciones: observaciones?.trim() || null,
+      limiteCredito: limiteVal,
+      activo: body.activo,
+    };
+    if (descuentoPorcentaje !== undefined) {
+      dataCompleta.descuentoPorcentaje = descuentoVal;
+    }
+
+    const dataSimple = { activo: body.activo };
+    if (descuentoPorcentaje !== undefined) {
+      dataSimple.descuentoPorcentaje = descuentoVal;
+    }
+
     const cliente = await prisma.cliente.update({
       where: { id: Number(id), localId: Number(localId) },
-      data: esEdicionCompleta
-        ? {
-            nombre: nombre.trim(),
-            documento: documento?.trim() || null,
-            telefono: telefono?.trim() || null,
-            email: email?.trim() || null,
-            direccion: direccion?.trim() || null,
-            observaciones: observaciones?.trim() || null,
-            activo: body.activo,
-          }
-        : {
-            activo: body.activo,
-          },
+      data: esEdicionCompleta ? dataCompleta : dataSimple,
     });
 
     return NextResponse.json({ ok: true, cliente });
@@ -78,7 +88,7 @@ export async function POST(req, { params }) {
 
     const { id } = await params;
     const body = await req.json();
-    const { nombre, documento, telefono, email, direccion, observaciones } = body;
+    const { nombre, documento, telefono, email, direccion, observaciones, limiteCredito, descuentoPorcentaje } = body;
 
     if (!nombre || !nombre.trim()) {
       return NextResponse.json(
@@ -108,6 +118,8 @@ export async function POST(req, { params }) {
         email: email?.trim() || null,
         direccion: direccion?.trim() || null,
         observaciones: observaciones?.trim() || null,
+        limiteCredito: limiteCredito !== "" && limiteCredito != null ? Number(limiteCredito) : null,
+        descuentoPorcentaje: descuentoPorcentaje !== "" && descuentoPorcentaje != null ? Number(descuentoPorcentaje) : null,
         activo: body.activo,
       },
     });

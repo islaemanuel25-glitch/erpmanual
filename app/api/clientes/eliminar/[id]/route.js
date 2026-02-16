@@ -1,32 +1,32 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
 
 export async function DELETE(req, { params }) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
-      return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
-      );
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
+    const { grupoId, localId } = scope;
 
     const { id } = await params;
 
-    // Obtener grupoId del usuario
-    let grupoId = session.grupoId;
-    if (!grupoId && session.localId) {
-      const gl = await prisma.grupoLocal.findFirst({
-        where: { localId: session.localId },
-        select: { grupoId: true },
-      });
-      grupoId = gl?.grupoId;
+    const clienteExistente = await prisma.cliente.findFirst({
+      where: { id: Number(id), localId, grupoId },
+      select: { id: true },
+    });
+
+    if (!clienteExistente) {
+      return NextResponse.json(
+        { ok: false, error: "Cliente no encontrado para este local" },
+        { status: 404 }
+      );
     }
 
     // Desactivar (no eliminar fisicamente)
     const cliente = await prisma.cliente.update({
-      where: { id: Number(id), grupoId },
+      where: { id: Number(id), localId: Number(localId) },
       data: { activo: false },
     });
 

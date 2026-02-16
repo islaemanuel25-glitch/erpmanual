@@ -10,6 +10,7 @@ const FORMAS_PAGO = [
   { key: "mercadopago", label: "MercadoPago", tieneComision: true },
   { key: "debito", label: "Debito", tieneComision: true },
   { key: "credito", label: "Credito", tieneComision: true },
+  { key: "fiado", label: "Fiado", tieneComision: false },
 ];
 
 function formatPrecio(n) {
@@ -38,7 +39,7 @@ export default function FormaPago({
   return (
     <SunmiCard className="p-2 lg:p-3">
       {/* Botones de forma de pago: 2x2 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 lg:grid-cols-5 gap-2">
         {FORMAS_PAGO.map((fp) => (
           <SunmiButton
             key={fp.key}

@@ -32,7 +32,25 @@ export async function GET(req) {
       where,
       orderBy: { nombre: "asc" },
       ...(take ? { take } : {}),
+      include: {
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
+          },
+        },
+      },
     });
+
+    // Formatear respuesta con tags
+    const clientesFormateados = clientes.map((c) => ({
+      ...c,
+      tags: c.tags.map((ct) => ct.tag),
+    }));
 
     let capped = false;
     if (take) {
@@ -40,7 +58,7 @@ export async function GET(req) {
       capped = total > take;
     }
 
-    return NextResponse.json({ ok: true, items: clientes, capped });
+    return NextResponse.json({ ok: true, items: clientesFormateados, capped });
   } catch (error) {
     console.error("Error listando clientes:", error);
     return NextResponse.json(

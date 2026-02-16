@@ -3,11 +3,9 @@
 import { useRouter, usePathname } from "next/navigation";
 import SidebarPro from "@/components/sidebar/SidebarPro";
 import Header from "./Header";
-import { useSunmiTheme } from "./sunmi/SunmiThemeProvider";
 
 export default function LayoutBase({ children }) {
   const pathname = usePathname();
-  const { theme } = useSunmiTheme();
 
   const tituloMobile =
     pathname.includes("usuarios")
@@ -33,7 +31,7 @@ export default function LayoutBase({ children }) {
       : "Panel";
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
+    <div className="flex min-h-full w-full overflow-x-hidden">
 
       {/* SIDEBAR */}
       <SidebarPro />
@@ -50,7 +48,7 @@ export default function LayoutBase({ children }) {
 
         {/* MAIN CONTENT (theme aplicado acá) */}
         <main
-          className={`flex-1 min-h-0 p-4 overflow-auto transition-colors duration-200 ${theme.layout}`}
+          className="flex-1 min-h-0 p-4 overflow-auto transition-colors duration-200"
         >
           {children}
         </main>

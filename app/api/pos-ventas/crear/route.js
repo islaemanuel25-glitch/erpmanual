@@ -1,33 +1,35 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
 
 const COMISION_PCT = 7;
 
 export async function POST(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
+        { ok: false, error: scope.error },
+        { status: scope.status }
       );
     }
 
+    const { grupoId, localId, session } = scope;
+
     const body = await req.json();
-    const { localId, clienteId, turnoId, formaPago, descuento, items } = body;
+    const { clienteId, turnoId, formaPago, descuento, items, esFiado } = body;
 
     // Validaciones
-    if (!localId) {
+    if (!formaPago) {
       return NextResponse.json(
-        { ok: false, error: "localId requerido" },
+        { ok: false, error: "Forma de pago requerida" },
         { status: 400 }
       );
     }
 
-    if (!formaPago) {
+    if (esFiado && !clienteId) {
       return NextResponse.json(
-        { ok: false, error: "Forma de pago requerida" },
+        { ok: false, error: "Venta fiado requiere un cliente seleccionado" },
         { status: 400 }
       );
     }
@@ -58,19 +60,91 @@ export async function POST(req) {
       }
     }
 
+    // Obtener descuento automático del cliente y sus tags
+    let descuentoAplicadoPct = 0;
+    if (clienteId) {
+      const clienteDesc = await prisma.cliente.findFirst({
+        where: { id: clienteId, grupoId, localId },
+        select: {
+          descuentoPorcentaje: true,
+          tags: {
+            select: {
+              tag: {
+                select: { descuentoPorcentaje: true },
+              },
+            },
+          },
+        },
+      });
+      if (clienteDesc) {
+        const pctCliente = Number(clienteDesc.descuentoPorcentaje) || 0;
+        let pctMaxTag = 0;
+        for (const ct of clienteDesc.tags) {
+          const pctTag = Number(ct.tag.descuentoPorcentaje) || 0;
+          if (pctTag > pctMaxTag) pctMaxTag = pctTag;
+        }
+        descuentoAplicadoPct = Math.max(pctCliente, pctMaxTag);
+      }
+    }
+
     // Calcular totales
     const subtotal = items.reduce(
       (acc, item) => acc + item.precio * item.cantidad,
       0
     );
-    const descuentoVal = Number(descuento) || 0;
-    const total = subtotal - descuentoVal; // Lo que paga el cliente (SIN comision)
+    const descuentoManual = Number(descuento) || 0;
+    const descuentoAutomatico = subtotal * (descuentoAplicadoPct / 100);
+    const descuentoTotal = descuentoAutomatico + descuentoManual;
+    const total = subtotal - descuentoTotal; // Lo que paga el cliente (SIN comision)
 
     if (total <= 0) {
       return NextResponse.json(
         { ok: false, error: "El total debe ser mayor a 0" },
         { status: 400 }
       );
+    }
+
+    // Validar límite de crédito si es fiado
+    if (esFiado && clienteId) {
+      const clienteCC = await prisma.cliente.findFirst({
+        where: { id: clienteId, grupoId, localId },
+        select: { limiteCredito: true },
+      });
+
+      if (clienteCC && clienteCC.limiteCredito != null) {
+        const limiteCredito = Number(clienteCC.limiteCredito);
+
+        // Calcular saldo actual: sum(DEBITO) - sum(CREDITO)
+        const agg = await prisma.movimientoCuenta.groupBy({
+          by: ["direccion"],
+          where: { clienteId, localId, grupoId },
+          _sum: { monto: true },
+        });
+
+        let debitos = 0;
+        let creditos = 0;
+        for (const row of agg) {
+          const val = Number(row._sum.monto || 0);
+          if (row.direccion === "DEBITO") debitos = val;
+          else if (row.direccion === "CREDITO") creditos = val;
+        }
+        const saldoActual = debitos - creditos;
+        const nuevoTotal = saldoActual + total;
+
+        if (nuevoTotal > limiteCredito) {
+          const local = await prisma.local.findFirst({
+            where: { id: localId },
+            select: { politicaLimiteCredito: true },
+          });
+
+          if (local?.politicaLimiteCredito === "BLOQUEAR") {
+            return NextResponse.json(
+              { ok: false, error: "Límite de crédito excedido." },
+              { status: 400 }
+            );
+          }
+        }
+      }
     }
 
     // Comision bancaria: solo para pagos digitales
@@ -103,7 +177,7 @@ export async function POST(req) {
     const gananciaBruta = total - costoTotal;
     const gananciaNeta = netoRecibido - costoTotal;
 
-    // Transaccion: crear venta + descontar stock
+    // Transaccion: crear venta + descontar stock + movimiento CC si fiado
     const venta = await prisma.$transaction(async (tx) => {
       // Obtener proximo numero de venta para este local
       const ultima = await tx.venta.findFirst({
@@ -122,7 +196,7 @@ export async function POST(req) {
           turnoId: turnoId || null,
           numero,
           subtotal,
-          descuento: descuentoVal,
+          descuento: descuentoTotal,
           total,
           comisionBancaria,
           netoRecibido,
@@ -130,6 +204,7 @@ export async function POST(req) {
           gananciaBruta,
           gananciaNeta,
           formaPago,
+          esFiado: !!esFiado,
           detalles: {
             create: itemsConCosto.map((item) => ({
               productoBaseId: item.productoBaseId,
@@ -146,7 +221,6 @@ export async function POST(req) {
 
       // Descontar stock de cada item
       for (const item of items) {
-        // Buscar productoLocal para este local y productoBase
         const productoLocal = await tx.productoLocal.findFirst({
           where: { localId, baseId: item.productoBaseId },
           select: { id: true },
@@ -154,7 +228,6 @@ export async function POST(req) {
 
         if (!productoLocal) continue;
 
-        // Descontar stock
         await tx.stockLocal.updateMany({
           where: {
             localId,
@@ -166,6 +239,32 @@ export async function POST(req) {
         });
       }
 
+      // Si es fiado, crear MovimientoCuenta DEBITO
+      if (esFiado && clienteId) {
+        try {
+          const existente = await tx.movimientoCuenta.findFirst({
+            where: { ventaId: nuevaVenta.id },
+          });
+          if (!existente) {
+            await tx.movimientoCuenta.create({
+              data: {
+                grupoId,
+                localId,
+                clienteId,
+                tipo: "VENTA",
+                direccion: "DEBITO",
+                monto: total,
+                ventaId: nuevaVenta.id,
+                nota: `Venta #${numero}`,
+              },
+            });
+          }
+        } catch (ccErr) {
+          // Si falla por unique constraint u otro error, loguear pero no romper la venta
+          console.error("Error creando movimiento CC (venta continúa):", ccErr.message);
+        }
+      }
+
       return nuevaVenta;
     });
 
@@ -174,6 +273,13 @@ export async function POST(req) {
       ventaId: venta.id,
       numero: venta.numero,
       message: `Venta #${venta.numero} registrada correctamente`,
+      breakdown: {
+        subtotal,
+        descuentoAutomatico,
+        descuentoManual,
+        descuentoTotal,
+        total,
+      },
     });
   } catch (err) {
     console.error("Error crear venta POS:", err);

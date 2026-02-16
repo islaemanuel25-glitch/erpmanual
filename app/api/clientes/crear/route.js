@@ -1,35 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
 
 export async function POST(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
-      return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
-      );
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
+    const { grupoId, localId } = scope;
 
-    // Obtener grupoId del usuario
-    let grupoId = session.grupoId;
-    if (!grupoId && session.localId) {
-      const gl = await prisma.grupoLocal.findFirst({
-        where: { localId: session.localId },
-        select: { grupoId: true },
-      });
-      grupoId = gl?.grupoId;
-    }
-
-    if (!grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "No se pudo determinar el grupo" },
-        { status: 400 }
-      );
-    }
-
-    const { nombre, documento, telefono, email, direccion } = await req.json();
+    const { nombre, documento, telefono, email, direccion, observaciones, limiteCredito, descuentoPorcentaje } = await req.json();
 
     if (!nombre || !nombre.trim()) {
       return NextResponse.json(
@@ -41,11 +22,15 @@ export async function POST(req) {
     const cliente = await prisma.cliente.create({
       data: {
         grupoId,
+        localId,
         nombre: nombre.trim(),
         documento: documento?.trim() || null,
         telefono: telefono?.trim() || null,
         email: email?.trim() || null,
         direccion: direccion?.trim() || null,
+        observaciones: observaciones?.trim() || null,
+        limiteCredito: limiteCredito !== "" && limiteCredito != null ? Number(limiteCredito) : null,
+        descuentoPorcentaje: descuentoPorcentaje !== "" && descuentoPorcentaje != null ? Number(descuentoPorcentaje) : null,
       },
     });
 

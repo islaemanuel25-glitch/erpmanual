@@ -26,6 +26,23 @@ export default function CarritoVenta({
   if (items.length === 0) {
     return (
       <SunmiCard className="p-2 lg:p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-semibold text-slate-300">
+            Carrito vacío
+          </span>
+          {onAbrirCliente && (
+            <button
+              onClick={onAbrirCliente}
+              className={`text-xs ${
+                clienteSeleccionado
+                  ? "text-cyan-400 hover:text-cyan-300 font-medium"
+                  : "text-cyan-400 hover:text-cyan-300"
+              }`}
+            >
+              {clienteSeleccionado ? clienteSeleccionado.nombre : "Cliente"}
+            </button>
+          )}
+        </div>
         <div className="text-sm text-slate-500 text-center py-4">
           No hay productos en el carrito.
         </div>

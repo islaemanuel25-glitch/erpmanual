@@ -6,6 +6,7 @@ import {
   Children,
   isValidElement,
 } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Check } from "lucide-react";
 import { useSunmiTheme } from "./SunmiThemeProvider";
 
@@ -19,23 +20,14 @@ export default function SunmiSelectAdv({
 }) {
   const { theme } = useSunmiTheme();
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
 
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    if (open) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  const wrapRef = useRef(null);
+  const btnRef = useRef(null);
+  const dropdownRef = useRef(null);
 
-  const optionList = Children.toArray(children).filter((c) =>
-    isValidElement(c)
-  );
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const optionList = Children.toArray(children).filter((c) => isValidElement(c));
 
   const isSelected = (v) => {
     if (!multiple) return v == value;
@@ -48,12 +40,11 @@ export default function SunmiSelectAdv({
       if (value.length <= 2) return value.join(", ");
       return `${value.length} seleccionados`;
     }
-
     const f = optionList.find((c) => c.props.value == value);
     return f ? f.props.children : placeholder;
   })();
 
-  const handleClick = (val) => {
+  const handlePick = (val) => {
     if (!multiple) {
       onChange(val);
       setOpen(false);
@@ -67,19 +58,116 @@ export default function SunmiSelectAdv({
     onChange(newArr);
   };
 
-  // Extraer colores del theme
-  const bgColor = theme.card.split(' ').find(c => c.startsWith('bg-')) || 'bg-slate-950/60';
-  const borderColor = theme.card.split(' ').find(c => c.startsWith('border-')) || 'border-slate-700';
-  const textColor = theme.layout.split(' ').find(c => c.startsWith('text-')) || 'text-slate-100';
-  const dropdownBg = theme.card.split(' ').find(c => c.startsWith('bg-'))?.replace('/70', '').replace('/60', '') || 'bg-slate-900';
+  const bgColor =
+    theme.card.split(" ").find((c) => c.startsWith("bg-")) || "bg-slate-950/60";
+  const borderColor =
+    theme.card.split(" ").find((c) => c.startsWith("border-")) || "border-slate-700";
+  const textColor =
+    theme.layout.split(" ").find((c) => c.startsWith("text-")) || "text-slate-100";
+  const dropdownBg =
+    theme.card
+      .split(" ")
+      .find((c) => c.startsWith("bg-"))
+      ?.replace("/70", "")
+      .replace("/60", "") || "bg-slate-900";
+
+  const updatePos = () => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({ top: r.bottom + 6, left: r.left, width: r.width });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+
+    const onScroll = () => updatePos();
+    const onResize = () => updatePos();
+
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [open]);
+
+  // Click afuera (incluye el dropdown que está en body)
+  useEffect(() => {
+    if (!open) return;
+
+    const onDown = (e) => {
+      const w = wrapRef.current;
+      const d = dropdownRef.current;
+
+      if (w && w.contains(e.target)) return;
+      if (d && d.contains(e.target)) return;
+
+      setOpen(false);
+    };
+
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [open]);
+
+  const dropdown = open ? (
+    <div
+      ref={dropdownRef}
+      style={{
+        position: "fixed",
+        top: pos.top,
+        left: pos.left,
+        width: pos.width,
+        zIndex: 99999,
+      }}
+      className={`
+        ${dropdownBg}
+        border ${borderColor}
+        rounded-md
+        shadow-lg
+        max-h-52 overflow-y-auto
+        text-[13px]
+      `}
+    >
+      {optionList.map((child, idx) => {
+        const val = child.props.value;
+        const selected = isSelected(val);
+
+        return (
+          <div
+            key={idx}
+            // IMPORTANT: onMouseDown selecciona antes de que el "click afuera" cierre
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handlePick(val);
+            }}
+            className={`
+              px-3 py-2 cursor-pointer flex items-center gap-2
+              ${selected ? "bg-amber-500 text-slate-900" : textColor}
+              hover:bg-amber-400 hover:text-slate-900
+              transition-all
+            `}
+          >
+            {multiple && (
+              <Check size={16} className={selected ? "opacity-100" : "opacity-0"} />
+            )}
+            {child.props.children}
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
 
   return (
-    <div ref={ref} className={`relative w-full ${open ? "z-[100]" : ""} ${className}`}>
-      {/* BOTON */}
+    <div ref={wrapRef} className={`w-full ${className}`}>
       <button
-        onClick={() => setOpen(!open)}
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
         className={`
-          w-full px-3 py-1.5     /* reducido */
+          w-full px-3 py-1.5
           rounded-md
           ${bgColor}
           border ${borderColor}
@@ -97,46 +185,7 @@ export default function SunmiSelectAdv({
         />
       </button>
 
-      {/* LISTA */}
-      {open && (
-        <div
-          className={`
-            absolute left-0 right-0 mt-1 z-[100]
-            ${dropdownBg}
-            border ${borderColor}
-            rounded-md
-            shadow-lg
-            max-h-52 overflow-y-auto
-            text-[13px]
-          `}
-        >
-          {optionList.map((child, idx) => {
-            const val = child.props.value;
-            const selected = isSelected(val);
-
-            return (
-              <div
-                key={idx}
-                onClick={() => handleClick(val)}
-                className={`
-                  px-3 py-2 cursor-pointer flex items-center gap-2
-                  ${selected ? "bg-amber-500 text-slate-900" : textColor}
-                  hover:bg-amber-400 hover:text-slate-900
-                  transition-all
-                `}
-              >
-                {multiple && (
-                  <Check
-                    size={16}
-                    className={selected ? "opacity-100" : "opacity-0"}
-                  />
-                )}
-                {child.props.children}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {typeof document !== "undefined" ? createPortal(dropdown, document.body) : null}
     </div>
   );
 }

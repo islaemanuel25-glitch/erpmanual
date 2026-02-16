@@ -113,7 +113,7 @@ export default function ReportesVentasPage() {
       </div>
 
       {/* Filtros */}
-      <SunmiCard className="p-3 overflow-visible">
+      <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
         <SunmiSeparator label="Filtros" />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 relative">
@@ -140,7 +140,7 @@ export default function ReportesVentasPage() {
           </div>
 
           {esAdmin && (
-            <div>
+            <div className="relative">
               <label className="text-[11px] text-slate-400 mb-1 block">
                 Local
               </label>
@@ -158,7 +158,7 @@ export default function ReportesVentasPage() {
             </div>
           )}
 
-          <div>
+          <div className="relative">
             <label className="text-[11px] text-slate-400 mb-1 block">
               Forma de pago
             </label>
