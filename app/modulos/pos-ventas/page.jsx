@@ -13,7 +13,7 @@ import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
-import ModalCliente from "@/components/pos-ventas/ModalCliente";
+import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullscreen";
 import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
@@ -39,7 +39,7 @@ export default function PosVentasPage() {
 
   // Cliente
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
-  const [modalCliente, setModalCliente] = useState(false);
+  const [mostrarPickerCliente, setMostrarPickerCliente] = useState(false);
 
   // Descuento
   const [descuento, setDescuento] = useState(0);
@@ -145,7 +145,7 @@ export default function PosVentasPage() {
       // No interceptar si esta escribiendo en un input
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
       // No interceptar si hay modal abierto
-      if (modalEfectivo || modalTicket || modalDescuento || modalCliente || mostrarHistorial) return;
+      if (modalEfectivo || modalTicket || modalDescuento || mostrarPickerCliente || mostrarHistorial) return;
 
       switch (e.key) {
         case "F1":
@@ -179,7 +179,7 @@ export default function PosVentasPage() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket, modalDescuento, modalCliente, mostrarHistorial]);
+  }, [carrito, cobrando, formaPago, modalEfectivo, modalTicket, modalDescuento, mostrarPickerCliente, mostrarHistorial]);
 
   // ---------------------------------------------------------------------------
   // Agregar producto al carrito
@@ -282,6 +282,15 @@ export default function PosVentasPage() {
       setErrorMsg("");
       setSuccessMsg("");
     }
+  };
+
+  const handleAbrirPickerCliente = () => {
+    if (!localActual) {
+      setErrorMsg("Seleccioná un local para elegir cliente.");
+      return;
+    }
+    setErrorMsg("");
+    setMostrarPickerCliente(true);
   };
 
   // ---------------------------------------------------------------------------
@@ -538,6 +547,12 @@ export default function PosVentasPage() {
               <ClipboardList size={14} />
               <span className="hidden sm:inline">Historial</span>
             </button>
+            <button
+              onClick={handleAbrirPickerCliente}
+              className="text-[11px] bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 px-2 py-1 rounded transition-colors"
+            >
+              {clienteSeleccionado ? `Cliente: ${clienteSeleccionado.nombre}` : "Elegir cliente"}
+            </button>
             {turnoActual && (
               <button
                 onClick={() => setMostrarCierre(true)}
@@ -593,7 +608,7 @@ export default function PosVentasPage() {
               descuentoInfo={descuentoInfo}
               onAbrirDescuento={() => setModalDescuento(true)}
               clienteSeleccionado={clienteSeleccionado}
-              onAbrirCliente={() => setModalCliente(true)}
+              onAbrirCliente={handleAbrirPickerCliente}
             />
 
             <FormaPago
@@ -614,14 +629,15 @@ export default function PosVentasPage() {
         </div>
       </div>
 
-      {/* Modal cliente */}
-      {modalCliente && (
-        <ModalCliente
+      {/* Picker cliente full-screen */}
+      {mostrarPickerCliente && (
+        <ClientePickerFullscreen
+          localId={localActual}
           onSeleccionar={(cliente) => {
             setClienteSeleccionado(cliente);
-            setModalCliente(false);
+            setMostrarPickerCliente(false);
           }}
-          onCerrar={() => setModalCliente(false)}
+          onCerrar={() => setMostrarPickerCliente(false)}
         />
       )}
 
