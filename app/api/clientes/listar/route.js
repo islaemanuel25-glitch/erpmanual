@@ -1,37 +1,46 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { resolveGrupo } from "@/lib/grupos";
 
 export async function GET(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
-      return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
-      );
+    // localId opcional: permite listar por grupoId solo (admin sin local)
+    const scope = await resolveGrupo(req, false);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
-
-    // Obtener grupoId del usuario
-    let grupoId = session.grupoId;
-    if (!grupoId && session.localId) {
-      const gl = await prisma.grupoLocal.findFirst({
-        where: { localId: session.localId },
-        select: { grupoId: true },
-      });
-      grupoId = gl?.grupoId;
+    const { grupoId, localId } = scope;
+    const activoParam = req.nextUrl.searchParams.get("activo");
+    const limitParam = Number(req.nextUrl.searchParams.get("limit"));
+    const take =
+      Number.isInteger(limitParam) && limitParam > 0
+        ? Math.min(limitParam, 500)
+        : undefined;
+    
+    // Construir where: siempre por grupoId, localId opcional
+    const where = { grupoId };
+    if (localId) {
+      where.localId = localId;
     }
-
-    if (!grupoId) {
-      return NextResponse.json({ ok: true, items: [] });
+    if (activoParam === "true") {
+      where.activo = true;
+    } else if (activoParam === "false") {
+      where.activo = false;
     }
 
     const clientes = await prisma.cliente.findMany({
-      where: { grupoId },
+      where,
       orderBy: { nombre: "asc" },
+      ...(take ? { take } : {}),
     });
 
-    return NextResponse.json({ ok: true, items: clientes });
+    let capped = false;
+    if (take) {
+      const total = await prisma.cliente.count({ where });
+      capped = total > take;
+    }
+
+    return NextResponse.json({ ok: true, items: clientes, capped });
   } catch (error) {
     console.error("Error listando clientes:", error);
     return NextResponse.json(
