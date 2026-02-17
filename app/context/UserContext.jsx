@@ -21,7 +21,7 @@ export function UserProvider({ children }) {
       if (data?.ok && data?.user) {
         const p = data.user;
 
-        const permisos = Array.isArray(p.permisos) ? p.permisos : ["*"];
+        const permisos = Array.isArray(p.permisos) ? p.permisos : [];
 
         setPerfil({
           id: p.id,

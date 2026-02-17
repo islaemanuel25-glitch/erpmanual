@@ -29,7 +29,7 @@ export default function SidebarGroup({
     return permisos.includes(perm);
   };
 
-  const visibles = esAdmin ? items : items.filter(i => puede(i.permiso));
+  const visibles = esAdmin ? items : items.filter(i => !i.permiso || puede(i.permiso));
   if (visibles.length === 0) return null;
 
   const activo = visibles.some(i => pathname.startsWith(i.href));

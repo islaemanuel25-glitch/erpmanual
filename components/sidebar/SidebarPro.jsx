@@ -20,16 +20,89 @@ import {
   Users2,
   Store,
   Settings,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 
 export default function SidebarPro() {
-  const { perfil } = useUser();
+  const { perfil, cargando, logout } = useUser();
   const { theme } = useSunmiTheme();
 
-  if (!perfil) return null;
-
+  // Hooks SIEMPRE antes de cualquier return
   const [openGroup, setOpenGroup] = useState(null);
 
+  // ========================================================
+  // CARGANDO — placeholder en sidebar
+  // ========================================================
+  if (cargando) {
+    return (
+      <>
+        {/* Mobile: nada mientras carga */}
+        <aside
+          className={`
+            hidden md:flex flex-col items-center justify-center
+            w-16 min-w-16
+            ${theme.sidebar.bg}
+            ${theme.sidebar.border} border-r
+            shadow-[2px_0_10px_rgba(0,0,0,0.45)]
+            py-4 z-40
+          `}
+        >
+          <Loader2 size={20} className="animate-spin text-slate-400" />
+          <span className="text-[8px] text-slate-500 mt-1">Menú</span>
+        </aside>
+      </>
+    );
+  }
+
+  // ========================================================
+  // SIN SESIÓN — mínimo Inicio + Cerrar sesión
+  // ========================================================
+  if (!perfil) {
+    const menuMinimo = [
+      {
+        key: "inicio",
+        label: "Inicio",
+        icon: Home,
+        iconFilled: Home,
+        items: [{ label: "Dashboard", href: "/modulos/dashboard" }],
+      },
+    ];
+
+    return (
+      <>
+        <SidebarMobile menu={menuMinimo} perfil={null} />
+        <aside
+          className={`
+            hidden md:flex flex-col items-center
+            w-16 min-w-16
+            ${theme.sidebar.bg}
+            ${theme.sidebar.border} border-r
+            shadow-[2px_0_10px_rgba(0,0,0,0.45)]
+            py-4 gap-6 z-40
+          `}
+        >
+          {menuMinimo.map((grupo) => (
+            <SidebarGroup
+              key={grupo.key}
+              id={grupo.key}
+              icon={grupo.icon}
+              iconFilled={grupo.iconFilled}
+              label={grupo.label}
+              items={grupo.items}
+              perfil={null}
+              openGroup={openGroup}
+              setOpenGroup={setOpenGroup}
+            />
+          ))}
+        </aside>
+      </>
+    );
+  }
+
+  // ========================================================
+  // PERFIL CARGADO — armar menú por permisos
+  // ========================================================
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
 
@@ -48,7 +121,7 @@ export default function SidebarPro() {
       items: [{ label: "Dashboard", href: "/modulos/dashboard" }],
     },
 
-    puede("pos.usar") || esAdmin
+    puede("pos.usar")
       ? {
           key: "pos-ventas",
           label: "POS Ventas",
@@ -72,7 +145,7 @@ export default function SidebarPro() {
         }
       : null,
 
-    esAdmin
+    puede("reportes.ver")
       ? {
           key: "reportes",
           label: "Reportes",
@@ -161,6 +234,9 @@ export default function SidebarPro() {
     },
   ].filter(Boolean);
 
+  // Nunca vacío: al menos Inicio siempre está
+  const tieneAlgo = menu.length > 1;
+
   return (
     <>
       <SidebarMobile menu={menu} perfil={perfil} />
@@ -191,6 +267,15 @@ export default function SidebarPro() {
             setOpenGroup={setOpenGroup}
           />
         ))}
+
+        {!tieneAlgo && (
+          <div className="px-2 text-center">
+            <span className="text-[8px] text-slate-500 leading-tight block">
+              Sin permisos.
+              Contactar admin.
+            </span>
+          </div>
+        )}
       </aside>
     </>
   );
