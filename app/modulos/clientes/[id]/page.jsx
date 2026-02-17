@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useUser } from "@/app/context/UserContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -15,8 +16,10 @@ export default function ClienteDetallePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { perfil } = useUser();
   const clienteId = Number(params.id);
-  const localId = Number(searchParams.get("localId"));
+  const qsLocalId = Number(searchParams.get("localId")) || null;
+  const localId = qsLocalId || perfil?.localId || null;
 
   const [cliente, setCliente] = useState(null);
   const [tab, setTab] = useState("datos");
