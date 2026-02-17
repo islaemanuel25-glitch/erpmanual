@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -23,6 +25,7 @@ import { ClipboardList } from "lucide-react";
 
 export default function PosVentasPage() {
   const router = useRouter();
+  const { perfil: perfilCtx, cargando: cargandoCtx } = useUser();
 
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -610,13 +613,18 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   // Loading
   // ---------------------------------------------------------------------------
-  if (loading) {
+  // Guard de permisos
+  if (cargandoCtx || loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <span className="text-sm text-slate-300">Cargando...</span>
       </div>
     );
   }
+
+  const permisosPos = perfilCtx?.permisos || [];
+  const esAdminPos = Array.isArray(permisosPos) && permisosPos.includes("*");
+  if (!esAdminPos && !permisosPos.includes("pos.usar")) return <SinPermisos />;
 
   // ---------------------------------------------------------------------------
   // Sin turno abierto: modal apertura de caja

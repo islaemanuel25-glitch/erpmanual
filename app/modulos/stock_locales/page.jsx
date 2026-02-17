@@ -6,8 +6,11 @@ import FiltrosStock from "@/components/stock_locales/FiltrosStock";
 import TablaStock from "@/components/stock_locales/TablaStock";
 import ModalAjuste from "@/components/stock_locales/ModalAjuste";
 import ModalLimites from "@/components/stock_locales/ModalLimites";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 export default function StockLocalesPage() {
+  const { perfil: perfilSt, cargando: cargandoSt } = useUser();
   const [locales, setLocales] = useState([]);
   const [localSeleccionado, setLocalSeleccionado] = useState(null);
 
@@ -84,13 +87,17 @@ export default function StockLocalesPage() {
       esDeposito: false,
     };
 
-  if (cargando) {
+  if (cargandoSt || cargando) {
     return (
       <div className="p-4 sunmi-bg min-h-screen">
         <p className="text-slate-400">Cargando módulo de stock...</p>
       </div>
     );
   }
+
+  const permisosSt = perfilSt?.permisos || [];
+  const esAdminSt = Array.isArray(permisosSt) && permisosSt.includes("*");
+  if (!esAdminSt && !permisosSt.includes("stock.ver")) return <SinPermisos />;
 
   // ============================================================
   // RENDER

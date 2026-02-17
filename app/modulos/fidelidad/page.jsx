@@ -8,8 +8,12 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 export default function FidelidadPage() {
+  const { perfil: perfilFid, cargando: cargandoFid } = useUser();
+
   // Local selector
   const [locales, setLocales] = useState([]);
   const [localSeleccionado, setLocalSeleccionado] = useState(null);
@@ -217,13 +221,17 @@ export default function FidelidadPage() {
   };
 
   // ── Render ────────────────────────────────────────────
-  if (cargandoLocales) {
+  if (cargandoFid || cargandoLocales) {
     return (
       <div className="p-2 lg:p-3 max-w-2xl mx-auto">
         <div className="text-center py-8 text-slate-400">Cargando...</div>
       </div>
     );
   }
+
+  const permisosFid = perfilFid?.permisos || [];
+  const esAdminFid = Array.isArray(permisosFid) && permisosFid.includes("*");
+  if (!esAdminFid) return <SinPermisos />;
 
   // Simulador cálculos
   const simCompraNum = Number(simCompra) || 0;

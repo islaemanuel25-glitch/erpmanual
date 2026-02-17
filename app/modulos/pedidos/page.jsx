@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -12,6 +14,7 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
 export default function PedidosCatalogoPage() {
   const router = useRouter();
+  const { perfil: perfilPed, cargando: cargandoPed } = useUser();
 
   // Estado general
   const [loading, setLoading] = useState(true);
@@ -227,15 +230,21 @@ export default function PedidosCatalogoPage() {
   };
 
   // ====================================================
-  // LOADING
+  // PERMISOS + LOADING
   // ====================================================
-  if (loading) {
+  const permisosPed = perfilPed?.permisos || [];
+  const esAdminPed = Array.isArray(permisosPed) && permisosPed.includes("*");
+  const puedePed = esAdminPed || permisosPed.includes("pedidos.ver");
+
+  if (cargandoPed || loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <span className="text-sm text-slate-300">Cargando...</span>
       </div>
     );
   }
+
+  if (!puedePed) return <SinPermisos />;
 
   if (!opciones) {
     return (

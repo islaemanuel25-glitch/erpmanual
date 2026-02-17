@@ -14,6 +14,7 @@ import useLocalSelector from "@/hooks/useLocalSelector";
 import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
 import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
 import ModalMergeClientes from "@/components/clientes/ModalMergeClientes";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 export default function ClientesPage() {
   const router = useRouter();
@@ -375,6 +376,10 @@ export default function ClientesPage() {
   });
 
   if (!perfil || cargandoLocales) return null;
+
+  const permisosC = perfil?.permisos || [];
+  const esAdminC = Array.isArray(permisosC) && permisosC.includes("*");
+  if (!esAdminC && !permisosC.includes("clientes.ver")) return <SinPermisos />;
 
   if (esAdminSinLocal && !localSeleccionado) {
     return (

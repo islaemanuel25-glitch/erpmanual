@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
@@ -25,6 +27,10 @@ const PAGE_SIZE = 25;
 export default function LocalesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { perfil, cargando: cargandoUser } = useUser();
+
+  const permisosUser = perfil?.permisos || [];
+  const esAdmin = Array.isArray(permisosUser) && permisosUser.includes("*");
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");
@@ -203,6 +209,9 @@ export default function LocalesPage() {
     if (tipo === "local") return "Local";
     return tipo || "—";
   };
+
+  if (cargandoUser) return null;
+  if (!esAdmin) return <SinPermisos />;
 
   return (
     <div className="w-full min-h-full">

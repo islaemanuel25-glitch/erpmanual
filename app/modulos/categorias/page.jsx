@@ -18,6 +18,7 @@ import ModalCategoria from "@/components/categorias/ModalCategoria";
 import useLocalSelector from "@/hooks/useLocalSelector";
 import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
 import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 export default function CategoriasPage() {
   const router = useRouter();
@@ -187,6 +188,10 @@ export default function CategoriasPage() {
       </div>
     );
   }
+
+  const permisosCat = perfil?.permisos || [];
+  const esAdminCat = Array.isArray(permisosCat) && permisosCat.includes("*");
+  if (!esAdminCat && !permisosCat.includes("productos.ver")) return <SinPermisos />;
 
   if (esAdminSinLocal && !localSeleccionado) {
     return (

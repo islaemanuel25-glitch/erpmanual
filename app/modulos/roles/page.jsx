@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
@@ -24,6 +26,11 @@ const PAGE_SIZE = 25;
 export default function RolesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { perfil, cargando } = useUser();
+
+  const permisos = perfil?.permisos || [];
+  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+  const puede = esAdmin || permisos.includes("roles.editar");
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");
@@ -157,6 +164,9 @@ export default function RolesPage() {
     handleCloseModal();
     fetchRoles();
   };
+
+  if (cargando) return null;
+  if (!puede) return <SinPermisos />;
 
   return (
     <div className="w-full min-h-full">

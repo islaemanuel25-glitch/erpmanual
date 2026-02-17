@@ -10,6 +10,7 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import useLocalSelector from "@/hooks/useLocalSelector";
 import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -92,6 +93,10 @@ export default function ReportesVentasPage() {
   };
 
   if (!perfil || cargandoLocales) return null;
+
+  const permisosR = perfil?.permisos || [];
+  const esAdminR = Array.isArray(permisosR) && permisosR.includes("*");
+  if (!esAdminR && !permisosR.includes("reportes.ver")) return <SinPermisos />;
 
   if (esAdminSinLocal && !localSeleccionado) {
     return (

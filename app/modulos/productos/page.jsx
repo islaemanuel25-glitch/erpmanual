@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -30,6 +32,11 @@ const TABS = [
 export default function ProductosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { perfil: perfilProd, cargando: cargandoProd } = useUser();
+
+  const permisosProd = perfilProd?.permisos || [];
+  const esAdminProd = Array.isArray(permisosProd) && permisosProd.includes("*");
+  const puedeProd = esAdminProd || permisosProd.includes("productos.ver");
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -537,6 +544,9 @@ export default function ProductosPage() {
   // =========================================================
   // RENDER
   // =========================================================
+  if (cargandoProd) return null;
+  if (!puedeProd) return <SinPermisos />;
+
   return (
     <div className="sunmi-bg w-full min-h-full p-2">
       <SunmiCard>

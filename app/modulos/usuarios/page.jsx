@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
@@ -26,6 +28,11 @@ const PAGE_SIZE = 25;
 export default function UsuariosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { perfil, cargando } = useUser();
+
+  const permisos = perfil?.permisos || [];
+  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+  const puede = esAdmin || permisos.includes("usuarios.ver");
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");
@@ -221,6 +228,9 @@ export default function UsuariosPage() {
       alert("Error de red al eliminar usuario.");
     }
   };
+
+  if (cargando) return null;
+  if (!puede) return <SinPermisos />;
 
   return (
     <div className="w-full min-h-full">

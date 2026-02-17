@@ -3,6 +3,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -37,6 +39,8 @@ const COLUMN_DEFAULTS = {
 };
 
 export default function TransferenciasPage() {
+  const { perfil: perfilTr, cargando: cargandoTr } = useUser();
+
   // 🔥 FECHAS INICIALIZADAS SIN FLASH
   const hoy = new Date().toISOString().split("T")[0];
 
@@ -139,6 +143,11 @@ export default function TransferenciasPage() {
 
   const prev = () => setPage((p) => Math.max(1, p - 1));
   const next = () => setPage((p) => Math.min(totalPages, p + 1));
+
+  if (cargandoTr) return null;
+  const permisosTr = perfilTr?.permisos || [];
+  const esAdminTr = Array.isArray(permisosTr) && permisosTr.includes("*");
+  if (!esAdminTr && !permisosTr.includes("transferencias.crear")) return <SinPermisos />;
 
   return (
     <div className="p-2 sm:p-4 max-w-6xl mx-auto">

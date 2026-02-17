@@ -5,9 +5,18 @@ import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { SUNMI_THEMES } from "@/lib/sunmiThemes";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 export default function AparienciaPage() {
   const { themeKey, setThemeKey } = useSunmiTheme();
+  const { perfil, cargando } = useUser();
+
+  if (cargando) return null;
+
+  const permisos = perfil?.permisos || [];
+  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+  if (!esAdmin) return <SinPermisos />;
 
   return (
     <div className="max-w-5xl mx-auto">

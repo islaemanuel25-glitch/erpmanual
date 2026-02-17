@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/app/context/UserContext";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -11,6 +13,7 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
 export default function PosTransferenciasHomePage() {
   const router = useRouter();
+  const { perfil: perfilCtx, cargando: cargandoCtx } = useUser();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -216,13 +219,17 @@ export default function PosTransferenciasHomePage() {
   // ========================================================
   // ESTADOS SIMPLES
   // ========================================================
-  if (loading) {
+  if (cargandoCtx || loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <span className="text-sm text-slate-300">Cargando opciones...</span>
       </div>
     );
   }
+
+  const permisosPt = perfilCtx?.permisos || [];
+  const esAdminPt = Array.isArray(permisosPt) && permisosPt.includes("*");
+  if (!esAdminPt && !permisosPt.includes("pos_transferencias.ver")) return <SinPermisos />;
 
   if (!me) {
     return (

@@ -20,6 +20,7 @@ import ModalProveedor from "@/components/proveedores/ModalProveedor";
 import useLocalSelector from "@/hooks/useLocalSelector";
 import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
 import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
+import SinPermisos from "@/components/auth/SinPermisos";
 
 const PAGE_SIZE = 10;
 
@@ -163,6 +164,10 @@ export default function ProveedoresPage() {
       </div>
     );
   }
+
+  const permisosP = perfil?.permisos || [];
+  const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
+  if (!esAdminP && !permisosP.includes("proveedores.ver")) return <SinPermisos />;
 
   if (esAdminSinLocal && !localSeleccionado) {
     return (
