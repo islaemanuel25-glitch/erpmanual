@@ -107,7 +107,8 @@ model Usuario {
 
   confirmaciones TransferenciaDetalle[]
 
-  posTransferencias PosTransferencia[]
+  posTransferencias            PosTransferencia[] @relation("pos_usuario")
+  posTransferenciasSolicitadas PosTransferencia[] @relation("pos_solicitado_por")
 
   ventas Venta[]
   turnos Turno[]
@@ -373,13 +374,18 @@ model PosTransferencia {
   destinoId   Int
   usuarioId   Int
 
-  estado      String                  @default("Borrador")
+  estado              String                  @default("Borrador")
+  origenManual        Boolean                 @default(false)
+  solicitadoAt        DateTime?
+  solicitadoPorUserId Int?
+
   createdAt   DateTime                @default(now())
   updatedAt   DateTime                @updatedAt
 
-  origen      Local                   @relation("pos_origen", fields: [origenId], references: [id])
-  destino     Local                   @relation("pos_destino", fields: [destinoId], references: [id])
-  usuario     Usuario                 @relation(fields: [usuarioId], references: [id])
+  origen        Local                   @relation("pos_origen", fields: [origenId], references: [id])
+  destino       Local                   @relation("pos_destino", fields: [destinoId], references: [id])
+  usuario       Usuario                 @relation("pos_usuario", fields: [usuarioId], references: [id])
+  solicitadoPor Usuario?                @relation("pos_solicitado_por", fields: [solicitadoPorUserId], references: [id])
 
   detalles    PosTransferenciaDetalle[]
 

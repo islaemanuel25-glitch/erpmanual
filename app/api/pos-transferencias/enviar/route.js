@@ -45,7 +45,28 @@ export async function POST(req) {
       );
     }
 
-    if (pos.estado === "Enviado") {
+    // E2: Solo depot/admin pueden enviar
+    const isAdmin =
+      Array.isArray(session.permisos) &&
+      session.permisos.includes("*") &&
+      !session.localId;
+
+    if (!isAdmin) {
+      const userLocal = await prisma.local.findUnique({
+        where: { id: Number(session.localId) },
+        select: { es_deposito: true },
+      });
+
+      if (!userLocal?.es_deposito) {
+        return NextResponse.json(
+          { ok: false, error: "Solo el depósito o admin pueden enviar transferencias" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // E1: Permitir Solicitado además de Borrador/Preparando
+    if (!["Borrador", "Preparando", "Solicitado"].includes(pos.estado)) {
       return NextResponse.json(
         { ok: false, error: "La POS ya fue enviada" },
         { status: 400 }
@@ -61,8 +82,6 @@ export async function POST(req) {
 
     // --------------------------------------------------
     // Preparar ítems válidos (cantidadRaw + unidadEnviada)
-    // Nota: TransferenciaDetalle.cantidad se guarda en la unidad indicada por unidadEnviada.
-    //       La conversión a UNIDADES se hace en confirmar-recepcion para actualizar StockLocal.
     // --------------------------------------------------
     const items = pos.detalles
       .map((detalle) => {
@@ -80,11 +99,9 @@ export async function POST(req) {
           base?.modo_envio ||
           (base?.unidad_medida === "cajon" ? "SOLO_BULTO" : "MIXTO");
 
-        // Unidad usada (BULTO/UNIDAD) queda persistida en TransferenciaDetalle.unidadEnviada
         const unidadPreparada =
           detalle.unidadPreparada || detalle.unidadSugerida || "BULTO";
 
-        // Validar según modo_envio
         const validacion = validarEnvio({
           modoEnvio,
           unidadElegida: unidadPreparada,
@@ -95,8 +112,6 @@ export async function POST(req) {
           );
         }
 
-        // Solo para validar coherencia (no se guarda en transferencia)
-        // Esto asegura que si alguien elige BULTO con factor 1, la conversión no rompe.
         toUnidades({
           cantidad: cantidadRaw,
           unidad: unidadPreparada,
@@ -105,10 +120,11 @@ export async function POST(req) {
 
         return {
           detalle,
-          cantidadRaw, // Cantidad original (bultos o unidades, según unidadEnviada)
-          unidadEnviada: unidadPreparada, // "BULTO" | "UNIDAD"
+          cantidadRaw,
+          unidadEnviada: unidadPreparada,
           baseId: detalle.producto?.baseId,
           productoLocalOrigen: detalle.producto,
+          factorPack,
         };
       })
       .filter(Boolean);
@@ -116,6 +132,48 @@ export async function POST(req) {
     if (!items.length) {
       return NextResponse.json(
         { ok: false, error: "No hay cantidades válidas para enviar" },
+        { status: 400 }
+      );
+    }
+
+    // --------------------------------------------------
+    // E3: Validación de stock del depósito
+    // --------------------------------------------------
+    const productoIds = items.map((i) => i.detalle.productoId);
+    const stocks = await prisma.stockLocal.findMany({
+      where: {
+        localId: pos.origenId,
+        productoId: { in: productoIds },
+      },
+    });
+
+    const stockMap = new Map(stocks.map((s) => [s.productoId, Number(s.cantidad)]));
+
+    const faltantes = [];
+    for (const item of items) {
+      const stockDisp = stockMap.get(item.detalle.productoId) || 0;
+      const unidadesNecesarias = toUnidades({
+        cantidad: item.cantidadRaw,
+        unidad: item.unidadEnviada,
+        factorPack: item.factorPack,
+      });
+
+      if (unidadesNecesarias > stockDisp) {
+        faltantes.push({
+          productoNombre: item.productoLocalOrigen?.base?.nombre || item.productoLocalOrigen?.nombre || "N/A",
+          necesario: unidadesNecesarias,
+          disponible: stockDisp,
+        });
+      }
+    }
+
+    if (faltantes.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "STOCK_INSUFICIENTE",
+          faltantes,
+        },
         { status: 400 }
       );
     }
@@ -157,8 +215,8 @@ export async function POST(req) {
 
         detallesTransferencia.push({
           productoId: productoLocalDestino.id,
-          cantidad: item.cantidadRaw, // 👈 IMPORTANTE: en unidad indicada por unidadEnviada
-          unidadEnviada: item.unidadEnviada, // "BULTO" | "UNIDAD"
+          cantidad: item.cantidadRaw,
+          unidadEnviada: item.unidadEnviada,
         });
       }
 

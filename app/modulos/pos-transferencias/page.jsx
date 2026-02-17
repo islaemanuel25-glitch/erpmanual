@@ -32,6 +32,14 @@ export default function PosTransferenciasHomePage() {
   const [origenIdAdmin, setOrigenIdAdmin] = useState("");
   const [destinoIdAdmin, setDestinoIdAdmin] = useState("");
 
+  // LOCAL
+  const [localInfo, setLocalInfo] = useState(null);
+  const [depositoInfo, setDepositoInfo] = useState(null);
+
+  // SOLICITADOS
+  const [solicitados, setSolicitados] = useState([]);
+  const [loadingSolicitados, setLoadingSolicitados] = useState(false);
+
   // ========================================================
   // CARGAR DATOS
   // ========================================================
@@ -102,7 +110,18 @@ export default function PosTransferenciasHomePage() {
           }
         }
 
+        // -------------------------
+        // MODO LOCAL (G1)
+        // -------------------------
+        if (jsonOpt.modo === "local") {
+          setLocalInfo(jsonOpt.local || null);
+          setDepositoInfo(jsonOpt.deposito || null);
+        }
+
         setLoading(false);
+
+        // 3. Cargar solicitados (para todos los modos)
+        cargarSolicitados();
       } catch (err) {
         console.error("Error cargando POS:", err);
         setError("Error cargando opciones");
@@ -112,6 +131,25 @@ export default function PosTransferenciasHomePage() {
 
     cargar();
   }, []);
+
+  // ========================================================
+  // CARGAR SOLICITADOS
+  // ========================================================
+  const cargarSolicitados = async () => {
+    setLoadingSolicitados(true);
+    try {
+      const res = await fetch("/api/pos-transferencias/solicitados", {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setSolicitados(json.items || []);
+      }
+    } catch (err) {
+      console.error("Error cargando solicitados:", err);
+    }
+    setLoadingSolicitados(false);
+  };
 
   // ========================================================
   // CAMBIOS ADMIN
@@ -197,6 +235,21 @@ export default function PosTransferenciasHomePage() {
   }
 
   // ========================================================
+  // FORMATEAR FECHA
+  // ========================================================
+  const formatFecha = (iso) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // ========================================================
   // UI SUNMI V2
   // ========================================================
   return (
@@ -207,8 +260,8 @@ export default function PosTransferenciasHomePage() {
           type="button"
           onClick={() => router.back()}
           className="
-            text-xs text-cyan-400 
-            hover:text-cyan-300 
+            text-xs text-cyan-400
+            hover:text-cyan-300
             flex items-center gap-1
             transition
           "
@@ -231,7 +284,13 @@ export default function PosTransferenciasHomePage() {
               <div className="text-slate-900/70 mt-1 sm:mt-0">
                 Modo:{" "}
                 <span className="font-semibold">
-                  {modo === "deposito" ? "Depósito" : "Admin"}
+                  {modo === "deposito"
+                    ? "Depósito"
+                    : modo === "admin"
+                    ? "Admin"
+                    : modo === "local"
+                    ? "Local"
+                    : "-"}
                 </span>
               </div>
             </div>
@@ -242,6 +301,57 @@ export default function PosTransferenciasHomePage() {
             <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">
               {error}
             </div>
+          )}
+
+          {/* =============================
+              MODO LOCAL (G1)
+          ============================= */}
+          {modo === "local" && localInfo && depositoInfo && (
+            <>
+              <SunmiSeparator label="Pedir mercadería al Depósito" />
+
+              <div className="space-y-4 text-[13px]">
+                <div
+                  className="
+                    bg-slate-900/80
+                    border border-slate-800
+                    rounded-2xl
+                    px-4 py-3
+                    flex flex-col sm:flex-row sm:items-center sm:justify-between
+                    gap-2
+                  "
+                >
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Tu local
+                    </div>
+                    <div className="text-[14px] font-semibold">
+                      {localInfo.nombre}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Depósito
+                    </div>
+                    <div className="text-[14px] font-semibold">
+                      {depositoInfo.nombre}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <SunmiButton
+                    color="cyan"
+                    onClick={() =>
+                      router.push("/modulos/pos-transferencias/nueva?modo=manual")
+                    }
+                  >
+                    Crear pedido manual
+                  </SunmiButton>
+                </div>
+              </div>
+            </>
           )}
 
           {/* =============================
@@ -396,6 +506,84 @@ export default function PosTransferenciasHomePage() {
           {!modo && (
             <div className="text-[12px] text-slate-400">
               No se configuró el modo de POS para este usuario.
+            </div>
+          )}
+
+          {/* =============================
+              PEDIDOS SOLICITADOS (G2/G3)
+          ============================= */}
+          {solicitados.length > 0 && (
+            <>
+              <SunmiSeparator
+                label={
+                  modo === "local"
+                    ? "Mis pedidos solicitados"
+                    : "Pedidos solicitados por locales"
+                }
+              />
+
+              <div className="space-y-2">
+                {solicitados.map((s) => (
+                  <div
+                    key={s.id}
+                    onClick={() =>
+                      router.push(
+                        `/modulos/pos-transferencias/nueva?posId=${s.id}`
+                      )
+                    }
+                    className="
+                      bg-slate-900/80
+                      border border-amber-500/30
+                      rounded-xl
+                      px-4 py-3
+                      cursor-pointer
+                      hover:border-amber-400/60
+                      transition
+                    "
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="
+                            px-2 py-0.5
+                            text-[9px] font-semibold
+                            rounded-full
+                            bg-amber-500/20
+                            text-amber-300
+                            border border-amber-400/40
+                          "
+                        >
+                          Solicitado
+                        </span>
+                        <span className="text-[13px] font-medium">
+                          {modo === "local"
+                            ? `→ ${s.origenNombre}`
+                            : `${s.destinoNombre} →`}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-slate-400">
+                        {s.itemCount} {s.itemCount === 1 ? "producto" : "productos"}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
+                      <span>
+                        Solicitado por {s.solicitadoPorNombre}
+                      </span>
+                      <span>
+                        {formatFecha(s.solicitadoAt)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {!loadingSolicitados && solicitados.length === 0 && modo !== "local" && modo && (
+            <div className="text-[11px] text-slate-500 mt-2">
+              No hay pedidos solicitados pendientes.
             </div>
           )}
         </SunmiCard>

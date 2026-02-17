@@ -17,42 +17,59 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
 
-    const destinoId = Number(searchParams.get("destinoId") || 0);
-    let origenId = null;
+    // =====================================================
+    // D1: SOPORTE ?posId=X (abrir POS existente)
+    // =====================================================
+    const posIdParam = Number(searchParams.get("posId") || 0);
+    if (posIdParam) {
+      const posExistente = await prisma.posTransferencia.findUnique({
+        where: { id: posIdParam },
+      });
 
-    if (!destinoId) {
-      return NextResponse.json(
-        { ok: false, error: "destinoId requerido" },
-        { status: 400 }
-      );
+      if (!posExistente) {
+        return NextResponse.json(
+          { ok: false, error: "POS no encontrada" },
+          { status: 404 }
+        );
+      }
+
+      if (posExistente.estado === "Enviado") {
+        return NextResponse.json(
+          { ok: false, error: "La POS ya fue enviada" },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        item: {
+          id: posExistente.id,
+          origenId: posExistente.origenId,
+          destinoId: posExistente.destinoId,
+          estado: posExistente.estado,
+          origenManual: posExistente.origenManual,
+          solicitadoAt: posExistente.solicitadoAt,
+          createdAt: posExistente.createdAt,
+          updatedAt: posExistente.updatedAt,
+        },
+        error: null,
+      });
     }
 
     // =====================================================
-    // VALIDAR DESTINO (debe ser local, no depósito)
-    // =====================================================
-    const destino = await prisma.local.findUnique({
-      where: { id: destinoId },
-      select: { es_deposito: true },
-    });
-
-    if (!destino || destino.es_deposito) {
-      return NextResponse.json(
-        { ok: false, error: "El destino debe ser un local (no depósito)" },
-        { status: 400 }
-      );
-    }
-
-    // =====================================================
-    // ADMIN vs DEPÓSITO NORMAL
+    // FLUJO NORMAL: crear/obtener POS
     // =====================================================
     const isAdmin = !session.localId;
+    let origenId = null;
+    let destinoId = Number(searchParams.get("destinoId") || 0);
 
     if (isAdmin) {
+      // ADMIN: requiere origenId + destinoId
       origenId = Number(searchParams.get("origenId") || 0);
 
-      if (!origenId) {
+      if (!origenId || !destinoId) {
         return NextResponse.json(
-          { ok: false, error: "origenId requerido para admin" },
+          { ok: false, error: "origenId y destinoId requeridos para admin" },
           { status: 400 }
         );
       }
@@ -69,20 +86,72 @@ export async function GET(req) {
         );
       }
     } else {
-      // DEPÓSITO NORMAL → origenId = sesión.localId
-      origenId = Number(session.localId);
-
-      const origen = await prisma.local.findUnique({
-        where: { id: origenId },
+      // USUARIO CON LOCAL
+      const localId = Number(session.localId);
+      const localUser = await prisma.local.findUnique({
+        where: { id: localId },
         select: { es_deposito: true },
       });
 
-      if (!origen || !origen.es_deposito) {
+      if (!localUser) {
         return NextResponse.json(
-          { ok: false, error: "El usuario no pertenece a un depósito" },
+          { ok: false, error: "Local del usuario no encontrado" },
           { status: 400 }
         );
       }
+
+      if (localUser.es_deposito) {
+        // DEPÓSITO NORMAL: origen = su local, destino del param
+        origenId = localId;
+
+        if (!destinoId) {
+          return NextResponse.json(
+            { ok: false, error: "destinoId requerido" },
+            { status: 400 }
+          );
+        }
+      } else {
+        // D2: LOCAL (no es depósito) → modo manual
+        // destino = el local del usuario, origen = depósito del grupo
+        destinoId = localId;
+
+        const grupoId = await getGrupoIdDeLocal(localId);
+        if (!grupoId) {
+          return NextResponse.json(
+            { ok: false, error: "El local no pertenece a ningún grupo" },
+            { status: 400 }
+          );
+        }
+
+        const grupoDeposito = await prisma.grupoDeposito.findFirst({
+          where: { grupoId },
+          select: { localId: true },
+        });
+
+        if (!grupoDeposito) {
+          return NextResponse.json(
+            { ok: false, error: "No se encontró un depósito para el grupo" },
+            { status: 400 }
+          );
+        }
+
+        origenId = grupoDeposito.localId;
+      }
+    }
+
+    // =====================================================
+    // VALIDAR DESTINO (debe ser local, no depósito)
+    // =====================================================
+    const destino = await prisma.local.findUnique({
+      where: { id: destinoId },
+      select: { es_deposito: true },
+    });
+
+    if (!destino || destino.es_deposito) {
+      return NextResponse.json(
+        { ok: false, error: "El destino debe ser un local (no depósito)" },
+        { status: 400 }
+      );
     }
 
     // =====================================================
@@ -126,13 +195,15 @@ export async function GET(req) {
     }
 
     // =====================================================
-    // RESPUESTA PRO PARA UI
+    // RESPUESTA
     // =====================================================
     const item = {
       id: pos.id,
       origenId,
       destinoId,
       estado: pos.estado,
+      origenManual: pos.origenManual,
+      solicitadoAt: pos.solicitadoAt,
       createdAt: pos.createdAt,
       updatedAt: pos.updatedAt,
     };

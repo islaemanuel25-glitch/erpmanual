@@ -44,40 +44,63 @@ export async function GET(req) {
         select: { id: true, nombre: true, es_deposito: true },
       });
 
-      if (!deposito || !deposito.es_deposito) {
-        return NextResponse.json(
-          { ok: false, error: "El usuario no pertenece a un depósito" },
-          { status: 400 }
-        );
-      }
-
-      // Grupo del depósito
+      // Grupo del local/depósito
       const grupoId = await getGrupoIdDeLocal(localId);
       if (!grupoId) {
         return NextResponse.json(
-          { ok: false, error: "El depósito no pertenece a ningún grupo" },
+          { ok: false, error: "El local no pertenece a ningún grupo" },
           { status: 400 }
         );
       }
 
-      // Locales destino del grupo
-      const destinos = await getLocalesDeGrupo(grupoId);
+      if (deposito.es_deposito) {
+        // MODO DEPÓSITO
+        const destinos = await getLocalesDeGrupo(grupoId);
+
+        return NextResponse.json({
+          ok: true,
+          modo: "deposito",
+          origen: {
+            id: deposito.id,
+            nombre: deposito.nombre,
+            esDeposito: true,
+            grupoId,
+          },
+          destinos: destinos.map((l) => ({
+            id: l.id,
+            nombre: l.nombre,
+            esDeposito: false,
+            grupoId,
+          })),
+          error: null,
+        });
+      }
+
+      // MODO LOCAL: resolver depósito del grupo
+      const grupoDeposito = await prisma.grupoDeposito.findFirst({
+        where: { grupoId },
+        include: { local: { select: { id: true, nombre: true } } },
+      });
+
+      if (!grupoDeposito) {
+        return NextResponse.json(
+          { ok: false, error: "No se encontró un depósito para el grupo" },
+          { status: 400 }
+        );
+      }
 
       return NextResponse.json({
         ok: true,
-        modo: "deposito",
-        origen: {
+        modo: "local",
+        local: {
           id: deposito.id,
           nombre: deposito.nombre,
-          esDeposito: true,
           grupoId,
         },
-        destinos: destinos.map((l) => ({
-          id: l.id,
-          nombre: l.nombre,
-          esDeposito: false,
-          grupoId,
-        })),
+        deposito: {
+          id: grupoDeposito.local.id,
+          nombre: grupoDeposito.local.nombre,
+        },
         error: null,
       });
     }

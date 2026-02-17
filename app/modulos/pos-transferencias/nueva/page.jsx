@@ -23,14 +23,22 @@ export default function NuevaTransferenciaPage() {
   const router = useRouter();
   const params = useSearchParams();
 
-  const origenId = Number(params.get("origenId") || 0);
-  const destinoId = Number(params.get("destinoId") || 0);
+  // H1: Parsear query params — modo manual / posId / normal
+  const qsModo = params.get("modo"); // "manual" | null
+  const qsPosId = Number(params.get("posId") || 0);
+  const qsOrigenId = Number(params.get("origenId") || 0);
+  const qsDestinoId = Number(params.get("destinoId") || 0);
+
+  const esModoManual = qsModo === "manual" || qsPosId > 0;
 
   const [me, setMe] = useState(null);
   const [origen, setOrigen] = useState(null);
   const [destino, setDestino] = useState(null);
 
   const [posId, setPosId] = useState(null);
+  const [posEstado, setPosEstado] = useState("Borrador");
+  const [origenIdResuelto, setOrigenIdResuelto] = useState(qsOrigenId);
+  const [destinoIdResuelto, setDestinoIdResuelto] = useState(qsDestinoId);
 
   const [sugeridos, setSugeridos] = useState([]);
   const [loadingSug, setLoadingSug] = useState(false);
@@ -58,35 +66,44 @@ export default function NuevaTransferenciaPage() {
   }, []);
 
   // ===============================
-  // 2. Origen y Destino
+  // 2. Origen y Destino (cargar nombres)
   // ===============================
   useEffect(() => {
     const cargar = async () => {
-      if (origenId) {
-        const r = await fetch(`/api/locales/${origenId}`);
+      if (origenIdResuelto) {
+        const r = await fetch(`/api/locales/${origenIdResuelto}`);
         const j = await r.json();
         if (j.ok) setOrigen(j.item);
       }
 
-      if (destinoId) {
-        const r = await fetch(`/api/locales/${destinoId}`);
+      if (destinoIdResuelto) {
+        const r = await fetch(`/api/locales/${destinoIdResuelto}`);
         const j = await r.json();
         if (j.ok) setDestino(j.item);
       }
     };
     cargar();
-  }, [origenId, destinoId]);
+  }, [origenIdResuelto, destinoIdResuelto]);
 
   // ===============================
-  // 3. Crear POS
+  // 3. Crear/Obtener POS
   // ===============================
   useEffect(() => {
-    if (!origenId || !destinoId) return;
-
     const iniciar = async () => {
       const url = new URL("/api/pos-transferencias/nueva", window.location.origin);
-      url.searchParams.set("origenId", origenId);
-      url.searchParams.set("destinoId", destinoId);
+
+      if (qsPosId) {
+        // H3: Cargar POS existente por posId
+        url.searchParams.set("posId", qsPosId);
+      } else if (qsModo === "manual") {
+        // H2: Modo manual — backend auto-resuelve para local
+        // No pasar origenId/destinoId, el backend los resuelve
+      } else {
+        // Modo normal
+        if (!qsOrigenId || !qsDestinoId) return;
+        url.searchParams.set("origenId", qsOrigenId);
+        url.searchParams.set("destinoId", qsDestinoId);
+      }
 
       const r = await fetch(url, { cache: "no-store" });
       const j = await r.json();
@@ -94,22 +111,28 @@ export default function NuevaTransferenciaPage() {
       if (!j.ok) return setError(j.error);
 
       setPosId(j.item.id);
+      setPosEstado(j.item.estado || "Borrador");
+
+      // H6: Usar origenId/destinoId resueltos del response
+      if (j.item.origenId) setOrigenIdResuelto(j.item.origenId);
+      if (j.item.destinoId) setDestinoIdResuelto(j.item.destinoId);
     };
 
     iniciar();
-  }, [origenId, destinoId]);
+  }, [qsPosId, qsModo, qsOrigenId, qsDestinoId]);
 
   // ===============================
-  // 4. Cargar sugeridos
+  // 4. Cargar sugeridos (solo en modo normal)
   // ===============================
   useEffect(() => {
-    if (!destinoId || !posId) return;
+    if (esModoManual) return; // H4: no cargar sugeridos en modo manual
+    if (!destinoIdResuelto || !posId) return;
 
     const cargar = async () => {
       setLoadingSug(true);
 
       const url = new URL("/api/pos-transferencias/sugeridos", window.location.origin);
-      url.searchParams.set("destinoId", destinoId);
+      url.searchParams.set("destinoId", destinoIdResuelto);
       url.searchParams.set("posId", posId);
 
       const r = await fetch(url, { cache: "no-store" });
@@ -118,31 +141,30 @@ export default function NuevaTransferenciaPage() {
       if (j.ok) {
         setSugeridos(
           j.items.map((s) => {
-            // Usar nuevos campos del endpoint con compatibilidad hacia atrás
             const sugeridoCantidad = s.sugeridoCantidad ?? s.sugerido ?? 0;
             const sugeridoUnidad = s.sugeridoUnidad ?? (s.factorPack > 1 ? "BULTO" : "UNIDAD");
             const faltanteUnidades = s.faltanteUnidades ?? s.faltanUnidades ?? 0;
             const factorPack = s.factorPack ?? 1;
-        
+
             return {
               ...s,
               unidadPlural: unidadPlural(s.unidadMedida || "unidad"),
               factorPack,
               faltanteUnidades,
-              faltanUnidades: faltanteUnidades, // Mantener por compatibilidad
+              faltanUnidades: faltanteUnidades,
               sugeridoCantidad,
               sugeridoUnidad,
-              sugerido: sugeridoCantidad, // Mantener por compatibilidad
+              sugerido: sugeridoCantidad,
             };
           })
-        );        
+        );
       }
 
       setLoadingSug(false);
     };
 
     cargar();
-  }, [destinoId, posId]);
+  }, [destinoIdResuelto, posId, esModoManual]);
 
   // ===============================
   // Filtros opciones
@@ -156,7 +178,7 @@ export default function NuevaTransferenciaPage() {
       })
     );
     return Array.from(set);
-  }, [sugeridos]);  
+  }, [sugeridos]);
 
   const areasOpciones = useMemo(() => {
     const set = new Set(
@@ -167,11 +189,8 @@ export default function NuevaTransferenciaPage() {
       })
     );
     return Array.from(set);
-  }, [sugeridos]);  
+  }, [sugeridos]);
 
-  // ==========================================
-  //  ⭐ FIX: FILTRADO REAL Y NORMALIZADO ⭐
-  // ==========================================
   const sugeridosFiltrados = useMemo(() => {
     return sugeridos.filter((s) => {
       const cat = (s.categoriaNombre || "").trim().toLowerCase();
@@ -237,11 +256,11 @@ export default function NuevaTransferenciaPage() {
     setSugeridos((prev) =>
       prev.map((s) =>
         s.productoLocalDestinoId === productoLocalDestinoId
-          ? { 
-              ...s, 
-              sugeridoCantidad: cantidad, // Cantidad editada
-              sugeridoUnidad: unidad || s.sugeridoUnidad || (s.factorPack > 1 ? "BULTO" : "UNIDAD"), // Mantener o actualizar unidad
-              sugerido: cantidad, // Alias para compatibilidad
+          ? {
+              ...s,
+              sugeridoCantidad: cantidad,
+              sugeridoUnidad: unidad || s.sugeridoUnidad || (s.factorPack > 1 ? "BULTO" : "UNIDAD"),
+              sugerido: cantidad,
             }
           : s
       )
@@ -257,10 +276,9 @@ export default function NuevaTransferenciaPage() {
     const s = sugeridos.find((x) => x.productoLocalOrigenId === productoLocalOrigenId);
     if (!s) return;
 
-    // Usar sugeridoCantidad y sugeridoUnidad del estado
     const sugeridoCantidad = Number(s.sugeridoCantidad ?? s.sugerido ?? 0);
     const sugeridoUnidad = s.sugeridoUnidad ?? (s.factorPack > 1 ? "BULTO" : "UNIDAD");
-    
+
     if (sugeridoCantidad <= 0) return;
 
     const r = await fetch("/api/pos-transferencias/detalle/agregar", {
@@ -271,8 +289,8 @@ export default function NuevaTransferenciaPage() {
           productoLocalId: productoLocalOrigenId,
           sugerido: sugeridoCantidad,
           preparado: sugeridoCantidad,
-          sugeridoUnidad, // Incluir unidad explícitamente
-          unidadPreparada: sugeridoUnidad, // Incluir unidad preparada
+          sugeridoUnidad,
+          unidadPreparada: sugeridoUnidad,
           tipo: "sugerido",
         }),
     });
@@ -319,8 +337,8 @@ export default function NuevaTransferenciaPage() {
 
     setItems((prev) =>
       prev.map((i) =>
-        i.detalleId === detalleId 
-          ? { ...i, preparado: cantidad, unidadPreparada } 
+        i.detalleId === detalleId
+          ? { ...i, preparado: cantidad, unidadPreparada }
           : i
       )
     );
@@ -328,10 +346,10 @@ export default function NuevaTransferenciaPage() {
     const r = await fetch("/api/pos-transferencias/detalle/editar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        detalleId, 
+      body: JSON.stringify({
+        detalleId,
         preparado: cantidad,
-        unidadPreparada 
+        unidadPreparada
       }),
     });
 
@@ -364,28 +382,27 @@ export default function NuevaTransferenciaPage() {
       {
         productoLocalDestinoId: d.productoLocalId,
         productoLocalOrigenId: d.productoLocalId,
-    
+
         baseId: d.baseId,
         productoNombre: d.productoNombre,
         codigoBarra: d.codigoBarra,
-    
+
         stockActual: d.stockActual,
         cantidadReal: d.cantidadReal,
-    
+
         precioCosto: d.precioCosto,
         unidadMedida: d.unidadMedida,
         factorPack: d.factorPack,
         sugerido: d.sugerido,
-    
-        // 🔥 Recuperar categoría/área desde la estructura real
+
         categoriaNombre: d.producto?.base?.categoria?.nombre || "Sin categoría",
-areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
+        areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
       },
     ]);
   };
 
   // ===============================
-  // 12. Buscar manual
+  // 12. Buscar manual (H6: usa origenIdResuelto)
   // ===============================
   const buscarProductos = async () => {
     if (!texto.trim()) {
@@ -400,7 +417,7 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
       window.location.origin
     );
     url.searchParams.set("q", texto);
-    url.searchParams.set("origenId", origenId);
+    url.searchParams.set("origenId", origenIdResuelto);
 
     const r = await fetch(url);
     const j = await r.json();
@@ -417,7 +434,7 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
   }, [texto]);
 
   // ===============================
-  // 13. Enviar POS
+  // 13. Enviar POS / Solicitar pedido
   // ===============================
   const enviarPOS = async () => {
     if (!posId) return setError("POS no generado");
@@ -427,6 +444,29 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
     setEnviando(true);
     setError("");
 
+    // H5: CTA condicional
+    if (esModoManual && posEstado !== "Solicitado") {
+      // Local solicita al depósito
+      const r = await fetch("/api/pos-transferencias/solicitar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ posId }),
+      });
+
+      const j = await r.json();
+
+      if (!j.ok) {
+        setError(j.error);
+        setEnviando(false);
+        return;
+      }
+
+      setPosEstado("Solicitado");
+      setEnviando(false);
+      return;
+    }
+
+    // Modo normal / depot procesando un solicitado → enviar
     const r = await fetch("/api/pos-transferencias/enviar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -436,7 +476,15 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
     const j = await r.json();
 
     if (!j.ok) {
-      setError(j.error);
+      // Mostrar faltantes de stock si aplica
+      if (j.error === "STOCK_INSUFICIENTE" && j.faltantes) {
+        const msgs = j.faltantes.map(
+          (f) => `${f.productoNombre}: necesario ${f.necesario}, disponible ${f.disponible}`
+        );
+        setError("Stock insuficiente:\n" + msgs.join("\n"));
+      } else {
+        setError(j.error);
+      }
       setEnviando(false);
       return;
     }
@@ -445,7 +493,22 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
   };
 
   // ===============================
-  // 14. Render Sunmi V2
+  // Texto del botón CTA
+  // ===============================
+  const getCtaText = () => {
+    if (enviando) return "Enviando...";
+    if (esModoManual && posEstado === "Solicitado") return "Enviar transferencia";
+    if (esModoManual) return "Enviar pedido al Depósito";
+    return "Enviar transferencia";
+  };
+
+  const getCtaColor = () => {
+    if (esModoManual && posEstado !== "Solicitado") return "bg-cyan-500 hover:bg-cyan-600 active:bg-cyan-700";
+    return "bg-orange-500 hover:bg-orange-600 active:bg-orange-700";
+  };
+
+  // ===============================
+  // 14. Render
   // ===============================
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -455,7 +518,7 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
         <button
           onClick={() => router.back()}
           className="
-            text-cyan-400 text-xs flex items-center gap-1 
+            text-cyan-400 text-xs flex items-center gap-1
             hover:text-cyan-300 active:scale-95 transition
           "
         >
@@ -465,10 +528,10 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
         {/* TARJETA */}
         <div
           className="
-            bg-slate-800/70 
-            border border-slate-700 
-            rounded-2xl 
-            p-4 
+            bg-slate-800/70
+            border border-slate-700
+            rounded-2xl
+            p-4
             shadow-md
             space-y-4
           "
@@ -477,34 +540,38 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
             origen={origen}
             destino={destino}
             me={me}
-            origenId={origenId}
-            destinoId={destinoId}
+            modo={esModoManual ? "manual" : "normal"}
+            posEstado={posEstado}
           />
 
-          {/* SUGERIDOS */}
-          <Separador label="Productos sugeridos" />
+          {/* SUGERIDOS — H4: ocultar en modo manual */}
+          {!esModoManual && (
+            <>
+              <Separador label="Productos sugeridos" />
 
-          <TablaSugeridos
-            datos={sugeridosFiltrados}
-            page={1}
-            totalPages={1}
-            onPrev={() => {}}
-            onNext={() => {}}
-            pageSize={50}
-            onPageSizeChange={() => {}}
-            onEditSugerido={handleEditSugerido}
-            onMarcarPreparado={handleMarcarPreparado}
-            loading={loadingSug}
-            categorias={categoriasOpciones}
-            areas={areasOpciones}
-            categoriaSeleccionada={categoriaFiltro}
-            areaSeleccionada={areaFiltro}
-            onChangeCategoria={setCategoriaFiltro}
-            onChangeArea={setAreaFiltro}
-          />
+              <TablaSugeridos
+                datos={sugeridosFiltrados}
+                page={1}
+                totalPages={1}
+                onPrev={() => {}}
+                onNext={() => {}}
+                pageSize={50}
+                onPageSizeChange={() => {}}
+                onEditSugerido={handleEditSugerido}
+                onMarcarPreparado={handleMarcarPreparado}
+                loading={loadingSug}
+                categorias={categoriasOpciones}
+                areas={areasOpciones}
+                categoriaSeleccionada={categoriaFiltro}
+                areaSeleccionada={areaFiltro}
+                onChangeCategoria={setCategoriaFiltro}
+                onChangeArea={setAreaFiltro}
+              />
+            </>
+          )}
 
           {/* PREPARADOS */}
-          <Separador label="Preparados" />
+          <Separador label={esModoManual ? "Productos del pedido" : "Preparados"} />
 
           <PreparadosTable
             datos={items}
@@ -529,27 +596,36 @@ areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
             }
           />
 
+          {/* MENSAJE: Pedido ya solicitado */}
+          {esModoManual && posEstado === "Solicitado" && (
+            <div className="text-[11px] text-amber-400 bg-amber-900/20 border border-amber-500/40 rounded-lg px-3 py-2">
+              Este pedido ya fue enviado al depósito. Esperá a que lo procesen.
+            </div>
+          )}
+
           {/* ERRORES */}
           {error && (
-            <div className="text-red-400 text-xs mt-1">
+            <div className="text-red-400 text-xs mt-1 whitespace-pre-line">
               {error}
             </div>
           )}
 
-          {/* ENVIAR */}
-          <button
-            disabled={enviando}
-            onClick={enviarPOS}
-            className="
-              mt-2 w-full px-4 py-3 
-              rounded-xl text-sm font-semibold shadow-md
-              bg-orange-500 hover:bg-orange-600 active:bg-orange-700
-              transition-colors 
-              disabled:opacity-60 active:scale-95
-            "
-          >
-            {enviando ? "Enviando..." : "Enviar transferencia"}
-          </button>
+          {/* CTA */}
+          {!(esModoManual && posEstado === "Solicitado") && (
+            <button
+              disabled={enviando}
+              onClick={enviarPOS}
+              className={`
+                mt-2 w-full px-4 py-3
+                rounded-xl text-sm font-semibold shadow-md
+                ${getCtaColor()}
+                transition-colors
+                disabled:opacity-60 active:scale-95
+              `}
+            >
+              {getCtaText()}
+            </button>
+          )}
         </div>
       </div>
     </div>
