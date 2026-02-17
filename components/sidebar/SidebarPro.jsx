@@ -9,6 +9,7 @@ import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import {
   Home,
   ShoppingCart,
+  ClipboardList,
   BarChart3,
   ContactRound,
   Package,
@@ -55,6 +56,18 @@ export default function SidebarPro() {
           iconFilled: ShoppingCart,
           items: [
             { label: "POS Ventas", href: "/modulos/pos-ventas" },
+          ],
+        }
+      : null,
+
+    perfil?.localId
+      ? {
+          key: "pedidos",
+          label: "Pedidos",
+          icon: ClipboardList,
+          iconFilled: ClipboardList,
+          items: [
+            { label: "Catálogo de Pedido", href: "/modulos/pedidos" },
           ],
         }
       : null,

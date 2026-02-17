@@ -81,34 +81,51 @@ export async function POST(req) {
       }
     }
 
+    // Determinar si el usuario es depósito/admin o local
+    const isAdminUser =
+      Array.isArray(session.permisos) &&
+      session.permisos.includes("*") &&
+      !session.localId;
+
+    let esDeposito = isAdminUser;
+    if (!isAdminUser && session.localId) {
+      const userLocal = await prisma.local.findUnique({
+        where: { id: Number(session.localId) },
+        select: { es_deposito: true },
+      });
+      esDeposito = !!userLocal?.es_deposito;
+    }
+
     const data = {};
 
-    if (sugerido !== undefined) {
-      if (isNaN(sugerido) || sugerido < 0) {
-        return NextResponse.json(
-          { ok: false, error: "sugerido debe ser un número válido" },
-          { status: 400 }
-        );
+    // Local → solo puede modificar sugerido/unidadSugerida
+    // Depósito/Admin → solo puede modificar preparado/unidadPreparada
+    if (esDeposito) {
+      if (preparado !== undefined) {
+        if (isNaN(preparado) || preparado < 0) {
+          return NextResponse.json(
+            { ok: false, error: "preparado debe ser un número válido" },
+            { status: 400 }
+          );
+        }
+        data.preparado = preparado;
       }
-      data.sugerido = sugerido;
-    }
-
-    if (preparado !== undefined) {
-      if (isNaN(preparado) || preparado < 0) {
-        return NextResponse.json(
-          { ok: false, error: "preparado debe ser un número válido" },
-          { status: 400 }
-        );
+      if (unidadPreparada !== undefined) {
+        data.unidadPreparada = unidadPreparada;
       }
-      data.preparado = preparado;
-    }
-
-    if (unidadSugerida !== undefined) {
-      data.unidadSugerida = unidadSugerida;
-    }
-
-    if (unidadPreparada !== undefined) {
-      data.unidadPreparada = unidadPreparada;
+    } else {
+      if (sugerido !== undefined) {
+        if (isNaN(sugerido) || sugerido < 0) {
+          return NextResponse.json(
+            { ok: false, error: "sugerido debe ser un número válido" },
+            { status: 400 }
+          );
+        }
+        data.sugerido = sugerido;
+      }
+      if (unidadSugerida !== undefined) {
+        data.unidadSugerida = unidadSugerida;
+      }
     }
 
     if (Object.keys(data).length === 0) {

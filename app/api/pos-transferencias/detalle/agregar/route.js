@@ -13,20 +13,14 @@ export async function POST(req) {
 
     const posId = Number(body.posId);
     const productoLocalDestinoId = Number(body.productoLocalId);
-    const sugerido = Number(body.sugerido || 0);
-    const preparado = Number(body.preparado || 0);
+    const cantidadBody = Number(body.sugerido || body.cantidad || body.preparado || 0);
     const tipo = body.tipo === "manual" ? "manual" : "sugerido";
-    
+
     // Leer unidades del body
-    let unidadSugerida = body.sugeridoUnidad;
-    let unidadPreparada = body.unidadPreparada || body.sugeridoUnidad;
-    
-    if (!unidadSugerida || (unidadSugerida !== "BULTO" && unidadSugerida !== "UNIDAD")) {
-      unidadSugerida = null; // Se calculará después de obtener el producto
-    }
-    
-    if (!unidadPreparada || (unidadPreparada !== "BULTO" && unidadPreparada !== "UNIDAD")) {
-      unidadPreparada = null; // Se calculará después de obtener el producto
+    let unidadBody = body.sugeridoUnidad || body.unidad || body.unidadPreparada;
+
+    if (!unidadBody || (unidadBody !== "BULTO" && unidadBody !== "UNIDAD")) {
+      unidadBody = null; // Se calculará después de obtener el producto
     }
 
     if (!posId || !productoLocalDestinoId) {
@@ -88,15 +82,43 @@ export async function POST(req) {
     if (!productoOrigen)
       return NextResponse.json({ ok: false, error: "El depósito no tiene este producto" }, { status: 400 });
 
-    // Inferir unidades si no vinieron en el body
+    // Inferir unidad si no vino en el body
     const factorPack = Number(productoOrigen.base.factor_pack || 1);
-    
-    if (!unidadSugerida || (unidadSugerida !== "BULTO" && unidadSugerida !== "UNIDAD")) {
-      unidadSugerida = factorPack > 1 ? "BULTO" : "UNIDAD";
+
+    if (!unidadBody || (unidadBody !== "BULTO" && unidadBody !== "UNIDAD")) {
+      unidadBody = factorPack > 1 ? "BULTO" : "UNIDAD";
     }
-    
-    if (!unidadPreparada || (unidadPreparada !== "BULTO" && unidadPreparada !== "UNIDAD")) {
-      unidadPreparada = unidadSugerida; // Usar misma unidad que sugerido
+
+    // Determinar si el usuario es depósito/admin o local
+    const isAdmin =
+      Array.isArray(session.permisos) &&
+      session.permisos.includes("*") &&
+      !session.localId;
+
+    let esDeposito = isAdmin;
+    if (!isAdmin && session.localId) {
+      const userLocal = await prisma.local.findUnique({
+        where: { id: Number(session.localId) },
+        select: { es_deposito: true },
+      });
+      esDeposito = !!userLocal?.es_deposito;
+    }
+
+    // Local → escribe sugerido, preparado=0
+    // Depósito/Admin → escribe preparado, sugerido=0
+    let sugerido = 0;
+    let preparado = 0;
+    let unidadSugerida = null;
+    let unidadPreparada = null;
+
+    if (esDeposito) {
+      preparado = cantidadBody;
+      unidadPreparada = unidadBody;
+      unidadSugerida = unidadBody;
+    } else {
+      sugerido = cantidadBody;
+      unidadSugerida = unidadBody;
+      unidadPreparada = unidadBody;
     }
 
     // Verificar que no exista
@@ -130,8 +152,8 @@ export async function POST(req) {
         productoLocalId: productoOrigen.id,
         baseId: productoOrigen.baseId,
         tipo,
-        sugerido,
-        preparado,
+        sugerido: Number(detalle.sugerido || 0),
+        preparado: Number(detalle.preparado || 0),
         unidadSugerida: detalle.unidadSugerida,
         unidadPreparada: detalle.unidadPreparada,
 

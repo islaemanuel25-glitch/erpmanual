@@ -1,0 +1,207 @@
+// app/api/pedidos/set-cantidad/route.js
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
+
+export async function POST(req) {
+  try {
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    const localId = Number(session.localId);
+    if (!localId) {
+      return NextResponse.json(
+        { ok: false, error: "Usuario sin local asignado" },
+        { status: 400 }
+      );
+    }
+
+    // Verificar que no es depósito
+    const localUser = await prisma.local.findUnique({
+      where: { id: localId },
+      select: { es_deposito: true },
+    });
+
+    if (localUser?.es_deposito) {
+      return NextResponse.json(
+        { ok: false, error: "El depósito no usa esta función. Usá POS Transferencias." },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const productoLocalId = Number(body.productoLocalId || 0);
+    const cantidad = Number(body.cantidad || 0);
+    let unidad = body.unidad;
+
+    if (!productoLocalId) {
+      return NextResponse.json(
+        { ok: false, error: "productoLocalId requerido" },
+        { status: 400 }
+      );
+    }
+
+    if (cantidad < 0) {
+      return NextResponse.json(
+        { ok: false, error: "La cantidad no puede ser negativa" },
+        { status: 400 }
+      );
+    }
+
+    // Resolver depósito del grupo
+    const grupoId = await getGrupoIdDeLocal(localId);
+    if (!grupoId) {
+      return NextResponse.json(
+        { ok: false, error: "El local no pertenece a ningún grupo" },
+        { status: 400 }
+      );
+    }
+
+    const grupoDeposito = await prisma.grupoDeposito.findFirst({
+      where: { grupoId },
+      select: { localId: true },
+    });
+
+    if (!grupoDeposito) {
+      return NextResponse.json(
+        { ok: false, error: "No se encontró un depósito para el grupo" },
+        { status: 400 }
+      );
+    }
+
+    const depositoId = grupoDeposito.localId;
+
+    // Verificar que el productoLocal pertenece al depósito
+    const productoOrigen = await prisma.productoLocal.findUnique({
+      where: { id: productoLocalId },
+      include: { base: true },
+    });
+
+    if (!productoOrigen || productoOrigen.localId !== depositoId) {
+      return NextResponse.json(
+        { ok: false, error: "Producto no encontrado en el depósito" },
+        { status: 404 }
+      );
+    }
+
+    // Inferir unidad
+    const factorPack = Number(productoOrigen.base.factor_pack || 1);
+    if (!unidad || (unidad !== "BULTO" && unidad !== "UNIDAD")) {
+      unidad = factorPack > 1 ? "BULTO" : "UNIDAD";
+    }
+
+    // Obtener/crear POS borrador para este par (depósito->local)
+    let pos = await prisma.posTransferencia.findFirst({
+      where: {
+        origenId: depositoId,
+        destinoId: localId,
+        usuarioId: session.id,
+        estado: { in: ["Borrador", "Preparando"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!pos) {
+      pos = await prisma.posTransferencia.create({
+        data: {
+          origenId: depositoId,
+          destinoId: localId,
+          usuarioId: session.id,
+          estado: "Borrador",
+        },
+      });
+    }
+
+    // Verificar que la POS no esté Solicitado o Enviado
+    if (pos.estado === "Solicitado") {
+      return NextResponse.json(
+        { ok: false, error: "Tu pedido ya fue solicitado. Esperá a que el depósito lo procese, o cancelalo." },
+        { status: 409 }
+      );
+    }
+
+    if (pos.estado === "Enviado") {
+      return NextResponse.json(
+        { ok: false, error: "Esta POS ya fue enviada" },
+        { status: 400 }
+      );
+    }
+
+    // Buscar detalle existente
+    const existente = await prisma.posTransferenciaDetalle.findFirst({
+      where: {
+        posTransferenciaId: pos.id,
+        productoId: productoLocalId,
+      },
+    });
+
+    let item = null;
+
+    if (cantidad === 0) {
+      // Quitar item si existe
+      if (existente) {
+        await prisma.posTransferenciaDetalle.delete({
+          where: { id: existente.id },
+        });
+      }
+    } else {
+      // Upsert: sugerido = cantidad, preparado = 0
+      if (existente) {
+        item = await prisma.posTransferenciaDetalle.update({
+          where: { id: existente.id },
+          data: {
+            sugerido: cantidad,
+            preparado: 0,
+            unidadSugerida: unidad,
+            tipo: "manual",
+          },
+        });
+      } else {
+        item = await prisma.posTransferenciaDetalle.create({
+          data: {
+            posTransferenciaId: pos.id,
+            productoId: productoLocalId,
+            sugerido: cantidad,
+            preparado: 0,
+            tipo: "manual",
+            unidadSugerida: unidad,
+            unidadPreparada: unidad,
+          },
+        });
+      }
+    }
+
+    // Contar items en el carrito
+    const itemCount = await prisma.posTransferenciaDetalle.count({
+      where: { posTransferenciaId: pos.id },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      posId: pos.id,
+      item: item
+        ? {
+            detalleId: item.id,
+            productoLocalId: item.productoId,
+            sugerido: Number(item.sugerido || 0),
+            preparado: Number(item.preparado || 0),
+            unidadSugerida: item.unidadSugerida,
+          }
+        : null,
+      itemCount,
+      cantidad,
+    });
+  } catch (err) {
+    console.error("Error pedidos/set-cantidad:", err);
+    return NextResponse.json(
+      { ok: false, error: "Error interno" },
+      { status: 500 }
+    );
+  }
+}
