@@ -133,6 +133,16 @@ export default function ClienteDetallePage() {
           >
             Cuenta Corriente
           </button>
+          <button
+            onClick={() => setTab("puntos")}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              tab === "puntos"
+                ? "text-purple-400 border-b-2 border-purple-400"
+                : "text-slate-400 hover:text-slate-300"
+            }`}
+          >
+            Puntos
+          </button>
         </div>
       </SunmiCard>
 
@@ -141,6 +151,9 @@ export default function ClienteDetallePage() {
       {tab === "ventas" && <TabVentas clienteId={clienteId} localId={localId} />}
       {tab === "cuenta-corriente" && (
         <TabCuentaCorriente cliente={cliente} localId={localId} />
+      )}
+      {tab === "puntos" && (
+        <TabPuntos clienteId={clienteId} localId={localId} />
       )}
     </div>
   );
@@ -316,6 +329,131 @@ function TabVentas({ clienteId, localId }) {
             ))}
           </SunmiTable>
         </div>
+      )}
+    </SunmiCard>
+  );
+}
+
+// Tab Puntos
+function TabPuntos({ clienteId, localId }) {
+  const [saldo, setSaldo] = useState(0);
+  const [activo, setActivo] = useState(false);
+  const [movimientos, setMovimientos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    const cargarPuntos = async () => {
+      if (!localId) {
+        setErrorMsg("Seleccioná un local para ver los puntos.");
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setErrorMsg("");
+      try {
+        const res = await fetch(`/api/clientes/${clienteId}/puntos?localId=${localId}`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setSaldo(data.saldo || 0);
+          setActivo(data.activo);
+          setMovimientos(data.items || []);
+        } else {
+          setErrorMsg(data.error || "Error cargando puntos");
+        }
+      } catch (error) {
+        console.error("Error cargando puntos:", error);
+        setErrorMsg("Error de conexión");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarPuntos();
+  }, [clienteId, localId]);
+
+  const formatFecha = (fechaStr) => {
+    try {
+      const fecha = new Date(fechaStr);
+      return fecha.toLocaleDateString("es-AR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return fechaStr;
+    }
+  };
+
+  const tipoLabel = {
+    ACREDITACION: "Acreditación",
+    CANJE: "Canje",
+    AJUSTE: "Ajuste",
+    EXPIRACION: "Expiración",
+  };
+
+  if (!activo && !loading) {
+    return (
+      <SunmiCard className="p-4">
+        <SunmiSeparator label="Puntos de Fidelidad" />
+        <div className="text-center py-8 text-slate-500">
+          Puntos no habilitados en este local
+        </div>
+      </SunmiCard>
+    );
+  }
+
+  return (
+    <SunmiCard className="p-4">
+      <SunmiSeparator label="Puntos de Fidelidad" />
+
+      {loading ? (
+        <div className="text-center py-8 text-slate-400">Cargando puntos...</div>
+      ) : errorMsg ? (
+        <div className="text-center py-8 text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+          {errorMsg}
+        </div>
+      ) : (
+        <>
+          {/* Saldo */}
+          <div className="rounded-lg px-4 py-3 mt-4 text-center font-bold text-lg bg-purple-500/15 text-purple-400 border border-purple-500/30">
+            Saldo: {saldo} puntos
+          </div>
+
+          {/* Movimientos */}
+          {movimientos.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 mt-4">Sin movimientos</div>
+          ) : (
+            <div className="overflow-x-auto mt-4">
+              <SunmiTable
+                headers={["Fecha", "Tipo", "Dirección", "Puntos", "Nota"]}
+                className="text-xs"
+              >
+                {movimientos.map((mov) => (
+                  <SunmiTableRow key={mov.id}>
+                    <td className="px-2 py-1.5 text-sm">{formatFecha(mov.createdAt)}</td>
+                    <td className="px-2 py-1.5 text-sm">{tipoLabel[mov.tipo] || mov.tipo}</td>
+                    <td className="px-2 py-1.5 text-sm">
+                      {mov.direccion === "CREDITO" ? "+" : "-"}
+                    </td>
+                    <td
+                      className={`px-2 py-1.5 font-mono text-sm ${
+                        mov.direccion === "CREDITO" ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
+                      {mov.puntos}
+                    </td>
+                    <td className="px-2 py-1.5 text-sm">{mov.nota || "-"}</td>
+                  </SunmiTableRow>
+                ))}
+              </SunmiTable>
+            </div>
+          )}
+        </>
       )}
     </SunmiCard>
   );

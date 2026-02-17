@@ -23,6 +23,7 @@ function formatPrecio(n) {
 export default function FormaPago({
   subtotal,
   descuento = 0,
+  descuentoPorPuntos = 0,
   formaPago,
   onFormaPagoChange,
   onCobrar,
@@ -31,8 +32,8 @@ export default function FormaPago({
 }) {
   const forma = FORMAS_PAGO.find((f) => f.key === formaPago);
   const tieneComision = forma?.tieneComision || false;
-  const base = subtotal - descuento;
-  const total = base; // Cliente paga subtotal - descuento, SIN comision
+  const base = subtotal - descuento - descuentoPorPuntos;
+  const total = base; // Cliente paga subtotal - descuentos, SIN comision
   const comisionBancaria = tieneComision ? base * (COMISION_PCT / 100) : 0;
   const netoRecibido = total - comisionBancaria;
 
@@ -58,6 +59,16 @@ export default function FormaPago({
           Descuento:{" "}
           <span className="font-semibold text-emerald-300">
             -${formatPrecio(descuento)}
+          </span>
+        </div>
+      )}
+
+      {/* Descuento por puntos */}
+      {descuentoPorPuntos > 0 && (
+        <div className="mt-2 px-2 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-xs text-center">
+          Descuento por puntos:{" "}
+          <span className="font-semibold text-purple-300">
+            -${formatPrecio(descuentoPorPuntos)}
           </span>
         </div>
       )}

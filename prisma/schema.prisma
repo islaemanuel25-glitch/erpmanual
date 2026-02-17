@@ -87,6 +87,8 @@ model Local {
   clientes Cliente[]
   tagsCliente TagCliente[]
   movimientosCC MovimientoCuenta[]
+  puntosConfig PuntosConfigLocal?
+  movimientosPuntos ClientePuntoMovimiento[]
 }
 
 model Usuario {
@@ -109,6 +111,7 @@ model Usuario {
 
   ventas Venta[]
   turnos Turno[]
+  movimientosPuntos ClientePuntoMovimiento[]
 
   @@map("Usuario")
 }
@@ -479,6 +482,7 @@ model Cliente {
   ventas      Venta[]
   tags        ClienteTag[]
   movimientosCC MovimientoCuenta[]
+  movimientosPuntos ClientePuntoMovimiento[]
 
   @@index([grupoId])
   @@index([localId])
@@ -567,6 +571,7 @@ model Venta {
   turno        Turno?         @relation(fields: [turnoId], references: [id])
   detalles     VentaDetalle[]
   movimientoCC MovimientoCuenta[]
+  movimientosPuntos ClientePuntoMovimiento[]
 
   @@index([localId])
   @@index([fecha])
@@ -623,4 +628,48 @@ model Turno {
   @@index([localId])
   @@index([vendedorId])
   @@index([apertura])
+}
+
+// PUNTOS DE FIDELIDAD
+// ---------------------------------------------------------------------------
+
+model PuntosConfigLocal {
+  id              Int      @id @default(autoincrement())
+  grupoId         Int
+  localId         Int      @unique
+  activo          Boolean  @default(false)
+  reglasJson      Json?    // { "puntosPorPeso": 0.01 }
+  redencionJson   Json?    // { "pesoPorPunto": 10 }
+  exclusionesJson Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  local           Local    @relation(fields: [localId], references: [id])
+
+  @@index([grupoId])
+  @@index([localId])
+}
+
+model ClientePuntoMovimiento {
+  id         Int      @id @default(autoincrement())
+  grupoId    Int
+  localId    Int
+  clienteId  Int
+  direccion  String   // "CREDITO" | "DEBITO"
+  tipo       String   // "ACREDITACION" | "CANJE" | "AJUSTE" | "EXPIRACION"
+  puntos     Int
+  ventaId    Int?
+  userId     Int?
+  nota       String?
+  createdAt  DateTime @default(now())
+
+  cliente    Cliente  @relation(fields: [clienteId], references: [id])
+  venta      Venta?   @relation(fields: [ventaId], references: [id])
+  usuario    Usuario? @relation(fields: [userId], references: [id])
+  local      Local    @relation(fields: [localId], references: [id])
+
+  @@unique([ventaId, tipo])
+  @@index([grupoId, localId, clienteId])
+  @@index([localId])
+  @@index([createdAt])
 }

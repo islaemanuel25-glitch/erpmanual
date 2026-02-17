@@ -17,7 +17,7 @@ export async function POST(req) {
     const { grupoId, localId, session } = scope;
 
     const body = await req.json();
-    const { clienteId, turnoId, formaPago, descuento, items, esFiado } = body;
+    const { clienteId, turnoId, formaPago, descuento, items, esFiado, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje } = body;
 
     // Validaciones
     if (!formaPago) {
@@ -94,7 +94,8 @@ export async function POST(req) {
     );
     const descuentoManual = Number(descuento) || 0;
     const descuentoAutomatico = subtotal * (descuentoAplicadoPct / 100);
-    const descuentoTotal = descuentoAutomatico + descuentoManual;
+    const descuentoPorPuntosVal = Number(descuentoPorPuntosBody) || 0;
+    const descuentoTotal = descuentoAutomatico + descuentoManual + descuentoPorPuntosVal;
     const total = subtotal - descuentoTotal; // Lo que paga el cliente (SIN comision)
 
     if (total <= 0) {
@@ -268,6 +269,64 @@ export async function POST(req) {
       return nuevaVenta;
     });
 
+    // Post-transacción: puntos de fidelidad
+    if (clienteId) {
+      try {
+        const puntosConfig = await prisma.puntosConfigLocal.findFirst({
+          where: { localId, activo: true },
+        });
+
+        if (puntosConfig) {
+          // 1. Acreditar puntos por la compra (idempotente por ventaId+tipo)
+          const puntosPorPeso = puntosConfig.reglasJson?.puntosPorPeso || 0;
+          const puntosAcreditar = Math.floor(total * puntosPorPeso);
+
+          if (puntosAcreditar > 0) {
+            const existeAcreditacion = await prisma.clientePuntoMovimiento.findFirst({
+              where: { ventaId: venta.id, tipo: "ACREDITACION" },
+            });
+            if (!existeAcreditacion) {
+              await prisma.clientePuntoMovimiento.create({
+                data: {
+                  grupoId,
+                  localId,
+                  clienteId,
+                  direccion: "CREDITO",
+                  tipo: "ACREDITACION",
+                  puntos: puntosAcreditar,
+                  ventaId: venta.id,
+                  userId: session.id,
+                  nota: `Venta #${venta.numero}`,
+                },
+              });
+            }
+          }
+
+          // 2. Asociar canje reciente a esta venta (si hubo)
+          if (puntosCanje > 0) {
+            const canjeReciente = await prisma.clientePuntoMovimiento.findFirst({
+              where: {
+                clienteId,
+                localId,
+                tipo: "CANJE",
+                ventaId: null,
+                createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+              },
+              orderBy: { createdAt: "desc" },
+            });
+            if (canjeReciente) {
+              await prisma.clientePuntoMovimiento.update({
+                where: { id: canjeReciente.id },
+                data: { ventaId: venta.id },
+              });
+            }
+          }
+        }
+      } catch (puntosErr) {
+        console.error("Error procesando puntos (venta continúa):", puntosErr.message);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       ventaId: venta.id,
@@ -277,6 +336,7 @@ export async function POST(req) {
         subtotal,
         descuentoAutomatico,
         descuentoManual,
+        descuentoPorPuntos: descuentoPorPuntosVal,
         descuentoTotal,
         total,
       },

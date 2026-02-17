@@ -13,6 +13,7 @@ import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
+import ModalCanjePuntos from "@/components/pos-ventas/ModalCanjePuntos";
 import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullscreen";
 import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
@@ -45,6 +46,14 @@ export default function PosVentasPage() {
   const [descuento, setDescuento] = useState(0);
   const [descuentoInfo, setDescuentoInfo] = useState(null); // { tipo, valor }
   const [modalDescuento, setModalDescuento] = useState(false);
+
+  // Puntos de fidelidad
+  const [saldoPuntos, setSaldoPuntos] = useState(0);
+  const [puntosActivo, setPuntosActivo] = useState(false);
+  const [puntosConfig, setPuntosConfig] = useState(null);
+  const [puntosCanje, setPuntosCanje] = useState(0);
+  const [descuentoPorPuntos, setDescuentoPorPuntos] = useState(0);
+  const [modalCanjePuntos, setModalCanjePuntos] = useState(false);
 
   // Turno de caja
   const [turnoActual, setTurnoActual] = useState(undefined); // undefined=cargando, null=sin turno, object=turno
@@ -175,6 +184,47 @@ export default function PosVentasPage() {
   }, [formaPago, clienteSeleccionado, localActual]);
 
   // ---------------------------------------------------------------------------
+  // Cargar puntos cuando hay cliente seleccionado
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!clienteSeleccionado || !localActual) {
+      setSaldoPuntos(0);
+      setPuntosActivo(false);
+      setPuntosConfig(null);
+      return;
+    }
+    let cancelado = false;
+    const cargar = async () => {
+      try {
+        const res = await fetch(
+          `/api/clientes/${clienteSeleccionado.id}/puntos?localId=${localActual}`,
+          { credentials: "include" }
+        );
+        const data = await res.json();
+        if (cancelado) return;
+        if (data.ok) {
+          setSaldoPuntos(data.saldo || 0);
+          setPuntosActivo(!!data.activo);
+          setPuntosConfig(data.config || null);
+        } else {
+          setSaldoPuntos(0);
+          setPuntosActivo(false);
+          setPuntosConfig(null);
+        }
+      } catch (err) {
+        console.error("Error cargando puntos:", err);
+        if (!cancelado) {
+          setSaldoPuntos(0);
+          setPuntosActivo(false);
+          setPuntosConfig(null);
+        }
+      }
+    };
+    cargar();
+    return () => { cancelado = true; };
+  }, [clienteSeleccionado, localActual]);
+
+  // ---------------------------------------------------------------------------
   // Shortcuts de teclado
   // ---------------------------------------------------------------------------
   useEffect(() => {
@@ -284,6 +334,11 @@ export default function PosVentasPage() {
     setClienteSeleccionado(null);
     setCreditoInfo(null);
     setUltimoBreakdown(null);
+    setPuntosCanje(0);
+    setDescuentoPorPuntos(0);
+    setSaldoPuntos(0);
+    setPuntosActivo(false);
+    setPuntosConfig(null);
     setErrorMsg("");
     setSuccessMsg("");
   }, []);
@@ -296,7 +351,7 @@ export default function PosVentasPage() {
     0
   );
 
-  const total = subtotal - descuento;
+  const total = subtotal - descuento - descuentoPorPuntos;
 
   // ---------------------------------------------------------------------------
   // Descuento
@@ -457,6 +512,8 @@ export default function PosVentasPage() {
           formaPago: datos.formaPago,
           esFiado: datos.formaPago === "fiado",
           descuento,
+          descuentoPorPuntos,
+          puntosCanje,
           items: carrito.map((item) => ({
             productoBaseId: item.productoBaseId,
             nombre: item.nombre,
@@ -508,6 +565,9 @@ export default function PosVentasPage() {
         setDescuentoInfo(null);
         setClienteSeleccionado(null);
         setDatosPagoEfectivo(null);
+        setPuntosCanje(0);
+        setDescuentoPorPuntos(0);
+        setSaldoPuntos(0);
       } else {
         setErrorMsg(data.error || "Error al registrar la venta.");
       }
@@ -662,6 +722,18 @@ export default function PosVentasPage() {
             >
               {clienteSeleccionado ? `Cliente: ${clienteSeleccionado.nombre}` : "Elegir cliente"}
             </button>
+            {clienteSeleccionado && puntosActivo && saldoPuntos > 0 && (
+              <button
+                onClick={() => setModalCanjePuntos(true)}
+                className={`text-[11px] px-2 py-1 rounded transition-colors ${
+                  puntosCanje > 0
+                    ? "bg-purple-500/30 text-purple-300 font-medium"
+                    : "bg-purple-500/20 hover:bg-purple-500/30 text-purple-300"
+                }`}
+              >
+                {puntosCanje > 0 ? `Puntos: -${puntosCanje}` : `Puntos: ${saldoPuntos}`}
+              </button>
+            )}
             {turnoActual && (
               <button
                 onClick={() => setMostrarCierre(true)}
@@ -769,6 +841,7 @@ export default function PosVentasPage() {
             <FormaPago
               subtotal={subtotal}
               descuento={descuento}
+              descuentoPorPuntos={descuentoPorPuntos}
               formaPago={formaPago}
               onFormaPagoChange={setFormaPago}
               onCobrar={handleCobrar}
@@ -804,6 +877,45 @@ export default function PosVentasPage() {
           onAplicar={handleAplicarDescuento}
           onQuitar={handleQuitarDescuento}
           onCancelar={() => setModalDescuento(false)}
+        />
+      )}
+
+      {/* Modal canje puntos */}
+      {modalCanjePuntos && clienteSeleccionado && (
+        <ModalCanjePuntos
+          saldo={saldoPuntos}
+          pesoPorPunto={puntosConfig?.redencionJson?.pesoPorPunto || 0}
+          canjeActual={puntosCanje}
+          onCanjear={async (pts) => {
+            try {
+              const res = await fetch(`/api/clientes/${clienteSeleccionado.id}/puntos`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ puntos: pts, localId: localActual }),
+              });
+              const data = await res.json();
+              if (data.ok) {
+                setPuntosCanje(data.puntosUsados);
+                setDescuentoPorPuntos(data.descuento);
+                setSaldoPuntos(data.saldoNuevoEstimado);
+                setModalCanjePuntos(false);
+              } else {
+                setErrorMsg(data.error || "Error canjeando puntos");
+                setModalCanjePuntos(false);
+              }
+            } catch (err) {
+              console.error("Error canjeando puntos:", err);
+              setErrorMsg("Error de conexión al canjear puntos");
+              setModalCanjePuntos(false);
+            }
+          }}
+          onQuitar={() => {
+            setPuntosCanje(0);
+            setDescuentoPorPuntos(0);
+            setModalCanjePuntos(false);
+          }}
+          onCancelar={() => setModalCanjePuntos(false)}
         />
       )}
 
