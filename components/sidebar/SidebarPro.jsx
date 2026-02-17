@@ -60,7 +60,7 @@ export default function SidebarPro() {
         }
       : null,
 
-    perfil?.localId && !perfil?.esDeposito
+    perfil?.localId && !perfil?.esDeposito && puede("pedidos.ver")
       ? {
           key: "pedidos",
           label: "Pedidos",
@@ -131,7 +131,7 @@ export default function SidebarPro() {
       items: [
         { label: "Stock Locales", href: "/modulos/stock_locales" },
         { label: "Faltantes", href: "/modulos/faltantes" },
-        puede("pos.usar") || esAdmin
+        puede("pos_transferencias.ver")
           ? {
               label: "POS Transferencias",
               href: "/modulos/pos-transferencias",

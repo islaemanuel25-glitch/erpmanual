@@ -13,6 +13,24 @@ export async function POST(req) {
       );
     }
 
+    // Si es local (no admin/depósito), exigir pedidos.solicitar
+    const permisos = Array.isArray(session.permisos) ? session.permisos : [];
+    const esAdmin = permisos.includes("*") && !session.localId;
+
+    if (!esAdmin && session.localId) {
+      const localSol = await prisma.local.findUnique({
+        where: { id: Number(session.localId) },
+        select: { es_deposito: true },
+      });
+
+      if (!localSol?.es_deposito && !permisos.includes("pedidos.solicitar")) {
+        return NextResponse.json(
+          { ok: false, error: "Sin permiso para solicitar pedidos" },
+          { status: 403 }
+        );
+      }
+    }
+
     const body = await req.json();
     const posId = Number(body.posId || 0);
 

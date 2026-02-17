@@ -16,6 +16,14 @@ export async function GET(req) {
       );
     }
 
+    const permisos = Array.isArray(session.permisos) ? session.permisos : [];
+    if (!permisos.includes("*") && !permisos.includes("pedidos.ver")) {
+      return NextResponse.json(
+        { ok: false, error: "Sin permiso para ver pedidos" },
+        { status: 403 }
+      );
+    }
+
     const localId = Number(session.localId);
     if (!localId) {
       return NextResponse.json(
