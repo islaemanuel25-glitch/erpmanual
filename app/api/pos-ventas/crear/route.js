@@ -284,6 +284,7 @@ export async function POST(req) {
                 monto: total,
                 ventaId: nuevaVenta.id,
                 nota: `Venta #${numero}`,
+                userId: session?.id || null,
               },
             });
           }

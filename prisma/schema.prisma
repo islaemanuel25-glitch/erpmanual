@@ -112,6 +112,7 @@ model Usuario {
   ventas Venta[]
   turnos Turno[]
   movimientosPuntos ClientePuntoMovimiento[]
+  movimientosCC MovimientoCuenta[]
 
   @@map("Usuario")
 }
@@ -526,6 +527,7 @@ model MovimientoCuenta {
   direccion  String   // "DEBITO" | "CREDITO"
   monto      Decimal  @db.Decimal(12, 2)
   ventaId    Int?
+  userId     Int?
   nota       String?
   createdAt  DateTime @default(now())
 
@@ -533,12 +535,14 @@ model MovimientoCuenta {
   local      Local    @relation(fields: [localId], references: [id])
   cliente    Cliente  @relation(fields: [clienteId], references: [id])
   venta      Venta?   @relation(fields: [ventaId], references: [id])
+  user       Usuario? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@unique([ventaId])
   @@index([grupoId, localId, clienteId])
   @@index([clienteId])
   @@index([localId])
   @@index([createdAt])
+  @@index([userId])
 }
 
 // POS VENTAS

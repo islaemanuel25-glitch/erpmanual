@@ -21,7 +21,7 @@ export async function POST(req, context) {
       );
     }
 
-    const { grupoId, localId } = scope;
+    const { grupoId, localId, session } = scope;
     const { id } = await context.params;
     const clienteId = Number(id);
 
@@ -72,6 +72,7 @@ export async function POST(req, context) {
         direccion,
         monto,
         nota,
+        userId: session?.id || null,
       },
     });
 
