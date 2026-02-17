@@ -33,6 +33,13 @@ export async function GET(req, context) {
       );
     }
 
+    // Paginación
+    const { searchParams } = new URL(req.url);
+    const takeRaw = Number(searchParams.get("take") || 50);
+    const take = Math.min(Math.max(takeRaw || 50, 1), 200);
+    const cursorRaw = searchParams.get("cursor");
+    const cursor = cursorRaw ? Number(cursorRaw) : null;
+
     // Verificar que el cliente pertenece al scope
     const cliente = await prisma.cliente.findFirst({
       where: { id: clienteId, grupoId, localId },
@@ -55,12 +62,14 @@ export async function GET(req, context) {
         ok: true,
         saldo: 0,
         items: [],
+        hasMore: false,
+        nextCursor: null,
         activo: false,
         config: null,
       });
     }
 
-    // Calcular saldo: SUM(CREDITO) - SUM(DEBITO)
+    // Saldo global (no paginado)
     const agg = await prisma.clientePuntoMovimiento.groupBy({
       by: ["direccion"],
       where: { clienteId, localId, grupoId },
@@ -76,14 +85,21 @@ export async function GET(req, context) {
     }
     const saldo = creditos - debitos;
 
-    // Movimientos recientes
-    const movimientos = await prisma.clientePuntoMovimiento.findMany({
-      where: { clienteId, localId, grupoId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
+    // Movimientos paginados
+    const where = { clienteId, localId, grupoId };
+    if (cursor) where.id = { lt: cursor };
+
+    const rows = await prisma.clientePuntoMovimiento.findMany({
+      where,
+      orderBy: { id: "desc" },
+      take: take + 1,
     });
 
-    const items = movimientos.map((m) => ({
+    const hasMore = rows.length > take;
+    const slice = hasMore ? rows.slice(0, take) : rows;
+    const nextCursor = hasMore ? slice[slice.length - 1].id : null;
+
+    const items = slice.map((m) => ({
       id: m.id,
       tipo: m.tipo,
       direccion: m.direccion,
@@ -97,6 +113,8 @@ export async function GET(req, context) {
       ok: true,
       saldo,
       items,
+      hasMore,
+      nextCursor,
       activo: true,
       config: { redencionJson: config.redencionJson },
     });

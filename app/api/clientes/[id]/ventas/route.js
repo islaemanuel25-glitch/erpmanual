@@ -23,8 +23,6 @@ export async function GET(req, context) {
       );
     }
 
-    // Verificar que el cliente existe y pertenece al scope del usuario
-    // localId es obligatorio: clientes son por local
     const scope = await resolveLocalAndGrupo(req);
     if (scope.error) {
       return NextResponse.json(
@@ -34,6 +32,13 @@ export async function GET(req, context) {
     }
 
     const { grupoId, localId } = scope;
+
+    // Paginación
+    const { searchParams } = new URL(req.url);
+    const takeRaw = Number(searchParams.get("take") || 100);
+    const take = Math.min(Math.max(takeRaw || 100, 1), 200);
+    const cursorRaw = searchParams.get("cursor");
+    const cursor = cursorRaw ? Number(cursorRaw) : null;
 
     // Verificar que el cliente pertenece al localId del usuario
     const cliente = await prisma.cliente.findFirst({
@@ -51,12 +56,12 @@ export async function GET(req, context) {
       );
     }
 
-    // Obtener ventas del cliente en el local específico
-    const ventas = await prisma.venta.findMany({
-      where: {
-        clienteId,
-        localId,
-      },
+    // Ventas paginadas
+    const where = { clienteId, localId };
+    if (cursor) where.id = { lt: cursor };
+
+    const rows = await prisma.venta.findMany({
+      where,
       include: {
         local: {
           select: {
@@ -65,14 +70,15 @@ export async function GET(req, context) {
           },
         },
       },
-      orderBy: {
-        fecha: "desc",
-      },
-      take: 100, // Limitar a las últimas 100 ventas
+      orderBy: { id: "desc" },
+      take: take + 1,
     });
 
-    // Formatear respuesta
-    const items = ventas.map((v) => ({
+    const hasMore = rows.length > take;
+    const slice = hasMore ? rows.slice(0, take) : rows;
+    const nextCursor = hasMore ? slice[slice.length - 1].id : null;
+
+    const items = slice.map((v) => ({
       id: v.id,
       fecha: v.fecha.toISOString(),
       numero: v.numero,
@@ -85,6 +91,8 @@ export async function GET(req, context) {
       ok: true,
       items,
       total: items.length,
+      hasMore,
+      nextCursor,
     });
   } catch (error) {
     console.error("Error obteniendo ventas del cliente:", error);
@@ -94,4 +102,3 @@ export async function GET(req, context) {
     );
   }
 }
-

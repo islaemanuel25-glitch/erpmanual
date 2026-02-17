@@ -32,6 +32,13 @@ export async function GET(req, context) {
       );
     }
 
+    // Paginación
+    const { searchParams } = new URL(req.url);
+    const takeRaw = Number(searchParams.get("take") || 200);
+    const take = Math.min(Math.max(takeRaw || 200, 1), 200);
+    const cursorRaw = searchParams.get("cursor");
+    const cursor = cursorRaw ? Number(cursorRaw) : null;
+
     // Verificar que el cliente pertenece al scope
     const cliente = await prisma.cliente.findFirst({
       where: { id: clienteId, grupoId, localId },
@@ -44,14 +51,7 @@ export async function GET(req, context) {
       );
     }
 
-    // Obtener movimientos
-    const movimientos = await prisma.movimientoCuenta.findMany({
-      where: { clienteId, localId, grupoId },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    });
-
-    // Calcular saldo: sum(DEBITO) - sum(CREDITO)
+    // Saldo global (no paginado)
     const agg = await prisma.movimientoCuenta.groupBy({
       by: ["direccion"],
       where: { clienteId, localId, grupoId },
@@ -67,7 +67,21 @@ export async function GET(req, context) {
     }
     const saldo = debitos - creditos;
 
-    const items = movimientos.map((m) => ({
+    // Movimientos paginados
+    const where = { clienteId, localId, grupoId };
+    if (cursor) where.id = { lt: cursor };
+
+    const rows = await prisma.movimientoCuenta.findMany({
+      where,
+      orderBy: { id: "desc" },
+      take: take + 1,
+    });
+
+    const hasMore = rows.length > take;
+    const slice = hasMore ? rows.slice(0, take) : rows;
+    const nextCursor = hasMore ? slice[slice.length - 1].id : null;
+
+    const items = slice.map((m) => ({
       id: m.id,
       tipo: m.tipo,
       direccion: m.direccion,
@@ -77,7 +91,7 @@ export async function GET(req, context) {
       createdAt: m.createdAt.toISOString(),
     }));
 
-    return NextResponse.json({ ok: true, saldo, items });
+    return NextResponse.json({ ok: true, saldo, items, hasMore, nextCursor });
   } catch (error) {
     console.error("Error obteniendo cuenta corriente:", error);
     return NextResponse.json(
