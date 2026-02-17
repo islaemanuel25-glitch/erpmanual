@@ -134,3 +134,22 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# ─── ERP Azul ───
+
+# PostgreSQL data (local dev)
+pgdata/
+
+# Backup / temp SQL (no afecta prisma/migrations/)
+backup_*.sql
+diff.sql
+fix_column.sql
+
+# Archives
+*.zip
+
+# Windows NUL artifact
+nul
+
+# Claude Code local settings
+.claude/settings.local.json

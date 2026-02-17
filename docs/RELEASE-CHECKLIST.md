@@ -1,0 +1,50 @@
+# Checklist de Release — ERP Azul
+
+## 1. Pre-release (dev)
+
+- [ ] `git status` limpio (sin cambios sin commitear)
+- [ ] `npx prisma migrate dev` — aplica migraciones pendientes en dev
+- [ ] `npx prisma generate` — regenera el cliente Prisma
+- [ ] `npm run lint` — sin errores ni warnings críticos
+
+### Smoke tests manuales
+
+- [ ] **Clientes:** listado, detalle, crear, editar
+- [ ] **Cuenta Corriente:** ver saldo + movimientos, registrar pago, registrar ajuste
+- [ ] **Puntos:** ver saldo, canjear puntos (si activo en el local)
+- [ ] **POS Venta contado:** buscar producto, agregar al carrito, cobrar efectivo
+- [ ] **POS Venta fiado:** cobrar como Cuenta Corriente → verificar movimiento CC generado
+- [ ] **Analytics:** ranking facturación/frecuencia, inactivos con/sin compras
+- [ ] **Import/Export:** importar preview + apply, exportar Excel, exportar PDF
+- [ ] **Merge clientes:** unificar duplicados, verificar transferencia de ventas/CC/puntos/tags
+
+## 2. Producción
+
+- [ ] `npx prisma migrate deploy` — aplica migraciones en producción
+- [ ] Verificar endpoints críticos:
+  - `GET /api/clientes/listar`
+  - `GET /api/clientes/[id]/cuenta-corriente`
+  - `GET /api/clientes/[id]/puntos`
+  - `POST /api/pos-ventas/crear`
+- [ ] Verificar que el login funciona correctamente
+- [ ] Verificar que el sidebar muestra todos los módulos
+
+## 3. Rollback
+
+### Solo código (sin migración nueva)
+
+```bash
+git revert <hash-del-commit>
+```
+
+### Con migración aplicada
+
+El rollback de migraciones Prisma es **manual**. Pasos:
+
+1. Identificar el migration.sql aplicado
+2. Escribir SQL inverso (DROP TABLE, DROP COLUMN, etc.)
+3. Ejecutar el SQL inverso directamente en la base de datos
+4. Eliminar la entrada de `_prisma_migrations` correspondiente
+5. Revertir el commit de código
+
+> **Importante:** Siempre hacer backup de la base de datos antes de aplicar migraciones en producción.
