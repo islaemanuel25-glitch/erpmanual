@@ -63,7 +63,6 @@ export default function LocalesPage() {
         console.log("🔍 API response:", json);
 
         if (json.ok && json.item) {
-          // Mapear campos de snake_case a camelCase si es necesario
           const local = json.item;
           setEditing({
             id: local.id,

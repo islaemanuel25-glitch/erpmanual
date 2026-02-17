@@ -106,11 +106,11 @@ export async function GET(req) {
       by: ["clienteId"],
       where: ventaWhere,
       _sum: { total: true },
-      _count: { _all: true },
+      _count: { id: true },
       _max: { fecha: true },
       orderBy:
         metric === "frecuencia"
-          ? { _count: { _all: "desc" } }
+          ? { _count: { id: "desc" } }
           : { _sum: { total: "desc" } },
       take,
     });
@@ -154,7 +154,7 @@ export async function GET(req) {
       if (!c) continue;
 
       const totalFacturado = Number(g._sum.total) || 0;
-      const cantidadCompras = g._count._all || 0;
+      const cantidadCompras = g._count.id || 0;
 
       items.push({
         clienteId: c.id,
