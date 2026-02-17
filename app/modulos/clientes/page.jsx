@@ -13,6 +13,7 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import useLocalSelector from "@/hooks/useLocalSelector";
 import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
 import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
+import ModalMergeClientes from "@/components/clientes/ModalMergeClientes";
 
 export default function ClientesPage() {
   const router = useRouter();
@@ -27,6 +28,10 @@ export default function ClientesPage() {
     handleCambiarLocal,
   } = useLocalSelector();
 
+  // Fallback: leer localId desde searchParams si no hay localSeleccionado
+  const localIdFromParams = searchParams.get("localId");
+  const localIdFinal = localSeleccionado || (localIdFromParams ? Number(localIdFromParams) : null);
+
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [estadoClientes, setEstadoClientes] = useState("activos");
@@ -38,13 +43,24 @@ export default function ClientesPage() {
   const [mostrarVentas, setMostrarVentas] = useState(false);
   const [clienteVentas, setClienteVentas] = useState(null);
   const [clienteCC, setClienteCC] = useState(null);
+  const [mostrarMerge, setMostrarMerge] = useState(false);
+
+  // Import / Export
+  const [mostrarImportExport, setMostrarImportExport] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [importPreview, setImportPreview] = useState(null);
+  const [importDecisions, setImportDecisions] = useState({});
+  const [aplicando, setAplicando] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
-    if (localSeleccionado) {
+    if (localIdFinal) {
       cargarClientes();
       cargarTags();
     }
-  }, [localSeleccionado, estadoClientes]);
+  }, [localIdFinal, estadoClientes]);
 
   // Abrir modal de edición si viene el parámetro editar en la URL
   useEffect(() => {
@@ -69,9 +85,9 @@ export default function ClientesPage() {
   }, [clientes, loading, searchParams, mostrarModal, router]);
 
   const cargarTags = async () => {
-    if (!localSeleccionado) return;
+    if (!localIdFinal) return;
     try {
-      const res = await fetch(`/api/clientes/tags?localId=${localSeleccionado}`, {
+      const res = await fetch(`/api/clientes/tags?localId=${localIdFinal}`, {
         credentials: "include",
       });
       const data = await res.json();
@@ -87,8 +103,8 @@ export default function ClientesPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (localSeleccionado) {
-        params.set("localId", String(localSeleccionado));
+      if (localIdFinal) {
+        params.set("localId", String(localIdFinal));
       }
       if (estadoClientes === "activos") {
         params.set("activo", "true");
@@ -140,7 +156,7 @@ export default function ClientesPage() {
         credentials: "include",
         body: JSON.stringify({
           activo: !cliente.activo,
-          localId: localSeleccionado,
+          localId: localIdFinal,
         }),
       });
       const data = await res.json();
@@ -149,6 +165,192 @@ export default function ClientesPage() {
       }
     } catch (error) {
       console.error("Error actualizando estado:", error);
+    }
+  };
+
+  const handleExportar = async () => {
+    if (!localIdFinal) return;
+    setExportando(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("localId", String(localIdFinal));
+      if (estadoClientes === "activos") {
+        params.set("activo", "true");
+      } else if (estadoClientes === "inactivos") {
+        params.set("activo", "false");
+      }
+      if (tagFiltro) {
+        params.set("tagId", String(tagFiltro));
+      }
+
+      const res = await fetch(`/api/clientes/export/excel?${params.toString()}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Error al exportar");
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clientes_${new Date().toISOString().split("T")[0]}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Error exportando:", e);
+      alert("Error de conexión al exportar");
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  const handleExportarPdf = async () => {
+    if (!localIdFinal) return;
+    setExportandoPdf(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("localId", String(localIdFinal));
+      if (estadoClientes === "activos") {
+        params.set("activo", "true");
+      } else if (estadoClientes === "inactivos") {
+        params.set("activo", "false");
+      }
+      if (tagFiltro) {
+        params.set("tagId", String(tagFiltro));
+      }
+
+      const res = await fetch(`/api/clientes/export/pdf?${params.toString()}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Error al exportar PDF");
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clientes_${localIdFinal}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Error exportando PDF:", e);
+      alert("Error de conexión al exportar PDF");
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
+  const handleImportPreview = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!localIdFinal || localIdFinal === 0) {
+      setImportResult({ error: "Seleccioná un local para importar." });
+      e.target.value = "";
+      return;
+    }
+
+    e.target.value = "";
+    setImportando(true);
+    setImportPreview(null);
+    setImportResult(null);
+    setImportDecisions({});
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("localId", String(localIdFinal));
+
+      const res = await fetch(`/api/clientes/import/preview?localId=${localIdFinal}`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.ok) {
+        setImportPreview(data);
+        // Inicializar decisions con las acciones sugeridas
+        const decs = {};
+        for (const f of data.filas) {
+          if (f.action === "create") {
+            decs[f.row] = { action: "create" };
+          } else if (f.action === "update" && f.match?.clienteId) {
+            decs[f.row] = { action: "update", targetClienteId: f.match.clienteId };
+          } else if (f.action === "ambiguous") {
+            decs[f.row] = { action: "skip" }; // por defecto skip, usuario elige
+          } else {
+            decs[f.row] = { action: "skip" };
+          }
+        }
+        setImportDecisions(decs);
+      } else {
+        setImportResult({ error: data.error || "Error al previsualizar" });
+      }
+    } catch (err) {
+      console.error("Error preview import:", err);
+      setImportResult({ error: "Error de conexión" });
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const handleImportApply = async () => {
+    if (!importPreview || !localIdFinal) return;
+
+    setAplicando(true);
+    setImportResult(null);
+
+    try {
+      const decisions = [];
+      const filasData = [];
+
+      for (const f of importPreview.filas) {
+        const dec = importDecisions[f.row];
+        if (!dec || dec.action === "skip") {
+          decisions.push({ row: f.row, action: "skip" });
+        } else {
+          decisions.push({
+            row: f.row,
+            action: dec.action,
+            targetClienteId: dec.targetClienteId || undefined,
+          });
+        }
+        filasData.push({ row: f.row, data: f.data });
+      }
+
+      const res = await fetch(`/api/clientes/import/apply?localId=${localIdFinal}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ decisions, filasData }),
+      });
+
+      const data = await res.json();
+      if (data.ok) {
+        setImportResult(data);
+        setImportPreview(null);
+        setImportDecisions({});
+        cargarClientes();
+        cargarTags();
+      } else {
+        setImportResult({ error: data.error || "Error al aplicar" });
+      }
+    } catch (err) {
+      console.error("Error apply import:", err);
+      setImportResult({ error: "Error de conexión" });
+    } finally {
+      setAplicando(false);
     }
   };
 
@@ -201,9 +403,24 @@ export default function ClientesPage() {
             onChange={handleCambiarLocal}
           />
         </div>
-        <SunmiButton color="amber" onClick={handleNuevo}>
-          + Nuevo Cliente
-        </SunmiButton>
+        <div className="flex gap-2">
+          <SunmiButton
+            color="slate"
+            onClick={() => setMostrarImportExport((v) => !v)}
+          >
+            Import / Export
+          </SunmiButton>
+          <SunmiButton
+            color="slate"
+            onClick={() => setMostrarMerge(true)}
+            disabled={!localIdFinal}
+          >
+            Unificar duplicados
+          </SunmiButton>
+          <SunmiButton color="amber" onClick={handleNuevo}>
+            + Nuevo Cliente
+          </SunmiButton>
+        </div>
       </div>
 
       {/* Busqueda */}
@@ -239,6 +456,274 @@ export default function ClientesPage() {
           </select>
         </div>
       </SunmiCard>
+
+      {/* Import / Export */}
+      {mostrarImportExport && (
+        <SunmiCard className="p-3">
+          <SunmiSeparator label="Import / Export" />
+          <div className="flex flex-col md:flex-row gap-3 items-start">
+            {/* Export */}
+            <div className="flex-1">
+              <p className="text-[11px] text-slate-400 mb-1">
+                Exportar clientes (respeta filtros activo y etiqueta)
+              </p>
+              <div className="flex gap-2">
+                <SunmiButton
+                  color="cyan"
+                  onClick={handleExportar}
+                  disabled={exportando || !localIdFinal || localIdFinal === 0}
+                >
+                  {exportando ? "Exportando…" : "Excel"}
+                </SunmiButton>
+                <SunmiButton
+                  color="cyan"
+                  onClick={handleExportarPdf}
+                  disabled={exportandoPdf || !localIdFinal || localIdFinal === 0}
+                >
+                  {exportandoPdf ? "Generando…" : "PDF"}
+                </SunmiButton>
+              </div>
+            </div>
+
+            {/* Import */}
+            <div className="flex-1">
+              <p className="text-[11px] text-slate-400 mb-1">
+                Importar desde Excel (.xlsx). Match por teléfono, email o
+                documento.
+              </p>
+              <label
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  importando || !localIdFinal || localIdFinal === 0
+                    ? "bg-slate-700 text-slate-400 cursor-not-allowed"
+                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 cursor-pointer"
+                }`}
+              >
+                {importando ? "Analizando…" : "Subir Excel (Preview)"}
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleImportPreview}
+                  disabled={importando || !localIdFinal || localIdFinal === 0}
+                />
+              </label>
+            </div>
+          </div>
+
+          {(!localIdFinal || localIdFinal === 0) && (
+            <p className="text-[11px] text-slate-500 mt-2">
+              Seleccioná un local para importar/exportar.
+            </p>
+          )}
+
+          {/* Preview de import */}
+          {importPreview && (
+            <div className="mt-3 space-y-2">
+              <SunmiSeparator label="Preview" />
+
+              {/* Resumen */}
+              <div className="flex flex-wrap gap-3 text-xs">
+                <span className="text-emerald-400">
+                  Crear: {importPreview.resumen.create}
+                </span>
+                <span className="text-cyan-400">
+                  Actualizar: {importPreview.resumen.update}
+                </span>
+                <span className="text-amber-400">
+                  Ambiguo: {importPreview.resumen.ambiguous}
+                </span>
+                {importPreview.resumen.skip > 0 && (
+                  <span className="text-red-400">
+                    Skip: {importPreview.resumen.skip}
+                  </span>
+                )}
+                <span className="text-slate-400">
+                  Total: {importPreview.resumen.total}
+                </span>
+              </div>
+
+              {/* Tabla de filas */}
+              <div className="max-h-[50vh] overflow-y-auto rounded border border-slate-700">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-800/80 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left text-slate-400">#</th>
+                      <th className="px-2 py-1.5 text-left text-slate-400">Nombre</th>
+                      <th className="px-2 py-1.5 text-left text-slate-400">Identificador</th>
+                      <th className="px-2 py-1.5 text-left text-slate-400">Acción</th>
+                      <th className="px-2 py-1.5 text-left text-slate-400">Match</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importPreview.filas.map((f) => {
+                      const dec = importDecisions[f.row] || { action: "skip" };
+                      const actionColors = {
+                        create: "text-emerald-400",
+                        update: "text-cyan-400",
+                        ambiguous: "text-amber-400",
+                        skip: "text-red-400",
+                      };
+                      const bgColors = {
+                        create: "",
+                        update: "",
+                        ambiguous: "bg-amber-500/5",
+                        skip: "bg-red-500/5",
+                      };
+
+                      return (
+                        <tr
+                          key={f.row}
+                          className={`border-b border-slate-800 last:border-0 ${bgColors[f.action] || ""}`}
+                        >
+                          <td className="px-2 py-1.5 text-slate-500">{f.row}</td>
+                          <td className="px-2 py-1.5 text-slate-200 max-w-[150px] truncate">
+                            {f.data.nombre || "—"}
+                          </td>
+                          <td className="px-2 py-1.5 text-slate-400 max-w-[140px] truncate">
+                            {f.data.telefono || f.data.email || f.data.documento || "—"}
+                          </td>
+                          <td className="px-2 py-1.5">
+                            {f.errors?.length > 0 ? (
+                              <span className="text-red-400">Skip — {f.errors[0]}</span>
+                            ) : f.action === "ambiguous" ? (
+                              <select
+                                value={dec.action === "update" ? `update:${dec.targetClienteId}` : dec.action}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "create") {
+                                    setImportDecisions((prev) => ({
+                                      ...prev,
+                                      [f.row]: { action: "create" },
+                                    }));
+                                  } else if (val === "skip") {
+                                    setImportDecisions((prev) => ({
+                                      ...prev,
+                                      [f.row]: { action: "skip" },
+                                    }));
+                                  } else if (val.startsWith("update:")) {
+                                    const cid = Number(val.split(":")[1]);
+                                    setImportDecisions((prev) => ({
+                                      ...prev,
+                                      [f.row]: { action: "update", targetClienteId: cid },
+                                    }));
+                                  }
+                                }}
+                                className="h-7 rounded border border-amber-500/30 bg-slate-900 px-1.5 text-[11px] text-amber-300"
+                              >
+                                <option value="skip">Skip</option>
+                                <option value="create">Crear nuevo</option>
+                                {f.match?.matches?.map((m) => (
+                                  <option key={m.id} value={`update:${m.id}`}>
+                                    Actualizar: {m.nombre} (#{m.id})
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className={actionColors[dec.action] || "text-slate-400"}>
+                                {dec.action === "create" && "Crear"}
+                                {dec.action === "update" && "Actualizar"}
+                                {dec.action === "skip" && "Skip"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-slate-500 max-w-[180px] truncate">
+                            {f.action === "update" && f.match?.matches?.[0] && (
+                              <span>
+                                {f.match.matches[0].nombre} (#{f.match.matches[0].id})
+                              </span>
+                            )}
+                            {f.action === "ambiguous" && f.match?.matches && (
+                              <span className="text-amber-400">
+                                {f.match.matches.length} coincidencias
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-2 justify-end pt-1">
+                <SunmiButton
+                  color="slate"
+                  onClick={() => {
+                    setImportPreview(null);
+                    setImportDecisions({});
+                  }}
+                >
+                  Cancelar
+                </SunmiButton>
+                <SunmiButton
+                  color="amber"
+                  onClick={handleImportApply}
+                  disabled={aplicando}
+                >
+                  {aplicando ? "Aplicando…" : "Aplicar importación"}
+                </SunmiButton>
+              </div>
+            </div>
+          )}
+
+          {/* Resultado final de apply */}
+          {importResult && (
+            <div className="mt-3">
+              {importResult.error ? (
+                <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
+                  {importResult.error}
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-3 text-xs mb-2">
+                    <span className="text-emerald-400">
+                      Creados: {importResult.resumen.creados}
+                    </span>
+                    <span className="text-cyan-400">
+                      Actualizados: {importResult.resumen.actualizados}
+                    </span>
+                    <span className="text-red-400">
+                      Errores: {importResult.resumen.errores}
+                    </span>
+                    <span className="text-slate-400">
+                      Total: {importResult.resumen.total}
+                    </span>
+                  </div>
+
+                  {importResult.detalle?.some((l) => l.error) && (
+                    <div className="rounded border border-red-500/30 bg-red-500/5 overflow-hidden">
+                      <div className="text-[11px] text-red-400 px-3 py-1.5 border-b border-red-500/20 font-medium">
+                        Filas con error
+                      </div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {importResult.detalle
+                          .filter((l) => l.error)
+                          .map((l, i) => (
+                            <div
+                              key={i}
+                              className="flex gap-3 px-3 py-1 text-xs border-b border-red-500/10 last:border-0"
+                            >
+                              <span className="text-slate-500 shrink-0">
+                                Fila {l.row}
+                              </span>
+                              <span className="text-slate-300 truncate">
+                                {l.nombre || "—"}
+                              </span>
+                              <span className="text-red-400 ml-auto shrink-0">
+                                {l.error}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </SunmiCard>
+      )}
 
       {/* Tabla */}
       <SunmiCard className="p-3">
@@ -299,7 +784,7 @@ export default function ClientesPage() {
                   <td className="px-2 py-1.5">
                     <div className="flex gap-2">
                       <button
-                        onClick={() => router.push(`/modulos/clientes/${cliente.id}?localId=${localSeleccionado}`)}
+                        onClick={() => router.push(`/modulos/clientes/${cliente.id}?localId=${localIdFinal}`)}
                         className="text-cyan-400 hover:text-cyan-300 text-xs font-medium"
                       >
                         Abrir
@@ -342,7 +827,7 @@ export default function ClientesPage() {
         <ModalCliente
           key={clienteEditar?.id || "nuevo"}
           cliente={clienteEditar}
-          localId={localSeleccionado}
+          localId={localIdFinal}
           onCerrar={() => setMostrarModal(false)}
           onGuardado={() => {
             setMostrarModal(false);
@@ -355,7 +840,7 @@ export default function ClientesPage() {
       {mostrarVentas && clienteVentas && (
         <ModalVentasCliente
           cliente={clienteVentas}
-          localId={localSeleccionado}
+          localId={localIdFinal}
           onCerrar={() => {
             setMostrarVentas(false);
             setClienteVentas(null);
@@ -367,8 +852,21 @@ export default function ClientesPage() {
       {clienteCC && (
         <ModalCuentaCorriente
           cliente={clienteCC}
-          localId={localSeleccionado}
+          localId={localIdFinal}
           onCerrar={() => setClienteCC(null)}
+        />
+      )}
+
+      {/* Modal Merge */}
+      {mostrarMerge && (
+        <ModalMergeClientes
+          localId={localIdFinal}
+          onCerrar={() => setMostrarMerge(false)}
+          onMerged={() => {
+            setMostrarMerge(false);
+            cargarClientes();
+            cargarTags();
+          }}
         />
       )}
     </div>

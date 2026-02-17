@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-02-16 21:16
+**Fecha:** 2026-02-17 09:04
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- feat: sistema de puntos de fidelidad nivel 1, feat: descuentoPorcentaje en clientes/tags + descuento automatico en POS, feat(pos): fullscreen cliente picker + allow selecting anytime
-- Archivos: 2 nuevos, 5 modificados (7 total)
+- feat: sistema de puntos de fidelidad nivel 1, feat: descuentoPorcentaje en clientes/tags + descuento automatico en POS
+- Archivos: 1 nuevos, 4 modificados (5 total)
 
 ### configuracion
 - feat: descuentoPorcentaje en clientes/tags + descuento automatico en POS
@@ -23,7 +23,6 @@
 
 ## Archivos nuevos desde última sincronización
 - components/pos-ventas/ModalCanjePuntos.jsx
-- components/pos-ventas/ClientePickerFullscreen.jsx
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

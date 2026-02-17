@@ -105,6 +105,31 @@ export async function POST(req) {
       );
     }
 
+    // Validar saldo de puntos antes de continuar
+    if (clienteId && puntosCanje > 0) {
+      const aggPuntos = await prisma.clientePuntoMovimiento.groupBy({
+        by: ["direccion"],
+        where: { clienteId, localId, grupoId },
+        _sum: { puntos: true },
+      });
+
+      let creditosPuntos = 0;
+      let debitosPuntos = 0;
+      for (const row of aggPuntos) {
+        const val = Number(row._sum.puntos || 0);
+        if (row.direccion === "CREDITO") creditosPuntos = val;
+        else if (row.direccion === "DEBITO") debitosPuntos = val;
+      }
+      const saldoPuntos = creditosPuntos - debitosPuntos;
+
+      if (puntosCanje > saldoPuntos) {
+        return NextResponse.json(
+          { ok: false, error: "Saldo de puntos insuficiente." },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validar límite de crédito si es fiado
     if (esFiado && clienteId) {
       const clienteCC = await prisma.cliente.findFirst({
@@ -157,11 +182,13 @@ export async function POST(req) {
     const productoBaseIds = items.map((i) => i.productoBaseId);
     const productosBase = await prisma.productoBase.findMany({
       where: { id: { in: productoBaseIds } },
-      select: { id: true, precio_costo: true },
+      select: { id: true, precio_costo: true, categoria_id: true },
     });
     const costosMap = {};
+    const pbMap = {};
     productosBase.forEach((p) => {
       costosMap[p.id] = Number(p.precio_costo) || 0;
+      pbMap[p.id] = { categoria_id: p.categoria_id };
     });
 
     // Calcular costo total y detalle con ganancia
@@ -279,7 +306,21 @@ export async function POST(req) {
         if (puntosConfig) {
           // 1. Acreditar puntos por la compra (idempotente por ventaId+tipo)
           const puntosPorPeso = puntosConfig.reglasJson?.puntosPorPeso || 0;
-          const puntosAcreditar = Math.floor(total * puntosPorPeso);
+
+          // Filtrar items excluidos de puntos
+          const excl = puntosConfig.exclusionesJson || {};
+          const exclCats = new Set(excl.categoriaIds || []);
+          const exclProds = new Set(excl.productoBaseIds || []);
+
+          let subtotalElegible = 0;
+          for (const item of items) {
+            if (exclProds.has(item.productoBaseId)) continue;
+            const catId = pbMap[item.productoBaseId]?.categoria_id;
+            if (catId != null && exclCats.has(catId)) continue;
+            subtotalElegible += item.precio * item.cantidad;
+          }
+
+          const puntosAcreditar = Math.floor(subtotalElegible * puntosPorPeso);
 
           if (puntosAcreditar > 0) {
             const existeAcreditacion = await prisma.clientePuntoMovimiento.findFirst({
