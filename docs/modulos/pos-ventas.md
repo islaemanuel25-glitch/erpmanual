@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-02-16 20:31
+**Última actualización:** 2026-02-16 21:16
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,10 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-02-16: feat: sistema de puntos de fidelidad nivel 1
+- 2026-02-16: feat: descuentoPorcentaje en clientes/tags + descuento automatico en POS
+- 2026-02-15: feat(pos): fullscreen cliente picker + allow selecting anytime
+- 2026-02-15: feat(pos): add cliente selector dropdown in ModalCliente
 - 2026-02-15: feat(pos): fullscreen cliente picker + allow selecting anytime
 - 2026-02-15: feat(pos): add cliente selector dropdown in ModalCliente
 - 2026-02-13: refactor: limpiar layout POS - historial a modal, stats en header
