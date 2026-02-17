@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 // GET /api/clientes/[id]/puntos?localId=...
 export async function GET(req, context) {
@@ -10,6 +11,14 @@ export async function GET(req, context) {
       return NextResponse.json(
         { ok: false, error: scope.error },
         { status: scope.status }
+      );
+    }
+
+    const perm = checkPerm(scope.session, "clientes.puntos.ver");
+    if (!perm.ok) {
+      return NextResponse.json(
+        { ok: false, error: perm.error },
+        { status: perm.status }
       );
     }
 
@@ -108,6 +117,14 @@ export async function POST(req, context) {
       return NextResponse.json(
         { ok: false, error: scope.error },
         { status: scope.status }
+      );
+    }
+
+    const perm = checkPerm(scope.session, "clientes.puntos.canjear");
+    if (!perm.ok) {
+      return NextResponse.json(
+        { ok: false, error: perm.error },
+        { status: perm.status }
       );
     }
 

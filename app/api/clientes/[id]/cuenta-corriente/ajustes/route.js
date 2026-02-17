@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 export async function POST(req, context) {
   try {
@@ -9,6 +10,14 @@ export async function POST(req, context) {
       return NextResponse.json(
         { ok: false, error: scope.error },
         { status: scope.status }
+      );
+    }
+
+    const perm = checkPerm(scope.session, "clientes.cc.ajustar");
+    if (!perm.ok) {
+      return NextResponse.json(
+        { ok: false, error: perm.error },
+        { status: perm.status }
       );
     }
 
