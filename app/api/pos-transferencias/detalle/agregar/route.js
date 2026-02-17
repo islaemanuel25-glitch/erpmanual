@@ -45,6 +45,28 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "POS ya enviada" }, { status: 400 });
     }
 
+    // Si está Solicitado, solo depósito/admin puede modificar
+    if (pos.estado === "Solicitado") {
+      const isAdmin =
+        Array.isArray(session.permisos) &&
+        session.permisos.includes("*") &&
+        !session.localId;
+
+      if (!isAdmin) {
+        const userLocal = await prisma.local.findUnique({
+          where: { id: Number(session.localId) },
+          select: { es_deposito: true },
+        });
+
+        if (!userLocal?.es_deposito) {
+          return NextResponse.json(
+            { ok: false, error: "Solo depósito/admin puede modificar una POS solicitada" },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     // PRODUCTO DEL DESTINO
     const productoDestino = await prisma.productoLocal.findUnique({
       where: { id: productoLocalDestinoId },

@@ -59,6 +59,28 @@ export async function POST(req) {
       );
     }
 
+    // Si está Solicitado, solo depósito/admin puede modificar
+    if (detalle.pos.estado === "Solicitado") {
+      const isAdmin =
+        Array.isArray(session.permisos) &&
+        session.permisos.includes("*") &&
+        !session.localId;
+
+      if (!isAdmin) {
+        const userLocal = await prisma.local.findUnique({
+          where: { id: Number(session.localId) },
+          select: { es_deposito: true },
+        });
+
+        if (!userLocal?.es_deposito) {
+          return NextResponse.json(
+            { ok: false, error: "Solo depósito/admin puede modificar una POS solicitada" },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     const data = {};
 
     if (sugerido !== undefined) {
