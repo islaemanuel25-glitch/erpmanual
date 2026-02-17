@@ -19,7 +19,6 @@ import {
   Users2,
   Store,
   Settings,
-  Gift,
 } from "lucide-react";
 
 export default function SidebarPro() {
@@ -138,14 +137,6 @@ export default function SidebarPro() {
         { label: "Usuarios", href: "/modulos/usuarios" },
         { label: "Roles", href: "/modulos/roles" },
       ],
-    },
-
-    {
-      key: "fidelidad",
-      label: "Fidelidad",
-      icon: Gift,
-      iconFilled: Gift,
-      items: [{ label: "Fidelidad", href: "/modulos/fidelidad" }],
     },
 
     {

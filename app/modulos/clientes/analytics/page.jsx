@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
@@ -280,10 +281,10 @@ export default function AnalyticsClientesPage() {
               onChange={(e) => setQ(e.target.value)}
               className="flex-1 min-w-[200px]"
             />
-            <select
+            <SunmiSelectAdv
               value={tagId}
-              onChange={(e) => setTagId(e.target.value)}
-              className="h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+              onChange={(val) => setTagId(val)}
+              placeholder="Todas las etiquetas"
             >
               <option value="">Todas las etiquetas</option>
               {tags.map((t) => (
@@ -291,7 +292,7 @@ export default function AnalyticsClientesPage() {
                   {t.nombre}
                 </option>
               ))}
-            </select>
+            </SunmiSelectAdv>
           </div>
         </div>
       </SunmiCard>
