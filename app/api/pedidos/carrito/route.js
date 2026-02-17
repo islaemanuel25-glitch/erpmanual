@@ -22,6 +22,19 @@ export async function GET(req) {
       );
     }
 
+    // Solo locales (no depósito) pueden usar Pedidos
+    const localUser = await prisma.local.findUnique({
+      where: { id: localId },
+      select: { es_deposito: true },
+    });
+
+    if (localUser?.es_deposito) {
+      return NextResponse.json(
+        { ok: false, error: "Solo locales pueden usar Pedidos" },
+        { status: 403 }
+      );
+    }
+
     const grupoId = await getGrupoIdDeLocal(localId);
     if (!grupoId) {
       return NextResponse.json(

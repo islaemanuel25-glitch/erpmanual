@@ -34,6 +34,13 @@ export async function GET(req) {
       );
     }
 
+    if (local.es_deposito) {
+      return NextResponse.json(
+        { ok: false, error: "Solo locales pueden usar Pedidos" },
+        { status: 403 }
+      );
+    }
+
     // Resolver depósito del grupo
     const grupoId = await getGrupoIdDeLocal(localId);
     if (!grupoId) {

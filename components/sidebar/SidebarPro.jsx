@@ -60,7 +60,7 @@ export default function SidebarPro() {
         }
       : null,
 
-    perfil?.localId
+    perfil?.localId && !perfil?.esDeposito
       ? {
           key: "pedidos",
           label: "Pedidos",

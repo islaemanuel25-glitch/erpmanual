@@ -30,8 +30,9 @@ export function UserProvider({ children }) {
           rolId: p.rolId,
           rolNombre: p.rolNombre ?? "",
           permisos,
-          esAdmin: permisos.includes("*"), 
+          esAdmin: permisos.includes("*"),
           localId: p.localId ?? null,
+          esDeposito: p.esDeposito ?? false,
         });
       } else {
         setPerfil(null);
