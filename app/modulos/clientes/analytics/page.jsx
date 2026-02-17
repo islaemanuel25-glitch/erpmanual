@@ -370,7 +370,7 @@ export default function AnalyticsClientesPage() {
                   className="cursor-pointer hover:bg-slate-800/50"
                   onClick={() =>
                     router.push(
-                      `/modulos/clientes/${item.clienteId}?localId=${localIdFinal}`
+                      `/modulos/clientes/${item.clienteId}`
                     )
                   }
                 >
@@ -510,7 +510,7 @@ export default function AnalyticsClientesPage() {
                   className="cursor-pointer hover:bg-slate-800/50"
                   onClick={() =>
                     router.push(
-                      `/modulos/clientes/${item.clienteId}?localId=${localIdFinal}`
+                      `/modulos/clientes/${item.clienteId}`
                     )
                   }
                 >
