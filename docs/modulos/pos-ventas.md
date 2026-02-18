@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-02-17 09:04
+**Última actualización:** 2026-02-18 00:29
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,9 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-02-17: feat(permisos): sidebar y paginas 100% por permisos
+- 2026-02-17: fix(migrations): corregir migracion userId MovimientoCuenta
+- 2026-02-17: feat(clientes): import PRO, export PDF, merge duplicados
 - 2026-02-16: feat: sistema de puntos de fidelidad nivel 1
 - 2026-02-16: feat: descuentoPorcentaje en clientes/tags + descuento automatico en POS
 - 2026-02-16: feat: sistema de puntos de fidelidad nivel 1
