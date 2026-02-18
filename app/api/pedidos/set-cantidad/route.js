@@ -98,33 +98,47 @@ export async function POST(req) {
       );
     }
 
-    // Inferir unidad
+    // Validar unidad contra modo_pedido del producto
     const factorPack = Number(productoOrigen.base.factor_pack || 1);
+    const modoPedido = productoOrigen.base.modo_pedido || "BULTO";
+
     if (!unidad || (unidad !== "BULTO" && unidad !== "UNIDAD")) {
-      unidad = factorPack > 1 ? "BULTO" : "UNIDAD";
+      // Inferir desde modo_pedido (siempre válido)
+      unidad = modoPedido;
+    } else if (unidad !== modoPedido) {
+      const label = modoPedido === "BULTO" ? "por BULTO" : "por UNIDAD";
+      return NextResponse.json(
+        { ok: false, error: `Este producto solo se pide ${label}` },
+        { status: 400 }
+      );
     }
 
     // Obtener/crear POS borrador para este par (depósito->local)
-    let pos = await prisma.posTransferencia.findFirst({
-      where: {
-        origenId: depositoId,
-        destinoId: localId,
-        usuarioId: session.id,
-        estado: { in: ["Borrador", "Preparando"] },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!pos) {
-      pos = await prisma.posTransferencia.create({
-        data: {
+    // Se busca por (origenId, destinoId) sin filtrar por usuarioId,
+    // para que todos los usuarios del mismo local compartan un único borrador.
+    const pos = await prisma.$transaction(async (tx) => {
+      let found = await tx.posTransferencia.findFirst({
+        where: {
           origenId: depositoId,
           destinoId: localId,
-          usuarioId: session.id,
-          estado: "Borrador",
+          estado: { in: ["Borrador", "Preparando"] },
         },
+        orderBy: { createdAt: "desc" },
       });
-    }
+
+      if (!found) {
+        found = await tx.posTransferencia.create({
+          data: {
+            origenId: depositoId,
+            destinoId: localId,
+            usuarioId: session.id,
+            estado: "Borrador",
+          },
+        });
+      }
+
+      return found;
+    });
 
     // Verificar que la POS no esté Solicitado o Enviado
     if (pos.estado === "Solicitado") {

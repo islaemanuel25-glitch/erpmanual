@@ -43,6 +43,11 @@ export default function PedidosCatalogoPage() {
   const [carritoItems, setCarritoItems] = useState([]);
   const [loadingCarrito, setLoadingCarrito] = useState(false);
 
+  // Pedido pendiente (Solicitado)
+  const [pendiente, setPendiente] = useState(null);
+  const [verDetallePendiente, setVerDetallePendiente] = useState(false);
+  const [cancelandoPendiente, setCancelandoPendiente] = useState(false);
+
   // Debounce busqueda
   const debounceRef = useRef(null);
 
@@ -132,6 +137,7 @@ export default function PedidosCatalogoPage() {
         setPosId(json.posId || null);
         setCarritoCount(json.itemCount || 0);
         setCarritoItems(json.items || []);
+        setPendiente(json.pendiente || null);
 
         // Reconstruir mapa de cantidades
         const mapa = {};
@@ -149,6 +155,11 @@ export default function PedidosCatalogoPage() {
   // SET CANTIDAD
   // ====================================================
   const setCantidad = async (productoLocalId, cantidad, unidad) => {
+    if (pendiente) {
+      setError("Hay un pedido solicitado pendiente. Esperá a que el depósito lo procese o cancelalo.");
+      return;
+    }
+
     // Optimistic update
     setCarrito((prev) => {
       const next = { ...prev };
@@ -220,6 +231,34 @@ export default function PedidosCatalogoPage() {
   };
 
   // ====================================================
+  // CANCELAR PEDIDO PENDIENTE
+  // ====================================================
+  const cancelarPendiente = async () => {
+    if (!pendiente) return;
+    if (!confirm("¿Cancelar el pedido solicitado? Se eliminarán todos los items.")) return;
+
+    setCancelandoPendiente(true);
+    try {
+      const res = await fetch("/api/pos-transferencias/cancelar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ posId: pendiente.posId }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setPendiente(null);
+        setVerDetallePendiente(false);
+      } else {
+        setError(json.error || "Error al cancelar pedido");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Error de conexión al cancelar");
+    }
+    setCancelandoPendiente(false);
+  };
+
+  // ====================================================
   // VER CARRITO
   // ====================================================
   const abrirCarrito = async () => {
@@ -280,6 +319,16 @@ export default function PedidosCatalogoPage() {
               <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">
                 {error}
               </div>
+            )}
+
+            {pendiente && (
+              <BannerPendiente
+                pendiente={pendiente}
+                verDetalle={verDetallePendiente}
+                onToggleDetalle={() => setVerDetallePendiente((v) => !v)}
+                onCancelar={cancelarPendiente}
+                cancelando={cancelandoPendiente}
+              />
             )}
 
             {loadingCarrito ? (
@@ -393,6 +442,17 @@ export default function PedidosCatalogoPage() {
                 cerrar
               </button>
             </div>
+          )}
+
+          {/* BANNER PEDIDO PENDIENTE */}
+          {pendiente && (
+            <BannerPendiente
+              pendiente={pendiente}
+              verDetalle={verDetallePendiente}
+              onToggleDetalle={() => setVerDetallePendiente((v) => !v)}
+              onCancelar={cancelarPendiente}
+              cancelando={cancelandoPendiente}
+            />
           )}
 
           {/* CARRITO FLOTANTE */}
@@ -665,6 +725,78 @@ function CantidadControl({ value, factorPack, unidad, onChange }) {
       >
         +
       </button>
+    </div>
+  );
+}
+
+// ====================================================
+// COMPONENTE: Banner pedido pendiente (Solicitado)
+// ====================================================
+function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, cancelando }) {
+  const fecha = pendiente.solicitadoAt
+    ? new Date(pendiente.solicitadoAt).toLocaleString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+
+  return (
+    <div className="mb-3 bg-amber-500/10 border border-amber-400/40 rounded-xl px-4 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-semibold text-amber-300">
+            Pedido solicitado pendiente
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">
+            POS #{pendiente.posId}
+            {fecha && <> &middot; {fecha}</>}
+            {" "}&middot; {pendiente.itemCount} producto{pendiente.itemCount !== 1 ? "s" : ""}
+          </div>
+          <div className="text-[11px] text-slate-500 mt-1">
+            Esperá a que el depósito lo procese o cancelalo para hacer un pedido nuevo.
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2 mt-2">
+        <button
+          type="button"
+          onClick={onToggleDetalle}
+          className="text-[11px] text-cyan-400 hover:text-cyan-300 underline transition"
+        >
+          {verDetalle ? "Ocultar detalle" : "Ver detalle"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancelar}
+          disabled={cancelando}
+          className="text-[11px] text-red-400 hover:text-red-300 underline transition disabled:opacity-50"
+        >
+          {cancelando ? "Cancelando..." : "Cancelar pedido"}
+        </button>
+      </div>
+
+      {verDetalle && pendiente.items?.length > 0 && (
+        <div className="mt-3 space-y-1 border-t border-amber-400/20 pt-2">
+          {pendiente.items.map((item, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between text-[11px] text-slate-300"
+            >
+              <span className="truncate flex-1 min-w-0">{item.nombre}</span>
+              <span className="ml-2 text-amber-300 font-medium whitespace-nowrap">
+                {item.sugerido}{" "}
+                {item.unidadSugerida === "BULTO"
+                  ? `bulto${item.sugerido !== 1 ? "s" : ""} (x${item.factorPack})`
+                  : `unidad${item.sugerido !== 1 ? "es" : ""}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

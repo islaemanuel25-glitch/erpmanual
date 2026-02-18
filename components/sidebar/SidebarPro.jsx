@@ -51,7 +51,10 @@ const MENU_CONFIG = [
     iconFilled: ClipboardList,
     localOnly: true,
     requiredAnyPerms: ["pedidos.ver"],
-    items: [{ label: "Catálogo de Pedido", href: "/modulos/pedidos" }],
+    items: [
+      { label: "Catálogo de Pedido", href: "/modulos/pedidos" },
+      { label: "Historial", href: "/modulos/pedidos/historial" },
+    ],
   },
   {
     key: "reportes",

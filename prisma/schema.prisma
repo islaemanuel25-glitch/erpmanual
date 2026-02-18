@@ -285,13 +285,14 @@ model ProductoListaPrecio {
 }
 
 model Transferencia {
-  id               Int                    @id @default(autoincrement())
-  origenId         Int
-  destinoId        Int
-  estado           String                 @default("Pendiente")
-  fechaEnvio       DateTime?
-  fechaRecepcion   DateTime?
-  creadaPor        Int?
+  id                   Int                    @id @default(autoincrement())
+  origenId             Int
+  destinoId            Int
+  estado               String                 @default("Pendiente")
+  fechaEnvio           DateTime?
+  fechaRecepcion       DateTime?
+  creadaPor            Int?
+  posTransferenciaId   Int?
 
   tieneDiferencias Boolean                @default(false)
 
@@ -300,12 +301,14 @@ model Transferencia {
 
   destino          Local                  @relation("destino", fields: [destinoId], references: [id])
   origen           Local                  @relation("origen", fields: [origenId], references: [id])
+  posTransferencia PosTransferencia?      @relation(fields: [posTransferenciaId], references: [id], onDelete: SetNull)
   detalle          TransferenciaDetalle[]
 
   @@index([origenId])
   @@index([destinoId])
   @@index([estado])
   @@index([createdAt])
+  @@index([posTransferenciaId])
 }
 
 model TransferenciaDetalle {
@@ -387,7 +390,8 @@ model PosTransferencia {
   usuario       Usuario                 @relation("pos_usuario", fields: [usuarioId], references: [id])
   solicitadoPor Usuario?                @relation("pos_solicitado_por", fields: [solicitadoPorUserId], references: [id])
 
-  detalles    PosTransferenciaDetalle[]
+  detalles       PosTransferenciaDetalle[]
+  transferencias Transferencia[]
 
   @@index([origenId])
   @@index([destinoId])

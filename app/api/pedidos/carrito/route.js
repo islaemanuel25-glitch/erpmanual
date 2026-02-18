@@ -65,12 +65,12 @@ export async function GET(req) {
 
     const depositoId = grupoDeposito.localId;
 
-    // Buscar POS borrador activa
+    // Buscar POS borrador activa para este par (depósito->local)
+    // Sin filtrar por usuarioId: todos los usuarios del local comparten el mismo borrador.
     const pos = await prisma.posTransferencia.findFirst({
       where: {
         origenId: depositoId,
         destinoId: localId,
-        usuarioId: session.id,
         estado: { in: ["Borrador", "Preparando"] },
       },
       orderBy: { createdAt: "desc" },
@@ -85,12 +85,52 @@ export async function GET(req) {
       },
     });
 
+    // Verificar si hay un pedido "Solicitado" pendiente para este par
+    const posPendiente = await prisma.posTransferencia.findFirst({
+      where: {
+        origenId: depositoId,
+        destinoId: localId,
+        estado: "Solicitado",
+      },
+      orderBy: { solicitadoAt: "desc" },
+      include: {
+        detalles: {
+          include: {
+            producto: {
+              include: { base: true },
+            },
+          },
+        },
+      },
+    });
+
+    const pendiente = posPendiente
+      ? {
+          posId: posPendiente.id,
+          estado: posPendiente.estado,
+          solicitadoAt: posPendiente.solicitadoAt,
+          createdAt: posPendiente.createdAt,
+          items: posPendiente.detalles.map((d) => {
+            const pl = d.producto;
+            const base = pl?.base;
+            return {
+              nombre: pl?.nombre || base?.nombre || "",
+              sugerido: Number(d.sugerido || 0),
+              unidadSugerida: d.unidadSugerida,
+              factorPack: Number(base?.factor_pack || 1),
+            };
+          }),
+          itemCount: posPendiente.detalles.length,
+        }
+      : null;
+
     if (!pos) {
       return NextResponse.json({
         ok: true,
         posId: null,
         items: [],
         itemCount: 0,
+        pendiente,
       });
     }
 
@@ -118,6 +158,7 @@ export async function GET(req) {
       estado: pos.estado,
       items,
       itemCount: items.length,
+      pendiente,
     });
   } catch (err) {
     console.error("Error pedidos/carrito:", err);

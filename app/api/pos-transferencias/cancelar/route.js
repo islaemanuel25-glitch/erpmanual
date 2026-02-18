@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function POST(req) {
   try {
@@ -11,6 +12,19 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "No autenticado" },
         { status: 401 }
+      );
+    }
+
+    // ============================
+    // Permiso: admin (*) o pedidos.editar
+    // ============================
+    const permisos = Array.isArray(session.permisos) ? session.permisos : [];
+    const esAdmin = permisos.includes("*");
+
+    if (!esAdmin && !permisos.includes("pedidos.editar")) {
+      return NextResponse.json(
+        { ok: false, error: "Sin permiso para cancelar pedidos" },
+        { status: 403 }
       );
     }
 
@@ -29,7 +43,7 @@ export async function POST(req) {
     // ============================
     const pos = await prisma.posTransferencia.findUnique({
       where: { id: posId },
-      select: { id: true, estado: true },
+      select: { id: true, estado: true, origenId: true, destinoId: true },
     });
 
     if (!pos) {
@@ -39,23 +53,57 @@ export async function POST(req) {
       );
     }
 
-    if (pos.estado === "Enviado") {
+    // ============================
+    // Ownership: usuario no-admin debe pertenecer al local destino y al mismo grupo
+    // ============================
+    if (!esAdmin) {
+      const localId = Number(session.localId);
+      if (!localId) {
+        return NextResponse.json(
+          { ok: false, error: "Usuario sin local asignado" },
+          { status: 403 }
+        );
+      }
+
+      if (pos.destinoId !== localId) {
+        return NextResponse.json(
+          { ok: false, error: "No tenés acceso a este pedido" },
+          { status: 403 }
+        );
+      }
+
+      // Verificar que el POS pertenezca al mismo grupo del usuario
+      const grupoUsuario = await getGrupoIdDeLocal(localId);
+      const grupoOrigen = await getGrupoIdDeLocal(pos.origenId);
+
+      if (!grupoUsuario || grupoUsuario !== grupoOrigen) {
+        return NextResponse.json(
+          { ok: false, error: "No tenés acceso a este pedido" },
+          { status: 403 }
+        );
+      }
+    }
+
+    // ============================
+    // Estado: solo se puede cancelar "Solicitado"
+    // ============================
+    if (pos.estado !== "Solicitado") {
       return NextResponse.json(
-        { ok: false, error: "No se puede cancelar una POS ya enviada" },
-        { status: 400 }
+        {
+          ok: false,
+          error: `No se puede cancelar un pedido en estado "${pos.estado}". Solo se pueden cancelar pedidos solicitados.`,
+        },
+        { status: 409 }
       );
     }
 
     // ============================
-    // Eliminar detalles
+    // Eliminar detalles + POS
     // ============================
     await prisma.posTransferenciaDetalle.deleteMany({
       where: { posTransferenciaId: posId },
     });
 
-    // ============================
-    // Eliminar POS
-    // ============================
     await prisma.posTransferencia.delete({
       where: { id: posId },
     });

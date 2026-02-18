@@ -231,6 +231,7 @@ export async function POST(req) {
           origenId: pos.origenId,
           destinoId: pos.destinoId,
           creadaPor: pos.usuarioId,
+          posTransferenciaId: pos.id,
 
           estado: "Enviada",
           fechaEnvio: new Date(),
