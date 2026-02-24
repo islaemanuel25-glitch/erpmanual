@@ -485,6 +485,32 @@ export default function DetallePedidoProveedorPage({ params }) {
                   );
                 })
               )}
+              {/* TOTAL ESTIMADO — siempre visible */}
+              {(pedido.detalles || []).length > 0 && (() => {
+                const totalEstimado = (pedido.detalles || []).reduce((acc, d) => {
+                  const cant = Number(d.cantidad) || 0;
+                  const costo = Number(d.precioCosto) || 0;
+                  return acc + cant * costo;
+                }, 0);
+                // Contar columnas visibles antes de esta fila
+                const baseCols = 5; // Producto, SKU, Cant. pedida, Unidad, Costo
+                const extraCols =
+                  (esRecepcion ? 1 : 0) +
+                  (esRecepcion && tieneFiambre ? 1 : 0) +
+                  (pedido.estado === "RECIBIDO" ? 1 : 0) +
+                  (pedido.estado === "RECIBIDO" && tieneFiambre ? 1 : 0);
+                const totalCols = baseCols + extraCols;
+                return (
+                  <tr className="border-t border-slate-600">
+                    <td colSpan={totalCols - 1} className="px-3 py-2 text-sm font-semibold text-right text-slate-300">
+                      TOTAL ESTIMADO
+                    </td>
+                    <td className="px-3 py-2 text-sm font-bold text-right text-amber-400">
+                      ${totalEstimado.toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              })()}
             </SunmiTable>
           </div>
         </SunmiPanel>
