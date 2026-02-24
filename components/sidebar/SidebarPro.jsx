@@ -19,6 +19,7 @@ import {
   Users,
   Users2,
   Store,
+  Truck,
   Settings,
   LogOut,
   Loader2,
@@ -114,6 +115,17 @@ const MENU_CONFIG = [
       { label: "Faltantes", href: "/modulos/faltantes", permiso: "stock.ver" },
       { label: "POS Transferencias", href: "/modulos/pos-transferencias", permiso: "pos_transferencias.ver" },
       { label: "Transferencias", href: "/modulos/transferencias", permiso: "transferencias.crear" },
+    ],
+  },
+  {
+    key: "compras-proveedor",
+    label: "Compras",
+    icon: Truck,
+    iconFilled: Truck,
+    requiredAnyPerms: ["compras.ver"],
+    items: [
+      { label: "Compras a Proveedor", href: "/modulos/compras-proveedor" },
+      { label: "Ganancia depósito", href: "/modulos/compras-proveedor/ganancia" },
     ],
   },
   {

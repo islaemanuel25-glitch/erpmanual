@@ -17,15 +17,16 @@ model Rol {
 }
 
 model Grupo {
-  id           Int             @id @default(autoincrement())
-  nombre       String          @unique
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  locales      GrupoDeposito[]
-  localesGrupo GrupoLocal[]
-  productos    ProductoBase[]
-  clientes     Cliente[]
-  movimientosCC MovimientoCuenta[]
+  id              Int                @id @default(autoincrement())
+  nombre          String             @unique
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  locales         GrupoDeposito[]
+  localesGrupo    GrupoLocal[]
+  productos       ProductoBase[]
+  clientes        Cliente[]
+  movimientosCC   MovimientoCuenta[]
+  contadoresVenta PosVentaCounter[]
 }
 
 model GrupoDeposito {
@@ -53,9 +54,9 @@ model GrupoLocal {
 }
 
 model Local {
-  id                    Int             @id @default(autoincrement())
+  id                    Int      @id @default(autoincrement())
   nombre                String
-  tipo                  String          @default("local")
+  tipo                  String   @default("local")
   direccion             String?
   telefono              String?
   email                 String?
@@ -63,11 +64,11 @@ model Local {
   ciudad                String?
   provincia             String?
   codigoPostal          String?
-  activo                Boolean         @default(true)
-  es_deposito           Boolean         @default(false)
-  politicaLimiteCredito String          @default("ADVERTIR")
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  activo                Boolean  @default(true)
+  es_deposito           Boolean  @default(false)
+  politicaLimiteCredito String   @default("ADVERTIR")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   grupoDepositos        GrupoDeposito[]
   grupoLocales          GrupoLocal?
@@ -82,13 +83,15 @@ model Local {
   posTransferenciasOrigen  PosTransferencia[] @relation("pos_origen")
   posTransferenciasDestino PosTransferencia[] @relation("pos_destino")
 
-  ventas Venta[]
-  turnos Turno[]
-  clientes Cliente[]
-  tagsCliente TagCliente[]
-  movimientosCC MovimientoCuenta[]
-  puntosConfig PuntosConfigLocal?
+  ventas            Venta[]
+  turnos            Turno[]
+  clientes          Cliente[]
+  tagsCliente       TagCliente[]
+  movimientosCC     MovimientoCuenta[]
+  puntosConfig      PuntosConfigLocal?
   movimientosPuntos ClientePuntoMovimiento[]
+  contadorVenta      PosVentaCounter?
+  pedidosProveedor   PedidoProveedor[]
 }
 
 model Usuario {
@@ -102,18 +105,18 @@ model Usuario {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  local        Local?   @relation(fields: [localId], references: [id])
-  rol          Rol      @relation(fields: [rolId], references: [id])
+  local Local? @relation(fields: [localId], references: [id])
+  rol   Rol    @relation(fields: [rolId], references: [id])
 
   confirmaciones TransferenciaDetalle[]
 
   posTransferencias            PosTransferencia[] @relation("pos_usuario")
   posTransferenciasSolicitadas PosTransferencia[] @relation("pos_solicitado_por")
 
-  ventas Venta[]
-  turnos Turno[]
+  ventas            Venta[]
+  turnos            Turno[]
   movimientosPuntos ClientePuntoMovimiento[]
-  movimientosCC MovimientoCuenta[]
+  movimientosCC     MovimientoCuenta[]
 
   @@map("Usuario")
 }
@@ -128,21 +131,23 @@ model Categoria {
 }
 
 model Proveedor {
-  id          Int            @id @default(autoincrement())
-  nombre      String
-  cuit        String?        @unique
-  telefono    String?
-  email       String?
-  direccion   String?
+  id        Int     @id @default(autoincrement())
+  nombre    String
+  cuit      String? @unique
+  telefono  String?
+  email     String?
+  direccion String?
 
-  dias_pedido DiaPedido[]    @default([])
+  dias_pedido DiaPedido[] @default([])
 
-  activo      Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  productos   ProductoBase[]
+  activo    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  productos         ProductoBase[]    @relation("productoProveedor1")
+  productos2        ProductoBase[]    @relation("productoProveedor2")
+  productos3        ProductoBase[]    @relation("productoProveedor3")
+  pedidosProveedor  PedidoProveedor[]
 }
-
 
 model AreaFisica {
   id          Int            @id @default(autoincrement())
@@ -156,7 +161,7 @@ model AreaFisica {
 }
 
 model ProductoBase {
-  id                Int                   @id @default(autoincrement())
+  id                Int          @id @default(autoincrement())
   grupoId           Int
   creadoEnLocalId   Int?
   nombre            String
@@ -165,65 +170,79 @@ model ProductoBase {
   codigo_barra      String?
   categoria_id      Int?
   proveedor_id      Int?
+  proveedor2_id     Int?
+  proveedor3_id     Int?
   area_fisica_id    Int?
   unidad_medida     UnidadMedida
   factor_pack       Int?
-  modo_pedido       ModoPedido            @default(BULTO)
+  modo_pedido       ModoPedido   @default(BULTO)
   modo_envio        ModoEnvio?
-  modo_stock        ModoStock             @default(BULTO)
-  peso_kg           Decimal?              @db.Decimal(10, 3)
-  volumen_ml        Decimal?              @db.Decimal(10, 2)
-  precio_costo      Decimal               @db.Decimal(12, 2)
-  precio_venta      Decimal               @db.Decimal(12, 2)
-  margen            Decimal?              @db.Decimal(6, 2)
-  precio_sugerido   Decimal?              @db.Decimal(12, 2)
-  iva_porcentaje    Decimal?              @db.Decimal(5, 2)
+  modo_stock        ModoStock    @default(BULTO)
+  peso_kg           Decimal?     @db.Decimal(10, 3)
+  volumen_ml        Decimal?     @db.Decimal(10, 2)
+
+  // Compras a proveedor — modo fiambre
+  modoCompraProveedor             ModoPedido @default(BULTO)
+  pesoReferenciaKg                Decimal?   @db.Decimal(10, 3)
+  pesoEsFijo                      Boolean    @default(false)
+  pesoPromedioKg                  Decimal?   @db.Decimal(10, 3)
+  actualizaPromedioPorRecepcion   Boolean    @default(true)
+  precio_costo      Decimal      @db.Decimal(12, 2)
+  precio_venta      Decimal      @db.Decimal(12, 2)
+  margen            Decimal?     @db.Decimal(6, 2)
+  precio_sugerido   Decimal?     @db.Decimal(12, 2)
+  iva_porcentaje    Decimal?     @db.Decimal(5, 2)
   fecha_vencimiento DateTime?
-  redondeo_100      Boolean               @default(false)
-  activo            Boolean               @default(true)
+  redondeo_100      Boolean      @default(false)
+  activo            Boolean      @default(true)
   imagen_url        String?
-  es_combo          Boolean               @default(false)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  es_combo          Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  area_fisica       AreaFisica?           @relation(fields: [area_fisica_id], references: [id])
-  categoria         Categoria?            @relation(fields: [categoria_id], references: [id])
-  creadoEnLocal     Local?                @relation("ProductoBaseCreador", fields: [creadoEnLocalId], references: [id])
-  grupo             Grupo                 @relation(fields: [grupoId], references: [id], onDelete: Cascade)
-  proveedor         Proveedor?            @relation(fields: [proveedor_id], references: [id])
+  area_fisica   AreaFisica? @relation(fields: [area_fisica_id], references: [id])
+  categoria     Categoria?  @relation(fields: [categoria_id], references: [id])
+  creadoEnLocal Local?      @relation("ProductoBaseCreador", fields: [creadoEnLocalId], references: [id])
+  grupo         Grupo       @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  proveedor     Proveedor?  @relation("productoProveedor1", fields: [proveedor_id], references: [id])
+  proveedor2    Proveedor?  @relation("productoProveedor2", fields: [proveedor2_id], references: [id])
+  proveedor3    Proveedor?  @relation("productoProveedor3", fields: [proveedor3_id], references: [id])
 
-  preciosPorLista   ProductoListaPrecio[]
-  locales           ProductoLocal[]
-  ventaDetalles     VentaDetalle[]
+  preciosPorLista ProductoListaPrecio[]
+  locales         ProductoLocal[]
+  ventaDetalles   VentaDetalle[]
 
   @@unique([grupoId, codigo_barra])
   @@index([grupoId])
   @@index([creadoEnLocalId])
   @@index([categoria_id])
   @@index([proveedor_id])
+  @@index([proveedor2_id])
+  @@index([proveedor3_id])
   @@index([area_fisica_id])
 }
 
 model ProductoLocal {
-  id           Int                    @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   localId      Int
   baseId       Int
   nombre       String?
   descripcion  String?
-  precio_costo Decimal?               @db.Decimal(12, 2)
-  precio_venta Decimal?               @db.Decimal(12, 2)
-  margen       Decimal?               @db.Decimal(6, 2)
-  activo       Boolean                @default(true)
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
+  precio_costo Decimal? @db.Decimal(12, 2)
+  precio_venta Decimal? @db.Decimal(12, 2)
+  margen       Decimal? @db.Decimal(6, 2)
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  base         ProductoBase           @relation(fields: [baseId], references: [id])
-  local        Local                  @relation(fields: [localId], references: [id])
+  base  ProductoBase @relation(fields: [baseId], references: [id])
+  local Local        @relation(fields: [localId], references: [id])
 
-  stock        StockLocal[]
-  detalles     TransferenciaDetalle[]
+  stock    StockLocal[]
+  detalles TransferenciaDetalle[]
 
-  posDetalles  PosTransferenciaDetalle[]
+  posDetalles             PosTransferenciaDetalle[]
+  pedidoProveedorDetalles PedidoProveedorDetalle[]
 
   @@unique([localId, baseId])
   @@index([localId])
@@ -231,17 +250,17 @@ model ProductoLocal {
 }
 
 model StockLocal {
-  id         Int           @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   localId    Int
   productoId Int
-  cantidad   Decimal       @db.Decimal(12, 2)
-  stockMin   Decimal?      @db.Decimal(12, 2)
-  stockMax   Decimal?      @db.Decimal(12, 2)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  cantidad   Decimal  @db.Decimal(12, 2)
+  stockMin   Decimal? @db.Decimal(12, 2)
+  stockMax   Decimal? @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  local      Local         @relation(fields: [localId], references: [id])
-  producto   ProductoLocal @relation(fields: [productoId], references: [id])
+  local    Local         @relation(fields: [localId], references: [id])
+  producto ProductoLocal @relation(fields: [productoId], references: [id])
 
   @@unique([localId, productoId])
   @@index([localId])
@@ -249,35 +268,35 @@ model StockLocal {
 }
 
 model ListaPrecio {
-  id             Int                   @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   localId        Int
   nombre         String
-  margen_default Decimal?              @db.Decimal(6, 2)
-  redondeo_100   Boolean               @default(false)
-  activo         Boolean               @default(true)
+  margen_default Decimal? @db.Decimal(6, 2)
+  redondeo_100   Boolean  @default(false)
+  activo         Boolean  @default(true)
   notas          String?
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  local          Local                 @relation(fields: [localId], references: [id], onDelete: Cascade)
-  productos      ProductoListaPrecio[]
+  local     Local                 @relation(fields: [localId], references: [id], onDelete: Cascade)
+  productos ProductoListaPrecio[]
 
   @@unique([localId, nombre], name: "lista_unica_por_local")
   @@index([localId])
 }
 
 model ProductoListaPrecio {
-  id              Int          @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   listaPrecioId   Int
   baseId          Int
-  precio_final    Decimal?     @db.Decimal(12, 2)
-  margen_especial Decimal?     @db.Decimal(6, 2)
-  activo          Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  precio_final    Decimal? @db.Decimal(12, 2)
+  margen_especial Decimal? @db.Decimal(6, 2)
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  base            ProductoBase @relation(fields: [baseId], references: [id], onDelete: Cascade)
-  lista           ListaPrecio  @relation(fields: [listaPrecioId], references: [id], onDelete: Cascade)
+  base  ProductoBase @relation(fields: [baseId], references: [id], onDelete: Cascade)
+  lista ListaPrecio  @relation(fields: [listaPrecioId], references: [id], onDelete: Cascade)
 
   @@unique([listaPrecioId, baseId], name: "precio_por_lista_y_producto")
   @@index([listaPrecioId])
@@ -285,19 +304,19 @@ model ProductoListaPrecio {
 }
 
 model Transferencia {
-  id                   Int                    @id @default(autoincrement())
-  origenId             Int
-  destinoId            Int
-  estado               String                 @default("Pendiente")
-  fechaEnvio           DateTime?
-  fechaRecepcion       DateTime?
-  creadaPor            Int?
-  posTransferenciaId   Int?
+  id                 Int       @id @default(autoincrement())
+  origenId           Int
+  destinoId          Int
+  estado             String    @default("Pendiente")
+  fechaEnvio         DateTime?
+  fechaRecepcion     DateTime?
+  creadaPor          Int?
+  posTransferenciaId Int?
 
-  tieneDiferencias Boolean                @default(false)
+  tieneDiferencias Boolean @default(false)
 
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   destino          Local                  @relation("destino", fields: [destinoId], references: [id])
   origen           Local                  @relation("origen", fields: [origenId], references: [id])
@@ -312,27 +331,27 @@ model Transferencia {
 }
 
 model TransferenciaDetalle {
-  id                Int           @id @default(autoincrement())
-  transferenciaId   Int
-  productoId        Int
-  cantidad          Decimal       @db.Decimal(12, 2)
-  recibido          Decimal?      @db.Decimal(12, 2)
-  precioCosto       Decimal?      @db.Decimal(12, 2)
-  unidadEnviada     ModoPedido?   // BULTO o UNIDAD según cómo se envió
+  id              Int         @id @default(autoincrement())
+  transferenciaId Int
+  productoId      Int
+  cantidad        Decimal     @db.Decimal(12, 2)
+  recibido        Decimal?    @db.Decimal(12, 2)
+  precioCosto     Decimal?    @db.Decimal(12, 2)
+  unidadEnviada   ModoPedido? // BULTO o UNIDAD según cómo se envió
 
-  motivoDiferencia  String?
-  motivoPrincipal   String?       // ← AGREGADO
-  motivoDetalle     String?       // ← AGREGADO
+  motivoDiferencia String?
+  motivoPrincipal  String? // ← AGREGADO
+  motivoDetalle    String? // ← AGREGADO
 
-  confirmadoPorId   Int?
-  fechaRecepcion    DateTime?
+  confirmadoPorId Int?
+  fechaRecepcion  DateTime?
 
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  producto          ProductoLocal @relation(fields: [productoId], references: [id])
-  transferencia     Transferencia @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
-  confirmadoPor     Usuario?      @relation(fields: [confirmadoPorId], references: [id])
+  producto      ProductoLocal @relation(fields: [productoId], references: [id])
+  transferencia Transferencia @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
+  confirmadoPor Usuario?      @relation(fields: [confirmadoPorId], references: [id])
 
   @@index([transferenciaId])
   @@index([productoId])
@@ -371,24 +390,31 @@ enum ModoStock {
   UNIDAD
 }
 
-model PosTransferencia {
-  id          Int                     @id @default(autoincrement())
-  origenId    Int
-  destinoId   Int
-  usuarioId   Int
+enum EstadoPedidoProveedor {
+  BORRADOR
+  CONFIRMADO
+  ENVIADO
+  RECIBIDO
+}
 
-  estado              String                  @default("Borrador")
-  origenManual        Boolean                 @default(false)
+model PosTransferencia {
+  id        Int @id @default(autoincrement())
+  origenId  Int
+  destinoId Int
+  usuarioId Int
+
+  estado              String    @default("Borrador")
+  origenManual        Boolean   @default(false)
   solicitadoAt        DateTime?
   solicitadoPorUserId Int?
 
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  origen        Local                   @relation("pos_origen", fields: [origenId], references: [id])
-  destino       Local                   @relation("pos_destino", fields: [destinoId], references: [id])
-  usuario       Usuario                 @relation("pos_usuario", fields: [usuarioId], references: [id])
-  solicitadoPor Usuario?                @relation("pos_solicitado_por", fields: [solicitadoPorUserId], references: [id])
+  origen        Local    @relation("pos_origen", fields: [origenId], references: [id])
+  destino       Local    @relation("pos_destino", fields: [destinoId], references: [id])
+  usuario       Usuario  @relation("pos_usuario", fields: [usuarioId], references: [id])
+  solicitadoPor Usuario? @relation("pos_solicitado_por", fields: [solicitadoPorUserId], references: [id])
 
   detalles       PosTransferenciaDetalle[]
   transferencias Transferencia[]
@@ -400,21 +426,21 @@ model PosTransferencia {
 }
 
 model PosTransferenciaDetalle {
-  id                 Int             @id @default(autoincrement())
+  id                 Int @id @default(autoincrement())
   posTransferenciaId Int
   productoId         Int
 
-  sugerido           Decimal?        @db.Decimal(12, 2)
-  preparado          Decimal?        @db.Decimal(12, 2)
-  tipo               String          @default("sugerido")
-  unidadSugerida     ModoPedido      @default(BULTO)
-  unidadPreparada    ModoPedido?     // BULTO o UNIDAD según cómo se preparó
+  sugerido        Decimal?    @db.Decimal(12, 2)
+  preparado       Decimal?    @db.Decimal(12, 2)
+  tipo            String      @default("sugerido")
+  unidadSugerida  ModoPedido  @default(BULTO)
+  unidadPreparada ModoPedido? // BULTO o UNIDAD según cómo se preparó
 
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  pos                PosTransferencia @relation(fields: [posTransferenciaId], references: [id], onDelete: Cascade)
-  producto           ProductoLocal     @relation(fields: [productoId], references: [id])
+  pos      PosTransferencia @relation(fields: [posTransferenciaId], references: [id], onDelete: Cascade)
+  producto ProductoLocal    @relation(fields: [productoId], references: [id])
 
   @@index([posTransferenciaId])
   @@index([productoId])
@@ -452,14 +478,14 @@ model PrecioUpdate {
 }
 
 model PrecioUpdateItem {
-  id             Int      @id @default(autoincrement())
+  id             Int @id @default(autoincrement())
   precioUpdateId Int
   productoBaseId Int
 
-  costoAnterior Decimal  @db.Decimal(12,2)
-  costoNuevo    Decimal  @db.Decimal(12,2)
-  ventaAnterior Decimal  @db.Decimal(12,2)
-  ventaNueva    Decimal  @db.Decimal(12,2)
+  costoAnterior Decimal @db.Decimal(12, 2)
+  costoNuevo    Decimal @db.Decimal(12, 2)
+  ventaAnterior Decimal @db.Decimal(12, 2)
+  ventaNueva    Decimal @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
 
@@ -473,26 +499,26 @@ model PrecioUpdateItem {
 // ---------------------------------------------------------------------------
 
 model Cliente {
-  id          Int      @id @default(autoincrement())
-  grupoId     Int
-  localId     Int?
-  nombre      String
-  documento   String?
-  telefono    String?
-  email       String?
-  direccion   String?
-  observaciones String?
-  limiteCredito Decimal? @db.Decimal(12,2)
-  descuentoPorcentaje Decimal? @db.Decimal(5,2)
-  activo      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  Int      @id @default(autoincrement())
+  grupoId             Int
+  localId             Int?
+  nombre              String
+  documento           String?
+  telefono            String?
+  email               String?
+  direccion           String?
+  observaciones       String?
+  limiteCredito       Decimal? @db.Decimal(12, 2)
+  descuentoPorcentaje Decimal? @db.Decimal(5, 2)
+  activo              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  grupo       Grupo    @relation(fields: [grupoId], references: [id])
-  local       Local?   @relation(fields: [localId], references: [id])
-  ventas      Venta[]
-  tags        ClienteTag[]
-  movimientosCC MovimientoCuenta[]
+  grupo             Grupo                    @relation(fields: [grupoId], references: [id])
+  local             Local?                   @relation(fields: [localId], references: [id])
+  ventas            Venta[]
+  tags              ClienteTag[]
+  movimientosCC     MovimientoCuenta[]
   movimientosPuntos ClientePuntoMovimiento[]
 
   @@index([grupoId])
@@ -502,15 +528,15 @@ model Cliente {
 }
 
 model TagCliente {
-  id        Int          @id @default(autoincrement())
-  localId   Int
-  nombre    String
-  descuentoPorcentaje Decimal? @db.Decimal(5,2)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id                  Int      @id @default(autoincrement())
+  localId             Int
+  nombre              String
+  descuentoPorcentaje Decimal? @db.Decimal(5, 2)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  local     Local        @relation(fields: [localId], references: [id], onDelete: Cascade)
-  clientes  ClienteTag[]
+  local    Local        @relation(fields: [localId], references: [id], onDelete: Cascade)
+  clientes ClienteTag[]
 
   @@unique([localId, nombre])
   @@index([localId])
@@ -520,8 +546,8 @@ model ClienteTag {
   clienteId Int
   tagId     Int
 
-  cliente   Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  tag       TagCliente  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  cliente Cliente    @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tag     TagCliente @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([clienteId, tagId])
   @@index([clienteId])
@@ -529,23 +555,23 @@ model ClienteTag {
 }
 
 model MovimientoCuenta {
-  id         Int      @id @default(autoincrement())
-  grupoId    Int
-  localId    Int
-  clienteId  Int
-  tipo       String   // "VENTA" | "PAGO" | "AJUSTE"
-  direccion  String   // "DEBITO" | "CREDITO"
-  monto      Decimal  @db.Decimal(12, 2)
-  ventaId    Int?
-  userId     Int?
-  nota       String?
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  grupoId   Int
+  localId   Int
+  clienteId Int
+  tipo      String // "VENTA" | "PAGO" | "AJUSTE"
+  direccion String // "DEBITO" | "CREDITO"
+  monto     Decimal  @db.Decimal(12, 2)
+  ventaId   Int?
+  userId    Int?
+  nota      String?
+  createdAt DateTime @default(now())
 
-  grupo      Grupo    @relation(fields: [grupoId], references: [id])
-  local      Local    @relation(fields: [localId], references: [id])
-  cliente    Cliente  @relation(fields: [clienteId], references: [id])
-  venta      Venta?   @relation(fields: [ventaId], references: [id])
-  user       Usuario? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  grupo   Grupo    @relation(fields: [grupoId], references: [id])
+  local   Local    @relation(fields: [localId], references: [id])
+  cliente Cliente  @relation(fields: [clienteId], references: [id])
+  venta   Venta?   @relation(fields: [ventaId], references: [id])
+  user    Usuario? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@unique([ventaId])
   @@index([grupoId, localId, clienteId])
@@ -559,54 +585,57 @@ model MovimientoCuenta {
 // ---------------------------------------------------------------------------
 
 model Venta {
-  id           Int            @id @default(autoincrement())
-  localId      Int
-  vendedorId   Int
-  clienteId    Int?
-  turnoId      Int?
-  numero       Int
-  fecha        DateTime       @default(now())
-  subtotal          Decimal        @db.Decimal(12, 2)
-  descuento         Decimal        @default(0) @db.Decimal(12, 2)
-  total             Decimal        @db.Decimal(12, 2)
-  comisionBancaria  Decimal        @default(0) @db.Decimal(12, 2)
-  netoRecibido      Decimal        @default(0) @db.Decimal(12, 2)
-  costoTotal        Decimal        @default(0) @db.Decimal(12, 2)
-  gananciaBruta     Decimal        @default(0) @db.Decimal(12, 2)
-  gananciaNeta      Decimal        @default(0) @db.Decimal(12, 2)
-  formaPago         String
-  esFiado           Boolean        @default(false)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id               Int      @id @default(autoincrement())
+  localId          Int
+  vendedorId       Int
+  clienteId        Int?
+  turnoId          Int?
+  numero           Int
+  clientTxnId      String?  @unique
+  fecha            DateTime @default(now())
+  subtotal         Decimal  @db.Decimal(12, 2)
+  descuento        Decimal  @default(0) @db.Decimal(12, 2)
+  total            Decimal  @db.Decimal(12, 2)
+  comisionBancaria Decimal  @default(0) @db.Decimal(12, 2)
+  netoRecibido     Decimal  @default(0) @db.Decimal(12, 2)
+  costoTotal       Decimal  @default(0) @db.Decimal(12, 2)
+  gananciaBruta    Decimal  @default(0) @db.Decimal(12, 2)
+  gananciaNeta     Decimal  @default(0) @db.Decimal(12, 2)
+  formaPago        String
+  esFiado          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  local        Local          @relation(fields: [localId], references: [id])
-  vendedor     Usuario        @relation(fields: [vendedorId], references: [id])
-  cliente      Cliente?       @relation(fields: [clienteId], references: [id])
-  turno        Turno?         @relation(fields: [turnoId], references: [id])
-  detalles     VentaDetalle[]
-  movimientoCC MovimientoCuenta[]
+  local             Local                    @relation(fields: [localId], references: [id])
+  vendedor          Usuario                  @relation(fields: [vendedorId], references: [id])
+  cliente           Cliente?                 @relation(fields: [clienteId], references: [id])
+  turno             Turno?                   @relation(fields: [turnoId], references: [id])
+  detalles          VentaDetalle[]
+  movimientoCC      MovimientoCuenta[]
   movimientosPuntos ClientePuntoMovimiento[]
 
+  @@unique([localId, numero])
   @@index([localId])
   @@index([fecha])
   @@index([clienteId])
   @@index([turnoId])
+  @@index([clientTxnId])
 }
 
 model VentaDetalle {
-  id              Int          @id @default(autoincrement())
-  ventaId         Int
-  productoBaseId  Int
-  nombre          String
-  precio          Decimal      @db.Decimal(12, 2)
-  precioCosto     Decimal      @default(0) @db.Decimal(12, 2)
-  cantidad        Int
-  subtotal        Decimal      @db.Decimal(12, 2)
-  ganancia        Decimal      @default(0) @db.Decimal(12, 2)
-  createdAt       DateTime     @default(now())
+  id             Int      @id @default(autoincrement())
+  ventaId        Int
+  productoBaseId Int
+  nombre         String
+  precio         Decimal  @db.Decimal(12, 2)
+  precioCosto    Decimal  @default(0) @db.Decimal(12, 2)
+  cantidad       Decimal  @db.Decimal(12, 3)
+  subtotal       Decimal  @db.Decimal(12, 2)
+  ganancia       Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime @default(now())
 
-  venta           Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
-  productoBase    ProductoBase @relation(fields: [productoBaseId], references: [id])
+  venta        Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoBase ProductoBase @relation(fields: [productoBaseId], references: [id])
 
   @@index([ventaId])
   @@index([productoBaseId])
@@ -616,28 +645,28 @@ model VentaDetalle {
 // ---------------------------------------------------------------------------
 
 model Turno {
-  id                      Int       @id @default(autoincrement())
-  localId                 Int
-  vendedorId              Int
-  apertura                DateTime  @default(now())
-  cierre                  DateTime?
-  montoInicial            Decimal   @db.Decimal(10, 2)
+  id           Int       @id @default(autoincrement())
+  localId      Int
+  vendedorId   Int
+  apertura     DateTime  @default(now())
+  cierre       DateTime?
+  montoInicial Decimal   @db.Decimal(10, 2)
 
-  montoEsperadoEfectivo   Decimal?  @db.Decimal(10, 2)
-  montoRealEfectivo       Decimal?  @db.Decimal(10, 2)
-  diferenciaEfectivo      Decimal?  @db.Decimal(10, 2)
+  montoEsperadoEfectivo Decimal? @db.Decimal(10, 2)
+  montoRealEfectivo     Decimal? @db.Decimal(10, 2)
+  diferenciaEfectivo    Decimal? @db.Decimal(10, 2)
 
-  totalVentasEfectivo     Decimal?  @db.Decimal(10, 2)
-  totalVentasDigital      Decimal?  @db.Decimal(10, 2)
-  cantidadVentas          Int?
+  totalVentasEfectivo Decimal? @db.Decimal(10, 2)
+  totalVentasDigital  Decimal? @db.Decimal(10, 2)
+  cantidadVentas      Int?
 
-  observaciones           String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  observaciones String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  local                   Local     @relation(fields: [localId], references: [id])
-  vendedor                Usuario   @relation(fields: [vendedorId], references: [id])
-  ventas                  Venta[]
+  local    Local   @relation(fields: [localId], references: [id])
+  vendedor Usuario @relation(fields: [vendedorId], references: [id])
+  ventas   Venta[]
 
   @@index([localId])
   @@index([vendedorId])
@@ -652,38 +681,108 @@ model PuntosConfigLocal {
   grupoId         Int
   localId         Int      @unique
   activo          Boolean  @default(false)
-  reglasJson      Json?    // { "puntosPorPeso": 0.01 }
-  redencionJson   Json?    // { "pesoPorPunto": 10 }
+  reglasJson      Json? // { "puntosPorPeso": 0.01 }
+  redencionJson   Json? // { "pesoPorPunto": 10 }
   exclusionesJson Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  local           Local    @relation(fields: [localId], references: [id])
+  local Local @relation(fields: [localId], references: [id])
 
   @@index([grupoId])
   @@index([localId])
 }
 
 model ClientePuntoMovimiento {
-  id         Int      @id @default(autoincrement())
-  grupoId    Int
-  localId    Int
-  clienteId  Int
-  direccion  String   // "CREDITO" | "DEBITO"
-  tipo       String   // "ACREDITACION" | "CANJE" | "AJUSTE" | "EXPIRACION"
-  puntos     Int
-  ventaId    Int?
-  userId     Int?
-  nota       String?
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  grupoId   Int
+  localId   Int
+  clienteId Int
+  direccion String // "CREDITO" | "DEBITO"
+  tipo      String // "ACREDITACION" | "CANJE" | "AJUSTE" | "EXPIRACION"
+  puntos    Int
+  ventaId   Int?
+  userId    Int?
+  nota      String?
+  createdAt DateTime @default(now())
 
-  cliente    Cliente  @relation(fields: [clienteId], references: [id])
-  venta      Venta?   @relation(fields: [ventaId], references: [id])
-  usuario    Usuario? @relation(fields: [userId], references: [id])
-  local      Local    @relation(fields: [localId], references: [id])
+  cliente Cliente  @relation(fields: [clienteId], references: [id])
+  venta   Venta?   @relation(fields: [ventaId], references: [id])
+  usuario Usuario? @relation(fields: [userId], references: [id])
+  local   Local    @relation(fields: [localId], references: [id])
 
   @@unique([ventaId, tipo])
   @@index([grupoId, localId, clienteId])
   @@index([localId])
   @@index([createdAt])
+}
+
+// CONTADOR DE VENTAS POR LOCAL (thread-safe)
+// ---------------------------------------------------------------------------
+
+model PosVentaCounter {
+  id           Int      @id @default(autoincrement())
+  grupoId      Int
+  localId      Int      @unique
+  ultimoNumero Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  local Local @relation(fields: [localId], references: [id])
+  grupo Grupo @relation(fields: [grupoId], references: [id])
+
+  @@index([localId])
+  @@index([grupoId])
+}
+
+// ---------------------------------------------------------------------------
+// COMPRAS / PEDIDOS A PROVEEDOR
+// ---------------------------------------------------------------------------
+
+model PedidoProveedor {
+  id              Int                    @id @default(autoincrement())
+  grupoId         Int
+  depositoId      Int
+  proveedorId     Int
+  estado          EstadoPedidoProveedor  @default(BORRADOR)
+  notas           String?
+  fechaConfirmado DateTime?
+  fechaEnviado    DateTime?
+  fechaRecibido   DateTime?
+  totalFactura    Decimal?               @db.Decimal(12, 2)
+  totalReal       Decimal?               @db.Decimal(12, 2)
+  nroFactura      String?
+  fechaFactura    DateTime?
+  creadoPorId     Int?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  deposito   Local     @relation(fields: [depositoId], references: [id])
+  proveedor  Proveedor @relation(fields: [proveedorId], references: [id])
+  detalles   PedidoProveedorDetalle[]
+
+  @@index([grupoId])
+  @@index([depositoId])
+  @@index([proveedorId])
+  @@index([estado])
+  @@index([createdAt])
+}
+
+model PedidoProveedorDetalle {
+  id               Int        @id @default(autoincrement())
+  pedidoId         Int
+  productoLocalId  Int
+  cantidad         Decimal    @db.Decimal(12, 2)
+  unidad           ModoPedido @default(BULTO)
+  cantidadRecibida Decimal?   @db.Decimal(12, 2)
+  kgRecibidos      Decimal?   @db.Decimal(12, 3)
+  precioCosto      Decimal?   @db.Decimal(12, 2)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  pedido   PedidoProveedor @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  producto ProductoLocal   @relation(fields: [productoLocalId], references: [id])
+
+  @@index([pedidoId])
+  @@index([productoLocalId])
 }

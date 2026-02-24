@@ -72,6 +72,50 @@ export async function POST(req, { params }) {
     const recibidos = body.recibidos || {}; // { detalleId: cantidadRecibida }
     const kgRecibidosMap = body.kgRecibidos || {}; // { detalleId: kgReales }
 
+    // --- Factura / ganancia (opcionales) ---
+    let totalFactura = null;
+    let totalReal = null;
+    let nroFactura = null;
+    let fechaFactura = null;
+
+    if (body.totalFactura !== undefined && body.totalFactura !== "" && body.totalFactura !== null) {
+      const tf = Number(body.totalFactura);
+      if (!Number.isFinite(tf) || tf < 0) {
+        return NextResponse.json(
+          { ok: false, error: "totalFactura debe ser un número >= 0" },
+          { status: 400 }
+        );
+      }
+      totalFactura = tf;
+    }
+
+    if (body.totalReal !== undefined && body.totalReal !== "" && body.totalReal !== null) {
+      const tr = Number(body.totalReal);
+      if (!Number.isFinite(tr) || tr < 0) {
+        return NextResponse.json(
+          { ok: false, error: "totalReal debe ser un número >= 0" },
+          { status: 400 }
+        );
+      }
+      totalReal = tr;
+    }
+
+    if (body.nroFactura !== undefined && body.nroFactura !== null) {
+      const nf = String(body.nroFactura).trim();
+      nroFactura = nf || null;
+    }
+
+    if (body.fechaFactura !== undefined && body.fechaFactura !== "" && body.fechaFactura !== null) {
+      const ff = new Date(body.fechaFactura);
+      if (isNaN(ff.getTime())) {
+        return NextResponse.json(
+          { ok: false, error: "fechaFactura inválida" },
+          { status: 400 }
+        );
+      }
+      fechaFactura = ff;
+    }
+
     // Validar cantidades recibidas: entero finito >= 0
     for (const [detId, cant] of Object.entries(recibidos)) {
       const c = Number(cant);
@@ -169,12 +213,16 @@ export async function POST(req, { params }) {
         });
       }
 
-      // Marcar pedido como RECIBIDO
+      // Marcar pedido como RECIBIDO + guardar factura/ganancia
       await tx.pedidoProveedor.update({
         where: { id: pedidoId },
         data: {
           estado: "RECIBIDO",
           fechaRecibido: new Date(),
+          totalFactura,
+          totalReal,
+          nroFactura,
+          fechaFactura,
         },
       });
     });
