@@ -49,6 +49,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [recibidos, setRecibidos] = useState({});
   const [kgRecibidos, setKgRecibidos] = useState({});
 
+  // Costos editables por ítem (en recepción)
+  const [costos, setCostos] = useState({});
+
   // Factura / ganancia
   const [totalFactura, setTotalFactura] = useState("");
   const [totalReal, setTotalReal] = useState("");
@@ -83,8 +86,19 @@ export default function DetallePedidoProveedorPage({ params }) {
         setRecibidos(rec);
         setKgRecibidos(kgRec);
 
-        // Factura
-        setTotalFactura(data.item.totalFactura != null ? String(Number(data.item.totalFactura)) : "");
+        // Costos editables
+        const costosInit = {};
+        let totalEst = 0;
+        for (const d of data.item.detalles || []) {
+          const c = d.precioCosto != null ? Number(d.precioCosto) : 0;
+          costosInit[d.id] = c > 0 ? c.toFixed(2) : "";
+          totalEst += (Number(d.cantidad) || 0) * c;
+        }
+        setCostos(costosInit);
+
+        // Factura — default totalFactura al total estimado si no tiene valor guardado
+        const tfGuardado = data.item.totalFactura != null ? String(Number(data.item.totalFactura)) : "";
+        setTotalFactura(tfGuardado || (totalEst > 0 ? totalEst.toFixed(2) : ""));
         setTotalReal(data.item.totalReal != null ? String(Number(data.item.totalReal)) : "");
         setNroFactura(data.item.nroFactura || "");
         setFechaFactura(data.item.fechaFactura ? data.item.fechaFactura.slice(0, 10) : "");
@@ -113,6 +127,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         bodyData = {
           recibidos,
           kgRecibidos,
+          costos,
           totalFactura: totalFactura || null,
           totalReal: totalReal || null,
           nroFactura: nroFactura || null,
@@ -383,9 +398,31 @@ export default function DetallePedidoProveedorPage({ params }) {
                       </td>
                       <td className="px-3 py-1.5 text-xs">{det.unidad}</td>
                       <td className="px-3 py-1.5 text-xs">
-                        {det.precioCosto
-                          ? `$${Number(det.precioCosto).toFixed(2)}`
-                          : "-"}
+                        {esRecepcion ? (
+                          <div className="flex items-center gap-0.5">
+                            <span className="text-slate-500">$</span>
+                            <SunmiInput
+                              type="text"
+                              inputMode="decimal"
+                              value={costos[det.id] ?? ""}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(",", ".");
+                                setCostos((prev) => ({ ...prev, [det.id]: raw }));
+                              }}
+                              onBlur={() => {
+                                const v = Number(costos[det.id]);
+                                if (isNaN(v) || v < 0) {
+                                  setCostos((prev) => ({ ...prev, [det.id]: "0" }));
+                                }
+                              }}
+                              className="w-[70px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </div>
+                        ) : (
+                          det.precioCosto
+                            ? `$${Number(det.precioCosto).toFixed(2)}`
+                            : "-"
+                        )}
                       </td>
 
                       {/* Cant. recibida (en recepción) */}

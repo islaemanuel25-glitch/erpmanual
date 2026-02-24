@@ -116,6 +116,20 @@ export async function POST(req, { params }) {
       fechaFactura = ff;
     }
 
+    // --- Costos editados por ítem (opcionales) ---
+    const costosMap = body.costos || {}; // { detalleId: precioCosto }
+
+    for (const [detId, costo] of Object.entries(costosMap)) {
+      if (costo === "" || costo === null) continue;
+      const c = Number(costo);
+      if (!Number.isFinite(c) || c < 0) {
+        return NextResponse.json(
+          { ok: false, error: `precioCosto debe ser un número >= 0 (detalleId: ${detId})` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validar cantidades recibidas: entero finito >= 0
     for (const [detId, cant] of Object.entries(recibidos)) {
       const c = Number(cant);
@@ -204,12 +218,23 @@ export async function POST(req, { params }) {
         });
 
         // Actualizar cantidadRecibida y kgRecibidos en detalle
+        // Actualizar detalle: cantRecibida, kg, y costo si fue editado
+        const detData = {
+          cantidadRecibida: cantRecibida,
+          kgRecibidos: kgReales,
+        };
+
+        const costoEditado = costosMap[det.id];
+        if (costoEditado !== undefined && costoEditado !== "" && costoEditado !== null) {
+          const cv = Number(costoEditado);
+          if (Number.isFinite(cv) && cv >= 0) {
+            detData.precioCosto = cv;
+          }
+        }
+
         await tx.pedidoProveedorDetalle.update({
           where: { id: det.id },
-          data: {
-            cantidadRecibida: cantRecibida,
-            kgRecibidos: kgReales,
-          },
+          data: detData,
         });
       }
 
