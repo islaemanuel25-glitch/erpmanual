@@ -135,9 +135,10 @@ export async function POST(req, { params }) {
             });
           }
         } else {
-          // BULTO: depósito trackea stock en bultos → incrementar directo
-          // (la conversión bultos*factorPack es SOLO para transferencias depósito→locales)
-          incremento = cantRecibida;
+          // BULTO: StockLocal del depósito SIEMPRE en UNIDADES.
+          // cantRecibida viene en bultos → convertir a unidades.
+          const factorPack = Math.max(1, Number(base?.factor_pack || 1));
+          incremento = cantRecibida * factorPack;
         }
 
         // productoLocalId ya apunta directo al ProductoLocal del depósito
