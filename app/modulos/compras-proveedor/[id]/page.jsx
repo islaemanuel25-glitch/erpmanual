@@ -390,20 +390,55 @@ export default function DetallePedidoProveedorPage({ params }) {
 
                       {/* Cant. recibida (en recepción) */}
                       {esRecepcion && (
-                        <td className="px-3 py-1.5 w-28">
-                          <SunmiInput
-                            type="number"
-                            min="0"
-                            step={esFiambre ? "1" : "0.01"}
-                            value={recibidos[det.id] ?? ""}
-                            onChange={(e) =>
-                              setRecibidos((prev) => ({
-                                ...prev,
-                                [det.id]: e.target.value,
-                              }))
-                            }
-                            className="w-24 text-center"
-                          />
+                        <td className="px-3 py-1.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = Number(recibidos[det.id]) || 0;
+                                setRecibidos((prev) => ({
+                                  ...prev,
+                                  [det.id]: Math.max(0, cur - 1),
+                                }));
+                              }}
+                              className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center"
+                            >−</button>
+                            <SunmiInput
+                              type="text"
+                              inputMode="numeric"
+                              value={recibidos[det.id] ?? ""}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw === "") {
+                                  setRecibidos((prev) => ({ ...prev, [det.id]: "" }));
+                                  return;
+                                }
+                                const val = parseInt(raw, 10);
+                                setRecibidos((prev) => ({
+                                  ...prev,
+                                  [det.id]: isNaN(val) ? "" : Math.max(0, val),
+                                }));
+                              }}
+                              onBlur={() => {
+                                const cur = Number(recibidos[det.id]);
+                                if (isNaN(cur) || cur < 0) {
+                                  setRecibidos((prev) => ({ ...prev, [det.id]: 0 }));
+                                }
+                              }}
+                              className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = Number(recibidos[det.id]) || 0;
+                                setRecibidos((prev) => ({
+                                  ...prev,
+                                  [det.id]: cur + 1,
+                                }));
+                              }}
+                              className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center"
+                            >+</button>
+                          </div>
                         </td>
                       )}
 
