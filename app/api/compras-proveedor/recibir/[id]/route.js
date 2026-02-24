@@ -73,21 +73,10 @@ export async function POST(req, { params }) {
     const kgRecibidosMap = body.kgRecibidos || {}; // { detalleId: kgReales }
 
     // --- Factura / ganancia (opcionales) ---
-    let totalFactura = null;
+    // totalFactura se computa en la transacción desde cantRecibida * precioCosto
     let totalReal = null;
     let nroFactura = null;
     let fechaFactura = null;
-
-    if (body.totalFactura !== undefined && body.totalFactura !== "" && body.totalFactura !== null) {
-      const tf = Number(body.totalFactura);
-      if (!Number.isFinite(tf) || tf < 0) {
-        return NextResponse.json(
-          { ok: false, error: "totalFactura debe ser un número >= 0" },
-          { status: 400 }
-        );
-      }
-      totalFactura = tf;
-    }
 
     if (body.totalReal !== undefined && body.totalReal !== "" && body.totalReal !== null) {
       const tr = Number(body.totalReal);
@@ -156,6 +145,8 @@ export async function POST(req, { params }) {
 
     // Transacción: incrementar stock + marcar recibido
     await prisma.$transaction(async (tx) => {
+      let totalFacturaComputed = 0;
+
       for (const det of pedido.detalles) {
         const cantRecibida =
           recibidos[det.id] !== undefined
@@ -236,6 +227,12 @@ export async function POST(req, { params }) {
           where: { id: det.id },
           data: detData,
         });
+
+        // Acumular totalFactura: cantRecibida * costo final del detalle
+        const costoFinal = detData.precioCosto !== undefined
+          ? Number(detData.precioCosto)
+          : Number(det.precioCosto || 0);
+        totalFacturaComputed += cantRecibida * costoFinal;
       }
 
       // Marcar pedido como RECIBIDO + guardar factura/ganancia
@@ -244,7 +241,7 @@ export async function POST(req, { params }) {
         data: {
           estado: "RECIBIDO",
           fechaRecibido: new Date(),
-          totalFactura,
+          totalFactura: totalFacturaComputed,
           totalReal,
           nroFactura,
           fechaFactura,

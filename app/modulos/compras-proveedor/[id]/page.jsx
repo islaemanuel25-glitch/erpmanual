@@ -52,8 +52,7 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Costos editables por ítem (en recepción)
   const [costos, setCostos] = useState({});
 
-  // Factura / ganancia
-  const [totalFactura, setTotalFactura] = useState("");
+  // Factura / ganancia (totalFactura es computed, no editable)
   const [totalReal, setTotalReal] = useState("");
   const [nroFactura, setNroFactura] = useState("");
   const [fechaFactura, setFechaFactura] = useState("");
@@ -96,9 +95,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         }
         setCostos(costosInit);
 
-        // Factura — default totalFactura al total estimado si no tiene valor guardado
-        const tfGuardado = data.item.totalFactura != null ? String(Number(data.item.totalFactura)) : "";
-        setTotalFactura(tfGuardado || (totalEst > 0 ? totalEst.toFixed(2) : ""));
+        // Factura
         setTotalReal(data.item.totalReal != null ? String(Number(data.item.totalReal)) : "");
         setNroFactura(data.item.nroFactura || "");
         setFechaFactura(data.item.fechaFactura ? data.item.fechaFactura.slice(0, 10) : "");
@@ -128,7 +125,6 @@ export default function DetallePedidoProveedorPage({ params }) {
           recibidos,
           kgRecibidos,
           costos,
-          totalFactura: totalFactura || null,
           totalReal: totalReal || null,
           nroFactura: nroFactura || null,
           fechaFactura: fechaFactura || null,
@@ -194,6 +190,18 @@ export default function DetallePedidoProveedorPage({ params }) {
   const tieneFiambre = (pedido?.detalles || []).some(
     (d) => d.producto?.base?.modoCompraProveedor === "UNIDAD"
   );
+
+  // Total factura computado: en recepción usa recibidos/costos editables,
+  // en otros estados usa los valores guardados del detalle.
+  const computedTotalFactura = (pedido?.detalles || []).reduce((acc, d) => {
+    const cant = esRecepcion
+      ? (Number(recibidos[d.id]) || 0)
+      : (Number(d.cantidadRecibida ?? d.cantidad) || 0);
+    const costo = esRecepcion
+      ? (Number(costos[d.id]) || 0)
+      : (Number(d.precioCosto) || 0);
+    return acc + cant * costo;
+  }, 0);
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
@@ -269,14 +277,10 @@ export default function DetallePedidoProveedorPage({ params }) {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Total factura ($)</label>
-                  <SunmiInput
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={totalFactura}
-                    onChange={(e) => setTotalFactura(e.target.value)}
-                    placeholder="0.00"
-                  />
+                  <p className="text-lg font-bold text-amber-400">
+                    ${computedTotalFactura.toFixed(2)}
+                  </p>
+                  <p className="text-[10px] text-slate-500">Calculado: cant. recibida × costo</p>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Total real ($)</label>
@@ -305,13 +309,13 @@ export default function DetallePedidoProveedorPage({ params }) {
                     onChange={(e) => setFechaFactura(e.target.value)}
                   />
                 </div>
-                {totalFactura && totalReal && (
+                {totalReal && (
                   <div className="col-span-2 md:col-span-4 pt-2 border-t border-slate-700/40">
                     <span className="text-xs text-slate-400">Ganancia depósito: </span>
                     <span className={`text-sm font-bold ${
-                      Number(totalFactura) - Number(totalReal) >= 0 ? "text-green-400" : "text-red-400"
+                      computedTotalFactura - Number(totalReal) >= 0 ? "text-green-400" : "text-red-400"
                     }`}>
-                      ${(Number(totalFactura) - Number(totalReal)).toFixed(2)}
+                      ${(computedTotalFactura - Number(totalReal)).toFixed(2)}
                     </span>
                   </div>
                 )}
@@ -522,13 +526,9 @@ export default function DetallePedidoProveedorPage({ params }) {
                   );
                 })
               )}
-              {/* TOTAL ESTIMADO — siempre visible */}
+              {/* TOTAL ESTIMADO — siempre visible, reactivo en recepción */}
               {(pedido.detalles || []).length > 0 && (() => {
-                const totalEstimado = (pedido.detalles || []).reduce((acc, d) => {
-                  const cant = Number(d.cantidad) || 0;
-                  const costo = Number(d.precioCosto) || 0;
-                  return acc + cant * costo;
-                }, 0);
+                const totalEstimado = computedTotalFactura;
                 // Contar columnas visibles antes de esta fila
                 const baseCols = 5; // Producto, SKU, Cant. pedida, Unidad, Costo
                 const extraCols =
