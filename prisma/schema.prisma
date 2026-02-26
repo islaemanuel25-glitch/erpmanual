@@ -395,6 +395,7 @@ enum EstadoPedidoProveedor {
   CONFIRMADO
   ENVIADO
   RECIBIDO
+  ANULADO
 }
 
 model PosTransferencia {
@@ -749,6 +750,7 @@ model PedidoProveedor {
   fechaConfirmado DateTime?
   fechaEnviado    DateTime?
   fechaRecibido   DateTime?
+  fechaAnulado    DateTime?
   totalFactura    Decimal?               @db.Decimal(12, 2)
   totalReal       Decimal?               @db.Decimal(12, 2)
   nroFactura      String?

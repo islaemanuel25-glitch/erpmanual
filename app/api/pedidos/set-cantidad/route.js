@@ -1,32 +1,28 @@
 // app/api/pedidos/set-cantidad/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
-import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { esBultoMode } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
+    // Auth + localId + grupoId (soporta admin con contexto activo)
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto || false },
+        { status: scope.status }
       );
     }
 
+    const { localId, grupoId, session } = scope;
+
+    // Permisos
     const permisos = Array.isArray(session.permisos) ? session.permisos : [];
     if (!permisos.includes("*") && !permisos.includes("pedidos.editar")) {
       return NextResponse.json(
         { ok: false, error: "Sin permiso para editar pedidos" },
         { status: 403 }
-      );
-    }
-
-    const localId = Number(session.localId);
-    if (!localId) {
-      return NextResponse.json(
-        { ok: false, error: "Usuario sin local asignado" },
-        { status: 400 }
       );
     }
 
@@ -46,7 +42,6 @@ export async function POST(req) {
     const body = await req.json();
     const productoLocalId = Number(body.productoLocalId || 0);
     const cantidad = Number(body.cantidad || 0);
-    let unidad = body.unidad;
 
     if (!productoLocalId) {
       return NextResponse.json(
@@ -63,14 +58,6 @@ export async function POST(req) {
     }
 
     // Resolver depósito del grupo
-    const grupoId = await getGrupoIdDeLocal(localId);
-    if (!grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "El local no pertenece a ningún grupo" },
-        { status: 400 }
-      );
-    }
-
     const grupoDeposito = await prisma.grupoDeposito.findFirst({
       where: { grupoId },
       select: { localId: true },
@@ -98,24 +85,22 @@ export async function POST(req) {
       );
     }
 
-    // Validar unidad contra modo_pedido del producto
-    const factorPack = Number(productoOrigen.base.factor_pack || 1);
-    const modoPedido = productoOrigen.base.modo_pedido || "BULTO";
-
-    if (!unidad || (unidad !== "BULTO" && unidad !== "UNIDAD")) {
-      // Inferir desde modo_pedido (siempre válido)
-      unidad = modoPedido;
-    } else if (unidad !== modoPedido) {
-      const label = modoPedido === "BULTO" ? "por BULTO" : "por UNIDAD";
-      return NextResponse.json(
-        { ok: false, error: `Este producto solo se pide ${label}` },
-        { status: 400 }
-      );
+    // Validar modo_envio: si BULTO, cantidad debe ser múltiplo de factorPack
+    const base = productoOrigen.base;
+    const factorPack = Number(base?.factor_pack || 1);
+    if (cantidad > 0 && base?.modo_envio === "SOLO_BULTO" && factorPack > 1) {
+      if (cantidad % factorPack !== 0) {
+        return NextResponse.json(
+          { ok: false, error: `Este producto se pide por bulto completo (x${factorPack}).` },
+          { status: 400 }
+        );
+      }
     }
 
+    // Local siempre pide en UNIDAD — el valor se guarda tal cual
+    const unidad = "UNIDAD";
+
     // Obtener/crear POS borrador para este par (depósito->local)
-    // Se busca por (origenId, destinoId) sin filtrar por usuarioId,
-    // para que todos los usuarios del mismo local compartan un único borrador.
     const pos = await prisma.$transaction(async (tx) => {
       let found = await tx.posTransferencia.findFirst({
         where: {

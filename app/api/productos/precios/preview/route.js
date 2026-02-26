@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { getContextoActivo } from "@/lib/contexto";
 
 function toNumber(value) {
   const n = Number(value);
@@ -74,15 +76,36 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
-    const grupoId = Number(session.grupoId);
-    if (!grupoId || grupoId <= 0) {
+    const { permisos } = session;
+    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+    if (!esAdmin && !permisos.includes("productos.editar")) {
+      return NextResponse.json({ ok: false, error: "Sin permisos" }, { status: 403 });
+    }
+
+    const body = await req.json();
+    
+    // Resolver grupoId: session → body.localId → session.localId → contexto cookie
+    let grupoId = Number(session.grupoId) || 0;
+    if (!grupoId) {
+      let localId = Number(body?.localId) || 0;
+      if (!localId && session.localId) localId = Number(session.localId);
+      if (!localId && session.esAdmin) {
+        const ctx = getContextoActivo(req, session);
+        if (ctx.localId) localId = Number(ctx.localId);
+      }
+      if (localId) grupoId = await getGrupoIdDeLocal(localId);
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[precios/preview] CTX:", { sessionGrupoId: session.grupoId, grupoIdResolved: grupoId });
+    }
+
+    if (!grupoId) {
       return NextResponse.json(
         { ok: false, error: "Seleccioná un grupo activo para trabajar." },
         { status: 400 }
       );
     }
-
-    const body = await req.json();
     const proveedorId = toNumber(body?.proveedorId);
     const pricingMode = body?.pricingMode;
     const metodo = body?.metodo || "AUMENTO";

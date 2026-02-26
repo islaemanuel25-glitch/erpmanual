@@ -49,7 +49,18 @@ export async function POST(req) {
       );
     }
 
-    // 2) Ver si el creador es depósito
+    // 2) Validar proveedores no repetidos
+    const provIds = [num(body.proveedor_id), num(body.proveedor2_id), num(body.proveedor3_id)]
+      .filter((v) => v !== null && v !== 0);
+    const provSet = new Set(provIds);
+    if (provSet.size !== provIds.length) {
+      return NextResponse.json(
+        { ok: false, error: "Los proveedores no pueden repetirse" },
+        { status: 400 }
+      );
+    }
+
+    // 3) Ver si el creador es depósito
     const creador = await prisma.local.findUnique({
       where: { id: localId },
       select: { es_deposito: true },
@@ -66,6 +77,8 @@ export async function POST(req) {
 
       categoria_id: num(body.categoria_id),
       proveedor_id: num(body.proveedor_id),
+      proveedor2_id: num(body.proveedor2_id),
+      proveedor3_id: num(body.proveedor3_id),
       area_fisica_id: num(body.area_fisica_id),
 
       unidad_medida: body.unidad_medida,
@@ -94,6 +107,13 @@ export async function POST(req) {
       activo: Boolean(body.activo),
       imagen_url: body.imagen_url || null,
       es_combo: Boolean(body.es_combo),
+
+      // Fiambre fields
+      modoCompraProveedor: body.modoCompraProveedor || "BULTO",
+      pesoReferenciaKg: num(body.pesoReferenciaKg),
+      pesoEsFijo: Boolean(body.pesoEsFijo ?? false),
+      pesoPromedioKg: num(body.pesoPromedioKg),
+      actualizaPromedioPorRecepcion: body.actualizaPromedioPorRecepcion !== false,
     };
 
     // modo_envio default
@@ -121,11 +141,21 @@ export async function POST(req) {
       } catch (e) {
         if (
           e.message?.includes("modo_envio") ||
-          e.message?.includes("modo_stock")
+          e.message?.includes("modo_stock") ||
+          e.message?.includes("modoCompraProveedor") ||
+          e.message?.includes("pesoReferenciaKg") ||
+          e.message?.includes("pesoEsFijo") ||
+          e.message?.includes("pesoPromedioKg") ||
+          e.message?.includes("actualizaPromedioPorRecepcion")
         ) {
           const fallback = { ...baseData };
           delete fallback.modo_envio;
           delete fallback.modo_stock;
+          delete fallback.modoCompraProveedor;
+          delete fallback.pesoReferenciaKg;
+          delete fallback.pesoEsFijo;
+          delete fallback.pesoPromedioKg;
+          delete fallback.actualizaPromedioPorRecepcion;
           base = await tx.productoBase.create({ data: fallback });
         } else {
           throw e;

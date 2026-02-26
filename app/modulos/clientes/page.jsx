@@ -10,28 +10,18 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
-import useLocalSelector from "@/hooks/useLocalSelector";
-import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
-import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
+import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
 import ModalMergeClientes from "@/components/clientes/ModalMergeClientes";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 export default function ClientesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const {
-    perfil,
-    locales,
-    localSeleccionado,
-    localNombre,
-    esAdminSinLocal,
-    cargandoLocales,
-    handleCambiarLocal,
-  } = useLocalSelector();
+  const { perfil } = useUser();
+  const { loading: loadingCtx, contexto, needsContexto } = useContextoActivo();
 
-  // Fallback: leer localId desde searchParams si no hay localSeleccionado
-  const localIdFromParams = searchParams.get("localId");
-  const localIdFinal = localSeleccionado || (localIdFromParams ? Number(localIdFromParams) : null);
+  const localIdFinal = contexto?.localId || null;
 
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState("");
@@ -256,7 +246,7 @@ export default function ClientesPage() {
     if (!file) return;
 
     if (!localIdFinal || localIdFinal === 0) {
-      setImportResult({ error: "Seleccioná un local para importar." });
+      setImportResult({ error: "No hay contexto operativo activo." });
       e.target.value = "";
       return;
     }
@@ -375,20 +365,12 @@ export default function ClientesPage() {
     return true;
   });
 
-  if (!perfil || cargandoLocales) return null;
+  if (!perfil || loadingCtx) return null;
+  if (needsContexto) { router.push("/inicio"); return null; }
 
   const permisosC = perfil?.permisos || [];
   const esAdminC = Array.isArray(permisosC) && permisosC.includes("*");
   if (!esAdminC && !permisosC.includes("clientes.ver")) return <SinPermisos />;
-
-  if (esAdminSinLocal && !localSeleccionado) {
-    return (
-      <PantallaSeleccionLocal
-        locales={locales}
-        onSeleccionar={handleCambiarLocal}
-      />
-    );
-  }
 
   return (
     <div className="p-2 lg:p-3 space-y-3 max-w-5xl mx-auto">
@@ -401,12 +383,6 @@ export default function ClientesPage() {
               Gestion de clientes del sistema
             </p>
           </div>
-          <SelectorLocalCompacto
-            locales={locales}
-            localSeleccionado={localSeleccionado}
-            localNombre={localNombre}
-            onChange={handleCambiarLocal}
-          />
         </div>
         <div className="flex gap-2">
           <SunmiButton
@@ -517,7 +493,7 @@ export default function ClientesPage() {
 
           {(!localIdFinal || localIdFinal === 0) && (
             <p className="text-[11px] text-slate-500 mt-2">
-              Seleccioná un local para importar/exportar.
+              No hay contexto operativo activo.
             </p>
           )}
 
@@ -1255,7 +1231,7 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
     const cargarVentas = async () => {
       // Validar que haya localId
       if (!localId) {
-        setErrorMsg("Seleccioná un local para ver el historial de ventas.");
+        setErrorMsg("No hay contexto operativo activo.");
         setLoading(false);
         return;
       }
@@ -1402,7 +1378,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
 
   const cargarCC = async () => {
     if (!localId) {
-      setErrorMsg("Seleccioná un local para ver la cuenta corriente.");
+      setErrorMsg("No hay contexto operativo activo.");
       setLoading(false);
       return;
     }

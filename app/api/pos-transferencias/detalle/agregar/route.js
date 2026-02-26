@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -14,7 +15,8 @@ export async function POST(req) {
     const posId = Number(body.posId);
     const productoLocalDestinoId = Number(body.productoLocalId);
     const cantidadBody = Number(body.sugerido || body.cantidad || body.preparado || 0);
-    const tipo = body.tipo === "manual" ? "manual" : "sugerido";
+    const tiposPermitidos = ["manual", "rotura"];
+    const tipo = tiposPermitidos.includes(body.tipo) ? body.tipo : "sugerido";
 
     // Leer unidades del body
     let unidadBody = body.sugeridoUnidad || body.unidad || body.unidadPreparada;
@@ -82,11 +84,12 @@ export async function POST(req) {
     if (!productoOrigen)
       return NextResponse.json({ ok: false, error: "El depósito no tiene este producto" }, { status: 400 });
 
-    // Inferir unidad si no vino en el body
+    // Inferir unidad si no vino en el body (respetar modo_envio)
     const factorPack = Number(productoOrigen.base.factor_pack || 1);
 
     if (!unidadBody || (unidadBody !== "BULTO" && unidadBody !== "UNIDAD")) {
-      unidadBody = factorPack > 1 ? "BULTO" : "UNIDAD";
+      const efectivo = productoOrigen.base.modo_envio || defaultModoEnvio(productoOrigen.base.unidad_medida || "unidad");
+      unidadBody = efectivo === "SOLO_UNIDAD" ? "UNIDAD" : (factorPack > 1 ? "BULTO" : "UNIDAD");
     }
 
     // Determinar si el usuario es depósito/admin o local
@@ -104,14 +107,22 @@ export async function POST(req) {
       esDeposito = !!userLocal?.es_deposito;
     }
 
-    // Local → escribe sugerido, preparado=0
-    // Depósito/Admin → escribe preparado, sugerido=0
+    // Si el body trae sugerido y preparado explícitos, usarlos directamente
+    // (por ejemplo, al devolver un ítem de Preparados a Sugeridos)
+    // Caso contrario: Local → sugerido, Depósito → preparado
     let sugerido = 0;
     let preparado = 0;
     let unidadSugerida = null;
     let unidadPreparada = null;
 
-    if (esDeposito) {
+    const hasSugeridoExplicito = body.sugerido !== undefined && body.preparado !== undefined;
+
+    if (hasSugeridoExplicito) {
+      sugerido = Number(body.sugerido || 0);
+      preparado = Number(body.preparado || 0);
+      unidadSugerida = unidadBody;
+      unidadPreparada = unidadBody;
+    } else if (esDeposito) {
       preparado = cantidadBody;
       unidadPreparada = unidadBody;
       unidadSugerida = unidadBody;
@@ -162,7 +173,8 @@ export async function POST(req) {
 
         precioCosto: Number(productoDestino.precio_costo || productoDestino.base.precio_costo || 0),
         unidadMedida: productoDestino.base.unidad_medida,
-        factorPack: Number(productoDestino.base.factor_pack || 1)
+        factorPack: Number(productoDestino.base.factor_pack || 1),
+        modoEnvio: productoOrigen.base.modo_envio || defaultModoEnvio(productoOrigen.base.unidad_medida || "unidad"),
       },
       error: null
     });

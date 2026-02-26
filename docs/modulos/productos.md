@@ -49,8 +49,9 @@ Catalogo centralizado de productos por grupo. Cada ProductoBase se replica como 
 - `TablaProductos` / `SunmiTablaProductos`: Tabla principal con acciones inline
 - `FiltrosProductos`: Barra de filtros
 - `ModalProductoFinal`: Modal de crear/editar
-- `SelectorLocales`: Selector de local activo
 - `ColumnManager`: Gestor de columnas visibles
+
+**Nota:** El contexto se elige solo en /inicio y se muestra en Header.
 
 ## Estado y hooks
 - Estado local con `useState`

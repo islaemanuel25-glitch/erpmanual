@@ -1,20 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import FiltrosStock from "@/components/stock_locales/FiltrosStock";
 import TablaStock from "@/components/stock_locales/TablaStock";
 import ModalAjuste from "@/components/stock_locales/ModalAjuste";
 import ModalLimites from "@/components/stock_locales/ModalLimites";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
+import useContextoActivo from "@/hooks/useContextoActivo";
 
 export default function StockLocalesPage() {
+  const router = useRouter();
   const { perfil: perfilSt, cargando: cargandoSt } = useUser();
-  const [locales, setLocales] = useState([]);
-  const [localSeleccionado, setLocalSeleccionado] = useState(null);
+  const { loading: cargandoContexto, contexto, needsContexto } = useContextoActivo();
 
-  const [cargando, setCargando] = useState(true);
   const [filtro, setFiltro] = useState({});
   const [page, setPage] = useState(1);
 
@@ -26,50 +26,6 @@ export default function StockLocalesPage() {
 
   const [refrescar, setRefrescar] = useState(false);
 
-  // ============================================================
-  // CARGAR LOCALES
-  // ============================================================
-  useEffect(() => {
-    const fetchLocales = async () => {
-      try {
-        const res = await fetch("/api/locales/listar", {
-          credentials: "include",
-        });
-        const json = await res.json();
-
-        if (json?.ok) {
-          setLocales(json.items);
-
-          const ultimo = localStorage.getItem("ultimoLocal");
-
-          if (ultimo && json.items.some((l) => l.id === Number(ultimo))) {
-            setLocalSeleccionado(Number(ultimo));
-          } else {
-            const primerLocal = json.items.find((l) => !l.esDeposito);
-            setLocalSeleccionado(primerLocal?.id || json.items[0]?.id || "");
-          }
-        }
-
-        setCargando(false);
-      } catch (e) {
-        console.error("Error cargando locales:", e);
-        setCargando(false);
-      }
-    };
-
-    fetchLocales();
-  }, []);
-
-  // ============================================================
-  // GUARDAR LOCAL EN LOCALSTORAGE
-  // ============================================================
-  useEffect(() => {
-    if (localSeleccionado) {
-      localStorage.setItem("ultimoLocal", localSeleccionado);
-      setRefrescar(true);
-    }
-  }, [localSeleccionado]);
-
   const abrirAjuste = (producto) => {
     setProductoAjuste(producto);
     setOpenAjuste(true);
@@ -80,14 +36,12 @@ export default function StockLocalesPage() {
     setOpenLimites(true);
   };
 
-  const localActual =
-    locales.find((l) => l.id === localSeleccionado) || {
-      id: localSeleccionado,
-      nombre: "Local",
-      esDeposito: false,
-    };
+  const localSeleccionado = contexto?.localId || null;
+  const localActual = contexto
+    ? { id: contexto.localId, nombre: contexto.nombre, esDeposito: contexto.esDeposito }
+    : { id: null, nombre: "", esDeposito: false };
 
-  if (cargandoSt || cargando) {
+  if (cargandoSt || cargandoContexto) {
     return (
       <div className="p-4 sunmi-bg min-h-screen">
         <p className="text-slate-400">Cargando módulo de stock...</p>
@@ -99,6 +53,11 @@ export default function StockLocalesPage() {
   const esAdminSt = Array.isArray(permisosSt) && permisosSt.includes("*");
   if (!esAdminSt && !permisosSt.includes("stock.ver")) return <SinPermisos />;
 
+  if (needsContexto) {
+    router.push("/inicio");
+    return null;
+  }
+
   // ============================================================
   // RENDER
   // ============================================================
@@ -108,24 +67,9 @@ export default function StockLocalesPage() {
       {/* CABECERA */}
       <div className="sunmi-card">
         <div className="sunmi-header-cyan">Stock de Locales</div>
-
-        <div className="mt-3 flex flex-col gap-2">
-          <label className="text-[11px] text-slate-400 mb-1 block">Local seleccionado</label>
-
-          <SunmiSelectAdv
-            value={localSeleccionado ?? ""}
-            onChange={(val) => {
-              setLocalSeleccionado(Number(val));
-              setPage(1);
-            }}
-          >
-            {locales.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.nombre}
-              </option>
-            ))}
-          </SunmiSelectAdv>
-        </div>
+        <p className="text-sm text-amber-400 font-medium mt-2">
+          {localActual.nombre || "Sin local"}
+        </p>
       </div>
 
       {/* FILTROS */}

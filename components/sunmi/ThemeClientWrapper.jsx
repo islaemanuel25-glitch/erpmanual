@@ -1,6 +1,6 @@
 "use client";
 
-import { SunmiThemeProvider, useSunmiTheme } from "./SunmiThemeProvider";
+import { SunmiThemeProvider } from "./SunmiThemeProvider";
 import { SunmiToaster } from "./SunmiToast";
 
 export default function ThemeClientWrapper({ children }) {
@@ -12,10 +12,8 @@ export default function ThemeClientWrapper({ children }) {
 }
 
 function ThemeBody({ children }) {
-  const { theme } = useSunmiTheme();
-
   return (
-    <div className={`min-h-screen w-full overflow-x-hidden ${theme.layout}`}>
+    <div className="min-h-screen w-full overflow-x-hidden">
       {children}
       <SunmiToaster />
     </div>

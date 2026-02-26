@@ -3,15 +3,29 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
 
 export default function ModalLimites({ open, onClose, producto, local }) {
   const [minimo, setMinimo] = useState("");
   const [maximo, setMaximo] = useState("");
 
+  const factorPack = Number(producto?.factorPack || producto?.factor_pack || 1);
+  const unidadMedida = producto?.unidadMedida || producto?.unidad_medida || "unidad";
+  const esDeposito = local?.esDeposito || local?.es_deposito || false;
+  const usarBultos = esDeposito && factorPack > 1 && (unidadMedida === "pack" || unidadMedida === "cajon");
+
   useEffect(() => {
     if (open && producto) {
-      setMinimo(producto.stockMin || "");
-      setMaximo(producto.stockMax || "");
+      if (usarBultos) {
+        // Mostrar en bultos: convertir unidades → bultos
+        const minUds = Number(producto.stockMin || 0);
+        const maxUds = Number(producto.stockMax || 0);
+        setMinimo(minUds ? fromUnidades({ unidades: minUds, factorPack }).bultos : "");
+        setMaximo(maxUds ? fromUnidades({ unidades: maxUds, factorPack }).bultos : "");
+      } else {
+        setMinimo(producto.stockMin || "");
+        setMaximo(producto.stockMax || "");
+      }
     }
   }, [open, producto]);
 
@@ -19,12 +33,20 @@ export default function ModalLimites({ open, onClose, producto, local }) {
 
   const guardar = async () => {
     try {
+      // Si depósito pack, convertir bultos → unidades antes de enviar
+      const minVal = minimo === "" ? null : Number(minimo);
+      const maxVal = maximo === "" ? null : Number(maximo);
+
       const body = {
         modo: "limites",
         localId: local.id,
         productoLocalId: producto.id,
-        nuevoMin: minimo === "" ? null : Number(minimo),
-        nuevoMax: maximo === "" ? null : Number(maximo),
+        nuevoMin: usarBultos && minVal != null
+          ? toUnidades({ cantidad: minVal, unidad: "BULTO", factorPack })
+          : minVal,
+        nuevoMax: usarBultos && maxVal != null
+          ? toUnidades({ cantidad: maxVal, unidad: "BULTO", factorPack })
+          : maxVal,
       };
 
       const res = await fetch("/api/stock_locales/ajustar", {
@@ -70,20 +92,48 @@ export default function ModalLimites({ open, onClose, producto, local }) {
           <div className="flex flex-col gap-3 mt-4">
 
             {/* Min */}
-            <SunmiInput
-              type="number"
-              placeholder="Stock mínimo"
-              value={minimo}
-              onChange={(e) => setMinimo(e.target.value)}
-            />
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">
+                {usarBultos ? "Stock mínimo (bultos)" : "Stock mínimo"}
+              </label>
+              <SunmiInput
+                type="number"
+                placeholder={usarBultos ? "0 bultos" : "0"}
+                min={0}
+                step={unidadMedida === "kg" ? 0.001 : 1}
+                value={minimo}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (unidadMedida !== "kg") {
+                    setMinimo(raw === "" ? "" : String(parseInt(raw, 10) || 0));
+                  } else {
+                    setMinimo(raw);
+                  }
+                }}
+              />
+            </div>
 
             {/* Max */}
-            <SunmiInput
-              type="number"
-              placeholder="Stock máximo"
-              value={maximo}
-              onChange={(e) => setMaximo(e.target.value)}
-            />
+            <div>
+              <label className="text-[11px] text-slate-400 mb-1 block">
+                {usarBultos ? "Stock máximo (bultos)" : "Stock máximo"}
+              </label>
+              <SunmiInput
+                type="number"
+                placeholder={usarBultos ? "0 bultos" : "0"}
+                min={0}
+                step={unidadMedida === "kg" ? 0.001 : 1}
+                value={maximo}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (unidadMedida !== "kg") {
+                    setMaximo(raw === "" ? "" : String(parseInt(raw, 10) || 0));
+                  } else {
+                    setMaximo(raw);
+                  }
+                }}
+              />
+            </div>
           </div>
 
           {/* Botón guardar */}

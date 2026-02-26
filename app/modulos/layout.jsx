@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
+import { LayoutSettingsProvider } from "@/app/context/LayoutSettingsContext";
 import LayoutBase from "@/components/LayoutBase";
 
 export default function ModulosLayout({ children }) {
@@ -19,6 +20,9 @@ export default function ModulosLayout({ children }) {
   if (cargando) return null;
   if (!perfil) return null;
 
-  // 🟦 Ahora SI usamos el LayoutBase Sunmi V2 completo
-  return <LayoutBase>{children}</LayoutBase>;
+  return (
+    <LayoutSettingsProvider>
+      <LayoutBase>{children}</LayoutBase>
+    </LayoutSettingsProvider>
+  );
 }

@@ -1,7 +1,10 @@
 "use client";
 
+import { useState, useEffect, useRef, useCallback } from "react";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+
+const DEBUG_FILTROS_SUGERIDOS = false;
 
 export default function TablaSugeridos({
   datos,
@@ -16,8 +19,8 @@ export default function TablaSugeridos({
   loading = false,
   categorias = [],
   areas = [],
-  categoriaSeleccionada = "todos",
-  areaSeleccionada = "todos",
+  categoriaSeleccionada = "__ALL__",
+  areaSeleccionada = "__ALL__",
   onChangeCategoria,
   onChangeArea,
 }) {
@@ -108,16 +111,20 @@ export default function TablaSugeridos({
           flex flex-wrap gap-4
         "
       >
-        {/* CATEGORÍAS */}
+        {/* CATEGORÍAS — mismo patrón que FiltrosProductos: value + onChange directo + placeholder */}
         <div className="flex items-center gap-2 text-[11px]">
           <span className="text-slate-400">Categorías</span>
 
           <SunmiSelectAdv
             value={categoriaSeleccionada}
-            onChange={(v) => onChangeCategoria?.(v)}
+            onChange={(v) => {
+              if (DEBUG_FILTROS_SUGERIDOS) console.debug("[TablaSugeridos] categoria raw:", v, "typeof:", typeof v);
+              onChangeCategoria?.(v);
+            }}
+            placeholder="Categoría..."
             className="w-[140px]"
           >
-            <SunmiSelectOption value="todos">Todas</SunmiSelectOption>
+            <SunmiSelectOption value="__ALL__">Todas</SunmiSelectOption>
             {categorias.map((c) => (
               <SunmiSelectOption key={c} value={c}>
                 {c}
@@ -126,16 +133,20 @@ export default function TablaSugeridos({
           </SunmiSelectAdv>
         </div>
 
-        {/* AREAS */}
+        {/* AREAS — mismo patrón que FiltrosProductos: value + onChange directo + placeholder */}
         <div className="flex items-center gap-2 text-[11px]">
           <span className="text-slate-400">Áreas</span>
 
           <SunmiSelectAdv
             value={areaSeleccionada}
-            onChange={(v) => onChangeArea?.(v)}
+            onChange={(v) => {
+              if (DEBUG_FILTROS_SUGERIDOS) console.debug("[TablaSugeridos] área raw:", v, "typeof:", typeof v);
+              onChangeArea?.(v);
+            }}
+            placeholder="Área..."
             className="w-[140px]"
           >
-            <SunmiSelectOption value="todos">Todas</SunmiSelectOption>
+            <SunmiSelectOption value="__ALL__">Todas</SunmiSelectOption>
             {areas.map((a) => (
               <SunmiSelectOption key={a} value={a}>
                 {a}
@@ -153,7 +164,7 @@ export default function TablaSugeridos({
 
       {/* TABLA */}
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
+        <table className="w-full table-fixed text-[12px]">
           <thead
             className="
               bg-slate-900
@@ -163,10 +174,12 @@ export default function TablaSugeridos({
           >
             <tr>
               <th className="px-3 py-2 text-left">Producto</th>
+              <th className="px-2 py-2 text-left">Categoría</th>
+              <th className="px-2 py-2 text-left">Área</th>
               <th className="px-2 py-2 text-left">Código</th>
               <th className="px-2 py-2 text-left">Presentación</th>
-              <th className="px-2 py-2 text-right">Sugerido</th>
-              <th className="px-2 py-2 text-center">Acción</th>
+              <th className="px-2 py-2 text-right w-[200px]">Sugerido</th>
+              <th className="px-2 py-2 text-center w-[72px]">Acción</th>
             </tr>
           </thead>
 
@@ -174,7 +187,7 @@ export default function TablaSugeridos({
             {datos.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={7}
                   className="
                     px-3 py-4 text-center 
                     text-slate-500 text-[11px]
@@ -185,118 +198,278 @@ export default function TablaSugeridos({
               </tr>
             )}
 
-            {datos.map((p) => {
-              // Compatibilidad: usar nuevos campos si existen, sino calcular
-              const sugeridoCantidad = p.sugeridoCantidad ?? p.sugerido ?? 0;
-              const sugeridoUnidad = p.sugeridoUnidad ?? (p.factorPack > 1 ? "BULTO" : "UNIDAD");
-              const faltanteUnidades = p.faltanteUnidades ?? p.faltanUnidades ?? 0;
-              const factorPack = Number(p.factorPack || 1);
-
-              return (
-                <tr
-                  key={p.productoLocalDestinoId}
-                  className="
-                    border-t border-slate-800
-                    hover:bg-slate-800/60
-                    transition
-                  "
-                >
-                  {/* PRODUCTO */}
-                  <td className="px-3 py-2">
-                    <div className="flex flex-col">
-                      <span className="font-medium">
-                        {p.productoNombre}
-                      </span>
-                      <span className="text-[11px] text-slate-500">
-                        {p.categoriaNombre || "Sin categoría"} ·{" "}
-                        {p.areaFisicaNombre || "Sin área"}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* CODIGO */}
-                  <td className="px-2 py-2 text-[11px] text-slate-400">
-                    {p.codigoBarra || "-"}
-                  </td>
-
-                  {/* PRESENTACIÓN */}
-                  <td className="px-2 py-2 text-[11px] text-slate-300">
-                    {factorPack > 1
-                      ? `${p.unidadMedida} x ${factorPack}`
-                      : p.unidadMedida}
-                  </td>
-
-                  {/* INPUT SUGERIDO CON UNIDAD CLARA */}
-                  <td className="px-2 py-2 text-right">
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="flex items-center gap-1">
-                        <SunmiInput
-                          type="number"
-                          min={0}
-                          step={1}
-                          value={sugeridoCantidad}
-                          onChange={(e) =>
-                            onEditSugerido(
-                              p.productoLocalDestinoId,
-                              Number(e.target.value),
-                              sugeridoUnidad // Mantener unidad actual
-                            )
-                          }
-                        />
-                        {(p.modoEnvio === "MIXTO" && factorPack > 1) ? (
-                          <SunmiSelectAdv
-                            value={sugeridoUnidad}
-                            onChange={(val) =>
-                              onEditSugerido(
-                                p.productoLocalDestinoId,
-                                sugeridoCantidad,
-                                val
-                              )
-                            }
-                          >
-                            <option value="BULTO">bultos</option>
-                            <option value="UNIDAD">uds</option>
-                          </SunmiSelectAdv>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">
-                            {sugeridoUnidad === "BULTO" ? "bultos" : "uds"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-slate-400">
-                        {sugeridoUnidad === "BULTO" ? (
-                          <span className="text-slate-500">
-                            (faltan {faltanteUnidades} uds · factor {factorPack})
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* BOTÓN PREP. */}
-                  <td className="px-2 py-2 text-center">
-                    <button
-                      onClick={() => onMarcarPreparado(p.productoLocalOrigenId)}
-                      className="
-                        px-3 py-1 rounded-full 
-                        text-[11px] font-semibold
-                        bg-cyan-400 
-                        hover:bg-cyan-500 
-                        active:bg-cyan-600
-                        text-slate-900 
-                        shadow-[0_0_8px_rgba(45,212,191,0.4)]
-                        active:scale-95 transition
-                      "
-                    >
-                      Prep.
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+            {datos.map((p) => (
+              <SugeridoRow
+                key={p.productoLocalDestinoId}
+                p={p}
+                onEditSugerido={onEditSugerido}
+                onMarcarPreparado={onMarcarPreparado}
+              />
+            ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+// ====================================================
+// Fila editable con estado local bultos/uds + rotura
+// Hardened: debounce 350ms, flush on blur, sync guard
+// ====================================================
+function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
+  const sugeridoCantidad = p.sugeridoCantidad ?? p.sugerido ?? 0;
+  const factorPack = Number(p.factorPack || 1);
+  const bultoMode = p.modoEnvio !== "SOLO_UNIDAD" && factorPack > 1;
+  const solosBultos = p.modoEnvio === "SOLO_BULTO";
+  const sugeridoUnidad = p.sugeridoUnidad || (factorPack > 1 ? "BULTO" : "UNIDAD");
+
+  const labelBulto =
+    p.unidadMedida === "cajon" ? "caj." :
+    p.unidadMedida === "pack" ? "packs" :
+    p.unidadMedida === "caja" ? "cajas" :
+    p.unidadMedida === "carton" ? "cart." :
+    "bultos";
+
+  const [rotura, setRotura] = useState(false);
+
+  // Estado local: bultos o uds según modo
+  // Cuando sugeridoUnidad es BULTO, sugeridoCantidad ya está en bultos
+  const [bultos, setBultos] = useState(() => {
+    if (!bultoMode) return 0;
+    return sugeridoUnidad === "BULTO"
+      ? sugeridoCantidad
+      : Math.floor(sugeridoCantidad / factorPack);
+  });
+  const [uds, setUds] = useState(
+    bultoMode ? 0 : sugeridoCantidad
+  );
+
+  // Guard: no pisar state local mientras el usuario edita
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Debounce refs
+  const timerRef = useRef(null);
+  const pendingRef = useRef(null);
+
+  // Sincronizar cuando el valor externo cambia (solo si no está editando)
+  useEffect(() => {
+    if (isEditing) return;
+    if (bultoMode) {
+      if (sugeridoUnidad === "BULTO") {
+        setBultos(sugeridoCantidad);
+      } else {
+        setBultos(Math.floor(sugeridoCantidad / factorPack));
+        if (rotura) setUds(sugeridoCantidad % factorPack);
+      }
+    } else {
+      setUds(sugeridoCantidad);
+    }
+  }, [sugeridoCantidad, factorPack, bultoMode, isEditing, sugeridoUnidad, rotura]);
+
+  // Cleanup timer on unmount
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const emitirDebounced = useCallback((val, unidad) => {
+    pendingRef.current = { val, unidad };
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onEditSugerido(p.productoLocalDestinoId, val, unidad);
+      pendingRef.current = null;
+    }, 350);
+  }, [onEditSugerido, p.productoLocalDestinoId]);
+
+  const flush = useCallback(() => {
+    if (pendingRef.current !== null) {
+      clearTimeout(timerRef.current);
+      onEditSugerido(
+        p.productoLocalDestinoId,
+        pendingRef.current.val,
+        pendingRef.current.unidad
+      );
+      pendingRef.current = null;
+    }
+    setIsEditing(false);
+  }, [onEditSugerido, p.productoLocalDestinoId]);
+
+  const handleFocus = () => setIsEditing(true);
+
+  const handleBultos = (val) => {
+    const nb = Math.max(0, Number(val) || 0);
+    setBultos(nb);
+    if (rotura) {
+      emitirDebounced(nb * factorPack + uds, "UNIDAD");
+    } else {
+      emitirDebounced(nb, "BULTO");
+    }
+  };
+
+  const handleUds = (val) => {
+    const nu = Math.max(0, Number(val) || 0);
+    setUds(nu);
+    if (bultoMode && rotura) {
+      emitirDebounced(bultos * factorPack + nu, "UNIDAD");
+    } else {
+      emitirDebounced(nu, "UNIDAD");
+    }
+  };
+
+  const toggleRotura = () => {
+    const next = !rotura;
+    setRotura(next);
+    if (!next) {
+      // Desactivar rotura: emit bultos como BULTO
+      setUds(0);
+      onEditSugerido(p.productoLocalDestinoId, bultos, "BULTO");
+    } else {
+      // Activar rotura: convertir a total unidades
+      const totalUnits = bultos * factorPack;
+      if (totalUnits > 0) {
+        onEditSugerido(p.productoLocalDestinoId, totalUnits, "UNIDAD");
+      }
+    }
+  };
+
+  const total = (() => {
+    if (!bultoMode) return uds;
+    if (rotura) return bultos * factorPack + uds;
+    return bultos * factorPack;
+  })();
+
+  const productoId =
+    p.productoLocalOrigenId ?? p.productoLocalDestinoId ?? p.productoLocalId;
+
+  return (
+    <tr
+      className="
+        border-t border-slate-800
+        hover:bg-slate-800/60
+        transition
+      "
+    >
+      {/* PRODUCTO */}
+      <td className="px-3 py-2 align-middle">
+        <span className="font-medium">{p.productoNombre}</span>
+        {String(p?.tipo || "").toLowerCase() === "rotura" && (
+          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-semibold">
+            Rotura
+          </span>
+        )}
+      </td>
+
+      {/* CATEGORÍA */}
+      <td className="px-2 py-2 text-[11px] text-slate-300 align-middle">
+        {p.categoriaNombre || "Sin categoría"}
+      </td>
+
+      {/* ÁREA */}
+      <td className="px-2 py-2 text-[11px] text-slate-300 align-middle">
+        {p.areaFisicaNombre || "Sin área"}
+      </td>
+
+      {/* CODIGO */}
+      <td className="px-2 py-2 text-[11px] text-slate-400 align-middle">
+        {p.codigoBarra || "-"}
+      </td>
+
+      {/* PRESENTACIÓN */}
+      <td className="px-2 py-2 text-[11px] text-slate-300 align-middle">
+        {bultoMode ? `${p.unidadMedida} x ${factorPack}` : p.unidadMedida}
+      </td>
+
+      {/* SUGERIDO EDITABLE + ROTURA */}
+      <td className="px-2 py-2 w-[200px] align-middle">
+        <div className="w-[200px] ml-auto">
+          <div className="flex items-center justify-end gap-3">
+            {bultoMode ? (
+              <>
+                {/* Bultos */}
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => handleBultos(Math.max(0, bultos - 1))} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">−</button>
+                  <SunmiInput
+                    type="text"
+                    inputMode="numeric"
+                    value={bultos}
+                    onFocus={handleFocus}
+                    onBlur={flush}
+                    onChange={(e) => handleBultos(e.target.value)}
+                    className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <button type="button" onClick={() => handleBultos(bultos + 1)} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">+</button>
+                  <span className="text-[10px] text-slate-400">{labelBulto}</span>
+                </div>
+                {/* Uds sueltas (solo si rotura) */}
+                {rotura && (
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => handleUds(Math.max(0, uds - 1))} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">−</button>
+                    <SunmiInput
+                      type="text"
+                      inputMode="numeric"
+                      value={uds}
+                      onFocus={handleFocus}
+                      onBlur={flush}
+                      onChange={(e) => handleUds(e.target.value)}
+                      className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">+</button>
+                    <span className="text-[10px] text-slate-400">uds</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => handleUds(Math.max(0, uds - 1))} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">−</button>
+                <SunmiInput
+                  type="text"
+                  inputMode="numeric"
+                  value={uds}
+                  onFocus={handleFocus}
+                  onBlur={flush}
+                  onChange={(e) => handleUds(e.target.value)}
+                  className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">+</button>
+                <span className="text-[10px] text-slate-400">uds</span>
+              </div>
+            )}
+          </div>
+          <div className="min-h-[14px] text-right text-[10px] leading-tight flex items-center justify-end gap-2">
+            {bultoMode && (
+              <span className="text-slate-500">= {total} uds</span>
+            )}
+            {bultoMode && !solosBultos && (
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rotura}
+                  onChange={toggleRotura}
+                  className="w-3 h-3 accent-amber-400"
+                />
+                <span className="text-amber-400">Rotura</span>
+              </label>
+            )}
+          </div>
+        </div>
+      </td>
+
+      {/* BOTÓN PREP. */}
+      <td className="px-2 py-2 text-center w-[72px] align-middle">
+        <button
+          onClick={() => onMarcarPreparado(productoId)}
+          className="
+            px-3 py-1 rounded-full
+            text-[11px] font-semibold
+            bg-cyan-400
+            hover:bg-cyan-500
+            active:bg-cyan-600
+            text-slate-900
+            shadow-[0_0_8px_rgba(45,212,191,0.4)]
+            active:scale-95 transition
+          "
+        >
+          Prep.
+        </button>
+      </td>
+    </tr>
   );
 }

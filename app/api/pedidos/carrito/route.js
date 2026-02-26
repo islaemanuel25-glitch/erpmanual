@@ -1,32 +1,28 @@
 // app/api/pedidos/carrito/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
-import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 export async function GET(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
+    // Auth + localId + grupoId (soporta admin con contexto activo)
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto || false },
+        { status: scope.status }
       );
     }
 
+    const { localId, grupoId, session } = scope;
+
+    // Permisos
     const permisos = Array.isArray(session.permisos) ? session.permisos : [];
     if (!permisos.includes("*") && !permisos.includes("pedidos.ver")) {
       return NextResponse.json(
         { ok: false, error: "Sin permiso para ver pedidos" },
         { status: 403 }
-      );
-    }
-
-    const localId = Number(session.localId);
-    if (!localId) {
-      return NextResponse.json(
-        { ok: false, error: "Usuario sin local asignado" },
-        { status: 400 }
       );
     }
 
@@ -40,14 +36,6 @@ export async function GET(req) {
       return NextResponse.json(
         { ok: false, error: "Solo locales pueden usar Pedidos" },
         { status: 403 }
-      );
-    }
-
-    const grupoId = await getGrupoIdDeLocal(localId);
-    if (!grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "El local no pertenece a ningún grupo" },
-        { status: 400 }
       );
     }
 
@@ -118,6 +106,7 @@ export async function GET(req) {
               sugerido: Number(d.sugerido || 0),
               unidadSugerida: d.unidadSugerida,
               factorPack: Number(base?.factor_pack || 1),
+              modoEnvio: base?.modo_envio || defaultModoEnvio(base?.unidad_medida),
             };
           }),
           itemCount: posPendiente.detalles.length,
@@ -147,6 +136,7 @@ export async function GET(req) {
         preparado: Number(d.preparado || 0),
         unidadSugerida: d.unidadSugerida,
         factorPack: Number(base?.factor_pack || 1),
+        modoEnvio: base?.modo_envio || defaultModoEnvio(base?.unidad_medida),
         unidadMedida: base?.unidad_medida || "unidad",
         imagenUrl: base?.imagen_url || null,
       };

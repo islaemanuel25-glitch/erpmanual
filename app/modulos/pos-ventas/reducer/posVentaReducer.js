@@ -1,0 +1,207 @@
+// Estado inicial del reducer
+export const initialState = {
+  // Carrito
+  carrito: [],
+  
+  // Forma de pago
+  formaPago: "efectivo",
+  
+  // Cliente
+  clienteSeleccionado: null,
+  
+  // Descuentos
+  descuento: 0,
+  descuentoInfo: null, // { tipo, valor }
+  
+  // Puntos de fidelidad
+  puntosCanje: 0,
+  descuentoPorPuntos: 0,
+  saldoPuntos: 0,
+  
+  // Modales
+  modalDescuento: false,
+  modalCanjePuntos: false,
+  modalEfectivo: null, // { total, formaPago } o null
+  modalTicket: null, // venta data para ticket o null
+  modalConfirmacion: null, // { mensaje, onConfirmar, onCancelar } o null
+  
+  // Estado de cobro
+  cobrando: false,
+};
+
+// Action types
+export const ActionTypes = {
+  ADD_ITEM: "ADD_ITEM",
+  UPDATE_CANTIDAD: "UPDATE_CANTIDAD",
+  REMOVE_ITEM: "REMOVE_ITEM",
+  CLEAR_CART: "CLEAR_CART",
+  SET_CLIENTE: "SET_CLIENTE",
+  SET_DESCUENTO: "SET_DESCUENTO",
+  REMOVE_DESCUENTO: "REMOVE_DESCUENTO",
+  SET_PUNTOS: "SET_PUNTOS",
+  REMOVE_PUNTOS: "REMOVE_PUNTOS",
+  SET_FORMA_PAGO: "SET_FORMA_PAGO",
+  SET_COBRANDO: "SET_COBRANDO",
+  OPEN_MODAL: "OPEN_MODAL",
+  CLOSE_MODAL: "CLOSE_MODAL",
+  SET_SALDO_PUNTOS: "SET_SALDO_PUNTOS",
+};
+
+// Reducer
+export function posVentaReducer(state, action) {
+  switch (action.type) {
+    case ActionTypes.ADD_ITEM: {
+      const { producto } = action.payload;
+      const idx = state.carrito.findIndex(
+        (item) => item.productoBaseId === producto.productoBaseId
+      );
+      
+      if (idx >= 0) {
+        const next = [...state.carrito];
+        const nuevo = { ...next[idx] };
+        if (nuevo.cantidad < producto.stock) {
+          nuevo.cantidad += 1;
+        }
+        next[idx] = nuevo;
+        return { ...state, carrito: next };
+      }
+      
+      return {
+        ...state,
+        carrito: [
+          ...state.carrito,
+          {
+            productoBaseId: producto.productoBaseId,
+            nombre: producto.nombre,
+            precio: producto.precioVenta,
+            cantidad: producto.unidadMedida === "kg" ? 1 : 1,
+            stockMax: producto.stock,
+            modoSalida: producto.modoSalidaDefault || "UNIDAD",
+            precioVentaUnitario: producto.precioVentaUnitario ?? producto.precioVenta,
+            precioVentaBulto: producto.precioVentaBulto ?? producto.precioVenta,
+            unidadMedida: producto.unidadMedida || "unidad",
+          },
+        ],
+      };
+    }
+
+    case ActionTypes.UPDATE_CANTIDAD: {
+      const { idx, nuevaCantidad } = action.payload;
+      const next = [...state.carrito];
+      next[idx] = { ...next[idx], cantidad: nuevaCantidad };
+      return { ...state, carrito: next };
+    }
+
+    case ActionTypes.REMOVE_ITEM: {
+      const { idx } = action.payload;
+      return {
+        ...state,
+        carrito: state.carrito.filter((_, i) => i !== idx),
+      };
+    }
+
+    case ActionTypes.CLEAR_CART: {
+      return {
+        ...state,
+        carrito: [],
+        descuento: 0,
+        descuentoInfo: null,
+        clienteSeleccionado: null,
+        puntosCanje: 0,
+        descuentoPorPuntos: 0,
+      };
+    }
+
+    case ActionTypes.SET_CLIENTE: {
+      return {
+        ...state,
+        clienteSeleccionado: action.payload,
+      };
+    }
+
+    case ActionTypes.SET_DESCUENTO: {
+      const { montoDescuento, tipo, valor } = action.payload;
+      return {
+        ...state,
+        descuento: montoDescuento,
+        descuentoInfo: { tipo, valor },
+        modalDescuento: false,
+      };
+    }
+
+    case ActionTypes.REMOVE_DESCUENTO: {
+      return {
+        ...state,
+        descuento: 0,
+        descuentoInfo: null,
+        modalDescuento: false,
+      };
+    }
+
+    case ActionTypes.SET_PUNTOS: {
+      const { puntosCanje, descuentoPorPuntos, saldoPuntos } = action.payload;
+      return {
+        ...state,
+        puntosCanje,
+        descuentoPorPuntos,
+        saldoPuntos: saldoPuntos !== undefined ? saldoPuntos : state.saldoPuntos,
+        modalCanjePuntos: false,
+      };
+    }
+
+    case ActionTypes.REMOVE_PUNTOS: {
+      return {
+        ...state,
+        puntosCanje: 0,
+        descuentoPorPuntos: 0,
+        modalCanjePuntos: false,
+      };
+    }
+
+    case ActionTypes.SET_SALDO_PUNTOS: {
+      return {
+        ...state,
+        saldoPuntos: action.payload,
+      };
+    }
+
+    case ActionTypes.SET_FORMA_PAGO: {
+      return {
+        ...state,
+        formaPago: action.payload,
+      };
+    }
+
+    case ActionTypes.SET_COBRANDO: {
+      return {
+        ...state,
+        cobrando: action.payload,
+      };
+    }
+
+    case ActionTypes.OPEN_MODAL: {
+      const { modal, data } = action.payload;
+      return {
+        ...state,
+        [modal]: data !== undefined ? data : true,
+      };
+    }
+
+    case ActionTypes.CLOSE_MODAL: {
+      const { modal } = action.payload;
+      const resetValue = modal === "modalEfectivo" || modal === "modalTicket" || modal === "modalConfirmacion" 
+        ? null 
+        : false;
+      return {
+        ...state,
+        [modal]: resetValue,
+      };
+    }
+
+    default:
+      return state;
+  }
+}
+
+
+

@@ -58,13 +58,22 @@ export async function DELETE(req, context) {
       }
     }
 
-    // Si no hay referencias, proceder con la eliminación
-    await prisma.productoLocal.deleteMany({
-      where: { baseId: numId },
-    });
+    // Si no hay referencias, proceder con la eliminación (transaccional)
+    await prisma.$transaction(async (tx) => {
+      // Eliminar StockLocal de todos los ProductoLocal de este base
+      await tx.stockLocal.deleteMany({
+        where: { productoId: { in: productoLocalIds } },
+      });
 
-    await prisma.productoBase.delete({
-      where: { id: numId },
+      // Eliminar ProductoLocal
+      await tx.productoLocal.deleteMany({
+        where: { baseId: numId },
+      });
+
+      // Eliminar ProductoBase
+      await tx.productoBase.delete({
+        where: { id: numId },
+      });
     });
 
     return NextResponse.json({ ok: true });

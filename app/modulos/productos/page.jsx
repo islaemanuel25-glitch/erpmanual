@@ -19,7 +19,7 @@ import FiltrosProductos from "@/components/productos/FiltrosProductos";
 import ColumnManager from "@/components/productos/ColumnManager";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
-import SelectorLocales from "@/components/productos/SelectorLocales";
+import useContextoActivo from "@/hooks/useContextoActivo";
 
 // =========================================================
 // TABS
@@ -33,6 +33,7 @@ export default function ProductosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { perfil: perfilProd, cargando: cargandoProd } = useUser();
+  const { loading: loadingCtx, contexto, needsContexto } = useContextoActivo();
 
   const permisosProd = perfilProd?.permisos || [];
   const esAdminProd = Array.isArray(permisosProd) && permisosProd.includes("*");
@@ -52,18 +53,13 @@ export default function ProductosPage() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [sortKey, setSortKey] = useState("createdAt");
+  const [sortDir, setSortDir] = useState("desc");
 
-  const [localId, setLocalId] = useState(() => {
-    if (typeof window !== "undefined") {
-      return Number(localStorage.getItem("productosLocalId") || 1);
-    }
-    return 1;
-  });
-
-  useEffect(() => {
-    localStorage.setItem("productosLocalId", String(localId));
-  }, [localId]);
+  const localId = contexto?.localId || 0;
 
   const [filtros, setFiltros] = useState({
     search: "",
@@ -94,13 +90,31 @@ export default function ProductosPage() {
     { key: "activo", label: "Estado" },
   ];
 
+  // "nombre" es obligatoria y no se puede ocultar
+  const LOCKED_COLS = ["nombre"];
+
   const [visibleCols, setVisibleCols] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("productosCols");
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Forzar columnas obligatorias
+        for (const k of LOCKED_COLS) {
+          if (!parsed.includes(k)) parsed.unshift(k);
+        }
+        return parsed;
+      }
     }
     return allColumns.map((c) => c.key);
   });
+
+  const handleVisibleColsChange = (next) => {
+    // Nunca permitir quitar columnas obligatorias
+    for (const k of LOCKED_COLS) {
+      if (!next.includes(k)) next.unshift(k);
+    }
+    setVisibleCols(next);
+  };
 
   useEffect(() => {
     localStorage.setItem("productosCols", JSON.stringify(visibleCols));
@@ -119,16 +133,12 @@ export default function ProductosPage() {
   // =========================================================
   // ESTADO IMPORT/EXPORT
   // =========================================================
-  const [locales, setLocales] = useState([]);
-
   // Export
-  const [expLocalId, setExpLocalId] = useState("");
   const [expProveedorId, setExpProveedorId] = useState("");
   const [expCategoriaId, setExpCategoriaId] = useState("");
   const [expLoading, setExpLoading] = useState(false);
 
   // Import
-  const [impLocalId, setImpLocalId] = useState("");
   const [impModo, setImpModo] = useState("crear_actualizar");
   const [impFile, setImpFile] = useState(null);
   const [impPreview, setImpPreview] = useState(null);
@@ -169,23 +179,14 @@ export default function ProductosPage() {
     }
   };
 
-  const fetchLocales = async () => {
-    try {
-      const res = await fetch("/api/locales/listar", { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        setLocales(data.items ?? []);
-      }
-    } catch (err) {
-      console.error("Error cargando locales:", err);
-    }
-  };
-
   const fetchProductos = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page,
+        pageSize,
+        sortKey,
+        sortDir,
         q: filtros.search,
         categoriaId: filtros.categoria,
         proveedorId: filtros.proveedor,
@@ -208,6 +209,7 @@ export default function ProductosPage() {
       if (data.ok) {
         setRows(data.items);
         setTotalPages(data.totalPages);
+        setTotalItems(data.total);
       }
     } catch (err) {
       console.error("Error cargando productos:", err);
@@ -217,12 +219,11 @@ export default function ProductosPage() {
 
   useEffect(() => {
     fetchCatalogos();
-    fetchLocales();
   }, []);
 
   useEffect(() => {
     fetchProductos();
-  }, [page, filtros, localId]);
+  }, [page, pageSize, sortKey, sortDir, filtros, localId]);
 
   useEffect(() => {
     if (nuevo === "1") {
@@ -333,10 +334,7 @@ export default function ProductosPage() {
   };
 
   const abrirNuevo = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("nuevo", "1");
-    params.delete("editar");
-    router.push(`/modulos/productos?${params.toString()}`);
+    router.push("/modulos/productos/nuevo");
   };
 
   const abrirActualizacionPrecios = () => {
@@ -348,11 +346,7 @@ export default function ProductosPage() {
       alert("Error: ID de producto inválido");
       return;
     }
-    const idNum = Number(id);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("editar", String(idNum));
-    params.delete("nuevo");
-    router.replace(`/modulos/productos?${params.toString()}`);
+    router.push(`/modulos/productos/${Number(id)}/editar`);
   };
 
   // =========================================================
@@ -366,7 +360,7 @@ export default function ProductosPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          localId: expLocalId ? Number(expLocalId) : null,
+          localId: localId || null,
           proveedorId: expProveedorId ? Number(expProveedorId) : null,
           categoriaId: expCategoriaId ? Number(expCategoriaId) : null,
         }),
@@ -411,8 +405,8 @@ export default function ProductosPage() {
     setImpResultado(null);
     setImpError("");
 
-    if (!impLocalId) {
-      setImpError("Seleccioná un local antes de importar");
+    if (!localId) {
+      setImpError("No hay contexto operativo activo");
       return;
     }
 
@@ -432,7 +426,7 @@ export default function ProductosPage() {
 
       // Validar columnas mínimas
       const cols = Object.keys(jsonData[0]);
-      const requeridas = ["nombre", "unidad_medida", "precio_costo", "precio_venta"];
+      const requeridas = ["codigo_barra", "nombre", "precio_costo", "precio_venta"];
       const faltantes = requeridas.filter((r) => !cols.includes(r));
       if (faltantes.length > 0) {
         setImpError(`Columnas faltantes: ${faltantes.join(", ")}`);
@@ -446,7 +440,7 @@ export default function ProductosPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          localId: Number(impLocalId),
+          localId: Number(localId),
           modo: impModo,
           productos: jsonData,
         }),
@@ -476,7 +470,7 @@ export default function ProductosPage() {
   // IMPORT: Confirmar importación
   // =========================================================
   const handleImportConfirm = async () => {
-    if (!impPreview || !impLocalId) return;
+    if (!impPreview || !localId) return;
 
     // Filtrar solo crear y actualizar
     const productosValidos = impPreview.filter(
@@ -496,7 +490,7 @@ export default function ProductosPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          localId: Number(impLocalId),
+          localId: Number(localId),
           modo: impModo,
           productos: productosValidos,
         }),
@@ -544,7 +538,8 @@ export default function ProductosPage() {
   // =========================================================
   // RENDER
   // =========================================================
-  if (cargandoProd) return null;
+  if (cargandoProd || loadingCtx) return null;
+  if (needsContexto) { router.push("/inicio"); return null; }
   if (!puedeProd) return <SinPermisos />;
 
   return (
@@ -578,14 +573,6 @@ export default function ProductosPage() {
               ========================================================= */}
           {activeTab === "listado" && (
             <>
-              {/* ALCANCE */}
-              <SunmiSeparator label="Alcance" className="!my-1" />
-
-              <SelectorLocales
-                value={localId}
-                onChange={(v) => setLocalId(Number(v))}
-              />
-
               {/* FILTROS */}
               <SunmiSeparator label="Filtros" className="!my-1" />
 
@@ -612,7 +599,8 @@ export default function ProductosPage() {
                 <ColumnManager
                   allColumns={allColumns}
                   visibleKeys={visibleCols}
-                  onChange={setVisibleCols}
+                  onChange={handleVisibleColsChange}
+                  lockedKeys={LOCKED_COLS}
                 />
               </div>
 
@@ -624,12 +612,29 @@ export default function ProductosPage() {
                   <SunmiTablaProductos
                     rows={rows}
                     columns={allColumns.filter((c) =>
-                      visibleCols.includes(c.key)
+                      c.key === "nombre" ? true : visibleCols.includes(c.key)
                     )}
                     page={page}
+                    pageSize={pageSize}
                     totalPages={totalPages}
+                    totalItems={totalItems}
                     onNext={() => setPage((p) => p + 1)}
                     onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size);
+                      setPage(1);
+                    }}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={(key) => {
+                      if (key === sortKey) {
+                        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                      } else {
+                        setSortKey(key);
+                        setSortDir("asc");
+                      }
+                      setPage(1);
+                    }}
                     onEditar={abrirEditar}
                     onEliminar={handleEliminar}
                     catalogos={catalogos}
@@ -654,22 +659,7 @@ export default function ProductosPage() {
                   ===================================================== */}
               <SunmiSeparator label="Exportar productos" className="!my-1" />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 px-1">
-                <div>
-                  <label className="text-[11px] text-slate-400 mb-1 block">Local</label>
-                  <SunmiSelectAdv
-                    value={expLocalId}
-                    onChange={(val) => setExpLocalId(val)}
-                  >
-                    <option value="">Todos</option>
-                    {locales.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.nombre} {l.es_deposito ? "(Depósito)" : ""}
-                      </option>
-                    ))}
-                  </SunmiSelectAdv>
-                </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-1">
                 <div>
                   <label className="text-[11px] text-slate-400 mb-1 block">Proveedor</label>
                   <SunmiSelectAdv
@@ -712,27 +702,61 @@ export default function ProductosPage() {
                   ===================================================== */}
               <SunmiSeparator label="Importar productos" className="!my-2" />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-1">
-                <div>
-                  <label className="text-[11px] text-slate-400 mb-1 block">
-                    Importar a local <span className="text-red-400">*</span>
-                  </label>
-                  <SunmiSelectAdv
-                    value={impLocalId}
-                    onChange={(val) => {
-                      setImpLocalId(val);
-                      resetImport();
-                    }}
-                  >
-                    <option value="">-- Seleccionar local --</option>
-                    {locales.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.nombre} {l.es_deposito ? "(Depósito)" : ""}
-                      </option>
-                    ))}
-                  </SunmiSelectAdv>
-                </div>
+              {/* Plantilla + Instructivo */}
+              <div className="px-1 mt-1 mb-2">
+                <a
+                  href="/templates/import_productos.xlsx"
+                  download
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[13px] font-semibold hover:bg-amber-500/30 transition"
+                >
+                  Descargar plantilla Excel
+                </a>
 
+                <details className="mt-3 rounded-lg border border-slate-700 bg-slate-800/50 overflow-hidden">
+                  <summary className="px-3 py-2 cursor-pointer text-[13px] font-semibold text-cyan-400 hover:text-cyan-300 select-none">
+                    Como preparar el Excel para importar productos
+                  </summary>
+                  <div className="px-3 pb-3 text-[12px] text-slate-300 leading-relaxed">
+                    <p className="mt-2 mb-2 text-slate-400 font-medium">Columnas del archivo:</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[11px] border-collapse">
+                        <thead>
+                          <tr className="text-left text-slate-400 border-b border-slate-700">
+                            <th className="py-1 pr-3">Columna</th>
+                            <th className="py-1 pr-3">Requerido</th>
+                            <th className="py-1">Valores / Notas</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-slate-300">
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-amber-400">codigo_barra</td><td className="py-1 pr-3 text-red-400">Obligatorio</td><td className="py-1">Unico por grupo</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-amber-400">nombre</td><td className="py-1 pr-3 text-red-400">Obligatorio</td><td className="py-1">Nombre del producto</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">unidad_medida</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">unidad | pack | cajon | kg (defecto: unidad)</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">factor_pack</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Cantidad de unidades por bulto (para pack/cajon)</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-amber-400">precio_costo</td><td className="py-1 pr-3 text-red-400">Obligatorio</td><td className="py-1">Mayor a 0</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-amber-400">precio_venta</td><td className="py-1 pr-3 text-red-400">Obligatorio</td><td className="py-1">Mayor a 0</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">margen</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Porcentaje (ej: 50)</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">categoria</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">proveedor</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">area_fisica</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
+                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">stock_inicial</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Cantidad inicial de stock</td></tr>
+                          <tr><td className="py-1 pr-3 font-mono text-slate-400">activo</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">SI / NO / true / false (defecto: SI)</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <p className="mt-3 mb-1 text-slate-400 font-medium">Reglas:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-slate-400">
+                      <li>El <span className="text-amber-400">codigo_barra</span> no puede repetirse dentro del archivo</li>
+                      <li>Si el codigo ya existe en el sistema, se clasifica como <span className="text-cyan-400">actualizar</span></li>
+                      <li>Si no existe, se clasifica como <span className="text-emerald-400">crear</span></li>
+                      <li>Categoria, proveedor y area_fisica deben coincidir exactamente con los nombres del catalogo (sin importar mayusculas)</li>
+                      <li>La primera fila del Excel debe ser los headers (nombres de columna)</li>
+                    </ul>
+                  </div>
+                </details>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-1">
                 <div>
                   <label className="text-[11px] text-slate-400 mb-1 block">
                     Modo de importación
@@ -760,7 +784,7 @@ export default function ProductosPage() {
                   type="file"
                   accept=".xlsx,.xls"
                   onChange={handleFileChange}
-                  disabled={!impLocalId || impLoading}
+                  disabled={!localId || impLoading}
                   className="text-[12px] text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[12px] file:font-medium file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600 disabled:opacity-50"
                 />
               </div>

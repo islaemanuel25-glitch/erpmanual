@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { toUnidades } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -29,7 +30,15 @@ export async function POST(req) {
     // ======================================================
     const transferencia = await prisma.transferencia.findUnique({
       where: { id: transferenciaId },
-      include: { detalle: true },
+      include: {
+        detalle: {
+          include: {
+            producto: {
+              include: { base: { select: { factor_pack: true } } },
+            },
+          },
+        },
+      },
     });
 
     if (!transferencia) {
@@ -79,6 +88,11 @@ export async function POST(req) {
 
       if (cant <= 0) continue;
 
+      // Convertir bulto→unidades antes de incrementar stock
+      const factorPack = Number(item.producto?.base?.factor_pack || 1);
+      const unidad = item.unidadEnviada || "BULTO";
+      const unidades = toUnidades({ cantidad: cant, unidad, factorPack });
+
       await prisma.stockLocal.upsert({
         where: {
           localId_productoId: {
@@ -88,13 +102,13 @@ export async function POST(req) {
         },
         update: {
           cantidad: {
-            increment: cant,
+            increment: unidades,
           },
         },
         create: {
           localId: destinoId,
           productoId: item.productoId,
-          cantidad: cant,
+          cantidad: unidades,
           stockMin: 0,
           stockMax: 0,
         },

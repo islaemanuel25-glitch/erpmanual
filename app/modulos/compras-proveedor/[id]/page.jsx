@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
@@ -21,6 +21,7 @@ const ESTADO_BADGE = {
   CONFIRMADO: "bg-amber-600 text-amber-100",
   ENVIADO: "bg-cyan-600 text-cyan-100",
   RECIBIDO: "bg-green-600 text-green-100",
+  ANULADO: "bg-red-600 text-red-100",
 };
 
 function formatFecha(f) {
@@ -51,6 +52,13 @@ export default function DetallePedidoProveedorPage({ params }) {
 
   // Costos editables por ítem (en recepción)
   const [costos, setCostos] = useState({});
+
+  // Buscar producto extra (recepción)
+  const [extraSearch, setExtraSearch] = useState("");
+  const [extraResults, setExtraResults] = useState([]);
+  const [extraLoading, setExtraLoading] = useState(false);
+  const [extraAdding, setExtraAdding] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   // Factura / ganancia (totalFactura es computed, no editable)
   const [totalReal, setTotalReal] = useState("");
@@ -119,6 +127,8 @@ export default function DetallePedidoProveedorPage({ params }) {
         url = `/api/compras-proveedor/confirmar/${id}`;
       } else if (accion === "enviar") {
         url = `/api/compras-proveedor/marcar-enviado/${id}`;
+      } else if (accion === "anular") {
+        url = `/api/compras-proveedor/anular/${id}`;
       } else if (accion === "recibir") {
         url = `/api/compras-proveedor/recibir/${id}`;
         bodyData = {
@@ -146,6 +156,102 @@ export default function DetallePedidoProveedorPage({ params }) {
       }
     } finally {
       setActing(false);
+    }
+  };
+
+  // --- Buscar producto extra (debounced) ---
+  const debounceRef = useRef(null);
+
+  const buscarExtra = useCallback(
+    (text) => {
+      setExtraSearch(text);
+      setExtraResults([]);
+
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+
+      if (!text.trim() || !pedido?.proveedorId) {
+        setExtraLoading(false);
+        return;
+      }
+
+      setExtraLoading(true);
+      debounceRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(
+            `/api/compras-proveedor/productos?proveedorId=${pedido.proveedorId}&search=${encodeURIComponent(text.trim())}`,
+            { credentials: "include" }
+          );
+          const data = await res.json();
+          if (data.ok) {
+            // Filtrar productos ya en el pedido
+            const idsEnPedido = new Set(
+              (pedido.detalles || []).map((d) => d.productoLocalId)
+            );
+            const filtrados = (data.items || []).filter(
+              (p) => !idsEnPedido.has(p.productoLocalId)
+            );
+            setExtraResults(filtrados.slice(0, 10));
+          }
+        } catch {
+          // silenciar
+        } finally {
+          setExtraLoading(false);
+        }
+      }, 350);
+    },
+    [pedido]
+  );
+
+  const agregarExtra = async (producto) => {
+    setExtraAdding(producto.productoLocalId);
+    try {
+      const res = await fetch(`/api/compras-proveedor/agregar-item/${id}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productoLocalId: producto.productoLocalId,
+          cantidad: 1,
+          cantidadRecibida: 1,
+          precioCosto: producto.precio_costo || null,
+          unidad: producto.modoCompra || "BULTO",
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setExtraSearch("");
+        setExtraResults([]);
+        await cargar();
+      } else {
+        alert(data.error || "Error al agregar producto");
+      }
+    } catch {
+      alert("Error de conexión");
+    } finally {
+      setExtraAdding(null);
+    }
+  };
+
+  const eliminarDetalle = async (detalleId) => {
+    if (!confirm("¿Eliminar este ítem del pedido?")) return;
+    setDeleting(detalleId);
+    try {
+      const res = await fetch(`/api/compras-proveedor/eliminar-item/${id}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ detalleId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        await cargar();
+      } else {
+        alert(data.error || "Error al eliminar ítem");
+      }
+    } catch {
+      alert("Error de conexión");
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -248,7 +354,7 @@ export default function DetallePedidoProveedorPage({ params }) {
           </div>
 
           {/* Fechas de flujo */}
-          <div className="grid grid-cols-3 gap-4 text-sm mt-3 pt-3 border-t border-slate-700/40">
+          <div className="grid grid-cols-4 gap-4 text-sm mt-3 pt-3 border-t border-slate-700/40">
             <div>
               <span className="text-slate-400 text-xs">Confirmado</span>
               <p className="text-slate-100">{formatFecha(pedido.fechaConfirmado)}</p>
@@ -260,6 +366,12 @@ export default function DetallePedidoProveedorPage({ params }) {
             <div>
               <span className="text-slate-400 text-xs">Recibido</span>
               <p className="text-slate-100">{formatFecha(pedido.fechaRecibido)}</p>
+            </div>
+            <div>
+              <span className="text-slate-400 text-xs">Anulado</span>
+              <p className={pedido.fechaAnulado ? "text-red-400" : "text-slate-100"}>
+                {formatFecha(pedido.fechaAnulado)}
+              </p>
             </div>
           </div>
         </SunmiPanel>
@@ -379,6 +491,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                 ...(esRecepcion && tieneFiambre ? ["Kg recibidos"] : []),
                 ...(pedido.estado === "RECIBIDO" ? ["Recibido"] : []),
                 ...(pedido.estado === "RECIBIDO" && tieneFiambre ? ["Kg reales"] : []),
+                ...(esRecepcion ? [""] : []),
               ]}
             >
               {(pedido.detalles || []).length === 0 ? (
@@ -522,6 +635,19 @@ export default function DetallePedidoProveedorPage({ params }) {
                             : "-"}
                         </td>
                       )}
+
+                      {esRecepcion && (
+                        <td className="px-3 py-1.5 text-center">
+                          <button
+                            type="button"
+                            disabled={deleting === det.id}
+                            onClick={() => eliminarDetalle(det.id)}
+                            className="text-red-400 hover:text-red-300 text-xs font-medium disabled:opacity-40"
+                          >
+                            {deleting === det.id ? "..." : "✕"}
+                          </button>
+                        </td>
+                      )}
                     </SunmiTableRow>
                   );
                 })
@@ -532,7 +658,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                 // Contar columnas visibles antes de esta fila
                 const baseCols = 5; // Producto, SKU, Cant. pedida, Unidad, Costo
                 const extraCols =
-                  (esRecepcion ? 1 : 0) +
+                  (esRecepcion ? 2 : 0) +
                   (esRecepcion && tieneFiambre ? 1 : 0) +
                   (pedido.estado === "RECIBIDO" ? 1 : 0) +
                   (pedido.estado === "RECIBIDO" && tieneFiambre ? 1 : 0);
@@ -552,8 +678,82 @@ export default function DetallePedidoProveedorPage({ params }) {
           </div>
         </SunmiPanel>
 
+        {/* Agregar producto extra — solo en recepción (ENVIADO) */}
+        {esRecepcion && (
+          <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-cyan-500/30 shadow-sm mb-4">
+            <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
+              <h3 className="text-[13px] font-semibold text-slate-200">
+                Agregar producto extra
+              </h3>
+            </div>
+
+            <SunmiInput
+              type="text"
+              placeholder="Buscar producto extra (nombre / SKU / código de barra)"
+              value={extraSearch}
+              onChange={(e) => buscarExtra(e.target.value)}
+              className="mb-3"
+            />
+
+            {extraLoading && (
+              <p className="text-xs text-slate-400">Buscando...</p>
+            )}
+
+            {!extraLoading && extraSearch.trim() && extraResults.length === 0 && (
+              <p className="text-xs text-slate-500">Sin resultados</p>
+            )}
+
+            {extraResults.length > 0 && (
+              <div className="overflow-x-auto rounded border border-slate-700">
+                <SunmiTable headers={["Producto", "SKU", "Cód. barra", "Modo", "Costo", ""]}>
+                  {extraResults.map((p) => (
+                    <SunmiTableRow key={p.productoLocalId}>
+                      <td className="px-3 py-1.5 text-sm">{p.nombre}</td>
+                      <td className="px-3 py-1.5 text-xs text-slate-400">{p.sku || "-"}</td>
+                      <td className="px-3 py-1.5 text-xs text-slate-400">{p.codigo_barra || "-"}</td>
+                      <td className="px-3 py-1.5 text-xs">
+                        {p.modoCompra === "UNIDAD" ? (
+                          <span className="text-cyan-400">FIAMBRE</span>
+                        ) : (
+                          "BULTO"
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 text-xs">
+                        {p.precio_costo ? `$${Number(p.precio_costo).toFixed(2)}` : "-"}
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <SunmiButton
+                          color="cyan"
+                          size="xs"
+                          disabled={extraAdding === p.productoLocalId}
+                          onClick={() => agregarExtra(p)}
+                        >
+                          {extraAdding === p.productoLocalId ? "..." : "Agregar"}
+                        </SunmiButton>
+                      </td>
+                    </SunmiTableRow>
+                  ))}
+                </SunmiTable>
+              </div>
+            )}
+          </SunmiPanel>
+        )}
+
         {/* Acciones */}
         <div className="flex justify-end gap-3">
+          {["BORRADOR", "CONFIRMADO", "ENVIADO"].includes(pedido.estado) && (
+            <SunmiButton
+              color="red"
+              disabled={acting}
+              onClick={() => {
+                if (!confirm("¿Anular este pedido? Esta acción no se puede deshacer.")) return;
+                ejecutarAccion("anular");
+              }}
+            >
+              {acting ? "Procesando..." : "Anular pedido"}
+            </SunmiButton>
+          )}
+
           {pedido.estado === "BORRADOR" && (
             <SunmiButton
               color="amber"

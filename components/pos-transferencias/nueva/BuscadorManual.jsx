@@ -10,6 +10,8 @@ export default function BuscadorManual({
   loading,
   resultados,
   onAgregar,
+  modo,
+  onModoChange,
 }) {
   const [focusIndex, setFocusIndex] = useState(-1);
 
@@ -141,8 +143,37 @@ export default function BuscadorManual({
   return (
     <div className="relative w-full mb-3">
 
-      <div className="text-[11px] uppercase tracking-wide text-cyan-400 mb-1 pl-1">
-        Buscar · Escanear · Hablar
+      <div className="flex items-center justify-between mb-1 pl-1">
+        <span className="text-[11px] uppercase tracking-wide text-cyan-400">
+          Buscar · Escanear · Hablar
+        </span>
+
+        {onModoChange && (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => onModoChange("manual")}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition ${
+                modo === "manual"
+                  ? "bg-cyan-500 text-slate-900"
+                  : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+              }`}
+            >
+              Manual
+            </button>
+            <button
+              type="button"
+              onClick={() => onModoChange("rotura")}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition ${
+                modo === "rotura"
+                  ? "bg-red-500 text-white"
+                  : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+              }`}
+            >
+              Rotura
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="relative">

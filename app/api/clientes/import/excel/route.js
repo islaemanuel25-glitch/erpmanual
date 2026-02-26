@@ -57,7 +57,7 @@ export async function POST(req) {
 
     if (!localId || localId <= 0) {
       return NextResponse.json(
-        { ok: false, error: "Seleccioná un local." },
+        { ok: false, error: "No hay contexto operativo activo." },
         { status: 400 }
       );
     }

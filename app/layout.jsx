@@ -9,7 +9,14 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("erp-sunmi-theme");if(typeof t!=="string"||t.length<1||!/^[a-zA-Z0-9_-]+$/.test(t))t="sunmiDark";document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme="sunmiDark";}})();`,
+          }}
+        />
+      </head>
       <body>
         <ThemeClientWrapper>
           <UserProvider>{children}</UserProvider>

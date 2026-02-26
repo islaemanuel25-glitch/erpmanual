@@ -1,7 +1,9 @@
 "use client";
 
+import { memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { showError } from "@/components/sunmi/SunmiToast";
 
 const COMISION_PCT = 7;
 
@@ -20,7 +22,7 @@ function formatPrecio(n) {
   });
 }
 
-export default function FormaPago({
+function FormaPago({
   subtotal,
   descuento = 0,
   descuentoPorPuntos = 0,
@@ -29,6 +31,10 @@ export default function FormaPago({
   onCobrar,
   cobrando,
   disabled,
+  offlineMode = false,
+  queueLength = 0,
+  onProcesarCola,
+  procesandoCola = false,
 }) {
   const forma = FORMAS_PAGO.find((f) => f.key === formaPago);
   const tieneComision = forma?.tieneComision || false;
@@ -38,75 +44,115 @@ export default function FormaPago({
   const netoRecibido = total - comisionBancaria;
 
   return (
-    <SunmiCard className="p-2 lg:p-3">
-      {/* Botones de forma de pago: 2x2 */}
-      <div className="grid grid-cols-3 lg:grid-cols-5 gap-2">
-        {FORMAS_PAGO.map((fp) => (
-          <SunmiButton
-            key={fp.key}
-            color={formaPago === fp.key ? "amber" : "cyan"}
-            onClick={() => onFormaPagoChange(fp.key)}
-            className="min-h-12 lg:min-h-10 text-sm !py-2"
-          >
-            {fp.label}
-          </SunmiButton>
-        ))}
-      </div>
-
-      {/* Descuento */}
-      {descuento > 0 && (
-        <div className="mt-2 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-center">
-          Descuento:{" "}
-          <span className="font-semibold text-emerald-300">
-            -${formatPrecio(descuento)}
-          </span>
-        </div>
-      )}
-
-      {/* Descuento por puntos */}
-      {descuentoPorPuntos > 0 && (
-        <div className="mt-2 px-2 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 text-xs text-center">
-          Descuento por puntos:{" "}
-          <span className="font-semibold text-purple-300">
-            -${formatPrecio(descuentoPorPuntos)}
-          </span>
-        </div>
-      )}
-
-      {/* Comision bancaria - info interna para el vendedor */}
-      {tieneComision && subtotal > 0 && (
-        <div className="mt-2 px-2 py-1.5 rounded-lg bg-slate-700/40 border border-slate-600/30 text-xs text-center text-slate-400">
-          Comision bancaria {COMISION_PCT}%:{" "}
-          <span className="font-semibold text-slate-300">
-            -${formatPrecio(comisionBancaria)}
-          </span>
-          <span className="ml-1 text-[10px]">(neto: ${formatPrecio(netoRecibido)})</span>
-        </div>
-      )}
-
-      {/* Total */}
-      <div className="mt-3 text-center">
-        <div className="text-xs text-slate-400 uppercase tracking-wide">
+    <SunmiCard className="p-3 lg:p-4 flex flex-col gap-3">
+      {/* Total a cobrar - bloque dominante */}
+      <div className="text-center py-2">
+        <div className="text-[11px] pos-text-muted uppercase tracking-widest font-medium">
           Total a cobrar
         </div>
-        <div className="text-3xl lg:text-2xl font-bold text-amber-400 mt-1">
+        <div className="text-4xl lg:text-5xl font-black pos-text-accent mt-1 tabular-nums tracking-tight">
           ${formatPrecio(total)}
         </div>
       </div>
 
-      {/* Boton cobrar */}
-      <div className="mt-3">
-        <SunmiButton
-          color="amber"
-          onClick={() => onCobrar({ formaPago, total })}
-          disabled={cobrando || disabled || !formaPago || subtotal <= 0}
-          className="!w-full min-h-16 lg:min-h-12 !text-xl lg:!text-lg !font-bold"
-        >
-          {cobrando ? "Procesando..." : `COBRAR $${formatPrecio(total)}`}
-        </SunmiButton>
+      {/* Botones según modo offline/online */}
+      {offlineMode ? (
+        <>
+          {/* Botón guardar pendiente (offline) - solo efectivo */}
+          <SunmiButton
+            color="amber"
+            onClick={() => onCobrar({ formaPago, total })}
+            disabled={cobrando || disabled || formaPago !== "efectivo" || subtotal <= 0}
+            className="!w-full min-h-14 lg:min-h-16 !text-lg lg:!text-xl !font-bold"
+          >
+            {cobrando ? "Guardando..." : `GUARDAR PENDIENTE $${formatPrecio(total)}`}
+          </SunmiButton>
+        </>
+      ) : (
+        <>
+          {/* Botón cobrar (online) */}
+          <SunmiButton
+            color="amber"
+            onClick={() => onCobrar({ formaPago, total })}
+            disabled={cobrando || disabled || !formaPago || subtotal <= 0}
+            className="!w-full min-h-14 lg:min-h-16 !text-lg lg:!text-xl !font-bold"
+          >
+            {cobrando ? "Procesando..." : `COBRAR $${formatPrecio(total)}`}
+          </SunmiButton>
+          
+          {/* Botón procesar cola (solo si hay items en cola y está online) */}
+          {queueLength > 0 && onProcesarCola && (
+            <SunmiButton
+              color="cyan"
+              onClick={onProcesarCola}
+              disabled={procesandoCola || offlineMode}
+              className="!w-full min-h-12 !text-base !font-semibold mt-2"
+            >
+              {procesandoCola ? "Procesando..." : `PROCESAR COLA (${queueLength})`}
+            </SunmiButton>
+          )}
+        </>
+      )}
+
+      {/* Formas de pago: grid 3x2 */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {FORMAS_PAGO.map((fp) => {
+          const esEfectivo = fp.key === "efectivo";
+          const estaDeshabilitado = offlineMode && !esEfectivo;
+          
+          return (
+            <SunmiButton
+              key={fp.key}
+              color={formaPago === fp.key ? "amber" : estaDeshabilitado ? "slate" : "cyan"}
+              onClick={() => {
+                if (offlineMode && !esEfectivo) {
+                  showError("Sin internet: solo efectivo disponible");
+                  return;
+                }
+                onFormaPagoChange(fp.key);
+              }}
+              disabled={estaDeshabilitado}
+              className={`min-h-11 text-xs !py-1.5 ${estaDeshabilitado ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {fp.label}
+            </SunmiButton>
+          );
+        })}
+      </div>
+
+      {/* Info descuentos y comisiones */}
+      <div className="space-y-1.5">
+        {descuento > 0 && (
+          <div className="px-2 py-1.5 rounded-lg pos-success-box text-xs text-center">
+            Descuento:{" "}
+            <span className="font-semibold pos-text-success-soft">
+              -${formatPrecio(descuento)}
+            </span>
+          </div>
+        )}
+
+        {descuentoPorPuntos > 0 && (
+          <div className="px-2 py-1.5 rounded-lg pos-points-box text-xs text-center">
+            Puntos:{" "}
+            <span className="font-semibold pos-text-points">
+              -${formatPrecio(descuentoPorPuntos)}
+            </span>
+          </div>
+        )}
+
+        {tieneComision && subtotal > 0 && (
+          <div className="px-2 py-1.5 rounded-lg pos-commission-box text-xs text-center pos-text-muted">
+            Comision {COMISION_PCT}%:{" "}
+            <span className="font-semibold pos-text-muted-strong">
+              -${formatPrecio(comisionBancaria)}
+            </span>
+            <span className="ml-1 text-[10px]">(neto: ${formatPrecio(netoRecibido)})</span>
+          </div>
+        )}
       </div>
     </SunmiCard>
   );
 }
 
+export default memo(FormaPago);
 export { COMISION_PCT, FORMAS_PAGO };

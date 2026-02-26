@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 export async function GET(req) {
   try {
@@ -175,12 +176,9 @@ export async function GET(req) {
         productoNombre: p.nombre || base.nombre,
         codigoBarra: base.codigo_barra || "",
 
-        // 💥 FIX DEFINITIVO: NUNCA null, siempre string real
-        categoriaNombre:
-          base?.categoria?.nombre?.trim() || "Sin categoría",
-
-        areaFisicaNombre:
-          base?.area_fisica?.nombre?.trim() || "Sin área",
+        // Filtros UI: devolver valor real o null (sin fallback de texto).
+        categoriaNombre: base?.categoria?.nombre?.trim() || null,
+        areaFisicaNombre: base?.area_fisica?.nombre?.trim() || null,
 
         stockActualDestino,
         stockMin: Number(stock.stockMin || 0),
@@ -193,7 +191,7 @@ export async function GET(req) {
         sugeridoUnidad,
         faltanteUnidades,
         factorPack,
-        modoEnvio: base.modo_envio || (base.unidad_medida === "cajon" ? "SOLO_BULTO" : "MIXTO"),
+        modoEnvio: base.modo_envio || defaultModoEnvio(base.unidad_medida),
         modoStock: base.modo_stock || "BULTO",
 
         // Campo legacy (compatibilidad)
@@ -203,6 +201,17 @@ export async function GET(req) {
         unidadMedida: base.unidad_medida,
         modoPedido: base.modo_pedido || "BULTO",
       });
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      const sampleConMeta = items.find((i) => i.categoriaNombre || i.areaFisicaNombre);
+      if (sampleConMeta) {
+        console.debug("[pos-transferencias/sugeridos] sample categoria/area", {
+          baseId: sampleConMeta.baseId,
+          categoriaNombre: sampleConMeta.categoriaNombre,
+          areaFisicaNombre: sampleConMeta.areaFisicaNombre,
+        });
+      }
     }
 
     return NextResponse.json({

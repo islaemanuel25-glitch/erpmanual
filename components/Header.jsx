@@ -1,18 +1,23 @@
 "use client";
 
-import { Bell, ChevronDown, LogOut } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { Bell, ChevronDown, LogOut, ArrowLeftRight, Store, Warehouse } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser } from "@/app/context/UserContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
   const { theme } = useSunmiTheme();
 
+  const esAdmin = Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
+
   const [open, setOpen] = useState(false);
+  const [contexto, setContexto] = useState(null); // { nombre, esDeposito } | null
+  const [contextoSinSeleccionar, setContextoSinSeleccionar] = useState(false);
 
   const nombre = perfil?.nombre || "Usuario";
   const rol = perfil?.rol || "-";
@@ -33,6 +38,31 @@ export default function Header() {
       : pathname.includes("pos")
       ? "POS"
       : "Panel";
+
+  // Cargar contexto activo para admin
+  const cargarContexto = useCallback(async () => {
+    if (!esAdmin) return;
+    try {
+      const res = await fetch("/api/contexto-activo/get", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setContexto({ nombre: data.nombre, esDeposito: data.esDeposito });
+        setContextoSinSeleccionar(false);
+      } else {
+        setContexto(null);
+        setContextoSinSeleccionar(data.needsContexto === true);
+      }
+    } catch {
+      setContexto(null);
+    }
+  }, [esAdmin]);
+
+  useEffect(() => {
+    cargarContexto();
+  }, [cargarContexto, pathname]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -72,6 +102,43 @@ export default function Header() {
             transition cursor-pointer
           `}
         />
+
+        {/* CONTEXTO ACTIVO (solo admin) */}
+        {esAdmin && contexto && (
+          <button
+            onClick={() => router.push("/inicio")}
+            className={`
+              hidden sm:flex items-center gap-1.5
+              text-[11px] px-2.5 py-1 rounded-lg
+              border transition cursor-pointer
+              ${theme.header.border}
+              hover:opacity-80
+            `}
+          >
+            {contexto.esDeposito ? (
+              <Warehouse size={13} className="text-amber-400" />
+            ) : (
+              <Store size={13} className="text-cyan-400" />
+            )}
+            <span className={theme.header.text}>
+              {contexto.esDeposito ? "Depósito: " : "Local: "}{contexto.nombre}
+            </span>
+          </button>
+        )}
+        {esAdmin && contextoSinSeleccionar && (
+          <button
+            onClick={() => router.push("/inicio")}
+            className={`
+              hidden sm:flex items-center gap-1.5
+              text-[11px] px-2.5 py-1 rounded-lg
+              border border-amber-500/40 transition cursor-pointer
+              hover:border-amber-400/60
+            `}
+          >
+            <Store size={13} className="text-amber-400" />
+            <span className="text-amber-400">(sin seleccionar)</span>
+          </button>
+        )}
 
         {/* USUARIO */}
         <div className="relative" ref={menuRef}>
@@ -137,6 +204,21 @@ export default function Header() {
               </div>
 
               <div className={`border-t my-1 ${theme.header.border}`} />
+
+              {esAdmin && (
+                <button
+                  onClick={() => { setOpen(false); router.push("/inicio"); }}
+                  className={`
+                    flex items-center gap-2 w-full text-left
+                    px-4 py-2 text-[13px]
+                    text-cyan-400 hover:bg-cyan-500/10
+                    transition
+                  `}
+                >
+                  <ArrowLeftRight size={16} />
+                  Cambiar local
+                </button>
+              )}
 
               <button
                 onClick={logout}

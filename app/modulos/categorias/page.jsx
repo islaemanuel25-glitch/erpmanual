@@ -15,24 +15,16 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import ModalCategoria from "@/components/categorias/ModalCategoria";
-import useLocalSelector from "@/hooks/useLocalSelector";
-import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
-import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
+import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 export default function CategoriasPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const {
-    perfil,
-    locales,
-    localSeleccionado,
-    localNombre,
-    esAdminSinLocal,
-    cargandoLocales,
-    handleCambiarLocal,
-  } = useLocalSelector();
+  const { perfil } = useUser();
+  const { loading: loadingCtx, needsContexto } = useContextoActivo();
 
   // ============================================
   // FILTROS + PAGINACIÓN
@@ -181,42 +173,16 @@ export default function CategoriasPage() {
   // ============================================
   // RENDER
   // ============================================
-  if (cargandoLocales) {
-    return (
-      <div className="p-6 flex justify-center">
-        <SunmiLoader />
-      </div>
-    );
-  }
+  if (!perfil || loadingCtx) return null;
+  if (needsContexto) { router.push("/inicio"); return null; }
 
   const permisosCat = perfil?.permisos || [];
   const esAdminCat = Array.isArray(permisosCat) && permisosCat.includes("*");
   if (!esAdminCat && !permisosCat.includes("productos.ver")) return <SinPermisos />;
 
-  if (esAdminSinLocal && !localSeleccionado) {
-    return (
-      <PantallaSeleccionLocal
-        locales={locales}
-        onSeleccionar={handleCambiarLocal}
-      />
-    );
-  }
-
   return (
     <div className="p-3 space-y-4">
       <SunmiCard>
-        {/* ========= SELECTOR LOCAL ========= */}
-        {locales.length > 1 && (
-          <div className="p-4 pb-0">
-            <SelectorLocalCompacto
-              locales={locales}
-              localSeleccionado={localSeleccionado}
-              localNombre={localNombre}
-              onChange={handleCambiarLocal}
-            />
-          </div>
-        )}
-
         {/* ========= FILTROS ========= */}
         <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <SunmiInput

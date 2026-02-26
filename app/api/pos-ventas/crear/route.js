@@ -17,7 +17,48 @@ export async function POST(req) {
     const { grupoId, localId, session } = scope;
 
     const body = await req.json();
-    const { clienteId, turnoId, formaPago, descuento, items, esFiado, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje } = body;
+    const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, esFiado, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje } = body;
+
+    // clientVentaId es alias de clientTxnId para compatibilidad con cola offline
+    const txnId = clientTxnId || clientVentaId;
+
+    // Verificar idempotencia por clientTxnId/clientVentaId
+    if (txnId) {
+      const ventaExistente = await prisma.venta.findUnique({
+        where: { clientTxnId: txnId },
+        select: {
+          id: true,
+          numero: true,
+          total: true,
+          fecha: true,
+          subtotal: true,
+          descuento: true,
+        },
+      });
+
+      if (ventaExistente) {
+        // Calcular breakdown desde venta existente
+        const descuentoAutomatico = 0; // No lo tenemos guardado, usar 0
+        const descuentoManual = Number(ventaExistente.descuento) || 0;
+        const descuentoPorPuntosVal = 0; // No lo tenemos guardado, usar 0
+
+        return NextResponse.json({
+          ok: true,
+          ventaId: ventaExistente.id,
+          numero: ventaExistente.numero,
+          message: `Venta #${ventaExistente.numero} ya registrada (idempotencia)`,
+          isDuplicate: true,
+          breakdown: {
+            subtotal: Number(ventaExistente.subtotal),
+            descuentoAutomatico,
+            descuentoManual,
+            descuentoPorPuntos: descuentoPorPuntosVal,
+            descuentoTotal: Number(ventaExistente.descuento),
+            total: Number(ventaExistente.total),
+          },
+        });
+      }
+    }
 
     // Validaciones
     if (!formaPago) {
@@ -41,9 +82,10 @@ export async function POST(req) {
       );
     }
 
-    // Validar cada item
+    // Validar cada item (cantidad puede ser decimal para KG)
     for (const item of items) {
-      if (!item.productoBaseId || !item.cantidad || item.cantidad <= 0) {
+      const cant = Number(item.cantidad);
+      if (!item.productoBaseId || !cant || cant <= 0) {
         return NextResponse.json(
           { ok: false, error: `Item invalido: ${item.nombre || "sin nombre"}` },
           { status: 400 }
@@ -58,6 +100,8 @@ export async function POST(req) {
           { status: 400 }
         );
       }
+      // Normalizar cantidad a número
+      item.cantidad = cant;
     }
 
     // Obtener descuento automático del cliente y sus tags
@@ -207,13 +251,78 @@ export async function POST(req) {
 
     // Transaccion: crear venta + descontar stock + movimiento CC si fiado
     const venta = await prisma.$transaction(async (tx) => {
-      // Obtener proximo numero de venta para este local
-      const ultima = await tx.venta.findFirst({
+      // Lock a nivel de transacción para evitar concurrencia en número de venta
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${Number(localId)})`;
+
+      // Calcular número de venta consultando el último número existente
+      const ultimaVenta = await tx.venta.findFirst({
         where: { localId },
         orderBy: { numero: "desc" },
         select: { numero: true },
       });
-      const numero = (ultima?.numero || 0) + 1;
+
+      const numero = ultimaVenta ? Number(ultimaVenta.numero) + 1 : 1;
+
+      // Actualizar contador para mantener consistencia (opcional, pero útil para consultas rápidas)
+      try {
+        await tx.posVentaCounter.upsert({
+          where: { localId },
+          update: { ultimoNumero: numero },
+          create: {
+            grupoId,
+            localId,
+            ultimoNumero: numero,
+          },
+        });
+      } catch (err) {
+        // Si falla el contador, no es crítico, el número ya está calculado
+        console.warn("Error actualizando contador (no crítico):", err);
+      }
+
+      // Validar y descontar stock con locks atómicos
+      const stockValidations = [];
+      for (const item of items) {
+        const productoLocal = await tx.productoLocal.findFirst({
+          where: { localId, baseId: item.productoBaseId },
+          select: { id: true },
+        });
+
+        if (!productoLocal) {
+          throw new Error(`Producto ${item.nombre || item.productoBaseId} no encontrado en este local`);
+        }
+
+        // Lockear stock con FOR UPDATE
+        const stockLocked = await tx.$queryRaw`
+          SELECT cantidad 
+          FROM "StockLocal" 
+          WHERE "localId" = ${localId} 
+            AND "productoId" = ${productoLocal.id}
+          FOR UPDATE
+        `;
+
+        const stockActual = stockLocked && Array.isArray(stockLocked) && stockLocked.length > 0 
+          ? Number(stockLocked[0].cantidad || 0)
+          : 0;
+        
+        if (stockActual < item.cantidad) {
+          throw new Error(
+            `Stock insuficiente para ${item.nombre || "producto"}. Disponible: ${stockActual}, Solicitado: ${item.cantidad}`
+          );
+        }
+
+        // Descontar stock
+        await tx.stockLocal.updateMany({
+          where: {
+            localId,
+            productoId: productoLocal.id,
+          },
+          data: {
+            cantidad: { decrement: item.cantidad },
+          },
+        });
+
+        stockValidations.push({ productoLocalId: productoLocal.id, cantidad: item.cantidad });
+      }
 
       // Crear venta
       const nuevaVenta = await tx.venta.create({
@@ -223,6 +332,7 @@ export async function POST(req) {
           clienteId: clienteId || null,
           turnoId: turnoId || null,
           numero,
+          clientTxnId: txnId || null,
           subtotal,
           descuento: descuentoTotal,
           total,
@@ -246,26 +356,6 @@ export async function POST(req) {
           },
         },
       });
-
-      // Descontar stock de cada item
-      for (const item of items) {
-        const productoLocal = await tx.productoLocal.findFirst({
-          where: { localId, baseId: item.productoBaseId },
-          select: { id: true },
-        });
-
-        if (!productoLocal) continue;
-
-        await tx.stockLocal.updateMany({
-          where: {
-            localId,
-            productoId: productoLocal.id,
-          },
-          data: {
-            cantidad: { decrement: item.cantidad },
-          },
-        });
-      }
 
       // Si es fiado, crear MovimientoCuenta DEBITO
       if (esFiado && clienteId) {
@@ -292,6 +382,44 @@ export async function POST(req) {
           // Si falla por unique constraint u otro error, loguear pero no romper la venta
           console.error("Error creando movimiento CC (venta continúa):", ccErr.message);
         }
+      }
+
+      // Canjear puntos dentro de transacción (si puntosCanje > 0)
+      if (clienteId && puntosCanje > 0) {
+        // Validar saldo dentro de transacción
+        const aggPuntos = await tx.clientePuntoMovimiento.groupBy({
+          by: ["direccion"],
+          where: { clienteId, localId, grupoId },
+          _sum: { puntos: true },
+        });
+
+        let creditosPuntos = 0;
+        let debitosPuntos = 0;
+        for (const row of aggPuntos) {
+          const val = Number(row._sum.puntos || 0);
+          if (row.direccion === "CREDITO") creditosPuntos = val;
+          else if (row.direccion === "DEBITO") debitosPuntos = val;
+        }
+        const saldoPuntos = creditosPuntos - debitosPuntos;
+
+        if (puntosCanje > saldoPuntos) {
+          throw new Error("Saldo de puntos insuficiente durante la transacción");
+        }
+
+        // Crear movimiento de canje asociado a la venta
+        await tx.clientePuntoMovimiento.create({
+          data: {
+            grupoId,
+            localId,
+            clienteId,
+            direccion: "DEBITO",
+            tipo: "CANJE",
+            puntos: puntosCanje,
+            ventaId: nuevaVenta.id,
+            userId: session.id,
+            nota: `Venta #${numero}`,
+          },
+        });
       }
 
       return nuevaVenta;
@@ -344,25 +472,8 @@ export async function POST(req) {
             }
           }
 
-          // 2. Asociar canje reciente a esta venta (si hubo)
-          if (puntosCanje > 0) {
-            const canjeReciente = await prisma.clientePuntoMovimiento.findFirst({
-              where: {
-                clienteId,
-                localId,
-                tipo: "CANJE",
-                ventaId: null,
-                createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
-              },
-              orderBy: { createdAt: "desc" },
-            });
-            if (canjeReciente) {
-              await prisma.clientePuntoMovimiento.update({
-                where: { id: canjeReciente.id },
-                data: { ventaId: venta.id },
-              });
-            }
-          }
+          // 2. Canje de puntos ya se procesó dentro de la transacción
+          // (removido: ya no se asocia canje previo, se crea directamente en transacción)
         }
       } catch (puntosErr) {
         console.error("Error procesando puntos (venta continúa):", puntosErr.message);
@@ -385,6 +496,30 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error("Error crear venta POS:", err);
+    
+    // Manejo de errores específicos
+    if (err.message && err.message.includes("Stock insuficiente")) {
+      return NextResponse.json(
+        { ok: false, error: err.message },
+        { status: 409 }
+      );
+    }
+    
+    if (err.message && err.message.includes("Saldo de puntos")) {
+      return NextResponse.json(
+        { ok: false, error: err.message },
+        { status: 409 }
+      );
+    }
+    
+    // Error de unique constraint (clientTxnId duplicado o número duplicado)
+    if (err.code === 'P2002') {
+      return NextResponse.json(
+        { ok: false, error: "Error de concurrencia. Intenta nuevamente." },
+        { status: 409 }
+      );
+    }
+    
     return NextResponse.json(
       { ok: false, error: "Error interno al registrar la venta" },
       { status: 500 }

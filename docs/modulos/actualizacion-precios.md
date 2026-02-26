@@ -32,7 +32,8 @@ Actualizacion masiva de precios de compra y venta por proveedor. Dos metodos: ed
 - Proveedores (proveedorId)
 - Productos (ProductoBase: precio_costo, precio_venta, margen, codigo_barra)
 - Grupos (grupoId de sesion)
-- SelectorGrupoActivo (cambio de grupo sin reload)
+
+**Nota:** El contexto se elige solo en /inicio y se muestra en Header.
 
 ### Genera
 - PrecioUpdate + PrecioUpdateItem (historial de cambios)
@@ -51,7 +52,8 @@ Actualizacion masiva de precios de compra y venta por proveedor. Dos metodos: ed
 
 ## Componentes principales
 - `ActualizacionPreciosPage`: Pagina completa con 2 tabs
-- `SelectorGrupoActivo`: Selector de grupo (callback onGrupoChanged)
+
+**Nota:** El contexto se elige solo en /inicio y se muestra en Header.
 
 ## Estado y hooks
 - Estado local simple (sin hook externo para la pagina principal)

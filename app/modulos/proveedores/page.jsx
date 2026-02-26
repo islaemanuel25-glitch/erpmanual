@@ -17,9 +17,8 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import SunmiPill from "@/components/sunmi/SunmiPill"; // 🔥 agregado para chips
 
 import ModalProveedor from "@/components/proveedores/ModalProveedor";
-import useLocalSelector from "@/hooks/useLocalSelector";
-import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
-import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
+import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 const PAGE_SIZE = 10;
@@ -28,15 +27,8 @@ export default function ProveedoresPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const {
-    perfil,
-    locales,
-    localSeleccionado,
-    localNombre,
-    esAdminSinLocal,
-    cargandoLocales,
-    handleCambiarLocal,
-  } = useLocalSelector();
+  const { perfil } = useUser();
+  const { loading: loadingCtx, needsContexto } = useContextoActivo();
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -157,42 +149,16 @@ export default function ProveedoresPage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  if (cargandoLocales) {
-    return (
-      <div className="sunmi-bg w-full min-h-full p-4 flex justify-center items-center">
-        <span className="text-sm text-slate-400">Cargando...</span>
-      </div>
-    );
-  }
+  if (!perfil || loadingCtx) return null;
+  if (needsContexto) { router.push("/inicio"); return null; }
 
   const permisosP = perfil?.permisos || [];
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("proveedores.ver")) return <SinPermisos />;
 
-  if (esAdminSinLocal && !localSeleccionado) {
-    return (
-      <PantallaSeleccionLocal
-        locales={locales}
-        onSeleccionar={handleCambiarLocal}
-      />
-    );
-  }
-
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-        {/* ========= SELECTOR LOCAL ========= */}
-        {locales.length > 1 && (
-          <div className="px-2 pt-2">
-            <SelectorLocalCompacto
-              locales={locales}
-              localSeleccionado={localSeleccionado}
-              localNombre={localNombre}
-              onChange={handleCambiarLocal}
-            />
-          </div>
-        )}
-
         <SunmiSeparator label="Filtros" className="my-4" />
 
         {/* ===================== */}
@@ -246,7 +212,7 @@ export default function ProveedoresPage() {
               "Email",
               "CUIT",
               "Días",
-              "Pedidos",   // 🔥 nueva columna
+              "Compras",
               "Estado",
               "Acciones",
             ]}
@@ -276,14 +242,14 @@ export default function ProveedoresPage() {
                     )}
                   </td>
 
-                  {/* 🔥 BOTÓN PEDIDOS */}
+                  {/* BOTÓN COMPRAS */}
                   <td className="px-3 py-2 text-center">
                     <SunmiButton
                       onClick={() =>
-                        router.push(`/modulos/pedidos?proveedorId=${item.id}`)
+                        router.push(`/modulos/compras-proveedor/nueva?proveedorId=${item.id}`)
                       }
                     >
-                      Pedidos
+                      Nuevo pedido
                     </SunmiButton>
                   </td>
 

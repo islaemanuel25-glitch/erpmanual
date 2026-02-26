@@ -7,15 +7,29 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+
+// Campos que se pueden ordenar desde el backend
+const SORTABLE_KEYS = [
+  "nombre", "codigoBarra", "precioCosto", "precioVenta",
+  "margen", "categoriaId", "proveedorId", "activo",
+];
+
+const PAGE_SIZES = [25, 50, 100];
 
 export default function SunmiTablaProductos({
   rows,
   columns,
   page,
+  pageSize = 25,
   totalPages,
+  totalItems = 0,
   onNext,
   onPrev,
+  onPageSizeChange,
+  sortKey,
+  sortDir,
+  onSort,
   onEditar,
   onEliminar,
   catalogos,
@@ -44,7 +58,7 @@ export default function SunmiTablaProductos({
   const DEFINICIONES = {
     imagenUrl: {
       titulo: "Img",
-      className: "w-16",
+      thClass: "w-[56px]",
       render: (_, row) =>
         row.imagenUrl ? (
           <img
@@ -59,12 +73,13 @@ export default function SunmiTablaProductos({
         ),
     },
 
-    codigoBarra: { titulo: "Código" },
-    sku: { titulo: "SKU" },
-    nombre: { titulo: "Nombre" },
+    codigoBarra: { titulo: "Código", thClass: "w-[140px]", tdClass: "truncate overflow-hidden text-slate-400", titleKey: "codigoBarra" },
+    sku: { titulo: "SKU", thClass: "w-[90px]" },
+    nombre: { titulo: "Nombre", tdClass: "whitespace-normal break-words line-clamp-2 overflow-hidden leading-tight", titleKey: "nombre" },
 
     categoriaId: {
       titulo: "Categoría",
+      thClass: "w-[100px]",
       render: (v) =>
         CAT[String(v)] ? (
           <SunmiPill color="amber">{CAT[String(v)]}</SunmiPill>
@@ -75,6 +90,7 @@ export default function SunmiTablaProductos({
 
     proveedorId: {
       titulo: "Proveedor",
+      thClass: "w-[100px]",
       render: (v) =>
         PROV[String(v)] ? (
           <SunmiPill color="cyan">{PROV[String(v)]}</SunmiPill>
@@ -85,6 +101,7 @@ export default function SunmiTablaProductos({
 
     areaFisicaId: {
       titulo: "Área",
+      thClass: "w-[100px]",
       render: (v) =>
         AREA[String(v)] ? (
           <SunmiPill color="slate">{AREA[String(v)]}</SunmiPill>
@@ -95,40 +112,50 @@ export default function SunmiTablaProductos({
 
     unidadMedida: {
       titulo: "Unidad",
+      thClass: "w-[80px]",
       render: (v) => <SunmiPill color="amber">{v}</SunmiPill>,
     },
 
-    factorPack: { titulo: "Pack" },
-    pesoKg: { titulo: "Peso" },
-    volumenMl: { titulo: "Vol" },
+    factorPack: { titulo: "Pack", thClass: "w-[56px]", tdClass: "text-center" },
+    pesoKg: { titulo: "Peso", thClass: "w-[56px]", tdClass: "text-center" },
+    volumenMl: { titulo: "Vol", thClass: "w-[56px]", tdClass: "text-center" },
 
     precioCosto: {
       titulo: "Costo",
+      thClass: "w-[90px]",
+      tdClass: "text-right",
       render: money,
     },
 
     margen: {
-      titulo: "Margen %",
-      render: (v) => (v != null ? `${Number(v).toFixed(2)}%` : "-"),
+      titulo: "Margen",
+      thClass: "w-[70px]",
+      tdClass: "text-right",
+      render: (v) => (v != null ? `${Number(v).toFixed(1)}%` : "-"),
     },
 
     precioVenta: {
       titulo: "Venta",
+      thClass: "w-[90px]",
+      tdClass: "text-right",
       render: money,
     },
 
     ivaPorcentaje: {
       titulo: "IVA %",
+      thClass: "w-[80px]",
       render: (v) => (v != null ? `${v}%` : "-"),
     },
 
     fechaVencimiento: {
       titulo: "Vencimiento",
+      thClass: "w-[100px]",
       render: (v) => (v ? new Date(v).toLocaleDateString("es-AR") : "-"),
     },
 
     esCombo: {
       titulo: "Combo",
+      thClass: "w-[70px]",
       render: (v) =>
         v ? (
           <SunmiPill color="cyan">Sí</SunmiPill>
@@ -139,6 +166,7 @@ export default function SunmiTablaProductos({
 
     activo: {
       titulo: "Estado",
+      thClass: "w-[80px]",
       render: (v) => <SunmiBadgeEstado value={v} />,
     },
   };
@@ -149,13 +177,42 @@ export default function SunmiTablaProductos({
       return {
         key: c.key,
         titulo: DEFINICIONES[c.key].titulo,
-        className: DEFINICIONES[c.key].className,
+        thClass: DEFINICIONES[c.key].thClass,
+        tdClass: DEFINICIONES[c.key].tdClass,
+        titleKey: DEFINICIONES[c.key].titleKey,
         render: DEFINICIONES[c.key].render,
       };
     })
     .filter(Boolean);
 
-  const headers = [...columnas.map((c) => c.titulo), "Acciones"];
+  const headers = [
+    ...columnas.map((c) => {
+      const isSortable = SORTABLE_KEYS.includes(c.key);
+      const isActive = sortKey === c.key;
+
+      const sortIcon = isSortable
+        ? isActive
+          ? sortDir === "asc"
+            ? <ArrowUp size={11} className="inline ml-0.5" />
+            : <ArrowDown size={11} className="inline ml-0.5" />
+          : <ArrowUpDown size={11} className="inline ml-0.5 opacity-30" />
+        : null;
+
+      const label = (
+        <span
+          className={isSortable ? "cursor-pointer select-none hover:text-amber-600 transition-colors" : ""}
+          onClick={isSortable ? () => onSort?.(c.key) : undefined}
+        >
+          {c.titulo}
+          {sortIcon}
+        </span>
+      );
+
+      // Siempre devolver { label, className } para que SunmiTable renderice el encabezado (si no hay thClass, h.label era undefined)
+      return { label, className: c.thClass || "" };
+    }),
+    { label: "Acciones", className: "w-[80px]" },
+  ];
   const colSpan = headers.length;
 
   return (
@@ -169,13 +226,14 @@ export default function SunmiTablaProductos({
               {columnas.map((c) => (
                 <td
                   key={c.key}
-                  className="px-3 py-1.5 whitespace-nowrap text-[13px]"
+                  className={`px-3 py-1.5 text-[12px] ${c.tdClass || "whitespace-nowrap"}`}
+                  title={c.titleKey ? String(row[c.titleKey] ?? "") : undefined}
                 >
                   {c.render ? c.render(row[c.key], row) : row[c.key] ?? "-"}
                 </td>
               ))}
 
-              <td className="px-3 py-1.5 text-right flex gap-1 justify-end">
+              <td className="px-3 py-1.5 w-[80px] text-right flex gap-1 justify-end">
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -218,18 +276,41 @@ export default function SunmiTablaProductos({
         )}
       </SunmiTable>
 
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-900">
-        <SunmiButton color="slate" disabled={page <= 1} onClick={onPrev}>
-          « Anterior
-        </SunmiButton>
+      <div className="flex items-center justify-between px-3 py-2 bg-slate-900 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <SunmiButton color="slate" disabled={page <= 1} onClick={onPrev}>
+            « Anterior
+          </SunmiButton>
 
-        <span className="text-slate-300 text-sm">
-          Página {page} / {totalPages}
-        </span>
+          <span className="text-slate-400 text-[11px]">
+            Página {page} / {totalPages}
+            {totalItems > 0 && <span className="ml-1 text-slate-500">({totalItems} items)</span>}
+          </span>
 
-        <SunmiButton color="slate" disabled={page >= totalPages} onClick={onNext}>
-          Siguiente »
-        </SunmiButton>
+          <SunmiButton color="slate" disabled={page >= totalPages} onClick={onNext}>
+            Siguiente »
+          </SunmiButton>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-slate-500 text-[11px]">Mostrar</span>
+          {PAGE_SIZES.map((size) => (
+            <button
+              key={size}
+              type="button"
+              onClick={() => onPageSizeChange?.(size)}
+              className={`
+                px-2 py-0.5 rounded text-[11px] font-medium transition
+                ${pageSize === size
+                  ? "bg-amber-400 text-slate-900"
+                  : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                }
+              `}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

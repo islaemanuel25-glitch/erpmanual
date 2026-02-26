@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-export default function BuscadorProductos({ localId, onAgregar }) {
+function BuscadorProductos({ localId, onAgregar }) {
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
   const [resultados, setResultados] = useState([]);
@@ -166,7 +166,7 @@ export default function BuscadorProductos({ localId, onAgregar }) {
             className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
               escuchando
                 ? "bg-red-500 animate-pulse text-white"
-                : "bg-slate-700 hover:bg-slate-600 text-slate-300"
+                : "pos-control"
             }`}
             title="Buscar por voz"
             type="button"
@@ -181,11 +181,11 @@ export default function BuscadorProductos({ localId, onAgregar }) {
       </div>
 
       {loading && (
-        <div className="text-xs text-slate-400 mt-2">Buscando...</div>
+        <div className="text-xs pos-text-muted mt-2">Buscando...</div>
       )}
 
       {escuchando && (
-        <div className="text-xs text-red-400 mt-2 animate-pulse">
+        <div className="text-xs pos-text-danger mt-2 animate-pulse">
           Escuchando...
         </div>
       )}
@@ -197,18 +197,18 @@ export default function BuscadorProductos({ localId, onAgregar }) {
             <div
               key={p.productoBaseId}
               onClick={() => handleAgregar(p)}
-              className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 active:bg-slate-600/60 transition cursor-pointer"
+              className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg pos-bg-surface-interactive transition cursor-pointer"
             >
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{p.nombre}</div>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-[11px] pos-text-muted">
                   {p.codigoBarra && (
                     <span className="mr-3">Cod: {p.codigoBarra}</span>
                   )}
-                  <span>Stock: {p.stock}</span>
+                  <span>Stock: {p.unidadMedida === "kg" ? `${Number(p.stock).toFixed(3)} kg` : p.stock}</span>
                 </div>
               </div>
-              <div className="text-sm font-semibold text-amber-400 shrink-0">
+              <div className="text-sm font-semibold pos-text-accent shrink-0">
                 ${Number(p.precioVenta).toLocaleString("es-AR", {
                   minimumFractionDigits: 2,
                 })}
@@ -219,10 +219,12 @@ export default function BuscadorProductos({ localId, onAgregar }) {
       )}
 
       {!loading && !escuchando && query.trim() && resultados.length === 0 && (
-        <div className="text-xs text-slate-500 mt-2">
+        <div className="text-xs pos-text-muted mt-2">
           No se encontraron productos.
         </div>
       )}
     </SunmiCard>
   );
 }
+
+export default memo(BuscadorProductos);

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { getContextoActivo } from "@/lib/contexto";
 
 export async function GET(req, { params }) {
   try {
@@ -9,8 +11,24 @@ export async function GET(req, { params }) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
-    const grupoId = Number(session.grupoId);
-    if (!grupoId || grupoId <= 0) {
+    // Resolver grupoId: session → query localId → session.localId → contexto cookie
+    const { searchParams } = new URL(req.url);
+    let grupoId = Number(session.grupoId) || 0;
+    if (!grupoId) {
+      let localId = Number(searchParams.get("localId")) || 0;
+      if (!localId && session.localId) localId = Number(session.localId);
+      if (!localId && session.esAdmin) {
+        const ctx = getContextoActivo(req, session);
+        if (ctx.localId) localId = Number(ctx.localId);
+      }
+      if (localId) grupoId = await getGrupoIdDeLocal(localId);
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[precios/history/id] CTX:", { sessionGrupoId: session.grupoId, grupoIdResolved: grupoId });
+    }
+
+    if (!grupoId) {
       return NextResponse.json(
         { ok: false, error: "Seleccioná un grupo activo para trabajar." },
         { status: 400 }

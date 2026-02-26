@@ -143,6 +143,11 @@ export default function SunmiSelectAdv({
               e.stopPropagation();
               handlePick(val);
             }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handlePick(val);
+            }}
             className={`
               px-3 py-2 cursor-pointer flex items-center gap-2
               ${selected ? "bg-amber-500 text-slate-900" : textColor}
@@ -169,10 +174,11 @@ export default function SunmiSelectAdv({
         className={`
           w-full px-3 py-1.5
           rounded-md
-          ${bgColor}
-          border ${borderColor}
+          bg-slate-950/40
+          border-2 border-slate-500/60
           ${textColor} text-[13px]
-          shadow-inner
+          hover:border-slate-400/70
+          focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-300/60
           flex items-center justify-between
         `}
       >

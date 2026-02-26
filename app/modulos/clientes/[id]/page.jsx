@@ -28,7 +28,7 @@ export default function ClienteDetallePage() {
 
   useEffect(() => {
     if (!localId) {
-      setErrorMsg("Seleccioná un local");
+      setErrorMsg("No hay contexto operativo activo.");
       setLoading(false);
       return;
     }
@@ -249,7 +249,7 @@ function TabVentas({ clienteId, localId }) {
   useEffect(() => {
     const cargarVentas = async () => {
       if (!localId) {
-        setErrorMsg("Seleccioná un local");
+        setErrorMsg("No hay contexto operativo activo.");
         setLoading(false);
         return;
       }
@@ -348,7 +348,7 @@ function TabPuntos({ clienteId, localId }) {
   useEffect(() => {
     const cargarPuntos = async () => {
       if (!localId) {
-        setErrorMsg("Seleccioná un local para ver los puntos.");
+        setErrorMsg("No hay contexto operativo activo.");
         setLoading(false);
         return;
       }
@@ -486,7 +486,7 @@ function TabCuentaCorriente({ cliente, localId }) {
 
   const cargarCC = async () => {
     if (!localId) {
-      setErrorMsg("Seleccioná un local para ver la cuenta corriente.");
+      setErrorMsg("No hay contexto operativo activo.");
       setLoading(false);
       return;
     }

@@ -15,19 +15,34 @@ export function useSunmiTheme() {
 
 const STORAGE_KEY = "erp-sunmi-theme";
 
-export function SunmiThemeProvider({ children }) {
-  const [themeKey, setThemeKeyState] = useState(DEFAULT_SUNMI_THEME_KEY);
+function getInitialKey() {
+  if (typeof document !== "undefined" && document.documentElement.dataset.theme) {
+    const fromHtml = document.documentElement.dataset.theme;
+    if (SUNMI_THEMES[fromHtml]) return fromHtml;
+  }
+  return DEFAULT_SUNMI_THEME_KEY;
+}
 
+export function SunmiThemeProvider({ children }) {
+  const [themeKey, setThemeKeyState] = useState(getInitialKey);
+
+  // Sincronizar con localStorage al montar (por si el script inline no corrió)
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved && SUNMI_THEMES[saved]) {
         setThemeKeyState(saved);
+        document.documentElement.dataset.theme = saved;
       }
     } catch (e) {
       console.error("Error leyendo theme:", e);
     }
   }, []);
+
+  // Sincronizar data-theme en <html> cuando cambia themeKey
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeKey;
+  }, [themeKey]);
 
   const setThemeKey = (key) => {
     if (!SUNMI_THEMES[key]) return;

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -19,7 +20,8 @@ export async function POST(req) {
     const posId = Number(body.posId || 0);
     const productoLocalId = Number(body.productoLocalId || 0);
     const cantidad = Number(body.cantidad || 0);
-    const tipo = body.tipo === "manual" ? "manual" : "sugerido";
+    const tiposPermitidos = ["manual", "rotura"];
+    const tipo = tiposPermitidos.includes(body.tipo) ? body.tipo : "sugerido";
 
     if (!posId || !productoLocalId || cantidad <= 0) {
       return NextResponse.json(
@@ -115,11 +117,13 @@ export async function POST(req) {
 
     let detalle;
 
-    // Inferir unidades desde factorPack
+    // Inferir unidades desde modo_envio + factorPack
     const factorPack = Number(productoLocal.base.factor_pack || 1);
+    const efectivo = productoLocal.base.modo_envio || defaultModoEnvio(productoLocal.base.unidad_medida || "unidad");
+    const unidadDefault = efectivo === "SOLO_UNIDAD" ? "UNIDAD" : (factorPack > 1 ? "BULTO" : "UNIDAD");
     const unidadSugerida = body.sugeridoUnidad && (body.sugeridoUnidad === "BULTO" || body.sugeridoUnidad === "UNIDAD")
       ? body.sugeridoUnidad
-      : (factorPack > 1 ? "BULTO" : "UNIDAD");
+      : unidadDefault;
     const unidadPreparada = body.unidadPreparada && (body.unidadPreparada === "BULTO" || body.unidadPreparada === "UNIDAD")
       ? body.unidadPreparada
       : unidadSugerida;
@@ -171,6 +175,7 @@ export async function POST(req) {
       tipo: detalle.tipo,
       unidadSugerida: detalle.unidadSugerida,
       unidadPreparada: detalle.unidadPreparada,
+      modoEnvio: productoLocal.base.modo_envio || efectivo,
     };
 
     return NextResponse.json({

@@ -13,6 +13,430 @@
 @tailwind utilities;
 
 /* ==================================================
+   ⭐ VARIABLES CSS POR THEME (data-theme en <html>)
+   ================================================== */
+html[data-theme="sunmiDark"],
+html:not([data-theme]) {
+  --app-bg: #0f172a;
+  --app-fg: #e2e8f0;
+  --app-border: #1e293b;
+  --app-input-bg: #1e293b;
+  --app-input-border: #475569;
+  --app-scrollbar-track: #0f172a;
+  --app-scrollbar-thumb: #1e293b;
+  --app-scrollbar-thumb-hover: #334155;
+  --app-autofill-bg: #0f172a;
+  --app-autofill-fg: #e2e8f0;
+  --app-date-indicator: invert(1) brightness(2);
+  --card-bg: rgba(2, 6, 23, 0.6);
+  --card-border: #1e293b;
+  --table-header-bg: rgba(15, 23, 42, 0.8);
+  --table-row-hover: rgba(15, 23, 42, 0.8);
+  --hover-bg: rgba(30, 41, 59, 0.4);
+
+  /* POS */
+  --pos-accent: #fbbf24;
+  --pos-link: #22d3ee;
+  --pos-link-hover: #67e8f9;
+  --pos-muted: #94a3b8;
+  --pos-muted-strong: #cbd5e1;
+  --pos-surface: rgba(30,41,59,0.6);
+  --pos-surface-hover: rgba(51,65,85,0.6);
+  --pos-surface-active: rgba(71,85,105,0.6);
+  --pos-control-bg: #334155;
+  --pos-control-hover: #475569;
+  --pos-control-active: #64748b;
+  --pos-control-text: #e2e8f0;
+  --pos-row-bg: #020617;
+  --pos-row-hover: #0f172a;
+  --pos-panel-bg: rgba(15,23,42,0.5);
+  --pos-success: #34d399;
+  --pos-success-soft: #6ee7b7;
+  --pos-success-bg: rgba(16,185,129,0.2);
+  --pos-success-border: rgba(16,185,129,0.5);
+  --pos-danger: #f87171;
+  --pos-danger-hover: #fca5a5;
+  --pos-points: #d8b4fe;
+  --pos-points-bg: rgba(168,85,247,0.1);
+  --pos-points-border: rgba(168,85,247,0.3);
+  --pos-tab-active-bg: #f59e0b;
+  --pos-tab-active-fg: #ffffff;
+  --pos-tab-bg: #334155;
+  --pos-tab-fg: #cbd5e1;
+  --pos-tab-hover: #475569;
+  --pos-commission-bg: rgba(51,65,85,0.4);
+  --pos-commission-border: rgba(71,85,105,0.3);
+  --pos-panel-border: #1e293b;
+  --pos-btn-primary-bg: #22c55e;
+  --pos-btn-primary-fg: #0b1220;
+  --pos-btn-secondary-bg: rgba(148,163,184,0.15);
+  --pos-btn-secondary-fg: #e2e8f0;
+  --pos-btn-danger-bg: #ef4444;
+  --pos-btn-danger-fg: #ffffff;
+  --pos-overlay: rgba(0,0,0,0.55);
+}
+
+html[data-theme="sunmiDarkCompact"] {
+  --app-bg: #020617;
+  --app-fg: #e2e8f0;
+  --app-border: #1e293b;
+  --app-input-bg: #0f172a;
+  --app-input-border: #334155;
+  --app-scrollbar-track: #020617;
+  --app-scrollbar-thumb: #1e293b;
+  --app-scrollbar-thumb-hover: #334155;
+  --app-autofill-bg: #020617;
+  --app-autofill-fg: #e2e8f0;
+  --app-date-indicator: invert(1) brightness(2);
+  --card-bg: rgba(15, 23, 42, 0.9);
+  --card-border: rgba(30, 41, 59, 0.8);
+  --table-header-bg: #0f172a;
+  --table-row-hover: #0f172a;
+  --hover-bg: rgba(15, 23, 42, 0.7);
+
+  /* POS */
+  --pos-accent: #fbbf24;
+  --pos-link: #22d3ee;
+  --pos-link-hover: #67e8f9;
+  --pos-muted: #94a3b8;
+  --pos-muted-strong: #cbd5e1;
+  --pos-surface: rgba(15,23,42,0.7);
+  --pos-surface-hover: rgba(30,41,59,0.7);
+  --pos-surface-active: rgba(51,65,85,0.7);
+  --pos-control-bg: #1e293b;
+  --pos-control-hover: #334155;
+  --pos-control-active: #475569;
+  --pos-control-text: #e2e8f0;
+  --pos-row-bg: #020617;
+  --pos-row-hover: #0f172a;
+  --pos-panel-bg: rgba(15,23,42,0.5);
+  --pos-success: #34d399;
+  --pos-success-soft: #6ee7b7;
+  --pos-success-bg: rgba(16,185,129,0.2);
+  --pos-success-border: rgba(16,185,129,0.5);
+  --pos-danger: #f87171;
+  --pos-danger-hover: #fca5a5;
+  --pos-points: #d8b4fe;
+  --pos-points-bg: rgba(168,85,247,0.1);
+  --pos-points-border: rgba(168,85,247,0.3);
+  --pos-tab-active-bg: #f59e0b;
+  --pos-tab-active-fg: #ffffff;
+  --pos-tab-bg: #1e293b;
+  --pos-tab-fg: #cbd5e1;
+  --pos-tab-hover: #334155;
+  --pos-commission-bg: rgba(30,41,59,0.4);
+  --pos-commission-border: rgba(51,65,85,0.3);
+  --pos-panel-border: #1e293b;
+  --pos-btn-primary-bg: #22c55e;
+  --pos-btn-primary-fg: #0b1220;
+  --pos-btn-secondary-bg: rgba(148,163,184,0.15);
+  --pos-btn-secondary-fg: #e2e8f0;
+  --pos-btn-danger-bg: #ef4444;
+  --pos-btn-danger-fg: #ffffff;
+  --pos-overlay: rgba(0,0,0,0.55);
+}
+
+html[data-theme="sunmiLight"] {
+  --app-bg: #f1f5f9;
+  --app-fg: #0f172a;
+  --app-border: #cbd5e1;
+  --app-input-bg: #ffffff;
+  --app-input-border: #cbd5e1;
+  --app-scrollbar-track: #f1f5f9;
+  --app-scrollbar-thumb: #cbd5e1;
+  --app-scrollbar-thumb-hover: #94a3b8;
+  --app-autofill-bg: #ffffff;
+  --app-autofill-fg: #0f172a;
+  --app-date-indicator: none;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --table-header-bg: #f1f5f9;
+  --table-row-hover: #f8fafc;
+  --hover-bg: #f1f5f9;
+
+  /* POS */
+  --pos-accent: #d97706;
+  --pos-link: #0891b2;
+  --pos-link-hover: #0e7490;
+  --pos-muted: #64748b;
+  --pos-muted-strong: #475569;
+  --pos-surface: #f1f5f9;
+  --pos-surface-hover: #e2e8f0;
+  --pos-surface-active: #cbd5e1;
+  --pos-control-bg: #cbd5e1;
+  --pos-control-hover: #94a3b8;
+  --pos-control-active: #64748b;
+  --pos-control-text: #1e293b;
+  --pos-row-bg: #ffffff;
+  --pos-row-hover: #f8fafc;
+  --pos-panel-bg: #f1f5f9;
+  --pos-success: #059669;
+  --pos-success-soft: #047857;
+  --pos-success-bg: rgba(16,185,129,0.1);
+  --pos-success-border: rgba(16,185,129,0.3);
+  --pos-danger: #dc2626;
+  --pos-danger-hover: #b91c1c;
+  --pos-points: #7c3aed;
+  --pos-points-bg: rgba(168,85,247,0.08);
+  --pos-points-border: rgba(168,85,247,0.2);
+  --pos-tab-active-bg: #f59e0b;
+  --pos-tab-active-fg: #ffffff;
+  --pos-tab-bg: #e2e8f0;
+  --pos-tab-fg: #475569;
+  --pos-tab-hover: #cbd5e1;
+  --pos-commission-bg: rgba(241,245,249,0.8);
+  --pos-commission-border: rgba(203,213,225,0.5);
+  --pos-panel-border: #cbd5e1;
+  --pos-btn-primary-bg: #16a34a;
+  --pos-btn-primary-fg: #ffffff;
+  --pos-btn-secondary-bg: #f1f5f9;
+  --pos-btn-secondary-fg: #0f172a;
+  --pos-btn-danger-bg: #dc2626;
+  --pos-btn-danger-fg: #ffffff;
+  --pos-overlay: rgba(0,0,0,0.35);
+}
+
+html[data-theme="sunmiGraphite"] {
+  --app-bg: #0e1116;
+  --app-fg: #e6edf3;
+  --app-border: #2a2f36;
+  --app-input-bg: #161b22;
+  --app-input-border: #2a2f36;
+  --app-scrollbar-track: #0e1116;
+  --app-scrollbar-thumb: #2a2f36;
+  --app-scrollbar-thumb-hover: #3a4048;
+  --app-autofill-bg: #161b22;
+  --app-autofill-fg: #e6edf3;
+  --app-date-indicator: invert(1) brightness(2);
+  --card-bg: #161b22;
+  --card-border: #2a2f36;
+  --table-header-bg: #161b22;
+  --table-row-hover: #1f242b;
+  --hover-bg: #1f242b;
+
+  /* POS */
+  --pos-accent: #fbbf24;
+  --pos-link: #22d3ee;
+  --pos-link-hover: #67e8f9;
+  --pos-muted: #9ca3af;
+  --pos-muted-strong: #d1d5db;
+  --pos-surface: rgba(22,27,34,0.8);
+  --pos-surface-hover: rgba(31,36,43,0.8);
+  --pos-surface-active: rgba(42,47,54,0.8);
+  --pos-control-bg: #2a2f36;
+  --pos-control-hover: #3a4048;
+  --pos-control-active: #4a5058;
+  --pos-control-text: #e6edf3;
+  --pos-row-bg: #0e1116;
+  --pos-row-hover: #161b22;
+  --pos-panel-bg: rgba(22,27,34,0.5);
+  --pos-success: #34d399;
+  --pos-success-soft: #6ee7b7;
+  --pos-success-bg: rgba(16,185,129,0.2);
+  --pos-success-border: rgba(16,185,129,0.5);
+  --pos-danger: #f87171;
+  --pos-danger-hover: #fca5a5;
+  --pos-points: #d8b4fe;
+  --pos-points-bg: rgba(168,85,247,0.1);
+  --pos-points-border: rgba(168,85,247,0.3);
+  --pos-tab-active-bg: #f59e0b;
+  --pos-tab-active-fg: #ffffff;
+  --pos-tab-bg: #2a2f36;
+  --pos-tab-fg: #d1d5db;
+  --pos-tab-hover: #3a4048;
+  --pos-commission-bg: rgba(42,47,54,0.4);
+  --pos-commission-border: rgba(58,64,72,0.3);
+  --pos-panel-border: #2a2f36;
+  --pos-btn-primary-bg: #22c55e;
+  --pos-btn-primary-fg: #0e1116;
+  --pos-btn-secondary-bg: rgba(156,163,175,0.15);
+  --pos-btn-secondary-fg: #e6edf3;
+  --pos-btn-danger-bg: #ef4444;
+  --pos-btn-danger-fg: #ffffff;
+  --pos-overlay: rgba(0,0,0,0.55);
+}
+
+html[data-theme="sunmiSand"] {
+  --app-bg: #f6f1e7;
+  --app-fg: #1f2937;
+  --app-border: #e7d9c3;
+  --app-input-bg: #fffaf0;
+  --app-input-border: #e7d9c3;
+  --app-scrollbar-track: #f6f1e7;
+  --app-scrollbar-thumb: #e7d9c3;
+  --app-scrollbar-thumb-hover: #d6c3a8;
+  --app-autofill-bg: #fffaf0;
+  --app-autofill-fg: #1f2937;
+  --app-date-indicator: none;
+  --card-bg: #fffaf0;
+  --card-border: #e7d9c3;
+  --table-header-bg: #f6f1e7;
+  --table-row-hover: #f1e6d5;
+  --hover-bg: #f1e6d5;
+
+  /* POS */
+  --pos-accent: #b45309;
+  --pos-link: #0e7490;
+  --pos-link-hover: #155e75;
+  --pos-muted: #6b7280;
+  --pos-muted-strong: #4b5563;
+  --pos-surface: #f6f1e7;
+  --pos-surface-hover: #f1e6d5;
+  --pos-surface-active: #e7d9c3;
+  --pos-control-bg: #e7d9c3;
+  --pos-control-hover: #d6c3a8;
+  --pos-control-active: #c4ad8d;
+  --pos-control-text: #1f2937;
+  --pos-row-bg: #fffaf0;
+  --pos-row-hover: #f6f1e7;
+  --pos-panel-bg: #f6f1e7;
+  --pos-success: #059669;
+  --pos-success-soft: #047857;
+  --pos-success-bg: rgba(16,185,129,0.1);
+  --pos-success-border: rgba(16,185,129,0.3);
+  --pos-danger: #dc2626;
+  --pos-danger-hover: #b91c1c;
+  --pos-points: #7c3aed;
+  --pos-points-bg: rgba(168,85,247,0.08);
+  --pos-points-border: rgba(168,85,247,0.2);
+  --pos-tab-active-bg: #d97706;
+  --pos-tab-active-fg: #ffffff;
+  --pos-tab-bg: #e7d9c3;
+  --pos-tab-fg: #4b5563;
+  --pos-tab-hover: #d6c3a8;
+  --pos-commission-bg: rgba(231,217,195,0.4);
+  --pos-commission-border: rgba(214,195,168,0.3);
+  --pos-panel-border: #e7d9c3;
+  --pos-btn-primary-bg: #16a34a;
+  --pos-btn-primary-fg: #ffffff;
+  --pos-btn-secondary-bg: #f6f1e7;
+  --pos-btn-secondary-fg: #1f2937;
+  --pos-btn-danger-bg: #dc2626;
+  --pos-btn-danger-fg: #ffffff;
+  --pos-overlay: rgba(0,0,0,0.35);
+}
+
+html[data-theme="sunmiBlueClassic"] {
+  --app-bg: #0b1f3a;
+  --app-fg: #e6f0ff;
+  --app-border: #1d3b6b;
+  --app-input-bg: #102a4d;
+  --app-input-border: #1d3b6b;
+  --app-scrollbar-track: #0b1f3a;
+  --app-scrollbar-thumb: #1d3b6b;
+  --app-scrollbar-thumb-hover: #163866;
+  --app-autofill-bg: #102a4d;
+  --app-autofill-fg: #e6f0ff;
+  --app-date-indicator: invert(1) brightness(2);
+  --card-bg: #102a4d;
+  --card-border: #1d3b6b;
+  --table-header-bg: #102a4d;
+  --table-row-hover: #163866;
+  --hover-bg: #163866;
+
+  /* POS */
+  --pos-accent: #fbbf24;
+  --pos-link: #7dd3fc;
+  --pos-link-hover: #bae6fd;
+  --pos-muted: #93c5fd;
+  --pos-muted-strong: #bfdbfe;
+  --pos-surface: rgba(16,42,77,0.6);
+  --pos-surface-hover: rgba(22,56,102,0.6);
+  --pos-surface-active: rgba(29,59,107,0.6);
+  --pos-control-bg: #1d3b6b;
+  --pos-control-hover: #163866;
+  --pos-control-active: #204e8a;
+  --pos-control-text: #e6f0ff;
+  --pos-row-bg: #0b1f3a;
+  --pos-row-hover: #102a4d;
+  --pos-panel-bg: rgba(16,42,77,0.5);
+  --pos-success: #34d399;
+  --pos-success-soft: #6ee7b7;
+  --pos-success-bg: rgba(16,185,129,0.2);
+  --pos-success-border: rgba(16,185,129,0.5);
+  --pos-danger: #f87171;
+  --pos-danger-hover: #fca5a5;
+  --pos-points: #d8b4fe;
+  --pos-points-bg: rgba(168,85,247,0.1);
+  --pos-points-border: rgba(168,85,247,0.3);
+  --pos-tab-active-bg: #f59e0b;
+  --pos-tab-active-fg: #ffffff;
+  --pos-tab-bg: #1d3b6b;
+  --pos-tab-fg: #bfdbfe;
+  --pos-tab-hover: #163866;
+  --pos-commission-bg: rgba(29,59,107,0.4);
+  --pos-commission-border: rgba(22,56,102,0.3);
+  --pos-panel-border: #1d3b6b;
+  --pos-btn-primary-bg: #22c55e;
+  --pos-btn-primary-fg: #0b1f3a;
+  --pos-btn-secondary-bg: rgba(147,197,253,0.15);
+  --pos-btn-secondary-fg: #e6f0ff;
+  --pos-btn-danger-bg: #ef4444;
+  --pos-btn-danger-fg: #ffffff;
+  --pos-overlay: rgba(0,0,0,0.55);
+}
+
+html[data-theme="sunmiFrance"] {
+  --app-bg: #ffffff;
+  --app-fg: #000000;
+  --app-border: #000000;
+  --app-input-bg: #ffffff;
+  --app-input-border: #000000;
+  --app-scrollbar-track: #ffffff;
+  --app-scrollbar-thumb: #0055A4;
+  --app-scrollbar-thumb-hover: #004080;
+  --app-autofill-bg: #ffffff;
+  --app-autofill-fg: #000000;
+  --app-date-indicator: none;
+  --card-bg: #ffffff;
+  --card-border: #000000;
+  --table-header-bg: #0055A4;
+  --table-row-hover: #e8f0fe;
+  --hover-bg: #e8f0fe;
+
+  /* POS */
+  --pos-accent: #0055A4;
+  --pos-link: #0055A4;
+  --pos-link-hover: #004080;
+  --pos-muted: #6b7280;
+  --pos-muted-strong: #374151;
+  --pos-surface: #f3f4f6;
+  --pos-surface-hover: #e5e7eb;
+  --pos-surface-active: #d1d5db;
+  --pos-control-bg: #e5e7eb;
+  --pos-control-hover: #d1d5db;
+  --pos-control-active: #9ca3af;
+  --pos-control-text: #000000;
+  --pos-row-bg: #ffffff;
+  --pos-row-hover: #e8f0fe;
+  --pos-panel-bg: #f3f4f6;
+  --pos-success: #059669;
+  --pos-success-soft: #047857;
+  --pos-success-bg: rgba(16,185,129,0.1);
+  --pos-success-border: rgba(16,185,129,0.3);
+  --pos-danger: #dc2626;
+  --pos-danger-hover: #b91c1c;
+  --pos-points: #7c3aed;
+  --pos-points-bg: rgba(168,85,247,0.08);
+  --pos-points-border: rgba(168,85,247,0.2);
+  --pos-tab-active-bg: #0055A4;
+  --pos-tab-active-fg: #ffffff;
+  --pos-tab-bg: #e5e7eb;
+  --pos-tab-fg: #374151;
+  --pos-tab-hover: #d1d5db;
+  --pos-commission-bg: rgba(243,244,246,0.8);
+  --pos-commission-border: rgba(209,213,219,0.5);
+  --pos-panel-border: #000000;
+  --pos-btn-primary-bg: #0055A4;
+  --pos-btn-primary-fg: #ffffff;
+  --pos-btn-secondary-bg: #e6f0fa;
+  --pos-btn-secondary-fg: #000000;
+  --pos-btn-danger-bg: #dc2626;
+  --pos-btn-danger-fg: #ffffff;
+  --pos-overlay: rgba(0,0,0,0.35);
+}
+
+/* ==================================================
    ⭐ RESET & BASE GLOBAL
    ================================================== */
 html, body {
@@ -21,8 +445,9 @@ html, body {
   margin: 0;
   padding: 0;
   font-family: 'Inter', sans-serif;
-  background: #0f172a; /* slate-900 oscuro */
-  color: #e2e8f0;      /* slate-200 */
+  font-size: 14px;
+  background: var(--app-bg);
+  color: var(--app-fg);
 }
 
 * {
@@ -64,7 +489,7 @@ html, body {
    ⭐ INPUT GLOBAL (formularios generales)
    ================================================== */
 .input {
-  @apply h-[36px] px-3 rounded-md border border-gray-300 bg-white 
+  @apply h-[36px] px-3 rounded-md border border-gray-300 bg-white
          text-[13px] text-gray-700 shadow-sm w-full;
 }
 
@@ -189,16 +614,16 @@ input[type="date"] {
   -webkit-appearance: auto !important;
   -moz-appearance: auto !important;
 
-  background-color: #1e293b; /* slate-800 */
-  color: #e2e8f0;           /* slate-200 */
-  border: 1px solid #475569;
+  background-color: var(--app-input-bg);
+  color: var(--app-fg);
+  border: 1px solid var(--app-input-border);
   padding: 6px 8px;
   height: 36px;
   border-radius: 6px;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) brightness(2);
+  filter: var(--app-date-indicator);
   opacity: 1;
   cursor: pointer;
 }
@@ -229,8 +654,8 @@ input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0px 1000px #0f172a inset !important;
-  -webkit-text-fill-color: #e2e8f0 !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--app-autofill-bg) inset !important;
+  -webkit-text-fill-color: var(--app-autofill-fg) !important;
   transition: background-color 9999s ease-in-out 0s !important;
 }
 
@@ -244,14 +669,14 @@ input:-webkit-autofill:active {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a; /* slate-900 */
+  background: var(--app-scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b; /* slate-800 */
+  background: var(--app-scrollbar-thumb);
   border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155; /* slate-700 */
+  background: var(--app-scrollbar-thumb-hover);
 }

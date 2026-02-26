@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 export async function GET(req) {
   try {
@@ -27,6 +28,13 @@ export async function GET(req) {
       return NextResponse.json({ ok: true, items: [] });
     }
 
+    // Obtener si el local es depósito (una sola query, cacheable)
+    const local = await prisma.local.findUnique({
+      where: { id: localId },
+      select: { es_deposito: true },
+    });
+    const esDeposito = local?.es_deposito === true;
+
     // Prioridad: match exacto por codigo_barra
     const exacto = await prisma.productoLocal.findMany({
       where: {
@@ -42,7 +50,7 @@ export async function GET(req) {
     });
 
     if (exacto.length > 0) {
-      const items = mapProductos(exacto);
+      const items = mapProductos(exacto, esDeposito);
       return NextResponse.json({ ok: true, items });
     }
 
@@ -65,7 +73,7 @@ export async function GET(req) {
       take: 10,
     });
 
-    const items = mapProductos(productos);
+    const items = mapProductos(productos, esDeposito);
     return NextResponse.json({ ok: true, items });
   } catch (err) {
     console.error("Error buscar-producto POS:", err);
@@ -76,18 +84,67 @@ export async function GET(req) {
   }
 }
 
-function mapProductos(lista) {
+/**
+ * Calcula modoSalidaDefault para un producto dado el contexto.
+ *
+ * - Local normal → siempre UNIDAD (vende unitario al público)
+ * - Depósito → según modo_envio configurado del producto:
+ *     SOLO_BULTO  → BULTO
+ *     MIXTO       → BULTO  (default conservador para depósito)
+ *     SOLO_UNIDAD → UNIDAD
+ *     null        → usa defaultModoEnvio(unidadMedida) y aplica la misma lógica
+ */
+function calcularModoSalida(esDeposito, modoEnvio, unidadMedida) {
+  if (!esDeposito) return "UNIDAD";
+
+  const efectivo = modoEnvio || defaultModoEnvio(unidadMedida);
+  if (efectivo === "SOLO_UNIDAD") return "UNIDAD";
+  // SOLO_BULTO y MIXTO → default BULTO en depósito
+  return "BULTO";
+}
+
+function mapProductos(lista, esDeposito) {
   return lista
     .map((pl) => {
       const stock = Number(pl.stock?.[0]?.cantidad || 0);
+      const unidadMedida = pl.base?.unidad_medida || "unidad";
+      const factorPack = Number(pl.base?.factor_pack || 1);
+      const modoEnvio = pl.base?.modo_envio || null;
+
+      // precio_venta en DB: precio tal como está cargado (puede ser bulto o unitario según el producto)
+      const precioDB = Number(pl.precio_venta || pl.base?.precio_venta || 0);
+
+      // Calcular ambos precios
+      let precioVentaBulto = precioDB;
+      let precioVentaUnitario = precioDB;
+
+      if (factorPack > 1 && unidadMedida !== "unidad" && precioDB > 0) {
+        // DB guarda precio del bulto → derivar unitario
+        precioVentaUnitario = Number((precioDB / factorPack).toFixed(2));
+        precioVentaBulto = Number(precioDB.toFixed(2));
+      }
+
+      const modoSalidaDefault = calcularModoSalida(esDeposito, modoEnvio, unidadMedida);
+
+      // precioVenta = el precio que corresponde según el modo de salida default
+      const precioVenta = modoSalidaDefault === "BULTO"
+        ? precioVentaBulto
+        : precioVentaUnitario;
+
       return {
         productoBaseId: pl.baseId,
         productoLocalId: pl.id,
         nombre: pl.nombre || pl.base?.nombre || "",
         codigoBarra: pl.base?.codigo_barra || "",
-        precioVenta: Number(pl.precio_venta || pl.base?.precio_venta || 0),
+        precioVenta: Number(precioVenta.toFixed(2)),
+        precioVentaUnitario,
+        precioVentaBulto,
         precioCosto: Number(pl.precio_costo || pl.base?.precio_costo || 0),
         stock,
+        unidadMedida,
+        factorPack,
+        modoEnvio,
+        modoSalidaDefault,
       };
     })
     .filter((p) => p.stock > 0);

@@ -5,6 +5,12 @@ import { fromUnidades } from "@/lib/conversiones/stock";
 
 const PAGE_SIZE = 25;
 
+function formatCantidad(valor, unidadMedida) {
+  const n = Number(valor || 0);
+  if (unidadMedida === "kg") return `${n.toFixed(3)} kg`;
+  return `${Math.round(n)} uds`;
+}
+
 export default function TablaStock({
   localSeleccionado,
   localNombre,
@@ -92,6 +98,14 @@ export default function TablaStock({
     return () => (cancelado = true);
   }, [localSeleccionado, JSON.stringify(filtro), page, refrescar]);
 
+  // ¿Debe mostrarse como packs en depósito?
+  const esPackDeposito = (p) => {
+    if (!localEsDeposito) return false;
+    const u = p.unidadMedida;
+    const f = Number(p.factorPack || 1);
+    return f > 1 && (u === "pack" || u === "cajon");
+  };
+
   // Unidad para DEPÓSITO: muestra unidad_medida + factor_pack
   const getUnidadDeposito = (p) => {
     const u = p.unidadMedida;
@@ -135,7 +149,7 @@ export default function TablaStock({
       <div className="sunmi-card">
         <div className="sunmi-header-cyan">Stock</div>
         <p className="text-slate-400 text-sm mt-3">
-          Seleccioná un local para ver el stock.
+          No hay contexto operativo activo.
         </p>
       </div>
     );
@@ -200,7 +214,7 @@ export default function TablaStock({
                   </td>
 
                 <td className="px-2 py-1 text-right">
-                  {localEsDeposito && p.modoStock === "BULTO" && p.factorPack > 1 ? (
+                  {esPackDeposito(p) ? (
                     (() => {
                       const { bultos, sueltas } = fromUnidades({
                         unidades: Number(p.stock || 0),
@@ -216,11 +230,19 @@ export default function TablaStock({
                       );
                     })()
                   ) : (
-                    <span>{p.stock} uds</span>
+                    <span>{formatCantidad(p.stock, p.unidadMedida)}</span>
                   )}
                 </td>
-                <td className="px-2 py-1 text-right">{p.stockMin}</td>
-                <td className="px-2 py-1 text-right">{p.stockMax}</td>
+                <td className="px-2 py-1 text-right">
+                  {esPackDeposito(p) && p.stockMin
+                    ? fromUnidades({ unidades: Number(p.stockMin), factorPack: p.factorPack }).bultos
+                    : p.stockMin != null ? formatCantidad(p.stockMin, p.unidadMedida) : "-"}
+                </td>
+                <td className="px-2 py-1 text-right">
+                  {esPackDeposito(p) && p.stockMax
+                    ? fromUnidades({ unidades: Number(p.stockMax), factorPack: p.factorPack }).bultos
+                    : p.stockMax != null ? formatCantidad(p.stockMax, p.unidadMedida) : "-"}
+                </td>
 
                 {/* 🟦 COSTO */}
                 <td className="px-2 py-1 text-right">

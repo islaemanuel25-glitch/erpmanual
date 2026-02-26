@@ -40,8 +40,8 @@ export default function ModalDescuento({
 
         <div className="space-y-3">
           {/* Subtotal */}
-          <div className="bg-slate-900/50 p-3 rounded-lg text-center">
-            <div className="text-xs text-slate-400">Subtotal</div>
+          <div className="pos-bg-panel p-3 rounded-lg text-center">
+            <div className="text-xs pos-text-muted">Subtotal</div>
             <div className="text-xl font-bold">${formatPrecio(subtotal)}</div>
           </div>
 
@@ -50,9 +50,7 @@ export default function ModalDescuento({
             <button
               onClick={() => { setTipo("porcentaje"); setValor(""); }}
               className={`flex-1 py-2 rounded font-medium text-sm transition-colors ${
-                tipo === "porcentaje"
-                  ? "bg-amber-500 text-white"
-                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                tipo === "porcentaje" ? "pos-tab-active" : "pos-tab"
               }`}
             >
               Porcentaje %
@@ -60,9 +58,7 @@ export default function ModalDescuento({
             <button
               onClick={() => { setTipo("fijo"); setValor(""); }}
               className={`flex-1 py-2 rounded font-medium text-sm transition-colors ${
-                tipo === "fijo"
-                  ? "bg-amber-500 text-white"
-                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                tipo === "fijo" ? "pos-tab-active" : "pos-tab"
               }`}
             >
               Monto fijo $
@@ -100,12 +96,12 @@ export default function ModalDescuento({
 
           {/* Preview */}
           {descuento > 0 && (
-            <div className="bg-emerald-500/20 border border-emerald-500/50 p-3 rounded-lg text-center">
-              <div className="text-xs text-emerald-300">
+            <div className="pos-success-box p-3 rounded-lg text-center">
+              <div className="text-xs pos-text-success-soft">
                 Descuento: -${formatPrecio(descuento)}
                 {tipo === "porcentaje" && ` (${valorNum}%)`}
               </div>
-              <div className="text-2xl font-bold text-emerald-400 mt-1">
+              <div className="text-2xl font-bold pos-text-success mt-1">
                 ${formatPrecio(totalConDescuento)}
               </div>
             </div>

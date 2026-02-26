@@ -18,7 +18,7 @@ export default function ClientePickerFullscreen({
 
   const buscarClientes = async () => {
     if (!localId) {
-      setErrorMsg("Seleccioná un local para elegir cliente.");
+      setErrorMsg("No hay contexto operativo activo.");
       return;
     }
     if (!busqueda || busqueda.length < 2) return;

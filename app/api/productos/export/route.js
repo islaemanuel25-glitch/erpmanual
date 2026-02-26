@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { getContextoActivo } from "@/lib/contexto";
 import * as XLSX from "xlsx";
 
 export async function POST(req) {
@@ -13,16 +15,34 @@ export async function POST(req) {
       );
     }
 
-    const grupoId = Number(session.grupoId);
-    if (!grupoId || grupoId <= 0) {
+    const body = await req.json();
+
+    // Resolver localId: body → session → contexto cookie
+    let localId = Number(body.localId) || 0;
+    if (!localId && session.localId) localId = Number(session.localId);
+    if (!localId && session.esAdmin) {
+      const ctx = getContextoActivo(req, session);
+      if (ctx.localId) localId = Number(ctx.localId);
+    }
+
+    // Resolver grupoId: session → derivar de localId
+    let grupoId = Number(session.grupoId) || 0;
+    if (!grupoId && localId) {
+      grupoId = await getGrupoIdDeLocal(localId);
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[productos/export] CTX:", { sessionGrupoId: session.grupoId, localId, grupoIdResolved: grupoId });
+    }
+
+    if (!grupoId) {
       return NextResponse.json(
         { ok: false, error: "Selecciona un grupo activo" },
         { status: 400 }
       );
     }
 
-    const body = await req.json();
-    const localId = body.localId ? Number(body.localId) : null;
+    localId = localId || null;
     const proveedorId = body.proveedorId ? Number(body.proveedorId) : null;
     const categoriaId = body.categoriaId ? Number(body.categoriaId) : null;
 

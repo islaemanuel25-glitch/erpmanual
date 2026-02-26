@@ -1,11 +1,20 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { useState } from "react";
+import { usePathname } from "next/navigation";
 import SidebarPro from "@/components/sidebar/SidebarPro";
+import TopbarNav from "@/components/layout/TopbarNav";
+import SidebarMobile from "@/components/sidebar/SidebarMobile";
 import Header from "./Header";
+import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
+import { useUser } from "@/app/context/UserContext";
+import { MENU_CONFIG, buildVisibleMenu } from "@/lib/menuConfig";
 
 export default function LayoutBase({ children }) {
   const pathname = usePathname();
+  const { menuMode } = useLayoutSettings();
+  const { perfil } = useUser();
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const tituloMobile =
     pathname.includes("usuarios")
@@ -30,23 +39,37 @@ export default function LayoutBase({ children }) {
       ? "POS"
       : "Panel";
 
-  return (
-    <div className="flex min-h-full w-full overflow-x-hidden">
+  const isSidebar = menuMode === "sidebarLeft";
+  const menu = !isSidebar && perfil ? buildVisibleMenu(MENU_CONFIG, perfil) : null;
 
-      {/* SIDEBAR */}
-      <SidebarPro />
+  return (
+    <div className={`${isSidebar ? "flex" : "flex flex-col"} min-h-full w-full overflow-x-hidden`}>
+
+      {/* SIDEBAR (solo en modo sidebarLeft) */}
+      {isSidebar && <SidebarPro />}
+
+      {/* MOBILE DRAWER (solo en modo topbar) */}
+      {!isSidebar && perfil && menu && <SidebarMobile menu={menu} perfil={perfil} />}
+
+      {/* DESKTOP DRAWER (solo en modo topbar, al clickear Menú) */}
+      {!isSidebar && drawerOpen && (
+        <SidebarPro variant="drawer" onClose={() => setDrawerOpen(false)} />
+      )}
 
       {/* CONTENT AREA */}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
 
         <Header />
 
+        {/* TOPBAR desktop (solo en modo topbar) */}
+        {!isSidebar && <TopbarNav onOpenMenu={() => setDrawerOpen(true)} />}
+
         {/* TITULO MOBILE */}
         <div className="md:hidden px-4 py-3 text-xl font-semibold">
           {tituloMobile}
         </div>
 
-        {/* MAIN CONTENT (theme aplicado acá) */}
+        {/* MAIN CONTENT */}
         <main
           className="flex-1 min-h-0 p-4 overflow-auto transition-colors duration-200"
         >

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { getContextoActivo } from "@/lib/contexto";
 
 function toNumber(value) {
   const n = Number(value);
@@ -14,15 +16,36 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
-    const grupoId = Number(session.grupoId);
-    if (!grupoId || grupoId <= 0) {
+    const { permisos } = session;
+    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+    if (!esAdmin && !permisos.includes("productos.editar")) {
+      return NextResponse.json({ ok: false, error: "Sin permisos" }, { status: 403 });
+    }
+
+    const body = await req.json();
+    
+    // Resolver grupoId: session → body.localId → session.localId → contexto cookie
+    let grupoId = Number(session.grupoId) || 0;
+    if (!grupoId) {
+      let localId = Number(body?.localId) || 0;
+      if (!localId && session.localId) localId = Number(session.localId);
+      if (!localId && session.esAdmin) {
+        const ctx = getContextoActivo(req, session);
+        if (ctx.localId) localId = Number(ctx.localId);
+      }
+      if (localId) grupoId = await getGrupoIdDeLocal(localId);
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[precios/apply] CTX:", { sessionGrupoId: session.grupoId, grupoIdResolved: grupoId });
+    }
+
+    if (!grupoId) {
       return NextResponse.json(
         { ok: false, error: "Seleccioná un grupo activo para trabajar." },
         { status: 400 }
       );
     }
-
-    const body = await req.json();
     const proveedorId = toNumber(body?.proveedorId);
     const metodo = body?.metodo;
     const pricingMode = body?.pricingMode;
@@ -43,6 +66,10 @@ export async function POST(req) {
 
     if (!items || items.length === 0) {
       return NextResponse.json({ ok: false, error: "items inválido" }, { status: 400 });
+    }
+
+    if (items.length > 1000) {
+      return NextResponse.json({ ok: false, error: "Demasiados items (máx 1000)" }, { status: 400 });
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -88,6 +115,33 @@ export async function POST(req) {
 
         if (updated.count === 0) {
           throw new Error(`Producto ${productoBaseId} fuera de alcance`);
+        }
+
+        // Sincronizar ProductoLocal solo si el precio local coincide con el anterior
+        const locales = await tx.productoLocal.findMany({
+          where: { baseId: productoBaseId },
+          select: { id: true, precio_costo: true, precio_venta: true },
+        });
+
+        for (const local of locales) {
+          const costoLocal = local.precio_costo ? Number(local.precio_costo) : null;
+          const ventaLocal = local.precio_venta ? Number(local.precio_venta) : null;
+          const data = {};
+
+          // Actualizar solo si no tiene override o si el override coincide con el anterior
+          if (costoLocal === null || Math.abs(costoLocal - costoAnterior) < 0.01) {
+            data.precio_costo = costoNuevo;
+          }
+          if (ventaLocal === null || Math.abs(ventaLocal - ventaAnterior) < 0.01) {
+            data.precio_venta = ventaNueva;
+          }
+
+          if (Object.keys(data).length > 0) {
+            await tx.productoLocal.update({
+              where: { id: local.id },
+              data,
+            });
+          }
         }
 
         await tx.precioUpdateItem.create({

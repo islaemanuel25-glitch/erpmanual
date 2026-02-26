@@ -48,7 +48,7 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
 
     // Validar que haya localId
     if (!localId) {
-      setErrorMsg("Seleccioná un local para buscar clientes.");
+      setErrorMsg("No hay contexto operativo activo.");
       return;
     }
 
@@ -136,7 +136,7 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
           {/* Advertencia si no hay localId */}
           {!localId && (
             <div className="text-center text-amber-400 py-2 text-xs bg-amber-500/10 border border-amber-500/30 rounded px-2">
-              Seleccioná un local para buscar clientes.
+              No hay contexto operativo activo.
             </div>
           )}
 

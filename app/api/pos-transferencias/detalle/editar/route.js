@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -176,6 +177,7 @@ export async function POST(req) {
       ),
       unidadMedida: base?.unidad_medida || "unidad",
       factorPack: Number(base?.factor_pack || 1),
+      modoEnvio: base?.modo_envio || defaultModoEnvio(base?.unidad_medida || "unidad"),
     };
 
     return NextResponse.json({

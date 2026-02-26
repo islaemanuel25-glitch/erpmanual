@@ -169,7 +169,6 @@ Todos los componentes Sunmi lo usan. Si se usa SunmiSelect en vez de `<select>`,
 | `components/transferencias/TablaDetalleTransferencia.jsx` | `bg-slate-900`, `border-slate-700` |
 | `components/transferencias/ColumnSettingsModal.jsx` | `bg-slate-900`, `border-slate-700` |
 | `components/pos-transferencias/nueva/*.jsx` | Multiples archivos con colores hardcodeados |
-| `components/grupo/SelectorGrupoActivo.jsx` | `bg-slate-900`, `border-slate-700` |
 | `components/productos/actualizacion-precios/*.jsx` | `bg-slate-900`, `border-slate-800` |
 
 **Total:** 40+ archivos con colores que no se adaptan al cambiar theme.

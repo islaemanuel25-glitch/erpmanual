@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -8,8 +9,8 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import useLocalSelector from "@/hooks/useLocalSelector";
-import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
+import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 function formatPrecio(n) {
@@ -20,21 +21,13 @@ function formatPrecio(n) {
 }
 
 export default function ReportesVentasPage() {
-  const {
-    perfil,
-    locales,
-    localSeleccionado,
-    esAdminSinLocal,
-    cargandoLocales,
-    handleCambiarLocal,
-  } = useLocalSelector();
-
-  const esAdmin = perfil?.esAdmin;
+  const router = useRouter();
+  const { perfil } = useUser();
+  const { loading: loadingCtx, contexto, needsContexto } = useContextoActivo();
 
   // Filtros
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
-  const [localId, setLocalId] = useState("");
   const [formaPago, setFormaPago] = useState("");
 
   // Datos
@@ -47,12 +40,6 @@ export default function ReportesVentasPage() {
     setFechaDesde(hoy);
     setFechaHasta(hoy);
   }, []);
-
-  useEffect(() => {
-    if (localSeleccionado) {
-      setLocalId(String(localSeleccionado));
-    }
-  }, [localSeleccionado]);
 
   const cargarReporte = async () => {
     if (!fechaDesde || !fechaHasta) {
@@ -69,7 +56,7 @@ export default function ReportesVentasPage() {
         fechaDesde,
         fechaHasta,
       });
-      if (localId) params.set("localId", localId);
+      if (contexto?.localId) params.set("localId", String(contexto.localId));
       if (formaPago) params.set("formaPago", formaPago);
 
       const res = await fetch(`/api/reportes-ventas/general?${params}`, {
@@ -92,20 +79,12 @@ export default function ReportesVentasPage() {
     }
   };
 
-  if (!perfil || cargandoLocales) return null;
+  if (!perfil || loadingCtx) return null;
+  if (needsContexto) { router.push("/inicio"); return null; }
 
   const permisosR = perfil?.permisos || [];
   const esAdminR = Array.isArray(permisosR) && permisosR.includes("*");
   if (!esAdminR && !permisosR.includes("reportes.ver")) return <SinPermisos />;
-
-  if (esAdminSinLocal && !localSeleccionado) {
-    return (
-      <PantallaSeleccionLocal
-        locales={locales}
-        onSeleccionar={handleCambiarLocal}
-      />
-    );
-  }
 
   return (
     <div className="p-2 lg:p-3 space-y-3 max-w-7xl mx-auto">
@@ -143,25 +122,6 @@ export default function ReportesVentasPage() {
               onChange={(e) => setFechaHasta(e.target.value)}
             />
           </div>
-
-          {esAdmin && (
-            <div className="relative">
-              <label className="text-[11px] text-slate-400 mb-1 block">
-                Local
-              </label>
-              <SunmiSelectAdv
-                value={localId}
-                onChange={(val) => setLocalId(val)}
-              >
-                <option value="">Todos</option>
-                {locales.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.nombre}
-                  </option>
-                ))}
-              </SunmiSelectAdv>
-            </div>
-          )}
 
           <div className="relative">
             <label className="text-[11px] text-slate-400 mb-1 block">

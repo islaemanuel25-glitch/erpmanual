@@ -46,7 +46,14 @@ export async function GET(req) {
       where: { posTransferenciaId: posId },
       include: {
         producto: {
-          include: { base: true },
+          include: {
+            base: {
+              include: {
+                categoria: { select: { nombre: true } },
+                area_fisica: { select: { nombre: true } },
+              },
+            },
+          },
         },
       },
       orderBy: { createdAt: "asc" },
@@ -137,6 +144,9 @@ export async function GET(req) {
         factorPack: Number(base?.factor_pack || 1),
         modoEnvio: base?.modo_envio || (base?.unidad_medida === "cajon" ? "SOLO_BULTO" : "MIXTO"),
         modoStock: base?.modo_stock || "BULTO",
+
+        categoriaNombre: base?.categoria?.nombre?.trim() || null,
+        areaFisicaNombre: base?.area_fisica?.nombre?.trim() || null,
       };
     });
 

@@ -10,10 +10,8 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiRow from "@/components/sunmi/SunmiRow";
-import SelectorGrupoActivo from "@/components/grupo/SelectorGrupoActivo";
-import useLocalSelector from "@/hooks/useLocalSelector";
-import PantallaSeleccionLocal from "@/components/local/PantallaSeleccionLocal";
-import SelectorLocalCompacto from "@/components/local/SelectorLocalCompacto";
+import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
 import * as XLSX from 'xlsx';
 
 // ---------------------------------------------------------------------------
@@ -54,16 +52,8 @@ function round2(n) {
 export default function ActualizacionPreciosPage() {
   const router = useRouter();
 
-  const {
-    perfil,
-    locales,
-    localSeleccionado,
-    localNombre,
-    esAdminSinLocal,
-    cargandoLocales,
-    handleCambiarLocal,
-    refrescarLocales,
-  } = useLocalSelector();
+  const { perfil } = useUser();
+  const { loading: loadingCtx, needsContexto, contexto } = useContextoActivo();
 
   // Estado compartido
   const [tab, setTab] = useState("proveedor");
@@ -136,6 +126,7 @@ export default function ActualizacionPreciosPage() {
         metodo: "AUMENTO",
         pricingMode: "KEEP_VENTA",
         increase: { kind: "PCT", value: 0 },
+        localId: contexto?.localId || null,
       }),
     });
     if (res.status === 401) {
@@ -304,6 +295,7 @@ export default function ActualizacionPreciosPage() {
           metodo: "AUMENTO",
           pricingMode: "SET_VENTA",
           items,
+          localId: contexto?.localId || null,
         }),
       });
       if (res.status === 401) {
@@ -509,6 +501,7 @@ export default function ActualizacionPreciosPage() {
           metodo: "XLSX",
           pricingMode: "SET_VENTA",
           items,
+          localId: contexto?.localId || null,
         }),
       });
       if (res.status === 401) {
@@ -534,29 +527,10 @@ export default function ActualizacionPreciosPage() {
   };
 
   // -----------------------------------------------------------------------
-  // Reset al cambiar de grupo
-  // -----------------------------------------------------------------------
-  const handleGrupoChanged = () => {
-    setFilas([]);
-    setExcelPreview([]);
-    setErrorMsg("");
-    setSuccessMsg("");
-    setGlobalPct("");
-    refrescarLocales();
-  };
-
-  // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
-  if (esAdminSinLocal && !localSeleccionado && !cargandoLocales) {
-    return (
-      <PantallaSeleccionLocal
-        locales={locales}
-        onSeleccionar={handleCambiarLocal}
-        volverUrl="/modulos/productos"
-      />
-    );
-  }
+  if (!perfil || loadingCtx) return null;
+  if (needsContexto) { router.push("/inicio"); return null; }
 
   return (
     <div className="sunmi-bg w-full min-h-full p-2">
@@ -564,17 +538,9 @@ export default function ActualizacionPreciosPage() {
         <div className="flex flex-col gap-3">
           {/* Header */}
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <h1 className="text-sm md:text-base font-semibold">
-                Actualizacion de Precios
-              </h1>
-              <SelectorLocalCompacto
-                locales={locales}
-                localSeleccionado={localSeleccionado}
-                localNombre={localNombre}
-                onChange={handleCambiarLocal}
-              />
-            </div>
+            <h1 className="text-sm md:text-base font-semibold">
+              Actualizacion de Precios
+            </h1>
             <SunmiButton
               color="cyan"
               onClick={() => router.push("/modulos/productos")}
@@ -582,8 +548,6 @@ export default function ActualizacionPreciosPage() {
               Volver a productos
             </SunmiButton>
           </div>
-
-          <SelectorGrupoActivo onGrupoChanged={handleGrupoChanged} />
 
           {/* Tabs */}
           <div className="grid grid-cols-2 gap-2 max-w-[340px]">

@@ -47,8 +47,7 @@ Agrupacion logica de locales y depositos. Los productos pertenecen a un grupo y 
 - `SelectAgregarLocal` / `SelectAgregarDeposito`: Selectores para asignar
 - `TablaLocales` / `TablaDepositos`: Tablas de asignaciones
 
-### Componente especial
-- `SelectorGrupoActivo` (en `components/grupo/`): Selector global para admin que cambia el grupo activo via cookie
+**Nota:** El contexto se elige solo en /inicio y se muestra en Header.
 
 ## Estado y hooks
 - Estado local con `useState`

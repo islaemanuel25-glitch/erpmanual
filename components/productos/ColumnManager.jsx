@@ -5,7 +5,7 @@ import { Settings2 } from "lucide-react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
-export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
+export default function ColumnManager({ allColumns, visibleKeys, onChange, lockedKeys = [] }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef(null);
@@ -20,6 +20,7 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
   }, []);
 
   const toggle = (key) => {
+    if (lockedKeys.includes(key)) return;
     const next = visibleKeys.includes(key)
       ? visibleKeys.filter((k) => k !== key)
       : [...visibleKeys, key];
@@ -66,29 +67,33 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange }) {
 
           {/* LISTADO */}
           <div className="max-h-56 overflow-y-auto pr-1 space-y-1">
-            {filtered.map((c) => (
-              <label
-                key={c.key}
-                className="
-                  flex items-center justify-between
-                  px-2 py-2 rounded-lg
-                  bg-slate-800 hover:bg-slate-700
-                  cursor-pointer
-                  text-sm text-slate-200
-                "
-              >
-                <span className="truncate">{c.label}</span>
+            {filtered.map((c) => {
+              const isLocked = lockedKeys.includes(c.key);
+              return (
+                <label
+                  key={c.key}
+                  className={`
+                    flex items-center justify-between
+                    px-2 py-2 rounded-lg
+                    bg-slate-800 ${isLocked ? "opacity-60" : "hover:bg-slate-700 cursor-pointer"}
+                    text-sm text-slate-200
+                  `}
+                >
+                  <span className="truncate">{c.label}</span>
 
-                <input
-                  type="checkbox"
-                  checked={visibleKeys.includes(c.key)}
-                  onChange={() => toggle(c.key)}
-                  className="
-                    w-4 h-4 cursor-pointer accent-amber-300
-                  "
-                />
-              </label>
-            ))}
+                  <input
+                    type="checkbox"
+                    checked={visibleKeys.includes(c.key)}
+                    onChange={() => toggle(c.key)}
+                    disabled={isLocked}
+                    className={`
+                      w-4 h-4 accent-amber-300
+                      ${isLocked ? "opacity-50" : "cursor-pointer"}
+                    `}
+                  />
+                </label>
+              );
+            })}
 
             {filtered.length === 0 && (
               <div className="text-xs text-slate-500 px-2 py-1">

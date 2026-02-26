@@ -2,88 +2,185 @@
    ⭐ SUNMI ERP AZUL — ESTILOS GLOBALES
    ============================================================ */
 
-/* Fondo general ERP */
+/* Fondo general ERP — responde a variables de theme */
 .sunmi-bg {
-    @apply bg-slate-900 text-slate-100;
-  }
-  
-  /* Tarjeta principal Sunmi */
-  .sunmi-card {
-    @apply rounded-2xl bg-slate-950/80 border border-slate-800
-           shadow-md p-4 mb-3 backdrop-blur-md;
-  }
-  
-  /* Header Sunmi — AMARILLO */
-  .sunmi-header-amber {
-    @apply bg-amber-400 text-slate-900 font-bold px-4 py-2 
-           text-[13px] tracking-wide uppercase shadow-md;
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
-  }
-  
-  /* Header Sunmi — CELESTE */
-  .sunmi-header-cyan {
-    @apply bg-cyan-400 text-slate-900 font-bold px-4 py-2 
-           text-[13px] tracking-wide uppercase shadow-md;
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
-  }
-  
-  /* Tabla Sunmi */
-  .sunmi-table thead {
-    @apply bg-slate-900 text-slate-400 border-b border-slate-800;
-  }
-  
-  .sunmi-table tbody tr {
-    @apply border-b border-slate-800;
-  }
-  
-  .sunmi-table tbody tr:hover {
-    @apply bg-slate-800/40;
-  }
-  
-  /* Input Sunmi */
-  .sunmi-input {
-    @apply bg-slate-900 border border-slate-700 text-slate-100 
-           rounded-lg px-2 py-1 text-[13px]
-           focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400;
-  }
-  
-  /* Botón Sunmi redondo */
-  .sunmi-btn {
-    @apply px-3 py-1 rounded-full text-[12px] font-semibold
-           shadow-md active:scale-95 transition;
-  }
-  
-  /* Botón celeste */
-  .sunmi-btn-cyan {
-    @apply bg-cyan-500 text-slate-900 hover:bg-cyan-600;
-  }
-  
-  /* Botón ámbar */
-  .sunmi-btn-amber {
-    @apply bg-amber-400 text-slate-900 hover:bg-amber-500;
-  }
-  
-  /* Botón rojo */
-  .sunmi-btn-red {
-    @apply bg-red-500 text-white hover:bg-red-600;
-  }
-  
-  /* Separador Sunmi */
-  .sunmi-separator {
-    @apply my-4 flex items-center gap-2;
-  }
-  
-  .sunmi-separator-line {
-    @apply flex-1 h-[3px] bg-gradient-to-r rounded-full;
-  }
-  
-  .sunmi-separator-amber {
-    @apply from-amber-400/40 via-amber-400/70 to-amber-400/40;
-  }
-  
-  .sunmi-separator-cyan {
-    @apply from-cyan-400/40 via-cyan-400/70 to-cyan-400/40;
-  }
-  
+  background: var(--app-bg);
+  color: var(--app-fg);
+}
+
+/* Tarjeta principal Sunmi */
+.sunmi-card {
+  @apply rounded-2xl shadow-md p-4 mb-3 backdrop-blur-md;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+}
+
+/* Header Sunmi — AMARILLO */
+.sunmi-header-amber {
+  @apply bg-amber-400 text-slate-900 font-bold px-4 py-2
+         text-[13px] tracking-wide uppercase shadow-md;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
+/* Header Sunmi — CELESTE */
+.sunmi-header-cyan {
+  @apply bg-cyan-400 text-slate-900 font-bold px-4 py-2
+         text-[13px] tracking-wide uppercase shadow-md;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
+/* Tabla Sunmi */
+.sunmi-table thead {
+  background: var(--table-header-bg);
+  color: var(--app-fg);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.sunmi-table tbody tr {
+  border-bottom: 1px solid var(--app-border);
+}
+
+.sunmi-table tbody tr:hover {
+  background: var(--table-row-hover);
+}
+
+/* Input Sunmi */
+.sunmi-input {
+  background: var(--app-input-bg);
+  border: 1px solid var(--app-input-border);
+  color: var(--app-fg);
+  @apply rounded-lg px-2 py-1 text-[13px]
+         focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400;
+}
+
+/* Botón Sunmi redondo */
+.sunmi-btn {
+  @apply px-3 py-1 rounded-full text-[12px] font-semibold
+         shadow-md active:scale-95 transition;
+}
+
+/* Botón celeste */
+.sunmi-btn-cyan {
+  @apply bg-cyan-500 text-slate-900 hover:bg-cyan-600;
+}
+
+/* Botón ámbar */
+.sunmi-btn-amber {
+  @apply bg-amber-400 text-slate-900 hover:bg-amber-500;
+}
+
+/* Botón rojo */
+.sunmi-btn-red {
+  @apply bg-red-500 text-white hover:bg-red-600;
+}
+
+/* Separador Sunmi */
+.sunmi-separator {
+  @apply my-4 flex items-center gap-2;
+}
+
+.sunmi-separator-line {
+  @apply flex-1 h-[3px] bg-gradient-to-r rounded-full;
+}
+
+.sunmi-separator-amber {
+  @apply from-amber-400/40 via-amber-400/70 to-amber-400/40;
+}
+
+.sunmi-separator-cyan {
+  @apply from-cyan-400/40 via-cyan-400/70 to-cyan-400/40;
+}
+
+/* ============================================================
+   ⭐ POS — CLASES SEMÁNTICAS (responden a --pos-* del theme)
+   ============================================================ */
+
+/* Textos */
+.pos-text-accent { color: var(--pos-accent); }
+.pos-text-link { color: var(--pos-link); }
+.pos-text-link:hover { color: var(--pos-link-hover); }
+.pos-text-muted { color: var(--pos-muted); }
+.pos-text-muted-strong { color: var(--pos-muted-strong); }
+.pos-text-success { color: var(--pos-success); }
+.pos-text-success-soft { color: var(--pos-success-soft); }
+.pos-text-danger { color: var(--pos-danger); }
+.pos-text-danger:hover { color: var(--pos-danger-hover); }
+.pos-text-points { color: var(--pos-points); }
+
+/* Superficies */
+.pos-bg-surface { background: var(--pos-surface); }
+.pos-bg-surface-interactive { background: var(--pos-surface); }
+.pos-bg-surface-interactive:hover { background: var(--pos-surface-hover); }
+.pos-bg-surface-interactive:active { background: var(--pos-surface-active); }
+.pos-bg-panel { background: var(--pos-panel-bg); }
+.pos-bg-row { background: var(--pos-row-bg); }
+.pos-bg-row-hover:hover { background: var(--pos-row-hover); }
+
+/* Controles (stepper −/+, voice btn) */
+.pos-control {
+  background: var(--pos-control-bg);
+  color: var(--pos-control-text);
+}
+.pos-control:hover { background: var(--pos-control-hover); }
+.pos-control:active { background: var(--pos-control-active); }
+
+/* Info boxes */
+.pos-success-box {
+  background: var(--pos-success-bg);
+  border: 1px solid var(--pos-success-border);
+}
+.pos-points-box {
+  background: var(--pos-points-bg);
+  border: 1px solid var(--pos-points-border);
+}
+.pos-commission-box {
+  background: var(--pos-commission-bg);
+  border: 1px solid var(--pos-commission-border);
+}
+
+/* Tabs (Porcentaje/Fijo en ModalDescuento) */
+.pos-tab {
+  background: var(--pos-tab-bg);
+  color: var(--pos-tab-fg);
+}
+.pos-tab:hover { background: var(--pos-tab-hover); }
+.pos-tab-active {
+  background: var(--pos-tab-active-bg);
+  color: var(--pos-tab-active-fg);
+}
+
+/* Panel POS (tarjetas grandes, resúmenes) */
+.sunmi-pos-panel {
+  background: var(--pos-panel-bg);
+  border: 1px solid var(--pos-panel-border);
+}
+
+/* Texto secundario POS */
+.sunmi-pos-muted { color: var(--pos-muted); }
+
+/* Botones POS */
+.sunmi-pos-btn-primary {
+  background: var(--pos-btn-primary-bg);
+  color: var(--pos-btn-primary-fg);
+}
+.sunmi-pos-btn-secondary {
+  background: var(--pos-btn-secondary-bg);
+  color: var(--pos-btn-secondary-fg);
+}
+.sunmi-pos-btn-danger {
+  background: var(--pos-btn-danger-bg);
+  color: var(--pos-btn-danger-fg);
+}
+
+/* Overlay POS (modales) */
+.sunmi-pos-overlay { background: var(--pos-overlay); }
+
+/* Textos POS semánticos */
+.sunmi-pos-text-accent { color: var(--pos-accent); }
+.sunmi-pos-text-danger { color: var(--pos-danger); }
+.sunmi-pos-text-success { color: var(--pos-success); }
+
+/* Superficie POS (cards internas sin borde) */
+.sunmi-pos-bg-surface { background: var(--pos-panel-bg); }

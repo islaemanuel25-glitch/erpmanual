@@ -1,23 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
+import useContextoActivo from "@/hooks/useContextoActivo";
 
 export default function FidelidadPage() {
+  const router = useRouter();
   const { perfil: perfilFid, cargando: cargandoFid } = useUser();
+  const { loading: cargandoContexto, contexto, needsContexto } = useContextoActivo();
 
-  // Local selector
-  const [locales, setLocales] = useState([]);
-  const [localSeleccionado, setLocalSeleccionado] = useState(null);
-  const [cargandoLocales, setCargandoLocales] = useState(true);
+  const localSeleccionado = contexto?.localId || null;
 
   // Config
   const [activo, setActivo] = useState(false);
@@ -46,32 +46,6 @@ export default function FidelidadPage() {
   // Valores numéricos derivados
   const ppwNum = Number(puntosPorPeso) || 0;
   const pppNum = Number(pesoPorPunto) || 0;
-
-  // ── Cargar locales ────────────────────────────────────
-  useEffect(() => {
-    const fetchLocales = async () => {
-      try {
-        const res = await fetch("/api/locales/listar?soloLocales=true", {
-          credentials: "include",
-        });
-        const json = await res.json();
-        if (json?.ok) {
-          setLocales(json.items || []);
-          const ultimo = localStorage.getItem("ultimoLocal");
-          if (ultimo && json.items.some((l) => l.id === Number(ultimo))) {
-            setLocalSeleccionado(Number(ultimo));
-          } else if (json.items.length > 0) {
-            setLocalSeleccionado(json.items[0].id);
-          }
-        }
-      } catch (e) {
-        console.error("Error cargando locales:", e);
-      } finally {
-        setCargandoLocales(false);
-      }
-    };
-    fetchLocales();
-  }, []);
 
   // ── Cargar categorías ───────────────────────────────────
   useEffect(() => {
@@ -128,8 +102,6 @@ export default function FidelidadPage() {
       setResultadosProd([]);
       return;
     }
-
-    localStorage.setItem("ultimoLocal", String(localSeleccionado));
 
     const fetchConfig = async () => {
       setCargandoConfig(true);
@@ -221,7 +193,7 @@ export default function FidelidadPage() {
   };
 
   // ── Render ────────────────────────────────────────────
-  if (cargandoFid || cargandoLocales) {
+  if (cargandoFid || cargandoContexto) {
     return (
       <div className="p-2 lg:p-3 max-w-2xl mx-auto">
         <div className="text-center py-8 text-slate-400">Cargando...</div>
@@ -232,6 +204,11 @@ export default function FidelidadPage() {
   const permisosFid = perfilFid?.permisos || [];
   const esAdminFid = Array.isArray(permisosFid) && permisosFid.includes("*");
   if (!esAdminFid) return <SinPermisos />;
+
+  if (needsContexto) {
+    router.push("/inicio");
+    return null;
+  }
 
   // Simulador cálculos
   const simCompraNum = Number(simCompra) || 0;
@@ -247,37 +224,17 @@ export default function FidelidadPage() {
           subtitle="Configurá el sistema de puntos por local"
         />
 
-        {/* Selector de local */}
-        <SunmiSeparator label="Local" />
+        <p className="text-sm text-amber-400 font-medium mt-1">
+          {contexto?.nombre || "Sin local"}
+        </p>
 
-        <div className="flex flex-col gap-1">
-          <span className="text-[11px] text-slate-400">Local</span>
-          <SunmiSelectAdv
-            value={localSeleccionado ? String(localSeleccionado) : ""}
-            onChange={(v) => setLocalSeleccionado(Number(v) || null)}
-          >
-            <option value="">Seleccionar local…</option>
-            {locales.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.nombre}
-              </option>
-            ))}
-          </SunmiSelectAdv>
-        </div>
-
-        {!localSeleccionado && (
-          <div className="text-center py-6 text-slate-500 text-sm">
-            Seleccioná un local para configurar puntos.
-          </div>
-        )}
-
-        {localSeleccionado && cargandoConfig && (
+        {cargandoConfig && (
           <div className="text-center py-6 text-slate-400 text-sm">
             Cargando configuración…
           </div>
         )}
 
-        {localSeleccionado && !cargandoConfig && (
+        {!cargandoConfig && (
           <>
             <SunmiSeparator label="Configuración" />
 

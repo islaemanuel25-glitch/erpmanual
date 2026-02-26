@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
@@ -11,7 +12,77 @@ function formatPrecio(n) {
   });
 }
 
-export default function CarritoVenta({
+/* ── Stepper de cantidad (− input +) ── */
+const btnStepClass =
+  "flex items-center justify-center w-7 h-7 rounded pos-control text-sm font-bold transition-colors select-none shrink-0";
+
+function CantidadStepper({ item, idx, onCantidadChange, compact }) {
+  const esKg = item.unidadMedida === "kg";
+  const minVal = esKg ? 0.001 : 1;
+  const step = esKg ? 0.001 : 1;
+
+  const handleChange = (e) => {
+    const raw = e.target.value;
+    if (raw === "") {
+      onCantidadChange(idx, "");
+      return;
+    }
+    if (esKg) {
+      const normalized = raw.replace(",", ".");
+      const val = parseFloat(normalized);
+      onCantidadChange(idx, isNaN(val) ? "" : val);
+    } else {
+      const val = parseInt(raw, 10);
+      onCantidadChange(idx, isNaN(val) ? "" : val);
+    }
+  };
+
+  const handleBlur = () => {
+    const cur = item.cantidad;
+    if (cur === "" || cur === null || cur === undefined || isNaN(Number(cur))) {
+      onCantidadChange(idx, minVal);
+      return;
+    }
+    const num = Number(cur);
+    if (num < minVal) {
+      onCantidadChange(idx, minVal);
+    } else if (!esKg) {
+      onCantidadChange(idx, Math.round(num));
+    }
+  };
+
+  const handleStep = (dir) => {
+    let cur = Number(item.cantidad);
+    if (isNaN(cur) || item.cantidad === "") cur = 0;
+    let next = cur + dir * step;
+    if (esKg) next = Math.round(next * 1000) / 1000;
+    next = Math.max(minVal, next);
+    next = Math.min(item.stockMax || 9999, next);
+    onCantidadChange(idx, next);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <button type="button" className={btnStepClass} onClick={() => handleStep(-1)}>
+        −
+      </button>
+      <SunmiInput
+        type={esKg ? "text" : "number"}
+        inputMode={esKg ? "decimal" : "numeric"}
+        {...(!esKg && { min: minVal, step, max: item.stockMax || 9999 })}
+        value={item.cantidad}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        className={compact ? "w-14 !text-center !py-1 text-sm" : "w-16 !text-center !py-1"}
+      />
+      <button type="button" className={btnStepClass} onClick={() => handleStep(1)}>
+        +
+      </button>
+    </div>
+  );
+}
+
+function CarritoVenta({
   items,
   onCantidadChange,
   onEliminar,
@@ -27,23 +98,21 @@ export default function CarritoVenta({
     return (
       <SunmiCard className="p-2 lg:p-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-slate-300">
-            Carrito vacío
+          <span className="text-sm font-semibold pos-text-muted-strong">
+            Carrito vacio
           </span>
           {onAbrirCliente && (
             <button
               onClick={onAbrirCliente}
-              className={`text-xs ${
-                clienteSeleccionado
-                  ? "text-cyan-400 hover:text-cyan-300 font-medium"
-                  : "text-cyan-400 hover:text-cyan-300"
+              className={`text-xs pos-text-link ${
+                clienteSeleccionado ? "font-medium" : ""
               }`}
             >
               {clienteSeleccionado ? clienteSeleccionado.nombre : "Cliente"}
             </button>
           )}
         </div>
-        <div className="text-sm text-slate-500 text-center py-4">
+        <div className="text-sm pos-text-muted text-center py-4">
           No hay productos en el carrito.
         </div>
       </SunmiCard>
@@ -53,17 +122,15 @@ export default function CarritoVenta({
   return (
     <SunmiCard className="p-2 lg:p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-semibold text-slate-300">
+        <span className="text-sm font-semibold pos-text-muted-strong">
           Carrito ({items.length})
         </span>
         <div className="flex items-center gap-3">
           {onAbrirCliente && (
             <button
               onClick={onAbrirCliente}
-              className={`text-xs ${
-                clienteSeleccionado
-                  ? "text-cyan-400 hover:text-cyan-300 font-medium"
-                  : "text-cyan-400 hover:text-cyan-300"
+              className={`text-xs pos-text-link ${
+                clienteSeleccionado ? "font-medium" : ""
               }`}
             >
               {clienteSeleccionado ? clienteSeleccionado.nombre : "Cliente"}
@@ -74,8 +141,8 @@ export default function CarritoVenta({
               onClick={onAbrirDescuento}
               className={`text-xs ${
                 descuento > 0
-                  ? "text-emerald-400 hover:text-emerald-300 font-medium"
-                  : "text-amber-400 hover:text-amber-300"
+                  ? "pos-text-success font-medium"
+                  : "pos-text-accent"
               }`}
             >
               {descuento > 0 ? `Desc. -$${formatPrecio(descuento)}` : "Descuento"}
@@ -83,7 +150,7 @@ export default function CarritoVenta({
           )}
           <button
             onClick={onLimpiar}
-            className="text-xs text-red-400 hover:text-red-300"
+            className="text-xs pos-text-danger"
           >
             Limpiar
           </button>
@@ -95,34 +162,29 @@ export default function CarritoVenta({
         {items.map((item, idx) => (
           <div
             key={`${item.productoBaseId}-${idx}`}
-            className="p-2 rounded-lg bg-slate-800/60 animate-fade-in"
+            className="p-2 rounded-lg pos-bg-surface animate-fade-in"
           >
             <div className="flex items-start gap-2">
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm truncate">{item.nombre}</div>
-                <div className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                <div className="text-xs pos-text-muted mt-1 flex items-center gap-2">
                   <span>${formatPrecio(item.precio)}</span>
                   <span>x</span>
-                  <SunmiInput
-                    type="number"
-                    min={1}
-                    max={item.stockMax || 9999}
-                    value={item.cantidad}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1;
-                      onCantidadChange(idx, Math.max(1, val));
-                    }}
-                    className="w-16 !text-center !py-1 text-sm"
+                  <CantidadStepper
+                    item={item}
+                    idx={idx}
+                    onCantidadChange={onCantidadChange}
+                    compact
                   />
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <div className="text-sm font-bold text-amber-400">
-                  ${formatPrecio(item.precio * item.cantidad)}
+                <div className="text-sm font-bold pos-text-accent">
+                  ${formatPrecio(item.precio * (Number(item.cantidad) || 0))}
                 </div>
                 <button
                   onClick={() => onEliminar(idx)}
-                  className="text-xs text-red-400 mt-1"
+                  className="text-xs pos-text-danger mt-1"
                 >
                   Quitar
                 </button>
@@ -140,34 +202,28 @@ export default function CarritoVenta({
           {items.map((item, idx) => (
             <tr
               key={`${item.productoBaseId}-${idx}`}
-              className="bg-slate-950 hover:bg-slate-900 animate-fade-in"
+              className="pos-bg-row pos-bg-row-hover animate-fade-in"
             >
               <td className="px-2 py-1.5 truncate max-w-[160px] text-sm">
                 {item.nombre}
               </td>
-              <td className="px-2 py-1.5 w-20">
-                <SunmiInput
-                  type="number"
-                  min={1}
-                  max={item.stockMax || 9999}
-                  value={item.cantidad}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 1;
-                    onCantidadChange(idx, Math.max(1, val));
-                  }}
-                  className="!text-center !py-1"
+              <td className="px-2 py-1.5">
+                <CantidadStepper
+                  item={item}
+                  idx={idx}
+                  onCantidadChange={onCantidadChange}
                 />
               </td>
               <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm">
                 $ {formatPrecio(item.precio)}
               </td>
               <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm font-medium">
-                $ {formatPrecio(item.precio * item.cantidad)}
+                $ {formatPrecio(item.precio * (Number(item.cantidad) || 0))}
               </td>
               <td className="px-2 py-1.5 text-center">
                 <button
                   onClick={() => onEliminar(idx)}
-                  className="text-red-400 hover:text-red-300 text-lg leading-none"
+                  className="pos-text-danger text-lg leading-none"
                   title="Eliminar"
                 >
                   ✕
@@ -181,10 +237,12 @@ export default function CarritoVenta({
       {/* Subtotal */}
       <div className="flex justify-end mt-2 px-1">
         <div className="text-right">
-          <span className="text-xs text-slate-400 mr-2">SUBTOTAL</span>
+          <span className="text-xs pos-text-muted mr-2">SUBTOTAL</span>
           <span className="text-lg font-bold">$ {formatPrecio(subtotal)}</span>
         </div>
       </div>
     </SunmiCard>
   );
 }
+
+export default memo(CarritoVenta);

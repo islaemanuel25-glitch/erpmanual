@@ -18,19 +18,18 @@ export default function SunmiTable({ headers = [], children }) {
         {headers.length > 0 && (
           <thead className={theme.table?.header || "bg-amber-400 text-slate-900"}>
             <tr>
-              {headers.map((h, i) => (
-                <th
-                  key={i}
-                  className="
-                    px-2 py-1.5        /* antes px-3 py-2 */
-                    text-left
-                    font-semibold
-                    whitespace-nowrap
-                  "
-                >
-                  {h}
-                </th>
-              ))}
+              {headers.map((h, i) => {
+                const label = typeof h === "string" ? h : h.label;
+                const extra = typeof h === "string" ? "" : (h.className || "");
+                return (
+                  <th
+                    key={i}
+                    className={`px-2 py-1.5 text-left font-semibold whitespace-nowrap ${extra}`}
+                  >
+                    {label}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
         )}

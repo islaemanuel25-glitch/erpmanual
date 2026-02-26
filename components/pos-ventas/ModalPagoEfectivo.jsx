@@ -33,16 +33,16 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
 
         <div className="space-y-3">
           {/* Total */}
-          <div className="bg-slate-900/50 p-3 rounded-lg">
-            <div className="text-xs text-slate-400">Total a cobrar</div>
-            <div className="text-2xl font-bold text-amber-400">
+          <div className="pos-bg-panel p-3 rounded-lg">
+            <div className="text-xs pos-text-muted">Total a cobrar</div>
+            <div className="text-2xl font-bold pos-text-accent">
               ${formatPrecio(total)}
             </div>
           </div>
 
           {/* Monto que paga */}
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] pos-text-muted mb-1 block">
               Cliente paga con:
             </label>
             <SunmiInput
@@ -82,16 +82,16 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
 
           {/* Vuelto */}
           {pagaConNum >= total && pagaConNum > 0 && (
-            <div className="bg-emerald-500/20 border border-emerald-500/50 p-3 rounded-lg">
-              <div className="text-xs text-emerald-300">VUELTO</div>
-              <div className="text-3xl font-bold text-emerald-400">
+            <div className="pos-success-box p-3 rounded-lg">
+              <div className="text-xs pos-text-success-soft">VUELTO</div>
+              <div className="text-3xl font-bold pos-text-success">
                 ${formatPrecio(vuelto)}
               </div>
             </div>
           )}
 
           {pagaConNum > 0 && pagaConNum < total && (
-            <div className="text-sm text-red-400">
+            <div className="text-sm pos-text-danger">
               El monto debe ser mayor o igual al total
             </div>
           )}

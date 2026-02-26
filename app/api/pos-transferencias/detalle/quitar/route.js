@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -91,18 +92,29 @@ export async function POST(req) {
 
     const stockActualDestino = Number(stockDestino?.cantidad || 0);
 
-    // ELIMINAR DETALLE
-    await prisma.posTransferenciaDetalle.delete({
-      where: { id: detalleId },
-    });
+    // Si tiene sugerido > 0, volver a Sugeridos (preparado=0) en vez de eliminar
+    const sugeridoActual = Number(detalle.sugerido || 0);
+    let accion = "eliminado";
+
+    if (sugeridoActual > 0) {
+      await prisma.posTransferenciaDetalle.update({
+        where: { id: detalleId },
+        data: { preparado: 0 },
+      });
+      accion = "devuelto_a_sugerido";
+    } else {
+      await prisma.posTransferenciaDetalle.delete({
+        where: { id: detalleId },
+      });
+    }
 
     const item = {
       detalleId,
       productoLocalId: detalle.productoId,
       baseId: detalle.producto.baseId,
       tipo: detalle.tipo,
-      sugerido: Number(detalle.sugerido || 0),
-      preparado: Number(detalle.preparado || 0),
+      sugerido: sugeridoActual,
+      preparado: 0,
       productoNombre: detalle.producto.nombre || detalle.producto.base.nombre,
       codigoBarra: detalle.producto.base.codigo_barra,
 
@@ -114,9 +126,10 @@ export async function POST(req) {
       ),
       unidadMedida: detalle.producto.base.unidad_medida,
       factorPack: Number(detalle.producto.base.factor_pack || 1),
+      modoEnvio: detalle.producto.base.modo_envio || defaultModoEnvio(detalle.producto.base.unidad_medida || "unidad"),
     };
 
-    return NextResponse.json({ ok: true, item, error: null });
+    return NextResponse.json({ ok: true, item, accion, error: null });
   } catch (err) {
     console.error("QUITAR DETALLE POS ERROR:", err);
     return NextResponse.json(

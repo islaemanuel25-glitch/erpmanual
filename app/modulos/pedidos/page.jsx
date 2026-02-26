@@ -11,7 +11,6 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
-
 export default function PedidosCatalogoPage() {
   const router = useRouter();
   const { perfil: perfilPed, cargando: cargandoPed } = useUser();
@@ -62,6 +61,10 @@ export default function PedidosCatalogoPage() {
         const json = await res.json();
 
         if (!json.ok) {
+          if (json.needsContexto) {
+            router.push("/inicio");
+            return;
+          }
           setError(json.error || "Error cargando opciones");
           setLoading(false);
           return;
@@ -139,7 +142,7 @@ export default function PedidosCatalogoPage() {
         setCarritoItems(json.items || []);
         setPendiente(json.pendiente || null);
 
-        // Reconstruir mapa de cantidades
+        // Reconstruir mapa de cantidades (siempre en unidades)
         const mapa = {};
         (json.items || []).forEach((it) => {
           mapa[it.productoLocalId] = it.sugerido;
@@ -154,13 +157,13 @@ export default function PedidosCatalogoPage() {
   // ====================================================
   // SET CANTIDAD
   // ====================================================
-  const setCantidad = async (productoLocalId, cantidad, unidad) => {
+  const setCantidad = async (productoLocalId, cantidad, unidad = "UNIDAD") => {
     if (pendiente) {
       setError("Hay un pedido solicitado pendiente. Esperá a que el depósito lo procese o cancelalo.");
       return;
     }
 
-    // Optimistic update
+    // Optimistic update (siempre en total unidades)
     setCarrito((prev) => {
       const next = { ...prev };
       if (cantidad === 0) {
@@ -343,51 +346,12 @@ export default function PedidosCatalogoPage() {
               <>
                 <div className="space-y-2">
                   {carritoItems.map((item) => (
-                    <div
+                    <CarritoItemCard
                       key={item.detalleId}
-                      className="bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-medium truncate">
-                            {item.nombre}
-                          </div>
-                          {item.codigoBarra && (
-                            <div className="text-[10px] text-slate-500">
-                              {item.codigoBarra}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 ml-3">
-                          <CantidadControl
-                            value={carrito[item.productoLocalId] || item.sugerido}
-                            factorPack={item.factorPack}
-                            unidad={item.unidadSugerida}
-                            onChange={(cant, uni) =>
-                              setCantidad(item.productoLocalId, cant, uni)
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-[10px] text-slate-500">
-                          {item.unidadSugerida === "BULTO"
-                            ? `Bulto (x${item.factorPack})`
-                            : "Unidad"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCantidad(item.productoLocalId, 0, null)
-                          }
-                          className="text-[10px] text-red-400 hover:text-red-300"
-                        >
-                          Quitar
-                        </button>
-                      </div>
-                    </div>
+                      item={item}
+                      totalActual={carrito[item.productoLocalId] || item.sugerido}
+                      onSetCantidad={(cant, uni) => setCantidad(item.productoLocalId, cant, uni)}
+                    />
                   ))}
                 </div>
 
@@ -598,12 +562,19 @@ function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
     imagenUrl,
     stockDeposito,
     factorPack,
-    modoPedido,
     categoriaNombre,
     unidadMedida,
+    modoEnvio,
   } = producto;
 
-  const unidadDefault = factorPack > 1 ? "BULTO" : "UNIDAD";
+  const bultoMode = modoEnvio === "SOLO_BULTO" && factorPack > 1;
+
+  const labelBulto =
+    unidadMedida === "cajon" ? "Cajón" :
+    unidadMedida === "pack" ? "Pack" :
+    unidadMedida === "caja" ? "Caja" :
+    unidadMedida === "carton" ? "Cartón" :
+    "Bulto";
 
   return (
     <div
@@ -648,51 +619,66 @@ function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
 
           <div className="flex items-center gap-3 mt-1">
             <span className="text-[10px] text-slate-500">
-              Stock dep.: {stockDeposito}{" "}
-              {unidadMedida === "pack" ? "packs" : "u."}
+              Stock dep.: {stockDeposito} u.
             </span>
-            {factorPack > 1 && (
+            {bultoMode && (
               <span className="text-[10px] text-slate-500">
-                Bulto x{factorPack}
+                {labelBulto} x{factorPack}
               </span>
             )}
           </div>
         </div>
 
-        {/* Control cantidad */}
+        {/* Control +/- */}
         <div className="flex-shrink-0 flex items-center">
-          <CantidadControl
-            value={cantidadActual}
+          <InputCantidad
+            totalActual={cantidadActual}
             factorPack={factorPack}
-            unidad={unidadDefault}
+            unidadMedida={unidadMedida}
+            modoEnvio={modoEnvio}
             onChange={onSetCantidad}
           />
         </div>
       </div>
+
+      {/* Info de bultos debajo */}
+      {bultoMode && cantidadActual > 0 && (
+        <div className="mt-1 flex items-center justify-between">
+          <span className="text-[10px] text-slate-500">
+            = {cantidadActual} uds ({Math.floor(cantidadActual / factorPack)} {labelBulto.toLowerCase()}{cantidadActual / factorPack !== Math.floor(cantidadActual / factorPack) ? ` + ${cantidadActual % factorPack} sueltas` : ""})
+          </span>
+          <button
+            type="button"
+            onClick={() => onSetCantidad(0, "UNIDAD")}
+            className="text-[10px] text-red-400 hover:text-red-300 flex-shrink-0"
+          >
+            Quitar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 // ====================================================
-// COMPONENTE: Control +/- cantidad
+// COMPONENTE: Input cantidad (mixto o simple)
 // ====================================================
-function CantidadControl({ value, factorPack, unidad, onChange }) {
-  const step = 1;
+function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = true, unidadMedida, modoEnvio }) {
+  const bultoMode = modoEnvio === "SOLO_BULTO" && factorPack > 1;
 
-  const incrementar = () => {
-    onChange(value + step, unidad);
-  };
+  const labelBulto =
+    unidadMedida === "cajon" ? "caj." :
+    unidadMedida === "pack" ? "packs" :
+    unidadMedida === "caja" ? "cajas" :
+    unidadMedida === "carton" ? "cart." :
+    "bultos";
 
-  const decrementar = () => {
-    const next = value - step;
-    onChange(next < 0 ? 0 : next, unidad);
-  };
-
-  if (value === 0) {
+  // Botón agregar
+  if (totalActual === 0 && mostrarAgregar) {
     return (
       <button
         type="button"
-        onClick={() => onChange(1, unidad)}
+        onClick={() => onChange(bultoMode ? factorPack : 1, "UNIDAD")}
         className="
           h-[32px] px-3
           rounded-lg
@@ -706,25 +692,111 @@ function CantidadControl({ value, factorPack, unidad, onChange }) {
     );
   }
 
-  return (
-    <div className="flex items-center gap-0 bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-      <button
-        type="button"
-        onClick={decrementar}
-        className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
-      >
-        -
-      </button>
-      <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold text-amber-300">
-        {value}
+  // BULTO mode: +/- en bultos completos
+  if (bultoMode) {
+    const bultos = Math.floor(totalActual / factorPack);
+    return (
+      <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-0 bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => onChange(Math.max(0, (bultos - 1)) * factorPack, "UNIDAD")}
+            className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
+          >
+            -
+          </button>
+          <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold text-amber-300">
+            {bultos}
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange((bultos + 1) * factorPack, "UNIDAD")}
+            className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
+          >
+            +
+          </button>
+        </div>
+        <span className="text-[11px] text-slate-400">{labelBulto}</span>
       </div>
-      <button
-        type="button"
-        onClick={incrementar}
-        className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
-      >
-        +
-      </button>
+    );
+  }
+
+  // UNIDAD mode: +/- en unidades
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-0 bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(0, totalActual - 1), "UNIDAD")}
+          className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
+        >
+          -
+        </button>
+        <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold text-amber-300">
+          {totalActual}
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(totalActual + 1, "UNIDAD")}
+          className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
+        >
+          +
+        </button>
+      </div>
+      <span className="text-[11px] text-slate-400">uds</span>
+    </div>
+  );
+}
+
+// ====================================================
+// COMPONENTE: Item del carrito (vista pedido)
+// ====================================================
+function CarritoItemCard({ item, totalActual, onSetCantidad }) {
+  const bultoMode = item.modoEnvio === "SOLO_BULTO" && item.factorPack > 1;
+  const labelBulto =
+    item.unidadMedida === "cajon" ? "caj." :
+    item.unidadMedida === "pack" ? "packs" :
+    item.unidadMedida === "caja" ? "cajas" :
+    item.unidadMedida === "carton" ? "cart." :
+    "bultos";
+
+  return (
+    <div className="bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-medium truncate">
+            {item.nombre}
+          </div>
+          {item.codigoBarra && (
+            <div className="text-[10px] text-slate-500">
+              {item.codigoBarra}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => onSetCantidad(0, "UNIDAD")}
+          className="text-[10px] text-red-400 hover:text-red-300 ml-3 flex-shrink-0"
+        >
+          Quitar
+        </button>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        <InputCantidad
+          totalActual={totalActual}
+          factorPack={item.factorPack}
+          unidadMedida={item.unidadMedida}
+          modoEnvio={item.modoEnvio}
+          onChange={onSetCantidad}
+          mostrarAgregar={false}
+        />
+        {bultoMode && totalActual > 0 && (
+          <span className="text-[10px] text-slate-500 ml-2">
+            = {totalActual} uds
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -781,20 +853,23 @@ function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, c
 
       {verDetalle && pendiente.items?.length > 0 && (
         <div className="mt-3 space-y-1 border-t border-amber-400/20 pt-2">
-          {pendiente.items.map((item, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between text-[11px] text-slate-300"
-            >
-              <span className="truncate flex-1 min-w-0">{item.nombre}</span>
-              <span className="ml-2 text-amber-300 font-medium whitespace-nowrap">
-                {item.sugerido}{" "}
-                {item.unidadSugerida === "BULTO"
-                  ? `bulto${item.sugerido !== 1 ? "s" : ""} (x${item.factorPack})`
-                  : `unidad${item.sugerido !== 1 ? "es" : ""}`}
-              </span>
-            </div>
-          ))}
+          {pendiente.items.map((item, i) => {
+            const isBulto = item.modoEnvio === "SOLO_BULTO" && item.factorPack > 1;
+            const bultos = isBulto ? Math.floor(item.sugerido / item.factorPack) : 0;
+            return (
+              <div
+                key={i}
+                className="flex items-center justify-between text-[11px] text-slate-300"
+              >
+                <span className="truncate flex-1 min-w-0">{item.nombre}</span>
+                <span className="ml-2 text-amber-300 font-medium whitespace-nowrap">
+                  {isBulto
+                    ? `${bultos} bulto${bultos !== 1 ? "s" : ""} (${item.sugerido} uds)`
+                    : `${item.sugerido} unidad${item.sugerido !== 1 ? "es" : ""}`}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

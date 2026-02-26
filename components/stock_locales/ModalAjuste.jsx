@@ -26,9 +26,9 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
   if (!open || !producto) return null;
 
   const factorPack = Number(producto.factorPack || producto.factor_pack || 1);
-  const modoStock = producto.modoStock || producto.modo_stock || "BULTO";
+  const unidadMedida = producto.unidadMedida || producto.unidad_medida || "unidad";
   const esDeposito = local?.esDeposito || local?.es_deposito || false;
-  const usarBultos = esDeposito && modoStock === "BULTO" && factorPack > 1;
+  const usarBultos = esDeposito && factorPack > 1 && (unidadMedida === "pack" || unidadMedida === "cajon");
 
   // Calcular total en unidades
   const totalUnidades = usarBultos
@@ -133,23 +133,30 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                   </div>
                 </div>
                 <p className="text-slate-400 text-[11px]">
-                  Total: <strong className="text-slate-200">{totalUnidades} unidades</strong>
+                  Total: <strong className="text-slate-200">{totalUnidades} {unidadMedida === "kg" ? "kg" : "unidades"}</strong>
                 </p>
               </>
             ) : (
               <>
-                {/* Solo unidades */}
+                {/* Solo unidades / kg */}
                 <div>
                   <label className="text-[11px] text-slate-400 mb-1 block">
-                    Cantidad (unidades)
+                    {unidadMedida === "kg" ? "Cantidad (kg)" : "Cantidad (unidades)"}
                   </label>
                   <SunmiInput
                     type="number"
                     placeholder="0"
                     min={0}
+                    step={unidadMedida === "kg" ? 0.001 : 1}
                     value={sueltas || bultos}
                     onChange={(e) => {
-                      setSueltas(e.target.value);
+                      const raw = e.target.value;
+                      if (unidadMedida !== "kg") {
+                        const entero = raw === "" ? "" : String(parseInt(raw, 10) || 0);
+                        setSueltas(entero);
+                      } else {
+                        setSueltas(raw);
+                      }
                       setBultos("");
                     }}
                   />

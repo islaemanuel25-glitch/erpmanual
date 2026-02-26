@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { getContextoActivo } from "@/lib/contexto";
 
 function normalized(value) {
   return String(value || "")
@@ -25,9 +27,29 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "proveedorId y text requeridos" }, { status: 400 });
     }
 
+    // Resolver grupoId: session → body.localId → session.localId → contexto cookie
+    let grupoId = Number(session.grupoId) || 0;
+    if (!grupoId) {
+      let localId = Number(body?.localId) || 0;
+      if (!localId && session.localId) localId = Number(session.localId);
+      if (!localId && session.esAdmin) {
+        const ctx = getContextoActivo(req, session);
+        if (ctx.localId) localId = Number(ctx.localId);
+      }
+      if (localId) grupoId = await getGrupoIdDeLocal(localId);
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[precios/parse] CTX:", { sessionGrupoId: session.grupoId, grupoIdResolved: grupoId });
+    }
+
+    if (!grupoId) {
+      return NextResponse.json({ ok: false, error: "Selecciona un grupo activo" }, { status: 400 });
+    }
+
     const productos = await prisma.productoBase.findMany({
       where: {
-        grupoId: Number(session.grupoId),
+        grupoId,
         proveedor_id: proveedorId,
       },
       select: {

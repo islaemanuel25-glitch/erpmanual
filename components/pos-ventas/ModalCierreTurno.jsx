@@ -71,9 +71,9 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
 
   if (!resumen) {
     return (
-      <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+      <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
         <SunmiCard className="w-full max-w-md p-4 text-center py-8">
-          <span className="text-sm text-slate-400">
+          <span className="text-sm sunmi-pos-muted">
             Cargando resumen del turno...
           </span>
         </SunmiCard>
@@ -86,11 +86,11 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
   const diferencia = montoReal ? Number(montoReal) - esperado : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50 overflow-y-auto">
       <SunmiCard className="w-full max-w-lg p-4 my-4">
         <div className="text-center mb-4">
           <h2 className="text-xl font-bold">Cierre de Caja</h2>
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-sm sunmi-pos-muted mt-1">
             Turno #{turno.id} &bull;{" "}
             {new Date(turno.apertura).toLocaleString("es-AR")}
           </div>
@@ -98,21 +98,21 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
 
         {/* Resumen del turno */}
         <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="bg-slate-800/60 p-3 rounded-lg text-center">
-            <div className="text-[10px] text-slate-400">Ventas</div>
-            <div className="text-xl font-bold text-cyan-400">
+          <div className="sunmi-pos-bg-surface p-3 rounded-lg text-center">
+            <div className="text-[10px] sunmi-pos-muted">Ventas</div>
+            <div className="text-xl font-bold sunmi-pos-text-accent">
               {resumen.cantidadVentas}
             </div>
           </div>
-          <div className="bg-slate-800/60 p-3 rounded-lg text-center">
-            <div className="text-[10px] text-slate-400">Efectivo</div>
-            <div className="text-xl font-bold text-emerald-400">
+          <div className="sunmi-pos-bg-surface p-3 rounded-lg text-center">
+            <div className="text-[10px] sunmi-pos-muted">Efectivo</div>
+            <div className="text-xl font-bold sunmi-pos-text-success">
               ${formatPrecio(resumen.totalEfectivo)}
             </div>
           </div>
-          <div className="bg-slate-800/60 p-3 rounded-lg text-center">
-            <div className="text-[10px] text-slate-400">Digital</div>
-            <div className="text-xl font-bold text-amber-400">
+          <div className="sunmi-pos-bg-surface p-3 rounded-lg text-center">
+            <div className="text-[10px] sunmi-pos-muted">Digital</div>
+            <div className="text-xl font-bold sunmi-pos-text-accent">
               ${formatPrecio(resumen.totalDigital)}
             </div>
           </div>
@@ -120,8 +120,8 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
 
         {/* Desglose digital + comisiones */}
         {Number(resumen.totalDigital) > 0 && (
-          <div className="bg-slate-800/40 p-2 rounded-lg mb-4 space-y-1">
-            <div className="text-xs text-slate-400 flex justify-around">
+          <div className="sunmi-pos-panel p-2 rounded-lg mb-4 space-y-1">
+            <div className="text-xs sunmi-pos-muted flex justify-around">
               {Number(resumen.desglose.mercadopago) > 0 && (
                 <span>MP: ${formatPrecio(resumen.desglose.mercadopago)}</span>
               )}
@@ -133,41 +133,41 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
               )}
             </div>
             {Number(resumen.totalComision) > 0 && (
-              <div className="text-xs text-slate-500 flex justify-between border-t border-slate-700 pt-1 mt-1">
+              <div className="text-xs sunmi-pos-muted flex justify-between border-t pt-1 mt-1" style={{ borderColor: 'var(--pos-panel-border)' }}>
                 <span>Comision bancaria:</span>
-                <span className="text-red-400">-${formatPrecio(resumen.totalComision)}</span>
+                <span className="sunmi-pos-text-danger">-${formatPrecio(resumen.totalComision)}</span>
               </div>
             )}
             {Number(resumen.netoDigital) > 0 && (
               <div className="text-xs flex justify-between">
-                <span className="text-slate-400">Neto digital:</span>
-                <span className="text-amber-300 font-semibold">${formatPrecio(resumen.netoDigital)}</span>
+                <span className="sunmi-pos-muted">Neto digital:</span>
+                <span className="sunmi-pos-text-accent font-semibold">${formatPrecio(resumen.netoDigital)}</span>
               </div>
             )}
           </div>
         )}
 
         {/* Detalle efectivo esperado */}
-        <div className="bg-slate-800/40 p-3 rounded-lg mb-4 space-y-1">
+        <div className="sunmi-pos-panel p-3 rounded-lg mb-4 space-y-1">
           <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Monto inicial</span>
+            <span className="sunmi-pos-muted">Monto inicial</span>
             <span>${formatPrecio(turno.montoInicial)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-slate-400">+ Ventas efectivo</span>
-            <span className="text-emerald-400">
+            <span className="sunmi-pos-muted">+ Ventas efectivo</span>
+            <span className="sunmi-pos-text-success">
               +${formatPrecio(resumen.totalEfectivo)}
             </span>
           </div>
-          <div className="flex justify-between text-sm font-bold border-t border-slate-700 pt-1">
+          <div className="flex justify-between text-sm font-bold border-t pt-1" style={{ borderColor: 'var(--pos-panel-border)' }}>
             <span>Efectivo esperado</span>
-            <span className="text-amber-400">${formatPrecio(esperado)}</span>
+            <span className="sunmi-pos-text-accent">${formatPrecio(esperado)}</span>
           </div>
         </div>
 
         {/* Input monto real */}
         <div className="mb-3">
-          <label className="text-sm text-slate-300 mb-1 block font-semibold">
+          <label className="text-sm sunmi-pos-muted mb-1 block font-semibold">
             Monto REAL contado en caja (efectivo)
           </label>
           <SunmiInput
@@ -187,11 +187,12 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
           <div
             className={`p-3 rounded-lg mb-3 text-center ${
               Math.abs(diferencia) < 0.01
-                ? "bg-emerald-500/20 border border-emerald-500/50"
+                ? "sunmi-pos-panel"
                 : diferencia > 0
-                ? "bg-blue-500/20 border border-blue-500/50"
-                : "bg-red-500/20 border border-red-500/50"
+                ? "sunmi-pos-panel"
+                : ""
             }`}
+            style={Math.abs(diferencia) >= 0.01 && diferencia <= 0 ? { background: 'color-mix(in srgb, var(--pos-danger) 15%, transparent)', border: '1px solid var(--pos-danger)' } : undefined}
           >
             <div className="text-xs mb-1">
               {Math.abs(diferencia) < 0.01
@@ -203,10 +204,10 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
             <div
               className={`text-3xl font-bold ${
                 Math.abs(diferencia) < 0.01
-                  ? "text-emerald-400"
+                  ? "sunmi-pos-text-success"
                   : diferencia > 0
-                  ? "text-blue-400"
-                  : "text-red-400"
+                  ? "sunmi-pos-text-accent"
+                  : "sunmi-pos-text-danger"
               }`}
             >
               {diferencia > 0 ? "+" : ""}${formatPrecio(diferencia)}
@@ -216,20 +217,20 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
 
         {/* Observaciones */}
         <div className="mb-3">
-          <label className="text-sm text-slate-300 mb-1 block">
+          <label className="text-sm sunmi-pos-muted mb-1 block">
             Observaciones (opcional)
           </label>
           <textarea
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}
             placeholder="Ej: Faltante por error en vuelto..."
-            className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-100 text-sm resize-none"
+            className="w-full sunmi-input text-sm resize-none"
             rows={2}
           />
         </div>
 
         {error && (
-          <div className="text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5 mb-3">
+          <div className="text-xs sunmi-pos-text-danger text-center rounded px-2 py-1.5 mb-3" style={{ background: 'color-mix(in srgb, var(--pos-danger) 10%, transparent)', border: '1px solid var(--pos-danger)' }}>
             {error}
           </div>
         )}

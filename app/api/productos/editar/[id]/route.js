@@ -76,6 +76,21 @@ export async function PUT(req, context) {
 
     const payload = await req.json();
 
+    // Validar proveedores no repetidos
+    const toNum = (v) =>
+      v === "" || v === null || v === undefined || Number.isNaN(Number(v))
+        ? null
+        : Number(v);
+    const provIds = [toNum(payload.proveedor_id), toNum(payload.proveedor2_id), toNum(payload.proveedor3_id)]
+      .filter((v) => v !== null && v !== 0);
+    const provSet = new Set(provIds);
+    if (provSet.size !== provIds.length) {
+      return NextResponse.json(
+        { ok: false, error: "Los proveedores no pueden repetirse" },
+        { status: 400 }
+      );
+    }
+
     // separar base vs local con snake_case
     const { baseData, localData } = splitUiToDb(payload);
 
@@ -144,11 +159,29 @@ async function editarBase(baseId, baseData) {
     imagen_url: baseData.imagen_url,
     es_combo: baseData.es_combo,
 
-    // 🔥🔥🔥 FIX CORRECTO: asignar las FKs directamente
     categoria_id: baseData.categoria_id ? Number(baseData.categoria_id) : null,
     proveedor_id: baseData.proveedor_id ? Number(baseData.proveedor_id) : null,
+    proveedor2_id: baseData.proveedor2_id ? Number(baseData.proveedor2_id) : null,
+    proveedor3_id: baseData.proveedor3_id ? Number(baseData.proveedor3_id) : null,
     area_fisica_id: baseData.area_fisica_id ? Number(baseData.area_fisica_id) : null,
   };
+
+  // Fiambre fields
+  if (baseData.modoCompraProveedor !== undefined) {
+    dataFinal.modoCompraProveedor = baseData.modoCompraProveedor;
+  }
+  if (baseData.pesoReferenciaKg !== undefined) {
+    dataFinal.pesoReferenciaKg = baseData.pesoReferenciaKg;
+  }
+  if (baseData.pesoEsFijo !== undefined) {
+    dataFinal.pesoEsFijo = baseData.pesoEsFijo;
+  }
+  if (baseData.pesoPromedioKg !== undefined) {
+    dataFinal.pesoPromedioKg = baseData.pesoPromedioKg;
+  }
+  if (baseData.actualizaPromedioPorRecepcion !== undefined) {
+    dataFinal.actualizaPromedioPorRecepcion = baseData.actualizaPromedioPorRecepcion;
+  }
 
   // Agregar modo_envio y modo_stock solo si están disponibles (después de migración)
   if (baseData.modo_envio !== undefined) {
@@ -175,9 +208,22 @@ async function editarBase(baseId, baseData) {
   } catch (e) {
     // Si falla porque los campos modo_envio/modo_stock no existen (migración no ejecutada),
     // intentar sin esos campos
-    if (e.message?.includes("modo_envio") || e.message?.includes("modo_stock")) {
+    if (
+      e.message?.includes("modo_envio") ||
+      e.message?.includes("modo_stock") ||
+      e.message?.includes("modoCompraProveedor") ||
+      e.message?.includes("pesoReferenciaKg") ||
+      e.message?.includes("pesoEsFijo") ||
+      e.message?.includes("pesoPromedioKg") ||
+      e.message?.includes("actualizaPromedioPorRecepcion")
+    ) {
       delete dataFinal.modo_envio;
       delete dataFinal.modo_stock;
+      delete dataFinal.modoCompraProveedor;
+      delete dataFinal.pesoReferenciaKg;
+      delete dataFinal.pesoEsFijo;
+      delete dataFinal.pesoPromedioKg;
+      delete dataFinal.actualizaPromedioPorRecepcion;
       updated = await prisma.productoBase.update({
         where: { id: baseId },
         data: dataFinal,

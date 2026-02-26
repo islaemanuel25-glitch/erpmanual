@@ -19,6 +19,21 @@ function unidadPlural(u) {
   return u + "s";
 }
 
+function norm(v, fallback) {
+  return String(v || fallback).trim().toLowerCase();
+}
+
+const SENTINEL_ALL = "__ALL__";
+const DEBUG_FILTROS = false;
+
+function normalizarValorFiltro(v) {
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  if (v && typeof v === "object" && "value" in v) return String(v.value);
+  if (v?.target?.value !== undefined) return String(v.target.value);
+  return SENTINEL_ALL;
+}
+
 export default function NuevaTransferenciaPage() {
   const router = useRouter();
   const params = useSearchParams();
@@ -52,9 +67,15 @@ export default function NuevaTransferenciaPage() {
 
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [modoAgregarManual, setModoAgregarManual] = useState("manual"); // "manual" | "rotura"
 
-  const [categoriaFiltro, setCategoriaFiltro] = useState("todos");
-  const [areaFiltro, setAreaFiltro] = useState("todos");
+  const [categoriaFiltro, setCategoriaFiltro] = useState(SENTINEL_ALL);
+  const [areaFiltro, setAreaFiltro] = useState(SENTINEL_ALL);
+  const [categoriaFiltroManual, setCategoriaFiltroManual] = useState(SENTINEL_ALL);
+  const [areaFiltroManual, setAreaFiltroManual] = useState(SENTINEL_ALL);
+
+  const [sugPage, setSugPage] = useState(1);
+  const [sugPageSize, setSugPageSize] = useState(50);
 
   // ===============================
   // 1. Usuario
@@ -100,9 +121,11 @@ export default function NuevaTransferenciaPage() {
         // No pasar origenId/destinoId, el backend los resuelve
       } else {
         // Modo normal
-        if (!qsOrigenId || !qsDestinoId) return;
-        url.searchParams.set("origenId", qsOrigenId);
-        url.searchParams.set("destinoId", qsDestinoId);
+        const origenNormal = qsOrigenId || origenIdResuelto;
+        const destinoNormal = qsDestinoId || destinoIdResuelto;
+        if (!origenNormal || !destinoNormal) return;
+        url.searchParams.set("origenId", origenNormal);
+        url.searchParams.set("destinoId", destinoNormal);
       }
 
       const r = await fetch(url, { cache: "no-store" });
@@ -119,7 +142,7 @@ export default function NuevaTransferenciaPage() {
     };
 
     iniciar();
-  }, [qsPosId, qsModo, qsOrigenId, qsDestinoId]);
+  }, [qsPosId, qsModo, qsOrigenId, qsDestinoId, origenIdResuelto, destinoIdResuelto]);
 
   // ===============================
   // 4. Cargar sugeridos (solo en modo normal)
@@ -170,41 +193,121 @@ export default function NuevaTransferenciaPage() {
   // Filtros opciones
   // ===============================
   const categoriasOpciones = useMemo(() => {
-    const set = new Set(
-      sugeridos.map((s) => {
-        return s.categoriaNombre
-          ? String(s.categoriaNombre).trim()
-          : "Sin categoría";
-      })
-    );
-    return Array.from(set);
+    const seen = new Map();
+    sugeridos.forEach((s) => {
+      const display = s.categoriaNombre ? String(s.categoriaNombre).trim() : "Sin categoría";
+      const key = norm(s.categoriaNombre, "Sin categoría");
+      if (!seen.has(key)) seen.set(key, display);
+    });
+    return Array.from(seen.values());
   }, [sugeridos]);
 
   const areasOpciones = useMemo(() => {
-    const set = new Set(
-      sugeridos.map((s) => {
-        return s.areaFisicaNombre
-          ? String(s.areaFisicaNombre).trim()
-          : "Sin área";
-      })
-    );
-    return Array.from(set);
+    const seen = new Map();
+    sugeridos.forEach((s) => {
+      const display = s.areaFisicaNombre ? String(s.areaFisicaNombre).trim() : "Sin área";
+      const key = norm(s.areaFisicaNombre, "Sin área");
+      if (!seen.has(key)) seen.set(key, display);
+    });
+    return Array.from(seen.values());
   }, [sugeridos]);
 
   const sugeridosFiltrados = useMemo(() => {
-    return sugeridos.filter((s) => {
-      const cat = (s.categoriaNombre || "").trim().toLowerCase();
-      const area = (s.areaFisicaNombre || "").trim().toLowerCase();
-
-      const filtroCat = categoriaFiltro.trim().toLowerCase();
-      const filtroArea = areaFiltro.trim().toLowerCase();
-
-      const okCat = filtroCat === "todos" || cat === filtroCat;
-      const okArea = filtroArea === "todos" || area === filtroArea;
-
+    const fc = norm(categoriaFiltro, SENTINEL_ALL);
+    const fa = norm(areaFiltro, SENTINEL_ALL);
+    const resultado = sugeridos.filter((s) => {
+      const okCat = fc === norm(SENTINEL_ALL, SENTINEL_ALL) || norm(s.categoriaNombre, "Sin categoría") === fc;
+      const okArea = fa === norm(SENTINEL_ALL, SENTINEL_ALL) || norm(s.areaFisicaNombre, "Sin área") === fa;
       return okCat && okArea;
     });
+    return resultado;
   }, [sugeridos, categoriaFiltro, areaFiltro]);
+
+  // Reset page al cambiar filtros (inline en handlers, ver onChangeCategoria/onChangeArea)
+
+  const totalPagesSug = Math.max(1, Math.ceil(sugeridosFiltrados.length / sugPageSize));
+
+  const sugeridosPaginados = useMemo(() => {
+    const start = (sugPage - 1) * sugPageSize;
+    return sugeridosFiltrados.slice(start, start + sugPageSize);
+  }, [sugeridosFiltrados, sugPage, sugPageSize]);
+
+  // ===============================
+  // Derivar preparados vs pedido manual sin preparar
+  // ===============================
+  const itemsPreparados = useMemo(
+    () => items.filter((i) => Number(i.preparado || 0) > 0),
+    [items]
+  );
+
+  const itemsPedidoManualSinPreparar = useMemo(() => {
+    return items.filter((i) => {
+      const sinPreparar = Number(i.preparado || 0) === 0;
+      if (!sinPreparar) return false;
+      if (String(i.tipo || "") === "rotura") return true;
+      return Number(i.sugerido || 0) > 0;
+    });
+  }, [items]);
+
+  const sugeridosDelPedido = useMemo(
+    () =>
+      itemsPedidoManualSinPreparar.map((d) => {
+        const qty = String(d.tipo || "") === "rotura"
+          ? Number(d.sugerido || d.cantidadReal || 1)
+          : Number(d.sugerido || 0);
+        return {
+          productoLocalDestinoId: d.productoLocalId,
+          productoLocalOrigenId: d.productoLocalId,
+          baseId: d.baseId,
+          productoNombre: d.productoNombre,
+          codigoBarra: d.codigoBarra,
+          stockActual: d.stockActual,
+          cantidadReal: d.cantidadReal,
+          precioCosto: d.precioCosto,
+          unidadMedida: d.unidadMedida,
+          factorPack: d.factorPack || 1,
+          modoEnvio: d.modoEnvio,
+          sugerido: qty,
+          sugeridoCantidad: qty,
+          sugeridoUnidad: d.unidadSugerida || "UNIDAD",
+          faltanteUnidades: 0,
+          categoriaNombre: d.categoriaNombre || null,
+          areaFisicaNombre: d.areaFisicaNombre || null,
+          tipo: d.tipo || null,
+        };
+      }),
+    [itemsPedidoManualSinPreparar]
+  );
+
+  const categoriasOpcionesManual = useMemo(() => {
+    const seen = new Map();
+    sugeridosDelPedido.forEach((s) => {
+      const display = s.categoriaNombre ? String(s.categoriaNombre).trim() : "Sin categoría";
+      const key = norm(s.categoriaNombre, "Sin categoría");
+      if (!seen.has(key)) seen.set(key, display);
+    });
+    return Array.from(seen.values());
+  }, [sugeridosDelPedido]);
+
+  const areasOpcionesManual = useMemo(() => {
+    const seen = new Map();
+    sugeridosDelPedido.forEach((s) => {
+      const display = s.areaFisicaNombre ? String(s.areaFisicaNombre).trim() : "Sin área";
+      const key = norm(s.areaFisicaNombre, "Sin área");
+      if (!seen.has(key)) seen.set(key, display);
+    });
+    return Array.from(seen.values());
+  }, [sugeridosDelPedido]);
+
+  const sugeridosDelPedidoFiltrados = useMemo(() => {
+    const fc = norm(categoriaFiltroManual, SENTINEL_ALL);
+    const fa = norm(areaFiltroManual, SENTINEL_ALL);
+    return sugeridosDelPedido.filter((s) => {
+      const okCat = fc === norm(SENTINEL_ALL, SENTINEL_ALL) || norm(s.categoriaNombre, "Sin categoría") === fc;
+      const okArea = fa === norm(SENTINEL_ALL, SENTINEL_ALL) || norm(s.areaFisicaNombre, "Sin área") === fa;
+      return okCat && okArea;
+    });
+  }, [sugeridosDelPedido, categoriaFiltroManual, areaFiltroManual]);
 
   // ===============================
   // 5. Upsert detalle
@@ -276,10 +379,21 @@ export default function NuevaTransferenciaPage() {
     const s = sugeridos.find((x) => x.productoLocalOrigenId === productoLocalOrigenId);
     if (!s) return;
 
-    const sugeridoCantidad = Number(s.sugeridoCantidad ?? s.sugerido ?? 0);
-    const sugeridoUnidad = s.sugeridoUnidad ?? (s.factorPack > 1 ? "BULTO" : "UNIDAD");
+    const rawCantidad = Number(s.sugeridoCantidad ?? s.sugerido ?? 0);
+    const rawUnidad = s.sugeridoUnidad ?? (s.factorPack > 1 ? "BULTO" : "UNIDAD");
+    const fp = Number(s.factorPack || 1);
 
-    if (sugeridoCantidad <= 0) return;
+    // Siempre mandar en BULTO si el producto tiene factorPack > 1,
+    // así baja a Preparados como cajones (no convertido a uds).
+    // El modo rotura en PreparadosTable permite luego ajustar uds sueltas.
+    let prepCantidad = rawCantidad;
+    let prepUnidad = rawUnidad;
+    if (fp > 1 && rawUnidad === "UNIDAD") {
+      prepCantidad = Math.floor(rawCantidad / fp);
+      prepUnidad = "BULTO";
+    }
+
+    if (prepCantidad <= 0) return;
 
     const r = await fetch("/api/pos-transferencias/detalle/agregar", {
       method: "POST",
@@ -287,10 +401,10 @@ export default function NuevaTransferenciaPage() {
         body: JSON.stringify({
           posId,
           productoLocalId: productoLocalOrigenId,
-          sugerido: sugeridoCantidad,
-          preparado: sugeridoCantidad,
-          sugeridoUnidad,
-          unidadPreparada: sugeridoUnidad,
+          sugerido: prepCantidad,
+          preparado: prepCantidad,
+          sugeridoUnidad: prepUnidad,
+          unidadPreparada: prepUnidad,
           tipo: "sugerido",
         }),
     });
@@ -308,8 +422,9 @@ export default function NuevaTransferenciaPage() {
   // ===============================
   // 9. Agregar manual
   // ===============================
-  const handleAgregarManual = async (p) => {
+  const handleAgregarManual = async (p, tipoOverride) => {
     if (!posId) return setError("POS no generado");
+    const tipoFinal = tipoOverride || modoAgregarManual;
 
     const r = await fetch("/api/pos-transferencias/agregarItem", {
       method: "POST",
@@ -318,7 +433,7 @@ export default function NuevaTransferenciaPage() {
         posId,
         productoLocalId: p.productoLocalId,
         cantidad: 1,
-        tipo: "manual",
+        tipo: tipoFinal,
       }),
     });
 
@@ -373,32 +488,77 @@ export default function NuevaTransferenciaPage() {
 
     const d = j.item;
 
-    setItems((prev) => prev.filter((i) => i.detalleId !== detalleId));
+    if (j.accion === "devuelto_a_sugerido" || Number(d.sugerido || 0) > 0) {
+      // El backend puso preparado=0, mantener en items para que
+      // itemsPedidoManualSinPreparar lo muestre en Sugeridos
+      setItems((prev) =>
+        prev.map((i) =>
+          i.detalleId === detalleId ? { ...i, preparado: 0 } : i
+        )
+      );
+    } else {
+      // Eliminado completamente
+      setItems((prev) => prev.filter((i) => i.detalleId !== detalleId));
 
-    if (d.tipo !== "sugerido") return;
+      // Si era tipo sugerido (auto-calculado), devolver a la lista de sugeridos
+      if (d.tipo === "sugerido") {
+        setSugeridos((prev) => [
+          ...prev,
+          {
+            productoLocalDestinoId: d.productoLocalId,
+            productoLocalOrigenId: d.productoLocalId,
+            baseId: d.baseId,
+            productoNombre: d.productoNombre,
+            codigoBarra: d.codigoBarra,
+            stockActual: d.stockActual,
+            cantidadReal: d.cantidadReal,
+            precioCosto: d.precioCosto,
+            unidadMedida: d.unidadMedida,
+            factorPack: d.factorPack,
+            sugerido: d.sugerido,
+            categoriaNombre: d.producto?.base?.categoria?.nombre || "Sin categoría",
+            areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
+          },
+        ]);
+      }
+    }
+  };
 
-    setSugeridos((prev) => [
-      ...prev,
-      {
-        productoLocalDestinoId: d.productoLocalId,
-        productoLocalOrigenId: d.productoLocalId,
+  // ===============================
+  // 11b. Editar sugerido de pedido manual (local state)
+  // ===============================
+  const handleEditSugeridoManual = (productoLocalId, valor, unidad) => {
+    setItems((prev) =>
+      prev.map((i) =>
+        i.productoLocalId === productoLocalId
+          ? {
+              ...i,
+              sugerido: Number(valor || 0),
+              unidadSugerida: unidad || i.unidadSugerida,
+            }
+          : i
+      )
+    );
+  };
 
-        baseId: d.baseId,
-        productoNombre: d.productoNombre,
-        codigoBarra: d.codigoBarra,
+  // ===============================
+  // 11c. Preparar item de pedido manual
+  // ===============================
+  const handleMarcarPreparadoManual = async (productoLocalId) => {
+    const item = items.find((i) => i.productoLocalId === productoLocalId);
+    if (!item) return;
+    const qty = Number(item.sugerido || 0);
+    if (qty <= 0) return;
+    const fp = Number(item.factorPack || 1);
+    const unidadPedido = item.sugeridoUnidad || item.unidadSugerida || (fp > 1 ? "BULTO" : "UNIDAD");
 
-        stockActual: d.stockActual,
-        cantidadReal: d.cantidadReal,
-
-        precioCosto: d.precioCosto,
-        unidadMedida: d.unidadMedida,
-        factorPack: d.factorPack,
-        sugerido: d.sugerido,
-
-        categoriaNombre: d.producto?.base?.categoria?.nombre || "Sin categoría",
-        areaFisicaNombre: d.producto?.base?.area_fisica?.nombre || "Sin área",
-      },
-    ]);
+    if (fp > 1 && unidadPedido === "UNIDAD") {
+      const bultos = Math.floor(qty / fp);
+      if (bultos <= 0) return;
+      await handleEditCantidad(item.detalleId, bultos, "BULTO");
+    } else {
+      await handleEditCantidad(item.detalleId, qty, unidadPedido);
+    }
   };
 
   // ===============================
@@ -489,12 +649,16 @@ export default function NuevaTransferenciaPage() {
       return;
     }
 
-    router.push(`/modulos/transferencias/${j.item.id}`);
+    setPosEstado("Enviado");
+    setEnviando(false);
   };
 
   // ===============================
   // Texto del botón CTA
   // ===============================
+  // Determinar si el usuario es depósito/admin
+  const esDepositoUser = !me?.localId || Number(me?.localId) === origenIdResuelto;
+
   const getCtaText = () => {
     if (enviando) return "Enviando...";
     if (esModoManual && posEstado === "Solicitado") return "Enviar transferencia";
@@ -506,6 +670,14 @@ export default function NuevaTransferenciaPage() {
     if (esModoManual && posEstado !== "Solicitado") return "bg-cyan-500 hover:bg-cyan-600 active:bg-cyan-700";
     return "bg-orange-500 hover:bg-orange-600 active:bg-orange-700";
   };
+
+  // Visibilidad del CTA: depot-only para enviar, local para solicitar
+  const showCTA = (() => {
+    if (posEstado === "Enviado") return false;
+    if (!esModoManual) return esDepositoUser;
+    if (posEstado === "Solicitado") return esDepositoUser;
+    return true;
+  })();
 
   // ===============================
   // 14. Render
@@ -544,19 +716,26 @@ export default function NuevaTransferenciaPage() {
             posEstado={posEstado}
           />
 
-          {/* SUGERIDOS — H4: ocultar en modo manual */}
-          {!esModoManual && (
+          {/* BANNER ENVIADO */}
+          {posEstado === "Enviado" && (
+            <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-xl px-4 py-3 text-emerald-300 text-sm font-semibold text-center">
+              Transferencia enviada al local
+            </div>
+          )}
+
+          {/* SUGERIDOS — H4: ocultar en modo manual y cuando ya se envió */}
+          {!esModoManual && posEstado !== "Enviado" && (
             <>
               <Separador label="Productos sugeridos" />
 
               <TablaSugeridos
-                datos={sugeridosFiltrados}
-                page={1}
-                totalPages={1}
-                onPrev={() => {}}
-                onNext={() => {}}
-                pageSize={50}
-                onPageSizeChange={() => {}}
+                datos={sugeridosPaginados}
+                page={sugPage}
+                totalPages={totalPagesSug}
+                onPrev={() => setSugPage((p) => Math.max(1, p - 1))}
+                onNext={() => setSugPage((p) => Math.min(totalPagesSug, p + 1))}
+                pageSize={sugPageSize}
+                onPageSizeChange={(v) => { setSugPageSize(v); setSugPage(1); }}
                 onEditSugerido={handleEditSugerido}
                 onMarcarPreparado={handleMarcarPreparado}
                 loading={loadingSug}
@@ -564,8 +743,44 @@ export default function NuevaTransferenciaPage() {
                 areas={areasOpciones}
                 categoriaSeleccionada={categoriaFiltro}
                 areaSeleccionada={areaFiltro}
-                onChangeCategoria={setCategoriaFiltro}
-                onChangeArea={setAreaFiltro}
+                onChangeCategoria={(v) => {
+                  const final = normalizarValorFiltro(v);
+                  if (DEBUG_FILTROS) console.debug("[filtro categoría] v", v, "final", final, "typeof v", typeof v);
+                  setCategoriaFiltro(final);
+                  setSugPage(1);
+                }}
+                onChangeArea={(v) => {
+                  const final = normalizarValorFiltro(v);
+                  if (DEBUG_FILTROS) console.debug("[filtro área] v", v, "final", final, "typeof v", typeof v);
+                  setAreaFiltro(final);
+                  setSugPage(1);
+                }}
+              />
+            </>
+          )}
+
+          {/* SUGERIDOS DEL PEDIDO MANUAL (sin preparar aún) */}
+          {esModoManual && posEstado !== "Enviado" && sugeridosDelPedido.length > 0 && (
+            <>
+              <Separador label="Sugeridos (pedido del local)" />
+
+              <TablaSugeridos
+                datos={sugeridosDelPedidoFiltrados}
+                page={1}
+                totalPages={1}
+                onPrev={() => {}}
+                onNext={() => {}}
+                pageSize={50}
+                onPageSizeChange={() => {}}
+                onEditSugerido={handleEditSugeridoManual}
+                onMarcarPreparado={handleMarcarPreparadoManual}
+                loading={false}
+                categorias={categoriasOpcionesManual}
+                areas={areasOpcionesManual}
+                categoriaSeleccionada={categoriaFiltroManual}
+                areaSeleccionada={areaFiltroManual}
+                onChangeCategoria={(v) => { setCategoriaFiltroManual(normalizarValorFiltro(v)); }}
+                onChangeArea={(v) => { setAreaFiltroManual(normalizarValorFiltro(v)); }}
               />
             </>
           )}
@@ -574,7 +789,7 @@ export default function NuevaTransferenciaPage() {
           <Separador label={esModoManual ? "Productos del pedido" : "Preparados"} />
 
           <PreparadosTable
-            datos={items}
+            datos={itemsPreparados}
             onDesmarcar={handleQuitarPreparado}
             onEditPreparado={handleEditCantidad}
             page={1}
@@ -584,6 +799,7 @@ export default function NuevaTransferenciaPage() {
             pageSize={50}
             onPageSizeChange={() => {}}
             loading={loadingDetalles}
+            bloqueado={posEstado === "Enviado"}
             buscador={
               <BuscadorManual
                 texto={texto}
@@ -592,12 +808,14 @@ export default function NuevaTransferenciaPage() {
                 loading={loadingBuscar}
                 resultados={buscados}
                 onAgregar={handleAgregarManual}
+                modo={modoAgregarManual}
+                onModoChange={setModoAgregarManual}
               />
             }
           />
 
           {/* MENSAJE: Pedido ya solicitado */}
-          {esModoManual && posEstado === "Solicitado" && (
+          {esModoManual && posEstado === "Solicitado" && !esDepositoUser && (
             <div className="text-[11px] text-amber-400 bg-amber-900/20 border border-amber-500/40 rounded-lg px-3 py-2">
               Este pedido ya fue enviado al depósito. Esperá a que lo procesen.
             </div>
@@ -611,20 +829,22 @@ export default function NuevaTransferenciaPage() {
           )}
 
           {/* CTA */}
-          {!(esModoManual && posEstado === "Solicitado") && (
-            <button
-              disabled={enviando}
-              onClick={enviarPOS}
-              className={`
-                mt-2 w-full px-4 py-3
-                rounded-xl text-sm font-semibold shadow-md
-                ${getCtaColor()}
-                transition-colors
-                disabled:opacity-60 active:scale-95
-              `}
-            >
-              {getCtaText()}
-            </button>
+          {showCTA && (
+            <div className="sticky bottom-0 z-10 pt-2 pb-1 bg-slate-800/90 backdrop-blur-sm -mx-4 px-4 border-t border-slate-700/50">
+              <button
+                disabled={enviando}
+                onClick={enviarPOS}
+                className={`
+                  w-full px-4 py-3
+                  rounded-xl text-sm font-semibold shadow-md
+                  ${getCtaColor()}
+                  transition-colors
+                  disabled:opacity-60 active:scale-95
+                `}
+              >
+                {getCtaText()}
+              </button>
+            </div>
           )}
         </div>
       </div>
