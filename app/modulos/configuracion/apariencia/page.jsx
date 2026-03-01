@@ -54,11 +54,11 @@ export default function AparienciaPage() {
           >
             <div>
               <h2 className="text-sm font-semibold mb-1">{t.label}</h2>
-              <p className="text-xs text-slate-400 mb-3">
+              <p className="text-xs sunmi-text-muted mb-3">
                 Vista rápida (colores, tarjetas, badges).
               </p>
 
-              <div className="rounded-xl border border-dashed border-slate-700 p-3 text-xs">
+              <div className="rounded-xl border border-dashed sunmi-border p-3 text-xs">
                 <div className={`mb-2 rounded-lg border px-2 py-1 ${t.header.bg} ${t.header.border}`}>
                   <div className={t.header.text}>Header ejemplo</div>
                 </div>
@@ -101,10 +101,10 @@ export default function AparienciaPage() {
                 menuMode === m.key ? "ring-2 ring-amber-400" : ""
               }`}
             >
-              <m.Icon size={32} className={menuMode === m.key ? "text-amber-400" : "text-slate-400"} />
+              <m.Icon size={32} className={menuMode === m.key ? "sunmi-text-accent" : "sunmi-text-muted"} />
               <div>
                 <h3 className="text-sm font-semibold">{m.label}</h3>
-                <p className="text-xs text-slate-400">{m.description}</p>
+                <p className="text-xs sunmi-text-muted">{m.description}</p>
               </div>
             </SunmiCard>
           </div>

@@ -131,7 +131,7 @@ export default function ComprasProveedorPage() {
 
         <SunmiSeparator label="Listado" className="my-4" />
 
-        <div className="overflow-x-auto rounded-2xl border border-slate-800">
+        <div className="overflow-x-auto rounded-2xl border sunmi-border">
           <SunmiTable
             headers={[
               "#",
@@ -157,11 +157,11 @@ export default function ComprasProveedorPage() {
                   <td className="px-3 py-2">
                     <span
                       className={`px-2 py-0.5 rounded text-xs font-medium
-                        ${item.estado === "BORRADOR" ? "bg-slate-600 text-slate-200" : ""}
-                        ${item.estado === "CONFIRMADO" ? "bg-amber-600 text-amber-100" : ""}
-                        ${item.estado === "ENVIADO" ? "bg-cyan-600 text-cyan-100" : ""}
-                        ${item.estado === "RECIBIDO" ? "bg-green-600 text-green-100" : ""}
-                        ${item.estado === "ANULADO" ? "bg-red-600 text-red-100" : ""}
+                        ${item.estado === "BORRADOR" ? "sunmi-badge-muted" : ""}
+                        ${item.estado === "CONFIRMADO" ? "sunmi-badge-accent" : ""}
+                        ${item.estado === "ENVIADO" ? "sunmi-badge-link" : ""}
+                        ${item.estado === "RECIBIDO" ? "sunmi-badge-success" : ""}
+                        ${item.estado === "ANULADO" ? "sunmi-badge-danger" : ""}
                       `}
                     >
                       {item.estado}
@@ -192,7 +192,7 @@ export default function ComprasProveedorPage() {
           >
             « Anterior
           </SunmiButton>
-          <span className="text-slate-400 text-sm self-center">
+          <span className="sunmi-text-muted text-sm self-center">
             Página {page} de {totalPages || 1}
           </span>
           <SunmiButton

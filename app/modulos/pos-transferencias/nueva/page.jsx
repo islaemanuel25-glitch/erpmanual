@@ -667,7 +667,7 @@ export default function NuevaTransferenciaPage() {
   };
 
   const getCtaColor = () => {
-    if (esModoManual && posEstado !== "Solicitado") return "bg-cyan-500 hover:bg-cyan-600 active:bg-cyan-700";
+    if (esModoManual && posEstado !== "Solicitado") return "sunmi-pos-btn-primary";
     return "bg-orange-500 hover:bg-orange-600 active:bg-orange-700";
   };
 
@@ -683,15 +683,15 @@ export default function NuevaTransferenciaPage() {
   // 14. Render
   // ===============================
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className="min-h-screen sunmi-bg">
       <div className="max-w-5xl mx-auto p-4 space-y-4">
 
         {/* VOLVER */}
         <button
           onClick={() => router.back()}
           className="
-            text-cyan-400 text-xs flex items-center gap-1
-            hover:text-cyan-300 active:scale-95 transition
+            sunmi-link text-xs flex items-center gap-1
+            active:scale-95 transition
           "
         >
           ← Volver
@@ -700,8 +700,8 @@ export default function NuevaTransferenciaPage() {
         {/* TARJETA */}
         <div
           className="
-            bg-slate-800/70
-            border border-slate-700
+            sunmi-surface
+            border sunmi-border
             rounded-2xl
             p-4
             shadow-md
@@ -718,7 +718,7 @@ export default function NuevaTransferenciaPage() {
 
           {/* BANNER ENVIADO */}
           {posEstado === "Enviado" && (
-            <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-xl px-4 py-3 text-emerald-300 text-sm font-semibold text-center">
+            <div className="sunmi-state-success rounded-xl px-4 py-3 sunmi-text-success text-sm font-semibold text-center">
               Transferencia enviada al local
             </div>
           )}
@@ -816,21 +816,21 @@ export default function NuevaTransferenciaPage() {
 
           {/* MENSAJE: Pedido ya solicitado */}
           {esModoManual && posEstado === "Solicitado" && !esDepositoUser && (
-            <div className="text-[11px] text-amber-400 bg-amber-900/20 border border-amber-500/40 rounded-lg px-3 py-2">
+            <div className="text-[11px] sunmi-text-accent sunmi-state-warning rounded-lg px-3 py-2">
               Este pedido ya fue enviado al depósito. Esperá a que lo procesen.
             </div>
           )}
 
           {/* ERRORES */}
           {error && (
-            <div className="text-red-400 text-xs mt-1 whitespace-pre-line">
+            <div className="sunmi-text-danger text-xs mt-1 whitespace-pre-line">
               {error}
             </div>
           )}
 
           {/* CTA */}
           {showCTA && (
-            <div className="sticky bottom-0 z-10 pt-2 pb-1 bg-slate-800/90 backdrop-blur-sm -mx-4 px-4 border-t border-slate-700/50">
+            <div className="sticky bottom-0 z-10 pt-2 pb-1 sunmi-surface backdrop-blur-sm -mx-4 px-4 border-t sunmi-divider">
               <button
                 disabled={enviando}
                 onClick={enviarPOS}

@@ -86,7 +86,7 @@ export default function InicioPage() {
   // Loading
   if (cargando || loading) {
     return (
-      <main className="min-h-screen grid place-items-center bg-slate-950">
+      <main className="min-h-screen grid place-items-center sunmi-bg">
         <div className="flex flex-col items-center gap-2">
           <Loader2 size={24} className="animate-spin text-slate-400" />
           <span className="text-sm text-slate-400">Cargando...</span>
@@ -96,7 +96,7 @@ export default function InicioPage() {
   }
 
   return (
-    <main className="min-h-screen grid place-items-center p-4 bg-slate-950">
+    <main className="min-h-screen grid place-items-center p-4 sunmi-bg">
       <SunmiCard className="w-full max-w-md p-6">
         <h1 className="text-xl font-semibold text-center mb-1">
           Elegí tu contexto operativo

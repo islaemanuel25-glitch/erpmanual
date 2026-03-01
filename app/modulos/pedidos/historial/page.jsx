@@ -21,14 +21,14 @@ const ESTADOS = [
 ];
 
 const BADGE_COLORS = {
-  Solicitado: "bg-amber-500/20 text-amber-300 border-amber-400/40",
-  Preparando: "bg-cyan-500/20 text-cyan-300 border-cyan-400/40",
-  Enviado: "bg-emerald-500/20 text-emerald-300 border-emerald-400/40",
+  Solicitado: "sunmi-btn-accent-soft sunmi-text-accent",
+  Preparando: "sunmi-btn-link-soft sunmi-text-link",
+  Enviado: "sunmi-state-success sunmi-text-success",
 };
 
 const TRANS_BADGE_COLORS = {
-  Enviada: "bg-blue-500/20 text-blue-300 border-blue-400/40",
-  Recibida: "bg-emerald-500/20 text-emerald-300 border-emerald-400/40",
+  Enviada: "sunmi-btn-link-soft sunmi-text-link",
+  Recibida: "sunmi-state-success sunmi-text-success",
 };
 
 export default function HistorialPedidosPage() {
@@ -106,8 +106,8 @@ export default function HistorialPedidosPage() {
 
   if (cargandoUser) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <span className="text-sm text-slate-300">Cargando...</span>
+      <div className="min-h-screen sunmi-bg flex items-center justify-center">
+        <span className="text-sm sunmi-text-muted">Cargando...</span>
       </div>
     );
   }
@@ -118,25 +118,25 @@ export default function HistorialPedidosPage() {
   // RENDER
   // ====================================================
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className="min-h-screen sunmi-bg">
       <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
         <button
           type="button"
           onClick={() => router.push("/modulos/pedidos")}
-          className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition"
+          className="text-xs sunmi-link flex items-center gap-1 transition"
         >
           ← Volver al catálogo
         </button>
 
         <SunmiCard>
           <SunmiHeader title="Historial de Pedidos" color="cyan">
-            <div className="text-[11px] text-slate-900/80 mt-1">
+            <div className="text-[11px] sunmi-text-muted mt-1">
               Pedidos solicitados, en preparación y enviados
             </div>
           </SunmiHeader>
 
           {error && (
-            <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">
+            <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
               {error}
               <button
                 type="button"
@@ -176,11 +176,11 @@ export default function HistorialPedidosPage() {
           <SunmiSeparator label={`Pedidos (${total})`} />
 
           {loading ? (
-            <div className="text-[12px] text-slate-400 py-6 text-center">
+            <div className="text-[12px] sunmi-text-muted py-6 text-center">
               Cargando historial...
             </div>
           ) : items.length === 0 ? (
-            <div className="text-[12px] text-slate-400 py-6 text-center">
+            <div className="text-[12px] sunmi-text-muted py-6 text-center">
               No se encontraron pedidos.
             </div>
           ) : (
@@ -210,7 +210,7 @@ export default function HistorialPedidosPage() {
               >
                 ← Anterior
               </SunmiButton>
-              <span className="text-[12px] text-slate-400">
+              <span className="text-[12px] sunmi-text-muted">
                 Página {page} de {totalPages}
               </span>
               <SunmiButton
@@ -250,14 +250,14 @@ function PedidoCard({ item, expandido, onToggle }) {
 
   const badgeClass =
     BADGE_COLORS[item.estado] ||
-    "bg-slate-500/20 text-slate-300 border-slate-400/40";
+    "sunmi-badge-muted";
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-3">
+    <div className="sunmi-surface sunmi-border border rounded-xl px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13px] font-semibold text-slate-200">
+            <span className="text-[13px] font-semibold sunmi-text-strong">
               POS #{item.posId}
             </span>
             <span
@@ -267,7 +267,7 @@ function PedidoCard({ item, expandido, onToggle }) {
             </span>
           </div>
 
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] text-slate-400">
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] sunmi-text-muted">
             <span>{fecha}</span>
             <span>{item.itemCount} producto{item.itemCount !== 1 ? "s" : ""}</span>
             {item.totalBultos > 0 && (
@@ -283,7 +283,7 @@ function PedidoCard({ item, expandido, onToggle }) {
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               <Link
                 href={`/modulos/transferencias/${item.transferenciaId}`}
-                className="text-[11px] text-cyan-400 hover:text-cyan-300 underline transition"
+                className="text-[11px] sunmi-link underline transition"
               >
                 Transferencia #{item.transferenciaId}
               </Link>
@@ -291,14 +291,14 @@ function PedidoCard({ item, expandido, onToggle }) {
                 <span
                   className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                     TRANS_BADGE_COLORS[item.transferenciaEstado] ||
-                    "bg-slate-500/20 text-slate-300 border-slate-400/40"
+                    "sunmi-badge-muted"
                   }`}
                 >
                   {item.transferenciaEstado}
                 </span>
               )}
               {item.transferenciaFechaRecepcion && (
-                <span className="text-[10px] text-slate-500">
+                <span className="text-[10px] sunmi-text-muted">
                   Recibida el{" "}
                   {new Date(item.transferenciaFechaRecepcion).toLocaleString(
                     "es-AR",
@@ -311,7 +311,7 @@ function PedidoCard({ item, expandido, onToggle }) {
 
           {/* Preview de items (resumen) */}
           {!expandido && item.resumen.length > 0 && (
-            <div className="mt-1.5 text-[10px] text-slate-500 truncate">
+            <div className="mt-1.5 text-[10px] sunmi-text-muted truncate">
               {item.resumen.map((r) => r.nombre).join(", ")}
               {item.itemCount > 5 && ` (+${item.itemCount - 5} más)`}
             </div>
@@ -321,7 +321,7 @@ function PedidoCard({ item, expandido, onToggle }) {
         <button
           type="button"
           onClick={onToggle}
-          className="text-[11px] text-cyan-400 hover:text-cyan-300 underline transition whitespace-nowrap"
+          className="text-[11px] sunmi-link underline transition whitespace-nowrap"
         >
           {expandido ? "Ocultar" : "Ver detalle"}
         </button>
@@ -329,14 +329,14 @@ function PedidoCard({ item, expandido, onToggle }) {
 
       {/* Detalle expandido */}
       {expandido && item.resumen.length > 0 && (
-        <div className="mt-3 space-y-1 border-t border-slate-700 pt-2">
+        <div className="mt-3 space-y-1 border-t sunmi-divider pt-2">
           {item.resumen.map((r, i) => (
             <div
               key={i}
-              className="flex items-center justify-between text-[11px] text-slate-300"
+              className="flex items-center justify-between text-[11px] sunmi-text-muted"
             >
               <span className="truncate flex-1 min-w-0">{r.nombre}</span>
-              <span className="ml-2 text-amber-300 font-medium whitespace-nowrap">
+              <span className="ml-2 sunmi-text-accent font-medium whitespace-nowrap">
                 {r.sugerido}{" "}
                 {r.unidadSugerida === "BULTO"
                   ? `bulto${r.sugerido !== 1 ? "s" : ""} (x${r.factorPack})`
@@ -345,7 +345,7 @@ function PedidoCard({ item, expandido, onToggle }) {
             </div>
           ))}
           {item.itemCount > 5 && (
-            <div className="text-[10px] text-slate-500 pt-1">
+            <div className="text-[10px] sunmi-text-muted pt-1">
               ... y {item.itemCount - 5} producto{item.itemCount - 5 !== 1 ? "s" : ""} más
             </div>
           )}

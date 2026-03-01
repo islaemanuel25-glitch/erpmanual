@@ -162,7 +162,7 @@ export default function EditarProductoPage({ params }) {
             submitLabel="Guardar cambios"
           />
         ) : (
-          <p className="text-slate-400 text-sm">Producto no encontrado.</p>
+          <p className="sunmi-text-muted text-sm">Producto no encontrado.</p>
         )}
       </SunmiCard>
     </div>

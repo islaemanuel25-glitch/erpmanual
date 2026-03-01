@@ -46,19 +46,42 @@
   background: var(--table-row-hover);
 }
 
-/* Input Sunmi */
+/* Input Sunmi — theme-safe (vars en globals.css) */
 .sunmi-input {
   background: var(--app-input-bg);
   border: 1px solid var(--app-input-border);
   color: var(--app-fg);
-  @apply rounded-lg px-2 py-1 text-[13px]
-         focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400;
+  @apply rounded-lg px-2 py-1 text-[13px];
+}
+.sunmi-input::placeholder {
+  color: var(--app-fg);
+  opacity: 0.6;
+}
+.sunmi-input:hover {
+  border-color: var(--app-input-border);
+}
+.sunmi-input:focus {
+  outline: none;
+  border-color: var(--pos-link, var(--app-input-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-link, var(--app-fg)) 25%, transparent);
 }
 
-/* Botón Sunmi redondo */
+/* Botón Sunmi — base (focus y disabled theme-safe) */
 .sunmi-btn {
-  @apply px-3 py-1 rounded-full text-[12px] font-semibold
-         shadow-md active:scale-95 transition;
+  @apply px-3 py-1 rounded-full text-[12px] font-semibold transition;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+.sunmi-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-accent, var(--app-fg)) 35%, transparent);
+}
+.sunmi-btn:disabled {
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+.sunmi-btn:not(:disabled):active {
+  transform: scale(0.98);
 }
 
 /* Botón celeste */
@@ -160,18 +183,28 @@
 /* Texto secundario POS */
 .sunmi-pos-muted { color: var(--pos-muted); }
 
-/* Botones POS */
+/* Botones POS — theme-safe */
 .sunmi-pos-btn-primary {
   background: var(--pos-btn-primary-bg);
   color: var(--pos-btn-primary-fg);
 }
+.sunmi-pos-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
 .sunmi-pos-btn-secondary {
   background: var(--pos-btn-secondary-bg);
   color: var(--pos-btn-secondary-fg);
+  border: 1px solid var(--pos-panel-border);
+}
+.sunmi-pos-btn-secondary:hover:not(:disabled) {
+  filter: brightness(1.12);
 }
 .sunmi-pos-btn-danger {
   background: var(--pos-btn-danger-bg);
   color: var(--pos-btn-danger-fg);
+}
+.sunmi-pos-btn-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
 /* Overlay POS (modales) */
@@ -184,3 +217,128 @@
 
 /* Superficie POS (cards internas sin borde) */
 .sunmi-pos-bg-surface { background: var(--pos-panel-bg); }
+
+/* ============================================================
+   ⭐ ERP — CLASES SEMÁNTICAS GENERALES (theme-safe)
+   Usan --pos-* / --app-* internamente.
+   ============================================================ */
+
+/* --- Superficies --- */
+.sunmi-surface      { background: var(--pos-surface); }
+.sunmi-surface-soft { background: var(--card-bg); }
+.sunmi-border       { border-color: var(--app-border); }
+
+/* --- Texto semántico --- */
+.sunmi-text-muted   { color: var(--pos-muted); }
+.sunmi-text-strong  { color: var(--pos-muted-strong); }
+.sunmi-text-accent  { color: var(--pos-accent); }
+.sunmi-text-link    { color: var(--pos-link); }
+.sunmi-text-success { color: var(--pos-success); }
+.sunmi-text-danger  { color: var(--pos-danger); }
+
+/* --- Links con hover --- */
+.sunmi-link              { color: var(--pos-link); }
+.sunmi-link:hover        { color: var(--pos-link-hover); }
+.sunmi-link-danger       { color: var(--pos-danger); }
+.sunmi-link-danger:hover { color: var(--pos-danger-hover); }
+.sunmi-link-success       { color: var(--pos-success); }
+.sunmi-link-success:hover { color: var(--pos-success-soft); }
+.sunmi-link-accent        { color: var(--pos-accent); }
+.sunmi-link-accent:hover  { filter: brightness(1.15); }
+.sunmi-link-muted         { color: var(--pos-muted); }
+.sunmi-link-muted:hover   { color: var(--pos-muted-strong); }
+
+/* --- Cajas de estado --- */
+.sunmi-state-danger {
+  background: color-mix(in srgb, var(--pos-danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-danger) 30%, transparent);
+}
+.sunmi-state-danger-soft {
+  background: color-mix(in srgb, var(--pos-danger) 5%, transparent);
+}
+.sunmi-state-warning {
+  background: color-mix(in srgb, var(--pos-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-accent) 40%, transparent);
+}
+.sunmi-state-warning-soft {
+  background: color-mix(in srgb, var(--pos-accent) 5%, transparent);
+}
+.sunmi-state-success {
+  background: color-mix(in srgb, var(--pos-success) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-success) 30%, transparent);
+}
+
+/* --- Control (stepper ±, placeholder img) --- */
+.sunmi-control       { background: var(--pos-control-bg); color: var(--pos-control-text); }
+.sunmi-control:hover { background: var(--pos-control-hover); }
+
+/* --- Select nativo theme-safe --- */
+.sunmi-select-native {
+  background: var(--app-input-bg);
+  border: 1px solid var(--app-input-border);
+  color: var(--app-fg);
+}
+.sunmi-select-native:focus {
+  outline: none;
+  border-color: var(--pos-link, var(--app-input-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-link, var(--app-fg)) 25%, transparent);
+}
+
+/* --- Textarea theme-safe --- */
+.sunmi-textarea {
+  background: var(--app-input-bg);
+  border: 1px solid var(--app-input-border);
+  color: var(--app-fg);
+}
+.sunmi-textarea::placeholder { color: var(--pos-muted); }
+.sunmi-textarea:focus {
+  outline: none;
+  border-color: var(--pos-link, var(--app-input-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-link, var(--app-fg)) 25%, transparent);
+}
+
+/* --- Badges --- */
+.sunmi-badge-link {
+  background: color-mix(in srgb, var(--pos-link) 20%, transparent);
+  color: var(--pos-link-hover);
+  border: 1px solid color-mix(in srgb, var(--pos-link) 30%, transparent);
+}
+.sunmi-badge-link:hover {
+  background: color-mix(in srgb, var(--pos-link) 30%, transparent);
+}
+.sunmi-badge-accent {
+  background: var(--pos-accent);
+  color: var(--app-bg);
+}
+
+/* --- Botones suaves (outline) --- */
+.sunmi-btn-accent-soft {
+  background: color-mix(in srgb, var(--pos-accent) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-accent) 40%, transparent);
+  color: var(--pos-accent);
+}
+.sunmi-btn-accent-soft:hover {
+  border-color: color-mix(in srgb, var(--pos-accent) 60%, transparent);
+}
+.sunmi-btn-link-soft {
+  background: color-mix(in srgb, var(--pos-link) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-link) 40%, transparent);
+  color: var(--pos-link-hover);
+}
+.sunmi-btn-link-soft:hover {
+  background: color-mix(in srgb, var(--pos-link) 30%, transparent);
+}
+
+/* --- Pill link (solid bg) --- */
+.sunmi-pill-link { background: var(--pos-link); color: var(--app-bg); }
+
+/* --- Badges sólidos (estado) --- */
+.sunmi-badge-muted   { background: var(--pos-control-bg); color: var(--pos-muted-strong); }
+.sunmi-badge-success { background: var(--pos-success); color: #fff; }
+.sunmi-badge-danger  { background: var(--pos-danger); color: #fff; }
+
+/* --- Utilidades --- */
+.sunmi-divider { border-color: var(--app-border); }
+.sunmi-ring    { --tw-ring-color: var(--app-border); }
+.sunmi-thead   { background: var(--table-header-bg); color: var(--table-header-fg, var(--app-fg)); }
+.sunmi-divide > :not([hidden]) ~ :not([hidden]) { border-color: var(--app-border); }

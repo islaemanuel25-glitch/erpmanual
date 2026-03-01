@@ -60,7 +60,7 @@ export default function ClienteDetallePage() {
   if (loading) {
     return (
       <div className="p-2 lg:p-3 max-w-5xl mx-auto">
-        <div className="text-center py-8 text-slate-400">Cargando...</div>
+        <div className="text-center py-8 sunmi-text-muted">Cargando...</div>
       </div>
     );
   }
@@ -69,7 +69,7 @@ export default function ClienteDetallePage() {
     return (
       <div className="p-2 lg:p-3 max-w-5xl mx-auto">
         <SunmiCard className="p-4">
-          <div className="text-center text-red-400">{errorMsg || "Cliente no encontrado"}</div>
+          <div className="text-center sunmi-text-danger">{errorMsg || "Cliente no encontrado"}</div>
           <div className="mt-4 flex justify-center">
             <SunmiButton color="slate" onClick={() => router.push("/modulos/clientes")}>
               Volver
@@ -86,7 +86,7 @@ export default function ClienteDetallePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Cliente: {cliente.nombre}</h1>
-          <p className="text-sm text-slate-400">Detalle del cliente</p>
+          <p className="text-sm sunmi-text-muted">Detalle del cliente</p>
         </div>
         <div className="flex gap-2">
           <SunmiButton
@@ -105,13 +105,13 @@ export default function ClienteDetallePage() {
 
       {/* Tabs */}
       <SunmiCard className="p-3">
-        <div className="flex gap-2 border-b border-slate-700">
+        <div className="flex gap-2 border-b sunmi-divider">
           <button
             onClick={() => setTab("datos")}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               tab === "datos"
-                ? "text-cyan-400 border-b-2 border-cyan-400"
-                : "text-slate-400 hover:text-slate-300"
+                ? "sunmi-text-link border-b-2 border-[var(--pos-link)]"
+                : "sunmi-link-muted"
             }`}
           >
             Datos
@@ -120,8 +120,8 @@ export default function ClienteDetallePage() {
             onClick={() => setTab("ventas")}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               tab === "ventas"
-                ? "text-cyan-400 border-b-2 border-cyan-400"
-                : "text-slate-400 hover:text-slate-300"
+                ? "sunmi-text-link border-b-2 border-[var(--pos-link)]"
+                : "sunmi-link-muted"
             }`}
           >
             Ventas
@@ -130,8 +130,8 @@ export default function ClienteDetallePage() {
             onClick={() => setTab("cuenta-corriente")}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               tab === "cuenta-corriente"
-                ? "text-cyan-400 border-b-2 border-cyan-400"
-                : "text-slate-400 hover:text-slate-300"
+                ? "sunmi-text-link border-b-2 border-[var(--pos-link)]"
+                : "sunmi-link-muted"
             }`}
           >
             Cuenta Corriente
@@ -141,7 +141,7 @@ export default function ClienteDetallePage() {
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               tab === "puntos"
                 ? "text-purple-400 border-b-2 border-purple-400"
-                : "text-slate-400 hover:text-slate-300"
+                : "sunmi-link-muted"
             }`}
           >
             Puntos
@@ -169,31 +169,31 @@ function TabDatos({ cliente }) {
       <SunmiSeparator label="Información del Cliente" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <div>
-          <label className="text-[11px] text-slate-400 mb-1 block">Nombre</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Nombre</label>
           <div className="text-sm font-medium">{cliente.nombre}</div>
         </div>
         <div>
-          <label className="text-[11px] text-slate-400 mb-1 block">Estado</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Estado</label>
           <SunmiBadgeEstado value={cliente.activo} />
         </div>
         <div>
-          <label className="text-[11px] text-slate-400 mb-1 block">Documento</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Documento</label>
           <div className="text-sm font-mono">{cliente.documento || "-"}</div>
         </div>
         <div>
-          <label className="text-[11px] text-slate-400 mb-1 block">Teléfono</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Teléfono</label>
           <div className="text-sm font-mono">{cliente.telefono || "-"}</div>
         </div>
         <div>
-          <label className="text-[11px] text-slate-400 mb-1 block">Email</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Email</label>
           <div className="text-sm">{cliente.email || "-"}</div>
         </div>
         <div>
-          <label className="text-[11px] text-slate-400 mb-1 block">Dirección</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Dirección</label>
           <div className="text-sm">{cliente.direccion || "-"}</div>
         </div>
         <div>
-          <label className="text-[11px] text-slate-400 mb-1 block">Límite de crédito</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Límite de crédito</label>
           <div className="text-sm font-mono">
             {cliente.limiteCredito != null
               ? `$${Number(cliente.limiteCredito).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -201,7 +201,7 @@ function TabDatos({ cliente }) {
           </div>
         </div>
         <div>
-          <label className="text-[11px] text-slate-400 mb-1 block">Descuento %</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Descuento %</label>
           <div className="text-sm font-mono">
             {cliente.descuentoPorcentaje != null
               ? `${Number(cliente.descuentoPorcentaje)}%`
@@ -213,12 +213,12 @@ function TabDatos({ cliente }) {
       {/* Etiquetas */}
       {cliente.tags && cliente.tags.length > 0 && (
         <div className="mt-4">
-          <label className="text-[11px] text-slate-400 mb-1 block">Etiquetas</label>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Etiquetas</label>
           <div className="flex flex-wrap gap-1">
             {cliente.tags.map((tag) => (
               <span
                 key={tag.id}
-                className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                className="text-[10px] px-2 py-0.5 rounded-full sunmi-badge-link"
               >
                 {tag.nombre}
               </span>
@@ -230,8 +230,8 @@ function TabDatos({ cliente }) {
       {/* Observaciones */}
       {cliente.observaciones && (
         <div className="mt-4">
-          <label className="text-[11px] text-slate-400 mb-1 block">Observaciones</label>
-          <div className="text-sm text-slate-300 bg-slate-900/50 p-3 rounded-lg">
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Observaciones</label>
+          <div className="text-sm sunmi-text-muted sunmi-surface p-3 rounded-lg">
             {cliente.observaciones}
           </div>
         </div>
@@ -310,13 +310,13 @@ function TabVentas({ clienteId, localId }) {
     <SunmiCard className="p-4">
       <SunmiSeparator label="Historial de Ventas" />
       {loading ? (
-        <div className="text-center py-8 text-slate-400">Cargando ventas...</div>
+        <div className="text-center py-8 sunmi-text-muted">Cargando ventas...</div>
       ) : errorMsg ? (
-        <div className="text-center py-8 text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+        <div className="text-center py-8 sunmi-text-danger sunmi-state-danger rounded px-2 py-1.5">
           {errorMsg}
         </div>
       ) : ventas.length === 0 ? (
-        <div className="text-center py-8 text-slate-500">Sin ventas registradas</div>
+        <div className="text-center py-8 sunmi-text-muted">Sin ventas registradas</div>
       ) : (
         <div className="overflow-x-auto mt-3">
           <SunmiTable headers={["Fecha", "Ticket", "Total", "Local"]} className="text-xs">
@@ -324,7 +324,7 @@ function TabVentas({ clienteId, localId }) {
               <SunmiTableRow key={venta.id}>
                 <td className="px-2 py-1.5 text-sm">{formatFecha(venta.fecha)}</td>
                 <td className="px-2 py-1.5 font-mono text-sm">#{venta.numero}</td>
-                <td className="px-2 py-1.5 font-mono text-sm text-emerald-400">
+                <td className="px-2 py-1.5 font-mono text-sm sunmi-text-success">
                   ${formatPrecio(venta.total)}
                 </td>
                 <td className="px-2 py-1.5 text-sm">{venta.localNombre}</td>
@@ -403,7 +403,7 @@ function TabPuntos({ clienteId, localId }) {
     return (
       <SunmiCard className="p-4">
         <SunmiSeparator label="Puntos de Fidelidad" />
-        <div className="text-center py-8 text-slate-500">
+        <div className="text-center py-8 sunmi-text-muted">
           Puntos no habilitados en este local
         </div>
       </SunmiCard>
@@ -415,9 +415,9 @@ function TabPuntos({ clienteId, localId }) {
       <SunmiSeparator label="Puntos de Fidelidad" />
 
       {loading ? (
-        <div className="text-center py-8 text-slate-400">Cargando puntos...</div>
+        <div className="text-center py-8 sunmi-text-muted">Cargando puntos...</div>
       ) : errorMsg ? (
-        <div className="text-center py-8 text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+        <div className="text-center py-8 sunmi-text-danger sunmi-state-danger rounded px-2 py-1.5">
           {errorMsg}
         </div>
       ) : (
@@ -429,7 +429,7 @@ function TabPuntos({ clienteId, localId }) {
 
           {/* Movimientos */}
           {movimientos.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 mt-4">Sin movimientos</div>
+            <div className="text-center py-8 sunmi-text-muted mt-4">Sin movimientos</div>
           ) : (
             <div className="overflow-x-auto mt-4">
               <SunmiTable
@@ -445,7 +445,7 @@ function TabPuntos({ clienteId, localId }) {
                     </td>
                     <td
                       className={`px-2 py-1.5 font-mono text-sm ${
-                        mov.direccion === "CREDITO" ? "text-emerald-400" : "text-red-400"
+                        mov.direccion === "CREDITO" ? "sunmi-text-success" : "sunmi-text-danger"
                       }`}
                     >
                       {mov.puntos}
@@ -615,8 +615,8 @@ function TabCuentaCorriente({ cliente, localId }) {
       <div
         className={`rounded-lg px-4 py-3 mt-4 text-center font-bold text-lg ${
           saldo > 0
-            ? "bg-red-500/15 text-red-400 border border-red-500/30"
-            : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+            ? "sunmi-state-danger sunmi-text-danger"
+            : "sunmi-state-success sunmi-text-success"
         }`}
       >
         Saldo: ${formatPrecio(saldo)}
@@ -653,10 +653,10 @@ function TabCuentaCorriente({ cliente, localId }) {
 
       {/* Form Pago */}
       {mostrarPago && (
-        <div className="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+        <div className="mt-4 p-3 sunmi-surface rounded-lg border sunmi-border">
           <div className="space-y-2">
             <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">Monto</label>
+              <label className="text-[11px] sunmi-text-muted mb-1 block">Monto</label>
               <SunmiInput
                 type="number"
                 value={montoPago}
@@ -666,7 +666,7 @@ function TabCuentaCorriente({ cliente, localId }) {
               />
             </div>
             <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">Nota (opcional)</label>
+              <label className="text-[11px] sunmi-text-muted mb-1 block">Nota (opcional)</label>
               <SunmiInput
                 type="text"
                 value={notaPago}
@@ -700,10 +700,10 @@ function TabCuentaCorriente({ cliente, localId }) {
 
       {/* Form Ajuste */}
       {mostrarAjuste && (
-        <div className="mt-4 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+        <div className="mt-4 p-3 sunmi-surface rounded-lg border sunmi-border">
           <div className="space-y-2">
             <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">Monto</label>
+              <label className="text-[11px] sunmi-text-muted mb-1 block">Monto</label>
               <SunmiInput
                 type="number"
                 value={montoAjuste}
@@ -713,18 +713,18 @@ function TabCuentaCorriente({ cliente, localId }) {
               />
             </div>
             <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">Dirección</label>
+              <label className="text-[11px] sunmi-text-muted mb-1 block">Dirección</label>
               <select
                 value={direccionAjuste}
                 onChange={(e) => setDireccionAjuste(e.target.value)}
-                className="w-full h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+                className="w-full h-11 rounded-xl px-3 text-sm sunmi-select-native"
               >
                 <option value="DEBITO">Débito</option>
                 <option value="CREDITO">Crédito</option>
               </select>
             </div>
             <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">Nota (opcional)</label>
+              <label className="text-[11px] sunmi-text-muted mb-1 block">Nota (opcional)</label>
               <SunmiInput
                 type="text"
                 value={notaAjuste}
@@ -758,16 +758,16 @@ function TabCuentaCorriente({ cliente, localId }) {
       )}
 
       {errorMsg && (
-        <div className="mt-4 text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+        <div className="mt-4 text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5">
           {errorMsg}
         </div>
       )}
 
       {/* Movimientos */}
       {loading ? (
-        <div className="text-center py-8 text-slate-400 mt-4">Cargando movimientos...</div>
+        <div className="text-center py-8 sunmi-text-muted mt-4">Cargando movimientos...</div>
       ) : movimientos.length === 0 ? (
-        <div className="text-center py-8 text-slate-500 mt-4">Sin movimientos</div>
+        <div className="text-center py-8 sunmi-text-muted mt-4">Sin movimientos</div>
       ) : (
         <div className="overflow-x-auto mt-4">
           <SunmiTable
@@ -781,8 +781,8 @@ function TabCuentaCorriente({ cliente, localId }) {
                 <td
                   className={`px-2 py-1.5 font-mono text-sm ${
                     mov.tipo === "PAGO" || mov.direccion === "CREDITO"
-                      ? "text-emerald-400"
-                      : "text-red-400"
+                      ? "sunmi-text-success"
+                      : "sunmi-text-danger"
                   }`}
                 >
                   {mov.direccion === "CREDITO" ? "+" : "-"}${formatPrecio(mov.monto)}

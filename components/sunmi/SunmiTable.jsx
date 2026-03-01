@@ -16,7 +16,7 @@ export default function SunmiTable({ headers = [], children }) {
       >
         {/* ===== HEADER ===== */}
         {headers.length > 0 && (
-          <thead className={theme.table?.header || "bg-amber-400 text-slate-900"}>
+          <thead className={theme.table?.headerClass || "sunmi-thead"}>
             <tr>
               {headers.map((h, i) => {
                 const label = typeof h === "string" ? h : h.label;
@@ -36,9 +36,7 @@ export default function SunmiTable({ headers = [], children }) {
 
         {/* ===== BODY ===== */}
         <tbody
-          className="
-            divide-y divide-slate-800
-          "
+          className="divide-y sunmi-divide"
         >
           {children}
         </tbody>

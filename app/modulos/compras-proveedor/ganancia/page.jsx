@@ -109,10 +109,10 @@ export default function GananciaComprasPage() {
         </div>
 
         {/* Filtros */}
-        <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm mb-4">
+        <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
           <div className="flex flex-wrap items-end gap-3">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Desde</label>
+              <label className="block text-xs sunmi-text-muted mb-1">Desde</label>
               <SunmiInput
                 type="date"
                 value={desde}
@@ -120,7 +120,7 @@ export default function GananciaComprasPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Hasta</label>
+              <label className="block text-xs sunmi-text-muted mb-1">Hasta</label>
               <SunmiInput
                 type="date"
                 value={hasta}
@@ -128,7 +128,7 @@ export default function GananciaComprasPage() {
               />
             </div>
             <div className="min-w-[180px]">
-              <label className="block text-xs text-slate-400 mb-1">Proveedor</label>
+              <label className="block text-xs sunmi-text-muted mb-1">Proveedor</label>
               <SunmiSelectAdv value={proveedorId} onChange={setProveedorId}>
                 <SunmiSelectOption value="">Todos</SunmiSelectOption>
                 {proveedores.map((p) => (
@@ -147,36 +147,36 @@ export default function GananciaComprasPage() {
         {/* Cards resumen */}
         {r && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <SunmiPanel className="bg-green-900/30 ring-1 ring-green-500/40 text-center py-3">
-              <p className="text-xs text-slate-400">Ganancia total</p>
-              <p className={`text-lg font-bold ${r.gananciaTotal >= 0 ? "text-green-400" : "text-red-400"}`}>
+            <SunmiPanel className="sunmi-state-success ring-1 text-center py-3">
+              <p className="text-xs sunmi-text-muted">Ganancia total</p>
+              <p className={`text-lg font-bold ${r.gananciaTotal >= 0 ? "sunmi-text-success" : "sunmi-text-danger"}`}>
                 ${r.gananciaTotal.toFixed(2)}
               </p>
             </SunmiPanel>
-            <SunmiPanel className="bg-slate-900/40 ring-1 ring-slate-500/40 text-center py-3">
-              <p className="text-xs text-slate-400">Total facturado</p>
-              <p className="text-lg font-bold text-slate-100">${r.totalFactura.toFixed(2)}</p>
+            <SunmiPanel className="sunmi-surface ring-1 sunmi-ring text-center py-3">
+              <p className="text-xs sunmi-text-muted">Total facturado</p>
+              <p className="text-lg font-bold sunmi-text-strong">${r.totalFactura.toFixed(2)}</p>
             </SunmiPanel>
-            <SunmiPanel className="bg-slate-900/40 ring-1 ring-slate-500/40 text-center py-3">
-              <p className="text-xs text-slate-400">Total real (costo)</p>
-              <p className="text-lg font-bold text-slate-100">${r.totalReal.toFixed(2)}</p>
+            <SunmiPanel className="sunmi-surface ring-1 sunmi-ring text-center py-3">
+              <p className="text-xs sunmi-text-muted">Total real (costo)</p>
+              <p className="text-lg font-bold sunmi-text-strong">${r.totalReal.toFixed(2)}</p>
             </SunmiPanel>
-            <SunmiPanel className="bg-slate-900/40 ring-1 ring-slate-500/40 text-center py-3">
-              <p className="text-xs text-slate-400">Compras recibidas</p>
-              <p className="text-lg font-bold text-slate-100">{r.cantidadCompras}</p>
+            <SunmiPanel className="sunmi-surface ring-1 sunmi-ring text-center py-3">
+              <p className="text-xs sunmi-text-muted">Compras recibidas</p>
+              <p className="text-lg font-bold sunmi-text-strong">{r.cantidadCompras}</p>
             </SunmiPanel>
           </div>
         )}
 
         {/* Ranking proveedores */}
         {data?.rankingProveedores?.length > 0 && (
-          <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-              <h3 className="text-[13px] font-semibold text-slate-200">
+          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+              <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Ranking proveedores
               </h3>
             </div>
-            <div className="overflow-x-auto rounded border border-slate-700">
+            <div className="overflow-x-auto rounded border sunmi-border">
               <SunmiTable headers={["Proveedor", "Compras", "Facturado", "Real", "Ganancia"]}>
                 {data.rankingProveedores.map((prov) => (
                   <SunmiTableRow key={prov.proveedorId}>
@@ -185,7 +185,7 @@ export default function GananciaComprasPage() {
                     <td className="px-3 py-1.5 text-xs text-right">${prov.totalFactura.toFixed(2)}</td>
                     <td className="px-3 py-1.5 text-xs text-right">${prov.totalReal.toFixed(2)}</td>
                     <td className={`px-3 py-1.5 text-xs text-right font-medium ${
-                      prov.ganancia >= 0 ? "text-green-400" : "text-red-400"
+                      prov.ganancia >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
                     }`}>
                       ${prov.ganancia.toFixed(2)}
                     </td>
@@ -198,23 +198,23 @@ export default function GananciaComprasPage() {
 
         {/* Tabla detalle compras */}
         {data?.compras && (
-          <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm">
-            <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-              <h3 className="text-[13px] font-semibold text-slate-200">
+          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+              <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Compras recibidas ({data.compras.length})
               </h3>
             </div>
-            <div className="overflow-x-auto rounded border border-slate-700">
+            <div className="overflow-x-auto rounded border sunmi-border">
               <SunmiTable headers={["#", "Proveedor", "Recibido", "Nro Fact.", "Facturado", "Real", "Ganancia", ""]}>
                 {data.compras.length === 0 ? (
                   <SunmiTableEmpty label="Sin compras en el período" />
                 ) : (
                   data.compras.map((c) => (
                     <SunmiTableRow key={c.id}>
-                      <td className="px-3 py-1.5 text-xs text-slate-400">{c.id}</td>
+                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">{c.id}</td>
                       <td className="px-3 py-1.5 text-sm">{c.proveedorNombre}</td>
                       <td className="px-3 py-1.5 text-xs">{formatFecha(c.fechaRecibido)}</td>
-                      <td className="px-3 py-1.5 text-xs text-slate-400">{c.nroFactura || "-"}</td>
+                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">{c.nroFactura || "-"}</td>
                       <td className="px-3 py-1.5 text-xs text-right">
                         {c.totalFactura != null ? `$${c.totalFactura.toFixed(2)}` : "-"}
                       </td>
@@ -222,8 +222,8 @@ export default function GananciaComprasPage() {
                         {c.totalReal != null ? `$${c.totalReal.toFixed(2)}` : "-"}
                       </td>
                       <td className={`px-3 py-1.5 text-xs text-right font-medium ${
-                        c.ganancia != null && c.ganancia >= 0 ? "text-green-400" :
-                        c.ganancia != null ? "text-red-400" : "text-slate-500"
+                        c.ganancia != null && c.ganancia >= 0 ? "sunmi-text-success" :
+                        c.ganancia != null ? "sunmi-text-danger" : "sunmi-text-muted"
                       }`}>
                         {c.ganancia != null ? `$${c.ganancia.toFixed(2)}` : "-"}
                       </td>

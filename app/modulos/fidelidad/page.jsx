@@ -196,7 +196,7 @@ export default function FidelidadPage() {
   if (cargandoFid || cargandoContexto) {
     return (
       <div className="p-2 lg:p-3 max-w-2xl mx-auto">
-        <div className="text-center py-8 text-slate-400">Cargando...</div>
+        <div className="text-center py-8 sunmi-text-muted">Cargando...</div>
       </div>
     );
   }
@@ -224,12 +224,12 @@ export default function FidelidadPage() {
           subtitle="Configurá el sistema de puntos por local"
         />
 
-        <p className="text-sm text-amber-400 font-medium mt-1">
+        <p className="text-sm sunmi-text-accent font-medium mt-1">
           {contexto?.nombre || "Sin local"}
         </p>
 
         {cargandoConfig && (
-          <div className="text-center py-6 text-slate-400 text-sm">
+          <div className="text-center py-6 sunmi-text-muted text-sm">
             Cargando configuración…
           </div>
         )}
@@ -239,7 +239,7 @@ export default function FidelidadPage() {
             <SunmiSeparator label="Configuración" />
 
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] text-slate-400">Puntos activos</span>
+              <span className="text-[11px] sunmi-text-muted">Puntos activos</span>
               <SunmiToggleEstado
                 value={activo}
                 onChange={(v) => setActivo(v)}
@@ -249,7 +249,7 @@ export default function FidelidadPage() {
             {activo && (
               <>
                 <div className="flex flex-col gap-1">
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] sunmi-text-muted">
                     Puntos por peso
                   </span>
                   <SunmiInput
@@ -260,13 +260,13 @@ export default function FidelidadPage() {
                     onChange={(e) => setPuntosPorPeso(e.target.value)}
                     placeholder="Ej: 0.01 (1 punto cada $100)"
                   />
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] sunmi-text-muted">
                     Cuántos puntos se acreditan por cada $1 de compra
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] sunmi-text-muted">
                     Peso por punto (redención)
                   </span>
                   <SunmiInput
@@ -277,28 +277,28 @@ export default function FidelidadPage() {
                     onChange={(e) => setPesoPorPunto(e.target.value)}
                     placeholder="Ej: 10 ($10 de descuento por punto)"
                   />
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] sunmi-text-muted">
                     Cuántos $ de descuento vale cada punto al canjear
                   </span>
                 </div>
 
                 {/* Equivalencias */}
                 {(ppwNum > 0 || pppNum > 0) && (
-                  <div className="mt-1 p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-1">
-                    <div className="text-[11px] font-semibold text-slate-300 mb-1">
+                  <div className="mt-1 p-3 rounded-lg sunmi-surface border sunmi-border space-y-1">
+                    <div className="text-[11px] font-semibold sunmi-text-muted mb-1">
                       Equivalencias
                     </div>
                     {ppwNum > 0 && (
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs sunmi-text-muted">
                         1 punto cada{" "}
-                        <span className="text-amber-400 font-medium">
+                        <span className="sunmi-text-accent font-medium">
                           ${Math.round(1 / ppwNum)}
                         </span>{" "}
                         de compra
                       </div>
                     )}
                     {pppNum > 0 && (
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs sunmi-text-muted">
                         1 punto vale{" "}
                         <span className="text-purple-400 font-medium">
                           ${pppNum.toFixed(2)}
@@ -307,9 +307,9 @@ export default function FidelidadPage() {
                       </div>
                     )}
                     {ppwNum > 0 && pppNum > 0 && (
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs sunmi-text-muted">
                         Devolución:{" "}
-                        <span className="text-emerald-400 font-medium">
+                        <span className="sunmi-text-success font-medium">
                           {(ppwNum * pppNum * 100).toFixed(2)}%
                         </span>{" "}
                         del valor de compra
@@ -323,8 +323,8 @@ export default function FidelidadPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Simular compra → puntos */}
-                  <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                    <div className="text-[11px] text-slate-400 mb-1">
+                  <div className="p-3 rounded-lg sunmi-surface border sunmi-border">
+                    <div className="text-[11px] sunmi-text-muted mb-1">
                       Compra ($) → Puntos ganados
                     </div>
                     <SunmiInput
@@ -336,20 +336,20 @@ export default function FidelidadPage() {
                       placeholder="Monto de compra"
                     />
                     {simCompraNum > 0 && ppwNum > 0 && (
-                      <div className="mt-2 text-center text-amber-400 font-bold text-lg">
+                      <div className="mt-2 text-center sunmi-text-accent font-bold text-lg">
                         {simPuntosGanados} puntos
                       </div>
                     )}
                     {simCompraNum > 0 && ppwNum <= 0 && (
-                      <div className="mt-2 text-center text-xs text-slate-500">
+                      <div className="mt-2 text-center text-xs sunmi-text-muted">
                         Configurá puntos por peso
                       </div>
                     )}
                   </div>
 
                   {/* Simular puntos → descuento */}
-                  <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                    <div className="text-[11px] text-slate-400 mb-1">
+                  <div className="p-3 rounded-lg sunmi-surface border sunmi-border">
+                    <div className="text-[11px] sunmi-text-muted mb-1">
                       Puntos → Descuento ($)
                     </div>
                     <SunmiInput
@@ -366,7 +366,7 @@ export default function FidelidadPage() {
                       </div>
                     )}
                     {simPuntosNum > 0 && pppNum <= 0 && (
-                      <div className="mt-2 text-center text-xs text-slate-500">
+                      <div className="mt-2 text-center text-xs sunmi-text-muted">
                         Configurá peso por punto
                       </div>
                     )}
@@ -377,11 +377,11 @@ export default function FidelidadPage() {
                 <SunmiSeparator label="Exclusiones" />
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] sunmi-text-muted">
                     Categorías excluidas
                   </span>
                   {categorias.length === 0 ? (
-                    <div className="text-[10px] text-slate-500">
+                    <div className="text-[10px] sunmi-text-muted">
                       No hay categorías cargadas
                     </div>
                   ) : (
@@ -402,8 +402,8 @@ export default function FidelidadPage() {
                             }}
                             className={`px-2.5 py-1 rounded-full text-xs border transition-all ${
                               excl
-                                ? "bg-red-500/20 border-red-500/50 text-red-400"
-                                : "bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-500"
+                                ? "sunmi-state-danger sunmi-text-danger"
+                                : "sunmi-control sunmi-text-muted"
                             }`}
                           >
                             {excl && "✕ "}
@@ -413,13 +413,13 @@ export default function FidelidadPage() {
                       })}
                     </div>
                   )}
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] sunmi-text-muted">
                     Los productos de estas categorías no sumarán puntos
                   </span>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] sunmi-text-muted">
                     Productos excluidos
                   </span>
                   <SunmiInput
@@ -428,10 +428,10 @@ export default function FidelidadPage() {
                     placeholder="Buscar producto por nombre o código…"
                   />
                   {buscandoProd && (
-                    <div className="text-[10px] text-slate-500">Buscando…</div>
+                    <div className="text-[10px] sunmi-text-muted">Buscando…</div>
                   )}
                   {resultadosProd.length > 0 && (
-                    <div className="rounded-lg border border-slate-700 bg-slate-900/50 max-h-40 overflow-y-auto">
+                    <div className="rounded-lg border sunmi-border sunmi-surface max-h-40 overflow-y-auto">
                       {resultadosProd.slice(0, 8).map((p) => {
                         const ya = exclProdIds.includes(p.id);
                         return (
@@ -449,20 +449,20 @@ export default function FidelidadPage() {
                               setResultadosProd([]);
                             }}
                             disabled={ya}
-                            className={`w-full text-left px-3 py-1.5 text-xs border-b border-slate-800 last:border-0 ${
+                            className={`w-full text-left px-3 py-1.5 text-xs border-b sunmi-divider last:border-0 ${
                               ya
-                                ? "text-slate-600"
-                                : "text-slate-300 hover:bg-slate-800"
+                                ? "sunmi-text-muted"
+                                : "sunmi-text-muted hover:bg-[var(--table-row-hover)]"
                             }`}
                           >
                             {p.nombre}
                             {p.codigoBarra && (
-                              <span className="text-slate-500 ml-1">
+                              <span className="sunmi-text-muted ml-1">
                                 ({p.codigoBarra})
                               </span>
                             )}
                             {ya && (
-                              <span className="text-slate-600 ml-1">
+                              <span className="sunmi-text-muted ml-1">
                                 — ya excluido
                               </span>
                             )}
@@ -476,7 +476,7 @@ export default function FidelidadPage() {
                       {exclProdIds.map((id) => (
                         <span
                           key={id}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-red-500/20 border border-red-500/50 text-red-400"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs sunmi-state-danger sunmi-text-danger"
                         >
                           {prodNombres[id] || `ID ${id}`}
                           <button
@@ -491,7 +491,7 @@ export default function FidelidadPage() {
                                 return next;
                               });
                             }}
-                            className="hover:text-red-300"
+                            className="sunmi-link-danger"
                           >
                             ✕
                           </button>
@@ -499,7 +499,7 @@ export default function FidelidadPage() {
                       ))}
                     </div>
                   )}
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] sunmi-text-muted">
                     Estos productos no sumarán puntos
                   </span>
                 </div>
@@ -508,12 +508,12 @@ export default function FidelidadPage() {
 
             {/* Mensajes */}
             {errorMsg && (
-              <div className="text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+              <div className="text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5">
                 {errorMsg}
               </div>
             )}
             {successMsg && (
-              <div className="text-xs text-emerald-400 text-center bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1.5">
+              <div className="text-xs sunmi-text-success text-center sunmi-state-success rounded px-2 py-1.5">
                 {successMsg}
               </div>
             )}

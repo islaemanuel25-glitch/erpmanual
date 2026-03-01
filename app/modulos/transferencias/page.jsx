@@ -154,7 +154,7 @@ export default function TransferenciasPage() {
       
       <SunmiCard>
         <SunmiHeader title="Transferencias">
-          <div className="text-xs sm:text-sm text-slate-200">
+          <div className="text-xs sm:text-sm sunmi-text-strong">
             Historial de transferencias entre Depósito y Locales
           </div>
         </SunmiHeader>
@@ -168,7 +168,7 @@ export default function TransferenciasPage() {
 
           {/* ESTADO */}
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Estado</label>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Estado</label>
             <SunmiSelectAdv
               value={estado}
               onChange={(val) => { setEstado(val); setPage(1); }}
@@ -181,7 +181,7 @@ export default function TransferenciasPage() {
 
           {/* LOCAL */}
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Local</label>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Local</label>
             <SunmiSelectAdv
               value={localId}
               onChange={(val) => { setLocalId(val); setPage(1); }}
@@ -197,7 +197,7 @@ export default function TransferenciasPage() {
 
           {/* DESDE */}
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Desde</label>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Desde</label>
             <SunmiInput
               type="date"
               value={fechaDesde}
@@ -207,7 +207,7 @@ export default function TransferenciasPage() {
 
           {/* HASTA */}
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Hasta</label>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Hasta</label>
             <SunmiInput
               type="date"
               value={fechaHasta}
@@ -251,9 +251,9 @@ export default function TransferenciasPage() {
             TOTAL GLOBAL
         ======================= */}
         <SunmiCard className="mx-1 mt-3">
-          <div className="text-slate-300 text-sm px-3 py-2 flex justify-between">
+          <div className="sunmi-text-muted text-sm px-3 py-2 flex justify-between">
             <span className="font-semibold">Importe total transferido:</span>
-            <span className="text-amber-300 font-bold">
+            <span className="sunmi-text-accent font-bold">
               ${Number(totalCostoGlobal).toFixed(2)}
             </span>
           </div>
@@ -262,7 +262,7 @@ export default function TransferenciasPage() {
         {/* ======================
             PAGINACIÓN
         ======================= */}
-        <div className="flex justify-between items-center px-2 pb-2 text-xs sm:text-sm text-slate-200">
+        <div className="flex justify-between items-center px-2 pb-2 text-xs sm:text-sm sunmi-text-strong">
           
           <div>Página {page} de {totalPages}</div>
 

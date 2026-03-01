@@ -44,7 +44,7 @@ export default function StockLocalesPage() {
   if (cargandoSt || cargandoContexto) {
     return (
       <div className="p-4 sunmi-bg min-h-screen">
-        <p className="text-slate-400">Cargando módulo de stock...</p>
+        <p className="sunmi-text-muted">Cargando módulo de stock...</p>
       </div>
     );
   }
@@ -67,7 +67,7 @@ export default function StockLocalesPage() {
       {/* CABECERA */}
       <div className="sunmi-card">
         <div className="sunmi-header-cyan">Stock de Locales</div>
-        <p className="text-sm text-amber-400 font-medium mt-2">
+        <p className="text-sm sunmi-text-accent font-medium mt-2">
           {localActual.nombre || "Sin local"}
         </p>
       </div>

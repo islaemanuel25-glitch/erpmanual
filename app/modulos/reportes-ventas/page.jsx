@@ -91,7 +91,7 @@ export default function ReportesVentasPage() {
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold">Reportes de Ventas</h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm sunmi-text-muted">
           Analisis de ventas, comisiones y rentabilidad
         </p>
       </div>
@@ -102,7 +102,7 @@ export default function ReportesVentasPage() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 relative">
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Desde
             </label>
             <SunmiInput
@@ -113,7 +113,7 @@ export default function ReportesVentasPage() {
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Hasta
             </label>
             <SunmiInput
@@ -124,7 +124,7 @@ export default function ReportesVentasPage() {
           </div>
 
           <div className="relative">
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Forma de pago
             </label>
             <SunmiSelectAdv
@@ -152,7 +152,7 @@ export default function ReportesVentasPage() {
         </div>
 
         {errorMsg && (
-          <div className="mt-2 text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+          <div className="mt-2 text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5">
             {errorMsg}
           </div>
         )}
@@ -173,39 +173,39 @@ export default function ReportesVentasPage() {
             <SunmiSeparator label="Resumen Financiero" />
 
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
-              <div className="bg-slate-900/50 p-3 rounded-lg text-center">
-                <div className="text-[10px] text-slate-400">Ventas</div>
-                <div className="text-xl font-bold text-cyan-400">
+              <div className="sunmi-surface p-3 rounded-lg text-center">
+                <div className="text-[10px] sunmi-text-muted">Ventas</div>
+                <div className="text-xl font-bold sunmi-text-link">
                   {reporte.resumen.cantidadVentas}
                 </div>
               </div>
 
-              <div className="bg-slate-900/50 p-3 rounded-lg text-center">
-                <div className="text-[10px] text-slate-400">Total Bruto</div>
-                <div className="text-xl font-bold text-amber-400">
+              <div className="sunmi-surface p-3 rounded-lg text-center">
+                <div className="text-[10px] sunmi-text-muted">Total Bruto</div>
+                <div className="text-xl font-bold sunmi-text-accent">
                   ${formatPrecio(reporte.resumen.totalBruto)}
                 </div>
               </div>
 
-              <div className="bg-slate-900/50 p-3 rounded-lg text-center">
-                <div className="text-[10px] text-slate-400">Comisiones</div>
-                <div className="text-xl font-bold text-orange-400">
+              <div className="sunmi-surface p-3 rounded-lg text-center">
+                <div className="text-[10px] sunmi-text-muted">Comisiones</div>
+                <div className="text-xl font-bold sunmi-text-accent">
                   -${formatPrecio(reporte.resumen.totalComisiones)}
                 </div>
               </div>
 
-              <div className="bg-slate-900/50 p-3 rounded-lg text-center">
-                <div className="text-[10px] text-slate-400">Neto Recibido</div>
-                <div className="text-xl font-bold text-emerald-400">
+              <div className="sunmi-surface p-3 rounded-lg text-center">
+                <div className="text-[10px] sunmi-text-muted">Neto Recibido</div>
+                <div className="text-xl font-bold sunmi-text-success">
                   ${formatPrecio(reporte.resumen.totalNeto)}
                 </div>
               </div>
 
-              <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-lg text-center">
-                <div className="text-[10px] text-emerald-300">
+              <div className="sunmi-state-success p-3 rounded-lg text-center">
+                <div className="text-[10px] sunmi-text-success">
                   Ganancia Neta
                 </div>
-                <div className="text-xl font-bold text-emerald-400">
+                <div className="text-xl font-bold sunmi-text-success">
                   ${formatPrecio(reporte.resumen.gananciaNeta)}
                 </div>
               </div>
@@ -228,7 +228,7 @@ export default function ReportesVentasPage() {
                   ]}
                 >
                   {reporte.desglosePago.map((item) => (
-                    <tr key={item.formaPago} className="hover:bg-slate-800/40">
+                    <tr key={item.formaPago} className="hover:bg-[var(--hover-bg)]">
                       <td className="px-2 py-1.5 font-medium capitalize">
                         {item.formaPago}
                       </td>
@@ -238,12 +238,12 @@ export default function ReportesVentasPage() {
                       <td className="px-2 py-1.5 text-right font-mono">
                         ${formatPrecio(item.total)}
                       </td>
-                      <td className="px-2 py-1.5 text-right font-mono text-orange-400">
+                      <td className="px-2 py-1.5 text-right font-mono sunmi-text-accent">
                         {item.comision > 0
                           ? `-$${formatPrecio(item.comision)}`
                           : "-"}
                       </td>
-                      <td className="px-2 py-1.5 text-right font-mono text-emerald-400 font-bold">
+                      <td className="px-2 py-1.5 text-right font-mono sunmi-text-success font-bold">
                         ${formatPrecio(item.neto)}
                       </td>
                     </tr>
@@ -275,7 +275,7 @@ export default function ReportesVentasPage() {
                         ? ((item.ganancia / item.totalVenta) * 100).toFixed(1)
                         : "0.0";
                     return (
-                      <tr key={idx} className="hover:bg-slate-800/40">
+                      <tr key={idx} className="hover:bg-[var(--hover-bg)]">
                         <td className="px-2 py-1.5 font-medium truncate max-w-[200px]">
                           {item.nombre}
                         </td>
@@ -285,20 +285,20 @@ export default function ReportesVentasPage() {
                         <td className="px-2 py-1.5 text-right font-mono">
                           ${formatPrecio(item.totalVenta)}
                         </td>
-                        <td className="px-2 py-1.5 text-right font-mono text-slate-400">
+                        <td className="px-2 py-1.5 text-right font-mono sunmi-text-muted">
                           ${formatPrecio(item.totalCosto)}
                         </td>
-                        <td className="px-2 py-1.5 text-right font-mono text-emerald-400">
+                        <td className="px-2 py-1.5 text-right font-mono sunmi-text-success">
                           ${formatPrecio(item.ganancia)}
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono">
                           <span
                             className={
                               margen > 30
-                                ? "text-emerald-400"
+                                ? "sunmi-text-success"
                                 : margen > 15
-                                ? "text-amber-400"
-                                : "text-red-400"
+                                ? "sunmi-text-accent"
+                                : "sunmi-text-danger"
                             }
                           >
                             {margen}%
@@ -317,7 +317,7 @@ export default function ReportesVentasPage() {
       {/* Sin datos */}
       {!reporte && !loading && (
         <SunmiCard className="p-3">
-          <div className="text-center py-12 text-slate-500">
+          <div className="text-center py-12 sunmi-text-muted">
             Selecciona las fechas y genera el reporte
           </div>
         </SunmiCard>

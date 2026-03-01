@@ -195,16 +195,16 @@ export default function NuevaCompraProveedorPage() {
         </div>
 
         {/* Selección de proveedor */}
-        <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm mb-4">
-          <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-            <h3 className="text-[13px] font-semibold text-slate-200">
+        <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+          <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+            <h3 className="text-[13px] font-semibold sunmi-text-strong">
               Proveedor y notas
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Proveedor</label>
+              <label className="block text-xs sunmi-text-muted mb-1">Proveedor</label>
               <SunmiSelectAdv value={proveedorId} onChange={setProveedorId}>
                 <SunmiSelectOption value="">-- Seleccionar --</SunmiSelectOption>
                 {proveedores.map((p) => (
@@ -216,7 +216,7 @@ export default function NuevaCompraProveedorPage() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Notas</label>
+              <label className="block text-xs sunmi-text-muted mb-1">Notas</label>
               <SunmiInput
                 placeholder="Notas opcionales..."
                 value={notas}
@@ -228,9 +228,9 @@ export default function NuevaCompraProveedorPage() {
 
         {/* Buscador de productos */}
         {proveedorId && (
-          <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-              <h3 className="text-[13px] font-semibold text-slate-200">
+          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+              <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Agregar productos
               </h3>
             </div>
@@ -242,18 +242,18 @@ export default function NuevaCompraProveedorPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="flex-1"
               />
-              <label className="flex items-center gap-1.5 text-xs text-slate-400 whitespace-nowrap cursor-pointer select-none">
+              <label className="flex items-center gap-1.5 text-xs sunmi-text-muted whitespace-nowrap cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={soloFaltantes}
                   onChange={(e) => setSoloFaltantes(e.target.checked)}
-                  className="accent-amber-400"
+                  className="accent-[var(--pos-accent)]"
                 />
                 Solo faltantes
               </label>
             </div>
 
-            <div className="max-h-80 overflow-y-auto rounded border border-slate-700">
+            <div className="max-h-80 overflow-y-auto rounded border sunmi-border">
               <SunmiTable headers={["Nombre", "SKU", "Actual", "Min", "Max", "Faltante", "Sugerido", "Costo", ""]}>
                 {loadingProds ? (
                   <SunmiTableEmpty label="Buscando..." colSpan={9} />
@@ -274,64 +274,64 @@ export default function NuevaCompraProveedorPage() {
                       );
                       const esFiambre = p.modoCompra === "UNIDAD";
                       const unidadSufijo = esFiambre ? "kg" : "";
-                      const rowClass = p.bajoMin ? "bg-red-500/10" : "";
+                      const rowClass = p.bajoMin ? "sunmi-state-danger-soft" : "";
                       return (
                         <SunmiTableRow key={p.productoLocalId} className={rowClass}>
                           <td className="px-3 py-1.5 text-sm">
                             {p.nombre}
                             {esFiambre && (
-                              <span className="ml-2 text-[10px] text-cyan-400 font-medium">FIAMBRE</span>
+                              <span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>
                             )}
                             {p.bajoMin && (
-                              <span className="ml-2 text-[10px] text-red-400 font-medium">BAJO MIN</span>
+                              <span className="ml-2 text-[10px] sunmi-text-danger font-medium">BAJO MIN</span>
                             )}
                           </td>
-                          <td className="px-3 py-1.5 text-xs text-slate-400">
+                          <td className="px-3 py-1.5 text-xs sunmi-text-muted">
                             {p.sku || "-"}
                           </td>
-                          <td className={`px-3 py-1.5 text-xs text-center ${p.bajoMin ? "text-red-400 font-medium" : ""}`}>
-                            {p.stockActual}{unidadSufijo && <span className="text-[10px] text-slate-500 ml-0.5">{unidadSufijo}</span>}
+                          <td className={`px-3 py-1.5 text-xs text-center ${p.bajoMin ? "sunmi-text-danger font-medium" : ""}`}>
+                            {p.stockActual}{unidadSufijo && <span className="text-[10px] sunmi-text-muted ml-0.5">{unidadSufijo}</span>}
                           </td>
                           <td className="px-3 py-1.5 text-xs text-center">
-                            {p.stockMin != null ? <>{p.stockMin}{unidadSufijo && <span className="text-[10px] text-slate-500 ml-0.5">{unidadSufijo}</span>}</> : <span className="text-slate-600">—</span>}
+                            {p.stockMin != null ? <>{p.stockMin}{unidadSufijo && <span className="text-[10px] sunmi-text-muted ml-0.5">{unidadSufijo}</span>}</> : <span className="sunmi-text-muted">—</span>}
                           </td>
                           <td className="px-3 py-1.5 text-xs text-center">
-                            {p.stockMax != null ? <>{p.stockMax}{unidadSufijo && <span className="text-[10px] text-slate-500 ml-0.5">{unidadSufijo}</span>}</> : <span className="text-slate-600">—</span>}
+                            {p.stockMax != null ? <>{p.stockMax}{unidadSufijo && <span className="text-[10px] sunmi-text-muted ml-0.5">{unidadSufijo}</span>}</> : <span className="sunmi-text-muted">—</span>}
                           </td>
                           <td className="px-3 py-1.5 text-xs text-center">
                             {p.sinParametros ? (
-                              <span className="text-slate-600">—</span>
+                              <span className="sunmi-text-muted">—</span>
                             ) : p.faltante > 0 ? (
-                              <span className="text-red-400">
+                              <span className="sunmi-text-danger">
                                 {esFiambre ? Number(p.faltante).toFixed(1) : p.faltante}
-                                {" "}<span className="text-[10px] text-slate-500">{esFiambre ? "kg" : "bultos"}</span>
+                                {" "}<span className="text-[10px] sunmi-text-muted">{esFiambre ? "kg" : "bultos"}</span>
                               </span>
                             ) : (
-                              <span className="text-green-400">0</span>
+                              <span className="sunmi-text-success">0</span>
                             )}
                           </td>
                           <td className="px-3 py-1.5 text-xs text-center">
                             {p.sinParametros ? (
-                              <span className="text-amber-500/80 text-[10px]" title="Sin stockMin/stockMax configurados">
+                              <span className="sunmi-text-accent text-[10px]" title="Sin stockMin/stockMax configurados">
                                 Sin min/max
                               </span>
                             ) : p.sugerido > 0 ? (
-                              <span className="text-amber-400 font-medium">
-                                {p.sugerido} <span className="text-[10px] text-slate-400">{esFiambre ? "uds" : "bultos"}</span>
+                              <span className="sunmi-text-accent font-medium">
+                                {p.sugerido} <span className="text-[10px] sunmi-text-muted">{esFiambre ? "uds" : "bultos"}</span>
                                 {esFiambre && p.pesoRefKg > 0 && (
-                                  <span className="text-[10px] text-slate-500 ml-1">
+                                  <span className="text-[10px] sunmi-text-muted ml-1">
                                     (~{(p.sugerido * p.pesoRefKg).toFixed(1)}kg)
                                   </span>
                                 )}
                               </span>
                             ) : (
-                              <span className="text-green-400">OK</span>
+                              <span className="sunmi-text-success">OK</span>
                             )}
                           </td>
                           <td className="px-3 py-1.5 text-xs">
                             ${Number(p.precio_costo || 0).toFixed(2)}
                             {esFiambre && p.pesoRefKg > 0 && (
-                              <div className="text-[10px] text-slate-500">~{p.pesoRefKg.toFixed(1)}kg/u{p.pesoEsFijo ? "" : " (var)"}</div>
+                              <div className="text-[10px] sunmi-text-muted">~{p.pesoRefKg.toFixed(1)}kg/u{p.pesoEsFijo ? "" : " (var)"}</div>
                             )}
                           </td>
                           <td className="px-3 py-1.5 text-right">
@@ -355,14 +355,14 @@ export default function NuevaCompraProveedorPage() {
 
         {/* Items del pedido */}
         {items.length > 0 && (
-          <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-              <h3 className="text-[13px] font-semibold text-slate-200">
+          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+              <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Detalle del pedido ({items.length} items)
               </h3>
             </div>
 
-            <div className="overflow-x-auto rounded border border-slate-700">
+            <div className="overflow-x-auto rounded border sunmi-border">
               <SunmiTable headers={["Producto", "Cant.", "Costo (por bulto)", "Subtotal", ""]}>
                 {items.map((item) => {
                   const subtotalItem = (Number(item.cantidad) || 0) * item.precioCosto;
@@ -374,12 +374,12 @@ export default function NuevaCompraProveedorPage() {
                       <td className="px-3 py-1.5 text-sm">
                         {item.nombre}
                         {item.sku && (
-                          <span className="text-xs text-slate-500 ml-2">
+                          <span className="text-xs sunmi-text-muted ml-2">
                             {item.sku}
                           </span>
                         )}
                         {esFiambre && (
-                          <span className="ml-2 text-[10px] text-cyan-400 font-medium">FIAMBRE</span>
+                          <span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>
                         )}
                       </td>
                       <td className="px-3 py-1.5">
@@ -390,7 +390,7 @@ export default function NuevaCompraProveedorPage() {
                               const cur = Number(item.cantidad) || 1;
                               updateItemCantidad(item.productoLocalId, String(Math.max(1, cur - 1)));
                             }}
-                            className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center"
+                            className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center"
                           >−</button>
                           <SunmiInput
                             type="text"
@@ -408,19 +408,19 @@ export default function NuevaCompraProveedorPage() {
                               const cur = Number(item.cantidad) || 0;
                               updateItemCantidad(item.productoLocalId, String(cur + 1));
                             }}
-                            className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center"
+                            className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center"
                           >+</button>
-                          <span className="text-[10px] text-slate-400">{unidadLabel}</span>
+                          <span className="text-[10px] sunmi-text-muted">{unidadLabel}</span>
                         </div>
                         {esFiambre && item.pesoRefKg > 0 && (
-                          <div className="text-[10px] text-slate-500 mt-0.5">
+                          <div className="text-[10px] sunmi-text-muted mt-0.5">
                             ~{((Number(item.cantidad) || 0) * item.pesoRefKg).toFixed(1)} kg
                           </div>
                         )}
                       </td>
                       <td className="px-3 py-1.5 text-xs text-right">
                         ${item.precioCosto.toFixed(2)}
-                        <span className="text-[10px] text-slate-500 ml-0.5">/{costoLabel}</span>
+                        <span className="text-[10px] sunmi-text-muted ml-0.5">/{costoLabel}</span>
                       </td>
                       <td className="px-3 py-1.5 text-xs text-right font-medium">
                         ${subtotalItem.toFixed(2)}
@@ -428,7 +428,7 @@ export default function NuevaCompraProveedorPage() {
                       <td className="px-3 py-1.5 text-right">
                         <button
                           onClick={() => quitarItem(item.productoLocalId)}
-                          className="text-red-400 hover:text-red-300 text-sm"
+                          className="sunmi-link-danger text-sm"
                         >
                           Quitar
                         </button>
@@ -436,11 +436,11 @@ export default function NuevaCompraProveedorPage() {
                     </SunmiTableRow>
                   );
                 })}
-                <tr className="border-t border-slate-600">
-                  <td colSpan={3} className="px-3 py-2 text-sm font-semibold text-right text-slate-300">
+                <tr className="border-t sunmi-divider">
+                  <td colSpan={3} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">
                     TOTAL ESTIMADO
                   </td>
-                  <td className="px-3 py-2 text-sm font-bold text-right text-amber-400">
+                  <td className="px-3 py-2 text-sm font-bold text-right sunmi-text-accent">
                     ${items.reduce((acc, i) => acc + (Number(i.cantidad) || 0) * i.precioCosto, 0).toFixed(2)}
                   </td>
                   <td />

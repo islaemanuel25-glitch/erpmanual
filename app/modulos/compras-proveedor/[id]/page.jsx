@@ -17,11 +17,11 @@ import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 const ESTADO_BADGE = {
-  BORRADOR: "bg-slate-600 text-slate-200",
-  CONFIRMADO: "bg-amber-600 text-amber-100",
-  ENVIADO: "bg-cyan-600 text-cyan-100",
-  RECIBIDO: "bg-green-600 text-green-100",
-  ANULADO: "bg-red-600 text-red-100",
+  BORRADOR: "sunmi-badge-muted",
+  CONFIRMADO: "sunmi-badge-accent",
+  ENVIADO: "sunmi-badge-link",
+  RECIBIDO: "sunmi-badge-success",
+  ANULADO: "sunmi-badge-danger",
 };
 
 function formatFecha(f) {
@@ -269,7 +269,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     return (
       <div className="sunmi-bg w-full min-h-full p-4">
         <SunmiCard>
-          <p className="text-slate-400">Cargando...</p>
+          <p className="sunmi-text-muted">Cargando...</p>
         </SunmiCard>
       </div>
     );
@@ -279,7 +279,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     return (
       <div className="sunmi-bg w-full min-h-full p-4">
         <SunmiCard>
-          <p className="text-red-400">Pedido no encontrado</p>
+          <p className="sunmi-text-danger">Pedido no encontrado</p>
           <SunmiButton
             color="slate"
             className="mt-3"
@@ -333,43 +333,43 @@ export default function DetallePedidoProveedorPage({ params }) {
         </div>
 
         {/* Info del pedido */}
-        <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm mb-4">
+        <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="text-slate-400 text-xs">Proveedor</span>
-              <p className="text-slate-100">{pedido.proveedor?.nombre}</p>
+              <span className="sunmi-text-muted text-xs">Proveedor</span>
+              <p className="sunmi-text-strong">{pedido.proveedor?.nombre}</p>
             </div>
             <div>
-              <span className="text-slate-400 text-xs">Depósito</span>
-              <p className="text-slate-100">{pedido.deposito?.nombre}</p>
+              <span className="sunmi-text-muted text-xs">Depósito</span>
+              <p className="sunmi-text-strong">{pedido.deposito?.nombre}</p>
             </div>
             <div>
-              <span className="text-slate-400 text-xs">Creado</span>
-              <p className="text-slate-100">{formatFecha(pedido.createdAt)}</p>
+              <span className="sunmi-text-muted text-xs">Creado</span>
+              <p className="sunmi-text-strong">{formatFecha(pedido.createdAt)}</p>
             </div>
             <div>
-              <span className="text-slate-400 text-xs">Notas</span>
-              <p className="text-slate-100">{pedido.notas || "-"}</p>
+              <span className="sunmi-text-muted text-xs">Notas</span>
+              <p className="sunmi-text-strong">{pedido.notas || "-"}</p>
             </div>
           </div>
 
           {/* Fechas de flujo */}
-          <div className="grid grid-cols-4 gap-4 text-sm mt-3 pt-3 border-t border-slate-700/40">
+          <div className="grid grid-cols-4 gap-4 text-sm mt-3 pt-3 border-t sunmi-divider">
             <div>
-              <span className="text-slate-400 text-xs">Confirmado</span>
-              <p className="text-slate-100">{formatFecha(pedido.fechaConfirmado)}</p>
+              <span className="sunmi-text-muted text-xs">Confirmado</span>
+              <p className="sunmi-text-strong">{formatFecha(pedido.fechaConfirmado)}</p>
             </div>
             <div>
-              <span className="text-slate-400 text-xs">Enviado</span>
-              <p className="text-slate-100">{formatFecha(pedido.fechaEnviado)}</p>
+              <span className="sunmi-text-muted text-xs">Enviado</span>
+              <p className="sunmi-text-strong">{formatFecha(pedido.fechaEnviado)}</p>
             </div>
             <div>
-              <span className="text-slate-400 text-xs">Recibido</span>
-              <p className="text-slate-100">{formatFecha(pedido.fechaRecibido)}</p>
+              <span className="sunmi-text-muted text-xs">Recibido</span>
+              <p className="sunmi-text-strong">{formatFecha(pedido.fechaRecibido)}</p>
             </div>
             <div>
-              <span className="text-slate-400 text-xs">Anulado</span>
-              <p className={pedido.fechaAnulado ? "text-red-400" : "text-slate-100"}>
+              <span className="sunmi-text-muted text-xs">Anulado</span>
+              <p className={pedido.fechaAnulado ? "sunmi-text-danger" : "sunmi-text-strong"}>
                 {formatFecha(pedido.fechaAnulado)}
               </p>
             </div>
@@ -378,9 +378,9 @@ export default function DetallePedidoProveedorPage({ params }) {
 
         {/* Panel factura — editable en ENVIADO, readonly en RECIBIDO */}
         {(esRecepcion || pedido.estado === "RECIBIDO") && (
-          <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-              <h3 className="text-[13px] font-semibold text-slate-200">
+          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+              <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Factura y ganancia
               </h3>
             </div>
@@ -388,14 +388,14 @@ export default function DetallePedidoProveedorPage({ params }) {
             {esRecepcion ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Total factura ($)</label>
-                  <p className="text-lg font-bold text-amber-400">
+                  <label className="block text-xs sunmi-text-muted mb-1">Total factura ($)</label>
+                  <p className="text-lg font-bold sunmi-text-accent">
                     ${computedTotalFactura.toFixed(2)}
                   </p>
-                  <p className="text-[10px] text-slate-500">Calculado: cant. recibida × costo</p>
+                  <p className="text-[10px] sunmi-text-muted">Calculado: cant. recibida × costo</p>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Total real ($)</label>
+                  <label className="block text-xs sunmi-text-muted mb-1">Total real ($)</label>
                   <SunmiInput
                     type="number"
                     min="0"
@@ -406,7 +406,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Nro factura</label>
+                  <label className="block text-xs sunmi-text-muted mb-1">Nro factura</label>
                   <SunmiInput
                     value={nroFactura}
                     onChange={(e) => setNroFactura(e.target.value)}
@@ -414,7 +414,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Fecha factura</label>
+                  <label className="block text-xs sunmi-text-muted mb-1">Fecha factura</label>
                   <SunmiInput
                     type="date"
                     value={fechaFactura}
@@ -422,10 +422,10 @@ export default function DetallePedidoProveedorPage({ params }) {
                   />
                 </div>
                 {totalReal && (
-                  <div className="col-span-2 md:col-span-4 pt-2 border-t border-slate-700/40">
-                    <span className="text-xs text-slate-400">Ganancia depósito: </span>
+                  <div className="col-span-2 md:col-span-4 pt-2 border-t sunmi-divider">
+                    <span className="text-xs sunmi-text-muted">Ganancia depósito: </span>
                     <span className={`text-sm font-bold ${
-                      computedTotalFactura - Number(totalReal) >= 0 ? "text-green-400" : "text-red-400"
+                      computedTotalFactura - Number(totalReal) >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
                     }`}>
                       ${(computedTotalFactura - Number(totalReal)).toFixed(2)}
                     </span>
@@ -435,32 +435,32 @@ export default function DetallePedidoProveedorPage({ params }) {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <span className="text-slate-400 text-xs">Total factura</span>
-                  <p className="text-slate-100">
+                  <span className="sunmi-text-muted text-xs">Total factura</span>
+                  <p className="sunmi-text-strong">
                     {pedido.totalFactura != null ? `$${Number(pedido.totalFactura).toFixed(2)}` : "-"}
                   </p>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-xs">Total real</span>
-                  <p className="text-slate-100">
+                  <span className="sunmi-text-muted text-xs">Total real</span>
+                  <p className="sunmi-text-strong">
                     {pedido.totalReal != null ? `$${Number(pedido.totalReal).toFixed(2)}` : "-"}
                   </p>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-xs">Nro factura</span>
-                  <p className="text-slate-100">{pedido.nroFactura || "-"}</p>
+                  <span className="sunmi-text-muted text-xs">Nro factura</span>
+                  <p className="sunmi-text-strong">{pedido.nroFactura || "-"}</p>
                 </div>
                 <div>
-                  <span className="text-slate-400 text-xs">Fecha factura</span>
-                  <p className="text-slate-100">
+                  <span className="sunmi-text-muted text-xs">Fecha factura</span>
+                  <p className="sunmi-text-strong">
                     {pedido.fechaFactura ? new Date(pedido.fechaFactura).toLocaleDateString("es-AR") : "-"}
                   </p>
                 </div>
                 {pedido.totalFactura != null && pedido.totalReal != null && (
-                  <div className="col-span-2 md:col-span-4 pt-2 border-t border-slate-700/40">
-                    <span className="text-xs text-slate-400">Ganancia depósito: </span>
+                  <div className="col-span-2 md:col-span-4 pt-2 border-t sunmi-divider">
+                    <span className="text-xs sunmi-text-muted">Ganancia depósito: </span>
                     <span className={`text-sm font-bold ${
-                      Number(pedido.totalFactura) - Number(pedido.totalReal) >= 0 ? "text-green-400" : "text-red-400"
+                      Number(pedido.totalFactura) - Number(pedido.totalReal) >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
                     }`}>
                       ${(Number(pedido.totalFactura) - Number(pedido.totalReal)).toFixed(2)}
                     </span>
@@ -472,14 +472,14 @@ export default function DetallePedidoProveedorPage({ params }) {
         )}
 
         {/* Detalle de productos */}
-        <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm mb-4">
-          <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-            <h3 className="text-[13px] font-semibold text-slate-200">
+        <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+          <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+            <h3 className="text-[13px] font-semibold sunmi-text-strong">
               Detalle ({pedido.detalles?.length || 0} items)
             </h3>
           </div>
 
-          <div className="overflow-x-auto rounded border border-slate-700">
+          <div className="overflow-x-auto rounded border sunmi-border">
             <SunmiTable
               headers={[
                 "Producto",
@@ -504,10 +504,10 @@ export default function DetallePedidoProveedorPage({ params }) {
                       <td className="px-3 py-1.5 text-sm">
                         {det.producto?.base?.nombre || "-"}
                         {esFiambre && (
-                          <span className="ml-2 text-[10px] text-cyan-400 font-medium">FIAMBRE</span>
+                          <span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-xs text-slate-400">
+                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">
                         {det.producto?.base?.sku || "-"}
                       </td>
                       <td className="px-3 py-1.5 text-center">
@@ -517,7 +517,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                       <td className="px-3 py-1.5 text-xs">
                         {esRecepcion ? (
                           <div className="flex items-center gap-0.5">
-                            <span className="text-slate-500">$</span>
+                            <span className="sunmi-text-muted">$</span>
                             <SunmiInput
                               type="text"
                               inputMode="decimal"
@@ -555,7 +555,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                                   [det.id]: Math.max(0, cur - 1),
                                 }));
                               }}
-                              className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center"
+                              className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center"
                             >−</button>
                             <SunmiInput
                               type="text"
@@ -590,7 +590,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                                   [det.id]: cur + 1,
                                 }));
                               }}
-                              className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center"
+                              className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center"
                             >+</button>
                           </div>
                         </td>
@@ -615,21 +615,21 @@ export default function DetallePedidoProveedorPage({ params }) {
                               placeholder="kg"
                             />
                           ) : (
-                            <span className="text-slate-600 text-xs">-</span>
+                            <span className="sunmi-text-muted text-xs">-</span>
                           )}
                         </td>
                       )}
 
                       {/* Estado RECIBIDO: mostrar valores finales */}
                       {pedido.estado === "RECIBIDO" && (
-                        <td className="px-3 py-1.5 text-center text-green-400">
+                        <td className="px-3 py-1.5 text-center sunmi-text-success">
                           {det.cantidadRecibida != null
                             ? Number(det.cantidadRecibida)
                             : "-"}
                         </td>
                       )}
                       {pedido.estado === "RECIBIDO" && tieneFiambre && (
-                        <td className="px-3 py-1.5 text-center text-green-400">
+                        <td className="px-3 py-1.5 text-center sunmi-text-success">
                           {esFiambre && det.kgRecibidos != null
                             ? `${Number(det.kgRecibidos).toFixed(2)} kg`
                             : "-"}
@@ -642,7 +642,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                             type="button"
                             disabled={deleting === det.id}
                             onClick={() => eliminarDetalle(det.id)}
-                            className="text-red-400 hover:text-red-300 text-xs font-medium disabled:opacity-40"
+                            className="sunmi-link-danger text-xs font-medium disabled:opacity-40"
                           >
                             {deleting === det.id ? "..." : "✕"}
                           </button>
@@ -664,11 +664,11 @@ export default function DetallePedidoProveedorPage({ params }) {
                   (pedido.estado === "RECIBIDO" && tieneFiambre ? 1 : 0);
                 const totalCols = baseCols + extraCols;
                 return (
-                  <tr className="border-t border-slate-600">
-                    <td colSpan={totalCols - 1} className="px-3 py-2 text-sm font-semibold text-right text-slate-300">
+                  <tr className="border-t sunmi-divider">
+                    <td colSpan={totalCols - 1} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">
                       TOTAL ESTIMADO
                     </td>
-                    <td className="px-3 py-2 text-sm font-bold text-right text-amber-400">
+                    <td className="px-3 py-2 text-sm font-bold text-right sunmi-text-accent">
                       ${totalEstimado.toFixed(2)}
                     </td>
                   </tr>
@@ -680,9 +680,9 @@ export default function DetallePedidoProveedorPage({ params }) {
 
         {/* Agregar producto extra — solo en recepción (ENVIADO) */}
         {esRecepcion && (
-          <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-cyan-500/30 shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-              <h3 className="text-[13px] font-semibold text-slate-200">
+          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+              <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Agregar producto extra
               </h3>
             </div>
@@ -696,24 +696,24 @@ export default function DetallePedidoProveedorPage({ params }) {
             />
 
             {extraLoading && (
-              <p className="text-xs text-slate-400">Buscando...</p>
+              <p className="text-xs sunmi-text-muted">Buscando...</p>
             )}
 
             {!extraLoading && extraSearch.trim() && extraResults.length === 0 && (
-              <p className="text-xs text-slate-500">Sin resultados</p>
+              <p className="text-xs sunmi-text-muted">Sin resultados</p>
             )}
 
             {extraResults.length > 0 && (
-              <div className="overflow-x-auto rounded border border-slate-700">
+              <div className="overflow-x-auto rounded border sunmi-border">
                 <SunmiTable headers={["Producto", "SKU", "Cód. barra", "Modo", "Costo", ""]}>
                   {extraResults.map((p) => (
                     <SunmiTableRow key={p.productoLocalId}>
                       <td className="px-3 py-1.5 text-sm">{p.nombre}</td>
-                      <td className="px-3 py-1.5 text-xs text-slate-400">{p.sku || "-"}</td>
-                      <td className="px-3 py-1.5 text-xs text-slate-400">{p.codigo_barra || "-"}</td>
+                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.sku || "-"}</td>
+                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.codigo_barra || "-"}</td>
                       <td className="px-3 py-1.5 text-xs">
                         {p.modoCompra === "UNIDAD" ? (
-                          <span className="text-cyan-400">FIAMBRE</span>
+                          <span className="sunmi-text-link">FIAMBRE</span>
                         ) : (
                           "BULTO"
                         )}

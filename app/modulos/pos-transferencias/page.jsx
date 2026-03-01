@@ -221,8 +221,8 @@ export default function PosTransferenciasHomePage() {
   // ========================================================
   if (cargandoCtx || loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <span className="text-sm text-slate-300">Cargando opciones...</span>
+      <div className="min-h-screen sunmi-bg flex items-center justify-center">
+        <span className="text-sm sunmi-text-muted">Cargando opciones...</span>
       </div>
     );
   }
@@ -233,8 +233,8 @@ export default function PosTransferenciasHomePage() {
 
   if (!me) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <span className="text-sm text-red-400">
+      <div className="min-h-screen sunmi-bg flex items-center justify-center">
+        <span className="text-sm sunmi-text-danger">
           No se encontró usuario actual.
         </span>
       </div>
@@ -260,15 +260,14 @@ export default function PosTransferenciasHomePage() {
   // UI SUNMI V2
   // ========================================================
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className="min-h-screen sunmi-bg">
       <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
         {/* VOLVER */}
         <button
           type="button"
           onClick={() => router.back()}
           className="
-            text-xs text-cyan-400
-            hover:text-cyan-300
+            text-xs sunmi-link
             flex items-center gap-1
             transition
           "
@@ -305,7 +304,7 @@ export default function PosTransferenciasHomePage() {
 
           {/* ERROR DENTRO DE LA CARD */}
           {error && (
-            <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">
+            <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
               {error}
             </div>
           )}
@@ -320,8 +319,8 @@ export default function PosTransferenciasHomePage() {
               <div className="space-y-4 text-[13px]">
                 <div
                   className="
-                    bg-slate-900/80
-                    border border-slate-800
+                    sunmi-surface
+                    border sunmi-border
                     rounded-2xl
                     px-4 py-3
                     flex flex-col sm:flex-row sm:items-center sm:justify-between
@@ -329,7 +328,7 @@ export default function PosTransferenciasHomePage() {
                   "
                 >
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
                       Tu local
                     </div>
                     <div className="text-[14px] font-semibold">
@@ -338,7 +337,7 @@ export default function PosTransferenciasHomePage() {
                   </div>
 
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
                       Depósito
                     </div>
                     <div className="text-[14px] font-semibold">
@@ -372,8 +371,8 @@ export default function PosTransferenciasHomePage() {
                 {/* RESUMEN ORIGEN */}
                 <div
                   className="
-                    bg-slate-900/80
-                    border border-slate-800
+                    sunmi-surface
+                    border sunmi-border
                     rounded-2xl
                     px-4 py-3
                     flex flex-col sm:flex-row sm:items-center sm:justify-between
@@ -381,7 +380,7 @@ export default function PosTransferenciasHomePage() {
                   "
                 >
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
                       Depósito origen
                     </div>
                     <div className="text-[14px] font-semibold">
@@ -389,14 +388,14 @@ export default function PosTransferenciasHomePage() {
                     </div>
                   </div>
 
-                  <div className="text-[11px] text-slate-400">
+                  <div className="text-[11px] sunmi-text-muted">
                     Seleccioná el local destino y comenzá la sesión POS.
                   </div>
                 </div>
 
                 {/* SELECT DESTINO SUNMI */}
                 <div className="space-y-1">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                  <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
                     Local destino
                   </div>
 
@@ -437,7 +436,7 @@ export default function PosTransferenciasHomePage() {
               <div className="space-y-4 text-[13px]">
                 {/* GRUPO */}
                 <div className="space-y-1">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                  <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
                     Grupo
                   </div>
 
@@ -458,7 +457,7 @@ export default function PosTransferenciasHomePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* DEPÓSITO ORIGEN */}
                   <div className="space-y-1">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
                       Depósito origen
                     </div>
 
@@ -477,7 +476,7 @@ export default function PosTransferenciasHomePage() {
 
                   {/* LOCAL DESTINO */}
                   <div className="space-y-1">
-                    <div className="text-[11px] uppercase tracking-wide text-slate-400">
+                    <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
                       Local destino
                     </div>
 
@@ -511,7 +510,7 @@ export default function PosTransferenciasHomePage() {
 
           {/* SI NO HAY MODO DEFINIDO */}
           {!modo && (
-            <div className="text-[12px] text-slate-400">
+            <div className="text-[12px] sunmi-text-muted">
               No se configuró el modo de POS para este usuario.
             </div>
           )}
@@ -539,12 +538,10 @@ export default function PosTransferenciasHomePage() {
                       )
                     }
                     className="
-                      bg-slate-900/80
-                      border border-amber-500/30
+                      sunmi-btn-accent-soft
                       rounded-xl
                       px-4 py-3
                       cursor-pointer
-                      hover:border-amber-400/60
                       transition
                     "
                   >
@@ -555,9 +552,7 @@ export default function PosTransferenciasHomePage() {
                             px-2 py-0.5
                             text-[9px] font-semibold
                             rounded-full
-                            bg-amber-500/20
-                            text-amber-300
-                            border border-amber-400/40
+                            sunmi-btn-accent-soft
                           "
                         >
                           Solicitado
@@ -569,12 +564,12 @@ export default function PosTransferenciasHomePage() {
                         </span>
                       </div>
 
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] sunmi-text-muted">
                         {s.itemCount} {s.itemCount === 1 ? "producto" : "productos"}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
+                    <div className="flex items-center justify-between mt-1 text-[11px] sunmi-text-muted">
                       <span>
                         Solicitado por {s.solicitadoPorNombre}
                       </span>
@@ -589,7 +584,7 @@ export default function PosTransferenciasHomePage() {
           )}
 
           {!loadingSolicitados && solicitados.length === 0 && modo !== "local" && modo && (
-            <div className="text-[11px] text-slate-500 mt-2">
+            <div className="text-[11px] sunmi-text-muted mt-2">
               No hay pedidos solicitados pendientes.
             </div>
           )}

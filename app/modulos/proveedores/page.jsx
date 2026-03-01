@@ -204,7 +204,7 @@ export default function ProveedoresPage() {
         {/* ===================== */}
         {/* TABLA */}
         {/* ===================== */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-800">
+        <div className="overflow-x-auto rounded-2xl border sunmi-border">
           <SunmiTable
             headers={[
               "Nombre",
@@ -265,14 +265,14 @@ export default function ProveedoresPage() {
                         onClick={() =>
                           router.push(`/modulos/proveedores?editar=${item.id}`)
                         }
-                        className="text-amber-300 hover:text-amber-200"
+                        className="sunmi-link-accent"
                       >
                         ✏️
                       </button>
 
                       <button
                         onClick={() => eliminar(item.id)}
-                        className="text-red-400 hover:text-red-300"
+                        className="sunmi-link-danger"
                       >
                         🗑️
                       </button>

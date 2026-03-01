@@ -102,7 +102,7 @@ export default function TransferenciaDetallePage() {
   useEffect(() => { cargarUsuario(); }, []);
   useEffect(() => { if (id) cargar(); }, [id]);
 
-  if (!me) return <div className="p-4 text-slate-300">Cargando usuario...</div>;
+  if (!me) return <div className="p-4 sunmi-text-muted">Cargando usuario...</div>;
 
   // ===============================
   // Permisos
@@ -220,7 +220,7 @@ export default function TransferenciaDetallePage() {
       <div>
         <Link
           href="/modulos/transferencias"
-          className="text-xs sm:text-sm text-amber-300 hover:underline"
+          className="text-xs sm:text-sm sunmi-link-accent hover:underline"
         >
           ← Volver al listado
         </Link>
@@ -230,7 +230,7 @@ export default function TransferenciaDetallePage() {
         {loading && (
           <SunmiLoader />
         )}
-        {error && <div className="text-red-400 px-2">{error}</div>}
+        {error && <div className="sunmi-text-danger px-2">{error}</div>}
 
         {!loading && !error && item && (
           <>
@@ -246,9 +246,9 @@ export default function TransferenciaDetallePage() {
             />
 
             <SunmiCard className="mx-1 mb-3">
-              <div className="px-3 py-2 text-sm flex justify-between text-slate-300">
+              <div className="px-3 py-2 text-sm flex justify-between sunmi-text-muted">
                 <span className="font-semibold">Total de la transferencia:</span>
-                <span className="text-amber-300 font-bold">
+                <span className="sunmi-text-accent font-bold">
                   ${totalTransferencia.toFixed(2)}
                 </span>
               </div>

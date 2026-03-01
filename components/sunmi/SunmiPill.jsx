@@ -1,23 +1,24 @@
 "use client";
 
-import { useSunmiTheme } from "./SunmiThemeProvider";
+const PILL_MAP = {
+  amber: "sunmi-badge-accent",
+  cyan: "sunmi-pill-link",
+  slate: "sunmi-badge-muted",
+};
 
-export default function SunmiPill({ children }) {
-  const { theme } = useSunmiTheme();
-  
-  // Usar color del header para el pill
-  const pillBg = theme.header.bg.includes('amber') ? 'bg-amber-400' : 'bg-cyan-400';
-  
+export default function SunmiPill({ children, color = "amber" }) {
+  const cls = PILL_MAP[color] || PILL_MAP.amber;
+
   return (
     <span
       className={`
-        inline-block 
-        px-1.5 py-[1px]            /* reducido */
-        rounded-md                 /* antes rounded-lg */
-        text-[10.5px]              /* fino, uniforme con badges */
+        inline-block
+        px-1.5 py-[1px]
+        rounded-md
+        text-[10.5px]
         font-semibold
-        ${pillBg} text-slate-900
-        leading-none               /* elimina altura fantasma */
+        ${cls}
+        leading-none
         whitespace-nowrap
       `}
     >

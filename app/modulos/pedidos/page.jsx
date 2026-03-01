@@ -280,8 +280,8 @@ export default function PedidosCatalogoPage() {
 
   if (cargandoPed || loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <span className="text-sm text-slate-300">Cargando...</span>
+      <div className="min-h-screen sunmi-bg flex items-center justify-center">
+        <span className="text-sm sunmi-text-muted">Cargando...</span>
       </div>
     );
   }
@@ -290,8 +290,8 @@ export default function PedidosCatalogoPage() {
 
   if (!opciones) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <span className="text-sm text-red-400">{error || "Sin opciones"}</span>
+      <div className="min-h-screen sunmi-bg flex items-center justify-center">
+        <span className="text-sm sunmi-text-danger">{error || "Sin opciones"}</span>
       </div>
     );
   }
@@ -301,12 +301,12 @@ export default function PedidosCatalogoPage() {
   // ====================================================
   if (vista === "carrito") {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-100">
+      <div className="min-h-screen sunmi-bg">
         <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
           <button
             type="button"
             onClick={() => setVista("catalogo")}
-            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition"
+            className="text-xs sunmi-link flex items-center gap-1 transition"
           >
             ← Volver al catálogo
           </button>
@@ -319,7 +319,7 @@ export default function PedidosCatalogoPage() {
             </SunmiHeader>
 
             {error && (
-              <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">
+              <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
                 {error}
               </div>
             )}
@@ -335,11 +335,11 @@ export default function PedidosCatalogoPage() {
             )}
 
             {loadingCarrito ? (
-              <div className="text-[12px] text-slate-400 py-4 text-center">
+              <div className="text-[12px] sunmi-text-muted py-4 text-center">
                 Cargando carrito...
               </div>
             ) : carritoItems.length === 0 ? (
-              <div className="text-[12px] text-slate-400 py-4 text-center">
+              <div className="text-[12px] sunmi-text-muted py-4 text-center">
                 El carrito está vacío. Volvé al catálogo para agregar productos.
               </div>
             ) : (
@@ -378,12 +378,12 @@ export default function PedidosCatalogoPage() {
   // VISTA CATÁLOGO
   // ====================================================
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
+    <div className="min-h-screen sunmi-bg">
       <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
         <button
           type="button"
           onClick={() => router.back()}
-          className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition"
+          className="text-xs sunmi-link flex items-center gap-1 transition"
         >
           ← Volver
         </button>
@@ -396,7 +396,7 @@ export default function PedidosCatalogoPage() {
           </SunmiHeader>
 
           {error && (
-            <div className="mb-3 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2">
+            <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
               {error}
               <button
                 type="button"
@@ -427,16 +427,16 @@ export default function PedidosCatalogoPage() {
                 onClick={abrirCarrito}
                 className="
                   w-full
-                  bg-amber-500/20 border border-amber-400/40
+                  sunmi-btn-accent-soft
                   rounded-xl px-4 py-2.5
                   flex items-center justify-between
-                  hover:border-amber-400/60 transition
+                  transition
                 "
               >
-                <span className="text-[13px] font-medium text-amber-300">
+                <span className="text-[13px] font-medium sunmi-text-accent">
                   Ver mi pedido
                 </span>
-                <span className="text-[12px] bg-amber-500 text-slate-900 font-bold px-2.5 py-0.5 rounded-full">
+                <span className="text-[12px] sunmi-badge-accent font-bold px-2.5 py-0.5 rounded-full">
                   {carritoCount}
                 </span>
               </button>
@@ -502,11 +502,11 @@ export default function PedidosCatalogoPage() {
           />
 
           {loadingCat ? (
-            <div className="text-[12px] text-slate-400 py-4 text-center">
+            <div className="text-[12px] sunmi-text-muted py-4 text-center">
               Cargando productos...
             </div>
           ) : productos.length === 0 ? (
-            <div className="text-[12px] text-slate-400 py-4 text-center">
+            <div className="text-[12px] sunmi-text-muted py-4 text-center">
               No se encontraron productos.
             </div>
           ) : (
@@ -534,7 +534,7 @@ export default function PedidosCatalogoPage() {
               >
                 ← Anterior
               </SunmiButton>
-              <span className="text-[12px] text-slate-400">
+              <span className="text-[12px] sunmi-text-muted">
                 Página {page} de {totalPages}
               </span>
               <SunmiButton
@@ -579,15 +579,16 @@ function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
   return (
     <div
       className={`
-        bg-slate-900/80 border rounded-xl px-4 py-3
-        ${cantidadActual > 0 ? "border-amber-500/50" : "border-slate-800"}
+        sunmi-surface border rounded-xl px-4 py-3
+        ${cantidadActual > 0 ? "" : "sunmi-border"}
         transition-colors
       `}
+      style={cantidadActual > 0 ? {borderColor: 'var(--pos-accent)'} : undefined}
     >
       <div className="flex gap-3">
         {/* Imagen */}
         {imagenUrl ? (
-          <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-slate-800">
+          <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 sunmi-control">
             <img
               src={imagenUrl}
               alt={nombre}
@@ -595,8 +596,8 @@ function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
             />
           </div>
         ) : (
-          <div className="w-14 h-14 rounded-lg flex-shrink-0 bg-slate-800 flex items-center justify-center">
-            <span className="text-[18px] text-slate-600">
+          <div className="w-14 h-14 rounded-lg flex-shrink-0 sunmi-control flex items-center justify-center">
+            <span className="text-[18px] sunmi-text-muted">
               {nombre?.[0]?.toUpperCase() || "?"}
             </span>
           </div>
@@ -608,21 +609,21 @@ function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
 
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
             {codigoBarra && (
-              <span className="text-[10px] text-slate-500">{codigoBarra}</span>
+              <span className="text-[10px] sunmi-text-muted">{codigoBarra}</span>
             )}
             {categoriaNombre && (
-              <span className="text-[10px] text-cyan-400/70">
+              <span className="text-[10px] sunmi-link opacity-70">
                 {categoriaNombre}
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-3 mt-1">
-            <span className="text-[10px] text-slate-500">
+            <span className="text-[10px] sunmi-text-muted">
               Stock dep.: {stockDeposito} u.
             </span>
             {bultoMode && (
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] sunmi-text-muted">
                 {labelBulto} x{factorPack}
               </span>
             )}
@@ -644,13 +645,13 @@ function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
       {/* Info de bultos debajo */}
       {bultoMode && cantidadActual > 0 && (
         <div className="mt-1 flex items-center justify-between">
-          <span className="text-[10px] text-slate-500">
+          <span className="text-[10px] sunmi-text-muted">
             = {cantidadActual} uds ({Math.floor(cantidadActual / factorPack)} {labelBulto.toLowerCase()}{cantidadActual / factorPack !== Math.floor(cantidadActual / factorPack) ? ` + ${cantidadActual % factorPack} sueltas` : ""})
           </span>
           <button
             type="button"
             onClick={() => onSetCantidad(0, "UNIDAD")}
-            className="text-[10px] text-red-400 hover:text-red-300 flex-shrink-0"
+            className="text-[10px] sunmi-link-danger flex-shrink-0"
           >
             Quitar
           </button>
@@ -682,9 +683,9 @@ function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = tru
         className="
           h-[32px] px-3
           rounded-lg
-          bg-cyan-500/20 border border-cyan-400/40
-          text-[12px] text-cyan-300 font-medium
-          hover:bg-cyan-500/30 transition
+          sunmi-btn-link-soft
+          text-[12px] font-medium
+          transition
         "
       >
         + Agregar
@@ -697,26 +698,26 @@ function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = tru
     const bultos = Math.floor(totalActual / factorPack);
     return (
       <div className="flex items-center gap-1.5">
-        <div className="flex items-center gap-0 bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+        <div className="flex items-center gap-0 sunmi-control rounded-lg border sunmi-border overflow-hidden">
           <button
             type="button"
             onClick={() => onChange(Math.max(0, (bultos - 1)) * factorPack, "UNIDAD")}
-            className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
+            className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
           >
             -
           </button>
-          <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold text-amber-300">
+          <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold sunmi-text-accent">
             {bultos}
           </div>
           <button
             type="button"
             onClick={() => onChange((bultos + 1) * factorPack, "UNIDAD")}
-            className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
+            className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
           >
             +
           </button>
         </div>
-        <span className="text-[11px] text-slate-400">{labelBulto}</span>
+        <span className="text-[11px] sunmi-text-muted">{labelBulto}</span>
       </div>
     );
   }
@@ -724,26 +725,26 @@ function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = tru
   // UNIDAD mode: +/- en unidades
   return (
     <div className="flex items-center gap-1.5">
-      <div className="flex items-center gap-0 bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="flex items-center gap-0 sunmi-control rounded-lg border sunmi-border overflow-hidden">
         <button
           type="button"
           onClick={() => onChange(Math.max(0, totalActual - 1), "UNIDAD")}
-          className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
+          className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
         >
           -
         </button>
-        <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold text-amber-300">
+        <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold sunmi-text-accent">
           {totalActual}
         </div>
         <button
           type="button"
           onClick={() => onChange(totalActual + 1, "UNIDAD")}
-          className="h-[32px] w-[32px] flex items-center justify-center text-[16px] text-slate-300 hover:bg-slate-700 transition"
+          className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
         >
           +
         </button>
       </div>
-      <span className="text-[11px] text-slate-400">uds</span>
+      <span className="text-[11px] sunmi-text-muted">uds</span>
     </div>
   );
 }
@@ -761,14 +762,14 @@ function CarritoItemCard({ item, totalActual, onSetCantidad }) {
     "bultos";
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-xl px-4 py-3">
+    <div className="sunmi-surface border sunmi-border rounded-xl px-4 py-3">
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-medium truncate">
             {item.nombre}
           </div>
           {item.codigoBarra && (
-            <div className="text-[10px] text-slate-500">
+            <div className="text-[10px] sunmi-text-muted">
               {item.codigoBarra}
             </div>
           )}
@@ -776,7 +777,7 @@ function CarritoItemCard({ item, totalActual, onSetCantidad }) {
         <button
           type="button"
           onClick={() => onSetCantidad(0, "UNIDAD")}
-          className="text-[10px] text-red-400 hover:text-red-300 ml-3 flex-shrink-0"
+          className="text-[10px] sunmi-link-danger ml-3 flex-shrink-0"
         >
           Quitar
         </button>
@@ -792,7 +793,7 @@ function CarritoItemCard({ item, totalActual, onSetCantidad }) {
           mostrarAgregar={false}
         />
         {bultoMode && totalActual > 0 && (
-          <span className="text-[10px] text-slate-500 ml-2">
+          <span className="text-[10px] sunmi-text-muted ml-2">
             = {totalActual} uds
           </span>
         )}
@@ -816,18 +817,18 @@ function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, c
     : null;
 
   return (
-    <div className="mb-3 bg-amber-500/10 border border-amber-400/40 rounded-xl px-4 py-3">
+    <div className="mb-3 sunmi-state-warning rounded-xl px-4 py-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-amber-300">
+          <div className="text-[13px] font-semibold sunmi-text-accent">
             Pedido solicitado pendiente
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
+          <div className="text-[11px] sunmi-text-muted mt-0.5">
             POS #{pendiente.posId}
             {fecha && <> &middot; {fecha}</>}
             {" "}&middot; {pendiente.itemCount} producto{pendiente.itemCount !== 1 ? "s" : ""}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] sunmi-text-muted mt-1">
             Esperá a que el depósito lo procese o cancelalo para hacer un pedido nuevo.
           </div>
         </div>
@@ -837,7 +838,7 @@ function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, c
         <button
           type="button"
           onClick={onToggleDetalle}
-          className="text-[11px] text-cyan-400 hover:text-cyan-300 underline transition"
+          className="text-[11px] sunmi-link underline transition"
         >
           {verDetalle ? "Ocultar detalle" : "Ver detalle"}
         </button>
@@ -845,24 +846,24 @@ function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, c
           type="button"
           onClick={onCancelar}
           disabled={cancelando}
-          className="text-[11px] text-red-400 hover:text-red-300 underline transition disabled:opacity-50"
+          className="text-[11px] sunmi-link-danger underline transition disabled:opacity-50"
         >
           {cancelando ? "Cancelando..." : "Cancelar pedido"}
         </button>
       </div>
 
       {verDetalle && pendiente.items?.length > 0 && (
-        <div className="mt-3 space-y-1 border-t border-amber-400/20 pt-2">
+        <div className="mt-3 space-y-1 border-t sunmi-divider pt-2">
           {pendiente.items.map((item, i) => {
             const isBulto = item.modoEnvio === "SOLO_BULTO" && item.factorPack > 1;
             const bultos = isBulto ? Math.floor(item.sugerido / item.factorPack) : 0;
             return (
               <div
                 key={i}
-                className="flex items-center justify-between text-[11px] text-slate-300"
+                className="flex items-center justify-between text-[11px] sunmi-text-strong"
               >
                 <span className="truncate flex-1 min-w-0">{item.nombre}</span>
-                <span className="ml-2 text-amber-300 font-medium whitespace-nowrap">
+                <span className="ml-2 sunmi-text-accent font-medium whitespace-nowrap">
                   {isBulto
                     ? `${bultos} bulto${bultos !== 1 ? "s" : ""} (${item.sugerido} uds)`
                     : `${item.sugerido} unidad${item.sugerido !== 1 ? "es" : ""}`}

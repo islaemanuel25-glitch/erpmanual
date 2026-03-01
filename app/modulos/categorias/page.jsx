@@ -235,7 +235,7 @@ export default function CategoriasPage() {
                   <td className="px-3 py-2 flex gap-3">
                     <SunmiButton
                       color="slate"
-                      className="text-amber-400 px-2"
+                      className="sunmi-text-accent px-2"
                       onClick={() => abrirEditar(item)}
                     >
                       Editar
@@ -267,7 +267,7 @@ export default function CategoriasPage() {
             ← Anterior
           </SunmiButton>
 
-          <span className="text-slate-400 text-sm self-center">
+          <span className="sunmi-text-muted text-sm self-center">
             Página {page} de {totalPages}
           </span>
 

@@ -379,7 +379,7 @@ export default function ClientesPage() {
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-xl font-bold">Clientes</h1>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm sunmi-text-muted">
               Gestion de clientes del sistema
             </p>
           </div>
@@ -417,7 +417,7 @@ export default function ClientesPage() {
           <select
             value={tagFiltro}
             onChange={(e) => setTagFiltro(e.target.value)}
-            className="h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+            className="h-11 rounded-xl sunmi-select-native px-3 text-sm"
           >
             <option value="">Todas las etiquetas</option>
             {tags.map((tag) => (
@@ -429,7 +429,7 @@ export default function ClientesPage() {
           <select
             value={estadoClientes}
             onChange={(e) => setEstadoClientes(e.target.value)}
-            className="h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+            className="h-11 rounded-xl sunmi-select-native px-3 text-sm"
           >
             <option value="activos">Activos</option>
             <option value="inactivos">Inactivos</option>
@@ -445,7 +445,7 @@ export default function ClientesPage() {
           <div className="flex flex-col md:flex-row gap-3 items-start">
             {/* Export */}
             <div className="flex-1">
-              <p className="text-[11px] text-slate-400 mb-1">
+              <p className="text-[11px] sunmi-text-muted mb-1">
                 Exportar clientes (respeta filtros activo y etiqueta)
               </p>
               <div className="flex gap-2">
@@ -468,15 +468,15 @@ export default function ClientesPage() {
 
             {/* Import */}
             <div className="flex-1">
-              <p className="text-[11px] text-slate-400 mb-1">
+              <p className="text-[11px] sunmi-text-muted mb-1">
                 Importar desde Excel (.xlsx). Match por teléfono, email o
                 documento.
               </p>
               <label
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   importando || !localIdFinal || localIdFinal === 0
-                    ? "bg-slate-700 text-slate-400 cursor-not-allowed"
-                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 cursor-pointer"
+                    ? "sunmi-control opacity-60 cursor-not-allowed"
+                    : "sunmi-btn-accent-soft cursor-pointer"
                 }`}
               >
                 {importando ? "Analizando…" : "Subir Excel (Preview)"}
@@ -492,7 +492,7 @@ export default function ClientesPage() {
           </div>
 
           {(!localIdFinal || localIdFinal === 0) && (
-            <p className="text-[11px] text-slate-500 mt-2">
+            <p className="text-[11px] sunmi-text-muted mt-2">
               No hay contexto operativo activo.
             </p>
           )}
@@ -504,68 +504,68 @@ export default function ClientesPage() {
 
               {/* Resumen */}
               <div className="flex flex-wrap gap-3 text-xs">
-                <span className="text-emerald-400">
+                <span className="sunmi-text-success">
                   Crear: {importPreview.resumen.create}
                 </span>
-                <span className="text-cyan-400">
+                <span className="sunmi-text-link">
                   Actualizar: {importPreview.resumen.update}
                 </span>
-                <span className="text-amber-400">
+                <span className="sunmi-text-accent">
                   Ambiguo: {importPreview.resumen.ambiguous}
                 </span>
                 {importPreview.resumen.skip > 0 && (
-                  <span className="text-red-400">
+                  <span className="sunmi-text-danger">
                     Skip: {importPreview.resumen.skip}
                   </span>
                 )}
-                <span className="text-slate-400">
+                <span className="sunmi-text-muted">
                   Total: {importPreview.resumen.total}
                 </span>
               </div>
 
               {/* Tabla de filas */}
-              <div className="max-h-[50vh] overflow-y-auto rounded border border-slate-700">
+              <div className="max-h-[50vh] overflow-y-auto rounded border sunmi-border">
                 <table className="w-full text-xs">
-                  <thead className="bg-slate-800/80 sticky top-0">
+                  <thead className="sunmi-thead sticky top-0">
                     <tr>
-                      <th className="px-2 py-1.5 text-left text-slate-400">#</th>
-                      <th className="px-2 py-1.5 text-left text-slate-400">Nombre</th>
-                      <th className="px-2 py-1.5 text-left text-slate-400">Identificador</th>
-                      <th className="px-2 py-1.5 text-left text-slate-400">Acción</th>
-                      <th className="px-2 py-1.5 text-left text-slate-400">Match</th>
+                      <th className="px-2 py-1.5 text-left sunmi-text-muted">#</th>
+                      <th className="px-2 py-1.5 text-left sunmi-text-muted">Nombre</th>
+                      <th className="px-2 py-1.5 text-left sunmi-text-muted">Identificador</th>
+                      <th className="px-2 py-1.5 text-left sunmi-text-muted">Acción</th>
+                      <th className="px-2 py-1.5 text-left sunmi-text-muted">Match</th>
                     </tr>
                   </thead>
                   <tbody>
                     {importPreview.filas.map((f) => {
                       const dec = importDecisions[f.row] || { action: "skip" };
                       const actionColors = {
-                        create: "text-emerald-400",
-                        update: "text-cyan-400",
-                        ambiguous: "text-amber-400",
-                        skip: "text-red-400",
+                        create: "sunmi-text-success",
+                        update: "sunmi-text-link",
+                        ambiguous: "sunmi-text-accent",
+                        skip: "sunmi-text-danger",
                       };
                       const bgColors = {
                         create: "",
                         update: "",
-                        ambiguous: "bg-amber-500/5",
-                        skip: "bg-red-500/5",
+                        ambiguous: "sunmi-state-warning-soft",
+                        skip: "sunmi-state-danger-soft",
                       };
 
                       return (
                         <tr
                           key={f.row}
-                          className={`border-b border-slate-800 last:border-0 ${bgColors[f.action] || ""}`}
+                          className={`border-b sunmi-border last:border-0 ${bgColors[f.action] || ""}`}
                         >
-                          <td className="px-2 py-1.5 text-slate-500">{f.row}</td>
-                          <td className="px-2 py-1.5 text-slate-200 max-w-[150px] truncate">
+                          <td className="px-2 py-1.5 sunmi-text-muted">{f.row}</td>
+                          <td className="px-2 py-1.5 sunmi-text-strong max-w-[150px] truncate">
                             {f.data.nombre || "—"}
                           </td>
-                          <td className="px-2 py-1.5 text-slate-400 max-w-[140px] truncate">
+                          <td className="px-2 py-1.5 sunmi-text-muted max-w-[140px] truncate">
                             {f.data.telefono || f.data.email || f.data.documento || "—"}
                           </td>
                           <td className="px-2 py-1.5">
                             {f.errors?.length > 0 ? (
-                              <span className="text-red-400">Skip — {f.errors[0]}</span>
+                              <span className="sunmi-text-danger">Skip — {f.errors[0]}</span>
                             ) : f.action === "ambiguous" ? (
                               <select
                                 value={dec.action === "update" ? `update:${dec.targetClienteId}` : dec.action}
@@ -589,7 +589,7 @@ export default function ClientesPage() {
                                     }));
                                   }
                                 }}
-                                className="h-7 rounded border border-amber-500/30 bg-slate-900 px-1.5 text-[11px] text-amber-300"
+                                className="h-7 rounded sunmi-select-native sunmi-text-accent px-1.5 text-[11px]"
                               >
                                 <option value="skip">Skip</option>
                                 <option value="create">Crear nuevo</option>
@@ -600,21 +600,21 @@ export default function ClientesPage() {
                                 ))}
                               </select>
                             ) : (
-                              <span className={actionColors[dec.action] || "text-slate-400"}>
+                              <span className={actionColors[dec.action] || "sunmi-text-muted"}>
                                 {dec.action === "create" && "Crear"}
                                 {dec.action === "update" && "Actualizar"}
                                 {dec.action === "skip" && "Skip"}
                               </span>
                             )}
                           </td>
-                          <td className="px-2 py-1.5 text-slate-500 max-w-[180px] truncate">
+                          <td className="px-2 py-1.5 sunmi-text-muted max-w-[180px] truncate">
                             {f.action === "update" && f.match?.matches?.[0] && (
                               <span>
                                 {f.match.matches[0].nombre} (#{f.match.matches[0].id})
                               </span>
                             )}
                             {f.action === "ambiguous" && f.match?.matches && (
-                              <span className="text-amber-400">
+                              <span className="sunmi-text-accent">
                                 {f.match.matches.length} coincidencias
                               </span>
                             )}
@@ -652,29 +652,29 @@ export default function ClientesPage() {
           {importResult && (
             <div className="mt-3">
               {importResult.error ? (
-                <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
+                <div className="text-xs sunmi-text-danger sunmi-state-danger rounded px-3 py-2">
                   {importResult.error}
                 </div>
               ) : (
                 <>
                   <div className="flex gap-3 text-xs mb-2">
-                    <span className="text-emerald-400">
+                    <span className="sunmi-text-success">
                       Creados: {importResult.resumen.creados}
                     </span>
-                    <span className="text-cyan-400">
+                    <span className="sunmi-text-link">
                       Actualizados: {importResult.resumen.actualizados}
                     </span>
-                    <span className="text-red-400">
+                    <span className="sunmi-text-danger">
                       Errores: {importResult.resumen.errores}
                     </span>
-                    <span className="text-slate-400">
+                    <span className="sunmi-text-muted">
                       Total: {importResult.resumen.total}
                     </span>
                   </div>
 
                   {importResult.detalle?.some((l) => l.error) && (
-                    <div className="rounded border border-red-500/30 bg-red-500/5 overflow-hidden">
-                      <div className="text-[11px] text-red-400 px-3 py-1.5 border-b border-red-500/20 font-medium">
+                    <div className="rounded sunmi-state-danger-soft overflow-hidden">
+                      <div className="text-[11px] sunmi-text-danger px-3 py-1.5 border-b sunmi-border font-medium">
                         Filas con error
                       </div>
                       <div className="max-h-40 overflow-y-auto">
@@ -683,15 +683,15 @@ export default function ClientesPage() {
                           .map((l, i) => (
                             <div
                               key={i}
-                              className="flex gap-3 px-3 py-1 text-xs border-b border-red-500/10 last:border-0"
+                              className="flex gap-3 px-3 py-1 text-xs border-b sunmi-border last:border-0"
                             >
-                              <span className="text-slate-500 shrink-0">
+                              <span className="sunmi-text-muted shrink-0">
                                 Fila {l.row}
                               </span>
-                              <span className="text-slate-300 truncate">
+                              <span className="sunmi-text-strong truncate">
                                 {l.nombre || "—"}
                               </span>
-                              <span className="text-red-400 ml-auto shrink-0">
+                              <span className="sunmi-text-danger ml-auto shrink-0">
                                 {l.error}
                               </span>
                             </div>
@@ -724,7 +724,7 @@ export default function ClientesPage() {
           >
             {loading ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-slate-400">
+                <td colSpan={7} className="text-center py-8 sunmi-text-muted">
                   Cargando...
                 </td>
               </tr>
@@ -749,13 +749,13 @@ export default function ClientesPage() {
                         cliente.tags.map((tag) => (
                           <span
                             key={tag.id}
-                            className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                            className="text-[10px] px-2 py-0.5 rounded-full sunmi-badge-link"
                           >
                             {tag.nombre}
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-slate-500">-</span>
+                        <span className="text-xs sunmi-text-muted">-</span>
                       )}
                     </div>
                   </td>
@@ -766,31 +766,31 @@ export default function ClientesPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => router.push(`/modulos/clientes/${cliente.id}?localId=${localIdFinal}`)}
-                        className="text-cyan-400 hover:text-cyan-300 text-xs font-medium"
+                        className="sunmi-link text-xs font-medium"
                       >
                         Abrir
                       </button>
                       <button
                         onClick={() => setClienteCC(cliente)}
-                        className="text-emerald-400 hover:text-emerald-300 text-xs"
+                        className="sunmi-link-success text-xs"
                       >
                         Cta Cte
                       </button>
                       <button
                         onClick={() => handleVerVentas(cliente)}
-                        className="text-amber-400 hover:text-amber-300 text-xs"
+                        className="sunmi-link-accent text-xs"
                       >
                         Ventas
                       </button>
                       <button
                         onClick={() => handleEditar(cliente)}
-                        className="text-cyan-400 hover:text-cyan-300 text-xs"
+                        className="sunmi-link text-xs"
                       >
                         Editar
                       </button>
                       <button
                         onClick={() => handleToggleActivo(cliente)}
-                        className="text-red-400 hover:text-red-300 text-xs"
+                        className="sunmi-link-danger text-xs"
                       >
                         {cliente.activo ? "Desactivar" : "Reactivar"}
                       </button>
@@ -1000,7 +1000,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-md p-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold">
@@ -1008,7 +1008,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
           </h3>
           <button
             onClick={onCerrar}
-            className="text-xl text-slate-400 hover:text-slate-200"
+            className="text-xl sunmi-link-muted"
           >
             ✕
           </button>
@@ -1016,7 +1016,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
 
         <div className="space-y-3">
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Nombre *
             </label>
             <SunmiInput
@@ -1029,7 +1029,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               DNI / CUIT
             </label>
             <SunmiInput
@@ -1041,7 +1041,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Telefono
             </label>
             <SunmiInput
@@ -1053,7 +1053,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Email
             </label>
             <SunmiInput
@@ -1065,7 +1065,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Direccion
             </label>
             <SunmiInput
@@ -1077,19 +1077,19 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Observaciones
             </label>
             <textarea
               value={form.observaciones}
               onChange={(e) => handleChange("observaciones", e.target.value)}
               placeholder="Notas internas del cliente..."
-              className="w-full min-h-20 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              className="w-full min-h-20 rounded-xl sunmi-textarea px-3 py-2 text-sm"
             />
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Límite de crédito (opcional)
             </label>
             <SunmiInput
@@ -1099,13 +1099,13 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
               placeholder="0.00"
               step="0.01"
             />
-            <p className="text-[10px] text-slate-500 mt-1">
+            <p className="text-[10px] sunmi-text-muted mt-1">
               Dejar vacío para sin límite
             </p>
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Descuento % (opcional)
             </label>
             <SunmiInput
@@ -1117,13 +1117,13 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
               min="0"
               max="100"
             />
-            <p className="text-[10px] text-slate-500 mt-1">
+            <p className="text-[10px] sunmi-text-muted mt-1">
               Dejar vacío para sin descuento
             </p>
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
               Etiquetas
             </label>
             <div className="space-y-2">
@@ -1135,7 +1135,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
                     <button
                       key={tag.id}
                       onClick={() => handleToggleTag(tag.id)}
-                      className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30"
+                      className="text-[10px] px-2 py-0.5 rounded-full sunmi-badge-link"
                     >
                       {tag.nombre} ✕
                     </button>
@@ -1151,7 +1151,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
                     e.target.value = "";
                   }
                 }}
-                className="w-full h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+                className="w-full h-11 rounded-xl sunmi-select-native px-3 text-sm"
               >
                 <option value="">Agregar etiqueta...</option>
                 {tags
@@ -1190,7 +1190,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
           </div>
 
           {errorMsg && (
-            <div className="text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+            <div className="text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5">
               {errorMsg}
             </div>
           )}
@@ -1289,31 +1289,31 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold">Historial de Ventas</h3>
-            <p className="text-sm text-slate-400">{cliente.nombre}</p>
+            <p className="text-sm sunmi-text-muted">{cliente.nombre}</p>
           </div>
           <button
             onClick={onCerrar}
-            className="text-xl text-slate-400 hover:text-slate-200"
+            className="text-xl sunmi-link-muted"
           >
             ✕
           </button>
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-slate-400">
+          <div className="text-center py-8 sunmi-text-muted">
             Cargando ventas...
           </div>
         ) : errorMsg ? (
-          <div className="text-center py-8 text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+          <div className="text-center py-8 sunmi-text-danger sunmi-state-danger rounded px-2 py-1.5">
             {errorMsg}
           </div>
         ) : ventas.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 sunmi-text-muted">
             Sin ventas registradas
           </div>
         ) : (
@@ -1330,7 +1330,7 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
                   <td className="px-2 py-1.5 font-mono text-sm">
                     #{venta.numero}
                   </td>
-                  <td className="px-2 py-1.5 font-mono text-sm text-emerald-400">
+                  <td className="px-2 py-1.5 font-mono text-sm sunmi-text-success">
                     ${formatPrecio(venta.total)}
                   </td>
                   <td className="px-2 py-1.5 text-sm">
@@ -1342,7 +1342,7 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
           </div>
         )}
 
-        <div className="mt-4 pt-4 border-t border-slate-700">
+        <div className="mt-4 pt-4 border-t sunmi-divider">
           <SunmiButton color="slate" onClick={onCerrar} className="w-full">
             Cerrar
           </SunmiButton>
@@ -1501,17 +1501,17 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
   const tipoLabel = { VENTA: "Venta", PAGO: "Pago", AJUSTE: "Ajuste" };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold">Cuenta Corriente</h3>
-            <p className="text-sm text-slate-400">{cliente.nombre}</p>
+            <p className="text-sm sunmi-text-muted">{cliente.nombre}</p>
           </div>
           <button
             onClick={onCerrar}
-            className="text-xl text-slate-400 hover:text-slate-200"
+            className="text-xl sunmi-link-muted"
           >
             ✕
           </button>
@@ -1521,8 +1521,8 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
         <div
           className={`rounded-lg px-4 py-3 mb-4 text-center font-bold text-lg ${
             saldo > 0
-              ? "bg-red-500/15 text-red-400 border border-red-500/30"
-              : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+              ? "sunmi-state-danger sunmi-text-danger"
+              : "sunmi-state-success sunmi-text-success"
           }`}
         >
           Saldo: ${formatPrecio(saldo)}
@@ -1563,7 +1563,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
             <p className="text-sm font-medium mb-2">Registrar Pago</p>
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <label className="text-[11px] text-slate-400 mb-1 block">
+                <label className="text-[11px] sunmi-text-muted mb-1 block">
                   Monto
                 </label>
                 <SunmiInput
@@ -1575,7 +1575,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
                 />
               </div>
               <div className="flex-1">
-                <label className="text-[11px] text-slate-400 mb-1 block">
+                <label className="text-[11px] sunmi-text-muted mb-1 block">
                   Nota (opcional)
                 </label>
                 <SunmiInput
@@ -1602,7 +1602,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
             <p className="text-sm font-medium mb-2">Registrar Ajuste</p>
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <label className="text-[11px] text-slate-400 mb-1 block">
+                <label className="text-[11px] sunmi-text-muted mb-1 block">
                   Monto
                 </label>
                 <SunmiInput
@@ -1614,20 +1614,20 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400 mb-1 block">
+                <label className="text-[11px] sunmi-text-muted mb-1 block">
                   Tipo
                 </label>
                 <select
                   value={direccionAjuste}
                   onChange={(e) => setDireccionAjuste(e.target.value)}
-                  className="h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+                  className="h-11 rounded-xl sunmi-select-native px-3 text-sm"
                 >
                   <option value="DEBITO">Debe (+deuda)</option>
                   <option value="CREDITO">Haber (-deuda)</option>
                 </select>
               </div>
               <div className="flex-1">
-                <label className="text-[11px] text-slate-400 mb-1 block">
+                <label className="text-[11px] sunmi-text-muted mb-1 block">
                   Nota
                 </label>
                 <SunmiInput
@@ -1649,18 +1649,18 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
         )}
 
         {errorMsg && (
-          <div className="text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5 mb-3">
+          <div className="text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5 mb-3">
             {errorMsg}
           </div>
         )}
 
         {/* Tabla movimientos */}
         {loading ? (
-          <div className="text-center py-8 text-slate-400">
+          <div className="text-center py-8 sunmi-text-muted">
             Cargando movimientos...
           </div>
         ) : movimientos.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 sunmi-text-muted">
             Sin movimientos registrados
           </div>
         ) : (
@@ -1677,13 +1677,13 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
                   <td className="px-2 py-1.5 text-sm">
                     {tipoLabel[m.tipo] || m.tipo}
                   </td>
-                  <td className="px-2 py-1.5 text-sm text-slate-400">
+                  <td className="px-2 py-1.5 text-sm sunmi-text-muted">
                     {m.nota || "-"}
                   </td>
-                  <td className="px-2 py-1.5 font-mono text-sm text-red-400">
+                  <td className="px-2 py-1.5 font-mono text-sm sunmi-text-danger">
                     {m.direccion === "DEBITO" ? `$${formatPrecio(m.monto)}` : ""}
                   </td>
-                  <td className="px-2 py-1.5 font-mono text-sm text-emerald-400">
+                  <td className="px-2 py-1.5 font-mono text-sm sunmi-text-success">
                     {m.direccion === "CREDITO"
                       ? `$${formatPrecio(m.monto)}`
                       : ""}
@@ -1694,7 +1694,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
           </div>
         )}
 
-        <div className="mt-4 pt-4 border-t border-slate-700">
+        <div className="mt-4 pt-4 border-t sunmi-divider">
           <SunmiButton color="slate" onClick={onCerrar} className="w-full">
             Cerrar
           </SunmiButton>

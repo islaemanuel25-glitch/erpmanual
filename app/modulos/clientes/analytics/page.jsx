@@ -203,7 +203,7 @@ export default function AnalyticsClientesPage() {
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-xl font-bold">Analytics Clientes</h1>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm sunmi-text-muted">
               Ranking y clientes inactivos
             </p>
           </div>
@@ -221,15 +221,15 @@ export default function AnalyticsClientesPage() {
         <div className="flex flex-col gap-2">
           {/* Presets + rango */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-slate-400">Período:</span>
+            <span className="text-[11px] sunmi-text-muted">Período:</span>
             {[7, 30, 90, 180].map((d) => (
               <button
                 key={d}
                 onClick={() => handlePreset(d)}
                 className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
                   from === daysAgo(d)
-                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
-                    : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500"
+                    ? "sunmi-btn-link-soft"
+                    : "sunmi-control sunmi-border"
                 }`}
               >
                 {d}d
@@ -239,14 +239,14 @@ export default function AnalyticsClientesPage() {
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="h-8 rounded-lg border border-slate-700 bg-slate-950 px-2 text-xs text-slate-200"
+              className="h-8 rounded-lg px-2 text-xs sunmi-select-native"
             />
-            <span className="text-slate-500 text-xs">—</span>
+            <span className="sunmi-text-muted text-xs">—</span>
             <input
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="h-8 rounded-lg border border-slate-700 bg-slate-950 px-2 text-xs text-slate-200"
+              className="h-8 rounded-lg px-2 text-xs sunmi-select-native"
             />
           </div>
 
@@ -281,15 +281,15 @@ export default function AnalyticsClientesPage() {
 
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {/* Metric toggle */}
-          <div className="flex rounded-lg border border-slate-700 overflow-hidden">
+          <div className="flex rounded-lg border sunmi-border overflow-hidden">
             {["facturacion", "frecuencia"].map((m) => (
               <button
                 key={m}
                 onClick={() => setRankMetric(m)}
                 className={`text-xs px-3 py-1.5 transition-all ${
                   rankMetric === m
-                    ? "bg-cyan-500/20 text-cyan-300"
-                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                    ? "sunmi-btn-link-soft"
+                    : "sunmi-control sunmi-link-muted"
                 }`}
               >
                 {m === "facturacion" ? "Facturación" : "Frecuencia"}
@@ -299,15 +299,15 @@ export default function AnalyticsClientesPage() {
 
           {/* Take selector */}
           <div className="flex items-center gap-1">
-            <span className="text-[11px] text-slate-400">Top:</span>
+            <span className="text-[11px] sunmi-text-muted">Top:</span>
             {[10, 20, 50].map((n) => (
               <button
                 key={n}
                 onClick={() => setRankTake(n)}
                 className={`text-xs px-2 py-1 rounded border transition-all ${
                   rankTake === n
-                    ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/30"
-                    : "bg-slate-800 text-slate-400 border-slate-700"
+                    ? "sunmi-btn-link-soft"
+                    : "sunmi-control sunmi-border"
                 }`}
               >
                 {n}
@@ -317,7 +317,7 @@ export default function AnalyticsClientesPage() {
         </div>
 
         {rankError && (
-          <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2 mb-2">
+          <div className="text-xs sunmi-text-danger sunmi-state-danger rounded px-3 py-2 mb-2">
             {rankError}
           </div>
         )}
@@ -335,7 +335,7 @@ export default function AnalyticsClientesPage() {
           >
             {rankLoading ? (
               <tr>
-                <td colSpan={6} className="text-center py-6 text-slate-400">
+                <td colSpan={6} className="text-center py-6 sunmi-text-muted">
                   Cargando...
                 </td>
               </tr>
@@ -345,7 +345,7 @@ export default function AnalyticsClientesPage() {
               rankItems.map((item, i) => (
                 <SunmiTableRow
                   key={item.clienteId}
-                  className="cursor-pointer hover:bg-slate-800/50"
+                  className="cursor-pointer hover:bg-[var(--table-row-hover)]"
                   onClick={() =>
                     router.push(
                       `/modulos/clientes/${item.clienteId}`
@@ -354,18 +354,18 @@ export default function AnalyticsClientesPage() {
                 >
                   <td className="px-2 py-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-slate-500 font-mono w-5">
+                      <span className="text-[10px] sunmi-text-muted font-mono w-5">
                         {i + 1}
                       </span>
                       <div>
                         <div className="text-sm font-medium">{item.nombre}</div>
-                        <div className="text-[10px] text-slate-500">
+                        <div className="text-[10px] sunmi-text-muted">
                           {item.telefono || item.email || ""}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 py-1.5 font-mono text-sm text-emerald-400">
+                  <td className="px-2 py-1.5 font-mono text-sm sunmi-text-success">
                     ${formatPrecio(item.totalFacturado)}
                   </td>
                   <td className="px-2 py-1.5 text-sm text-center">
@@ -374,7 +374,7 @@ export default function AnalyticsClientesPage() {
                   <td className="px-2 py-1.5 font-mono text-sm">
                     ${formatPrecio(item.ticketPromedio)}
                   </td>
-                  <td className="px-2 py-1.5 text-sm text-slate-400">
+                  <td className="px-2 py-1.5 text-sm sunmi-text-muted">
                     {formatFecha(item.ultimaCompraAt)}
                   </td>
                   <td className="px-2 py-1.5">
@@ -383,12 +383,12 @@ export default function AnalyticsClientesPage() {
                         ? item.tags.map((t, ti) => (
                             <span
                               key={ti}
-                              className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                              className="text-[10px] px-1.5 py-0.5 rounded-full sunmi-badge-link"
                             >
                               {t}
                             </span>
                           ))
-                        : <span className="text-[10px] text-slate-600">-</span>}
+                        : <span className="text-[10px] sunmi-text-muted">-</span>}
                     </div>
                   </td>
                 </SunmiTableRow>
@@ -405,15 +405,15 @@ export default function AnalyticsClientesPage() {
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {/* Días selector */}
           <div className="flex items-center gap-1">
-            <span className="text-[11px] text-slate-400">Inactivos hace:</span>
+            <span className="text-[11px] sunmi-text-muted">Inactivos hace:</span>
             {[30, 60, 90, 180].map((d) => (
               <button
                 key={d}
                 onClick={() => setInactDias(d)}
                 className={`text-xs px-2 py-1 rounded border transition-all ${
                   inactDias === d
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                    : "bg-slate-800 text-slate-400 border-slate-700"
+                    ? "sunmi-btn-accent-soft"
+                    : "sunmi-control sunmi-border"
                 }`}
               >
                 {d}d
@@ -422,7 +422,7 @@ export default function AnalyticsClientesPage() {
           </div>
 
           {/* Modo toggle */}
-          <div className="flex rounded-lg border border-slate-700 overflow-hidden">
+          <div className="flex rounded-lg border sunmi-border overflow-hidden">
             {[
               { value: "conCompras", label: "Con compras" },
               { value: "incluyeNunca", label: "Incluye nunca" },
@@ -432,8 +432,8 @@ export default function AnalyticsClientesPage() {
                 onClick={() => setInactModo(m.value)}
                 className={`text-xs px-3 py-1.5 transition-all ${
                   inactModo === m.value
-                    ? "bg-amber-500/20 text-amber-300"
-                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                    ? "sunmi-btn-accent-soft"
+                    : "sunmi-control sunmi-link-muted"
                 }`}
               >
                 {m.label}
@@ -443,15 +443,15 @@ export default function AnalyticsClientesPage() {
 
           {/* Take */}
           <div className="flex items-center gap-1">
-            <span className="text-[11px] text-slate-400">Mostrar:</span>
+            <span className="text-[11px] sunmi-text-muted">Mostrar:</span>
             {[50, 100].map((n) => (
               <button
                 key={n}
                 onClick={() => setInactTake(n)}
                 className={`text-xs px-2 py-1 rounded border transition-all ${
                   inactTake === n
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                    : "bg-slate-800 text-slate-400 border-slate-700"
+                    ? "sunmi-btn-accent-soft"
+                    : "sunmi-control sunmi-border"
                 }`}
               >
                 {n}
@@ -461,7 +461,7 @@ export default function AnalyticsClientesPage() {
         </div>
 
         {inactError && (
-          <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2 mb-2">
+          <div className="text-xs sunmi-text-danger sunmi-state-danger rounded px-3 py-2 mb-2">
             {inactError}
           </div>
         )}
@@ -472,7 +472,7 @@ export default function AnalyticsClientesPage() {
           >
             {inactLoading ? (
               <tr>
-                <td colSpan={4} className="text-center py-6 text-slate-400">
+                <td colSpan={4} className="text-center py-6 sunmi-text-muted">
                   Cargando...
                 </td>
               </tr>
@@ -485,7 +485,7 @@ export default function AnalyticsClientesPage() {
               inactItems.map((item) => (
                 <SunmiTableRow
                   key={item.clienteId}
-                  className="cursor-pointer hover:bg-slate-800/50"
+                  className="cursor-pointer hover:bg-[var(--table-row-hover)]"
                   onClick={() =>
                     router.push(
                       `/modulos/clientes/${item.clienteId}`
@@ -495,14 +495,14 @@ export default function AnalyticsClientesPage() {
                   <td className="px-2 py-1.5">
                     <div>
                       <div className="text-sm font-medium">{item.nombre}</div>
-                      <div className="text-[10px] text-slate-500">
+                      <div className="text-[10px] sunmi-text-muted">
                         {item.telefono || item.email || ""}
                       </div>
                     </div>
                   </td>
-                  <td className="px-2 py-1.5 text-sm text-slate-400">
+                  <td className="px-2 py-1.5 text-sm sunmi-text-muted">
                     {item.ultimaCompraAt ? formatFecha(item.ultimaCompraAt) : (
-                      <span className="text-slate-600">Nunca</span>
+                      <span className="sunmi-text-muted">Nunca</span>
                     )}
                   </td>
                   <td className="px-2 py-1.5 text-sm">
@@ -510,16 +510,16 @@ export default function AnalyticsClientesPage() {
                       <span
                         className={
                           item.diasInactivo > 90
-                            ? "text-red-400"
+                            ? "sunmi-text-danger"
                             : item.diasInactivo > 30
-                              ? "text-amber-400"
-                              : "text-slate-300"
+                              ? "sunmi-text-accent"
+                              : "sunmi-text-muted"
                         }
                       >
                         {item.diasInactivo}d
                       </span>
                     ) : (
-                      <span className="text-slate-600">-</span>
+                      <span className="sunmi-text-muted">-</span>
                     )}
                   </td>
                   <td className="px-2 py-1.5">
@@ -528,12 +528,12 @@ export default function AnalyticsClientesPage() {
                         ? item.tags.map((t, ti) => (
                             <span
                               key={ti}
-                              className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                              className="text-[10px] px-1.5 py-0.5 rounded-full sunmi-badge-link"
                             >
                               {t}
                             </span>
                           ))
-                        : <span className="text-[10px] text-slate-600">-</span>}
+                        : <span className="text-[10px] sunmi-text-muted">-</span>}
                     </div>
                   </td>
                 </SunmiTableRow>

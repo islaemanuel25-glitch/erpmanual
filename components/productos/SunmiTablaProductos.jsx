@@ -63,19 +63,19 @@ export default function SunmiTablaProductos({
         row.imagenUrl ? (
           <img
             src={row.imagenUrl}
-            className="w-12 h-12 rounded-md object-cover border border-slate-700"
+            className="w-12 h-12 rounded-md object-cover border sunmi-border"
             alt=""
           />
         ) : (
-          <div className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-md flex items-center justify-center text-xs text-slate-500">
+          <div className="w-12 h-12 sunmi-control border sunmi-border rounded-md flex items-center justify-center text-xs sunmi-text-muted">
             -
           </div>
         ),
     },
 
-    codigoBarra: { titulo: "Código", thClass: "w-[140px]", tdClass: "truncate overflow-hidden text-slate-400", titleKey: "codigoBarra" },
+    codigoBarra: { titulo: "Código", thClass: "w-[140px]", tdClass: "truncate overflow-hidden sunmi-text-muted", titleKey: "codigoBarra" },
     sku: { titulo: "SKU", thClass: "w-[90px]" },
-    nombre: { titulo: "Nombre", tdClass: "whitespace-normal break-words line-clamp-2 overflow-hidden leading-tight", titleKey: "nombre" },
+    nombre: { titulo: "Nombre", thClass: "min-w-[160px]", tdClass: "whitespace-normal break-words line-clamp-2 overflow-hidden leading-tight", titleKey: "nombre" },
 
     categoriaId: {
       titulo: "Categoría",
@@ -200,7 +200,7 @@ export default function SunmiTablaProductos({
 
       const label = (
         <span
-          className={isSortable ? "cursor-pointer select-none hover:text-amber-600 transition-colors" : ""}
+          className={isSortable ? "cursor-pointer select-none hover:text-[var(--pos-accent)] transition-colors" : ""}
           onClick={isSortable ? () => onSort?.(c.key) : undefined}
         >
           {c.titulo}
@@ -216,7 +216,7 @@ export default function SunmiTablaProductos({
   const colSpan = headers.length;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+    <div className="overflow-hidden rounded-xl border sunmi-border">
       <SunmiTable headers={headers}>
         {rows.length === 0 ? (
           <SunmiTableEmpty message="No hay productos disponibles" colSpan={colSpan} />
@@ -244,8 +244,7 @@ export default function SunmiTablaProductos({
                     w-[26px] h-[26px]
                     flex items-center justify-center
                     rounded-md
-                    bg-amber-400 text-slate-900
-                    hover:bg-amber-300
+                    sunmi-btn-amber
                     transition
                     cursor-pointer
                   "
@@ -261,8 +260,7 @@ export default function SunmiTablaProductos({
                     w-[26px] h-[26px]
                     flex items-center justify-center
                     rounded-md
-                    bg-red-500 text-white
-                    hover:bg-red-400
+                    sunmi-btn-red
                     transition
                   "
                   type="button"
@@ -276,15 +274,15 @@ export default function SunmiTablaProductos({
         )}
       </SunmiTable>
 
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-900 flex-wrap gap-2">
+      <div className="flex items-center justify-between px-3 py-2 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <SunmiButton color="slate" disabled={page <= 1} onClick={onPrev}>
             « Anterior
           </SunmiButton>
 
-          <span className="text-slate-400 text-[11px]">
+          <span className="sunmi-text-muted text-[11px]">
             Página {page} / {totalPages}
-            {totalItems > 0 && <span className="ml-1 text-slate-500">({totalItems} items)</span>}
+            {totalItems > 0 && <span className="ml-1 opacity-70">({totalItems} items)</span>}
           </span>
 
           <SunmiButton color="slate" disabled={page >= totalPages} onClick={onNext}>
@@ -293,7 +291,7 @@ export default function SunmiTablaProductos({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-slate-500 text-[11px]">Mostrar</span>
+          <span className="sunmi-text-muted text-[11px]">Mostrar</span>
           {PAGE_SIZES.map((size) => (
             <button
               key={size}
@@ -302,8 +300,8 @@ export default function SunmiTablaProductos({
               className={`
                 px-2 py-0.5 rounded text-[11px] font-medium transition
                 ${pageSize === size
-                  ? "bg-amber-400 text-slate-900"
-                  : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                  ? "sunmi-badge-accent"
+                  : "sunmi-control"
                 }
               `}
             >

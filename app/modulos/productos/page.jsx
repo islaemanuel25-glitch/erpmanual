@@ -550,7 +550,7 @@ export default function ProductosPage() {
           {/* =========================================================
               TABS
               ========================================================= */}
-          <div className="flex gap-1 border-b border-slate-700 pb-1">
+          <div className="flex gap-1 border-b sunmi-divider pb-1">
             {TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -558,8 +558,8 @@ export default function ProductosPage() {
                 className={`
                   px-4 py-1.5 rounded-t-md text-[13px] font-medium transition-all
                   ${activeTab === tab.key
-                    ? "bg-amber-400 text-slate-900"
-                    : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                    ? "sunmi-badge-accent"
+                    : "sunmi-control"
                   }
                 `}
               >
@@ -608,7 +608,7 @@ export default function ProductosPage() {
               <SunmiSeparator label="Listado" className="!my-1" />
 
               <div className="overflow-x-auto w-full mt-1">
-                <div className="rounded-lg border border-slate-800 overflow-hidden">
+                <div className="rounded-lg border sunmi-border overflow-hidden">
                   <SunmiTablaProductos
                     rows={rows}
                     columns={allColumns.filter((c) =>
@@ -661,7 +661,7 @@ export default function ProductosPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-1">
                 <div>
-                  <label className="text-[11px] text-slate-400 mb-1 block">Proveedor</label>
+                  <label className="text-[11px] sunmi-text-muted mb-1 block">Proveedor</label>
                   <SunmiSelectAdv
                     value={expProveedorId}
                     onChange={(val) => setExpProveedorId(val)}
@@ -674,7 +674,7 @@ export default function ProductosPage() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] text-slate-400 mb-1 block">Categoría</label>
+                  <label className="text-[11px] sunmi-text-muted mb-1 block">Categoría</label>
                   <SunmiSelectAdv
                     value={expCategoriaId}
                     onChange={(val) => setExpCategoriaId(val)}
@@ -707,48 +707,48 @@ export default function ProductosPage() {
                 <a
                   href="/templates/import_productos.xlsx"
                   download
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[13px] font-semibold hover:bg-amber-500/30 transition"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg sunmi-btn-accent-soft text-[13px] font-semibold transition"
                 >
                   Descargar plantilla Excel
                 </a>
 
-                <details className="mt-3 rounded-lg border border-slate-700 bg-slate-800/50 overflow-hidden">
-                  <summary className="px-3 py-2 cursor-pointer text-[13px] font-semibold text-cyan-400 hover:text-cyan-300 select-none">
+                <details className="mt-3 rounded-lg border sunmi-border sunmi-surface overflow-hidden">
+                  <summary className="px-3 py-2 cursor-pointer text-[13px] font-semibold sunmi-link select-none">
                     Como preparar el Excel para importar productos
                   </summary>
-                  <div className="px-3 pb-3 text-[12px] text-slate-300 leading-relaxed">
-                    <p className="mt-2 mb-2 text-slate-400 font-medium">Columnas del archivo:</p>
+                  <div className="px-3 pb-3 text-[12px] sunmi-text-strong leading-relaxed">
+                    <p className="mt-2 mb-2 sunmi-text-muted font-medium">Columnas del archivo:</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-[11px] border-collapse">
                         <thead>
-                          <tr className="text-left text-slate-400 border-b border-slate-700">
+                          <tr className="text-left sunmi-text-muted border-b sunmi-divider">
                             <th className="py-1 pr-3">Columna</th>
                             <th className="py-1 pr-3">Requerido</th>
                             <th className="py-1">Valores / Notas</th>
                           </tr>
                         </thead>
-                        <tbody className="text-slate-300">
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-amber-400">codigo_barra</td><td className="py-1 pr-3 text-red-400">Obligatorio</td><td className="py-1">Unico por grupo</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-amber-400">nombre</td><td className="py-1 pr-3 text-red-400">Obligatorio</td><td className="py-1">Nombre del producto</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">unidad_medida</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">unidad | pack | cajon | kg (defecto: unidad)</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">factor_pack</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Cantidad de unidades por bulto (para pack/cajon)</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-amber-400">precio_costo</td><td className="py-1 pr-3 text-red-400">Obligatorio</td><td className="py-1">Mayor a 0</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-amber-400">precio_venta</td><td className="py-1 pr-3 text-red-400">Obligatorio</td><td className="py-1">Mayor a 0</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">margen</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Porcentaje (ej: 50)</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">categoria</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">proveedor</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">area_fisica</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
-                          <tr className="border-b border-slate-800"><td className="py-1 pr-3 font-mono text-slate-400">stock_inicial</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">Cantidad inicial de stock</td></tr>
-                          <tr><td className="py-1 pr-3 font-mono text-slate-400">activo</td><td className="py-1 pr-3 text-slate-500">Opcional</td><td className="py-1">SI / NO / true / false (defecto: SI)</td></tr>
+                        <tbody className="sunmi-text-strong">
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-accent">codigo_barra</td><td className="py-1 pr-3 sunmi-text-danger">Obligatorio</td><td className="py-1">Unico por grupo</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-accent">nombre</td><td className="py-1 pr-3 sunmi-text-danger">Obligatorio</td><td className="py-1">Nombre del producto</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-muted">unidad_medida</td><td className="py-1 pr-3 sunmi-text-muted">Opcional</td><td className="py-1">unidad | pack | cajon | kg (defecto: unidad)</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-muted">factor_pack</td><td className="py-1 pr-3 sunmi-text-muted">Opcional</td><td className="py-1">Cantidad de unidades por bulto (para pack/cajon)</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-accent">precio_costo</td><td className="py-1 pr-3 sunmi-text-danger">Obligatorio</td><td className="py-1">Mayor a 0</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-accent">precio_venta</td><td className="py-1 pr-3 sunmi-text-danger">Obligatorio</td><td className="py-1">Mayor a 0</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-muted">margen</td><td className="py-1 pr-3 sunmi-text-muted">Opcional</td><td className="py-1">Porcentaje (ej: 50)</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-muted">categoria</td><td className="py-1 pr-3 sunmi-text-muted">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-muted">proveedor</td><td className="py-1 pr-3 sunmi-text-muted">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-muted">area_fisica</td><td className="py-1 pr-3 sunmi-text-muted">Opcional</td><td className="py-1">Nombre exacto del catalogo</td></tr>
+                          <tr className="border-b sunmi-border"><td className="py-1 pr-3 font-mono sunmi-text-muted">stock_inicial</td><td className="py-1 pr-3 sunmi-text-muted">Opcional</td><td className="py-1">Cantidad inicial de stock</td></tr>
+                          <tr><td className="py-1 pr-3 font-mono sunmi-text-muted">activo</td><td className="py-1 pr-3 sunmi-text-muted">Opcional</td><td className="py-1">SI / NO / true / false (defecto: SI)</td></tr>
                         </tbody>
                       </table>
                     </div>
 
-                    <p className="mt-3 mb-1 text-slate-400 font-medium">Reglas:</p>
-                    <ul className="list-disc list-inside space-y-0.5 text-slate-400">
-                      <li>El <span className="text-amber-400">codigo_barra</span> no puede repetirse dentro del archivo</li>
-                      <li>Si el codigo ya existe en el sistema, se clasifica como <span className="text-cyan-400">actualizar</span></li>
-                      <li>Si no existe, se clasifica como <span className="text-emerald-400">crear</span></li>
+                    <p className="mt-3 mb-1 sunmi-text-muted font-medium">Reglas:</p>
+                    <ul className="list-disc list-inside space-y-0.5 sunmi-text-muted">
+                      <li>El <span className="sunmi-text-accent">codigo_barra</span> no puede repetirse dentro del archivo</li>
+                      <li>Si el codigo ya existe en el sistema, se clasifica como <span className="sunmi-text-link">actualizar</span></li>
+                      <li>Si no existe, se clasifica como <span className="sunmi-text-success">crear</span></li>
                       <li>Categoria, proveedor y area_fisica deben coincidir exactamente con los nombres del catalogo (sin importar mayusculas)</li>
                       <li>La primera fila del Excel debe ser los headers (nombres de columna)</li>
                     </ul>
@@ -758,7 +758,7 @@ export default function ProductosPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-1">
                 <div>
-                  <label className="text-[11px] text-slate-400 mb-1 block">
+                  <label className="text-[11px] sunmi-text-muted mb-1 block">
                     Modo de importación
                   </label>
                   <SunmiSelectAdv
@@ -777,7 +777,7 @@ export default function ProductosPage() {
 
               {/* Input archivo */}
               <div className="px-1 mt-2">
-                <label className="text-[11px] text-slate-400 mb-1 block">
+                <label className="text-[11px] sunmi-text-muted mb-1 block">
                   Archivo Excel (.xlsx, .xls)
                 </label>
                 <input
@@ -785,33 +785,33 @@ export default function ProductosPage() {
                   accept=".xlsx,.xls"
                   onChange={handleFileChange}
                   disabled={!localId || impLoading}
-                  className="text-[12px] text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[12px] file:font-medium file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600 disabled:opacity-50"
+                  className="text-[12px] sunmi-text-strong file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[12px] file:font-medium file:bg-[var(--pos-control-bg)] file:text-[var(--pos-muted-strong)] hover:file:bg-[var(--pos-control-hover)] disabled:opacity-50"
                 />
               </div>
 
               {/* Loading */}
               {impLoading && (
-                <div className="text-center text-amber-400 text-[12px] py-3 animate-pulse">
+                <div className="text-center sunmi-text-accent text-[12px] py-3 animate-pulse">
                   Procesando...
                 </div>
               )}
 
               {/* Error */}
               {impError && (
-                <div className="mx-1 mt-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-[12px]">
+                <div className="mx-1 mt-2 px-3 py-2 rounded-md sunmi-state-danger sunmi-text-danger text-[12px]">
                   {impError}
                 </div>
               )}
 
               {/* Resultado final de importación */}
               {impResultado && (
-                <div className="mx-1 mt-2 px-3 py-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[12px]">
+                <div className="mx-1 mt-2 px-3 py-2 rounded-md sunmi-state-success sunmi-text-success text-[12px]">
                   <p className="font-semibold">{impResultado.message}</p>
                   <p className="mt-1">
                     Creados: {impResultado.creados} | Actualizados: {impResultado.actualizados} | Errores: {impResultado.errores}
                   </p>
                   {impResultado.detalles?.length > 0 && (
-                    <div className="mt-2 text-red-400">
+                    <div className="mt-2 sunmi-text-danger">
                       {impResultado.detalles.map((d, i) => (
                         <p key={i}>Fila {d.fila} ({d.nombre}): {d.error}</p>
                       ))}
@@ -825,31 +825,31 @@ export default function ProductosPage() {
                 <>
                   {/* Resumen */}
                   <div className="flex flex-wrap gap-3 px-1 mt-3">
-                    <span className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 text-[12px] font-medium">
+                    <span className="px-2 py-1 rounded sunmi-state-success sunmi-text-success text-[12px] font-medium">
                       Crear: {impResumen.crear}
                     </span>
-                    <span className="px-2 py-1 rounded bg-cyan-500/20 text-cyan-400 text-[12px] font-medium">
+                    <span className="px-2 py-1 rounded sunmi-badge-link text-[12px] font-medium">
                       Actualizar: {impResumen.actualizar}
                     </span>
-                    <span className="px-2 py-1 rounded bg-red-500/20 text-red-400 text-[12px] font-medium">
+                    <span className="px-2 py-1 rounded sunmi-state-danger sunmi-text-danger text-[12px] font-medium">
                       Errores: {impResumen.errores}
                     </span>
                     {impResumen.ignorados > 0 && (
-                      <span className="px-2 py-1 rounded bg-slate-500/20 text-slate-400 text-[12px] font-medium">
+                      <span className="px-2 py-1 rounded sunmi-surface sunmi-text-muted text-[12px] font-medium">
                         Ignorados: {impResumen.ignorados}
                       </span>
                     )}
                   </div>
 
                   {impPreview.length > 50 && (
-                    <p className="text-[11px] text-slate-500 px-1">
+                    <p className="text-[11px] sunmi-text-muted px-1">
                       Mostrando primeras 50 filas de {impPreview.length}
                     </p>
                   )}
 
                   {/* Tabla preview */}
                   <div className="overflow-x-auto mt-2">
-                    <div className="rounded-lg border border-slate-800 overflow-hidden">
+                    <div className="rounded-lg border sunmi-border overflow-hidden">
                       <SunmiTable
                         headers={["Fila", "Acción", "Código", "Nombre", "Unidad", "Costo", "Venta", "Categoría", "Proveedor", "Motivo"]}
                       >
@@ -862,16 +862,16 @@ export default function ProductosPage() {
                               <td className="px-2 py-1.5">
                                 <span className={`
                                   px-1.5 py-0.5 rounded text-[10px] font-semibold
-                                  ${row.accion === "crear" ? "bg-emerald-400/20 text-emerald-400" : ""}
-                                  ${row.accion === "actualizar" ? "bg-cyan-400/20 text-cyan-400" : ""}
-                                  ${row.accion === "error" ? "bg-red-400/20 text-red-400" : ""}
-                                  ${row.accion === "ignorar" ? "bg-slate-400/20 text-slate-400" : ""}
+                                  ${row.accion === "crear" ? "sunmi-state-success sunmi-text-success" : ""}
+                                  ${row.accion === "actualizar" ? "sunmi-badge-link" : ""}
+                                  ${row.accion === "error" ? "sunmi-state-danger sunmi-text-danger" : ""}
+                                  ${row.accion === "ignorar" ? "sunmi-surface sunmi-text-muted" : ""}
                                 `}>
                                   {row.accion}
                                 </span>
                               </td>
                               <td className="px-2 py-1.5 text-[11px]">{row.codigo_barra || "-"}</td>
-                              <td className={`px-2 py-1.5 text-[11px] ${row.accion === "error" ? "text-red-400" : ""}`}>
+                              <td className={`px-2 py-1.5 text-[11px] ${row.accion === "error" ? "sunmi-text-danger" : ""}`}>
                                 {row.nombre}
                               </td>
                               <td className="px-2 py-1.5 text-[11px]">{row.unidad_medida}</td>
@@ -883,7 +883,7 @@ export default function ProductosPage() {
                               </td>
                               <td className="px-2 py-1.5 text-[11px]">{row.categoria || "-"}</td>
                               <td className="px-2 py-1.5 text-[11px]">{row.proveedor || "-"}</td>
-                              <td className={`px-2 py-1.5 text-[11px] ${row.accion === "error" ? "text-red-400" : "text-slate-500"}`}>
+                              <td className={`px-2 py-1.5 text-[11px] ${row.accion === "error" ? "sunmi-text-danger" : "sunmi-text-muted"}`}>
                                 {row.motivoError || "-"}
                               </td>
                             </SunmiTableRow>

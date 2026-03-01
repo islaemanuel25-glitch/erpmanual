@@ -2,7 +2,6 @@
 
 import { memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiButton from "@/components/sunmi/SunmiButton";
 import { showError } from "@/components/sunmi/SunmiToast";
 
 const COMISION_PCT = 7;
@@ -59,51 +58,56 @@ function FormaPago({
       {offlineMode ? (
         <>
           {/* Botón guardar pendiente (offline) - solo efectivo */}
-          <SunmiButton
-            color="amber"
+          <button
+            type="button"
             onClick={() => onCobrar({ formaPago, total })}
             disabled={cobrando || disabled || formaPago !== "efectivo" || subtotal <= 0}
-            className="!w-full min-h-14 lg:min-h-16 !text-lg lg:!text-xl !font-bold"
+            className="sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md"
           >
             {cobrando ? "Guardando..." : `GUARDAR PENDIENTE $${formatPrecio(total)}`}
-          </SunmiButton>
+          </button>
         </>
       ) : (
         <>
           {/* Botón cobrar (online) */}
-          <SunmiButton
-            color="amber"
+          <button
+            type="button"
             onClick={() => onCobrar({ formaPago, total })}
             disabled={cobrando || disabled || !formaPago || subtotal <= 0}
-            className="!w-full min-h-14 lg:min-h-16 !text-lg lg:!text-xl !font-bold"
+            className="sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md"
           >
             {cobrando ? "Procesando..." : `COBRAR $${formatPrecio(total)}`}
-          </SunmiButton>
+          </button>
           
           {/* Botón procesar cola (solo si hay items en cola y está online) */}
           {queueLength > 0 && onProcesarCola && (
-            <SunmiButton
-              color="cyan"
+            <button
+              type="button"
               onClick={onProcesarCola}
               disabled={procesandoCola || offlineMode}
-              className="!w-full min-h-12 !text-base !font-semibold mt-2"
+              className="sunmi-btn sunmi-pos-btn-secondary w-full min-h-12 text-base font-semibold mt-2 rounded-md"
             >
               {procesandoCola ? "Procesando..." : `PROCESAR COLA (${queueLength})`}
-            </SunmiButton>
+            </button>
           )}
         </>
       )}
 
-      {/* Formas de pago: grid 3x2 */}
+      {/* Formas de pago: grid 3x2 — theme-safe (sunmi-pos-btn-*) */}
       <div className="grid grid-cols-3 gap-1.5">
         {FORMAS_PAGO.map((fp) => {
           const esEfectivo = fp.key === "efectivo";
           const estaDeshabilitado = offlineMode && !esEfectivo;
-          
+          const selected = formaPago === fp.key;
+          const btnClass = estaDeshabilitado
+            ? "sunmi-btn pos-control opacity-50 cursor-not-allowed"
+            : selected
+            ? "sunmi-btn sunmi-pos-btn-primary"
+            : "sunmi-btn sunmi-pos-btn-secondary";
           return (
-            <SunmiButton
+            <button
               key={fp.key}
-              color={formaPago === fp.key ? "amber" : estaDeshabilitado ? "slate" : "cyan"}
+              type="button"
               onClick={() => {
                 if (offlineMode && !esEfectivo) {
                   showError("Sin internet: solo efectivo disponible");
@@ -112,10 +116,10 @@ function FormaPago({
                 onFormaPagoChange(fp.key);
               }}
               disabled={estaDeshabilitado}
-              className={`min-h-11 text-xs !py-1.5 ${estaDeshabilitado ? "opacity-50 cursor-not-allowed" : ""}`}
+              className={`min-h-11 text-xs py-1.5 rounded-md ${btnClass}`}
             >
               {fp.label}
-            </SunmiButton>
+            </button>
           );
         })}
       </div>
