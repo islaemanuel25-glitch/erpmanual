@@ -64,16 +64,17 @@ export default function StockLocalesPage() {
   return (
     <div className="p-4 sunmi-bg w-full min-h-screen flex flex-col gap-4">
 
-      {/* CABECERA */}
-      <div className="sunmi-card">
-        <div className="sunmi-header-cyan">Stock de Locales</div>
-        <p className="text-sm sunmi-text-accent font-medium mt-2">
+      {/* CABECERA compacta */}
+      <div>
+        <h1 className="text-lg sunmi-section-title">Stock</h1>
+        <p className="text-sm sunmi-section-subtitle">
           {localActual.nombre || "Sin local"}
         </p>
       </div>
 
-      {/* FILTROS */}
+      {/* FILTROS compactos */}
       <FiltrosStock
+        compact
         localSeleccionado={localSeleccionado}
         onFiltroChange={setFiltro}
         onReset={() => setFiltro({})}

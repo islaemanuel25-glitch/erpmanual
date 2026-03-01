@@ -78,7 +78,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
       <div className="sunmi-card relative w-full max-w-md">
 
         {/* HEADER */}
-        <div className="sunmi-header-amber flex items-center justify-between">
+        <div className="sunmi-header-accent flex items-center justify-between">
           <span>Ajustar stock</span>
           <button className="text-slate-900" onClick={() => onClose(false)}>
             <X size={18} />
@@ -102,7 +102,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                 {/* Bultos + Sueltas */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[11px] text-slate-400 mb-1 block">
+                    <label className="text-[11px] sunmi-label mb-1 block">
                       Bultos
                     </label>
                     <SunmiInput
@@ -114,7 +114,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-slate-400 mb-1 block">
+                    <label className="text-[11px] sunmi-label mb-1 block">
                       Sueltas
                     </label>
                     <SunmiInput
@@ -140,7 +140,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
               <>
                 {/* Solo unidades / kg */}
                 <div>
-                  <label className="text-[11px] text-slate-400 mb-1 block">
+                  <label className="text-[11px] sunmi-label mb-1 block">
                     {unidadMedida === "kg" ? "Cantidad (kg)" : "Cantidad (unidades)"}
                   </label>
                   <SunmiInput
@@ -184,7 +184,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
 
           {/* Botón guardar */}
           <button
-            className="sunmi-btn sunmi-btn-cyan w-full mt-5 py-2 text-[13px] font-bold"
+            className="sunmi-btn sunmi-btn-primary w-full mt-5 py-2 text-[13px] font-bold"
             onClick={guardar}
           >
             Guardar ajuste

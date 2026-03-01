@@ -8,7 +8,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Check } from "lucide-react";
-import { useSunmiTheme } from "./SunmiThemeProvider";
 
 export default function SunmiSelectAdv({
   value,
@@ -18,7 +17,6 @@ export default function SunmiSelectAdv({
   className = "",
   multiple = false,
 }) {
-  const { theme } = useSunmiTheme();
   const [open, setOpen] = useState(false);
 
   const wrapRef = useRef(null);
@@ -57,19 +55,6 @@ export default function SunmiSelectAdv({
 
     onChange(newArr);
   };
-
-  const bgColor =
-    theme.card.split(" ").find((c) => c.startsWith("bg-")) || "bg-slate-950/60";
-  const borderColor =
-    theme.card.split(" ").find((c) => c.startsWith("border-")) || "border-slate-700";
-  const textColor =
-    theme.layout.split(" ").find((c) => c.startsWith("text-")) || "text-slate-100";
-  const dropdownBg =
-    theme.card
-      .split(" ")
-      .find((c) => c.startsWith("bg-"))
-      ?.replace("/70", "")
-      .replace("/60", "") || "bg-slate-900";
 
   const updatePos = () => {
     const el = btnRef.current;
@@ -121,14 +106,7 @@ export default function SunmiSelectAdv({
         width: pos.width,
         zIndex: 99999,
       }}
-      className={`
-        ${dropdownBg}
-        border ${borderColor}
-        rounded-md
-        shadow-lg
-        max-h-52 overflow-y-auto
-        text-[13px]
-      `}
+      className="sunmi-select-dropdown rounded-md shadow-lg max-h-52 overflow-y-auto text-[13px]"
     >
       {optionList.map((child, idx) => {
         const val = child.props.value;
@@ -149,10 +127,8 @@ export default function SunmiSelectAdv({
               handlePick(val);
             }}
             className={`
-              px-3 py-2 cursor-pointer flex items-center gap-2
-              ${selected ? "bg-amber-500 text-slate-900" : textColor}
-              hover:bg-amber-400 hover:text-slate-900
-              transition-all
+              px-3 py-2 cursor-pointer flex items-center gap-2 transition-all
+              ${selected ? "sunmi-select-item-active" : "sunmi-select-item"}
             `}
           >
             {multiple && (
@@ -171,22 +147,19 @@ export default function SunmiSelectAdv({
         ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`
+        className="
           w-full px-3 py-1.5
           rounded-md
-          bg-slate-950/40
-          border-2 border-slate-500/60
-          ${textColor} text-[13px]
-          hover:border-slate-400/70
-          focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-300/60
+          sunmi-select-trigger
+          text-[13px]
           flex items-center justify-between
-        `}
+        "
       >
         <span className="truncate">{currentText}</span>
         <ChevronDown
           size={16}
-          className={`transition-transform ${
-            open ? "rotate-180 text-amber-400" : "text-amber-300"
+          className={`transition-transform sunmi-text-accent ${
+            open ? "rotate-180" : ""
           }`}
         />
       </button>

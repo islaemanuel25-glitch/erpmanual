@@ -127,7 +127,7 @@ export default function ModalCategoria({
 
         <div className="p-4 space-y-4">
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">Nombre</label>
+            <label className="text-[11px] sunmi-label mb-1 block">Nombre</label>
             <SunmiInput
               value={form.nombre}
               onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
@@ -138,7 +138,7 @@ export default function ModalCategoria({
           <SunmiSeparator />
 
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Activo</span>
+            <span className="text-[11px] sunmi-label">Activo</span>
             <SunmiToggleEstado
               value={form.activo}
               onChange={(v) => setForm((f) => ({ ...f, activo: v }))}

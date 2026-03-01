@@ -72,7 +72,7 @@ export default function ModalLimites({ open, onClose, producto, local }) {
       <div className="sunmi-card relative w-full max-w-md">
 
         {/* HEADER */}
-        <div className="sunmi-header-amber flex items-center justify-between">
+        <div className="sunmi-header-accent flex items-center justify-between">
           <span>Límites de stock</span>
           <button className="text-slate-900" onClick={() => onClose(false)}>
             <X size={18} />
@@ -93,7 +93,7 @@ export default function ModalLimites({ open, onClose, producto, local }) {
 
             {/* Min */}
             <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">
+              <label className="text-[11px] sunmi-label mb-1 block">
                 {usarBultos ? "Stock mínimo (bultos)" : "Stock mínimo"}
               </label>
               <SunmiInput
@@ -115,7 +115,7 @@ export default function ModalLimites({ open, onClose, producto, local }) {
 
             {/* Max */}
             <div>
-              <label className="text-[11px] text-slate-400 mb-1 block">
+              <label className="text-[11px] sunmi-label mb-1 block">
                 {usarBultos ? "Stock máximo (bultos)" : "Stock máximo"}
               </label>
               <SunmiInput
@@ -138,7 +138,7 @@ export default function ModalLimites({ open, onClose, producto, local }) {
 
           {/* Botón guardar */}
           <button
-            className="sunmi-btn sunmi-btn-cyan w-full mt-5 py-2 text-[13px] font-bold"
+            className="sunmi-btn sunmi-btn-primary w-full mt-5 py-2 text-[13px] font-bold"
             onClick={guardar}
           >
             Guardar límites

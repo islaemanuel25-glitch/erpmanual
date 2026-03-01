@@ -8,6 +8,7 @@ export default function FiltrosStock({
   localSeleccionado,
   onFiltroChange,
   onReset,
+  compact = false,
 }) {
   const [q, setQ] = useState("");
   const [categoria, setCategoria] = useState("");
@@ -20,7 +21,6 @@ export default function FiltrosStock({
 
   const debounceRef = useRef(null);
 
-  // 🔄 Debounce filtros (200ms)
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -39,7 +39,6 @@ export default function FiltrosStock({
     return () => clearTimeout(debounceRef.current);
   }, [q, categoria, proveedor, area, conStock, sinStock, faltantes, onFiltroChange]);
 
-  // 🔄 Reset filtros
   const resetFiltros = () => {
     setQ("");
     setCategoria("");
@@ -51,88 +50,90 @@ export default function FiltrosStock({
     onReset?.();
   };
 
+  const contenido = (
+    <div className="flex flex-col gap-3">
+      {/* Buscador */}
+      <div className="flex items-center gap-2">
+        <SunmiInput
+          type="text"
+          placeholder="Buscar por nombre o código…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+
+        <button
+          onClick={resetFiltros}
+          className="sunmi-btn sunmi-btn-red h-[38px]"
+        >
+          Limpiar
+        </button>
+      </div>
+
+      {/* Selectores */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <SunmiSelectAdv
+          value={categoria}
+          onChange={(val) => setCategoria(val)}
+        >
+          <option value="">Categoría</option>
+        </SunmiSelectAdv>
+
+        <SunmiSelectAdv
+          value={proveedor}
+          onChange={(val) => setProveedor(val)}
+        >
+          <option value="">Proveedor</option>
+        </SunmiSelectAdv>
+
+        <SunmiSelectAdv
+          value={area}
+          onChange={(val) => setArea(val)}
+        >
+          <option value="">Área física</option>
+        </SunmiSelectAdv>
+      </div>
+
+      {/* Checkboxes */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[12px] sunmi-label">
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={conStock}
+            onChange={(e) => setConStock(e.target.checked)}
+            className="scale-90"
+          />
+          Con stock
+        </label>
+
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={sinStock}
+            onChange={(e) => setSinStock(e.target.checked)}
+            className="scale-90"
+          />
+          Sin stock
+        </label>
+
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={faltantes}
+            onChange={(e) => setFaltantes(e.target.checked)}
+            className="scale-90"
+          />
+          Faltantes
+        </label>
+      </div>
+    </div>
+  );
+
+  if (compact) return contenido;
+
   return (
     <div className="sunmi-card">
-
-      {/* HEADER */}
-      <div className="sunmi-header-cyan">Filtros</div>
-
-      <div className="mt-3 flex flex-col gap-3">
-
-        {/* 🔍 Buscador */}
-        <div className="flex items-center gap-2">
-          <SunmiInput
-            type="text"
-            placeholder="Buscar por nombre o código…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-
-          <button
-            onClick={resetFiltros}
-            className="sunmi-btn sunmi-btn-red h-[38px]"
-          >
-            Limpiar
-          </button>
-        </div>
-
-        {/* 🧩 Selectores */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <SunmiSelectAdv
-            value={categoria}
-            onChange={(val) => setCategoria(val)}
-          >
-            <option value="">Categoría</option>
-          </SunmiSelectAdv>
-
-          <SunmiSelectAdv
-            value={proveedor}
-            onChange={(val) => setProveedor(val)}
-          >
-            <option value="">Proveedor</option>
-          </SunmiSelectAdv>
-
-          <SunmiSelectAdv
-            value={area}
-            onChange={(val) => setArea(val)}
-          >
-            <option value="">Área física</option>
-          </SunmiSelectAdv>
-        </div>
-
-        {/* ✔ Checkboxes */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[12px] text-slate-300">
-          <label className="flex items-center gap-1">
-            <input
-              type="checkbox"
-              checked={conStock}
-              onChange={(e) => setConStock(e.target.checked)}
-              className="scale-90"
-            />
-            Con stock
-          </label>
-
-          <label className="flex items-center gap-1">
-            <input
-              type="checkbox"
-              checked={sinStock}
-              onChange={(e) => setSinStock(e.target.checked)}
-              className="scale-90"
-            />
-            Sin stock
-          </label>
-
-          <label className="flex items-center gap-1">
-            <input
-              type="checkbox"
-              checked={faltantes}
-              onChange={(e) => setFaltantes(e.target.checked)}
-              className="scale-90"
-            />
-            Faltantes
-          </label>
-        </div>
-      </div>
+      <div className="sunmi-header-accent">Filtros</div>
+      <div className="mt-3">{contenido}</div>
     </div>
   );
 }

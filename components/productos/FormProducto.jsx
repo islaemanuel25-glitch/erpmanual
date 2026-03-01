@@ -515,7 +515,7 @@ export default function FormProducto({
         <Section title="Opciones">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div data-field="redondeo_100" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
-              <label className="text-[12px] text-slate-300">Redondeo a $100</label>
+              <label className="text-[12px] sunmi-label">Redondeo a $100</label>
               <SunmiToggleEstado
                 value={form.redondeo_100}
                 onChange={(v) => {
@@ -527,7 +527,7 @@ export default function FormProducto({
             </div>
 
             <div data-field="es_combo" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
-              <label className="text-[12px] text-slate-300">Es combo</label>
+              <label className="text-[12px] sunmi-label">Es combo</label>
               <SunmiToggleEstado
                 value={form.es_combo}
                 onChange={(v) => setField("es_combo", v)}
@@ -535,7 +535,7 @@ export default function FormProducto({
             </div>
 
             <div data-field="activo" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
-              <label className="text-[12px] text-slate-300">Activo</label>
+              <label className="text-[12px] sunmi-label">Activo</label>
               <SunmiToggleEstado
                 value={form.activo}
                 onChange={(v) => setField("activo", v)}
@@ -617,7 +617,7 @@ export default function FormProducto({
                 </Field>
 
                 <div data-field="pesoEsFijo" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
-                  <label className="text-[12px] text-slate-300">Peso fijo</label>
+                  <label className="text-[12px] sunmi-label">Peso fijo</label>
                   <SunmiToggleEstado
                     value={form.pesoEsFijo}
                     onChange={(v) => setField("pesoEsFijo", v)}
@@ -628,7 +628,7 @@ export default function FormProducto({
                 </div>
 
                 <div data-field="actualizaPromedioPorRecepcion" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
-                  <label className="text-[12px] text-slate-300">Actualizar promedio en recepción</label>
+                  <label className="text-[12px] sunmi-label">Actualizar promedio en recepción</label>
                   <SunmiToggleEstado
                     value={form.actualizaPromedioPorRecepcion}
                     onChange={(v) => setField("actualizaPromedioPorRecepcion", v)}
@@ -663,9 +663,9 @@ export default function FormProducto({
 /** Sección visual — panel con fondo diferenciado y borde visible */
 function Section({ title, children }) {
   return (
-    <SunmiPanel className="bg-slate-900/40 ring-2 ring-inset ring-slate-500/70 shadow-sm">
-      <div className="flex items-center pb-2 mb-3 border-b border-slate-600/40">
-        <h3 className="text-[13px] font-semibold text-slate-200">{title}</h3>
+    <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+      <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+        <h3 className="text-[13px] sunmi-section-title">{title}</h3>
       </div>
       {children}
     </SunmiPanel>
@@ -679,7 +679,7 @@ function Field({ label, children, colSpan, fieldKey }) {
       data-field={fieldKey}
       className={colSpan ? "md:col-span-2 flex flex-col gap-1.5" : "flex flex-col gap-1.5"}
     >
-      <label className="text-[12px] text-slate-300 mb-1 block">{label}</label>
+      <label className="text-[12px] sunmi-label mb-1 block">{label}</label>
       {children}
     </div>
   );

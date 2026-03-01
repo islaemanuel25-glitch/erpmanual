@@ -216,7 +216,7 @@ export default function SunmiTablaProductos({
   const colSpan = headers.length;
 
   return (
-    <div className="overflow-hidden rounded-xl border sunmi-border">
+    <div className="overflow-x-auto sm:overflow-hidden rounded-xl border sunmi-border">
       <SunmiTable headers={headers}>
         {rows.length === 0 ? (
           <SunmiTableEmpty message="No hay productos disponibles" colSpan={colSpan} />
@@ -244,7 +244,7 @@ export default function SunmiTablaProductos({
                     w-[26px] h-[26px]
                     flex items-center justify-center
                     rounded-md
-                    sunmi-btn-amber
+                    sunmi-btn-secondary
                     transition
                     cursor-pointer
                   "

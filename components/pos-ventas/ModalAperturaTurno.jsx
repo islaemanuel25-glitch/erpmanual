@@ -64,7 +64,7 @@ export default function ModalAperturaTurno({
 
         <div className="space-y-3">
           <div>
-            <label className="text-sm text-slate-300 mb-1 block">
+            <label className="text-sm sunmi-label mb-1 block">
               Monto inicial en caja
             </label>
             <SunmiInput

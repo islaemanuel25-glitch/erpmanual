@@ -44,7 +44,7 @@ export default function ModalCanjePuntos({
 
           {/* Input */}
           <div>
-            <label className="text-[11px] text-slate-400 mb-1 block">
+            <label className="text-[11px] sunmi-label mb-1 block">
               Puntos a canjear
             </label>
             <SunmiInput

@@ -146,27 +146,22 @@ export default function TablaStock({
 
   if (!localSeleccionado) {
     return (
-      <div className="sunmi-card">
-        <div className="sunmi-header-cyan">Stock</div>
-        <p className="text-slate-400 text-sm mt-3">
-          No hay contexto operativo activo.
-        </p>
-      </div>
+      <p className="sunmi-text-muted text-sm py-4">
+        No hay contexto operativo activo.
+      </p>
     );
   }
 
   return (
-    <div className="sunmi-card">
-      <div className="sunmi-header-cyan">Stock del Local</div>
-
+    <div>
       {loading && (
-        <p className="text-slate-400 text-[13px] mt-3">Cargando stock...</p>
+        <p className="sunmi-text-muted text-[13px] mb-3">Cargando stock...</p>
       )}
-      {error && <p className="text-red-400 text-[13px] mt-3">{error}</p>}
+      {error && <p className="sunmi-text-danger text-[13px] mb-3">{error}</p>}
 
-      <div className="overflow-x-auto mt-3">
+      <div className="overflow-x-auto rounded-xl border sunmi-border">
         <table className="min-w-full text-[12px] sunmi-table">
-          <thead>
+          <thead className="sunmi-thead">
             <tr>
               <th className="px-2 py-1 text-left">Producto</th>
               <th className="px-2 py-1 text-left">Código</th>
@@ -185,7 +180,7 @@ export default function TablaStock({
               <tr>
                 <td
                   colSpan={9}
-                  className="px-2 py-3 text-center text-slate-500"
+                  className="px-2 py-3 text-center sunmi-text-muted"
                 >
                   No hay productos para mostrar.
                 </td>
@@ -195,7 +190,7 @@ export default function TablaStock({
             {items.map((p) => {
               const presentacionDep = getPresentacionDeposito(p);
               return (
-                <tr key={p.id} className="hover:bg-slate-800/40">
+                <tr key={p.id} className="hover:bg-[var(--table-row-hover)]">
                   <td className="px-2 py-1">{p.nombre}</td>
                   <td className="px-2 py-1">{p.codigoBarra || "-"}</td>
                   <td className="px-2 py-1">
@@ -205,7 +200,7 @@ export default function TablaStock({
                       <div className="flex flex-col">
                         <span>{getUnidadLocal(p)}</span>
                         {presentacionDep && (
-                          <span className="text-[10px] text-slate-500">
+                          <span className="text-[10px] sunmi-text-muted">
                             Presentación dep: {presentacionDep}
                           </span>
                         )}
@@ -244,14 +239,12 @@ export default function TablaStock({
                     : p.stockMax != null ? formatCantidad(p.stockMax, p.unidadMedida) : "-"}
                 </td>
 
-                {/* 🟦 COSTO */}
                 <td className="px-2 py-1 text-right">
                   {localEsDeposito
                     ? `$ ${Number(p.precioCosto || 0).toFixed(2)}`
                     : `$ ${Number(p.precioUnitario || 0).toFixed(2)}`}
                 </td>
 
-                {/* 🟦 PRECIO VENTA */}
                 <td className="px-2 py-1 text-right">
                   {localEsDeposito
                     ? `$ ${Number(p.precioVenta || 0).toFixed(2)}`
@@ -263,14 +256,14 @@ export default function TablaStock({
                 <td className="px-2 py-1 text-center">
                   <div className="flex justify-center gap-1">
                     <button
-                      className="sunmi-btn sunmi-btn-cyan text-[11px] px-2 py-1"
+                      className="sunmi-btn sunmi-btn-primary text-[11px] px-2 py-1"
                       onClick={() => onAjustar(p)}
                     >
                       Ajustar
                     </button>
 
                     <button
-                      className="sunmi-btn sunmi-btn-amber text-[11px] px-2 py-1"
+                      className="sunmi-btn sunmi-btn-secondary text-[11px] px-2 py-1"
                       onClick={() => onEditarLimites(p)}
                     >
                       Límites
@@ -285,26 +278,26 @@ export default function TablaStock({
       </div>
 
       {/* PAGINACIÓN */}
-      <div className="flex items-center justify-between mt-4 text-[12px] text-slate-400">
+      <div className="flex items-center justify-between mt-4 text-[12px] sunmi-text-muted">
         <div>
-          Total: <strong className="text-slate-200">{total}</strong> productos
+          Total: <strong className="sunmi-text-strong">{total}</strong> productos
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            className="sunmi-btn bg-slate-800 text-slate-200 disabled:opacity-40 px-3 py-1"
+            className="sunmi-btn sunmi-control disabled:opacity-40 px-3 py-1"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
           >
             ◀
           </button>
 
-          <span className="text-slate-300">
+          <span className="sunmi-text-strong">
             Página {page} de {totalPages}
           </span>
 
           <button
-            className="sunmi-btn bg-slate-800 text-slate-200 disabled:opacity-40 px-3 py-1"
+            className="sunmi-btn sunmi-control disabled:opacity-40 px-3 py-1"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
           >

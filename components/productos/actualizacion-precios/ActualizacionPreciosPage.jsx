@@ -579,7 +579,7 @@ export default function ActualizacionPreciosPage() {
               {/* Selector de proveedor + boton cargar */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
                 <div className="md:col-span-2">
-                  <label className="text-[11px] text-slate-400 mb-1 block">
+                  <label className="text-[11px] sunmi-label mb-1 block">
                     Proveedor
                   </label>
                   <SunmiSelectAdv
@@ -619,7 +619,7 @@ export default function ActualizacionPreciosPage() {
                   {/* Input global + boton aplicar a todos */}
                   <div className="flex gap-2 items-end">
                     <div className="w-32">
-                      <label className="text-[11px] text-slate-400 mb-1 block">
+                      <label className="text-[11px] sunmi-label mb-1 block">
                         % Aumento
                       </label>
                       <SunmiInput
@@ -724,7 +724,7 @@ export default function ActualizacionPreciosPage() {
               <SunmiRow
                 left={
                   <div className="flex-1">
-                    <label className="text-[11px] text-slate-400 mb-1 block">
+                    <label className="text-[11px] sunmi-label mb-1 block">
                       Proveedor
                     </label>
                     <SunmiSelectAdv
@@ -763,7 +763,7 @@ export default function ActualizacionPreciosPage() {
               />
 
               <div>
-                <label className="text-[11px] text-slate-400 mb-1 block">
+                <label className="text-[11px] sunmi-label mb-1 block">
                   Subir archivo Excel (.xlsx)
                 </label>
                 <input

@@ -15,7 +15,7 @@
   border: 1px solid var(--card-border);
 }
 
-/* Header Sunmi — AMARILLO */
+/* Header Sunmi — AMARILLO (legacy) */
 .sunmi-header-amber {
   @apply bg-amber-400 text-slate-900 font-bold px-4 py-2
          text-[13px] tracking-wide uppercase shadow-md;
@@ -23,7 +23,7 @@
   border-top-right-radius: 16px;
 }
 
-/* Header Sunmi — CELESTE */
+/* Header Sunmi — CELESTE (legacy) */
 .sunmi-header-cyan {
   @apply bg-cyan-400 text-slate-900 font-bold px-4 py-2
          text-[13px] tracking-wide uppercase shadow-md;
@@ -31,10 +31,19 @@
   border-top-right-radius: 16px;
 }
 
+/* Header Sunmi — theme-safe (accent) */
+.sunmi-header-accent {
+  background: var(--pos-accent);
+  color: var(--pos-accent-fg, var(--app-bg));
+  @apply font-bold px-4 py-2 text-[13px] tracking-wide uppercase shadow-md;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
 /* Tabla Sunmi */
 .sunmi-table thead {
   background: var(--table-header-bg);
-  color: var(--app-fg);
+  color: var(--table-header-fg, var(--app-fg));
   border-bottom: 1px solid var(--app-border);
 }
 
@@ -97,6 +106,34 @@
 /* Botón rojo */
 .sunmi-btn-red {
   @apply bg-red-500 text-white hover:bg-red-600;
+}
+
+/* Botón primario — theme-safe (accent) */
+.sunmi-btn-primary {
+  background: var(--pos-accent);
+  color: var(--pos-accent-fg, var(--app-bg));
+}
+.sunmi-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.sunmi-btn-primary:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-accent) 35%, transparent);
+}
+
+/* Botón secundario — theme-safe (neutro) */
+.sunmi-btn-secondary {
+  background: var(--app-input-bg);
+  border: 1px solid var(--app-input-border);
+  color: var(--app-fg);
+}
+.sunmi-btn-secondary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--app-input-border) 100%, var(--app-fg) 20%);
+  filter: brightness(1.08);
+}
+.sunmi-btn-secondary:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-accent) 35%, transparent);
 }
 
 /* Separador Sunmi */
@@ -342,3 +379,49 @@
 .sunmi-ring    { --tw-ring-color: var(--app-border); }
 .sunmi-thead   { background: var(--table-header-bg); color: var(--table-header-fg, var(--app-fg)); }
 .sunmi-divide > :not([hidden]) ~ :not([hidden]) { border-color: var(--app-border); }
+
+/* --- Secciones de formulario --- */
+.sunmi-section-title { color: var(--app-fg); font-weight: 700; }
+.sunmi-section-subtitle { color: color-mix(in srgb, var(--app-fg) 70%, transparent); }
+
+/* --- Labels de formulario --- */
+.sunmi-label { color: var(--app-fg); }
+.sunmi-label-muted { color: color-mix(in srgb, var(--app-fg) 65%, transparent); }
+
+/* --- Select avanzado (SunmiSelectAdv / SunmiSelect) --- */
+.sunmi-select-trigger {
+  background: var(--app-input-bg);
+  border: 1px solid var(--app-input-border);
+  color: var(--app-fg);
+}
+.sunmi-select-trigger:hover {
+  border-color: color-mix(in srgb, var(--app-input-border) 100%, var(--app-fg) 20%);
+}
+.sunmi-select-trigger:focus {
+  outline: none;
+  border-color: var(--pos-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-accent) 30%, transparent);
+}
+
+.sunmi-select-dropdown {
+  background: var(--card-bg);
+  border: 1px solid var(--app-border);
+  color: var(--app-fg);
+}
+
+.sunmi-select-item {
+  color: var(--app-fg);
+}
+.sunmi-select-item:hover {
+  background: color-mix(in srgb, var(--pos-accent) 20%, transparent);
+  color: var(--app-fg);
+}
+
+.sunmi-select-item-active {
+  background: var(--pos-accent);
+  color: var(--app-bg);
+}
+.sunmi-select-item-active:hover {
+  background: var(--pos-accent);
+  filter: brightness(1.08);
+}

@@ -11,7 +11,7 @@ export default function SunmiTable({ headers = [], children }) {
         className="
           w-full 
           text-[12px]              /* más compacto */
-          table-fixed
+          table-auto sm:table-fixed
         "
       >
         {/* ===== HEADER ===== */}

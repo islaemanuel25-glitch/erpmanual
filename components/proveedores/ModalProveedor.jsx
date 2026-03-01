@@ -213,7 +213,7 @@ export default function ModalProveedor({
 function Field({ label, children }) {
   return (
     <div className="flex flex-col gap-1 px-1">
-      <label className="text-[11px] text-slate-400 mb-1 block">{label}</label>
+      <label className="text-[11px] sunmi-label mb-1 block">{label}</label>
       {children}
     </div>
   );
