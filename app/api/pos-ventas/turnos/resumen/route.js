@@ -20,6 +20,25 @@ export async function GET(req) {
       );
     }
 
+    const turno = await prisma.turno.findUnique({
+      where: { id: turnoId },
+      select: { localId: true },
+    });
+
+    if (!turno) {
+      return NextResponse.json(
+        { ok: false, error: "Turno no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    if (!session.esAdmin && Number(session.localId) !== Number(turno.localId)) {
+      return NextResponse.json(
+        { ok: false, error: "No autorizado para este turno" },
+        { status: 403 }
+      );
+    }
+
     const ventas = await prisma.venta.findMany({
       where: { turnoId },
       select: { total: true, formaPago: true, comisionBancaria: true, netoRecibido: true },
