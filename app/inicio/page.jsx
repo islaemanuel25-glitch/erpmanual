@@ -88,8 +88,8 @@ export default function InicioPage() {
     return (
       <main className="min-h-screen grid place-items-center sunmi-bg">
         <div className="flex flex-col items-center gap-2">
-          <Loader2 size={24} className="animate-spin text-slate-400" />
-          <span className="text-sm text-slate-400">Cargando...</span>
+          <Loader2 size={24} className="animate-spin sunmi-text-muted" />
+          <span className="text-sm sunmi-text-muted">Cargando...</span>
         </div>
       </main>
     );
@@ -101,12 +101,12 @@ export default function InicioPage() {
         <h1 className="text-xl font-semibold text-center mb-1">
           Elegí tu contexto operativo
         </h1>
-        <p className="text-xs text-slate-400 text-center mb-5">
+        <p className="text-xs sunmi-text-muted text-center mb-5">
           Seleccioná el local o depósito desde donde vas a operar.
         </p>
 
         {error && (
-          <div className="mb-4 text-[11px] text-red-400 bg-red-900/20 border border-red-500/40 rounded-lg px-3 py-2 text-center">
+          <div className="mb-4 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2 text-center">
             {error}
           </div>
         )}
@@ -120,21 +120,21 @@ export default function InicioPage() {
               onClick={() => seleccionar(local)}
               className="
                 w-full flex items-center gap-3 p-3
-                bg-slate-800/60 border border-slate-700
+                sunmi-surface-soft sunmi-border
                 rounded-xl
-                hover:border-cyan-500/50 hover:bg-slate-800
+                sunmi-row-hover
                 transition text-left
                 disabled:opacity-50
               "
             >
               {local.esDeposito ? (
-                <Warehouse size={20} className="text-amber-400 flex-shrink-0" />
+                <Warehouse size={20} className="sunmi-text-warning flex-shrink-0" />
               ) : (
-                <Store size={20} className="text-cyan-400 flex-shrink-0" />
+                <Store size={20} className="sunmi-text-accent flex-shrink-0" />
               )}
               <div>
                 <div className="text-[13px] font-medium">{local.nombre}</div>
-                <div className="text-[10px] text-slate-500">
+                <div className="text-[10px] sunmi-text-muted">
                   {local.esDeposito ? "Depósito" : "Local"}
                 </div>
               </div>
@@ -143,7 +143,7 @@ export default function InicioPage() {
         </div>
 
         {locales.length === 0 && !error && (
-          <div className="text-xs text-slate-500 text-center py-4">
+          <div className="text-xs sunmi-text-muted text-center py-4">
             No hay locales disponibles. Seleccioná un grupo primero.
           </div>
         )}

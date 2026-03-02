@@ -28,16 +28,16 @@ export default function ModalCanjePuntos({
   const descuento = puntosNum * pesoPorPunto;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-md p-4">
         <h3 className="text-lg font-bold mb-3">Canjear Puntos</h3>
 
         <div className="space-y-3">
           {/* Saldo disponible */}
-          <div className="bg-slate-900/50 p-3 rounded-lg text-center">
-            <div className="text-xs text-slate-400">Puntos disponibles</div>
-            <div className="text-xl font-bold text-purple-400">{saldo}</div>
-            <div className="text-[10px] text-slate-500 mt-1">
+          <div className="sunmi-surface-soft p-3 rounded-lg text-center">
+            <div className="text-xs sunmi-text-muted">Puntos disponibles</div>
+            <div className="text-xl font-bold sunmi-text-link">{saldo}</div>
+            <div className="text-[10px] sunmi-text-muted mt-1">
               1 punto = ${formatPrecio(pesoPorPunto)}
             </div>
           </div>
@@ -82,11 +82,11 @@ export default function ModalCanjePuntos({
 
           {/* Preview */}
           {puntosNum > 0 && (
-            <div className="bg-purple-500/20 border border-purple-500/50 p-3 rounded-lg text-center">
-              <div className="text-xs text-purple-300">
+            <div className="sunmi-badge-link p-3 rounded-lg text-center">
+              <div className="text-xs">
                 {puntosNum} puntos = descuento de -${formatPrecio(descuento)}
               </div>
-              <div className="text-2xl font-bold text-purple-400 mt-1">
+              <div className="text-2xl font-bold sunmi-text-link mt-1">
                 -${formatPrecio(descuento)}
               </div>
             </div>

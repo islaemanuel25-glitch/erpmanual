@@ -186,20 +186,20 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-md p-4">
         <div className="text-center mb-4">
-          <div className="text-red-400 text-3xl mb-2">⚠</div>
-          <h3 className="text-lg font-bold text-red-400">PENDIENTE DE SINCRONIZACIÓN</h3>
+          <div className="sunmi-text-danger text-3xl mb-2">⚠</div>
+          <h3 className="text-lg font-bold sunmi-text-danger">PENDIENTE DE SINCRONIZACIÓN</h3>
         </div>
 
 
         {/* Vista previa en pantalla */}
         <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
-          <div className="text-center border-b border-slate-700 pb-2">
-            <div className="text-red-400 font-bold text-sm mb-1">⚠ PENDIENTE DE SINCRONIZACIÓN ⚠</div>
-            <div className="text-xs text-slate-400">{ticket.localNombre} (ID: {ticket.localId})</div>
-            <div className="text-xs text-slate-400">{formatFecha(ticket.createdAt)}</div>
+          <div className="text-center border-b sunmi-divider pb-2">
+            <div className="sunmi-text-danger font-bold text-sm mb-1">⚠ PENDIENTE DE SINCRONIZACIÓN ⚠</div>
+            <div className="text-xs sunmi-text-muted">{ticket.localNombre} (ID: {ticket.localId})</div>
+            <div className="text-xs sunmi-text-muted">{formatFecha(ticket.createdAt)}</div>
           </div>
 
           <div className="text-xs space-y-1">
@@ -210,7 +210,7 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
             )}
           </div>
 
-          <div className="border-t border-b border-slate-700 py-2 space-y-1">
+          <div className="border-t border-b sunmi-divider py-2 space-y-1">
             {ticket.items.map((item, idx) => (
               <div key={idx} className="flex justify-between text-xs">
                 <span>{item.cantidad}x {item.nombre}</span>
@@ -236,7 +236,7 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
                 <span>-${formatPrecio(ticket.descuentoPorPuntos)}</span>
               </div>
             )}
-            <div className="flex justify-between font-bold text-base border-t border-slate-700 pt-1 mt-1">
+            <div className="flex justify-between font-bold text-base border-t sunmi-divider pt-1 mt-1">
               <span>TOTAL:</span>
               <span>${formatPrecio(ticket.total)}</span>
             </div>
@@ -251,7 +251,7 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
             </div>
           )}
 
-          <div className="text-center text-xs text-slate-400 border-t border-slate-700 pt-2">
+          <div className="text-center text-xs sunmi-text-muted border-t sunmi-divider pt-2">
             <div><strong>ID:</strong> {ticket.clientVentaIdCorto}</div>
             <div className="mt-1">Se enviará automáticamente cuando vuelva internet.</div>
           </div>

@@ -4,27 +4,12 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 
 function getBadge(modo, posEstado) {
   if (modo === "manual" && posEstado === "Solicitado") {
-    return {
-      label: "Pedido solicitado",
-      bg: "bg-amber-500/20",
-      text: "text-amber-300",
-      border: "border-amber-400/40",
-    };
+    return { label: "Pedido solicitado", cls: "sunmi-state-warning sunmi-text-warning" };
   }
   if (modo === "manual") {
-    return {
-      label: "Pedido manual",
-      bg: "bg-cyan-500/20",
-      text: "text-cyan-300",
-      border: "border-cyan-400/40",
-    };
+    return { label: "Pedido manual", cls: "sunmi-badge-link" };
   }
-  return {
-    label: "POS activa",
-    bg: "bg-emerald-500/20",
-    text: "text-emerald-300",
-    border: "border-emerald-400/40",
-  };
+  return { label: "POS activa", cls: "sunmi-state-success sunmi-text-success" };
 }
 
 export default function Encabezado({ origen, destino, me, modo, posEstado }) {
@@ -44,17 +29,17 @@ export default function Encabezado({ origen, destino, me, modo, posEstado }) {
             className="
               h-11 w-11
               rounded-2xl
-              bg-amber-400
+              sunmi-badge-accent
               flex items-center justify-center
-              text-slate-900 font-black text-[13px]
-              shadow-[0_0_10px_rgba(250,204,21,0.6)]
+              font-black text-[13px]
+              shadow-md
             "
           >
             POS
           </div>
 
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-slate-400">
+            <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
               {modo === "manual" ? "Pedido de mercadería" : "Sesión de preparación"}
             </div>
             <div className="text-[15px] font-semibold">
@@ -69,9 +54,7 @@ export default function Encabezado({ origen, destino, me, modo, posEstado }) {
             px-3 py-1
             text-[10px] font-semibold
             rounded-full
-            ${badge.bg}
-            ${badge.text}
-            border ${badge.border}
+            ${badge.cls}
           `}
         >
           ● {badge.label}
@@ -87,11 +70,11 @@ export default function Encabezado({ origen, destino, me, modo, posEstado }) {
         </span>
 
         <div className="mx-3 flex items-center">
-          <div className="w-10 h-[2px] bg-amber-500/40 relative overflow-hidden rounded-full">
-            <div className="absolute inset-0 bg-amber-400 animate-[pulseLine_1.4s_linear_infinite]"></div>
+          <div className="w-10 h-[2px] relative overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--pos-accent) 40%, transparent)' }}>
+            <div className="absolute inset-0 animate-[pulseLine_1.4s_linear_infinite]" style={{ background: 'var(--pos-accent)' }}></div>
           </div>
 
-          <span className="ml-2 text-amber-400 text-[16px]">→</span>
+          <span className="ml-2 sunmi-text-accent text-[16px]">→</span>
         </div>
 
         <span className="text-[13px] font-semibold">
@@ -107,14 +90,14 @@ export default function Encabezado({ origen, destino, me, modo, posEstado }) {
         {/* ORIGEN */}
         <div
           className="
-            bg-slate-800
+            sunmi-surface-soft
             rounded-xl
             px-4 py-3
             shadow-inner
-            border border-slate-800
+            sunmi-border
           "
         >
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">
+          <span className="text-[11px] uppercase tracking-wide sunmi-text-muted">
             {modo === "manual" ? "Depósito" : "Origen"}
           </span>
           <div className="flex items-center gap-2 mt-1">
@@ -127,14 +110,14 @@ export default function Encabezado({ origen, destino, me, modo, posEstado }) {
         {/* DESTINO */}
         <div
           className="
-            bg-slate-800
+            sunmi-surface-soft
             rounded-xl
             px-4 py-3
             shadow-inner
-            border border-slate-800
+            sunmi-border
           "
         >
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">
+          <span className="text-[11px] uppercase tracking-wide sunmi-text-muted">
             {modo === "manual" ? "Mi local" : "Destino"}
           </span>
           <div className="flex items-center gap-2 mt-1">
@@ -147,14 +130,14 @@ export default function Encabezado({ origen, destino, me, modo, posEstado }) {
         {/* USUARIO */}
         <div
           className="
-            bg-slate-800
+            sunmi-surface-soft
             rounded-xl
             px-4 py-3
             shadow-inner
-            border border-slate-800
+            sunmi-border
           "
         >
-          <span className="text-[11px] uppercase tracking-wide text-slate-400">
+          <span className="text-[11px] uppercase tracking-wide sunmi-text-muted">
             Usuario
           </span>
           <div className="flex items-center gap-2 mt-1">

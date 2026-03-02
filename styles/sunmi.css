@@ -93,25 +93,64 @@
   transform: scale(0.98);
 }
 
-/* Botón celeste */
+/* Base para SunmiButton component */
+.sunmi-btn-base {
+  height: 36px;
+  padding-inline: 1rem;
+  border-radius: 0.375rem;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 150ms;
+  cursor: pointer;
+}
+.sunmi-btn-base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sunmi-btn-base:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* Botón celeste — theme-safe (link) */
 .sunmi-btn-cyan {
-  @apply bg-cyan-500 text-slate-900 hover:bg-cyan-600;
+  background: var(--pos-link);
+  color: var(--app-bg);
+}
+.sunmi-btn-cyan:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
-/* Botón ámbar */
+/* Botón ámbar — theme-safe (accent) */
 .sunmi-btn-amber {
-  @apply bg-amber-400 text-slate-900 hover:bg-amber-500;
+  background: var(--pos-accent);
+  color: var(--app-bg);
+}
+.sunmi-btn-amber:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
-/* Botón rojo */
+/* Botón rojo — theme-safe (danger) */
 .sunmi-btn-red {
-  @apply bg-red-500 text-white hover:bg-red-600;
+  background: var(--pos-danger);
+  color: var(--app-bg);
+}
+.sunmi-btn-red:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
-/* Botón primario — theme-safe (accent) */
+/* Botón neutro — theme-safe (control) */
+.sunmi-btn-slate {
+  background: var(--pos-control-bg);
+  color: var(--pos-control-text);
+}
+.sunmi-btn-slate:hover:not(:disabled) {
+  background: var(--pos-control-hover);
+}
+
+/* Botón primario — theme-safe (accent, alias) */
 .sunmi-btn-primary {
   background: var(--pos-accent);
-  color: var(--pos-accent-fg, var(--app-bg));
+  color: var(--app-bg);
 }
 .sunmi-btn-primary:hover:not(:disabled) {
   filter: brightness(1.1);
@@ -261,17 +300,22 @@
    ============================================================ */
 
 /* --- Superficies --- */
-.sunmi-surface      { background: var(--pos-surface); }
-.sunmi-surface-soft { background: var(--card-bg); }
-.sunmi-border       { border-color: var(--app-border); }
+.sunmi-surface      { background: var(--app-bg); }
+.sunmi-surface-soft { background: var(--app-input-bg); }
+.sunmi-border       { border: 1px solid var(--app-border); }
 
 /* --- Texto semántico --- */
-.sunmi-text-muted   { color: var(--pos-muted); }
-.sunmi-text-strong  { color: var(--pos-muted-strong); }
+.sunmi-text-muted   { color: color-mix(in srgb, var(--app-fg) 60%, transparent); }
+.sunmi-text-strong  { color: var(--app-fg); }
 .sunmi-text-accent  { color: var(--pos-accent); }
 .sunmi-text-link    { color: var(--pos-link); }
-.sunmi-text-success { color: var(--pos-success); }
-.sunmi-text-danger  { color: var(--pos-danger); }
+.sunmi-text-success { color: var(--pos-success, #22c55e); }
+.sunmi-text-danger  { color: var(--pos-danger, #ef4444); }
+.sunmi-text-warning { color: var(--pos-warning, #f59e0b); }
+
+/* --- Overlays --- */
+.sunmi-overlay        { background: color-mix(in srgb, black 50%, transparent); }
+.sunmi-overlay-strong { background: color-mix(in srgb, black 80%, transparent); }
 
 /* --- Links con hover --- */
 .sunmi-link              { color: var(--pos-link); }
@@ -375,6 +419,7 @@
 .sunmi-badge-danger  { background: var(--pos-danger); color: #fff; }
 
 /* --- Utilidades --- */
+.sunmi-row-hover:hover { background: var(--table-row-hover); }
 .sunmi-divider { border-color: var(--app-border); }
 .sunmi-ring    { --tw-ring-color: var(--app-border); }
 .sunmi-thead   { background: var(--table-header-bg); color: var(--table-header-fg, var(--app-fg)); }

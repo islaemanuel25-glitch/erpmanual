@@ -35,23 +35,24 @@ export default function SidebarMobile({ menu, perfil }) {
       {/* PANEL */}
       <aside
         className={`
-          fixed top-0 left-0 h-full w-64 
+          fixed top-0 left-0 h-dvh w-64
+          flex flex-col
           ${theme.sidebar.bg}
           ${theme.sidebar.border} border-r
           shadow-xl shadow-black/60
-          p-4 transform z-50
+          transform z-50
           transition-transform duration-300
           ${open ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <div className="flex justify-between items-center mb-4 text-slate-900">
+        <div className="flex justify-between items-center min-h-[44px] px-4 pt-4 text-slate-900">
           <h2 className="text-lg font-bold">Menú</h2>
           <button onClick={() => setOpen(false)}>
             <X size={24} className="text-slate-900" />
           </button>
         </div>
 
-        <nav className="flex flex-col gap-6">
+        <nav className="flex-1 flex flex-col gap-6 px-4 py-4 overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
           {menu.map((grupo) => (
             <div key={grupo.label}>
               <h3 className="text-xs font-bold uppercase text-slate-800">

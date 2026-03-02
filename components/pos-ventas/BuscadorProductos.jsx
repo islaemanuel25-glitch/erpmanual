@@ -165,7 +165,7 @@ function BuscadorProductos({ localId, onAgregar }) {
             onClick={iniciarVoz}
             className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
               escuchando
-                ? "bg-red-500 animate-pulse text-white"
+                ? "sunmi-btn-red animate-pulse"
                 : "pos-control"
             }`}
             title="Buscar por voz"

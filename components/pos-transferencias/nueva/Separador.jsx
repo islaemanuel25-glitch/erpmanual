@@ -4,13 +4,11 @@ export default function Separador({ label, icon = "◆" }) {
   const text = label.toLowerCase();
 
   const esSugeridos = text.includes("suger");
-  const esPreparados = text.includes("prepar");
 
-  const color = esSugeridos
-    ? "#FACC15" // AMARILLO
-    : esPreparados
-    ? "#22D3EE" // CELESTE
-    : "#22D3EE"; // default
+  // Sugeridos → accent, Preparados/default → link
+  const cssColor = esSugeridos
+    ? "var(--pos-accent)"
+    : "var(--pos-link)";
 
   return (
     <div className="my-4 select-none">
@@ -19,7 +17,7 @@ export default function Separador({ label, icon = "◆" }) {
       <div className="flex items-center gap-2 mb-1 px-1">
         <span
           className="text-[10px] font-bold drop-shadow"
-          style={{ color }}
+          style={{ color: cssColor }}
         >
           {icon}
         </span>
@@ -29,7 +27,7 @@ export default function Separador({ label, icon = "◆" }) {
             text-[11px] uppercase tracking-wider font-semibold
             drop-shadow
           "
-          style={{ color }}
+          style={{ color: cssColor }}
         >
           {label}
         </span>
@@ -40,15 +38,15 @@ export default function Separador({ label, icon = "◆" }) {
         <div
           className="absolute inset-0 rounded-full shadow"
           style={{
-            backgroundColor: color + "99",
-            boxShadow: `0 0 6px ${color}66`,
+            backgroundColor: `color-mix(in srgb, ${cssColor} 60%, transparent)`,
+            boxShadow: `0 0 6px color-mix(in srgb, ${cssColor} 40%, transparent)`,
           }}
         />
 
         <div
           className="absolute inset-x-6 top-[1px] h-[1px]"
           style={{
-            backgroundColor: color + "55",
+            backgroundColor: `color-mix(in srgb, ${cssColor} 33%, transparent)`,
           }}
         />
       </div>

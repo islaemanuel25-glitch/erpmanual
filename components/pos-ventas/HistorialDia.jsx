@@ -40,13 +40,13 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
   const totalVendido = ventas.reduce((s, v) => s + Number(v.total), 0);
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div className="fixed inset-0 sunmi-overlay-strong flex items-center justify-center p-4 z-50 overflow-y-auto">
       <SunmiCard className="w-full max-w-lg p-4 my-4">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-bold">Ventas del dia</h2>
           <button
             onClick={cargar}
-            className="text-[11px] text-cyan-400 hover:text-cyan-300"
+            className="text-[11px] sunmi-link"
           >
             Actualizar
           </button>
@@ -55,13 +55,13 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
         {/* Resumen */}
         {ventas.length > 0 && (
           <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="bg-slate-800/60 p-2 rounded-lg text-center">
-              <div className="text-[10px] text-slate-400">Ventas</div>
-              <div className="text-lg font-bold text-cyan-400">{ventas.length}</div>
+            <div className="sunmi-surface-soft p-2 rounded-lg text-center">
+              <div className="text-[10px] sunmi-text-muted">Ventas</div>
+              <div className="text-lg font-bold sunmi-text-link">{ventas.length}</div>
             </div>
-            <div className="bg-slate-800/60 p-2 rounded-lg text-center">
-              <div className="text-[10px] text-slate-400">Total</div>
-              <div className="text-lg font-bold text-amber-400">
+            <div className="sunmi-surface-soft p-2 rounded-lg text-center">
+              <div className="text-[10px] sunmi-text-muted">Total</div>
+              <div className="text-lg font-bold sunmi-text-accent">
                 ${formatPrecio(totalVendido)}
               </div>
             </div>
@@ -71,9 +71,9 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
         {/* Lista de ventas */}
         <div className="space-y-1 max-h-96 overflow-y-auto">
           {loading ? (
-            <div className="text-center py-8 text-slate-400">Cargando...</div>
+            <div className="text-center py-8 sunmi-text-muted">Cargando...</div>
           ) : ventas.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
+            <div className="text-center py-8 sunmi-text-muted">
               No hay ventas registradas hoy
             </div>
           ) : (
@@ -81,12 +81,12 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
               <div
                 key={v.id}
                 onClick={() => setDetalle(v)}
-                className="bg-slate-900/50 p-2 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors"
+                className="sunmi-surface-soft p-2 rounded-lg cursor-pointer sunmi-row-hover transition-colors"
               >
                 <div className="flex justify-between items-center">
                   <div>
                     <span className="text-sm font-medium">#{v.numero}</span>
-                    <span className="text-[11px] text-slate-400 ml-2">
+                    <span className="text-[11px] sunmi-text-muted ml-2">
                       {new Date(v.fecha).toLocaleTimeString("es-AR", {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -94,10 +94,10 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
                     </span>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-bold text-amber-400">
+                    <div className="text-sm font-bold sunmi-text-accent">
                       ${formatPrecio(Number(v.total))}
                     </div>
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[10px] sunmi-text-muted">
                       {v.formaPago}
                     </div>
                   </div>
@@ -117,11 +117,11 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
 
       {/* Modal detalle */}
       {detalle && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
+        <div className="fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-[60]">
           <SunmiCard className="w-full max-w-md p-4">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-lg font-bold">Ticket #{detalle.numero}</h3>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs sunmi-text-muted">
                 {new Date(detalle.fecha).toLocaleString("es-AR")}
               </span>
             </div>
@@ -131,10 +131,10 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
               {detalle.detalles?.map((d, i) => (
                 <div
                   key={i}
-                  className="flex justify-between text-sm bg-slate-800/40 px-2 py-1 rounded"
+                  className="flex justify-between text-sm sunmi-surface-soft px-2 py-1 rounded"
                 >
                   <span className="truncate flex-1 mr-2">{d.nombre}</span>
-                  <span className="text-slate-400 shrink-0">
+                  <span className="sunmi-text-muted shrink-0">
                     {d.cantidad} x ${formatPrecio(Number(d.precio))}
                   </span>
                   <span className="font-medium ml-2 shrink-0">
@@ -145,26 +145,26 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
             </div>
 
             {/* Totales */}
-            <div className="border-t border-slate-700 pt-2 space-y-1">
+            <div className="border-t sunmi-divider pt-2 space-y-1">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Subtotal</span>
+                <span className="sunmi-text-muted">Subtotal</span>
                 <span>${formatPrecio(Number(detalle.subtotal))}</span>
               </div>
               {Number(detalle.descuento) > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-emerald-400">Descuento</span>
-                  <span className="text-emerald-400">
+                  <span className="sunmi-text-success">Descuento</span>
+                  <span className="sunmi-text-success">
                     -${formatPrecio(Number(detalle.descuento))}
                   </span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
-                <span className="text-amber-400">
+                <span className="sunmi-text-accent">
                   ${formatPrecio(Number(detalle.total))}
                 </span>
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs sunmi-text-muted">
                 Pago: {detalle.formaPago}
               </div>
             </div>

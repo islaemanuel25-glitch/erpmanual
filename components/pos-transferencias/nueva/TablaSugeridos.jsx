@@ -27,9 +27,8 @@ export default function TablaSugeridos({
   return (
     <div
       className="
-        rounded-2xl 
-        bg-slate-900 
-        border border-slate-800 
+        rounded-2xl
+        sunmi-surface sunmi-border
         shadow-md
         overflow-hidden
         text-[12px]
@@ -38,11 +37,8 @@ export default function TablaSugeridos({
       {/* HEADER */}
       <div
         className="
-          bg-[#FACC15]
-          text-slate-900 
-          px-4 py-2 
+          sunmi-header-accent
           flex items-center justify-between
-          shadow-[0_0_12px_rgba(250,204,21,0.45)]
         "
       >
         <span className="font-bold text-xs uppercase tracking-wide">
@@ -66,12 +62,10 @@ export default function TablaSugeridos({
 
           <button
             className="
-              px-2 py-1 rounded-lg 
-              bg-slate-900 text-slate-200 
-              border border-slate-800 
+              px-2 py-1 rounded-lg
+              sunmi-control sunmi-border
               disabled:opacity-30
-              hover:bg-slate-800/60 
-              active:scale-95 
+              active:scale-95
               transition
             "
             onClick={onPrev}
@@ -86,12 +80,10 @@ export default function TablaSugeridos({
 
           <button
             className="
-              px-2 py-1 rounded-lg 
-              bg-slate-900 text-slate-200 
-              border border-slate-800 
+              px-2 py-1 rounded-lg
+              sunmi-control sunmi-border
               disabled:opacity-30
-              hover:bg-slate-800/60 
-              active:scale-95 
+              active:scale-95
               transition
             "
             onClick={onNext}
@@ -105,15 +97,15 @@ export default function TablaSugeridos({
       {/* FILTROS */}
       <div
         className="
-          px-3 py-2 
-          bg-slate-900 
-          border-b border-slate-800 
+          px-3 py-2
+          sunmi-surface
+          border-b sunmi-divider
           flex flex-wrap gap-4
         "
       >
         {/* CATEGORÍAS — mismo patrón que FiltrosProductos: value + onChange directo + placeholder */}
         <div className="flex items-center gap-2 text-[11px]">
-          <span className="text-slate-400">Categorías</span>
+          <span className="sunmi-text-muted">Categorías</span>
 
           <SunmiSelectAdv
             value={categoriaSeleccionada}
@@ -135,7 +127,7 @@ export default function TablaSugeridos({
 
         {/* AREAS — mismo patrón que FiltrosProductos: value + onChange directo + placeholder */}
         <div className="flex items-center gap-2 text-[11px]">
-          <span className="text-slate-400">Áreas</span>
+          <span className="sunmi-text-muted">Áreas</span>
 
           <SunmiSelectAdv
             value={areaSeleccionada}
@@ -156,7 +148,7 @@ export default function TablaSugeridos({
         </div>
 
         {loading && (
-          <span className="ml-auto text-[11px] text-slate-500 animate-pulse">
+          <span className="ml-auto text-[11px] sunmi-text-muted animate-pulse">
             Cargando sugeridos...
           </span>
         )}
@@ -167,9 +159,8 @@ export default function TablaSugeridos({
         <table className="w-full table-fixed text-[12px]">
           <thead
             className="
-              bg-slate-900
-              border-b border-slate-800
-              text-slate-400
+              sunmi-thead
+              border-b sunmi-divider
             "
           >
             <tr>
@@ -189,8 +180,8 @@ export default function TablaSugeridos({
                 <td
                   colSpan={7}
                   className="
-                    px-3 py-4 text-center 
-                    text-slate-500 text-[11px]
+                    px-3 py-4 text-center
+                    sunmi-text-muted text-[11px]
                   "
                 >
                   No hay productos sugeridos.
@@ -342,8 +333,8 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
   return (
     <tr
       className="
-        border-t border-slate-800
-        hover:bg-slate-800/60
+        border-t sunmi-divider
+        sunmi-row-hover
         transition
       "
     >
@@ -351,29 +342,29 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
       <td className="px-3 py-2 align-middle">
         <span className="font-medium">{p.productoNombre}</span>
         {String(p?.tipo || "").toLowerCase() === "rotura" && (
-          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 font-semibold">
+          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full sunmi-state-danger sunmi-text-danger font-semibold">
             Rotura
           </span>
         )}
       </td>
 
       {/* CATEGORÍA */}
-      <td className="px-2 py-2 text-[11px] text-slate-300 align-middle">
+      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle">
         {p.categoriaNombre || "Sin categoría"}
       </td>
 
       {/* ÁREA */}
-      <td className="px-2 py-2 text-[11px] text-slate-300 align-middle">
+      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle">
         {p.areaFisicaNombre || "Sin área"}
       </td>
 
       {/* CODIGO */}
-      <td className="px-2 py-2 text-[11px] text-slate-400 align-middle">
+      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle">
         {p.codigoBarra || "-"}
       </td>
 
       {/* PRESENTACIÓN */}
-      <td className="px-2 py-2 text-[11px] text-slate-300 align-middle">
+      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle">
         {bultoMode ? `${p.unidadMedida} x ${factorPack}` : p.unidadMedida}
       </td>
 
@@ -385,7 +376,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
               <>
                 {/* Bultos */}
                 <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => handleBultos(Math.max(0, bultos - 1))} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">−</button>
+                  <button type="button" onClick={() => handleBultos(Math.max(0, bultos - 1))} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">−</button>
                   <SunmiInput
                     type="text"
                     inputMode="numeric"
@@ -395,13 +386,13 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
                     onChange={(e) => handleBultos(e.target.value)}
                     className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <button type="button" onClick={() => handleBultos(bultos + 1)} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">+</button>
-                  <span className="text-[10px] text-slate-400">{labelBulto}</span>
+                  <button type="button" onClick={() => handleBultos(bultos + 1)} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
+                  <span className="text-[10px] sunmi-text-muted">{labelBulto}</span>
                 </div>
                 {/* Uds sueltas (solo si rotura) */}
                 {rotura && (
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => handleUds(Math.max(0, uds - 1))} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">−</button>
+                    <button type="button" onClick={() => handleUds(Math.max(0, uds - 1))} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">−</button>
                     <SunmiInput
                       type="text"
                       inputMode="numeric"
@@ -411,14 +402,14 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
                       onChange={(e) => handleUds(e.target.value)}
                       className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
-                    <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">+</button>
-                    <span className="text-[10px] text-slate-400">uds</span>
+                    <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
+                    <span className="text-[10px] sunmi-text-muted">uds</span>
                   </div>
                 )}
               </>
             ) : (
               <div className="flex items-center gap-1">
-                <button type="button" onClick={() => handleUds(Math.max(0, uds - 1))} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">−</button>
+                <button type="button" onClick={() => handleUds(Math.max(0, uds - 1))} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">−</button>
                 <SunmiInput
                   type="text"
                   inputMode="numeric"
@@ -428,14 +419,14 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
                   onChange={(e) => handleUds(e.target.value)}
                   className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
-                <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md bg-slate-700 text-slate-200 text-[13px] font-bold hover:bg-slate-600 active:scale-95 transition flex items-center justify-center">+</button>
-                <span className="text-[10px] text-slate-400">uds</span>
+                <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
+                <span className="text-[10px] sunmi-text-muted">uds</span>
               </div>
             )}
           </div>
           <div className="min-h-[14px] text-right text-[10px] leading-tight flex items-center justify-end gap-2">
             {bultoMode && (
-              <span className="text-slate-500">= {total} uds</span>
+              <span className="sunmi-text-muted">= {total} uds</span>
             )}
             {bultoMode && !solosBultos && (
               <label className="flex items-center gap-1 cursor-pointer">
@@ -443,9 +434,9 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
                   type="checkbox"
                   checked={rotura}
                   onChange={toggleRotura}
-                  className="w-3 h-3 accent-amber-400"
+                  className="w-3 h-3 accent-[var(--pos-accent)]"
                 />
-                <span className="text-amber-400">Rotura</span>
+                <span className="sunmi-text-accent">Rotura</span>
               </label>
             )}
           </div>
@@ -457,13 +448,9 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
         <button
           onClick={() => onMarcarPreparado(productoId)}
           className="
+            sunmi-btn sunmi-btn-primary
             px-3 py-1 rounded-full
             text-[11px] font-semibold
-            bg-cyan-400
-            hover:bg-cyan-500
-            active:bg-cyan-600
-            text-slate-900
-            shadow-[0_0_8px_rgba(45,212,191,0.4)]
             active:scale-95 transition
           "
         >

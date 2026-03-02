@@ -77,7 +77,7 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-md p-4">
         <h3 className="text-lg font-bold mb-3">Seleccionar Cliente</h3>
 
@@ -91,12 +91,12 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
             Consumidor Final
           </SunmiButton>
 
-          <div className="text-center text-[11px] text-slate-500">
+          <div className="text-center text-[11px] sunmi-text-muted">
             o seleccionar de la lista
           </div>
 
           {loadingAll ? (
-            <div className="text-center text-slate-400 py-2 text-sm">
+            <div className="text-center sunmi-text-muted py-2 text-sm">
               Cargando clientes...
             </div>
           ) : (
@@ -110,7 +110,7 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
                 if (cliente) onSeleccionar(cliente);
               }}
               disabled={!localId}
-              className="w-full h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200"
+              className="w-full h-11 rounded-xl sunmi-select-native px-3 text-sm"
             >
               <option value="">Seleccionar cliente...</option>
               {clientesAll.map((cliente) => (
@@ -124,18 +124,18 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
           )}
 
           {showLimitWarning && (
-            <div className="text-center text-amber-400 py-2 text-xs bg-amber-500/10 border border-amber-500/30 rounded px-2">
+            <div className="text-center sunmi-text-accent py-2 text-xs sunmi-state-warning rounded px-2">
               Mostrando primeros 500, use búsqueda para más
             </div>
           )}
 
-          <div className="text-center text-[11px] text-slate-500">
+          <div className="text-center text-[11px] sunmi-text-muted">
             o buscar cliente
           </div>
 
           {/* Advertencia si no hay localId */}
           {!localId && (
-            <div className="text-center text-amber-400 py-2 text-xs bg-amber-500/10 border border-amber-500/30 rounded px-2">
+            <div className="text-center sunmi-text-accent py-2 text-xs sunmi-state-warning rounded px-2">
               No hay contexto operativo activo.
             </div>
           )}
@@ -162,14 +162,14 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
 
           {/* Mensaje de error */}
           {errorMsg && (
-            <div className="text-center text-red-400 py-2 text-xs bg-red-500/10 border border-red-500/30 rounded px-2">
+            <div className="text-center sunmi-text-danger py-2 text-xs sunmi-state-danger rounded px-2">
               {errorMsg}
             </div>
           )}
 
           {/* Resultados */}
           {loading ? (
-            <div className="text-center text-slate-400 py-4 text-sm">
+            <div className="text-center sunmi-text-muted py-4 text-sm">
               Buscando...
             </div>
           ) : clientes.length > 0 ? (
@@ -178,16 +178,16 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
                 <button
                   key={cliente.id}
                   onClick={() => onSeleccionar(cliente)}
-                  className="w-full bg-slate-800/40 p-3 rounded-lg text-left hover:bg-slate-700/60 transition-colors"
+                  className="w-full sunmi-surface-soft p-3 rounded-lg text-left sunmi-row-hover transition-colors"
                 >
                   <div className="font-medium text-sm">{cliente.nombre}</div>
                   {cliente.documento && (
-                    <div className="text-[11px] text-slate-400">
+                    <div className="text-[11px] sunmi-text-muted">
                       DNI: {cliente.documento}
                     </div>
                   )}
                   {cliente.telefono && (
-                    <div className="text-[11px] text-slate-400">
+                    <div className="text-[11px] sunmi-text-muted">
                       Tel: {cliente.telefono}
                     </div>
                   )}
@@ -195,7 +195,7 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
               ))}
             </div>
           ) : buscado && !loading ? (
-            <div className="text-center text-slate-500 py-4 text-sm">
+            <div className="text-center sunmi-text-muted py-4 text-sm">
               No se encontraron clientes
             </div>
           ) : null}

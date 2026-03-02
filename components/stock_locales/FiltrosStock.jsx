@@ -19,8 +19,39 @@ export default function FiltrosStock({
   const [sinStock, setSinStock] = useState(false);
   const [faltantes, setFaltantes] = useState(false);
 
+  const [categorias, setCategorias] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
+  const [areas, setAreas] = useState([]);
+
   const debounceRef = useRef(null);
 
+  // Cargar catálogos al montar
+  useEffect(() => {
+    const cargar = async () => {
+      try {
+        const [catRes, provRes, areaRes] = await Promise.all([
+          fetch("/api/catalogos/categorias", { credentials: "include" }),
+          fetch("/api/catalogos/proveedores", { credentials: "include" }),
+          fetch("/api/catalogos/areas-fisicas", { credentials: "include" }),
+        ]);
+
+        const [cat, prov, ar] = await Promise.all([
+          catRes.ok ? catRes.json() : { items: [] },
+          provRes.ok ? provRes.json() : { items: [] },
+          areaRes.ok ? areaRes.json() : { items: [] },
+        ]);
+
+        setCategorias(cat.items ?? []);
+        setProveedores(prov.items ?? []);
+        setAreas(ar.items ?? []);
+      } catch (err) {
+        console.error("Error cargando catálogos para filtros:", err);
+      }
+    };
+    cargar();
+  }, []);
+
+  // Debounce filtros
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -74,22 +105,34 @@ export default function FiltrosStock({
         <SunmiSelectAdv
           value={categoria}
           onChange={(val) => setCategoria(val)}
+          searchable
         >
           <option value="">Categoría</option>
+          {categorias.map((c) => (
+            <option key={c.id} value={String(c.id)}>{c.nombre}</option>
+          ))}
         </SunmiSelectAdv>
 
         <SunmiSelectAdv
           value={proveedor}
           onChange={(val) => setProveedor(val)}
+          searchable
         >
           <option value="">Proveedor</option>
+          {proveedores.map((p) => (
+            <option key={p.id} value={String(p.id)}>{p.nombre}</option>
+          ))}
         </SunmiSelectAdv>
 
         <SunmiSelectAdv
           value={area}
           onChange={(val) => setArea(val)}
+          searchable
         >
           <option value="">Área física</option>
+          {areas.map((a) => (
+            <option key={a.id} value={String(a.id)}>{a.nombre}</option>
+          ))}
         </SunmiSelectAdv>
       </div>
 

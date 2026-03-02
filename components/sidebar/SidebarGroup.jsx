@@ -3,7 +3,7 @@
 import Link from "next/link";
 import SidebarIcon from "./SidebarIcon";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 export default function SidebarGroup({
@@ -18,7 +18,9 @@ export default function SidebarGroup({
 }) {
   const pathname = usePathname();
   const panelRef = useRef(null);
+  const btnRef = useRef(null);
   const { theme } = useSunmiTheme();
+  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
@@ -35,20 +37,42 @@ export default function SidebarGroup({
   const activo = visibles.some(i => pathname.startsWith(i.href));
   const abierto = openGroup === id;
 
+  // Posicionar flyout con fixed usando rect del botón
+  useEffect(() => {
+    if (!abierto || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setPos({ top: rect.top, left: rect.right + 8 });
+  }, [abierto]);
+
+  // Cerrar al scrollear el sidebar
+  useEffect(() => {
+    if (!abierto || !btnRef.current) return;
+    const scrollParent = btnRef.current.closest("[data-sidebar-scroll]");
+    if (!scrollParent) return;
+    const onScroll = () => setOpenGroup(null);
+    scrollParent.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollParent.removeEventListener("scroll", onScroll);
+  }, [abierto, setOpenGroup]);
+
+  // Click-outside: cerrar si click fuera del panel Y fuera del botón
   useEffect(() => {
     if (!abierto) return;
     const handler = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
+      if (
+        panelRef.current && !panelRef.current.contains(e.target) &&
+        btnRef.current && !btnRef.current.contains(e.target)
+      ) {
         setOpenGroup(null);
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [abierto]);
+  }, [abierto, setOpenGroup]);
 
   return (
-    <div className="relative flex flex-col items-center w-full">
+    <div className="flex flex-col items-center w-full">
       <button
+        ref={btnRef}
         onClick={() => setOpenGroup(abierto ? null : id)}
         className={`flex items-center justify-center w-12 h-12 rounded-xl transition ${theme.sidebar.hover}`}
       >
@@ -58,14 +82,15 @@ export default function SidebarGroup({
       {abierto && (
         <div
           ref={panelRef}
+          style={{ position: "fixed", top: pos.top, left: pos.left }}
           className={`
-            absolute left-14 top-0
             ${theme.sidebar.dropdownBg}
             ${theme.sidebar.dropdownBorder} border
             rounded-xl
-            shadow-xl shadow-black/50 
-            p-3 w-48 
+            shadow-xl shadow-black/50
+            p-3 w-48
             z-50
+            max-h-[calc(100dvh-2rem)] overflow-y-auto
           `}
         >
           <h3 className={`${theme.sidebar.dropdownHeading} text-xs font-bold mb-2 uppercase tracking-wide`}>

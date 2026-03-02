@@ -34,7 +34,7 @@ export default function ModalDescuento({
   const porcentajesRapidos = [5, 10, 15, 20];
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-md p-4">
         <h3 className="text-lg font-bold mb-3">Aplicar Descuento</h3>
 

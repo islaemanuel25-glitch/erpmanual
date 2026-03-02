@@ -47,7 +47,7 @@ export default function ClientePickerFullscreen({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] bg-slate-950 p-2 lg:p-3">
+    <div className="fixed inset-0 z-[80] sunmi-surface p-2 lg:p-3">
       <div className="max-w-4xl mx-auto h-full flex flex-col gap-3">
         <SunmiCard className="p-3">
           <div className="flex items-center justify-between gap-2">
@@ -77,12 +77,12 @@ export default function ClientePickerFullscreen({
           </div>
 
           {errorMsg && (
-            <div className="mt-2 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+            <div className="mt-2 text-xs sunmi-text-danger sunmi-state-danger rounded px-2 py-1.5">
               {errorMsg}
             </div>
           )}
 
-          <div className="mt-2 text-[11px] text-slate-500">
+          <div className="mt-2 text-[11px] sunmi-text-muted">
             Escribí al menos 2 caracteres para buscar.
           </div>
         </SunmiCard>
@@ -98,16 +98,16 @@ export default function ClientePickerFullscreen({
             </SunmiButton>
 
             {loading ? (
-              <div className="text-center text-slate-400 py-8">Buscando...</div>
+              <div className="text-center sunmi-text-muted py-8">Buscando...</div>
             ) : clientes.length > 0 ? (
               clientes.map((cliente) => (
                 <button
                   key={cliente.id}
                   onClick={() => onSeleccionar(cliente)}
-                  className="w-full bg-slate-900/60 p-3 rounded-lg text-left hover:bg-slate-800 transition-colors"
+                  className="w-full sunmi-surface-soft p-3 rounded-lg text-left sunmi-row-hover transition-colors"
                 >
                   <div className="font-medium text-sm">{cliente.nombre}</div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className="text-[11px] sunmi-text-muted">
                     {[cliente.telefono, cliente.documento, cliente.email]
                       .filter(Boolean)
                       .join(" · ") || "-"}
@@ -115,11 +115,11 @@ export default function ClientePickerFullscreen({
                 </button>
               ))
             ) : buscado ? (
-              <div className="text-center text-slate-500 py-8">
+              <div className="text-center sunmi-text-muted py-8">
                 No se encontraron clientes
               </div>
             ) : (
-              <div className="text-center text-slate-500 py-8">
+              <div className="text-center sunmi-text-muted py-8">
                 Buscá un cliente para seleccionarlo
               </div>
             )}

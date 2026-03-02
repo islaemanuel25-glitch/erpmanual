@@ -52,11 +52,11 @@ export default function ModalAperturaTurno({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-overlay-strong flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-md p-4">
         <div className="text-center mb-4">
           <h2 className="text-xl font-bold">Apertura de Caja</h2>
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-sm sunmi-text-muted mt-1">
             {vendedorNombre} &bull;{" "}
             {new Date().toLocaleDateString("es-AR")}
           </div>
@@ -77,7 +77,7 @@ export default function ModalAperturaTurno({
               className="text-2xl !text-center"
               autoFocus
             />
-            <div className="text-[11px] text-slate-500 mt-1 text-center">
+            <div className="text-[11px] sunmi-text-muted mt-1 text-center">
               Efectivo que hay en caja al iniciar el turno
             </div>
           </div>
@@ -97,7 +97,7 @@ export default function ModalAperturaTurno({
           </div>
 
           {error && (
-            <div className="text-xs text-red-400 text-center bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+            <div className="text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5">
               {error}
             </div>
           )}

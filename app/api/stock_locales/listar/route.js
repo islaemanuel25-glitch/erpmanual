@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { redondear100 } from "@/lib/precios/redondeo";
 
 const PAGE_SIZE = 25;
 
@@ -131,9 +132,9 @@ export async function GET(req) {
             ? Number(p.precio_venta || base.precio_venta) / factor
             : Number(p.precio_venta || base.precio_venta);
 
-        // 🟩 REDONDEO A 100 HACIA ARRIBA
+        // 🟩 REDONDEO A 100 HACIA ARRIBA (helper compartido con POS)
         if (base.redondeo_100 === true) {
-          ventaUnit = Math.ceil(ventaUnit / 100) * 100;
+          ventaUnit = redondear100(ventaUnit);
         }
 
         return {

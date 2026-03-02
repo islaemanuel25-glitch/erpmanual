@@ -31,6 +31,7 @@ export default function SidebarPro({ variant = "static", onClose }) {
           className={`
             hidden md:flex flex-col items-center justify-center
             w-16 min-w-16
+            h-dvh sticky top-0
             ${theme.sidebar.bg}
             ${theme.sidebar.border} border-r
             shadow-[2px_0_10px_rgba(0,0,0,0.45)]
@@ -66,6 +67,7 @@ export default function SidebarPro({ variant = "static", onClose }) {
           className={`
             hidden md:flex flex-col items-center
             w-16 min-w-16
+            h-dvh sticky top-0
             ${theme.sidebar.bg}
             ${theme.sidebar.border} border-r
             shadow-[2px_0_10px_rgba(0,0,0,0.45)]
@@ -113,29 +115,30 @@ export default function SidebarPro({ variant = "static", onClose }) {
         {/* Sidebar drawer */}
         <aside
           className={`
-            fixed top-0 left-0 h-screen
+            fixed top-0 left-0 h-dvh
             flex flex-col items-center
             w-16 min-w-16
             ${theme.sidebar.bg}
             ${theme.sidebar.border} border-r
             shadow-[2px_0_10px_rgba(0,0,0,0.45)]
-            py-4 gap-6
             z-50
           `}
         >
-          {menu.map((grupo) => (
-            <SidebarGroup
-              key={grupo.key}
-              id={grupo.key}
-              icon={grupo.icon}
-              iconFilled={grupo.iconFilled}
-              label={grupo.label}
-              items={grupo.items}
-              perfil={perfil}
-              openGroup={openGroup}
-              setOpenGroup={setOpenGroup}
-            />
-          ))}
+          <nav data-sidebar-scroll className="flex-1 flex flex-col items-center gap-6 py-4 overflow-y-auto overscroll-contain w-full">
+            {menu.map((grupo) => (
+              <SidebarGroup
+                key={grupo.key}
+                id={grupo.key}
+                icon={grupo.icon}
+                iconFilled={grupo.iconFilled}
+                label={grupo.label}
+                items={grupo.items}
+                perfil={perfil}
+                openGroup={openGroup}
+                setOpenGroup={setOpenGroup}
+              />
+            ))}
+          </nav>
         </aside>
       </>
     );
@@ -152,37 +155,39 @@ export default function SidebarPro({ variant = "static", onClose }) {
         className={`
           hidden md:flex flex-col items-center
           w-16 min-w-16
+          h-dvh sticky top-0
 
           ${theme.sidebar.bg}
           ${theme.sidebar.border} border-r
           shadow-[2px_0_10px_rgba(0,0,0,0.45)]
 
-          py-4 gap-6
           z-40
         `}
       >
-        {menu.map((grupo) => (
-          <SidebarGroup
-            key={grupo.key}
-            id={grupo.key}
-            icon={grupo.icon}
-            iconFilled={grupo.iconFilled}
-            label={grupo.label}
-            items={grupo.items}
-            perfil={perfil}
-            openGroup={openGroup}
-            setOpenGroup={setOpenGroup}
-          />
-        ))}
+        <nav data-sidebar-scroll className="flex-1 flex flex-col items-center gap-6 py-4 overflow-y-auto overscroll-contain w-full">
+          {menu.map((grupo) => (
+            <SidebarGroup
+              key={grupo.key}
+              id={grupo.key}
+              icon={grupo.icon}
+              iconFilled={grupo.iconFilled}
+              label={grupo.label}
+              items={grupo.items}
+              perfil={perfil}
+              openGroup={openGroup}
+              setOpenGroup={setOpenGroup}
+            />
+          ))}
 
-        {!tieneAlgo && (
-          <div className="px-2 text-center">
-            <span className="text-[8px] text-slate-500 leading-tight block">
-              Sin permisos asignados.
-              Contactar admin.
-            </span>
-          </div>
-        )}
+          {!tieneAlgo && (
+            <div className="px-2 text-center">
+              <span className="text-[8px] text-slate-500 leading-tight block">
+                Sin permisos asignados.
+                Contactar admin.
+              </span>
+            </div>
+          )}
+        </nav>
       </aside>
     </>
   );

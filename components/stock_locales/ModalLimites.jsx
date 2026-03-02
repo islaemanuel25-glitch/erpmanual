@@ -74,7 +74,7 @@ export default function ModalLimites({ open, onClose, producto, local }) {
         {/* HEADER */}
         <div className="sunmi-header-accent flex items-center justify-between">
           <span>Límites de stock</span>
-          <button className="text-slate-900" onClick={() => onClose(false)}>
+          <button className="opacity-80 hover:opacity-100" onClick={() => onClose(false)}>
             <X size={18} />
           </button>
         </div>

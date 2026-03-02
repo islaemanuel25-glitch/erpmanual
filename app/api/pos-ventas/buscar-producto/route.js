@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { redondear100 } from "@/lib/precios/redondeo";
 
 export async function GET(req) {
   try {
@@ -122,6 +123,11 @@ function mapProductos(lista, esDeposito) {
         // DB guarda precio del bulto → derivar unitario
         precioVentaUnitario = Number((precioDB / factorPack).toFixed(2));
         precioVentaBulto = Number(precioDB.toFixed(2));
+      }
+
+      // Misma regla que stock_locales/listar: redondeo a 100 hacia arriba (helper compartido)
+      if (pl.base?.redondeo_100 === true) {
+        precioVentaUnitario = redondear100(precioVentaUnitario);
       }
 
       const modoSalidaDefault = calcularModoSalida(esDeposito, modoEnvio, unidadMedida);

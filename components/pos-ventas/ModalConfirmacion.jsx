@@ -6,10 +6,10 @@ export default function ModalConfirmacion({ open, mensaje, onConfirmar, onCancel
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 w-full max-w-md shadow-xl">
+    <div className="fixed inset-0 z-[9999] sunmi-overlay backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="sunmi-surface sunmi-border rounded-lg p-4 w-full max-w-md shadow-xl">
         <div className="mb-4">
-          <p className="text-sm text-slate-200">{mensaje}</p>
+          <p className="text-sm sunmi-text-strong">{mensaje}</p>
         </div>
         <div className="flex justify-end gap-2">
           <SunmiButton color="slate" onClick={onCancelar}>

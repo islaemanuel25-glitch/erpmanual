@@ -40,16 +40,16 @@ export default function ModalPendientesOffline({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-50">
       <SunmiCard className="w-full max-w-lg p-4 flex flex-col max-h-[85vh]">
         {/* Header */}
         <div className="flex items-center justify-between mb-3 shrink-0">
-          <h3 className="text-sm font-bold text-amber-400">
+          <h3 className="text-sm font-bold sunmi-text-accent">
             Pendientes de sincronización ({queue.length})
           </h3>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 text-lg leading-none"
+            className="sunmi-link-muted text-lg leading-none"
           >
             ✕
           </button>
@@ -81,7 +81,7 @@ export default function ModalPendientesOffline({
         {/* Lista */}
         <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
           {queue.length === 0 ? (
-            <div className="text-center text-sm text-slate-500 py-8">
+            <div className="text-center text-sm sunmi-text-muted py-8">
               No hay ventas pendientes.
             </div>
           ) : (
@@ -92,33 +92,33 @@ export default function ModalPendientesOffline({
               return (
                 <div
                   key={item.clientVentaId}
-                  className="rounded-lg bg-slate-800/60 border border-slate-700/50 p-3"
+                  className="rounded-lg sunmi-surface-soft sunmi-border p-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="font-mono text-amber-400 font-bold">{idCorto}</span>
-                        <span className="text-slate-500">{formatFecha(item.createdAt)}</span>
+                        <span className="font-mono sunmi-text-accent font-bold">{idCorto}</span>
+                        <span className="sunmi-text-muted">{formatFecha(item.createdAt)}</span>
                       </div>
-                      <div className="text-xs text-slate-400 mt-1">
+                      <div className="text-xs sunmi-text-muted mt-1">
                         {cantItems} producto{cantItems !== 1 ? "s" : ""} · {(item.formaPago || "efectivo").toUpperCase()}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-bold text-amber-400">
+                      <div className="text-sm font-bold sunmi-text-accent">
                         ${formatPrecio(item.total)}
                       </div>
                     </div>
                   </div>
                   {/* Items preview */}
-                  <div className="mt-2 text-[11px] text-slate-500 truncate">
+                  <div className="mt-2 text-[11px] sunmi-text-muted truncate">
                     {item.items?.map((p) => `${p.cantidad}x ${p.nombre}`).join(", ")}
                   </div>
                   {/* Acciones */}
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={() => onImprimir(item)}
-                      className="text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                      className="text-[11px] sunmi-link transition-colors"
                     >
                       Imprimir
                     </button>
@@ -127,7 +127,7 @@ export default function ModalPendientesOffline({
                         const ok = confirm(`¿Eliminar venta pendiente ${idCorto}?`);
                         if (ok) onEliminar(item.clientVentaId);
                       }}
-                      className="text-[11px] text-red-400 hover:text-red-300 transition-colors"
+                      className="text-[11px] sunmi-link-danger transition-colors"
                     >
                       Eliminar
                     </button>

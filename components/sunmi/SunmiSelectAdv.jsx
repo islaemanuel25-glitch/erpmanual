@@ -7,7 +7,7 @@ import {
   isValidElement,
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, Search } from "lucide-react";
 
 export default function SunmiSelectAdv({
   value,
@@ -16,16 +16,26 @@ export default function SunmiSelectAdv({
   placeholder = "Seleccionar...",
   className = "",
   multiple = false,
+  searchable = false,
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
 
   const wrapRef = useRef(null);
   const btnRef = useRef(null);
   const dropdownRef = useRef(null);
+  const searchRef = useRef(null);
 
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
 
   const optionList = Children.toArray(children).filter((c) => isValidElement(c));
+
+  const filteredOptions = searchable && search
+    ? optionList.filter((c) => {
+        const text = typeof c.props.children === "string" ? c.props.children : "";
+        return text.toLowerCase().includes(search.toLowerCase());
+      })
+    : optionList;
 
   const isSelected = (v) => {
     if (!multiple) return v == value;
@@ -46,6 +56,7 @@ export default function SunmiSelectAdv({
     if (!multiple) {
       onChange(val);
       setOpen(false);
+      setSearch("");
       return;
     }
 
@@ -64,7 +75,10 @@ export default function SunmiSelectAdv({
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setSearch("");
+      return;
+    }
     updatePos();
 
     const onScroll = () => updatePos();
@@ -72,6 +86,12 @@ export default function SunmiSelectAdv({
 
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onResize);
+
+    // Autofocus search input
+    if (searchable) {
+      setTimeout(() => searchRef.current?.focus(), 0);
+    }
+
     return () => {
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
@@ -106,38 +126,62 @@ export default function SunmiSelectAdv({
         width: pos.width,
         zIndex: 99999,
       }}
-      className="sunmi-select-dropdown rounded-md shadow-lg max-h-52 overflow-y-auto text-[13px]"
+      className="sunmi-select-dropdown rounded-md shadow-lg text-[13px] flex flex-col"
     >
-      {optionList.map((child, idx) => {
-        const val = child.props.value;
-        const selected = isSelected(val);
-
-        return (
-          <div
-            key={idx}
-            // IMPORTANT: onMouseDown selecciona antes de que el "click afuera" cierre
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handlePick(val);
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handlePick(val);
-            }}
-            className={`
-              px-3 py-2 cursor-pointer flex items-center gap-2 transition-all
-              ${selected ? "sunmi-select-item-active" : "sunmi-select-item"}
-            `}
-          >
-            {multiple && (
-              <Check size={16} className={selected ? "opacity-100" : "opacity-0"} />
-            )}
-            {child.props.children}
+      {searchable && (
+        <div className="p-1.5 border-b sunmi-divider">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded sunmi-select-trigger">
+            <Search size={13} className="sunmi-text-muted shrink-0" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar..."
+              className="w-full bg-transparent outline-none text-[12px]"
+              style={{ color: "inherit" }}
+            />
           </div>
-        );
-      })}
+        </div>
+      )}
+
+      <div className="max-h-52 overflow-y-auto">
+        {filteredOptions.length === 0 ? (
+          <div className="px-3 py-2 sunmi-text-muted text-[12px]">
+            Sin resultados
+          </div>
+        ) : (
+          filteredOptions.map((child, idx) => {
+            const val = child.props.value;
+            const selected = isSelected(val);
+
+            return (
+              <div
+                key={idx}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handlePick(val);
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handlePick(val);
+                }}
+                className={`
+                  px-3 py-2 cursor-pointer flex items-center gap-2 transition-all
+                  ${selected ? "sunmi-select-item-active" : "sunmi-select-item"}
+                `}
+              >
+                {multiple && (
+                  <Check size={16} className={selected ? "opacity-100" : "opacity-0"} />
+                )}
+                {child.props.children}
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   ) : null;
 

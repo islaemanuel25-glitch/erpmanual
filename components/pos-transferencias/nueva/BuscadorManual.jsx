@@ -144,7 +144,7 @@ export default function BuscadorManual({
     <div className="relative w-full mb-3">
 
       <div className="flex items-center justify-between mb-1 pl-1">
-        <span className="text-[11px] uppercase tracking-wide text-cyan-400">
+        <span className="text-[11px] uppercase tracking-wide sunmi-text-link">
           Buscar · Escanear · Hablar
         </span>
 
@@ -155,8 +155,8 @@ export default function BuscadorManual({
               onClick={() => onModoChange("manual")}
               className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition ${
                 modo === "manual"
-                  ? "bg-cyan-500 text-slate-900"
-                  : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                  ? "sunmi-btn-primary"
+                  : "sunmi-control sunmi-text-muted"
               }`}
             >
               Manual
@@ -166,8 +166,8 @@ export default function BuscadorManual({
               onClick={() => onModoChange("rotura")}
               className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition ${
                 modo === "rotura"
-                  ? "bg-red-500 text-white"
-                  : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                  ? "sunmi-btn sunmi-btn-red"
+                  : "sunmi-control sunmi-text-muted"
               }`}
             >
               Rotura
@@ -183,15 +183,14 @@ export default function BuscadorManual({
           className="
             absolute right-2 top-1/2 -translate-y-1/2
             h-8 w-8 rounded-full
-            bg-slate-800
-            border border-cyan-500
+            sunmi-surface-soft sunmi-text-link
             flex items-center justify-center
-            text-cyan-300 text-[16px]
-            hover:bg-slate-700 
+            text-[16px]
             active:scale-95
             transition
-            shadow-[0_0_8px_rgba(34,211,238,0.35)]
+            shadow-md
           "
+          style={{ border: '1px solid var(--pos-link)' }}
         >
           🎤
         </button>
@@ -205,15 +204,15 @@ export default function BuscadorManual({
         />
 
         <span className="
-          absolute left-3 top-1/2 -translate-y-1/2 
-          text-[15px] text-cyan-400
+          absolute left-3 top-1/2 -translate-y-1/2
+          text-[15px] sunmi-text-link
         ">
           🔍
         </span>
       </div>
 
       {loading && (
-        <div className="text-[12px] text-cyan-300 mt-1 animate-pulse">
+        <div className="text-[12px] sunmi-text-link mt-1 animate-pulse">
           Buscando...
         </div>
       )}
@@ -221,10 +220,9 @@ export default function BuscadorManual({
       {!loading && resultados.length > 0 && texto.trim() !== "" && (
         <div
           className="
-            absolute top-[60px] left-0 right-0 
-            bg-slate-900 
-            border border-cyan-500/40 
-            rounded-xl shadow-xl 
+            absolute top-[60px] left-0 right-0
+            sunmi-surface sunmi-border
+            rounded-xl shadow-xl
             max-h-64 overflow-auto z-50
             animate-[fadeIn_0.2s_ease]
           "
@@ -233,11 +231,11 @@ export default function BuscadorManual({
             <div
               key={p.productoLocalId}
               className={`
-                px-3 py-2 cursor-pointer text-[13px] 
+                px-3 py-2 cursor-pointer text-[13px]
                 ${
                   idx === focusIndex
-                    ? "bg-cyan-600/20 border-l-4 border-cyan-400"
-                    : "hover:bg-cyan-500/10"
+                    ? "sunmi-select-item-active"
+                    : "sunmi-row-hover"
                 }
                 transition-all
               `}
@@ -249,10 +247,10 @@ export default function BuscadorManual({
                 setFocusIndex(-1);
               }}
             >
-              <div className="text-slate-100 font-medium">{p.nombre}</div>
+              <div className="font-medium">{p.nombre}</div>
 
               {p.codigoBarra && (
-                <div className="text-[11px] text-slate-400">
+                <div className="text-[11px] sunmi-text-muted">
                   Código: {p.codigoBarra}
                 </div>
               )}
@@ -262,7 +260,7 @@ export default function BuscadorManual({
       )}
 
       {!loading && texto.trim() !== "" && resultados.length === 0 && (
-        <div className="text-[12px] text-slate-400 mt-1">
+        <div className="text-[12px] sunmi-text-muted mt-1">
           No se encontraron productos.
         </div>
       )}
