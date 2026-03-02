@@ -2,12 +2,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { inheritDepositoProductsToLocal } from "@/lib/grupos";
+import { requireAdmin } from "@/lib/authorize";
 
 // ========================================================
 // GET /api/locales  → listar todos
 // ========================================================
-export async function GET() {
+export async function GET(req) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const locales = await prisma.local.findMany({
       select: {
         id: true,
@@ -45,6 +49,9 @@ export async function GET() {
 // ========================================================
 export async function POST(req) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const body = await req.json();
 
     const {

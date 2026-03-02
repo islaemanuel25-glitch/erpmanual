@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcrypt"; // ✅ unificado con seed
+import { requireAdmin } from "@/lib/authorize";
 
 export async function PUT(req, context) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     // ⚠️ En Next 15 params es un Promise: hay que hacer await
     const { id } = await context.params;
     const userId = Number(id);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/authorize";
 
 // ========================================================
 // POST /api/grupos/:id/sync-productos
@@ -7,6 +8,9 @@ import prisma from "@/lib/prisma";
 // ========================================================
 export async function POST(req, context) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const { id } = await context.params;
     const grupoId = Number(id);
 

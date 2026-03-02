@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/authorize";
 
 export async function DELETE(req, { params }) {
   try {
-    console.log("🔌 DATABASE_URL =", process.env.DATABASE_URL);
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { id } = await params;
     console.log("🧨 ELIMINAR params.id =", id, "type:", typeof id);

@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/authorize";
+
+const _guard = (req) => {
+  const auth = requireAdmin(req);
+  if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+  return null;
+};
 
 // GET → obtener depósitos del grupo
 export async function GET(req, context) {
   try {
+    const denied = _guard(req); if (denied) return denied;
     const { id } = await context.params;
     const grupoId = Number(id);
 
@@ -42,6 +50,7 @@ export async function GET(req, context) {
 // POST → asignar depósito al grupo
 export async function POST(req, context) {
   try {
+    const denied = _guard(req); if (denied) return denied;
     const { id } = await context.params;
     const grupoId = Number(id);
 
@@ -102,6 +111,7 @@ export async function POST(req, context) {
 // DELETE → quitar depósito del grupo
 export async function DELETE(req, context) {
   try {
+    const denied = _guard(req); if (denied) return denied;
     const { id } = await context.params;
     const grupoId = Number(id);
 

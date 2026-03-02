@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/authorize";
 
 // POST /api/grupos/crear  { nombre }
 export async function POST(req) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const contentType = req.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
       return NextResponse.json(
@@ -40,6 +44,9 @@ export async function POST(req) {
 // GET /api/grupos/crear?nombre=Central   (opcional para test rápido)
 export async function GET(req) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const { searchParams } = new URL(req.url);
     const nombre = (searchParams.get("nombre") || "").trim();
     if (!nombre) {

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
+import { requireAuth } from "@/lib/authorize";
 
-export async function GET() {
+export async function GET(req) {
+  const auth = requireAuth(req);
+  if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
   const columns = [{
     nombre: "",
     descripcion: "",

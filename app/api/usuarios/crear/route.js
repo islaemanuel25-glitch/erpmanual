@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcrypt"; // ✅ unificado con seed.js
+import { requireAdmin } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const body = await req.json();
 
     const nombre = String(body?.nombre ?? "").trim();

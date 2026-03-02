@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { requirePerm } from "@/lib/authorize";
 
 const COMISION_PCT = 7;
 
 export async function POST(req) {
   try {
+    const perm = requirePerm(req, "pos.usar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const scope = await resolveLocalAndGrupo(req);
     if (scope.error) {
       return NextResponse.json(

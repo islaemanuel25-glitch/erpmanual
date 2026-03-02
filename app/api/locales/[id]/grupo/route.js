@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { inheritDepositoProductsToLocal } from "@/lib/grupos";
+import { requireAdmin } from "@/lib/authorize";
+
+const _guard = (req) => {
+  const auth = requireAdmin(req);
+  if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+  return null;
+};
 
 // ========================================================
 // GET /api/locales/:id/grupo  → devuelve grupo y tipo
 // ========================================================
 export async function GET(req, context) {
   try {
+    const denied = _guard(req); if (denied) return denied;
     const { id } = await context.params;
     const localId = Number(id);
 
@@ -64,6 +72,7 @@ export async function GET(req, context) {
 // ========================================================
 export async function POST(req, context) {
   try {
+    const denied = _guard(req); if (denied) return denied;
     const { id } = await context.params;
     const localId = Number(id);
 
@@ -199,6 +208,7 @@ export async function POST(req, context) {
 // ========================================================
 export async function PUT(req, context) {
   try {
+    const denied = _guard(req); if (denied) return denied;
     const { id } = await context.params;
     const localId = Number(id);
 
