@@ -4,7 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import SidebarPro from "@/components/sidebar/SidebarPro";
 import TopbarNav from "@/components/layout/TopbarNav";
-import SidebarMobile from "@/components/sidebar/SidebarMobile";
+import MobileNav from "@/components/layout/MobileNav";
 import Header from "./Header";
 import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import { useUser } from "@/app/context/UserContext";
@@ -15,6 +15,7 @@ export default function LayoutBase({ children }) {
   const { menuMode } = useLayoutSettings();
   const { perfil } = useUser();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const tituloMobile =
     pathname.includes("usuarios")
@@ -48,8 +49,10 @@ export default function LayoutBase({ children }) {
       {/* SIDEBAR (solo en modo sidebarLeft) */}
       {isSidebar && <SidebarPro />}
 
-      {/* MOBILE DRAWER (solo en modo topbar) */}
-      {!isSidebar && perfil && menu && <SidebarMobile menu={menu} perfil={perfil} />}
+      {/* MOBILE: BottomNav + Drawer "Más" (solo en modo topbar) */}
+      {!isSidebar && perfil && menu && (
+        <MobileNav menu={menu} drawerOpen={mobileDrawerOpen} setDrawerOpen={setMobileDrawerOpen} />
+      )}
 
       {/* DESKTOP DRAWER (solo en modo topbar, al clickear Menú) */}
       {!isSidebar && drawerOpen && (
@@ -59,7 +62,7 @@ export default function LayoutBase({ children }) {
       {/* CONTENT AREA */}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
 
-        <Header />
+        <Header onOpenMobileMenu={!isSidebar ? () => setMobileDrawerOpen(true) : undefined} />
 
         {/* TOPBAR desktop (solo en modo topbar) */}
         {!isSidebar && <TopbarNav onOpenMenu={() => setDrawerOpen(true)} />}
@@ -69,9 +72,9 @@ export default function LayoutBase({ children }) {
           {tituloMobile}
         </div>
 
-        {/* MAIN CONTENT */}
+        {/* MAIN CONTENT: pb en mobile para no tapar con BottomNav */}
         <main
-          className="flex-1 min-h-0 p-4 overflow-auto transition-colors duration-200"
+          className="flex-1 min-h-0 p-4 pb-20 md:pb-4 overflow-auto transition-colors duration-200"
         >
           {children}
         </main>

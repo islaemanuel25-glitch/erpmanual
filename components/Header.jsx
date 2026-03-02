@@ -1,12 +1,12 @@
 "use client";
 
-import { Bell, ChevronDown, LogOut, ArrowLeftRight, Store, Warehouse } from "lucide-react";
+import { Bell, ChevronDown, LogOut, ArrowLeftRight, Store, Warehouse, Menu } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser } from "@/app/context/UserContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
-export default function Header() {
+export default function Header({ onOpenMobileMenu }) {
   const pathname = usePathname();
   const router = useRouter();
   const menuRef = useRef(null);
@@ -86,10 +86,22 @@ export default function Header() {
         transition-colors duration-200
       `}
     >
-      {/* IZQUIERDA: TITULO */}
-      <h1 className={`text-xl font-semibold hidden md:block ${theme.header.text}`}>
-        {titulo}
-      </h1>
+      {/* IZQUIERDA: HAMBURGUESA mobile + TITULO desktop */}
+      <div className="flex items-center gap-2">
+        {onOpenMobileMenu && (
+          <button
+            type="button"
+            onClick={onOpenMobileMenu}
+            className={`md:hidden p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center ${theme.header.text} hover:opacity-80 transition cursor-pointer`}
+            aria-label="Abrir menú"
+          >
+            <Menu size={24} />
+          </button>
+        )}
+        <h1 className={`text-xl font-semibold hidden md:block ${theme.header.text}`}>
+          {titulo}
+        </h1>
+      </div>
 
       {/* DERECHA */}
       <div className="flex items-center gap-6">
