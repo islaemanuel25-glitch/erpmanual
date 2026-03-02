@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 export async function POST(req, { params }) {
   try {
@@ -13,7 +14,11 @@ export async function POST(req, { params }) {
       );
     }
 
-    const { grupoId } = ctx;
+    const { grupoId, session } = ctx;
+
+    const perm = checkPerm(session, "compras.crear");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const { id } = await params;
     const pedidoId = Number(id);
 

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
@@ -14,6 +15,9 @@ export async function POST(req) {
     }
 
     const { grupoId, session } = ctx;
+
+    const perm = checkPerm(session, "compras.crear");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const body = await req.json();
     const { proveedorId, depositoId, notas, items } = body;

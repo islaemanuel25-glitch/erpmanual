@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 export async function GET(req) {
   try {
@@ -13,7 +14,11 @@ export async function GET(req) {
       );
     }
 
-    const { grupoId } = ctx;
+    const { grupoId, session } = ctx;
+
+    const perm = checkPerm(session, "compras.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const url = new URL(req.url);
     const proveedorId = Number(url.searchParams.get("proveedorId") || 0);
     const search = (url.searchParams.get("search") || "").trim();
