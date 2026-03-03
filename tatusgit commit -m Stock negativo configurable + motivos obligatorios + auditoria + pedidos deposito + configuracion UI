@@ -1,0 +1,49 @@
+warning: in the working copy of 'app/api/pos-transferencias/detalle/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/pos-ventas/buscar-producto/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/pos-ventas/crear/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/productos/eliminar/[id]/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/productos/import/preview/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/productos/listar/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/productos/obtener/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/productos/precios/apply/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/productos/precios/history/[id]/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/productos/precios/history/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/productos/precios/preview/route.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/modulos/pos-ventas/page.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/layout/MobileNav.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'prisma/schema.prisma', LF will be replaced by CRLF the next time Git touches it
+ .../pos-transferencias/buscarProductos/route.js    | 11 [32m++[m[31m-[m
+ app/api/pos-transferencias/detalle/route.js        |  7 [32m++[m
+ app/api/pos-transferencias/enviar/route.js         | 22 [32m+++++[m[31m-[m
+ app/api/pos-ventas/buscar-producto/route.js        | 31 [32m++++++[m[31m--[m
+ app/api/pos-ventas/crear/route.js                  | 33 [32m++++++[m[31m--[m
+ app/api/productos/crear/route.js                   |  4 [32m+[m
+ app/api/productos/editar/[id]/route.js             | 25 [32m++++++[m
+ app/api/productos/eliminar/[id]/route.js           | 23 [32m++++++[m
+ app/api/productos/export/route.js                  |  4 [32m+[m
+ app/api/productos/import/apply/route.js            |  4 [32m+[m
+ app/api/productos/import/preview/route.js          |  4 [32m+[m
+ app/api/productos/listar/route.js                  |  4 [32m+[m
+ app/api/productos/obtener/route.js                 |  4 [32m+[m
+ app/api/productos/precios/apply/route.js           |  8 [32m+[m[31m-[m
+ app/api/productos/precios/history/[id]/route.js    |  4 [32m+[m
+ app/api/productos/precios/history/route.js         |  4 [32m+[m
+ app/api/productos/precios/parse/route.js           |  4 [32m+[m
+ app/api/productos/precios/preview/route.js         |  8 [32m+[m[31m-[m
+ app/api/stock_locales/ajustar/route.js             | 88 [32m+++++++++++++++++++[m[31m---[m
+ app/api/stock_locales/importar/route.js            | 12 [32m+[m[31m--[m
+ app/api/stock_locales/limites/route.js             | 71 [32m+++++++++++++++[m[31m--[m
+ app/api/stock_locales/listar/route.js              | 13 [32m++[m[31m--[m
+ app/api/stock_locales/nuevo/route.js               | 12 [32m+[m[31m--[m
+ app/api/stock_locales/obtener/route.js             | 12 [32m+[m[31m--[m
+ .../transferencias/confirmar-recepcion/route.js    |  7 [32m+[m[31m-[m
+ app/api/transferencias/detalle/route.js            | 27 [32m++[m[31m-----[m
+ app/api/transferencias/guardar-recepcion/route.js  | 27 [32m+++++++[m
+ app/api/transferencias/pdf-recepcion/route.js      | 11 [32m+++[m
+ app/api/transferencias/pdf/route.js                | 11 [32m+++[m
+ app/modulos/pos-ventas/page.jsx                    |  7 [32m++[m
+ components/layout/MobileNav.jsx                    |  2 [32m+[m[31m-[m
+ components/layout/TopbarNav.jsx                    |  2 [32m+[m[31m-[m
+ lib/menuConfig.js                                  |  5 [32m+[m[31m-[m
+ prisma/schema.prisma                               | 47 [32m++++++++++++[m
+ 34 files changed, 458 insertions(+), 100 deletions(-)

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function GET(req) {
   try {
@@ -11,12 +12,11 @@ export async function GET(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
-    const { permisos, localId: sessionLocalId } = session;
-    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+    const perm = checkPerm(session, "stock.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    if (!esAdmin && !permisos.includes("stock.ver")) {
-      return NextResponse.json({ ok: false, error: "No tenés permisos" }, { status: 403 });
-    }
+    const sessionLocalId = session.localId;
+    const esAdmin = session.esAdmin;
 
     const { searchParams } = new URL(req.url);
     const id = Number(searchParams.get("id") || 0);
@@ -38,7 +38,7 @@ export async function GET(req) {
       return NextResponse.json({ ok: false, error: "Producto no encontrado" }, { status: 404 });
     }
 
-    if (!esAdmin && sessionLocalId !== pl.localId) {
+    if (!esAdmin && Number(sessionLocalId) !== Number(pl.localId)) {
       return NextResponse.json({ ok: false, error: "Sin permisos" }, { status: 403 });
     }
 

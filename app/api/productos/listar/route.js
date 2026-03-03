@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
@@ -30,6 +31,9 @@ export async function GET(req) {
         { status: 401 }
       );
     }
+
+    const perm = checkPerm(session, "productos.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const { searchParams } = new URL(req.url);
 

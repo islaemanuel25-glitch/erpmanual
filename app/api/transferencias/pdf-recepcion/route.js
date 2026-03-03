@@ -42,6 +42,17 @@ export async function GET(req) {
       );
     }
 
+    // Scope: non-admin debe ser origen o destino
+    const session = auth.session;
+    if (!session.esAdmin) {
+      const localId = Number(session.localId || 0);
+      if (!localId || (transferencia.origenId !== localId && transferencia.destinoId !== localId)) {
+        return NextResponse.json(
+          { ok: false, error: "Sin permiso" },
+          { status: 403 }
+        );
+      }
+    }
 
     // ===========================================================
     // 🔥 PDF CONFIG PRO

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { getContextoActivo } from "@/lib/contexto";
 
@@ -76,11 +77,8 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
-    const { permisos } = session;
-    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
-    if (!esAdmin && !permisos.includes("productos.editar")) {
-      return NextResponse.json({ ok: false, error: "Sin permisos" }, { status: 403 });
-    }
+    const perm = checkPerm(session, "productos.editar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const body = await req.json();
     

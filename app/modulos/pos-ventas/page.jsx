@@ -612,6 +612,9 @@ export default function PosVentasPage() {
           dequeueById(ventaPendiente.clientVentaId);
           procesadas++;
           showSuccess(`Venta procesada #${data.numero || "N/A"}`);
+          if (data.allowNegativeStockUsed) {
+            setSuccessMsg((prev) => (prev ? `${prev} — ` : "") + "Advertencia: venta con stock negativo (carga inicial).");
+          }
         } else {
           // Error → cortar procesamiento
           errores++;
@@ -939,6 +942,10 @@ export default function PosVentasPage() {
 
         // Mostrar modal de ticket
         dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalTicket", data: ventaTicket } });
+
+        if (data.allowNegativeStockUsed) {
+          setSuccessMsg("Advertencia: esta venta se registró con stock negativo (carga inicial).");
+        }
 
         // Limpiar carrito
         dispatch({ type: ActionTypes.CLEAR_CART });

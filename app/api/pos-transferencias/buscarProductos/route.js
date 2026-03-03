@@ -16,12 +16,21 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
 
     const q = (searchParams.get("q") || "").trim();
-    const origenId = Number(searchParams.get("origenId") || 0);
+    let origenId = Number(searchParams.get("origenId") || 0);
+
+    if (!origenId) origenId = Number(session.localId || 0);
 
     if (!origenId) {
       return NextResponse.json(
         { ok: false, error: "origenId requerido" },
         { status: 400 }
+      );
+    }
+
+    if (!session.esAdmin && origenId !== Number(session.localId)) {
+      return NextResponse.json(
+        { ok: false, error: "No autorizado para este local" },
+        { status: 403 }
       );
     }
 

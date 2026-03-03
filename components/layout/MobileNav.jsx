@@ -9,7 +9,7 @@ const BOTTOM_ITEMS = [
   { key: "inicio", label: "Inicio", icon: Home, href: "/modulos/dashboard" },
   { key: "pos-ventas", label: "POS", icon: ShoppingCart, href: "/modulos/pos-ventas" },
   { key: "stock", label: "Stock", icon: Layers, href: "/modulos/stock_locales" },
-  { key: "config", label: "Config", icon: Settings, href: "/modulos/configuracion/apariencia" },
+  { key: "config", label: "Config", icon: Settings, href: "/modulos/configuracion" },
 ];
 
 export default function MobileNav({ menu, drawerOpen, setDrawerOpen }) {

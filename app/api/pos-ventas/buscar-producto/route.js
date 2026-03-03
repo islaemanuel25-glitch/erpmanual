@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
 
@@ -16,12 +17,21 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim();
-    const localId = Number(searchParams.get("localId") || 0);
+    let localId = Number(searchParams.get("localId") || 0);
+
+    if (!localId) localId = Number(session.localId || 0);
 
     if (!localId) {
       return NextResponse.json(
         { ok: false, error: "localId requerido" },
         { status: 400 }
+      );
+    }
+
+    if (!session.esAdmin && localId !== Number(session.localId)) {
+      return NextResponse.json(
+        { ok: false, error: "No autorizado para este local" },
+        { status: 403 }
       );
     }
 
@@ -35,6 +45,17 @@ export async function GET(req) {
       select: { es_deposito: true },
     });
     const esDeposito = local?.es_deposito === true;
+
+    // Leer config de stock negativo desde DB
+    const grupoId = await getGrupoIdDeLocal(localId);
+    let allowNegativeStock = false;
+    if (grupoId) {
+      const configGrupo = await prisma.configuracionGrupo.findUnique({
+        where: { grupoId },
+        select: { allowNegativeStock: true },
+      });
+      allowNegativeStock = configGrupo?.allowNegativeStock === true;
+    }
 
     // Prioridad: match exacto por codigo_barra
     const exacto = await prisma.productoLocal.findMany({
@@ -51,7 +72,7 @@ export async function GET(req) {
     });
 
     if (exacto.length > 0) {
-      const items = mapProductos(exacto, esDeposito);
+      const items = mapProductos(exacto, esDeposito, allowNegativeStock);
       return NextResponse.json({ ok: true, items });
     }
 
@@ -74,7 +95,7 @@ export async function GET(req) {
       take: 10,
     });
 
-    const items = mapProductos(productos, esDeposito);
+    const items = mapProductos(productos, esDeposito, allowNegativeStock);
     return NextResponse.json({ ok: true, items });
   } catch (err) {
     console.error("Error buscar-producto POS:", err);
@@ -104,7 +125,7 @@ function calcularModoSalida(esDeposito, modoEnvio, unidadMedida) {
   return "BULTO";
 }
 
-function mapProductos(lista, esDeposito) {
+function mapProductos(lista, esDeposito, allowNegativeStock = false) {
   return lista
     .map((pl) => {
       const stock = Number(pl.stock?.[0]?.cantidad || 0);
@@ -153,5 +174,5 @@ function mapProductos(lista, esDeposito) {
         modoSalidaDefault,
       };
     })
-    .filter((p) => p.stock > 0);
+    .filter((p) => p.stock > 0 || allowNegativeStock);
 }

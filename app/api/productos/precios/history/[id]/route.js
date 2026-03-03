@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { getContextoActivo } from "@/lib/contexto";
 
@@ -10,6 +11,9 @@ export async function GET(req, { params }) {
     if (!session) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
+
+    const perm = checkPerm(session, "productos.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     // Resolver grupoId: session → query localId → session.localId → contexto cookie
     const { searchParams } = new URL(req.url);

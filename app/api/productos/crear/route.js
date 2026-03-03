@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getGrupoIdDeLocal, getLocalesDeGrupo } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 // Validar modo_pedido según unidad_medida y factor_pack
 function validarModoPedido(modoPedido, unidadMedida, factorPack) {
@@ -23,6 +24,9 @@ export async function POST(req) {
         { status: 401 }
       );
     }
+
+    const perm = checkPerm(session, "productos.crear");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const url = new URL(req.url);
     const localId = Number(url.searchParams.get("localId") || 0);

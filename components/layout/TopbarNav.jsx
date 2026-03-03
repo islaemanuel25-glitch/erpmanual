@@ -9,7 +9,7 @@ const TOPBAR_SHORTCUTS = [
   { key: "inicio", label: "Inicio", icon: Home, href: "/modulos/dashboard" },
   { key: "pos-ventas", label: "POS Ventas", icon: ShoppingCart, href: "/modulos/pos-ventas" },
   { key: "stock", label: "Stock", icon: Layers, href: "/modulos/stock_locales" },
-  { key: "config", label: "Config", icon: Settings, href: "/modulos/configuracion/apariencia" },
+  { key: "config", label: "Config", icon: Settings, href: "/modulos/configuracion" },
 ];
 
 export default function TopbarNav({ onOpenMenu }) {

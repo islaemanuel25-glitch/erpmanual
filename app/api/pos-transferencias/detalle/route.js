@@ -39,6 +39,13 @@ export async function GET(req) {
       );
     }
 
+    if (!session.esAdmin && Number(session.localId) !== pos.origenId && Number(session.localId) !== pos.destinoId) {
+      return NextResponse.json(
+        { ok: false, error: "No autorizado para esta transferencia" },
+        { status: 403 }
+      );
+    }
+
     // ============================================
     // 1) Obtener DETALLES + PRODUCTOS
     // ============================================

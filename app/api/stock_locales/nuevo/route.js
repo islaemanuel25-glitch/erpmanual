@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
@@ -17,15 +18,10 @@ export async function POST(req) {
       );
     }
 
-    const { permisos, localId: sessionLocalId } = session;
-    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+    const perm = checkPerm(session, "stock.editar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    if (!esAdmin && !permisos.includes("productos.crear")) {
-      return NextResponse.json(
-        { ok: false, error: "No tenés permisos para crear productos." },
-        { status: 403 }
-      );
-    }
+    const sessionLocalId = session.localId;
 
     // --------------------------------------------
     // 1. NORMALIZAR ENTRADA (camelCase → snake_case)

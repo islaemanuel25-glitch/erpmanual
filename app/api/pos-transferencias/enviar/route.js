@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { toUnidades, validarEnvio } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
@@ -139,6 +140,16 @@ export async function POST(req) {
     // --------------------------------------------------
     // E3: Validación de stock del depósito
     // --------------------------------------------------
+    const grupoId = await getGrupoIdDeLocal(pos.origenId);
+    let allowNegativeStock = false;
+    if (grupoId) {
+      const configGrupo = await prisma.configuracionGrupo.findUnique({
+        where: { grupoId },
+        select: { allowNegativeStock: true },
+      });
+      allowNegativeStock = configGrupo?.allowNegativeStock === true;
+    }
+
     const productoIds = items.map((i) => i.detalle.productoId);
     const stocks = await prisma.stockLocal.findMany({
       where: {
@@ -167,7 +178,7 @@ export async function POST(req) {
       }
     }
 
-    if (faltantes.length > 0) {
+    if (faltantes.length > 0 && !allowNegativeStock) {
       return NextResponse.json(
         {
           ok: false,
@@ -175,6 +186,15 @@ export async function POST(req) {
           faltantes,
         },
         { status: 400 }
+      );
+    }
+
+    if (faltantes.length > 0 && allowNegativeStock) {
+      console.log(
+        "[POS-transferencia envío con stock negativo] posId=%s origenId=%s faltantes=%s",
+        posId,
+        pos.origenId,
+        JSON.stringify(faltantes)
       );
     }
 

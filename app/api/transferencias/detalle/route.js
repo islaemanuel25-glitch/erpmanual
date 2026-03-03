@@ -56,33 +56,16 @@ export async function GET(req) {
     }
 
     // ======================================================
-    // PERMISOS
+    // SCOPE: non-admin debe ser origen o destino
     // ======================================================
-    if (session.localId) {
-      const localId = Number(session.localId);
-
-      const local = await prisma.local.findUnique({
-        where: { id: localId },
-        select: { es_deposito: true },
-      });
-
-      if (!local)
-        return NextResponse.json(
-          { ok: false, error: "Local no encontrado" },
-          { status: 404 }
-        );
-
-      if (local.es_deposito && transferencia.origenId !== localId)
+    if (!session.esAdmin) {
+      const localId = Number(session.localId || 0);
+      if (!localId || (transferencia.origenId !== localId && transferencia.destinoId !== localId)) {
         return NextResponse.json(
           { ok: false, error: "Sin permiso" },
           { status: 403 }
         );
-
-      if (!local.es_deposito && transferencia.destinoId !== localId)
-        return NextResponse.json(
-          { ok: false, error: "Sin permiso" },
-          { status: 403 }
-        );
+      }
     }
 
     // ======================================================

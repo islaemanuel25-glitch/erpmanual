@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { redondear100 } from "@/lib/precios/redondeo";
 
 const PAGE_SIZE = 25;
@@ -16,15 +17,11 @@ export async function GET(req) {
       );
     }
 
-    const { permisos, localId: sessionLocalId } = session;
-    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+    const perm = checkPerm(session, "stock.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    if (!esAdmin && !permisos.includes("stock.ver")) {
-      return NextResponse.json(
-        { ok: false, error: "No tenés permisos para ver stock." },
-        { status: 403 }
-      );
-    }
+    const sessionLocalId = session.localId;
+    const esAdmin = session.esAdmin;
 
     const { searchParams } = new URL(req.url);
 

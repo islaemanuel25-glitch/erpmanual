@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { mergeBaseLocalToUi, splitUiToDb } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 // Sincronizar precioCosto/activo a overrides, recalculando precio_venta por margen
 async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
@@ -61,6 +63,9 @@ export async function PUT(req, context) {
       );
     }
 
+    const perm = checkPerm(session, "productos.editar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const { id } = await context.params;
     const baseId = Number(id);
 
@@ -73,6 +78,26 @@ export async function PUT(req, context) {
 
     const url = new URL(req.url);
     const localId = Number(url.searchParams.get("localId") || "0");
+
+    // Scope check: verificar que el producto pertenece al grupo del usuario
+    let grupoId = Number(session.grupoId) || 0;
+    if (!grupoId && localId > 0) {
+      grupoId = await getGrupoIdDeLocal(localId);
+    } else if (!grupoId && session.localId) {
+      grupoId = await getGrupoIdDeLocal(Number(session.localId));
+    }
+    if (grupoId) {
+      const productoScope = await prisma.productoBase.findFirst({
+        where: { id: baseId, grupoId },
+        select: { id: true },
+      });
+      if (!productoScope) {
+        return NextResponse.json(
+          { ok: false, error: "Producto no encontrado" },
+          { status: 404 }
+        );
+      }
+    }
 
     const payload = await req.json();
 

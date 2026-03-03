@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function GET(req) {
   try {
@@ -13,6 +14,9 @@ export async function GET(req) {
         { status: 401 }
       );
     }
+
+    const perm = checkPerm(session, "productos.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const url = new URL(req.url);
 

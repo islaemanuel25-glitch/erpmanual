@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
@@ -14,8 +15,10 @@ export async function POST(req) {
       );
     }
 
-    const esAdmin =
-      Array.isArray(session.permisos) && session.permisos.includes("*");
+    const perm = checkPerm(session, "transferencias.recibir");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
+    const esAdmin = session.esAdmin;
 
     const body = await req.json();
     const transferenciaId = Number(body.transferenciaId || 0);

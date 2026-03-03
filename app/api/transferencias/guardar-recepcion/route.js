@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
@@ -14,6 +15,9 @@ export async function POST(req) {
       );
     }
 
+    const perm = checkPerm(session, "transferencias.recibir");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const body = await req.json();
     const { transferenciaId, items } = body;
 
@@ -22,6 +26,29 @@ export async function POST(req) {
         { ok: false, error: "Datos inválidos" },
         { status: 400 }
       );
+    }
+
+    // Scope: non-admin debe ser destino de la transferencia
+    const transferencia = await prisma.transferencia.findUnique({
+      where: { id: transferenciaId },
+      select: { destinoId: true },
+    });
+
+    if (!transferencia) {
+      return NextResponse.json(
+        { ok: false, error: "Transferencia no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    if (!session.esAdmin) {
+      const localId = Number(session.localId || 0);
+      if (!localId || localId !== transferencia.destinoId) {
+        return NextResponse.json(
+          { ok: false, error: "Sin permiso para esta transferencia" },
+          { status: 403 }
+        );
+      }
     }
 
     // Validación — solo si hay diferencia

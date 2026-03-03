@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function DELETE(req, context) {
   try {
@@ -12,6 +14,9 @@ export async function DELETE(req, context) {
       );
     }
 
+    const perm = checkPerm(session, "productos.eliminar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const { id } = await context.params;
     const numId = Number(id);
 
@@ -20,6 +25,24 @@ export async function DELETE(req, context) {
         { ok: false, error: "ID inválido o faltante" },
         { status: 400 }
       );
+    }
+
+    // Scope check: verificar que el producto pertenece al grupo del usuario
+    let grupoId = Number(session.grupoId) || 0;
+    if (!grupoId && session.localId) {
+      grupoId = await getGrupoIdDeLocal(Number(session.localId));
+    }
+    if (grupoId) {
+      const productoScope = await prisma.productoBase.findFirst({
+        where: { id: numId, grupoId },
+        select: { id: true },
+      });
+      if (!productoScope) {
+        return NextResponse.json(
+          { ok: false, error: "Producto no encontrado" },
+          { status: 404 }
+        );
+      }
     }
 
     // Verificar si hay referencias en Transferencias o POS

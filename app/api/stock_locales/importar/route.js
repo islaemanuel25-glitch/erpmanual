@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
@@ -16,15 +17,8 @@ export async function POST(req) {
       );
     }
 
-    const { permisos } = session;
-    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
-
-    if (!esAdmin && !permisos.includes("productos.importar")) {
-      return NextResponse.json(
-        { ok: false, error: "No tenés permisos para importar productos." },
-        { status: 403 }
-      );
-    }
+    const perm = checkPerm(session, "stock.editar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     // ================================
     // 1) RECIBIR BODY

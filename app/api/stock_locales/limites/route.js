@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function POST(req) {
   try {
@@ -19,21 +21,18 @@ export async function POST(req) {
       );
     }
 
-    const { permisos, localId: sessionLocalId } = session;
-    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+    const perm = checkPerm(session, "stock.editar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    if (!esAdmin && !permisos.includes("stock.editar")) {
-      return NextResponse.json(
-        { ok: false, error: "No tenés permisos para editar límites." },
-        { status: 403 }
-      );
-    }
+    const sessionLocalId = session.localId;
+    const esAdmin = session.esAdmin;
 
     // ======================================================
     // 1) ENTRADA
     // ======================================================
     const bodyLocalId = Number(body.localId || 0);
     const productoLocalId = Number(body.productoLocalId || 0);
+    const motivo = (body.motivo || "").trim();
 
     const nuevoMin =
       body.nuevoMin !== undefined ? Number(body.nuevoMin) : null;
@@ -71,6 +70,23 @@ export async function POST(req) {
     }
 
     // ======================================================
+    // 2b) LEER CONFIG DE GRUPO (motivo obligatorio)
+    // ======================================================
+    const grupoId = await getGrupoIdDeLocal(localId);
+    if (grupoId) {
+      const configGrupo = await prisma.configuracionGrupo.findUnique({
+        where: { grupoId },
+        select: { requireMotivoLimitesStock: true },
+      });
+      if (configGrupo?.requireMotivoLimitesStock === true && !motivo) {
+        return NextResponse.json(
+          { ok: false, error: "Motivo requerido para modificar límites de stock." },
+          { status: 400 }
+        );
+      }
+    }
+
+    // ======================================================
     // 3) VALIDAR PRODUCTO-LOCAL
     // ======================================================
     const prodLocal = await prisma.productoLocal.findUnique({
@@ -105,6 +121,24 @@ export async function POST(req) {
         },
       });
 
+      // Auditoría para creación
+      if (grupoId) {
+        await prisma.auditoriaStock.create({
+          data: {
+            grupoId,
+            localId,
+            productoLocalId,
+            userId: session.id,
+            accion: "LIMITES",
+            stockMinAnterior: 0,
+            stockMinNuevo: Number(registro.stockMin || 0),
+            stockMaxAnterior: 0,
+            stockMaxNuevo: Number(registro.stockMax || 0),
+            motivo: motivo || null,
+          },
+        }).catch((e) => console.error("Error auditoría stock:", e.message));
+      }
+
       return NextResponse.json({
         ok: true,
         item: {
@@ -121,6 +155,9 @@ export async function POST(req) {
     // ======================================================
     // 5) ACTUALIZAR LÍMITES
     // ======================================================
+    const minAnterior = Number(registro.stockMin || 0);
+    const maxAnterior = Number(registro.stockMax || 0);
+
     const actualizado = await prisma.stockLocal.update({
       where: {
         localId_productoId: { localId, productoId: productoLocalId },
@@ -130,6 +167,24 @@ export async function POST(req) {
         stockMax: nuevoMax ?? registro.stockMax ?? 0,
       },
     });
+
+    // Auditoría
+    if (grupoId) {
+      await prisma.auditoriaStock.create({
+        data: {
+          grupoId,
+          localId,
+          productoLocalId,
+          userId: session.id,
+          accion: "LIMITES",
+          stockMinAnterior: minAnterior,
+          stockMinNuevo: Number(actualizado.stockMin || 0),
+          stockMaxAnterior: maxAnterior,
+          stockMaxNuevo: Number(actualizado.stockMax || 0),
+          motivo: motivo || null,
+        },
+      }).catch((e) => console.error("Error auditoría stock:", e.message));
+    }
 
     return NextResponse.json({
       ok: true,

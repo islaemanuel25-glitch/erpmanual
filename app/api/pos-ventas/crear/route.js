@@ -253,8 +253,15 @@ export async function POST(req) {
     const gananciaBruta = total - costoTotal;
     const gananciaNeta = netoRecibido - costoTotal;
 
+    // Leer config de stock negativo desde DB
+    const configGrupo = await prisma.configuracionGrupo.findUnique({
+      where: { grupoId },
+      select: { allowNegativeStock: true },
+    });
+    const ALLOW_NEGATIVE_STOCK = configGrupo?.allowNegativeStock === true;
+
     // Transaccion: crear venta + descontar stock + movimiento CC si fiado
-    const venta = await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx) => {
       // Lock a nivel de transacción para evitar concurrencia en número de venta
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${Number(localId)})`;
 
@@ -285,6 +292,7 @@ export async function POST(req) {
 
       // Validar y descontar stock con locks atómicos
       const stockValidations = [];
+      let allowNegativeStockUsed = false;
       for (const item of items) {
         const productoLocal = await tx.productoLocal.findFirst({
           where: { localId, baseId: item.productoBaseId },
@@ -309,12 +317,23 @@ export async function POST(req) {
           : 0;
         
         if (stockActual < item.cantidad) {
-          throw new Error(
-            `Stock insuficiente para ${item.nombre || "producto"}. Disponible: ${stockActual}, Solicitado: ${item.cantidad}`
+          if (!ALLOW_NEGATIVE_STOCK) {
+            throw new Error(
+              `Stock insuficiente para ${item.nombre || "producto"}. Disponible: ${stockActual}, Solicitado: ${item.cantidad}`
+            );
+          }
+          allowNegativeStockUsed = true;
+          console.log(
+            "[POS venta con stock negativo] productoBaseId=%s productoLocalId=%s localId=%s cantidad=%s stockActual=%s",
+            item.productoBaseId,
+            productoLocal.id,
+            localId,
+            item.cantidad,
+            stockActual
           );
         }
 
-        // Descontar stock
+        // Descontar stock (permite negativo si ALLOW_NEGATIVE_STOCK=1)
         await tx.stockLocal.updateMany({
           where: {
             localId,
@@ -426,8 +445,11 @@ export async function POST(req) {
         });
       }
 
-      return nuevaVenta;
+      return { venta: nuevaVenta, allowNegativeStockUsed };
     });
+
+    const venta = txResult.venta;
+    const allowNegativeStockUsed = txResult.allowNegativeStockUsed === true;
 
     // Post-transacción: puntos de fidelidad
     if (clienteId) {
@@ -489,6 +511,7 @@ export async function POST(req) {
       ventaId: venta.id,
       numero: venta.numero,
       message: `Venta #${venta.numero} registrada correctamente`,
+      allowNegativeStockUsed: allowNegativeStockUsed || undefined,
       breakdown: {
         subtotal,
         descuentoAutomatico,

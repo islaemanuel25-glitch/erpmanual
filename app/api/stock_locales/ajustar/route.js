@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function POST(req) {
   try {
@@ -19,15 +21,11 @@ export async function POST(req) {
       );
     }
 
-    const { permisos, localId: sessionLocalId } = session;
-    const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+    const perm = checkPerm(session, "stock.editar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    if (!esAdmin && !permisos.includes("stock.editar")) {
-      return NextResponse.json(
-        { ok: false, error: "No tenés permisos para ajustar stock." },
-        { status: 403 }
-      );
-    }
+    const sessionLocalId = session.localId;
+    const esAdmin = session.esAdmin;
 
     // ======================================================
     // 1) ENTRADA
@@ -37,6 +35,7 @@ export async function POST(req) {
 
     const modo = String(body.modo || "ajuste");
     const tipo = String(body.tipo || "sumar");
+    const motivo = (body.motivo || "").trim();
 
     const cantidad =
       body.cantidad !== undefined ? Number(body.cantidad) : null;
@@ -67,6 +66,37 @@ export async function POST(req) {
           { status: 400 }
         );
       }
+    }
+
+    // ======================================================
+    // 2b) LEER CONFIG DE GRUPO (motivo obligatorio)
+    // ======================================================
+    const grupoId = await getGrupoIdDeLocal(localId);
+    let requireMotivoAjuste = false;
+    let requireMotivoLimites = false;
+    let allowNegativeStock = false;
+    if (grupoId) {
+      const configGrupo = await prisma.configuracionGrupo.findUnique({
+        where: { grupoId },
+        select: { requireMotivoAjusteStock: true, requireMotivoLimitesStock: true, allowNegativeStock: true },
+      });
+      requireMotivoAjuste = configGrupo?.requireMotivoAjusteStock === true;
+      requireMotivoLimites = configGrupo?.requireMotivoLimitesStock === true;
+      allowNegativeStock = configGrupo?.allowNegativeStock === true;
+    }
+
+    if (modo === "ajuste" && requireMotivoAjuste && !motivo) {
+      return NextResponse.json(
+        { ok: false, error: "Motivo requerido para ajustar stock." },
+        { status: 400 }
+      );
+    }
+
+    if (modo === "limites" && requireMotivoLimites && !motivo) {
+      return NextResponse.json(
+        { ok: false, error: "Motivo requerido para modificar límites de stock." },
+        { status: 400 }
+      );
     }
 
     // ======================================================
@@ -132,20 +162,33 @@ export async function POST(req) {
       }
 
       const actual = Number(stock.cantidad || 0);
-
-      // 🚩 DEPÓSITO NO CONVIERTE NADA
-      // 🚩 LOCALES YA TRABAJAN EN UNIDADES
       const cantidadReal = cantidad;
 
       let nuevoStock =
         tipo === "restar" ? actual - cantidadReal : actual + cantidadReal;
 
-      if (nuevoStock < 0) nuevoStock = 0;
+      if (nuevoStock < 0 && !allowNegativeStock) nuevoStock = 0;
 
       const actualizado = await prisma.stockLocal.update({
         where: { localId_productoId: { localId, productoId: productoLocalId } },
         data: { cantidad: nuevoStock },
       });
+
+      // Auditoría
+      if (grupoId) {
+        await prisma.auditoriaStock.create({
+          data: {
+            grupoId,
+            localId,
+            productoLocalId,
+            userId: session.id,
+            accion: tipo === "restar" ? "AJUSTE_RESTAR" : "AJUSTE_SUMAR",
+            cantidadAnterior: actual,
+            cantidadNueva: nuevoStock,
+            motivo: motivo || null,
+          },
+        }).catch((e) => console.error("Error auditoría stock:", e.message));
+      }
 
       return NextResponse.json({
         ok: true,
@@ -164,6 +207,9 @@ export async function POST(req) {
     // 7) MODO LIMITES
     // ======================================================
     if (modo === "limites") {
+      const minAnterior = Number(stock.stockMin || 0);
+      const maxAnterior = Number(stock.stockMax || 0);
+
       const actualizado = await prisma.stockLocal.update({
         where: { localId_productoId: { localId, productoId: productoLocalId } },
         data: {
@@ -171,6 +217,24 @@ export async function POST(req) {
           stockMax: nuevoMax ?? stock.stockMax ?? 0,
         },
       });
+
+      // Auditoría
+      if (grupoId) {
+        await prisma.auditoriaStock.create({
+          data: {
+            grupoId,
+            localId,
+            productoLocalId,
+            userId: session.id,
+            accion: "LIMITES",
+            stockMinAnterior: minAnterior,
+            stockMinNuevo: Number(actualizado.stockMin || 0),
+            stockMaxAnterior: maxAnterior,
+            stockMaxNuevo: Number(actualizado.stockMax || 0),
+            motivo: motivo || null,
+          },
+        }).catch((e) => console.error("Error auditoría stock:", e.message));
+      }
 
       return NextResponse.json({
         ok: true,
