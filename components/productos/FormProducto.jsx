@@ -302,6 +302,7 @@ export default function FormProducto({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Categoría" fieldKey="categoria_id">
               <SunmiSelectAdv
+                searchable
                 value={form.categoria_id === "" ? "" : String(form.categoria_id)}
                 onChange={(v) =>
                   setField("categoria_id", v === "" ? "" : Number(v))
@@ -318,6 +319,7 @@ export default function FormProducto({
 
             <Field label="Área física" fieldKey="area_fisica_id">
               <SunmiSelectAdv
+                searchable
                 value={form.area_fisica_id === "" ? "" : String(form.area_fisica_id)}
                 onChange={(v) =>
                   setField("area_fisica_id", v === "" ? "" : Number(v))
@@ -339,6 +341,7 @@ export default function FormProducto({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Proveedor 1" fieldKey="proveedor_id">
               <SunmiSelectAdv
+                searchable
                 value={form.proveedor_id === "" ? "" : String(form.proveedor_id)}
                 onChange={(v) =>
                   setField("proveedor_id", v === "" ? "" : Number(v))
@@ -355,6 +358,7 @@ export default function FormProducto({
 
             <Field label="Proveedor 2" fieldKey="proveedor2_id">
               <SunmiSelectAdv
+                searchable
                 value={form.proveedor2_id === "" ? "" : String(form.proveedor2_id)}
                 onChange={(v) =>
                   setField("proveedor2_id", v === "" ? "" : Number(v))
@@ -371,6 +375,7 @@ export default function FormProducto({
 
             <Field label="Proveedor 3" fieldKey="proveedor3_id">
               <SunmiSelectAdv
+                searchable
                 value={form.proveedor3_id === "" ? "" : String(form.proveedor3_id)}
                 onChange={(v) =>
                   setField("proveedor3_id", v === "" ? "" : Number(v))
