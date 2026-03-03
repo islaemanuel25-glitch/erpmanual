@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo, getGrupoIdDeLocal } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import * as XLSX from "xlsx";
 
 // Helper: normalizar teléfono (solo dígitos)
@@ -44,16 +45,22 @@ export async function POST(req) {
       );
     }
 
+    const perm = checkPerm(session, "clientes.crear");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     // Leer FormData
     const formData = await req.formData();
     const file = formData.get("file");
     const modoParam = formData.get("modo");
     const localIdFromForm = formData.get("localId");
 
-    // Obtener localId: primero del FormData, luego de session
-    const localId = localIdFromForm 
-      ? Number(localIdFromForm) 
-      : (session.localId ? Number(session.localId) : null);
+    // Obtener localId: admin puede usar FormData, no-admin forzado a session.localId
+    let localId;
+    if (session.esAdmin && localIdFromForm) {
+      localId = Number(localIdFromForm);
+    } else {
+      localId = session.localId ? Number(session.localId) : null;
+    }
 
     if (!localId || localId <= 0) {
       return NextResponse.json(

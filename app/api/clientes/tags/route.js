@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 // GET /api/clientes/tags?localId=...
 export async function GET(req) {
@@ -47,7 +48,11 @@ export async function POST(req) {
       );
     }
 
-    const { localId } = scope;
+    const { localId, session } = scope;
+
+    const perm = checkPerm(session, "clientes.editar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const { nombre, descuentoPorcentaje } = await req.json();
 
     if (!nombre || !nombre.trim()) {

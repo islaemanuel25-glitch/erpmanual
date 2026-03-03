@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 export async function DELETE(req, { params }) {
   try {
@@ -8,7 +9,10 @@ export async function DELETE(req, { params }) {
     if (scope.error) {
       return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
-    const { grupoId, localId } = scope;
+    const { grupoId, localId, session } = scope;
+
+    const perm = checkPerm(session, "clientes.eliminar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const { id } = await params;
 

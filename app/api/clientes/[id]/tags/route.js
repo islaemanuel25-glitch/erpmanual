@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 // PUT /api/clientes/[id]/tags (asignar tags al cliente)
 export async function PUT(req, context) {
@@ -13,7 +14,11 @@ export async function PUT(req, context) {
       );
     }
 
-    const { localId, grupoId } = scope;
+    const { localId, grupoId, session } = scope;
+
+    const perm = checkPerm(session, "clientes.editar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const { id } = await context.params;
     const clienteId = Number(id);
 

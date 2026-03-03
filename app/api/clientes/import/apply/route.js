@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 
 function normTel(val) {
   if (!val) return null;
@@ -44,7 +45,11 @@ export async function POST(req) {
       );
     }
 
-    const { grupoId, localId } = scope;
+    const { grupoId, localId, session } = scope;
+
+    const perm = checkPerm(session, "clientes.crear");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const body = await req.json();
     const { decisions, filasData } = body;
 
