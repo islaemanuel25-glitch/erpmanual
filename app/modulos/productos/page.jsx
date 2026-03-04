@@ -222,6 +222,7 @@ export default function ProductosPage() {
   }, []);
 
   useEffect(() => {
+    if (!localId) return;
     fetchProductos();
   }, [page, pageSize, sortKey, sortDir, filtros, localId]);
 
