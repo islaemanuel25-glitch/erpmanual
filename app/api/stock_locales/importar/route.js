@@ -93,6 +93,7 @@ export async function POST(req) {
     // 5) OBTENER LOCALES
     // ================================
     const locales = await prisma.local.findMany({
+      where: { es_deposito: false },
       select: { id: true },
     });
 

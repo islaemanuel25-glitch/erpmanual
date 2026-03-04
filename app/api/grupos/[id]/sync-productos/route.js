@@ -83,12 +83,10 @@ export async function POST(req, context) {
       select: { localId: true },
     });
 
-    const localIds = [
-      ...new Set([
-        ...grupoLocales.map((gl) => gl.localId),
-        depositoId,
-      ]),
-    ];
+    // Solo locales reales, sin depósito (el depósito lee directo de ProductoBase)
+    const localIds = grupoLocales
+      .map((gl) => gl.localId)
+      .filter((id) => id !== depositoId);
 
     // ── 2) Armar datos fuera de transacción (CPU puro) ───────
 

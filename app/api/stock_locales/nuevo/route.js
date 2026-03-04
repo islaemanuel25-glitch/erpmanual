@@ -164,7 +164,7 @@ export async function POST(req) {
         },
       });
 
-      const locales = await tx.local.findMany({ select: { id: true } });
+      const locales = await tx.local.findMany({ where: { es_deposito: false }, select: { id: true } });
 
       for (const l of locales) {
         const pl = await tx.productoLocal.create({

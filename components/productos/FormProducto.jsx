@@ -422,13 +422,20 @@ export default function FormProducto({
                 type="number"
                 value={form.factor_pack}
                 onChange={(e) => {
-                  setNumber("factor_pack", e.target.value);
-                  const factor = Number(e.target.value);
-                  if (!factor || factor <= 1) {
-                    setField("modo_pedido", "UNIDAD");
-                  } else if (!form.modo_pedido || form.modo_pedido === "") {
-                    setField("modo_pedido", "BULTO");
+                  const val = e.target.value;
+                  if (val === "") {
+                    setForm((p) => ({ ...p, factor_pack: "", modo_pedido: "UNIDAD" }));
+                    return;
                   }
+                  const n = Number(val);
+                  if (!Number.isFinite(n) || n < 0) return;
+                  let modoPedido = form.modo_pedido;
+                  if (!n || n <= 1) {
+                    modoPedido = "UNIDAD";
+                  } else if (!form.modo_pedido || form.modo_pedido === "") {
+                    modoPedido = "BULTO";
+                  }
+                  setForm((p) => ({ ...p, factor_pack: n, modo_pedido: modoPedido }));
                 }}
               />
             </Field>
