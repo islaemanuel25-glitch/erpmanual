@@ -128,7 +128,7 @@ export default function FormProducto({
     setForm((p) => {
       const m = Number(p.margen) || 0;
       if (m > 0) {
-        let pv = pc * (1 + m / 100);
+        let pv = Math.round(pc * (1 + m / 100) * 100) / 100;
         if (p.redondeo_100 && pv > 0) pv = roundUp100(pv);
         return { ...p, precio_costo: pc, precio_venta: pv };
       }
@@ -142,7 +142,7 @@ export default function FormProducto({
     if (!Number.isFinite(m) || m < 0) return;
     setForm((p) => {
       const pc = Number(p.precio_costo) || 0;
-      let pv = pc > 0 ? pc * (1 + m / 100) : 0;
+      let pv = pc > 0 ? Math.round(pc * (1 + m / 100) * 100) / 100 : 0;
       if (p.redondeo_100 && pv > 0) pv = roundUp100(pv);
       return { ...p, margen: m, precio_venta: pv };
     });
@@ -430,6 +430,7 @@ export default function FormProducto({
               <SunmiInput
                 type="number"
                 value={form.factor_pack}
+                onWheel={(e) => e.target.blur()}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === "") {
@@ -453,6 +454,7 @@ export default function FormProducto({
               <SunmiInput
                 type="number"
                 value={form.peso_kg}
+                onWheel={(e) => e.target.blur()}
                 onChange={(e) => setNumber("peso_kg", e.target.value)}
               />
             </Field>
@@ -461,6 +463,7 @@ export default function FormProducto({
               <SunmiInput
                 type="number"
                 value={form.volumen_ml}
+                onWheel={(e) => e.target.blur()}
                 onChange={(e) => setNumber("volumen_ml", e.target.value)}
               />
             </Field>
@@ -474,6 +477,7 @@ export default function FormProducto({
               <SunmiInput
                 type="number"
                 value={form.precio_costo}
+                onWheel={(e) => e.target.blur()}
                 onChange={(e) => onChangeCosto(e.target.value)}
               />
             </Field>
@@ -482,6 +486,7 @@ export default function FormProducto({
               <SunmiInput
                 type="number"
                 value={form.margen}
+                onWheel={(e) => e.target.blur()}
                 onChange={(e) => onChangeMargen(e.target.value)}
               />
             </Field>
@@ -490,6 +495,7 @@ export default function FormProducto({
               <SunmiInput
                 type="number"
                 value={form.precio_venta}
+                onWheel={(e) => e.target.blur()}
                 onChange={(e) => onChangeVenta(e.target.value)}
               />
             </Field>
@@ -498,6 +504,7 @@ export default function FormProducto({
               <SunmiInput
                 type="number"
                 value={form.iva_porcentaje}
+                onWheel={(e) => e.target.blur()}
                 onChange={(e) => setNumber("iva_porcentaje", e.target.value)}
               />
             </Field>
@@ -511,6 +518,7 @@ export default function FormProducto({
               <SunmiInput
                 type="number"
                 value={form.precio_sugerido}
+                onWheel={(e) => e.target.blur()}
                 onChange={(e) => setNumber("precio_sugerido", e.target.value)}
               />
             </Field>
@@ -633,6 +641,7 @@ export default function FormProducto({
                     step="0.001"
                     min="0"
                     value={form.pesoReferenciaKg}
+                    onWheel={(e) => e.target.blur()}
                     onChange={(e) => setNumber("pesoReferenciaKg", e.target.value)}
                     placeholder="ej: 3.5"
                   />
