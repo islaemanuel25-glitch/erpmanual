@@ -121,39 +121,44 @@ export default function FormProducto({
     if (Number.isFinite(n) && n >= 0) setField(key, n);
   };
 
-  const costo = Number(form.precio_costo) || 0;
-  const usarRedondeo = Boolean(form.redondeo_100);
-
   const onChangeCosto = (val) => {
-    if (val === "") return setField("precio_costo", "");
-    let pc = Number(val);
+    if (val === "") return setForm((p) => ({ ...p, precio_costo: "" }));
+    const pc = Number(val);
     if (!Number.isFinite(pc) || pc < 0) return;
-
-    if (form.margen > 0) {
-      let pv = pc * (1 + form.margen / 100);
-      if (usarRedondeo) pv = roundUp100(pv);
-      setForm((p) => ({ ...p, precio_costo: pc, precio_venta: pv }));
-    } else setField("precio_costo", pc);
+    setForm((p) => {
+      const m = Number(p.margen) || 0;
+      if (m > 0) {
+        let pv = pc * (1 + m / 100);
+        if (p.redondeo_100 && pv > 0) pv = roundUp100(pv);
+        return { ...p, precio_costo: pc, precio_venta: pv };
+      }
+      return { ...p, precio_costo: pc };
+    });
   };
 
   const onChangeMargen = (val) => {
-    if (val === "") return setField("margen", "");
-    let m = Number(val);
+    if (val === "") return setForm((p) => ({ ...p, margen: "" }));
+    const m = Number(val);
     if (!Number.isFinite(m) || m < 0) return;
-
-    let pv = costo > 0 ? costo * (1 + m / 100) : 0;
-    if (usarRedondeo && pv > 0) pv = roundUp100(pv);
-    setForm((p) => ({ ...p, margen: m, precio_venta: pv }));
+    setForm((p) => {
+      const pc = Number(p.precio_costo) || 0;
+      let pv = pc > 0 ? pc * (1 + m / 100) : 0;
+      if (p.redondeo_100 && pv > 0) pv = roundUp100(pv);
+      return { ...p, margen: m, precio_venta: pv };
+    });
   };
 
   const onChangeVenta = (val) => {
-    if (val === "") return setField("precio_venta", "");
-    let pv = Number(val);
-    if (!Number.isFinite(pv) || pv < 0) return;
-    if (usarRedondeo) pv = roundUp100(pv);
-
-    let m = costo > 0 ? (pv / costo - 1) * 100 : 0;
-    setForm((p) => ({ ...p, precio_venta: pv, margen: Number(m.toFixed(2)) }));
+    if (val === "") return setForm((p) => ({ ...p, precio_venta: "" }));
+    const pvRaw = Number(val);
+    if (!Number.isFinite(pvRaw) || pvRaw < 0) return;
+    setForm((p) => {
+      let pv = pvRaw;
+      if (p.redondeo_100) pv = roundUp100(pv);
+      const pc = Number(p.precio_costo) || 0;
+      const m = pc > 0 ? (pv / pc - 1) * 100 : 0;
+      return { ...p, precio_venta: pv, margen: Number(m.toFixed(2)) };
+    });
   };
 
   const validar = () => {
@@ -399,15 +404,19 @@ export default function FormProducto({
               <SunmiSelectAdv
                 value={form.unidad_medida}
                 onChange={(v) => {
-                  setField("unidad_medida", v);
-                  if (v === "unidad" || !form.factor_pack || form.factor_pack <= 1) {
-                    setField("modo_pedido", "UNIDAD");
-                  } else if (!form.modo_pedido || form.modo_pedido === "") {
-                    setField("modo_pedido", "BULTO");
-                  }
-                  if (!initialData || !form.modo_envio) {
-                    setField("modo_envio", defaultModoEnvio(v));
-                  }
+                  setForm((p) => {
+                    let modoPedido = p.modo_pedido;
+                    if (v === "unidad" || !p.factor_pack || p.factor_pack <= 1) {
+                      modoPedido = "UNIDAD";
+                    } else if (!p.modo_pedido || p.modo_pedido === "") {
+                      modoPedido = "BULTO";
+                    }
+                    let modoEnvio = p.modo_envio;
+                    if (!initialData || !p.modo_envio) {
+                      modoEnvio = defaultModoEnvio(v);
+                    }
+                    return { ...p, unidad_medida: v, modo_pedido: modoPedido, modo_envio: modoEnvio };
+                  });
                 }}
               >
                 <SunmiSelectOption value="unidad">Unidad</SunmiSelectOption>
@@ -531,9 +540,13 @@ export default function FormProducto({
               <SunmiToggleEstado
                 value={form.redondeo_100}
                 onChange={(v) => {
-                  setField("redondeo_100", v);
-                  if (v && form.precio_venta > 0)
-                    setField("precio_venta", roundUp100(Number(form.precio_venta)));
+                  setForm((p) => {
+                    const next = { ...p, redondeo_100: v };
+                    if (v && Number(p.precio_venta) > 0) {
+                      next.precio_venta = roundUp100(Number(p.precio_venta));
+                    }
+                    return next;
+                  });
                 }}
               />
             </div>
