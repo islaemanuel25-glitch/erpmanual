@@ -235,7 +235,7 @@ export default function ProductosPage() {
 
     if (editarId) {
       const idNum = Number(editarId);
-      if (!idNum) return;
+      if (!idNum || !localId) return;
 
       const cargar = async () => {
         try {
