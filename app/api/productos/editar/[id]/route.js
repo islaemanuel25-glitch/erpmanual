@@ -259,10 +259,21 @@ async function editarBase(baseId, baseData) {
     }
   }
 
-  // sincronizar precioCosto/activo en overrides
+  // sincronizar precioCosto/activo en overrides (locales)
   await syncFromBaseToLocales(baseId, {
     precioCosto: baseData.precio_costo,
     activo: baseData.activo,
+  });
+
+  // Sincronizar ProductoLocal del depósito con los valores exactos de la base
+  await prisma.productoLocal.updateMany({
+    where: { baseId, local: { es_deposito: true } },
+    data: {
+      precio_costo: dataFinal.precio_costo,
+      precio_venta: dataFinal.precio_venta,
+      margen: dataFinal.margen,
+      activo: dataFinal.activo,
+    },
   });
 
   return NextResponse.json({
