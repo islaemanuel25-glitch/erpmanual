@@ -145,7 +145,7 @@ export default function PedidosCatalogoPage() {
         // Reconstruir mapa de cantidades (siempre en unidades)
         const mapa = {};
         (json.items || []).forEach((it) => {
-          mapa[it.baseId] = it.sugerido;
+          mapa[it.productoLocalId] = it.sugerido;
         });
         setCarrito(mapa);
       }
@@ -157,7 +157,7 @@ export default function PedidosCatalogoPage() {
   // ====================================================
   // SET CANTIDAD
   // ====================================================
-  const setCantidad = async (baseId, cantidad, unidad = "UNIDAD") => {
+  const setCantidad = async (productoLocalId, cantidad, unidad = "UNIDAD") => {
     if (pendiente) {
       setError("Hay un pedido solicitado pendiente. Esperá a que el depósito lo procese o cancelalo.");
       return;
@@ -167,9 +167,9 @@ export default function PedidosCatalogoPage() {
     setCarrito((prev) => {
       const next = { ...prev };
       if (cantidad === 0) {
-        delete next[baseId];
+        delete next[productoLocalId];
       } else {
-        next[baseId] = cantidad;
+        next[productoLocalId] = cantidad;
       }
       return next;
     });
@@ -178,7 +178,7 @@ export default function PedidosCatalogoPage() {
       const res = await fetch("/api/pedidos/set-cantidad", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseId, cantidad, unidad }),
+        body: JSON.stringify({ productoLocalId, cantidad, unidad }),
       });
       const json = await res.json();
       if (json.ok) {
@@ -349,8 +349,8 @@ export default function PedidosCatalogoPage() {
                     <CarritoItemCard
                       key={item.detalleId}
                       item={item}
-                      totalActual={carrito[item.baseId] || item.sugerido}
-                      onSetCantidad={(cant, uni) => setCantidad(item.baseId, cant, uni)}
+                      totalActual={carrito[item.productoLocalId] || item.sugerido}
+                      onSetCantidad={(cant, uni) => setCantidad(item.productoLocalId, cant, uni)}
                     />
                   ))}
                 </div>
@@ -513,11 +513,11 @@ export default function PedidosCatalogoPage() {
             <div className="space-y-2">
               {productos.map((prod) => (
                 <ProductoCard
-                  key={prod.baseId}
+                  key={prod.productoLocalId}
                   producto={prod}
-                  cantidadActual={carrito[prod.baseId] || 0}
+                  cantidadActual={carrito[prod.productoLocalId] || 0}
                   onSetCantidad={(cant, uni) =>
-                    setCantidad(prod.baseId, cant, uni)
+                    setCantidad(prod.productoLocalId, cant, uni)
                   }
                 />
               ))}

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { esBultoMode } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -39,12 +40,12 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const baseId = Number(body.baseId || 0);
+    const productoLocalId = Number(body.productoLocalId || 0);
     const cantidad = Number(body.cantidad || 0);
 
-    if (!baseId) {
+    if (!productoLocalId) {
       return NextResponse.json(
-        { ok: false, error: "baseId requerido" },
+        { ok: false, error: "productoLocalId requerido" },
         { status: 400 }
       );
     }
@@ -53,18 +54,6 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "La cantidad no puede ser negativa" },
         { status: 400 }
-      );
-    }
-
-    // Validar que el ProductoBase pertenece al grupo
-    const productoBase = await prisma.productoBase.findUnique({
-      where: { id: baseId },
-    });
-
-    if (!productoBase || productoBase.grupoId !== grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "Producto no encontrado en el grupo" },
-        { status: 404 }
       );
     }
 
@@ -83,23 +72,23 @@ export async function POST(req) {
 
     const depositoId = grupoDeposito.localId;
 
-    // Buscar el ProductoLocal del LOCAL (no del depósito) para la FK de PosTransferenciaDetalle
-    const productoLocal = await prisma.productoLocal.findUnique({
-      where: { localId_baseId: { localId, baseId } },
+    // Verificar que el productoLocal pertenece al depósito
+    const productoOrigen = await prisma.productoLocal.findUnique({
+      where: { id: productoLocalId },
+      include: { base: true },
     });
 
-    if (!productoLocal) {
+    if (!productoOrigen || productoOrigen.localId !== depositoId) {
       return NextResponse.json(
-        { ok: false, error: "Producto no sincronizado con este local. Ejecutá la sincronización." },
+        { ok: false, error: "Producto no encontrado en el depósito" },
         { status: 404 }
       );
     }
 
-    const productoLocalId = productoLocal.id;
-
     // Validar modo_envio: si BULTO, cantidad debe ser múltiplo de factorPack
-    const factorPack = Number(productoBase.factor_pack || 1);
-    if (cantidad > 0 && productoBase.modo_envio === "SOLO_BULTO" && factorPack > 1) {
+    const base = productoOrigen.base;
+    const factorPack = Number(base?.factor_pack || 1);
+    if (cantidad > 0 && base?.modo_envio === "SOLO_BULTO" && factorPack > 1) {
       if (cantidad % factorPack !== 0) {
         return NextResponse.json(
           { ok: false, error: `Este producto se pide por bulto completo (x${factorPack}).` },
@@ -206,7 +195,6 @@ export async function POST(req) {
       item: item
         ? {
             detalleId: item.id,
-            baseId,
             productoLocalId: item.productoId,
             sugerido: Number(item.sugerido || 0),
             preparado: Number(item.preparado || 0),
