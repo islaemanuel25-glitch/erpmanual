@@ -146,33 +146,33 @@ export async function POST(req) {
 
       // ── Campos obligatorios ──
       if (!codigoBarra) {
-        erroresArr.push(`Fila ${fila}: codigo_barra es obligatorio`);
+        erroresArr.push({ field: "codigo_barra", message: "es obligatorio" });
       }
 
       if (!nombre) {
-        erroresArr.push(`Fila ${fila}: nombre es obligatorio`);
+        erroresArr.push({ field: "nombre", message: "es obligatorio" });
       }
 
       if (!UNIDADES_VALIDAS.includes(unidadMedida)) {
-        erroresArr.push(`Fila ${fila}: unidad_medida debe ser: ${UNIDADES_VALIDAS.join(", ")}`);
+        erroresArr.push({ field: "unidad_medida", message: `debe ser: ${UNIDADES_VALIDAS.join(", ")}` });
       }
 
       if (isNaN(precioCosto) || precioCosto <= 0) {
-        erroresArr.push(`Fila ${fila}: precio_costo debe ser mayor a 0`);
+        erroresArr.push({ field: "precio_costo", message: "debe ser mayor a 0" });
       }
 
       if (isNaN(precioVenta) || precioVenta <= 0) {
-        erroresArr.push(`Fila ${fila}: precio_venta debe ser mayor a 0`);
+        erroresArr.push({ field: "precio_venta", message: "debe ser mayor a 0" });
       }
 
       // Margen >= 0 si se envía
       if (margenRaw !== null && (isNaN(margenRaw) || margenRaw < 0)) {
-        erroresArr.push(`Fila ${fila}: margen debe ser >= 0`);
+        erroresArr.push({ field: "margen", message: "debe ser >= 0" });
       }
 
       // ── Deduplicación intra-archivo ──
       if (codigoBarra && codigosVistos.has(codigoBarra)) {
-        erroresArr.push(`Fila ${fila}: codigo_barra "${codigoBarra}" duplicado (ya en fila ${codigosVistos.get(codigoBarra)})`);
+        erroresArr.push({ field: "codigo_barra", message: `duplicado (ya en fila ${codigosVistos.get(codigoBarra)})` });
       } else if (codigoBarra) {
         codigosVistos.set(codigoBarra, fila);
       }
@@ -183,7 +183,7 @@ export async function POST(req) {
       if (catNombre) {
         categoriaId = catMap.get(catNombre.toLowerCase()) || null;
         if (!categoriaId) {
-          erroresArr.push(`Fila ${fila}: categoría "${catNombre}" no encontrada`);
+          erroresArr.push({ field: "categoria", message: `"${catNombre}" no encontrada` });
         }
       }
 
@@ -192,7 +192,7 @@ export async function POST(req) {
       if (provNombre) {
         proveedorId = provMap.get(provNombre.toLowerCase()) || null;
         if (!proveedorId) {
-          erroresArr.push(`Fila ${fila}: proveedor "${provNombre}" no encontrado`);
+          erroresArr.push({ field: "proveedor", message: `"${provNombre}" no encontrado` });
         }
       }
 
@@ -201,7 +201,7 @@ export async function POST(req) {
       if (areaNombre) {
         areaFisicaId = areaMap.get(areaNombre.toLowerCase()) || null;
         if (!areaFisicaId) {
-          erroresArr.push(`Fila ${fila}: área física "${areaNombre}" no encontrada`);
+          erroresArr.push({ field: "area_fisica", message: `"${areaNombre}" no encontrada` });
         }
       }
 
@@ -214,7 +214,7 @@ export async function POST(req) {
 
       if (erroresArr.length > 0) {
         accion = "error";
-        motivoError = erroresArr.join("; ");
+        motivoError = erroresArr.map((e) => `${e.field}: ${e.message}`).join("; ");
         errores++;
       } else if (existente) {
         if (modo === "crear") {
@@ -242,6 +242,7 @@ export async function POST(req) {
         fila,
         accion,
         motivoError,
+        erroresDetalle: erroresArr.length > 0 ? erroresArr : null,
         productoBaseId: existente?.id || null,
         codigo_barra: codigoBarra,
         nombre,

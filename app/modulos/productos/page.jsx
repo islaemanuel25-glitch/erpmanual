@@ -146,6 +146,9 @@ export default function ProductosPage() {
   const [impLoading, setImpLoading] = useState(false);
   const [impResultado, setImpResultado] = useState(null);
   const [impError, setImpError] = useState("");
+  const [impTab, setImpTab] = useState("errores"); // errores | correctos
+  const [impPage, setImpPage] = useState(1);
+  const IMP_PAGE_SIZE = 50;
 
   // =========================================================
   // FETCH CATALOGOS + LOCALES
@@ -530,11 +533,60 @@ export default function ProductosPage() {
     setImpError("");
   };
 
-  // Preview limitado a 50 filas
-  const previewRows = useMemo(() => {
+  // Preview: separar errores y correctos, paginar client-side
+  const impErrorRows = useMemo(() => {
     if (!impPreview) return [];
-    return impPreview.slice(0, 50);
+    return impPreview.filter((r) => r.accion === "error");
   }, [impPreview]);
+
+  const impOkRows = useMemo(() => {
+    if (!impPreview) return [];
+    return impPreview.filter((r) => r.accion === "crear" || r.accion === "actualizar");
+  }, [impPreview]);
+
+  const impActiveList = impTab === "errores" ? impErrorRows : impOkRows;
+  const impTotalPages = Math.max(1, Math.ceil(impActiveList.length / IMP_PAGE_SIZE));
+  const impPagedRows = impActiveList.slice(
+    (impPage - 1) * IMP_PAGE_SIZE,
+    impPage * IMP_PAGE_SIZE
+  );
+
+  // Reset page when tab changes
+  useEffect(() => {
+    setImpPage(1);
+  }, [impTab]);
+
+  // Descargar errores como Excel
+  const descargarErroresExcel = () => {
+    if (impErrorRows.length === 0) return;
+    const data = [];
+    for (const row of impErrorRows) {
+      if (row.erroresDetalle && row.erroresDetalle.length > 0) {
+        for (const err of row.erroresDetalle) {
+          data.push({
+            fila: row.fila,
+            codigo_barra: row.codigo_barra || "",
+            nombre: row.nombre || "",
+            campo: err.field,
+            error: err.message,
+          });
+        }
+      } else {
+        data.push({
+          fila: row.fila,
+          codigo_barra: row.codigo_barra || "",
+          nombre: row.nombre || "",
+          campo: "",
+          error: row.motivoError || "",
+        });
+      }
+    }
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = [{ wch: 6 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 50 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Errores");
+    XLSX.writeFile(wb, `errores_importacion_${new Date().toISOString().split("T")[0]}.xlsx`);
+  };
 
   // =========================================================
   // RENDER
@@ -824,8 +876,11 @@ export default function ProductosPage() {
               {/* Preview de importación */}
               {impResumen && impPreview && (
                 <>
-                  {/* Resumen */}
+                  {/* Resumen badges */}
                   <div className="flex flex-wrap gap-3 px-1 mt-3">
+                    <span className="px-2 py-1 rounded sunmi-surface text-[12px] font-medium">
+                      Total: {impResumen.total}
+                    </span>
                     <span className="px-2 py-1 rounded sunmi-state-success sunmi-text-success text-[12px] font-medium">
                       Crear: {impResumen.crear}
                     </span>
@@ -842,57 +897,114 @@ export default function ProductosPage() {
                     )}
                   </div>
 
-                  {impPreview.length > 50 && (
-                    <p className="text-[11px] sunmi-text-muted px-1">
-                      Mostrando primeras 50 filas de {impPreview.length}
-                    </p>
-                  )}
+                  {/* Tabs errores / correctos */}
+                  <div className="flex gap-2 px-1 mt-3">
+                    <button
+                      className={`px-3 py-1.5 rounded text-[12px] font-medium transition-colors ${
+                        impTab === "errores"
+                          ? "sunmi-state-danger sunmi-text-danger"
+                          : "sunmi-surface sunmi-text-muted hover:opacity-80"
+                      }`}
+                      onClick={() => { setImpTab("errores"); setImpPage(1); }}
+                    >
+                      Errores ({impErrorRows.length})
+                    </button>
+                    <button
+                      className={`px-3 py-1.5 rounded text-[12px] font-medium transition-colors ${
+                        impTab === "correctos"
+                          ? "sunmi-state-success sunmi-text-success"
+                          : "sunmi-surface sunmi-text-muted hover:opacity-80"
+                      }`}
+                      onClick={() => { setImpTab("correctos"); setImpPage(1); }}
+                    >
+                      Correctos ({impOkRows.length})
+                    </button>
+                    {impTab === "errores" && impErrorRows.length > 0 && (
+                      <SunmiButton size="sm" color="red" onClick={descargarErroresExcel}>
+                        Descargar errores (Excel)
+                      </SunmiButton>
+                    )}
+                  </div>
 
-                  {/* Tabla preview */}
+                  {/* Tabla paginada */}
                   <div className="overflow-x-auto mt-2">
                     <div className="rounded-lg border sunmi-border overflow-hidden">
-                      <SunmiTable
-                        headers={["Fila", "Acción", "Código", "Nombre", "Unidad", "Costo", "Venta", "Categoría", "Proveedor", "Motivo"]}
-                      >
-                        {previewRows.length === 0 ? (
-                          <SunmiTableEmpty message="Sin productos en preview" />
-                        ) : (
-                          previewRows.map((row, i) => (
-                            <SunmiTableRow key={i}>
-                              <td className="px-2 py-1.5">{row.fila}</td>
-                              <td className="px-2 py-1.5">
-                                <span className={`
-                                  px-1.5 py-0.5 rounded text-[10px] font-semibold
-                                  ${row.accion === "crear" ? "sunmi-state-success sunmi-text-success" : ""}
-                                  ${row.accion === "actualizar" ? "sunmi-badge-link" : ""}
-                                  ${row.accion === "error" ? "sunmi-state-danger sunmi-text-danger" : ""}
-                                  ${row.accion === "ignorar" ? "sunmi-surface sunmi-text-muted" : ""}
-                                `}>
-                                  {row.accion}
-                                </span>
-                              </td>
-                              <td className="px-2 py-1.5 text-[11px]">{row.codigo_barra || "-"}</td>
-                              <td className={`px-2 py-1.5 text-[11px] ${row.accion === "error" ? "sunmi-text-danger" : ""}`}>
-                                {row.nombre}
-                              </td>
-                              <td className="px-2 py-1.5 text-[11px]">{row.unidad_medida}</td>
-                              <td className="px-2 py-1.5 text-[11px] text-right">
-                                {!isNaN(row.precio_costo) ? `$ ${Number(row.precio_costo).toLocaleString("es-AR", { minimumFractionDigits: 2 })}` : "-"}
-                              </td>
-                              <td className="px-2 py-1.5 text-[11px] text-right">
-                                {!isNaN(row.precio_venta) ? `$ ${Number(row.precio_venta).toLocaleString("es-AR", { minimumFractionDigits: 2 })}` : "-"}
-                              </td>
-                              <td className="px-2 py-1.5 text-[11px]">{row.categoria || "-"}</td>
-                              <td className="px-2 py-1.5 text-[11px]">{row.proveedor || "-"}</td>
-                              <td className={`px-2 py-1.5 text-[11px] ${row.accion === "error" ? "sunmi-text-danger" : "sunmi-text-muted"}`}>
-                                {row.motivoError || "-"}
-                              </td>
-                            </SunmiTableRow>
-                          ))
-                        )}
-                      </SunmiTable>
+                      {impTab === "errores" ? (
+                        <SunmiTable headers={["Fila", "Código", "Nombre", "Campo", "Error"]}>
+                          {impPagedRows.length === 0 ? (
+                            <SunmiTableEmpty message="Sin errores" />
+                          ) : (
+                            impPagedRows.map((row, i) =>
+                              (row.erroresDetalle || [{ field: "-", message: row.motivoError || "-" }]).map((err, j) => (
+                                <SunmiTableRow key={`${i}-${j}`}>
+                                  {j === 0 && (
+                                    <>
+                                      <td className="px-2 py-1.5 text-[11px]" rowSpan={row.erroresDetalle?.length || 1}>{row.fila}</td>
+                                      <td className="px-2 py-1.5 text-[11px]" rowSpan={row.erroresDetalle?.length || 1}>{row.codigo_barra || "-"}</td>
+                                      <td className="px-2 py-1.5 text-[11px]" rowSpan={row.erroresDetalle?.length || 1}>{row.nombre || "-"}</td>
+                                    </>
+                                  )}
+                                  <td className="px-2 py-1.5 text-[11px] sunmi-text-danger font-medium">{err.field}</td>
+                                  <td className="px-2 py-1.5 text-[11px] sunmi-text-danger">{err.message}</td>
+                                </SunmiTableRow>
+                              ))
+                            )
+                          )}
+                        </SunmiTable>
+                      ) : (
+                        <SunmiTable headers={["Fila", "Acción", "Código", "Nombre", "Unidad", "Costo", "Venta"]}>
+                          {impPagedRows.length === 0 ? (
+                            <SunmiTableEmpty message="Sin productos válidos" />
+                          ) : (
+                            impPagedRows.map((row, i) => (
+                              <SunmiTableRow key={i}>
+                                <td className="px-2 py-1.5 text-[11px]">{row.fila}</td>
+                                <td className="px-2 py-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                    row.accion === "crear" ? "sunmi-state-success sunmi-text-success" : "sunmi-badge-link"
+                                  }`}>
+                                    {row.accion}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-1.5 text-[11px]">{row.codigo_barra || "-"}</td>
+                                <td className="px-2 py-1.5 text-[11px]">{row.nombre}</td>
+                                <td className="px-2 py-1.5 text-[11px]">{row.unidad_medida}</td>
+                                <td className="px-2 py-1.5 text-[11px] text-right">
+                                  {!isNaN(row.precio_costo) ? `$ ${Number(row.precio_costo).toLocaleString("es-AR", { minimumFractionDigits: 2 })}` : "-"}
+                                </td>
+                                <td className="px-2 py-1.5 text-[11px] text-right">
+                                  {!isNaN(row.precio_venta) ? `$ ${Number(row.precio_venta).toLocaleString("es-AR", { minimumFractionDigits: 2 })}` : "-"}
+                                </td>
+                              </SunmiTableRow>
+                            ))
+                          )}
+                        </SunmiTable>
+                      )}
                     </div>
                   </div>
+
+                  {/* Paginación */}
+                  {impTotalPages > 1 && (
+                    <div className="flex items-center justify-center gap-3 px-1 mt-2">
+                      <SunmiButton
+                        size="sm"
+                        disabled={impPage <= 1}
+                        onClick={() => setImpPage((p) => Math.max(1, p - 1))}
+                      >
+                        Anterior
+                      </SunmiButton>
+                      <span className="text-[12px] sunmi-text-muted">
+                        Página {impPage} de {impTotalPages}
+                      </span>
+                      <SunmiButton
+                        size="sm"
+                        disabled={impPage >= impTotalPages}
+                        onClick={() => setImpPage((p) => Math.min(impTotalPages, p + 1))}
+                      >
+                        Siguiente
+                      </SunmiButton>
+                    </div>
+                  )}
 
                   {/* Botón confirmar */}
                   {(impResumen.crear > 0 || impResumen.actualizar > 0) && (
