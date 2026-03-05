@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -41,6 +41,62 @@ const FORMA_PAGO_LABELS = {
   credito: "Credito",
   fiado: "Fiado",
 };
+
+function imprimirZReport(turno, resumen) {
+  const totalVentas =
+    (resumen.totalEfectivo || 0) + (resumen.totalDigital || 0);
+  const esperado =
+    Number(turno.montoInicial) + (resumen.totalEfectivo || 0);
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Z Report - Turno #${turno.id}</title>
+<style>
+  body { font-family: monospace; font-size: 12px; width: 280px; margin: 0 auto; padding: 10px; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .line { border-top: 1px dashed #000; margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; }
+  .row span:last-child { text-align: right; }
+  .big { font-size: 14px; }
+  .danger { }
+  h2 { margin: 4px 0; font-size: 14px; }
+</style></head><body>
+<div class="center bold big">Z REPORT</div>
+<div class="center">Cierre de Turno</div>
+<div class="line"></div>
+<div class="row"><span>Turno:</span><span>#${turno.id}</span></div>
+<div class="row"><span>Cajero:</span><span>${turno.vendedor?.nombre || "-"}</span></div>
+<div class="row"><span>Apertura:</span><span>${fmtFecha(turno.apertura)}</span></div>
+<div class="row"><span>Cierre:</span><span>${fmtFecha(turno.cierre)}</span></div>
+<div class="line"></div>
+<div class="center bold">VENTAS</div>
+<div class="row"><span>Cantidad:</span><span>${resumen.cantidadVentas || 0}</span></div>
+<div class="line"></div>
+<div class="row"><span>Efectivo:</span><span>$${fmt(resumen.totalEfectivo)}</span></div>
+<div class="row"><span>MercadoPago:</span><span>$${fmt(resumen.desglose?.mercadopago)}</span></div>
+<div class="row"><span>Debito:</span><span>$${fmt(resumen.desglose?.debito)}</span></div>
+<div class="row"><span>Credito:</span><span>$${fmt(resumen.desglose?.credito)}</span></div>
+<div class="row"><span>Fiado:</span><span>$${fmt(resumen.desglose?.fiado)}</span></div>
+<div class="line"></div>
+<div class="row bold"><span>Total ventas:</span><span>$${fmt(totalVentas)}</span></div>
+<div class="line"></div>
+<div class="center bold">ARQUEO EFECTIVO</div>
+<div class="row"><span>Monto inicial:</span><span>$${fmt(turno.montoInicial)}</span></div>
+<div class="row"><span>+ Ventas efectivo:</span><span>$${fmt(resumen.totalEfectivo)}</span></div>
+<div class="row bold"><span>Esperado:</span><span>$${fmt(esperado)}</span></div>
+<div class="row"><span>Real contado:</span><span>$${fmt(turno.montoRealEfectivo)}</span></div>
+<div class="row bold"><span>Diferencia:</span><span>$${fmt(turno.diferenciaEfectivo)}</span></div>
+<div class="line"></div>
+<div class="center" style="font-size:10px; margin-top:8px;">Impreso: ${new Date().toLocaleString("es-AR")}</div>
+</body></html>`;
+
+  const win = window.open("", "_blank", "width=320,height=600");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+}
 
 export default function TurnoDetallePage() {
   const router = useRouter();
@@ -130,6 +186,12 @@ export default function TurnoDetallePage() {
 
   if (!turno) return null;
 
+  const estaCerrado = turno.cierre != null;
+  const totalVentas =
+    (resumen?.totalEfectivo || 0) + (resumen?.totalDigital || 0);
+  const esperadoEfectivo =
+    Number(turno.montoInicial) + (resumen?.totalEfectivo || 0);
+
   const ventaHeaders = [
     "#",
     "Fecha",
@@ -149,9 +211,19 @@ export default function TurnoDetallePage() {
           <h1 className="text-lg font-bold">
             Turno #{turno.id} - {turno.vendedor?.nombre || "-"}
           </h1>
-          <SunmiButton color="slate" onClick={() => router.push("/modulos/turnos")}>
-            Volver
-          </SunmiButton>
+          <div className="flex gap-2">
+            {estaCerrado && resumen && (
+              <SunmiButton
+                color="cyan"
+                onClick={() => imprimirZReport(turno, resumen)}
+              >
+                Imprimir Z Report
+              </SunmiButton>
+            )}
+            <SunmiButton color="slate" onClick={() => router.push("/modulos/turnos")}>
+              Volver
+            </SunmiButton>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
@@ -162,7 +234,7 @@ export default function TurnoDetallePage() {
           <div>
             <span className="sunmi-text-muted text-xs">Cierre</span>
             <p className="font-semibold text-sm">
-              {turno.cierre ? (
+              {estaCerrado ? (
                 fmtFecha(turno.cierre)
               ) : (
                 <span className="sunmi-text-success">Abierto</span>
@@ -175,36 +247,11 @@ export default function TurnoDetallePage() {
           </div>
           <div>
             <span className="sunmi-text-muted text-xs">Cant. Ventas</span>
-            <p className="font-semibold text-sm">{turno.cantidadVentas ?? ventas.length}</p>
+            <p className="font-semibold text-sm">
+              {resumen?.cantidadVentas ?? turno.cantidadVentas ?? ventas.length}
+            </p>
           </div>
         </div>
-
-        {turno.cierre && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-            <div>
-              <span className="sunmi-text-muted text-xs">Esperado Efectivo</span>
-              <p className="font-semibold text-sm">${fmt(turno.montoEsperadoEfectivo)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Real Efectivo</span>
-              <p className="font-semibold text-sm">${fmt(turno.montoRealEfectivo)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Diferencia</span>
-              <p
-                className={`font-semibold text-sm ${
-                  turno.diferenciaEfectivo != null && turno.diferenciaEfectivo < 0
-                    ? "sunmi-text-danger"
-                    : turno.diferenciaEfectivo != null && turno.diferenciaEfectivo > 0
-                    ? "sunmi-text-success"
-                    : ""
-                }`}
-              >
-                ${fmt(turno.diferenciaEfectivo)}
-              </p>
-            </div>
-          </div>
-        )}
 
         {turno.observaciones && (
           <div className="mt-3">
@@ -214,46 +261,55 @@ export default function TurnoDetallePage() {
         )}
       </SunmiCard>
 
-      {/* Resumen por forma de pago */}
+      {/* X Report (siempre visible) */}
       {resumen && (
         <SunmiCard>
-          <SunmiSeparator label="Resumen por Forma de Pago" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+          <div className="flex items-center justify-between mb-1">
+            <SunmiSeparator label={estaCerrado ? "Reporte de turno" : "Reporte de turno (X Report)"} />
+            {!estaCerrado && (
+              <span className="text-xs font-semibold sunmi-text-success px-2 py-0.5 rounded-full sunmi-state-success">
+                Turno abierto
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
             <div>
               <span className="sunmi-text-muted text-xs">Efectivo</span>
               <p className="font-semibold text-sm">${fmt(resumen.totalEfectivo)}</p>
             </div>
             <div>
-              <span className="sunmi-text-muted text-xs">Digital (bruto)</span>
+              <span className="sunmi-text-muted text-xs">MercadoPago</span>
+              <p className="font-semibold text-sm">${fmt(resumen.desglose?.mercadopago)}</p>
+            </div>
+            <div>
+              <span className="sunmi-text-muted text-xs">Debito</span>
+              <p className="font-semibold text-sm">${fmt(resumen.desglose?.debito)}</p>
+            </div>
+            <div>
+              <span className="sunmi-text-muted text-xs">Credito</span>
+              <p className="font-semibold text-sm">${fmt(resumen.desglose?.credito)}</p>
+            </div>
+            <div>
+              <span className="sunmi-text-muted text-xs">Fiado</span>
+              <p className="font-semibold text-sm">${fmt(resumen.desglose?.fiado)}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
+            <div>
+              <span className="sunmi-text-muted text-xs">Total Digital (bruto)</span>
               <p className="font-semibold text-sm">${fmt(resumen.totalDigital)}</p>
             </div>
             <div>
               <span className="sunmi-text-muted text-xs">Comisiones</span>
-              <p className="font-semibold text-sm sunmi-text-danger">
-                -${fmt(resumen.totalComision)}
-              </p>
+              <p className="font-semibold text-sm sunmi-text-danger">-${fmt(resumen.totalComision)}</p>
             </div>
             <div>
-              <span className="sunmi-text-muted text-xs">Neto Digital</span>
-              <p className="font-semibold text-sm">${fmt(resumen.netoDigital)}</p>
+              <span className="sunmi-text-muted text-xs">Total Ventas</span>
+              <p className="font-bold text-base sunmi-text-accent">${fmt(totalVentas)}</p>
             </div>
           </div>
-          {resumen.desglose && (
-            <div className="grid grid-cols-3 gap-3 mt-3">
-              <div>
-                <span className="sunmi-text-muted text-xs">MercadoPago</span>
-                <p className="text-sm">${fmt(resumen.desglose.mercadopago)}</p>
-              </div>
-              <div>
-                <span className="sunmi-text-muted text-xs">Debito</span>
-                <p className="text-sm">${fmt(resumen.desglose.debito)}</p>
-              </div>
-              <div>
-                <span className="sunmi-text-muted text-xs">Credito</span>
-                <p className="text-sm">${fmt(resumen.desglose.credito)}</p>
-              </div>
-            </div>
-          )}
         </SunmiCard>
       )}
 
@@ -283,6 +339,58 @@ export default function TurnoDetallePage() {
           )}
         </SunmiTable>
       </SunmiCard>
+
+      {/* Z Report (solo turno cerrado) */}
+      {estaCerrado && resumen && (
+        <SunmiCard>
+          <SunmiSeparator label="Cierre de turno (Z Report)" />
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+            <div>
+              <span className="sunmi-text-muted text-xs">Monto Inicial</span>
+              <p className="font-semibold text-sm">${fmt(turno.montoInicial)}</p>
+            </div>
+            <div>
+              <span className="sunmi-text-muted text-xs">Ventas Efectivo</span>
+              <p className="font-semibold text-sm">${fmt(resumen.totalEfectivo)}</p>
+            </div>
+            <div>
+              <span className="sunmi-text-muted text-xs">Ventas Digital</span>
+              <p className="font-semibold text-sm">${fmt(resumen.totalDigital)}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
+            <div>
+              <span className="sunmi-text-muted text-xs">Total Ventas</span>
+              <p className="font-bold text-sm">${fmt(totalVentas)}</p>
+            </div>
+            <div>
+              <span className="sunmi-text-muted text-xs">Esperado Efectivo</span>
+              <p className="font-bold text-sm">${fmt(esperadoEfectivo)}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
+            <div>
+              <span className="sunmi-text-muted text-xs">Real Contado</span>
+              <p className="font-bold text-sm">${fmt(turno.montoRealEfectivo)}</p>
+            </div>
+            <div>
+              <span className="sunmi-text-muted text-xs">Diferencia</span>
+              <p
+                className={`font-bold text-base ${
+                  turno.diferenciaEfectivo != null && Number(turno.diferenciaEfectivo) !== 0
+                    ? "sunmi-text-danger"
+                    : "sunmi-text-success"
+                }`}
+              >
+                ${fmt(turno.diferenciaEfectivo)}
+              </p>
+            </div>
+          </div>
+        </SunmiCard>
+      )}
     </div>
   );
 }

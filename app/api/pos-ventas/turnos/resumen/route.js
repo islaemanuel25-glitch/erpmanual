@@ -48,7 +48,7 @@ export async function GET(req) {
     let totalDigital = 0;
     let totalComision = 0;
     let netoDigital = 0;
-    const desglose = { mercadopago: 0, debito: 0, credito: 0 };
+    const desglose = { mercadopago: 0, debito: 0, credito: 0, fiado: 0 };
 
     ventas.forEach((v) => {
       const total = Number(v.total);

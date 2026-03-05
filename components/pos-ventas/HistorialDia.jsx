@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -11,45 +13,154 @@ function formatPrecio(n) {
   });
 }
 
-export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
+function formatHora(iso) {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleTimeString("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const FORMAS_PAGO = [
+  { value: "TODAS", label: "Todas" },
+  { value: "efectivo", label: "Efectivo" },
+  { value: "mercadopago", label: "MercadoPago" },
+  { value: "debito", label: "Debito" },
+  { value: "credito", label: "Credito" },
+  { value: "fiado", label: "Fiado" },
+];
+
+const FORMA_PAGO_LABELS = {
+  efectivo: "Efectivo",
+  mercadopago: "MP",
+  debito: "Debito",
+  credito: "Credito",
+  fiado: "Fiado",
+};
+
+export default function HistorialDia({
+  localId,
+  onReimprimir,
+  onCerrar,
+  puedeVerTodosCajeros = false,
+}) {
   const [ventas, setVentas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detalle, setDetalle] = useState(null);
 
-  const cargar = async () => {
+  // Filtros
+  const [filtroNumero, setFiltroNumero] = useState("");
+  const [filtroFormaPago, setFiltroFormaPago] = useState("TODAS");
+  const [filtroVendedorId, setFiltroVendedorId] = useState("");
+  const [filtroSoloConTurno, setFiltroSoloConTurno] = useState(false);
+
+  // Cajeros derivados de ventas (para select)
+  const [cajeros, setCajeros] = useState([]);
+
+  const cargar = useCallback(async () => {
     if (!localId) return;
     try {
       setLoading(true);
+      const params = new URLSearchParams();
+      if (filtroNumero) params.set("numero", filtroNumero);
+      if (filtroFormaPago !== "TODAS") params.set("formaPago", filtroFormaPago);
+      if (filtroVendedorId) params.set("vendedorId", filtroVendedorId);
+      if (filtroSoloConTurno) params.set("soloConTurno", "true");
+
       const res = await fetch(
-        `/api/pos-ventas/historial-dia?localId=${localId}`,
+        `/api/pos-ventas/historial-dia?${params}`,
         { credentials: "include" }
       );
       const data = await res.json();
-      if (data.ok) setVentas(data.items || []);
+      if (data.ok) {
+        setVentas(data.items || []);
+
+        // Derivar cajeros únicos (solo en primera carga sin filtro vendedor)
+        if (!filtroVendedorId && puedeVerTodosCajeros) {
+          const map = new Map();
+          (data.items || []).forEach((v) => {
+            if (v.vendedor?.id && !map.has(v.vendedor.id)) {
+              map.set(v.vendedor.id, v.vendedor.nombre || v.vendedor.email || `#${v.vendedor.id}`);
+            }
+          });
+          setCajeros(Array.from(map, ([id, nombre]) => ({ id, nombre })));
+        }
+      }
     } catch {
       // silencioso
     } finally {
       setLoading(false);
     }
-  };
+  }, [localId, filtroNumero, filtroFormaPago, filtroVendedorId, filtroSoloConTurno, puedeVerTodosCajeros]);
 
+  // Carga inicial
   useEffect(() => {
     cargar();
   }, [localId]);
 
+  // Re-fetch al cambiar filtros (con debounce implícito por user action)
+  const handleBuscar = () => cargar();
+
   const totalVendido = ventas.reduce((s, v) => s + Number(v.total), 0);
+
+  const formatTurno = (v) => {
+    if (!v.turnoId || !v.turno) return "—";
+    const hora = formatHora(v.turno.apertura);
+    const label = `#${v.turno.id} · ${hora}`;
+    return v.turno.cierre ? label : `${label} (abierto)`;
+  };
 
   return (
     <div className="fixed inset-0 sunmi-overlay-strong flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <SunmiCard className="w-full max-w-lg p-4 my-4">
+      <SunmiCard className="w-full max-w-2xl p-4 my-4">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-lg font-bold">Ventas del dia</h2>
-          <button
-            onClick={cargar}
-            className="text-[11px] sunmi-link"
-          >
+          <button onClick={handleBuscar} className="text-[11px] sunmi-link">
             Actualizar
           </button>
+        </div>
+
+        {/* Filtros */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+          <SunmiInput
+            type="number"
+            placeholder="Nº ticket"
+            value={filtroNumero}
+            onChange={(e) => setFiltroNumero(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleBuscar()}
+          />
+          <SunmiSelectAdv
+            value={filtroFormaPago}
+            onChange={(val) => setFiltroFormaPago(val)}
+            options={FORMAS_PAGO}
+          />
+          {puedeVerTodosCajeros && (
+            <SunmiSelectAdv
+              value={filtroVendedorId}
+              onChange={(val) => setFiltroVendedorId(val)}
+              options={[
+                { value: "", label: "Todos los cajeros" },
+                ...cajeros.map((c) => ({
+                  value: String(c.id),
+                  label: c.nombre,
+                })),
+              ]}
+            />
+          )}
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filtroSoloConTurno}
+              onChange={(e) => setFiltroSoloConTurno(e.target.checked)}
+              className="accent-cyan-500"
+            />
+            Solo con turno
+          </label>
+        </div>
+        <div className="flex gap-2 mb-3">
+          <SunmiButton color="amber" onClick={handleBuscar} className="!text-sm">
+            Buscar
+          </SunmiButton>
         </div>
 
         {/* Resumen */}
@@ -83,24 +194,27 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
                 onClick={() => setDetalle(v)}
                 className="sunmi-surface-soft p-2 rounded-lg cursor-pointer sunmi-row-hover transition-colors"
               >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-sm font-medium">#{v.numero}</span>
-                    <span className="text-[11px] sunmi-text-muted ml-2">
-                      {new Date(v.fecha).toLocaleTimeString("es-AR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                <div className="flex justify-between items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-medium shrink-0">#{v.numero}</span>
+                    <span className="text-[11px] sunmi-text-muted shrink-0">
+                      {formatHora(v.fecha)}
+                    </span>
+                    <span className="text-[11px] sunmi-text-muted truncate">
+                      {FORMA_PAGO_LABELS[v.formaPago] || v.formaPago}
                     </span>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold sunmi-text-accent">
-                      ${formatPrecio(Number(v.total))}
-                    </div>
-                    <div className="text-[10px] sunmi-text-muted">
-                      {v.formaPago}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <div className="text-sm font-bold sunmi-text-accent">
+                        ${formatPrecio(Number(v.total))}
+                      </div>
                     </div>
                   </div>
+                </div>
+                <div className="flex gap-3 mt-0.5 text-[10px] sunmi-text-muted">
+                  <span>{v.vendedor?.nombre || v.vendedor?.email || "-"}</span>
+                  <span>{formatTurno(v)}</span>
                 </div>
               </div>
             ))
@@ -124,6 +238,12 @@ export default function HistorialDia({ localId, onReimprimir, onCerrar }) {
               <span className="text-xs sunmi-text-muted">
                 {new Date(detalle.fecha).toLocaleString("es-AR")}
               </span>
+            </div>
+
+            {/* Info cajero y turno */}
+            <div className="flex gap-4 mb-3 text-xs sunmi-text-muted">
+              <span>Cajero: {detalle.vendedor?.nombre || detalle.vendedor?.email || "-"}</span>
+              <span>Turno: {formatTurno(detalle)}</span>
             </div>
 
             {/* Items */}

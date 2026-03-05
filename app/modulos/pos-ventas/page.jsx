@@ -1354,6 +1354,7 @@ export default function PosVentasPage() {
       {mostrarHistorial && (
         <HistorialDia
           localId={localActual}
+          puedeVerTodosCajeros={esAdminPos || permisosPos.includes("turnos.ver_todos")}
           onCerrar={() => setMostrarHistorial(false)}
           onReimprimir={async (venta) => {
             const { default: imprimirTicketTermico } = await import(
