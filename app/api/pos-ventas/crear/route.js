@@ -230,24 +230,27 @@ export async function POST(req) {
     const productoBaseIds = items.map((i) => i.productoBaseId);
     const productosBase = await prisma.productoBase.findMany({
       where: { id: { in: productoBaseIds } },
-      select: { id: true, precio_costo: true, categoria_id: true },
+      select: { id: true, precio_costo: true, factor_pack: true, categoria_id: true },
     });
     const costosMap = {};
     const pbMap = {};
     productosBase.forEach((p) => {
-      costosMap[p.id] = Number(p.precio_costo) || 0;
+      const costoBulto = Number(p.precio_costo) || 0;
+      const factorPack = Math.max(1, Number(p.factor_pack) || 1);
+      costosMap[p.id] = { costoBulto, factorPack };
       pbMap[p.id] = { categoria_id: p.categoria_id };
     });
 
     // Calcular costo total y detalle con ganancia
     let costoTotal = 0;
     const itemsConCosto = items.map((item) => {
-      const precioCosto = costosMap[item.productoBaseId] || 0;
+      const { costoBulto, factorPack } = costosMap[item.productoBaseId] || { costoBulto: 0, factorPack: 1 };
+      const costoUnitario = costoBulto / factorPack;
       const subtotalItem = item.precio * item.cantidad;
-      const costoItem = precioCosto * item.cantidad;
+      const costoItem = costoUnitario * item.cantidad;
       const ganancia = subtotalItem - costoItem;
       costoTotal += costoItem;
-      return { ...item, precioCosto, subtotalItem, ganancia };
+      return { ...item, precioCosto: costoUnitario, subtotalItem, ganancia };
     });
 
     const gananciaBruta = total - costoTotal;
