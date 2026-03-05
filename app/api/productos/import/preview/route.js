@@ -17,10 +17,42 @@ function normLower(v) {
   return normStr(v).toLowerCase();
 }
 
-function parseDecimal(v) {
+/**
+ * Parsea un valor numérico/precio proveniente de Excel.
+ * Casos soportados:
+ *   "1500"        → 1500        (entero simple)
+ *   "1500.50"     → 1500.5      (punto decimal)
+ *   "1500,50"     → 1500.5      (coma decimal, formato AR/EU)
+ *   "1.500,50"    → 1500.5      (punto como miles + coma decimal)
+ *   "1,500.50"    → 1500.5      (coma como miles + punto decimal, formato US)
+ *   "$1.500,50"   → 1500.5      (con símbolo de moneda)
+ *   " $ 1500 "    → 1500        (espacios y símbolo suelto)
+ */
+function parsePrecio(v) {
   if (v == null || v === "") return NaN;
-  const n = Number(String(v).replace(",", "."));
-  return n;
+  let s = String(v).trim().replace(/[$\s]/g, "");
+  if (!s) return NaN;
+
+  // Detectar formato por la posición de punto y coma
+  const lastDot = s.lastIndexOf(".");
+  const lastComma = s.lastIndexOf(",");
+
+  if (lastDot > -1 && lastComma > -1) {
+    if (lastComma > lastDot) {
+      // "1.500,50" → quitar puntos, coma→punto
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      // "1,500.50" → quitar comas
+      s = s.replace(/,/g, "");
+    }
+  } else if (lastComma > -1) {
+    // Solo coma: "1500,50" → coma como decimal
+    s = s.replace(",", ".");
+  }
+  // Solo punto o sin separador: no hacer nada
+
+  const n = Number(s);
+  return isFinite(n) ? n : NaN;
 }
 
 function parseBool(v) {
@@ -137,10 +169,10 @@ export async function POST(req) {
       const codigoBarra = normStr(row.codigo_barra);
       const nombre = normStr(row.nombre);
       const unidadMedida = normLower(row.unidad_medida) || "unidad";
-      const precioCosto = parseDecimal(row.precio_costo);
-      const precioVenta = parseDecimal(row.precio_venta);
+      const precioCosto = parsePrecio(row.precio_costo);
+      const precioVenta = parsePrecio(row.precio_venta);
       const factorPackRaw = row.factor_pack != null && row.factor_pack !== "" ? Number(row.factor_pack) : null;
-      const margenRaw = row.margen != null && row.margen !== "" ? parseDecimal(row.margen) : null;
+      const margenRaw = row.margen != null && row.margen !== "" ? parsePrecio(row.margen) : null;
       const stockActual = row.stock_inicial != null && row.stock_inicial !== "" ? Number(row.stock_inicial) : 0;
       const activo = parseBool(row.activo);
 
