@@ -23,6 +23,32 @@ export async function POST(req) {
     const body = await req.json();
     const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, esFiado, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje } = body;
 
+    // Validar turnoId obligatorio
+    if (!turnoId) {
+      return NextResponse.json(
+        { ok: false, error: "Debe haber un turno abierto" },
+        { status: 400 }
+      );
+    }
+
+    // Validar que el turno existe, pertenece al local, al vendedor, y está abierto
+    const turnoValido = await prisma.turno.findFirst({
+      where: {
+        id: turnoId,
+        localId,
+        vendedorId: session.id,
+        cierre: null,
+      },
+      select: { id: true },
+    });
+
+    if (!turnoValido) {
+      return NextResponse.json(
+        { ok: false, error: "Turno inválido, cerrado, o no pertenece a este usuario/local" },
+        { status: 403 }
+      );
+    }
+
     // clientVentaId es alias de clientTxnId para compatibilidad con cola offline
     const txnId = clientTxnId || clientVentaId;
 
@@ -356,7 +382,7 @@ export async function POST(req) {
           localId,
           vendedorId: session.id,
           clienteId: clienteId || null,
-          turnoId: turnoId || null,
+          turnoId,
           numero,
           clientTxnId: txnId || null,
           subtotal,

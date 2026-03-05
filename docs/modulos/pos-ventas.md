@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-02-18 00:29
+**Última actualización:** 2026-03-05 10:49
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,13 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-03-05: fix: sincronizar ProductoLocal del deposito al editar base
+- 2026-03-03: Stock negativo configurable + motivos obligatorios + auditoria + pedidos deposito + configuracion UI
+- 2026-03-02: security(scope): validar ownership turnoId en resumen
+- 2026-03-02: security(rbac): cerrar endpoints sin auth + admin guards + permiso pos.usar
+- 2026-03-02: feat: mejoras POS + sidebar overflow fix + redondeo precios
+- 2026-03-01: Refactor UI Sunmi + fixes stock/productos + mejoras UX
+- 2026-03-01: refactor: normalización theme-safe completa — eliminar tokens Tailwind hardcoded
 - 2026-02-17: feat(permisos): sidebar y paginas 100% por permisos
 - 2026-02-17: fix(migrations): corregir migracion userId MovimientoCuenta
 - 2026-02-17: feat(clientes): import PRO, export PDF, merge duplicados

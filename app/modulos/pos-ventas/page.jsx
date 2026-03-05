@@ -572,6 +572,11 @@ export default function PosVentasPage() {
   const procesarCola = useCallback(async () => {
     if (offlineMode || procesandoCola) return;
 
+    if (!turnoActual?.id) {
+      showError("Abrí turno para procesar ventas pendientes");
+      return;
+    }
+
     const queue = loadQueue();
     if (queue.length === 0) {
       showSuccess("No hay ventas pendientes para procesar");
@@ -595,7 +600,7 @@ export default function PosVentasPage() {
             clientTxnId: ventaPendiente.clientVentaId,
             localId: ventaPendiente.localId,
             clienteId: ventaPendiente.clienteId,
-            turnoId: null, // No guardamos turnoId en cola offline
+            turnoId: turnoActual?.id || null,
             formaPago: ventaPendiente.formaPago,
             esFiado: ventaPendiente.formaPago === "fiado",
             descuento: ventaPendiente.descuento,
@@ -640,7 +645,7 @@ export default function PosVentasPage() {
       showSuccess(`${procesadas} venta(s) procesada(s) correctamente`);
       setSuccessMsg(`${procesadas} venta(s) procesada(s). ${nuevaLongitud} pendiente(s)`);
     }
-  }, [offlineMode, procesandoCola]);
+  }, [offlineMode, procesandoCola, turnoActual]);
 
   // ---------------------------------------------------------------------------
   // Gestión de pendientes offline (modal)
@@ -789,6 +794,12 @@ export default function PosVentasPage() {
   // Cobrar desde FormaPago (redirige a iniciarCobro)
   // ---------------------------------------------------------------------------
   const handleCobrar = async ({ formaPago: fp, total: tot }) => {
+    // Bloquear cobro sin turno abierto (excepto offline que guarda pendiente)
+    if (!turnoActual?.id && !offlineMode) {
+      showError("Abrí turno para registrar ventas");
+      return;
+    }
+
     // Bloquear cobro con formas de pago no efectivo cuando offline
     if (offlineMode && fp !== "efectivo") {
       showError("Sin internet: solo se puede guardar ventas en efectivo");
