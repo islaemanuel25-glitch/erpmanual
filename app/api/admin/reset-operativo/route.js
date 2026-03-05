@@ -57,6 +57,13 @@ export async function POST(req) {
       );
     }
 
+    if (!usuario.passwordHash) {
+      return NextResponse.json(
+        { ok: false, error: "Usuario sin password configurada" },
+        { status: 400 }
+      );
+    }
+
     const passOk = await bcrypt.compare(password, usuario.passwordHash);
     if (!passOk) {
       return NextResponse.json(
@@ -76,8 +83,7 @@ export async function POST(req) {
       const puntoMov = await tx.clientePuntoMovimiento.deleteMany({});
       const ventas = await tx.venta.deleteMany({});
 
-      // Caja y Turnos
-      const cajaMov = await tx.cajaMovimiento.deleteMany({});
+      // Turnos (CajaMovimiento NO existe en VPS, no tocar)
       const turnos = await tx.turno.deleteMany({});
 
       // Transferencias
@@ -112,7 +118,6 @@ export async function POST(req) {
         ventaDetalle: ventaDetalle.count,
         movimientosCuenta: movCuenta.count,
         puntoMovimientos: puntoMov.count,
-        cajaMovimientos: cajaMov.count,
         turnos: turnos.count,
         transferencias: transf.count + posTransf.count,
         transferenciaDetalles: transfDet.count + posTransfDet.count,
@@ -130,16 +135,27 @@ export async function POST(req) {
     });
 
     // Reiniciar secuencias de autoincrement
+    // (No incluir CajaMovimiento porque no existe en VPS)
     const secuencias = [
-      "VentaDetalle", "Venta", "MovimientoCuenta", "ClientePuntoMovimiento",
-      "CajaMovimiento", "Turno",
-      "TransferenciaDetalle", "Transferencia",
-      "PosTransferenciaDetalle", "PosTransferencia",
-      "PedidoProveedorDetalle", "PedidoProveedor",
-      "PrecioUpdateItem", "PrecioUpdate",
-      "AuditoriaStock", "StockLocal",
-      "ProductoListaPrecio", "ListaPrecio",
-      "ProductoLocal", "ProductoBase",
+      "VentaDetalle",
+      "Venta",
+      "MovimientoCuenta",
+      "ClientePuntoMovimiento",
+      "Turno",
+      "TransferenciaDetalle",
+      "Transferencia",
+      "PosTransferenciaDetalle",
+      "PosTransferencia",
+      "PedidoProveedorDetalle",
+      "PedidoProveedor",
+      "PrecioUpdateItem",
+      "PrecioUpdate",
+      "AuditoriaStock",
+      "StockLocal",
+      "ProductoListaPrecio",
+      "ListaPrecio",
+      "ProductoLocal",
+      "ProductoBase",
       "PosVentaCounter",
     ];
 
