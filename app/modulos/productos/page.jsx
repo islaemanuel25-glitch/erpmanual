@@ -588,6 +588,38 @@ export default function ProductosPage() {
     XLSX.writeFile(wb, `errores_importacion_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
+  // Descargar errores en formato reparable (misma plantilla para re-subir)
+  const descargarErroresReparable = () => {
+    if (impErrorRows.length === 0) return;
+    const PLANTILLA_COLS = [
+      "codigo_barra", "nombre", "unidad_medida", "factor_pack",
+      "precio_costo", "precio_venta", "margen",
+      "categoria", "proveedor", "area_fisica",
+      "stock_inicial", "activo",
+    ];
+    const data = impErrorRows.map((row) => {
+      const obj = {};
+      for (const col of PLANTILLA_COLS) {
+        const v = row[col];
+        obj[col] = v != null && v !== "" ? String(v) : "";
+      }
+      // Columna activo: convertir boolean a texto
+      if (typeof row.activo === "boolean") {
+        obj.activo = row.activo ? "SI" : "NO";
+      }
+      // Columnas extra de error al final
+      const errores = row.erroresDetalle || [];
+      obj.error_campos = [...new Set(errores.map((e) => e.field))].join(" | ");
+      obj.error_mensajes = errores.map((e) => `${e.field}: ${e.message}`).join("; ");
+      return obj;
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = PLANTILLA_COLS.map(() => ({ wch: 16 })).concat([{ wch: 20 }, { wch: 50 }]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Errores");
+    XLSX.writeFile(wb, `errores_corregir_${new Date().toISOString().split("T")[0]}.xlsx`);
+  };
+
   // =========================================================
   // RENDER
   // =========================================================
@@ -920,9 +952,14 @@ export default function ProductosPage() {
                       Correctos ({impOkRows.length})
                     </button>
                     {impTab === "errores" && impErrorRows.length > 0 && (
-                      <SunmiButton size="sm" color="red" onClick={descargarErroresExcel}>
-                        Descargar errores (Excel)
-                      </SunmiButton>
+                      <>
+                        <SunmiButton size="sm" color="red" onClick={descargarErroresExcel}>
+                          Descargar errores (Excel)
+                        </SunmiButton>
+                        <SunmiButton size="sm" color="amber" onClick={descargarErroresReparable}>
+                          Descargar errores (para corregir)
+                        </SunmiButton>
+                      </>
                     )}
                   </div>
 
