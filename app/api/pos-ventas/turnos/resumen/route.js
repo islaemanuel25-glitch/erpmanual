@@ -41,19 +41,26 @@ export async function GET(req) {
 
     const ventas = await prisma.venta.findMany({
       where: { turnoId },
-      select: { total: true, formaPago: true, comisionBancaria: true, netoRecibido: true },
+      select: { total: true, formaPago: true, esFiado: true, comisionBancaria: true, netoRecibido: true },
     });
 
     let totalEfectivo = 0;
     let totalDigital = 0;
     let totalComision = 0;
     let netoDigital = 0;
+    let totalFiado = 0;
     const desglose = { mercadopago: 0, debito: 0, credito: 0, fiado: 0 };
 
     ventas.forEach((v) => {
       const total = Number(v.total);
       const comision = Number(v.comisionBancaria) || 0;
       const neto = Number(v.netoRecibido) || total;
+
+      if (v.esFiado === true) {
+        totalFiado += total;
+        desglose.fiado += total;
+        return;
+      }
 
       if (v.formaPago === "efectivo") {
         totalEfectivo += total;
@@ -72,6 +79,7 @@ export async function GET(req) {
       cantidadVentas: ventas.length,
       totalEfectivo,
       totalDigital,
+      totalFiado,
       totalComision,
       netoDigital,
       desglose,
