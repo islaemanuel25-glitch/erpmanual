@@ -70,74 +70,65 @@ export async function GET(req) {
       ? Number(searchParams.get("areaId"))
       : null;
 
-    // WHERE sobre ProductoLocal del depósito
-    const whereProductoLocal = {
-      localId: depositoId,
+    // WHERE directo sobre ProductoBase
+    const whereBase = {
+      grupoId,
       activo: true,
-      base: {
-        AND: [
-          { grupoId },
-          { activo: true },
-          categoriaId ? { categoria_id: categoriaId } : {},
-          proveedorId ? { proveedor_id: proveedorId } : {},
-          areaId ? { area_fisica_id: areaId } : {},
-          q
-            ? {
-                OR: [
-                  { nombre: { contains: q, mode: "insensitive" } },
-                  { codigo_barra: { contains: q, mode: "insensitive" } },
-                  { sku: { contains: q, mode: "insensitive" } },
-                ],
-              }
-            : {},
-        ],
-      },
+      ...(categoriaId ? { categoria_id: categoriaId } : {}),
+      ...(proveedorId ? { proveedor_id: proveedorId } : {}),
+      ...(areaId ? { area_fisica_id: areaId } : {}),
+      ...(q
+        ? {
+            OR: [
+              { nombre: { contains: q, mode: "insensitive" } },
+              { codigo_barra: { contains: q, mode: "insensitive" } },
+              { sku: { contains: q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
     };
 
-    const total = await prisma.productoLocal.count({
-      where: whereProductoLocal,
-    });
+    const total = await prisma.productoBase.count({ where: whereBase });
 
-    const rows = await prisma.productoLocal.findMany({
-      where: whereProductoLocal,
+    const rows = await prisma.productoBase.findMany({
+      where: whereBase,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      orderBy: { base: { nombre: "asc" } },
+      orderBy: { nombre: "asc" },
       include: {
-        base: {
-          include: {
-            categoria: { select: { id: true, nombre: true } },
-            proveedor: { select: { id: true, nombre: true } },
-            area_fisica: { select: { id: true, nombre: true } },
-          },
-        },
-        stock: {
+        categoria: { select: { nombre: true } },
+        proveedor: { select: { nombre: true } },
+        area_fisica: { select: { nombre: true } },
+        // Stock del depósito: ProductoBase → ProductoLocal(depositoId) → StockLocal
+        locales: {
           where: { localId: depositoId },
-          select: { cantidad: true },
+          select: {
+            stock: {
+              select: { cantidad: true },
+            },
+          },
         },
       },
     });
 
-    const items = rows.map((pl) => {
-      const base = pl.base;
-      const stockDeposito = Number(pl.stock?.[0]?.cantidad || 0);
+    const items = rows.map((base) => {
+      const stockDeposito = Number(base.locales?.[0]?.stock?.[0]?.cantidad || 0);
 
       return {
-        productoLocalId: pl.id,
-        baseId: pl.baseId,
-        nombre: pl.nombre || base?.nombre || "",
-        codigoBarra: base?.codigo_barra || null,
-        sku: base?.sku || null,
-        imagenUrl: base?.imagen_url || null,
-        precioCosto: Number(pl.precio_costo || base?.precio_costo || 0),
-        unidadMedida: base?.unidad_medida || "unidad",
-        factorPack: Number(base?.factor_pack || 1),
-        modoPedido: base?.modo_pedido || "BULTO",
-        modoEnvio: base?.modo_envio || defaultModoEnvio(base?.unidad_medida),
+        baseId: base.id,
+        nombre: base.nombre,
+        codigoBarra: base.codigo_barra || null,
+        sku: base.sku || null,
+        imagenUrl: base.imagen_url || null,
+        precioCosto: Number(base.precio_costo || 0),
+        unidadMedida: base.unidad_medida || "unidad",
+        factorPack: Number(base.factor_pack || 1),
+        modoPedido: base.modo_pedido || "BULTO",
+        modoEnvio: base.modo_envio || defaultModoEnvio(base.unidad_medida),
         stockDeposito,
-        categoriaNombre: base?.categoria?.nombre ?? null,
-        proveedorNombre: base?.proveedor?.nombre ?? null,
-        areaFisicaNombre: base?.area_fisica?.nombre ?? null,
+        categoriaNombre: base.categoria?.nombre ?? null,
+        proveedorNombre: base.proveedor?.nombre ?? null,
+        areaFisicaNombre: base.area_fisica?.nombre ?? null,
       };
     });
 
