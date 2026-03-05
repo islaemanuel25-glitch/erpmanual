@@ -117,6 +117,7 @@ model Usuario {
 
   ventas            Venta[]
   turnos            Turno[]
+  cajaMovimientos   CajaMovimiento[]
   movimientosPuntos ClientePuntoMovimiento[]
   movimientosCC     MovimientoCuenta[]
   auditoriaStock    AuditoriaStock[]
@@ -671,10 +672,26 @@ model Turno {
   local    Local   @relation(fields: [localId], references: [id])
   vendedor Usuario @relation(fields: [vendedorId], references: [id])
   ventas   Venta[]
+  cajaMovimientos CajaMovimiento[]
 
   @@index([localId])
   @@index([vendedorId])
   @@index([apertura])
+}
+
+model CajaMovimiento {
+  id        Int      @id @default(autoincrement())
+  turnoId   Int
+  usuarioId Int
+  tipo      String   // INGRESO | RETIRO
+  monto     Decimal  @db.Decimal(10, 2)
+  motivo    String?
+  createdAt DateTime @default(now())
+
+  turno   Turno   @relation(fields: [turnoId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([turnoId])
 }
 
 // PUNTOS DE FIDELIDAD

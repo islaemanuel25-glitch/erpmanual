@@ -9,10 +9,12 @@ import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import { showError, showSuccess } from "@/components/sunmi/SunmiToast";
 
 const fmt = (n) =>
   n != null
@@ -34,6 +36,14 @@ const fmtFecha = (iso) => {
   });
 };
 
+const fmtHora = (iso) => {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleTimeString("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const FORMA_PAGO_LABELS = {
   efectivo: "Efectivo",
   mercadopago: "MercadoPago",
@@ -42,11 +52,26 @@ const FORMA_PAGO_LABELS = {
   fiado: "Fiado",
 };
 
-function imprimirZReport(turno, resumen) {
+function imprimirZReport(turno, resumen, movimientos) {
   const totalVentas =
     (resumen.totalEfectivo || 0) + (resumen.totalDigital || 0);
+  const totalIngresos = (movimientos || [])
+    .filter((m) => m.tipo === "INGRESO")
+    .reduce((s, m) => s + m.monto, 0);
+  const totalRetiros = (movimientos || [])
+    .filter((m) => m.tipo === "RETIRO")
+    .reduce((s, m) => s + m.monto, 0);
   const esperado =
-    Number(turno.montoInicial) + (resumen.totalEfectivo || 0);
+    Number(turno.montoInicial) + (resumen.totalEfectivo || 0) + totalIngresos - totalRetiros;
+
+  let movHtml = "";
+  if (movimientos && movimientos.length > 0) {
+    movHtml = `
+<div class="line"></div>
+<div class="center bold">MOVIMIENTOS CAJA</div>
+<div class="row"><span>Ingresos:</span><span>+$${fmt(totalIngresos)}</span></div>
+<div class="row"><span>Retiros:</span><span>-$${fmt(totalRetiros)}</span></div>`;
+  }
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Z Report - Turno #${turno.id}</title>
@@ -58,7 +83,6 @@ function imprimirZReport(turno, resumen) {
   .row { display: flex; justify-content: space-between; }
   .row span:last-child { text-align: right; }
   .big { font-size: 14px; }
-  .danger { }
   h2 { margin: 4px 0; font-size: 14px; }
 </style></head><body>
 <div class="center bold big">Z REPORT</div>
@@ -79,10 +103,13 @@ function imprimirZReport(turno, resumen) {
 <div class="row"><span>Fiado:</span><span>$${fmt(resumen.desglose?.fiado)}</span></div>
 <div class="line"></div>
 <div class="row bold"><span>Total ventas:</span><span>$${fmt(totalVentas)}</span></div>
+${movHtml}
 <div class="line"></div>
 <div class="center bold">ARQUEO EFECTIVO</div>
 <div class="row"><span>Monto inicial:</span><span>$${fmt(turno.montoInicial)}</span></div>
 <div class="row"><span>+ Ventas efectivo:</span><span>$${fmt(resumen.totalEfectivo)}</span></div>
+${totalIngresos > 0 ? `<div class="row"><span>+ Ingresos:</span><span>$${fmt(totalIngresos)}</span></div>` : ""}
+${totalRetiros > 0 ? `<div class="row"><span>- Retiros:</span><span>$${fmt(totalRetiros)}</span></div>` : ""}
 <div class="row bold"><span>Esperado:</span><span>$${fmt(esperado)}</span></div>
 <div class="row"><span>Real contado:</span><span>$${fmt(turno.montoRealEfectivo)}</span></div>
 <div class="row bold"><span>Diferencia:</span><span>$${fmt(turno.diferenciaEfectivo)}</span></div>
@@ -109,12 +136,33 @@ export default function TurnoDetallePage() {
   const [turno, setTurno] = useState(null);
   const [ventas, setVentas] = useState([]);
   const [resumen, setResumen] = useState(null);
+  const [movimientos, setMovimientos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Modal movimiento caja
+  const [modalMov, setModalMov] = useState(null); // null | "INGRESO" | "RETIRO"
+  const [movMonto, setMovMonto] = useState("");
+  const [movMotivo, setMovMotivo] = useState("");
+  const [guardandoMov, setGuardandoMov] = useState(false);
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
   const puedeUsar = esAdmin || permisos.includes("pos.usar");
+
+  const cargarMovimientos = useCallback(async () => {
+    if (!turnoId) return;
+    try {
+      const res = await fetch(
+        `/api/pos-ventas/caja-movimientos/listar?turnoId=${turnoId}`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (data.ok) setMovimientos(data.items || []);
+    } catch {
+      // silencioso
+    }
+  }, [turnoId]);
 
   useEffect(() => {
     if (!turnoId || !contexto?.localId) return;
@@ -154,7 +202,45 @@ export default function TurnoDetallePage() {
     };
 
     cargar();
-  }, [turnoId, contexto?.localId]);
+    cargarMovimientos();
+  }, [turnoId, contexto?.localId, cargarMovimientos]);
+
+  const handleGuardarMovimiento = async () => {
+    const montoNum = Number(movMonto);
+    if (!montoNum || montoNum <= 0) {
+      showError("Ingresa un monto valido");
+      return;
+    }
+
+    setGuardandoMov(true);
+    try {
+      const res = await fetch("/api/pos-ventas/caja-movimientos/crear", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          turnoId: Number(turnoId),
+          tipo: modalMov,
+          monto: montoNum,
+          motivo: movMotivo || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showSuccess(`${modalMov === "INGRESO" ? "Ingreso" : "Retiro"} registrado`);
+        setModalMov(null);
+        setMovMonto("");
+        setMovMotivo("");
+        cargarMovimientos();
+      } else {
+        showError(data.error || "Error al registrar movimiento");
+      }
+    } catch {
+      showError("Error de conexion");
+    } finally {
+      setGuardandoMov(false);
+    }
+  };
 
   if (cargandoUser || cargandoCtx) return null;
   if (needsContexto) {
@@ -189,8 +275,19 @@ export default function TurnoDetallePage() {
   const estaCerrado = turno.cierre != null;
   const totalVentas =
     (resumen?.totalEfectivo || 0) + (resumen?.totalDigital || 0);
+
+  const totalIngresos = movimientos
+    .filter((m) => m.tipo === "INGRESO")
+    .reduce((s, m) => s + m.monto, 0);
+  const totalRetiros = movimientos
+    .filter((m) => m.tipo === "RETIRO")
+    .reduce((s, m) => s + m.monto, 0);
+
   const esperadoEfectivo =
-    Number(turno.montoInicial) + (resumen?.totalEfectivo || 0);
+    Number(turno.montoInicial) +
+    (resumen?.totalEfectivo || 0) +
+    totalIngresos -
+    totalRetiros;
 
   const ventaHeaders = [
     "#",
@@ -202,6 +299,8 @@ export default function TurnoDetallePage() {
     "Costo",
     "Ganancia Neta",
   ];
+
+  const movHeaders = ["Hora", "Tipo", "Motivo", "Monto", "Usuario"];
 
   return (
     <div className="p-3 space-y-3">
@@ -215,7 +314,7 @@ export default function TurnoDetallePage() {
             {estaCerrado && resumen && (
               <SunmiButton
                 color="cyan"
-                onClick={() => imprimirZReport(turno, resumen)}
+                onClick={() => imprimirZReport(turno, resumen, movimientos)}
               >
                 Imprimir Z Report
               </SunmiButton>
@@ -313,6 +412,70 @@ export default function TurnoDetallePage() {
         </SunmiCard>
       )}
 
+      {/* Movimientos de Caja */}
+      <SunmiCard>
+        <div className="flex items-center justify-between mb-1">
+          <SunmiSeparator label="Movimientos de Caja" />
+          {!estaCerrado && (
+            <div className="flex gap-2">
+              <SunmiButton
+                color="cyan"
+                onClick={() => { setModalMov("INGRESO"); setMovMonto(""); setMovMotivo(""); }}
+                className="!text-sm"
+              >
+                + Ingreso
+              </SunmiButton>
+              <SunmiButton
+                color="amber"
+                onClick={() => { setModalMov("RETIRO"); setMovMonto(""); setMovMotivo(""); }}
+                className="!text-sm"
+              >
+                + Retiro
+              </SunmiButton>
+            </div>
+          )}
+        </div>
+
+        {movimientos.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 mb-3 mt-2">
+            <div className="sunmi-surface-soft p-2 rounded-lg text-center">
+              <div className="text-[10px] sunmi-text-muted">Ingresos</div>
+              <div className="text-sm font-bold sunmi-text-success">+${fmt(totalIngresos)}</div>
+            </div>
+            <div className="sunmi-surface-soft p-2 rounded-lg text-center">
+              <div className="text-[10px] sunmi-text-muted">Retiros</div>
+              <div className="text-sm font-bold sunmi-text-danger">-${fmt(totalRetiros)}</div>
+            </div>
+          </div>
+        )}
+
+        <SunmiTable headers={movHeaders}>
+          {movimientos.length === 0 ? (
+            <SunmiTableEmpty colSpan={movHeaders.length} />
+          ) : (
+            movimientos.map((m) => (
+              <SunmiTableRow key={m.id}>
+                <td className="px-3 py-2 text-sm">{fmtHora(m.createdAt)}</td>
+                <td className="px-3 py-2 text-sm">
+                  <span
+                    className={`font-semibold ${
+                      m.tipo === "INGRESO" ? "sunmi-text-success" : "sunmi-text-danger"
+                    }`}
+                  >
+                    {m.tipo}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-sm">{m.motivo || "-"}</td>
+                <td className="px-3 py-2 text-sm text-right font-semibold">
+                  {m.tipo === "INGRESO" ? "+" : "-"}${fmt(m.monto)}
+                </td>
+                <td className="px-3 py-2 text-sm">{m.usuario?.nombre || "-"}</td>
+              </SunmiTableRow>
+            ))
+          )}
+        </SunmiTable>
+      </SunmiCard>
+
       {/* Tabla de ventas */}
       <SunmiCard>
         <SunmiSeparator label="Ventas del Turno" />
@@ -360,6 +523,19 @@ export default function TurnoDetallePage() {
             </div>
           </div>
 
+          {(totalIngresos > 0 || totalRetiros > 0) && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
+              <div>
+                <span className="sunmi-text-muted text-xs">Ingresos Caja</span>
+                <p className="font-semibold text-sm sunmi-text-success">+${fmt(totalIngresos)}</p>
+              </div>
+              <div>
+                <span className="sunmi-text-muted text-xs">Retiros Caja</span>
+                <p className="font-semibold text-sm sunmi-text-danger">-${fmt(totalRetiros)}</p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
             <div>
               <span className="sunmi-text-muted text-xs">Total Ventas</span>
@@ -390,6 +566,57 @@ export default function TurnoDetallePage() {
             </div>
           </div>
         </SunmiCard>
+      )}
+
+      {/* Modal ingreso/retiro */}
+      {modalMov && (
+        <div className="fixed inset-0 sunmi-overlay-strong flex items-center justify-center p-4 z-50">
+          <SunmiCard className="w-full max-w-sm p-4">
+            <h3 className="text-lg font-bold mb-3">
+              {modalMov === "INGRESO" ? "Ingreso de Efectivo" : "Retiro de Efectivo"}
+            </h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs sunmi-text-muted">Monto</label>
+                <SunmiInput
+                  type="number"
+                  placeholder="0.00"
+                  value={movMonto}
+                  onChange={(e) => setMovMonto(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs sunmi-text-muted">Motivo (opcional)</label>
+                <SunmiInput
+                  placeholder="Ej: cambio, pago proveedor..."
+                  value={movMotivo}
+                  onChange={(e) => setMovMotivo(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <SunmiButton
+                color={modalMov === "INGRESO" ? "cyan" : "amber"}
+                onClick={handleGuardarMovimiento}
+                disabled={guardandoMov}
+                className="flex-1"
+              >
+                {guardandoMov ? "Guardando..." : "Confirmar"}
+              </SunmiButton>
+              <SunmiButton
+                color="slate"
+                onClick={() => setModalMov(null)}
+                disabled={guardandoMov}
+                className="flex-1"
+              >
+                Cancelar
+              </SunmiButton>
+            </div>
+          </SunmiCard>
+        </div>
       )}
     </div>
   );
