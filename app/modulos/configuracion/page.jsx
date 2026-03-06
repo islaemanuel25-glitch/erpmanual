@@ -8,7 +8,9 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { Palette, PackageOpen, Trash2, Printer } from "lucide-react";
+import { Palette, PackageOpen, Trash2, Printer, Download } from "lucide-react";
+
+const PRINTER_SETUP_URL = process.env.NEXT_PUBLIC_PRINTER_SETUP_URL || "";
 
 const SECCIONES = [
   {
@@ -199,13 +201,24 @@ export default function ConfiguracionPage() {
               {printStatus === "offline" && (
                 <div className="mt-2">
                   <div className="px-3 py-2 rounded sunmi-state-danger sunmi-text-danger text-[12px]">
-                    El servicio local no esta iniciado.
+                    El servicio de impresion no esta activo en esta PC.
                   </div>
                   <p className="text-[11px] sunmi-text-muted mt-2">
-                    Verifica que ERP-Imprimir.exe este corriendo en esta PC.
-                    Si no lo instalaste todavia, ejecuta instalar.bat.
+                    Instalalo una sola vez en esta computadora y luego volve a intentar.
                   </p>
-                  <div className="mt-2">
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {PRINTER_SETUP_URL ? (
+                      <a href={PRINTER_SETUP_URL} download="ERP-Azul-Printer-Setup.exe">
+                        <SunmiButton size="sm" color="amber">
+                          <Download size={14} className="mr-1.5 inline-block -mt-0.5" />
+                          Descargar instalador de impresion
+                        </SunmiButton>
+                      </a>
+                    ) : (
+                      <p className="text-[11px] sunmi-text-muted">
+                        Pedi el archivo <strong>ERP-Azul-Printer-Setup.exe</strong> al administrador del sistema.
+                      </p>
+                    )}
                     <SunmiButton size="sm" onClick={checkPrintServer}>Reintentar</SunmiButton>
                   </div>
                 </div>

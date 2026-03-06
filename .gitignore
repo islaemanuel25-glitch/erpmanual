@@ -153,3 +153,6 @@ nul
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Instalador de impresion (binario grande, se genera con build-installer.bat)
+public/downloads/*.exe
