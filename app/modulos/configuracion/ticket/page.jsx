@@ -10,8 +10,8 @@ import SinPermisos from "@/components/auth/SinPermisos";
 import TicketEditor from "@/components/pos-ventas/TicketEditor";
 import TicketPreview from "@/components/pos-ventas/TicketPreview";
 import {
-  loadTicketConfig,
-  saveTicketConfig,
+  fetchTicketConfig,
+  saveTicketConfigRemote,
   buildDefaultConfig,
   PRESETS,
 } from "@/lib/pos-ventas/ticketConfig";
@@ -22,11 +22,13 @@ export default function TicketConfigPage() {
   const { perfil, cargando } = useUser();
   const [config, setConfig] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [preset, setPreset] = useState("");
   const previewRef = useRef(null);
 
   useEffect(() => {
-    setConfig(loadTicketConfig());
+    fetchTicketConfig().then(setConfig);
   }, []);
 
   if (cargando || !config) return null;
@@ -35,10 +37,19 @@ export default function TicketConfigPage() {
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
   if (!esAdmin) return <SinPermisos />;
 
-  const handleSave = () => {
-    saveTicketConfig(config);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await saveTicketConfigRemote(config);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error("Error guardando ticket config:", err);
+      setSaveError("Error guardando configuracion en servidor. Los cambios no se aplicaron.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleReset = () => {
@@ -113,9 +124,9 @@ export default function TicketConfigPage() {
           </div>
 
           <div className="flex gap-2 items-end">
-            <SunmiButton size="sm" color="amber" onClick={handleSave}>
+            <SunmiButton size="sm" color="amber" onClick={handleSave} disabled={saving}>
               <Save size={14} className="mr-1 inline-block -mt-0.5" />
-              {saved ? "Guardado" : "Guardar"}
+              {saving ? "Guardando..." : saved ? "Guardado" : "Guardar"}
             </SunmiButton>
             <SunmiButton size="sm" onClick={handleReset}>
               <RotateCcw size={14} className="mr-1 inline-block -mt-0.5" />
@@ -129,7 +140,12 @@ export default function TicketConfigPage() {
 
           {saved && (
             <span className="text-[12px] sunmi-text-success font-medium">
-              Configuracion guardada en este navegador
+              Configuracion guardada
+            </span>
+          )}
+          {saveError && (
+            <span className="text-[12px] text-red-500 font-medium">
+              {saveError}
             </span>
           )}
         </div>

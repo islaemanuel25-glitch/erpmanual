@@ -146,35 +146,18 @@ export default function TicketPreview({ config }) {
         </span>
       </div>
 
-      {/* Total — franja completa de lado a lado.
-          Se ignoran textAlign individuales; se usa flex space-between.
-          Margen negativo horizontal compensa el padding del contenedor padre
-          para que el fondo negro cubra todo el ancho del ticket. */}
+      {/* Total — fila unica, label izq + importe der, bordes finos */}
       <div style={{
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "center",
-        width: "100%",
-        boxSizing: "border-box",
+        alignItems: "baseline",
         gap: "4px",
-        ...(c.totalRowInverted ? {
-          backgroundImage: 'url("/ticket/black.png")',
-          backgroundRepeat: "repeat",
-          backgroundSize: "auto",
-          backgroundColor: "#000",
-          color: "#fff",
-          marginLeft: "-1.5mm",
-          marginRight: "-1.5mm",
-          paddingLeft: "1.5mm",
-          paddingRight: "1.5mm",
-          paddingTop: "5px",
-          paddingBottom: "5px",
-          width: "calc(100% + 3mm)",
-        } : {}),
+        borderTop: "1px solid #000",
+        borderBottom: "1px solid #000",
+        paddingTop: "4px",
+        paddingBottom: "4px",
         marginTop: Math.max(c.totalLabel?.marginTop || 0, c.totalAmount?.marginTop || 0, 6) + "px",
         marginBottom: Math.max(c.totalLabel?.marginBottom || 0, c.totalAmount?.marginBottom || 0, 6) + "px",
-        WebkitPrintColorAdjust: "exact",
-        printColorAdjust: "exact",
       }}>
         <span style={{
           fontSize: c.totalLabel?.fontSize + "px",

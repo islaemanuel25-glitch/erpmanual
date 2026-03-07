@@ -94,6 +94,7 @@ model Local {
   contadorVenta      PosVentaCounter?
   pedidosProveedor   PedidoProveedor[]
   auditoriaStock     AuditoriaStock[]
+  ticketConfig       TicketConfig?
 }
 
 model Usuario {
@@ -824,6 +825,21 @@ model ConfiguracionGrupo {
   grupo Grupo @relation(fields: [grupoId], references: [id], onDelete: Cascade)
 
   @@index([grupoId])
+}
+
+// CONFIGURACION DE TICKET POR LOCAL
+// ---------------------------------------------------------------------------
+
+model TicketConfig {
+  id         Int      @id @default(autoincrement())
+  localId    Int      @unique
+  configJson Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  local Local @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  @@index([localId])
 }
 
 // AUDITORIA DE STOCK
