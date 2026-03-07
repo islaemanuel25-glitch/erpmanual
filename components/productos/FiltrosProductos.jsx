@@ -6,7 +6,6 @@ import SunmiSelectAdv, {
   SunmiSelectOption,
 } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 export default function FiltrosProductos({ onChange, catalogos, initial }) {
   const [search, setSearch] = useState(initial.search || "");
@@ -157,7 +156,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
               className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
                 escuchando
                   ? "bg-red-600 text-white animate-pulse"
-                  : "text-slate-400 hover:text-white hover:bg-slate-700"
+                  : "sunmi-text-muted hover:text-[var(--app-fg)] hover:bg-[var(--pos-control-bg)]"
               }`}
               title="Buscar por voz"
               type="button"
@@ -195,20 +194,19 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
         <div
           className="
             rounded-2xl p-4
-            border border-slate-800
-            bg-slate-900
+            border border-[var(--app-border)]
+            bg-[var(--app-input-bg)]
             shadow-md
             animate-fadeIn
           "
         >
-          <SunmiSeparator label="Filtros avanzados" />
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {/* CATEGORIA */}
             <SunmiSelectAdv
               value={categoria}
               onChange={setCategoria}
               placeholder="Categoría..."
+              searchable
             >
               <SunmiSelectOption value="">Categoría...</SunmiSelectOption>
               {catalogos.CATEGORIAS?.map((c) => (
@@ -223,6 +221,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
               value={proveedor}
               onChange={setProveedor}
               placeholder="Proveedor..."
+              searchable
             >
               <SunmiSelectOption value="">Proveedor...</SunmiSelectOption>
               {catalogos.PROVEEDORES?.map((p) => (
@@ -237,6 +236,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
               value={area}
               onChange={setArea}
               placeholder="Área física..."
+              searchable
             >
               <SunmiSelectOption value="">Área física...</SunmiSelectOption>
               {catalogos.AREAS?.map((a) => (
