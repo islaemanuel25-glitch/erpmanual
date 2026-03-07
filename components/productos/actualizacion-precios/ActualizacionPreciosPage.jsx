@@ -46,6 +46,8 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+const PAGE_SIZES = [25, 50, 100];
+
 // ---------------------------------------------------------------------------
 // Componente principal
 // ---------------------------------------------------------------------------
@@ -69,6 +71,10 @@ export default function ActualizacionPreciosPage() {
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [globalPct, setGlobalPct] = useState("");
   const [applying, setApplying] = useState(false);
+
+  // Paginacion tabla proveedor
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Tab Excel
   const [excelProveedorId, setExcelProveedorId] = useState("");
@@ -251,6 +257,26 @@ export default function ActualizacionPreciosPage() {
       }),
     [filas]
   );
+
+  // Resetear pagina al cargar nuevos productos
+  useEffect(() => { setPage(1); }, [filas.length]);
+
+  // Paginacion frontend
+  const totalPages = Math.max(1, Math.ceil(filas.length / pageSize));
+  const visibleFilas = filas.slice((page - 1) * pageSize, page * pageSize);
+
+  // Navegacion con Enter tipo planilla
+  const handleInputKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const row = Number(e.target.dataset.row);
+    const col = e.target.dataset.col;
+    const nextRow = e.shiftKey ? row - 1 : row + 1;
+    const next = document.querySelector(
+      `input[data-row="${nextRow}"][data-col="${col}"]`
+    );
+    if (next) { next.focus(); next.select(); }
+  };
 
   // Aplicar cambios al servidor
   const handleAplicar = async () => {
@@ -618,23 +644,36 @@ export default function ActualizacionPreciosPage() {
                     className="!my-0"
                   />
 
-                  {/* Input global + boton aplicar a todos */}
-                  <div className="flex gap-2 items-end">
-                    <div className="w-32">
-                      <label className="text-[11px] sunmi-label mb-1 block">
-                        % Aumento
-                      </label>
-                      <SunmiInput
-                        type="number"
-                        step="0.01"
-                        value={globalPct}
-                        onChange={(e) => setGlobalPct(e.target.value)}
-                        placeholder="Ej: 10"
-                      />
+                  {/* Toolbar sticky: % global + aplicar */}
+                  <div className="sticky top-0 z-10 bg-[var(--app-bg)] border-b border-[var(--app-border)] py-2 -mx-3 px-3">
+                    <div className="flex flex-wrap gap-2 items-end justify-between">
+                      <div className="flex gap-2 items-end">
+                        <div className="w-32">
+                          <label className="text-[11px] sunmi-label mb-1 block">
+                            % Aumento
+                          </label>
+                          <SunmiInput
+                            type="number"
+                            step="0.01"
+                            value={globalPct}
+                            onChange={(e) => setGlobalPct(e.target.value)}
+                            placeholder="Ej: 10"
+                          />
+                        </div>
+                        <SunmiButton color="cyan" onClick={handleAplicarGlobal}>
+                          Aplicar a todos
+                        </SunmiButton>
+                      </div>
+                      <SunmiButton
+                        color="amber"
+                        onClick={handleAplicar}
+                        disabled={applying || !itemsConCambios.length}
+                      >
+                        {applying
+                          ? "Aplicando..."
+                          : `Aplicar cambios (${itemsConCambios.length})`}
+                      </SunmiButton>
                     </div>
-                    <SunmiButton color="cyan" onClick={handleAplicarGlobal}>
-                      Aplicar a todos
-                    </SunmiButton>
                   </div>
 
                   {/* Tabla de productos editable */}
@@ -643,12 +682,13 @@ export default function ActualizacionPreciosPage() {
                       "Producto",
                       "Compra actual",
                       "% Aumento",
-                      "Compra nueva",
+                      "Nuevo precio",
                       "Venta actual",
                       "Venta nueva",
                     ]}
                   >
-                    {filas.map((f, idx) => {
+                    {visibleFilas.map((f, localIdx) => {
+                      const globalIdx = (page - 1) * pageSize + localIdx;
                       const cn = parseFloat(f.compraNueva);
                       const vn = !isNaN(cn) ? calcVentaNueva(cn, f.margen) : null;
                       const isPct = f.editadoPor === "porcentaje";
@@ -656,6 +696,7 @@ export default function ActualizacionPreciosPage() {
                       return (
                         <SunmiTableRow key={f.productoBaseId}>
                           <td className="px-2 py-1.5 truncate max-w-[200px]">
+                            {f.editadoPor && <span className="text-amber-400 mr-1">●</span>}
                             {f.nombre}
                           </td>
                           <td className="px-2 py-1.5 text-right whitespace-nowrap">
@@ -667,10 +708,13 @@ export default function ActualizacionPreciosPage() {
                               step="0.01"
                               value={f.pct}
                               onChange={(e) =>
-                                handlePctChange(idx, e.target.value)
+                                handlePctChange(globalIdx, e.target.value)
                               }
+                              onKeyDown={handleInputKeyDown}
+                              data-row={globalIdx}
+                              data-col="pct"
                               placeholder="%"
-                              className={isPct ? "!border-amber-400/60" : ""}
+                              className={`text-right ${isPct ? "!border-amber-400/60" : ""}`}
                             />
                           </td>
                           <td className="px-2 py-1.5 w-28">
@@ -679,33 +723,58 @@ export default function ActualizacionPreciosPage() {
                               step="0.01"
                               value={f.compraNueva}
                               onChange={(e) =>
-                                handlePrecioDirectoChange(idx, e.target.value)
+                                handlePrecioDirectoChange(globalIdx, e.target.value)
                               }
+                              onKeyDown={handleInputKeyDown}
+                              data-row={globalIdx}
+                              data-col="precio"
                               placeholder="$"
-                              className={isPrecio ? "!border-cyan-400/60" : ""}
+                              className={`text-right ${isPrecio ? "!border-cyan-400/60" : ""}`}
                             />
                           </td>
                           <td className="px-2 py-1.5 text-right whitespace-nowrap">
                             {formatPrecio(f.ventaActual)}
                           </td>
                           <td className="px-2 py-1.5 text-right whitespace-nowrap">
-                            {vn != null ? formatPrecio(vn) : "\u2014"}
+                            {vn != null
+                              ? formatPrecio(vn)
+                              : <span className="sunmi-text-muted">{formatPrecio(f.ventaActual)}</span>}
                           </td>
                         </SunmiTableRow>
                       );
                     })}
                   </SunmiTable>
 
-                  {/* Boton aplicar cambios */}
-                  <SunmiButton
-                    color="amber"
-                    onClick={handleAplicar}
-                    disabled={applying || !itemsConCambios.length}
-                  >
-                    {applying
-                      ? "Aplicando..."
-                      : `Aplicar cambios (${itemsConCambios.length} productos)`}
-                  </SunmiButton>
+                  {/* Paginacion */}
+                  <div className="flex items-center justify-between px-3 py-2 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <SunmiButton color="slate" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                        « Anterior
+                      </SunmiButton>
+                      <span className="sunmi-text-muted text-[11px]">
+                        Página {page} / {totalPages}
+                        {filas.length > 0 && <span className="ml-1 opacity-70">({filas.length} items)</span>}
+                      </span>
+                      <SunmiButton color="slate" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                        Siguiente »
+                      </SunmiButton>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="sunmi-text-muted text-[11px]">Mostrar</span>
+                      {PAGE_SIZES.map((size) => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => { setPageSize(size); setPage(1); }}
+                          className={`px-2 py-0.5 rounded text-[11px] font-medium transition ${
+                            pageSize === size ? "sunmi-badge-accent" : "sunmi-control"
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </>
               )}
             </>
