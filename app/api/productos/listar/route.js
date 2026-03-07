@@ -87,6 +87,8 @@ export async function GET(req) {
     const activoFilter =
       activo === "true" ? true : activo === "false" ? false : undefined;
 
+    const incompletos = searchParams.get("incompletos") === "true";
+
     // WHERE — snake_case SOLO dentro de Prisma
     const baseFilters = [
       { grupoId },
@@ -94,6 +96,16 @@ export async function GET(req) {
       proveedorId ? { proveedor_id: proveedorId } : {},
       areaFisicaId ? { area_fisica_id: areaFisicaId } : {},
       activoFilter !== undefined ? { activo: activoFilter } : {},
+      ...(incompletos
+        ? [{
+            OR: [
+              { proveedor_id: null },
+              { categoria_id: null },
+              { area_fisica_id: null },
+              { factor_pack: null },
+            ],
+          }]
+        : []),
     ];
 
     // Busqueda: prioridad a match exacto por codigo_barra/sku (alineado con POS)

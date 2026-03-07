@@ -36,6 +36,8 @@ const ALL_COLUMNS = [
   { key: "precioVenta", label: "Venta" },
   { key: "margen", label: "Margen %" },
   { key: "activo", label: "Estado" },
+  { key: "modoPedido", label: "Modo pedido" },
+  { key: "modoCompraProveedor", label: "Compra prov." },
 ];
 
 const DEFAULT_VISIBLE = [
@@ -53,6 +55,16 @@ const UNIDAD_OPCIONES = [
   { value: "kg", label: "Kg" },
   { value: "pack", label: "Pack" },
   { value: "cajon", label: "Cajón" },
+];
+
+const MODO_PEDIDO_OPCIONES = [
+  { value: "BULTO", label: "Bulto" },
+  { value: "UNIDAD", label: "Unidad" },
+];
+
+const MODO_COMPRA_OPCIONES = [
+  { value: "BULTO", label: "Bulto" },
+  { value: "UNIDAD", label: "Unidad (fiambre)" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -86,11 +98,13 @@ function uiToPayload(row) {
     iva_porcentaje: row.ivaPorcentaje ?? null,
     fecha_vencimiento: row.fechaVencimiento ?? null,
 
-    redondeo_100: row.redondeo100 ?? false,
+    redondeo_100: row.redondeo100 ?? true,
     activo: row.activo ?? true,
 
     imagen_url: row.imagenUrl ?? null,
     es_combo: row.esCombo ?? false,
+
+    modoCompraProveedor: row.modoCompraProveedor ?? "BULTO",
   };
 }
 
@@ -128,6 +142,7 @@ export default function EdicionRapidaPage() {
     area: "",
     activo: "",
   });
+  const [incompletos, setIncompletos] = useState(false);
 
   // =========================================================
   // Catálogos
@@ -290,6 +305,7 @@ export default function EdicionRapidaPage() {
         areaFisicaId: filtros.area,
         activo: filtros.activo,
         localId: String(localId),
+        ...(incompletos ? { incompletos: "true" } : {}),
       });
       const res = await fetch(`/api/productos/listar?${params.toString()}`, {
         credentials: "include",
@@ -305,7 +321,7 @@ export default function EdicionRapidaPage() {
       console.error("Error cargando productos:", err);
     }
     setLoading(false);
-  }, [page, pageSize, sortKey, sortDir, filtros, localId]);
+  }, [page, pageSize, sortKey, sortDir, filtros, localId, incompletos]);
 
   useEffect(() => {
     fetchProductos();
@@ -365,6 +381,28 @@ export default function EdicionRapidaPage() {
       console.error("Error guardando producto:", err);
       setRowStatus((prev) => ({ ...prev, [id]: "error" }));
     }
+  };
+
+  // =========================================================
+  // Guardar filas seleccionadas (cola secuencial)
+  // =========================================================
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const handleSaveSelected = async () => {
+    const idsToSave = [...selectedRows].filter(
+      (id) => edits[id] && Object.keys(edits[id]).length > 0
+    );
+    if (idsToSave.length === 0) return;
+
+    setBulkSaving(true);
+
+    for (const id of idsToSave) {
+      const row = rows.find((r) => r.id === Number(id) || r.id === id);
+      if (!row) continue;
+      await handleSaveRow(row);
+    }
+
+    setBulkSaving(false);
   };
 
   // =========================================================
@@ -588,6 +626,38 @@ export default function EdicionRapidaPage() {
           />
         );
 
+      case "modoPedido":
+        if (!isEditable) return val || "—";
+        return (
+          <SunmiSelectAdv
+            value={val || "BULTO"}
+            onChange={(v) => setFieldEdit(row.id, "modoPedido", v)}
+            data-row={rowIdx}
+            data-col="modoPedido"
+            onClose={() => handleSelectClose(rowIdx, "modoPedido")}
+          >
+            {MODO_PEDIDO_OPCIONES.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </SunmiSelectAdv>
+        );
+
+      case "modoCompraProveedor":
+        if (!isEditable) return val || "—";
+        return (
+          <SunmiSelectAdv
+            value={val || "BULTO"}
+            onChange={(v) => setFieldEdit(row.id, "modoCompraProveedor", v)}
+            data-row={rowIdx}
+            data-col="modoCompraProveedor"
+            onClose={() => handleSelectClose(rowIdx, "modoCompraProveedor")}
+          >
+            {MODO_COMPRA_OPCIONES.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </SunmiSelectAdv>
+        );
+
       default:
         return val ?? "—";
     }
@@ -674,12 +744,49 @@ export default function EdicionRapidaPage() {
             }}
           />
 
+          {/* Toggle faltantes críticos */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setIncompletos((v) => !v); setPage(1); }}
+              className={`px-3 py-1 rounded-lg text-[12px] font-medium transition border ${
+                incompletos
+                  ? "border-amber-500 bg-amber-500/10 text-amber-400"
+                  : "border-[var(--app-border)] sunmi-text-muted hover:text-[var(--app-fg)]"
+              }`}
+            >
+              {incompletos ? "✕ Faltantes críticos" : "Solo con faltantes críticos"}
+            </button>
+            {incompletos && (
+              <span className="text-[11px] sunmi-text-muted">
+                Proveedor, categoría, área física o factor pack sin completar
+              </span>
+            )}
+          </div>
+
           {/* Toolbar acciones masivas */}
           {puedeEditar && selectedRows.size > 0 && (
             <div className="rounded-xl p-3 border border-[var(--app-border)] bg-[var(--app-input-bg)] flex flex-col md:flex-row md:items-end gap-3">
               <span className="text-xs sunmi-text-muted shrink-0 self-center">
                 {selectedRows.size} seleccionado{selectedRows.size > 1 ? "s" : ""}
               </span>
+              {(() => {
+                const count = [...selectedRows].filter(
+                  (id) => edits[id] && Object.keys(edits[id]).length > 0
+                ).length;
+                return count > 0 ? (
+                  <SunmiButton
+                    color="emerald"
+                    className="!text-[11px] !px-3 !py-1 shrink-0 self-center"
+                    disabled={bulkSaving}
+                    onClick={handleSaveSelected}
+                  >
+                    {bulkSaving
+                      ? "Guardando..."
+                      : `Guardar seleccionadas (${count})`}
+                  </SunmiButton>
+                ) : null;
+              })()}
               <div className="flex flex-col md:flex-row gap-2 flex-1">
                 {/* Proveedor masivo */}
                 <div className="flex items-center gap-1.5">

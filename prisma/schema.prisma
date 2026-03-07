@@ -198,7 +198,7 @@ model ProductoBase {
   precio_sugerido   Decimal?     @db.Decimal(12, 2)
   iva_porcentaje    Decimal?     @db.Decimal(5, 2)
   fecha_vencimiento DateTime?
-  redondeo_100      Boolean      @default(false)
+  redondeo_100      Boolean      @default(true)
   activo            Boolean      @default(true)
   imagen_url        String?
   es_combo          Boolean      @default(false)
