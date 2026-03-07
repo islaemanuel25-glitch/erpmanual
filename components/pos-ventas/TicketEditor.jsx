@@ -143,6 +143,22 @@ export default function TicketEditor({ config, onChange }) {
                 </SunmiCard>
               );
             })}
+            {/* Control de modo invertido solo en la seccion Totales */}
+            {section.section === "Totales" && (
+              <SunmiCard className="!p-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!config.totalRowInverted}
+                    onChange={(e) => onChange({ ...config, totalRowInverted: e.target.checked })}
+                    className="accent-amber-500 w-4 h-4"
+                  />
+                  <span className="text-[12px] font-semibold sunmi-text-strong">
+                    TOTAL invertido (fondo negro, texto blanco)
+                  </span>
+                </label>
+              </SunmiCard>
+            )}
           </div>
         </div>
       ))}

@@ -146,12 +146,45 @@ export default function TicketPreview({ config }) {
         </span>
       </div>
 
-      {/* Total */}
-      <div style={{ textAlign: "center", margin: "6px 0" }}>
-        <div style={s("totalLabel")}>TOTAL</div>
-        <div style={{ ...s("totalAmount"), fontVariantNumeric: "tabular-nums" }}>
-          ${formatPrecio(v.total)}
-        </div>
+      {/* Total — franja completa de lado a lado.
+          Se ignoran textAlign individuales; se usa flex space-between.
+          Margen negativo horizontal compensa el padding del contenedor padre
+          para que el fondo negro cubra todo el ancho del ticket. */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        width: "100%",
+        boxSizing: "border-box",
+        gap: "4px",
+        ...(c.totalRowInverted ? {
+          background: "#000",
+          color: "#fff",
+          marginLeft: "-1.5mm",
+          marginRight: "-1.5mm",
+          paddingLeft: "1.5mm",
+          paddingRight: "1.5mm",
+          paddingTop: "5px",
+          paddingBottom: "5px",
+          width: "calc(100% + 3mm)",
+        } : {}),
+        marginTop: Math.max(c.totalLabel?.marginTop || 0, c.totalAmount?.marginTop || 0, 6) + "px",
+        marginBottom: Math.max(c.totalLabel?.marginBottom || 0, c.totalAmount?.marginBottom || 0, 6) + "px",
+        WebkitPrintColorAdjust: "exact",
+        printColorAdjust: "exact",
+      }}>
+        <span style={{
+          fontSize: c.totalLabel?.fontSize + "px",
+          fontWeight: c.totalLabel?.fontWeight,
+          fontFamily: c.totalLabel?.fontFamily || "Arial",
+        }}>TOTAL</span>
+        <span style={{
+          fontSize: c.totalAmount?.fontSize + "px",
+          fontWeight: c.totalAmount?.fontWeight,
+          fontFamily: c.totalAmount?.fontFamily || "Arial",
+          fontVariantNumeric: "tabular-nums",
+          flexShrink: 0,
+        }}>${formatPrecio(v.total)}</span>
       </div>
 
       {/* Forma de pago */}
