@@ -158,7 +158,10 @@ export default function TicketPreview({ config }) {
         boxSizing: "border-box",
         gap: "4px",
         ...(c.totalRowInverted ? {
-          background: "#000",
+          backgroundImage: 'url("/ticket/black.png")',
+          backgroundRepeat: "repeat",
+          backgroundSize: "auto",
+          backgroundColor: "#000",
           color: "#fff",
           marginLeft: "-1.5mm",
           marginRight: "-1.5mm",
