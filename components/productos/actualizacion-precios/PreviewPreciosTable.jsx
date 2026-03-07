@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 
 const money = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -28,7 +29,7 @@ export default function PreviewPreciosTable({
   const allSelected = items.length > 0 && selectedIds.size === items.length;
 
   return (
-    <div className="rounded-lg border border-slate-800 overflow-hidden">
+    <div className="rounded-lg border border-[var(--app-border)] overflow-hidden">
       <SunmiTable
         headers={[
           <label key="all" className="inline-flex items-center gap-2">
@@ -55,7 +56,7 @@ export default function PreviewPreciosTable({
           const alertas = Array.isArray(item.alertas) ? item.alertas : [];
 
           return (
-            <tr key={key} className="bg-slate-900/50 hover:bg-slate-800/60">
+            <SunmiTableRow key={key}>
               <td className="px-2 py-2 align-top">
                 <input
                   type="checkbox"
@@ -65,15 +66,15 @@ export default function PreviewPreciosTable({
                 />
               </td>
               <td className="px-2 py-2 align-top">{item.nombre || "-"}</td>
-              <td className="px-2 py-2 text-slate-300 align-top">{formatMoney(item.costoAnterior)}</td>
+              <td className="px-2 py-2 sunmi-text-muted align-top">{formatMoney(item.costoAnterior)}</td>
               <td className="px-2 py-2 align-top">{formatMoney(item.costoNuevo)}</td>
               <td className="px-2 py-2 align-top">{pct.toFixed(2)}%</td>
-              <td className="px-2 py-2 text-slate-300 align-top">{formatMoney(item.ventaAnterior)}</td>
+              <td className="px-2 py-2 sunmi-text-muted align-top">{formatMoney(item.ventaAnterior)}</td>
               <td className="px-2 py-2 align-top">{formatMoney(item.ventaNueva)}</td>
-              <td className="px-2 py-2 text-xs text-amber-200 align-top">
+              <td className="px-2 py-2 text-xs text-amber-400 align-top">
                 {alertas.length ? alertas.join(" · ") : "-"}
               </td>
-            </tr>
+            </SunmiTableRow>
           );
         })}
       </SunmiTable>

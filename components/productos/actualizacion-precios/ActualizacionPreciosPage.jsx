@@ -9,6 +9,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiRow from "@/components/sunmi/SunmiRow";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -586,6 +587,7 @@ export default function ActualizacionPreciosPage() {
                     value={proveedorId}
                     onChange={(val) => setProveedorId(val)}
                     disabled={loadingProveedores || loadingProductos}
+                    searchable
                   >
                     <option value="">
                       {loadingProveedores
@@ -652,10 +654,7 @@ export default function ActualizacionPreciosPage() {
                       const isPct = f.editadoPor === "porcentaje";
                       const isPrecio = f.editadoPor === "precio";
                       return (
-                        <tr
-                          key={f.productoBaseId}
-                          className="bg-slate-950 hover:bg-slate-900"
-                        >
+                        <SunmiTableRow key={f.productoBaseId}>
                           <td className="px-2 py-1.5 truncate max-w-[200px]">
                             {f.nombre}
                           </td>
@@ -692,7 +691,7 @@ export default function ActualizacionPreciosPage() {
                           <td className="px-2 py-1.5 text-right whitespace-nowrap">
                             {vn != null ? formatPrecio(vn) : "\u2014"}
                           </td>
-                        </tr>
+                        </SunmiTableRow>
                       );
                     })}
                   </SunmiTable>
@@ -731,6 +730,7 @@ export default function ActualizacionPreciosPage() {
                       value={excelProveedorId}
                       onChange={(val) => setExcelProveedorId(val)}
                       disabled={loadingProveedores || loadingExcel}
+                      searchable
                     >
                       <option value="">
                         {loadingProveedores
@@ -771,10 +771,10 @@ export default function ActualizacionPreciosPage() {
                   accept=".xlsx,.xls"
                   onChange={handleSubirExcel}
                   disabled={loadingExcel || !excelProveedorId}
-                  className="text-xs text-slate-300 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600"
+                  className="text-xs sunmi-text-strong file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-[var(--pos-control-bg)] file:text-[var(--pos-muted-strong)] hover:file:bg-[var(--pos-control-hover)] disabled:opacity-50"
                 />
                 {!excelProveedorId && (
-                  <div className="text-xs text-slate-500 mt-1">
+                  <div className="text-xs sunmi-text-muted mt-1">
                     Selecciona un proveedor arriba antes de importar.
                   </div>
                 )}
@@ -798,10 +798,7 @@ export default function ActualizacionPreciosPage() {
                     ]}
                   >
                     {excelPreview.map((p) => (
-                      <tr
-                        key={p.productoBaseId}
-                        className="bg-slate-950 hover:bg-slate-900"
-                      >
+                      <SunmiTableRow key={p.productoBaseId}>
                         <td className="px-2 py-1.5 truncate max-w-[200px]">
                           {p.nombre}
                         </td>
@@ -817,7 +814,7 @@ export default function ActualizacionPreciosPage() {
                         <td className="px-2 py-1.5 text-right whitespace-nowrap">
                           {formatPrecio(p.ventaNueva)}
                         </td>
-                      </tr>
+                      </SunmiTableRow>
                     ))}
                   </SunmiTable>
 
@@ -837,13 +834,13 @@ export default function ActualizacionPreciosPage() {
 
           {/* Mensajes de error / exito */}
           {errorMsg && (
-            <div className="rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
               {errorMsg}
             </div>
           )}
 
           {successMsg && (
-            <div className="rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400">
               {successMsg}
             </div>
           )}

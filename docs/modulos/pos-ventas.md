@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-03-05 10:49
+**Última actualización:** 2026-03-07 03:17
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,17 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-03-07: print1
+- 2026-03-07: imp1
+- 2026-03-07: impresorafin1
+- 2026-03-06: impresionfin
+- 2026-03-06: print ok
+- 2026-03-06: agrega impresion termica nativa con print-server y configuracion en ERP
+- 2026-03-05: fix: sincronizar ProductoLocal del deposito al editar base
+- 2026-03-05: Fix turnos resumen: separar FIADO de efectivo/digital/comisiones
+- 2026-03-05: P1 Turnos: X/Z report + imprimir Z + resumen incluye fiado
+- 2026-03-05: P0 Turnos: ventas requieren turno + módulo Turnos + permisos
+- 2026-03-05: fix: sincronizar ProductoLocal del deposito al editar base
 - 2026-03-05: fix: sincronizar ProductoLocal del deposito al editar base
 - 2026-03-03: Stock negativo configurable + motivos obligatorios + auditoria + pedidos deposito + configuracion UI
 - 2026-03-02: security(scope): validar ownership turnoId en resumen

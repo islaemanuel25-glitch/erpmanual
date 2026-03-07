@@ -61,8 +61,9 @@ export async function GET(req) {
     const pageSize = PAGE_SIZES_VALIDOS.includes(rawPageSize) ? rawPageSize : DEFAULT_PAGE_SIZE;
 
     // Ordenamiento
-    const sortKey = searchParams.get("sortKey") || "createdAt";
-    const sortDir = searchParams.get("sortDir") === "asc" ? "asc" : "desc";
+    const sortKey = searchParams.get("sortKey") || "nombre";
+    const rawSortDir = searchParams.get("sortDir");
+    const sortDir = rawSortDir === "desc" ? "desc" : "asc";
 
     // Filtros
     const q = (searchParams.get("q") || "").trim();
@@ -87,24 +88,42 @@ export async function GET(req) {
       activo === "true" ? true : activo === "false" ? false : undefined;
 
     // WHERE — snake_case SOLO dentro de Prisma
-    const where = {
-      AND: [
-        { grupoId },
-        categoriaId ? { categoria_id: categoriaId } : {},
-        proveedorId ? { proveedor_id: proveedorId } : {},
-        areaFisicaId ? { area_fisica_id: areaFisicaId } : {},
-        activoFilter !== undefined ? { activo: activoFilter } : {},
-        q
-          ? {
-              OR: [
-                { nombre: { contains: q, mode: "insensitive" } },
-                { codigo_barra: { contains: q, mode: "insensitive" } },
-                { sku: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {},
-      ],
-    };
+    const baseFilters = [
+      { grupoId },
+      categoriaId ? { categoria_id: categoriaId } : {},
+      proveedorId ? { proveedor_id: proveedorId } : {},
+      areaFisicaId ? { area_fisica_id: areaFisicaId } : {},
+      activoFilter !== undefined ? { activo: activoFilter } : {},
+    ];
+
+    // Busqueda: prioridad a match exacto por codigo_barra/sku (alineado con POS)
+    let searchFilter = {};
+    if (q) {
+      const exactCount = await prisma.productoBase.count({
+        where: {
+          AND: [
+            ...baseFilters,
+            { OR: [
+              { codigo_barra: { equals: q, mode: "insensitive" } },
+              { sku: { equals: q, mode: "insensitive" } },
+            ] },
+          ],
+        },
+      });
+
+      searchFilter = exactCount > 0
+        ? { OR: [
+            { codigo_barra: { equals: q, mode: "insensitive" } },
+            { sku: { equals: q, mode: "insensitive" } },
+          ] }
+        : { OR: [
+            { nombre: { contains: q, mode: "insensitive" } },
+            { codigo_barra: { contains: q, mode: "insensitive" } },
+            { sku: { contains: q, mode: "insensitive" } },
+          ] };
+    }
+
+    const where = { AND: [...baseFilters, searchFilter] };
 
     const total = await prisma.productoBase.count({ where });
 

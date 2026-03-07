@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, {
   SunmiSelectOption,
@@ -17,16 +17,114 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
 
   const [open, setOpen] = useState(false);
 
+  // Refs para voz y scanner
+  const inputRef = useRef(null);
+  const [escuchando, setEscuchando] = useState(false);
+  const recognitionRef = useRef(null);
+  const lastKeyTime = useRef(0);
+  const scanBuffer = useRef("");
+  const debounceRef = useRef(null);
+
+  // Soporte de voz
+  const soportaVoz =
+    typeof window !== "undefined" &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
   // ============================
-  // Debounce 250ms
+  // Debounce 250ms para cambios de texto
   // ============================
   useEffect(() => {
-    const timeout = setTimeout(() => {
+    debounceRef.current = setTimeout(() => {
       onChange({ search, categoria, proveedor, area, activo });
     }, 250);
 
-    return () => clearTimeout(timeout);
+    return () => clearTimeout(debounceRef.current);
   }, [search, categoria, proveedor, area, activo]);
+
+  // Busqueda inmediata (bypass debounce) — para Enter, scanner y voz
+  const buscarInmediato = useCallback(
+    (texto) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      onChange({ search: texto, categoria, proveedor, area, activo });
+    },
+    [onChange, categoria, proveedor, area, activo]
+  );
+
+  // ============================
+  // Busqueda por voz
+  // ============================
+  const iniciarVoz = () => {
+    const SpeechRecognition =
+      typeof window !== "undefined" &&
+      (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    if (!SpeechRecognition) return;
+
+    if (escuchando && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setEscuchando(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "es-AR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setEscuchando(true);
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setSearch(transcript);
+      buscarInmediato(transcript);
+      setEscuchando(false);
+    };
+    recognition.onerror = () => setEscuchando(false);
+    recognition.onend = () => setEscuchando(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  // ============================
+  // Deteccion de scanner + Enter + Escape
+  // ============================
+  const handleKeyDown = (e) => {
+    const now = Date.now();
+    const diff = now - lastKeyTime.current;
+    lastKeyTime.current = now;
+
+    if (e.key === "Escape") {
+      setSearch("");
+      buscarInmediato("");
+      inputRef.current?.focus();
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      // Scanner: caracteres rapidos + Enter
+      if (diff < 200 && scanBuffer.current.length > 3) {
+        setSearch(scanBuffer.current);
+        buscarInmediato(scanBuffer.current);
+        scanBuffer.current = "";
+        return;
+      }
+
+      // Enter normal: buscar inmediatamente
+      if (search.trim()) {
+        buscarInmediato(search);
+      }
+      scanBuffer.current = "";
+      return;
+    }
+
+    // Acumular buffer del scanner
+    if (e.key.length === 1) {
+      if (diff > 500) scanBuffer.current = "";
+      scanBuffer.current += e.key;
+    }
+  };
 
   const limpiar = () => {
     setSearch("");
@@ -42,17 +140,45 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
       {/* BARRA PRINCIPAL */}
       {/* ================================= */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        {/* BUSCADOR SUNMI */}
-        <div className="flex-1">
+        {/* BUSCADOR CON VOZ */}
+        <div className="flex-1 relative">
           <SunmiInput
+            ref={inputRef}
             placeholder="Buscar producto, código o categoría..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className={soportaVoz ? "!pr-12" : ""}
             icon="search"
           />
+          {soportaVoz && (
+            <button
+              onClick={iniciarVoz}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
+                escuchando
+                  ? "bg-red-600 text-white animate-pulse"
+                  : "text-slate-400 hover:text-white hover:bg-slate-700"
+              }`}
+              title="Buscar por voz"
+              type="button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            </button>
+          )}
         </div>
 
-        {/* BOTÓN MÁS FILTROS */}
+        {/* INDICADOR DE VOZ */}
+        {escuchando && (
+          <span className="text-xs text-red-400 animate-pulse md:shrink-0">
+            Escuchando...
+          </span>
+        )}
+
+        {/* BOTON MAS FILTROS */}
         <SunmiButton
           color="slate"
           className="w-full md:w-auto"
@@ -68,7 +194,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
       {open && (
         <div
           className="
-            rounded-2xl p-4 
+            rounded-2xl p-4
             border border-slate-800
             bg-slate-900
             shadow-md
@@ -78,7 +204,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
           <SunmiSeparator label="Filtros avanzados" />
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
-            {/* CATEGORÍA */}
+            {/* CATEGORIA */}
             <SunmiSelectAdv
               value={categoria}
               onChange={setCategoria}
@@ -106,7 +232,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
               ))}
             </SunmiSelectAdv>
 
-            {/* ÁREA FÍSICA */}
+            {/* AREA FISICA */}
             <SunmiSelectAdv
               value={area}
               onChange={setArea}

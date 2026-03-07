@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as XLSX from "xlsx";
 import { useUser } from "@/app/context/UserContext";
@@ -48,26 +48,53 @@ export default function ProductosPage() {
   const [activeTab, setActiveTab] = useState("listado");
 
   // =========================================================
-  // ESTADO LISTADO (existente)
+  // ESTADO LISTADO — inicializado desde URL query params
   // =========================================================
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get("page"));
+    return p > 0 ? p : 1;
+  });
   const [pageSize, setPageSize] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [sortKey, setSortKey] = useState("createdAt");
-  const [sortDir, setSortDir] = useState("desc");
+  const [sortKey, setSortKey] = useState(searchParams.get("sortKey") || "nombre");
+  const [sortDir, setSortDir] = useState(searchParams.get("sortDir") || "asc");
 
   const localId = contexto?.localId || 0;
 
   const [filtros, setFiltros] = useState({
-    search: "",
-    categoria: "",
-    proveedor: "",
-    area: "",
-    activo: "",
+    search: searchParams.get("q") || "",
+    categoria: searchParams.get("categoria") || "",
+    proveedor: searchParams.get("proveedor") || "",
+    area: searchParams.get("area") || "",
+    activo: searchParams.get("activo") || "",
   });
+
+  // =========================================================
+  // SYNC ESTADO LISTADO → URL (query params)
+  // =========================================================
+  const buildListingUrl = useCallback(() => {
+    const params = new URLSearchParams();
+    if (page > 1) params.set("page", String(page));
+    if (sortKey !== "nombre") params.set("sortKey", sortKey);
+    if (sortDir !== "asc") params.set("sortDir", sortDir);
+    if (filtros.search) params.set("q", filtros.search);
+    if (filtros.categoria) params.set("categoria", filtros.categoria);
+    if (filtros.proveedor) params.set("proveedor", filtros.proveedor);
+    if (filtros.area) params.set("area", filtros.area);
+    if (filtros.activo) params.set("activo", filtros.activo);
+    const qs = params.toString();
+    return qs ? `/modulos/productos?${qs}` : "/modulos/productos";
+  }, [page, sortKey, sortDir, filtros]);
+
+  const urlSyncRef = useRef(false);
+  useEffect(() => {
+    // Saltar el primer render (la URL ya tiene los params correctos)
+    if (!urlSyncRef.current) { urlSyncRef.current = true; return; }
+    router.replace(buildListingUrl(), { scroll: false });
+  }, [buildListingUrl]);
 
   const allColumns = [
     { key: "imagenUrl", label: "Imagen" },
@@ -277,7 +304,7 @@ export default function ProductosPage() {
   const cerrarModal = () => {
     setModalOpen(false);
     setEditing(null);
-    router.push("/modulos/productos");
+    router.push(buildListingUrl());
   };
 
   const handleSubmit = async (form) => {
@@ -350,7 +377,11 @@ export default function ProductosPage() {
       alert("Error: ID de producto inválido");
       return;
     }
-    router.push(`/modulos/productos/${Number(id)}/editar`);
+    // Pasar query del listado para poder volver al mismo contexto
+    const listingUrl = buildListingUrl();
+    const qs = listingUrl.includes("?") ? listingUrl.split("?")[1] : "";
+    const editUrl = `/modulos/productos/${Number(id)}/editar${qs ? `?${qs}` : ""}`;
+    router.push(editUrl);
   };
 
   // =========================================================
@@ -665,8 +696,16 @@ export default function ProductosPage() {
                 initial={filtros}
                 catalogos={catalogos}
                 onChange={(f) => {
-                  setPage(1);
-                  setFiltros(f);
+                  // Solo resetear página si los filtros realmente cambiaron
+                  const changed = f.search !== filtros.search ||
+                    f.categoria !== filtros.categoria ||
+                    f.proveedor !== filtros.proveedor ||
+                    f.area !== filtros.area ||
+                    f.activo !== filtros.activo;
+                  if (changed) {
+                    setPage(1);
+                    setFiltros(f);
+                  }
                 }}
               />
 

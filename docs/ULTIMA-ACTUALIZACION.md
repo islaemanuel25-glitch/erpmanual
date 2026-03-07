@@ -1,61 +1,30 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-03-05 10:49
+**Fecha:** 2026-03-07 03:17
 
 ## Módulos modificados recientemente
 
+### configuracion
+- print1, impresionfin, print ok
+- Archivos: 1 nuevos, 1 modificados (2 total)
+
 ### pos-ventas
-- fix: sincronizar ProductoLocal del deposito al editar base, Stock negativo configurable + motivos obligatorios + auditoria + pedidos deposito + configuracion UI, security(scope): validar ownership turnoId en resumen
-- Archivos: 17 modificados (17 total)
+- print1, imp1, impresorafin1
+- Archivos: 6 nuevos, 6 modificados (12 total)
 
 ### productos
-- fix: sincronizar ProductoLocal del deposito al editar base, fix: bloquear scroll en inputs numericos y precision de margen, fix: refactorizar onChange de precios y margen para evitar state stale
-- Archivos: 18 modificados (18 total)
-
-### grupos
-- fix: factor_pack actualiza en un solo setForm, fix sincronizacion productos y ajustes precios deposito, security(rbac): cerrar endpoints sin auth + admin guards + permiso pos.usar
-- Archivos: 6 modificados (6 total)
-
-### stock
-- fix: factor_pack actualiza en un solo setForm, Stock negativo configurable + motivos obligatorios + auditoria + pedidos deposito + configuracion UI, feat: mejoras POS + sidebar overflow fix + redondeo precios
-- Archivos: 11 modificados (11 total)
-
-### pos-transferencias
-- Stock negativo configurable + motivos obligatorios + auditoria + pedidos deposito + configuracion UI, feat: mejoras POS + sidebar overflow fix + redondeo precios, refactor: normalización theme-safe completa — eliminar tokens Tailwind hardcoded
-- Archivos: 10 modificados (10 total)
-
-### transferencias
-- Stock negativo configurable + motivos obligatorios + auditoria + pedidos deposito + configuracion UI, security(rbac): cerrar endpoints sin auth + admin guards + permiso pos.usar, refactor: normalización theme-safe completa — eliminar tokens Tailwind hardcoded
-- Archivos: 7 modificados (7 total)
-
-### configuracion
-- Stock negativo configurable + motivos obligatorios + auditoria + pedidos deposito + configuracion UI, feat: mejoras POS + sidebar overflow fix + redondeo precios, feat(mobile-nav): drawer abre desde la izquierda + trigger en topbar
-- Archivos: 2 nuevos, 5 modificados (7 total)
-
-### locales
-- security(rbac): cerrar endpoints sin auth + admin guards + permiso pos.usar
-- Archivos: 3 modificados (3 total)
-
-### roles
-- security(rbac): cerrar endpoints sin auth + admin guards + permiso pos.usar
-- Archivos: 5 modificados (5 total)
-
-### usuarios
-- security(rbac): cerrar endpoints sin auth + admin guards + permiso pos.usar
-- Archivos: 8 modificados (8 total)
-
-### categorias
-- refactor: normalización theme-safe completa — eliminar tokens Tailwind hardcoded
-- Archivos: 1 modificados (1 total)
-
-### proveedores
-- refactor: normalización theme-safe completa — eliminar tokens Tailwind hardcoded
-- Archivos: 1 modificados (1 total)
+- feat(importador-productos): descargar errores reparable con columnas plantilla + error_campos/error_mensajes, fix(importador-productos): parsePrecio robusto (coma/punto/miles/$) en costo/venta/margen, fix(importador-productos): separar errores/correctos, quitar limite 50 filas, paginacion y export excel de errores
+- Archivos: 2 modificados (2 total)
 
 
 ## Archivos nuevos desde última sincronización
-- app/modulos/configuracion/page.jsx
-- app/modulos/configuracion/stock/page.jsx
+- app/modulos/configuracion/ticket/page.jsx
+- components/pos-ventas/TicketEditor.jsx
+- components/pos-ventas/TicketPreview.jsx
+- app/api/pos-ventas/caja-movimientos/crear/route.js
+- app/api/pos-ventas/caja-movimientos/listar/route.js
+- app/api/pos-ventas/turnos/listar/route.js
+- app/api/pos-ventas/turnos/ventas/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

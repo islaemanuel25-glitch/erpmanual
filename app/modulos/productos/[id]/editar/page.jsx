@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -11,9 +11,20 @@ import useContextoActivo from "@/hooks/useContextoActivo";
 
 export default function EditarProductoPage({ params }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { loading: loadingCtx, contexto, needsContexto } = useContextoActivo();
 
   const localId = contexto?.localId || 0;
+
+  // URL de retorno al listado preservando contexto (page, sort, filtros)
+  const returnUrl = useMemo(() => {
+    const listing = new URLSearchParams();
+    for (const [k, v] of searchParams.entries()) {
+      listing.set(k, v);
+    }
+    const qs = listing.toString();
+    return qs ? `/modulos/productos?${qs}` : "/modulos/productos";
+  }, [searchParams]);
 
   const [catalogos, setCatalogos] = useState({
     CATEGORIAS: [],
@@ -86,14 +97,14 @@ export default function EditarProductoPage({ params }) {
 
         if (!data.ok) {
           alert(data.error || "Producto no encontrado");
-          router.push("/modulos/productos");
+          router.push(returnUrl);
           return;
         }
 
         setInitialData(data.item);
       } catch (err) {
         console.error("Error cargando producto:", err);
-        router.push("/modulos/productos");
+        router.push(returnUrl);
       }
       setLoadingProd(false);
     };
@@ -125,7 +136,7 @@ export default function EditarProductoPage({ params }) {
         return;
       }
 
-      router.push("/modulos/productos");
+      router.push(returnUrl);
     } catch (err) {
       console.error("Error guardando producto:", err);
       alert("Error interno");
@@ -133,7 +144,7 @@ export default function EditarProductoPage({ params }) {
   };
 
   const handleCancel = () => {
-    router.push("/modulos/productos");
+    router.push(returnUrl);
   };
 
   if (loadingCtx) return null;
