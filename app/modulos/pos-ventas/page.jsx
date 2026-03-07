@@ -992,16 +992,7 @@ export default function PosVentasPage() {
   const handleOpcionTicket = async (opcion) => {
     if (!state.modalTicket) return;
 
-    if (opcion === "termica_nativa") {
-      const { default: imprimirTicketNativo } = await import(
-        "@/lib/pos-ventas/imprimirTicketNativo"
-      );
-      const result = await imprimirTicketNativo(state.modalTicket);
-      if (!result.ok) {
-        showError(result.error);
-        return; // no cerrar modal, permite reintentar o usar otro metodo
-      }
-    } else if (opcion === "termica") {
+    if (opcion === "termica") {
       const { default: imprimirTicketTermico } = await import(
         "@/lib/pos-ventas/imprimirTicketTermico"
       );

@@ -21,6 +21,16 @@ const TEXT_ALIGNS = [
   { value: "justify", label: "Justificado" },
 ];
 
+const FONT_FAMILIES = [
+  { value: "Arial", label: "Arial" },
+  { value: "Helvetica", label: "Helvetica" },
+  { value: "Roboto", label: "Roboto" },
+  { value: "Inter", label: "Inter" },
+  { value: "Courier New", label: "Courier New" },
+  { value: "Consolas", label: "Consolas" },
+  { value: "Roboto Mono", label: "Roboto Mono" },
+];
+
 function ElementControls({ elKey, val, onUpdate }) {
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-2">
@@ -59,6 +69,18 @@ function ElementControls({ elKey, val, onUpdate }) {
         >
           {TEXT_ALIGNS.map((ta) => (
             <option key={ta.value} value={ta.value}>{ta.label}</option>
+          ))}
+        </SunmiSelectAdv>
+      </div>
+
+      <div>
+        <label className="text-[10px] sunmi-text-muted block mb-0.5">Font Family</label>
+        <SunmiSelectAdv
+          value={val.fontFamily || "Arial"}
+          onChange={(v) => onUpdate(elKey, "fontFamily", v)}
+        >
+          {FONT_FAMILIES.map((ff) => (
+            <option key={ff.value} value={ff.value}>{ff.label}</option>
           ))}
         </SunmiSelectAdv>
       </div>

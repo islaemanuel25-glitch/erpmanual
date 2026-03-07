@@ -41,6 +41,7 @@ export default function TicketPreview({ config }) {
     fontSize: c[key]?.fontSize + "px",
     fontWeight: c[key]?.fontWeight,
     textAlign: c[key]?.textAlign,
+    fontFamily: c[key]?.fontFamily || "Arial",
     marginTop: (c[key]?.marginTop || 0) + "px",
     marginBottom: (c[key]?.marginBottom || 0) + "px",
   });
@@ -52,6 +53,7 @@ export default function TicketPreview({ config }) {
     gap: "4px",
     fontSize: c[key]?.fontSize + "px",
     fontWeight: c[key]?.fontWeight,
+    fontFamily: c[key]?.fontFamily || "Arial",
     marginTop: (c[key]?.marginTop || 0) + "px",
     marginBottom: (c[key]?.marginBottom || 0) + "px",
   });
@@ -102,6 +104,7 @@ export default function TicketPreview({ config }) {
             <span style={{
               fontSize: c.clientLabel?.fontSize + "px",
               fontWeight: c.clientLabel?.fontWeight,
+              fontFamily: c.clientLabel?.fontFamily || "Arial",
               flexShrink: 0,
             }}>
               {row.label}
@@ -109,6 +112,7 @@ export default function TicketPreview({ config }) {
             <span style={{
               fontSize: c.clientValue?.fontSize + "px",
               fontWeight: c.clientValue?.fontWeight,
+              fontFamily: c.clientValue?.fontFamily || "Arial",
               wordBreak: "break-word",
             }}>
               {row.value}
