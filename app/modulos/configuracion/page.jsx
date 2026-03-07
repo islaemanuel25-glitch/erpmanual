@@ -8,7 +8,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { Palette, PackageOpen, Trash2, Printer, Download } from "lucide-react";
+import { Palette, PackageOpen, Trash2, Printer, Download, Receipt } from "lucide-react";
 
 const SECCIONES = [
   {
@@ -22,6 +22,12 @@ const SECCIONES = [
     href: "/modulos/configuracion/stock",
     icon: PackageOpen,
     descripcion: "Permitir vender sin stock (modo carga inicial).",
+  },
+  {
+    label: "Editor de Ticket",
+    href: "/modulos/configuracion/ticket",
+    icon: Receipt,
+    descripcion: "Personalizar tipografia y estilos del ticket termico.",
   },
 ];
 
