@@ -372,6 +372,10 @@ export default function ProductosPage() {
     router.push("/modulos/productos/actualizacion-precios");
   };
 
+  const abrirEdicionRapida = () => {
+    router.push("/modulos/productos/edicion-rapida");
+  };
+
   const abrirEditar = (id) => {
     if (!id || id === 0 || id === "0" || Number.isNaN(Number(id))) {
       alert("Error: ID de producto inválido");
@@ -717,6 +721,9 @@ export default function ProductosPage() {
                   </SunmiButton>
                   <SunmiButton color="cyan" onClick={abrirActualizacionPrecios}>
                     Actualización de precios
+                  </SunmiButton>
+                  <SunmiButton color="cyan" onClick={abrirEdicionRapida}>
+                    Edición rápida
                   </SunmiButton>
                 </div>
 

@@ -17,6 +17,8 @@ export default function SunmiSelectAdv({
   className = "",
   multiple = false,
   searchable = false,
+  onClose,
+  ...restProps
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -57,6 +59,7 @@ export default function SunmiSelectAdv({
       onChange(val);
       setOpen(false);
       setSearch("");
+      onClose?.();
       return;
     }
 
@@ -186,7 +189,7 @@ export default function SunmiSelectAdv({
   ) : null;
 
   return (
-    <div ref={wrapRef} className={`w-full ${className}`}>
+    <div ref={wrapRef} className={`w-full ${className}`} {...restProps}>
       <button
         ref={btnRef}
         type="button"
