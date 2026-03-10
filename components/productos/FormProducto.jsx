@@ -176,6 +176,9 @@ export default function FormProducto({
     if (form.precio_venta === "" || !Number.isFinite(Number(form.precio_venta)))
       return "Precio venta inválido.";
 
+    if (form.modoCompraProveedor === "UNIDAD" && form.unidad_medida !== "kg")
+      return "Modo compra 'Por pieza / barra' solo aplica a productos con tipo de venta Kg.";
+
     // Validar proveedores no repetidos
     const provs = [form.proveedor_id, form.proveedor2_id, form.proveedor3_id]
       .filter((v) => v !== "" && v !== null && v !== undefined)
@@ -397,10 +400,10 @@ export default function FormProducto({
           </div>
         </Section>
 
-        {/* PRESENTACIÓN */}
-        <Section title="Presentación">
+        {/* VENTA EN LOCAL */}
+        <Section title="Venta en local">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Unidad *" fieldKey="unidad_medida">
+            <Field label="Tipo de venta *" fieldKey="unidad_medida">
               <SunmiSelectAdv
                 value={form.unidad_medida}
                 onChange={(v) => {
@@ -415,7 +418,12 @@ export default function FormProducto({
                     if (!initialData || !p.modo_envio) {
                       modoEnvio = defaultModoEnvio(v);
                     }
-                    return { ...p, unidad_medida: v, modo_pedido: modoPedido, modo_envio: modoEnvio };
+                    // Si cambia de kg a otro, resetear modoCompraProveedor
+                    let modoCompra = p.modoCompraProveedor;
+                    if (v !== "kg" && modoCompra === "UNIDAD") {
+                      modoCompra = "BULTO";
+                    }
+                    return { ...p, unidad_medida: v, modo_pedido: modoPedido, modo_envio: modoEnvio, modoCompraProveedor: modoCompra };
                   });
                 }}
               >
@@ -424,6 +432,13 @@ export default function FormProducto({
                 <SunmiSelectOption value="cajon">Cajón</SunmiSelectOption>
                 <SunmiSelectOption value="kg">Kg</SunmiSelectOption>
               </SunmiSelectAdv>
+              <p className="text-xs text-slate-500 mt-1">
+                {form.unidad_medida === "kg"
+                  ? "Se vende por peso en el POS (ej: fiambre, queso, carne)."
+                  : form.unidad_medida === "unidad"
+                  ? "Se vende por unidad en el POS."
+                  : "Se vende por bulto (pack/cajón) en el POS."}
+              </p>
             </Field>
 
             <Field label="Factor pack" fieldKey="factor_pack">
@@ -450,13 +465,16 @@ export default function FormProducto({
               />
             </Field>
 
-            <Field label="Peso (kg)" fieldKey="peso_kg">
+            <Field label="Peso del producto (kg)" fieldKey="peso_kg">
               <SunmiInput
                 type="number"
                 value={form.peso_kg}
                 onWheel={(e) => e.target.blur()}
                 onChange={(e) => setNumber("peso_kg", e.target.value)}
               />
+              <p className="text-xs text-slate-500 mt-1">
+                Peso neto del producto o bulto (informativo).
+              </p>
             </Field>
 
             <Field label="Volumen (ml)" fieldKey="volumen_ml">
@@ -473,7 +491,7 @@ export default function FormProducto({
         {/* PRECIOS */}
         <Section title="Precios">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Costo *" fieldKey="precio_costo">
+            <Field label={`Costo * ${form.unidad_medida === "kg" ? "(por kg)" : ["pack", "cajon"].includes(form.unidad_medida) ? "(por bulto)" : "(por unidad)"}`} fieldKey="precio_costo">
               <SunmiInput
                 type="number"
                 value={form.precio_costo}
@@ -491,7 +509,7 @@ export default function FormProducto({
               />
             </Field>
 
-            <Field label="Venta *" fieldKey="precio_venta">
+            <Field label={`Venta * ${form.unidad_medida === "kg" ? "(por kg)" : ["pack", "cajon"].includes(form.unidad_medida) ? "(por bulto)" : "(por unidad)"}`} fieldKey="precio_venta">
               <SunmiInput
                 type="number"
                 value={form.precio_venta}
@@ -617,10 +635,10 @@ export default function FormProducto({
           </div>
         </Section>
 
-        {/* COMPRAS A PROVEEDOR (FIAMBRE) */}
+        {/* COMPRA A PROVEEDOR */}
         <Section title={
           <span className="flex items-center gap-2">
-            Compras a proveedor (fiambre)
+            Compra a proveedor
             {form.modoCompraProveedor === "UNIDAD" && (
               <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-red-600 text-white leading-none">
                 Fiambre
@@ -633,18 +651,26 @@ export default function FormProducto({
               <SunmiSelectAdv
                 value={form.modoCompraProveedor || "BULTO"}
                 onChange={(v) => setField("modoCompraProveedor", v)}
+                disabled={form.unidad_medida !== "kg"}
               >
-                <SunmiSelectOption value="BULTO">Bulto (default)</SunmiSelectOption>
-                <SunmiSelectOption value="UNIDAD">Unidad (fiambre/kg)</SunmiSelectOption>
+                <SunmiSelectOption value="BULTO">Por kg</SunmiSelectOption>
+                <SunmiSelectOption value="UNIDAD">Por pieza / barra</SunmiSelectOption>
               </SunmiSelectAdv>
-              <p className="text-xs text-slate-500 mt-1">
-                Fiambre: stock en kg, pedido por unidades (piezas)
-              </p>
+              {form.unidad_medida !== "kg" && (
+                <p className="text-xs text-amber-500 mt-1">
+                  "Por pieza / barra" solo disponible para productos con tipo de venta Kg.
+                </p>
+              )}
+              {form.unidad_medida === "kg" && form.modoCompraProveedor === "UNIDAD" && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Se pide por piezas al proveedor, pero el stock se lleva en kg.
+                </p>
+              )}
             </Field>
 
             {form.modoCompraProveedor === "UNIDAD" && (
               <>
-                <Field label="Peso referencia (kg)" fieldKey="pesoReferenciaKg">
+                <Field label="Peso referencia por pieza (kg)" fieldKey="pesoReferenciaKg">
                   <SunmiInput
                     type="number"
                     step="0.001"
@@ -652,21 +678,23 @@ export default function FormProducto({
                     value={form.pesoReferenciaKg}
                     onWheel={(e) => e.target.blur()}
                     onChange={(e) => setNumber("pesoReferenciaKg", e.target.value)}
-                    placeholder="ej: 3.5"
+                    placeholder="ej: 4.5"
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    Peso por pieza. Ej: mortadela 4.5kg, salame 1.2kg
+                    Ejemplo: mortadela pesa 4.5 kg por pieza.
                   </p>
                 </Field>
 
                 <div data-field="pesoEsFijo" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
-                  <label className="text-[12px] sunmi-label">Peso fijo</label>
+                  <label className="text-[12px] sunmi-label">Peso fijo / variable</label>
                   <SunmiToggleEstado
                     value={form.pesoEsFijo}
                     onChange={(v) => setField("pesoEsFijo", v)}
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    Fijo: mortadela siempre 4.5kg. Variable: salame (peso varía)
+                    {form.pesoEsFijo
+                      ? "Fijo: cada pieza pesa siempre lo mismo (ej: mortadela)."
+                      : "Variable: el peso varía entre piezas (ej: salame)."}
                   </p>
                 </div>
 
@@ -677,7 +705,7 @@ export default function FormProducto({
                     onChange={(v) => setField("actualizaPromedioPorRecepcion", v)}
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    Al recibir, recalcular peso promedio con los kg reales
+                    Al recibir mercadería, recalcular peso promedio con los kg reales.
                   </p>
                 </div>
               </>

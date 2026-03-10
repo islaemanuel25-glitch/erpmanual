@@ -51,21 +51,26 @@ export const ActionTypes = {
 export function posVentaReducer(state, action) {
   switch (action.type) {
     case ActionTypes.ADD_ITEM: {
-      const { producto } = action.payload;
+      const { producto, cantidadInicial } = action.payload;
+      const esKg = producto.unidadMedida === "kg";
+      const cantAdd = cantidadInicial ?? 1;
       const idx = state.carrito.findIndex(
         (item) => item.productoBaseId === producto.productoBaseId
       );
-      
+
       if (idx >= 0) {
         const next = [...state.carrito];
         const nuevo = { ...next[idx] };
-        if (nuevo.cantidad < producto.stock) {
-          nuevo.cantidad += 1;
+        if (esKg) {
+          // Kg: sumar el peso ingresado (puede ser decimal)
+          nuevo.cantidad = Math.round((nuevo.cantidad + cantAdd) * 1000) / 1000;
+        } else {
+          nuevo.cantidad += cantAdd;
         }
         next[idx] = nuevo;
         return { ...state, carrito: next };
       }
-      
+
       return {
         ...state,
         carrito: [
@@ -74,7 +79,7 @@ export function posVentaReducer(state, action) {
             productoBaseId: producto.productoBaseId,
             nombre: producto.nombre,
             precio: producto.precioVenta,
-            cantidad: producto.unidadMedida === "kg" ? 1 : 1,
+            cantidad: cantAdd,
             stockMax: producto.stock,
             modoSalida: producto.modoSalidaDefault || "UNIDAD",
             precioVentaUnitario: producto.precioVentaUnitario ?? producto.precioVenta,

@@ -19,9 +19,30 @@ function BuscadorProductos({ localId, onAgregar }) {
     inputRef.current?.focus();
   }, []);
 
+  // Rankear resultados por relevancia respecto al texto buscado
+  const rankear = useCallback((items, texto) => {
+    const q = texto.trim().toLowerCase();
+    if (!q) return items;
+    return [...items].sort((a, b) => {
+      const scoreOf = (p) => {
+        const nombre = (p.nombre || "").toLowerCase();
+        const codigo = (p.codigoBarra || "").toLowerCase();
+        if (codigo === q) return 0; // código exacto
+        if (nombre === q) return 1; // nombre exacto
+        if (nombre.startsWith(q)) return 2; // nombre empieza con
+        // alguna palabra del nombre empieza con q
+        const palabras = nombre.split(/\s+/);
+        if (palabras.some((w) => w.startsWith(q))) return 3;
+        if (nombre.includes(q)) return 4; // contiene
+        return 5;
+      };
+      return scoreOf(a) - scoreOf(b);
+    });
+  }, []);
+
   // Buscar productos
   const buscar = useCallback(
-    async (texto) => {
+    async (texto, autoAdd = false) => {
       if (!texto.trim() || !localId) {
         setResultados([]);
         return;
@@ -34,7 +55,31 @@ function BuscadorProductos({ localId, onAgregar }) {
         );
         const data = await res.json();
         if (data.ok) {
-          setResultados(data.items || []);
+          const items = rankear(data.items || [], texto);
+
+          // Auto-agregar si match exacto por código de barras (1 resultado con código idéntico)
+          if (
+            items.length >= 1 &&
+            items[0].codigoBarra &&
+            items[0].codigoBarra.toLowerCase() === texto.trim().toLowerCase()
+          ) {
+            onAgregar(items[0]);
+            setQuery("");
+            setResultados([]);
+            inputRef.current?.focus();
+            return;
+          }
+
+          // Auto-agregar si se pidió (scanner Enter) y hay resultado único
+          if (autoAdd && items.length === 1) {
+            onAgregar(items[0]);
+            setQuery("");
+            setResultados([]);
+            inputRef.current?.focus();
+            return;
+          }
+
+          setResultados(items);
         }
       } catch (err) {
         console.error("Error buscando:", err);
@@ -42,7 +87,7 @@ function BuscadorProductos({ localId, onAgregar }) {
         setLoading(false);
       }
     },
-    [localId]
+    [localId, rankear, onAgregar]
   );
 
   // Busqueda por voz
@@ -96,7 +141,8 @@ function BuscadorProductos({ localId, onAgregar }) {
 
       // Scanner: caracteres rapidos + Enter
       if (diff < 200 && scanBuffer.current.length > 3) {
-        buscar(scanBuffer.current);
+        setQuery(scanBuffer.current);
+        buscar(scanBuffer.current, true);
         scanBuffer.current = "";
         return;
       }
@@ -127,6 +173,13 @@ function BuscadorProductos({ localId, onAgregar }) {
     setQuery(val);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    // Si vacío, limpiar resultados al instante
+    if (!val.trim()) {
+      setResultados([]);
+      return;
+    }
+
     debounceRef.current = setTimeout(() => {
       buscar(val);
     }, 300);

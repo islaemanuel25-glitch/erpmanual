@@ -35,6 +35,7 @@ function FormaPago({
   onProcesarCola,
   procesandoCola = false,
   comisiones = null,
+  clienteSeleccionado = null,
 }) {
   const forma = FORMAS_PAGO.find((f) => f.key === formaPago);
   const tieneComision = forma?.tieneComision || false;
@@ -45,6 +46,7 @@ function FormaPago({
   const total = base; // Cliente paga subtotal - descuentos, SIN comision
   const comisionBancaria = tieneComision ? base * (comisionPct / 100) : 0;
   const netoRecibido = total - comisionBancaria;
+  const fiadoSinCliente = formaPago === "fiado" && !clienteSeleccionado;
 
   return (
     <SunmiCard className="p-3 lg:p-4 flex flex-col gap-3">
@@ -73,16 +75,23 @@ function FormaPago({
         </>
       ) : (
         <>
-          {/* Botón cobrar (online) */}
+          {/* Aviso fiado sin cliente */}
+          {fiadoSinCliente && subtotal > 0 && (
+            <div className="px-2 py-1.5 rounded-lg text-xs text-center font-medium" style={{ background: 'color-mix(in srgb, var(--pos-danger) 12%, transparent)', color: 'var(--pos-danger)' }}>
+              Seleccione un cliente para vender fiado
+            </div>
+          )}
+
+          {/* Botón principal COBRAR */}
           <button
             type="button"
             onClick={() => onCobrar({ formaPago, total })}
-            disabled={cobrando || disabled || !formaPago || subtotal <= 0}
+            disabled={cobrando || disabled || !formaPago || subtotal <= 0 || fiadoSinCliente}
             className="sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md"
           >
             {cobrando ? "Procesando..." : `COBRAR $${formatPrecio(total)}`}
           </button>
-          
+
           {/* Botón procesar cola (solo si hay items en cola y está online) */}
           {queueLength > 0 && onProcesarCola && (
             <button

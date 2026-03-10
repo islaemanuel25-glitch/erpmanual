@@ -23,6 +23,7 @@ import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullsc
 import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
+import ModalPesoKg from "@/components/pos-ventas/ModalPesoKg";
 import ModalConfirmacion from "@/components/pos-ventas/ModalConfirmacion";
 import ModalPendientesOffline from "@/components/pos-ventas/ModalPendientesOffline";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
@@ -48,6 +49,7 @@ export default function PosVentasPage() {
   const [turnoActual, setTurnoActual] = useState(undefined); // undefined=cargando, null=sin turno, object=turno
   const [mostrarCierre, setMostrarCierre] = useState(false);
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
+  const [productoKgPendiente, setProductoKgPendiente] = useState(null);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [comisiones, setComisiones] = useState(null);
   const [creditoInfo, setCreditoInfo] = useState(null); // { limiteCredito, saldoActual }
@@ -400,6 +402,10 @@ export default function PosVentasPage() {
   const handleAgregar = useCallback((producto) => {
     setErrorMsg("");
     setSuccessMsg("");
+    if (producto.unidadMedida === "kg") {
+      setProductoKgPendiente(producto);
+      return;
+    }
     dispatch({ type: ActionTypes.ADD_ITEM, payload: { producto } });
   }, []);
 
@@ -1272,11 +1278,12 @@ export default function PosVentasPage() {
               onProcesarCola={procesarCola}
               procesandoCola={procesandoCola}
               comisiones={comisiones}
+              clienteSeleccionado={state.clienteSeleccionado}
             />
             {/* Mensaje offline */}
             {offlineMode && (
               <div className="mt-2 text-[10px] sunmi-pos-text-accent text-center px-2 py-1 sunmi-pos-panel rounded">
-                OFFLINE: solo efectivo. Se guarda pendiente y se sincroniza al volver internet.
+                OFFLINE — Las ventas se guardan en este dispositivo. Debe presionar "Procesar cola" cuando vuelva internet.
               </div>
             )}
           </div>
@@ -1395,6 +1402,21 @@ export default function PosVentasPage() {
       )}
 
       {/* Modal movimiento de caja */}
+      {/* Modal peso kg */}
+      {productoKgPendiente && (
+        <ModalPesoKg
+          producto={productoKgPendiente}
+          onConfirmar={(cantidadKg) => {
+            dispatch({
+              type: ActionTypes.ADD_ITEM,
+              payload: { producto: productoKgPendiente, cantidadInicial: cantidadKg },
+            });
+            setProductoKgPendiente(null);
+          }}
+          onCancelar={() => setProductoKgPendiente(null)}
+        />
+      )}
+
       {mostrarCajaMovimiento && turnoActual && (
         <ModalCajaMovimiento
           turnoId={turnoActual.id}

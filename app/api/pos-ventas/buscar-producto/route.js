@@ -61,7 +61,7 @@ export async function GET(req) {
       allowNegativeStock = configGrupo?.allowNegativeStock === true;
     }
 
-    // Prioridad: match exacto por codigo_barra
+    // Prioridad: match exacto por codigo_barra (retorno inmediato)
     const exacto = await prisma.productoLocal.findMany({
       where: {
         localId,
@@ -80,7 +80,7 @@ export async function GET(req) {
       return NextResponse.json({ ok: true, items });
     }
 
-    // Busqueda por nombre (LIKE)
+    // Busqueda amplia (traer más para rankear correctamente)
     const productos = await prisma.productoLocal.findMany({
       where: {
         localId,
@@ -96,10 +96,16 @@ export async function GET(req) {
         base: true,
         stock: { where: { localId }, select: { cantidad: true } },
       },
-      take: 10,
+      take: 30,
     });
 
-    const items = mapProductos(productos, esDeposito, allowNegativeStock);
+    // Rankear por relevancia antes de mapear
+    const qLower = q.toLowerCase();
+    productos.sort((a, b) => {
+      return rankScore(a, qLower) - rankScore(b, qLower);
+    });
+
+    const items = mapProductos(productos.slice(0, 10), esDeposito, allowNegativeStock);
     return NextResponse.json({ ok: true, items });
   } catch (err) {
     console.error("Error buscar-producto POS:", err);
@@ -108,6 +114,23 @@ export async function GET(req) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Score de relevancia para ranking de búsqueda (menor = más relevante).
+ * 0: código exacto | 1: nombre exacto | 2: nombre empieza con q
+ * 3: alguna palabra empieza con q | 4: contiene q | 5: resto
+ */
+function rankScore(pl, qLower) {
+  const nombre = (pl.nombre || pl.base?.nombre || "").toLowerCase();
+  const codigo = (pl.base?.codigo_barra || "").toLowerCase();
+  if (codigo === qLower) return 0;
+  if (nombre === qLower) return 1;
+  if (nombre.startsWith(qLower)) return 2;
+  const palabras = nombre.split(/\s+/);
+  if (palabras.some((w) => w.startsWith(qLower))) return 3;
+  if (nombre.includes(qLower)) return 4;
+  return 5;
 }
 
 /**

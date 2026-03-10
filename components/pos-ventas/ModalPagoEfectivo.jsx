@@ -71,13 +71,13 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
             </div>
           )}
 
-          {/* Monto exacto */}
+          {/* Pago exacto — confirma al instante */}
           <SunmiButton
-            color="cyan"
-            onClick={() => setPagaCon(String(Math.ceil(total)))}
-            className="!text-sm !py-2 w-full"
+            color="amber"
+            onClick={() => onConfirmar({ pagaCon: total, vuelto: 0 })}
+            className="!text-base !py-3 w-full !font-bold"
           >
-            Monto exacto ${formatPrecio(total)}
+            PAGO EXACTO ${formatPrecio(total)}
           </SunmiButton>
 
           {/* Vuelto */}

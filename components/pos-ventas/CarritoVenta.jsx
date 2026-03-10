@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
@@ -30,10 +30,10 @@ function CantidadStepper({ item, idx, onCantidadChange, compact }) {
     if (esKg) {
       const normalized = raw.replace(",", ".");
       const val = parseFloat(normalized);
-      onCantidadChange(idx, isNaN(val) ? "" : val);
+      onCantidadChange(idx, isNaN(val) ? "" : Math.max(minVal, val));
     } else {
       const val = parseInt(raw, 10);
-      onCantidadChange(idx, isNaN(val) ? "" : val);
+      onCantidadChange(idx, isNaN(val) ? "" : Math.max(minVal, val));
     }
   };
 
@@ -57,7 +57,9 @@ function CantidadStepper({ item, idx, onCantidadChange, compact }) {
     let next = cur + dir * step;
     if (esKg) next = Math.round(next * 1000) / 1000;
     next = Math.max(minVal, next);
-    next = Math.min(item.stockMax || 9999, next);
+    // stockMax puede ser negativo si stock es negativo — no limitar hacia abajo
+    const tope = item.stockMax != null && item.stockMax > 0 ? item.stockMax : 9999;
+    next = Math.min(tope, next);
     onCantidadChange(idx, next);
   };
 
@@ -67,9 +69,8 @@ function CantidadStepper({ item, idx, onCantidadChange, compact }) {
         −
       </button>
       <SunmiInput
-        type={esKg ? "text" : "number"}
+        type="text"
         inputMode={esKg ? "decimal" : "numeric"}
-        {...(!esKg && { min: minVal, step, max: item.stockMax || 9999 })}
         value={item.cantidad}
         onChange={handleChange}
         onBlur={handleBlur}
@@ -94,6 +95,7 @@ function CarritoVenta({
   clienteSeleccionado = null,
   onAbrirCliente,
 }) {
+  const [confirmarLimpiar, setConfirmarLimpiar] = useState(false);
   if (items.length === 0) {
     return (
       <SunmiCard className="p-2 lg:p-3">
@@ -148,12 +150,30 @@ function CarritoVenta({
               {descuento > 0 ? `Desc. -$${formatPrecio(descuento)}` : "Descuento"}
             </button>
           )}
-          <button
-            onClick={onLimpiar}
-            className="text-xs pos-text-danger"
-          >
-            Limpiar
-          </button>
+          {confirmarLimpiar ? (
+            <span className="flex items-center gap-1.5">
+              <span className="text-xs pos-text-danger">¿Vaciar carrito?</span>
+              <button
+                onClick={() => { onLimpiar(); setConfirmarLimpiar(false); }}
+                className="text-xs font-bold pos-text-danger"
+              >
+                Vaciar
+              </button>
+              <button
+                onClick={() => setConfirmarLimpiar(false)}
+                className="text-xs pos-text-muted"
+              >
+                Cancelar
+              </button>
+            </span>
+          ) : (
+            <button
+              onClick={() => setConfirmarLimpiar(true)}
+              className="text-xs pos-text-danger"
+            >
+              Limpiar
+            </button>
+          )}
         </div>
       </div>
 
