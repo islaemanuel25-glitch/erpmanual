@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
@@ -11,6 +12,9 @@ export async function POST(req) {
         { status: 401 }
       );
     }
+
+    const perm = checkPerm(session, "pos.usar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const { turnoId, montoRealEfectivo, observaciones } = await req.json();
 
@@ -33,10 +37,16 @@ export async function POST(req) {
     }
 
     // Calcular totales de ventas del turno
-    const ventas = await prisma.venta.findMany({
-      where: { turnoId },
-      select: { total: true, formaPago: true },
-    });
+    const [ventas, cajaMovimientos] = await Promise.all([
+      prisma.venta.findMany({
+        where: { turnoId },
+        select: { total: true, formaPago: true },
+      }),
+      prisma.cajaMovimiento.findMany({
+        where: { turnoId },
+        select: { tipo: true, monto: true },
+      }),
+    ]);
 
     let totalEfectivo = 0;
     let totalDigital = 0;
@@ -50,7 +60,15 @@ export async function POST(req) {
       }
     });
 
-    const montoEsperado = Number(turno.montoInicial) + totalEfectivo;
+    let totalIngresosCaja = 0;
+    let totalRetirosCaja = 0;
+    cajaMovimientos.forEach((m) => {
+      const monto = Number(m.monto) || 0;
+      if (m.tipo === "INGRESO") totalIngresosCaja += monto;
+      else if (m.tipo === "RETIRO") totalRetirosCaja += monto;
+    });
+
+    const montoEsperado = Number(turno.montoInicial) + totalEfectivo + totalIngresosCaja - totalRetirosCaja;
     const diferencia = Number(montoRealEfectivo) - montoEsperado;
 
     const turnoCerrado = await prisma.turno.update({

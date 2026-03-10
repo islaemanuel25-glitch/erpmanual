@@ -97,6 +97,8 @@ export async function POST(req) {
           area_fisica: p.area_fisica?.nombre || "",
           unidad_medida: p.unidad_medida || "",
           factor_pack: p.factor_pack != null ? Number(p.factor_pack) : "",
+          modo_pedido: p.modo_pedido || "BULTO",
+          modo_compra_proveedor: p.modoCompraProveedor || "BULTO",
           precio_costo: Number(loc.precio_costo ?? p.precio_costo ?? 0),
           precio_venta: Number(loc.precio_venta ?? p.precio_venta ?? 0),
           margen: Number(loc.margen ?? p.margen ?? 0),
@@ -139,6 +141,8 @@ export async function POST(req) {
           area_fisica: p.area_fisica?.nombre || "",
           unidad_medida: p.unidad_medida || "",
           factor_pack: p.factor_pack != null ? Number(p.factor_pack) : "",
+          modo_pedido: p.modo_pedido || "BULTO",
+          modo_compra_proveedor: p.modoCompraProveedor || "BULTO",
           precio_costo: Number(p.precio_costo ?? 0),
           precio_venta: Number(p.precio_venta ?? 0),
           margen: Number(p.margen ?? 0),
@@ -166,6 +170,8 @@ export async function POST(req) {
       { wch: 15 },  // area_fisica
       { wch: 14 },  // unidad_medida
       { wch: 10 },  // factor_pack
+      { wch: 14 },  // modo_pedido
+      { wch: 22 },  // modo_compra_proveedor
       { wch: 12 },  // precio_costo
       { wch: 12 },  // precio_venta
       { wch: 8 },   // margen

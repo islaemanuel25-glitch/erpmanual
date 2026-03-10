@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function GET(req) {
   try {
@@ -11,6 +12,9 @@ export async function GET(req) {
         { status: 401 }
       );
     }
+
+    const perm = checkPerm(session, "pos.usar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const localId = Number(req.nextUrl.searchParams.get("localId"));
     if (!localId) {

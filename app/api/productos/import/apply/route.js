@@ -109,6 +109,7 @@ export async function POST(req) {
               modo_pedido: p.modo_pedido || (esPack && fp ? "BULTO" : "UNIDAD"),
               modo_envio: p.modo_envio || (unidadMedida === "cajon" ? "SOLO_BULTO" : "MIXTO"),
               modo_stock: "BULTO",
+              modoCompraProveedor: p.modo_compra_proveedor || "BULTO",
             };
 
             const base = await tx.productoBase.create({ data: baseData });
@@ -181,6 +182,7 @@ export async function POST(req) {
             if (p.areaFisicaId) updateData.area_fisica_id = p.areaFisicaId;
             if (p.modo_pedido) updateData.modo_pedido = p.modo_pedido;
             if (p.modo_envio) updateData.modo_envio = p.modo_envio;
+            if (p.modo_compra_proveedor) updateData.modoCompraProveedor = p.modo_compra_proveedor;
 
             await tx.productoBase.update({
               where: { id: p.productoBaseId },

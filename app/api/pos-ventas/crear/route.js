@@ -3,8 +3,6 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 
-const COMISION_PCT = 7;
-
 export async function POST(req) {
   try {
     const perm = requirePerm(req, "pos.usar");
@@ -247,9 +245,24 @@ export async function POST(req) {
       }
     }
 
-    // Comision bancaria: solo para pagos digitales
+    // Comision bancaria: solo para pagos digitales, con tasas configurables por grupo
     const tieneComision = ["mercadopago", "debito", "credito"].includes(formaPago);
-    const comisionBancaria = tieneComision ? total * (COMISION_PCT / 100) : 0;
+    let comisionPct = 7; // default
+    if (tieneComision) {
+      const comisionConfig = await prisma.configuracionGrupo.findUnique({
+        where: { grupoId },
+        select: { comisionDebito: true, comisionCredito: true, comisionMercadopago: true },
+      });
+      if (comisionConfig) {
+        const mapaCom = {
+          debito: Number(comisionConfig.comisionDebito ?? 7),
+          credito: Number(comisionConfig.comisionCredito ?? 7),
+          mercadopago: Number(comisionConfig.comisionMercadopago ?? 7),
+        };
+        comisionPct = mapaCom[formaPago] ?? 7;
+      }
+    }
+    const comisionBancaria = tieneComision ? total * (comisionPct / 100) : 0;
     const netoRecibido = total - comisionBancaria;
 
     // Obtener precios de costo de cada producto

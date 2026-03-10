@@ -466,6 +466,11 @@ export default function EdicionRapidaPage() {
         return (
           <span className="truncate block max-w-[220px]" title={row.nombre}>
             {row.nombre}
+            {row.modoCompraProveedor === "UNIDAD" && (
+              <span className="ml-1.5 inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-red-600 text-white leading-none align-middle">
+                Fiambre
+              </span>
+            )}
           </span>
         );
 

@@ -4,7 +4,7 @@ import { memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import { showError } from "@/components/sunmi/SunmiToast";
 
-const COMISION_PCT = 7;
+const COMISION_DEFAULT = 7;
 
 const FORMAS_PAGO = [
   { key: "efectivo", label: "Efectivo", tieneComision: false },
@@ -34,12 +34,16 @@ function FormaPago({
   queueLength = 0,
   onProcesarCola,
   procesandoCola = false,
+  comisiones = null,
 }) {
   const forma = FORMAS_PAGO.find((f) => f.key === formaPago);
   const tieneComision = forma?.tieneComision || false;
+  const comisionPct = tieneComision
+    ? Number(comisiones?.[formaPago] ?? COMISION_DEFAULT)
+    : 0;
   const base = subtotal - descuento - descuentoPorPuntos;
   const total = base; // Cliente paga subtotal - descuentos, SIN comision
-  const comisionBancaria = tieneComision ? base * (COMISION_PCT / 100) : 0;
+  const comisionBancaria = tieneComision ? base * (comisionPct / 100) : 0;
   const netoRecibido = total - comisionBancaria;
 
   return (
@@ -146,7 +150,7 @@ function FormaPago({
 
         {tieneComision && subtotal > 0 && (
           <div className="px-2 py-1.5 rounded-lg pos-commission-box text-xs text-center pos-text-muted">
-            Comision {COMISION_PCT}%:{" "}
+            Comision {comisionPct}%:{" "}
             <span className="font-semibold pos-text-muted-strong">
               -${formatPrecio(comisionBancaria)}
             </span>
@@ -159,4 +163,4 @@ function FormaPago({
 }
 
 export default memo(FormaPago);
-export { COMISION_PCT, FORMAS_PAGO };
+export { COMISION_DEFAULT, FORMAS_PAGO };

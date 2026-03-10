@@ -75,7 +75,22 @@ export default function SunmiTablaProductos({
 
     codigoBarra: { titulo: "Código", thClass: "w-[140px]", tdClass: "truncate overflow-hidden sunmi-text-muted", titleKey: "codigoBarra" },
     sku: { titulo: "SKU", thClass: "w-[90px]" },
-    nombre: { titulo: "Nombre", thClass: "min-w-[160px]", tdClass: "whitespace-normal break-words line-clamp-2 overflow-hidden leading-tight", titleKey: "nombre" },
+    nombre: {
+      titulo: "Nombre",
+      thClass: "min-w-[160px]",
+      tdClass: "whitespace-normal break-words line-clamp-2 overflow-hidden leading-tight",
+      titleKey: "nombre",
+      render: (v, row) => (
+        <span>
+          {v}
+          {row.modoCompraProveedor === "UNIDAD" && (
+            <span className="ml-1.5 inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-red-600 text-white leading-none align-middle">
+              Fiambre
+            </span>
+          )}
+        </span>
+      ),
+    },
 
     categoriaId: {
       titulo: "Categoría",

@@ -618,7 +618,16 @@ export default function FormProducto({
         </Section>
 
         {/* COMPRAS A PROVEEDOR (FIAMBRE) */}
-        <Section title="Compras a proveedor (fiambre)">
+        <Section title={
+          <span className="flex items-center gap-2">
+            Compras a proveedor (fiambre)
+            {form.modoCompraProveedor === "UNIDAD" && (
+              <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-red-600 text-white leading-none">
+                Fiambre
+              </span>
+            )}
+          </span>
+        }>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Modo compra proveedor" fieldKey="modoCompraProveedor">
               <SunmiSelectAdv

@@ -819,6 +819,9 @@ model ConfiguracionGrupo {
   allowNegativeStock        Boolean  @default(false)
   requireMotivoAjusteStock  Boolean  @default(false)
   requireMotivoLimitesStock Boolean  @default(false)
+  comisionDebito            Decimal  @default(7) @db.Decimal(5, 2)
+  comisionCredito           Decimal  @default(7) @db.Decimal(5, 2)
+  comisionMercadopago       Decimal  @default(7) @db.Decimal(5, 2)
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 

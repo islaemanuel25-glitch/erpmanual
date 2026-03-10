@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
@@ -14,6 +15,9 @@ export async function GET(req) {
         { status: 401 }
       );
     }
+
+    const perm = checkPerm(session, "pos.usar");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim();

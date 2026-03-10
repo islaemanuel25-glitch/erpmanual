@@ -22,6 +22,7 @@ import ModalCanjePuntos from "@/components/pos-ventas/ModalCanjePuntos";
 import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullscreen";
 import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
+import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
 import ModalConfirmacion from "@/components/pos-ventas/ModalConfirmacion";
 import ModalPendientesOffline from "@/components/pos-ventas/ModalPendientesOffline";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
@@ -46,7 +47,9 @@ export default function PosVentasPage() {
   const [mostrarPickerCliente, setMostrarPickerCliente] = useState(false);
   const [turnoActual, setTurnoActual] = useState(undefined); // undefined=cargando, null=sin turno, object=turno
   const [mostrarCierre, setMostrarCierre] = useState(false);
+  const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
+  const [comisiones, setComisiones] = useState(null);
   const [creditoInfo, setCreditoInfo] = useState(null); // { limiteCredito, saldoActual }
   const [ultimoBreakdown, setUltimoBreakdown] = useState(null);
   const [datosPagoEfectivo, setDatosPagoEfectivo] = useState(null); // { pagaCon, vuelto }
@@ -97,6 +100,19 @@ export default function PosVentasPage() {
         })
         .catch(() => {});
     }
+  }, [localActual]);
+
+  // ---------------------------------------------------------------------------
+  // Cargar config de comisiones
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!localActual) return;
+    fetch(`/api/pos-ventas/config-comisiones?localId=${localActual}`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok) setComisiones(data.comisiones);
+      })
+      .catch(() => {});
   }, [localActual]);
 
   // ---------------------------------------------------------------------------
@@ -1129,6 +1145,14 @@ export default function PosVentasPage() {
             )}
             {turnoActual && (
               <button
+                onClick={() => setMostrarCajaMovimiento(true)}
+                className="text-[11px] sunmi-pos-btn-secondary px-2 py-1 rounded transition-colors sunmi-pos-text-accent"
+              >
+                Caja +/-
+              </button>
+            )}
+            {turnoActual && (
+              <button
                 onClick={() => setMostrarCierre(true)}
                 className="text-[11px] sunmi-pos-btn-danger px-2 py-1 rounded transition-colors"
               >
@@ -1247,6 +1271,7 @@ export default function PosVentasPage() {
               queueLength={queueLength}
               onProcesarCola={procesarCola}
               procesandoCola={procesandoCola}
+              comisiones={comisiones}
             />
             {/* Mensaje offline */}
             {offlineMode && (
@@ -1365,6 +1390,17 @@ export default function PosVentasPage() {
               vendedor: me?.nombre || "-",
               localNombre,
             });
+          }}
+        />
+      )}
+
+      {/* Modal movimiento de caja */}
+      {mostrarCajaMovimiento && turnoActual && (
+        <ModalCajaMovimiento
+          turnoId={turnoActual.id}
+          onClose={() => setMostrarCajaMovimiento(false)}
+          onSuccess={(item) => {
+            showSuccess(`${item.tipo === "INGRESO" ? "Ingreso" : "Retiro"} de $${Number(item.monto).toLocaleString("es-AR", { minimumFractionDigits: 2 })} registrado`);
           }}
         />
       )}

@@ -81,8 +81,10 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
     );
   }
 
+  const totalIngresos = Number(resumen.totalIngresosCaja) || 0;
+  const totalRetiros = Number(resumen.totalRetirosCaja) || 0;
   const esperado =
-    Number(turno.montoInicial) + Number(resumen.totalEfectivo);
+    Number(turno.montoInicial) + Number(resumen.totalEfectivo) + totalIngresos - totalRetiros;
   const diferencia = montoReal ? Number(montoReal) - esperado : 0;
 
   return (
@@ -159,6 +161,22 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
               +${formatPrecio(resumen.totalEfectivo)}
             </span>
           </div>
+          {totalIngresos > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="sunmi-pos-muted">+ Ingresos caja</span>
+              <span className="sunmi-pos-text-success">
+                +${formatPrecio(totalIngresos)}
+              </span>
+            </div>
+          )}
+          {totalRetiros > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="sunmi-pos-muted">- Retiros caja</span>
+              <span className="sunmi-pos-text-danger">
+                -${formatPrecio(totalRetiros)}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between text-sm font-bold border-t pt-1" style={{ borderColor: 'var(--pos-panel-border)' }}>
             <span>Efectivo esperado</span>
             <span className="sunmi-pos-text-accent">${formatPrecio(esperado)}</span>

@@ -38,6 +38,13 @@ export async function POST(req) {
       );
     }
 
+    if (!motivo || !motivo.trim()) {
+      return NextResponse.json(
+        { ok: false, error: "motivo es obligatorio" },
+        { status: 400 }
+      );
+    }
+
     const montoNum = Number(monto);
     if (!montoNum || montoNum <= 0) {
       return NextResponse.json(

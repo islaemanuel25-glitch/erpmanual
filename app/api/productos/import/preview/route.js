@@ -264,11 +264,22 @@ export async function POST(req) {
         }
       }
 
+      // ── Leer modo_pedido / modo_compra_proveedor del Excel ──
+      const modoPedidoRaw = normStr(row.modo_pedido).toUpperCase();
+      const modoCompraRaw = normStr(row.modo_compra_proveedor).toUpperCase();
+
+      const MODOS_VALIDOS = ["BULTO", "UNIDAD"];
+
       // ── Calcular modo_pedido / modo_envio ──
       const esPack = unidadMedida === "pack" || unidadMedida === "cajon";
       const fp = factorPackRaw && factorPackRaw > 1 ? factorPackRaw : null;
-      const modoPedido = esPack && fp ? "BULTO" : "UNIDAD";
+      const modoPedido = MODOS_VALIDOS.includes(modoPedidoRaw)
+        ? modoPedidoRaw
+        : (esPack && fp ? "BULTO" : "UNIDAD");
       const modoEnvio = defaultModoEnvio(unidadMedida || "unidad");
+      const modoCompraProveedor = MODOS_VALIDOS.includes(modoCompraRaw)
+        ? modoCompraRaw
+        : "BULTO";
 
       items.push({
         fila,
@@ -285,6 +296,7 @@ export async function POST(req) {
         margen: margenRaw,
         modo_pedido: modoPedido,
         modo_envio: modoEnvio,
+        modo_compra_proveedor: modoCompraProveedor,
         categoria: catNombre,
         categoriaId,
         proveedor: provNombre,
