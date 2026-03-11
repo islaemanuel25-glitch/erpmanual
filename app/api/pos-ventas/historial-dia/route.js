@@ -63,9 +63,12 @@ export async function GET(req) {
       where.turnoId = { not: null };
     }
 
+    const limit = params.get("limit") ? Number(params.get("limit")) : undefined;
+
     const ventas = await prisma.venta.findMany({
       where,
       orderBy: { fecha: "desc" },
+      ...(limit && { take: limit }),
       select: {
         id: true,
         numero: true,

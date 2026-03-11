@@ -28,7 +28,7 @@ import ModalConfirmacion from "@/components/pos-ventas/ModalConfirmacion";
 import ModalPendientesOffline from "@/components/pos-ventas/ModalPendientesOffline";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
 import HistorialDia from "@/components/pos-ventas/HistorialDia";
-import { ClipboardList, Printer } from "lucide-react";
+import { ClipboardList, Printer, Undo2 } from "lucide-react";
 
 export default function PosVentasPage() {
   const router = useRouter();
@@ -66,6 +66,14 @@ export default function PosVentasPage() {
   const [mostrarPendientesOffline, setMostrarPendientesOffline] = useState(false);
   const [offlineQueueSnapshot, setOfflineQueueSnapshot] = useState([]);
   const prevOfflineModeRef = useRef(false);
+
+  // Historial rápido
+  const [historialRapido, setHistorialRapido] = useState([]);
+  const [mostrarHistorialRapido, setMostrarHistorialRapido] = useState(false);
+  const [busquedaMonto, setBusquedaMonto] = useState("");
+
+  // Undo carrito (CTRL+Z)
+  const [previousCarrito, setPreviousCarrito] = useState(null);
 
   // Desestructurar estado del reducer
   const {
@@ -116,6 +124,27 @@ export default function PosVentasPage() {
       })
       .catch(() => {});
   }, [localActual]);
+
+  // ---------------------------------------------------------------------------
+  // Cargar historial rapido (ultimos 20 tickets)
+  // ---------------------------------------------------------------------------
+  const cargarHistorialRapido = useCallback(async () => {
+    if (!localActual) return;
+    try {
+      const res = await fetch(
+        `/api/pos-ventas/historial-dia?limit=20`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (data.ok) setHistorialRapido(data.items || []);
+    } catch {
+      // silencioso
+    }
+  }, [localActual]);
+
+  useEffect(() => {
+    cargarHistorialRapido();
+  }, [cargarHistorialRapido]);
 
   // ---------------------------------------------------------------------------
   // Detector de conectividad
@@ -389,54 +418,6 @@ export default function PosVentasPage() {
   }, [state.clienteSeleccionado, localActual]);
 
   // ---------------------------------------------------------------------------
-  // Shortcuts de teclado
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    const handleShortcut = (e) => {
-      // No interceptar si esta escribiendo en un input
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      // No interceptar si hay modal abierto
-      if (modalEfectivo || modalTicket || modalDescuento || mostrarPickerCliente || mostrarHistorial) return;
-
-      switch (e.key) {
-        case "F1":
-          e.preventDefault();
-          document.getElementById("buscar-producto")?.focus();
-          break;
-        case "F2":
-          e.preventDefault();
-          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
-          break;
-        case "F3":
-          e.preventDefault();
-          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "mercadopago" });
-          break;
-        case "F4":
-          e.preventDefault();
-          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "debito" });
-          break;
-        case "F5":
-          e.preventDefault();
-          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "credito" });
-          break;
-        case "F6":
-          e.preventDefault();
-          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "fiado" });
-          break;
-        case "F10":
-          e.preventDefault();
-          if (state.carrito.length > 0 && !state.cobrando) {
-            iniciarCobro();
-          }
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleShortcut);
-    return () => window.removeEventListener("keydown", handleShortcut);
-  }, [state.carrito, state.cobrando, state.formaPago, state.modalEfectivo, state.modalTicket, state.modalDescuento, mostrarPickerCliente, mostrarHistorial]);
-
-  // ---------------------------------------------------------------------------
   // Agregar producto al carrito
   // ---------------------------------------------------------------------------
   const handleAgregar = useCallback((producto) => {
@@ -446,22 +427,33 @@ export default function PosVentasPage() {
       setProductoKgPendiente(producto);
       return;
     }
+    setPreviousCarrito([...state.carrito]);
     dispatch({ type: ActionTypes.ADD_ITEM, payload: { producto } });
-  }, []);
+
+    // Alerta de stock bajo
+    const enCarrito = state.carrito.find((i) => i.productoBaseId === producto.productoBaseId);
+    const cantidadResultante = enCarrito ? enCarrito.cantidad + 1 : 1;
+    const stockDisponible = producto.stock ?? Infinity;
+    if (stockDisponible !== Infinity && cantidadResultante >= stockDisponible) {
+      showError(`Stock bajo: "${producto.nombre}" tiene ${stockDisponible} en stock`);
+    }
+  }, [state.carrito]);
 
   // ---------------------------------------------------------------------------
   // Editar cantidad
   // ---------------------------------------------------------------------------
   const handleCantidadChange = useCallback((idx, nuevaCantidad) => {
+    setPreviousCarrito([...state.carrito]);
     dispatch({ type: ActionTypes.UPDATE_CANTIDAD, payload: { idx, nuevaCantidad } });
-  }, []);
+  }, [state.carrito]);
 
   // ---------------------------------------------------------------------------
   // Eliminar item
   // ---------------------------------------------------------------------------
   const handleEliminar = useCallback((idx) => {
+    setPreviousCarrito([...state.carrito]);
     dispatch({ type: ActionTypes.REMOVE_ITEM, payload: { idx } });
-  }, []);
+  }, [state.carrito]);
 
   // ---------------------------------------------------------------------------
   // Limpiar carrito
@@ -493,7 +485,20 @@ export default function PosVentasPage() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Atajo F9: reimprimir ultimo ticket
+  // Deshacer ultima accion del carrito
+  // ---------------------------------------------------------------------------
+  const handleUndo = useCallback(() => {
+    if (!previousCarrito) {
+      showError("No hay accion para deshacer");
+      return;
+    }
+    dispatch({ type: ActionTypes.RESTORE_CART, payload: { carrito: previousCarrito } });
+    setPreviousCarrito(null);
+    showSuccess("Accion deshecha");
+  }, [previousCarrito]);
+
+  // ---------------------------------------------------------------------------
+  // Atajos: F9 reimprimir / CTRL+Z deshacer
   // ---------------------------------------------------------------------------
   useEffect(() => {
     function handleKeyDown(e) {
@@ -501,10 +506,16 @@ export default function PosVentasPage() {
         e.preventDefault();
         reimprimirUltimoTicket();
       }
+      if (e.key === "z" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        // No interceptar si esta escribiendo en un input
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+        e.preventDefault();
+        handleUndo();
+      }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [reimprimirUltimoTicket]);
+  }, [reimprimirUltimoTicket, handleUndo]);
 
   // ---------------------------------------------------------------------------
   // Subtotal y totales
@@ -885,6 +896,75 @@ export default function PosVentasPage() {
   };
 
   // ---------------------------------------------------------------------------
+  // Shortcuts de teclado
+  // ---------------------------------------------------------------------------
+  const CICLO_FORMAS_PAGO = ["efectivo", "debito", "credito", "mercadopago", "fiado"];
+
+  useEffect(() => {
+    const handleShortcut = (e) => {
+      // ENTER: cobrar (funciona incluso desde inputs)
+      if (e.key === "Enter") {
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+        if (modalEfectivo || modalTicket || modalDescuento || mostrarPickerCliente || mostrarHistorial) return;
+        if (state.carrito.length > 0 && !state.cobrando) {
+          e.preventDefault();
+          iniciarCobro();
+        }
+        return;
+      }
+
+      // No interceptar si esta escribiendo en un input (excepto ENTER arriba)
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      // No interceptar si hay modal abierto
+      if (modalEfectivo || modalTicket || modalDescuento || mostrarPickerCliente || mostrarHistorial) return;
+
+      switch (e.key) {
+        case "F1":
+          e.preventDefault();
+          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
+          break;
+        case "F2":
+          e.preventDefault();
+          document.getElementById("pos-buscador-producto")?.focus()
+            || document.getElementById("buscar-producto")?.focus();
+          break;
+        case "F3":
+          e.preventDefault();
+          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "mercadopago" });
+          break;
+        case "F4":
+          e.preventDefault();
+          handleAbrirPickerCliente();
+          break;
+        case "F5":
+          e.preventDefault();
+          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "credito" });
+          break;
+        case "F6": {
+          e.preventDefault();
+          const idxActual = CICLO_FORMAS_PAGO.indexOf(state.formaPago);
+          const siguiente = CICLO_FORMAS_PAGO[(idxActual + 1) % CICLO_FORMAS_PAGO.length];
+          dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: siguiente });
+          break;
+        }
+        case "F8":
+          e.preventDefault();
+          handleLimpiar();
+          break;
+        case "F10":
+          e.preventDefault();
+          if (state.carrito.length > 0 && !state.cobrando) {
+            iniciarCobro();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [state.carrito, state.cobrando, state.formaPago, state.modalEfectivo, state.modalTicket, state.modalDescuento, mostrarPickerCliente, mostrarHistorial, handleLimpiar, handleAbrirPickerCliente]);
+
+  // ---------------------------------------------------------------------------
   // Cobrar desde FormaPago (redirige a iniciarCobro)
   // ---------------------------------------------------------------------------
   const handleCobrar = async ({ formaPago: fp, total: tot }) => {
@@ -1108,6 +1188,7 @@ export default function PosVentasPage() {
     const msg = `Venta #${numero} registrada correctamente.`;
     setSuccessMsg(msg);
     showSuccess(msg);
+    cargarHistorialRapido();
   };
 
   const handleCerrarTicket = () => {
@@ -1116,6 +1197,7 @@ export default function PosVentasPage() {
     const msg = `Venta #${numero} registrada correctamente.`;
     setSuccessMsg(msg);
     showSuccess(msg);
+    cargarHistorialRapido();
   };
 
   // ---------------------------------------------------------------------------
@@ -1193,6 +1275,19 @@ export default function PosVentasPage() {
             >
               <Printer size={14} />
               <span className="hidden sm:inline">Reimprimir</span>
+            </button>
+            <button
+              onClick={() => {
+                setMostrarHistorialRapido((v) => !v);
+                if (!mostrarHistorialRapido) cargarHistorialRapido();
+              }}
+              className={`text-[11px] sunmi-pos-btn-secondary px-2 py-1 rounded transition-colors flex items-center gap-1 ${
+                mostrarHistorialRapido ? "sunmi-pos-text-accent font-medium" : ""
+              }`}
+              title="Ultimos 20 tickets"
+            >
+              <ClipboardList size={14} />
+              <span className="hidden sm:inline">Rapido</span>
             </button>
             <button
               onClick={() => setMostrarHistorial(true)}
@@ -1319,6 +1414,76 @@ export default function PosVentasPage() {
             <div className="flex justify-between font-bold sunmi-pos-text-accent border-t pt-1" style={{ borderColor: 'var(--pos-panel-border)' }}>
               <span>Total</span>
               <span className="font-mono">${Number(ultimoBreakdown.total).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Panel historial rapido */}
+        {mostrarHistorialRapido && (
+          <div className="rounded-md sunmi-pos-panel px-3 py-2 text-xs space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="font-bold sunmi-pos-text-accent">Ultimos tickets</span>
+              <button
+                onClick={() => { setMostrarHistorialRapido(false); setBusquedaMonto(""); }}
+                className="sunmi-pos-muted text-[10px]"
+              >
+                Cerrar
+              </button>
+            </div>
+            <input
+              type="number"
+              placeholder="Buscar por monto..."
+              value={busquedaMonto}
+              onChange={(e) => setBusquedaMonto(e.target.value)}
+              className="w-full px-2 py-1 rounded text-xs sunmi-pos-panel border"
+              style={{ borderColor: 'var(--pos-panel-border)' }}
+            />
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {(() => {
+                const montoFiltro = busquedaMonto ? Number(busquedaMonto) : null;
+                const filtrados = montoFiltro
+                  ? historialRapido.filter((v) => Math.abs(Number(v.total) - montoFiltro) < 50)
+                  : historialRapido;
+                if (filtrados.length === 0) {
+                  return <div className="text-center sunmi-pos-muted py-2">No hay resultados</div>;
+                }
+                return filtrados.map((v) => (
+                  <div key={v.id} className="flex items-center justify-between gap-2 sunmi-surface-soft px-2 py-1 rounded">
+                    <span className="sunmi-pos-muted">
+                      {new Date(v.fecha).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span className="font-medium sunmi-pos-text-accent">
+                      ${Number(v.total).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="sunmi-pos-muted">#{v.numero}</span>
+                    <button
+                      onClick={async () => {
+                        const { default: imprimirTicketTermico } = await import(
+                          "@/lib/pos-ventas/imprimirTicketTermico"
+                        );
+                        imprimirTicketTermico({
+                          numero: v.numero,
+                          fecha: v.fecha,
+                          items: (v.detalles || []).map((d) => ({
+                            nombre: d.nombre,
+                            precio: Number(d.precio),
+                            cantidad: d.cantidad,
+                          })),
+                          subtotal: Number(v.subtotal),
+                          descuento: Number(v.descuento),
+                          total: Number(v.total),
+                          formaPago: v.formaPago,
+                          vendedor: v.vendedor?.nombre || "-",
+                          localNombre,
+                        });
+                      }}
+                      className="text-[10px] sunmi-pos-btn-secondary px-2 py-0.5 rounded"
+                    >
+                      Reimprimir
+                    </button>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         )}
@@ -1492,10 +1657,18 @@ export default function PosVentasPage() {
         <ModalPesoKg
           producto={productoKgPendiente}
           onConfirmar={(cantidadKg) => {
+            setPreviousCarrito([...state.carrito]);
             dispatch({
               type: ActionTypes.ADD_ITEM,
               payload: { producto: productoKgPendiente, cantidadInicial: cantidadKg },
             });
+            // Alerta de stock bajo (kg)
+            const enCarrito = state.carrito.find((i) => i.productoBaseId === productoKgPendiente.productoBaseId);
+            const cantResultante = (enCarrito ? enCarrito.cantidad : 0) + cantidadKg;
+            const stockKg = productoKgPendiente.stock ?? Infinity;
+            if (stockKg !== Infinity && cantResultante >= stockKg) {
+              showError(`Stock bajo: "${productoKgPendiente.nombre}" tiene ${stockKg} kg en stock`);
+            }
             setProductoKgPendiente(null);
           }}
           onCancelar={() => setProductoKgPendiente(null)}

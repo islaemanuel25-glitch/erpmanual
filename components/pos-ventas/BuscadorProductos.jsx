@@ -139,6 +139,12 @@ function BuscadorProductos({ localId, onAgregar }) {
     if (e.key === "Enter") {
       e.preventDefault();
 
+      // Cancelar debounce pendiente para evitar doble agregado
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+
       // Scanner: caracteres rapidos + Enter
       if (diff < 200 && scanBuffer.current.length > 3) {
         setQuery(scanBuffer.current);
