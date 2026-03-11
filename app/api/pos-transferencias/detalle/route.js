@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { esProductoFiambre } from "@/lib/conversiones/stock";
 
 export async function GET(req) {
   try {
@@ -154,6 +155,10 @@ export async function GET(req) {
 
         categoriaNombre: base?.categoria?.nombre?.trim() || null,
         areaFisicaNombre: base?.area_fisica?.nombre?.trim() || null,
+
+        esFiambre: esProductoFiambre(base),
+        modoVentaDeposito: base?.modoVentaDeposito || "PESO",
+        pesoReferenciaKg: esProductoFiambre(base) ? Number(base?.pesoReferenciaKg || 0) : null,
       };
     });
 

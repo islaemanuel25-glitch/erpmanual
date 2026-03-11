@@ -1,0 +1,75 @@
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { requirePerm } from "@/lib/authorize";
+
+export async function GET(req, { params }) {
+  try {
+    const perm = requirePerm(req, "pos.usar");
+    if (!perm.ok)
+      return NextResponse.json(
+        { ok: false, error: perm.error },
+        { status: perm.status }
+      );
+
+    const { id } = await params;
+    const ventaId = Number(id);
+    if (!ventaId || isNaN(ventaId)) {
+      return NextResponse.json(
+        { ok: false, error: "ID de venta invalido" },
+        { status: 400 }
+      );
+    }
+
+    const venta = await prisma.venta.findUnique({
+      where: { id: ventaId },
+      include: {
+        detalles: true,
+        cliente: true,
+        vendedor: { select: { id: true, nombre: true, email: true } },
+        local: { select: { id: true, nombre: true } },
+      },
+    });
+
+    if (!venta) {
+      return NextResponse.json(
+        { ok: false, error: "Venta no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      venta: {
+        id: venta.id,
+        numero: venta.numero,
+        fecha: venta.fecha,
+        subtotal: venta.subtotal,
+        descuento: venta.descuento,
+        total: venta.total,
+        formaPago: venta.formaPago,
+        cliente: venta.cliente
+          ? { id: venta.cliente.id, nombre: venta.cliente.nombre }
+          : null,
+        vendedor: venta.vendedor
+          ? { id: venta.vendedor.id, nombre: venta.vendedor.nombre || venta.vendedor.email }
+          : null,
+        local: venta.local
+          ? { id: venta.local.id, nombre: venta.local.nombre }
+          : null,
+        detalles: venta.detalles.map((d) => ({
+          id: d.id,
+          nombre: d.nombre,
+          precio: d.precio,
+          cantidad: d.cantidad,
+          subtotal: d.subtotal,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error("Error en GET /api/pos-ventas/venta/[id]:", err);
+    return NextResponse.json(
+      { ok: false, error: "Error interno" },
+      { status: 500 }
+    );
+  }
+}

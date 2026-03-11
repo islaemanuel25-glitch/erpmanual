@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esProductoFiambre, piezasToKg } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -18,10 +18,10 @@ export async function POST(req) {
     const tiposPermitidos = ["manual", "rotura"];
     const tipo = tiposPermitidos.includes(body.tipo) ? body.tipo : "sugerido";
 
-    // Leer unidades del body
+    // Leer unidades del body (BULTO | UNIDAD | PIEZA para fiambre)
     let unidadBody = body.sugeridoUnidad || body.unidad || body.unidadPreparada;
 
-    if (!unidadBody || (unidadBody !== "BULTO" && unidadBody !== "UNIDAD")) {
+    if (!unidadBody || (unidadBody !== "BULTO" && unidadBody !== "UNIDAD" && unidadBody !== "PIEZA")) {
       unidadBody = null; // Se calculará después de obtener el producto
     }
 
@@ -86,9 +86,12 @@ export async function POST(req) {
 
     // Inferir unidad si no vino en el body (respetar modo_envio)
     const factorPack = Number(productoOrigen.base.factor_pack || 1);
+    const baseOrigen = productoOrigen.base;
+    const esFiambre = esProductoFiambre(baseOrigen);
+    const pesoReferenciaKg = Number(baseOrigen.pesoReferenciaKg || 0);
 
-    if (!unidadBody || (unidadBody !== "BULTO" && unidadBody !== "UNIDAD")) {
-      const efectivo = productoOrigen.base.modo_envio || defaultModoEnvio(productoOrigen.base.unidad_medida || "unidad");
+    if (!unidadBody || (unidadBody !== "BULTO" && unidadBody !== "UNIDAD" && unidadBody !== "PIEZA")) {
+      const efectivo = baseOrigen.modo_envio || defaultModoEnvio(baseOrigen.unidad_medida || "unidad");
       unidadBody = efectivo === "SOLO_UNIDAD" ? "UNIDAD" : (factorPack > 1 ? "BULTO" : "UNIDAD");
     }
 
@@ -130,6 +133,17 @@ export async function POST(req) {
       sugerido = cantidadBody;
       unidadSugerida = unidadBody;
       unidadPreparada = unidadBody;
+    }
+
+    // Fiambre: si vino PIEZA, convertir SIEMPRE a kg antes de persistir (stock real en kg)
+    if (unidadBody === "PIEZA") {
+      if (!esFiambre || pesoReferenciaKg <= 0) {
+        return NextResponse.json({ ok: false, error: "Este producto no admite cantidad en piezas (solo fiambres con peso de referencia)" }, { status: 400 });
+      }
+      sugerido = piezasToKg(sugerido, pesoReferenciaKg);
+      preparado = piezasToKg(preparado, pesoReferenciaKg);
+      unidadSugerida = "UNIDAD";
+      unidadPreparada = "UNIDAD";
     }
 
     // Verificar que no exista
@@ -175,6 +189,9 @@ export async function POST(req) {
         unidadMedida: productoDestino.base.unidad_medida,
         factorPack: Number(productoDestino.base.factor_pack || 1),
         modoEnvio: productoOrigen.base.modo_envio || defaultModoEnvio(productoOrigen.base.unidad_medida || "unidad"),
+        esFiambre,
+        modoVentaDeposito: baseOrigen.modoVentaDeposito || "PESO",
+        pesoReferenciaKg: esFiambre ? pesoReferenciaKg : null,
       },
       error: null
     });

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { kgToPiezas } from "@/lib/conversiones/stock";
 
 const DEBUG_FILTROS_SUGERIDOS = false;
 
@@ -214,6 +215,9 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
   const bultoMode = p.modoEnvio !== "SOLO_UNIDAD" && factorPack > 1;
   const solosBultos = p.modoEnvio === "SOLO_BULTO";
   const sugeridoUnidad = p.sugeridoUnidad || (factorPack > 1 ? "BULTO" : "UNIDAD");
+  const esFiambre = !!p.esFiambre && Number(p.pesoReferenciaKg || 0) > 0;
+  const ventaDepositoPieza = p.modoVentaDeposito === "PIEZA";
+  const pesoRefKg = Number(p.pesoReferenciaKg || 0);
 
   const labelBulto =
     p.unidadMedida === "cajon" ? "caj." :
@@ -223,6 +227,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
     "bultos";
 
   const [rotura, setRotura] = useState(false);
+  const [inputEnPiezas, setInputEnPiezas] = useState(esFijo);
 
   // Estado local: bultos o uds según modo
   // Cuando sugeridoUnidad es BULTO, sugeridoCantidad ya está en bultos
@@ -233,7 +238,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
       : Math.floor(sugeridoCantidad / factorPack);
   });
   const [uds, setUds] = useState(
-    bultoMode ? 0 : sugeridoCantidad
+    bultoMode ? 0 : (esFiambre && sugeridoUnidad === "PIEZA" ? kgToPiezas(sugeridoCantidad, pesoRefKg) : sugeridoCantidad)
   );
 
   // Guard: no pisar state local mientras el usuario edita
@@ -254,9 +259,13 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
         if (rotura) setUds(sugeridoCantidad % factorPack);
       }
     } else {
-      setUds(sugeridoCantidad);
+      if (esFiambre && inputEnPiezas) {
+        setUds(sugeridoUnidad === "PIEZA" ? sugeridoCantidad : kgToPiezas(sugeridoCantidad, pesoRefKg));
+      } else {
+        setUds(sugeridoCantidad);
+      }
     }
-  }, [sugeridoCantidad, factorPack, bultoMode, isEditing, sugeridoUnidad, rotura]);
+  }, [sugeridoCantidad, factorPack, bultoMode, isEditing, sugeridoUnidad, rotura, esFiambre, inputEnPiezas, pesoRefKg]);
 
   // Cleanup timer on unmount
   useEffect(() => () => clearTimeout(timerRef.current), []);
@@ -300,6 +309,8 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
     setUds(nu);
     if (bultoMode && rotura) {
       emitirDebounced(bultos * factorPack + nu, "UNIDAD");
+    } else if (esFiambre && inputEnPiezas) {
+      emitirDebounced(nu, "PIEZA");
     } else {
       emitirDebounced(nu, "UNIDAD");
     }
@@ -365,7 +376,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
 
       {/* PRESENTACIÓN */}
       <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle">
-        {bultoMode ? `${p.unidadMedida} x ${factorPack}` : p.unidadMedida}
+        {bultoMode ? `${p.unidadMedida} x ${factorPack}` : (ventaDepositoPieza ? "pieza (dep.)" : esFiambre ? `${p.unidadMedida} (fiambre)` : p.unidadMedida)}
       </td>
 
       {/* SUGERIDO EDITABLE + ROTURA */}
@@ -420,13 +431,37 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
                   className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
-                <span className="text-[10px] sunmi-text-muted">uds</span>
+                <span className="text-[10px] sunmi-text-muted">{esFiambre && inputEnPiezas ? "pzs" : (esFiambre ? "kg" : "uds")}</span>
               </div>
             )}
           </div>
           <div className="min-h-[14px] text-right text-[10px] leading-tight flex items-center justify-end gap-2">
             {bultoMode && (
               <span className="sunmi-text-muted">= {total} uds</span>
+            )}
+            {esFiambre && !bultoMode && (
+              <span className="sunmi-text-muted">
+                {inputEnPiezas
+                  ? `= ${(sugeridoCantidad || 0).toFixed(2)} kg`
+                  : `= ${kgToPiezas(sugeridoCantidad, pesoRefKg)} pzs`}
+              </span>
+            )}
+            {esFiambre && ventaDepositoPieza && !bultoMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!inputEnPiezas) {
+                    setInputEnPiezas(true);
+                    onEditSugerido(p.productoLocalDestinoId, kgToPiezas(sugeridoCantidad, pesoRefKg), "PIEZA");
+                  } else {
+                    setInputEnPiezas(false);
+                    onEditSugerido(p.productoLocalDestinoId, (uds * pesoRefKg), "UNIDAD");
+                  }
+                }}
+                className={`px-2 py-0.5 rounded text-[10px] font-semibold transition ${inputEnPiezas ? "sunmi-btn sunmi-btn-primary" : "sunmi-control"}`}
+              >
+                {inputEnPiezas ? "Kg" : "Piezas"}
+              </button>
             )}
             {bultoMode && !solosBultos && (
               <label className="flex items-center gap-1 cursor-pointer">

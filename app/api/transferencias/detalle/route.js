@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { esFiambreFijo } from "@/lib/conversiones/stock";
 
 function toNumber(v) {
   const n = Number(v);
@@ -110,6 +111,10 @@ export async function GET(req) {
 
         motivoPrincipal: d.motivoPrincipal || "",
         motivoDetalle: d.motivoDetalle || "",
+        unidadEnviada: d.unidadEnviada || null,
+        unidadMedida: d.producto?.base?.unidad_medida || null,
+        esFiambreFijo: esFiambreFijo(d.producto?.base),
+        pesoReferenciaKg: esFiambreFijo(d.producto?.base) ? toNumber(d.producto?.base?.pesoReferenciaKg) : null,
       };
     });
 

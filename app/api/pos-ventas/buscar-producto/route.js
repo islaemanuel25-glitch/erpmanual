@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
 
 export async function GET(req) {
@@ -156,9 +156,13 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
   return lista
     .map((pl) => {
       const stock = Number(pl.stock?.[0]?.cantidad || 0);
-      const unidadMedida = pl.base?.unidad_medida || "unidad";
+      let unidadMedida = pl.base?.unidad_medida || "unidad";
       const factorPack = Number(pl.base?.factor_pack || 1);
       const modoEnvio = pl.base?.modo_envio || null;
+
+      // Detectar fiambre fijo en depósito → vende por pieza
+      const fiambreFijo = esDeposito && checkFiambreFijo(pl.base);
+      const pesoReferenciaKg = fiambreFijo ? Number(pl.base.pesoReferenciaKg) : 0;
 
       // precio_venta en DB: precio tal como está cargado (puede ser bulto o unitario según el producto)
       const precioDB = Number(pl.precio_venta || pl.base?.precio_venta || 0);
@@ -167,18 +171,27 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
       let precioVentaBulto = precioDB;
       let precioVentaUnitario = precioDB;
 
-      if (factorPack > 1 && unidadMedida !== "unidad" && precioDB > 0) {
+      if (fiambreFijo) {
+        // Fiambre fijo en depósito: precio por pieza = precioPerKg × pesoReferencia
+        const precioPorPieza = Number((precioDB * pesoReferenciaKg).toFixed(2));
+        precioVentaUnitario = precioPorPieza;
+        precioVentaBulto = precioPorPieza;
+        // Cambiar unidadMedida para que el frontend no abra modal kg
+        unidadMedida = "unidad";
+      } else if (factorPack > 1 && unidadMedida !== "unidad" && precioDB > 0) {
         // DB guarda precio del bulto → derivar unitario
         precioVentaUnitario = Number((precioDB / factorPack).toFixed(2));
         precioVentaBulto = Number(precioDB.toFixed(2));
       }
 
       // Misma regla que stock_locales/listar: redondeo a 100 hacia arriba (helper compartido)
-      if (pl.base?.redondeo_100 === true) {
+      if (pl.base?.redondeo_100 === true && !fiambreFijo) {
         precioVentaUnitario = redondear100(precioVentaUnitario);
       }
 
-      const modoSalidaDefault = calcularModoSalida(esDeposito, modoEnvio, unidadMedida);
+      const modoSalidaDefault = fiambreFijo
+        ? "UNIDAD"
+        : calcularModoSalida(esDeposito, modoEnvio, unidadMedida);
 
       // precioVenta = el precio que corresponde según el modo de salida default
       const precioVenta = modoSalidaDefault === "BULTO"
@@ -199,6 +212,9 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
         factorPack,
         modoEnvio,
         modoSalidaDefault,
+        // Fiambre fijo: frontend puede mostrar "pieza" como label
+        esFiambreFijo: fiambreFijo || false,
+        pesoReferenciaKg: fiambreFijo ? pesoReferenciaKg : undefined,
       };
     })
     .filter((p) => p.stock > 0 || allowNegativeStock);

@@ -116,6 +116,7 @@ export async function POST(req) {
       modoCompraProveedor: body.modoCompraProveedor || "BULTO",
       pesoReferenciaKg: num(body.pesoReferenciaKg),
       pesoEsFijo: Boolean(body.pesoEsFijo ?? false),
+      modoVentaDeposito: body.modoVentaDeposito || "PESO",
       pesoPromedioKg: num(body.pesoPromedioKg),
       actualizaPromedioPorRecepcion: body.actualizaPromedioPorRecepcion !== false,
     };
@@ -149,6 +150,7 @@ export async function POST(req) {
           e.message?.includes("modoCompraProveedor") ||
           e.message?.includes("pesoReferenciaKg") ||
           e.message?.includes("pesoEsFijo") ||
+          e.message?.includes("modoVentaDeposito") ||
           e.message?.includes("pesoPromedioKg") ||
           e.message?.includes("actualizaPromedioPorRecepcion")
         ) {
@@ -158,6 +160,7 @@ export async function POST(req) {
           delete fallback.modoCompraProveedor;
           delete fallback.pesoReferenciaKg;
           delete fallback.pesoEsFijo;
+          delete fallback.modoVentaDeposito;
           delete fallback.pesoPromedioKg;
           delete fallback.actualizaPromedioPorRecepcion;
           base = await tx.productoBase.create({ data: fallback });

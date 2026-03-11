@@ -201,6 +201,9 @@ async function editarBase(baseId, baseData) {
   if (baseData.pesoEsFijo !== undefined) {
     dataFinal.pesoEsFijo = baseData.pesoEsFijo;
   }
+  if (baseData.modoVentaDeposito !== undefined) {
+    dataFinal.modoVentaDeposito = baseData.modoVentaDeposito;
+  }
   if (baseData.pesoPromedioKg !== undefined) {
     dataFinal.pesoPromedioKg = baseData.pesoPromedioKg;
   }
@@ -239,6 +242,7 @@ async function editarBase(baseId, baseData) {
       e.message?.includes("modoCompraProveedor") ||
       e.message?.includes("pesoReferenciaKg") ||
       e.message?.includes("pesoEsFijo") ||
+      e.message?.includes("modoVentaDeposito") ||
       e.message?.includes("pesoPromedioKg") ||
       e.message?.includes("actualizaPromedioPorRecepcion")
     ) {
@@ -247,6 +251,7 @@ async function editarBase(baseId, baseData) {
       delete dataFinal.modoCompraProveedor;
       delete dataFinal.pesoReferenciaKg;
       delete dataFinal.pesoEsFijo;
+      delete dataFinal.modoVentaDeposito;
       delete dataFinal.pesoPromedioKg;
       delete dataFinal.actualizaPromedioPorRecepcion;
       updated = await prisma.productoBase.update({

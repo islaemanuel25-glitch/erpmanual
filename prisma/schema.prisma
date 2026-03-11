@@ -190,6 +190,7 @@ model ProductoBase {
   modoCompraProveedor             ModoPedido @default(BULTO)
   pesoReferenciaKg                Decimal?   @db.Decimal(10, 3)
   pesoEsFijo                      Boolean    @default(false)
+  modoVentaDeposito               ModoVentaDeposito @default(PESO)
   pesoPromedioKg                  Decimal?   @db.Decimal(10, 3)
   actualizaPromedioPorRecepcion   Boolean    @default(true)
   precio_costo      Decimal      @db.Decimal(12, 2)
@@ -393,6 +394,11 @@ enum ModoEnvio {
 enum ModoStock {
   BULTO
   UNIDAD
+}
+
+enum ModoVentaDeposito {
+  PIEZA
+  PESO
 }
 
 enum EstadoPedidoProveedor {

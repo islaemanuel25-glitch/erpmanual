@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 
 export async function GET(req) {
   try {
@@ -144,13 +144,18 @@ export async function GET(req) {
 
       if (faltanteUnidades <= 0) continue;
 
-      // Aplicar modo_pedido
+      // Aplicar modo_pedido; modoVentaDeposito PIEZA → sugerir en piezas cuando aplique
       const modoPedido = base.modo_pedido || "BULTO";
       const factorPack = Number(base.factor_pack || 1);
+      const modoVentaDep = base.modoVentaDeposito || "PESO";
+      const pesoRef = Number(base.pesoReferenciaKg || 0);
       let sugeridoCantidad;
       let sugeridoUnidad;
 
-      if (modoPedido === "BULTO" && factorPack > 1) {
+      if (modoVentaDep === "PIEZA" && pesoRef > 0 && esProductoFiambre(base)) {
+        sugeridoCantidad = Math.ceil(faltanteUnidades / pesoRef);
+        sugeridoUnidad = "UNIDAD";
+      } else if (modoPedido === "BULTO" && factorPack > 1) {
         // Por bulto: ceil(faltanteUnidades / factor)
         sugeridoCantidad = Math.ceil(faltanteUnidades / factorPack);
         sugeridoUnidad = "BULTO";
@@ -200,6 +205,11 @@ export async function GET(req) {
         precioCosto: Number(p.precio_costo || base.precio_costo || 0),
         unidadMedida: base.unidad_medida,
         modoPedido: base.modo_pedido || "BULTO",
+
+        // Fiambre: modoVentaDeposito define si depósito opera por PIEZA o PESO
+        esFiambre: esProductoFiambre(base),
+        modoVentaDeposito: base.modoVentaDeposito || "PESO",
+        pesoReferenciaKg: esProductoFiambre(base) ? Number(base.pesoReferenciaKg || 0) : null,
       });
     }
 

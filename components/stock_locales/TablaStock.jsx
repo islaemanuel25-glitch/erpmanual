@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fromUnidades } from "@/lib/conversiones/stock";
+import { fromUnidades, kgToPiezas } from "@/lib/conversiones/stock";
 
 const PAGE_SIZE = 25;
 
-function formatCantidad(valor, unidadMedida) {
+function formatCantidad(valor, unidadMedida, opts = {}) {
   const n = Number(valor || 0);
+  // Fiambre fijo en depósito: stock es piezas, no kg
+  if (opts.esFiambreFijo && opts.esDeposito) return `${Math.round(n)} pzs`;
   if (unidadMedida === "kg") return `${n.toFixed(3)} kg`;
   return `${Math.round(n)} uds`;
 }
@@ -117,7 +119,10 @@ export default function TablaStock({
 
     if (u === "cajon") return f > 1 ? `Cajón x${f}` : "Cajón";
     if (u === "pack") return f > 1 ? `Pack x${f}` : "Pack";
-    if (u === "kg") return "Kg";
+    if (u === "kg") {
+      if (p.modoCompraProveedor === "UNIDAD" && p.pesoReferenciaKg > 0 && (p.modoVentaDeposito === "PIEZA" || p.pesoEsFijo)) return "Pieza";
+      return "Kg";
+    }
     if (u === "lt") return "Litro";
 
     return u.charAt(0).toUpperCase() + u.slice(1);
@@ -189,6 +194,8 @@ export default function TablaStock({
 
             {items.map((p) => {
               const presentacionDep = getPresentacionDeposito(p);
+              const isFiambreFijo = p.unidadMedida === "kg" && p.modoCompraProveedor === "UNIDAD" && p.pesoReferenciaKg > 0 && (p.modoVentaDeposito === "PIEZA" || p.pesoEsFijo === true);
+              const fmtOpts = { esFiambreFijo: isFiambreFijo, esDeposito: localEsDeposito };
               return (
                 <tr key={p.id} className="hover:bg-[var(--table-row-hover)]">
                   <td className="px-2 py-1">{p.nombre}</td>
@@ -225,18 +232,35 @@ export default function TablaStock({
                       );
                     })()
                   ) : (
-                    <span>{formatCantidad(p.stock, p.unidadMedida)}</span>
+                    <span>
+                      {formatCantidad(p.stock, p.unidadMedida, fmtOpts)}
+                      {p.unidadMedida === "kg" && p.modoCompraProveedor === "UNIDAD" && p.pesoReferenciaKg > 0 && !isFiambreFijo && (
+                        <span className="block text-[10px] sunmi-text-muted">
+                          ≈ {kgToPiezas(Number(p.stock || 0), p.pesoReferenciaKg)} pzs
+                        </span>
+                      )}
+                      {isFiambreFijo && localEsDeposito && (
+                        <span className="block text-[10px] sunmi-text-muted">
+                          = {(Number(p.stock || 0) * p.pesoReferenciaKg).toFixed(3)} kg
+                        </span>
+                      )}
+                      {isFiambreFijo && !localEsDeposito && (
+                        <span className="block text-[10px] sunmi-text-muted">
+                          ≈ {kgToPiezas(Number(p.stock || 0), p.pesoReferenciaKg)} pzs
+                        </span>
+                      )}
+                    </span>
                   )}
                 </td>
                 <td className="px-2 py-1 text-right">
                   {esPackDeposito(p) && p.stockMin
                     ? fromUnidades({ unidades: Number(p.stockMin), factorPack: p.factorPack }).bultos
-                    : p.stockMin != null ? formatCantidad(p.stockMin, p.unidadMedida) : "-"}
+                    : p.stockMin != null ? formatCantidad(p.stockMin, p.unidadMedida, fmtOpts) : "-"}
                 </td>
                 <td className="px-2 py-1 text-right">
                   {esPackDeposito(p) && p.stockMax
                     ? fromUnidades({ unidades: Number(p.stockMax), factorPack: p.factorPack }).bultos
-                    : p.stockMax != null ? formatCantidad(p.stockMax, p.unidadMedida) : "-"}
+                    : p.stockMax != null ? formatCantidad(p.stockMax, p.unidadMedida, fmtOpts) : "-"}
                 </td>
 
                 <td className="px-2 py-1 text-right">

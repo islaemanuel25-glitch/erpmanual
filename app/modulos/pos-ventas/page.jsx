@@ -28,7 +28,7 @@ import ModalConfirmacion from "@/components/pos-ventas/ModalConfirmacion";
 import ModalPendientesOffline from "@/components/pos-ventas/ModalPendientesOffline";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
 import HistorialDia from "@/components/pos-ventas/HistorialDia";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Printer } from "lucide-react";
 
 export default function PosVentasPage() {
   const router = useRouter();
@@ -257,6 +257,46 @@ export default function PosVentasPage() {
   }, [router]);
 
   // ---------------------------------------------------------------------------
+  // Restaurar carrito persistido desde localStorage
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!localActual || !me) return;
+    try {
+      const raw = localStorage.getItem("posVentasCarritoEnCurso_v1");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed.localId === localActual && parsed.userId === me.id) {
+        dispatch({ type: ActionTypes.RESTORE_CART, payload: parsed });
+      }
+    } catch (e) {
+      // Si el dato está corrupto, ignorar
+    }
+  }, [localActual, me]);
+
+  // ---------------------------------------------------------------------------
+  // Persistir carrito en localStorage
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!localActual || !me) return;
+    const draft = {
+      localId: localActual,
+      userId: me.id,
+      carrito: state.carrito,
+      clienteSeleccionado: state.clienteSeleccionado,
+      descuento: state.descuento,
+      descuentoInfo: state.descuentoInfo,
+      formaPago: state.formaPago,
+      puntosCanje: state.puntosCanje,
+      descuentoPorPuntos: state.descuentoPorPuntos,
+    };
+    localStorage.setItem("posVentasCarritoEnCurso_v1", JSON.stringify(draft));
+  }, [
+    localActual, me,
+    state.carrito, state.clienteSeleccionado, state.descuento,
+    state.formaPago, state.puntosCanje, state.descuentoPorPuntos,
+  ]);
+
+  // ---------------------------------------------------------------------------
   // Verificar turno abierto
   // ---------------------------------------------------------------------------
   useEffect(() => {
@@ -428,6 +468,7 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   const handleLimpiar = useCallback(() => {
     dispatch({ type: ActionTypes.CLEAR_CART });
+    localStorage.removeItem("posVentasCarritoEnCurso_v1");
     setCreditoInfo(null);
     setUltimoBreakdown(null);
     setPuntosActivo(false);
@@ -435,6 +476,35 @@ export default function PosVentasPage() {
     setErrorMsg("");
     setSuccessMsg("");
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Reimprimir ultimo ticket
+  // ---------------------------------------------------------------------------
+  const reimprimirUltimoTicket = useCallback(async () => {
+    const raw = localStorage.getItem("posUltimoTicket_v1");
+    if (!raw) {
+      showError("No hay ticket reciente para reimprimir");
+      return;
+    }
+    const { default: imprimirTicketTermico } = await import(
+      "@/lib/pos-ventas/imprimirTicketTermico"
+    );
+    imprimirTicketTermico(JSON.parse(raw));
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Atajo F9: reimprimir ultimo ticket
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === "F9") {
+        e.preventDefault();
+        reimprimirUltimoTicket();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reimprimirUltimoTicket]);
 
   // ---------------------------------------------------------------------------
   // Subtotal y totales
@@ -576,10 +646,12 @@ export default function PosVentasPage() {
     };
 
     // Guardar ticket offline y mostrarlo
+    localStorage.setItem("posUltimoTicket_v1", JSON.stringify(ticketOffline));
     setUltimoTicketOffline(ticketOffline);
 
     // Limpiar carrito
     dispatch({ type: ActionTypes.CLEAR_CART });
+    localStorage.removeItem("posVentasCarritoEnCurso_v1");
     dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
     setDatosPagoEfectivo(null);
     dispatch({ type: ActionTypes.SET_SALDO_PUNTOS, payload: 0 });
@@ -955,6 +1027,7 @@ export default function PosVentasPage() {
         // Preparar datos del ticket
         const ventaTicket = {
           numero: data.numero,
+          fecha: new Date().toISOString(),
           items: state.carrito.map((item) => ({
             nombre: item.nombre,
             precio: item.precio,
@@ -973,6 +1046,9 @@ export default function PosVentasPage() {
           vuelto: pagoEfectivo?.vuelto || null,
         };
 
+        // Guardar último ticket para reimpresión
+        localStorage.setItem("posUltimoTicket_v1", JSON.stringify(ventaTicket));
+
         // Mostrar modal de ticket
         dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalTicket", data: ventaTicket } });
 
@@ -982,6 +1058,7 @@ export default function PosVentasPage() {
 
         // Limpiar carrito
         dispatch({ type: ActionTypes.CLEAR_CART });
+        localStorage.removeItem("posVentasCarritoEnCurso_v1");
         dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
         setDatosPagoEfectivo(null);
         dispatch({ type: ActionTypes.SET_SALDO_PUNTOS, payload: 0 });
@@ -1109,6 +1186,14 @@ export default function PosVentasPage() {
                 Pendientes: {queueLength}
               </div>
             )}
+            <button
+              onClick={reimprimirUltimoTicket}
+              className="text-[11px] sunmi-pos-btn-secondary px-2 py-1 rounded transition-colors flex items-center gap-1"
+              title="Reimprimir ultimo ticket"
+            >
+              <Printer size={14} />
+              <span className="hidden sm:inline">Reimprimir</span>
+            </button>
             <button
               onClick={() => setMostrarHistorial(true)}
               className="text-[11px] sunmi-pos-btn-secondary px-2 py-1 rounded transition-colors flex items-center gap-1"

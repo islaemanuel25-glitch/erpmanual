@@ -87,6 +87,7 @@ export default function FormProducto({
     modoCompraProveedor: o.modoCompraProveedor ?? o.modo_compra_proveedor ?? "BULTO",
     pesoReferenciaKg: toNum(o.pesoReferenciaKg ?? o.peso_referencia_kg ?? ""),
     pesoEsFijo: Boolean(o.pesoEsFijo ?? o.peso_es_fijo ?? false),
+    modoVentaDeposito: o.modoVentaDeposito ?? o.modo_venta_deposito ?? "PESO",
     actualizaPromedioPorRecepcion: o.actualizaPromedioPorRecepcion ?? o.actualiza_promedio_por_recepcion ?? true,
   });
 
@@ -237,6 +238,7 @@ export default function FormProducto({
       modoCompraProveedor: p.modoCompraProveedor || "BULTO",
       pesoReferenciaKg: p.pesoReferenciaKg === "" ? null : Number(p.pesoReferenciaKg),
       pesoEsFijo: Boolean(p.pesoEsFijo),
+      modoVentaDeposito: p.modoVentaDeposito || "PESO",
       actualizaPromedioPorRecepcion: p.actualizaPromedioPorRecepcion !== false,
     };
 
@@ -697,6 +699,21 @@ export default function FormProducto({
                       : "Variable: el peso varía entre piezas (ej: salame)."}
                   </p>
                 </div>
+
+                <Field label="Modo de venta en depósito" fieldKey="modoVentaDeposito">
+                  <SunmiSelectAdv
+                    value={form.modoVentaDeposito || "PESO"}
+                    onChange={(v) => setField("modoVentaDeposito", v)}
+                  >
+                    <SunmiSelectOption value="PESO">Por peso (kg)</SunmiSelectOption>
+                    <SunmiSelectOption value="PIEZA">Por pieza</SunmiSelectOption>
+                  </SunmiSelectAdv>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {form.modoVentaDeposito === "PIEZA"
+                      ? "El depósito maneja stock y vende por pieza. El local recibe en kg."
+                      : "El depósito maneja stock y vende por kg (se pesa al vender)."}
+                  </p>
+                </Field>
 
                 <div data-field="actualizaPromedioPorRecepcion" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
                   <label className="text-[12px] sunmi-label">Actualizar promedio en recepción</label>

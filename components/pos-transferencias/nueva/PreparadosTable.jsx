@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { kgToPiezas } from "@/lib/conversiones/stock";
 export default function PreparadosTable({
   datos = [],
   onDesmarcar,
@@ -150,6 +151,9 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
   const factorPack = Number(p.factorPack || 1);
   const puedeRotura = factorPack > 1;
   const muestraEnBulto = p.unidadPreparada === "BULTO" && factorPack > 1;
+  const esFiambre = !!p.esFiambre && Number(p.pesoReferenciaKg || 0) > 0;
+  const ventaDepositoPieza = p.modoVentaDeposito === "PIEZA";
+  const pesoRefKg = Number(p.pesoReferenciaKg || 0);
 
   const labelBulto =
     p.unidadMedida === "cajon" ? "caj." :
@@ -171,6 +175,9 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
   const [mixBultos, setMixBultos] = useState(0);
   const [mixUds, setMixUds] = useState(0);
 
+  // --- Fiambre: editar en piezas solo si modoVentaDeposito = PIEZA ---
+  const [inputEnPiezas, setInputEnPiezas] = useState(ventaDepositoPieza);
+
   // Sync desde props cuando no se edita
   useEffect(() => {
     if (isEditing) return;
@@ -178,15 +185,17 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
       const prepUds = muestraEnBulto ? preparadoVal * factorPack : preparadoVal;
       setMixBultos(Math.floor(prepUds / factorPack));
       setMixUds(prepUds % factorPack);
+    } else if (esFiambre && inputEnPiezas) {
+      setInputVal(kgToPiezas(preparadoVal, pesoRefKg));
     } else {
       setInputVal(preparadoVal);
     }
-  }, [preparadoVal, isEditing, roturaMode, muestraEnBulto, factorPack]);
+  }, [preparadoVal, isEditing, roturaMode, muestraEnBulto, factorPack, esFiambre, inputEnPiezas, pesoRefKg]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   // --- Emit helpers ---
-  const unidadEmitNormal = muestraEnBulto ? "BULTO" : "UNIDAD";
+  const unidadEmitNormal = esFiambre && inputEnPiezas ? "PIEZA" : (muestraEnBulto ? "BULTO" : "UNIDAD");
 
   const emitDebounced = useCallback((val, unidad) => {
     pendingRef.current = { val, unidad };
@@ -211,6 +220,18 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
     const v = Math.max(0, Number(val) || 0);
     setInputVal(v);
     emitDebounced(v, unidadEmitNormal);
+  };
+
+  // --- Fiambre: toggle piezas/kg ---
+  const togglePiezas = () => {
+    const next = !inputEnPiezas;
+    setInputEnPiezas(next);
+    if (next) {
+      setInputVal(kgToPiezas(preparadoVal, pesoRefKg));
+    } else {
+      setInputVal(preparadoVal);
+    }
+    if (!next) emitDebounced(preparadoVal, "UNIDAD");
   };
 
   // --- Handlers modo rotura ---
@@ -321,12 +342,27 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
 
       {/* STOCK DEPÓSITO */}
       <td className="px-2 py-2 text-center text-[11px] sunmi-text-muted">
-        {p.stockActual}
+        {esFijo ? (
+          <div>
+            <span>{Math.round(Number(p.stockActual || 0))} pzs</span>
+            <span className="block text-[10px]">= {(Number(p.stockActual || 0) * pesoRefKg).toFixed(3)} kg</span>
+          </div>
+        ) : esFiambre ? (
+          <div>
+            <span>{Number(p.stockActual || 0).toFixed(3)} kg</span>
+            <span className="block text-[10px]">≈ {kgToPiezas(Number(p.stockActual || 0), pesoRefKg)} pzs</span>
+          </div>
+        ) : p.stockActual}
       </td>
 
       {/* STOCK LOCAL */}
       <td className="px-2 py-2 text-center text-[11px] sunmi-text-muted">
-        {p.cantidadReal}
+        {esFiambre ? (
+          <div>
+            <span>{Number(p.cantidadReal || 0).toFixed(3)} kg</span>
+            <span className="block text-[10px]">≈ {kgToPiezas(Number(p.cantidadReal || 0), pesoRefKg)} pzs</span>
+          </div>
+        ) : p.cantidadReal}
       </td>
 
       {/* INPUT PREPARADO */}
@@ -390,7 +426,7 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
                   <SunmiInput
                     type="number"
                     min={0}
-                    step={1}
+                    step={esFiambre && inputEnPiezas ? 1 : (esFiambre ? 0.001 : 1)}
                     value={inputVal}
                     onFocus={() => setIsEditing(true)}
                     onBlur={flush}
@@ -399,14 +435,30 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
                     disabled={bloqueado}
                   />
                   {!bloqueado && (
-                    <button type="button" onClick={() => handleChange(inputVal + 1)} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
+                    <button type="button" onClick={() => handleChange(inputVal + (esFiambre && inputEnPiezas ? 1 : 1))} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
                   )}
                   <span className="text-[10px] sunmi-text-muted">
-                    {muestraEnBulto ? labelBulto : "uds"}
+                    {esFiambre && inputEnPiezas ? "pzs" : muestraEnBulto ? labelBulto : (esFiambre ? "kg" : "uds")}
                   </span>
                 </div>
                 {muestraEnBulto && (
                   <span className="text-[10px] sunmi-text-muted">= {totalUdsDisplay} uds</span>
+                )}
+                {esFiambre && !muestraEnBulto && (
+                  <span className="text-[10px] sunmi-text-muted">
+                    {inputEnPiezas
+                      ? `= ${Number(preparadoVal || 0).toFixed(2)} kg`
+                      : `= ${kgToPiezas(preparadoVal, pesoRefKg)} pzs`}
+                  </span>
+                )}
+                {esFiambre && ventaDepositoPieza && !bloqueado && (
+                  <button
+                    type="button"
+                    onClick={togglePiezas}
+                    className={`px-2 py-0.5 rounded text-[10px] font-semibold transition ${inputEnPiezas ? "sunmi-btn sunmi-btn-primary" : "sunmi-control"}`}
+                  >
+                    {inputEnPiezas ? "Kg" : "Piezas"}
+                  </button>
                 )}
               </>
             )}

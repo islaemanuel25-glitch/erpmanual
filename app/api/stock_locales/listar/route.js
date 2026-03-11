@@ -102,6 +102,10 @@ export async function GET(req) {
               precio_costo: true,
               precio_venta: true,
               redondeo_100: true,
+              modoCompraProveedor: true,
+              pesoReferenciaKg: true,
+              pesoEsFijo: true,
+              modoVentaDeposito: true,
             },
           },
           stock: {
@@ -160,6 +164,10 @@ export async function GET(req) {
           stockMin: Number(s.stockMin || 0),
           stockMax: Number(s.stockMax || 0),
           faltante: Number(s.cantidad || 0) < Number(s.stockMin || 0),
+          modoCompraProveedor: base.modoCompraProveedor,
+          pesoReferenciaKg: base.pesoReferenciaKg ? Number(base.pesoReferenciaKg) : null,
+          pesoEsFijo: base.pesoEsFijo === true,
+          modoVentaDeposito: base.modoVentaDeposito || "PESO",
         };
       });
     }
@@ -202,6 +210,10 @@ export async function GET(req) {
                 select: {
                   unidad_medida: true,
                   factor_pack: true,
+                  modoCompraProveedor: true,
+                  pesoReferenciaKg: true,
+                  pesoEsFijo: true,
+                  modoVentaDeposito: true,
                 },
               },
             },
@@ -226,7 +238,7 @@ export async function GET(req) {
             },
             include: {
               stock: true,
-              base: { select: { unidad_medida: true, factor_pack: true } },
+              base: { select: { unidad_medida: true, factor_pack: true, modoCompraProveedor: true, pesoReferenciaKg: true, modoVentaDeposito: true } },
             },
           });
 
@@ -267,6 +279,10 @@ export async function GET(req) {
           stockMin: Number(stock.stockMin || 0),
           stockMax: Number(stock.stockMax || 0),
           faltante: Number(stock.cantidad || 0) < Number(stock.stockMin || 0),
+          modoCompraProveedor: pl.base?.modoCompraProveedor ?? b.modoCompraProveedor,
+          pesoReferenciaKg: (pl.base?.pesoReferenciaKg ?? b.pesoReferenciaKg) ? Number(pl.base?.pesoReferenciaKg ?? b.pesoReferenciaKg) : null,
+          pesoEsFijo: (pl.base?.pesoEsFijo ?? b.pesoEsFijo) === true,
+          modoVentaDeposito: (pl.base?.modoVentaDeposito ?? b.modoVentaDeposito) || "PESO",
         });
       }
     }

@@ -45,6 +45,7 @@ export const ActionTypes = {
   OPEN_MODAL: "OPEN_MODAL",
   CLOSE_MODAL: "CLOSE_MODAL",
   SET_SALDO_PUNTOS: "SET_SALDO_PUNTOS",
+  RESTORE_CART: "RESTORE_CART",
 };
 
 // Reducer
@@ -200,6 +201,19 @@ export function posVentaReducer(state, action) {
       return {
         ...state,
         [modal]: resetValue,
+      };
+    }
+
+    case ActionTypes.RESTORE_CART: {
+      return {
+        ...state,
+        carrito: action.payload.carrito || [],
+        clienteSeleccionado: action.payload.clienteSeleccionado || null,
+        descuento: action.payload.descuento || 0,
+        descuentoInfo: action.payload.descuentoInfo || null,
+        formaPago: action.payload.formaPago || "efectivo",
+        puntosCanje: action.payload.puntosCanje || 0,
+        descuentoPorPuntos: action.payload.descuentoPorPuntos || 0,
       };
     }
 

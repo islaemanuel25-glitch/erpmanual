@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -176,6 +176,9 @@ export async function POST(req) {
       unidadSugerida: detalle.unidadSugerida,
       unidadPreparada: detalle.unidadPreparada,
       modoEnvio: productoLocal.base.modo_envio || efectivo,
+      esFiambre: esProductoFiambre(productoLocal.base),
+      modoVentaDeposito: productoLocal.base.modoVentaDeposito || "PESO",
+      pesoReferenciaKg: esProductoFiambre(productoLocal.base) ? Number(productoLocal.base.pesoReferenciaKg || 0) : null,
     };
 
     return NextResponse.json({

@@ -265,19 +265,26 @@ export async function POST(req) {
     const comisionBancaria = tieneComision ? total * (comisionPct / 100) : 0;
     const netoRecibido = total - comisionBancaria;
 
-    // Obtener precios de costo de cada producto
+    // Obtener precios de costo y datos para conversión piezas→kg (depósito PIEZA)
     const productoBaseIds = items.map((i) => i.productoBaseId);
     const productosBase = await prisma.productoBase.findMany({
       where: { id: { in: productoBaseIds } },
-      select: { id: true, precio_costo: true, factor_pack: true, categoria_id: true },
+      select: { id: true, precio_costo: true, factor_pack: true, categoria_id: true, modoVentaDeposito: true, pesoReferenciaKg: true },
     });
+    const localInfo = await prisma.local.findUnique({
+      where: { id: localId },
+      select: { es_deposito: true },
+    });
+    const esDeposito = localInfo?.es_deposito === true;
     const costosMap = {};
     const pbMap = {};
+    const baseStockMap = {};
     productosBase.forEach((p) => {
       const costoBulto = Number(p.precio_costo) || 0;
       const factorPack = Math.max(1, Number(p.factor_pack) || 1);
       costosMap[p.id] = { costoBulto, factorPack };
       pbMap[p.id] = { categoria_id: p.categoria_id };
+      baseStockMap[p.id] = { modoVentaDeposito: p.modoVentaDeposito || "PESO", pesoReferenciaKg: Number(p.pesoReferenciaKg || 0) };
     });
 
     // Calcular costo total y detalle con ganancia
@@ -345,6 +352,13 @@ export async function POST(req) {
           throw new Error(`Producto ${item.nombre || item.productoBaseId} no encontrado en este local`);
         }
 
+        // Depósito vendiendo por PIEZA: cantidad en carrito son piezas → convertir a kg para stock
+        const baseStock = baseStockMap[item.productoBaseId] || {};
+        const vendePorPieza = esDeposito && baseStock.modoVentaDeposito === "PIEZA" && baseStock.pesoReferenciaKg > 0;
+        const cantidadParaStock = vendePorPieza
+          ? Math.round(Number(item.cantidad) * baseStock.pesoReferenciaKg * 1000) / 1000
+          : Number(item.cantidad);
+
         // Lockear stock con FOR UPDATE
         const stockLocked = await tx.$queryRaw`
           SELECT cantidad 
@@ -358,10 +372,10 @@ export async function POST(req) {
           ? Number(stockLocked[0].cantidad || 0)
           : 0;
         
-        if (stockActual < item.cantidad) {
+        if (stockActual < cantidadParaStock) {
           if (!ALLOW_NEGATIVE_STOCK) {
             throw new Error(
-              `Stock insuficiente para ${item.nombre || "producto"}. Disponible: ${stockActual}, Solicitado: ${item.cantidad}`
+              `Stock insuficiente para ${item.nombre || "producto"}. Disponible: ${stockActual}, Solicitado: ${cantidadParaStock}`
             );
           }
           allowNegativeStockUsed = true;
@@ -370,23 +384,23 @@ export async function POST(req) {
             item.productoBaseId,
             productoLocal.id,
             localId,
-            item.cantidad,
+            cantidadParaStock,
             stockActual
           );
         }
 
-        // Descontar stock (permite negativo si ALLOW_NEGATIVE_STOCK=1)
+        // Descontar stock (permite negativo si ALLOW_NEGATIVE_STOCK=1). VentaDetalle sigue con item.cantidad (piezas o kg según corresponda).
         await tx.stockLocal.updateMany({
           where: {
             localId,
             productoId: productoLocal.id,
           },
           data: {
-            cantidad: { decrement: item.cantidad },
+            cantidad: { decrement: cantidadParaStock },
           },
         });
 
-        stockValidations.push({ productoLocalId: productoLocal.id, cantidad: item.cantidad });
+        stockValidations.push({ productoLocalId: productoLocal.id, cantidad: cantidadParaStock });
       }
 
       // Crear venta

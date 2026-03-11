@@ -34,7 +34,17 @@ export async function POST(req) {
         detalle: {
           include: {
             producto: {
-              include: { base: { select: { factor_pack: true } } },
+              include: {
+                base: {
+                  select: {
+                    factor_pack: true,
+                    unidad_medida: true,
+                    modoCompraProveedor: true,
+                    pesoReferenciaKg: true,
+                    pesoEsFijo: true,
+                  },
+                },
+              },
             },
           },
         },
@@ -88,10 +98,11 @@ export async function POST(req) {
 
       if (cant <= 0) continue;
 
-      // Convertir bulto→unidades antes de incrementar stock
-      const factorPack = Number(item.producto?.base?.factor_pack || 1);
+      const base = item.producto?.base;
+      const factorPack = Number(base?.factor_pack || 1);
       const unidad = item.unidadEnviada || "BULTO";
-      const unidades = toUnidades({ cantidad: cant, unidad, factorPack });
+      // Cantidad en detalle ya está en kg (PIEZA se convierte al guardar en agregar/editar)
+      const incrementoLocal = toUnidades({ cantidad: cant, unidad, factorPack });
 
       await prisma.stockLocal.upsert({
         where: {
@@ -102,13 +113,13 @@ export async function POST(req) {
         },
         update: {
           cantidad: {
-            increment: unidades,
+            increment: incrementoLocal,
           },
         },
         create: {
           localId: destinoId,
           productoId: item.productoId,
-          cantidad: unidades,
+          cantidad: incrementoLocal,
           stockMin: 0,
           stockMax: 0,
         },

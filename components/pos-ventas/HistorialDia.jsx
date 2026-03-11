@@ -297,6 +297,7 @@ export default function HistorialDia({
                   if (onReimprimir) {
                     onReimprimir({
                       numero: detalle.numero,
+                      fecha: detalle.fecha,
                       items: detalle.detalles.map((d) => ({
                         nombre: d.nombre,
                         precio: Number(d.precio),
@@ -306,6 +307,9 @@ export default function HistorialDia({
                       descuento: Number(detalle.descuento),
                       total: Number(detalle.total),
                       formaPago: detalle.formaPago,
+                      cliente: detalle.cliente?.nombre
+                        ? { nombre: detalle.cliente.nombre }
+                        : null,
                     });
                   }
                   setDetalle(null);

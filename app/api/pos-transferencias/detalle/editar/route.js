@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esProductoFiambre, piezasToKg } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -20,10 +20,10 @@ export async function POST(req) {
       body.sugerido !== undefined ? Number(body.sugerido) : undefined;
     const preparado =
       body.preparado !== undefined ? Number(body.preparado) : undefined;
-    const unidadSugerida = body.unidadSugerida && (body.unidadSugerida === "BULTO" || body.unidadSugerida === "UNIDAD")
+    const unidadSugerida = body.unidadSugerida && (body.unidadSugerida === "BULTO" || body.unidadSugerida === "UNIDAD" || body.unidadSugerida === "PIEZA")
       ? body.unidadSugerida
       : undefined;
-    const unidadPreparada = body.unidadPreparada && (body.unidadPreparada === "BULTO" || body.unidadPreparada === "UNIDAD")
+    const unidadPreparada = body.unidadPreparada && (body.unidadPreparada === "BULTO" || body.unidadPreparada === "UNIDAD" || body.unidadPreparada === "PIEZA")
       ? body.unidadPreparada
       : undefined;
 
@@ -97,10 +97,15 @@ export async function POST(req) {
       esDeposito = !!userLocal?.es_deposito;
     }
 
+    const baseProducto = detalle.producto?.base;
+    const esFiambre = esProductoFiambre(baseProducto);
+    const pesoReferenciaKg = Number(baseProducto?.pesoReferenciaKg || 0);
+
     const data = {};
 
     // Local → solo puede modificar sugerido/unidadSugerida
     // Depósito/Admin → solo puede modificar preparado/unidadPreparada
+    // Si entra PIEZA: convertir SIEMPRE a kg antes de persistir (stock real en kg)
     if (esDeposito) {
       if (preparado !== undefined) {
         if (isNaN(preparado) || preparado < 0) {
@@ -109,9 +114,20 @@ export async function POST(req) {
             { status: 400 }
           );
         }
-        data.preparado = preparado;
-      }
-      if (unidadPreparada !== undefined) {
+        if (unidadPreparada === "PIEZA") {
+          if (!esFiambre || pesoReferenciaKg <= 0) {
+            return NextResponse.json(
+              { ok: false, error: "Este producto no admite cantidad en piezas" },
+              { status: 400 }
+            );
+          }
+          data.preparado = piezasToKg(preparado, pesoReferenciaKg);
+          data.unidadPreparada = "UNIDAD";
+        } else {
+          data.preparado = preparado;
+          if (unidadPreparada !== undefined) data.unidadPreparada = unidadPreparada;
+        }
+      } else if (unidadPreparada !== undefined && unidadPreparada !== "PIEZA") {
         data.unidadPreparada = unidadPreparada;
       }
     } else {
@@ -122,9 +138,20 @@ export async function POST(req) {
             { status: 400 }
           );
         }
-        data.sugerido = sugerido;
-      }
-      if (unidadSugerida !== undefined) {
+        if (unidadSugerida === "PIEZA") {
+          if (!esFiambre || pesoReferenciaKg <= 0) {
+            return NextResponse.json(
+              { ok: false, error: "Este producto no admite cantidad en piezas" },
+              { status: 400 }
+            );
+          }
+          data.sugerido = piezasToKg(sugerido, pesoReferenciaKg);
+          data.unidadSugerida = "UNIDAD";
+        } else {
+          data.sugerido = sugerido;
+          if (unidadSugerida !== undefined) data.unidadSugerida = unidadSugerida;
+        }
+      } else if (unidadSugerida !== undefined && unidadSugerida !== "PIEZA") {
         data.unidadSugerida = unidadSugerida;
       }
     }
@@ -156,7 +183,7 @@ export async function POST(req) {
     });
 
     const productoLocal = updated.producto;
-    const base = productoLocal?.base;
+    const baseItem = productoLocal?.base;
     const stockActual = Number(stockOrigen?.cantidad || 0);
 
     const item = {
@@ -168,16 +195,19 @@ export async function POST(req) {
       preparado: Number(updated.preparado || 0),
       unidadSugerida: updated.unidadSugerida,
       unidadPreparada: updated.unidadPreparada,
-      productoNombre: productoLocal?.nombre || base?.nombre || "",
-      codigoBarra: base?.codigo_barra || "",
+      productoNombre: productoLocal?.nombre || baseItem?.nombre || "",
+      codigoBarra: baseItem?.codigo_barra || "",
       stockActual,
       cantidadReal: stockActual,
       precioCosto: Number(
-        productoLocal?.precio_costo || base?.precio_costo || 0
+        productoLocal?.precio_costo || baseItem?.precio_costo || 0
       ),
-      unidadMedida: base?.unidad_medida || "unidad",
-      factorPack: Number(base?.factor_pack || 1),
-      modoEnvio: base?.modo_envio || defaultModoEnvio(base?.unidad_medida || "unidad"),
+      unidadMedida: baseItem?.unidad_medida || "unidad",
+      factorPack: Number(baseItem?.factor_pack || 1),
+      modoEnvio: baseItem?.modo_envio || defaultModoEnvio(baseItem?.unidad_medida || "unidad"),
+      esFiambre,
+      modoVentaDeposito: baseItem?.modoVentaDeposito || "PESO",
+      pesoReferenciaKg: esFiambre ? pesoReferenciaKg : null,
     };
 
     return NextResponse.json({

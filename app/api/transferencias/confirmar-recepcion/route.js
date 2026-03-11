@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -81,13 +82,20 @@ export async function POST(req) {
         // ============================================================
         // 🟦 CONVERSIÓN: TransferenciaDetalle.cantidad está en la unidad
         // indicada por d.unidadEnviada (BULTO/UNIDAD).
-        // StockLocal SIEMPRE en UNIDADES.
+        // StockLocal SIEMPRE en UNIDADES (o kg para local de fiambre fijo).
         // ============================================================
         const factor = Number(d.producto.base.factor_pack || 1);
         const unidadEnviada = d.unidadEnviada || "BULTO"; // compat
+        const esFijo = esFiambreFijo(d.producto.base);
 
+        // Unidades para descontar del depósito (piezas para fiambre fijo, unidades normal)
         const recibidaUnidades =
           unidadEnviada === "BULTO" && factor > 1 ? recibida * factor : recibida;
+
+        // Unidades para sumar al local (KG para fiambre fijo, unidades normal)
+        const incrementoLocal = esFijo
+          ? piezasToKg(recibida, Number(d.producto.base.pesoReferenciaKg))
+          : recibidaUnidades;
 
         // ============================================================
         // 🟦 PRODUCTO DESTINO
@@ -127,7 +135,7 @@ export async function POST(req) {
         }
 
         // ============================================================
-        // 🟩 SUMAR UNIDADES AL DESTINO
+        // 🟩 SUMAR AL DESTINO (KG para fiambre fijo, unidades normal)
         // ============================================================
         await tx.stockLocal.upsert({
           where: {
@@ -136,11 +144,11 @@ export async function POST(req) {
               productoId: productoDestino.id,
             },
           },
-          update: { cantidad: { increment: recibidaUnidades } },
+          update: { cantidad: { increment: incrementoLocal } },
           create: {
             localId: transferencia.destinoId,
             productoId: productoDestino.id,
-            cantidad: recibidaUnidades,
+            cantidad: incrementoLocal,
           },
         });
 
