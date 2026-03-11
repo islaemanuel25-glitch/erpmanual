@@ -10,9 +10,8 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 export default function LoginPage() {
   const { refrescar } = useUser();
 
-  // ✅ DATOS REALES DEL SEED
-  const [email, setEmail] = useState("admin@admin.com");
-  const [password, setPassword] = useState("123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);

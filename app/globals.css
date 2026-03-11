@@ -687,3 +687,15 @@ input:-webkit-autofill:active {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--app-scrollbar-thumb-hover);
 }
+
+/* ==================================================
+   ⭐ FIX — OCULTAR SPINNERS EN INPUT NUMBER
+   ================================================== */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

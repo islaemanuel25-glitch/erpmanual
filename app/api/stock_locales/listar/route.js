@@ -81,7 +81,14 @@ export async function GET(req) {
         where: {
           localId,
           base: {
-            nombre: q ? { contains: q, mode: "insensitive" } : undefined,
+            ...(q
+              ? {
+                  OR: [
+                    { nombre: { contains: q, mode: "insensitive" } },
+                    { codigo_barra: { contains: q, mode: "insensitive" } },
+                  ],
+                }
+              : {}),
             categoria_id: categoria ? Number(categoria) : undefined,
             proveedor_id: proveedor ? Number(proveedor) : undefined,
             area_fisica_id: area ? Number(area) : undefined,
@@ -195,7 +202,14 @@ export async function GET(req) {
       const bases = await prisma.productoBase.findMany({
         where: {
           grupoId: { in: grupoIds },
-          nombre: q ? { contains: q, mode: "insensitive" } : undefined,
+          ...(q
+            ? {
+                OR: [
+                  { nombre: { contains: q, mode: "insensitive" } },
+                  { codigo_barra: { contains: q, mode: "insensitive" } },
+                ],
+              }
+            : {}),
           categoria_id: categoria ? Number(categoria) : undefined,
           proveedor_id: proveedor ? Number(proveedor) : undefined,
           area_fisica_id: area ? Number(area) : undefined,
@@ -290,6 +304,9 @@ export async function GET(req) {
     if (conStock) final = final.filter((p) => p.stock > 0);
     if (sinStock) final = final.filter((p) => p.stock === 0);
     if (faltantes) final = final.filter((p) => p.faltante);
+
+    // Orden alfabético por nombre
+    final.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"));
 
     const total = final.length;
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

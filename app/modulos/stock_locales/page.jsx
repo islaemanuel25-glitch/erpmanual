@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import FiltrosStock from "@/components/stock_locales/FiltrosStock";
 import TablaStock from "@/components/stock_locales/TablaStock";
 import ModalAjuste from "@/components/stock_locales/ModalAjuste";
-import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import ModalLimites from "@/components/stock_locales/ModalLimites";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -72,18 +71,6 @@ export default function StockLocalesPage() {
           {localActual.nombre || "Sin local"}
         </p>
       </div>
-
-      {/* Buscador igual que POS: código/nombre, debounce, Enter, barcode → abre Ajuste */}
-      <BuscadorProductos
-        localId={localSeleccionado}
-        apiPath="/api/stock_locales/buscar-producto"
-        onAgregar={(producto) => {
-          abrirAjuste({
-            ...producto,
-            id: producto.productoLocalId,
-          });
-        }}
-      />
 
       {/* FILTROS compactos */}
       <FiltrosStock

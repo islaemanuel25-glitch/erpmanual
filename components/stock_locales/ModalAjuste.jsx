@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
 
@@ -12,6 +11,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
   const [sueltas, setSueltas] = useState("");
   const [tipo, setTipo] = useState("sumar");
   const [motivo, setMotivo] = useState("");
+  const cantidadRef = useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -19,7 +19,30 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
       setSueltas("");
       setTipo("sumar");
       setMotivo("");
+      // Autofocus y seleccionar al abrir
+      setTimeout(() => {
+        cantidadRef.current?.focus();
+        cantidadRef.current?.select();
+      }, 50);
     }
+  }, [open]);
+
+  // Bloquear scroll del body cuando el cursor está en un input number
+  const handleWheel = (e) => {
+    e.target.focus();
+    e.stopPropagation();
+  };
+  const handleFocus = (e) => {
+    e.target.select();
+    document.body.style.overflow = "hidden";
+  };
+  const handleBlur = () => {
+    document.body.style.overflow = "";
+  };
+
+  // Limpiar overflow al cerrar
+  useEffect(() => {
+    if (!open) document.body.style.overflow = "";
   }, [open]);
 
   // Validación después de los hooks
@@ -87,12 +110,19 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
 
         <div className="mt-4">
 
-          <p className="text-slate-300 text-[13px]">
-            Producto: <strong className="text-slate-100">{producto.nombre}</strong>
+          <p className="text-[14px] font-medium sunmi-text-strong">
+            {producto.nombre}
+          </p>
+          <p className="text-[12px] sunmi-text-muted mt-0.5">
+            {local.nombre}
           </p>
 
-          <p className="text-slate-300 text-[13px] mt-1">
-            Local: <strong className="text-slate-100">{local.nombre}</strong>
+          <p className="text-[13px] mt-2 px-3 py-2 rounded sunmi-surface-soft">
+            Stock actual: <strong className="sunmi-text-strong">
+              {unidadMedida === "kg"
+                ? `${Number(producto.stock || 0).toFixed(3)} kg`
+                : `${Math.round(Number(producto.stock || 0))} unidades`}
+            </strong>
           </p>
 
           {/* Inputs */}
@@ -106,11 +136,16 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                       Bultos
                     </label>
                     <SunmiInput
+                      ref={cantidadRef}
                       type="number"
                       placeholder="0"
                       min={0}
                       value={bultos}
                       onChange={(e) => setBultos(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && guardar()}
+                      onWheel={handleWheel}
+                      onFocus={handleFocus}
+                      onBlur={handleBlur}
                     />
                   </div>
                   <div>
@@ -129,6 +164,10 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                           setSueltas(e.target.value);
                         }
                       }}
+                      onKeyDown={(e) => e.key === "Enter" && guardar()}
+                      onWheel={handleWheel}
+                      onFocus={handleFocus}
+                      onBlur={handleBlur}
                     />
                   </div>
                 </div>
@@ -144,6 +183,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                     {unidadMedida === "kg" ? "Cantidad (kg)" : "Cantidad (unidades)"}
                   </label>
                   <SunmiInput
+                    ref={cantidadRef}
                     type="number"
                     placeholder="0"
                     min={0}
@@ -159,19 +199,40 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                       }
                       setBultos("");
                     }}
+                    onKeyDown={(e) => e.key === "Enter" && guardar()}
+                    onWheel={handleWheel}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
                   />
                 </div>
               </>
             )}
 
             {/* Tipo */}
-            <SunmiSelectAdv
-              value={tipo}
-              onChange={(val) => setTipo(val)}
-            >
-              <option value="sumar">Sumar</option>
-              <option value="restar">Restar</option>
-            </SunmiSelectAdv>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+                <input
+                  type="radio"
+                  name="tipo-ajuste"
+                  value="sumar"
+                  checked={tipo === "sumar"}
+                  onChange={() => setTipo("sumar")}
+                  className="accent-cyan-500"
+                />
+                <span className="sunmi-text-strong">Sumar</span>
+              </label>
+              <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+                <input
+                  type="radio"
+                  name="tipo-ajuste"
+                  value="restar"
+                  checked={tipo === "restar"}
+                  onChange={() => setTipo("restar")}
+                  className="accent-cyan-500"
+                />
+                <span className="sunmi-text-strong">Restar</span>
+              </label>
+            </div>
 
             {/* Motivo */}
             <textarea

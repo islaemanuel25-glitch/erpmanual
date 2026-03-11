@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
@@ -8,6 +8,7 @@ import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
 export default function ModalLimites({ open, onClose, producto, local }) {
   const [minimo, setMinimo] = useState("");
   const [maximo, setMaximo] = useState("");
+  const minimoRef = useRef(null);
 
   const factorPack = Number(producto?.factorPack || producto?.factor_pack || 1);
   const unidadMedida = producto?.unidadMedida || producto?.unidad_medida || "unidad";
@@ -26,8 +27,31 @@ export default function ModalLimites({ open, onClose, producto, local }) {
         setMinimo(producto.stockMin || "");
         setMaximo(producto.stockMax || "");
       }
+      // Autofocus y seleccionar al abrir
+      setTimeout(() => {
+        minimoRef.current?.focus();
+        minimoRef.current?.select();
+      }, 50);
     }
   }, [open, producto]);
+
+  // Bloquear scroll del body cuando el cursor está en un input number
+  const handleWheel = (e) => {
+    e.target.focus();
+    e.stopPropagation();
+  };
+  const handleFocus = (e) => {
+    e.target.select();
+    document.body.style.overflow = "hidden";
+  };
+  const handleBlur = () => {
+    document.body.style.overflow = "";
+  };
+
+  // Limpiar overflow al cerrar
+  useEffect(() => {
+    if (!open) document.body.style.overflow = "";
+  }, [open]);
 
   if (!open || !producto) return null;
 
@@ -80,12 +104,11 @@ export default function ModalLimites({ open, onClose, producto, local }) {
         </div>
 
         <div className="mt-4">
-          <p className="text-slate-300 text-[13px]">
-            Producto: <strong className="text-slate-100">{producto.nombre}</strong>
+          <p className="text-[14px] font-medium sunmi-text-strong">
+            {producto.nombre}
           </p>
-
-          <p className="text-slate-300 text-[13px] mt-1">
-            Local: <strong className="text-slate-100">{local.nombre}</strong>
+          <p className="text-[12px] sunmi-text-muted mt-0.5">
+            {local.nombre}
           </p>
 
           {/* Inputs */}
@@ -97,6 +120,7 @@ export default function ModalLimites({ open, onClose, producto, local }) {
                 {usarBultos ? "Stock mínimo (bultos)" : "Stock mínimo"}
               </label>
               <SunmiInput
+                ref={minimoRef}
                 type="number"
                 placeholder={usarBultos ? "0 bultos" : "0"}
                 min={0}
@@ -110,6 +134,10 @@ export default function ModalLimites({ open, onClose, producto, local }) {
                     setMinimo(raw);
                   }
                 }}
+                onKeyDown={(e) => e.key === "Enter" && guardar()}
+                onWheel={handleWheel}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
               />
             </div>
 
@@ -132,6 +160,10 @@ export default function ModalLimites({ open, onClose, producto, local }) {
                     setMaximo(raw);
                   }
                 }}
+                onKeyDown={(e) => e.key === "Enter" && guardar()}
+                onWheel={handleWheel}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
               />
             </div>
           </div>
