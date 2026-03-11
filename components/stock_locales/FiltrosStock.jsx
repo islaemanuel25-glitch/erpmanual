@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
-import SunmiInput from "@/components/sunmi/SunmiInput";
 
 export default function FiltrosStock({
   localSeleccionado,
@@ -10,7 +9,6 @@ export default function FiltrosStock({
   onReset,
   compact = false,
 }) {
-  const [q, setQ] = useState("");
   const [categoria, setCategoria] = useState("");
   const [proveedor, setProveedor] = useState("");
   const [area, setArea] = useState("");
@@ -57,7 +55,6 @@ export default function FiltrosStock({
 
     debounceRef.current = setTimeout(() => {
       onFiltroChange({
-        q,
         categoria,
         proveedor,
         area,
@@ -68,10 +65,9 @@ export default function FiltrosStock({
     }, 200);
 
     return () => clearTimeout(debounceRef.current);
-  }, [q, categoria, proveedor, area, conStock, sinStock, faltantes, onFiltroChange]);
+  }, [categoria, proveedor, area, conStock, sinStock, faltantes, onFiltroChange]);
 
   const resetFiltros = () => {
-    setQ("");
     setCategoria("");
     setProveedor("");
     setArea("");
@@ -83,20 +79,12 @@ export default function FiltrosStock({
 
   const contenido = (
     <div className="flex flex-col gap-3">
-      {/* Buscador */}
       <div className="flex items-center gap-2">
-        <SunmiInput
-          type="text"
-          placeholder="Buscar por nombre o código…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-
         <button
           onClick={resetFiltros}
           className="sunmi-btn sunmi-btn-red h-[38px]"
         >
-          Limpiar
+          Limpiar filtros
         </button>
       </div>
 

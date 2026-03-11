@@ -3,7 +3,10 @@
 import { useRef, useState, useEffect, useCallback, memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-function BuscadorProductos({ localId, onAgregar }) {
+const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
+
+function BuscadorProductos({ localId, onAgregar, apiPath }) {
+  const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
   const [resultados, setResultados] = useState([]);
@@ -50,7 +53,7 @@ function BuscadorProductos({ localId, onAgregar }) {
       setLoading(true);
       try {
         const res = await fetch(
-          `/api/pos-ventas/buscar-producto?q=${encodeURIComponent(texto)}&localId=${localId}`,
+          `${searchApi}?q=${encodeURIComponent(texto)}&localId=${localId}`,
           { credentials: "include" }
         );
         const data = await res.json();
@@ -87,7 +90,7 @@ function BuscadorProductos({ localId, onAgregar }) {
         setLoading(false);
       }
     },
-    [localId, rankear, onAgregar]
+    [localId, rankear, onAgregar, searchApi]
   );
 
   // Busqueda por voz
