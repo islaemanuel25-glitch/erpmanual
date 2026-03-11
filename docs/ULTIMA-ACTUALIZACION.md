@@ -1,17 +1,33 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-03-10 12:55
+**Fecha:** 2026-03-11 19:19
 
 ## Módulos modificados recientemente
 
+### stock
+- stock, docker, pos2
+- Archivos: 1 nuevos, 6 modificados (7 total)
+
+### pos-ventas
+- docker, pos3, pos2
+- Archivos: 1 nuevos, 7 modificados (8 total)
+
+### pos-transferencias
+- pos2
+- Archivos: 8 modificados (8 total)
+
 ### productos
-- prod2, prod1
-- Archivos: 2 nuevos, 2 modificados (4 total)
+- pos2
+- Archivos: 4 modificados (4 total)
+
+### transferencias
+- pos2
+- Archivos: 2 modificados (2 total)
 
 
 ## Archivos nuevos desde última sincronización
-- components/productos/edicion-rapida/EdicionRapidaPage.jsx
-- app/modulos/productos/edicion-rapida/page.jsx
+- app/api/stock_locales/buscar-producto/route.js
+- app/api/pos-ventas/venta/[id]/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
