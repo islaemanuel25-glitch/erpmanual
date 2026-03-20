@@ -1,17 +1,15 @@
 /** @type {import('next').NextConfig} */
+const isProd = process.env.NODE_ENV === "production";
 const nextConfig = {
-  // ✅ Requerido para Next 16 + Supabase Auth (estabiliza cookies y sesión)
   experimental: {
     serverActions: {
-      allowedOrigins: ["*"],
+      allowedOrigins: isProd
+        ? ["https://operix.cloud"]
+        : ["http://localhost:3000", "http://127.0.0.1:3000"],
     },
   },
 
-  // ✅ Necesario para que Next maneje las cookies correctamente en producción y dev
-  output: "standalone", 
-
-  // ✅ Permite CORS y manejo estándar de las requests (opcional pero recomendado)
-  // basePath: "",
+  output: "standalone",
 };
 
 export default nextConfig;

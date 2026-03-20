@@ -31,6 +31,23 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "proveedorId y text requeridos" }, { status: 400 });
     }
 
+    const MAX_TEXT_LENGTH = 200 * 1024; // 200 KB
+    if (text.length > MAX_TEXT_LENGTH) {
+      return NextResponse.json(
+        { ok: false, error: "Texto demasiado largo. Máximo 200 KB." },
+        { status: 400 }
+      );
+    }
+
+    const lineas = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const MAX_LINEAS = 5000;
+    if (lineas.length > MAX_LINEAS) {
+      return NextResponse.json(
+        { ok: false, error: `Máximo ${MAX_LINEAS} líneas. Recibidas ${lineas.length}.` },
+        { status: 400 }
+      );
+    }
+
     // Resolver grupoId: session → body.localId → session.localId → contexto cookie
     let grupoId = Number(session.grupoId) || 0;
     if (!grupoId) {
@@ -66,14 +83,10 @@ export async function POST(req) {
     const byBarcode = new Map(productos.filter((p) => p.codigo_barra).map((p) => [String(p.codigo_barra), p]));
     const byName = new Map(productos.map((p) => [normalized(p.nombre), p]));
 
-    const parsedRows = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [codigo, nombre, costo, venta] = line.split(/[|;\t]/).map((x) => x?.trim() || "");
-        return { codigo, nombre, costo, venta };
-      });
+    const parsedRows = lineas.map((line) => {
+      const [codigo, nombre, costo, venta] = line.split(/[|;\t]/).map((x) => x?.trim() || "");
+      return { codigo, nombre, costo, venta };
+    });
 
     const matchedRows = [];
     const noEncontrados = [];

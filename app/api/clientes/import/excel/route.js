@@ -89,6 +89,14 @@ export async function POST(req) {
       );
     }
 
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { ok: false, error: "Archivo demasiado grande. Máximo 5 MB." },
+        { status: 400 }
+      );
+    }
+
     // Validar modo
     const modo = modoParam || "crear_actualizar";
     if (!["crear", "actualizar", "crear_actualizar"].includes(modo)) {
@@ -115,6 +123,14 @@ export async function POST(req) {
     if (filas.length === 0) {
       return NextResponse.json(
         { ok: false, error: "El archivo está vacío" },
+        { status: 400 }
+      );
+    }
+
+    const MAX_FILAS = 2000;
+    if (filas.length > MAX_FILAS) {
+      return NextResponse.json(
+        { ok: false, error: `Máximo ${MAX_FILAS} filas. El archivo tiene ${filas.length}.` },
         { status: 400 }
       );
     }

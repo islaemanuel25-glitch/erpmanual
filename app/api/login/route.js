@@ -2,17 +2,63 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import bcrypt from "bcrypt"; // ✅ bcrypt NATIVO (coincide con tu hash real)
+import bcrypt from "bcrypt";
 import { firmarToken, SesionCookie } from "@/lib/auth";
+
+// Rate limit en memoria por IP: máx 10 intentos por 15 min
+const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_RATE_MAX = 10;
+const loginAttempts = new Map();
+
+function getClientIp(req) {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return req.headers.get("x-real-ip") || "unknown";
+}
+
+function isLoginRateLimited(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry) return false;
+  if (now > entry.resetAt) {
+    loginAttempts.delete(ip);
+    return false;
+  }
+  return entry.count >= LOGIN_RATE_MAX;
+}
+
+function recordLoginAttempt(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + LOGIN_RATE_WINDOW_MS });
+    return;
+  }
+  entry.count += 1;
+}
 
 export async function POST(req) {
   try {
-    const { email, password } = await req.json();
+    const ip = getClientIp(req);
+    if (isLoginRateLimited(ip)) {
+      return NextResponse.json(
+        { ok: false, error: "Demasiados intentos. Intente más tarde." },
+        { status: 429 }
+      );
+    }
+    recordLoginAttempt(ip);
 
-    // ============================
-    // 1) Validación de inputs
-    // ============================
-    if (!email?.trim() || !password?.trim()) {
+    const body = await req.json();
+    if (body == null || typeof body !== "object") {
+      return NextResponse.json(
+        { ok: false, error: "Payload inválido." },
+        { status: 400 }
+      );
+    }
+    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const password = typeof body.password === "string" ? body.password : "";
+
+    if (!email || !password) {
       return NextResponse.json(
         { ok: false, error: "Completa email y contraseña." },
         { status: 400 }

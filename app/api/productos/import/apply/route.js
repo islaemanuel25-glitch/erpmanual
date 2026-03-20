@@ -59,6 +59,14 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "No se recibieron productos" }, { status: 400 });
     }
 
+    const MAX_PRODUCTOS = 2000;
+    if (productos.length > MAX_PRODUCTOS) {
+      return NextResponse.json(
+        { ok: false, error: `Máximo ${MAX_PRODUCTOS} productos por importación.` },
+        { status: 400 }
+      );
+    }
+
     // Filtrar SOLO filas con acción válida (crear o actualizar)
     const aCrear = productos.filter((p) => p.accion === "crear");
     const aActualizar = productos.filter((p) => p.accion === "actualizar");

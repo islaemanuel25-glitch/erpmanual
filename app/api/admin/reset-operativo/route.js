@@ -4,6 +4,9 @@ import { getUsuarioSession } from "@/lib/auth";
 import bcrypt from "bcrypt";
 
 export async function POST(req) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ ok: false, error: "No disponible" }, { status: 404 });
+  }
   try {
     const session = getUsuarioSession(req);
     if (!session) {

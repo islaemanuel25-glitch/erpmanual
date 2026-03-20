@@ -60,6 +60,14 @@ export async function POST(req) {
       );
     }
 
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { ok: false, error: "Archivo demasiado grande. Máximo 5 MB." },
+        { status: 400 }
+      );
+    }
+
     const bytes = await file.arrayBuffer();
     const wb = XLSX.read(bytes, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -74,6 +82,14 @@ export async function POST(req) {
     if (rawFilas.length === 0) {
       return NextResponse.json(
         { ok: false, error: "El archivo está vacío" },
+        { status: 400 }
+      );
+    }
+
+    const MAX_FILAS = 2000;
+    if (rawFilas.length > MAX_FILAS) {
+      return NextResponse.json(
+        { ok: false, error: `Máximo ${MAX_FILAS} filas. El archivo tiene ${rawFilas.length}.` },
         { status: 400 }
       );
     }

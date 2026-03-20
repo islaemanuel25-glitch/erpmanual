@@ -60,6 +60,14 @@ export async function POST(req) {
       );
     }
 
+    const MAX_ITEMS = 2000;
+    if (decisions.length > MAX_ITEMS || filasData.length > MAX_ITEMS) {
+      return NextResponse.json(
+        { ok: false, error: `Máximo ${MAX_ITEMS} ítems en decisions/filasData.` },
+        { status: 400 }
+      );
+    }
+
     // Index filasData by row
     const dataByRow = {};
     for (const fd of filasData) {
