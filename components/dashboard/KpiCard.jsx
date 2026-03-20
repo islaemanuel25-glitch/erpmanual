@@ -38,23 +38,33 @@ export default function KpiCard({
       )}
       <div className="min-w-0 flex-1">
         <p className="text-lg font-bold truncate leading-tight">{valor}</p>
-        <p className="text-[11px] uppercase tracking-wider font-medium opacity-60 truncate mt-0.5">
+        <p className="text-[11px] uppercase tracking-wider font-medium sunmi-text-muted truncate mt-0.5">
           {titulo}
         </p>
       </div>
       {variacion != null && (
         <span
-          className={`
-            text-[10px] font-semibold px-1.5 py-0.5 rounded leading-none shrink-0
-            ${variacion >= 0 ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400" : "bg-red-500/20 text-red-600 dark:text-red-400"}
-          `}
+          className="text-[10px] font-semibold px-1.5 py-0.5 rounded leading-none shrink-0"
+          style={
+            variacion >= 0
+              ? {
+                  background: "color-mix(in srgb, var(--pos-success) 15%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--pos-success) 30%, transparent)",
+                  color: "var(--pos-success)",
+                }
+              : {
+                  background: "color-mix(in srgb, var(--pos-danger) 10%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--pos-danger) 30%, transparent)",
+                  color: "var(--pos-danger)",
+                }
+          }
         >
           {variacion >= 0 ? "+" : ""}
           {variacion}%
         </span>
       )}
       {variacion == null && (
-        <span className="text-[10px] font-semibold opacity-40 shrink-0">0%</span>
+        <span className="text-[10px] font-semibold sunmi-text-muted shrink-0">0%</span>
       )}
     </div>
   );

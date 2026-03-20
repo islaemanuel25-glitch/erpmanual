@@ -12,85 +12,66 @@ import {
 } from "lucide-react";
 
 const ACCESOS = [
-  {
-    label: "POS",
-    href: "/modulos/pos-ventas",
-    icon: ShoppingCart,
-    color: "blue",
-  },
-  {
-    label: "Stock",
-    href: "/modulos/stock_locales",
-    icon: Layers,
-    color: "orange",
-  },
-  {
-    label: "Clientes",
-    href: "/modulos/clientes",
-    icon: Users,
-    color: "green",
-  },
-  {
-    label: "Reportes",
-    href: "/modulos/reportes-ventas",
-    icon: BarChart3,
-    color: "purple",
-  },
-  {
-    label: "Productos",
-    href: "/modulos/productos",
-    icon: Package,
-    color: "sky",
-  },
-  {
-    label: "Config",
-    href: "/modulos/configuracion",
-    icon: Settings,
-    color: "red",
-  },
+  { label: "POS", href: "/modulos/pos-ventas", icon: ShoppingCart, color: "blue" },
+  { label: "Stock", href: "/modulos/stock_locales", icon: Layers, color: "orange" },
+  { label: "Clientes", href: "/modulos/clientes", icon: Users, color: "green" },
+  { label: "Reportes", href: "/modulos/reportes-ventas", icon: BarChart3, color: "purple" },
+  { label: "Productos", href: "/modulos/productos", icon: Package, color: "sky" },
+  { label: "Config", href: "/modulos/configuracion", icon: Settings, color: "red" },
 ];
 
-const TILE_COLORS = {
-  blue: "bg-blue-500/15 text-blue-600 dark:bg-blue-500/25 dark:text-blue-400",
-  orange:
-    "bg-amber-500/15 text-amber-600 dark:bg-amber-500/25 dark:text-amber-400",
-  green:
-    "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/25 dark:text-emerald-400",
-  purple:
-    "bg-violet-500/15 text-violet-600 dark:bg-violet-500/25 dark:text-violet-400",
-  sky: "bg-sky-400/15 text-sky-600 dark:bg-sky-400/25 dark:text-sky-400",
-  red: "bg-red-500/15 text-red-600 dark:bg-red-500/25 dark:text-red-400",
+const TILE_BG = {
+  blue: "bg-blue-500/[0.14] dark:bg-blue-400/[0.12]",
+  orange: "bg-amber-500/[0.14] dark:bg-amber-400/[0.12]",
+  green: "bg-emerald-500/[0.14] dark:bg-emerald-400/[0.12]",
+  purple: "bg-violet-500/[0.14] dark:bg-violet-400/[0.12]",
+  sky: "bg-sky-400/[0.14] dark:bg-sky-400/[0.12]",
+  red: "bg-red-500/[0.14] dark:bg-red-400/[0.12]",
+};
+
+const TILE_ICON = {
+  blue: "text-blue-600 dark:text-blue-400",
+  orange: "text-amber-600 dark:text-amber-400",
+  green: "text-emerald-600 dark:text-emerald-400",
+  purple: "text-violet-600 dark:text-violet-400",
+  sky: "text-sky-600 dark:text-sky-400",
+  red: "text-red-600 dark:text-red-400",
 };
 
 export default function AccesosRapidos({ variant = "mobile" }) {
   const { theme } = useSunmiTheme();
   const isDesktop = variant === "desktop";
 
+  const linkBase = `
+    rounded-xl
+    flex flex-col items-center justify-center
+    transition-all duration-200
+    hover:bg-current/[0.04] active:bg-current/[0.06]
+    border border-current/[0.04]
+    hover:border-current/[0.08]
+  `;
+
+  const cardStyle = `${theme.card} shadow-sm`;
+
   if (isDesktop) {
     return (
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2.5 w-full">
         {ACCESOS.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className={`
-              ${theme.card}
-              rounded-xl p-4
-              flex flex-col items-center justify-center gap-2.5
-              min-h-[96px]
-              transition hover:opacity-90 active:scale-[0.98]
-              border border-current/10
-            `}
+            className={`${cardStyle} ${linkBase} p-3.5 min-h-[84px] gap-2`}
           >
             <div
               className={`
-                w-12 h-12 rounded-xl flex items-center justify-center shrink-0
-                ${TILE_COLORS[item.color] || TILE_COLORS.blue}
+                w-11 h-11 rounded-full flex items-center justify-center shrink-0
+                ${TILE_BG[item.color] || TILE_BG.blue}
+                ${TILE_ICON[item.color] || TILE_ICON.blue}
               `}
             >
-              <item.icon size={24} strokeWidth={2} />
+              <item.icon size={22} strokeWidth={1.75} />
             </div>
-            <span className="text-sm font-medium text-center leading-tight">
+            <span className="text-[13px] font-medium text-center leading-tight opacity-95">
               {item.label}
             </span>
           </Link>
@@ -100,29 +81,23 @@ export default function AccesosRapidos({ variant = "mobile" }) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-2.5 w-full">
       {ACCESOS.map((item) => (
         <Link
           key={item.href}
           href={item.href}
-          className={`
-            ${theme.card}
-            rounded-xl p-4
-            flex flex-col items-center justify-center gap-2.5
-            min-h-[88px]
-            transition hover:opacity-90 active:scale-[0.98]
-            border border-current/10
-          `}
+          className={`${cardStyle} ${linkBase} p-3.5 min-h-[80px] gap-2`}
         >
           <div
             className={`
-              w-11 h-11 rounded-xl flex items-center justify-center shrink-0
-              ${TILE_COLORS[item.color] || TILE_COLORS.blue}
+              w-10 h-10 rounded-full flex items-center justify-center shrink-0
+              ${TILE_BG[item.color] || TILE_BG.blue}
+              ${TILE_ICON[item.color] || TILE_ICON.blue}
             `}
           >
-            <item.icon size={22} strokeWidth={2} />
+            <item.icon size={20} strokeWidth={1.75} />
           </div>
-          <span className="text-sm font-medium text-center leading-tight">
+          <span className="text-[13px] font-medium text-center leading-tight opacity-95">
             {item.label}
           </span>
         </Link>
