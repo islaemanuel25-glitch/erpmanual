@@ -470,3 +470,56 @@
   background: var(--pos-accent);
   filter: brightness(1.08);
 }
+
+/* --- Scroll horizontal tablas (Bloque 1 auditoria POS ventas) --- */
+.sunmi-scroll-area {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--pos-link) 45%, transparent) transparent;
+}
+
+.sunmi-scroll-area::-webkit-scrollbar {
+  height: 8px;
+}
+
+.sunmi-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sunmi-scroll-area::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pos-link) 45%, transparent);
+  border-radius: 999px;
+}
+
+.sunmi-scroll-hint.sunmi-scroll-area::before,
+.sunmi-scroll-hint.sunmi-scroll-area::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.2s;
+}
+
+.sunmi-scroll-hint.sunmi-scroll-area::before {
+  left: 0;
+  background: linear-gradient(to right, var(--card-bg, rgba(0, 0, 0, 0.15)), transparent);
+  border-radius: 8px 0 0 8px;
+  opacity: 0.55;
+}
+
+.sunmi-scroll-hint.sunmi-scroll-area::after {
+  right: 0;
+  background: linear-gradient(to right, transparent, var(--card-bg, rgba(0, 0, 0, 0.15)));
+  border-radius: 0 8px 8px 0;
+  opacity: 0.9;
+}
+
+@media (min-width: 768px) {
+  .sunmi-scroll-hint.sunmi-scroll-area::before {
+    opacity: 0.25;
+  }
+}

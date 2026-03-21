@@ -394,5 +394,12 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 10. Carrito se limpia, muestra mensaje de éxito
 ```
 
+## Auditoría POS Ventas (V1, solo lectura)
+
+- **Ruta UI:** `app/modulos/auditoria-pos-ventas/page.jsx` → `/modulos/auditoria-pos-ventas`
+- **APIs:** `app/api/auditoria-pos-ventas/*` (resumen, turnos, medios, productos, tickets)
+- **Permiso:** `reportes.ver` · Local solo desde contexto activo (`resolveLocalAndGrupo`)
+- **Datos:** agregados desde `Venta` / `VentaDetalle` / `Turno`; comisión por producto prorrateada (derivada, no persistida)
+
 ---
 *Documento generado automáticamente. No editar manualmente.*
