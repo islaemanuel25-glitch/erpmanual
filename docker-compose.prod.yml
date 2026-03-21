@@ -2,24 +2,33 @@ services:
   db:
     image: postgres:16
     container_name: erpazul_db
+    restart: unless-stopped
+    env_file:
+      - .env.prod
     environment:
       POSTGRES_USER: erpazul
-      POSTGRES_PASSWORD: erpazul
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: erpazul
-    ports:
-      - "5432:5432"
     volumes:
       - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erpazul -d erpazul"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: erpazul_app
+    restart: unless-stopped
+    env_file:
+      - .env.prod
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     environment:
-      DATABASE_URL: postgresql://erpazul:erpazul@db:5432/erpazul
       NODE_ENV: production
     depends_on:
-      - db
+      db:
+        condition: service_healthy
