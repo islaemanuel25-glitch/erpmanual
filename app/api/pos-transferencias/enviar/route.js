@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { toUnidades, validarEnvio } from "@/lib/conversiones/stock";
+import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -202,6 +202,19 @@ export async function POST(req) {
     // TRANSACCIÓN REAL
     // --------------------------------------------------
     const transferencia = await prisma.$transaction(async (tx) => {
+      // Barrera atómica: evitar doble envío concurrente
+      const lock = await tx.posTransferencia.updateMany({
+        where: {
+          id: pos.id,
+          estado: { in: ["Borrador", "Preparando", "Solicitado"] },
+        },
+        data: { estado: "Enviando" },
+      });
+
+      if (lock.count === 0) {
+        throw new Error("ALREADY_SENT");
+      }
+
       const detallesTransferencia = [];
 
       for (const item of items) {
@@ -233,10 +246,38 @@ export async function POST(req) {
           },
         });
 
+        // Calcular unidades para stock (misma lógica que confirmar-recepcion)
+        const unidadesStock = toUnidades({
+          cantidad: item.cantidadRaw,
+          unidad: item.unidadEnviada,
+          factorPack: item.factorPack,
+        });
+
+        // Descontar cantidad del origen + incrementar enTransito
+        await tx.stockLocal.upsert({
+          where: {
+            localId_productoId: {
+              localId: pos.origenId,
+              productoId: item.detalle.productoId,
+            },
+          },
+          update: {
+            cantidad: { decrement: unidadesStock },
+            enTransito: { increment: unidadesStock },
+          },
+          create: {
+            localId: pos.origenId,
+            productoId: item.detalle.productoId,
+            cantidad: -unidadesStock,
+            enTransito: unidadesStock,
+          },
+        });
+
         detallesTransferencia.push({
           productoId: productoLocalDestino.id,
           cantidad: item.cantidadRaw,
           unidadEnviada: item.unidadEnviada,
+          precioCosto: item.productoLocalOrigen?.precio_costo || base?.precio_costo || 0,
         });
       }
 
@@ -279,6 +320,12 @@ export async function POST(req) {
       error: null,
     });
   } catch (err) {
+    if (err.message === "ALREADY_SENT") {
+      return NextResponse.json(
+        { ok: false, error: "Esta transferencia ya fue enviada." },
+        { status: 400 }
+      );
+    }
     console.error("Error enviar POS:", err);
     return NextResponse.json(
       { ok: false, error: "Error interno al enviar POS" },

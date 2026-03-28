@@ -49,6 +49,21 @@ export async function POST(req) {
       );
     }
 
+    // Validar estado antes de procesar
+    if (transferencia.estado === "Recibida") {
+      return NextResponse.json(
+        { ok: false, error: "Esta transferencia ya fue confirmada. No se puede volver a confirmar." },
+        { status: 400 }
+      );
+    }
+
+    if (transferencia.estado !== "Enviada" && transferencia.estado !== "Recibiendo") {
+      return NextResponse.json(
+        { ok: false, error: `No se puede confirmar una transferencia en estado "${transferencia.estado}"` },
+        { status: 400 }
+      );
+    }
+
     if (!esAdmin) {
       const localId = Number(session.localId || 0);
       if (!localId) {
@@ -69,6 +84,21 @@ export async function POST(req) {
     // TODO en transacción para consistencia de stock
     // ============================================================
     await prisma.$transaction(async (tx) => {
+      // Barrera atómica: tomar exclusividad con updateMany condicional.
+      // Solo pasa si estado es Enviada o Recibiendo.
+      // Si otro proceso ya cambió el estado, count = 0 → abortar.
+      const lock = await tx.transferencia.updateMany({
+        where: {
+          id: transferenciaId,
+          estado: { in: ["Enviada", "Recibiendo"] },
+        },
+        data: { estado: "Confirmando" },
+      });
+
+      if (lock.count === 0) {
+        throw new Error("ALREADY_CONFIRMED");
+      }
+
       let tieneDiferencias = false;
 
       for (const d of transferencia.detalle) {
@@ -153,9 +183,13 @@ export async function POST(req) {
         });
 
         // ============================================================
-        // 🟥 PRODUCTO ORIGEN (DEPÓSITO / ORIGEN)
+        // 🟥 DESCONTAR enTransito DEL ORIGEN (por lo ENVIADO, no lo recibido)
+        // La cantidad ya se descontó al enviar. Aquí solo limpiamos tránsito.
         // ============================================================
-        let productoOrigen = await tx.productoLocal.findUnique({
+        const enviadaUnidades =
+          unidadEnviada === "BULTO" && factor > 1 ? enviada * factor : enviada;
+
+        const productoOrigen = await tx.productoLocal.findUnique({
           where: {
             localId_baseId: {
               localId: transferencia.origenId,
@@ -164,49 +198,15 @@ export async function POST(req) {
           },
         });
 
-        if (!productoOrigen) {
-          productoOrigen = await tx.productoLocal.create({
-            data: {
-              localId: transferencia.origenId,
-              baseId: d.producto.base.id,
-              precio_costo:
-                d.producto.precio_costo || d.producto.base.precio_costo || 0,
-              precio_venta:
-                d.producto.precio_venta || d.producto.base.precio_venta || 0,
-              margen: d.producto.margen || d.producto.base.margen || 0,
-              activo: true,
-            },
-          });
-
-          await tx.stockLocal.create({
-            data: {
+        if (productoOrigen) {
+          await tx.stockLocal.updateMany({
+            where: {
               localId: transferencia.origenId,
               productoId: productoOrigen.id,
-              cantidad: 0,
-              stockMin: 0,
-              stockMax: 0,
             },
+            data: { enTransito: { decrement: enviadaUnidades } },
           });
         }
-
-        // ============================================================
-        // 🟥 DESCONTAR UNIDADES DEL ORIGEN
-        // StockLocal.cantidad SIEMPRE en unidades
-        // ============================================================
-        await tx.stockLocal.upsert({
-          where: {
-            localId_productoId: {
-              localId: transferencia.origenId,
-              productoId: productoOrigen.id,
-            },
-          },
-          update: { cantidad: { decrement: recibidaUnidades } },
-          create: {
-            localId: transferencia.origenId,
-            productoId: productoOrigen.id,
-            cantidad: -recibidaUnidades,
-          },
-        });
 
         // ============================================================
         // 🟨 GUARDAR RECEPCIÓN
@@ -236,6 +236,12 @@ export async function POST(req) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err.message === "ALREADY_CONFIRMED") {
+      return NextResponse.json(
+        { ok: false, error: "Esta transferencia ya fue confirmada." },
+        { status: 400 }
+      );
+    }
     console.error("ERROR confirmar recepcion:", err);
     return NextResponse.json(
       { ok: false, error: "Error interno" },

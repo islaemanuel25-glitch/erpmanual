@@ -95,6 +95,7 @@ model Local {
   pedidosProveedor   PedidoProveedor[]
   auditoriaStock     AuditoriaStock[]
   ticketConfig       TicketConfig?
+  operadorAsignaciones OperadorEnLocal[]
 }
 
 model Usuario {
@@ -118,6 +119,7 @@ model Usuario {
 
   ventas            Venta[]
   turnos            Turno[]
+  turnosCerrados    Turno[]            @relation("turnoCerradoPor")
   cajaMovimientos   CajaMovimiento[]
   movimientosPuntos ClientePuntoMovimiento[]
   movimientosCC     MovimientoCuenta[]
@@ -260,6 +262,7 @@ model StockLocal {
   localId    Int
   productoId Int
   cantidad   Decimal  @db.Decimal(12, 2)
+  enTransito Decimal  @default(0) @db.Decimal(12, 2)
   stockMin   Decimal? @db.Decimal(12, 2)
   stockMax   Decimal? @db.Decimal(12, 2)
   createdAt  DateTime @default(now())
@@ -600,6 +603,7 @@ model Venta {
   id               Int      @id @default(autoincrement())
   localId          Int
   vendedorId       Int
+  operadorId       Int?
   clienteId        Int?
   turnoId          Int?
   numero           Int
@@ -607,8 +611,12 @@ model Venta {
   fecha            DateTime @default(now())
   subtotal         Decimal  @db.Decimal(12, 2)
   descuento        Decimal  @default(0) @db.Decimal(12, 2)
+  descuentoAutomatico  Decimal? @db.Decimal(12, 2)
+  descuentoManual      Decimal? @db.Decimal(12, 2)
+  descuentoPorPuntos   Decimal? @db.Decimal(12, 2)
   total            Decimal  @db.Decimal(12, 2)
   comisionBancaria Decimal  @default(0) @db.Decimal(12, 2)
+  comisionPct      Decimal? @db.Decimal(5, 2)
   netoRecibido     Decimal  @default(0) @db.Decimal(12, 2)
   costoTotal       Decimal  @default(0) @db.Decimal(12, 2)
   gananciaBruta    Decimal  @default(0) @db.Decimal(12, 2)
@@ -620,6 +628,7 @@ model Venta {
 
   local             Local                    @relation(fields: [localId], references: [id])
   vendedor          Usuario                  @relation(fields: [vendedorId], references: [id])
+  operador          OperadorLocal?           @relation(fields: [operadorId], references: [id])
   cliente           Cliente?                 @relation(fields: [clienteId], references: [id])
   turno             Turno?                   @relation(fields: [turnoId], references: [id])
   detalles          VentaDetalle[]
@@ -632,6 +641,7 @@ model Venta {
   @@index([clienteId])
   @@index([turnoId])
   @@index([clientTxnId])
+  @@index([operadorId])
 }
 
 model VentaDetalle {
@@ -644,6 +654,7 @@ model VentaDetalle {
   cantidad       Decimal  @db.Decimal(12, 3)
   subtotal       Decimal  @db.Decimal(12, 2)
   ganancia       Decimal  @default(0) @db.Decimal(12, 2)
+  comisionLinea  Decimal? @db.Decimal(12, 2)
   createdAt      DateTime @default(now())
 
   venta        Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
@@ -660,6 +671,8 @@ model Turno {
   id           Int       @id @default(autoincrement())
   localId      Int
   vendedorId   Int
+  operadorId   Int?
+  cerradoPorId Int?
   apertura     DateTime  @default(now())
   cierre       DateTime?
   montoInicial Decimal   @db.Decimal(10, 2)
@@ -676,14 +689,17 @@ model Turno {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  local    Local   @relation(fields: [localId], references: [id])
-  vendedor Usuario @relation(fields: [vendedorId], references: [id])
-  ventas   Venta[]
+  local       Local          @relation(fields: [localId], references: [id])
+  vendedor    Usuario        @relation(fields: [vendedorId], references: [id])
+  operador    OperadorLocal? @relation(fields: [operadorId], references: [id])
+  cerradoPor  Usuario?       @relation("turnoCerradoPor", fields: [cerradoPorId], references: [id])
+  ventas      Venta[]
   cajaMovimientos CajaMovimiento[]
 
   @@index([localId])
   @@index([vendedorId])
   @@index([apertura])
+  @@index([operadorId])
 }
 
 model CajaMovimiento {
@@ -876,4 +892,31 @@ model AuditoriaStock {
   @@index([grupoId, localId])
   @@index([productoLocalId])
   @@index([createdAt])
+}
+
+// OPERADORES INTERNOS
+// ---------------------------------------------------------------------------
+
+model OperadorLocal {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+  pinHash   String
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  locales OperadorEnLocal[]
+  ventas  Venta[]
+  turnos  Turno[]
+}
+
+model OperadorEnLocal {
+  operadorId Int
+  localId    Int
+
+  operador OperadorLocal @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+  local    Local         @relation(fields: [localId], references: [id])
+
+  @@id([operadorId, localId])
+  @@index([localId])
 }
