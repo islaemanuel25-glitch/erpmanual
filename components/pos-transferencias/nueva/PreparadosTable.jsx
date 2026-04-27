@@ -342,7 +342,7 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
 
       {/* STOCK DEPÓSITO */}
       <td className="px-2 py-2 text-center text-[11px] sunmi-text-muted">
-        {esFijo ? (
+        {ventaDepositoPieza ? (
           <div>
             <span>{Math.round(Number(p.stockActual || 0))} pzs</span>
             <span className="block text-[10px]">= {(Number(p.stockActual || 0) * pesoRefKg).toFixed(3)} kg</span>

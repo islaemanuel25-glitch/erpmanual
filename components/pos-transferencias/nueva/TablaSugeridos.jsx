@@ -39,7 +39,7 @@ export default function TablaSugeridos({
       <div
         className="
           sunmi-header-accent
-          flex items-center justify-between
+          flex flex-wrap items-center justify-between gap-2
         "
       >
         <span className="font-bold text-xs uppercase tracking-wide">
@@ -101,7 +101,7 @@ export default function TablaSugeridos({
           px-3 py-2
           sunmi-surface
           border-b sunmi-divider
-          flex flex-wrap gap-4
+          flex flex-wrap gap-2 sm:gap-4
         "
       >
         {/* CATEGORÍAS — mismo patrón que FiltrosProductos: value + onChange directo + placeholder */}
@@ -157,7 +157,7 @@ export default function TablaSugeridos({
 
       {/* TABLA */}
       <div className="overflow-x-auto">
-        <table className="w-full table-fixed text-[12px]">
+        <table className="w-full table-auto text-[12px]">
           <thead
             className="
               sunmi-thead
@@ -166,11 +166,11 @@ export default function TablaSugeridos({
           >
             <tr>
               <th className="px-3 py-2 text-left">Producto</th>
-              <th className="px-2 py-2 text-left">Categoría</th>
-              <th className="px-2 py-2 text-left">Área</th>
-              <th className="px-2 py-2 text-left">Código</th>
+              <th className="px-2 py-2 text-left hidden md:table-cell">Categoría</th>
+              <th className="px-2 py-2 text-left hidden md:table-cell">Área</th>
+              <th className="px-2 py-2 text-left hidden md:table-cell">Código</th>
               <th className="px-2 py-2 text-left">Presentación</th>
-              <th className="px-2 py-2 text-right w-[200px]">Sugerido</th>
+              <th className="px-2 py-2 text-right min-w-[140px] md:min-w-[200px]">Sugerido</th>
               <th className="px-2 py-2 text-center w-[72px]">Acción</th>
             </tr>
           </thead>
@@ -227,7 +227,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
     "bultos";
 
   const [rotura, setRotura] = useState(false);
-  const [inputEnPiezas, setInputEnPiezas] = useState(esFijo);
+  const [inputEnPiezas, setInputEnPiezas] = useState(ventaDepositoPieza);
 
   // Estado local: bultos o uds según modo
   // Cuando sugeridoUnidad es BULTO, sugeridoCantidad ya está en bultos
@@ -360,17 +360,17 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
       </td>
 
       {/* CATEGORÍA */}
-      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle">
+      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle hidden md:table-cell">
         {p.categoriaNombre || "Sin categoría"}
       </td>
 
       {/* ÁREA */}
-      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle">
+      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle hidden md:table-cell">
         {p.areaFisicaNombre || "Sin área"}
       </td>
 
       {/* CODIGO */}
-      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle">
+      <td className="px-2 py-2 text-[11px] sunmi-text-muted align-middle hidden md:table-cell">
         {p.codigoBarra || "-"}
       </td>
 
@@ -380,8 +380,8 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
       </td>
 
       {/* SUGERIDO EDITABLE + ROTURA */}
-      <td className="px-2 py-2 w-[200px] align-middle">
-        <div className="w-[200px] ml-auto">
+      <td className="px-2 py-2 min-w-[140px] md:min-w-[200px] align-middle">
+        <div className="ml-auto">
           <div className="flex items-center justify-end gap-3">
             {bultoMode ? (
               <>

@@ -14,32 +14,22 @@ export default function BuscadorManual({
   onModoChange,
 }) {
   const [focusIndex, setFocusIndex] = useState(-1);
-
+  const [escuchando, setEscuchando] = useState(false);
+  const inputRef = useRef(null);
+  const recognitionRef = useRef(null);
   const lastTimeRef = useRef(Date.now());
   const beepRef = useRef(null);
 
-  // ===================================================
-  // 🔊 CARGA DE AUDIO — FIX "NotSupportedError"
-  // ===================================================
+  const soportaVoz =
+    typeof window !== "undefined" &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  // Audio beep
   useEffect(() => {
     const audio = new Audio("/beep.wav");
-
-    const handleLoad = () => {
-      beepRef.current = audio;
-      console.log("✅ Beep cargado correctamente");
-    };
-
-    const handleError = () => {
-      console.error("❌ Error cargando beep.wav");
-    };
-
-    audio.addEventListener("canplaythrough", handleLoad);
-    audio.addEventListener("error", handleError);
-
-    return () => {
-      audio.removeEventListener("canplaythrough", handleLoad);
-      audio.removeEventListener("error", handleError);
-    };
+    audio.addEventListener("canplaythrough", () => { beepRef.current = audio; });
+    audio.addEventListener("error", () => {});
+    return () => { beepRef.current = null; };
   }, []);
 
   const beep = () => {
@@ -49,9 +39,10 @@ export default function BuscadorManual({
     }
   };
 
-  // ===================================================
-  // SCANNER + INPUT
-  // ===================================================
+  // Autofocus
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Scanner + input
   const handleInputChange = (e) => {
     const now = Date.now();
     const delta = now - lastTimeRef.current;
@@ -60,8 +51,7 @@ export default function BuscadorManual({
     const value = e.target.value;
     onTextoChange(value);
 
-    const esScanner = delta < 40 && value.length >= 4;
-    if (esScanner) {
+    if (delta < 40 && value.length >= 4) {
       onBuscar();
       beep();
     }
@@ -72,32 +62,33 @@ export default function BuscadorManual({
     onBuscar();
   }, [texto]);
 
+  // Keyboard
   const handleKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (resultados.length)
-        setFocusIndex((i) => (i + 1 < resultados.length ? i + 1 : 0));
+      if (resultados.length) setFocusIndex((i) => (i + 1 < resultados.length ? i + 1 : 0));
     }
-
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      if (resultados.length)
-        setFocusIndex((i) => (i - 1 >= 0 ? i - 1 : resultados.length - 1));
+      if (resultados.length) setFocusIndex((i) => (i - 1 >= 0 ? i - 1 : resultados.length - 1));
     }
-
+    if (e.key === "Escape") {
+      onTextoChange("");
+      setFocusIndex(-1);
+      inputRef.current?.focus();
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       if (focusIndex >= 0 && resultados[focusIndex]) {
-        const p = resultados[focusIndex];
         beep();
-        onAgregar(p);
+        onAgregar(resultados[focusIndex]);
         onTextoChange("");
         setFocusIndex(-1);
       }
     }
   };
 
-  // Auto agregar si hay 1 solo
+  // Auto-agregar si 1 solo resultado
   useEffect(() => {
     if (resultados.length === 1 && texto.length > 0) {
       beep();
@@ -107,138 +98,120 @@ export default function BuscadorManual({
     }
   }, [resultados]);
 
-  // ===================================================
-  // 🎤 MIC — RECONOCIMIENTO DE VOZ
-  // ===================================================
+  // Voz
   const iniciarVoz = () => {
-    if (
-      !("webkitSpeechRecognition" in window) &&
-      !("SpeechRecognition" in window)
-    ) {
-      alert("Este dispositivo no soporta reconocimiento de voz");
+    const SR =
+      typeof window !== "undefined" &&
+      (window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (!SR) return;
+
+    if (escuchando && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setEscuchando(false);
       return;
     }
 
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SR();
+    recognition.lang = "es-AR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
 
-    const recog = new SpeechRecognition();
-    recog.lang = "es-AR";
-    recog.interimResults = false;
-    recog.maxAlternatives = 1;
-
-    recog.onresult = (event) => {
-      const voiceText = event.results[0][0].transcript;
-      onTextoChange(voiceText);
+    recognition.onstart = () => setEscuchando(true);
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      onTextoChange(transcript);
       onBuscar();
       beep();
+      setEscuchando(false);
     };
+    recognition.onerror = () => setEscuchando(false);
+    recognition.onend = () => setEscuchando(false);
 
-    recog.start();
+    recognitionRef.current = recognition;
+    recognition.start();
   };
 
-  // ===================================================
-  // RENDER SUNMI
-  // ===================================================
   return (
     <div className="relative w-full mb-3">
-
-      <div className="flex items-center justify-between mb-1 pl-1">
-        <span className="text-[11px] uppercase tracking-wide sunmi-text-link">
-          Buscar · Escanear · Hablar
-        </span>
-
-        {onModoChange && (
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => onModoChange("manual")}
-              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition ${
-                modo === "manual"
-                  ? "sunmi-btn-primary"
-                  : "sunmi-control sunmi-text-muted"
-              }`}
-            >
-              Manual
-            </button>
-            <button
-              type="button"
-              onClick={() => onModoChange("rotura")}
-              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition ${
-                modo === "rotura"
-                  ? "sunmi-btn sunmi-btn-red"
-                  : "sunmi-control sunmi-text-muted"
-              }`}
-            >
-              Rotura
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="relative">
-        <button
-          type="button"
-          onClick={iniciarVoz}
-          className="
-            absolute right-2 top-1/2 -translate-y-1/2
-            h-8 w-8 rounded-full
-            sunmi-surface-soft sunmi-text-link
-            flex items-center justify-center
-            text-[16px]
-            active:scale-95
-            transition
-            shadow-md
-          "
-          style={{ border: '1px solid var(--pos-link)' }}
-        >
-          🎤
-        </button>
-
-        <SunmiInput
-          type="text"
-          placeholder="Buscar producto o decirlo..."
-          value={texto}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-        />
-
-        <span className="
-          absolute left-3 top-1/2 -translate-y-1/2
-          text-[15px] sunmi-text-link
-        ">
-          🔍
-        </span>
-      </div>
-
-      {loading && (
-        <div className="text-[12px] sunmi-text-link mt-1 animate-pulse">
-          Buscando...
+      {/* Modo manual / rotura */}
+      {onModoChange && (
+        <div className="flex items-center justify-end gap-1 mb-1.5">
+          <button
+            type="button"
+            onClick={() => onModoChange("manual")}
+            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition ${
+              modo === "manual"
+                ? "sunmi-btn-primary"
+                : "sunmi-control sunmi-text-muted"
+            }`}
+          >
+            Manual
+          </button>
+          <button
+            type="button"
+            onClick={() => onModoChange("rotura")}
+            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition ${
+              modo === "rotura"
+                ? "sunmi-btn sunmi-btn-red"
+                : "sunmi-control sunmi-text-muted"
+            }`}
+          >
+            Rotura
+          </button>
         </div>
       )}
 
+      {/* Input con mic */}
+      <div className="relative">
+        <SunmiInput
+          ref={inputRef}
+          type="text"
+          placeholder="Buscar producto, escanear o hablar..."
+          value={texto}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          className={`w-full text-base min-h-12 lg:min-h-10 !py-2 ${soportaVoz ? "!pr-12" : ""}`}
+          autoFocus
+        />
+        {soportaVoz && (
+          <button
+            onClick={iniciarVoz}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
+              escuchando
+                ? "bg-red-600 text-white animate-pulse"
+                : "sunmi-text-muted hover:text-[var(--app-fg)] hover:bg-[var(--pos-control-bg)]"
+            }`}
+            title="Buscar por voz"
+            type="button"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" x2="12" y1="19" y2="22" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Estado */}
+      {loading && (
+        <div className="text-xs sunmi-text-muted mt-2 animate-pulse">Buscando...</div>
+      )}
+      {escuchando && (
+        <div className="text-xs text-red-400 mt-2 animate-pulse">Escuchando...</div>
+      )}
+
+      {/* Resultados */}
       {!loading && resultados.length > 0 && texto.trim() !== "" && (
-        <div
-          className="
-            absolute top-[60px] left-0 right-0
-            sunmi-surface sunmi-border
-            rounded-xl shadow-xl
-            max-h-64 overflow-auto z-50
-            animate-[fadeIn_0.2s_ease]
-          "
-        >
+        <div className="mt-2 space-y-1 max-h-60 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card-bg)] shadow-lg">
           {resultados.slice(0, 30).map((p, idx) => (
             <div
               key={p.productoLocalId}
-              className={`
-                px-3 py-2 cursor-pointer text-[13px]
-                ${
-                  idx === focusIndex
-                    ? "sunmi-select-item-active"
-                    : "sunmi-row-hover"
-                }
-                transition-all
-              `}
+              className={`flex items-center justify-between gap-2 px-3 py-2 cursor-pointer transition-all ${
+                idx === focusIndex
+                  ? "sunmi-select-item-active"
+                  : "sunmi-row-hover"
+              }`}
               onMouseEnter={() => setFocusIndex(idx)}
               onClick={() => {
                 beep();
@@ -247,22 +220,20 @@ export default function BuscadorManual({
                 setFocusIndex(-1);
               }}
             >
-              <div className="font-medium">{p.nombre}</div>
-
-              {p.codigoBarra && (
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{p.nombre}</div>
                 <div className="text-[11px] sunmi-text-muted">
-                  Código: {p.codigoBarra}
+                  {p.codigoBarra && <span className="mr-3">Cod: {p.codigoBarra}</span>}
+                  {p.stockActual != null && <span>Stock: {Number(p.stockActual).toLocaleString("es-AR")}</span>}
                 </div>
-              )}
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {!loading && texto.trim() !== "" && resultados.length === 0 && (
-        <div className="text-[12px] sunmi-text-muted mt-1">
-          No se encontraron productos.
-        </div>
+      {!loading && !escuchando && texto.trim() !== "" && resultados.length === 0 && (
+        <div className="text-xs sunmi-text-muted mt-2">No se encontraron productos.</div>
       )}
     </div>
   );

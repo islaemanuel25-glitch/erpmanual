@@ -74,8 +74,34 @@ export default function NuevaTransferenciaPage() {
   const [categoriaFiltroManual, setCategoriaFiltroManual] = useState(SENTINEL_ALL);
   const [areaFiltroManual, setAreaFiltroManual] = useState(SENTINEL_ALL);
 
-  const [sugPage, setSugPage] = useState(1);
-  const [sugPageSize, setSugPageSize] = useState(50);
+  const SK_TRANS = "pos-trans-nueva";
+
+  const [sugPage, setSugPageRaw] = useState(() => {
+    try { return Number(sessionStorage.getItem(SK_TRANS + "-sugPage")) || 1; } catch { return 1; }
+  });
+  const [sugPageSize, setSugPageSizeRaw] = useState(() => {
+    try { const v = Number(sessionStorage.getItem(SK_TRANS + "-sugPageSize")); return [25, 50, 100, 150, 200].includes(v) ? v : 50; } catch { return 50; }
+  });
+  const [manPage, setManPageRaw] = useState(() => {
+    try { return Number(sessionStorage.getItem(SK_TRANS + "-manPage")) || 1; } catch { return 1; }
+  });
+  const [manPageSize, setManPageSizeRaw] = useState(() => {
+    try { const v = Number(sessionStorage.getItem(SK_TRANS + "-manPageSize")); return [25, 50, 100, 150, 200].includes(v) ? v : 50; } catch { return 50; }
+  });
+
+  const [prepPage, setPrepPageRaw] = useState(() => {
+    try { return Number(sessionStorage.getItem(SK_TRANS + "-prepPage")) || 1; } catch { return 1; }
+  });
+  const [prepPageSize, setPrepPageSizeRaw] = useState(() => {
+    try { const v = Number(sessionStorage.getItem(SK_TRANS + "-prepPageSize")); return [25, 50, 100, 150, 200].includes(v) ? v : 50; } catch { return 50; }
+  });
+
+  const setSugPage = (v) => { const val = typeof v === "function" ? v(sugPage) : v; setSugPageRaw(val); try { sessionStorage.setItem(SK_TRANS + "-sugPage", String(val)); } catch {} };
+  const setSugPageSize = (v) => { setSugPageSizeRaw(v); try { sessionStorage.setItem(SK_TRANS + "-sugPageSize", String(v)); } catch {} };
+  const setManPage = (v) => { const val = typeof v === "function" ? v(manPage) : v; setManPageRaw(val); try { sessionStorage.setItem(SK_TRANS + "-manPage", String(val)); } catch {} };
+  const setManPageSize = (v) => { setManPageSizeRaw(v); try { sessionStorage.setItem(SK_TRANS + "-manPageSize", String(v)); } catch {} };
+  const setPrepPage = (v) => { const val = typeof v === "function" ? v(prepPage) : v; setPrepPageRaw(val); try { sessionStorage.setItem(SK_TRANS + "-prepPage", String(val)); } catch {} };
+  const setPrepPageSize = (v) => { setPrepPageSizeRaw(v); try { sessionStorage.setItem(SK_TRANS + "-prepPageSize", String(v)); } catch {} };
 
   // ===============================
   // 1. Usuario
@@ -227,10 +253,17 @@ export default function NuevaTransferenciaPage() {
 
   const totalPagesSug = Math.max(1, Math.ceil(sugeridosFiltrados.length / sugPageSize));
 
+  // Clamp: si sugPage quedó fuera de rango, corregir
+  useEffect(() => {
+    if (sugPage > totalPagesSug) setSugPage(totalPagesSug);
+  }, [sugPage, totalPagesSug]);
+
+  const sugPageSafe = Math.max(1, Math.min(sugPage, totalPagesSug));
+
   const sugeridosPaginados = useMemo(() => {
-    const start = (sugPage - 1) * sugPageSize;
+    const start = (sugPageSafe - 1) * sugPageSize;
     return sugeridosFiltrados.slice(start, start + sugPageSize);
-  }, [sugeridosFiltrados, sugPage, sugPageSize]);
+  }, [sugeridosFiltrados, sugPageSafe, sugPageSize]);
 
   // ===============================
   // Derivar preparados vs pedido manual sin preparar
@@ -239,6 +272,20 @@ export default function NuevaTransferenciaPage() {
     () => items.filter((i) => Number(i.preparado || 0) > 0),
     [items]
   );
+
+  // Paginación preparados
+  const totalPagesPrep = Math.max(1, Math.ceil(itemsPreparados.length / prepPageSize));
+
+  useEffect(() => {
+    if (prepPage > totalPagesPrep) setPrepPage(totalPagesPrep);
+  }, [prepPage, totalPagesPrep]);
+
+  const prepPageSafe = Math.max(1, Math.min(prepPage, totalPagesPrep));
+
+  const itemsPreparadosPaginados = useMemo(() => {
+    const start = (prepPageSafe - 1) * prepPageSize;
+    return itemsPreparados.slice(start, start + prepPageSize);
+  }, [itemsPreparados, prepPageSafe, prepPageSize]);
 
   const itemsPedidoManualSinPreparar = useMemo(() => {
     return items.filter((i) => {
@@ -308,6 +355,20 @@ export default function NuevaTransferenciaPage() {
       return okCat && okArea;
     });
   }, [sugeridosDelPedido, categoriaFiltroManual, areaFiltroManual]);
+
+  // Paginación modo manual
+  const totalPagesMan = Math.max(1, Math.ceil(sugeridosDelPedidoFiltrados.length / manPageSize));
+
+  useEffect(() => {
+    if (manPage > totalPagesMan) setManPage(totalPagesMan);
+  }, [manPage, totalPagesMan]);
+
+  const manPageSafe = Math.max(1, Math.min(manPage, totalPagesMan));
+
+  const sugeridosDelPedidoPaginados = useMemo(() => {
+    const start = (manPageSafe - 1) * manPageSize;
+    return sugeridosDelPedidoFiltrados.slice(start, start + manPageSize);
+  }, [sugeridosDelPedidoFiltrados, manPageSafe, manPageSize]);
 
   // ===============================
   // 5. Upsert detalle
@@ -730,10 +791,13 @@ export default function NuevaTransferenciaPage() {
 
               <TablaSugeridos
                 datos={sugeridosPaginados}
-                page={sugPage}
+                page={sugPageSafe}
                 totalPages={totalPagesSug}
                 onPrev={() => setSugPage((p) => Math.max(1, p - 1))}
-                onNext={() => setSugPage((p) => Math.min(totalPagesSug, p + 1))}
+                onNext={() => {
+                  const maxP = Math.max(1, Math.ceil(sugeridosFiltrados.length / sugPageSize));
+                  setSugPage((p) => Math.min(maxP, p + 1));
+                }}
                 pageSize={sugPageSize}
                 onPageSizeChange={(v) => { setSugPageSize(v); setSugPage(1); }}
                 onEditSugerido={handleEditSugerido}
@@ -765,13 +829,16 @@ export default function NuevaTransferenciaPage() {
               <Separador label="Sugeridos (pedido del local)" />
 
               <TablaSugeridos
-                datos={sugeridosDelPedidoFiltrados}
-                page={1}
-                totalPages={1}
-                onPrev={() => {}}
-                onNext={() => {}}
-                pageSize={50}
-                onPageSizeChange={() => {}}
+                datos={sugeridosDelPedidoPaginados}
+                page={manPageSafe}
+                totalPages={totalPagesMan}
+                onPrev={() => setManPage((p) => Math.max(1, p - 1))}
+                onNext={() => {
+                  const maxP = Math.max(1, Math.ceil(sugeridosDelPedidoFiltrados.length / manPageSize));
+                  setManPage((p) => Math.min(maxP, p + 1));
+                }}
+                pageSize={manPageSize}
+                onPageSizeChange={(v) => { setManPageSize(v); setManPage(1); }}
                 onEditSugerido={handleEditSugeridoManual}
                 onMarcarPreparado={handleMarcarPreparadoManual}
                 loading={false}
@@ -779,8 +846,8 @@ export default function NuevaTransferenciaPage() {
                 areas={areasOpcionesManual}
                 categoriaSeleccionada={categoriaFiltroManual}
                 areaSeleccionada={areaFiltroManual}
-                onChangeCategoria={(v) => { setCategoriaFiltroManual(normalizarValorFiltro(v)); }}
-                onChangeArea={(v) => { setAreaFiltroManual(normalizarValorFiltro(v)); }}
+                onChangeCategoria={(v) => { setCategoriaFiltroManual(normalizarValorFiltro(v)); setManPage(1); }}
+                onChangeArea={(v) => { setAreaFiltroManual(normalizarValorFiltro(v)); setManPage(1); }}
               />
             </>
           )}
@@ -789,15 +856,18 @@ export default function NuevaTransferenciaPage() {
           <Separador label={esModoManual ? "Productos del pedido" : "Preparados"} />
 
           <PreparadosTable
-            datos={itemsPreparados}
+            datos={itemsPreparadosPaginados}
             onDesmarcar={handleQuitarPreparado}
             onEditPreparado={handleEditCantidad}
-            page={1}
-            totalPages={1}
-            onPrev={() => {}}
-            onNext={() => {}}
-            pageSize={50}
-            onPageSizeChange={() => {}}
+            page={prepPageSafe}
+            totalPages={totalPagesPrep}
+            onPrev={() => setPrepPage((p) => Math.max(1, p - 1))}
+            onNext={() => {
+              const maxP = Math.max(1, Math.ceil(itemsPreparados.length / prepPageSize));
+              setPrepPage((p) => Math.min(maxP, p + 1));
+            }}
+            pageSize={prepPageSize}
+            onPageSizeChange={(v) => { setPrepPageSize(v); setPrepPage(1); }}
             loading={loadingDetalles}
             bloqueado={posEstado === "Enviado"}
             buscador={
