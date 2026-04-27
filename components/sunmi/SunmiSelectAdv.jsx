@@ -47,8 +47,12 @@ export default function SunmiSelectAdv({
   const currentText = (() => {
     if (multiple) {
       if (!Array.isArray(value) || value.length === 0) return placeholder;
-      if (value.length <= 2) return value.join(", ");
-      return `${value.length} seleccionados`;
+      const labels = value.map((v) => {
+        const opt = optionList.find((c) => c.props.value == v);
+        return opt ? opt.props.children : v;
+      });
+      if (labels.length <= 2) return labels.join(", ");
+      return `${labels.length} seleccionados`;
     }
     const f = optionList.find((c) => c.props.value == value);
     return f ? f.props.children : placeholder;

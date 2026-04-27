@@ -9,9 +9,9 @@ export default function SunmiTable({ headers = [], children }) {
     <div className="overflow-x-auto">
       <table
         className="
-          w-full 
-          text-[12px]              /* más compacto */
-          table-auto sm:table-fixed
+          w-full
+          text-[12px]
+          table-auto
         "
       >
         {/* ===== HEADER ===== */}
