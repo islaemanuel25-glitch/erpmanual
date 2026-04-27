@@ -151,8 +151,17 @@ fix_column.sql
 # Windows NUL artifact
 nul
 
-# Claude Code local settings
-.claude/settings.local.json
+# Claude Code locales (versionamos solo .claude/agents/)
+.claude/*
+!.claude/agents/
 
 # Instalador de impresion (binario grande, se genera con build-installer.bat)
 public/downloads/*.exe
+
+# Screenshots y debug images locales
+audit-*.png
+debug-*.png
+redesign-*.png
+v2-*.png
+e1-*.png
+diagnostico-*.md
