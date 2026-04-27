@@ -26,6 +26,7 @@ export async function GET(req) {
 
     const agg = await prisma.venta.aggregate({
       where,
+      _count: { id: true },
       _sum: {
         total: true,
         comisionBancaria: true,
@@ -35,6 +36,7 @@ export async function GET(req) {
       },
     });
 
+    const totalTickets = agg._count.id;
     const sumTotal = Number(agg._sum.total ?? 0);
     const sumComision = Number(agg._sum.comisionBancaria ?? 0);
     const sumNeto = Number(agg._sum.netoRecibido ?? 0);
@@ -42,16 +44,19 @@ export async function GET(req) {
     const sumGn = Number(agg._sum.gananciaNeta ?? 0);
 
     const margenPct = margenPctFromSums(sumGn, sumNeto);
+    const ticketPromedio = totalTickets > 0 ? sumTotal / totalTickets : null;
 
     return NextResponse.json({
       ok: true,
       resumen: {
+        totalTickets,
         ventaBruta: sumTotal,
         comisionTotal: sumComision,
         netoRecibido: sumNeto,
         costoVendido: sumCosto,
         gananciaNeta: sumGn,
         margenPct: margenPct === null ? null : Number(margenPct.toFixed(4)),
+        ticketPromedio: ticketPromedio === null ? null : Number(ticketPromedio.toFixed(2)),
       },
     });
   } catch (e) {

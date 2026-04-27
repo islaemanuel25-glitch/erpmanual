@@ -1,7 +1,5 @@
 "use client";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
@@ -47,26 +45,22 @@ export default function TablaTicketsConflictivos({
   const total = pagination?.total ?? 0;
 
   return (
-    <SunmiCard className="p-3">
-      <SunmiSeparator label="Tickets conflictivos" />
-      <p className="text-[11px] sunmi-text-muted mt-1 mb-2">{criterio || ""}</p>
+    <div>
+      <p className="text-[10px] sunmi-text-muted mb-1.5">{criterio || ""}</p>
 
       {loadingTickets && (
         <p className="text-xs sunmi-text-muted py-2">Actualizando lista…</p>
       )}
 
       {!loadingTickets && (!items || items.length === 0) && (
-        <p className="text-sm sunmi-text-muted py-4 text-center">
-          Ningún ticket cumple el criterio en el período
+        <p className="text-sm sunmi-text-muted py-3 text-center">
+          Ningún ticket requiere atención en el período.
         </p>
       )}
 
       {!loadingTickets && items && items.length > 0 && (
         <>
-          <p className="md:hidden text-[10px] sunmi-text-muted mt-1 mb-1">
-            Deslizá horizontalmente para ver todas las columnas.
-          </p>
-          <div className="overflow-x-auto mt-2 sunmi-scroll-hint sunmi-scroll-area">
+          <div className="overflow-x-auto sunmi-scroll-hint sunmi-scroll-area">
             <div className="min-w-[820px] md:min-w-[960px]">
               <SunmiTable
                 headers={[
@@ -119,8 +113,8 @@ export default function TablaTicketsConflictivos({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 mt-3 flex-wrap">
-            <p className="text-[11px] sunmi-text-muted">
+          <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
+            <p className="text-[10px] sunmi-text-muted">
               Página {page} de {totalPages || 1} — {total} ticket(s)
             </p>
             <div className="flex gap-2">
@@ -144,6 +138,6 @@ export default function TablaTicketsConflictivos({
           </div>
         </>
       )}
-    </SunmiCard>
+    </div>
   );
 }

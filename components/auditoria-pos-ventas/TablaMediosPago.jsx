@@ -1,7 +1,5 @@
 "use client";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 
 function formatPrecio(n) {
@@ -44,16 +42,11 @@ export default function TablaMediosPago({ items }) {
   );
 
   return (
-    <SunmiCard className="p-3">
-      <SunmiSeparator label="Medios de pago" />
-      <p className="text-[11px] sunmi-text-muted mt-1 mb-2">
-        Fiado prioriza <code className="text-[10px]">esFiado</code>. Valores desde{" "}
-        <strong>Venta</strong> persistida.
+    <div>
+      <p className="text-[10px] sunmi-text-muted mb-1.5">
+        Fiado prioriza <code className="text-[9px]">esFiado</code>. Valores desde Venta persistida.
       </p>
-      <p className="md:hidden text-[10px] sunmi-text-muted mt-1 mb-1">
-        Deslizá horizontalmente para ver todas las columnas.
-      </p>
-      <div className="overflow-x-auto mt-2 sunmi-scroll-hint sunmi-scroll-area">
+      <div className="overflow-x-auto sunmi-scroll-hint sunmi-scroll-area">
         <div className="min-w-[520px] md:min-w-[540px]">
           <SunmiTable
             headers={["Medio", "Bruto", "Comisión", "Neto", "Costo", "Ganancia"]}
@@ -82,10 +75,10 @@ export default function TablaMediosPago({ items }) {
         </div>
       </div>
       {sinMovimiento > 0 && conMovimiento.length > 0 && (
-        <p className="text-[10px] sunmi-text-muted mt-1.5">
+        <p className="text-[9px] sunmi-text-muted mt-1">
           {sinMovimiento} medio(s) sin movimiento no mostrado(s).
         </p>
       )}
-    </SunmiCard>
+    </div>
   );
 }

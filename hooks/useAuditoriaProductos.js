@@ -11,20 +11,18 @@ function buildQuery(fechaDesde, fechaHasta, extra = {}) {
 }
 
 /**
- * Carga los 5 bloques de auditoría POS en paralelo (solo lectura).
- * No envía localId: el servidor usa contexto activo (resolveLocalAndGrupo).
+ * Hook desacoplado para el submódulo Productos.
+ * Carga: productos (rentabilidad) + tickets conflictivos.
  */
-export function useAuditoriaPosVentas() {
+export function useAuditoriaProductos() {
   const [loading, setLoading] = useState(false);
   const [loadingTickets, setLoadingTickets] = useState(false);
   const [error, setError] = useState("");
-  const [resumen, setResumen] = useState(null);
-  const [turnos, setTurnos] = useState(null);
-  const [medios, setMedios] = useState(null);
   const [productos, setProductos] = useState(null);
+  const [categorias, setCategorias] = useState([]);
+  const [productosNota, setProductosNota] = useState("");
   const [tickets, setTickets] = useState(null);
   const [ticketsPagination, setTicketsPagination] = useState(null);
-  const [productosNota, setProductosNota] = useState("");
   const [ticketsCriterio, setTicketsCriterio] = useState("");
 
   const cargar = useCallback(async (fechaDesde, fechaHasta, ticketsPage = 1, ticketsPageSize = 25) => {
@@ -34,14 +32,13 @@ export function useAuditoriaPosVentas() {
     }
     setError("");
     setLoading(true);
-    setResumen(null);
-    setTurnos(null);
-    setMedios(null);
     setProductos(null);
+    setCategorias([]);
     setProductosNota("");
     setTickets(null);
     setTicketsPagination(null);
     setTicketsCriterio("");
+
     const qBase = buildQuery(fechaDesde, fechaHasta);
     const qTickets = buildQuery(fechaDesde, fechaHasta, {
       page: ticketsPage,
@@ -49,53 +46,21 @@ export function useAuditoriaPosVentas() {
     });
 
     try {
-      const [rRes, rTurnos, rMedios, rProd, rTickets] = await Promise.all([
-        fetch(`/api/auditoria-pos-ventas/resumen?${qBase}`, { credentials: "include" }),
-        fetch(`/api/auditoria-pos-ventas/turnos?${qBase}`, { credentials: "include" }),
-        fetch(`/api/auditoria-pos-ventas/medios?${qBase}`, { credentials: "include" }),
+      const [rProd, rTickets] = await Promise.all([
         fetch(`/api/auditoria-pos-ventas/productos?${qBase}`, { credentials: "include" }),
         fetch(`/api/auditoria-pos-ventas/tickets?${qTickets}`, { credentials: "include" }),
       ]);
 
-      const [dRes, dTurnos, dMedios, dProd, dTickets] = await Promise.all([
-        rRes.json(),
-        rTurnos.json(),
-        rMedios.json(),
+      const [dProd, dTickets] = await Promise.all([
         rProd.json(),
         rTickets.json(),
       ]);
 
-      if (!dRes.ok) {
-        setError(dRes.error || "Error en resumen");
-        setResumen(null);
-        setTurnos(null);
-        setMedios(null);
-        setProductos(null);
-        setTickets(null);
-        setTicketsPagination(null);
-        return;
-      }
-      if (!dTurnos.ok) {
-        setError(dTurnos.error || "Error en turnos");
-        return;
-      }
-      if (!dMedios.ok) {
-        setError(dMedios.error || "Error en medios");
-        return;
-      }
-      if (!dProd.ok) {
-        setError(dProd.error || "Error en productos");
-        return;
-      }
-      if (!dTickets.ok) {
-        setError(dTickets.error || "Error en tickets");
-        return;
-      }
+      if (!dProd.ok) { setError(dProd.error || "Error en productos"); return; }
+      if (!dTickets.ok) { setError(dTickets.error || "Error en tickets"); return; }
 
-      setResumen(dRes.resumen);
-      setTurnos(dTurnos.items);
-      setMedios(dMedios.items);
       setProductos(dProd.items);
+      setCategorias(dProd.categorias || []);
       setProductosNota(dProd.nota || "");
       setTickets(dTickets.items);
       setTicketsPagination(dTickets.pagination);
@@ -103,12 +68,6 @@ export function useAuditoriaPosVentas() {
     } catch (e) {
       console.error(e);
       setError("Error de conexión");
-      setResumen(null);
-      setTurnos(null);
-      setMedios(null);
-      setProductos(null);
-      setTickets(null);
-      setTicketsPagination(null);
     } finally {
       setLoading(false);
     }
@@ -125,10 +84,7 @@ export function useAuditoriaPosVentas() {
           credentials: "include",
         });
         const data = await res.json();
-        if (!data.ok) {
-          setError(data.error || "Error en tickets");
-          return;
-        }
+        if (!data.ok) { setError(data.error || "Error en tickets"); return; }
         setTickets(data.items);
         setTicketsPagination(data.pagination);
         setTicketsCriterio(data.criterio || "");
@@ -146,10 +102,8 @@ export function useAuditoriaPosVentas() {
     loading,
     loadingTickets,
     error,
-    resumen,
-    turnos,
-    medios,
     productos,
+    categorias,
     productosNota,
     tickets,
     ticketsPagination,

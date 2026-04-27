@@ -32,6 +32,13 @@ export async function GET(req) {
         cantidad: true,
         subtotal: true,
         precioCosto: true,
+        comisionLinea: true,
+        productoBase: {
+          select: {
+            categoria_id: true,
+            categoria: { select: { id: true, nombre: true } },
+          },
+        },
         venta: {
           select: {
             id: true,
@@ -49,16 +56,24 @@ export async function GET(req) {
       const sub = Number(d.subtotal) || 0;
       const cant = Number(d.cantidad) || 0;
       const costoLinea = (Number(d.precioCosto) || 0) * cant;
-      const totalVenta = Number(d.venta.total) || 0;
-      const comisionVenta = Number(d.venta.comisionBancaria) || 0;
-      const share = totalVenta > 0 ? sub / totalVenta : 0;
-      const comisionProrrateada = comisionVenta * share;
+      // Usar comisionLinea persistida (E1) si existe, fallback a prorrateo runtime
+      let comisionProrrateada;
+      if (d.comisionLinea != null) {
+        comisionProrrateada = Number(d.comisionLinea);
+      } else {
+        const totalVenta = Number(d.venta.total) || 0;
+        const comisionVenta = Number(d.venta.comisionBancaria) || 0;
+        const share = totalVenta > 0 ? sub / totalVenta : 0;
+        comisionProrrateada = comisionVenta * share;
+      }
       const resultadoLinea = sub - costoLinea - comisionProrrateada;
 
       if (!map.has(pid)) {
         map.set(pid, {
           productoBaseId: pid,
           nombre: d.nombre,
+          categoriaId: d.productoBase?.categoria_id || null,
+          categoriaNombre: d.productoBase?.categoria?.nombre || null,
           cantidad: 0,
           venta: 0,
           costo: 0,
@@ -92,9 +107,21 @@ export async function GET(req) {
       })
       .sort((a, b) => a.resultadoReal - b.resultadoReal);
 
+    // Extraer categorías únicas para filtro frontend
+    const catMap = new Map();
+    for (const row of items) {
+      if (row.categoriaId && row.categoriaNombre && !catMap.has(row.categoriaId)) {
+        catMap.set(row.categoriaId, row.categoriaNombre);
+      }
+    }
+    const categorias = Array.from(catMap.entries())
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
     return NextResponse.json({
       ok: true,
       items,
+      categorias,
       nota: `Comisión por producto prorrateada desde Venta.comisionBancaria × (subtotal línea / total ticket). Umbral margen bajo: 0–${UMBRAL_MARGEN_BAJO_PCT}% sobre venta del producto.`,
     });
   } catch (e) {
