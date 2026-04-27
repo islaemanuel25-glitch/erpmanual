@@ -1,7 +1,6 @@
 "use client";
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
-import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import FilaTransferencia from "./FilaTransferencia";
 
 const formatDate = (value) => {
@@ -30,18 +29,17 @@ export default function TablaTransferencias({
   ].filter(Boolean);
 
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-slate-800 mx-1 mb-2">
+    <div className="w-full overflow-x-auto rounded-xl border border-[var(--border)] mx-1 mb-2">
       <SunmiTable headers={headers} className="min-w-[1000px]">
         {items.map((t) => (
-          <SunmiTableRow key={t.id}>
             <FilaTransferencia
+              key={t.id}
               t={t}
               columns={columns}
               filaAbierta={filaAbierta}
               setFilaAbierta={setFilaAbierta}
               formatDate={formatDate}
             />
-          </SunmiTableRow>
         ))}
       </SunmiTable>
     </div>

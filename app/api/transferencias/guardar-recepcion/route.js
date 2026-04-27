@@ -31,13 +31,27 @@ export async function POST(req) {
     // Scope: non-admin debe ser destino de la transferencia
     const transferencia = await prisma.transferencia.findUnique({
       where: { id: transferenciaId },
-      select: { destinoId: true },
+      select: { destinoId: true, estado: true },
     });
 
     if (!transferencia) {
       return NextResponse.json(
         { ok: false, error: "Transferencia no encontrada" },
         { status: 404 }
+      );
+    }
+
+    if (transferencia.estado === "Recibida") {
+      return NextResponse.json(
+        { ok: false, error: "Esta transferencia ya fue confirmada. No se pueden guardar cambios." },
+        { status: 400 }
+      );
+    }
+
+    if (transferencia.estado !== "Enviada" && transferencia.estado !== "Recibiendo") {
+      return NextResponse.json(
+        { ok: false, error: `No se puede editar una transferencia en estado "${transferencia.estado}"` },
+        { status: 400 }
       );
     }
 

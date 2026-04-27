@@ -1,35 +1,51 @@
 // app/api/transferencias/listar/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { getUsuarioSession, getCookieValue } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 const PAGE_SIZE = 25;
 
 export async function GET(req) {
   try {
     const session = getUsuarioSession(req);
-
     if (!session) {
       return NextResponse.json(
-        {
-          ok: false,
-          items: [],
-          total: 0,
-          totalPages: 1,
-          error: "No autenticado",
-        },
+        { ok: false, items: [], total: 0, totalPages: 1, error: "No autenticado" },
         { status: 401 }
       );
     }
 
-    const permisos = Array.isArray(session.permisos) ? session.permisos : [];
-    const esAdmin = permisos.includes("*");
+    const perm = checkPerm(session, "transferencias.ver");
+    if (!perm.ok) {
+      return NextResponse.json(
+        { ok: false, items: [], total: 0, totalPages: 1, error: perm.error },
+        { status: perm.status }
+      );
+    }
+
+    // Resolver localId: cookie de contexto > JWT
+    let localId = null;
+
+    // 1. Intentar cookie de contexto activo
+    const raw = getCookieValue(req, "erpazul_contexto_activo");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        const ctx = Number(parsed.localId);
+        if (ctx > 0) localId = ctx;
+      } catch {}
+    }
+
+    // 2. Fallback: localId del JWT
+    if (!localId && session.localId) {
+      localId = Number(session.localId);
+    }
 
     const { searchParams } = new URL(req.url);
 
     const page = Math.max(Number(searchParams.get("page") || 1), 1);
     const estado = searchParams.get("estado") || "";
-    const localIdFiltro = searchParams.get("localId") || "";
     const fechaDesde = searchParams.get("fechaDesde") || "";
     const fechaHasta = searchParams.get("fechaHasta") || "";
 
@@ -37,31 +53,23 @@ export async function GET(req) {
 
     if (estado) where.estado = estado;
 
-    if (esAdmin && localIdFiltro) {
-      const localIdNum = Number(localIdFiltro);
-      where.OR = [
-        { origenId: localIdNum },
-        { destinoId: localIdNum },
-      ];
-    }
-
     if (fechaDesde || fechaHasta) {
       where.fechaEnvio = {};
       if (fechaDesde) where.fechaEnvio.gte = new Date(fechaDesde + "T00:00:00");
       if (fechaHasta) where.fechaEnvio.lte = new Date(fechaHasta + "T23:59:59");
     }
 
-    if (!esAdmin) {
-      const localId = session.localId ? Number(session.localId) : null;
-
+    // Filtrar por contexto activo
+    if (localId) {
       const local = await prisma.local.findUnique({
         where: { id: localId },
         select: { es_deposito: true },
       });
 
-      if (local.es_deposito) where.origenId = localId;
+      if (local?.es_deposito) where.origenId = localId;
       else where.destinoId = localId;
     }
+    // Si no hay localId (admin sin contexto): no filtra por local, ve todas
 
     // ======================================
     // CONSULTA PRINCIPAL CORREGIDA

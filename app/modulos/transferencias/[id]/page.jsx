@@ -3,13 +3,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import useContextoActivo from "@/hooks/useContextoActivo";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
+import SinPermisos from "@/components/auth/SinPermisos";
 import TransferenciaHeader from "@/components/transferencias/TransferenciaHeader";
 import TablaDetalleTransferencia from "@/components/transferencias/TablaDetalleTransferencia";
 import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
@@ -21,6 +23,7 @@ function num(v) {
 
 export default function TransferenciaDetallePage() {
   const { id } = useParams();
+  const { contexto } = useContextoActivo();
 
   const [item, setItem] = useState(null);
   const [editItems, setEditItems] = useState([]);
@@ -29,6 +32,7 @@ export default function TransferenciaDetallePage() {
 
   const [guardando, setGuardando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
 
   const [me, setMe] = useState(null);
 
@@ -105,21 +109,32 @@ export default function TransferenciaDetallePage() {
   if (!me) return <div className="p-4 sunmi-text-muted">Cargando usuario...</div>;
 
   // ===============================
-  // Permisos
+  // Guard de acceso a pantalla
   // ===============================
-  const localId = me.localId || null;
-  const esAdmin = me.esAdmin || me.permisos?.includes("*");
+  const permisos = me?.permisos || [];
+  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+  if (!esAdmin && !permisos.includes("transferencias.ver")) return <SinPermisos />;
+
+  // ===============================
+  // Permisos — solo el local destino puede editar/recibir
+  // ===============================
+  const localIdActivo = contexto?.localId || me.localId || null;
 
   let puedeRecibir = false;
 
-  if (item) {
-    const esDestino = localId && item.destino?.id === localId;
+  if (item && localIdActivo) {
+    const esDestino = item.destino?.id === localIdActivo;
     const estadoValido =
       item.estado === "Enviada" || item.estado === "Recibiendo";
-    puedeRecibir = estadoValido && (esAdmin || esDestino);
+    puedeRecibir = estadoValido && esDestino;
   }
 
   const inputsHabilitados = puedeRecibir;
+
+  // Cancelar: solo estado "Enviada" + permiso transferencias.cancelar
+  const puedeCancelar =
+    item?.estado === "Enviada" &&
+    (esAdmin || permisos.includes("transferencias.cancelar"));
 
   // ===============================
   // Guardar cambios
@@ -205,6 +220,34 @@ export default function TransferenciaDetallePage() {
   };
 
   // ===============================
+  // Cancelar transferencia
+  // ===============================
+  const cancelarTransferencia = async () => {
+    if (!confirm("¿Estás seguro de cancelar esta transferencia? Se revertirá el stock en tránsito al origen.")) {
+      return;
+    }
+
+    try {
+      setCancelando(true);
+
+      const res = await fetch("/api/transferencias/cancelar", {
+        method: "POST",
+        body: JSON.stringify({ transferenciaId: item.id }),
+      });
+
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
+
+      await cargar();
+
+    } catch (err) {
+      alert("Error cancelando: " + err.message);
+    } finally {
+      setCancelando(false);
+    }
+  };
+
+  // ===============================
   // Total transferencia
   // ===============================
   const totalTransferencia = item
@@ -217,13 +260,8 @@ export default function TransferenciaDetallePage() {
   return (
     <div className="p-2 sm:p-4 max-w-6xl mx-auto space-y-3">
 
-      <div>
-        <Link
-          href="/modulos/transferencias"
-          className="text-xs sm:text-sm sunmi-link-accent hover:underline"
-        >
-          ← Volver al listado
-        </Link>
+      <div className="flex justify-end">
+        <SunmiBackButton href="/modulos/transferencias" />
       </div>
 
       <SunmiCard>
@@ -260,6 +298,9 @@ export default function TransferenciaDetallePage() {
               guardarCambios={guardarCambios}
               confirmando={confirmando}
               confirmarRecepcion={confirmarRecepcion}
+              puedeCancelar={puedeCancelar}
+              cancelando={cancelando}
+              cancelarTransferencia={cancelarTransferencia}
             />
           </>
         )}

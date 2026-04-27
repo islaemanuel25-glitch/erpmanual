@@ -18,63 +18,63 @@ export default function FilaTransferencia({
   return (
     <>
       <tr
-        className="border-t border-slate-800 cursor-pointer hover:bg-slate-800/40"
+        className="border-t border-[var(--border)] cursor-pointer sunmi-row-hover transition"
         onClick={toggleFila}
       >
-        {columns.id && <td>{t.id}</td>}
+        {columns.id && <td className="px-2 py-1.5">{t.id}</td>}
 
         {columns.origen && (
-          <td>
+          <td className="px-2 py-1.5">
             {t.origenNombre}
             {t.origenEsDeposito && (
-              <span className="text-amber-300 text-[10px] ml-1">(Depósito)</span>
+              <span className="sunmi-text-accent text-[10px] ml-1">(Dep.)</span>
             )}
           </td>
         )}
 
-        {columns.destino && <td>{t.destinoNombre}</td>}
+        {columns.destino && <td className="px-2 py-1.5">{t.destinoNombre}</td>}
 
         {columns.estado && (
-          <td>
-            <span className="inline-flex px-2 py-[2px] text-[11px] bg-slate-800 border border-slate-700 rounded-full text-slate-200">
+          <td className="px-2 py-1.5">
+            <span className={`${t.estado === "Cancelada" ? "sunmi-badge-danger" : t.estado === "Recibida" ? "sunmi-badge-success" : "sunmi-badge-muted"} text-[11px] px-2 py-0.5 rounded-full font-medium`}>
               {t.estado}
             </span>
           </td>
         )}
 
         {columns.recepcion && (
-          <td>
+          <td className="px-2 py-1.5">
             {t.estado !== "Recibida" ? (
-              <span className="text-slate-500 text-[11px]">-</span>
+              <span className="text-[11px] sunmi-text-muted">-</span>
             ) : t.tieneDiferencias ? (
-              <span className="inline-flex px-2 py-[2px] text-[11px] bg-red-900/40 border border-red-600 text-red-300 rounded-full">
+              <span className="sunmi-badge-danger text-[11px] px-2 py-0.5 rounded-full font-medium">
                 Con diferencias
               </span>
             ) : (
-              <span className="inline-flex px-2 py-[2px] text-[11px] bg-emerald-900/40 border border-emerald-600 text-emerald-300 rounded-full">
+              <span className="sunmi-badge-success text-[11px] px-2 py-0.5 rounded-full font-medium">
                 Correcta
               </span>
             )}
           </td>
         )}
 
-        {columns.items && <td className="text-right">{t.cantidadItems}</td>}
+        {columns.items && <td className="px-2 py-1.5 text-right">{t.cantidadItems}</td>}
 
         {columns.importe && (
-          <td className="text-right">
+          <td className="px-2 py-1.5 text-right tabular-nums">
             ${Number(t.totalCosto || 0).toFixed(2)}
           </td>
         )}
 
-        {columns.fechaEnvio && <td>{formatDate(t.fechaEnvio)}</td>}
+        {columns.fechaEnvio && <td className="px-2 py-1.5">{formatDate(t.fechaEnvio)}</td>}
 
-        {columns.fechaRecepcion && <td>{formatDate(t.fechaRecepcion)}</td>}
+        {columns.fechaRecepcion && <td className="px-2 py-1.5">{formatDate(t.fechaRecepcion)}</td>}
 
         {columns.acciones && (
-          <td>
+          <td className="px-2 py-1.5">
             <Link
               href={`/modulos/transferencias/${t.id}`}
-              onClick={(e) => e.stopPropagation()} // evita abrir/cerrar fila
+              onClick={(e) => e.stopPropagation()}
             >
               <SunmiButton color="cyan">Ver</SunmiButton>
             </Link>
@@ -83,7 +83,7 @@ export default function FilaTransferencia({
       </tr>
 
       {filaAbierta === t.id && (
-        <tr className="animate-fade">
+        <tr>
           <td colSpan="20">
             <MiniInfo t={t} />
           </td>

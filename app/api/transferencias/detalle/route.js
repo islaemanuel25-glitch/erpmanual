@@ -1,7 +1,8 @@
 // app/api/transferencias/detalle/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { getUsuarioSession, getCookieValue } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
 
 function toNumber(v) {
@@ -19,6 +20,9 @@ export async function GET(req) {
         { status: 401 }
       );
     }
+
+    const perm = checkPerm(session, "transferencias.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const url = new URL(req.url);
     const id = Number(url.searchParams.get("id") || 0);
@@ -58,9 +62,20 @@ export async function GET(req) {
 
     // ======================================================
     // SCOPE: non-admin debe ser origen o destino
+    // Resolver localId: cookie de contexto > JWT (consistente con listar)
     // ======================================================
     if (!session.esAdmin) {
-      const localId = Number(session.localId || 0);
+      let localId = null;
+      const raw = getCookieValue(req, "erpazul_contexto_activo");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          const ctx = Number(parsed.localId);
+          if (ctx > 0) localId = ctx;
+        } catch {}
+      }
+      if (!localId && session.localId) localId = Number(session.localId);
+
       if (!localId || (transferencia.origenId !== localId && transferencia.destinoId !== localId)) {
         return NextResponse.json(
           { ok: false, error: "Sin permiso" },

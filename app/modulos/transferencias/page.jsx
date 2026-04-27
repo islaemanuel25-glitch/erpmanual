@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import { Settings2 } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 
@@ -10,8 +10,9 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 
 import ColumnSettingsModal from "@/components/transferencias/ColumnSettingsModal";
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
@@ -40,16 +41,18 @@ const COLUMN_DEFAULTS = {
 
 export default function TransferenciasPage() {
   const { perfil: perfilTr, cargando: cargandoTr } = useUser();
+  const permisosTr = perfilTr?.permisos || [];
+  const esAdminTr = Array.isArray(permisosTr) && permisosTr.includes("*");
 
-  // 🔥 FECHAS INICIALIZADAS SIN FLASH
-  const hoy = new Date().toISOString().split("T")[0];
+  const _d = new Date();
+  const hoy = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
+  const _d30 = new Date(_d.getFullYear(), _d.getMonth(), _d.getDate() - 30);
+  const hace30 = `${_d30.getFullYear()}-${String(_d30.getMonth() + 1).padStart(2, "0")}-${String(_d30.getDate()).padStart(2, "0")}`;
 
   const [items, setItems] = useState([]);
   const [estado, setEstado] = useState("");
-  const [localId, setLocalId] = useState("");
-  const [locales, setLocales] = useState([]);
 
-  const [fechaDesde, setFechaDesde] = useState(hoy);
+  const [fechaDesde, setFechaDesde] = useState(hace30);
   const [fechaHasta, setFechaHasta] = useState(hoy);
 
   const [page, setPage] = useState(1);
@@ -83,15 +86,6 @@ export default function TransferenciasPage() {
   }, [columns]);
 
   // ==============================
-  // CARGA DE LOCALES
-  // ==============================
-  const fetchLocales = async () => {
-    const res = await fetch("/api/locales/listar");
-    const json = await res.json();
-    if (json.ok) setLocales(json.items || []);
-  };
-
-  // ==============================
   // CARGA DE TRANSFERENCIAS
   // ==============================
   const fetchData = async () => {
@@ -103,7 +97,6 @@ export default function TransferenciasPage() {
 
       url.searchParams.set("page", String(page));
       if (estado) url.searchParams.set("estado", estado);
-      if (localId) url.searchParams.set("localId", localId);
       if (fechaDesde) url.searchParams.set("fechaDesde", fechaDesde);
       if (fechaHasta) url.searchParams.set("fechaHasta", fechaHasta);
 
@@ -129,15 +122,16 @@ export default function TransferenciasPage() {
     }
   };
 
-  useEffect(() => { fetchLocales(); }, []);
-  useEffect(() => { fetchData(); }, [page, estado, localId, fechaDesde, fechaHasta]);
+  useEffect(() => { fetchData(); }, [page, estado, fechaDesde, fechaHasta]);
 
   const quitarFiltros = () => {
-    const hoy = new Date().toISOString().split("T")[0];
+    const d = new Date();
+    const h = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const d30 = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 30);
+    const h30 = `${d30.getFullYear()}-${String(d30.getMonth() + 1).padStart(2, "0")}-${String(d30.getDate()).padStart(2, "0")}`;
     setEstado("");
-    setLocalId("");
-    setFechaDesde(hoy);
-    setFechaHasta(hoy);
+    setFechaDesde(h30);
+    setFechaHasta(h);
     setPage(1);
   };
 
@@ -145,16 +139,15 @@ export default function TransferenciasPage() {
   const next = () => setPage((p) => Math.min(totalPages, p + 1));
 
   if (cargandoTr) return null;
-  const permisosTr = perfilTr?.permisos || [];
-  const esAdminTr = Array.isArray(permisosTr) && permisosTr.includes("*");
-  if (!esAdminTr && !permisosTr.includes("transferencias.crear")) return <SinPermisos />;
+  if (!esAdminTr && !permisosTr.includes("transferencias.ver")) return <SinPermisos />;
 
   return (
-    <div className="p-2 sm:p-4 max-w-6xl mx-auto">
-      
+    <div className="p-2 sm:p-4 max-w-6xl mx-auto space-y-3">
+      <SunmiBackButton href="/inicio" />
+
       <SunmiCard>
         <SunmiHeader title="Transferencias">
-          <div className="text-xs sm:text-sm sunmi-text-strong">
+          <div className="text-xs sm:text-sm sunmi-text-muted">
             Historial de transferencias entre Depósito y Locales
           </div>
         </SunmiHeader>
@@ -164,7 +157,7 @@ export default function TransferenciasPage() {
         ======================= */}
         <SunmiSeparator label="Filtros" />
 
-        <div className="grid sm:grid-cols-3 gap-3 px-2 pb-2">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 px-2 pb-2">
 
           {/* ESTADO */}
           <div>
@@ -179,39 +172,20 @@ export default function TransferenciasPage() {
             </SunmiSelectAdv>
           </div>
 
-          {/* LOCAL */}
+          {/* PERÍODO */}
           <div>
-            <label className="text-[11px] sunmi-text-muted mb-1 block">Local</label>
-            <SunmiSelectAdv
-              value={localId}
-              onChange={(val) => { setLocalId(val); setPage(1); }}
-            >
-              <option value="">Todos</option>
-              {locales.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.nombre} {l.esDeposito ? "(Depósito)" : ""}
-                </option>
-              ))}
-            </SunmiSelectAdv>
-          </div>
-
-          {/* DESDE */}
-          <div>
-            <label className="text-[11px] sunmi-text-muted mb-1 block">Desde</label>
-            <SunmiInput
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => { setFechaDesde(e.target.value); setPage(1); }}
-            />
-          </div>
-
-          {/* HASTA */}
-          <div>
-            <label className="text-[11px] sunmi-text-muted mb-1 block">Hasta</label>
-            <SunmiInput
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => { setFechaHasta(e.target.value); setPage(1); }}
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Período</label>
+            <SunmiDateRangePicker
+              valueDesde={fechaDesde}
+              valueHasta={fechaHasta}
+              onChangeDesde={setFechaDesde}
+              onChangeHasta={setFechaHasta}
+              onApply={(desde, hasta) => {
+                setFechaDesde(desde);
+                setFechaHasta(hasta);
+                setPage(1);
+              }}
+              maxDate={hoy}
             />
           </div>
 
@@ -233,7 +207,7 @@ export default function TransferenciasPage() {
             color="slate"
             onClick={() => setOpenCols(true)}
           >
-            ⚙️ Columnas
+            <Settings2 size={14} className="inline -mt-0.5" /> Columnas
           </SunmiButton>
         </div>
 
@@ -262,20 +236,18 @@ export default function TransferenciasPage() {
         {/* ======================
             PAGINACIÓN
         ======================= */}
-        <div className="flex justify-between items-center px-2 pb-2 text-xs sm:text-sm sunmi-text-strong">
-          
-          <div>Página {page} de {totalPages}</div>
-
+        <div className="flex justify-between items-center flex-wrap gap-2 px-2 pb-2">
           <div className="flex items-center gap-2">
             <SunmiButton color="slate" onClick={prev} disabled={page <= 1}>
               Anterior
             </SunmiButton>
-
+            <span className="sunmi-text-muted text-[11px]">
+              Página {page} de {totalPages}
+            </span>
             <SunmiButton color="slate" onClick={next} disabled={page >= totalPages}>
               Siguiente
             </SunmiButton>
           </div>
-
         </div>
 
       </SunmiCard>
