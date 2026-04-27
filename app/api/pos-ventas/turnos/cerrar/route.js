@@ -75,6 +75,7 @@ export async function POST(req) {
       where: { id: turnoId },
       data: {
         cierre: new Date(),
+        cerradoPorId: session.id,
         montoEsperadoEfectivo: montoEsperado,
         montoRealEfectivo: Number(montoRealEfectivo),
         diferenciaEfectivo: diferencia,

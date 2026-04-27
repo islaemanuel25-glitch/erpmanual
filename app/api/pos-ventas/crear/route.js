@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
+import { getOperadorActivo } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -17,6 +18,10 @@ export async function POST(req) {
     }
 
     const { grupoId, localId, session } = scope;
+
+    // Operador activo (opcional, desde cookie)
+    const opActivo = getOperadorActivo(req);
+    const operadorId = opActivo?.operadorId || null;
 
     const body = await req.json();
     const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, esFiado, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje } = body;
@@ -408,14 +413,19 @@ export async function POST(req) {
         data: {
           localId,
           vendedorId: session.id,
+          operadorId,
           clienteId: clienteId || null,
           turnoId,
           numero,
           clientTxnId: txnId || null,
           subtotal,
           descuento: descuentoTotal,
+          descuentoAutomatico: descuentoAutomatico || null,
+          descuentoManual: descuentoManual || null,
+          descuentoPorPuntos: descuentoPorPuntosVal || null,
           total,
           comisionBancaria,
+          comisionPct: tieneComision ? comisionPct : null,
           netoRecibido,
           costoTotal,
           gananciaBruta,
@@ -423,15 +433,21 @@ export async function POST(req) {
           formaPago,
           esFiado: !!esFiado,
           detalles: {
-            create: itemsConCosto.map((item) => ({
-              productoBaseId: item.productoBaseId,
-              nombre: item.nombre,
-              precio: item.precio,
-              precioCosto: item.precioCosto,
-              cantidad: item.cantidad,
-              subtotal: item.subtotalItem,
-              ganancia: item.ganancia,
-            })),
+            create: itemsConCosto.map((item) => {
+              const lineaSubtotal = item.subtotalItem;
+              const shareLinea = total > 0 ? lineaSubtotal / total : 0;
+              const comisionLinea = comisionBancaria * shareLinea;
+              return {
+                productoBaseId: item.productoBaseId,
+                nombre: item.nombre,
+                precio: item.precio,
+                precioCosto: item.precioCosto,
+                cantidad: item.cantidad,
+                subtotal: item.subtotalItem,
+                ganancia: item.ganancia,
+                comisionLinea: comisionLinea > 0 ? Number(comisionLinea.toFixed(2)) : null,
+              };
+            }),
           },
         },
       });

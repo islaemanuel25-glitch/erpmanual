@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { getOperadorActivo } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -41,10 +42,13 @@ export async function POST(req) {
       );
     }
 
+    const opActivo = getOperadorActivo(req);
+
     const turno = await prisma.turno.create({
       data: {
         localId,
         vendedorId: session.id,
+        operadorId: opActivo?.operadorId || null,
         montoInicial: Number(montoInicial) || 0,
       },
     });

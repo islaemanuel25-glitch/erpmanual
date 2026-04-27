@@ -6,7 +6,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 export default function ModalTicket({ venta, onOpcion, onCerrar }) {
   return (
     <div className="fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-50">
-      <SunmiCard className="w-full max-w-sm p-4">
+      <SunmiCard className="w-full max-w-md p-4">
         <div className="text-center mb-4">
           <div className="sunmi-text-success text-3xl mb-2">✓</div>
           <h3 className="text-lg font-bold">Venta registrada</h3>

@@ -28,21 +28,21 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
 
   return (
     <div className="fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-50">
-      <SunmiCard className="w-full max-w-md p-4">
-        <h3 className="text-lg font-bold mb-4">Pago en Efectivo</h3>
+      <SunmiCard className="w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-xl font-bold mb-4">Pago en Efectivo</h3>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Total */}
-          <div className="pos-bg-panel p-3 rounded-lg">
-            <div className="text-xs pos-text-muted">Total a cobrar</div>
-            <div className="text-2xl font-bold pos-text-accent">
+          <div className="pos-bg-panel p-4 rounded-lg">
+            <div className="text-sm pos-text-muted">Total a cobrar</div>
+            <div className="text-5xl font-black pos-text-accent">
               ${formatPrecio(total)}
             </div>
           </div>
 
           {/* Monto que paga */}
           <div>
-            <label className="text-[11px] pos-text-muted mb-1 block">
+            <label className="text-sm pos-text-muted mb-1 block">
               Cliente paga con:
             </label>
             <SunmiInput
@@ -63,7 +63,7 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
                   key={monto}
                   color="cyan"
                   onClick={() => setPagaCon(String(monto))}
-                  className="!text-sm !py-2"
+                  className="!text-sm !py-3"
                 >
                   ${monto.toLocaleString("es-AR")}
                 </SunmiButton>
@@ -83,8 +83,8 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
           {/* Vuelto */}
           {pagaConNum >= total && pagaConNum > 0 && (
             <div className="pos-success-box p-3 rounded-lg">
-              <div className="text-xs pos-text-success-soft">VUELTO</div>
-              <div className="text-3xl font-bold pos-text-success">
+              <div className="text-sm pos-text-success-soft">VUELTO</div>
+              <div className="text-5xl font-black tracking-wide pos-text-success">
                 ${formatPrecio(vuelto)}
               </div>
             </div>
@@ -98,7 +98,7 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
 
           {/* Acciones */}
           <div className="flex gap-2 pt-2">
-            <SunmiButton color="slate" onClick={onCancelar} className="flex-1">
+            <SunmiButton color="slate" onClick={onCancelar} className="flex-1 !py-3">
               Cancelar
             </SunmiButton>
             <SunmiButton
@@ -107,7 +107,7 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
                 onConfirmar({ pagaCon: pagaConNum, vuelto })
               }
               disabled={!pagaConNum || pagaConNum < total}
-              className="flex-1 !font-bold"
+              className="flex-1 !font-bold !py-3"
             >
               Confirmar
             </SunmiButton>
