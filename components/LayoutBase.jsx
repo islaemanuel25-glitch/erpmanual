@@ -44,7 +44,7 @@ export default function LayoutBase({ children }) {
   const menu = !isSidebar && perfil ? buildVisibleMenu(MENU_CONFIG, perfil) : null;
 
   return (
-    <div className={`${isSidebar ? "flex" : "flex flex-col"} min-h-full w-full overflow-x-hidden`}>
+    <div className={`${isSidebar ? "flex" : "flex flex-col"} h-dvh w-full overflow-x-hidden`}>
 
       {/* SIDEBAR (solo en modo sidebarLeft) */}
       {isSidebar && <SidebarPro />}
