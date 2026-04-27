@@ -50,7 +50,7 @@ export function UserProvider({ children }) {
   }, [refrescar]);
 
   const logout = async () => {
-    await fetch("/api/auth/logout", {
+    await fetch("/api/logout", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
