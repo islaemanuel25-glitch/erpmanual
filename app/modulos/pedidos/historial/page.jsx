@@ -10,6 +10,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
@@ -120,13 +121,9 @@ export default function HistorialPedidosPage() {
   return (
     <div className="min-h-screen sunmi-bg">
       <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
-        <button
-          type="button"
-          onClick={() => router.push("/modulos/pedidos")}
-          className="text-xs sunmi-link flex items-center gap-1 transition"
-        >
-          ← Volver al catálogo
-        </button>
+        <div className="flex justify-end">
+          <SunmiBackButton href="/modulos/pedidos" />
+        </div>
 
         <SunmiCard>
           <SunmiHeader title="Historial de Pedidos" color="cyan">

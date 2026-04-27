@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiTable from "@/components/sunmi/SunmiTable";
@@ -280,13 +281,9 @@ export default function DetallePedidoProveedorPage({ params }) {
       <div className="sunmi-bg w-full min-h-full p-4">
         <SunmiCard>
           <p className="sunmi-text-danger">Pedido no encontrado</p>
-          <SunmiButton
-            color="slate"
-            className="mt-3"
-            onClick={() => router.push("/modulos/compras-proveedor")}
-          >
-            ← Volver
-          </SunmiButton>
+          <div className="mt-3 flex justify-end">
+            <SunmiBackButton href="/modulos/compras-proveedor" />
+          </div>
         </SunmiCard>
       </div>
     );
@@ -324,12 +321,7 @@ export default function DetallePedidoProveedorPage({ params }) {
             </span>
           </div>
 
-          <SunmiButton
-            color="slate"
-            onClick={() => router.push("/modulos/compras-proveedor")}
-          >
-            ← Volver
-          </SunmiButton>
+          <SunmiBackButton href="/modulos/compras-proveedor" />
         </div>
 
         {/* Info del pedido */}

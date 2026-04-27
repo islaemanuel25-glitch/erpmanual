@@ -15,8 +15,8 @@ import {
   buildDefaultConfig,
   PRESETS,
 } from "@/lib/pos-ventas/ticketConfig";
-import { ArrowLeft, Save, Printer, RotateCcw } from "lucide-react";
-import Link from "next/link";
+import { Save, Printer, RotateCcw } from "lucide-react";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 
 export default function TicketConfigPage() {
   const { perfil, cargando } = useUser();
@@ -96,13 +96,8 @@ export default function TicketConfigPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-center gap-2 mb-2">
-        <Link href="/modulos/configuracion">
-          <SunmiButton size="sm">
-            <ArrowLeft size={14} className="mr-1 inline-block -mt-0.5" />
-            Volver
-          </SunmiButton>
-        </Link>
+      <div className="flex justify-end mb-2">
+        <SunmiBackButton href="/modulos/configuracion" />
       </div>
 
       <SunmiHeader title="Editor de Ticket" />

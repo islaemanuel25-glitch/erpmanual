@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
@@ -70,10 +71,8 @@ export default function ClienteDetallePage() {
       <div className="p-2 lg:p-3 max-w-5xl mx-auto">
         <SunmiCard className="p-4">
           <div className="text-center sunmi-text-danger">{errorMsg || "Cliente no encontrado"}</div>
-          <div className="mt-4 flex justify-center">
-            <SunmiButton color="slate" onClick={() => router.push("/modulos/clientes")}>
-              Volver
-            </SunmiButton>
+          <div className="mt-4 flex justify-end">
+            <SunmiBackButton href="/modulos/clientes" />
           </div>
         </SunmiCard>
       </div>
@@ -97,9 +96,7 @@ export default function ClienteDetallePage() {
           >
             Editar
           </SunmiButton>
-          <SunmiButton color="slate" onClick={() => router.push(`/modulos/clientes?localId=${localId}`)}>
-            Volver
-          </SunmiButton>
+          <SunmiBackButton href={`/modulos/clientes?localId=${localId}`} />
         </div>
       </div>
 

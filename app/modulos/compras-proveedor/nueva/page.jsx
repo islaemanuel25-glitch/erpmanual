@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiTable from "@/components/sunmi/SunmiTable";
@@ -186,12 +187,7 @@ export default function NuevaCompraProveedorPage() {
       <SunmiCard>
         <div className="flex items-center justify-between mb-4">
           <SunmiHeader title="Nuevo pedido a proveedor" />
-          <SunmiButton
-            color="slate"
-            onClick={() => router.push("/modulos/compras-proveedor")}
-          >
-            ← Volver
-          </SunmiButton>
+          <SunmiBackButton href="/modulos/compras-proveedor" />
         </div>
 
         {/* Selección de proveedor */}

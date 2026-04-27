@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -208,12 +208,7 @@ export default function AnalyticsClientesPage() {
             </p>
           </div>
         </div>
-        <SunmiButton
-          color="slate"
-          onClick={() => router.push("/modulos/clientes")}
-        >
-          Volver a Clientes
-        </SunmiButton>
+        <SunmiBackButton href="/modulos/clientes" />
       </div>
 
       {/* Filtros globales */}

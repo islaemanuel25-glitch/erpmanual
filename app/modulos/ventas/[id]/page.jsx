@@ -1,18 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useUser } from "@/app/context/UserContext";
+import { useParams } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import VentaDetalleContent from "@/components/dashboard/VentaDetalleContent";
-import { ArrowLeft } from "lucide-react";
 
 export default function VentaDetallePage() {
   const params = useParams();
-  const router = useRouter();
-  const { perfil } = useUser();
   const ventaId = params.id;
 
   const [venta, setVenta] = useState(null);
@@ -65,13 +61,8 @@ export default function VentaDetallePage() {
       <div className="p-4 md:p-6 max-w-2xl mx-auto">
         <SunmiCard className="p-5">
           <p className="text-center opacity-80">{error || "Venta no encontrada"}</p>
-          <div className="mt-4 flex justify-center">
-            <SunmiButton
-              color="slate"
-              onClick={() => router.push("/modulos/dashboard")}
-            >
-              Volver al panel
-            </SunmiButton>
+          <div className="mt-4 flex justify-end">
+            <SunmiBackButton href="/modulos/dashboard" />
           </div>
         </SunmiCard>
       </div>
@@ -80,18 +71,11 @@ export default function VentaDetallePage() {
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-4">
-        <button
-          type="button"
-          onClick={() => router.push("/modulos/dashboard")}
-          className="p-2 rounded-lg opacity-70 hover:opacity-100 hover:bg-current/10 transition"
-          aria-label="Volver"
-        >
-          <ArrowLeft size={20} />
-        </button>
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <h1 className="text-lg font-semibold opacity-90">
           Ticket #{venta.numero}
         </h1>
+        <SunmiBackButton href="/modulos/dashboard" />
       </div>
 
       <div className="flex flex-col gap-4">

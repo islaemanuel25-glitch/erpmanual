@@ -9,6 +9,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
@@ -262,9 +263,9 @@ export default function TurnoDetallePage() {
       <div className="p-3 space-y-3">
         <SunmiCard>
           <p className="sunmi-text-danger">{error}</p>
-          <SunmiButton color="slate" onClick={() => router.push("/modulos/turnos")} className="mt-3">
-            Volver
-          </SunmiButton>
+          <div className="mt-3 flex justify-end">
+            <SunmiBackButton href="/modulos/turnos" />
+          </div>
         </SunmiCard>
       </div>
     );
@@ -319,9 +320,7 @@ export default function TurnoDetallePage() {
                 Imprimir Z Report
               </SunmiButton>
             )}
-            <SunmiButton color="slate" onClick={() => router.push("/modulos/turnos")}>
-              Volver
-            </SunmiButton>
+            <SunmiBackButton href="/modulos/turnos" />
           </div>
         </div>
 
