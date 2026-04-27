@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import FormProducto from "@/components/productos/FormProducto";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -96,9 +97,7 @@ export default function NuevoProductoPage() {
       <SunmiCard>
         <div className="flex items-center justify-between mb-3">
           <SunmiHeader title="Nuevo producto" />
-          <SunmiButton color="cyan" onClick={handleCancel}>
-            Volver
-          </SunmiButton>
+          <SunmiBackButton href="/modulos/productos" />
         </div>
 
         {loadingCat ? (

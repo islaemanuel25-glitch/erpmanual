@@ -8,6 +8,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -722,12 +723,7 @@ export default function EdicionRapidaPage() {
                 onChange={handleVisibleColsChange}
                 lockedKeys={LOCKED_COLS}
               />
-              <SunmiButton
-                color="cyan"
-                onClick={() => router.push("/modulos/productos")}
-              >
-                Volver a productos
-              </SunmiButton>
+              <SunmiBackButton href="/modulos/productos" />
             </div>
           </div>
 

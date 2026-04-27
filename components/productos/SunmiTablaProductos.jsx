@@ -6,6 +6,7 @@ import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
+import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
 
 import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
@@ -14,8 +15,6 @@ const SORTABLE_KEYS = [
   "nombre", "codigoBarra", "precioCosto", "precioVenta",
   "margen", "categoriaId", "proveedorId", "activo",
 ];
-
-const PAGE_SIZES = [25, 50, 100];
 
 export default function SunmiTablaProductos({
   rows,
@@ -77,8 +76,8 @@ export default function SunmiTablaProductos({
     sku: { titulo: "SKU", thClass: "w-[90px]" },
     nombre: {
       titulo: "Nombre",
-      thClass: "min-w-[160px]",
-      tdClass: "whitespace-normal break-words line-clamp-2 overflow-hidden leading-tight",
+      thClass: "min-w-[220px]",
+      tdClass: "whitespace-normal leading-tight",
       titleKey: "nombre",
       render: (v, row) => (
         <span>
@@ -231,7 +230,7 @@ export default function SunmiTablaProductos({
   const colSpan = headers.length;
 
   return (
-    <div className="overflow-x-auto sm:overflow-hidden rounded-xl border sunmi-border">
+    <div className="overflow-x-auto rounded-xl border sunmi-border">
       <SunmiTable headers={headers}>
         {rows.length === 0 ? (
           <SunmiTableEmpty message="No hay productos disponibles" colSpan={colSpan} />
@@ -305,25 +304,7 @@ export default function SunmiTablaProductos({
           </SunmiButton>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="sunmi-text-muted text-[11px]">Mostrar</span>
-          {PAGE_SIZES.map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => onPageSizeChange?.(size)}
-              className={`
-                px-2 py-0.5 rounded text-[11px] font-medium transition
-                ${pageSize === size
-                  ? "sunmi-badge-accent"
-                  : "sunmi-control"
-                }
-              `}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
+        <SunmiPageSizer value={pageSize} onChange={(size) => onPageSizeChange?.(size)} />
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
-import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import FormProducto from "@/components/productos/FormProducto";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -157,9 +157,7 @@ export default function EditarProductoPage({ params }) {
       <SunmiCard>
         <div className="flex items-center justify-between mb-3">
           <SunmiHeader title="Editar producto" />
-          <SunmiButton color="cyan" onClick={handleCancel}>
-            Volver
-          </SunmiButton>
+          <SunmiBackButton href={returnUrl} />
         </div>
 
         {loading ? (

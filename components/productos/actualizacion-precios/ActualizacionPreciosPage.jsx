@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -568,12 +569,7 @@ export default function ActualizacionPreciosPage() {
             <h1 className="text-sm md:text-base font-semibold">
               Actualizacion de Precios
             </h1>
-            <SunmiButton
-              color="cyan"
-              onClick={() => router.push("/modulos/productos")}
-            >
-              Volver a productos
-            </SunmiButton>
+            <SunmiBackButton href="/modulos/productos" />
           </div>
 
           {/* Tabs */}

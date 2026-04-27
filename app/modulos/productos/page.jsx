@@ -738,8 +738,7 @@ export default function ProductosPage() {
               {/* LISTADO */}
               <SunmiSeparator label="Listado" className="!my-1" />
 
-              <div className="overflow-x-auto w-full mt-1">
-                <div className="rounded-lg border sunmi-border overflow-hidden">
+              <div className="w-full mt-1">
                   <SunmiTablaProductos
                     rows={rows}
                     columns={allColumns.filter((c) =>
@@ -771,7 +770,6 @@ export default function ProductosPage() {
                     catalogos={catalogos}
                     loading={loading || loadingEditar}
                   />
-                </div>
               </div>
 
               {(loading || loadingEditar) && (
