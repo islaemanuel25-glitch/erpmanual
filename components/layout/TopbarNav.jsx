@@ -2,19 +2,39 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingCart, Layers, Settings, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { useUser } from "@/app/context/UserContext";
+import { MENU_CONFIG, buildVisibleMenu } from "@/lib/menuConfig";
 
-const TOPBAR_SHORTCUTS = [
-  { key: "inicio", label: "Inicio", icon: Home, href: "/modulos/dashboard" },
-  { key: "pos-ventas", label: "POS Ventas", icon: ShoppingCart, href: "/modulos/pos-ventas" },
-  { key: "stock", label: "Stock", icon: Layers, href: "/modulos/stock_locales" },
-  { key: "config", label: "Config", icon: Settings, href: "/modulos/configuracion" },
-];
+const MAX_TOPBAR = 8;
 
 export default function TopbarNav({ onOpenMenu }) {
   const { theme } = useSunmiTheme();
+  const { perfil } = useUser();
   const pathname = usePathname();
+
+  const menu = perfil ? buildVisibleMenu(MENU_CONFIG, perfil) : [];
+
+  // Destino principal RBAC-safe: group.href solo si coincide con un ítem visible;
+  // sino, primer ítem visible. Si no hay ítem visible, no renderiza el acceso.
+  const accesos = menu
+    .map((grupo) => {
+      const visibles = grupo.items || [];
+      const primer = visibles[0];
+      if (!primer) return null;
+      const principal = grupo.href && visibles.some((i) => i.href === grupo.href)
+        ? grupo.href
+        : primer.href;
+      return {
+        key: grupo.key,
+        label: grupo.label,
+        icon: grupo.icon,
+        href: principal,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, MAX_TOPBAR);
 
   const btnClasses = (activo) => `
     flex items-center gap-1.5 px-3 py-1.5
@@ -36,8 +56,8 @@ export default function TopbarNav({ onOpenMenu }) {
         ${theme.sidebar.border}
       `}
     >
-      <div className="flex items-center gap-0.5">
-        {TOPBAR_SHORTCUTS.map((s) => {
+      <div className="flex items-center gap-0.5 overflow-x-auto">
+        {accesos.map((s) => {
           const activo = pathname.startsWith(s.href);
           return (
             <Link key={s.key} href={s.href} className={btnClasses(activo)}>

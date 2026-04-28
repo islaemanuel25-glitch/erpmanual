@@ -2,19 +2,38 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ShoppingCart, Layers, Settings, X } from "lucide-react";
+import { MoreHorizontal, X } from "lucide-react";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
-const BOTTOM_ITEMS = [
-  { key: "inicio", label: "Inicio", icon: Home, href: "/modulos/dashboard" },
-  { key: "pos-ventas", label: "POS", icon: ShoppingCart, href: "/modulos/pos-ventas" },
-  { key: "stock", label: "Stock", icon: Layers, href: "/modulos/stock_locales" },
-  { key: "config", label: "Config", icon: Settings, href: "/modulos/configuracion" },
-];
+// Cantidad máxima de accesos en la BottomNav antes del botón "Más"
+const MAX_BOTTOM = 4;
 
 export default function MobileNav({ menu, drawerOpen, setDrawerOpen }) {
   const pathname = usePathname();
   const { theme } = useSunmiTheme();
+
+  // Destino principal RBAC-safe: group.href solo si coincide con un ítem visible;
+  // sino, primer ítem visible. Si no hay ítem visible, no renderiza el acceso.
+  const items = (menu || [])
+    .map((grupo) => {
+      const visibles = grupo.items || [];
+      const primer = visibles[0];
+      if (!primer) return null;
+      const principal = grupo.href && visibles.some((i) => i.href === grupo.href)
+        ? grupo.href
+        : primer.href;
+      return {
+        key: grupo.key,
+        label: grupo.label,
+        icon: grupo.icon,
+        href: principal,
+      };
+    })
+    .filter(Boolean);
+
+  // Reservamos un slot para "Más" si hay más grupos que MAX_BOTTOM
+  const hayMas = items.length > MAX_BOTTOM;
+  const visibles = hayMas ? items.slice(0, MAX_BOTTOM - 1) : items.slice(0, MAX_BOTTOM);
 
   const navBtn = (activo) => `
     flex flex-col items-center justify-center min-h-[44px] min-w-[44px] flex-1
@@ -35,7 +54,7 @@ export default function MobileNav({ menu, drawerOpen, setDrawerOpen }) {
           ${theme.sidebar.border}
         `}
       >
-        {BOTTOM_ITEMS.map((item) => {
+        {visibles.map((item) => {
           const activo = pathname.startsWith(item.href);
           return (
             <Link
@@ -49,6 +68,18 @@ export default function MobileNav({ menu, drawerOpen, setDrawerOpen }) {
             </Link>
           );
         })}
+
+        {hayMas && (
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className={navBtn(false)}
+            aria-label="Más opciones"
+          >
+            <MoreHorizontal size={22} aria-hidden />
+            <span className="mt-0.5">Más</span>
+          </button>
+        )}
       </nav>
 
       {/* Drawer overlay */}
