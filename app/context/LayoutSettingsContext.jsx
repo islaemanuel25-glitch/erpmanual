@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 const STORAGE_KEY = "erpazul_layout";
 
+const VALID_MODES = ["sidebarLeft", "topbar", "launcher"];
+
 const DEFAULTS = {
   menuMode: "sidebarLeft",
 };
@@ -25,7 +27,7 @@ export function LayoutSettingsProvider({ children }) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.menuMode === "sidebarLeft" || parsed.menuMode === "topbar") {
+        if (VALID_MODES.includes(parsed.menuMode)) {
           setMenuModeState(parsed.menuMode);
         }
       }
@@ -35,10 +37,15 @@ export function LayoutSettingsProvider({ children }) {
   }, []);
 
   const setMenuMode = (mode) => {
-    if (mode !== "sidebarLeft" && mode !== "topbar") return;
+    if (!VALID_MODES.includes(mode)) return;
     setMenuModeState(mode);
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ menuMode: mode }));
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      const prev = raw ? JSON.parse(raw) : {};
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...prev, menuMode: mode })
+      );
     } catch (e) {
       console.error("Error guardando layout settings:", e);
     }

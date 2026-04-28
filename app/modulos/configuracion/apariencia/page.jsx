@@ -8,7 +8,7 @@ import { SUNMI_THEMES } from "@/lib/sunmiThemes";
 import { useUser } from "@/app/context/UserContext";
 import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { PanelLeft, PanelTop } from "lucide-react";
+import { PanelLeft, PanelTop, LayoutGrid } from "lucide-react";
 
 const MENU_MODES = [
   {
@@ -22,6 +22,12 @@ const MENU_MODES = [
     label: "Menú superior",
     description: "Barra horizontal arriba con dropdowns.",
     Icon: PanelTop,
+  },
+  {
+    key: "launcher",
+    label: "App / Launcher",
+    description: "Grilla de aplicaciones que se abre desde un botón flotante o la hamburguesa.",
+    Icon: LayoutGrid,
   },
 ];
 
@@ -89,7 +95,7 @@ export default function AparienciaPage() {
       {/* DISPOSICION DEL MENU */}
       <h2 className="text-lg font-semibold mt-8 mb-4">Disposici&oacute;n del men&uacute;</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {MENU_MODES.map((m) => (
           <div
             key={m.key}
