@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { LayoutGrid } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
@@ -11,19 +13,25 @@ const MAX_TILES = 8;
 export default function AppLauncher() {
   const { perfil, cargando } = useUser();
   const { theme } = useSunmiTheme();
+  const pathname = usePathname();
+  const [openKey, setOpenKey] = useState(null);
+  const [lastPath, setLastPath] = useState(pathname);
+
+  // Cerrar el panel expandido al navegar a otra ruta (patrón derived state)
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
+    setOpenKey(null);
+  }
 
   if (cargando || !perfil) return null;
 
   const menu = buildVisibleMenu(MENU_CONFIG, perfil).slice(0, MAX_TILES);
 
   return (
-    <section
-      className="w-full max-w-5xl mx-auto"
-      aria-label="App Launcher"
-    >
-      <div className="flex items-center gap-2 mb-4">
-        <LayoutGrid size={20} className={theme.sidebar.icon} aria-hidden />
-        <h2 className={`text-lg font-semibold ${theme.sidebar.icon}`}>
+    <section className="w-full mb-6" aria-label="App Launcher">
+      <div className="flex items-center gap-2 mb-3">
+        <LayoutGrid size={18} className={theme.sidebar.icon} aria-hidden />
+        <h2 className={`text-base font-semibold ${theme.sidebar.icon}`}>
           Aplicaciones
         </h2>
       </div>
@@ -32,7 +40,7 @@ export default function AppLauncher() {
         <div
           className={`
             rounded-2xl border border-dashed
-            p-8 text-center
+            p-6 text-center
             ${theme.card}
             ${theme.sidebar.border}
           `}
@@ -45,9 +53,17 @@ export default function AppLauncher() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {menu.map((grupo) => (
-            <AppLauncherTile key={grupo.key} group={grupo} />
+            <AppLauncherTile
+              key={grupo.key}
+              group={grupo}
+              isOpen={openKey === grupo.key}
+              onToggle={() =>
+                setOpenKey((prev) => (prev === grupo.key ? null : grupo.key))
+              }
+              onItemClick={() => setOpenKey(null)}
+            />
           ))}
         </div>
       )}
