@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-04-28 17:57
+**Fecha:** 2026-04-28 18:39
 
 ## Módulos modificados recientemente
 
 ### configuracion
-- fix(layout): sidebar fija al scrollear (min-h-full → h-dvh)
-- Archivos: 1 modificados (1 total)
+- feat: add launcher navigation mode, fix(layout): sidebar fija al scrollear (min-h-full → h-dvh)
+- Archivos: 2 modificados (2 total)
 
 
 
