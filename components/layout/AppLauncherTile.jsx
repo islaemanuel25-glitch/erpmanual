@@ -6,6 +6,14 @@ import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 const PREVIEW_COUNT = 3;
 
+// Tokens semánticos del launcher: cada uno apunta a una CSS var ya definida
+// por theme en app/globals.css. No hardcodeamos colores en el componente.
+const TXT = "text-[color:var(--app-fg)]";
+const HOVER = "hover:bg-[color:var(--hover-bg)]";
+const ICON_BLOCK = "bg-[color:var(--pos-accent)] text-[color:var(--pos-tab-active-fg)]";
+const DIVIDER = "border-[color:var(--card-border)]";
+const RING_OPEN = "ring-2 ring-[color:var(--pos-accent)]";
+
 export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }) {
   const { theme } = useSunmiTheme();
 
@@ -35,24 +43,24 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
         href={groupHref}
         className={`
           flex items-center gap-3 p-4
-          rounded-2xl border shadow-sm
+          rounded-2xl shadow-sm
           transition cursor-pointer
           hover:shadow-md hover:-translate-y-0.5
           ${theme.card}
-          ${theme.sidebar.border}
+          ${HOVER}
         `}
         aria-label={group.label}
       >
         <div
           className={`
             flex items-center justify-center w-11 h-11 rounded-xl shrink-0
-            ${theme.sidebar.iconActive}
+            ${ICON_BLOCK}
           `}
         >
           {Icon && <Icon size={22} aria-hidden />}
         </div>
         <div className="flex flex-col leading-tight min-w-0">
-          <span className={`text-sm font-semibold truncate ${theme.sidebar.icon}`}>
+          <span className={`text-sm font-semibold truncate ${TXT}`}>
             {group.label}
           </span>
           <span className="text-[11px] sunmi-text-muted truncate">
@@ -67,11 +75,10 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
   return (
     <div
       className={`
-        rounded-2xl border shadow-sm overflow-hidden
+        rounded-2xl shadow-sm overflow-hidden
         transition
         ${theme.card}
-        ${theme.sidebar.border}
-        ${isOpen ? "ring-2 ring-amber-400/40" : ""}
+        ${isOpen ? RING_OPEN : ""}
       `}
     >
       <button
@@ -82,20 +89,20 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
         className={`
           w-full flex items-center gap-3 p-4 text-left
           cursor-pointer transition
-          ${theme.sidebar.hover}
+          ${HOVER}
         `}
       >
         <div
           className={`
             flex items-center justify-center w-11 h-11 rounded-xl shrink-0
-            ${theme.sidebar.iconActive}
+            ${ICON_BLOCK}
           `}
         >
           {Icon && <Icon size={22} aria-hidden />}
         </div>
         <div className="flex flex-col leading-tight flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className={`text-sm font-semibold truncate ${theme.sidebar.icon}`}>
+            <span className={`text-sm font-semibold truncate ${TXT}`}>
               {group.label}
             </span>
             <span className="text-[11px] sunmi-text-muted shrink-0">
@@ -111,7 +118,7 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
           aria-hidden
           className={`
             shrink-0 transition-transform
-            ${theme.sidebar.icon}
+            ${TXT}
             ${isOpen ? "rotate-180" : ""}
           `}
         />
@@ -120,7 +127,7 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
       {isOpen && (
         <ul
           id={`launcher-panel-${group.key}`}
-          className={`flex flex-col border-t ${theme.sidebar.border}`}
+          className={`flex flex-col border-t ${DIVIDER}`}
         >
           {visibles.map((item) => (
             <li key={item.href}>
@@ -130,8 +137,8 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
                 className={`
                   flex items-center min-h-[40px] px-4 py-2
                   text-[13px] font-medium transition
-                  ${theme.sidebar.icon}
-                  ${theme.sidebar.hover}
+                  ${TXT}
+                  ${HOVER}
                 `}
               >
                 {item.label}

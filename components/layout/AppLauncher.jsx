@@ -10,6 +10,10 @@ import AppLauncherTile from "./AppLauncherTile";
 
 const MAX_TILES = 8;
 
+// Tokens semánticos del launcher (ver app/globals.css)
+const TXT = "text-[color:var(--app-fg)]";
+const DIVIDER = "border-[color:var(--card-border)]";
+
 export default function AppLauncher() {
   const { perfil, cargando } = useUser();
   const { theme } = useSunmiTheme();
@@ -30,8 +34,8 @@ export default function AppLauncher() {
   return (
     <section className="w-full mb-6" aria-label="App Launcher">
       <div className="flex items-center gap-2 mb-3">
-        <LayoutGrid size={18} className={theme.sidebar.icon} aria-hidden />
-        <h2 className={`text-base font-semibold ${theme.sidebar.icon}`}>
+        <LayoutGrid size={18} className={TXT} aria-hidden />
+        <h2 className={`text-base font-semibold ${TXT}`}>
           Aplicaciones
         </h2>
       </div>
@@ -42,10 +46,10 @@ export default function AppLauncher() {
             rounded-2xl border border-dashed
             p-6 text-center
             ${theme.card}
-            ${theme.sidebar.border}
+            ${DIVIDER}
           `}
         >
-          <p className={`text-sm font-medium ${theme.sidebar.icon}`}>
+          <p className={`text-sm font-medium ${TXT}`}>
             No tenés módulos disponibles.
           </p>
           <p className="text-xs sunmi-text-muted mt-1">
