@@ -84,12 +84,12 @@ async function main() {
       email: "admin@admin.com",
       passwordHash,
       rolId: rolAdmin.id,
-      localId: deposito.id,
+      localId: null,
       activo: true,
     },
   });
 
-  console.log("✅ Usuario admin asignado al Depósito Central");
+  console.log("✅ Usuario admin creado como global (sin local fijo)");
   console.log("🔐 Credenciales: admin@admin.com / 123456");
 
   console.log("🌱 SEED COMPLETO ✅");
