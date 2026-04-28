@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
 import { LayoutGrid } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
@@ -10,22 +8,12 @@ import AppLauncherTile from "./AppLauncherTile";
 
 const MAX_TILES = 8;
 
-// Tokens semánticos del launcher (ver app/globals.css)
 const TXT = "text-[color:var(--app-fg)]";
 const DIVIDER = "border-[color:var(--card-border)]";
 
 export default function AppLauncher() {
   const { perfil, cargando } = useUser();
   const { theme } = useSunmiTheme();
-  const pathname = usePathname();
-  const [openKey, setOpenKey] = useState(null);
-  const [lastPath, setLastPath] = useState(pathname);
-
-  // Cerrar el panel expandido al navegar a otra ruta (patrón derived state)
-  if (lastPath !== pathname) {
-    setLastPath(pathname);
-    setOpenKey(null);
-  }
 
   if (cargando || !perfil) return null;
 
@@ -57,17 +45,9 @@ export default function AppLauncher() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 auto-rows-fr">
           {menu.map((grupo) => (
-            <AppLauncherTile
-              key={grupo.key}
-              group={grupo}
-              isOpen={openKey === grupo.key}
-              onToggle={() =>
-                setOpenKey((prev) => (prev === grupo.key ? null : grupo.key))
-              }
-              onItemClick={() => setOpenKey(null)}
-            />
+            <AppLauncherTile key={grupo.key} group={grupo} />
           ))}
         </div>
       )}

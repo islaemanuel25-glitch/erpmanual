@@ -1,20 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
-const PREVIEW_COUNT = 3;
-
-// Tokens semánticos del launcher: cada uno apunta a una CSS var ya definida
-// por theme en app/globals.css. No hardcodeamos colores en el componente.
 const TXT = "text-[color:var(--app-fg)]";
 const HOVER = "hover:bg-[color:var(--hover-bg)]";
 const ICON_BLOCK = "bg-[color:var(--pos-accent)] text-[color:var(--pos-tab-active-fg)]";
 const DIVIDER = "border-[color:var(--card-border)]";
-const RING_OPEN = "ring-2 ring-[color:var(--pos-accent)]";
+const BADGE = "bg-[color:var(--hover-bg)]";
 
-export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }) {
+export default function AppLauncherTile({ group }) {
   const { theme } = useSunmiTheme();
 
   const visibles = group?.items || [];
@@ -31,25 +26,20 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
       ? group.href
       : primer.href;
 
-  const preview = visibles
-    .slice(0, PREVIEW_COUNT)
-    .map((i) => i.label)
-    .join(" · ");
-
-  // Caso: un solo subitem visible → tile es link directo
+  // Caso: un solo subitem visible → tile compacto con link directo
   if (isSingle) {
     return (
       <Link
         href={groupHref}
+        aria-label={group.label}
         className={`
-          flex items-center gap-3 p-4
-          rounded-2xl shadow-sm
+          flex items-center gap-3 p-3
+          rounded-2xl shadow-sm h-full
           transition cursor-pointer
           hover:shadow-md hover:-translate-y-0.5
           ${theme.card}
           ${HOVER}
         `}
-        aria-label={group.label}
       >
         <div
           className={`
@@ -59,86 +49,58 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
         >
           {Icon && <Icon size={22} aria-hidden />}
         </div>
-        <div className="flex flex-col leading-tight min-w-0">
-          <span className={`text-sm font-semibold truncate ${TXT}`}>
-            {group.label}
-          </span>
-          <span className="text-[11px] sunmi-text-muted truncate">
-            {primer.label}
-          </span>
-        </div>
+        <span className={`text-sm font-semibold truncate ${TXT}`}>
+          {group.label}
+        </span>
       </Link>
     );
   }
 
-  // Caso: múltiples subitems → toggle de panel inline con todos los accesos
+  // Caso: múltiples subitems → tarjeta compacta con submenús siempre visibles
   return (
     <div
       className={`
-        rounded-2xl shadow-sm overflow-hidden
-        transition
+        flex gap-3 p-3
+        rounded-2xl shadow-sm h-full
         ${theme.card}
-        ${isOpen ? RING_OPEN : ""}
       `}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-        aria-controls={`launcher-panel-${group.key}`}
+      {/* Columna izquierda: icono */}
+      <div
         className={`
-          w-full flex items-center gap-3 p-4 text-left
-          cursor-pointer transition
-          ${HOVER}
+          flex items-center justify-center w-11 h-11 rounded-xl shrink-0
+          ${ICON_BLOCK}
         `}
       >
-        <div
-          className={`
-            flex items-center justify-center w-11 h-11 rounded-xl shrink-0
-            ${ICON_BLOCK}
-          `}
-        >
-          {Icon && <Icon size={22} aria-hidden />}
-        </div>
-        <div className="flex flex-col leading-tight flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <span className={`text-sm font-semibold truncate ${TXT}`}>
-              {group.label}
-            </span>
-            <span className="text-[11px] sunmi-text-muted shrink-0">
-              {count} accesos
-            </span>
-          </div>
-          <span className="text-[11px] sunmi-text-muted truncate mt-0.5">
-            {preview}
+        {Icon && <Icon size={22} aria-hidden />}
+      </div>
+
+      {/* Columna derecha: header (nombre + badge) + lista de subitems */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className={`flex items-center justify-between gap-2 pb-2 mb-1 border-b ${DIVIDER}`}>
+          <span className={`text-sm font-semibold truncate ${TXT}`}>
+            {group.label}
+          </span>
+          <span
+            className={`
+              text-[10px] font-bold leading-none
+              px-1.5 py-0.5 rounded-full shrink-0
+              ${BADGE} ${TXT}
+            `}
+            aria-label={`${count} accesos`}
+          >
+            {count}
           </span>
         </div>
-        <ChevronDown
-          size={18}
-          aria-hidden
-          className={`
-            shrink-0 transition-transform
-            ${TXT}
-            ${isOpen ? "rotate-180" : ""}
-          `}
-        />
-      </button>
-
-      {isOpen && (
-        <ul
-          id={`launcher-panel-${group.key}`}
-          className={`flex flex-col border-t ${DIVIDER}`}
-        >
+        <ul className="flex flex-col">
           {visibles.map((item) => (
             <li key={item.href}>
               <Link
                 href={item.href}
-                onClick={onItemClick}
                 className={`
-                  flex items-center min-h-[40px] px-4 py-2
-                  text-[13px] font-medium transition
-                  ${TXT}
-                  ${HOVER}
+                  block py-1 px-1.5 -mx-1.5
+                  rounded text-[12px] truncate transition
+                  ${TXT} ${HOVER}
                 `}
               >
                 {item.label}
@@ -146,7 +108,7 @@ export default function AppLauncherTile({ group, isOpen, onToggle, onItemClick }
             </li>
           ))}
         </ul>
-      )}
+      </div>
     </div>
   );
 }
