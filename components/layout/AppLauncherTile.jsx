@@ -6,7 +6,6 @@ import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 const TXT = "text-[color:var(--app-fg)]";
 const HOVER = "hover:bg-[color:var(--hover-bg)]";
 const ICON_BLOCK = "bg-[color:var(--pos-accent)] text-[color:var(--pos-tab-active-fg)]";
-const DIVIDER = "border-[color:var(--card-border)]";
 const BADGE = "bg-[color:var(--hover-bg)]";
 
 export default function AppLauncherTile({ group }) {
@@ -18,97 +17,59 @@ export default function AppLauncherTile({ group }) {
 
   const Icon = group.icon;
   const count = visibles.length;
-  const isSingle = count === 1;
 
-  // Href RBAC-safe del grupo (usado solo cuando hay un único item visible)
-  const groupHref =
+  // Href RBAC-safe: group.href sólo si apunta a un item visible; si no, el primero.
+  const href =
     group.href && visibles.some((i) => i.href === group.href)
       ? group.href
       : primer.href;
 
-  // Caso: un solo subitem visible → tile compacto con link directo
-  if (isSingle) {
-    return (
-      <Link
-        href={groupHref}
-        aria-label={group.label}
-        className={`
-          flex items-center gap-3 p-3
-          rounded-2xl shadow-sm h-full
-          transition cursor-pointer
-          hover:shadow-md hover:-translate-y-0.5
-          ${theme.card}
-          ${HOVER}
-        `}
-      >
+  return (
+    <Link
+      href={href}
+      aria-label={
+        count > 1 ? `${group.label}, ${count} accesos` : group.label
+      }
+      className={`
+        flex flex-col items-center justify-start gap-2
+        p-3 sm:p-4 rounded-2xl shadow-sm h-full
+        transition cursor-pointer
+        hover:shadow-md hover:-translate-y-0.5
+        ${theme.card}
+        ${HOVER}
+      `}
+    >
+      <div className="relative">
         <div
           className={`
-            flex items-center justify-center w-11 h-11 rounded-xl shrink-0
+            flex items-center justify-center
+            w-16 h-16 sm:w-20 sm:h-20 rounded-2xl
             ${ICON_BLOCK}
           `}
         >
-          {Icon && <Icon size={22} aria-hidden />}
+          {Icon && <Icon size={32} aria-hidden />}
         </div>
-        <span className={`text-sm font-semibold truncate ${TXT}`}>
-          {group.label}
-        </span>
-      </Link>
-    );
-  }
-
-  // Caso: múltiples subitems → tarjeta compacta con submenús siempre visibles
-  return (
-    <div
-      className={`
-        flex gap-3 p-3
-        rounded-2xl shadow-sm h-full
-        ${theme.card}
-      `}
-    >
-      {/* Columna izquierda: icono */}
-      <div
-        className={`
-          flex items-center justify-center w-11 h-11 rounded-xl shrink-0
-          ${ICON_BLOCK}
-        `}
-      >
-        {Icon && <Icon size={22} aria-hidden />}
-      </div>
-
-      {/* Columna derecha: header (nombre + badge) + lista de subitems */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <div className={`flex items-center justify-between gap-2 pb-2 mb-1 border-b ${DIVIDER}`}>
-          <span className={`text-sm font-semibold truncate ${TXT}`}>
-            {group.label}
-          </span>
+        {count > 1 && (
           <span
             className={`
-              text-[10px] font-bold leading-none
-              px-1.5 py-0.5 rounded-full shrink-0
+              absolute -top-1 -right-1
+              min-w-[20px] h-5 px-1.5
+              rounded-full text-[10px] font-bold leading-none
+              flex items-center justify-center
+              shadow-sm
               ${BADGE} ${TXT}
             `}
-            aria-label={`${count} accesos`}
+            aria-hidden
           >
             {count}
           </span>
-        </div>
-        <ul className="flex flex-col">
-          {visibles.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={`
-                  block py-1 px-1.5 -mx-1.5
-                  rounded text-[12px] truncate transition
-                  ${TXT} ${HOVER}
-                `}
-              >
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        )}
       </div>
-    </div>
+      <span
+        className={`text-xs sm:text-sm font-medium text-center truncate w-full ${TXT}`}
+      >
+        {group.label}
+      </span>
+    </Link>
   );
 }
