@@ -1,16 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 
 const TXT = "text-[color:var(--app-fg)]";
-const HOVER = "hover:bg-[color:var(--hover-bg)]";
 const ICON_BLOCK = "bg-[color:var(--pos-accent)] text-[color:var(--pos-tab-active-fg)]";
 const BADGE = "bg-[color:var(--hover-bg)]";
+const FOCUS_RING = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--pos-accent)]";
 
 export default function AppLauncherTile({ group }) {
-  const { theme } = useSunmiTheme();
-
   const visibles = group?.items || [];
   const primer = visibles[0];
   if (!primer) return null;
@@ -31,19 +28,20 @@ export default function AppLauncherTile({ group }) {
         count > 1 ? `${group.label}, ${count} accesos` : group.label
       }
       className={`
-        flex flex-col items-center justify-start gap-2
-        p-3 sm:p-4 rounded-2xl shadow-sm h-full
+        group flex flex-col items-center gap-2
+        rounded-xl p-1
         transition cursor-pointer
-        hover:shadow-md hover:-translate-y-0.5
-        ${theme.card}
-        ${HOVER}
+        ${FOCUS_RING}
       `}
     >
       <div className="relative">
         <div
           className={`
             flex items-center justify-center
-            w-16 h-16 sm:w-20 sm:h-20 rounded-2xl
+            w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-2xl
+            shadow-sm
+            transition
+            group-hover:-translate-y-1 group-hover:shadow-md
             ${ICON_BLOCK}
           `}
         >
@@ -66,7 +64,7 @@ export default function AppLauncherTile({ group }) {
         )}
       </div>
       <span
-        className={`text-xs sm:text-sm font-medium text-center truncate w-full ${TXT}`}
+        className={`text-xs sm:text-[13px] font-medium text-center truncate max-w-[8rem] ${TXT}`}
       >
         {group.label}
       </span>

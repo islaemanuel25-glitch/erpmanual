@@ -45,7 +45,7 @@ export default function AppLauncher() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 auto-rows-fr">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-2 gap-y-6 sm:gap-y-8 justify-items-center max-w-md sm:max-w-2xl mx-auto">
           {menu.map((grupo) => (
             <AppLauncherTile key={grupo.key} group={grupo} />
           ))}
