@@ -13,6 +13,28 @@
 @tailwind utilities;
 
 /* ==================================================
+   ⭐ MODULE COLORS (constantes del producto)
+   ──────────────────────────────────────────────
+   Igual que iOS: Mensajes siempre verde, Mapas siempre verde-azulado,
+   sea cual sea el modo. NO dependen del theme — definidos UNA sola vez
+   en :root para que escalen a N themes sin tocar este archivo.
+
+   Formato RGB sin formato (componer con `/ alpha`):
+     background: rgb(var(--module-teal) / 0.15);
+     color:      rgb(var(--module-teal));
+   ================================================== */
+:root {
+  --module-blue:   55 138 221;
+  --module-teal:   29 158 117;
+  --module-purple: 127 119 221;
+  --module-amber:  239 159 39;
+  --module-green:  151 196 89;
+  --module-coral:  216 90 48;
+  --module-pink:   212 83 126;
+  --module-gray:   136 135 128;
+}
+
+/* ==================================================
    ⭐ VARIABLES CSS POR THEME (data-theme en <html>)
    ================================================== */
 html[data-theme="sunmiDark"],
