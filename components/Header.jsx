@@ -1,19 +1,25 @@
 "use client";
 
-import { Bell, ChevronDown, LogOut, ArrowLeftRight, Store, Warehouse, Menu, UserCheck } from "lucide-react";
+import { Bell, ChevronDown, LogOut, ArrowLeftRight, Store, Warehouse, Menu, UserCheck, Home } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser } from "@/app/context/UserContext";
+import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useOperadorActivo } from "@/hooks/useOperadorActivo";
 import OperadorSelector from "@/components/operador/OperadorSelector";
+import { getDefaultRoute } from "@/lib/getDefaultRoute";
 
 export default function Header({ onOpenMobileMenu }) {
   const pathname = usePathname();
   const router = useRouter();
   const menuRef = useRef(null);
   const { perfil, logout } = useUser();
+  const { menuMode } = useLayoutSettings();
   const { theme } = useSunmiTheme();
+  const homeRoute = getDefaultRoute(menuMode);
+  const showHomeBtn = pathname !== homeRoute;
   const { operador, login: loginOperador, logout: logoutOperador } = useOperadorActivo();
   const [showOperadorSelector, setShowOperadorSelector] = useState(false);
   const operadorRef = useRef(null);
@@ -114,6 +120,23 @@ export default function Header({ onOpenMobileMenu }) {
         <h1 className={`text-xl font-semibold hidden md:block ${theme.header.text}`}>
           {titulo}
         </h1>
+        {showHomeBtn && (
+          <Link
+            href={homeRoute}
+            className={`
+              flex items-center gap-1.5
+              px-3 py-1.5 rounded-lg
+              hover:bg-[color:var(--hover-bg)]
+              text-sm font-medium
+              transition cursor-pointer
+              ${theme.header.text}
+            `}
+            aria-label="Ir al inicio"
+          >
+            <Home size={16} />
+            <span className="hidden sm:inline">Inicio</span>
+          </Link>
+        )}
       </div>
 
       {/* DERECHA */}

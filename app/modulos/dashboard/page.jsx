@@ -1,13 +1,25 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
+import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import DashboardMobile from "@/components/dashboard/DashboardMobile";
 import DashboardDesktop from "@/components/dashboard/DashboardDesktop";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { menuMode } = useLayoutSettings();
   const { perfil, cargando } = useUser();
+
+  useEffect(() => {
+    if (menuMode === "launcher") {
+      router.replace("/modulos/inicio");
+    }
+  }, [menuMode, router]);
+
+  if (menuMode === "launcher") return null;
 
   const [resumen, setResumen] = useState(null);
   const [ventas, setVentas] = useState([]);
