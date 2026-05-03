@@ -10,6 +10,8 @@ import Header from "./Header";
 import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import { useUser } from "@/app/context/UserContext";
 import { MENU_CONFIG, buildVisibleMenu } from "@/lib/menuConfig";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { LEGACY_LAYOUTBASE_TITLES } from "@/lib/menu/legacyTitles";
 
 export default function LayoutBase({ children }) {
   const pathname = usePathname();
@@ -18,28 +20,7 @@ export default function LayoutBase({ children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
-  const tituloMobile =
-    pathname.includes("usuarios")
-      ? "Usuarios"
-      : pathname.includes("roles")
-      ? "Roles"
-      : pathname.includes("locales")
-      ? "Locales"
-      : pathname.includes("proveedores")
-      ? "Proveedores"
-      : pathname.includes("productos")
-      ? "Productos"
-      : pathname.includes("stock")
-      ? "Stock"
-      : pathname.includes("transferencias")
-      ? "Transferencias"
-      : pathname.includes("pos-ventas")
-      ? "POS Ventas"
-      : pathname.includes("pos-transferencias")
-      ? "POS Transferencias"
-      : pathname.includes("pos")
-      ? "POS"
-      : "Panel";
+  const tituloMobile = usePageTitle({ overrides: LEGACY_LAYOUTBASE_TITLES });
 
   const isSidebar = menuMode === "sidebarLeft";
   const isTopbar = menuMode === "topbar";

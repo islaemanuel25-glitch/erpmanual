@@ -10,6 +10,8 @@ import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useOperadorActivo } from "@/hooks/useOperadorActivo";
 import OperadorSelector from "@/components/operador/OperadorSelector";
 import { getDefaultRoute } from "@/lib/getDefaultRoute";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import { LEGACY_HEADER_TITLES } from "@/lib/menu/legacyTitles";
 
 export default function Header({ onOpenMobileMenu }) {
   const pathname = usePathname();
@@ -37,24 +39,7 @@ export default function Header({ onOpenMobileMenu }) {
   const nombre = perfil?.nombre || "Usuario";
   const rol = perfil?.rol || "-";
 
-  const titulo =
-    pathname.includes("auditoria-pos-ventas")
-      ? "Auditoría POS Ventas"
-      : pathname.includes("usuarios")
-      ? "Usuarios"
-      : pathname.includes("roles")
-      ? "Roles"
-      : pathname.includes("locales")
-      ? "Locales"
-      : pathname.includes("productos")
-      ? "Productos"
-      : pathname.includes("stock")
-      ? "Stock"
-      : pathname.includes("transferencias")
-      ? "Transferencias"
-      : pathname.includes("pos")
-      ? "POS"
-      : "Panel";
+  const titulo = usePageTitle({ overrides: LEGACY_HEADER_TITLES });
 
   const cargarContexto = useCallback(async () => {
     if (!esAdmin) return;
