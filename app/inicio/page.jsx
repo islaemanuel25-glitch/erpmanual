@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
+import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
+import { getDefaultRoute } from "@/lib/getDefaultRoute";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import { Store, Warehouse, Loader2 } from "lucide-react";
 
 export default function InicioPage() {
   const router = useRouter();
   const { perfil, cargando } = useUser();
+  const { menuMode } = useLayoutSettings();
 
   const [locales, setLocales] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,12 +28,12 @@ export default function InicioPage() {
 
     // Usuario con local fijo → ir directo
     if (perfil.localId) {
-      router.replace("/modulos/dashboard");
+      router.replace(getDefaultRoute(menuMode));
       return;
     }
 
     cargarOpciones();
-  }, [cargando, perfil]);
+  }, [cargando, perfil, menuMode]);
 
   const cargarOpciones = async () => {
     try {
@@ -72,7 +75,7 @@ export default function InicioPage() {
       const data = await res.json();
 
       if (data.ok) {
-        router.replace("/modulos/dashboard");
+        router.replace(getDefaultRoute(menuMode));
         return;
       }
       setError(data.error || "Error al seleccionar");

@@ -15,29 +15,32 @@ export function useSunmiTheme() {
 
 const STORAGE_KEY = "erp-sunmi-theme";
 
-function getInitialKey() {
-  if (typeof document !== "undefined" && document.documentElement.dataset.theme) {
-    const fromHtml = document.documentElement.dataset.theme;
-    if (SUNMI_THEMES[fromHtml]) return fromHtml;
-  }
-  return DEFAULT_SUNMI_THEME_KEY;
-}
-
 export function SunmiThemeProvider({ children }) {
-  const [themeKey, setThemeKeyState] = useState(getInitialKey);
+  // Server y primer client render siempre arrancan con el default,
+  // para evitar hydration mismatch. El tema real se aplica en el useEffect.
+  const [themeKey, setThemeKeyState] = useState(DEFAULT_SUNMI_THEME_KEY);
 
-  // Sincronizar con localStorage al montar (por si el script inline no corrió)
+  // Sincronizar con localStorage / data-theme al montar.
+  // setState en mount-effect es necesario: el server no puede leer localStorage,
+  // así que hidratamos desde acá para evitar mismatch con SSR.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved && SUNMI_THEMES[saved]) {
         setThemeKeyState(saved);
         document.documentElement.dataset.theme = saved;
+        return;
+      }
+      const fromHtml = document.documentElement.dataset.theme;
+      if (fromHtml && SUNMI_THEMES[fromHtml]) {
+        setThemeKeyState(fromHtml);
       }
     } catch (e) {
       console.error("Error leyendo theme:", e);
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Sincronizar data-theme en <html> cuando cambia themeKey
   useEffect(() => {

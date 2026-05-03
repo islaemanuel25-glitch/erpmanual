@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useUser } from "@/app/context/UserContext";
+import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
+import { getDefaultRoute } from "@/lib/getDefaultRoute";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -9,6 +11,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 
 export default function LoginPage() {
   const { refrescar } = useUser();
+  const { menuMode } = useLayoutSettings();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +38,7 @@ export default function LoginPage() {
         setError(data.error || "Error al iniciar sesión.");
       } else {
         await refrescar();
-        window.location.href = "/modulos/dashboard";
+        window.location.href = getDefaultRoute(menuMode);
       }
     } catch (err) {
       console.error(err);

@@ -13,14 +13,6 @@ export default function DashboardPage() {
   const { menuMode } = useLayoutSettings();
   const { perfil, cargando } = useUser();
 
-  useEffect(() => {
-    if (menuMode === "launcher") {
-      router.replace("/modulos/inicio");
-    }
-  }, [menuMode, router]);
-
-  if (menuMode === "launcher") return null;
-
   const [resumen, setResumen] = useState(null);
   const [ventas, setVentas] = useState([]);
   const [actividad, setActividad] = useState([]);
@@ -28,6 +20,12 @@ export default function DashboardPage() {
   const [cargandoVentas, setCargandoVentas] = useState(true);
   const [cargandoActividad, setCargandoActividad] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
+
+  useEffect(() => {
+    if (menuMode === "launcher") {
+      router.replace("/modulos/inicio");
+    }
+  }, [menuMode, router]);
 
   const fetchDatos = useCallback(async () => {
     setCargandoResumen(true);
@@ -82,8 +80,10 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (perfil) fetchDatos();
-  }, [perfil, fetchDatos]);
+    if (perfil && menuMode !== "launcher") fetchDatos();
+  }, [perfil, menuMode, fetchDatos]);
+
+  if (menuMode === "launcher") return null;
 
   if (cargando) return <div className="p-4"><SunmiLoader /></div>;
 
