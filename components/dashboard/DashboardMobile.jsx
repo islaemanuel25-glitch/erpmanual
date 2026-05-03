@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { useMenu } from "@/hooks/useMenu";
+import { isHrefVisible } from "@/lib/menu/lookup";
 import AccesosRapidos from "./AccesosRapidos";
 import UltimasVentas from "./UltimasVentas";
 import ActividadReciente from "./ActividadReciente";
@@ -20,6 +22,7 @@ export default function DashboardMobile({
 }) {
   const { theme } = useSunmiTheme();
   const router = useRouter();
+  const { menu } = useMenu();
 
   const totalHoy = resumen
     ? `$${resumen.totalVentas.toLocaleString("es-AR", { minimumFractionDigits: 2 })}`
@@ -45,13 +48,15 @@ export default function DashboardMobile({
             ? "Obteniendo datos del día..."
             : `Ventas del día · ${ticketsHoy} tickets`}
         </p>
-        <Link
-          href="/modulos/pos-ventas"
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium sunmi-pill-link hover:opacity-90 transition"
-        >
-          <Plus size={18} />
-          Nueva Venta
-        </Link>
+        {isHrefVisible(menu, "/modulos/pos-ventas") && (
+          <Link
+            href="/modulos/pos-ventas"
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium sunmi-pill-link hover:opacity-90 transition"
+          >
+            <Plus size={18} />
+            Nueva Venta
+          </Link>
+        )}
       </div>
 
       {errorCarga && !cargandoResumen && (

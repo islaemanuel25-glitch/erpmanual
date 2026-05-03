@@ -7,6 +7,8 @@ import AccesosRapidos from "./AccesosRapidos";
 import UltimasVentas from "./UltimasVentas";
 import ActividadReciente from "./ActividadReciente";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
+import { useMenu } from "@/hooks/useMenu";
+import { isHrefVisible } from "@/lib/menu/lookup";
 import {
   DollarSign,
   Receipt,
@@ -35,6 +37,7 @@ export default function DashboardDesktop({
 }) {
   const { theme } = useSunmiTheme();
   const router = useRouter();
+  const { menu } = useMenu();
 
   const kpisDefs = [
     { titulo: "Ventas hoy", campo: "totalVentas", formato: true, icono: DollarSign, color: "blue" },
@@ -57,27 +60,33 @@ export default function DashboardDesktop({
   return (
     <div className="hidden md:flex flex-col gap-5">
       <div className="flex items-center justify-end gap-2">
-        <Link
-          href="/modulos/pos-ventas"
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium sunmi-pill-link hover:opacity-90 transition"
-        >
-          <Plus size={16} />
-          Nueva Venta
-        </Link>
-        <Link
-          href="/modulos/pedidos"
-          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium ${theme.card} border border-current/[0.08] hover:bg-current/[0.03] transition`}
-        >
-          <ClipboardList size={15} />
-          Pedido
-        </Link>
-        <Link
-          href="/modulos/clientes"
-          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium ${theme.card} border border-current/[0.08] hover:bg-current/[0.03] transition`}
-        >
-          <UserPlus size={15} />
-          Cliente
-        </Link>
+        {isHrefVisible(menu, "/modulos/pos-ventas") && (
+          <Link
+            href="/modulos/pos-ventas"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium sunmi-pill-link hover:opacity-90 transition"
+          >
+            <Plus size={16} />
+            Nueva Venta
+          </Link>
+        )}
+        {isHrefVisible(menu, "/modulos/pedidos") && (
+          <Link
+            href="/modulos/pedidos"
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium ${theme.card} border border-current/[0.08] hover:bg-current/[0.03] transition`}
+          >
+            <ClipboardList size={15} />
+            Pedido
+          </Link>
+        )}
+        {isHrefVisible(menu, "/modulos/clientes") && (
+          <Link
+            href="/modulos/clientes"
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium ${theme.card} border border-current/[0.08] hover:bg-current/[0.03] transition`}
+          >
+            <UserPlus size={15} />
+            Cliente
+          </Link>
+        )}
       </div>
 
       {errorCarga && !cargandoResumen && (
@@ -129,12 +138,14 @@ export default function DashboardDesktop({
         <div className={`lg:col-span-2 flex flex-col min-h-0 ${cardSoft} p-3.5`}>
           <div className="flex items-center justify-between gap-2 mb-2.5 shrink-0">
             <h3 className="text-sm font-semibold">Accesos rápidos</h3>
-            <Link
-              href="/modulos/configuracion"
-              className="text-[11px] font-normal sunmi-text-muted hover:opacity-80 transition"
-            >
-              Personalizar
-            </Link>
+            {isHrefVisible(menu, "/modulos/configuracion") && (
+              <Link
+                href="/modulos/configuracion"
+                className="text-[11px] font-normal sunmi-text-muted hover:opacity-80 transition"
+              >
+                Personalizar
+              </Link>
+            )}
           </div>
           <div className="flex-1 flex items-center min-h-0">
             <AccesosRapidos variant="desktop" />
