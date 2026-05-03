@@ -19,57 +19,66 @@ export default function AppLauncherTile({ group }) {
   const color = group.color || "gray";
   const hasSubmenu = count > 1;
 
-  const iconBoxStyle = {
-    background: `rgb(var(--module-${color}) / 0.15)`,
+  const circleStyle = {
+    background: `rgb(var(--module-${color}) / 0.18)`,
     color: `rgb(var(--module-${color}))`,
+    transition: "transform 0.18s ease",
   };
 
   const badgeStyle = {
     background: `rgb(var(--module-${color}))`,
     color: "#ffffff",
+    border: "2px solid #ffffff",
   };
 
-  const tileClasses = `
-    group relative w-full
-    flex flex-col items-center justify-center gap-2
-    lg:flex-row lg:justify-start lg:gap-3
-    p-2 lg:p-3 rounded-xl
-    transition cursor-pointer text-left
-    hover:-translate-y-0.5
+  const wrapperClasses = `
+    group relative
+    flex flex-col items-center
+    bg-transparent border-0 p-0
+    cursor-pointer text-center
     ${FOCUS_RING}
   `;
 
   const tileContent = (
     <>
-      {hasSubmenu && (
-        <span
+      <div className="relative">
+        <div
           className="
-            absolute top-1.5 right-1.5
-            min-w-[18px] h-[18px] px-1
-            rounded-full text-[10px] font-bold leading-none
-            flex items-center justify-center shadow-sm
+            flex items-center justify-center
+            w-20 h-20 sm:w-24 sm:h-24 rounded-full shrink-0
+            group-hover:-translate-y-[3px]
           "
-          style={badgeStyle}
-          aria-hidden
+          style={circleStyle}
         >
-          {count}
-        </span>
-      )}
-      <div
-        className="
-          flex items-center justify-center
-          w-12 h-12 rounded-2xl shrink-0
-          transition
-        "
-        style={iconBoxStyle}
-      >
-        {Icon && <Icon size={22} aria-hidden strokeWidth={2} />}
+          {Icon && (
+            <Icon
+              aria-hidden
+              strokeWidth={2}
+              className="w-9 h-9 sm:w-10 sm:h-10"
+            />
+          )}
+        </div>
+        {hasSubmenu && (
+          <span
+            className="
+              absolute top-0 right-0
+              min-w-[22px] h-[22px] px-1.5
+              rounded-full text-[11px] font-bold leading-none
+              flex items-center justify-center shadow-sm
+              group-hover:-translate-y-[3px]
+            "
+            style={{ ...badgeStyle, transition: "transform 0.18s ease" }}
+            aria-hidden
+          >
+            {count}
+          </span>
+        )}
       </div>
       <span
         className="
-          text-xs lg:text-sm font-medium
+          mt-3 text-[13px] font-medium
           text-[color:var(--app-fg)]
-          truncate max-w-full
+          truncate max-w-[112px]
         "
       >
         {group.label}
@@ -84,7 +93,7 @@ export default function AppLauncherTile({ group }) {
           type="button"
           onClick={() => setPanelOpen(true)}
           aria-label={`${group.label}, ${count} accesos`}
-          className={tileClasses}
+          className={wrapperClasses}
         >
           {tileContent}
         </button>
@@ -98,7 +107,7 @@ export default function AppLauncherTile({ group }) {
   }
 
   return (
-    <Link href={primer.href} aria-label={group.label} className={tileClasses}>
+    <Link href={primer.href} aria-label={group.label} className={wrapperClasses}>
       {tileContent}
     </Link>
   );

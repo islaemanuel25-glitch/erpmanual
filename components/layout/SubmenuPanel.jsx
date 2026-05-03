@@ -7,92 +7,83 @@ import { X } from "lucide-react";
 export default function SubmenuPanel({ group, isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen) return;
-    const onKey = (e) => {
+    const handleEscape = (e) => {
       if (e.key === "Escape") onClose();
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
   if (!isOpen || !group) return null;
 
-  const items = group.items || [];
   const color = group.color || "gray";
+  const items = group.items || [];
   const Icon = group.icon;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={group.label}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[color:var(--pos-overlay)] backdrop-blur-sm"
+      onClick={onClose}
     >
       <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        className="
-          relative z-10 w-full max-w-md
-          rounded-2xl overflow-hidden shadow-xl
-          bg-[color:var(--card-bg)]
-          border border-[color:var(--card-border)]
-        "
+        className="bg-[color:var(--card-bg)] border border-[color:var(--card-border)] rounded-3xl p-6 shadow-2xl w-full sm:w-auto sm:min-w-[460px]"
+        style={{ maxWidth: "90vw" }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[color:var(--card-border)]">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
             <div
-              className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0"
+              className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{
-                background: `rgb(var(--module-${color}) / 0.15)`,
+                background: `rgb(var(--module-${color}) / 0.18)`,
                 color: `rgb(var(--module-${color}))`,
               }}
             >
-              {Icon && <Icon size={20} aria-hidden strokeWidth={2} />}
+              {Icon && <Icon size={20} />}
             </div>
-            <h3 className="text-sm font-semibold text-[color:var(--app-fg)] truncate">
-              {group.label}
-            </h3>
+            <div>
+              <div className="text-[15px] font-medium text-[color:var(--app-fg)]">
+                {group.label}
+              </div>
+              <div className="text-[12px] sunmi-text-muted">
+                {items.length} {items.length === 1 ? "herramienta disponible" : "herramientas disponibles"}
+              </div>
+            </div>
           </div>
           <button
-            type="button"
             onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-[color:var(--hover-bg)] text-[color:var(--app-fg)]"
             aria-label="Cerrar"
-            className="
-              p-1 rounded-md
-              text-[color:var(--app-fg)] opacity-70
-              hover:opacity-100 hover:bg-[color:var(--hover-bg)]
-              transition cursor-pointer
-            "
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        <div className="p-2 max-h-[70vh] overflow-y-auto">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className="
-                flex items-center gap-3 px-3 py-2 rounded-lg
-                hover:bg-[color:var(--hover-bg)]
-                transition
-              "
-            >
-              {item.icon && (
-                <item.icon
-                  size={18}
-                  className="text-[color:var(--app-fg)] opacity-70"
-                />
-              )}
-              <span className="text-sm text-[color:var(--app-fg)]">
-                {item.label}
-              </span>
-            </Link>
-          ))}
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+          {items.map((item) => {
+            const ItemIcon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className="flex flex-col items-center gap-2 p-2.5 rounded-xl hover:bg-[color:var(--hover-bg)] transition"
+              >
+                <div
+                  className="w-[60px] h-[60px] rounded-full flex items-center justify-center"
+                  style={{
+                    background: `rgb(var(--module-${color}) / 0.18)`,
+                    color: `rgb(var(--module-${color}))`,
+                  }}
+                >
+                  {ItemIcon && <ItemIcon size={26} />}
+                </div>
+                <span className="text-[12px] font-medium text-[color:var(--app-fg)] text-center">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </div>
