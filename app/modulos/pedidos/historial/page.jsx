@@ -68,6 +68,10 @@ export default function HistorialPedidosPage() {
         const json = await res.json();
 
         if (!json.ok) {
+          if (json.needsContexto) {
+            router.push("/inicio");
+            return;
+          }
           setError(json.error || "Error al cargar historial");
           setItems([]);
           setTotalPages(1);
@@ -86,7 +90,7 @@ export default function HistorialPedidosPage() {
         setLoading(false);
       }
     },
-    [estado, busqueda]
+    [estado, busqueda, router]
   );
 
   // Debounce búsqueda + cambio de estado
