@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@/app/context/UserContext";
 import SidebarGroup from "./SidebarGroup";
 import SidebarMobile from "./SidebarMobile";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
-import { MENU_CONFIG, buildVisibleMenu } from "@/lib/menuConfig";
+import { useMenu } from "@/hooks/useMenu";
 import { Home, Loader2 } from "lucide-react";
 
 // ============================================================
 // Componente principal
 // ============================================================
 export default function SidebarPro({ variant = "static", onClose }) {
-  const { perfil, cargando, logout } = useUser();
+  const { menu, perfil, isLoading: cargando } = useMenu();
   const { theme } = useSunmiTheme();
 
   // Hooks SIEMPRE antes de cualquier return
@@ -93,9 +92,9 @@ export default function SidebarPro({ variant = "static", onClose }) {
   }
 
   // ========================================================
-  // PERFIL CARGADO — armar menú filtrando por permisos
+  // PERFIL CARGADO — `menu` ya viene filtrado desde useMenu
+  // (cruce RBAC + capacidades comerciales).
   // ========================================================
-  const menu = buildVisibleMenu(MENU_CONFIG, perfil);
 
   // Anti menú vacío: al menos Inicio siempre está
   const tieneAlgo = menu.length > 1;

@@ -4,17 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
-import { useUser } from "@/app/context/UserContext";
-import { MENU_CONFIG, buildVisibleMenu } from "@/lib/menuConfig";
+import { useMenu } from "@/hooks/useMenu";
 
 const MAX_TOPBAR = 8;
 
 export default function TopbarNav({ onOpenMenu }) {
   const { theme } = useSunmiTheme();
-  const { perfil } = useUser();
+  const { menu } = useMenu();
   const pathname = usePathname();
-
-  const menu = perfil ? buildVisibleMenu(MENU_CONFIG, perfil) : [];
 
   // Destino principal RBAC-safe: group.href solo si coincide con un ítem visible;
   // sino, primer ítem visible. Si no hay ítem visible, no renderiza el acceso.
