@@ -6,16 +6,26 @@
 // Lectura centralizada del menú visible y del contexto de
 // navegación actual.
 //
-// Etapa 3 — modo compatibilidad:
-//   El menú devuelto por este hook es EXACTAMENTE el resultado
-//   de `buildVisibleMenu(MENU_CONFIG, perfil)` que la UI ya
-//   consume hoy. NO se aplica todavía el filtrado comercial por
-//   módulos/features contratados (eso queda para una etapa
-//   posterior). De ese modo este hook no cambia ni un pixel de
-//   lo que se ve actualmente.
+// Etapa 5 del refactor modular/comercial:
+//   El menú ya NO se construye con `buildVisibleMenu(MENU_CONFIG, perfil)`.
+//   Ahora se itera `MENU_CONFIG` cruzando:
+//     - permisos del usuario (RBAC),
+//     - capacidades comerciales del grupo (módulos/features/
+//       integraciones/scope/multi-sucursal) vía `getGrupoConfig()`,
+//     - reglas operativas históricas (localOnly/depositoOnly).
 //
-// Devuelve:
-//   - menu          : grupos visibles para el perfil activo.
+//   La fuente comercial es `lib/empresa-config.js`, donde
+//   `getGrupoConfig()` devuelve hoy `ACTIVE_GRUPO_CONFIG` =
+//   `COMPAT_GRUPO_CONFIG` (Etapa 4.5). Esto deja activas las
+//   capacidades necesarias para que el menú visible NO pierda
+//   módulos respecto al estado pre-Etapa 5.
+//
+//   Cuando se decida cortar a la semántica comercial real
+//   (single-local), basta con apuntar `ACTIVE_GRUPO_CONFIG` a
+//   `DEFAULT_GRUPO_CONFIG`. Este hook no cambia.
+//
+// API pública preservada (idéntica a Etapas 3/4):
+//   - menu          : grupos visibles para el perfil + grupoConfig.
 //   - homeRoute     : ruta de inicio según menuMode.
 //   - currentGroup  : grupo del menú que matchea el pathname (o null).
 //   - currentItem   : sub-item del menú que matchea el pathname (o null).
@@ -29,8 +39,13 @@ import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
-import { MENU_CONFIG, buildVisibleMenu } from "@/lib/menuConfig";
+import { MENU_CONFIG } from "@/lib/menu/registry";
 import { getDefaultRoute } from "@/lib/getDefaultRoute";
+import { getGrupoConfig } from "@/lib/empresa-config";
+import {
+  canAccessMenuGroup,
+  canAccessMenuItem,
+} from "@/lib/menu/canAccess";
 
 export function useMenu() {
   const pathname = usePathname() || "";
@@ -42,8 +57,37 @@ export function useMenu() {
   const menuMode = layoutCtx?.menuMode ?? null;
 
   const menu = useMemo(() => {
+    // Sin perfil no se construye el menú: misma semántica que Etapa 3.
+    // La UI ya tolera `[]` durante el loading.
     if (!perfil) return [];
-    return buildVisibleMenu(MENU_CONFIG, perfil);
+
+    const grupoConfig = getGrupoConfig();
+    const result = [];
+
+    for (const group of MENU_CONFIG) {
+      const groupCheck = canAccessMenuGroup(
+        perfil,
+        grupoConfig,
+        group,
+        MENU_CONFIG
+      );
+      if (!groupCheck.visible) continue;
+
+      const items = Array.isArray(group.items) ? group.items : [];
+      const visibleItems = items.filter(
+        (item) =>
+          canAccessMenuItem(perfil, grupoConfig, item, MENU_CONFIG).visible
+      );
+
+      // Descartar grupos sin items visibles, salvo los `core`
+      // (ej. Inicio) que son siempre alcanzables vía group.href.
+      if (visibleItems.length === 0 && group.type !== "core") continue;
+
+      // Copia superficial: no mutamos MENU_CONFIG.
+      result.push({ ...group, items: visibleItems });
+    }
+
+    return result;
   }, [perfil]);
 
   const homeRoute = useMemo(() => getDefaultRoute(menuMode), [menuMode]);
