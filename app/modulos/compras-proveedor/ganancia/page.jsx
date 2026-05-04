@@ -100,7 +100,7 @@ export default function GananciaComprasPage() {
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
         <div className="flex items-center justify-between mb-4">
-          <SunmiHeader title="Ganancia depósito" />
+          <SunmiHeader title="Ganancia Depósito" />
           <SunmiBackButton href="/modulos/compras-proveedor" />
         </div>
 

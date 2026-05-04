@@ -90,7 +90,7 @@ export default function ReportesVentasPage() {
     <div className="p-2 lg:p-3 space-y-3 max-w-7xl mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold">Reportes de Ventas</h1>
+        <h1 className="text-xl font-bold">Ventas</h1>
         <p className="text-sm sunmi-text-muted">
           Analisis de ventas, comisiones y rentabilidad
         </p>

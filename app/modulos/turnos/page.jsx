@@ -122,7 +122,7 @@ export default function TurnosPage() {
   return (
     <div className="p-3 space-y-3">
       <SunmiCard>
-        <h1 className="text-lg font-bold mb-2">Turnos</h1>
+        <h1 className="text-lg font-bold mb-2">Cajas</h1>
         <SunmiSeparator label="Filtros" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
           <SunmiInput
