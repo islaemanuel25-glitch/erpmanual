@@ -1,11 +1,15 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-05-03 16:44
+**Fecha:** 2026-05-04 02:55
 
 ## Módulos modificados recientemente
 
+### configuracion
+- refactor(menu): migrar consumidores visuales a useMenu, refactor(menu): etapa 4b centralizar titulos de header y layout
+- Archivos: 2 modificados (2 total)
+
 ### dashboard
-- fix(launcher,theme): corregir redirect launcher e hidratación theme, feat(launcher): inicio dedicado, panel modal de submódulos y botón Inicio
+- fix(launcher,theme): corregir redirect launcher e hidratación theme
 - Archivos: 1 modificados (1 total)
 
 
