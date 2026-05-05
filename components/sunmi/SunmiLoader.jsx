@@ -5,8 +5,7 @@ import { useSunmiTheme } from "./SunmiThemeProvider";
 export default function SunmiLoader({ size = 20 }) {
   const { theme } = useSunmiTheme();
   
-  // Usar color del header para el spinner
-  const spinnerColor = theme.header.bg.includes('amber') ? 'border-t-amber-400' : 'border-t-cyan-400';
+  const spinnerColor = theme.accent === 'amber' ? 'border-t-amber-400' : 'border-t-cyan-400';
   const borderColor = theme.card.split(' ').find(c => c.startsWith('border-'))?.replace('border-', 'border-') || 'border-slate-700';
   
   return (

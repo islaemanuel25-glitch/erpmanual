@@ -57,6 +57,10 @@ html:not([data-theme]) {
   --table-row-hover: rgba(15, 23, 42, 0.8);
   --hover-bg: rgba(30, 41, 59, 0.4);
 
+  /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
+  --chrome-bg: #FACC15;
+  --chrome-border: rgba(0, 0, 0, 0.15);
+
   /* POS — estética cyan/amarillo */
   --pos-accent: #fbbf24;
   --pos-link: #22d3ee;
@@ -117,6 +121,10 @@ html[data-theme="sunmiDarkCompact"] {
   --table-header-fg: #e2e8f0;
   --table-row-hover: #0f172a;
   --hover-bg: rgba(15, 23, 42, 0.7);
+
+  /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
+  --chrome-bg: #020617;
+  --chrome-border: rgba(255, 255, 255, 0.08);
 
   /* POS */
   --pos-accent: #fbbf24;
@@ -179,6 +187,10 @@ html[data-theme="sunmiLight"] {
   --table-row-hover: #f8fafc;
   --hover-bg: #f1f5f9;
 
+  /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
+  --chrome-bg: #ffffff;
+  --chrome-border: rgba(0, 0, 0, 0.08);
+
   /* POS */
   --pos-accent: #d97706;
   --pos-link: #0891b2;
@@ -239,6 +251,10 @@ html[data-theme="sunmiGraphite"] {
   --table-header-fg: #d1d5db;
   --table-row-hover: #1f242b;
   --hover-bg: #1f242b;
+
+  /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
+  --chrome-bg: #0e1116;
+  --chrome-border: rgba(255, 255, 255, 0.06);
 
   /* POS */
   --pos-accent: #fbbf24;
@@ -301,6 +317,10 @@ html[data-theme="sunmiSand"] {
   --table-row-hover: #f1e6d5;
   --hover-bg: #f1e6d5;
 
+  /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
+  --chrome-bg: #fffaf0;
+  --chrome-border: rgba(0, 0, 0, 0.08);
+
   /* POS */
   --pos-accent: #b45309;
   --pos-link: #0e7490;
@@ -362,6 +382,10 @@ html[data-theme="sunmiBlueClassic"] {
   --table-row-hover: #163866;
   --hover-bg: #163866;
 
+  /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
+  --chrome-bg: #0b1f3a;
+  --chrome-border: rgba(255, 255, 255, 0.08);
+
   /* POS */
   --pos-accent: #fbbf24;
   --pos-link: #7dd3fc;
@@ -422,6 +446,10 @@ html[data-theme="sunmiFrance"] {
   --table-header-fg: #ffffff;
   --table-row-hover: #e8f0fe;
   --hover-bg: #e8f0fe;
+
+  /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
+  --chrome-bg: #0055A4;
+  --chrome-border: #000000;
 
   /* POS */
   --pos-accent: #0055A4;

@@ -6,8 +6,7 @@ export default function SunmiUserCell({ nombre = "", email = "" }) {
   const { theme } = useSunmiTheme();
   const inicial = nombre?.[0]?.toUpperCase() ?? "?";
 
-  // Usar color del header para el avatar (amber o cyan según theme)
-  const avatarBg = theme.header.bg.includes('amber') ? 'bg-amber-400' : 'bg-cyan-400';
+  const avatarBg = theme.accent === 'amber' ? 'bg-amber-400' : 'bg-cyan-400';
   const textColor = theme.layout.split(' ').find(c => c.startsWith('text-')) || 'text-slate-100';
 
   return (

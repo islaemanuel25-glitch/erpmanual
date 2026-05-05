@@ -22,6 +22,7 @@ export default function Header({ onOpenMobileMenu }) {
   const { theme } = useSunmiTheme();
   const homeRoute = getDefaultRoute(menuMode);
   const showHomeBtn = pathname !== homeRoute;
+  const isLauncher = menuMode === "launcher";
   const { operador, login: loginOperador, logout: logoutOperador } = useOperadorActivo();
   const [showOperadorSelector, setShowOperadorSelector] = useState(false);
   const operadorRef = useRef(null);
@@ -83,8 +84,6 @@ export default function Header({ onOpenMobileMenu }) {
       className={`
         w-full h-16 px-4 sm:px-6 flex justify-between items-center
         border-b
-        shadow-[0_3px_8px_rgba(0,0,0,0.35)]
-        bg-gradient-to-r
         ${theme.header.bg}
         ${theme.header.border}
         transition-colors duration-200
@@ -110,7 +109,8 @@ export default function Header({ onOpenMobileMenu }) {
             href={homeRoute}
             className={`
               flex items-center gap-1.5
-              px-3 py-1.5 rounded-lg
+              px-3 ${isLauncher ? "py-2 sm:py-1.5" : "py-1.5"} rounded-lg
+              ${isLauncher ? `border sm:border-0 ${theme.header.border}` : ""}
               hover:bg-[color:var(--hover-bg)]
               text-sm font-medium
               transition cursor-pointer
@@ -118,8 +118,8 @@ export default function Header({ onOpenMobileMenu }) {
             `}
             aria-label="Ir al inicio"
           >
-            <Home size={16} />
-            <span className="hidden sm:inline">Inicio</span>
+            <Home size={isLauncher ? 18 : 16} />
+            <span className={isLauncher ? "inline" : "hidden sm:inline"}>Inicio</span>
           </Link>
         )}
       </div>

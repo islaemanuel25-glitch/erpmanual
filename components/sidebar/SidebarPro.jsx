@@ -32,8 +32,6 @@ export default function SidebarPro({ variant = "static", onClose }) {
             w-16 min-w-16
             h-dvh sticky top-0
             ${theme.sidebar.bg}
-            ${theme.sidebar.border} border-r
-            shadow-[2px_0_10px_rgba(0,0,0,0.45)]
             py-4 z-40
           `}
         >
@@ -68,8 +66,6 @@ export default function SidebarPro({ variant = "static", onClose }) {
             w-16 min-w-16
             h-dvh sticky top-0
             ${theme.sidebar.bg}
-            ${theme.sidebar.border} border-r
-            shadow-[2px_0_10px_rgba(0,0,0,0.45)]
             py-4 gap-6 z-40
           `}
         >
@@ -118,7 +114,6 @@ export default function SidebarPro({ variant = "static", onClose }) {
             flex flex-col items-center
             w-16 min-w-16
             ${theme.sidebar.bg}
-            ${theme.sidebar.border} border-r
             shadow-[2px_0_10px_rgba(0,0,0,0.45)]
             z-50
           `}
@@ -157,8 +152,6 @@ export default function SidebarPro({ variant = "static", onClose }) {
           h-dvh sticky top-0
 
           ${theme.sidebar.bg}
-          ${theme.sidebar.border} border-r
-          shadow-[2px_0_10px_rgba(0,0,0,0.45)]
 
           z-40
         `}

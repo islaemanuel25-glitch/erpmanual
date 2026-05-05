@@ -69,7 +69,7 @@ export default function LayoutBase({ children }) {
 
         {/* MAIN CONTENT: pb en mobile para no tapar con BottomNav (solo topbar) */}
         <main
-          className={`flex-1 min-h-0 p-4 ${isTopbar ? "pb-20 md:pb-4" : "pb-4"} overflow-auto transition-colors duration-200`}
+          className={`flex-1 min-h-0 p-4 ${isTopbar ? "pb-20 md:pb-4" : "pb-4"} overflow-auto transition-colors duration-200 ${isSidebar ? "md:border-l md:border-[var(--chrome-border)]" : ""}`}
         >
           {/* En modo launcher el menú aparece sólo en Inicio/Dashboard */}
           {showLauncher && <AppLauncher />}
