@@ -32,6 +32,22 @@
   --module-coral:  216 90 48;
   --module-pink:   212 83 126;
   --module-gray:   136 135 128;
+
+  /* ----------------------------------------------------
+     Semantic color tokens (success / danger / warning / info)
+     Defaults = tonos pensados para themes oscuros.
+     Themes claros (sunmiLight / sunmiSand / sunmiFrance)
+     hacen override más abajo.
+     ---------------------------------------------------- */
+  --success-fg: #34d399;
+  --success-bg-hover: rgba(52, 211, 153, 0.10);
+  --danger-fg: #f87171;
+  --danger-bg-hover: rgba(239, 68, 68, 0.10);
+  --warning-fg: #fbbf24;
+  --warning-border: rgba(245, 158, 11, 0.5);
+  --warning-border-hover: rgba(251, 191, 36, 0.7);
+  --info-fg: #22d3ee;
+  --info-bg-hover: rgba(34, 211, 238, 0.10);
 }
 
 /* ==================================================
@@ -187,6 +203,17 @@ html[data-theme="sunmiLight"] {
   --table-row-hover: #f8fafc;
   --hover-bg: #f1f5f9;
 
+  /* Semantic tokens — light theme */
+  --success-fg: #059669;
+  --success-bg-hover: rgba(5, 150, 105, 0.08);
+  --danger-fg: #dc2626;
+  --danger-bg-hover: rgba(220, 38, 38, 0.08);
+  --warning-fg: #d97706;
+  --warning-border: rgba(217, 119, 6, 0.5);
+  --warning-border-hover: rgba(217, 119, 6, 0.7);
+  --info-fg: #0891b2;
+  --info-bg-hover: rgba(8, 145, 178, 0.08);
+
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #ffffff;
   --chrome-border: rgba(0, 0, 0, 0.08);
@@ -317,6 +344,17 @@ html[data-theme="sunmiSand"] {
   --table-row-hover: #f1e6d5;
   --hover-bg: #f1e6d5;
 
+  /* Semantic tokens — sand theme */
+  --success-fg: #059669;
+  --success-bg-hover: rgba(5, 150, 105, 0.08);
+  --danger-fg: #dc2626;
+  --danger-bg-hover: rgba(220, 38, 38, 0.08);
+  --warning-fg: #b45309;
+  --warning-border: rgba(180, 83, 9, 0.5);
+  --warning-border-hover: rgba(180, 83, 9, 0.7);
+  --info-fg: #0e7490;
+  --info-bg-hover: rgba(14, 116, 144, 0.08);
+
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #fffaf0;
   --chrome-border: rgba(0, 0, 0, 0.08);
@@ -446,6 +484,17 @@ html[data-theme="sunmiFrance"] {
   --table-header-fg: #ffffff;
   --table-row-hover: #e8f0fe;
   --hover-bg: #e8f0fe;
+
+  /* Semantic tokens — france theme */
+  --success-fg: #059669;
+  --success-bg-hover: rgba(5, 150, 105, 0.08);
+  --danger-fg: #dc2626;
+  --danger-bg-hover: rgba(220, 38, 38, 0.08);
+  --warning-fg: #d97706;
+  --warning-border: rgba(217, 119, 6, 0.5);
+  --warning-border-hover: rgba(217, 119, 6, 0.7);
+  --info-fg: #0055A4;
+  --info-bg-hover: rgba(0, 85, 164, 0.08);
 
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #0055A4;

@@ -150,9 +150,9 @@ export default function Header({ onOpenMobileMenu }) {
             `}
           >
             {contexto.esDeposito ? (
-              <Warehouse size={13} className="text-amber-400" />
+              <Warehouse size={13} className="text-[color:var(--warning-fg)]" />
             ) : (
-              <Store size={13} className="text-cyan-400" />
+              <Store size={13} className="text-[color:var(--info-fg)]" />
             )}
             <span className={theme.header.text}>
               {contexto.esDeposito ? "Depósito: " : "Local: "}{contexto.nombre}
@@ -165,12 +165,12 @@ export default function Header({ onOpenMobileMenu }) {
             className={`
               hidden sm:flex items-center gap-1.5
               text-[11px] px-2.5 py-1 rounded-lg
-              border border-amber-500/40 transition cursor-pointer
-              hover:border-amber-400/60
+              border border-[color:var(--warning-border)] transition cursor-pointer
+              hover:border-[color:var(--warning-border-hover)]
             `}
           >
-            <Store size={13} className="text-amber-400" />
-            <span className="text-amber-400">(sin seleccionar)</span>
+            <Store size={13} className="text-[color:var(--warning-fg)]" />
+            <span className="text-[color:var(--warning-fg)]">(sin seleccionar)</span>
           </button>
         )}
 
@@ -187,8 +187,8 @@ export default function Header({ onOpenMobileMenu }) {
               `}
               title={`Operando como ${nombre}`}
             >
-              <UserCheck size={14} className="text-emerald-400" />
-              <span className="text-emerald-400 font-medium">{nombre}</span>
+              <UserCheck size={14} className="text-[color:var(--success-fg)]" />
+              <span className="text-[color:var(--success-fg)] font-medium">{nombre}</span>
             </div>
           ) : operador ? (
             /* Cuenta compartida + operador elegido: pill verde, click para cambiar */
@@ -203,8 +203,8 @@ export default function Header({ onOpenMobileMenu }) {
               `}
               title={`Operador: ${operador.nombre} — click para cambiar`}
             >
-              <UserCheck size={14} className="text-emerald-400" />
-              <span className="text-emerald-400 font-medium">{operador.nombre}</span>
+              <UserCheck size={14} className="text-[color:var(--success-fg)]" />
+              <span className="text-[color:var(--success-fg)] font-medium">{operador.nombre}</span>
             </button>
           ) : (
             /* Cuenta compartida + SIN operador: prominente, ámbar fuerte */
@@ -213,14 +213,14 @@ export default function Header({ onOpenMobileMenu }) {
               className="
                 flex items-center gap-1.5
                 text-xs font-semibold px-3 py-1.5 rounded-lg
-                border-2 border-amber-500 transition cursor-pointer
-                hover:border-amber-400
+                border-2 border-[color:var(--warning-border)] transition cursor-pointer
+                hover:border-[color:var(--warning-border-hover)]
                 animate-pulse hover:animate-none
               "
               title="Identificate para operar"
             >
-              <UserCheck size={15} className="text-amber-400" />
-              <span className="text-amber-400">Sin operador</span>
+              <UserCheck size={15} className="text-[color:var(--warning-fg)]" />
+              <span className="text-[color:var(--warning-fg)]">Sin operador</span>
             </button>
           )}
 
@@ -311,7 +311,7 @@ export default function Header({ onOpenMobileMenu }) {
                   className={`
                     flex items-center gap-2 w-full text-left
                     px-4 py-2 text-[13px]
-                    text-cyan-400 hover:bg-cyan-500/10
+                    text-[color:var(--info-fg)] hover:bg-[color:var(--info-bg-hover)]
                     transition
                   `}
                 >
@@ -325,7 +325,7 @@ export default function Header({ onOpenMobileMenu }) {
                 className={`
                   flex items-center gap-2 w-full text-left
                   px-4 py-2 text-[13px]
-                  text-red-400 hover:bg-red-500/10
+                  text-[color:var(--danger-fg)] hover:bg-[color:var(--danger-bg-hover)]
                   transition
                 `}
               >
