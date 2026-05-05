@@ -8,7 +8,6 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import FormProducto from "@/components/productos/FormProducto";
-import VoiceProductWizard from "@/components/productos/VoiceProductWizard";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 export default function NuevoProductoPage() {
@@ -23,7 +22,6 @@ export default function NuevoProductoPage() {
     AREAS: [],
   });
   const [loadingCat, setLoadingCat] = useState(true);
-  const [voiceData, setVoiceData] = useState(null);
 
   useEffect(() => {
     const cargar = async () => {
@@ -105,20 +103,14 @@ export default function NuevoProductoPage() {
         {loadingCat ? (
           <SunmiLoader />
         ) : (
-          <>
-            <VoiceProductWizard
-              categorias={catalogos.CATEGORIAS}
-              proveedores={catalogos.PROVEEDORES}
-              onApply={(partialData) => setVoiceData(partialData)}
-            />
-            <FormProducto
-              initialData={voiceData}
-              catalogos={catalogos}
-              onSubmit={handleSubmit}
-              onCancel={handleCancel}
-              submitLabel="Crear producto"
-            />
-          </>
+          <FormProducto
+            initialData={null}
+            catalogos={catalogos}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            submitLabel="Crear producto"
+            enableVoiceInputs={true}
+          />
         )}
       </SunmiCard>
     </div>

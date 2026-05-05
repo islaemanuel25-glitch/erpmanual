@@ -6,7 +6,23 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
+import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
+
+function parseVoiceNumber(text) {
+  if (text === null || text === undefined) return null;
+  const cleaned = String(text)
+    .replace(/[^\d,.\-]/g, "")
+    .replace(/\.(?=\d{3}\b)/g, "")
+    .replace(",", ".");
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseVoiceCodigoBarra(text) {
+  return String(text || "").replace(/\D+/g, "");
+}
 
 /* ============================================================
    FOCUS ORDER — Enter avanza al siguiente campo
@@ -38,6 +54,7 @@ export default function FormProducto({
   onSubmit,
   onCancel,
   submitLabel,
+  enableVoiceInputs = false,
 }) {
   const scrollRef = useRef(null);
 
@@ -120,6 +137,23 @@ export default function FormProducto({
     if (val === "") return setField(key, "");
     const n = Number(val);
     if (Number.isFinite(n) && n >= 0) setField(key, n);
+  };
+
+  const applyFactorPackValue = (raw) => {
+    const val = String(raw ?? "");
+    if (val === "") {
+      setForm((p) => ({ ...p, factor_pack: "", modo_pedido: "UNIDAD" }));
+      return;
+    }
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 0) return;
+    let modoPedido = form.modo_pedido;
+    if (!n || n <= 1) {
+      modoPedido = "UNIDAD";
+    } else if (!form.modo_pedido || form.modo_pedido === "") {
+      modoPedido = "BULTO";
+    }
+    setForm((p) => ({ ...p, factor_pack: n, modo_pedido: modoPedido }));
   };
 
   const onChangeCosto = (val) => {
@@ -290,19 +324,75 @@ export default function FormProducto({
         <Section title="Identidad">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nombre *" fieldKey="nombre">
-              <SunmiInput value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput value={form.nombre} onChange={(e) => setField("nombre", e.target.value)} />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="nombre"
+                    label="Dictar nombre"
+                    onResult={(t) => {
+                      const v = String(t || "").trim();
+                      if (v) setField("nombre", v);
+                    }}
+                  />
+                )}
+              </div>
             </Field>
 
             <Field label="Código barras" fieldKey="codigo_barra">
-              <SunmiInput value={form.codigo_barra} onChange={(e) => setField("codigo_barra", e.target.value)} />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput value={form.codigo_barra} onChange={(e) => setField("codigo_barra", e.target.value)} />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="codigo_barra"
+                    label="Dictar código de barras"
+                    onResult={(t) => {
+                      const v = parseVoiceCodigoBarra(t);
+                      if (v) setField("codigo_barra", v);
+                    }}
+                  />
+                )}
+              </div>
             </Field>
 
             <Field label="SKU" fieldKey="sku">
-              <SunmiInput value={form.sku} onChange={(e) => setField("sku", e.target.value)} />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput value={form.sku} onChange={(e) => setField("sku", e.target.value)} />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="sku"
+                    label="Dictar SKU"
+                    onResult={(t) => {
+                      const v = String(t || "").trim();
+                      if (v) setField("sku", v);
+                    }}
+                  />
+                )}
+              </div>
             </Field>
 
             <Field label="Descripción" fieldKey="descripcion" colSpan>
-              <SunmiInput value={form.descripcion} onChange={(e) => setField("descripcion", e.target.value)} />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput value={form.descripcion} onChange={(e) => setField("descripcion", e.target.value)} />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="descripcion"
+                    label="Dictar descripción"
+                    onResult={(t) => {
+                      const v = String(t || "").trim();
+                      if (v) setField("descripcion", v);
+                    }}
+                  />
+                )}
+              </div>
             </Field>
           </div>
         </Section>
@@ -444,48 +534,75 @@ export default function FormProducto({
             </Field>
 
             <Field label="Factor pack" fieldKey="factor_pack">
-              <SunmiInput
-                type="number"
-                value={form.factor_pack}
-                onWheel={(e) => e.target.blur()}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "") {
-                    setForm((p) => ({ ...p, factor_pack: "", modo_pedido: "UNIDAD" }));
-                    return;
-                  }
-                  const n = Number(val);
-                  if (!Number.isFinite(n) || n < 0) return;
-                  let modoPedido = form.modo_pedido;
-                  if (!n || n <= 1) {
-                    modoPedido = "UNIDAD";
-                  } else if (!form.modo_pedido || form.modo_pedido === "") {
-                    modoPedido = "BULTO";
-                  }
-                  setForm((p) => ({ ...p, factor_pack: n, modo_pedido: modoPedido }));
-                }}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput
+                    type="number"
+                    value={form.factor_pack}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => applyFactorPackValue(e.target.value)}
+                  />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="factor_pack"
+                    label="Dictar factor pack"
+                    onResult={(t) => {
+                      const n = parseVoiceNumber(t);
+                      if (n !== null && n >= 0) applyFactorPackValue(n);
+                    }}
+                  />
+                )}
+              </div>
             </Field>
 
             <Field label="Peso del producto (kg)" fieldKey="peso_kg">
-              <SunmiInput
-                type="number"
-                value={form.peso_kg}
-                onWheel={(e) => e.target.blur()}
-                onChange={(e) => setNumber("peso_kg", e.target.value)}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput
+                    type="number"
+                    value={form.peso_kg}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => setNumber("peso_kg", e.target.value)}
+                  />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="peso_kg"
+                    label="Dictar peso en kg"
+                    onResult={(t) => {
+                      const n = parseVoiceNumber(t);
+                      if (n !== null && n >= 0) setField("peso_kg", n);
+                    }}
+                  />
+                )}
+              </div>
               <p className="text-xs text-slate-500 mt-1">
                 Peso neto del producto o bulto (informativo).
               </p>
             </Field>
 
             <Field label="Volumen (ml)" fieldKey="volumen_ml">
-              <SunmiInput
-                type="number"
-                value={form.volumen_ml}
-                onWheel={(e) => e.target.blur()}
-                onChange={(e) => setNumber("volumen_ml", e.target.value)}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput
+                    type="number"
+                    value={form.volumen_ml}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => setNumber("volumen_ml", e.target.value)}
+                  />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="volumen_ml"
+                    label="Dictar volumen en ml"
+                    onResult={(t) => {
+                      const n = parseVoiceNumber(t);
+                      if (n !== null && n >= 0) setField("volumen_ml", n);
+                    }}
+                  />
+                )}
+              </div>
             </Field>
           </div>
         </Section>
@@ -494,12 +611,26 @@ export default function FormProducto({
         <Section title="Precios">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label={`Costo * ${form.unidad_medida === "kg" ? "(por kg)" : ["pack", "cajon"].includes(form.unidad_medida) ? "(por bulto)" : "(por unidad)"}`} fieldKey="precio_costo">
-              <SunmiInput
-                type="number"
-                value={form.precio_costo}
-                onWheel={(e) => e.target.blur()}
-                onChange={(e) => onChangeCosto(e.target.value)}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput
+                    type="number"
+                    value={form.precio_costo}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => onChangeCosto(e.target.value)}
+                  />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="precio_costo"
+                    label="Dictar precio de costo"
+                    onResult={(t) => {
+                      const n = parseVoiceNumber(t);
+                      if (n !== null && n >= 0) onChangeCosto(n);
+                    }}
+                  />
+                )}
+              </div>
             </Field>
 
             <Field label="Margen %" fieldKey="margen">
@@ -512,12 +643,26 @@ export default function FormProducto({
             </Field>
 
             <Field label={`Venta * ${form.unidad_medida === "kg" ? "(por kg)" : ["pack", "cajon"].includes(form.unidad_medida) ? "(por bulto)" : "(por unidad)"}`} fieldKey="precio_venta">
-              <SunmiInput
-                type="number"
-                value={form.precio_venta}
-                onWheel={(e) => e.target.blur()}
-                onChange={(e) => onChangeVenta(e.target.value)}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiInput
+                    type="number"
+                    value={form.precio_venta}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => onChangeVenta(e.target.value)}
+                  />
+                </div>
+                {enableVoiceInputs && (
+                  <VoiceFieldButton
+                    fieldName="precio_venta"
+                    label="Dictar precio de venta"
+                    onResult={(t) => {
+                      const n = parseVoiceNumber(t);
+                      if (n !== null && n >= 0) onChangeVenta(n);
+                    }}
+                  />
+                )}
+              </div>
             </Field>
 
             <Field label="IVA %" fieldKey="iva_porcentaje">
