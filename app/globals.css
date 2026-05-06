@@ -76,6 +76,10 @@ html:not([data-theme]) {
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #FACC15;
   --chrome-border: rgba(0, 0, 0, 0.15);
+  --header-bg: var(--chrome-bg);
+  --header-border: var(--chrome-border);
+  --sidebar-bg: var(--chrome-bg);
+  --sidebar-border: var(--chrome-border);
 
   /* POS — estética cyan/amarillo */
   --pos-accent: #fbbf24;
@@ -141,6 +145,10 @@ html[data-theme="sunmiDarkCompact"] {
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #020617;
   --chrome-border: rgba(255, 255, 255, 0.08);
+  --header-bg: var(--chrome-bg);
+  --header-border: var(--chrome-border);
+  --sidebar-bg: var(--chrome-bg);
+  --sidebar-border: var(--chrome-border);
 
   /* POS */
   --pos-accent: #fbbf24;
@@ -217,6 +225,10 @@ html[data-theme="sunmiLight"] {
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #ffffff;
   --chrome-border: rgba(0, 0, 0, 0.08);
+  --header-bg: var(--chrome-bg);
+  --header-border: var(--chrome-border);
+  --sidebar-bg: var(--chrome-bg);
+  --sidebar-border: var(--chrome-border);
 
   /* POS */
   --pos-accent: #d97706;
@@ -282,6 +294,10 @@ html[data-theme="sunmiGraphite"] {
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #0e1116;
   --chrome-border: rgba(255, 255, 255, 0.06);
+  --header-bg: var(--chrome-bg);
+  --header-border: var(--chrome-border);
+  --sidebar-bg: var(--chrome-bg);
+  --sidebar-border: var(--chrome-border);
 
   /* POS */
   --pos-accent: #fbbf24;
@@ -358,6 +374,10 @@ html[data-theme="sunmiSand"] {
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #fffaf0;
   --chrome-border: rgba(0, 0, 0, 0.08);
+  --header-bg: var(--chrome-bg);
+  --header-border: var(--chrome-border);
+  --sidebar-bg: var(--chrome-bg);
+  --sidebar-border: var(--chrome-border);
 
   /* POS */
   --pos-accent: #b45309;
@@ -423,6 +443,10 @@ html[data-theme="sunmiBlueClassic"] {
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #0b1f3a;
   --chrome-border: rgba(255, 255, 255, 0.08);
+  --header-bg: var(--chrome-bg);
+  --header-border: var(--chrome-border);
+  --sidebar-bg: var(--chrome-bg);
+  --sidebar-border: var(--chrome-border);
 
   /* POS */
   --pos-accent: #fbbf24;
@@ -499,6 +523,10 @@ html[data-theme="sunmiFrance"] {
   /* Chrome (sidebar + header + topbar + mobile nav) — color compartido */
   --chrome-bg: #0055A4;
   --chrome-border: #000000;
+  --header-bg: var(--chrome-bg);
+  --header-border: var(--chrome-border);
+  --sidebar-bg: var(--chrome-bg);
+  --sidebar-border: var(--chrome-border);
 
   /* POS */
   --pos-accent: #0055A4;
