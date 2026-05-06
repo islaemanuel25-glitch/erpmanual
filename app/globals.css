@@ -570,6 +570,86 @@ html[data-theme="sunmiFrance"] {
   --pos-overlay: rgba(0,0,0,0.35);
 }
 
+html[data-theme="sunmiFranceSplit"] {
+  --app-bg: #f3f4f6;
+  --app-fg: #0b0f17;
+  --app-border: #000000;
+  --app-input-bg: #ffffff;
+  --app-input-border: #000000;
+  --app-scrollbar-track: #ffffff;
+  --app-scrollbar-thumb: #0055A4;
+  --app-scrollbar-thumb-hover: #004080;
+  --app-autofill-bg: #ffffff;
+  --app-autofill-fg: #0b0f17;
+  --app-date-indicator: none;
+  --card-bg: #ffffff;
+  --card-border: #000000;
+  --table-header-bg: #0055A4;
+  --table-header-fg: #ffffff;
+  --table-row-hover: #e8f0fe;
+  --hover-bg: #e8f0fe;
+
+  /* Semantic tokens — france split theme */
+  --success-fg: #059669;
+  --success-bg-hover: rgba(5, 150, 105, 0.08);
+  --danger-fg: #dc2626;
+  --danger-bg-hover: rgba(220, 38, 38, 0.08);
+  --warning-fg: #d97706;
+  --warning-border: rgba(217, 119, 6, 0.5);
+  --warning-border-hover: rgba(217, 119, 6, 0.7);
+  --info-fg: #0055A4;
+  --info-bg-hover: rgba(0, 85, 164, 0.08);
+
+  /* Chrome — Header blanco, Sidebar azul (split) */
+  --chrome-bg: #0055A4;
+  --chrome-border: #000000;
+  --header-bg: #ffffff;
+  --header-border: rgba(0, 0, 0, 0.12);
+  --sidebar-bg: #0055A4;
+  --sidebar-border: #000000;
+
+  /* POS */
+  --pos-accent: #0055A4;
+  --pos-link: #0055A4;
+  --pos-link-hover: #004080;
+  --pos-muted: #6b7280;
+  --pos-muted-strong: #374151;
+  --pos-surface: #f3f4f6;
+  --pos-surface-hover: #e5e7eb;
+  --pos-surface-active: #d1d5db;
+  --pos-control-bg: #e5e7eb;
+  --pos-control-hover: #d1d5db;
+  --pos-control-active: #9ca3af;
+  --pos-control-text: #0b0f17;
+  --pos-row-bg: #ffffff;
+  --pos-row-hover: #e8f0fe;
+  --pos-panel-bg: #ffffff;
+  --pos-success: #059669;
+  --pos-success-soft: #047857;
+  --pos-success-bg: rgba(16,185,129,0.1);
+  --pos-success-border: rgba(16,185,129,0.3);
+  --pos-danger: #dc2626;
+  --pos-danger-hover: #b91c1c;
+  --pos-points: #7c3aed;
+  --pos-points-bg: rgba(168,85,247,0.08);
+  --pos-points-border: rgba(168,85,247,0.2);
+  --pos-tab-active-bg: #0055A4;
+  --pos-tab-active-fg: #ffffff;
+  --pos-tab-bg: #e5e7eb;
+  --pos-tab-fg: #374151;
+  --pos-tab-hover: #d1d5db;
+  --pos-commission-bg: rgba(243,244,246,0.8);
+  --pos-commission-border: rgba(209,213,219,0.5);
+  --pos-panel-border: #000000;
+  --pos-btn-primary-bg: #0055A4;
+  --pos-btn-primary-fg: #ffffff;
+  --pos-btn-secondary-bg: #ffffff;
+  --pos-btn-secondary-fg: #0b0f17;
+  --pos-btn-danger-bg: #dc2626;
+  --pos-btn-danger-fg: #ffffff;
+  --pos-overlay: rgba(0,0,0,0.35);
+}
+
 /* ==================================================
    ⭐ RESET & BASE GLOBAL
    ================================================== */
