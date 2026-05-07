@@ -166,6 +166,9 @@ export async function POST(req) {
       }
 
       return { updateId: update.id, applied };
+    }, {
+      maxWait: 10000,
+      timeout: 120000,
     });
 
     return NextResponse.json({
