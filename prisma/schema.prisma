@@ -469,6 +469,7 @@ enum PrecioUpdateMetodo {
   PEGADO
   XLSX
   SCAN
+  MARGEN_MASIVO
 }
 
 enum PrecioUpdatePricingMode {

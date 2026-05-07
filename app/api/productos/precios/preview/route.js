@@ -108,6 +108,13 @@ export async function POST(req) {
     const pricingMode = body?.pricingMode;
     const metodo = body?.metodo || "AUMENTO";
 
+    // ══════════════════════════════════════════════════════
+    // MARGEN_MASIVO: rama separada (proveedorId opcional via filtros)
+    // ══════════════════════════════════════════════════════
+    if (metodo === "MARGEN_MASIVO") {
+      return await handleMargenMasivoPreview({ body, grupoId });
+    }
+
     // Validación dura (evita proveedorId 0 / null)
     if (proveedorId == null || proveedorId <= 0) {
       return NextResponse.json(
@@ -278,4 +285,96 @@ export async function POST(req) {
     console.error("ERROR productos/precios/preview:", e);
     return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
   }
+}
+
+// ══════════════════════════════════════════════════════
+// Preview para MARGEN_MASIVO
+// ══════════════════════════════════════════════════════
+async function handleMargenMasivoPreview({ body, grupoId }) {
+  const margenPorcentaje = toNumber(body?.margenPorcentaje);
+  if (margenPorcentaje === null || margenPorcentaje <= -100) {
+    return NextResponse.json(
+      { ok: false, error: "margenPorcentaje inválido" },
+      { status: 400 }
+    );
+  }
+
+  const redondeo = body?.redondeo === "CIEN_ARRIBA" ? "CIEN_ARRIBA" : "NINGUNO";
+  const soloDondeVentaIgualCosto = body?.soloDondeVentaIgualCosto !== false;
+  const forzar = body?.forzar === true;
+  const filtros = body?.filtros || {};
+
+  const where = { grupoId, activo: true };
+  const filtroCategoriaId = toNumber(filtros.categoriaId);
+  if (filtroCategoriaId && filtroCategoriaId > 0) where.categoria_id = filtroCategoriaId;
+  const filtroProveedorId = toNumber(filtros.proveedorId);
+  if (filtroProveedorId && filtroProveedorId > 0) where.proveedor_id = filtroProveedorId;
+  if (filtros.creadosDesde) {
+    const desde = new Date(filtros.creadosDesde);
+    if (!Number.isNaN(desde.getTime())) where.createdAt = { gte: desde };
+  }
+
+  const productos = await prisma.productoBase.findMany({
+    where,
+    select: {
+      id: true,
+      nombre: true,
+      codigo_barra: true,
+      precio_costo: true,
+      precio_venta: true,
+    },
+    orderBy: { id: "asc" },
+  });
+
+  let ignoradosCostoCero = 0;
+  let ignoradosPrecioModificado = 0;
+  const items = [];
+
+  for (const p of productos) {
+    const precioCosto = Number(p.precio_costo);
+    const ventaActual = Number(p.precio_venta);
+
+    if (!Number.isFinite(precioCosto) || precioCosto <= 0) {
+      ignoradosCostoCero += 1;
+      continue;
+    }
+
+    const ventaIgualCosto = Math.abs(ventaActual - precioCosto) < 0.01;
+    if (soloDondeVentaIgualCosto && !forzar && !ventaIgualCosto) {
+      ignoradosPrecioModificado += 1;
+      continue;
+    }
+
+    let ventaNueva = precioCosto * (1 + margenPorcentaje / 100);
+    if (redondeo === "CIEN_ARRIBA") ventaNueva = roundUpTo100(ventaNueva);
+    ventaNueva = Math.round(ventaNueva * 100) / 100;
+
+    items.push({
+      productoBaseId: p.id,
+      nombre: p.nombre,
+      codigoBarra: p.codigo_barra || null,
+      precioCosto,
+      ventaAnterior: ventaActual,
+      ventaNueva,
+      diferencia: Math.round((ventaNueva - ventaActual) * 100) / 100,
+      estado: ventaIgualCosto ? "inicial" : forzar ? "forzado" : "aplicar",
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    items,
+    summary: {
+      encontrados: productos.length,
+      aActualizar: items.length,
+      ignoradosPrecioModificado,
+      ignoradosCostoCero,
+      metodo: "MARGEN_MASIVO",
+      margenPorcentaje,
+      redondeo,
+      soloDondeVentaIgualCosto,
+      forzar,
+    },
+    alertas: { criticas: 0, advertencias: 0 },
+  });
 }

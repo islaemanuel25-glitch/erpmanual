@@ -48,13 +48,14 @@ export async function POST(req) {
     const metodo = body?.metodo;
     const pricingMode = body?.pricingMode;
     const items = Array.isArray(body?.items) ? body.items : null;
+    const esMargenMasivo = metodo === "MARGEN_MASIVO";
 
-    // FIX: validar explícito (null / NaN / <= 0)
-    if (proveedorId == null || proveedorId <= 0) {
+    // proveedorId requerido salvo en MARGEN_MASIVO (donde es opcional via filtros)
+    if (!esMargenMasivo && (proveedorId == null || proveedorId <= 0)) {
       return NextResponse.json({ ok: false, error: "proveedorId requerido" }, { status: 400 });
     }
 
-    if (!["MANUAL", "AUMENTO", "XLSX", "SCAN", "REGLAS", "PEGADO"].includes(metodo)) {
+    if (!["MANUAL", "AUMENTO", "XLSX", "SCAN", "REGLAS", "PEGADO", "MARGEN_MASIVO"].includes(metodo)) {
       return NextResponse.json({ ok: false, error: "metodo inválido" }, { status: 400 });
     }
 
@@ -66,15 +67,21 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "items inválido" }, { status: 400 });
     }
 
-    if (items.length > 1000) {
-      return NextResponse.json({ ok: false, error: "Demasiados items (máx 1000)" }, { status: 400 });
+    if (items.length > 5000) {
+      return NextResponse.json({ ok: false, error: "Demasiados items (máx 5000)" }, { status: 400 });
     }
+
+    const proveedorIdParaUpdate = esMargenMasivo
+      ? proveedorId && proveedorId > 0
+        ? proveedorId
+        : null
+      : proveedorId;
 
     const result = await prisma.$transaction(async (tx) => {
       const update = await tx.precioUpdate.create({
         data: {
           grupoId,
-          proveedorId,
+          proveedorId: proveedorIdParaUpdate,
           metodo,
           pricingMode,
           usuarioId: session.id ? Number(session.id) : null,
@@ -99,12 +106,14 @@ export async function POST(req) {
           throw new Error("Item inválido");
         }
 
+        const productoWhere = {
+          id: productoBaseId,
+          grupoId,
+        };
+        if (!esMargenMasivo) productoWhere.proveedor_id = proveedorId;
+
         const updated = await tx.productoBase.updateMany({
-          where: {
-            id: productoBaseId,
-            grupoId,
-            proveedor_id: proveedorId,
-          },
+          where: productoWhere,
           data: {
             precio_costo: costoNuevo,
             precio_venta: ventaNueva,

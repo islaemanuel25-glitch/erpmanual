@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "PrecioUpdateMetodo" ADD VALUE IF NOT EXISTS 'MARGEN_MASIVO';

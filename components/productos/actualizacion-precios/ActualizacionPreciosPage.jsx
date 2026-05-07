@@ -83,6 +83,22 @@ export default function ActualizacionPreciosPage() {
   const [excelPreview, setExcelPreview] = useState([]);
   const [applyingExcel, setApplyingExcel] = useState(false);
 
+  // Tab Margen masivo
+  const [margenPct, setMargenPct] = useState("30");
+  const [margenRedondeo, setMargenRedondeo] = useState("CIEN_ARRIBA");
+  const [margenSoloIgualCosto, setMargenSoloIgualCosto] = useState(true);
+  const [margenForzar, setMargenForzar] = useState(false);
+  const [margenFiltroCategoria, setMargenFiltroCategoria] = useState("");
+  const [margenFiltroProveedor, setMargenFiltroProveedor] = useState("");
+  const [margenFiltroDesde, setMargenFiltroDesde] = useState("");
+  const [margenCategorias, setMargenCategorias] = useState([]);
+  const [margenLoadingCategorias, setMargenLoadingCategorias] = useState(false);
+  const [margenLoadingPreview, setMargenLoadingPreview] = useState(false);
+  const [margenApplying, setMargenApplying] = useState(false);
+  const [margenItems, setMargenItems] = useState([]);
+  const [margenSummary, setMargenSummary] = useState(null);
+  const [margenConfirmOpen, setMargenConfirmOpen] = useState(false);
+
   // -----------------------------------------------------------------------
   // Cargar proveedores al montar
   // -----------------------------------------------------------------------
@@ -555,6 +571,134 @@ export default function ActualizacionPreciosPage() {
   };
 
   // -----------------------------------------------------------------------
+  // TAB MARGEN MASIVO
+  // -----------------------------------------------------------------------
+  const cargarMargenCategorias = async () => {
+    if (margenCategorias.length || margenLoadingCategorias) return;
+    setMargenLoadingCategorias(true);
+    try {
+      const res = await fetch("/api/categorias/listar", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setMargenCategorias(Array.isArray(data?.items) ? data.items : []);
+      }
+    } catch (err) {
+      console.error("Error cargando categorías:", err);
+    } finally {
+      setMargenLoadingCategorias(false);
+    }
+  };
+
+  const handleMargenPreview = async () => {
+    setErrorMsg("");
+    setSuccessMsg("");
+    setMargenItems([]);
+    setMargenSummary(null);
+
+    const pct = parseFloat(margenPct);
+    if (isNaN(pct) || pct <= -100) {
+      setErrorMsg("Margen inválido. Ingresá un número mayor a -100.");
+      return;
+    }
+
+    setMargenLoadingPreview(true);
+    try {
+      const filtros = {};
+      if (margenFiltroCategoria) filtros.categoriaId = Number(margenFiltroCategoria);
+      if (margenFiltroProveedor) filtros.proveedorId = Number(margenFiltroProveedor);
+      if (margenFiltroDesde) filtros.creadosDesde = margenFiltroDesde;
+
+      const res = await fetch("/api/productos/precios/preview", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metodo: "MARGEN_MASIVO",
+          pricingMode: "SET_VENTA",
+          margenPorcentaje: pct,
+          redondeo: margenRedondeo,
+          soloDondeVentaIgualCosto: margenSoloIgualCosto,
+          forzar: margenForzar,
+          filtros,
+          localId: contexto?.localId || null,
+        }),
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      const data = await res.json();
+      if (!data.ok) {
+        setErrorMsg(data.error || "Error al previsualizar.");
+        return;
+      }
+      setMargenItems(Array.isArray(data.items) ? data.items : []);
+      setMargenSummary(data.summary || null);
+      if (!data.items?.length) {
+        setErrorMsg(
+          "No hay productos para actualizar con los filtros y reglas seleccionadas."
+        );
+      }
+    } catch (err) {
+      console.error("Error previsualizando margen masivo:", err);
+      setErrorMsg("Error de conexión al previsualizar.");
+    } finally {
+      setMargenLoadingPreview(false);
+    }
+  };
+
+  const handleMargenAplicar = async () => {
+    if (!margenItems.length) return;
+    setMargenConfirmOpen(false);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    const items = margenItems.map((it) => ({
+      productoBaseId: it.productoBaseId,
+      costoAnterior: it.precioCosto,
+      costoNuevo: it.precioCosto,
+      ventaAnterior: it.ventaAnterior,
+      ventaNueva: it.ventaNueva,
+    }));
+
+    setMargenApplying(true);
+    try {
+      const res = await fetch("/api/productos/precios/apply", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metodo: "MARGEN_MASIVO",
+          pricingMode: "SET_VENTA",
+          proveedorId: margenFiltroProveedor ? Number(margenFiltroProveedor) : null,
+          items,
+          localId: contexto?.localId || null,
+        }),
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      const data = await res.json();
+      if (data.ok) {
+        setSuccessMsg(
+          data.message ||
+            `Margen aplicado a ${items.length} productos.`
+        );
+        setMargenItems([]);
+        setMargenSummary(null);
+      } else {
+        setErrorMsg(data.error || "Error al aplicar margen masivo.");
+      }
+    } catch (err) {
+      console.error("Error aplicando margen masivo:", err);
+      setErrorMsg("Error de conexión al aplicar margen masivo.");
+    } finally {
+      setMargenApplying(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
   if (!perfil || loadingCtx) return null;
@@ -573,7 +717,7 @@ export default function ActualizacionPreciosPage() {
           </div>
 
           {/* Tabs */}
-          <div className="grid grid-cols-2 gap-2 max-w-[340px]">
+          <div className="grid grid-cols-3 gap-2 max-w-[510px]">
             <SunmiButton
               color={tab === "proveedor" ? "amber" : "cyan"}
               onClick={() => {
@@ -593,6 +737,17 @@ export default function ActualizacionPreciosPage() {
               }}
             >
               Excel
+            </SunmiButton>
+            <SunmiButton
+              color={tab === "margen" ? "amber" : "cyan"}
+              onClick={() => {
+                setTab("margen");
+                setErrorMsg("");
+                setSuccessMsg("");
+                cargarMargenCategorias();
+              }}
+            >
+              Margen masivo
             </SunmiButton>
           </div>
 
@@ -893,6 +1048,265 @@ export default function ActualizacionPreciosPage() {
                       : `Aplicar cambios (${excelPreview.length} productos)`}
                   </SunmiButton>
                 </>
+              )}
+            </>
+          )}
+
+          {/* =================== TAB: MARGEN MASIVO =================== */}
+          {tab === "margen" && (
+            <>
+              <SunmiSeparator label="Configuración" className="!my-0" />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] sunmi-label mb-1 block">
+                    Margen porcentual sobre costo
+                  </label>
+                  <SunmiInput
+                    type="number"
+                    step="0.01"
+                    value={margenPct}
+                    onChange={(e) => setMargenPct(e.target.value)}
+                    placeholder="Ej: 30"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] sunmi-label mb-1 block">
+                    Redondeo
+                  </label>
+                  <SunmiSelectAdv
+                    value={margenRedondeo}
+                    onChange={(val) => setMargenRedondeo(val)}
+                  >
+                    <option value="NINGUNO">Sin redondeo</option>
+                    <option value="CIEN_ARRIBA">Redondear a 100 hacia arriba</option>
+                  </SunmiSelectAdv>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center gap-2 text-[12px] sunmi-text-strong cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={margenSoloIgualCosto}
+                    onChange={(e) => setMargenSoloIgualCosto(e.target.checked)}
+                  />
+                  Solo productos donde precio venta = precio costo
+                </label>
+                <label className="flex items-center gap-2 text-[12px] sunmi-text-strong cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={margenForzar}
+                    onChange={(e) => setMargenForzar(e.target.checked)}
+                  />
+                  Forzar actualización de productos ya modificados
+                </label>
+                {margenForzar && (
+                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+                    Atención: forzar pisará precios de venta editados manualmente.
+                    No se puede deshacer.
+                  </div>
+                )}
+              </div>
+
+              <SunmiSeparator label="Filtros (opcionales)" className="!my-0" />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] sunmi-label mb-1 block">
+                    Categoría
+                  </label>
+                  <SunmiSelectAdv
+                    value={margenFiltroCategoria}
+                    onChange={(val) => setMargenFiltroCategoria(val)}
+                    disabled={margenLoadingCategorias}
+                    searchable
+                  >
+                    <option value="">Todas</option>
+                    {margenCategorias.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </SunmiSelectAdv>
+                </div>
+                <div>
+                  <label className="text-[11px] sunmi-label mb-1 block">
+                    Proveedor
+                  </label>
+                  <SunmiSelectAdv
+                    value={margenFiltroProveedor}
+                    onChange={(val) => setMargenFiltroProveedor(val)}
+                    disabled={loadingProveedores}
+                    searchable
+                  >
+                    <option value="">Todos</option>
+                    {proveedores.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </SunmiSelectAdv>
+                </div>
+                <div>
+                  <label className="text-[11px] sunmi-label mb-1 block">
+                    Creados desde
+                  </label>
+                  <SunmiInput
+                    type="date"
+                    value={margenFiltroDesde}
+                    onChange={(e) => setMargenFiltroDesde(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <SunmiButton
+                  color="cyan"
+                  onClick={handleMargenPreview}
+                  disabled={margenLoadingPreview || margenApplying}
+                >
+                  {margenLoadingPreview ? "Calculando..." : "Previsualizar"}
+                </SunmiButton>
+                {margenItems.length > 0 && (
+                  <SunmiButton
+                    color="amber"
+                    onClick={() => setMargenConfirmOpen(true)}
+                    disabled={margenApplying}
+                  >
+                    {margenApplying
+                      ? "Aplicando..."
+                      : `Aplicar cambios (${margenItems.length})`}
+                  </SunmiButton>
+                )}
+              </div>
+
+              {margenSummary && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                  <div className="rounded-md sunmi-card px-3 py-2">
+                    <div className="sunmi-text-muted">Encontrados</div>
+                    <div className="text-base font-semibold">
+                      {margenSummary.encontrados}
+                    </div>
+                  </div>
+                  <div className="rounded-md sunmi-card px-3 py-2">
+                    <div className="sunmi-text-muted">A actualizar</div>
+                    <div className="text-base font-semibold sunmi-text-success">
+                      {margenSummary.aActualizar}
+                    </div>
+                  </div>
+                  <div className="rounded-md sunmi-card px-3 py-2">
+                    <div className="sunmi-text-muted">Ignorados precio modificado</div>
+                    <div className="text-base font-semibold">
+                      {margenSummary.ignoradosPrecioModificado}
+                    </div>
+                  </div>
+                  <div className="rounded-md sunmi-card px-3 py-2">
+                    <div className="sunmi-text-muted">Ignorados costo 0</div>
+                    <div className="text-base font-semibold">
+                      {margenSummary.ignoradosCostoCero}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {margenItems.length > 0 && (
+                <>
+                  <SunmiSeparator
+                    label={`Vista previa (${margenItems.length} productos)`}
+                    className="!my-0"
+                  />
+                  <SunmiTable
+                    headers={[
+                      "Producto",
+                      "Cód. barras",
+                      "Costo",
+                      "Venta actual",
+                      "Venta nueva",
+                      "Diferencia",
+                      "Estado",
+                    ]}
+                  >
+                    {margenItems.slice(0, 200).map((it) => (
+                      <SunmiTableRow key={it.productoBaseId}>
+                        <td className="px-2 py-1.5 truncate max-w-[200px]">
+                          {it.nombre}
+                        </td>
+                        <td className="px-2 py-1.5 sunmi-text-muted whitespace-nowrap">
+                          {it.codigoBarra || "—"}
+                        </td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                          {formatPrecio(it.precioCosto)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                          {formatPrecio(it.ventaAnterior)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap font-semibold">
+                          {formatPrecio(it.ventaNueva)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                          {formatPrecio(it.diferencia)}
+                        </td>
+                        <td className="px-2 py-1.5 text-[11px]">
+                          {it.estado === "forzado" ? (
+                            <span className="text-amber-400">forzado</span>
+                          ) : it.estado === "inicial" ? (
+                            <span className="sunmi-text-muted">inicial</span>
+                          ) : (
+                            <span className="sunmi-text-success">aplicar</span>
+                          )}
+                        </td>
+                      </SunmiTableRow>
+                    ))}
+                  </SunmiTable>
+                  {margenItems.length > 200 && (
+                    <div className="text-[11px] sunmi-text-muted px-1">
+                      Mostrando los primeros 200 de {margenItems.length}. Al aplicar
+                      se actualizarán todos.
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Modal de confirmación */}
+              {margenConfirmOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                  <div className="sunmi-card w-full max-w-md mx-4 p-5 rounded-xl shadow-xl">
+                    <h3 className="text-sm font-bold mb-2">
+                      Confirmar aplicación masiva
+                    </h3>
+                    <p className="text-[12px] sunmi-text-muted mb-3">
+                      Se actualizará el precio de venta de {margenItems.length}{" "}
+                      productos aplicando un margen de {margenPct}% sobre el costo
+                      {margenRedondeo === "CIEN_ARRIBA"
+                        ? " con redondeo a 100 hacia arriba"
+                        : " sin redondeo"}
+                      .
+                    </p>
+                    {margenForzar && (
+                      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300 mb-3">
+                        Forzar está activado: se pisarán precios manualmente
+                        modificados.
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <SunmiButton
+                        color="amber"
+                        onClick={handleMargenAplicar}
+                        disabled={margenApplying}
+                      >
+                        {margenApplying ? "Aplicando..." : "Confirmar"}
+                      </SunmiButton>
+                      <SunmiButton
+                        color="slate"
+                        onClick={() => setMargenConfirmOpen(false)}
+                        disabled={margenApplying}
+                      >
+                        Cancelar
+                      </SunmiButton>
+                    </div>
+                  </div>
+                </div>
               )}
             </>
           )}
