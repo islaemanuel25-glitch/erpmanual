@@ -3,7 +3,9 @@
 import { useRef, useState, useEffect, useCallback, memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { showError } from "@/components/sunmi/SunmiToast";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
+const SIN_STOCK_MSG = "Producto sin stock disponible";
 
 function BuscadorProductos({ localId, onAgregar, apiPath }) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
@@ -66,6 +68,11 @@ function BuscadorProductos({ localId, onAgregar, apiPath }) {
             items[0].codigoBarra &&
             items[0].codigoBarra.toLowerCase() === texto.trim().toLowerCase()
           ) {
+            if (items[0].disponibleParaVenta === false) {
+              showError(SIN_STOCK_MSG);
+              setResultados(items);
+              return;
+            }
             onAgregar(items[0]);
             setQuery("");
             setResultados([]);
@@ -75,6 +82,11 @@ function BuscadorProductos({ localId, onAgregar, apiPath }) {
 
           // Auto-agregar si se pidió (scanner Enter) y hay resultado único
           if (autoAdd && items.length === 1) {
+            if (items[0].disponibleParaVenta === false) {
+              showError(SIN_STOCK_MSG);
+              setResultados(items);
+              return;
+            }
             onAgregar(items[0]);
             setQuery("");
             setResultados([]);
@@ -158,6 +170,11 @@ function BuscadorProductos({ localId, onAgregar, apiPath }) {
 
       // Enter normal: agregar primer resultado o buscar
       if (resultados.length > 0) {
+        if (resultados[0].disponibleParaVenta === false) {
+          showError(SIN_STOCK_MSG);
+          scanBuffer.current = "";
+          return;
+        }
         onAgregar(resultados[0]);
         setQuery("");
         setResultados([]);
@@ -196,6 +213,10 @@ function BuscadorProductos({ localId, onAgregar, apiPath }) {
 
   // Agregar producto y limpiar
   const handleAgregar = (producto) => {
+    if (producto?.disponibleParaVenta === false) {
+      showError(SIN_STOCK_MSG);
+      return;
+    }
     onAgregar(producto);
     setQuery("");
     setResultados([]);
@@ -255,28 +276,35 @@ function BuscadorProductos({ localId, onAgregar, apiPath }) {
       {/* Resultados */}
       {resultados.length > 0 && (
         <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
-          {resultados.map((p) => (
-            <div
-              key={p.productoBaseId}
-              onClick={() => handleAgregar(p)}
-              className="flex items-center justify-between gap-2 px-2 py-2 rounded-lg pos-bg-surface-interactive transition cursor-pointer"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{p.nombre}</div>
-                <div className="text-[11px] pos-text-muted">
-                  {p.codigoBarra && (
-                    <span className="mr-3">Cod: {p.codigoBarra}</span>
-                  )}
-                  <span>Stock: {p.unidadMedida === "kg" ? `${Number(p.stock).toFixed(3)} kg` : p.stock}</span>
+          {resultados.map((p) => {
+            const noDisponible = p.disponibleParaVenta === false;
+            return (
+              <div
+                key={p.productoBaseId}
+                onClick={() => handleAgregar(p)}
+                className={`flex items-center justify-between gap-2 px-2 py-2 rounded-lg pos-bg-surface-interactive transition cursor-pointer ${noDisponible ? "opacity-60" : ""}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{p.nombre}</div>
+                  <div className="text-[11px] pos-text-muted">
+                    {p.codigoBarra && (
+                      <span className="mr-3">Cod: {p.codigoBarra}</span>
+                    )}
+                    {p.sinStock && p.disponibleParaVenta === false ? (
+                      <span className="pos-text-danger font-semibold">Sin stock</span>
+                    ) : (
+                      <span>Stock: {p.unidadMedida === "kg" ? `${Number(p.stock).toFixed(3)} kg` : p.stock}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-sm font-semibold pos-text-accent shrink-0">
+                  ${Number(p.precioVenta).toLocaleString("es-AR", {
+                    minimumFractionDigits: 2,
+                  })}
                 </div>
               </div>
-              <div className="text-sm font-semibold pos-text-accent shrink-0">
-                ${Number(p.precioVenta).toLocaleString("es-AR", {
-                  minimumFractionDigits: 2,
-                })}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

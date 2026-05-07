@@ -156,6 +156,8 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
   return lista
     .map((pl) => {
       const stock = Number(pl.stock?.[0]?.cantidad || 0);
+      const sinStock = stock <= 0;
+      const disponibleParaVenta = !sinStock || allowNegativeStock;
       let unidadMedida = pl.base?.unidad_medida || "unidad";
       const factorPack = Number(pl.base?.factor_pack || 1);
       const modoEnvio = pl.base?.modo_envio || null;
@@ -208,6 +210,9 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
         precioVentaBulto,
         precioCosto: Number(pl.precio_costo || pl.base?.precio_costo || 0),
         stock,
+        sinStock,
+        allowNegativeStock,
+        disponibleParaVenta,
         unidadMedida,
         factorPack,
         modoEnvio,
@@ -216,6 +221,5 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
         esFiambreFijo: fiambreFijo || false,
         pesoReferenciaKg: fiambreFijo ? pesoReferenciaKg : undefined,
       };
-    })
-    .filter((p) => p.stock > 0 || allowNegativeStock);
+    });
 }
