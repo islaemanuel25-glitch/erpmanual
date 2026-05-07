@@ -89,6 +89,16 @@ export default function NuevoProductoPage() {
     router.push("/modulos/productos");
   };
 
+  const handleCatalogoCreado = (tipo, item) => {
+    if (!item) return;
+    setCatalogos((prev) => {
+      if (tipo === "categoria") return { ...prev, CATEGORIAS: [...prev.CATEGORIAS, item] };
+      if (tipo === "area_fisica") return { ...prev, AREAS: [...prev.AREAS, item] };
+      if (tipo === "proveedor") return { ...prev, PROVEEDORES: [...prev.PROVEEDORES, item] };
+      return prev;
+    });
+  };
+
   if (loadingCtx) return null;
   if (needsContexto) { router.push("/inicio"); return null; }
 
@@ -110,6 +120,7 @@ export default function NuevoProductoPage() {
             onCancel={handleCancel}
             submitLabel="Crear producto"
             enableVoiceInputs={true}
+            onCatalogoCreado={handleCatalogoCreado}
           />
         )}
       </SunmiCard>

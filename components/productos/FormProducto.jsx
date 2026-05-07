@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import SunmiSelectConCrearRapido from "@/components/sunmi/SunmiSelectConCrearRapido";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
@@ -55,6 +56,7 @@ export default function FormProducto({
   onCancel,
   submitLabel,
   enableVoiceInputs = false,
+  onCatalogoCreado,
 }) {
   const scrollRef = useRef(null);
 
@@ -132,6 +134,39 @@ export default function FormProducto({
   }, [initialData]);
 
   const setField = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  // ========================================================================
+  // Creación rápida de catálogos (categoría / área física / proveedor)
+  // ========================================================================
+  const crearCatalogo = async (tipo, payload, campoDestino) => {
+    const url =
+      tipo === "categoria"
+        ? "/api/categorias/crear"
+        : tipo === "area_fisica"
+        ? "/api/areas-fisicas/crear"
+        : tipo === "proveedor"
+        ? "/api/proveedores/crear"
+        : null;
+    if (!url) throw new Error("Tipo de catálogo no soportado");
+
+    const res = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {}
+    if (!res.ok || !data?.ok || !data?.item) {
+      throw new Error(data?.error || `Error al crear ${tipo}`);
+    }
+
+    setField(campoDestino, Number(data.item.id));
+    onCatalogoCreado?.(tipo, data.item);
+    return data.item;
+  };
 
   const setNumber = (key, val) => {
     if (val === "") return setField(key, "");
@@ -401,37 +436,35 @@ export default function FormProducto({
         <Section title="Catálogos">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Categoría" fieldKey="categoria_id">
-              <SunmiSelectAdv
-                searchable
+              <SunmiSelectConCrearRapido
                 value={form.categoria_id === "" ? "" : String(form.categoria_id)}
                 onChange={(v) =>
                   setField("categoria_id", v === "" ? "" : Number(v))
                 }
-              >
-                <SunmiSelectOption value="">-</SunmiSelectOption>
-                {catalogos.CATEGORIAS?.map((c) => (
-                  <SunmiSelectOption key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
+                items={catalogos.CATEGORIAS || []}
+                tituloModal="Crear categoría"
+                campos={[{ key: "nombre", label: "Nombre", requerido: true }]}
+                onCrear={(payload) => crearCatalogo("categoria", payload, "categoria_id")}
+              />
             </Field>
 
             <Field label="Área física" fieldKey="area_fisica_id">
-              <SunmiSelectAdv
-                searchable
+              <SunmiSelectConCrearRapido
                 value={form.area_fisica_id === "" ? "" : String(form.area_fisica_id)}
                 onChange={(v) =>
                   setField("area_fisica_id", v === "" ? "" : Number(v))
                 }
-              >
-                <SunmiSelectOption value="">-</SunmiSelectOption>
-                {catalogos.AREAS?.map((c) => (
-                  <SunmiSelectOption key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
+                items={catalogos.AREAS || []}
+                tituloModal="Crear área física"
+                campos={[
+                  { key: "nombre", label: "Nombre", requerido: true },
+                  { key: "descripcion", label: "Descripción" },
+                  { key: "tipo", label: "Tipo" },
+                ]}
+                onCrear={(payload) =>
+                  crearCatalogo("area_fisica", payload, "area_fisica_id")
+                }
+              />
             </Field>
           </div>
         </Section>
@@ -440,54 +473,66 @@ export default function FormProducto({
         <Section title="Proveedores">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Proveedor 1" fieldKey="proveedor_id">
-              <SunmiSelectAdv
-                searchable
+              <SunmiSelectConCrearRapido
                 value={form.proveedor_id === "" ? "" : String(form.proveedor_id)}
                 onChange={(v) =>
                   setField("proveedor_id", v === "" ? "" : Number(v))
                 }
-              >
-                <SunmiSelectOption value="">-</SunmiSelectOption>
-                {catalogos.PROVEEDORES?.map((c) => (
-                  <SunmiSelectOption key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
+                items={catalogos.PROVEEDORES || []}
+                tituloModal="Crear proveedor"
+                campos={[
+                  { key: "nombre", label: "Nombre", requerido: true },
+                  { key: "telefono", label: "Teléfono", type: "tel" },
+                  { key: "email", label: "Email", type: "email" },
+                  { key: "cuit", label: "CUIT" },
+                  { key: "direccion", label: "Dirección" },
+                ]}
+                onCrear={(payload) =>
+                  crearCatalogo("proveedor", payload, "proveedor_id")
+                }
+              />
             </Field>
 
             <Field label="Proveedor 2" fieldKey="proveedor2_id">
-              <SunmiSelectAdv
-                searchable
+              <SunmiSelectConCrearRapido
                 value={form.proveedor2_id === "" ? "" : String(form.proveedor2_id)}
                 onChange={(v) =>
                   setField("proveedor2_id", v === "" ? "" : Number(v))
                 }
-              >
-                <SunmiSelectOption value="">-</SunmiSelectOption>
-                {catalogos.PROVEEDORES?.map((c) => (
-                  <SunmiSelectOption key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
+                items={catalogos.PROVEEDORES || []}
+                tituloModal="Crear proveedor"
+                campos={[
+                  { key: "nombre", label: "Nombre", requerido: true },
+                  { key: "telefono", label: "Teléfono", type: "tel" },
+                  { key: "email", label: "Email", type: "email" },
+                  { key: "cuit", label: "CUIT" },
+                  { key: "direccion", label: "Dirección" },
+                ]}
+                onCrear={(payload) =>
+                  crearCatalogo("proveedor", payload, "proveedor2_id")
+                }
+              />
             </Field>
 
             <Field label="Proveedor 3" fieldKey="proveedor3_id">
-              <SunmiSelectAdv
-                searchable
+              <SunmiSelectConCrearRapido
                 value={form.proveedor3_id === "" ? "" : String(form.proveedor3_id)}
                 onChange={(v) =>
                   setField("proveedor3_id", v === "" ? "" : Number(v))
                 }
-              >
-                <SunmiSelectOption value="">-</SunmiSelectOption>
-                {catalogos.PROVEEDORES?.map((c) => (
-                  <SunmiSelectOption key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
+                items={catalogos.PROVEEDORES || []}
+                tituloModal="Crear proveedor"
+                campos={[
+                  { key: "nombre", label: "Nombre", requerido: true },
+                  { key: "telefono", label: "Teléfono", type: "tel" },
+                  { key: "email", label: "Email", type: "email" },
+                  { key: "cuit", label: "CUIT" },
+                  { key: "direccion", label: "Dirección" },
+                ]}
+                onCrear={(payload) =>
+                  crearCatalogo("proveedor", payload, "proveedor3_id")
+                }
+              />
             </Field>
           </div>
         </Section>
