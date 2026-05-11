@@ -151,109 +151,125 @@ export default function ModalGrupo({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
       <div className="w-full max-w-xl">
         <SunmiCard>
           <SunmiCardHeader
             title={editMode ? "Editar grupo" : "Nuevo grupo"}
-            subtitle="Configurá el grupo y sus asignaciones"
-           
           />
+          <p className="text-[11px] sunmi-text-muted -mt-1 mb-2">
+            Configurá el grupo y sus asignaciones.
+          </p>
 
           {/* CONTENIDO SCROLLEABLE */}
-          <div className="flex flex-col max-h-[65vh] overflow-y-auto">
+          <div className="flex flex-col gap-3 max-h-[65vh] overflow-y-auto pr-1">
 
             {/* Datos */}
-            <SunmiSeparator label="Datos" />
-            <Field label="Nombre *">
+            <Field label="Nombre del grupo *">
               <SunmiInput
                 value={form.nombre}
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, nombre: e.target.value }))
                 }
+                placeholder="Ej: Grupo Centro"
               />
             </Field>
 
             {/* LOCALES */}
             <SunmiSeparator label="Locales" />
 
-            <div className="flex gap-2">
-              <SunmiSelectAdv
-                value={localSeleccionado}
-                onChange={setLocalSeleccionado}
-              >
-                <SunmiSelectOption value="">Seleccionar local…</SunmiSelectOption>
-                {locales
-                  .filter((l) => !localesSeleccionados.some((ls) => ls.id === l.id))
-                  .map((l) => (
-                    <SunmiSelectOption key={l.id} value={l.id}>
-                      {l.nombre}
-                    </SunmiSelectOption>
-                  ))}
-              </SunmiSelectAdv>
-
-              <SunmiButton onClick={agregarLocal}>
-                Agregar
-              </SunmiButton>
+            <div>
+              <label className="text-[11px] sunmi-label mb-1 block">
+                Agregar local
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiSelectAdv
+                    value={localSeleccionado}
+                    onChange={setLocalSeleccionado}
+                  >
+                    <SunmiSelectOption value="">Seleccionar local…</SunmiSelectOption>
+                    {locales
+                      .filter((l) => !localesSeleccionados.some((ls) => ls.id === l.id))
+                      .map((l) => (
+                        <SunmiSelectOption key={l.id} value={l.id}>
+                          {l.nombre}
+                        </SunmiSelectOption>
+                      ))}
+                  </SunmiSelectAdv>
+                </div>
+                <SunmiButton color="amber" onClick={agregarLocal}>
+                  Agregar
+                </SunmiButton>
+              </div>
             </div>
 
-            <SunmiListCard>
-              {localesSeleccionados.length === 0 ? (
-                <div className="flex justify-center">No hay locales asignados</div>
-              ) : (
-                localesSeleccionados.map((l) => (
+            {localesSeleccionados.length === 0 ? (
+              <div className="py-3 text-center sunmi-text-muted text-[11px] border sunmi-divider rounded-md">
+                No hay locales asignados.
+              </div>
+            ) : (
+              <SunmiListCard compact>
+                {localesSeleccionados.map((l) => (
                   <SunmiListCardItem key={l.id}>
-                    <span>{l.nombre}</span>
-                    <SunmiListCardRemove onClick={() => quitarLocal(l.id)} />
+                    <span className="text-sm sunmi-text-strong">{l.nombre}</span>
+                    <SunmiListCardRemove compact onClick={() => quitarLocal(l.id)} />
                   </SunmiListCardItem>
-                ))
-              )}
-            </SunmiListCard>
+                ))}
+              </SunmiListCard>
+            )}
 
             {/* DEPÓSITOS */}
             <SunmiSeparator label="Depósitos" />
 
-            <div className="flex gap-2">
-              <SunmiSelectAdv
-                value={depositoSeleccionado}
-                onChange={setDepositoSeleccionado}
-              >
-                <SunmiSelectOption value="">Seleccionar depósito…</SunmiSelectOption>
-                {depositos
-                  .filter((d) => !depositosSeleccionados.some((ds) => ds.id === d.id))
-                  .map((d) => (
-                    <SunmiSelectOption key={d.id} value={d.id}>
-                      {d.nombre}
-                    </SunmiSelectOption>
-                  ))}
-              </SunmiSelectAdv>
-
-              <SunmiButton onClick={agregarDeposito}>
-                Agregar
-              </SunmiButton>
+            <div>
+              <label className="text-[11px] sunmi-label mb-1 block">
+                Agregar depósito
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1 min-w-0">
+                  <SunmiSelectAdv
+                    value={depositoSeleccionado}
+                    onChange={setDepositoSeleccionado}
+                  >
+                    <SunmiSelectOption value="">Seleccionar depósito…</SunmiSelectOption>
+                    {depositos
+                      .filter((d) => !depositosSeleccionados.some((ds) => ds.id === d.id))
+                      .map((d) => (
+                        <SunmiSelectOption key={d.id} value={d.id}>
+                          {d.nombre}
+                        </SunmiSelectOption>
+                      ))}
+                  </SunmiSelectAdv>
+                </div>
+                <SunmiButton color="amber" onClick={agregarDeposito}>
+                  Agregar
+                </SunmiButton>
+              </div>
             </div>
 
-            <SunmiListCard>
-              {depositosSeleccionados.length === 0 ? (
-                <div className="flex justify-center">No hay depósitos asignados</div>
-              ) : (
-                depositosSeleccionados.map((d) => (
+            {depositosSeleccionados.length === 0 ? (
+              <div className="py-3 text-center sunmi-text-muted text-[11px] border sunmi-divider rounded-md">
+                No hay depósitos asignados.
+              </div>
+            ) : (
+              <SunmiListCard compact>
+                {depositosSeleccionados.map((d) => (
                   <SunmiListCardItem key={d.id}>
-                    <span>{d.nombre}</span>
-                    <SunmiListCardRemove onClick={() => quitarDeposito(d.id)} />
+                    <span className="text-sm sunmi-text-strong">{d.nombre}</span>
+                    <SunmiListCardRemove compact onClick={() => quitarDeposito(d.id)} />
                   </SunmiListCardItem>
-                ))
-              )}
-            </SunmiListCard>
+                ))}
+              </SunmiListCard>
+            )}
           </div>
 
           {/* ACCIONES */}
-          <div className="flex justify-end gap-2 mt-2">
+          <div className="flex justify-end gap-2 mt-3 pt-3 border-t sunmi-divider">
             <SunmiButton color="slate" onClick={onClose}>
               Cancelar
             </SunmiButton>
-
-            <SunmiButton onClick={handleSubmit}>
+            <SunmiButton color="amber" onClick={handleSubmit}>
               {editMode ? "Guardar cambios" : "Crear grupo"}
             </SunmiButton>
           </div>
@@ -266,7 +282,7 @@ export default function ModalGrupo({
 function Field({ label, children }) {
   return (
     <div className="flex flex-col gap-1">
-      <span>{label}</span>
+      <label className="text-[11px] sunmi-label">{label}</label>
       {children}
     </div>
   );

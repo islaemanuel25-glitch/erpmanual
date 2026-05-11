@@ -29,12 +29,24 @@ export async function GET(req, context) {
       include: {
         // ✅ depósitos del grupo (GrupoDeposito)
         locales: {
-          include: { local: true },
+          include: {
+            local: {
+              include: {
+                _count: { select: { productos: true } },
+              },
+            },
+          },
         },
 
         // ✅ locales asignados (GrupoLocal)
         localesGrupo: {
-          include: { local: true },
+          include: {
+            local: {
+              include: {
+                _count: { select: { productos: true } },
+              },
+            },
+          },
         },
       },
     });

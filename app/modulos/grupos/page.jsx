@@ -5,25 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSelectAdv, {
   SunmiSelectOption,
 } from "@/components/sunmi/SunmiSelectAdv";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
 
-import SunmiEntityCard from "@/components/sunmi/SunmiEntityCard";
-import SunmiSection from "@/components/sunmi/SunmiSection";
-import SunmiList from "@/components/sunmi/SunmiList";
-import SunmiListItem from "@/components/sunmi/SunmiListItem";
-import SunmiGrid from "@/components/sunmi/SunmiGrid";
-
-import { Pencil, Trash2 } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
 import ModalGrupo from "@/components/grupos/ModalGrupo";
+import GrupoListRow from "@/components/grupos/GrupoListRow";
 
 const PAGE_SIZE = 25;
 
@@ -267,141 +258,82 @@ export default function PageGrupos() {
   if (!esAdmin) return <SinPermisos />;
 
   return (
-    <div className="w-full min-h-full">
-      <SunmiCard>
-        <SunmiCardHeader
-          title="Grupos del sistema"
-          subtitle="Gestioná grupos de locales y depósitos"
-         
-        />
+    <div className="w-full min-h-full p-2 flex flex-col gap-3">
+      {/* HEADER DE PÁGINA: título + búsqueda inline + nuevo */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <h1 className="text-base md:text-lg font-semibold sunmi-text-strong shrink-0">
+          Grupos
+        </h1>
 
-        {/* FILTROS */}
-        <SunmiSeparator label="Filtros" />
-
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-col md:flex-row gap-3 flex-1">
-            <SunmiInput
-              placeholder="Buscar grupo..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-
-            <SunmiSelectAdv value={orden} onChange={setOrden}>
-              <SunmiSelectOption value="nombreAsc">
-                Nombre (A → Z)
-              </SunmiSelectOption>
-              <SunmiSelectOption value="nombreDesc">
-                Nombre (Z → A)
-              </SunmiSelectOption>
-              <SunmiSelectOption value="depositosDesc">
-                Más depósitos
-              </SunmiSelectOption>
-              <SunmiSelectOption value="localesDesc">
-                Más locales
-              </SunmiSelectOption>
-            </SunmiSelectAdv>
-          </div>
-
-          <div className="flex gap-2">
-            <SunmiButton onClick={limpiarFiltros} color="slate">
-              Limpiar
-            </SunmiButton>
-
-            <SunmiButton onClick={handleNuevo}>
-              ＋ Nuevo
-            </SunmiButton>
-          </div>
+        <div className="relative flex-1 min-w-[160px] max-w-md">
+          <Search
+            size={14}
+            className="absolute left-2 top-1/2 -translate-y-1/2 sunmi-text-muted pointer-events-none"
+          />
+          <SunmiInput
+            placeholder="Buscar grupo..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-7"
+          />
         </div>
 
-        {/* LISTADO */}
-        <SunmiSeparator label="Listado" />
+        <SunmiButton color="amber" onClick={handleNuevo}>
+          <span className="inline-flex items-center gap-1">
+            <Plus size={14} /> Nuevo grupo
+          </span>
+        </SunmiButton>
+      </div>
 
+      {/* TOOLBAR CHICA: orden + limpiar + contador */}
+      <div className="flex items-center gap-2 flex-wrap text-[11px] sunmi-text-muted">
+        <span className="shrink-0">Ordenar:</span>
+        <div className="w-44">
+          <SunmiSelectAdv value={orden} onChange={setOrden}>
+            <SunmiSelectOption value="nombreAsc">Nombre (A → Z)</SunmiSelectOption>
+            <SunmiSelectOption value="nombreDesc">Nombre (Z → A)</SunmiSelectOption>
+            <SunmiSelectOption value="depositosDesc">Más depósitos</SunmiSelectOption>
+            <SunmiSelectOption value="localesDesc">Más locales</SunmiSelectOption>
+          </SunmiSelectAdv>
+        </div>
+        <button
+          type="button"
+          onClick={limpiarFiltros}
+          className="px-2 py-1 rounded-md hover:sunmi-control-hover transition"
+        >
+          Limpiar
+        </button>
+        <span className="ml-auto">
+          {!cargando && `${items.length} ${items.length === 1 ? "grupo" : "grupos"}`}
+        </span>
+      </div>
+
+      {/* LISTA: cards horizontales */}
+      <div className="flex flex-col gap-2">
         {cargando ? (
-          <div className="flex justify-center">Cargando grupos...</div>
+          <div className="py-10 text-center sunmi-text-muted text-xs">
+            Cargando grupos...
+          </div>
         ) : items.length === 0 ? (
-          <div className="flex justify-center">No hay grupos coincidentes.</div>
+          <div className="py-10 text-center sunmi-text-muted text-xs border sunmi-divider rounded-lg">
+            No hay grupos coincidentes.
+          </div>
         ) : (
-          <SunmiGrid minWidth={320} gap={16}>
-            {items.map((g) => {
-              const cantidadLocales = Array.isArray(g.localesGrupo)
-                ? g.localesGrupo.length
-                : 0;
-              const cantidadDepositos = Array.isArray(g.locales)
-                ? g.locales.length
-                : 0;
-
-              return (
-                <SunmiEntityCard
-                  key={g.id}
-                  title={g.nombre}
-                  subtitle={`${cantidadLocales} locales · ${cantidadDepositos} depósitos`}
-                 
-                  actions={
-                    <>
-                      <SunmiButton
-                       
-                        onClick={() =>
-                          router.push(`/modulos/grupos/${g.id}`)
-                        }
-                      >
-                        Administrar
-                      </SunmiButton>
-
-                      <SunmiButtonIcon
-                        icon={Pencil}
-                       
-                        size={16}
-                        onClick={() => handleEditar(g.id)}
-                      />
-
-                      <SunmiButtonIcon
-                        icon={Trash2}
-                        color="red"
-                        size={16}
-                        onClick={() => eliminar(g.id, g.nombre)}
-                      />
-                    </>
-                  }
-                >
-                  <SunmiSection title="Locales">
-                    {cantidadLocales === 0 ? (
-                      <div>No hay locales asignados</div>
-                    ) : (
-                      <SunmiList>
-                        {g.localesGrupo.map((lg) => (
-                          <SunmiListItem
-                            key={lg.local.id}
-                            label={lg.local.nombre}
-                          />
-                        ))}
-                      </SunmiList>
-                    )}
-                  </SunmiSection>
-
-                  <SunmiSection title="Depósitos">
-                    {cantidadDepositos === 0 ? (
-                      <div>No hay depósitos asignados</div>
-                    ) : (
-                      <SunmiList>
-                        {g.locales.map((d) => (
-                          <SunmiListItem
-                            key={d.localId}
-                            label={d.local.nombre}
-                          />
-                        ))}
-                      </SunmiList>
-                    )}
-                  </SunmiSection>
-                </SunmiEntityCard>
-              );
-            })}
-          </SunmiGrid>
+          items.map((g) => (
+            <GrupoListRow
+              key={g.id}
+              grupo={g}
+              onAdministrar={(grupo) => router.push(`/modulos/grupos/${grupo.id}`)}
+              onEditar={(grupo) => handleEditar(grupo.id)}
+              onEliminar={(grupo) => eliminar(grupo.id, grupo.nombre)}
+            />
+          ))
         )}
+      </div>
 
-        {/* PAGINACIÓN */}
-        <SunmiSeparator />
-
-        <div className="flex justify-between gap-2">
+      {/* PAGINACIÓN */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-2 pt-2 border-t sunmi-divider">
           <SunmiButton
             color="slate"
             disabled={page <= 1}
@@ -409,7 +341,9 @@ export default function PageGrupos() {
           >
             « Anterior
           </SunmiButton>
-
+          <span className="sunmi-text-muted text-[11px]">
+            Página {page} / {totalPages}
+          </span>
           <SunmiButton
             color="slate"
             disabled={page >= totalPages}
@@ -418,7 +352,7 @@ export default function PageGrupos() {
             Siguiente »
           </SunmiButton>
         </div>
-      </SunmiCard>
+      )}
 
       <ModalGrupo
         open={modalOpen}

@@ -1,45 +1,43 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { RefreshCw, Plus } from "lucide-react";
 
-import SunmiPanel from "@/components/sunmi/SunmiPanel";
-import SunmiSection from "@/components/sunmi/SunmiSection";
-import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-
-import SunmiListCard from "@/components/sunmi/SunmiListCard";
-import SunmiListCardItem from "@/components/sunmi/SunmiListCardItem";
-import SunmiListCardRemove from "@/components/sunmi/SunmiListCardRemove";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 
 import SelectAgregarLocal from "@/components/grupos/SelectAgregarLocal";
 import SelectAgregarDeposito from "@/components/grupos/SelectAgregarDeposito";
+import GrupoHeader from "@/components/grupos/GrupoHeader";
+import GrupoItemRow from "@/components/grupos/GrupoItemRow";
 
 export default function EditorGrupo({ grupoId }) {
+  const router = useRouter();
   const [grupo, setGrupo] = useState(null);
-  const [nombre, setNombre] = useState("");
   const [sincronizando, setSincronizando] = useState(false);
+  const [showAgregarLocal, setShowAgregarLocal] = useState(false);
+  const [showAgregarDeposito, setShowAgregarDeposito] = useState(false);
+  const [pendingId, setPendingId] = useState(null);
 
   const load = async () => {
     const res = await fetch(`/api/grupos/${grupoId}`, { credentials: "include" });
     const data = await res.json();
     setGrupo(data);
-    setNombre(data.nombre || "");
   };
 
   useEffect(() => {
     load();
   }, [grupoId]);
 
-  const saveNombre = async (e) => {
-    e.preventDefault();
+  const saveNombre = async (nuevoNombre) => {
     await fetch(`/api/grupos/${grupoId}`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre }),
+      body: JSON.stringify({ nombre: nuevoNombre }),
     });
-    load();
+    await load();
   };
 
   const sincronizarProductos = async () => {
@@ -65,6 +63,7 @@ export default function EditorGrupo({ grupoId }) {
           `- ${productoLocalCreated} ProductoLocal creados\n` +
           `- ${stockCreated} StockLocal creados`
         );
+        await load();
       } else {
         alert(`❌ Error: ${json.error || "Error al sincronizar productos"}`);
       }
@@ -76,139 +75,227 @@ export default function EditorGrupo({ grupoId }) {
     }
   };
 
-  if (!grupo) return "Cargando…";
+  if (!grupo) {
+    return (
+      <div className="py-10 text-center sunmi-text-muted text-xs">
+        Cargando…
+      </div>
+    );
+  }
+
+  const cantidadLocales = (grupo.localesGrupo || []).length;
+  const cantidadDepositos = (grupo.locales || []).length;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
+    <div className="flex flex-col gap-4 max-w-3xl mx-auto">
+      {/* TOPBAR: breadcrumb + back */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <nav className="text-[11px] sunmi-text-muted flex items-center gap-1.5 min-w-0">
+          <span
+            onClick={() => router.push("/modulos/grupos")}
+            className="cursor-pointer hover:sunmi-text-strong transition shrink-0"
+          >
+            Grupos
+          </span>
+          <span className="opacity-60 shrink-0">/</span>
+          <span className="sunmi-text-strong truncate max-w-[260px]">
+            {grupo.nombre}
+          </span>
+        </nav>
+        <SunmiBackButton href="/modulos/grupos" />
+      </div>
 
-      {/* ========== COLUMNA IZQUIERDA ========== */}
-      <div className="md:col-span-1 h-full">
-        <SunmiPanel title="Datos del grupo" className="h-full">
-          <SunmiSection>
-            <form onSubmit={saveNombre} className="flex items-center gap-2">
-              <SunmiInput
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                className="p-1 text-sm w-full"
-                placeholder="Nombre del grupo"
-              />
-
-              <SunmiButton
-                color="amber"
-                type="submit"
-                className="px-3 py-1 text-sm"
-              >
-                Guardar
-              </SunmiButton>
-            </form>
-          </SunmiSection>
-
-          <SunmiSection className="mt-3">
-            <SunmiButton
-              color="cyan"
-              onClick={sincronizarProductos}
-              disabled={sincronizando}
-              className="w-full flex items-center justify-center gap-2"
-            >
+      {/* HEADER: avatar+nombre+edit a la izquierda, sincronizar a la derecha */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <GrupoHeader grupo={grupo} onSaveNombre={saveNombre} />
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <SunmiButton
+            color="cyan"
+            onClick={sincronizarProductos}
+            disabled={sincronizando}
+          >
+            <span className="inline-flex items-center gap-1.5">
               <RefreshCw
-                size={16}
+                size={14}
                 className={sincronizando ? "animate-spin" : ""}
               />
-              {sincronizando ? "Sincronizando..." : "Sincronizar catálogo"}
+              {sincronizando ? "Sincronizando…" : "Sincronizar catálogo"}
+            </span>
+          </SunmiButton>
+          <span className="text-[11px] sunmi-text-muted">Catálogo compartido</span>
+        </div>
+      </div>
+
+      <div className="border-t sunmi-divider" />
+
+      {/* SECCIÓN: Locales */}
+      <section className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-sm font-semibold sunmi-text-strong">
+            Locales{" "}
+            <span className="sunmi-text-muted font-normal">
+              ({cantidadLocales})
+            </span>
+          </h2>
+          {!showAgregarLocal && (
+            <SunmiButton
+              color="amber"
+              onClick={() => setShowAgregarLocal(true)}
+            >
+              <span className="inline-flex items-center gap-1">
+                <Plus size={13} />
+                Agregar local
+              </span>
             </SunmiButton>
-            <p className="text-xs text-slate-400 mt-2">
-              Sincroniza todos los productos del depósito a todos los locales del grupo
-            </p>
-          </SunmiSection>
-        </SunmiPanel>
-      </div>
+          )}
+        </div>
 
-      {/* ========== COLUMNA DERECHA ========== */}
-      <div className="md:col-span-2 flex flex-col gap-3 h-full">
-
-        {/* PANEL: DEPÓSITOS */}
-        <SunmiPanel title="Depósitos" className="h-full">
-          <SunmiSection>
-            <SelectAgregarDeposito
-              onAgregar={async (localId) => {
-                await fetch(`/api/grupos/${grupoId}/depositos`, {
-                  method: "POST",
-                  credentials: "include",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ localId }),
-                });
-                load();
-              }}
-              excluidos={(grupo.locales || []).map((d) => d.localId)}
-            />
-          </SunmiSection>
-
-          <div className="mt-1">
-            <SunmiListCard compact>
-              {(grupo.locales || []).map((d) => (
-                <SunmiListCardItem key={d.localId}>
-                  <span className="text-sm">{d.local.nombre}</span>
-
-                  <SunmiListCardRemove
-                    compact
-                    onClick={async () => {
-                      await fetch(`/api/grupos/${grupoId}/depositos`, {
-                        method: "DELETE",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ localId: d.localId }),
-                      });
-                      load();
-                    }}
-                  />
-                </SunmiListCardItem>
-              ))}
-            </SunmiListCard>
+        {showAgregarLocal && (
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <div className="flex-1 min-w-0">
+              <SelectAgregarLocal
+                onAgregar={async (localId) => {
+                  await fetch(`/api/grupos/${grupoId}/locales`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ localId }),
+                  });
+                  await load();
+                  setShowAgregarLocal(false);
+                }}
+                excluidos={(grupo.localesGrupo || []).map((lg) => lg.local.id)}
+              />
+            </div>
+            <SunmiButton
+              color="slate"
+              onClick={() => setShowAgregarLocal(false)}
+            >
+              Cancelar
+            </SunmiButton>
           </div>
-        </SunmiPanel>
+        )}
 
-        {/* PANEL: LOCALES */}
-        <SunmiPanel title="Locales" className="h-full">
-          <SunmiSection>
-            <SelectAgregarLocal
-              onAgregar={async (localId) => {
-                await fetch(`/api/grupos/${grupoId}/locales`, {
-                  method: "POST",
-                  credentials: "include",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ localId }),
-                });
-                load();
-              }}
-              excluidos={(grupo.localesGrupo || []).map((lg) => lg.local.id)}
-            />
-          </SunmiSection>
-
-          <div className="mt-1">
-            <SunmiListCard compact>
-              {(grupo.localesGrupo || []).map((lg) => (
-                <SunmiListCardItem key={lg.local.id}>
-                  <span className="text-sm">{lg.local.nombre}</span>
-
-                  <SunmiListCardRemove
-                    compact
-                    onClick={async () => {
-                      await fetch(`/api/grupos/${grupoId}/locales`, {
-                        method: "DELETE",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ localId: lg.local.id }),
-                      });
-                      load();
-                    }}
-                  />
-                </SunmiListCardItem>
-              ))}
-            </SunmiListCard>
+        {cantidadLocales === 0 ? (
+          <div className="py-6 text-center sunmi-text-muted text-[12px] border sunmi-divider rounded-lg">
+            Aún no hay locales asignados al grupo.
           </div>
-        </SunmiPanel>
+        ) : (
+          <div className="rounded-lg border sunmi-divider sunmi-card overflow-hidden divide-y sunmi-divide">
+            {(grupo.localesGrupo || []).map((lg) => (
+              <GrupoItemRow
+                key={lg.local.id}
+                local={lg.local}
+                tipo="local"
+                productCount={lg.local?._count?.productos ?? 0}
+                pending={pendingId === `local:${lg.local.id}`}
+                onIr={() =>
+                  router.push(`/modulos/locales/editar/${lg.local.id}`)
+                }
+                onQuitar={async () => {
+                  setPendingId(`local:${lg.local.id}`);
+                  try {
+                    await fetch(`/api/grupos/${grupoId}/locales`, {
+                      method: "DELETE",
+                      credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ localId: lg.local.id }),
+                    });
+                    await load();
+                  } finally {
+                    setPendingId(null);
+                  }
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
-      </div>
+      {/* SECCIÓN: Depósitos */}
+      <section className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-sm font-semibold sunmi-text-strong">
+            Depósitos{" "}
+            <span className="sunmi-text-muted font-normal">
+              ({cantidadDepositos})
+            </span>
+          </h2>
+          {!showAgregarDeposito && (
+            <SunmiButton
+              color="amber"
+              onClick={() => setShowAgregarDeposito(true)}
+            >
+              <span className="inline-flex items-center gap-1">
+                <Plus size={13} />
+                Agregar depósito
+              </span>
+            </SunmiButton>
+          )}
+        </div>
+
+        {showAgregarDeposito && (
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <div className="flex-1 min-w-0">
+              <SelectAgregarDeposito
+                onAgregar={async (localId) => {
+                  await fetch(`/api/grupos/${grupoId}/depositos`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ localId }),
+                  });
+                  await load();
+                  setShowAgregarDeposito(false);
+                }}
+                excluidos={(grupo.locales || []).map((d) => d.localId)}
+              />
+            </div>
+            <SunmiButton
+              color="slate"
+              onClick={() => setShowAgregarDeposito(false)}
+            >
+              Cancelar
+            </SunmiButton>
+          </div>
+        )}
+
+        {cantidadDepositos === 0 ? (
+          <div className="py-6 text-center sunmi-text-muted text-[12px] border sunmi-divider rounded-lg">
+            Aún no hay depósitos asignados al grupo.
+          </div>
+        ) : (
+          <div className="rounded-lg border sunmi-divider sunmi-card overflow-hidden divide-y sunmi-divide">
+            {(grupo.locales || []).map((d) => (
+              <GrupoItemRow
+                key={d.localId}
+                local={d.local}
+                tipo="deposito"
+                productCount={d.local?._count?.productos ?? 0}
+                showActivo={false}
+                pending={pendingId === `deposito:${d.localId}`}
+                onIr={() => router.push(`/modulos/locales/editar/${d.localId}`)}
+                onQuitar={async () => {
+                  setPendingId(`deposito:${d.localId}`);
+                  try {
+                    await fetch(`/api/grupos/${grupoId}/depositos`, {
+                      method: "DELETE",
+                      credentials: "include",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ localId: d.localId }),
+                    });
+                    await load();
+                  } finally {
+                    setPendingId(null);
+                  }
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

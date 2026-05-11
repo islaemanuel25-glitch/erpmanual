@@ -3,10 +3,6 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-
 import EditorGrupo from "@/components/grupos/EditorGrupo";
 
 export default function PageGrupo({ params }) {
@@ -20,18 +16,8 @@ export default function PageGrupo({ params }) {
   }
 
   return (
-    <div className="w-full min-h-full">
-      <SunmiCard>
-        <SunmiCardHeader
-          title="Administrar Grupo"
-          subtitle={`Grupo #${numId}`}
-          color="amber"
-        />
-
-        <SunmiSeparator />
-
-        <EditorGrupo grupoId={numId} />
-      </SunmiCard>
+    <div className="w-full min-h-full p-2">
+      <EditorGrupo grupoId={numId} />
     </div>
   );
 }
