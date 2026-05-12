@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-04-27 14:41
+**Última actualización:** 2026-05-12 18:33
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,7 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-05-06: fix: mostrar productos sin stock en POS
 - 2026-04-27: feat(pos-ventas): mejoras en venta, apertura/cierre de turno y modales
 - 2026-04-27: feat(auditoria-pos-ventas): nuevos módulos cajas, balances, productos, turnos y operadores
 - 2026-03-11: docker

@@ -5,7 +5,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { Palette, PackageOpen, Receipt, Wrench } from "lucide-react";
+import { Palette, PackageOpen, Receipt, Wrench, Tags } from "lucide-react";
 
 const SECCIONES = [
   {
@@ -25,6 +25,12 @@ const SECCIONES = [
     href: "/modulos/configuracion/ticket",
     icon: Receipt,
     descripcion: "Personalizar tipografia y estilos del ticket termico.",
+  },
+  {
+    label: "Listas de precios",
+    href: "/modulos/configuracion/listas-precios",
+    icon: Tags,
+    descripcion: "Administrá listas de precios comerciales del grupo (minorista, mayorista, costos).",
   },
   {
     label: "Mantenimiento",

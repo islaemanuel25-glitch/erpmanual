@@ -1,0 +1,302 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiPill from "@/components/sunmi/SunmiPill";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
+
+import useContextoActivo from "@/hooks/useContextoActivo";
+
+// ============================================================
+// Helpers
+// ============================================================
+const formatMoney = (n) => {
+  if (n === null || n === undefined) return "—";
+  const num = Number(n);
+  if (!Number.isFinite(num)) return "—";
+  return num.toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const tipoLabel = (tipo) => {
+  if (tipo === "PRECIO_VENTA") return "Precio de venta";
+  if (tipo === "COSTO") return "Costo";
+  if (tipo === "MANUAL_AUTORIZADO") return "Manual";
+  return tipo || "—";
+};
+
+// ============================================================
+// Modal Preview Precio
+// ============================================================
+export default function ModalPreviewPrecio({ open, lista, onClose }) {
+  const router = useRouter();
+  const { loading: cargandoContexto, contexto } = useContextoActivo();
+  const localActivo = contexto?.localId ? contexto : null;
+
+  // Búsqueda
+  const [busqueda, setBusqueda] = useState("");
+  const [resultados, setResultados] = useState([]);
+  const [buscando, setBuscando] = useState(false);
+
+  // Resultado de preview
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Reset estado al abrir/cerrar
+  useEffect(() => {
+    if (!open) {
+      setBusqueda("");
+      setResultados([]);
+      setPreview(null);
+      setPreviewLoading(false);
+    }
+  }, [open]);
+
+  // Búsqueda de productos con debounce 400ms
+  useEffect(() => {
+    if (!open || !localActivo) {
+      setResultados([]);
+      return;
+    }
+
+    const q = busqueda.trim();
+    if (!q) {
+      setResultados([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setBuscando(true);
+      try {
+        const url = `/api/productos/listar?localId=${localActivo.localId}&q=${encodeURIComponent(q)}&pageSize=10`;
+        const res = await fetch(url, {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+
+        const data = await res.json();
+        if (data?.ok) {
+          setResultados(data.items || []);
+        } else {
+          setResultados([]);
+        }
+      } catch (e) {
+        console.error("Error buscando productos:", e);
+        setResultados([]);
+      } finally {
+        setBuscando(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [busqueda, open, localActivo, router]);
+
+  // Click en producto → fetch preview-precio
+  const seleccionarProducto = async (producto) => {
+    if (!lista?.id) return;
+    try {
+      setPreviewLoading(true);
+      setPreview(null);
+
+      const res = await fetch("/api/listas-precios/preview-precio", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productoBaseId: producto.baseId ?? producto.id,
+          listaPrecioId: lista.id,
+        }),
+      });
+
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.ok) {
+        alert(data?.error || "Error al obtener el preview");
+        return;
+      }
+
+      setPreview(data.preview);
+    } catch (e) {
+      console.error("Error obteniendo preview:", e);
+      alert("Error al obtener el preview");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="
+        fixed inset-0 z-50
+        bg-black/50
+        backdrop-blur-sm
+        flex items-center justify-center
+        p-4
+      "
+    >
+      <SunmiCard className="w-full max-w-2xl p-0 overflow-hidden">
+        <SunmiCardHeader title={`Preview de "${lista?.nombre || ""}"`} />
+
+        <div className="p-4 space-y-4">
+          {/* Resumen de la lista */}
+          <div className="flex flex-wrap items-center gap-2">
+            <SunmiPill color="amber">{tipoLabel(lista?.tipoBase)}</SunmiPill>
+            {lista?.tipoBase === "COSTO" &&
+              lista?.margenPorcentaje !== null &&
+              lista?.margenPorcentaje !== undefined && (
+                <SunmiPill color="cyan">
+                  Margen {Number(lista.margenPorcentaje)}%
+                </SunmiPill>
+              )}
+            {lista?.redondeo_100 && (
+              <SunmiPill color="slate">Redondeo a 100</SunmiPill>
+            )}
+          </div>
+
+          <SunmiSeparator />
+
+          {/* Sin local activo */}
+          {cargandoContexto ? (
+            <div className="py-4">
+              <SunmiLoader />
+            </div>
+          ) : !localActivo ? (
+            <div className="text-center py-4 space-y-3">
+              <p className="text-sm sunmi-text-muted">
+                Para previsualizar precios, activá un local desde la pantalla de Inicio.
+              </p>
+              <div className="flex justify-end">
+                <SunmiButton color="slate" onClick={onClose}>
+                  Cerrar
+                </SunmiButton>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Búsqueda */}
+              <div>
+                <label className="text-[11px] sunmi-label mb-1 block">
+                  Buscar producto
+                </label>
+                <SunmiInput
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Nombre, código o SKU..."
+                />
+              </div>
+
+              {/* Resultados */}
+              {buscando ? (
+                <SunmiLoader />
+              ) : resultados.length > 0 ? (
+                <div className="max-h-48 overflow-y-auto sunmi-divide divide-y rounded-md border sunmi-divider">
+                  {resultados.map((p) => {
+                    const id = p.baseId ?? p.id;
+                    return (
+                      <div
+                        key={id}
+                        onClick={() => seleccionarProducto(p)}
+                        className="px-3 py-2 cursor-pointer hover:bg-[var(--table-row-hover)] flex items-center justify-between text-[12px]"
+                      >
+                        <span className="truncate">{p.nombre}</span>
+                        <span className="sunmi-text-muted text-[11px]">
+                          ${formatMoney(p.precio_venta ?? p.precioVenta)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : busqueda.trim() ? (
+                <p className="text-[12px] sunmi-text-muted italic text-center py-2">
+                  Sin resultados
+                </p>
+              ) : null}
+
+              {/* Preview del producto seleccionado */}
+              {previewLoading ? (
+                <SunmiLoader />
+              ) : preview ? (
+                <>
+                  <SunmiSeparator label="Resultado" />
+
+                  <div className="space-y-2">
+                    <div className="text-[13px] font-semibold">{preview.nombre}</div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[12px]">
+                      <div>
+                        <span className="sunmi-text-muted">Precio venta original: </span>
+                        <span>${formatMoney(preview.precioVenta)}</span>
+                      </div>
+                      <div>
+                        <span className="sunmi-text-muted">Costo: </span>
+                        <span>${formatMoney(preview.costo)}</span>
+                      </div>
+                    </div>
+
+                    {preview.requiereManual ? (
+                      <div className="mt-2 p-3 rounded-md sunmi-badge-muted text-[12px]">
+                        Esta lista requiere que el operador autorice el precio manualmente
+                        en la venta. No hay precio precalculado.
+                      </div>
+                    ) : (
+                      <div className="mt-2 p-3 rounded-md sunmi-badge-accent flex items-center justify-between">
+                        <div>
+                          <div className="text-[11px] sunmi-text-muted">
+                            Precio aplicado
+                          </div>
+                          <div className="text-[20px] font-bold sunmi-text-accent">
+                            ${formatMoney(preview.precioFinal)}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <SunmiPill color="amber">
+                            {tipoLabel(preview.tipoPrecioAplicado)}
+                          </SunmiPill>
+                          {preview.margenAplicado !== null &&
+                            preview.margenAplicado !== undefined && (
+                              <SunmiPill color="cyan">
+                                Margen {Number(preview.margenAplicado)}%
+                              </SunmiPill>
+                            )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+
+              <SunmiSeparator />
+
+              <div className="flex justify-end">
+                <SunmiButton color="slate" onClick={onClose}>
+                  Cerrar
+                </SunmiButton>
+              </div>
+            </>
+          )}
+        </div>
+      </SunmiCard>
+    </div>
+  );
+}
