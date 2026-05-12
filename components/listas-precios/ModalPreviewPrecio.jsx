@@ -119,6 +119,7 @@ export default function ModalPreviewPrecio({ open, lista, onClose }) {
         body: JSON.stringify({
           productoBaseId: producto.baseId ?? producto.id,
           listaPrecioId: lista.id,
+          localId: localActivo.localId,
         }),
       });
 

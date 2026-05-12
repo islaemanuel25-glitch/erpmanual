@@ -11,6 +11,8 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
+import useContextoActivo from "@/hooks/useContextoActivo";
+
 // ============================================================
 // Modal Crear / Editar Lista de Precio
 // Patrón inspirado en components/categorias/ModalCategoria.jsx
@@ -24,6 +26,8 @@ export default function ModalListaPrecio({
   puedeEditar = true,
 }) {
   const router = useRouter();
+  const { contexto } = useContextoActivo();
+  const localIdFinal = contexto?.localId || null;
 
   // =========================
   // FORM STATE
@@ -76,6 +80,11 @@ export default function ModalListaPrecio({
   const handleSubmit = async () => {
     try {
       if (!puedeEditar) return;
+
+      if (!localIdFinal) {
+        alert("Activá un local desde la pantalla de Inicio para gestionar listas.");
+        return;
+      }
 
       // Validaciones cliente
       if (!form.nombre.trim()) {
@@ -136,7 +145,7 @@ export default function ModalListaPrecio({
 
         url = `/api/listas-precios/editar/${lista.id}`;
         method = "PUT";
-        payload = diff;
+        payload = { ...diff, localId: localIdFinal };
       } else {
         url = "/api/listas-precios/crear";
         method = "POST";
@@ -147,6 +156,7 @@ export default function ModalListaPrecio({
           esDefault: form.esDefault,
           redondeo_100: form.redondeo_100,
           notas: form.notas.trim() || null,
+          localId: localIdFinal,
         };
       }
 

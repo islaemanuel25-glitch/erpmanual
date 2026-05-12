@@ -18,6 +18,7 @@ import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 import ModalListaPrecio from "@/components/listas-precios/ModalListaPrecio";
@@ -39,6 +40,8 @@ const tipoLabel = (tipo) => {
 export default function ListasPreciosPage() {
   const router = useRouter();
   const { perfil, cargando } = useUser();
+  const { contexto } = useContextoActivo();
+  const localIdFinal = contexto?.localId || null;
 
   const [listas, setListas] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -58,10 +61,13 @@ export default function ListasPreciosPage() {
   // CARGAR LISTAS
   // =========================
   const cargar = useCallback(async () => {
+    if (!localIdFinal) return;
     try {
       setLoading(true);
-      const qs = incluirInactivas ? "?incluirInactivas=true" : "";
-      const res = await fetch(`/api/listas-precios/listar${qs}`, {
+      const params = new URLSearchParams();
+      params.set("localId", String(localIdFinal));
+      if (incluirInactivas) params.set("incluirInactivas", "true");
+      const res = await fetch(`/api/listas-precios/listar?${params.toString()}`, {
         credentials: "include",
         cache: "no-store",
       });
@@ -85,12 +91,12 @@ export default function ListasPreciosPage() {
     } finally {
       setLoading(false);
     }
-  }, [incluirInactivas, router]);
+  }, [incluirInactivas, localIdFinal, router]);
 
   useEffect(() => {
-    if (!perfil) return;
+    if (!perfil || !localIdFinal) return;
     cargar();
-  }, [perfil, cargar]);
+  }, [perfil, localIdFinal, cargar]);
 
   // =========================
   // PERMISOS (sanity)
@@ -139,11 +145,14 @@ export default function ListasPreciosPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/listas-precios/marcar-default/${lista.id}`, {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/listas-precios/marcar-default/${lista.id}?localId=${localIdFinal}`,
+        {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+        }
+      );
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -166,11 +175,14 @@ export default function ListasPreciosPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/listas-precios/activar/${lista.id}`, {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/listas-precios/activar/${lista.id}?localId=${localIdFinal}`,
+        {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+        }
+      );
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -192,11 +204,14 @@ export default function ListasPreciosPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/listas-precios/eliminar/${lista.id}`, {
-        method: "DELETE",
-        credentials: "include",
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/listas-precios/eliminar/${lista.id}?localId=${localIdFinal}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          cache: "no-store",
+        }
+      );
       if (res.status === 401) {
         router.replace("/login");
         return;
