@@ -28,6 +28,7 @@ model Grupo {
   movimientosCC   MovimientoCuenta[]
   contadoresVenta PosVentaCounter[]
   configuracion   ConfiguracionGrupo?
+  listasPrecio    ListaPrecio[]
 }
 
 model GrupoDeposito {
@@ -277,21 +278,32 @@ model StockLocal {
 }
 
 model ListaPrecio {
-  id             Int      @id @default(autoincrement())
-  localId        Int
-  nombre         String
-  margen_default Decimal? @db.Decimal(6, 2)
-  redondeo_100   Boolean  @default(false)
-  activo         Boolean  @default(true)
-  notas          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               Int                 @id @default(autoincrement())
+  localId          Int?
+  grupoId          Int
+  nombre           String
+  tipoBase         ListaPrecioTipoBase @default(PRECIO_VENTA)
+  margenPorcentaje Decimal?            @db.Decimal(6, 2)
+  esDefault        Boolean             @default(false)
+  /// Legacy (pre–listas comerciales por grupo): preferir `margenPorcentaje` + `tipoBase`.
+  margen_default   Decimal?            @db.Decimal(6, 2)
+  redondeo_100     Boolean             @default(false)
+  activo           Boolean             @default(true)
+  notas            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
-  local     Local                 @relation(fields: [localId], references: [id], onDelete: Cascade)
-  productos ProductoListaPrecio[]
+  local         Local?                @relation(fields: [localId], references: [id], onDelete: Cascade)
+  grupo         Grupo                 @relation(fields: [grupoId], references: [id])
+  productos     ProductoListaPrecio[]
+  clientes      Cliente[]
+  ventas        Venta[]
+  ventaDetalles VentaDetalle[]
 
   @@unique([localId, nombre], name: "lista_unica_por_local")
+  @@unique([grupoId, nombre], name: "lista_unica_por_grupo")
   @@index([localId])
+  @@index([grupoId])
 }
 
 model ProductoListaPrecio {
@@ -518,6 +530,7 @@ model Cliente {
   id                  Int      @id @default(autoincrement())
   grupoId             Int
   localId             Int?
+  listaPrecioId       Int?
   nombre              String
   documento           String?
   telefono            String?
@@ -532,6 +545,7 @@ model Cliente {
 
   grupo             Grupo                    @relation(fields: [grupoId], references: [id])
   local             Local?                   @relation(fields: [localId], references: [id])
+  listaPrecio       ListaPrecio?             @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   ventas            Venta[]
   tags              ClienteTag[]
   movimientosCC     MovimientoCuenta[]
@@ -541,6 +555,7 @@ model Cliente {
   @@index([localId])
   @@index([grupoId, localId])
   @@index([nombre])
+  @@index([listaPrecioId])
 }
 
 model TagCliente {
@@ -606,6 +621,7 @@ model Venta {
   vendedorId       Int
   operadorId       Int?
   clienteId        Int?
+  listaPrecioId    Int?
   turnoId          Int?
   numero           Int
   clientTxnId      String?  @unique
@@ -631,6 +647,7 @@ model Venta {
   vendedor          Usuario                  @relation(fields: [vendedorId], references: [id])
   operador          OperadorLocal?           @relation(fields: [operadorId], references: [id])
   cliente           Cliente?                 @relation(fields: [clienteId], references: [id])
+  listaPrecio       ListaPrecio?             @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   turno             Turno?                   @relation(fields: [turnoId], references: [id])
   detalles          VentaDetalle[]
   movimientoCC      MovimientoCuenta[]
@@ -643,26 +660,34 @@ model Venta {
   @@index([turnoId])
   @@index([clientTxnId])
   @@index([operadorId])
+  @@index([listaPrecioId])
 }
 
 model VentaDetalle {
-  id             Int      @id @default(autoincrement())
-  ventaId        Int
-  productoBaseId Int
-  nombre         String
-  precio         Decimal  @db.Decimal(12, 2)
-  precioCosto    Decimal  @default(0) @db.Decimal(12, 2)
-  cantidad       Decimal  @db.Decimal(12, 3)
-  subtotal       Decimal  @db.Decimal(12, 2)
-  ganancia       Decimal  @default(0) @db.Decimal(12, 2)
-  comisionLinea  Decimal? @db.Decimal(12, 2)
-  createdAt      DateTime @default(now())
+  id                 Int                @id @default(autoincrement())
+  ventaId            Int
+  productoBaseId     Int
+  listaPrecioId      Int?
+  nombre             String
+  /// Precio unitario final de línea (no duplicar con precioUnitario).
+  precio             Decimal            @db.Decimal(12, 2)
+  /// Costo unitario (no duplicar con costoUnitario).
+  precioCosto        Decimal            @default(0) @db.Decimal(12, 2)
+  cantidad           Decimal            @db.Decimal(12, 3)
+  subtotal           Decimal            @db.Decimal(12, 2)
+  ganancia           Decimal            @default(0) @db.Decimal(12, 2)
+  comisionLinea      Decimal?           @db.Decimal(12, 2)
+  tipoPrecioAplicado TipoPrecioAplicado @default(PRECIO_VENTA)
+  margenAplicado     Decimal?           @db.Decimal(6, 2)
+  createdAt          DateTime           @default(now())
 
   venta        Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   productoBase ProductoBase @relation(fields: [productoBaseId], references: [id])
+  listaPrecio  ListaPrecio? @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
 
   @@index([ventaId])
   @@index([productoBaseId])
+  @@index([listaPrecioId])
 }
 
 // TURNOS DE CAJA
@@ -920,4 +945,21 @@ model OperadorEnLocal {
 
   @@id([operadorId, localId])
   @@index([localId])
+}
+
+// LISTAS DE PRECIOS COMERCIALES
+// ---------------------------------------------------------------------------
+
+enum ListaPrecioTipoBase {
+  PRECIO_VENTA
+  COSTO
+  MANUAL_AUTORIZADO
+}
+
+enum TipoPrecioAplicado {
+  PRECIO_VENTA
+  COSTO_MAS_MARGEN
+  COSTO_PURO
+  MANUAL_AUTORIZADO
+  OVERRIDE_PRODUCTO
 }
