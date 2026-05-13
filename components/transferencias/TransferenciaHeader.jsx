@@ -3,10 +3,16 @@
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import TicketTransferencia from "@/components/transferencias/TicketTransferencia";
 
 export default function TransferenciaHeader({ item, id, me }) {
   if (!item) return null;
+
+  const handleImprimirTicket = async () => {
+    const { default: imprimirTicketTransferencia } = await import(
+      "@/lib/transferencias/imprimirTicketTransferencia"
+    );
+    imprimirTicketTransferencia(item, me);
+  };
 
   return (
     <div className="space-y-2">
@@ -18,13 +24,10 @@ export default function TransferenciaHeader({ item, id, me }) {
         <a href={`/api/transferencias/pdf-recepcion?id=${id}`} target="_blank">
           <SunmiButton color="cyan">PDF Recepción</SunmiButton>
         </a>
-        <SunmiButton color="slate" onClick={() => window.print()}>
+        <SunmiButton color="slate" onClick={handleImprimirTicket}>
           Imprimir ticket POS
         </SunmiButton>
       </div>
-
-      {/* Ticket invisible en pantalla, visible solo al imprimir */}
-      <TicketTransferencia item={item} me={me} />
 
       <SunmiSeparator label="Datos generales" />
 
