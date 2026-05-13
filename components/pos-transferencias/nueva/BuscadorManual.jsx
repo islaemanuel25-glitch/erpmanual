@@ -19,6 +19,7 @@ export default function BuscadorManual({
   const recognitionRef = useRef(null);
   const lastTimeRef = useRef(Date.now());
   const beepRef = useRef(null);
+  const voiceTriggerRef = useRef(false);
 
   const soportaVoz =
     typeof window !== "undefined" &&
@@ -59,7 +60,9 @@ export default function BuscadorManual({
 
   useEffect(() => {
     if (texto.trim() === "") return;
-    onBuscar();
+    const fromVoice = voiceTriggerRef.current;
+    voiceTriggerRef.current = false;
+    onBuscar({ fromVoice });
   }, [texto]);
 
   // Keyboard
@@ -119,8 +122,9 @@ export default function BuscadorManual({
     recognition.onstart = () => setEscuchando(true);
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
+      voiceTriggerRef.current = true;
       onTextoChange(transcript);
-      onBuscar();
+      onBuscar({ fromVoice: true });
       beep();
       setEscuchando(false);
     };

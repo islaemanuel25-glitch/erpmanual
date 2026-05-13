@@ -47,7 +47,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
 
   // Buscar productos
   const buscar = useCallback(
-    async (texto, autoAdd = false) => {
+    async (texto, autoAdd = false, fromVoice = false) => {
       if (!texto.trim() || !localId) {
         setResultados([]);
         return;
@@ -58,6 +58,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
         params.set("q", texto);
         params.set("localId", String(localId));
         if (clienteId != null) params.set("clienteId", String(clienteId));
+        if (fromVoice) params.set("fromVoice", "true");
         const res = await fetch(`${searchApi}?${params.toString()}`, {
           credentials: "include",
         });
@@ -131,7 +132,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setQuery(transcript);
-      buscar(transcript);
+      buscar(transcript, false, true);
       setEscuchando(false);
     };
     recognition.onerror = () => setEscuchando(false);

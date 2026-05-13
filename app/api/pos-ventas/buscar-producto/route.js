@@ -7,6 +7,11 @@ import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conve
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
+import { rankearFuzzy } from "@/lib/productos/busquedaFuzzyProducto";
+
+const FUZZY_CANDIDATE_LIMIT = 2000;
+const FUZZY_MIN_LIKE_RESULTS = 3;
+const FUZZY_TOP_RESULTS = 10;
 
 export async function GET(req) {
   try {
@@ -26,6 +31,7 @@ export async function GET(req) {
     let localId = Number(searchParams.get("localId") || 0);
     const clienteIdRaw = Number(searchParams.get("clienteId") || 0);
     const clienteId = Number.isFinite(clienteIdRaw) && clienteIdRaw > 0 ? clienteIdRaw : null;
+    const fromVoice = searchParams.get("fromVoice") === "true";
 
     if (!localId) localId = Number(session.localId || 0);
 
@@ -123,6 +129,54 @@ export async function GET(req) {
     productos.sort((a, b) => {
       return rankScore(a, qLower) - rankScore(b, qLower);
     });
+
+    // Fallback fuzzy para búsqueda por voz: si el LIKE devolvió pocos resultados
+    // (transcripción imprecisa típica de voz), traer candidatos del local y rankear
+    // por similitud (Levenshtein). Solo se activa con fromVoice=true para no
+    // afectar la búsqueda manual ni el scanner.
+    if (fromVoice && productos.length < FUZZY_MIN_LIKE_RESULTS) {
+      const idsActuales = new Set(productos.map((p) => p.id));
+      const candidatos = await prisma.productoLocal.findMany({
+        where: {
+          localId,
+          activo: true,
+          base: { activo: true },
+        },
+        select: {
+          id: true,
+          nombre: true,
+          base: { select: { nombre: true, codigo_barra: true } },
+        },
+        take: FUZZY_CANDIDATE_LIMIT,
+        orderBy: { id: "asc" },
+      });
+
+      const ranked = rankearFuzzy(candidatos, q, {
+        getNombre: (p) => p.nombre || p.base?.nombre || "",
+        getCodigo: (p) => p.base?.codigo_barra || null,
+        maxDistance: 3,
+      });
+
+      const idsFuzzy = ranked
+        .map((r) => r.item.id)
+        .filter((id) => !idsActuales.has(id))
+        .slice(0, FUZZY_TOP_RESULTS);
+
+      if (idsFuzzy.length > 0) {
+        const fuzzyFull = await prisma.productoLocal.findMany({
+          where: { id: { in: idsFuzzy } },
+          include: {
+            base: true,
+            stock: { where: { localId }, select: { cantidad: true } },
+          },
+        });
+        const orderMap = new Map(idsFuzzy.map((id, idx) => [id, idx]));
+        fuzzyFull.sort(
+          (a, b) => orderMap.get(a.id) - orderMap.get(b.id)
+        );
+        productos.push(...fuzzyFull);
+      }
+    }
 
     const items = mapProductos(productos.slice(0, 10), esDeposito, allowNegativeStock, listaAplicable);
     return NextResponse.json({ ok: true, items });

@@ -625,7 +625,7 @@ export default function NuevaTransferenciaPage() {
   // ===============================
   // 12. Buscar manual (H6: usa origenIdResuelto)
   // ===============================
-  const buscarProductos = async () => {
+  const buscarProductos = async (opts = {}) => {
     if (!texto.trim()) {
       setBuscados([]);
       return;
@@ -639,6 +639,7 @@ export default function NuevaTransferenciaPage() {
     );
     url.searchParams.set("q", texto);
     url.searchParams.set("origenId", origenIdResuelto);
+    if (opts.fromVoice) url.searchParams.set("fromVoice", "true");
 
     const r = await fetch(url);
     const j = await r.json();
