@@ -224,10 +224,24 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
       let aplicacionLista = null;
       if (listaAplicable) {
         const precioOriginal = Number(precioVenta.toFixed(2));
+        // El costo en DB está en la misma escala que precio_venta (bulto si factor_pack>1,
+        // por kg si fiambre fijo). Para que `calcularPrecioConLista` produzca un precio
+        // consistente con la escala de `precioVenta` (que ya fue derivado a unitario/pieza
+        // según modoSalidaDefault), hay que escalar el costo igual.
+        let costoEnEscala = precioCosto;
+        if (fiambreFijo) {
+          costoEnEscala = Number((precioCosto * pesoReferenciaKg).toFixed(2));
+        } else if (
+          factorPack > 1 &&
+          unidadMedida !== "unidad" &&
+          modoSalidaDefault === "UNIDAD"
+        ) {
+          costoEnEscala = Number((precioCosto / factorPack).toFixed(2));
+        }
         try {
           const calc = calcularPrecioConLista({
             precioVenta,
-            costo: precioCosto,
+            costo: costoEnEscala,
             lista: listaAplicable,
           });
           const precioFinalNum = Number(calc.precioFinal);
