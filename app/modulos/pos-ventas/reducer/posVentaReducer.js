@@ -60,22 +60,21 @@ export function posVentaReducer(state, action) {
       );
 
       if (idx >= 0) {
-        const next = [...state.carrito];
-        const nuevo = { ...next[idx] };
+        // Item existente: incrementar cantidad y moverlo al principio
+        const nuevo = { ...state.carrito[idx] };
         if (esKg) {
           // Kg: sumar el peso ingresado (puede ser decimal)
           nuevo.cantidad = Math.round((nuevo.cantidad + cantAdd) * 1000) / 1000;
         } else {
           nuevo.cantidad += cantAdd;
         }
-        next[idx] = nuevo;
-        return { ...state, carrito: next };
+        const resto = state.carrito.filter((_, i) => i !== idx);
+        return { ...state, carrito: [nuevo, ...resto] };
       }
 
       return {
         ...state,
         carrito: [
-          ...state.carrito,
           {
             productoBaseId: producto.productoBaseId,
             nombre: producto.nombre,
@@ -93,6 +92,7 @@ export function posVentaReducer(state, action) {
             margenAplicado: producto.aplicacionLista?.margenAplicado ?? null,
             precioCosto: producto.precioCosto ?? 0,
           },
+          ...state.carrito,
         ],
       };
     }
