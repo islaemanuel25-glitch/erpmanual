@@ -38,6 +38,19 @@ export async function GET(req) {
       where,
       take: 20,
       orderBy: { nombre: "asc" },
+      include: {
+        listaPrecio: {
+          select: {
+            id: true,
+            nombre: true,
+            esDefault: true,
+            activo: true,
+            tipoBase: true,
+            margenPorcentaje: true,
+            redondeo_100: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({ ok: true, items: clientes });

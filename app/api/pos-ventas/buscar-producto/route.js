@@ -5,6 +5,8 @@ import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
+import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
+import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
 
 export async function GET(req) {
   try {
@@ -22,6 +24,8 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim();
     let localId = Number(searchParams.get("localId") || 0);
+    const clienteIdRaw = Number(searchParams.get("clienteId") || 0);
+    const clienteId = Number.isFinite(clienteIdRaw) && clienteIdRaw > 0 ? clienteIdRaw : null;
 
     if (!localId) localId = Number(session.localId || 0);
 
@@ -61,6 +65,21 @@ export async function GET(req) {
       allowNegativeStock = configGrupo?.allowNegativeStock === true;
     }
 
+    // Resolver lista de precios aplicable (una sola vez por request)
+    // Fallback silencioso: si no se puede resolver, cae al precioVenta clásico del producto.
+    let listaAplicable = null;
+    if (grupoId) {
+      try {
+        listaAplicable = await resolverListaCliente({ clienteId, grupoId, prisma });
+      } catch (e) {
+        console.warn(
+          `[pos-ventas/buscar-producto] No se pudo resolver lista (grupoId=${grupoId}, clienteId=${clienteId}):`,
+          e.message
+        );
+        listaAplicable = null;
+      }
+    }
+
     // Prioridad: match exacto por codigo_barra (retorno inmediato)
     const exacto = await prisma.productoLocal.findMany({
       where: {
@@ -76,7 +95,7 @@ export async function GET(req) {
     });
 
     if (exacto.length > 0) {
-      const items = mapProductos(exacto, esDeposito, allowNegativeStock);
+      const items = mapProductos(exacto, esDeposito, allowNegativeStock, listaAplicable);
       return NextResponse.json({ ok: true, items });
     }
 
@@ -105,7 +124,7 @@ export async function GET(req) {
       return rankScore(a, qLower) - rankScore(b, qLower);
     });
 
-    const items = mapProductos(productos.slice(0, 10), esDeposito, allowNegativeStock);
+    const items = mapProductos(productos.slice(0, 10), esDeposito, allowNegativeStock, listaAplicable);
     return NextResponse.json({ ok: true, items });
   } catch (err) {
     console.error("Error buscar-producto POS:", err);
@@ -152,7 +171,7 @@ function calcularModoSalida(esDeposito, modoEnvio, unidadMedida) {
   return "BULTO";
 }
 
-function mapProductos(lista, esDeposito, allowNegativeStock = false) {
+function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplicable = null) {
   return lista
     .map((pl) => {
       const stock = Number(pl.stock?.[0]?.cantidad || 0);
@@ -168,6 +187,7 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
 
       // precio_venta en DB: precio tal como está cargado (puede ser bulto o unitario según el producto)
       const precioDB = Number(pl.precio_venta || pl.base?.precio_venta || 0);
+      const precioCosto = Number(pl.precio_costo || pl.base?.precio_costo || 0);
 
       // Calcular ambos precios
       let precioVentaBulto = precioDB;
@@ -196,9 +216,53 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
         : calcularModoSalida(esDeposito, modoEnvio, unidadMedida);
 
       // precioVenta = el precio que corresponde según el modo de salida default
-      const precioVenta = modoSalidaDefault === "BULTO"
+      let precioVenta = modoSalidaDefault === "BULTO"
         ? precioVentaBulto
         : precioVentaUnitario;
+
+      // Aplicar lista de precios (si hay una resuelta)
+      let aplicacionLista = null;
+      if (listaAplicable) {
+        const precioOriginal = Number(precioVenta.toFixed(2));
+        try {
+          const calc = calcularPrecioConLista({
+            precioVenta,
+            costo: precioCosto,
+            lista: listaAplicable,
+          });
+          const precioFinalNum = Number(calc.precioFinal);
+
+          // Mantener proporción unitario/bulto cuando hay factor_pack > 1
+          if (factorPack > 1 && precioVenta > 0) {
+            const ratio = precioFinalNum / precioVenta;
+            precioVentaUnitario = Number((precioVentaUnitario * ratio).toFixed(2));
+            precioVentaBulto = Number((precioVentaBulto * ratio).toFixed(2));
+          } else {
+            // Sin factor pack: precioUnitario == precioBulto == precioFinal
+            precioVentaUnitario = precioFinalNum;
+            precioVentaBulto = precioFinalNum;
+          }
+          precioVenta = precioFinalNum;
+
+          aplicacionLista = {
+            listaPrecioId: listaAplicable.id,
+            listaPrecioNombre: listaAplicable.nombre,
+            tipoBase: listaAplicable.tipoBase,
+            tipoPrecioAplicado: calc.tipoPrecioAplicado,
+            margenAplicado: calc.margenAplicado,
+            precioOriginal,
+            precioFinal: precioFinalNum,
+            esDefault: !!listaAplicable.esDefault,
+          };
+        } catch (e) {
+          console.warn(
+            "[pos-ventas/buscar-producto] calcularPrecioConLista lanzó (probable MANUAL_AUTORIZADO):",
+            e.message
+          );
+          // Mantener precioVenta clásico, aplicacionLista = null
+          aplicacionLista = null;
+        }
+      }
 
       return {
         productoBaseId: pl.baseId,
@@ -208,7 +272,7 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
         precioVenta: Number(precioVenta.toFixed(2)),
         precioVentaUnitario,
         precioVentaBulto,
-        precioCosto: Number(pl.precio_costo || pl.base?.precio_costo || 0),
+        precioCosto,
         stock,
         sinStock,
         allowNegativeStock,
@@ -220,6 +284,8 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false) {
         // Fiambre fijo: frontend puede mostrar "pieza" como label
         esFiambreFijo: fiambreFijo || false,
         pesoReferenciaKg: fiambreFijo ? pesoReferenciaKg : undefined,
+        // Trazabilidad de lista de precios aplicada (null si no aplica)
+        aplicacionLista,
       };
     });
 }

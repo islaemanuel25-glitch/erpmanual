@@ -187,6 +187,11 @@ function CarritoVenta({
             <div className="flex items-start gap-2">
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm truncate">{item.nombre}</div>
+                {item.listaPrecioNombre && item.tipoPrecioAplicado && item.tipoPrecioAplicado !== "PRECIO_VENTA" && (
+                  <span className="block text-[10px] sunmi-text-muted truncate">
+                    {item.listaPrecioNombre}
+                  </span>
+                )}
                 <div className="text-xs pos-text-muted mt-1 flex items-center gap-2">
                   <span>${formatPrecio(item.precio)}</span>
                   <span>x</span>
@@ -225,7 +230,12 @@ function CarritoVenta({
               className="pos-bg-row pos-bg-row-hover animate-fade-in"
             >
               <td className="px-2 py-1.5 truncate max-w-[160px] text-sm">
-                {item.nombre}
+                <div className="truncate">{item.nombre}</div>
+                {item.listaPrecioNombre && item.tipoPrecioAplicado && item.tipoPrecioAplicado !== "PRECIO_VENTA" && (
+                  <span className="block text-[10px] sunmi-text-muted truncate">
+                    {item.listaPrecioNombre}
+                  </span>
+                )}
               </td>
               <td className="px-2 py-1.5">
                 <CantidadStepper

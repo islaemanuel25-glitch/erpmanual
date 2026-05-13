@@ -3,6 +3,21 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { getOperadorActivo } from "@/lib/operador";
+import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
+
+// Mapea lista.tipoBase a VentaDetalle.tipoPrecioAplicado.
+// MANUAL_AUTORIZADO y casos desconocidos caen a PRECIO_VENTA (fallback).
+function mapTipoPrecioAplicado(lista) {
+  if (!lista) return "PRECIO_VENTA";
+  if (lista.tipoBase === "PRECIO_VENTA") return "PRECIO_VENTA";
+  if (lista.tipoBase === "COSTO") {
+    const margen = Number(lista.margenPorcentaje);
+    if (!Number.isFinite(margen) || margen === 0) return "COSTO_PURO";
+    return "COSTO_MAS_MARGEN";
+  }
+  // MANUAL_AUTORIZADO o cualquier otro caso: fallback
+  return "PRECIO_VENTA";
+}
 
 export async function POST(req) {
   try {
@@ -161,6 +176,43 @@ export async function POST(req) {
           if (pctTag > pctMaxTag) pctMaxTag = pctTag;
         }
         descuentoAplicadoPct = Math.max(pctCliente, pctMaxTag);
+      }
+    }
+
+    // Resolver lista de precios aplicable para trazabilidad (server-authoritative).
+    // Fallback silencioso si no se puede resolver — NO bloquea la venta.
+    let listaResuelta = null;
+    try {
+      listaResuelta = await resolverListaCliente({ clienteId, grupoId, prisma });
+    } catch (e) {
+      console.warn(
+        `[pos-ventas/crear] No se pudo resolver lista (grupoId=${grupoId}, clienteId=${clienteId}):`,
+        e.message
+      );
+      listaResuelta = null;
+    }
+
+    // Validar listaPrecioId que viene de cada item: debe pertenecer al grupoId.
+    // Si no pertenece o no existe, se descarta y queda null.
+    const idsListasPorValidar = new Set();
+    for (const item of items) {
+      const itemListaId = Number.isInteger(item?.listaPrecioId) ? item.listaPrecioId : null;
+      if (itemListaId && (!listaResuelta || listaResuelta.id !== itemListaId)) {
+        idsListasPorValidar.add(itemListaId);
+      }
+    }
+    let listasValidadasPorGrupo = new Map();
+    if (idsListasPorValidar.size > 0) {
+      const listas = await prisma.listaPrecio.findMany({
+        where: { id: { in: Array.from(idsListasPorValidar) }, grupoId },
+        select: { id: true, tipoBase: true, margenPorcentaje: true },
+      });
+      for (const lp of listas) {
+        listasValidadasPorGrupo.set(lp.id, {
+          id: lp.id,
+          tipoBase: lp.tipoBase,
+          margenPorcentaje: lp.margenPorcentaje,
+        });
       }
     }
 
@@ -418,6 +470,7 @@ export async function POST(req) {
           turnoId,
           numero,
           clientTxnId: txnId || null,
+          listaPrecioId: listaResuelta?.id ?? null,
           subtotal,
           descuento: descuentoTotal,
           descuentoAutomatico: descuentoAutomatico || null,
@@ -437,6 +490,25 @@ export async function POST(req) {
               const lineaSubtotal = item.subtotalItem;
               const shareLinea = total > 0 ? lineaSubtotal / total : 0;
               const comisionLinea = comisionBancaria * shareLinea;
+
+              // Resolver lista para este item (trazabilidad por línea):
+              // 1) Si el item trae listaPrecioId y coincide con listaResuelta → usarla
+              // 2) Si trae listaPrecioId distinta, validada contra el grupo → usarla
+              // 3) Si el item no trae listaPrecioId pero hay listaResuelta → usar listaResuelta
+              // 4) Sino → null
+              const itemListaId = Number.isInteger(item?.listaPrecioId) ? item.listaPrecioId : null;
+              let itemListaValida = null;
+              if (itemListaId) {
+                if (listaResuelta && listaResuelta.id === itemListaId) {
+                  itemListaValida = listaResuelta;
+                } else if (listasValidadasPorGrupo.has(itemListaId)) {
+                  itemListaValida = listasValidadasPorGrupo.get(itemListaId);
+                }
+              }
+              if (!itemListaValida && listaResuelta) {
+                itemListaValida = listaResuelta;
+              }
+
               return {
                 productoBaseId: item.productoBaseId,
                 nombre: item.nombre,
@@ -446,6 +518,12 @@ export async function POST(req) {
                 subtotal: item.subtotalItem,
                 ganancia: item.ganancia,
                 comisionLinea: comisionLinea > 0 ? Number(comisionLinea.toFixed(2)) : null,
+                listaPrecioId: itemListaValida?.id ?? null,
+                tipoPrecioAplicado: mapTipoPrecioAplicado(itemListaValida),
+                margenAplicado:
+                  itemListaValida && itemListaValida.tipoBase === "COSTO"
+                    ? itemListaValida.margenPorcentaje
+                    : null,
               };
             }),
           },

@@ -7,7 +7,7 @@ import { showError } from "@/components/sunmi/SunmiToast";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
 const SIN_STOCK_MSG = "Producto sin stock disponible";
 
-function BuscadorProductos({ localId, onAgregar, apiPath }) {
+function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -54,10 +54,13 @@ function BuscadorProductos({ localId, onAgregar, apiPath }) {
       }
       setLoading(true);
       try {
-        const res = await fetch(
-          `${searchApi}?q=${encodeURIComponent(texto)}&localId=${localId}`,
-          { credentials: "include" }
-        );
+        const params = new URLSearchParams();
+        params.set("q", texto);
+        params.set("localId", String(localId));
+        if (clienteId != null) params.set("clienteId", String(clienteId));
+        const res = await fetch(`${searchApi}?${params.toString()}`, {
+          credentials: "include",
+        });
         const data = await res.json();
         if (data.ok) {
           const items = rankear(data.items || [], texto);
@@ -102,7 +105,7 @@ function BuscadorProductos({ localId, onAgregar, apiPath }) {
         setLoading(false);
       }
     },
-    [localId, rankear, onAgregar, searchApi]
+    [localId, clienteId, rankear, onAgregar, searchApi]
   );
 
   // Busqueda por voz

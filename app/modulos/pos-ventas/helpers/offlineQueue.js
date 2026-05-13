@@ -15,8 +15,16 @@ const STORAGE_KEY = "posVentasOfflineQueue_v1";
  *   descuentoPorPuntos: number,
  *   total: number,
  *   clienteId: number | null,
- *   items: Array<{ productoBaseId, nombre, precio, cantidad }>
+ *   items: Array<{
+ *     productoBaseId, nombre, precio, cantidad,
+ *     // Trazabilidad de lista de precios (Etapa 4 — opcional, tolerar legacy sin estos campos):
+ *     listaPrecioId: number | null,
+ *     tipoPrecioAplicado: 'PRECIO_VENTA' | 'COSTO_MAS_MARGEN' | 'COSTO_PURO' | 'MANUAL_AUTORIZADO' | 'OVERRIDE_PRODUCTO',
+ *     margenAplicado: number | null,
+ *   }>
  * }
+ * Nota: ítems legacy (anteriores a Etapa 4) sin trazabilidad siguen siendo procesables.
+ * El server resuelve la lista al procesar items sin listaPrecioId.
  */
 
 export function loadQueue() {

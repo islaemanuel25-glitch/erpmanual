@@ -626,6 +626,9 @@ export default function PosVentasPage() {
         nombre: item.nombre,
         precio: item.precio,
         cantidad: item.cantidad,
+        listaPrecioId: item.listaPrecioId ?? null,
+        tipoPrecioAplicado: item.tipoPrecioAplicado ?? "PRECIO_VENTA",
+        margenAplicado: item.margenAplicado ?? null,
       })),
     };
 
@@ -1082,6 +1085,9 @@ export default function PosVentasPage() {
             nombre: item.nombre,
             precio: item.precio,
             cantidad: item.cantidad,
+            listaPrecioId: item.listaPrecioId ?? null,
+            tipoPrecioAplicado: item.tipoPrecioAplicado ?? "PRECIO_VENTA",
+            margenAplicado: item.margenAplicado ?? null,
           })),
         }),
       });
@@ -1494,6 +1500,7 @@ export default function PosVentasPage() {
           <div className="flex flex-col gap-2 lg:gap-3 lg:flex-[3] min-h-0">
             <BuscadorProductos
               localId={localActual}
+              clienteId={state.clienteSeleccionado?.id ?? null}
               onAgregar={handleAgregar}
             />
             <div className="flex-1 min-h-0 lg:overflow-auto">

@@ -86,6 +86,12 @@ export function posVentaReducer(state, action) {
             precioVentaUnitario: producto.precioVentaUnitario ?? producto.precioVenta,
             precioVentaBulto: producto.precioVentaBulto ?? producto.precioVenta,
             unidadMedida: producto.unidadMedida || "unidad",
+            // Trazabilidad de lista de precios (Etapa 4) — capturada al momento de agregar
+            listaPrecioId: producto.aplicacionLista?.listaPrecioId ?? null,
+            listaPrecioNombre: producto.aplicacionLista?.listaPrecioNombre ?? null,
+            tipoPrecioAplicado: producto.aplicacionLista?.tipoPrecioAplicado ?? "PRECIO_VENTA",
+            margenAplicado: producto.aplicacionLista?.margenAplicado ?? null,
+            precioCosto: producto.precioCosto ?? 0,
           },
         ],
       };
