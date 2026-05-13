@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { rankearFuzzy } from "@/lib/productos/busquedaFuzzyProducto";
 
-const FUZZY_CANDIDATE_LIMIT = 2000;
+const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_MIN_LIKE_RESULTS = 3;
 const FUZZY_TOP_RESULTS = 10;
 

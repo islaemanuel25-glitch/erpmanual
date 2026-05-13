@@ -6,7 +6,7 @@ import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conve
 import { redondear100 } from "@/lib/precios/redondeo";
 import { rankearFuzzy } from "@/lib/productos/busquedaFuzzyProducto";
 
-const FUZZY_CANDIDATE_LIMIT = 2000;
+const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_MIN_LIKE_RESULTS = 3;
 const FUZZY_TOP_RESULTS = 10;
 
