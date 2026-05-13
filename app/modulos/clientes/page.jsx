@@ -909,8 +909,12 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
     let cancelado = false;
     (async () => {
       try {
-        const res = await fetch("/api/listas-precios/opciones", {
+        const url = localId
+          ? `/api/listas-precios/opciones?localId=${localId}`
+          : "/api/listas-precios/opciones";
+        const res = await fetch(url, {
           credentials: "include",
+          cache: "no-store",
         });
         if (!res.ok) {
           if (!cancelado) setListasOpciones([]);
@@ -927,7 +931,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [localId]);
 
   const cargarTags = async () => {
     if (!localId) return;
