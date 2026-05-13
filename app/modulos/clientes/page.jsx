@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
@@ -718,18 +719,19 @@ export default function ClientesPage() {
               "Telefono",
               "Email",
               "Etiquetas",
+              "Lista de precios",
               "Estado",
               "Acciones",
             ]}
           >
             {loading ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 sunmi-text-muted">
+                <td colSpan={8} className="text-center py-8 sunmi-text-muted">
                   Cargando...
                 </td>
               </tr>
             ) : clientesFiltrados.length === 0 ? (
-              <SunmiTableEmpty colSpan={7} message="No hay clientes" />
+              <SunmiTableEmpty colSpan={8} message="No hay clientes" />
             ) : (
               clientesFiltrados.map((cliente) => (
                 <SunmiTableRow key={cliente.id}>
@@ -758,6 +760,20 @@ export default function ClientesPage() {
                         <span className="text-xs sunmi-text-muted">-</span>
                       )}
                     </div>
+                  </td>
+                  <td className="px-2 py-1.5 text-sm">
+                    {cliente.listaPrecio?.nombre ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span>{cliente.listaPrecio.nombre}</span>
+                        {cliente.listaPrecio.activo === false && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded sunmi-state-warning-soft sunmi-text-accent">
+                            Inactiva
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-xs sunmi-text-muted">Usa default</span>
+                    )}
                   </td>
                   <td className="px-2 py-1.5">
                     <SunmiBadgeEstado value={cliente.activo} />
@@ -869,6 +885,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
     observaciones: cliente?.observaciones || "",
     limiteCredito: cliente?.limiteCredito != null ? String(cliente.limiteCredito) : "",
     descuentoPorcentaje: cliente?.descuentoPorcentaje != null ? String(cliente.descuentoPorcentaje) : "",
+    listaPrecioId: cliente?.listaPrecio?.id ?? null,
   });
 
   const [tags, setTags] = useState([]);
@@ -880,11 +897,37 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
   const [guardando, setGuardando] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const [listasOpciones, setListasOpciones] = useState([]);
+
   useEffect(() => {
     if (localId) {
       cargarTags();
     }
   }, [localId]);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/listas-precios/opciones", {
+          credentials: "include",
+        });
+        if (!res.ok) {
+          if (!cancelado) setListasOpciones([]);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelado) {
+          setListasOpciones(data.ok && Array.isArray(data.items) ? data.items : []);
+        }
+      } catch {
+        if (!cancelado) setListasOpciones([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   const cargarTags = async () => {
     if (!localId) return;
@@ -1062,6 +1105,39 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
               onChange={(e) => handleChange("email", e.target.value)}
               placeholder="cliente@email.com"
             />
+          </div>
+
+          <div>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
+              Lista de precios
+            </label>
+            <SunmiSelectAdv
+              value={form.listaPrecioId == null ? "" : form.listaPrecioId}
+              onChange={(val) => {
+                if (val === "" || val === null || val === undefined) {
+                  handleChange("listaPrecioId", null);
+                } else {
+                  handleChange("listaPrecioId", Number(val));
+                }
+              }}
+              placeholder="Sin lista específica (usa default)"
+            >
+              <option value="">Sin lista específica (usa default)</option>
+              {listasOpciones.map((lp) => (
+                <option key={lp.id} value={lp.id}>
+                  {lp.esDefault ? `${lp.nombre} (default)` : lp.nombre}
+                </option>
+              ))}
+              {cliente?.listaPrecio?.id &&
+                !listasOpciones.some((lp) => lp.id === cliente.listaPrecio.id) && (
+                  <option
+                    key={`legacy-${cliente.listaPrecio.id}`}
+                    value={cliente.listaPrecio.id}
+                  >
+                    {`${cliente.listaPrecio.nombre} (inactiva)`}
+                  </option>
+                )}
+            </SunmiSelectAdv>
           </div>
 
           <div>

@@ -43,6 +43,9 @@ export async function GET(req) {
             },
           },
         },
+        listaPrecio: {
+          select: { id: true, nombre: true, esDefault: true, activo: true },
+        },
       },
     });
 

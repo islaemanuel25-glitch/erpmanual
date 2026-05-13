@@ -42,6 +42,9 @@ export async function GET(req, context) {
             },
           },
         },
+        listaPrecio: {
+          select: { id: true, nombre: true, esDefault: true, activo: true },
+        },
       },
     });
 

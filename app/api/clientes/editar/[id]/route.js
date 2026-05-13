@@ -16,11 +16,11 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const body = await req.json();
-    const { nombre, documento, telefono, email, direccion, observaciones, limiteCredito, descuentoPorcentaje } = body;
+    const { nombre, documento, telefono, email, direccion, observaciones, limiteCredito, descuentoPorcentaje, listaPrecioId } = body;
 
     const clienteExistente = await prisma.cliente.findFirst({
       where: { id: Number(id), localId, grupoId },
-      select: { id: true },
+      select: { id: true, listaPrecioId: true },
     });
 
     if (!clienteExistente) {
@@ -45,6 +45,36 @@ export async function PUT(req, { params }) {
       );
     }
 
+    // Validar listaPrecioId si vino en el body
+    const tieneListaPrecio = Object.prototype.hasOwnProperty.call(body, "listaPrecioId");
+    let listaPrecioIdFinal = undefined;
+    if (tieneListaPrecio) {
+      if (listaPrecioId === null) {
+        listaPrecioIdFinal = null;
+      } else if (typeof listaPrecioId === "number") {
+        const esMismaQueActual = clienteExistente.listaPrecioId === listaPrecioId;
+        if (esMismaQueActual) {
+          // No re-validar activo si es la misma lista que ya tenía
+          listaPrecioIdFinal = listaPrecioId;
+        } else {
+          const lp = await prisma.listaPrecio.findFirst({
+            where: { id: listaPrecioId, grupoId, activo: true },
+            select: { id: true },
+          });
+          if (!lp) {
+            return NextResponse.json(
+              { ok: false, error: "Lista de precios inválida o de otro grupo" },
+              { status: 400 }
+            );
+          }
+          listaPrecioIdFinal = listaPrecioId;
+        }
+      } else {
+        // Tipo inesperado: ignorar (no actualizar)
+        listaPrecioIdFinal = undefined;
+      }
+    }
+
     const limiteVal = limiteCredito !== "" && limiteCredito != null ? Number(limiteCredito) : null;
     const descuentoVal = descuentoPorcentaje !== "" && descuentoPorcentaje != null ? Number(descuentoPorcentaje) : null;
 
@@ -67,9 +97,19 @@ export async function PUT(req, { params }) {
       dataSimple.descuentoPorcentaje = descuentoVal;
     }
 
+    if (listaPrecioIdFinal !== undefined) {
+      dataCompleta.listaPrecioId = listaPrecioIdFinal;
+      dataSimple.listaPrecioId = listaPrecioIdFinal;
+    }
+
     const cliente = await prisma.cliente.update({
       where: { id: Number(id), localId: Number(localId) },
       data: esEdicionCompleta ? dataCompleta : dataSimple,
+      include: {
+        listaPrecio: {
+          select: { id: true, nombre: true, esDefault: true, activo: true },
+        },
+      },
     });
 
     return NextResponse.json({ ok: true, cliente });

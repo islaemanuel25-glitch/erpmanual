@@ -14,13 +14,39 @@ export async function POST(req) {
     const perm = checkPerm(session, "clientes.crear");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    const { nombre, documento, telefono, email, direccion, observaciones, limiteCredito, descuentoPorcentaje } = await req.json();
+    const {
+      nombre,
+      documento,
+      telefono,
+      email,
+      direccion,
+      observaciones,
+      limiteCredito,
+      descuentoPorcentaje,
+      listaPrecioId,
+    } = await req.json();
 
     if (!nombre || !nombre.trim()) {
       return NextResponse.json(
         { ok: false, error: "Nombre requerido" },
         { status: 400 }
       );
+    }
+
+    // Validar listaPrecioId si vino un number
+    let listaPrecioIdFinal = null;
+    if (typeof listaPrecioId === "number") {
+      const lp = await prisma.listaPrecio.findFirst({
+        where: { id: listaPrecioId, grupoId, activo: true },
+        select: { id: true },
+      });
+      if (!lp) {
+        return NextResponse.json(
+          { ok: false, error: "Lista de precios inválida o de otro grupo" },
+          { status: 400 }
+        );
+      }
+      listaPrecioIdFinal = listaPrecioId;
     }
 
     const cliente = await prisma.cliente.create({
@@ -35,6 +61,12 @@ export async function POST(req) {
         observaciones: observaciones?.trim() || null,
         limiteCredito: limiteCredito !== "" && limiteCredito != null ? Number(limiteCredito) : null,
         descuentoPorcentaje: descuentoPorcentaje !== "" && descuentoPorcentaje != null ? Number(descuentoPorcentaje) : null,
+        listaPrecioId: listaPrecioIdFinal,
+      },
+      include: {
+        listaPrecio: {
+          select: { id: true, nombre: true, esDefault: true, activo: true },
+        },
       },
     });
 

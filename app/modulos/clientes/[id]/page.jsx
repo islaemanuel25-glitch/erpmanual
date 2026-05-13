@@ -205,6 +205,21 @@ function TabDatos({ cliente }) {
               : "Sin descuento"}
           </div>
         </div>
+        <div>
+          <label className="text-[11px] sunmi-text-muted mb-1 block">Lista de precios</label>
+          <div className="text-sm">
+            {cliente.listaPrecio?.nombre ? (
+              <span>
+                {cliente.listaPrecio.nombre}
+                {cliente.listaPrecio.activo === false && (
+                  <span className="sunmi-text-muted ml-1">(inactiva)</span>
+                )}
+              </span>
+            ) : (
+              <span className="sunmi-text-muted">Usa default</span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Etiquetas */}
