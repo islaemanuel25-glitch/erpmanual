@@ -141,7 +141,7 @@ export default function EdicionRapidaPage() {
     categoria: "",
     proveedor: "",
     area: "",
-    activo: "",
+    estado: "activos",
   });
   const [incompletos, setIncompletos] = useState(false);
 
@@ -304,7 +304,7 @@ export default function EdicionRapidaPage() {
         categoriaId: filtros.categoria,
         proveedorId: filtros.proveedor,
         areaFisicaId: filtros.area,
-        activo: filtros.activo,
+        estado: filtros.estado || "activos",
         localId: String(localId),
         ...(incompletos ? { incompletos: "true" } : {}),
       });
@@ -737,7 +737,7 @@ export default function EdicionRapidaPage() {
                 f.categoria !== filtros.categoria ||
                 f.proveedor !== filtros.proveedor ||
                 f.area !== filtros.area ||
-                f.activo !== filtros.activo;
+                f.estado !== filtros.estado;
               if (changed) {
                 setPage(1);
                 setFiltros(f);

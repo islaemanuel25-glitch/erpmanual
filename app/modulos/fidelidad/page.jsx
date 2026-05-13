@@ -74,7 +74,7 @@ export default function FidelidadPage() {
       setBuscandoProd(true);
       try {
         const res = await fetch(
-          `/api/productos/listar?localId=${localSeleccionado}&q=${encodeURIComponent(busqProd.trim())}`,
+          `/api/productos/listar?localId=${localSeleccionado}&q=${encodeURIComponent(busqProd.trim())}&estado=todos`,
           { credentials: "include" }
         );
         const data = await res.json();

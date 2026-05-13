@@ -76,7 +76,7 @@ export default function ModalPreviewPrecio({ open, lista, onClose }) {
     const timer = setTimeout(async () => {
       setBuscando(true);
       try {
-        const url = `/api/productos/listar?localId=${localActivo.localId}&q=${encodeURIComponent(q)}&pageSize=10`;
+        const url = `/api/productos/listar?localId=${localActivo.localId}&q=${encodeURIComponent(q)}&pageSize=10&estado=todos`;
         const res = await fetch(url, {
           credentials: "include",
           cache: "no-store",

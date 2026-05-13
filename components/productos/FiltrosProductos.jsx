@@ -12,7 +12,8 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
   const [categoria, setCategoria] = useState(initial.categoria || "");
   const [proveedor, setProveedor] = useState(initial.proveedor || "");
   const [area, setArea] = useState(initial.area || "");
-  const [activo, setActivo] = useState(initial.activo ?? "");
+  // estado: activos | inactivos | todos. Por defecto solo activos.
+  const [estado, setEstado] = useState(initial.estado || "activos");
 
   const [open, setOpen] = useState(false);
 
@@ -34,19 +35,19 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
   // ============================
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
-      onChange({ search, categoria, proveedor, area, activo });
+      onChange({ search, categoria, proveedor, area, estado });
     }, 250);
 
     return () => clearTimeout(debounceRef.current);
-  }, [search, categoria, proveedor, area, activo]);
+  }, [search, categoria, proveedor, area, estado]);
 
   // Busqueda inmediata (bypass debounce) — para Enter, scanner y voz
   const buscarInmediato = useCallback(
     (texto) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      onChange({ search: texto, categoria, proveedor, area, activo });
+      onChange({ search: texto, categoria, proveedor, area, estado });
     },
-    [onChange, categoria, proveedor, area, activo]
+    [onChange, categoria, proveedor, area, estado]
   );
 
   // ============================
@@ -130,7 +131,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
     setCategoria("");
     setProveedor("");
     setArea("");
-    setActivo("");
+    setEstado("activos");
   };
 
   return (
@@ -177,6 +178,19 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
           </span>
         )}
 
+        {/* SELECT ESTADO (activos / inactivos / todos) */}
+        <div className="w-full md:w-44 md:shrink-0">
+          <SunmiSelectAdv
+            value={estado}
+            onChange={setEstado}
+            placeholder="Estado..."
+          >
+            <SunmiSelectOption value="activos">Activos</SunmiSelectOption>
+            <SunmiSelectOption value="inactivos">Inactivos</SunmiSelectOption>
+            <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
+          </SunmiSelectAdv>
+        </div>
+
         {/* BOTON MAS FILTROS */}
         <SunmiButton
           color="slate"
@@ -200,7 +214,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
             animate-fadeIn
           "
         >
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* CATEGORIA */}
             <SunmiSelectAdv
               value={categoria}
@@ -244,17 +258,6 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
                   {a.nombre}
                 </SunmiSelectOption>
               ))}
-            </SunmiSelectAdv>
-
-            {/* ESTADO */}
-            <SunmiSelectAdv
-              value={activo}
-              onChange={setActivo}
-              placeholder="Estado..."
-            >
-              <SunmiSelectOption value="">Estado...</SunmiSelectOption>
-              <SunmiSelectOption value="true">Activo</SunmiSelectOption>
-              <SunmiSelectOption value="false">Inactivo</SunmiSelectOption>
             </SunmiSelectAdv>
 
             {/* LIMPIAR */}

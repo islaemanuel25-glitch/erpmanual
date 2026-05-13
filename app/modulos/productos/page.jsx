@@ -69,7 +69,15 @@ export default function ProductosPage() {
     categoria: searchParams.get("categoria") || "",
     proveedor: searchParams.get("proveedor") || "",
     area: searchParams.get("area") || "",
-    activo: searchParams.get("activo") || "",
+    // estado: activos (default) | inactivos | todos. Soporta URL vieja con
+    // ?activo=true/false para no romper bookmarks de operadores.
+    estado:
+      searchParams.get("estado") ||
+      (searchParams.get("activo") === "false"
+        ? "inactivos"
+        : searchParams.get("activo") === "true"
+        ? "activos"
+        : "activos"),
   });
 
   // =========================================================
@@ -84,7 +92,10 @@ export default function ProductosPage() {
     if (filtros.categoria) params.set("categoria", filtros.categoria);
     if (filtros.proveedor) params.set("proveedor", filtros.proveedor);
     if (filtros.area) params.set("area", filtros.area);
-    if (filtros.activo) params.set("activo", filtros.activo);
+    // Sólo persistir estado en URL cuando no es el default "activos".
+    if (filtros.estado && filtros.estado !== "activos") {
+      params.set("estado", filtros.estado);
+    }
     const qs = params.toString();
     return qs ? `/modulos/productos?${qs}` : "/modulos/productos";
   }, [page, sortKey, sortDir, filtros]);
@@ -221,7 +232,7 @@ export default function ProductosPage() {
         categoriaId: filtros.categoria,
         proveedorId: filtros.proveedor,
         areaFisicaId: filtros.area,
-        activo: filtros.activo,
+        estado: filtros.estado || "activos",
         localId: String(localId),
       });
 
@@ -705,7 +716,7 @@ export default function ProductosPage() {
                     f.categoria !== filtros.categoria ||
                     f.proveedor !== filtros.proveedor ||
                     f.area !== filtros.area ||
-                    f.activo !== filtros.activo;
+                    f.estado !== filtros.estado;
                   if (changed) {
                     setPage(1);
                     setFiltros(f);

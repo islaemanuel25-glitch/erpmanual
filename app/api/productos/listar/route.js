@@ -83,9 +83,25 @@ export async function GET(req) {
         ? Number(searchParams.get("areaFisicaId"))
         : null;
 
-    const activo = searchParams.get("activo");
-    const activoFilter =
-      activo === "true" ? true : activo === "false" ? false : undefined;
+    // estado: activos (default) | inactivos | todos. Para no romper URLs
+    // antiguas, también acepta el viejo `activo=true|false`.
+    const estadoRaw = (searchParams.get("estado") || "").toLowerCase();
+    const activoLegacy = searchParams.get("activo");
+    let activoFilter;
+    if (estadoRaw === "todos") {
+      activoFilter = undefined;
+    } else if (estadoRaw === "inactivos") {
+      activoFilter = false;
+    } else if (estadoRaw === "activos") {
+      activoFilter = true;
+    } else if (activoLegacy === "true") {
+      activoFilter = true;
+    } else if (activoLegacy === "false") {
+      activoFilter = false;
+    } else {
+      // sin estado ni activo: default seguro = solo activos
+      activoFilter = true;
+    }
 
     const incompletos = searchParams.get("incompletos") === "true";
 
