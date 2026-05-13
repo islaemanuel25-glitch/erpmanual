@@ -272,7 +272,7 @@ export default function TransferenciaDetallePage() {
 
         {!loading && !error && item && (
           <>
-            <TransferenciaHeader item={item} id={id} />
+            <TransferenciaHeader item={item} id={id} me={me} />
 
             <SunmiSeparator label="Detalle y recepción" />
 
