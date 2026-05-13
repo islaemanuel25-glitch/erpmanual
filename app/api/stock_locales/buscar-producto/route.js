@@ -4,7 +4,10 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
-import { resolverContraCatalogo } from "@/lib/productos/busquedaFuzzyProducto";
+import {
+  rankearLiteral,
+  resolverContraCatalogo,
+} from "@/lib/productos/busquedaFuzzyProducto";
 
 const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_TOP_RESULTS = 10;
@@ -77,75 +80,61 @@ export async function GET(req) {
       return NextResponse.json({ ok: true, items });
     }
 
-    // Búsqueda por voz: resolver contra catálogo real.
+    // Manual y voz comparten universo: el catálogo real del local. Se rankea
+    // en memoria sobre todo el catálogo para no perder matches válidos por el
+    // efecto del take fijo del LIKE clásico.
+    const candidatos = await prisma.productoLocal.findMany({
+      where: { localId, activo: true, base: { activo: true } },
+      select: {
+        id: true,
+        nombre: true,
+        base: { select: { nombre: true, codigo_barra: true } },
+      },
+      take: FUZZY_CANDIDATE_LIMIT,
+    });
+
+    const getNombre = (p) => p.nombre || p.base?.nombre || "";
+    const getCodigo = (p) => p.base?.codigo_barra || null;
+
+    let rankings;
+    let queryInterpretada = null;
     if (fromVoice) {
-      const candidatos = await prisma.productoLocal.findMany({
-        where: { localId, activo: true, base: { activo: true } },
-        select: {
-          id: true,
-          nombre: true,
-          base: { select: { nombre: true, codigo_barra: true } },
-        },
-        take: FUZZY_CANDIDATE_LIMIT,
+      const resuelto = resolverContraCatalogo(candidatos, q, {
+        getNombre,
+        getCodigo,
+        maxDistance: 3,
       });
-
-      const { rankings, queryInterpretada } = resolverContraCatalogo(
-        candidatos,
-        q,
-        {
-          getNombre: (p) => p.nombre || p.base?.nombre || "",
-          getCodigo: (p) => p.base?.codigo_barra || null,
-          maxDistance: 3,
-        }
-      );
-
-      const topIds = rankings.slice(0, FUZZY_TOP_RESULTS).map((r) => r.item.id);
-      if (topIds.length === 0) {
-        return NextResponse.json({
-          ok: true,
-          items: [],
-          queryInterpretada: null,
-        });
-      }
-
-      const productosFull = await prisma.productoLocal.findMany({
-        where: { id: { in: topIds } },
-        include: {
-          base: true,
-          stock: { where: { localId }, select: { cantidad: true } },
-        },
-      });
-      const orderMap = new Map(topIds.map((id, idx) => [id, idx]));
-      productosFull.sort((a, b) => orderMap.get(a.id) - orderMap.get(b.id));
-
-      const items = mapProductos(productosFull, esDeposito);
-      return NextResponse.json({ ok: true, items, queryInterpretada });
+      rankings = resuelto.rankings;
+      queryInterpretada = resuelto.queryInterpretada;
+    } else {
+      rankings = rankearLiteral(candidatos, q, { getNombre, getCodigo });
     }
 
-    // Búsqueda manual: LIKE clásico + ranking tradicional.
-    const productos = await prisma.productoLocal.findMany({
-      where: {
-        localId,
-        activo: true,
-        base: { activo: true },
-        OR: [
-          { nombre: { contains: q, mode: "insensitive" } },
-          { base: { nombre: { contains: q, mode: "insensitive" } } },
-          { base: { codigo_barra: { contains: q, mode: "insensitive" } } },
-        ],
-      },
+    const topIds = rankings.slice(0, FUZZY_TOP_RESULTS).map((r) => r.item.id);
+    if (topIds.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        items: [],
+        ...(fromVoice ? { queryInterpretada: null } : {}),
+      });
+    }
+
+    const productosFull = await prisma.productoLocal.findMany({
+      where: { id: { in: topIds } },
       include: {
         base: true,
         stock: { where: { localId }, select: { cantidad: true } },
       },
-      take: 30,
     });
+    const orderMap = new Map(topIds.map((id, idx) => [id, idx]));
+    productosFull.sort((a, b) => orderMap.get(a.id) - orderMap.get(b.id));
 
-    const qLower = q.toLowerCase();
-    productos.sort((a, b) => rankScore(a, qLower) - rankScore(b, qLower));
-
-    const items = mapProductos(productos.slice(0, 10), esDeposito);
-    return NextResponse.json({ ok: true, items });
+    const items = mapProductos(productosFull, esDeposito);
+    return NextResponse.json({
+      ok: true,
+      items,
+      ...(fromVoice ? { queryInterpretada } : {}),
+    });
   } catch (err) {
     console.error("Error buscar-producto Stock:", err);
     return NextResponse.json(
@@ -153,18 +142,6 @@ export async function GET(req) {
       { status: 500 }
     );
   }
-}
-
-function rankScore(pl, qLower) {
-  const nombre = (pl.nombre || pl.base?.nombre || "").toLowerCase();
-  const codigo = (pl.base?.codigo_barra || "").toLowerCase();
-  if (codigo === qLower) return 0;
-  if (nombre === qLower) return 1;
-  if (nombre.startsWith(qLower)) return 2;
-  const palabras = nombre.split(/\s+/);
-  if (palabras.some((w) => w.startsWith(qLower))) return 3;
-  if (nombre.includes(qLower)) return 4;
-  return 5;
 }
 
 function calcularModoSalida(esDeposito, modoEnvio, unidadMedida) {
