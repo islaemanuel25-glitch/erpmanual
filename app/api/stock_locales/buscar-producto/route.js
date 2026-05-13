@@ -4,10 +4,9 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
-import { rankearFuzzy } from "@/lib/productos/busquedaFuzzyProducto";
+import { resolverContraCatalogo } from "@/lib/productos/busquedaFuzzyProducto";
 
 const FUZZY_CANDIDATE_LIMIT = 10000;
-const FUZZY_MIN_LIKE_RESULTS = 3;
 const FUZZY_TOP_RESULTS = 10;
 
 /**
@@ -78,7 +77,52 @@ export async function GET(req) {
       return NextResponse.json({ ok: true, items });
     }
 
-    // Búsqueda amplia
+    // Búsqueda por voz: resolver contra catálogo real.
+    if (fromVoice) {
+      const candidatos = await prisma.productoLocal.findMany({
+        where: { localId, activo: true, base: { activo: true } },
+        select: {
+          id: true,
+          nombre: true,
+          base: { select: { nombre: true, codigo_barra: true } },
+        },
+        take: FUZZY_CANDIDATE_LIMIT,
+      });
+
+      const { rankings, queryInterpretada } = resolverContraCatalogo(
+        candidatos,
+        q,
+        {
+          getNombre: (p) => p.nombre || p.base?.nombre || "",
+          getCodigo: (p) => p.base?.codigo_barra || null,
+          maxDistance: 3,
+        }
+      );
+
+      const topIds = rankings.slice(0, FUZZY_TOP_RESULTS).map((r) => r.item.id);
+      if (topIds.length === 0) {
+        return NextResponse.json({
+          ok: true,
+          items: [],
+          queryInterpretada: null,
+        });
+      }
+
+      const productosFull = await prisma.productoLocal.findMany({
+        where: { id: { in: topIds } },
+        include: {
+          base: true,
+          stock: { where: { localId }, select: { cantidad: true } },
+        },
+      });
+      const orderMap = new Map(topIds.map((id, idx) => [id, idx]));
+      productosFull.sort((a, b) => orderMap.get(a.id) - orderMap.get(b.id));
+
+      const items = mapProductos(productosFull, esDeposito);
+      return NextResponse.json({ ok: true, items, queryInterpretada });
+    }
+
+    // Búsqueda manual: LIKE clásico + ranking tradicional.
     const productos = await prisma.productoLocal.findMany({
       where: {
         localId,
@@ -99,51 +143,6 @@ export async function GET(req) {
 
     const qLower = q.toLowerCase();
     productos.sort((a, b) => rankScore(a, qLower) - rankScore(b, qLower));
-
-    // Fallback fuzzy para búsqueda por voz: tolera errores de transcripción
-    // típicos ("brama" → BRAHMA, "acotar" → COTAR). Solo se activa con
-    // fromVoice=true para no afectar la búsqueda manual ni el scanner.
-    if (fromVoice && productos.length < FUZZY_MIN_LIKE_RESULTS) {
-      const idsActuales = new Set(productos.map((p) => p.id));
-      const candidatos = await prisma.productoLocal.findMany({
-        where: {
-          localId,
-          activo: true,
-          base: { activo: true },
-        },
-        select: {
-          id: true,
-          nombre: true,
-          base: { select: { nombre: true, codigo_barra: true } },
-        },
-        take: FUZZY_CANDIDATE_LIMIT,
-        orderBy: { id: "asc" },
-      });
-
-      const ranked = rankearFuzzy(candidatos, q, {
-        getNombre: (p) => p.nombre || p.base?.nombre || "",
-        getCodigo: (p) => p.base?.codigo_barra || null,
-        maxDistance: 3,
-      });
-
-      const idsFuzzy = ranked
-        .map((r) => r.item.id)
-        .filter((id) => !idsActuales.has(id))
-        .slice(0, FUZZY_TOP_RESULTS);
-
-      if (idsFuzzy.length > 0) {
-        const fuzzyFull = await prisma.productoLocal.findMany({
-          where: { id: { in: idsFuzzy } },
-          include: {
-            base: true,
-            stock: { where: { localId }, select: { cantidad: true } },
-          },
-        });
-        const orderMap = new Map(idsFuzzy.map((id, idx) => [id, idx]));
-        fuzzyFull.sort((a, b) => orderMap.get(a.id) - orderMap.get(b.id));
-        productos.push(...fuzzyFull);
-      }
-    }
 
     const items = mapProductos(productos.slice(0, 10), esDeposito);
     return NextResponse.json({ ok: true, items });

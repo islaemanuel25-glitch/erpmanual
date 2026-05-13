@@ -14,6 +14,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
   const [resultados, setResultados] = useState([]);
   const [loading, setLoading] = useState(false);
   const [escuchando, setEscuchando] = useState(false);
+  const [queryInterpretada, setQueryInterpretada] = useState(null);
   const debounceRef = useRef(null);
   const lastKeyTime = useRef(0);
   const scanBuffer = useRef("");
@@ -65,6 +66,11 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
         const data = await res.json();
         if (data.ok) {
           const items = rankear(data.items || [], texto);
+          // El backend devuelve queryInterpretada solo en fromVoice cuando la
+          // transcripción no coincide con ninguna palabra real del catálogo.
+          setQueryInterpretada(
+            fromVoice && data.queryInterpretada ? data.queryInterpretada : null
+          );
 
           // Auto-agregar si match exacto por código de barras (1 resultado con código idéntico)
           if (
@@ -80,6 +86,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
             onAgregar(items[0]);
             setQuery("");
             setResultados([]);
+            setQueryInterpretada(null);
             inputRef.current?.focus();
             return;
           }
@@ -94,6 +101,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
             onAgregar(items[0]);
             setQuery("");
             setResultados([]);
+            setQueryInterpretada(null);
             inputRef.current?.focus();
             return;
           }
@@ -151,6 +159,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
     if (e.key === "Escape") {
       setQuery("");
       setResultados([]);
+      setQueryInterpretada(null);
       inputRef.current?.focus();
       return;
     }
@@ -182,6 +191,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
         onAgregar(resultados[0]);
         setQuery("");
         setResultados([]);
+        setQueryInterpretada(null);
         inputRef.current?.focus();
       } else if (query.trim()) {
         buscar(query);
@@ -201,6 +211,8 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
   const handleChange = (e) => {
     const val = e.target.value;
     setQuery(val);
+    // Escritura manual descarta la interpretación previa de voz.
+    setQueryInterpretada(null);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -224,6 +236,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
     onAgregar(producto);
     setQuery("");
     setResultados([]);
+    setQueryInterpretada(null);
     inputRef.current?.focus();
   };
 
@@ -274,6 +287,12 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
       {escuchando && (
         <div className="text-xs pos-text-danger mt-2 animate-pulse">
           Escuchando...
+        </div>
+      )}
+
+      {!loading && !escuchando && queryInterpretada && resultados.length > 0 && (
+        <div className="text-[11px] pos-text-muted mt-2 italic">
+          Interpretado como: <span className="font-semibold not-italic">{queryInterpretada.toUpperCase()}</span>
         </div>
       )}
 
