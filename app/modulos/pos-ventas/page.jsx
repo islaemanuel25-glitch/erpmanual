@@ -645,7 +645,14 @@ export default function PosVentasPage() {
       localNombre: localNombre || `Local ${localActual}`,
       vendedor: me?.nombre || me?.email || "-",
       formaPago: datos.formaPago,
-      cliente: state.clienteSeleccionado?.nombre || "Consumidor Final",
+      cliente: state.clienteSeleccionado
+        ? {
+            nombre: state.clienteSeleccionado.nombre,
+            documento: state.clienteSeleccionado.documento || null,
+            telefono: state.clienteSeleccionado.telefono || null,
+            direccion: state.clienteSeleccionado.direccion || null,
+          }
+        : null,
       items: state.carrito.map((item) => ({
         nombre: item.nombre,
         precio: item.precio,
@@ -788,7 +795,7 @@ export default function PosVentasPage() {
       localNombre: item.localNombre || `Local ${item.localId}`,
       vendedor: item.vendedor || item.userNombre || item.userEmail || me?.nombre || me?.email || "-",
       formaPago: item.formaPago,
-      cliente: item.clienteNombre || "Consumidor Final",
+      cliente: item.clienteNombre ? { nombre: item.clienteNombre } : null,
       items: (item.items || []).map((it) => ({
         nombre: it.nombre ?? it.productoNombre ?? it.descripcion ?? "-",
         cantidad: Number(it.cantidad ?? it.qty ?? 0),
@@ -1126,7 +1133,14 @@ export default function PosVentasPage() {
           total: bd ? bd.total : datos.total,
           formaPago: datos.formaPago,
           vendedor: me?.nombre || "-",
-          cliente: state.clienteSeleccionado?.nombre || "Consumidor Final",
+          cliente: state.clienteSeleccionado
+            ? {
+                nombre: state.clienteSeleccionado.nombre,
+                documento: state.clienteSeleccionado.documento || null,
+                telefono: state.clienteSeleccionado.telefono || null,
+                direccion: state.clienteSeleccionado.direccion || null,
+              }
+            : null,
           localNombre,
           pagaCon: pagoEfectivo?.pagaCon || null,
           vuelto: pagoEfectivo?.vuelto || null,
