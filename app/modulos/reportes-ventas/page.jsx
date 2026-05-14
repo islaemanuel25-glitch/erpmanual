@@ -13,11 +13,42 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
+const TZ_AR = "America/Argentina/Cordoba";
+
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+// Fecha de hoy en Argentina como YYYY-MM-DD (sin tocar UTC).
+function hoyArgentinaISO() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ_AR,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  const d = parts.find((p) => p.type === "day")?.value;
+  return `${y}-${m}-${d}`;
+}
+
+// Formatea una fecha ISO (o Date) en hora argentina, ej: 13/05/2026 21:35
+function formatFechaHoraAR(iso) {
+  if (!iso) return "";
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: TZ_AR,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
 }
 
 export default function ReportesVentasPage() {
@@ -35,11 +66,52 @@ export default function ReportesVentasPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Listado venta por venta
+  const LIMIT_VENTAS = 50;
+  const [listado, setListado] = useState(null);
+  const [paginacion, setPaginacion] = useState(null);
+  const [pageVentas, setPageVentas] = useState(1);
+  const [loadingListado, setLoadingListado] = useState(false);
+  // Filtros usados en el último "Generar Reporte". La paginación los usa para
+  // no desincronizarse del resumen si el usuario cambia inputs sin re-generar.
+  const [filtrosVigentes, setFiltrosVigentes] = useState(null);
+
   useEffect(() => {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = hoyArgentinaISO();
     setFechaDesde(hoy);
     setFechaHasta(hoy);
   }, []);
+
+  const cargarListado = async (page, filtrosOverride) => {
+    const filtros = filtrosOverride || filtrosVigentes;
+    if (!filtros) return;
+
+    setLoadingListado(true);
+    try {
+      const params = new URLSearchParams({
+        fechaDesde: filtros.fechaDesde,
+        fechaHasta: filtros.fechaHasta,
+        page: String(page),
+        limit: String(LIMIT_VENTAS),
+      });
+      if (filtros.localId) params.set("localId", String(filtros.localId));
+      if (filtros.formaPago) params.set("formaPago", filtros.formaPago);
+
+      const res = await fetch(`/api/reportes-ventas/listado?${params}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setListado(data.ventas || []);
+        setPaginacion(data.paginacion || null);
+        setPageVentas(page);
+      }
+    } catch (error) {
+      console.error("Error listado ventas:", error);
+    } finally {
+      setLoadingListado(false);
+    }
+  };
 
   const cargarReporte = async () => {
     if (!fechaDesde || !fechaHasta) {
@@ -50,14 +122,27 @@ export default function ReportesVentasPage() {
     setErrorMsg("");
     setLoading(true);
     setReporte(null);
+    setListado(null);
+    setPaginacion(null);
+    setPageVentas(1);
+
+    // Snapshot de filtros para que la paginación use estos valores aunque el
+    // usuario cambie los inputs después.
+    const filtros = {
+      fechaDesde,
+      fechaHasta,
+      formaPago,
+      localId: contexto?.localId ?? null,
+    };
+    setFiltrosVigentes(filtros);
 
     try {
       const params = new URLSearchParams({
-        fechaDesde,
-        fechaHasta,
+        fechaDesde: filtros.fechaDesde,
+        fechaHasta: filtros.fechaHasta,
       });
-      if (contexto?.localId) params.set("localId", String(contexto.localId));
-      if (formaPago) params.set("formaPago", formaPago);
+      if (filtros.localId) params.set("localId", String(filtros.localId));
+      if (filtros.formaPago) params.set("formaPago", filtros.formaPago);
 
       const res = await fetch(`/api/reportes-ventas/general?${params}`, {
         credentials: "include",
@@ -71,6 +156,8 @@ export default function ReportesVentasPage() {
       }
 
       setReporte(data);
+      // Pasa filtros directo para no depender del state recién seteado.
+      cargarListado(1, filtros);
     } catch (error) {
       console.error("Error:", error);
       setErrorMsg("Error de conexion al generar reporte");
@@ -252,6 +339,107 @@ export default function ReportesVentasPage() {
               </div>
             </SunmiCard>
           )}
+
+          {/* Ventas del período (venta por venta) */}
+          <SunmiCard className="p-3">
+            <SunmiSeparator label="Ventas del período" />
+
+            {loadingListado && (
+              <div className="text-center py-6">
+                <SunmiLoader />
+              </div>
+            )}
+
+            {!loadingListado && listado && listado.length === 0 && (
+              <div className="text-center py-8 sunmi-text-muted text-sm">
+                No hay ventas en el período seleccionado
+              </div>
+            )}
+
+            {!loadingListado && listado && listado.length > 0 && (
+              <>
+                <div className="overflow-x-auto mt-3">
+                  <SunmiTable
+                    headers={[
+                      "Fecha/hora",
+                      "Ticket",
+                      "Cliente",
+                      "Cajero",
+                      "Local",
+                      "Items",
+                      "Forma pago",
+                      "Estado",
+                      "Total",
+                    ]}
+                  >
+                    {listado.map((v) => (
+                      <tr key={v.id} className="hover:bg-[var(--hover-bg)]">
+                        <td className="px-2 py-1.5 font-mono text-[11px] whitespace-nowrap">
+                          {formatFechaHoraAR(v.fecha)}
+                        </td>
+                        <td className="px-2 py-1.5 font-mono">
+                          #{v.numero ?? v.id}
+                        </td>
+                        <td className="px-2 py-1.5 truncate max-w-[160px]">
+                          {v.cliente?.nombre || "—"}
+                        </td>
+                        <td className="px-2 py-1.5 truncate max-w-[140px]">
+                          {v.vendedor?.nombre || "—"}
+                        </td>
+                        <td className="px-2 py-1.5 truncate max-w-[140px]">
+                          {v.local?.nombre || "—"}
+                        </td>
+                        <td className="px-2 py-1.5 text-center">{v.items}</td>
+                        <td className="px-2 py-1.5 capitalize">
+                          {v.formaPago}
+                        </td>
+                        <td className="px-2 py-1.5 text-center">
+                          <span
+                            className={
+                              v.estado === "fiado"
+                                ? "sunmi-text-accent"
+                                : "sunmi-text-success"
+                            }
+                          >
+                            {v.estado}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono font-bold">
+                          ${formatPrecio(v.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </SunmiTable>
+                </div>
+
+                {paginacion && paginacion.totalPaginas > 1 && (
+                  <div className="flex items-center justify-between mt-3 text-xs sunmi-text-muted">
+                    <div>
+                      Página {paginacion.page} de {paginacion.totalPaginas} ·{" "}
+                      {paginacion.total} venta{paginacion.total === 1 ? "" : "s"}
+                    </div>
+                    <div className="flex gap-2">
+                      <SunmiButton
+                        onClick={() => cargarListado(pageVentas - 1)}
+                        disabled={pageVentas <= 1 || loadingListado}
+                      >
+                        Anterior
+                      </SunmiButton>
+                      <SunmiButton
+                        onClick={() => cargarListado(pageVentas + 1)}
+                        disabled={
+                          pageVentas >= paginacion.totalPaginas ||
+                          loadingListado
+                        }
+                      >
+                        Siguiente
+                      </SunmiButton>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </SunmiCard>
 
           {/* Top productos */}
           {reporte.topProductos && reporte.topProductos.length > 0 && (

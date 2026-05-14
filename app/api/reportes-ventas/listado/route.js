@@ -1,0 +1,116 @@
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getUsuarioSession } from "@/lib/auth";
+import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
+
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
+
+export async function GET(req) {
+  try {
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = req.nextUrl;
+    const fechaDesde = searchParams.get("fechaDesde");
+    const fechaHasta = searchParams.get("fechaHasta");
+    const localIdParam = searchParams.get("localId");
+    const formaPagoParam = searchParams.get("formaPago");
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+
+    if (!fechaDesde || !fechaHasta) {
+      return NextResponse.json(
+        { ok: false, error: "Fechas requeridas" },
+        { status: 400 }
+      );
+    }
+
+    const page = Math.max(1, Number(pageParam) || 1);
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(1, Number(limitParam) || DEFAULT_LIMIT)
+    );
+    const skip = (page - 1) * limit;
+
+    const { fechaInicio, fechaFin } = getRangoArgentina(fechaDesde, fechaHasta);
+
+    const where = {
+      fecha: {
+        gte: fechaInicio,
+        lte: fechaFin,
+      },
+    };
+
+    if (localIdParam) {
+      where.localId = Number(localIdParam);
+    } else if (session.localId) {
+      where.localId = session.localId;
+    }
+
+    if (formaPagoParam) {
+      where.formaPago = formaPagoParam;
+    }
+
+    const [total, ventas] = await Promise.all([
+      prisma.venta.count({ where }),
+      prisma.venta.findMany({
+        where,
+        orderBy: { fecha: "desc" },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          numero: true,
+          fecha: true,
+          total: true,
+          formaPago: true,
+          esFiado: true,
+          cliente: { select: { id: true, nombre: true } },
+          vendedor: { select: { id: true, nombre: true } },
+          local: { select: { id: true, nombre: true } },
+          _count: { select: { detalles: true } },
+        },
+      }),
+    ]);
+
+    const items = ventas.map((v) => ({
+      id: v.id,
+      numero: v.numero,
+      fecha: v.fecha,
+      total: Number(v.total).toFixed(2),
+      formaPago: v.formaPago,
+      estado: v.esFiado ? "fiado" : "cobrado",
+      cliente: v.cliente
+        ? { id: v.cliente.id, nombre: v.cliente.nombre }
+        : null,
+      vendedor: v.vendedor
+        ? { id: v.vendedor.id, nombre: v.vendedor.nombre }
+        : null,
+      local: v.local ? { id: v.local.id, nombre: v.local.nombre } : null,
+      items: v._count?.detalles ?? 0,
+    }));
+
+    return NextResponse.json({
+      ok: true,
+      ventas: items,
+      paginacion: {
+        page,
+        limit,
+        total,
+        totalPaginas: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
+  } catch (error) {
+    console.error("Error listando ventas:", error);
+    return NextResponse.json(
+      { ok: false, error: "Error interno" },
+      { status: 500 }
+    );
+  }
+}

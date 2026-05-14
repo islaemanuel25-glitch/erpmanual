@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 
 export async function GET(req) {
   try {
@@ -25,11 +26,14 @@ export async function GET(req) {
       );
     }
 
-    // Construir WHERE
+    // Rango en hora Argentina (UTC-3) para que las ventas de la noche
+    // no se corran un día cuando el contenedor corre en UTC.
+    const { fechaInicio, fechaFin } = getRangoArgentina(fechaDesde, fechaHasta);
+
     const where = {
       fecha: {
-        gte: new Date(fechaDesde + "T00:00:00"),
-        lte: new Date(fechaHasta + "T23:59:59"),
+        gte: fechaInicio,
+        lte: fechaFin,
       },
     };
 
