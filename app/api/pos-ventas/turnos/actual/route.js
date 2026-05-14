@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 export async function GET(req) {
   try {
@@ -33,7 +34,21 @@ export async function GET(req) {
       orderBy: { apertura: "desc" },
     });
 
-    return NextResponse.json({ ok: true, turno });
+    // Marcar como vencido si la apertura no cae en el día calendario AR de hoy.
+    // El front bloquea la venta y obliga a cerrar caja antes de seguir.
+    let requiereCierre = false;
+    let mensaje = null;
+    if (turno) {
+      const diaApertura = fechaArgentinaISO(turno.apertura);
+      const hoy = hoyArgentinaISO();
+      if (diaApertura && diaApertura !== hoy) {
+        requiereCierre = true;
+        mensaje =
+          "Tenés una caja abierta de un día anterior. Cerrala antes de seguir vendiendo.";
+      }
+    }
+
+    return NextResponse.json({ ok: true, turno, requiereCierre, mensaje });
   } catch (error) {
     console.error("Error obteniendo turno actual:", error);
     return NextResponse.json(

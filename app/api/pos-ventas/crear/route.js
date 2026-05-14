@@ -4,6 +4,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { getOperadorActivo } from "@/lib/operador";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
+import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 // Mapea lista.tipoBase a VentaDetalle.tipoPrecioAplicado.
 // MANUAL_AUTORIZADO y casos desconocidos caen a PRECIO_VENTA (fallback).
@@ -57,12 +58,26 @@ export async function POST(req) {
         vendedorId: session.id,
         cierre: null,
       },
-      select: { id: true },
+      select: { id: true, apertura: true },
     });
 
     if (!turnoValido) {
       return NextResponse.json(
         { ok: false, error: "Turno inválido, cerrado, o no pertenece a este usuario/local" },
+        { status: 403 }
+      );
+    }
+
+    // Bloquear si el turno fue abierto un día anterior (calendario AR).
+    // El cajero debe cerrar caja antes de seguir vendiendo.
+    const diaAperturaAR = fechaArgentinaISO(turnoValido.apertura);
+    const hoyAR = hoyArgentinaISO();
+    if (diaAperturaAR && diaAperturaAR !== hoyAR) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Caja abierta de un día anterior. Cerrá caja antes de vender.",
+        },
         { status: 403 }
       );
     }

@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getOperadorActivo } from "@/lib/operador";
+import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 export async function POST(req) {
   try {
@@ -36,10 +37,12 @@ export async function POST(req) {
     });
 
     if (turnoAbierto) {
-      return NextResponse.json(
-        { ok: false, error: "Ya tenes un turno abierto" },
-        { status: 400 }
-      );
+      const diaApertura = fechaArgentinaISO(turnoAbierto.apertura);
+      const esViejo = diaApertura && diaApertura !== hoyArgentinaISO();
+      const error = esViejo
+        ? `Tenés una caja abierta del ${diaApertura}. Cerrala antes de abrir una nueva.`
+        : "Ya tenes un turno abierto";
+      return NextResponse.json({ ok: false, error }, { status: 400 });
     }
 
     const opActivo = getOperadorActivo(req);
