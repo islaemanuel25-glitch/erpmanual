@@ -36,11 +36,14 @@ export async function POST(req) {
       );
     }
 
-    // Calcular totales de ventas del turno
+    // Calcular totales de ventas del turno.
+    // Misma lógica que resumen/route.js: fiado va aparte, no infla digital.
+    // (El modelo Turno no tiene campo totalVentasFiado, así que fiado no se
+    // persiste — sólo se evita que contamine totalVentasDigital).
     const [ventas, cajaMovimientos] = await Promise.all([
       prisma.venta.findMany({
         where: { turnoId },
-        select: { total: true, formaPago: true },
+        select: { total: true, formaPago: true, esFiado: true },
       }),
       prisma.cajaMovimiento.findMany({
         where: { turnoId },
@@ -53,6 +56,10 @@ export async function POST(req) {
 
     ventas.forEach((v) => {
       const total = Number(v.total);
+      if (v.esFiado === true) {
+        // fiado: no entró plata real, no suma ni a efectivo ni a digital
+        return;
+      }
       if (v.formaPago === "efectivo") {
         totalEfectivo += total;
       } else {
