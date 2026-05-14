@@ -22,6 +22,14 @@ function formatPrecio(n) {
   });
 }
 
+// Cantidad en es-AR: enteros sin decimales, fraccionarios con máx 3 útiles.
+function formatCantidad(n) {
+  const num = Number(n);
+  if (!isFinite(num)) return "0";
+  if (Number.isInteger(num)) return num.toLocaleString("es-AR");
+  return num.toLocaleString("es-AR", { maximumFractionDigits: 3 });
+}
+
 // Fecha de hoy en Argentina como YYYY-MM-DD (sin tocar UTC).
 function hoyArgentinaISO() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -467,8 +475,8 @@ export default function ReportesVentasPage() {
                         <td className="px-2 py-1.5 font-medium truncate max-w-[200px]">
                           {item.nombre}
                         </td>
-                        <td className="px-2 py-1.5 text-center">
-                          {item.cantidad}
+                        <td className="px-2 py-1.5 text-center tabular-nums">
+                          {formatCantidad(item.cantidad)}
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono">
                           ${formatPrecio(item.totalVenta)}

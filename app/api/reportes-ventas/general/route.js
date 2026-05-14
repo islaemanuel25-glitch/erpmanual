@@ -126,9 +126,12 @@ export async function GET(req) {
             ganancia: 0,
           };
         }
-        productosMap[d.nombre].cantidad += d.cantidad;
+        // Prisma serializa Decimal como string: convertir antes de operar
+        // para evitar concatenación tipo "0" + "1.510" → "01.510".
+        const cantidad = Number(d.cantidad);
+        productosMap[d.nombre].cantidad += cantidad;
         productosMap[d.nombre].totalVenta += Number(d.subtotal);
-        productosMap[d.nombre].totalCosto += Number(d.precioCosto) * d.cantidad;
+        productosMap[d.nombre].totalCosto += Number(d.precioCosto) * cantidad;
         productosMap[d.nombre].ganancia += Number(d.ganancia);
       });
     });
