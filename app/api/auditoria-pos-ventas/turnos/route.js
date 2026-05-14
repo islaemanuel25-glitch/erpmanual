@@ -20,10 +20,18 @@ export async function GET(req) {
     const { localId } = scope;
     const { fechaInicio, fechaFin } = rango;
 
+    // Filtro por intersección: turno aparece si su ventana
+    // [apertura, cierre || abierto] toca el rango pedido. Esto cubre
+    // turnos largos que cierran dentro del rango (caso típico al cerrar
+    // caja después de varios días).
     const turnos = await prisma.turno.findMany({
       where: {
         localId,
-        apertura: { gte: fechaInicio, lte: fechaFin },
+        apertura: { lte: fechaFin },
+        OR: [
+          { cierre: null },
+          { cierre: { gte: fechaInicio } },
+        ],
       },
       orderBy: { apertura: "desc" },
       include: {

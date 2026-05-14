@@ -29,11 +29,18 @@ export async function GET(req) {
     const { localId } = scope;
     const { fechaInicio, fechaFin } = rango;
 
-    // 1. Traer turnos con vendedor y movimientos de caja
+    // 1. Traer turnos cuya ventana [apertura, cierre || abierto] intersecta
+    //    el rango pedido. Si filtraramos solo por apertura ∈ rango, un turno
+    //    abierto antes y cerrado dentro del rango (o abierto antes y todavía
+    //    abierto) no aparecería — perdiendo la vista del día.
     const turnos = await prisma.turno.findMany({
       where: {
         localId,
-        apertura: { gte: fechaInicio, lte: fechaFin },
+        apertura: { lte: fechaFin },
+        OR: [
+          { cierre: null },
+          { cierre: { gte: fechaInicio } },
+        ],
       },
       orderBy: { apertura: "desc" },
       include: {
@@ -63,6 +70,9 @@ export async function GET(req) {
         where: {
           turnoId: { in: turnoIds },
           localId,
+          // Solo las ventas que cayeron dentro del rango pedido, aunque el
+          // turno haya tenido más ventas fuera de ese rango.
+          fecha: { gte: fechaInicio, lte: fechaFin },
         },
         select: {
           turnoId: true,
