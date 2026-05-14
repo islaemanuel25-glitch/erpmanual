@@ -9,6 +9,8 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
+import VentaDetalleAdmin from "@/components/reportes-ventas/VentaDetalleAdmin";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -83,6 +85,45 @@ export default function ReportesVentasPage() {
   // Filtros usados en el último "Generar Reporte". La paginación los usa para
   // no desincronizarse del resumen si el usuario cambia inputs sin re-generar.
   const [filtrosVigentes, setFiltrosVigentes] = useState(null);
+
+  // Detalle de ticket (modal)
+  const [detalleAbierto, setDetalleAbierto] = useState(false);
+  const [detalleData, setDetalleData] = useState(null);
+  const [detallePermisos, setDetallePermisos] = useState(null);
+  const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [errorDetalle, setErrorDetalle] = useState("");
+
+  const abrirDetalle = async (ventaId) => {
+    setDetalleAbierto(true);
+    setDetalleData(null);
+    setDetallePermisos(null);
+    setErrorDetalle("");
+    setLoadingDetalle(true);
+    try {
+      const res = await fetch(`/api/reportes-ventas/detalle/${ventaId}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setDetalleData(data.venta);
+        setDetallePermisos(data.permisos || null);
+      } else {
+        setErrorDetalle(data.error || "No se pudo cargar el ticket");
+      }
+    } catch (error) {
+      console.error("Error detalle venta:", error);
+      setErrorDetalle("Error de conexión");
+    } finally {
+      setLoadingDetalle(false);
+    }
+  };
+
+  const cerrarDetalle = () => {
+    setDetalleAbierto(false);
+    setDetalleData(null);
+    setDetallePermisos(null);
+    setErrorDetalle("");
+  };
 
   useEffect(() => {
     const hoy = hoyArgentinaISO();
@@ -366,7 +407,85 @@ export default function ReportesVentasPage() {
 
             {!loadingListado && listado && listado.length > 0 && (
               <>
-                <div className="overflow-x-auto mt-3">
+                {/* Mobile: cards */}
+                <div className="md:hidden mt-3 space-y-2">
+                  {listado.map((v) => (
+                    <div
+                      key={v.id}
+                      className="sunmi-surface rounded-lg p-3 space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-mono font-bold text-sm">
+                            #{v.numero ?? v.id}
+                          </div>
+                          <div className="text-[11px] sunmi-text-muted">
+                            {formatFechaHoraAR(v.fecha)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono font-bold text-base">
+                            ${formatPrecio(v.total)}
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-1 mt-0.5 text-[10px]">
+                            <span
+                              className={`px-1.5 py-0.5 rounded-full capitalize ${
+                                v.estado === "fiado"
+                                  ? "sunmi-state-warning sunmi-text-accent"
+                                  : "sunmi-state-success sunmi-text-success"
+                              }`}
+                            >
+                              {v.estado}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded-full sunmi-surface capitalize">
+                              {v.formaPago}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[12px] space-y-0.5">
+                        <div className="flex gap-1">
+                          <span className="sunmi-text-muted">Cajero:</span>
+                          <span className="font-medium truncate">
+                            {v.vendedor?.nombre || "—"}
+                          </span>
+                        </div>
+                        {v.cliente?.nombre && (
+                          <div className="flex gap-1">
+                            <span className="sunmi-text-muted">Cliente:</span>
+                            <span className="font-medium truncate">
+                              {v.cliente.nombre}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span>
+                            <span className="sunmi-text-muted">Local:</span>{" "}
+                            <span className="font-medium">
+                              {v.local?.nombre || "—"}
+                            </span>
+                          </span>
+                          <span className="sunmi-text-muted">
+                            {v.items} item{v.items === 1 ? "" : "s"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <SunmiButton
+                        color="amber"
+                        size="sm"
+                        onClick={() => abrirDetalle(v.id)}
+                        className="w-full"
+                      >
+                        Ver ticket
+                      </SunmiButton>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop: tabla */}
+                <div className="hidden md:block overflow-x-auto mt-3">
                   <SunmiTable
                     headers={[
                       "Fecha/hora",
@@ -378,6 +497,7 @@ export default function ReportesVentasPage() {
                       "Forma pago",
                       "Estado",
                       "Total",
+                      "",
                     ]}
                   >
                     {listado.map((v) => (
@@ -414,6 +534,15 @@ export default function ReportesVentasPage() {
                         </td>
                         <td className="px-2 py-1.5 text-right font-mono font-bold">
                           ${formatPrecio(v.total)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <SunmiButton
+                            color="slate"
+                            size="sm"
+                            onClick={() => abrirDetalle(v.id)}
+                          >
+                            Ver ticket
+                          </SunmiButton>
                         </td>
                       </tr>
                     ))}
@@ -518,6 +647,39 @@ export default function ReportesVentasPage() {
           </div>
         </SunmiCard>
       )}
+
+      {/* Modal detalle de ticket */}
+      <SunmiModalLayout
+        open={detalleAbierto}
+        title={
+          detalleData
+            ? `Ticket #${detalleData.numero ?? detalleData.id}`
+            : "Detalle de venta"
+        }
+        subtitle={detalleData ? detalleData.local?.nombre : null}
+        color="amber"
+        maxWidth="max-w-2xl"
+        onClose={cerrarDetalle}
+      >
+        {loadingDetalle && (
+          <div className="text-center py-8">
+            <SunmiLoader />
+          </div>
+        )}
+
+        {!loadingDetalle && errorDetalle && (
+          <div className="text-center py-6 text-xs sunmi-text-danger sunmi-state-danger rounded px-2 py-1.5">
+            {errorDetalle}
+          </div>
+        )}
+
+        {!loadingDetalle && !errorDetalle && detalleData && (
+          <VentaDetalleAdmin
+            venta={detalleData}
+            permisos={detallePermisos}
+          />
+        )}
+      </SunmiModalLayout>
     </div>
   );
 }
