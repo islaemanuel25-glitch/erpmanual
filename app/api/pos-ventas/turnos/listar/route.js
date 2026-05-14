@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
+import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 
 export async function GET(req) {
   try {
@@ -52,13 +53,15 @@ export async function GET(req) {
     }
 
     if (fechaDesde || fechaHasta) {
+      // Rango en hora Argentina para que turnos cercanos a medianoche no se
+      // corran un día cuando el contenedor corre en UTC.
+      const { fechaInicio, fechaFin } = getRangoArgentina(
+        fechaDesde || fechaHasta,
+        fechaHasta || fechaDesde
+      );
       where.apertura = {};
-      if (fechaDesde) where.apertura.gte = new Date(fechaDesde);
-      if (fechaHasta) {
-        const hasta = new Date(fechaHasta);
-        hasta.setHours(23, 59, 59, 999);
-        where.apertura.lte = hasta;
-      }
+      if (fechaDesde) where.apertura.gte = fechaInicio;
+      if (fechaHasta) where.apertura.lte = fechaFin;
     }
 
     const turnos = await prisma.turno.findMany({
