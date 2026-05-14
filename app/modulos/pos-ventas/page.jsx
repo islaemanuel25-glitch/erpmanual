@@ -47,6 +47,8 @@ export default function PosVentasPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [mostrarPickerCliente, setMostrarPickerCliente] = useState(false);
   const [turnoActual, setTurnoActual] = useState(undefined); // undefined=cargando, null=sin turno, object=turno
+  const [turnoVencido, setTurnoVencido] = useState(false);
+  const [mensajeTurnoVencido, setMensajeTurnoVencido] = useState("");
   const [mostrarCierre, setMostrarCierre] = useState(false);
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
@@ -338,8 +340,12 @@ export default function PosVentasPage() {
         );
         const data = await res.json();
         setTurnoActual(data.ok && data.turno ? data.turno : null);
+        setTurnoVencido(!!(data.ok && data.requiereCierre));
+        setMensajeTurnoVencido(data.ok && data.mensaje ? data.mensaje : "");
       } catch {
         setTurnoActual(null);
+        setTurnoVencido(false);
+        setMensajeTurnoVencido("");
       }
     };
     verificarTurno();
@@ -693,6 +699,11 @@ export default function PosVentasPage() {
       return;
     }
 
+    if (turnoVencido) {
+      showError("Caja vencida: cerrala antes de procesar ventas pendientes");
+      return;
+    }
+
     const queue = loadQueue();
     if (queue.length === 0) {
       showSuccess("No hay ventas pendientes para procesar");
@@ -761,7 +772,7 @@ export default function PosVentasPage() {
       showSuccess(`${procesadas} venta(s) procesada(s) correctamente`);
       setSuccessMsg(`${procesadas} venta(s) procesada(s). ${nuevaLongitud} pendiente(s)`);
     }
-  }, [offlineMode, procesandoCola, turnoActual]);
+  }, [offlineMode, procesandoCola, turnoActual, turnoVencido]);
 
   // ---------------------------------------------------------------------------
   // Gestión de pendientes offline (modal)
@@ -982,6 +993,16 @@ export default function PosVentasPage() {
     // Bloquear cobro sin turno abierto (excepto offline que guarda pendiente)
     if (!turnoActual?.id && !offlineMode) {
       showError("Abrí turno para registrar ventas");
+      return;
+    }
+
+    // Bloquear cobro si la caja está vencida (turno de un día anterior).
+    // El backend igual rechaza con 403, pero atajamos antes para mejor UX.
+    if (turnoVencido) {
+      showError(
+        mensajeTurnoVencido ||
+          "Caja vencida: cerrá la caja anterior antes de seguir vendiendo"
+      );
       return;
     }
 
@@ -1242,6 +1263,55 @@ export default function PosVentasPage() {
   if (needsContexto) {
     router.push("/inicio");
     return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Caja vencida (turno abierto de un día anterior): pantalla bloqueante
+  // ---------------------------------------------------------------------------
+  if (localActual && me && turnoActual && turnoVencido) {
+    const fechaAperturaTxt = turnoActual.apertura
+      ? new Intl.DateTimeFormat("es-AR", {
+          timeZone: "America/Argentina/Cordoba",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(new Date(turnoActual.apertura))
+      : "—";
+    return (
+      <div className="sunmi-bg w-full min-h-full flex items-center justify-center p-4">
+        <div className="max-w-md w-full sunmi-surface rounded-xl p-5 space-y-4">
+          <h1 className="text-lg font-bold text-center">Caja vencida</h1>
+          <div className="sunmi-state-warning sunmi-text-accent rounded-lg p-3 text-sm text-center">
+            {mensajeTurnoVencido ||
+              "Tenés una caja abierta de un día anterior. Cerrala antes de seguir vendiendo."}
+          </div>
+          <div className="text-xs sunmi-text-muted text-center">
+            Caja abierta el {fechaAperturaTxt}
+          </div>
+          <SunmiButton
+            color="amber"
+            onClick={() => setMostrarCierre(true)}
+            className="w-full"
+          >
+            Cerrar caja
+          </SunmiButton>
+        </div>
+        {mostrarCierre && (
+          <ModalCierreTurno
+            turno={turnoActual}
+            onCerrar={() => setMostrarCierre(false)}
+            onCerrado={() => {
+              setMostrarCierre(false);
+              setTurnoActual(null);
+              setTurnoVencido(false);
+              setMensajeTurnoVencido("");
+            }}
+          />
+        )}
+      </div>
+    );
   }
 
   // ---------------------------------------------------------------------------
