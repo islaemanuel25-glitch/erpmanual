@@ -344,16 +344,27 @@ export async function POST(req) {
       baseStockMap[p.id] = { modoVentaDeposito: p.modoVentaDeposito || "PESO", pesoReferenciaKg: Number(p.pesoReferenciaKg || 0) };
     });
 
-    // Calcular costo total y detalle con ganancia
+    // Calcular costo total y detalle con ganancia.
+    //
+    // Fuente de verdad: item.precioCosto (lo manda el POS desde buscar-producto,
+    // ya en la MISMA escala que item.precio — unitario, bulto o pieza según el
+    // modo de salida). Esto evita el bug de calcular costo unitario dividiendo
+    // costoBulto/factorPack cuando la línea se vendió como bulto (factor_pack
+    // x ganancia falsa). Fallback al cálculo legacy si el item no trae costo
+    // (cola offline pre-fix o clientes viejos).
     let costoTotal = 0;
     const itemsConCosto = items.map((item) => {
       const { costoBulto, factorPack } = costosMap[item.productoBaseId] || { costoBulto: 0, factorPack: 1 };
-      const costoUnitario = costoBulto / factorPack;
+      const costoFromClient = Number(item.precioCosto);
+      const costoUnitarioDeLinea =
+        Number.isFinite(costoFromClient) && costoFromClient >= 0
+          ? costoFromClient
+          : costoBulto / factorPack;
       const subtotalItem = item.precio * item.cantidad;
-      const costoItem = costoUnitario * item.cantidad;
+      const costoItem = costoUnitarioDeLinea * item.cantidad;
       const ganancia = subtotalItem - costoItem;
       costoTotal += costoItem;
-      return { ...item, precioCosto: costoUnitario, subtotalItem, ganancia };
+      return { ...item, precioCosto: costoUnitarioDeLinea, subtotalItem, ganancia };
     });
 
     const gananciaBruta = total - costoTotal;

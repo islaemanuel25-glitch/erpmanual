@@ -253,28 +253,30 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         ? precioVentaBulto
         : precioVentaUnitario;
 
+      // Costo escalado a la MISMA unidad que precioVenta (unitario/bulto/pieza).
+      // El precio_costo en DB está en la misma escala que precio_venta (bulto si
+      // factor_pack>1, por kg si fiambre fijo). Lo escalamos una sola vez para que:
+      //   - calcularPrecioConLista reciba un costo consistente con precioVenta.
+      //   - el POS lo mande al crear la venta y la ganancia se calcule en escala.
+      let precioCostoEnEscala = precioCosto;
+      if (fiambreFijo) {
+        precioCostoEnEscala = Number((precioCosto * pesoReferenciaKg).toFixed(2));
+      } else if (
+        factorPack > 1 &&
+        unidadMedida !== "unidad" &&
+        modoSalidaDefault === "UNIDAD"
+      ) {
+        precioCostoEnEscala = Number((precioCosto / factorPack).toFixed(2));
+      }
+
       // Aplicar lista de precios (si hay una resuelta)
       let aplicacionLista = null;
       if (listaAplicable) {
         const precioOriginal = Number(precioVenta.toFixed(2));
-        // El costo en DB está en la misma escala que precio_venta (bulto si factor_pack>1,
-        // por kg si fiambre fijo). Para que `calcularPrecioConLista` produzca un precio
-        // consistente con la escala de `precioVenta` (que ya fue derivado a unitario/pieza
-        // según modoSalidaDefault), hay que escalar el costo igual.
-        let costoEnEscala = precioCosto;
-        if (fiambreFijo) {
-          costoEnEscala = Number((precioCosto * pesoReferenciaKg).toFixed(2));
-        } else if (
-          factorPack > 1 &&
-          unidadMedida !== "unidad" &&
-          modoSalidaDefault === "UNIDAD"
-        ) {
-          costoEnEscala = Number((precioCosto / factorPack).toFixed(2));
-        }
         try {
           const calc = calcularPrecioConLista({
             precioVenta,
-            costo: costoEnEscala,
+            costo: precioCostoEnEscala,
             lista: listaAplicable,
           });
           const precioFinalNum = Number(calc.precioFinal);
@@ -319,7 +321,7 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         precioVenta: Number(precioVenta.toFixed(2)),
         precioVentaUnitario,
         precioVentaBulto,
-        precioCosto,
+        precioCosto: precioCostoEnEscala,
         stock,
         sinStock,
         allowNegativeStock,
