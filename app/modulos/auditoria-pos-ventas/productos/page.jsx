@@ -14,6 +14,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import TablaRentabilidadProductos from "@/components/auditoria-pos-ventas/TablaRentabilidadProductos";
 import TablaTicketsConflictivos from "@/components/auditoria-pos-ventas/TablaTicketsConflictivos";
+import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 const TABS = [
   { key: "productos", label: "Rentabilidad" },
@@ -48,7 +49,7 @@ export default function AuditoriaProductosPage() {
   } = useAuditoriaProductos();
 
   useEffect(() => {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = hoyArgentinaISO();
     setFechaDesde(hoy);
     setFechaHasta(hoy);
   }, []);

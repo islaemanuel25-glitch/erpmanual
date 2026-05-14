@@ -11,6 +11,7 @@ import { useAuditoriaTurnos } from "@/hooks/useAuditoriaTurnos";
 import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
+import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import {
   AlertTriangle,
   Clock,
@@ -85,7 +86,20 @@ const FRANJAS_ORDEN = ["manana", "tarde", "noche"];
 
 function getFechaKey(apertura) {
   if (!apertura) return "sin-fecha";
-  return new Date(apertura).toISOString().split("T")[0];
+  const d = new Date(apertura);
+  if (isNaN(d.getTime())) return "sin-fecha";
+  // Día calendario en hora Argentina, no UTC. Sin esto un turno abierto a las
+  // 22:00 ART caería en el día siguiente UTC y agruparía mal en la lista.
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  return `${y}-${m}-${day}`;
 }
 
 function agruparTurnos(turnos, franjaFiltro, ordenApertura) {
@@ -681,7 +695,7 @@ export default function AuditoriaTurnosPage() {
 
   useEffect(() => {
     if (!fechaDesde && !fechaHasta) {
-      const hoy = new Date().toISOString().split("T")[0];
+      const hoy = hoyArgentinaISO();
       setFechaDesde(hoy);
       setFechaHasta(hoy);
     }
@@ -787,7 +801,7 @@ export default function AuditoriaTurnosPage() {
                   setFechaHasta(hasta);
                   cargar(desde, hasta, 1, 25);
                 }}
-                maxDate={new Date().toISOString().split("T")[0]}
+                maxDate={hoyArgentinaISO()}
               />
             </div>
           </div>

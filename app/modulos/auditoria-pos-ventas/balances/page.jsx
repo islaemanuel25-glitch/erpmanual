@@ -14,6 +14,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import ResumenKpis from "@/components/auditoria-pos-ventas/ResumenKpis";
 import TablaMediosPago from "@/components/auditoria-pos-ventas/TablaMediosPago";
+import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 function fmt(n) {
   return Number(n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -157,7 +158,7 @@ export default function AuditoriaBalancesPage() {
   const { loading, error, resumen, medios, comparacion, cargar } = useAuditoriaBalances();
 
   useEffect(() => {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = hoyArgentinaISO();
     setFechaDesde(hoy);
     setFechaHasta(hoy);
   }, []);
