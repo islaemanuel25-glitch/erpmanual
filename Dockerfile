@@ -1,9 +1,16 @@
+# syntax=docker/dockerfile:1
+
 # --- Build stage ---
 FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
+# CLI de Prisma autocontenido (arbol de deps completo, aislado)
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --prefix /opt/prisma-cli prisma@6.19.3
 
 COPY . .
 
@@ -22,6 +29,11 @@ COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/prisma ./prisma
+
+# Prisma CLI aislado en /opt (arbol completo y autocontenido)
+COPY --from=builder /opt/prisma-cli /opt/prisma-cli
+RUN printf '#!/bin/sh\nexec node /opt/prisma-cli/node_modules/prisma/build/index.js "$@"\n' > /usr/local/bin/prisma \
+    && chmod +x /usr/local/bin/prisma
 
 USER node
 

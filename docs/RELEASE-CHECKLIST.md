@@ -20,7 +20,7 @@
 
 ## 2. Producción
 
-- [ ] `npx prisma migrate deploy` — aplica migraciones en producción
+- [ ] `docker exec erpazul_app prisma migrate deploy` — aplica migraciones en producción (CLI de prisma incluido en la imagen, sin `npx`)
 - [ ] Verificar endpoints críticos:
   - `GET /api/clientes/listar`
   - `GET /api/clientes/[id]/cuenta-corriente`
@@ -48,3 +48,15 @@ El rollback de migraciones Prisma es **manual**. Pasos:
 5. Revertir el commit de código
 
 > **Importante:** Siempre hacer backup de la base de datos antes de aplicar migraciones en producción.
+
+## 4. Notas de deploy
+
+- El deploy reconstruye la imagen Docker en el VPS. Un deploy típico tarda
+  **~10-11 min**, dominado casi por completo por `next build` (~10 min con
+  Turbopack). El resto (`npm ci`, copies, migrate) es marginal.
+- El `next build` no se acelera con cache entre builds porque Turbopack no
+  reaprovecha `.next/cache`. Optimizar este punto queda pendiente para una
+  sesión futura (evaluar build con Webpack para producción, cache persistente
+  experimental de Turbopack, o build en CI con push a un registry).
+- `docker compose -f docker-compose.prod.yml up -d --no-deps app` recrea el
+  container con ~3-5 s de corte (502 vía nginx mientras Next arranca).
