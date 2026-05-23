@@ -145,6 +145,8 @@ pgdata/
 backup_*.sql
 diff.sql
 fix_column.sql
+*.dump
+backups/
 
 # Archives
 *.zip
