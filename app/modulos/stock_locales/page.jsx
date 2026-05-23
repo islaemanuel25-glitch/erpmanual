@@ -9,6 +9,8 @@ import ModalLimites from "@/components/stock_locales/ModalLimites";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 export default function StockLocalesPage() {
   const router = useRouter();
@@ -62,37 +64,38 @@ export default function StockLocalesPage() {
   // RENDER
   // ============================================================
   return (
-    <div className="p-4 sunmi-bg w-full min-h-screen flex flex-col gap-4">
+    <div className="p-2 sunmi-bg w-full min-h-screen">
+      <SunmiCard className="p-2 flex flex-col gap-2">
 
-      {/* CABECERA compacta */}
-      <div>
-        <h1 className="text-lg sunmi-section-title">Stock</h1>
-        <p className="text-sm sunmi-section-subtitle">
-          {localActual.nombre || "Sin local"}
-        </p>
-      </div>
+        <SunmiSeparator
+          label={`Stock${localActual.nombre ? ` — ${localActual.nombre}` : ""}`}
+        />
 
-      {/* FILTROS compactos */}
-      <FiltrosStock
-        compact
-        localSeleccionado={localSeleccionado}
-        onFiltroChange={setFiltro}
-        onReset={() => setFiltro({})}
-      />
+        {/* FILTROS compactos */}
+        <FiltrosStock
+          compact
+          localSeleccionado={localSeleccionado}
+          onFiltroChange={setFiltro}
+          onReset={() => setFiltro({})}
+        />
 
-      {/* TABLA DE STOCK */}
-      <TablaStock
-        localSeleccionado={localSeleccionado}
-        localNombre={localActual.nombre}
-        localEsDeposito={localActual.esDeposito}
-        filtro={filtro}
-        page={page}
-        setPage={setPage}
-        refrescar={refrescar}
-        setRefrescar={setRefrescar}
-        onAjustar={abrirAjuste}
-        onEditarLimites={abrirLimites}
-      />
+        <SunmiSeparator label="Listado" />
+
+        {/* TABLA DE STOCK */}
+        <TablaStock
+          localSeleccionado={localSeleccionado}
+          localNombre={localActual.nombre}
+          localEsDeposito={localActual.esDeposito}
+          filtro={filtro}
+          page={page}
+          setPage={setPage}
+          refrescar={refrescar}
+          setRefrescar={setRefrescar}
+          onAjustar={abrirAjuste}
+          onEditarLimites={abrirLimites}
+        />
+
+      </SunmiCard>
 
       {/* MODAL AJUSTE */}
       <ModalAjuste
@@ -115,7 +118,6 @@ export default function StockLocalesPage() {
         producto={productoLimites}
         local={localActual}
       />
-
     </div>
   );
 }
