@@ -219,14 +219,16 @@ export default function TablaStock({
         unidades: Number(p.stock || 0),
         factorPack: p.factorPack,
       });
-      return (
-        <span>
-          {bultos > 0 && <strong>{bultos} bultos</strong>}
-          {bultos > 0 && sueltas > 0 && " + "}
-          {sueltas > 0 && `${sueltas} uds`}
-          {bultos === 0 && sueltas === 0 && "0"}
-        </span>
-      );
+      if (bultos > 0 || sueltas > 0) {
+        return (
+          <span>
+            {bultos > 0 && <strong>{bultos} bultos</strong>}
+            {bultos > 0 && sueltas > 0 && " + "}
+            {sueltas > 0 && `${sueltas} uds`}
+          </span>
+        );
+      }
+      return <span>{formatCantidad(p.stock, p.unidadMedida, fmtOpts)}</span>;
     }
     return (
       <span>
@@ -364,14 +366,14 @@ export default function TablaStock({
                   )}
                   {isVisible("min") && (
                     <td className="px-2 py-1 text-right">
-                      {esPackDeposito(p) && p.stockMin
+                      {esPackDeposito(p) && p.stockMin != null
                         ? fromUnidades({ unidades: Number(p.stockMin), factorPack: p.factorPack }).bultos
                         : p.stockMin != null ? formatCantidad(p.stockMin, p.unidadMedida, fmtOpts) : "-"}
                     </td>
                   )}
                   {isVisible("max") && (
                     <td className="px-2 py-1 text-right">
-                      {esPackDeposito(p) && p.stockMax
+                      {esPackDeposito(p) && p.stockMax != null
                         ? fromUnidades({ unidades: Number(p.stockMax), factorPack: p.factorPack }).bultos
                         : p.stockMax != null ? formatCantidad(p.stockMax, p.unidadMedida, fmtOpts) : "-"}
                     </td>

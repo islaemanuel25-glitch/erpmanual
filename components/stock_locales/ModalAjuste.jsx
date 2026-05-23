@@ -63,8 +63,14 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
     : Number(sueltas || bultos || 0);
 
   const guardar = async () => {
-    if (totalUnidades <= 0) {
-      alert("La cantidad debe ser mayor a 0");
+    const cantidadInvalida =
+      tipo === "fijar" ? totalUnidades < 0 : totalUnidades <= 0;
+    if (cantidadInvalida) {
+      alert(
+        tipo === "fijar"
+          ? "La cantidad no puede ser negativa"
+          : "La cantidad debe ser mayor a 0"
+      );
       return;
     }
 
@@ -209,7 +215,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
             )}
 
             {/* Tipo */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-2 text-[13px] cursor-pointer">
                 <input
                   type="radio"
@@ -231,6 +237,17 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                   className="accent-cyan-500"
                 />
                 <span className="sunmi-text-strong">Restar</span>
+              </label>
+              <label className="flex items-center gap-2 text-[13px] cursor-pointer">
+                <input
+                  type="radio"
+                  name="tipo-ajuste"
+                  value="fijar"
+                  checked={tipo === "fijar"}
+                  onChange={() => setTipo("fijar")}
+                  className="accent-cyan-500"
+                />
+                <span className="sunmi-text-strong">Fijar stock real</span>
               </label>
             </div>
 

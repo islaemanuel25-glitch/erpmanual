@@ -164,8 +164,14 @@ export async function POST(req) {
       const actual = Number(stock.cantidad || 0);
       const cantidadReal = cantidad;
 
-      let nuevoStock =
-        tipo === "restar" ? actual - cantidadReal : actual + cantidadReal;
+      let nuevoStock;
+      if (tipo === "fijar") {
+        nuevoStock = cantidadReal;
+      } else if (tipo === "restar") {
+        nuevoStock = actual - cantidadReal;
+      } else {
+        nuevoStock = actual + cantidadReal;
+      }
 
       if (nuevoStock < 0 && !allowNegativeStock) nuevoStock = 0;
 
@@ -182,7 +188,12 @@ export async function POST(req) {
             localId,
             productoLocalId,
             userId: session.id,
-            accion: tipo === "restar" ? "AJUSTE_RESTAR" : "AJUSTE_SUMAR",
+            accion:
+              tipo === "fijar"
+                ? "AJUSTE_FIJAR"
+                : tipo === "restar"
+                ? "AJUSTE_RESTAR"
+                : "AJUSTE_SUMAR",
             cantidadAnterior: actual,
             cantidadNueva: nuevoStock,
             motivo: motivo || null,
