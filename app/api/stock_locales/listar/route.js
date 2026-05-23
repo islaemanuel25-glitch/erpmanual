@@ -80,7 +80,9 @@ export async function GET(req) {
       const rows = await prisma.productoLocal.findMany({
         where: {
           localId,
+          activo: true,
           base: {
+            activo: true,
             ...(q
               ? {
                   OR: [
@@ -202,6 +204,7 @@ export async function GET(req) {
       const bases = await prisma.productoBase.findMany({
         where: {
           grupoId: { in: grupoIds },
+          activo: true,
           ...(q
             ? {
                 OR: [
@@ -217,7 +220,7 @@ export async function GET(req) {
         orderBy: { id: "desc" },
         include: {
           locales: {
-            where: { localId },
+            where: { localId, activo: true },
             include: {
               stock: true,
               base: {
