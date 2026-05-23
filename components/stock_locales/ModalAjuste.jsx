@@ -123,13 +123,58 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
             {local.nombre}
           </p>
 
-          <p className="text-[13px] mt-2 px-3 py-2 rounded sunmi-surface-soft">
-            Stock actual: <strong className="sunmi-text-strong">
-              {unidadMedida === "kg"
-                ? `${Number(producto.stock || 0).toFixed(3)} kg`
-                : `${Math.round(Number(producto.stock || 0))} unidades`}
-            </strong>
-          </p>
+          {(() => {
+            const stockNum = Number(producto.stock || 0);
+            if (usarBultos) {
+              const presentacionLabel =
+                unidadMedida === "cajon"
+                  ? `Cajón x${factorPack}`
+                  : `Pack x${factorPack}`;
+              let stockActualLabel;
+              if (stockNum < 0) {
+                stockActualLabel = `${stockNum} uds`;
+              } else if (stockNum === 0) {
+                stockActualLabel = "0 uds";
+              } else {
+                const { bultos, sueltas } = fromUnidades({
+                  unidades: stockNum,
+                  factorPack,
+                });
+                if (bultos > 0 && sueltas > 0) {
+                  stockActualLabel = `${bultos} bultos + ${sueltas} uds`;
+                } else if (bultos > 0) {
+                  stockActualLabel = `${bultos} bultos`;
+                } else {
+                  stockActualLabel = `${sueltas} uds`;
+                }
+              }
+              return (
+                <div className="text-[13px] mt-2 px-3 py-2 rounded sunmi-surface-soft">
+                  <div className="text-[11px] sunmi-text-muted">
+                    Presentación:{" "}
+                    <span className="sunmi-text-strong">{presentacionLabel}</span>
+                  </div>
+                  <div>
+                    Stock actual:{" "}
+                    <strong className="sunmi-text-strong">{stockActualLabel}</strong>
+                  </div>
+                  <div className="text-[11px] sunmi-text-muted">
+                    Total: {stockNum} unidades
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <p className="text-[13px] mt-2 px-3 py-2 rounded sunmi-surface-soft">
+                Stock actual:{" "}
+                <strong className="sunmi-text-strong">
+                  {unidadMedida === "kg"
+                    ? `${stockNum.toFixed(3)} kg`
+                    : `${Math.round(stockNum)} unidades`}
+                </strong>
+              </p>
+            );
+          })()}
 
           {/* Inputs */}
           <div className="flex flex-col gap-3 mt-4">
