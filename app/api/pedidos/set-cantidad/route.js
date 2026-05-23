@@ -85,10 +85,18 @@ export async function POST(req) {
       );
     }
 
-    // Validar modo_envio: si BULTO, cantidad debe ser múltiplo de factorPack
+    // Validar modo_envio: si llega cantidad en UNIDAD y el producto sale por bulto,
+    // la cantidad debe ser múltiplo de factorPack. Si llega en BULTO, no aplica.
     const base = productoOrigen.base;
     const factorPack = Number(base?.factor_pack || 1);
-    if (cantidad > 0 && base?.modo_envio === "SOLO_BULTO" && factorPack > 1) {
+    const unidadIn = body.unidad === "BULTO" ? "BULTO" : "UNIDAD";
+
+    if (
+      unidadIn === "UNIDAD" &&
+      cantidad > 0 &&
+      base?.modo_envio === "SOLO_BULTO" &&
+      factorPack > 1
+    ) {
       if (cantidad % factorPack !== 0) {
         return NextResponse.json(
           { ok: false, error: `Este producto se pide por bulto completo (x${factorPack}).` },
@@ -97,8 +105,8 @@ export async function POST(req) {
       }
     }
 
-    // Local siempre pide en UNIDAD — el valor se guarda tal cual
-    const unidad = "UNIDAD";
+    // Se respeta la unidad recibida ("BULTO" o "UNIDAD"). Fallback a "UNIDAD".
+    const unidad = unidadIn;
 
     // Obtener/crear POS borrador para este par (depósito->local)
     const pos = await prisma.$transaction(async (tx) => {

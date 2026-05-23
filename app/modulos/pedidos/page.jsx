@@ -192,10 +192,22 @@ export default function PedidosCatalogoPage() {
         setCarritoItems(json.items || []);
         setPendiente(json.pendiente || null);
 
-        // Reconstruir mapa de cantidades (siempre en unidades)
+        // Reconstruir mapa de cantidades segun la unidad guardada del item.
+        // - Si unidadSugerida === "BULTO" → it.sugerido ya esta en bultos, leer tal cual.
+        // - Si unidadSugerida === "UNIDAD" y el producto sale por bulto (legacy):
+        //   convertir a bultos para que el frontend en bultoMode funcione coherente.
+        // - Si producto sale por unidad: it.sugerido en unidades, tal cual.
         const mapa = {};
         (json.items || []).forEach((it) => {
-          mapa[it.productoLocalId] = it.sugerido;
+          const isBultoMode = it.modoEnvio === "SOLO_BULTO" && it.factorPack > 1;
+          if (isBultoMode) {
+            mapa[it.productoLocalId] =
+              it.unidadSugerida === "BULTO"
+                ? it.sugerido
+                : Math.floor(it.sugerido / it.factorPack);
+          } else {
+            mapa[it.productoLocalId] = it.sugerido;
+          }
         });
         setCarrito(mapa);
       }
@@ -769,11 +781,11 @@ function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
         </div>
       </div>
 
-      {/* Info de bultos debajo */}
+      {/* Info de bultos debajo (cantidadActual ya esta en bultos cuando bultoMode) */}
       {bultoMode && cantidadActual > 0 && (
         <div className="mt-1 flex items-center justify-between">
           <span className="text-[10px] sunmi-text-muted">
-            = {cantidadActual} uds ({Math.floor(cantidadActual / factorPack)} {labelBulto.toLowerCase()}{cantidadActual / factorPack !== Math.floor(cantidadActual / factorPack) ? ` + ${cantidadActual % factorPack} sueltas` : ""})
+            = {cantidadActual * factorPack} uds totales
           </span>
           <button
             type="button"
@@ -806,7 +818,7 @@ function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = tru
     return (
       <button
         type="button"
-        onClick={() => onChange(bultoMode ? factorPack : 1, "UNIDAD")}
+        onClick={() => onChange(1, bultoMode ? "BULTO" : "UNIDAD")}
         className="
           h-[32px] px-3
           rounded-lg
@@ -820,15 +832,15 @@ function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = tru
     );
   }
 
-  // BULTO mode: +/- en bultos completos
+  // BULTO mode: +/- en bultos. totalActual ya representa bultos.
   if (bultoMode) {
-    const bultos = Math.floor(totalActual / factorPack);
+    const bultos = totalActual;
     return (
       <div className="flex items-center gap-1.5">
         <div className="flex items-center gap-0 sunmi-control rounded-lg border sunmi-border overflow-hidden">
           <button
             type="button"
-            onClick={() => onChange(Math.max(0, (bultos - 1)) * factorPack, "UNIDAD")}
+            onClick={() => onChange(Math.max(0, bultos - 1), "BULTO")}
             className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
           >
             -
@@ -838,7 +850,7 @@ function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = tru
           </div>
           <button
             type="button"
-            onClick={() => onChange((bultos + 1) * factorPack, "UNIDAD")}
+            onClick={() => onChange(bultos + 1, "BULTO")}
             className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
           >
             +
@@ -921,7 +933,7 @@ function CarritoItemCard({ item, totalActual, onSetCantidad }) {
         />
         {bultoMode && totalActual > 0 && (
           <span className="text-[10px] sunmi-text-muted ml-2">
-            = {totalActual} uds
+            = {totalActual * item.factorPack} uds totales
           </span>
         )}
       </div>
@@ -982,8 +994,13 @@ function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, c
       {verDetalle && pendiente.items?.length > 0 && (
         <div className="mt-3 space-y-1 border-t sunmi-divider pt-2">
           {pendiente.items.map((item, i) => {
-            const isBulto = item.modoEnvio === "SOLO_BULTO" && item.factorPack > 1;
-            const bultos = isBulto ? Math.floor(item.sugerido / item.factorPack) : 0;
+            const isBultoMode = item.modoEnvio === "SOLO_BULTO" && item.factorPack > 1;
+            const enBulto = item.unidadSugerida === "BULTO";
+            // bultos y uds segun como esta guardado el sugerido (compat legacy)
+            const bultos = enBulto
+              ? item.sugerido
+              : (isBultoMode ? Math.floor(item.sugerido / item.factorPack) : 0);
+            const uds = enBulto ? item.sugerido * item.factorPack : item.sugerido;
             return (
               <div
                 key={i}
@@ -991,8 +1008,8 @@ function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, c
               >
                 <span className="truncate flex-1 min-w-0">{item.nombre}</span>
                 <span className="ml-2 sunmi-text-accent font-medium whitespace-nowrap">
-                  {isBulto
-                    ? `${bultos} bulto${bultos !== 1 ? "s" : ""} (${item.sugerido} uds)`
+                  {isBultoMode
+                    ? `${bultos} bulto${bultos !== 1 ? "s" : ""} (${uds} uds)`
                     : `${item.sugerido} unidad${item.sugerido !== 1 ? "es" : ""}`}
                 </span>
               </div>
