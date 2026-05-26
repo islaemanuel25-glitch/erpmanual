@@ -4,6 +4,7 @@ import { mergeBaseLocalToUi, splitUiToDb } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 
 // Sincronizar precioCosto/activo a overrides, recalculando precio_venta por margen
 async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
@@ -116,6 +117,36 @@ export async function PUT(req, context) {
       );
     }
 
+    // Normalizar y validar códigos de barra (principal + secundario)
+    const norm = normalizarCodigosBarra({
+      codigoBarra: payload.codigo_barra,
+      codigoBarraSecundario: payload.codigo_barra_secundario,
+    });
+    if (!norm.ok) {
+      return NextResponse.json({ ok: false, error: norm.error }, { status: 400 });
+    }
+
+    // Resolver grupoId del producto para validar unicidad cruzada
+    const baseScope = await prisma.productoBase.findUnique({
+      where: { id: baseId },
+      select: { grupoId: true },
+    });
+    if (baseScope) {
+      const vUnic = await validarUnicidadCodigos({
+        prisma,
+        grupoId: baseScope.grupoId,
+        baseIdExcluir: baseId,
+        principal: norm.principal,
+        secundario: norm.secundario,
+      });
+      if (!vUnic.ok) {
+        return NextResponse.json({ ok: false, error: vUnic.error }, { status: 400 });
+      }
+    }
+
+    payload.codigo_barra = norm.principal;
+    payload.codigo_barra_secundario = norm.secundario;
+
     // separar base vs local con snake_case
     const { baseData, localData } = splitUiToDb(payload);
 
@@ -161,6 +192,7 @@ async function editarBase(baseId, baseData) {
     descripcion: baseData.descripcion,
     sku: baseData.sku,
     codigo_barra: baseData.codigo_barra,
+    codigo_barra_secundario: baseData.codigo_barra_secundario,
 
     unidad_medida: baseData.unidad_medida,
     factor_pack: baseData.factor_pack,
@@ -244,7 +276,8 @@ async function editarBase(baseId, baseData) {
       e.message?.includes("pesoEsFijo") ||
       e.message?.includes("modoVentaDeposito") ||
       e.message?.includes("pesoPromedioKg") ||
-      e.message?.includes("actualizaPromedioPorRecepcion")
+      e.message?.includes("actualizaPromedioPorRecepcion") ||
+      e.message?.includes("codigo_barra_secundario")
     ) {
       delete dataFinal.modo_envio;
       delete dataFinal.modo_stock;
@@ -254,6 +287,7 @@ async function editarBase(baseId, baseData) {
       delete dataFinal.modoVentaDeposito;
       delete dataFinal.pesoPromedioKg;
       delete dataFinal.actualizaPromedioPorRecepcion;
+      delete dataFinal.codigo_barra_secundario;
       updated = await prisma.productoBase.update({
         where: { id: baseId },
         data: dataFinal,

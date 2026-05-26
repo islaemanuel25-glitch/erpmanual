@@ -29,7 +29,7 @@ function parseVoiceCodigoBarra(text) {
    FOCUS ORDER — Enter avanza al siguiente campo
    ============================================================ */
 const FOCUS_ORDER = [
-  "nombre", "codigo_barra", "sku", "descripcion",
+  "nombre", "codigo_barra", "codigo_barra_secundario", "sku", "descripcion",
   "categoria_id", "area_fisica_id",
   "proveedor_id", "proveedor2_id", "proveedor3_id",
   "unidad_medida", "factor_pack", "peso_kg", "volumen_ml",
@@ -76,6 +76,7 @@ export default function FormProducto({
     descripcion: o.descripcion ?? "",
     sku: o.sku ?? "",
     codigo_barra: o.codigo_barra ?? o.codigoBarra ?? "",
+    codigo_barra_secundario: o.codigo_barra_secundario ?? o.codigoBarraSecundario ?? "",
     categoria_id: o.categoria_id ?? o.categoriaId ?? "",
     proveedor_id: o.proveedor_id ?? o.proveedorId ?? "",
     proveedor2_id: o.proveedor2_id ?? o.proveedor2Id ?? "",
@@ -275,6 +276,7 @@ export default function FormProducto({
       descripcion: p.descripcion || null,
       sku: p.sku || null,
       codigo_barra: p.codigo_barra || null,
+      codigo_barra_secundario: p.codigo_barra_secundario || null,
       categoria_id: p.categoria_id ? Number(p.categoria_id) : null,
       proveedor_id: p.proveedor_id ? Number(p.proveedor_id) : null,
       proveedor2_id: p.proveedor2_id ? Number(p.proveedor2_id) : null,
@@ -392,6 +394,16 @@ export default function FormProducto({
                   />
                 )}
               </div>
+            </Field>
+
+            <Field label="Código barras secundario" fieldKey="codigo_barra_secundario">
+              <SunmiInput
+                value={form.codigo_barra_secundario}
+                onChange={(e) => setField("codigo_barra_secundario", e.target.value)}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Opcional. Identifica al mismo producto que el principal.
+              </p>
             </Field>
 
             <Field label="SKU" fieldKey="sku">

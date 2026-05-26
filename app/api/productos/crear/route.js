@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getGrupoIdDeLocal, getLocalesDeGrupo } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 
 // Validar modo_pedido según unidad_medida y factor_pack
 function validarModoPedido(modoPedido, unidadMedida, factorPack) {
@@ -70,14 +71,35 @@ export async function POST(req) {
       select: { es_deposito: true },
     });
 
-    // 3) Armar baseData
+    // 3.bis) Normalizar y validar códigos de barra (principal + secundario)
+    const norm = normalizarCodigosBarra({
+      codigoBarra: body.codigo_barra,
+      codigoBarraSecundario: body.codigo_barra_secundario,
+    });
+    if (!norm.ok) {
+      return NextResponse.json({ ok: false, error: norm.error }, { status: 400 });
+    }
+
+    const vUnic = await validarUnicidadCodigos({
+      prisma,
+      grupoId,
+      baseIdExcluir: null,
+      principal: norm.principal,
+      secundario: norm.secundario,
+    });
+    if (!vUnic.ok) {
+      return NextResponse.json({ ok: false, error: vUnic.error }, { status: 400 });
+    }
+
+    // 4) Armar baseData
     const baseData = {
       grupoId,
       creadoEnLocalId: localId,
       nombre: body.nombre,
       descripcion: body.descripcion || null,
       sku: body.sku || null,
-      codigo_barra: body.codigo_barra || null,
+      codigo_barra: norm.principal,
+      codigo_barra_secundario: norm.secundario,
 
       categoria_id: num(body.categoria_id),
       proveedor_id: num(body.proveedor_id),
@@ -152,7 +174,8 @@ export async function POST(req) {
           e.message?.includes("pesoEsFijo") ||
           e.message?.includes("modoVentaDeposito") ||
           e.message?.includes("pesoPromedioKg") ||
-          e.message?.includes("actualizaPromedioPorRecepcion")
+          e.message?.includes("actualizaPromedioPorRecepcion") ||
+          e.message?.includes("codigo_barra_secundario")
         ) {
           const fallback = { ...baseData };
           delete fallback.modo_envio;
@@ -163,6 +186,7 @@ export async function POST(req) {
           delete fallback.modoVentaDeposito;
           delete fallback.pesoPromedioKg;
           delete fallback.actualizaPromedioPorRecepcion;
+          delete fallback.codigo_barra_secundario;
           base = await tx.productoBase.create({ data: fallback });
         } else {
           throw e;

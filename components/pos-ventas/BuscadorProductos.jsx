@@ -33,7 +33,8 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
       const scoreOf = (p) => {
         const nombre = (p.nombre || "").toLowerCase();
         const codigo = (p.codigoBarra || "").toLowerCase();
-        if (codigo === q) return 0; // código exacto
+        const codigoSec = (p.codigoBarraSecundario || "").toLowerCase();
+        if (codigo === q || codigoSec === q) return 0; // código exacto (primario o secundario)
         if (nombre === q) return 1; // nombre exacto
         if (nombre.startsWith(q)) return 2; // nombre empieza con
         // alguna palabra del nombre empieza con q
@@ -72,12 +73,15 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
             fromVoice && data.queryInterpretada ? data.queryInterpretada : null
           );
 
-          // Auto-agregar si match exacto por código de barras (1 resultado con código idéntico)
-          if (
+          // Auto-agregar si match exacto por código de barras (primario o secundario)
+          const queryLower = texto.trim().toLowerCase();
+          const matchCodigoExacto =
             items.length >= 1 &&
-            items[0].codigoBarra &&
-            items[0].codigoBarra.toLowerCase() === texto.trim().toLowerCase()
-          ) {
+            ((items[0].codigoBarra &&
+              items[0].codigoBarra.toLowerCase() === queryLower) ||
+              (items[0].codigoBarraSecundario &&
+                items[0].codigoBarraSecundario.toLowerCase() === queryLower));
+          if (matchCodigoExacto) {
             if (items[0].disponibleParaVenta === false) {
               showError(SIN_STOCK_MSG);
               setResultados(items);

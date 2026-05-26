@@ -176,6 +176,7 @@ model ProductoBase {
   descripcion       String?
   sku               String?
   codigo_barra      String?
+  codigo_barra_secundario String?
   categoria_id      Int?
   proveedor_id      Int?
   proveedor2_id     Int?
@@ -223,6 +224,7 @@ model ProductoBase {
 
   @@unique([grupoId, codigo_barra])
   @@index([grupoId])
+  @@index([grupoId, codigo_barra_secundario])
   @@index([creadoEnLocalId])
   @@index([categoria_id])
   @@index([proveedor_id])
