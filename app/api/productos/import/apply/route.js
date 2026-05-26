@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal, getLocalesDeGrupo, inheritDepositoProductsToLocal } from "@/lib/grupos";
 import { getContextoActivo } from "@/lib/contexto";
+import { validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 
 const CHUNK_SIZE = 50;
 
@@ -100,11 +101,22 @@ export async function POST(req) {
             const esPack = unidadMedida === "pack" || unidadMedida === "cajon";
             const fp = p.factor_pack && p.factor_pack > 1 ? p.factor_pack : null;
 
+            // Defensa: el estado pudo cambiar entre preview y apply.
+            const v = await validarUnicidadCodigos({
+              prisma: tx,
+              grupoId,
+              baseIdExcluir: null,
+              principal: p.codigo_barra || null,
+              secundario: p.codigo_barra_secundario || null,
+            });
+            if (!v.ok) throw new Error(v.error);
+
             const baseData = {
               grupoId,
               creadoEnLocalId: localId,
               nombre: p.nombre,
               codigo_barra: p.codigo_barra || null,
+              codigo_barra_secundario: p.codigo_barra_secundario || null,
               unidad_medida: unidadMedida,
               factor_pack: fp,
               precio_costo: p.precio_costo,
@@ -175,12 +187,23 @@ export async function POST(req) {
           }
 
           await prisma.$transaction(async (tx) => {
+            // Defensa: el estado pudo cambiar entre preview y apply.
+            const v = await validarUnicidadCodigos({
+              prisma: tx,
+              grupoId,
+              baseIdExcluir: p.productoBaseId,
+              principal: p.codigo_barra || null,
+              secundario: p.codigo_barra_secundario || null,
+            });
+            if (!v.ok) throw new Error(v.error);
+
             const updateData = {
               nombre: p.nombre,
               unidad_medida: p.unidad_medida || "unidad",
               precio_costo: p.precio_costo,
               precio_venta: p.precio_venta,
               activo: p.activo !== false,
+              codigo_barra_secundario: p.codigo_barra_secundario || null,
             };
 
             if (p.factor_pack) updateData.factor_pack = p.factor_pack;

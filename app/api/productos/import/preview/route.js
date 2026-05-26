@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { getContextoActivo } from "@/lib/contexto";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { normalizarCodigosBarra } from "@/lib/productos/validarCodigosBarra";
 
 const UNIDADES_VALIDAS = ["unidad", "pack", "cajon", "kg"];
 
@@ -145,17 +146,21 @@ export async function POST(req) {
     const areaMap = new Map(areas.map((a) => [a.nombre.toLowerCase().trim(), a.id]));
 
     // ══════════════════════════════════════════════════════
-    // 2. Cargar productos existentes del grupo por codigo_barra
+    // 2. Cargar productos existentes del grupo (por principal y secundario)
     // ══════════════════════════════════════════════════════
     const existentes = await prisma.productoBase.findMany({
       where: { grupoId },
-      select: { id: true, codigo_barra: true, nombre: true },
+      select: { id: true, codigo_barra: true, codigo_barra_secundario: true, nombre: true },
     });
 
-    const existentesPorCodigo = new Map();
+    const existentesPorPrincipal = new Map();
+    const existentesPorSecundario = new Map();
     for (const p of existentes) {
       if (p.codigo_barra) {
-        existentesPorCodigo.set(p.codigo_barra.trim(), p);
+        existentesPorPrincipal.set(p.codigo_barra.trim(), p);
+      }
+      if (p.codigo_barra_secundario) {
+        existentesPorSecundario.set(p.codigo_barra_secundario.trim(), p);
       }
     }
 
@@ -174,7 +179,16 @@ export async function POST(req) {
       const erroresArr = [];
 
       // ── Normalizar campos ──
-      const codigoBarra = normStr(row.codigo_barra);
+      const codigoBarraRaw = normStr(row.codigo_barra);
+      const codigoBarraSecundarioRaw = normStr(row.codigo_barra_secundario);
+      const normCB = normalizarCodigosBarra({
+        codigoBarra: codigoBarraRaw,
+        codigoBarraSecundario: codigoBarraSecundarioRaw,
+      });
+      // Si secundario sin principal → error del helper; igualmente el chequeo de
+      // obligatoriedad de codigo_barra (abajo) cubre el caso.
+      const codigoBarra = normCB.principal ?? codigoBarraRaw;
+      const codigoBarraSecundario = normCB.ok ? normCB.secundario : null;
       const nombre = normStr(row.nombre);
       const unidadMedida = normLower(row.unidad_medida) || "unidad";
       const precioCosto = parsePrecio(row.precio_costo);
@@ -183,6 +197,11 @@ export async function POST(req) {
       const margenRaw = row.margen != null && row.margen !== "" ? parsePrecio(row.margen) : null;
       const stockActual = row.stock_inicial != null && row.stock_inicial !== "" ? Number(row.stock_inicial) : 0;
       const activo = parseBool(row.activo);
+
+      // ── Normalización de códigos de barras (par principal/secundario) ──
+      if (!normCB.ok) {
+        erroresArr.push({ field: "codigo_barra_secundario", message: normCB.error });
+      }
 
       // ── Campos obligatorios ──
       if (!codigoBarra) {
@@ -210,11 +229,28 @@ export async function POST(req) {
         erroresArr.push({ field: "margen", message: "debe ser >= 0" });
       }
 
-      // ── Deduplicación intra-archivo ──
-      if (codigoBarra && codigosVistos.has(codigoBarra)) {
-        erroresArr.push({ field: "codigo_barra", message: `duplicado (ya en fila ${codigosVistos.get(codigoBarra)})` });
-      } else if (codigoBarra) {
-        codigosVistos.set(codigoBarra, fila);
+      // ── Deduplicación intra-archivo (cubre principal y secundario) ──
+      if (codigoBarra) {
+        if (codigosVistos.has(codigoBarra)) {
+          const prev = codigosVistos.get(codigoBarra);
+          erroresArr.push({
+            field: "codigo_barra",
+            message: `duplicado (ya cargado como ${prev.tipo} en fila ${prev.fila})`,
+          });
+        } else {
+          codigosVistos.set(codigoBarra, { fila, tipo: "principal" });
+        }
+      }
+      if (codigoBarraSecundario) {
+        if (codigosVistos.has(codigoBarraSecundario)) {
+          const prev = codigosVistos.get(codigoBarraSecundario);
+          erroresArr.push({
+            field: "codigo_barra_secundario",
+            message: `duplicado (ya cargado como ${prev.tipo} en fila ${prev.fila})`,
+          });
+        } else {
+          codigosVistos.set(codigoBarraSecundario, { fila, tipo: "secundario" });
+        }
       }
 
       // ── Resolver catálogos por nombre ──
@@ -245,8 +281,39 @@ export async function POST(req) {
         }
       }
 
-      // ── Buscar existente en DB por codigo_barra ──
-      const existente = codigoBarra ? existentesPorCodigo.get(codigoBarra) : null;
+      // ── Buscar existente en DB por codigo_barra (principal identifica al producto) ──
+      const existente = codigoBarra ? existentesPorPrincipal.get(codigoBarra) : null;
+      const existenteId = existente?.id ?? null;
+
+      // ── Conflictos cruzados contra productos existentes del grupo ──
+      // 1) principal de la fila == secundario de OTRO producto
+      if (codigoBarra) {
+        const conflicto = existentesPorSecundario.get(codigoBarra);
+        if (conflicto && conflicto.id !== existenteId) {
+          erroresArr.push({
+            field: "codigo_barra",
+            message: `ya está usado como secundario de "${conflicto.nombre}" (id ${conflicto.id})`,
+          });
+        }
+      }
+      // 2) secundario de la fila == principal de OTRO producto
+      if (codigoBarraSecundario) {
+        const conflictoP = existentesPorPrincipal.get(codigoBarraSecundario);
+        if (conflictoP && conflictoP.id !== existenteId) {
+          erroresArr.push({
+            field: "codigo_barra_secundario",
+            message: `ya está usado como principal de "${conflictoP.nombre}" (id ${conflictoP.id})`,
+          });
+        }
+        // 3) secundario de la fila == secundario de OTRO producto
+        const conflictoS = existentesPorSecundario.get(codigoBarraSecundario);
+        if (conflictoS && conflictoS.id !== existenteId) {
+          erroresArr.push({
+            field: "codigo_barra_secundario",
+            message: `ya está usado como secundario de "${conflictoS.nombre}" (id ${conflictoS.id})`,
+          });
+        }
+      }
 
       // ── Clasificar acción según modo ──
       let accion = "error";
@@ -296,6 +363,7 @@ export async function POST(req) {
         erroresDetalle: erroresArr.length > 0 ? erroresArr : null,
         productoBaseId: existente?.id || null,
         codigo_barra: codigoBarra,
+        codigo_barra_secundario: codigoBarraSecundario,
         nombre,
         unidad_medida: unidadMedida,
         factor_pack: fp,

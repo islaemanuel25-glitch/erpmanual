@@ -7,6 +7,7 @@ const path = require("path");
 
 const headers = [
   "codigo_barra",
+  "codigo_barra_secundario",
   "nombre",
   "unidad_medida",
   "factor_pack",
@@ -22,6 +23,7 @@ const headers = [
 
 const ejemplo = {
   codigo_barra: "7790001000101",
+  codigo_barra_secundario: "7790001000102",
   nombre: "Coca Cola 500ml",
   unidad_medida: "pack",
   factor_pack: 6,
@@ -40,6 +42,7 @@ const ws = XLSX.utils.json_to_sheet([ejemplo], { header: headers });
 // Anchos de columna
 ws["!cols"] = [
   { wch: 16 }, // codigo_barra
+  { wch: 20 }, // codigo_barra_secundario
   { wch: 30 }, // nombre
   { wch: 14 }, // unidad_medida
   { wch: 12 }, // factor_pack

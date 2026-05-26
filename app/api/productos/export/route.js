@@ -91,6 +91,7 @@ export async function POST(req) {
         filas.push({
           id: p.id,
           codigo_barra: p.codigo_barra || "",
+          codigo_barra_secundario: p.codigo_barra_secundario || "",
           nombre: loc.nombre || p.nombre,
           categoria: p.categoria?.nombre || "",
           proveedor: p.proveedor?.nombre || "",
@@ -135,6 +136,7 @@ export async function POST(req) {
         filas.push({
           id: p.id,
           codigo_barra: p.codigo_barra || "",
+          codigo_barra_secundario: p.codigo_barra_secundario || "",
           nombre: p.nombre,
           categoria: p.categoria?.nombre || "",
           proveedor: p.proveedor?.nombre || "",
@@ -164,6 +166,7 @@ export async function POST(req) {
     ws["!cols"] = [
       { wch: 6 },   // id
       { wch: 16 },  // codigo_barra
+      { wch: 20 },  // codigo_barra_secundario
       { wch: 35 },  // nombre
       { wch: 15 },  // categoria
       { wch: 18 },  // proveedor
