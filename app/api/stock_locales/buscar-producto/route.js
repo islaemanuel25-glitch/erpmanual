@@ -61,12 +61,18 @@ export async function GET(req) {
     });
     const esDeposito = local?.es_deposito === true;
 
-    // Match exacto por código de barras
+    // Match exacto por código de barras (primario o secundario)
     const exacto = await prisma.productoLocal.findMany({
       where: {
         localId,
         activo: true,
-        base: { codigo_barra: q, activo: true },
+        base: {
+          activo: true,
+          OR: [
+            { codigo_barra: q },
+            { codigo_barra_secundario: q },
+          ],
+        },
       },
       include: {
         base: true,
@@ -88,13 +94,13 @@ export async function GET(req) {
       select: {
         id: true,
         nombre: true,
-        base: { select: { nombre: true, codigo_barra: true } },
+        base: { select: { nombre: true, codigo_barra: true, codigo_barra_secundario: true } },
       },
       take: FUZZY_CANDIDATE_LIMIT,
     });
 
     const getNombre = (p) => p.nombre || p.base?.nombre || "";
-    const getCodigo = (p) => p.base?.codigo_barra || null;
+    const getCodigo = (p) => [p.base?.codigo_barra, p.base?.codigo_barra_secundario].filter(Boolean);
 
     let rankings;
     let queryInterpretada = null;
@@ -192,6 +198,7 @@ function mapProductos(lista, esDeposito) {
       productoLocalId: pl.id,
       nombre: pl.nombre || pl.base?.nombre || "",
       codigoBarra: pl.base?.codigo_barra || "",
+      codigoBarraSecundario: pl.base?.codigo_barra_secundario || "",
       precioVenta: Number(precioVenta.toFixed(2)),
       precioVentaUnitario,
       precioVentaBulto,

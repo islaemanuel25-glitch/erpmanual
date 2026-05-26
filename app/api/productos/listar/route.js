@@ -124,7 +124,7 @@ export async function GET(req) {
         : []),
     ];
 
-    // Busqueda: prioridad a match exacto por codigo_barra/sku (alineado con POS)
+    // Busqueda: prioridad a match exacto por codigo_barra/codigo_barra_secundario/sku (alineado con POS)
     let searchFilter = {};
     if (q) {
       const exactCount = await prisma.productoBase.count({
@@ -133,6 +133,7 @@ export async function GET(req) {
             ...baseFilters,
             { OR: [
               { codigo_barra: { equals: q, mode: "insensitive" } },
+              { codigo_barra_secundario: { equals: q, mode: "insensitive" } },
               { sku: { equals: q, mode: "insensitive" } },
             ] },
           ],
@@ -142,11 +143,13 @@ export async function GET(req) {
       searchFilter = exactCount > 0
         ? { OR: [
             { codigo_barra: { equals: q, mode: "insensitive" } },
+            { codigo_barra_secundario: { equals: q, mode: "insensitive" } },
             { sku: { equals: q, mode: "insensitive" } },
           ] }
         : { OR: [
             { nombre: { contains: q, mode: "insensitive" } },
             { codigo_barra: { contains: q, mode: "insensitive" } },
+            { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
             { sku: { contains: q, mode: "insensitive" } },
           ] };
     }

@@ -88,6 +88,7 @@ export async function GET(req) {
                   OR: [
                     { nombre: { contains: q, mode: "insensitive" } },
                     { codigo_barra: { contains: q, mode: "insensitive" } },
+                    { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
                   ],
                 }
               : {}),
@@ -210,6 +211,7 @@ export async function GET(req) {
                 OR: [
                   { nombre: { contains: q, mode: "insensitive" } },
                   { codigo_barra: { contains: q, mode: "insensitive" } },
+                  { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
                 ],
               }
             : {}),
