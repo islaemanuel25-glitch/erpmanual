@@ -18,6 +18,7 @@ function mapItem(productoLocal) {
     baseId: productoLocal.baseId,
     nombre: productoLocal.nombre || base?.nombre || "",
     codigoBarra: base?.codigo_barra || "",
+    codigoBarraSecundario: base?.codigo_barra_secundario || "",
     stockActual,
     precioCosto: Number(
       productoLocal.precio_costo || base?.precio_costo || 0
@@ -88,13 +89,13 @@ export async function GET(req) {
       select: {
         id: true,
         nombre: true,
-        base: { select: { nombre: true, codigo_barra: true } },
+        base: { select: { nombre: true, codigo_barra: true, codigo_barra_secundario: true } },
       },
       take: FUZZY_CANDIDATE_LIMIT,
     });
 
     const getNombre = (p) => p.nombre || p.base?.nombre || "";
-    const getCodigo = (p) => p.base?.codigo_barra || null;
+    const getCodigo = (p) => [p.base?.codigo_barra, p.base?.codigo_barra_secundario].filter(Boolean);
 
     let rankings;
     let queryInterpretada = null;

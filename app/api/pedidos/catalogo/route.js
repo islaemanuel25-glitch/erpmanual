@@ -86,6 +86,7 @@ export async function GET(req) {
                 OR: [
                   { nombre: { contains: q, mode: "insensitive" } },
                   { codigo_barra: { contains: q, mode: "insensitive" } },
+                  { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
                   { sku: { contains: q, mode: "insensitive" } },
                 ],
               }
@@ -127,6 +128,7 @@ export async function GET(req) {
         baseId: pl.baseId,
         nombre: pl.nombre || base?.nombre || "",
         codigoBarra: base?.codigo_barra || null,
+        codigoBarraSecundario: base?.codigo_barra_secundario || null,
         sku: base?.sku || null,
         imagenUrl: base?.imagen_url || null,
         precioCosto: Number(pl.precio_costo || base?.precio_costo || 0),

@@ -63,6 +63,7 @@ export async function GET(req) {
             { nombre: { contains: search, mode: "insensitive" } },
             { sku: { contains: search, mode: "insensitive" } },
             { codigo_barra: { contains: search, mode: "insensitive" } },
+            { codigo_barra_secundario: { contains: search, mode: "insensitive" } },
           ],
         },
       ];
@@ -81,6 +82,7 @@ export async function GET(req) {
             nombre: true,
             sku: true,
             codigo_barra: true,
+            codigo_barra_secundario: true,
             unidad_medida: true,
             factor_pack: true,
             modo_pedido: true,
@@ -155,6 +157,7 @@ export async function GET(req) {
         nombre: pl.base.nombre,
         sku: pl.base.sku,
         codigo_barra: pl.base.codigo_barra,
+        codigo_barra_secundario: pl.base.codigo_barra_secundario || null,
         unidad_medida: pl.base.unidad_medida,
         factor_pack: factorPack,
         modoCompra,
