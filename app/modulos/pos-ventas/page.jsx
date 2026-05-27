@@ -59,6 +59,10 @@ export default function PosVentasPage() {
   const [datosPagoEfectivo, setDatosPagoEfectivo] = useState(null); // { pagaCon, vuelto }
   const [puntosActivo, setPuntosActivo] = useState(false);
   const [puntosConfig, setPuntosConfig] = useState(null);
+  const [posVentasConfig, setPosVentasConfig] = useState({
+    exigirClienteVentasDeposito: false,
+    exigirClienteVentasLocal: false,
+  });
   
   // Estado offline
   const [offlineMode, setOfflineMode] = useState(false);
@@ -123,6 +127,25 @@ export default function PosVentasPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.ok) setComisiones(data.comisiones);
+      })
+      .catch(() => {});
+  }, [localActual]);
+
+  // ---------------------------------------------------------------------------
+  // Cargar config "cliente obligatorio" del POS (feedback preventivo;
+  // la autoridad final es el backend en /api/pos-ventas/crear).
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!localActual) return;
+    fetch("/api/config/pos-ventas-cliente", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok) {
+          setPosVentasConfig({
+            exigirClienteVentasDeposito: data.exigirClienteVentasDeposito ?? false,
+            exigirClienteVentasLocal: data.exigirClienteVentasLocal ?? false,
+          });
+        }
       })
       .catch(() => {});
   }, [localActual]);
@@ -589,6 +612,20 @@ export default function PosVentasPage() {
       const msg = "Faltan datos para guardar venta pendiente.";
       setErrorMsg(msg);
       showError(msg);
+      return;
+    }
+
+    // Gate "cliente obligatorio" también en offline (consistente con online).
+    const exigirCliente = contexto?.esDeposito
+      ? posVentasConfig.exigirClienteVentasDeposito
+      : posVentasConfig.exigirClienteVentasLocal;
+    if (exigirCliente && !state.clienteSeleccionado?.id) {
+      const msg = contexto?.esDeposito
+        ? "Este depósito exige cliente para cerrar la venta."
+        : "Este local exige cliente para cerrar la venta.";
+      setErrorMsg(msg);
+      showError(msg);
+      setMostrarPickerCliente(true);
       return;
     }
 
@@ -1081,6 +1118,20 @@ export default function PosVentasPage() {
       const msg = `Cantidad invalida en "${itemInvalido.nombre}". Revisa el carrito.`;
       setErrorMsg(msg);
       showError(msg);
+      return;
+    }
+
+    // Gate "cliente obligatorio" (preventivo; el backend valida igual).
+    const exigirCliente = contexto?.esDeposito
+      ? posVentasConfig.exigirClienteVentasDeposito
+      : posVentasConfig.exigirClienteVentasLocal;
+    if (exigirCliente && !state.clienteSeleccionado?.id) {
+      const msg = contexto?.esDeposito
+        ? "Este depósito exige cliente para cerrar la venta."
+        : "Este local exige cliente para cerrar la venta.";
+      setErrorMsg(msg);
+      showError(msg);
+      setMostrarPickerCliente(true);
       return;
     }
 

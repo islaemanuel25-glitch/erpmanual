@@ -131,6 +131,33 @@ export async function POST(req) {
       );
     }
 
+    // Gate "cliente obligatorio" según contexto + config del grupo.
+    // Se evalúa antes de la regla de fiado para mensaje más específico.
+    if (!clienteId) {
+      const [localCtx, configGrupo] = await Promise.all([
+        prisma.local.findUnique({ where: { id: localId }, select: { es_deposito: true } }),
+        prisma.configuracionGrupo.findUnique({
+          where: { grupoId },
+          select: { exigirClienteVentasDeposito: true, exigirClienteVentasLocal: true },
+        }),
+      ]);
+      const esDeposito = localCtx?.es_deposito === true;
+      const exigir = esDeposito
+        ? configGrupo?.exigirClienteVentasDeposito === true
+        : configGrupo?.exigirClienteVentasLocal === true;
+      if (exigir) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: esDeposito
+              ? "Este depósito exige cliente para cerrar la venta."
+              : "Este local exige cliente para cerrar la venta.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     if (esFiado && !clienteId) {
       return NextResponse.json(
         { ok: false, error: "Venta fiado requiere un cliente seleccionado" },

@@ -864,16 +864,18 @@ model PedidoProveedorDetalle {
 // ---------------------------------------------------------------------------
 
 model ConfiguracionGrupo {
-  id                        Int      @id @default(autoincrement())
-  grupoId                   Int      @unique
-  allowNegativeStock        Boolean  @default(false)
-  requireMotivoAjusteStock  Boolean  @default(false)
-  requireMotivoLimitesStock Boolean  @default(false)
-  comisionDebito            Decimal  @default(7) @db.Decimal(5, 2)
-  comisionCredito           Decimal  @default(7) @db.Decimal(5, 2)
-  comisionMercadopago       Decimal  @default(7) @db.Decimal(5, 2)
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                            Int      @id @default(autoincrement())
+  grupoId                       Int      @unique
+  allowNegativeStock            Boolean  @default(false)
+  requireMotivoAjusteStock      Boolean  @default(false)
+  requireMotivoLimitesStock     Boolean  @default(false)
+  exigirClienteVentasDeposito   Boolean  @default(false)
+  exigirClienteVentasLocal      Boolean  @default(false)
+  comisionDebito                Decimal  @default(7) @db.Decimal(5, 2)
+  comisionCredito               Decimal  @default(7) @db.Decimal(5, 2)
+  comisionMercadopago           Decimal  @default(7) @db.Decimal(5, 2)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
 
   grupo Grupo @relation(fields: [grupoId], references: [id], onDelete: Cascade)
 

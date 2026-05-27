@@ -5,7 +5,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { Palette, PackageOpen, Receipt, Wrench, Tags } from "lucide-react";
+import { Palette, PackageOpen, Receipt, Wrench, Tags, ShoppingCart } from "lucide-react";
 
 const SECCIONES = [
   {
@@ -19,6 +19,12 @@ const SECCIONES = [
     href: "/modulos/configuracion/stock",
     icon: PackageOpen,
     descripcion: "Permitir vender sin stock (modo carga inicial).",
+  },
+  {
+    label: "POS Ventas",
+    href: "/modulos/configuracion/pos-ventas",
+    icon: ShoppingCart,
+    descripcion: "Reglas de cierre de venta del POS (cliente obligatorio).",
   },
   {
     label: "Editor de Ticket",
