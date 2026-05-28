@@ -165,11 +165,6 @@ export default function SunmiSelectAdv({
             return (
               <div
                 key={idx}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handlePick(val);
-                }}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
