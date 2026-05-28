@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback, memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { showError } from "@/components/sunmi/SunmiToast";
+import { Search } from "lucide-react";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
 const SIN_STOCK_MSG = "Producto sin stock disponible";
 
@@ -253,6 +254,11 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
     <SunmiCard className="p-2 lg:p-3">
       {/* Input con boton de voz */}
       <div className="relative">
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+          style={{ color: "var(--pos-link)" }}
+        />
         <SunmiInput
           ref={inputRef}
           id="buscar-producto"
@@ -261,7 +267,8 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
           value={query}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          className={`w-full text-base min-h-12 lg:min-h-10 !py-2 ${soportaVoz ? "!pr-12" : ""}`}
+          className={`w-full text-base min-h-12 lg:min-h-10 !py-2 !pl-9 !border-2 pulse-neon ${soportaVoz ? "!pr-12" : ""}`}
+          style={{ borderColor: "var(--pos-link)" }}
           autoFocus
         />
         {soportaVoz && (
