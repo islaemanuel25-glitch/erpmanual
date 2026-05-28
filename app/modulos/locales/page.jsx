@@ -18,7 +18,7 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Search } from "lucide-react";
 
 import ModalLocal from "@/components/locales/ModalLocal";
 
@@ -227,21 +227,36 @@ export default function LocalesPage() {
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-col md:flex-row gap-3 flex-1">
-            <SunmiInput
-              placeholder="Buscar local..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="flex-1 relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: "var(--pos-link)" }}
+              />
+              <SunmiInput
+                placeholder="Buscar local..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="!pl-9 !border-2 pulse-neon"
+                style={{ borderColor: "var(--pos-link)" }}
+              />
+            </div>
 
-            <SunmiSelectAdv value={activoFiltro} onChange={setActivoFiltro}>
-              <SunmiSelectOption value="">Estado…</SunmiSelectOption>
-              <SunmiSelectOption value="activo">Activo</SunmiSelectOption>
-              <SunmiSelectOption value="inactivo">Inactivo</SunmiSelectOption>
-            </SunmiSelectAdv>
+            <div className="w-full md:w-44 md:shrink-0">
+              <SunmiSelectAdv
+                value={activoFiltro}
+                onChange={setActivoFiltro}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+              >
+                <SunmiSelectOption value="">Estado…</SunmiSelectOption>
+                <SunmiSelectOption value="activo">Activo</SunmiSelectOption>
+                <SunmiSelectOption value="inactivo">Inactivo</SunmiSelectOption>
+              </SunmiSelectAdv>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <SunmiButton onClick={limpiarFiltros} color="slate">
+          <div className="flex gap-2 md:shrink-0">
+            <SunmiButton onClick={limpiarFiltros} color="slate" className="!border !border-[var(--pos-link)]">
               Limpiar
             </SunmiButton>
 

@@ -19,7 +19,7 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Search } from "lucide-react";
 
 import ModalUsuario from "@/components/usuarios/ModalUsuario";
 
@@ -246,33 +246,54 @@ export default function UsuariosPage() {
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex flex-col md:flex-row gap-3 flex-1">
-            <SunmiInput
-              placeholder="Buscar usuario..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="flex-1 relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: "var(--pos-link)" }}
+              />
+              <SunmiInput
+                placeholder="Buscar usuario..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="!pl-9 !border-2 pulse-neon"
+                style={{ borderColor: "var(--pos-link)" }}
+              />
+            </div>
 
-            <SunmiSelectAdv value={rolFiltro} onChange={setRolFiltro}>
-              <SunmiSelectOption value="">Rol…</SunmiSelectOption>
-              {roles.map((r) => (
-                <SunmiSelectOption key={r.id} value={r.id}>
-                  {r.nombre}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
+            <div className="w-full md:w-44 md:shrink-0">
+              <SunmiSelectAdv
+                value={rolFiltro}
+                onChange={setRolFiltro}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+              >
+                <SunmiSelectOption value="">Rol…</SunmiSelectOption>
+                {roles.map((r) => (
+                  <SunmiSelectOption key={r.id} value={r.id}>
+                    {r.nombre}
+                  </SunmiSelectOption>
+                ))}
+              </SunmiSelectAdv>
+            </div>
 
-            <SunmiSelectAdv value={localFiltro} onChange={setLocalFiltro}>
-              <SunmiSelectOption value="">Local…</SunmiSelectOption>
-              {locales.map((l) => (
-                <SunmiSelectOption key={l.id} value={l.id}>
-                  {l.nombre}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
+            <div className="w-full md:w-44 md:shrink-0">
+              <SunmiSelectAdv
+                value={localFiltro}
+                onChange={setLocalFiltro}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+              >
+                <SunmiSelectOption value="">Local…</SunmiSelectOption>
+                {locales.map((l) => (
+                  <SunmiSelectOption key={l.id} value={l.id}>
+                    {l.nombre}
+                  </SunmiSelectOption>
+                ))}
+              </SunmiSelectAdv>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <SunmiButton onClick={limpiarFiltros} color="slate">
+          <div className="flex gap-2 md:shrink-0">
+            <SunmiButton onClick={limpiarFiltros} color="slate" className="!border !border-[var(--pos-link)]">
               Limpiar
             </SunmiButton>
 

@@ -6,6 +6,7 @@ import SunmiSelectAdv, {
 } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { Search } from "lucide-react";
 
 export default function FiltrosStock({
   localSeleccionado,
@@ -167,6 +168,11 @@ export default function FiltrosStock({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         {/* BUSCADOR CON VOZ */}
         <div className="flex-1 relative">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: "var(--pos-link)" }}
+          />
           <SunmiInput
             ref={inputRef}
             type="text"
@@ -174,7 +180,8 @@ export default function FiltrosStock({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={handleKeyDown}
-            className={`w-full ${soportaVoz ? "!pr-12" : ""}`}
+            className={`w-full !pl-9 !border-2 pulse-neon ${soportaVoz ? "!pr-12" : ""}`}
+            style={{ borderColor: "var(--pos-link)" }}
             icon="search"
           />
           {soportaVoz && (
@@ -220,6 +227,7 @@ export default function FiltrosStock({
             value={estadoStock}
             onChange={setEstadoStock}
             placeholder="Estado..."
+            className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
           >
             <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
             <SunmiSelectOption value="con_stock">Con stock</SunmiSelectOption>
@@ -232,7 +240,7 @@ export default function FiltrosStock({
         <div className="flex gap-2 md:shrink-0">
           <SunmiButton
             color="slate"
-            className="w-full md:w-auto"
+            className="w-full md:w-auto !border !border-[var(--pos-link)]"
             onClick={() => setOpenAvanzado((v) => !v)}
           >
             {openAvanzado ? "Ocultar filtros" : "Más filtros"}
@@ -240,7 +248,7 @@ export default function FiltrosStock({
           {hayFiltrosActivos && (
             <SunmiButton
               color="cyan"
-              className="shrink-0"
+              className="shrink-0 !border !border-[var(--pos-link)]"
               onClick={resetFiltros}
             >
               Limpiar
@@ -268,6 +276,7 @@ export default function FiltrosStock({
               onChange={setCategoria}
               placeholder="Categoría..."
               searchable
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               <SunmiSelectOption value="">Categoría...</SunmiSelectOption>
               {categorias.map((c) => (
@@ -282,6 +291,7 @@ export default function FiltrosStock({
               onChange={setProveedor}
               placeholder="Proveedor..."
               searchable
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               <SunmiSelectOption value="">Proveedor...</SunmiSelectOption>
               {proveedores.map((p) => (
@@ -296,6 +306,7 @@ export default function FiltrosStock({
               onChange={setArea}
               placeholder="Área física..."
               searchable
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               <SunmiSelectOption value="">Área física...</SunmiSelectOption>
               {areas.map((a) => (

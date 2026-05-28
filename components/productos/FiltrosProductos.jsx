@@ -6,6 +6,7 @@ import SunmiSelectAdv, {
   SunmiSelectOption,
 } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { Search } from "lucide-react";
 
 export default function FiltrosProductos({ onChange, catalogos, initial }) {
   const [search, setSearch] = useState(initial.search || "");
@@ -142,13 +143,19 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         {/* BUSCADOR CON VOZ */}
         <div className="flex-1 relative">
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: "var(--pos-link)" }}
+          />
           <SunmiInput
             ref={inputRef}
             placeholder="Buscar producto, código o categoría..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={handleKeyDown}
-            className={soportaVoz ? "!pr-12" : ""}
+            className={`!pl-9 !border-2 pulse-neon ${soportaVoz ? "!pr-12" : ""}`}
+            style={{ borderColor: "var(--pos-link)" }}
             icon="search"
           />
           {soportaVoz && (
@@ -184,6 +191,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
             value={estado}
             onChange={setEstado}
             placeholder="Estado..."
+            className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
           >
             <SunmiSelectOption value="activos">Activos</SunmiSelectOption>
             <SunmiSelectOption value="inactivos">Inactivos</SunmiSelectOption>
@@ -194,7 +202,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
         {/* BOTON MAS FILTROS */}
         <SunmiButton
           color="slate"
-          className="w-full md:w-auto"
+          className="w-full md:w-auto !border !border-[var(--pos-link)]"
           onClick={() => setOpen(!open)}
         >
           {open ? "Ocultar filtros" : "Más filtros"}
@@ -221,6 +229,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
               onChange={setCategoria}
               placeholder="Categoría..."
               searchable
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               <SunmiSelectOption value="">Categoría...</SunmiSelectOption>
               {catalogos.CATEGORIAS?.map((c) => (
@@ -236,6 +245,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
               onChange={setProveedor}
               placeholder="Proveedor..."
               searchable
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               <SunmiSelectOption value="">Proveedor...</SunmiSelectOption>
               {catalogos.PROVEEDORES?.map((p) => (
@@ -251,6 +261,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
               onChange={setArea}
               placeholder="Área física..."
               searchable
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               <SunmiSelectOption value="">Área física...</SunmiSelectOption>
               {catalogos.AREAS?.map((a) => (
@@ -261,7 +272,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
             </SunmiSelectAdv>
 
             {/* LIMPIAR */}
-            <SunmiButton color="cyan" onClick={limpiar}>
+            <SunmiButton color="cyan" onClick={limpiar} className="!border !border-[var(--pos-link)]">
               Limpiar
             </SunmiButton>
           </div>
