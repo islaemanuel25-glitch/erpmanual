@@ -13,6 +13,7 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import { Search } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -232,12 +233,20 @@ export default function NuevaCompraProveedorPage() {
             </div>
 
             <div className="flex items-center gap-3 mb-3">
-              <SunmiInput
-                placeholder="Buscar por nombre, SKU o código de barra..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="flex-1"
-              />
+              <div className="relative flex-1">
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                  style={{ color: "var(--pos-link)" }}
+                />
+                <SunmiInput
+                  placeholder="Buscar por nombre, SKU o código de barra..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="!pl-9 !border-2 pulse-neon"
+                  style={{ borderColor: "var(--pos-link)" }}
+                />
+              </div>
               <label className="flex items-center gap-1.5 text-xs sunmi-text-muted whitespace-nowrap cursor-pointer select-none">
                 <input
                   type="checkbox"

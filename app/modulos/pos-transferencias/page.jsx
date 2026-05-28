@@ -403,6 +403,7 @@ export default function PosTransferenciasHomePage() {
                     value={destinoIdDeposito}
                     placeholder="Seleccionar local destino"
                     onChange={(value) => setDestinoIdDeposito(value)}
+                    className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
                   >
                     {destinosDeposito.map((l) => (
                       <div key={l.id} value={String(l.id)}>
@@ -444,6 +445,7 @@ export default function PosTransferenciasHomePage() {
                     value={grupoIdSel}
                     placeholder="Seleccionar grupo"
                     onChange={(value) => handleChangeGrupo(value)}
+                    className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
                   >
                     {grupos.map((g) => (
                       <div key={g.id} value={String(g.id)}>
@@ -465,6 +467,7 @@ export default function PosTransferenciasHomePage() {
                       value={origenIdAdmin}
                       placeholder="Seleccionar depósito"
                       onChange={(value) => setOrigenIdAdmin(value)}
+                      className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
                     >
                       {depositosGrupo.map((d) => (
                         <div key={d.id} value={String(d.id)}>
@@ -484,6 +487,7 @@ export default function PosTransferenciasHomePage() {
                       value={destinoIdAdmin}
                       placeholder="Seleccionar local"
                       onChange={(value) => setDestinoIdAdmin(value)}
+                      className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
                     >
                       {localesGrupo.map((l) => (
                         <div key={l.id} value={String(l.id)}>

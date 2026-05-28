@@ -12,6 +12,7 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import { Search } from "lucide-react";
 
 // Helpers
 function formatFecha(str) {
@@ -247,13 +248,21 @@ export default function AnalyticsClientesPage() {
 
           {/* Search + tag */}
           <div className="flex flex-wrap gap-2">
-            <SunmiInput
-              type="text"
-              placeholder="Buscar cliente (nombre, tel, email)..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="flex-1 min-w-[200px]"
-            />
+            <div className="relative flex-1 min-w-[200px]">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                style={{ color: "var(--pos-link)" }}
+              />
+              <SunmiInput
+                type="text"
+                placeholder="Buscar cliente (nombre, tel, email)..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="!pl-9 !border-2 pulse-neon"
+                style={{ borderColor: "var(--pos-link)" }}
+              />
+            </div>
             <SunmiSelectAdv
               value={tagId}
               onChange={(val) => setTagId(val)}

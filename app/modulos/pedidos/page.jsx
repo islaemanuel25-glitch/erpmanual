@@ -12,6 +12,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
+import { Search } from "lucide-react";
 export default function PedidosCatalogoPage() {
   const router = useRouter();
   const { perfil: perfilPed, cargando: cargandoPed } = useUser();
@@ -554,12 +555,18 @@ export default function PedidosCatalogoPage() {
 
           <div className="space-y-2">
             <div className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                style={{ color: "var(--pos-link)" }}
+              />
               <SunmiInput
                 placeholder="Buscar por nombre, código de barras, SKU..."
                 type="text"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className={soportaVoz ? "!pr-12" : ""}
+                className={`!pl-9 !border-2 pulse-neon ${soportaVoz ? "!pr-12" : ""}`}
+                style={{ borderColor: "var(--pos-link)" }}
               />
               {soportaVoz && (
                 <button
@@ -591,6 +598,7 @@ export default function PedidosCatalogoPage() {
                 value={categoriaId}
                 placeholder="Categoría"
                 onChange={(v) => setCategoriaId(v)}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
               >
                 <div value="">Todas</div>
                 {(opciones.categorias || []).map((c) => (
@@ -604,6 +612,7 @@ export default function PedidosCatalogoPage() {
                 value={proveedorId}
                 placeholder="Proveedor"
                 onChange={(v) => setProveedorId(v)}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
               >
                 <div value="">Todos</div>
                 {(opciones.proveedores || []).map((p) => (
@@ -617,6 +626,7 @@ export default function PedidosCatalogoPage() {
                 value={areaId}
                 placeholder="Área"
                 onChange={(v) => setAreaId(v)}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
               >
                 <div value="">Todas</div>
                 {(opciones.areas || []).map((a) => (

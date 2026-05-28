@@ -23,6 +23,7 @@ export default function FiltrosDeposito({
         <SunmiSelectAdv
           value={areaId}
           onChange={(val) => onAreaChange(Number(val))}
+          className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
         >
           <option value={0}>Área física</option>
           {areasFisicas.map((a) => (
@@ -36,6 +37,7 @@ export default function FiltrosDeposito({
         <SunmiSelectAdv
           value={categoriaId}
           onChange={(val) => onCategoriaChange(Number(val))}
+          className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
         >
           <option value={0}>Categoría</option>
           {categorias.map((c) => (
@@ -47,7 +49,7 @@ export default function FiltrosDeposito({
 
         {/* Limpiar */}
         <button
-          className="h-[32px] px-3 bg-gray-100 rounded text-xs"
+          className="h-[32px] px-3 bg-gray-100 rounded text-xs border border-[var(--pos-link)]"
           onClick={onLimpiar}
         >
           Limpiar filtros

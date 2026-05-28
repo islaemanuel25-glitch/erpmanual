@@ -267,14 +267,16 @@ export default function PageGrupos() {
 
         <div className="relative flex-1 min-w-[160px] max-w-md">
           <Search
-            size={14}
-            className="absolute left-2 top-1/2 -translate-y-1/2 sunmi-text-muted pointer-events-none"
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: "var(--pos-link)" }}
           />
           <SunmiInput
             placeholder="Buscar grupo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-7"
+            className="!pl-9 !border-2 pulse-neon"
+            style={{ borderColor: "var(--pos-link)" }}
           />
         </div>
 
@@ -289,7 +291,11 @@ export default function PageGrupos() {
       <div className="flex items-center gap-2 flex-wrap text-[11px] sunmi-text-muted">
         <span className="shrink-0">Ordenar:</span>
         <div className="w-44">
-          <SunmiSelectAdv value={orden} onChange={setOrden}>
+          <SunmiSelectAdv
+            value={orden}
+            onChange={setOrden}
+            className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+          >
             <SunmiSelectOption value="nombreAsc">Nombre (A → Z)</SunmiSelectOption>
             <SunmiSelectOption value="nombreDesc">Nombre (Z → A)</SunmiSelectOption>
             <SunmiSelectOption value="depositosDesc">Más depósitos</SunmiSelectOption>

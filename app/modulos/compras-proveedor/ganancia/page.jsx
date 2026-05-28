@@ -113,6 +113,7 @@ export default function GananciaComprasPage() {
                 type="date"
                 value={desde}
                 onChange={(e) => setDesde(e.target.value)}
+                className="!border !border-[var(--pos-link)]"
               />
             </div>
             <div>
@@ -121,11 +122,16 @@ export default function GananciaComprasPage() {
                 type="date"
                 value={hasta}
                 onChange={(e) => setHasta(e.target.value)}
+                className="!border !border-[var(--pos-link)]"
               />
             </div>
             <div className="min-w-[180px]">
               <label className="block text-xs sunmi-text-muted mb-1">Proveedor</label>
-              <SunmiSelectAdv value={proveedorId} onChange={setProveedorId}>
+              <SunmiSelectAdv
+                value={proveedorId}
+                onChange={setProveedorId}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+              >
                 <SunmiSelectOption value="">Todos</SunmiSelectOption>
                 {proveedores.map((p) => (
                   <SunmiSelectOption key={p.id} value={String(p.id)}>
@@ -134,7 +140,12 @@ export default function GananciaComprasPage() {
                 ))}
               </SunmiSelectAdv>
             </div>
-            <SunmiButton color="amber" onClick={buscar} disabled={loading}>
+            <SunmiButton
+              color="amber"
+              onClick={buscar}
+              disabled={loading}
+              className="!border !border-[var(--pos-link)]"
+            >
               {loading ? "Buscando..." : "Buscar"}
             </SunmiButton>
           </div>
