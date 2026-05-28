@@ -1161,6 +1161,22 @@ html, body {
   animation: fadeInSmooth 0.15s ease-out;
 }
 
+@keyframes pulse-neon {
+  0%, 100% {
+    box-shadow: 0 0 4px color-mix(in srgb, var(--pos-link) 40%, transparent),
+                0 0 8px color-mix(in srgb, var(--pos-link) 20%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 12px color-mix(in srgb, var(--pos-link) 90%, transparent),
+                0 0 24px color-mix(in srgb, var(--pos-link) 60%, transparent),
+                0 0 36px color-mix(in srgb, var(--pos-link) 30%, transparent);
+  }
+}
+
+.pulse-neon {
+  animation: pulse-neon 4s ease-in-out infinite;
+}
+
 /* ==================================================
    ⭐ INPUT GLOBAL (formularios generales)
    ================================================== */
