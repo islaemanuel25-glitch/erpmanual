@@ -132,7 +132,7 @@ export default function AuditoriaProductosPage() {
                 type="date"
                 value={fechaDesde}
                 onChange={(e) => setFechaDesde(e.target.value)}
-                className="!py-1 text-xs"
+                className="!py-1 text-xs !border !border-[var(--pos-link)]"
               />
             </div>
             <div>
@@ -141,7 +141,7 @@ export default function AuditoriaProductosPage() {
                 type="date"
                 value={fechaHasta}
                 onChange={(e) => setFechaHasta(e.target.value)}
-                className="!py-1 text-xs"
+                className="!py-1 text-xs !border !border-[var(--pos-link)]"
               />
             </div>
             <SunmiButton color="amber" onClick={ejecutarConsulta} disabled={loading} className="!py-1 text-xs">

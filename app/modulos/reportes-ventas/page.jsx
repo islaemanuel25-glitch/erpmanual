@@ -245,6 +245,7 @@ export default function ReportesVentasPage() {
               type="date"
               value={fechaDesde}
               onChange={(e) => setFechaDesde(e.target.value)}
+              className="!border !border-[var(--pos-link)]"
             />
           </div>
 
@@ -256,6 +257,7 @@ export default function ReportesVentasPage() {
               type="date"
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)}
+              className="!border !border-[var(--pos-link)]"
             />
           </div>
 
@@ -266,6 +268,7 @@ export default function ReportesVentasPage() {
             <SunmiSelectAdv
               value={formaPago}
               onChange={(val) => setFormaPago(val)}
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               <option value="">Todas</option>
               <option value="efectivo">Efectivo</option>

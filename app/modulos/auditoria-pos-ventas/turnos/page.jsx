@@ -780,7 +780,7 @@ export default function AuditoriaTurnosPage() {
                     onChange={(val) => setBusqueda(val)}
                     placeholder="Todos los cajeros"
                     searchable
-                    className="min-w-[180px] !py-2 text-[13px]"
+                    className="min-w-[180px] !py-2 text-[13px] [&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
                   >
                     <SunmiSelectOption value="">Todos los cajeros</SunmiSelectOption>
                     {cajeros.map((nombre) => (

@@ -198,11 +198,11 @@ export default function AuditoriaBalancesPage() {
           <div className="flex flex-wrap items-end justify-end gap-1.5">
             <div>
               <label className="text-[9px] sunmi-text-muted mb-0.5 block">Desde</label>
-              <SunmiInput type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="!py-1 text-xs" />
+              <SunmiInput type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} className="!py-1 text-xs !border !border-[var(--pos-link)]" />
             </div>
             <div>
               <label className="text-[9px] sunmi-text-muted mb-0.5 block">Hasta</label>
-              <SunmiInput type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="!py-1 text-xs" />
+              <SunmiInput type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="!py-1 text-xs !border !border-[var(--pos-link)]" />
             </div>
             <SunmiButton color="amber" onClick={ejecutarConsulta} disabled={loading} className="!py-1 text-xs">
               {loading ? "Cargando..." : "Consultar"}
@@ -228,11 +228,11 @@ export default function AuditoriaBalancesPage() {
           <div className="flex flex-wrap items-end gap-1.5 pl-1 border-l-2 border-[var(--accent)] ml-1">
             <div>
               <label className="text-[9px] sunmi-text-muted mb-0.5 block">Desde (ant.)</label>
-              <SunmiInput type="date" value={fechaDesde2} onChange={(e) => setFechaDesde2(e.target.value)} className="!py-1 text-xs" />
+              <SunmiInput type="date" value={fechaDesde2} onChange={(e) => setFechaDesde2(e.target.value)} className="!py-1 text-xs !border !border-[var(--pos-link)]" />
             </div>
             <div>
               <label className="text-[9px] sunmi-text-muted mb-0.5 block">Hasta (ant.)</label>
-              <SunmiInput type="date" value={fechaHasta2} onChange={(e) => setFechaHasta2(e.target.value)} className="!py-1 text-xs" />
+              <SunmiInput type="date" value={fechaHasta2} onChange={(e) => setFechaHasta2(e.target.value)} className="!py-1 text-xs !border !border-[var(--pos-link)]" />
             </div>
           </div>
         )}

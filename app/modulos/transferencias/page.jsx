@@ -165,6 +165,7 @@ export default function TransferenciasPage() {
             <SunmiSelectAdv
               value={estado}
               onChange={(val) => { setEstado(val); setPage(1); }}
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               {ESTADOS.map((e) => (
                 <option key={e.value} value={e.value}>{e.label}</option>
@@ -190,7 +191,7 @@ export default function TransferenciasPage() {
           </div>
 
           <div className="flex items-end">
-            <SunmiButton color="slate" onClick={quitarFiltros}>
+            <SunmiButton color="slate" className="!border !border-[var(--pos-link)]" onClick={quitarFiltros}>
               Quitar filtros
             </SunmiButton>
           </div>

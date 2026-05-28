@@ -130,16 +130,19 @@ export default function TurnosPage() {
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
             placeholder="Desde"
+            className="!border !border-[var(--pos-link)]"
           />
           <SunmiInput
             type="date"
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
             placeholder="Hasta"
+            className="!border !border-[var(--pos-link)]"
           />
           <SunmiSelectAdv
             value={estado}
             onChange={(val) => setEstado(val)}
+            className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             options={[
               { value: "todos", label: "Todos" },
               { value: "abierto", label: "Abierto" },
@@ -150,6 +153,7 @@ export default function TurnosPage() {
             <SunmiSelectAdv
               value={vendedorId}
               onChange={(val) => setVendedorId(val)}
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
               options={[
                 { value: "", label: "Todos los vendedores" },
                 ...vendedores.map((v) => ({

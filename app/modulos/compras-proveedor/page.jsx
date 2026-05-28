@@ -108,7 +108,11 @@ export default function ComprasProveedorPage() {
 
         <div className="flex flex-col md:flex-row gap-3 px-2 mb-4">
           <div className="w-48">
-            <SunmiSelectAdv value={estado} onChange={setEstado}>
+            <SunmiSelectAdv
+              value={estado}
+              onChange={setEstado}
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+            >
               <SunmiSelectOption value="">Todos los estados</SunmiSelectOption>
               <SunmiSelectOption value="BORRADOR">Borrador</SunmiSelectOption>
               <SunmiSelectOption value="CONFIRMADO">Confirmado</SunmiSelectOption>
@@ -120,6 +124,7 @@ export default function ComprasProveedorPage() {
 
           <SunmiButton
             color="slate"
+            className="!border !border-[var(--pos-link)]"
             onClick={() => {
               setEstado("");
               setPage(1);
