@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
@@ -13,11 +13,17 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import SunmiPill from "@/components/sunmi/SunmiPill";
 import { Search } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
+import {
+  recibeHoy,
+  formatDiaLabel,
+  diaActualEnum,
+} from "@/lib/proveedores/diasPedido";
 
 export default function NuevaCompraProveedorPage() {
   const router = useRouter();
@@ -43,6 +49,21 @@ export default function NuevaCompraProveedorPage() {
   const [soloFaltantes, setSoloFaltantes] = useState(true);
 
   const [saving, setSaving] = useState(false);
+
+  // Proveedor seleccionado (objeto completo) para mostrar info de dias_pedido.
+  const proveedorSel = useMemo(
+    () =>
+      proveedores.find((p) => String(p.id) === String(proveedorId)) || null,
+    [proveedores, proveedorId]
+  );
+
+  // Mostrar warning solo si el proveedor tiene dias_pedido configurados
+  // y hoy NO es uno de esos días. Si dias_pedido está vacío, no inferimos nada.
+  const mostrarWarningDia =
+    proveedorSel &&
+    Array.isArray(proveedorSel.dias_pedido) &&
+    proveedorSel.dias_pedido.length > 0 &&
+    !recibeHoy(proveedorSel.dias_pedido);
 
   // Cargar proveedores
   useEffect(() => {
@@ -222,6 +243,30 @@ export default function NuevaCompraProveedorPage() {
             </div>
           </div>
         </SunmiPanel>
+
+        {/* Warning informativo: hoy no es día válido para este proveedor */}
+        {mostrarWarningDia && (
+          <div
+            className="rounded-2xl border p-3 mb-4 text-[12px]"
+            style={{
+              borderColor: "var(--pos-warning, #f59e0b)",
+              color: "var(--pos-warning, #f59e0b)",
+            }}
+          >
+            <div className="font-semibold mb-1">
+              Hoy es {formatDiaLabel(diaActualEnum())}.
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 sunmi-text-muted">
+              <span>{proveedorSel.nombre} recibe pedidos:</span>
+              {proveedorSel.dias_pedido.map((d, i) => (
+                <SunmiPill key={i}>{formatDiaLabel(d)}</SunmiPill>
+              ))}
+            </div>
+            <div className="mt-1 sunmi-text-muted">
+              Podés crear la compra igual.
+            </div>
+          </div>
+        )}
 
         {/* Buscador de productos */}
         {proveedorId && (

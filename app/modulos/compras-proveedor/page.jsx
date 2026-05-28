@@ -17,6 +17,7 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
+import { recibeHoy } from "@/lib/proveedores/diasPedido";
 
 const PAGE_SIZE = 20;
 
@@ -51,6 +52,8 @@ export default function ComprasProveedorPage() {
   const [page, setPage] = useState(1);
   const [estado, setEstado] = useState("");
 
+  const [proveedoresHoy, setProveedoresHoy] = useState([]);
+
   const proveedorIdParam = searchParams.get("proveedorId") || "";
 
   const cargar = async () => {
@@ -80,6 +83,26 @@ export default function ComprasProveedorPage() {
     cargar();
   }, [page, estado, proveedorIdParam]);
 
+  // Cargar proveedores activos para detectar los que reciben pedido hoy.
+  // Reutiliza el endpoint de listar (pageSize=200 ya alcanza para todos los activos).
+  useEffect(() => {
+    const cargarProveedoresHoy = async () => {
+      try {
+        const res = await fetch(
+          "/api/proveedores/listar?estado=activos&pageSize=200",
+          { credentials: "include" }
+        );
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.items)) {
+          setProveedoresHoy(data.items.filter((p) => recibeHoy(p.dias_pedido)));
+        }
+      } catch {
+        // Silenciar: el strip queda vacío y se muestra el placeholder.
+      }
+    };
+    cargarProveedoresHoy();
+  }, []);
+
   // Redirigir a inicio si falta contexto (evitar router.push durante render)
   useEffect(() => {
     if (needsContexto) router.push("/inicio");
@@ -102,6 +125,44 @@ export default function ComprasProveedorPage() {
           <SunmiButton onClick={() => router.push("/modulos/compras-proveedor/nueva")}>
             ＋ Nuevo pedido
           </SunmiButton>
+        </div>
+
+        {/* Strip: proveedores que reciben pedido hoy */}
+        <div
+          className="rounded-2xl border p-3 mb-4"
+          style={{ borderColor: "var(--pos-link)" }}
+        >
+          <div className="text-[12px] font-semibold mb-2" style={{ color: "var(--pos-link)" }}>
+            Proveedores que reciben pedido hoy
+          </div>
+
+          {proveedoresHoy.length === 0 ? (
+            <div className="text-[11px] sunmi-text-muted">
+              Hoy no hay proveedores configurados para recibir pedidos.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {proveedoresHoy.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-2 rounded-lg border px-2 py-1 sunmi-surface"
+                  style={{ borderColor: "var(--pos-link)" }}
+                >
+                  <span className="text-[12px] font-medium sunmi-text-strong">
+                    {p.nombre}
+                  </span>
+                  <SunmiButton
+                    color="cyan"
+                    onClick={() =>
+                      router.push(`/modulos/compras-proveedor/nueva?proveedorId=${p.id}`)
+                    }
+                  >
+                    Crear compra
+                  </SunmiButton>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <SunmiSeparator label="Filtros" className="my-4" />

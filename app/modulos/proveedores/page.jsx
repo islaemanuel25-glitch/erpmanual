@@ -21,6 +21,7 @@ import ModalProveedor from "@/components/proveedores/ModalProveedor";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
+import { recibeHoy, formatDiaLabel } from "@/lib/proveedores/diasPedido";
 
 const PAGE_SIZE = 10;
 
@@ -40,6 +41,7 @@ export default function ProveedoresPage() {
 
   const [search, setSearch] = useState("");
   const [estado, setEstado] = useState("activos");
+  const [soloHoy, setSoloHoy] = useState(false);
 
   const [page, setPage] = useState(1);
 
@@ -192,6 +194,19 @@ export default function ProveedoresPage() {
                 <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
               </SunmiSelectAdv>
             </div>
+
+            <label
+              className="flex items-center gap-1.5 text-xs sunmi-text-muted whitespace-nowrap cursor-pointer select-none md:shrink-0"
+              title="Solo proveedores cuyo día de pedido incluye hoy"
+            >
+              <input
+                type="checkbox"
+                checked={soloHoy}
+                onChange={(e) => setSoloHoy(e.target.checked)}
+                className="accent-[var(--pos-link)]"
+              />
+              Solo de hoy
+            </label>
           </div>
 
           <div className="flex gap-2 md:shrink-0 justify-end">
@@ -201,6 +216,7 @@ export default function ProveedoresPage() {
               onClick={() => {
                 setSearch("");
                 setEstado("activos");
+                setSoloHoy(false);
                 setPage(1);
               }}
             >
@@ -236,22 +252,44 @@ export default function ProveedoresPage() {
           >
             {loading ? (
               <SunmiTableEmpty label="Cargando..." />
-            ) : items.length === 0 ? (
-              <SunmiTableEmpty label="Sin proveedores" />
-            ) : (
-              items.map((item) => (
+            ) : (() => {
+              const itemsFiltrados = soloHoy
+                ? items.filter((p) => recibeHoy(p.dias_pedido))
+                : items;
+
+              if (itemsFiltrados.length === 0) {
+                return (
+                  <SunmiTableEmpty
+                    label={soloHoy ? "Sin proveedores que reciban pedido hoy" : "Sin proveedores"}
+                  />
+                );
+              }
+
+              return itemsFiltrados.map((item) => (
                 <SunmiTableRow key={item.id}>
                   <td className="px-3 py-2">{item.nombre}</td>
                   <td className="px-3 py-2">{item.telefono || "-"}</td>
                   <td className="px-3 py-2">{item.email || "-"}</td>
                   <td className="px-3 py-2">{item.cuit || "-"}</td>
 
-                  {/* 🔥 DIAS EN CHIPS */}
+                  {/* DIAS EN CHIPS + badge "Hoy" si aplica */}
                   <td className="px-3 py-2">
                     {item.dias_pedido?.length ? (
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1 items-center">
+                        {recibeHoy(item.dias_pedido) && (
+                          <span
+                            className="inline-block px-1.5 py-[1px] rounded-md text-[10.5px] font-semibold leading-none whitespace-nowrap border"
+                            style={{
+                              color: "var(--pos-link)",
+                              borderColor: "var(--pos-link)",
+                            }}
+                            title="Este proveedor recibe pedidos hoy"
+                          >
+                            Hoy
+                          </span>
+                        )}
                         {item.dias_pedido.map((d, i) => (
-                          <SunmiPill key={i}>{d}</SunmiPill>
+                          <SunmiPill key={i}>{formatDiaLabel(d)}</SunmiPill>
                         ))}
                       </div>
                     ) : (
@@ -296,8 +334,8 @@ export default function ProveedoresPage() {
                     </div>
                   </td>
                 </SunmiTableRow>
-              ))
-            )}
+              ));
+            })()}
           </SunmiTable>
         </div>
 
