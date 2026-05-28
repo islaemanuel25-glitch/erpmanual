@@ -83,7 +83,15 @@ export default function ModalProveedor({
 
   if (!open) return null;
 
-  const dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+  const dias = [
+    { value: "Lunes", label: "Lunes" },
+    { value: "Martes", label: "Martes" },
+    { value: "Miercoles", label: "Miércoles" },
+    { value: "Jueves", label: "Jueves" },
+    { value: "Viernes", label: "Viernes" },
+    { value: "Sabado", label: "Sábado" },
+    { value: "Domingo", label: "Domingo" },
+  ];
 
   return (
     <div
@@ -172,14 +180,11 @@ export default function ModalProveedor({
                 multiple
                 value={form.dias_pedido}
                 onChange={(v) => setField("dias_pedido", v)}
+                placeholder="Seleccionar días…"
               >
-                <SunmiSelectOption value="">
-                  Seleccionar días…
-                </SunmiSelectOption>
-
                 {dias.map((d) => (
-                  <SunmiSelectOption key={d} value={d}>
-                    {d}
+                  <SunmiSelectOption key={d.value} value={d.value}>
+                    {d.label}
                   </SunmiSelectOption>
                 ))}
               </SunmiSelectAdv>

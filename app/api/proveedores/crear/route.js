@@ -30,18 +30,14 @@ export async function POST(req) {
       );
     }
 
-    // 🔥 MAPEADOR FRONT → ENUM PRISMA
-    const mapDias = {
-      "Lunes": "Lunes",
-      "Martes": "Martes",
-      "Miércoles": "Miercoles",
-      "Jueves": "Jueves",
-      "Viernes": "Viernes",
-      "Sábado": "Sabado",
-      "Domingo": "Domingo",
-    };
+    // Normalizar dias_pedido contra el enum DiaPedido (sin acentos).
+    // Acepta inputs viejos con acento ("Miércoles", "Sábado") y filtra falsy/inválidos.
+    const DIAS_VALIDOS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
+    const ACENTOS_LEGACY = { "Miércoles": "Miercoles", "Sábado": "Sabado" };
 
-    const diasEnum = (dias_pedido || []).map(d => mapDias[d]);
+    const diasEnum = (Array.isArray(dias_pedido) ? dias_pedido : [])
+      .map((d) => ACENTOS_LEGACY[d] || d)
+      .filter((d) => DIAS_VALIDOS.includes(d));
 
     const item = await prisma.proveedor.create({
       data: {
