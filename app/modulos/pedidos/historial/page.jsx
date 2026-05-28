@@ -13,6 +13,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import { Search } from "lucide-react";
 
 const ESTADOS = [
   { value: "", label: "Todos" },
@@ -152,25 +153,37 @@ export default function HistorialPedidosPage() {
           {/* FILTROS */}
           <SunmiSeparator label="Filtros" />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-            <SunmiInput
-              placeholder="Buscar por nombre o código..."
-              type="text"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+            <div className="flex-1 relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                style={{ color: "var(--pos-link)" }}
+              />
+              <SunmiInput
+                placeholder="Buscar por nombre o código..."
+                type="text"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className="!pl-9 !border-2 pulse-neon"
+                style={{ borderColor: "var(--pos-link)" }}
+              />
+            </div>
 
-            <SunmiSelectAdv
-              value={estado}
-              placeholder="Estado"
-              onChange={(v) => setEstado(v)}
-            >
-              {ESTADOS.map((e) => (
-                <div key={e.value} value={e.value}>
-                  {e.label}
-                </div>
-              ))}
-            </SunmiSelectAdv>
+            <div className="w-full md:w-44 md:shrink-0">
+              <SunmiSelectAdv
+                value={estado}
+                placeholder="Estado"
+                onChange={(v) => setEstado(v)}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+              >
+                {ESTADOS.map((e) => (
+                  <div key={e.value} value={e.value}>
+                    {e.label}
+                  </div>
+                ))}
+              </SunmiSelectAdv>
+            </div>
           </div>
 
           {/* RESULTADOS */}

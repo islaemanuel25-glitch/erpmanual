@@ -17,7 +17,7 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Search } from "lucide-react";
 
 import ModalOperador from "@/components/operadores/ModalOperador";
 
@@ -120,13 +120,22 @@ export default function OperadoresPage() {
 
         <SunmiSeparator label="Filtros" />
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <SunmiInput
-            placeholder="Buscar operador..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <div className="flex gap-2">
-            <SunmiButton onClick={() => setSearch("")} color="slate">Limpiar</SunmiButton>
+          <div className="flex-1 relative">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ color: "var(--pos-link)" }}
+            />
+            <SunmiInput
+              placeholder="Buscar operador..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="!pl-9 !border-2 pulse-neon"
+              style={{ borderColor: "var(--pos-link)" }}
+            />
+          </div>
+          <div className="flex gap-2 md:shrink-0">
+            <SunmiButton onClick={() => setSearch("")} color="slate" className="!border !border-[var(--pos-link)]">Limpiar</SunmiButton>
             <SunmiButton onClick={() => router.push("/modulos/operadores?nuevo=1")}>+ Nuevo</SunmiButton>
           </div>
         </div>

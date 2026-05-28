@@ -18,6 +18,7 @@ import ModalCategoria from "@/components/categorias/ModalCategoria";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
+import { Search } from "lucide-react";
 
 export default function CategoriasPage() {
   const router = useRouter();
@@ -184,29 +185,41 @@ export default function CategoriasPage() {
     <div className="p-3 space-y-4">
       <SunmiCard>
         {/* ========= FILTROS ========= */}
-        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <SunmiInput
-            placeholder="Buscar por nombre..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex-1 relative">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+              style={{ color: "var(--pos-link)" }}
+            />
+            <SunmiInput
+              placeholder="Buscar por nombre..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="!pl-9 !border-2 pulse-neon"
+              style={{ borderColor: "var(--pos-link)" }}
+            />
+          </div>
 
-          <SunmiSelectAdv
-            value={estado}
-            onChange={(v) => setEstado(v)}
-            options={[
-              new SunmiSelectOption("todos", "Todas"),
-              new SunmiSelectOption("activas", "Activas"),
-              new SunmiSelectOption("inactivas", "Inactivas"),
-            ]}
-          />
+          <div className="w-full md:w-44 md:shrink-0">
+            <SunmiSelectAdv
+              value={estado}
+              onChange={(v) => setEstado(v)}
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+              options={[
+                new SunmiSelectOption("todos", "Todas"),
+                new SunmiSelectOption("activas", "Activas"),
+                new SunmiSelectOption("inactivas", "Inactivas"),
+              ]}
+            />
+          </div>
 
-          <div className="flex gap-2">
-            <SunmiButton color="slate" className="w-full" onClick={limpiar}>
+          <div className="flex gap-2 md:shrink-0">
+            <SunmiButton color="slate" className="w-full md:w-auto !border !border-[var(--pos-link)]" onClick={limpiar}>
               Limpiar
             </SunmiButton>
 
-            <SunmiButton className="w-full" onClick={abrirNuevo}>
+            <SunmiButton className="w-full md:w-auto" onClick={abrirNuevo}>
               ＋ Nueva
             </SunmiButton>
           </div>

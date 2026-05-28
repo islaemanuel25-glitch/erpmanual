@@ -15,6 +15,7 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import SunmiPill from "@/components/sunmi/SunmiPill"; // 🔥 agregado para chips
+import { Search } from "lucide-react";
 
 import ModalProveedor from "@/components/proveedores/ModalProveedor";
 import { useUser } from "@/app/context/UserContext";
@@ -164,23 +165,39 @@ export default function ProveedoresPage() {
         {/* ===================== */}
         {/* FILTROS */}
         {/* ===================== */}
-        <div className="flex flex-col md:flex-row gap-4 px-2">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-2">
           <div className="flex flex-col md:flex-row gap-3 flex-1">
-            <SunmiInput
-              placeholder="Buscar proveedor..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="flex-1 relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: "var(--pos-link)" }}
+              />
+              <SunmiInput
+                placeholder="Buscar proveedor..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="!pl-9 !border-2 pulse-neon"
+                style={{ borderColor: "var(--pos-link)" }}
+              />
+            </div>
 
-            <SunmiSelectAdv value={estado} onChange={setEstado}>
-              <SunmiSelectOption value="activos">Activos</SunmiSelectOption>
-              <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
-            </SunmiSelectAdv>
+            <div className="w-full md:w-44 md:shrink-0">
+              <SunmiSelectAdv
+                value={estado}
+                onChange={setEstado}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+              >
+                <SunmiSelectOption value="activos">Activos</SunmiSelectOption>
+                <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
+              </SunmiSelectAdv>
+            </div>
           </div>
 
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 md:shrink-0 justify-end">
             <SunmiButton
               color="slate"
+              className="!border !border-[var(--pos-link)]"
               onClick={() => {
                 setSearch("");
                 setEstado("activos");
