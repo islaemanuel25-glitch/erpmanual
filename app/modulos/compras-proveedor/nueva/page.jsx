@@ -223,7 +223,11 @@ export default function NuevaCompraProveedorPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs sunmi-text-muted mb-1">Proveedor</label>
-              <SunmiSelectAdv value={proveedorId} onChange={setProveedorId}>
+              <SunmiSelectAdv
+                value={proveedorId}
+                onChange={setProveedorId}
+                searchable
+              >
                 <SunmiSelectOption value="">-- Seleccionar --</SunmiSelectOption>
                 {proveedores.map((p) => (
                   <SunmiSelectOption key={p.id} value={String(p.id)}>
