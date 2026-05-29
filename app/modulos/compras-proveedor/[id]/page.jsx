@@ -12,6 +12,7 @@ import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -51,8 +52,12 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [recibidos, setRecibidos] = useState({});
   const [kgRecibidos, setKgRecibidos] = useState({});
 
-  // Costos editables por ítem (en recepción)
+  // Costos editables por ítem (en recepción Y en borrador)
   const [costos, setCostos] = useState({});
+
+  // Edición en BORRADOR: cantidad pedida y unidad por línea
+  const [cantidadesEdit, setCantidadesEdit] = useState({});
+  const [unidadesEdit, setUnidadesEdit] = useState({});
 
   // Buscar producto extra (recepción)
   const [extraSearch, setExtraSearch] = useState("");
@@ -94,7 +99,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         setRecibidos(rec);
         setKgRecibidos(kgRec);
 
-        // Costos editables
+        // Costos editables (recepción Y borrador)
         const costosInit = {};
         let totalEst = 0;
         for (const d of data.item.detalles || []) {
@@ -103,6 +108,16 @@ export default function DetallePedidoProveedorPage({ params }) {
           totalEst += (Number(d.cantidad) || 0) * c;
         }
         setCostos(costosInit);
+
+        // Edición en BORRADOR: cantidad pedida y unidad iniciales por línea
+        const cantInit = {};
+        const uniInit = {};
+        for (const d of data.item.detalles || []) {
+          cantInit[d.id] = String(Number(d.cantidad) || 1);
+          uniInit[d.id] = d.unidad || "BULTO";
+        }
+        setCantidadesEdit(cantInit);
+        setUnidadesEdit(uniInit);
 
         // Factura
         setTotalReal(data.item.totalReal != null ? String(Number(data.item.totalReal)) : "");
@@ -233,6 +248,25 @@ export default function DetallePedidoProveedorPage({ params }) {
     }
   };
 
+  // Persiste cambios de cantidad/unidad/precioCosto de una línea en BORRADOR.
+  // Optimista: actualiza local state primero, después manda al server.
+  const editarItemAPI = async (detalleId, patch) => {
+    try {
+      const res = await fetch(`/api/compras-proveedor/editar-item/${id}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ detalleId, ...patch }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        alert(data.error || "No se pudo guardar el cambio");
+      }
+    } catch {
+      alert("Error de conexión al guardar el cambio");
+    }
+  };
+
   const eliminarDetalle = async (detalleId) => {
     if (!confirm("¿Eliminar este ítem del pedido?")) return;
     setDeleting(detalleId);
@@ -290,19 +324,25 @@ export default function DetallePedidoProveedorPage({ params }) {
   }
 
   const esRecepcion = pedido.estado === "ENVIADO";
+  const esBorrador = pedido.estado === "BORRADOR";
   const tieneFiambre = (pedido?.detalles || []).some(
     (d) => d.producto?.base?.modoCompraProveedor === "UNIDAD"
   );
 
-  // Total factura computado: en recepción usa recibidos/costos editables,
-  // en otros estados usa los valores guardados del detalle.
+  // Total estimado/factura reactivo. Usa local edits en BORRADOR y recepción,
+  // y los valores guardados del detalle en otros estados.
   const computedTotalFactura = (pedido?.detalles || []).reduce((acc, d) => {
-    const cant = esRecepcion
-      ? (Number(recibidos[d.id]) || 0)
-      : (Number(d.cantidadRecibida ?? d.cantidad) || 0);
-    const costo = esRecepcion
-      ? (Number(costos[d.id]) || 0)
-      : (Number(d.precioCosto) || 0);
+    let cant, costo;
+    if (esBorrador) {
+      cant = Number(cantidadesEdit[d.id] ?? d.cantidad) || 0;
+      costo = Number(costos[d.id] ?? d.precioCosto ?? 0) || 0;
+    } else if (esRecepcion) {
+      cant = Number(recibidos[d.id]) || 0;
+      costo = Number(costos[d.id]) || 0;
+    } else {
+      cant = Number(d.cantidadRecibida ?? d.cantidad) || 0;
+      costo = Number(d.precioCosto) || 0;
+    }
     return acc + cant * costo;
   }, 0);
 
@@ -463,6 +503,21 @@ export default function DetallePedidoProveedorPage({ params }) {
           </SunmiPanel>
         )}
 
+        {/* Banner BORRADOR editable */}
+        {esBorrador && (
+          <div
+            className="rounded-2xl border p-3 mb-4 text-[12px]"
+            style={{ borderColor: "var(--pos-link)", color: "var(--pos-link)" }}
+          >
+            <span className="font-semibold">Estás editando un borrador.</span>{" "}
+            <span className="sunmi-text-muted">
+              Podés editar cantidades, unidad y costo de cada línea, o agregar
+              y quitar productos. Cuando esté listo, usá &quot;Confirmar
+              pedido&quot; abajo.
+            </span>
+          </div>
+        )}
+
         {/* Detalle de productos */}
         <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
           <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
@@ -483,7 +538,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                 ...(esRecepcion && tieneFiambre ? ["Kg recibidos"] : []),
                 ...(pedido.estado === "RECIBIDO" ? ["Recibido"] : []),
                 ...(pedido.estado === "RECIBIDO" && tieneFiambre ? ["Kg reales"] : []),
-                ...(esRecepcion ? [""] : []),
+                ...((esRecepcion || esBorrador) ? [""] : []),
               ]}
             >
               {(pedido.detalles || []).length === 0 ? (
@@ -503,11 +558,60 @@ export default function DetallePedidoProveedorPage({ params }) {
                         {det.producto?.base?.sku || "-"}
                       </td>
                       <td className="px-3 py-1.5 text-center">
-                        {Number(det.cantidad)}
+                        {esBorrador ? (
+                          <SunmiInput
+                            type="text"
+                            inputMode="numeric"
+                            value={cantidadesEdit[det.id] ?? ""}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setCantidadesEdit((prev) => ({
+                                ...prev,
+                                [det.id]: raw,
+                              }));
+                            }}
+                            onBlur={() => {
+                              const v = parseInt(cantidadesEdit[det.id], 10);
+                              const final = isNaN(v) || v < 1 ? 1 : v;
+                              setCantidadesEdit((prev) => ({
+                                ...prev,
+                                [det.id]: String(final),
+                              }));
+                              if (final !== Number(det.cantidad)) {
+                                editarItemAPI(det.id, { cantidad: final });
+                              }
+                            }}
+                            className="w-[60px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        ) : (
+                          Number(det.cantidad)
+                        )}
                       </td>
-                      <td className="px-3 py-1.5 text-xs">{det.unidad}</td>
                       <td className="px-3 py-1.5 text-xs">
-                        {esRecepcion ? (
+                        {esBorrador ? (
+                          <div className="w-24">
+                            <SunmiSelectAdv
+                              value={unidadesEdit[det.id] || "BULTO"}
+                              onChange={(v) => {
+                                setUnidadesEdit((prev) => ({
+                                  ...prev,
+                                  [det.id]: v,
+                                }));
+                                if (v !== det.unidad) {
+                                  editarItemAPI(det.id, { unidad: v });
+                                }
+                              }}
+                            >
+                              <SunmiSelectOption value="BULTO">BULTO</SunmiSelectOption>
+                              <SunmiSelectOption value="UNIDAD">UNIDAD</SunmiSelectOption>
+                            </SunmiSelectAdv>
+                          </div>
+                        ) : (
+                          det.unidad
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 text-xs">
+                        {(esRecepcion || esBorrador) ? (
                           <div className="flex items-center gap-0.5">
                             <span className="sunmi-text-muted">$</span>
                             <SunmiInput
@@ -520,8 +624,15 @@ export default function DetallePedidoProveedorPage({ params }) {
                               }}
                               onBlur={() => {
                                 const v = Number(costos[det.id]);
-                                if (isNaN(v) || v < 0) {
-                                  setCostos((prev) => ({ ...prev, [det.id]: "0" }));
+                                const final = isNaN(v) || v < 0 ? 0 : v;
+                                setCostos((prev) => ({ ...prev, [det.id]: String(final) }));
+                                if (esBorrador) {
+                                  const prevCosto = Number(det.precioCosto);
+                                  if (final !== prevCosto) {
+                                    editarItemAPI(det.id, {
+                                      precioCosto: final > 0 ? final : null,
+                                    });
+                                  }
                                 }
                               }}
                               className="w-[70px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -628,7 +739,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                         </td>
                       )}
 
-                      {esRecepcion && (
+                      {(esRecepcion || esBorrador) && (
                         <td className="px-3 py-1.5 text-center">
                           <button
                             type="button"
@@ -644,16 +755,17 @@ export default function DetallePedidoProveedorPage({ params }) {
                   );
                 })
               )}
-              {/* TOTAL ESTIMADO — siempre visible, reactivo en recepción */}
+              {/* TOTAL ESTIMADO — siempre visible, reactivo en recepción y borrador */}
               {(pedido.detalles || []).length > 0 && (() => {
                 const totalEstimado = computedTotalFactura;
                 // Contar columnas visibles antes de esta fila
                 const baseCols = 5; // Producto, SKU, Cant. pedida, Unidad, Costo
                 const extraCols =
-                  (esRecepcion ? 2 : 0) +
-                  (esRecepcion && tieneFiambre ? 1 : 0) +
-                  (pedido.estado === "RECIBIDO" ? 1 : 0) +
-                  (pedido.estado === "RECIBIDO" && tieneFiambre ? 1 : 0);
+                  (esRecepcion ? 1 : 0) + // Cant. recibida
+                  (esRecepcion && tieneFiambre ? 1 : 0) + // Kg recibidos
+                  (pedido.estado === "RECIBIDO" ? 1 : 0) + // Recibido
+                  (pedido.estado === "RECIBIDO" && tieneFiambre ? 1 : 0) + // Kg reales
+                  ((esRecepcion || esBorrador) ? 1 : 0); // Acción (delete)
                 const totalCols = baseCols + extraCols;
                 return (
                   <tr className="border-t sunmi-divider">
@@ -670,12 +782,12 @@ export default function DetallePedidoProveedorPage({ params }) {
           </div>
         </SunmiPanel>
 
-        {/* Agregar producto extra — solo en recepción (ENVIADO) */}
-        {esRecepcion && (
+        {/* Agregar productos al pedido — visible en BORRADOR y ENVIADO */}
+        {(esRecepcion || esBorrador) && (
           <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
             <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
               <h3 className="text-[13px] font-semibold sunmi-text-strong">
-                Agregar producto extra
+                {esBorrador ? "Agregar productos al pedido" : "Agregar producto extra"}
               </h3>
             </div>
 

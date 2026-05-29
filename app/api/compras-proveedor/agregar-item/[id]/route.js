@@ -41,9 +41,9 @@ export async function POST(req, { params }) {
       );
     }
 
-    if (pedido.estado !== "ENVIADO") {
+    if (!["BORRADOR", "ENVIADO"].includes(pedido.estado)) {
       return NextResponse.json(
-        { ok: false, error: "Solo se pueden agregar ítems en estado ENVIADO" },
+        { ok: false, error: "Solo se pueden agregar ítems en estado BORRADOR o ENVIADO" },
         { status: 400 }
       );
     }

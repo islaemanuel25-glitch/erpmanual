@@ -33,11 +33,16 @@ export default function NuevaCompraProveedorPage() {
   const { loading: loadingCtx, needsContexto } = useContextoActivo();
 
   const proveedorIdParam = searchParams.get("proveedorId") || "";
+  const pedidoIdParam = searchParams.get("pedidoId") || "";
+  const esContinuar = Boolean(pedidoIdParam);
 
   // Proveedores
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState(proveedorIdParam);
   const [notas, setNotas] = useState("");
+
+  // En modo continuar: nombre del proveedor cargado para mostrar como readonly.
+  const [proveedorNombre, setProveedorNombre] = useState("");
 
   // Productos del proveedor (ProductoLocal del depósito)
   const [productos, setProductos] = useState([]);
@@ -49,6 +54,10 @@ export default function NuevaCompraProveedorPage() {
   const [soloFaltantes, setSoloFaltantes] = useState(true);
 
   const [saving, setSaving] = useState(false);
+
+  // Detección de pedido BORRADOR existente para el proveedor seleccionado.
+  // null = no hay / no chequeado. Objeto = hay borrador y se ofrece continuar.
+  const [borradorExistente, setBorradorExistente] = useState(null);
 
   // Proveedor seleccionado (objeto completo) para mostrar info de dias_pedido.
   const proveedorSel = useMemo(
@@ -76,6 +85,86 @@ export default function NuevaCompraProveedorPage() {
     };
     load();
   }, []);
+
+  // Modo continuar: cargar el pedido BORRADOR y reconstruir items con detalleId
+  useEffect(() => {
+    if (!esContinuar) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/compras-proveedor/obtener?id=${pedidoIdParam}`,
+          { credentials: "include" }
+        );
+        const data = await res.json();
+        if (cancelado || !data.ok || !data.item) return;
+        const p = data.item;
+        if (p.estado !== "BORRADOR") {
+          alert(`Este pedido no es un borrador (estado: ${p.estado}). Volviendo al detalle.`);
+          router.replace(`/modulos/compras-proveedor/${p.id}`);
+          return;
+        }
+        setProveedorId(String(p.proveedor?.id || ""));
+        setProveedorNombre(p.proveedor?.nombre || "");
+        setNotas(p.notas || "");
+        const itemsFromDetalles = (p.detalles || []).map((d) => {
+          const base = d.producto?.base || {};
+          const modoCompra = base.modoCompraProveedor || "BULTO";
+          const factorPack = Number(base.factor_pack) || 1;
+          const pesoRefKg = Number(base.pesoReferenciaKg) || 0;
+          return {
+            detalleId: d.id,
+            productoLocalId: d.productoLocalId,
+            nombre: base.nombre || "",
+            sku: base.sku || "",
+            modoCompra,
+            cantidad: Number(d.cantidad) || 1,
+            precioCosto: Number(d.precioCosto) || 0,
+            factorPack,
+            sugerido: 0,
+            sinParametros: false,
+            pesoRefKg,
+          };
+        });
+        setItems(itemsFromDetalles);
+      } catch {
+        alert("No se pudo cargar el pedido. Volvé al listado e intentá de nuevo.");
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [esContinuar, pedidoIdParam, router]);
+
+  // Al cambiar el proveedor, chequear si ya hay BORRADOR pendiente para él.
+  // Reusa /api/compras-proveedor/listar (ya soporta filtros estado + proveedorId).
+  // En modo continuar no aplica: ya estamos editando ese borrador.
+  useEffect(() => {
+    setBorradorExistente(null); // reset en cada cambio de proveedor
+    if (esContinuar) return;
+    if (!proveedorId) return;
+
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/compras-proveedor/listar?estado=BORRADOR&proveedorId=${proveedorId}&pageSize=1`,
+          { credentials: "include" }
+        );
+        const data = await res.json();
+        if (cancelado) return;
+        if (data.ok && Array.isArray(data.items) && data.items.length > 0) {
+          setBorradorExistente(data.items[0]);
+        }
+      } catch {
+        // Silenciar: si falla, no se muestra el aviso y el usuario sigue normalmente.
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [proveedorId, esContinuar]);
 
   // Cargar productos del proveedor seleccionado
   const cargarProductos = useCallback(async () => {
@@ -106,26 +195,80 @@ export default function NuevaCompraProveedorPage() {
 
   // Agregar producto al pedido
   // modoCompra es la ÚNICA fuente de verdad: "BULTO" (depósito) o "UNIDAD" (fiambre)
-  const agregarItem = (prod) => {
+  // En modo continuar, persiste inmediatamente vía /agregar-item.
+  const agregarItem = async (prod) => {
     if (items.find((i) => i.productoLocalId === prod.productoLocalId)) return;
-    setItems((prev) => [
-      ...prev,
-      {
-        productoLocalId: prod.productoLocalId,
-        nombre: prod.nombre,
-        sku: prod.sku,
-        modoCompra: prod.modoCompra || "BULTO",
-        cantidad: prod.sugerido > 0 ? prod.sugerido : 1,
-        precioCosto: Number(prod.precio_costo || 0),
-        factorPack: Number(prod.factor_pack) || 1,
-        sugerido: prod.sugerido,
-        sinParametros: prod.sinParametros,
-        pesoRefKg: prod.pesoRefKg,
-      },
-    ]);
+
+    const cantidadInicial = prod.sugerido > 0 ? prod.sugerido : 1;
+    const nuevoItemBase = {
+      productoLocalId: prod.productoLocalId,
+      nombre: prod.nombre,
+      sku: prod.sku,
+      modoCompra: prod.modoCompra || "BULTO",
+      cantidad: cantidadInicial,
+      precioCosto: Number(prod.precio_costo || 0),
+      factorPack: Number(prod.factor_pack) || 1,
+      sugerido: prod.sugerido,
+      sinParametros: prod.sinParametros,
+      pesoRefKg: prod.pesoRefKg,
+    };
+
+    if (esContinuar) {
+      try {
+        const res = await fetch(
+          `/api/compras-proveedor/agregar-item/${pedidoIdParam}`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              productoLocalId: prod.productoLocalId,
+              cantidad: cantidadInicial,
+              precioCosto: prod.precio_costo || null,
+              unidad: prod.modoCompra || "BULTO",
+            }),
+          }
+        );
+        const data = await res.json();
+        if (!data.ok) {
+          alert(data.error || "No se pudo agregar el producto al borrador");
+          return;
+        }
+        setItems((prev) => [...prev, { ...nuevoItemBase, detalleId: data.detalle.id }]);
+      } catch {
+        alert("Error de conexión al agregar el producto");
+      }
+      return;
+    }
+
+    setItems((prev) => [...prev, nuevoItemBase]);
   };
 
-  const quitarItem = (productoLocalId) => {
+  const quitarItem = async (productoLocalId) => {
+    const item = items.find((i) => i.productoLocalId === productoLocalId);
+
+    if (esContinuar && item?.detalleId) {
+      try {
+        const res = await fetch(
+          `/api/compras-proveedor/eliminar-item/${pedidoIdParam}`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ detalleId: item.detalleId }),
+          }
+        );
+        const data = await res.json();
+        if (!data.ok) {
+          alert(data.error || "No se pudo quitar el producto");
+          return;
+        }
+      } catch {
+        alert("Error de conexión al quitar el producto");
+        return;
+      }
+    }
+
     setItems((prev) => prev.filter((i) => i.productoLocalId !== productoLocalId));
   };
 
@@ -140,14 +283,38 @@ export default function NuevaCompraProveedorPage() {
     );
   };
 
-  const handleBlurCantidad = (productoLocalId) => {
+  const handleBlurCantidad = async (productoLocalId) => {
+    const item = items.find((i) => i.productoLocalId === productoLocalId);
+    if (!item) return;
+
+    const val = parseInt(item.cantidad, 10);
+    const final = isNaN(val) || val < 1 ? 1 : val;
+
     setItems((prev) =>
-      prev.map((i) => {
-        if (i.productoLocalId !== productoLocalId) return i;
-        const val = parseInt(i.cantidad, 10);
-        return { ...i, cantidad: isNaN(val) || val < 1 ? 1 : val };
-      })
+      prev.map((i) =>
+        i.productoLocalId === productoLocalId ? { ...i, cantidad: final } : i
+      )
     );
+
+    if (esContinuar && item.detalleId) {
+      try {
+        const res = await fetch(
+          `/api/compras-proveedor/editar-item/${pedidoIdParam}`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ detalleId: item.detalleId, cantidad: final }),
+          }
+        );
+        const data = await res.json();
+        if (!data.ok) {
+          alert(data.error || "No se pudo guardar la cantidad");
+        }
+      } catch {
+        alert("Error de conexión al guardar la cantidad");
+      }
+    }
   };
 
   // Unidad fija BULTO para compras a proveedor (depósito)
@@ -208,7 +375,13 @@ export default function NuevaCompraProveedorPage() {
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
         <div className="flex items-center justify-between mb-4">
-          <SunmiHeader title="Nuevo pedido a proveedor" />
+          <SunmiHeader
+            title={
+              esContinuar
+                ? `Continuar pedido${pedidoIdParam ? ` #${pedidoIdParam}` : ""}`
+                : "Nuevo pedido a proveedor"
+            }
+          />
           <SunmiBackButton href="/modulos/compras-proveedor" />
         </div>
 
@@ -223,30 +396,89 @@ export default function NuevaCompraProveedorPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs sunmi-text-muted mb-1">Proveedor</label>
-              <SunmiSelectAdv
-                value={proveedorId}
-                onChange={setProveedorId}
-                searchable
-              >
-                <SunmiSelectOption value="">-- Seleccionar --</SunmiSelectOption>
-                {proveedores.map((p) => (
-                  <SunmiSelectOption key={p.id} value={String(p.id)}>
-                    {p.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
+              {esContinuar ? (
+                <div className="px-3 py-1.5 rounded-md sunmi-control text-[13px] sunmi-text-strong">
+                  {proveedorNombre || "—"}
+                </div>
+              ) : (
+                <SunmiSelectAdv
+                  value={proveedorId}
+                  onChange={setProveedorId}
+                  searchable
+                >
+                  <SunmiSelectOption value="">-- Seleccionar --</SunmiSelectOption>
+                  {proveedores.map((p) => (
+                    <SunmiSelectOption key={p.id} value={String(p.id)}>
+                      {p.nombre}
+                    </SunmiSelectOption>
+                  ))}
+                </SunmiSelectAdv>
+              )}
             </div>
 
             <div>
               <label className="block text-xs sunmi-text-muted mb-1">Notas</label>
-              <SunmiInput
-                placeholder="Notas opcionales..."
-                value={notas}
-                onChange={(e) => setNotas(e.target.value)}
-              />
+              {esContinuar ? (
+                <div className="px-3 py-1.5 rounded-md sunmi-control text-[13px] sunmi-text-muted">
+                  {notas || "—"}
+                </div>
+              ) : (
+                <SunmiInput
+                  placeholder="Notas opcionales..."
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                />
+              )}
             </div>
           </div>
         </SunmiPanel>
+
+        {/* Aviso: ya hay BORRADOR pendiente para este proveedor */}
+        {borradorExistente && (
+          <div
+            className="rounded-2xl border p-3 mb-4"
+            style={{ borderColor: "var(--pos-warning, #f59e0b)" }}
+          >
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div
+                  className="text-[13px] font-semibold mb-1"
+                  style={{ color: "var(--pos-warning, #f59e0b)" }}
+                >
+                  Ya hay un pedido en curso para este proveedor.
+                </div>
+                <div className="text-[12px] sunmi-text-muted">
+                  Pedido #{borradorExistente.id} ·{" "}
+                  {borradorExistente.cantItems}{" "}
+                  {borradorExistente.cantItems === 1 ? "ítem" : "ítems"} · creado el{" "}
+                  {new Date(borradorExistente.createdAt).toLocaleDateString("es-AR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <SunmiButton
+                  color="cyan"
+                  onClick={() =>
+                    router.push(`/modulos/compras-proveedor/nueva?pedidoId=${borradorExistente.id}`)
+                  }
+                >
+                  Continuar pedido
+                </SunmiButton>
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setBorradorExistente(null)}
+                >
+                  Crear pedido nuevo
+                </SunmiButton>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Warning informativo: hoy no es día válido para este proveedor */}
         {mostrarWarningDia && (
@@ -418,13 +650,19 @@ export default function NuevaCompraProveedorPage() {
 
             <div className="overflow-x-auto rounded border sunmi-border">
               <SunmiTable headers={["Producto", "Cant.", "Costo (por bulto)", "Subtotal", ""]}>
-                {items.map((item) => {
+                {items.map((item, index) => {
                   const subtotalItem = (Number(item.cantidad) || 0) * item.precioCosto;
                   const esFiambre = item.modoCompra === "UNIDAD";
                   const unidadLabel = esFiambre ? "uds" : "bultos";
                   const costoLabel = esFiambre ? "unidad" : "bulto";
                   return (
-                    <SunmiTableRow key={item.productoLocalId}>
+                    <SunmiTableRow
+                      key={
+                        item.detalleId
+                          ? `detalle-${item.detalleId}`
+                          : `producto-${item.productoLocalId}-${index}`
+                      }
+                    >
                       <td className="px-3 py-1.5 text-sm">
                         {item.nombre}
                         {item.sku && (
@@ -504,21 +742,42 @@ export default function NuevaCompraProveedorPage() {
           </SunmiPanel>
         )}
 
-        {/* Botón crear */}
+        {/* Footer */}
         <div className="flex justify-end gap-3 mt-4">
-          <SunmiButton
-            color="slate"
-            onClick={() => router.push("/modulos/compras-proveedor")}
-          >
-            Cancelar
-          </SunmiButton>
-          <SunmiButton
-            color="green"
-            disabled={saving || items.length === 0 || !proveedorId}
-            onClick={crearPedido}
-          >
-            {saving ? "Guardando..." : "Crear pedido"}
-          </SunmiButton>
+          {esContinuar ? (
+            <>
+              <SunmiButton
+                color="slate"
+                onClick={() => router.push("/modulos/compras-proveedor")}
+              >
+                Volver al listado
+              </SunmiButton>
+              <SunmiButton
+                color="cyan"
+                onClick={() =>
+                  router.push(`/modulos/compras-proveedor/${pedidoIdParam}`)
+                }
+              >
+                Ir al detalle
+              </SunmiButton>
+            </>
+          ) : (
+            <>
+              <SunmiButton
+                color="slate"
+                onClick={() => router.push("/modulos/compras-proveedor")}
+              >
+                Cancelar
+              </SunmiButton>
+              <SunmiButton
+                color="green"
+                disabled={saving || items.length === 0 || !proveedorId}
+                onClick={crearPedido}
+              >
+                {saving ? "Guardando..." : "Guardar borrador"}
+              </SunmiButton>
+            </>
+          )}
         </div>
       </SunmiCard>
     </div>

@@ -223,26 +223,37 @@ export default function ComprasProveedorPage() {
                   <td className="px-3 py-2">
                     <span
                       className={`px-2 py-0.5 rounded text-xs font-medium
-                        ${item.estado === "BORRADOR" ? "sunmi-badge-muted" : ""}
+                        ${item.estado === "BORRADOR" ? "sunmi-badge-accent" : ""}
                         ${item.estado === "CONFIRMADO" ? "sunmi-badge-accent" : ""}
                         ${item.estado === "ENVIADO" ? "sunmi-badge-link" : ""}
                         ${item.estado === "RECIBIDO" ? "sunmi-badge-success" : ""}
                         ${item.estado === "ANULADO" ? "sunmi-badge-danger" : ""}
                       `}
                     >
-                      {item.estado}
+                      {item.estado === "BORRADOR" ? "EN CURSO" : item.estado}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-xs">{formatFecha(item.createdAt)}</td>
                   <td className="px-3 py-2">
-                    <SunmiButton
-                      color="cyan"
-                      onClick={() =>
-                        router.push(`/modulos/compras-proveedor/${item.id}`)
-                      }
-                    >
-                      Ver
-                    </SunmiButton>
+                    {item.estado === "BORRADOR" ? (
+                      <SunmiButton
+                        color="green"
+                        onClick={() =>
+                          router.push(`/modulos/compras-proveedor/nueva?pedidoId=${item.id}`)
+                        }
+                      >
+                        Continuar pedido
+                      </SunmiButton>
+                    ) : (
+                      <SunmiButton
+                        color="cyan"
+                        onClick={() =>
+                          router.push(`/modulos/compras-proveedor/${item.id}`)
+                        }
+                      >
+                        Ver
+                      </SunmiButton>
+                    )}
                   </td>
                 </SunmiTableRow>
               ))
