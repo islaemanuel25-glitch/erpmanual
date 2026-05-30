@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-05-27 21:11
+**Última actualización:** 2026-05-30 01:30
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,9 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-05-29: fix: decrement stock by factor_pack when selling pack from warehouse
+- 2026-05-27: feat(ui): aplicar patrón de buscador con lupa, --pos-link y pulse-neon en POS-ventas
+- 2026-05-27: style(ui): aplicar color --pos-link a date inputs, selects y botones de filtro en auditoria, compras, reportes, transferencias y turnos
 - 2026-05-26: feat: require customer in POS by context
 - 2026-05-26: feat: add secondary barcode support for products
 - 2026-05-13: feat: improve voice product search matching
