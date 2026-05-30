@@ -39,6 +39,15 @@ function formatFecha(f) {
   });
 }
 
+// Hoy local en YYYY-MM-DD (zona del navegador, default AR).
+function hoyLocalISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function ComprasProveedorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,6 +60,8 @@ export default function ComprasProveedorPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [estado, setEstado] = useState("");
+  const [fechaDesde, setFechaDesde] = useState(hoyLocalISO);
+  const [fechaHasta, setFechaHasta] = useState(hoyLocalISO);
 
   const [proveedoresHoy, setProveedoresHoy] = useState([]);
 
@@ -65,6 +76,10 @@ export default function ComprasProveedorPage() {
       });
       if (estado) qs.set("estado", estado);
       if (proveedorIdParam) qs.set("proveedorId", proveedorIdParam);
+      if (fechaDesde && fechaHasta) {
+        qs.set("fechaDesde", fechaDesde);
+        qs.set("fechaHasta", fechaHasta);
+      }
 
       const res = await fetch(`/api/compras-proveedor/listar?${qs}`, {
         credentials: "include",
@@ -81,7 +96,12 @@ export default function ComprasProveedorPage() {
 
   useEffect(() => {
     cargar();
-  }, [page, estado, proveedorIdParam]);
+  }, [page, estado, proveedorIdParam, fechaDesde, fechaHasta]);
+
+  // Cambio de filtros (no de página) → volver a página 1.
+  useEffect(() => {
+    setPage(1);
+  }, [estado, fechaDesde, fechaHasta]);
 
   // Cargar proveedores activos para detectar los que reciben pedido hoy.
   // Reutiliza el endpoint de listar (pageSize=200 ya alcanza para todos los activos).
@@ -167,7 +187,7 @@ export default function ComprasProveedorPage() {
 
         <SunmiSeparator label="Filtros" className="my-4" />
 
-        <div className="flex flex-col md:flex-row gap-3 px-2 mb-4">
+        <div className="flex flex-col md:flex-row md:flex-wrap gap-3 px-2 mb-4 items-end">
           <div className="w-48">
             <SunmiSelectAdv
               value={estado}
@@ -183,12 +203,56 @@ export default function ComprasProveedorPage() {
             </SunmiSelectAdv>
           </div>
 
+          <div>
+            <label className="block text-[11px] sunmi-text-muted mb-1">Desde</label>
+            <SunmiInput
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              className="!border !border-[var(--pos-link)]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] sunmi-text-muted mb-1">Hasta</label>
+            <SunmiInput
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="!border !border-[var(--pos-link)]"
+            />
+          </div>
+
+          <SunmiButton
+            color="cyan"
+            onClick={() => {
+              const hoy = hoyLocalISO();
+              setFechaDesde(hoy);
+              setFechaHasta(hoy);
+            }}
+          >
+            Hoy
+          </SunmiButton>
+
+          <SunmiButton
+            color="slate"
+            className="!border !border-[var(--pos-link)]"
+            onClick={() => {
+              setFechaDesde("");
+              setFechaHasta("");
+            }}
+          >
+            Ver todos
+          </SunmiButton>
+
           <SunmiButton
             color="slate"
             className="!border !border-[var(--pos-link)]"
             onClick={() => {
               setEstado("");
-              setPage(1);
+              const hoy = hoyLocalISO();
+              setFechaDesde(hoy);
+              setFechaHasta(hoy);
             }}
           >
             Limpiar

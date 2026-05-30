@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 
 export async function GET(req) {
   try {
@@ -23,12 +24,20 @@ export async function GET(req) {
 
     const proveedorId = Number(url.searchParams.get("proveedorId") || 0) || undefined;
     const estado = url.searchParams.get("estado") || undefined;
+    const fechaDesde = url.searchParams.get("fechaDesde") || "";
+    const fechaHasta = url.searchParams.get("fechaHasta") || "";
     const page = Math.max(1, Number(url.searchParams.get("page") || 1));
     const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get("pageSize") || 20)));
 
     const where = { grupoId };
     if (proveedorId) where.proveedorId = proveedorId;
     if (estado) where.estado = estado;
+
+    // Filtro por rango de fecha de creación (AR). Solo aplica si vienen ambos.
+    if (fechaDesde && fechaHasta) {
+      const { fechaInicio, fechaFin } = getRangoArgentina(fechaDesde, fechaHasta);
+      where.createdAt = { gte: fechaInicio, lte: fechaFin };
+    }
 
     const [items, total] = await Promise.all([
       prisma.pedidoProveedor.findMany({
