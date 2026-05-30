@@ -56,6 +56,7 @@ export async function GET(req) {
     const conStock = searchParams.get("conStock") === "true";
     const sinStock = searchParams.get("sinStock") === "true";
     const faltantes = searchParams.get("faltantes") === "true";
+    const negativo = searchParams.get("negativo") === "true";
 
     const local = await prisma.local.findUnique({
       where: { id: localId },
@@ -309,6 +310,7 @@ export async function GET(req) {
     if (conStock) final = final.filter((p) => p.stock > 0);
     if (sinStock) final = final.filter((p) => p.stock === 0);
     if (faltantes) final = final.filter((p) => p.faltante);
+    if (negativo) final = final.filter((p) => p.stock < 0);
 
     // Orden alfabético por nombre
     final.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"));

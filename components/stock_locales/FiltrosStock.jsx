@@ -19,7 +19,7 @@ export default function FiltrosStock({
   const [proveedor, setProveedor] = useState("");
   const [area, setArea] = useState("");
 
-  // Selector unificado: "todos" | "con_stock" | "sin_stock" | "faltantes"
+  // Selector unificado: "todos" | "con_stock" | "sin_stock" | "faltantes" | "negativo"
   const [estadoStock, setEstadoStock] = useState("todos");
 
   const [openAvanzado, setOpenAvanzado] = useState(false);
@@ -56,7 +56,7 @@ export default function FiltrosStock({
     cargar();
   }, []);
 
-  // Debounce + mapeo estadoStock -> {conStock, sinStock, faltantes}
+  // Debounce + mapeo estadoStock -> {conStock, sinStock, faltantes, negativo}
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -69,6 +69,7 @@ export default function FiltrosStock({
         conStock: estadoStock === "con_stock",
         sinStock: estadoStock === "sin_stock",
         faltantes: estadoStock === "faltantes",
+        negativo: estadoStock === "negativo",
       });
     }, 300);
 
@@ -233,6 +234,7 @@ export default function FiltrosStock({
             <SunmiSelectOption value="con_stock">Con stock</SunmiSelectOption>
             <SunmiSelectOption value="sin_stock">Sin stock</SunmiSelectOption>
             <SunmiSelectOption value="faltantes">Faltantes</SunmiSelectOption>
+            <SunmiSelectOption value="negativo">Negativo</SunmiSelectOption>
           </SunmiSelectAdv>
         </div>
 

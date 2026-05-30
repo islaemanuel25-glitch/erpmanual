@@ -118,6 +118,7 @@ export default function TablaStock({
     if (filtro.conStock) params.set("conStock", "true");
     if (filtro.sinStock) params.set("sinStock", "true");
     if (filtro.faltantes) params.set("faltantes", "true");
+    if (filtro.negativo) params.set("negativo", "true");
 
     return params.toString();
   };
