@@ -11,7 +11,7 @@
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { redondear100 } from "@/lib/precios/redondeo";
 
@@ -24,36 +24,22 @@ function safeNum(n) {
 // Devuelve:
 //   { ok: true, resumen, items, local }
 //   { ok: false, error, status }
+//
+// El local SIEMPRE se resuelve desde el contexto activo de la sesión (JWT
+// o cookie de contexto-activo) — nunca desde query. Esto evita que un
+// usuario pueda ver el stock de otro local distinto al que está operando.
 export async function obtenerReporte(req) {
-  const session = getUsuarioSession(req);
-  if (!session) return { ok: false, error: "No autenticado", status: 401 };
+  const ctx = await resolveLocalAndGrupo(req);
+  if (ctx.error) {
+    return { ok: false, error: ctx.error, status: ctx.status };
+  }
+
+  const { session, localId } = ctx;
 
   const perm = checkPerm(session, "stock.ver");
   if (!perm.ok) return { ok: false, error: perm.error, status: perm.status };
 
   const { searchParams } = new URL(req.url);
-
-  const sessionLocalId = session.localId;
-  const esAdmin = session.esAdmin;
-
-  // Resolver localId. Para admin sin local bindeado, requiere query.
-  // Para admin con local bindeado, permitimos override por query para inspeccionar otros.
-  let localId;
-  const queryLocalId = Number(searchParams.get("localId") || 0);
-
-  if (esAdmin && queryLocalId) {
-    localId = queryLocalId;
-  } else if (esAdmin && !sessionLocalId) {
-    if (!queryLocalId) {
-      return { ok: false, error: "localId requerido para admin sin local.", status: 400 };
-    }
-    localId = queryLocalId;
-  } else {
-    localId = Number(sessionLocalId || 0);
-    if (!localId) {
-      return { ok: false, error: "localId inválido", status: 400 };
-    }
-  }
 
   const q = (searchParams.get("q") || "").trim();
   const categoria = searchParams.get("categoria") || "";

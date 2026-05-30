@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -14,6 +15,7 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import { Search } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 function fmtMonto(n) {
@@ -33,15 +35,15 @@ function fmtCant(n) {
 }
 
 export default function ReportesStockPage() {
+  const router = useRouter();
   const { perfil, cargando } = useUser();
+  const { loading: loadingCtx, contexto, needsContexto } = useContextoActivo();
 
-  // Catálogos
-  const [locales, setLocales] = useState([]);
+  // Catálogos (sin "locales" — local viene del contexto activo)
   const [categorias, setCategorias] = useState([]);
   const [proveedores, setProveedores] = useState([]);
 
   // Filtros
-  const [localId, setLocalId] = useState("");
   const [q, setQ] = useState("");
   const [categoria, setCategoria] = useState("");
   const [proveedor, setProveedor] = useState("");
@@ -56,33 +58,27 @@ export default function ReportesStockPage() {
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
   const puede = esAdmin || permisos.includes("stock.ver");
 
+  // Redirigir si admin sin contexto operativo
+  useEffect(() => {
+    if (needsContexto) router.push("/inicio");
+  }, [needsContexto, router]);
+
   // Cargar catálogos al montar
   useEffect(() => {
     let cancelado = false;
     const load = async () => {
       try {
-        const [locRes, catRes, provRes] = await Promise.all([
-          fetch("/api/locales/opciones", { credentials: "include" }),
+        const [catRes, provRes] = await Promise.all([
           fetch("/api/catalogos/categorias", { credentials: "include" }),
           fetch("/api/catalogos/proveedores", { credentials: "include" }),
         ]);
-        const [locJson, catJson, provJson] = await Promise.all([
-          locRes.ok ? locRes.json() : { items: [] },
+        const [catJson, provJson] = await Promise.all([
           catRes.ok ? catRes.json() : { items: [] },
           provRes.ok ? provRes.json() : { items: [] },
         ]);
         if (cancelado) return;
-        const locsArr = locJson.items || [];
-        setLocales(locsArr);
         setCategorias(catJson.items || []);
         setProveedores(provJson.items || []);
-
-        // Pre-seleccionar local del usuario, o el primero disponible.
-        if (perfil?.localId) {
-          setLocalId(String(perfil.localId));
-        } else if (locsArr.length > 0) {
-          setLocalId(String(locsArr[0].id));
-        }
       } catch {
         // Silenciar: el usuario igual puede usar la UI con catálogos vacíos.
       }
@@ -93,25 +89,28 @@ export default function ReportesStockPage() {
     };
   }, [perfil]);
 
-  // Cargar reporte cada vez que cambia un filtro
+  // Cargar reporte cada vez que cambia un filtro.
+  // El local lo resuelve el server desde sesión/contexto-activo — la UI no lo manda.
   useEffect(() => {
     if (!puede) return;
-    if (!localId) return;
+    if (loadingCtx) return;
+    if (needsContexto) return;
 
     let cancelado = false;
     const cargar = async () => {
       setLoading(true);
       try {
-        const qs = new URLSearchParams({ localId });
+        const qs = new URLSearchParams();
         if (q.trim()) qs.set("q", q.trim());
         if (categoria) qs.set("categoria", categoria);
         if (proveedor) qs.set("proveedor", proveedor);
         if (estadoStock && estadoStock !== "todos") {
           qs.set("estadoStock", estadoStock);
         }
-        const res = await fetch(`/api/reportes-stock/valorizado?${qs}`, {
-          credentials: "include",
-        });
+        const url = qs.toString()
+          ? `/api/reportes-stock/valorizado?${qs}`
+          : `/api/reportes-stock/valorizado`;
+        const res = await fetch(url, { credentials: "include" });
         const data = await res.json();
         if (cancelado) return;
         if (data.ok) {
@@ -129,16 +128,18 @@ export default function ReportesStockPage() {
     return () => {
       cancelado = true;
     };
-  }, [puede, localId, q, categoria, proveedor, estadoStock]);
+  }, [puede, loadingCtx, needsContexto, q, categoria, proveedor, estadoStock]);
 
   const exportarExcel = () => {
-    if (!localId) return;
-    const qs = new URLSearchParams({ localId });
+    const qs = new URLSearchParams();
     if (q.trim()) qs.set("q", q.trim());
     if (categoria) qs.set("categoria", categoria);
     if (proveedor) qs.set("proveedor", proveedor);
     if (estadoStock && estadoStock !== "todos") qs.set("estadoStock", estadoStock);
-    window.open(`/api/reportes-stock/valorizado/exportar-excel?${qs}`, "_blank");
+    const url = qs.toString()
+      ? `/api/reportes-stock/valorizado/exportar-excel?${qs}`
+      : `/api/reportes-stock/valorizado/exportar-excel`;
+    window.open(url, "_blank");
   };
 
   const limpiar = () => {
@@ -148,23 +149,29 @@ export default function ReportesStockPage() {
     setEstadoStock("todos");
   };
 
-  const localNombre = useMemo(() => {
-    const l = locales.find((x) => String(x.id) === String(localId));
-    return l?.nombre || "";
-  }, [locales, localId]);
-
-  if (cargando) return null;
+  if (cargando || loadingCtx) return null;
   if (!perfil) return null;
+  if (needsContexto) return null;
   if (!puede) return <SinPermisos />;
+
+  // Nombre del local activo para mostrar en header.
+  const localNombre = contexto?.nombre || (perfil?.localId ? `Local #${perfil.localId}` : "—");
+  const esDeposito = contexto?.esDeposito === true;
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <SunmiHeader title="Stock Valorizado" />
+          <div>
+            <SunmiHeader title="Stock Valorizado" />
+            <div className="text-[12px] sunmi-text-muted mt-1">
+              {esDeposito ? "Depósito" : "Local"}:{" "}
+              <span className="sunmi-text-strong">{localNombre}</span>
+            </div>
+          </div>
           <SunmiButton
             color="cyan"
-            disabled={!localId || loading}
+            disabled={loading}
             onClick={exportarExcel}
           >
             Exportar Excel
@@ -179,30 +186,7 @@ export default function ReportesStockPage() {
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div>
-              <label className="block text-xs sunmi-text-muted mb-1">Local</label>
-              {esAdmin ? (
-                <SunmiSelectAdv
-                  value={localId}
-                  onChange={setLocalId}
-                  searchable
-                  placeholder="Seleccionar local..."
-                >
-                  {locales.map((l) => (
-                    <SunmiSelectOption key={l.id} value={String(l.id)}>
-                      {l.nombre}
-                      {l.esDeposito ? " (depósito)" : ""}
-                    </SunmiSelectOption>
-                  ))}
-                </SunmiSelectAdv>
-              ) : (
-                <div className="px-3 py-1.5 rounded-md sunmi-control text-[13px] sunmi-text-strong">
-                  {localNombre || "—"}
-                </div>
-              )}
-            </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs sunmi-text-muted mb-1">
                 Categoría
@@ -318,8 +302,6 @@ export default function ReportesStockPage() {
           >
             {loading ? (
               <SunmiTableEmpty label="Cargando..." />
-            ) : !localId ? (
-              <SunmiTableEmpty label="Elegí un local" />
             ) : items.length === 0 ? (
               <SunmiTableEmpty label="Sin productos para los filtros aplicados" />
             ) : (
