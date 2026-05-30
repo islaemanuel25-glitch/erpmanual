@@ -170,6 +170,12 @@ export default function DetallePedidoProveedorPage({ params }) {
 
       const data = await res.json();
       if (data.ok) {
+        // Marcar como enviado → salir del detalle para evitar que el usuario
+        // siga "tocando botones" hasta recibir por error.
+        if (accion === "enviar") {
+          router.push("/modulos/compras-proveedor");
+          return;
+        }
         cargar();
       } else {
         alert(data.error || "Error al ejecutar acción");
@@ -444,6 +450,26 @@ export default function DetallePedidoProveedorPage({ params }) {
             </div>
           </div>
         </SunmiPanel>
+
+        {/* Banner ENVIADO: esperando mercadería */}
+        {esRecepcion && (
+          <div
+            className="rounded-2xl border p-3 mb-4"
+            style={{ borderColor: "var(--pos-warning, #f59e0b)" }}
+          >
+            <div
+              className="text-[13px] font-semibold mb-1"
+              style={{ color: "var(--pos-warning, #f59e0b)" }}
+            >
+              Pedido enviado al proveedor. Esperando mercadería.
+            </div>
+            <div className="text-[12px] sunmi-text-muted">
+              No marques recepción hasta que la mercadería haya llegado físicamente
+              al depósito. Cuando llegue, usá el botón &quot;Recibir mercadería&quot;
+              al final del detalle.
+            </div>
+          </div>
+        )}
 
         {/* Panel factura — editable en ENVIADO, readonly en RECIBIDO */}
         {(esRecepcion || pedido.estado === "RECIBIDO") && (
@@ -928,7 +954,10 @@ export default function DetallePedidoProveedorPage({ params }) {
               <SunmiButton
                 color="cyan"
                 disabled={acting}
-                onClick={() => ejecutarAccion("enviar")}
+                onClick={() => {
+                  if (!confirm("¿Confirmás que este pedido ya fue enviado al proveedor?")) return;
+                  ejecutarAccion("enviar");
+                }}
               >
                 {acting ? "Procesando..." : "Marcar como enviado"}
               </SunmiButton>
@@ -937,11 +966,16 @@ export default function DetallePedidoProveedorPage({ params }) {
 
           {pedido.estado === "ENVIADO" && (
             <SunmiButton
-              color="green"
+              color="amber"
               disabled={acting}
-              onClick={() => ejecutarAccion("recibir")}
+              className="!border !border-[var(--pos-warning,#f59e0b)]"
+              title="Solo continuar si la mercadería llegó físicamente al depósito"
+              onClick={() => {
+                if (!confirm("Solo continuar si la mercadería llegó físicamente.\n\n¿Confirmás la recepción de este pedido?")) return;
+                ejecutarAccion("recibir");
+              }}
             >
-              {acting ? "Procesando..." : "Recibir pedido"}
+              {acting ? "Procesando..." : "Recibir mercadería"}
             </SunmiButton>
           )}
         </div>
