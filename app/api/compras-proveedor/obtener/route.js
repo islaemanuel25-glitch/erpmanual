@@ -32,7 +32,7 @@ export async function GET(req) {
     const pedido = await prisma.pedidoProveedor.findUnique({
       where: { id },
       include: {
-        proveedor: { select: { id: true, nombre: true } },
+        proveedor: { select: { id: true, nombre: true, telefono: true, email: true, direccion: true } },
         deposito: { select: { id: true, nombre: true } },
         detalles: {
           include: {

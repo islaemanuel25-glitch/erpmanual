@@ -17,6 +17,10 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
+import {
+  generarTextoWhatsApp,
+  normalizarTelefonoWa,
+} from "@/lib/compras-proveedor/whatsappTexto";
 
 const ESTADO_BADGE = {
   BORRADOR: "sunmi-badge-muted",
@@ -246,6 +250,39 @@ export default function DetallePedidoProveedorPage({ params }) {
     } finally {
       setExtraAdding(null);
     }
+  };
+
+  // Salida del pedido al proveedor (PDF / WhatsApp / copia).
+  // No cambian estado ni stock — solo lectura y exportación.
+  const descargarPDF = () => {
+    // Misma origin → cookies viajan. Nueva pestaña dispara el "attachment" del header.
+    window.open(`/api/compras-proveedor/exportar-pdf/${id}`, "_blank");
+  };
+
+  const copiarPedido = async () => {
+    if (!pedido) return;
+    const texto = generarTextoWhatsApp(pedido);
+    try {
+      await navigator.clipboard.writeText(texto);
+      alert("Pedido copiado al portapapeles");
+    } catch {
+      alert("No se pudo copiar al portapapeles (¿permisos del navegador?)");
+    }
+  };
+
+  const enviarWhatsApp = () => {
+    if (!pedido) return;
+    const tel = normalizarTelefonoWa(pedido.proveedor?.telefono);
+    if (!tel) {
+      alert("El proveedor no tiene teléfono cargado.");
+      return;
+    }
+    const texto = encodeURIComponent(generarTextoWhatsApp(pedido));
+    // Desktop: usa WhatsApp Web directo (sin pantalla intermedia de api.whatsapp.com).
+    window.open(
+      `https://web.whatsapp.com/send?phone=${tel}&text=${texto}`,
+      "_blank"
+    );
   };
 
   // Persiste cambios de cantidad/unidad/precioCosto de una línea en BORRADOR.
@@ -869,13 +906,33 @@ export default function DetallePedidoProveedorPage({ params }) {
           )}
 
           {pedido.estado === "CONFIRMADO" && (
-            <SunmiButton
-              color="cyan"
-              disabled={acting}
-              onClick={() => ejecutarAccion("enviar")}
-            >
-              {acting ? "Procesando..." : "Marcar como enviado"}
-            </SunmiButton>
+            <>
+              <SunmiButton color="slate" onClick={descargarPDF}>
+                Descargar PDF
+              </SunmiButton>
+              <SunmiButton color="slate" onClick={copiarPedido}>
+                Copiar pedido
+              </SunmiButton>
+              <SunmiButton
+                color="green"
+                disabled={!pedido.proveedor?.telefono}
+                title={
+                  !pedido.proveedor?.telefono
+                    ? "El proveedor no tiene teléfono cargado"
+                    : "Abre WhatsApp con el pedido listo para enviar"
+                }
+                onClick={enviarWhatsApp}
+              >
+                Enviar por WhatsApp
+              </SunmiButton>
+              <SunmiButton
+                color="cyan"
+                disabled={acting}
+                onClick={() => ejecutarAccion("enviar")}
+              >
+                {acting ? "Procesando..." : "Marcar como enviado"}
+              </SunmiButton>
+            </>
           )}
 
           {pedido.estado === "ENVIADO" && (
