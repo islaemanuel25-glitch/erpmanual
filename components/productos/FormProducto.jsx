@@ -550,6 +550,16 @@ export default function FormProducto({
           </div>
         </Section>
 
+        {/* CÓDIGOS INTERNOS POR PROVEEDOR — identificación del producto por proveedor,
+            junto al resto de datos principales. Solo en producto existente. */}
+        {initialData?.id && (
+          <SeccionCodigosProveedor
+            productoBaseId={initialData.id}
+            proveedores={catalogos?.PROVEEDORES || []}
+            proveedoresSugeridos={[form.proveedor_id, form.proveedor2_id, form.proveedor3_id]}
+          />
+        )}
+
         {/* VENTA EN LOCAL */}
         <Section title="Venta en local">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -932,14 +942,6 @@ export default function FormProducto({
             )}
           </div>
         </Section>
-
-        {/* CÓDIGOS INTERNOS POR PROVEEDOR — solo en producto existente */}
-        {initialData?.id && (
-          <SeccionCodigosProveedor
-            productoBaseId={initialData.id}
-            proveedores={catalogos?.PROVEEDORES || []}
-          />
-        )}
       </div>
 
       <div className="mx-auto w-full max-w-5xl mt-4 pt-4 border-t border-slate-800 flex justify-end gap-2">

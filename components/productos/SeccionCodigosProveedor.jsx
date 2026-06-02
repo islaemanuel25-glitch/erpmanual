@@ -22,8 +22,15 @@ import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
  * Props:
  *  - productoBaseId: id del ProductoBase (requerido; la sección no se monta sin él)
  *  - proveedores: catálogo [{ id, nombre }]
+ *  - proveedoresSugeridos: ids de los proveedores del producto en orden
+ *    [principal, segundo, tercero]. Se preselecciona el principal al agregar
+ *    y se muestran como accesos rápidos. Igual se puede elegir cualquier otro.
  */
-export default function SeccionCodigosProveedor({ productoBaseId, proveedores = [] }) {
+export default function SeccionCodigosProveedor({
+  productoBaseId,
+  proveedores = [],
+  proveedoresSugeridos = [],
+}) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -68,6 +75,26 @@ export default function SeccionCodigosProveedor({ productoBaseId, proveedores = 
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // Proveedores del producto (sugeridos): dedup + nombre, principal primero.
+  const sugeridos = (() => {
+    const seen = new Set();
+    const out = [];
+    for (const raw of proveedoresSugeridos) {
+      const id = Number(raw);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const prov = proveedores.find((p) => Number(p.id) === id);
+      out.push({ id, nombre: prov?.nombre ?? `#${id}` });
+    }
+    return out;
+  })();
+  const principalId = sugeridos[0]?.id ?? null;
+
+  // Preseleccionar el proveedor principal al cambiar de producto (o al conocerlo).
+  useEffect(() => {
+    setNuevoProv(principalId ? String(principalId) : "");
+  }, [productoBaseId, principalId]);
 
   const crear = async () => {
     setErrorAlta("");
@@ -203,6 +230,25 @@ export default function SeccionCodigosProveedor({ productoBaseId, proveedores = 
       </p>
 
       {/* Alta */}
+      {sugeridos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-2 text-xs">
+          <span className="sunmi-text-muted">Proveedores del producto:</span>
+          {sugeridos.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setNuevoProv(String(s.id))}
+              className={`px-2 py-0.5 rounded-full border text-[11px] transition-colors ${
+                String(s.id) === nuevoProv
+                  ? "bg-cyan-600 text-white border-cyan-600"
+                  : "sunmi-text-muted border-slate-600 hover:border-cyan-500"
+              }`}
+            >
+              {s.nombre}{i === 0 ? " · principal" : ""}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end mb-3">
         <div className="flex flex-col gap-1.5">
           <label className="text-[12px] sunmi-label">Proveedor</label>
