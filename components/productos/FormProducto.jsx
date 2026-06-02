@@ -8,6 +8,7 @@ import SunmiSelectConCrearRapido from "@/components/sunmi/SunmiSelectConCrearRap
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
+import SeccionCodigosProveedor from "@/components/productos/SeccionCodigosProveedor";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 function parseVoiceNumber(text) {
@@ -931,6 +932,14 @@ export default function FormProducto({
             )}
           </div>
         </Section>
+
+        {/* CÓDIGOS INTERNOS POR PROVEEDOR — solo en producto existente */}
+        {initialData?.id && (
+          <SeccionCodigosProveedor
+            productoBaseId={initialData.id}
+            proveedores={catalogos?.PROVEEDORES || []}
+          />
+        )}
       </div>
 
       <div className="mx-auto w-full max-w-5xl mt-4 pt-4 border-t border-slate-800 flex justify-end gap-2">
