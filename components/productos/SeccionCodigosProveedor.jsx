@@ -5,9 +5,6 @@ import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiTable from "@/components/sunmi/SunmiTable";
-import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
-import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 
 /**
  * SeccionCodigosProveedor — gestión manual de códigos internos por proveedor
@@ -300,94 +297,99 @@ export default function SeccionCodigosProveedor({
         <p className="text-xs text-red-500 mb-2">{loadError}</p>
       )}
 
-      <SunmiTable
-        headers={[
-          "Proveedor",
-          "Código interno",
-          "Descripción",
-          { label: "Acciones", className: "text-right" },
-        ]}
-      >
-        {loading ? (
-          <SunmiTableEmpty message="Cargando..." colSpan={4} />
-        ) : items.length === 0 ? (
-          <SunmiTableEmpty message="Sin códigos internos cargados." colSpan={4} />
-        ) : (
-          items.map((item) => {
+      {/* Listado: filas simples, sin tabla ni encabezado */}
+      {loading ? (
+        <p className="text-xs sunmi-text-muted italic">Cargando...</p>
+      ) : items.length === 0 ? (
+        <p className="text-xs sunmi-text-muted italic">Sin códigos internos cargados.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {items.map((item) => {
             const enEdicion = editId === item.id;
+
             if (enEdicion) {
               return (
-                <SunmiTableRow key={item.id}>
-                  <td className="px-2 py-1.5 align-top">
-                    <SunmiSelectAdv
-                      value={editProv}
-                      onChange={(v) => setEditProv(v)}
-                      searchable
-                      placeholder="Proveedor..."
-                    >
-                      {proveedores.map((p) => (
-                        <SunmiSelectOption key={p.id} value={String(p.id)}>
-                          {p.nombre}
-                        </SunmiSelectOption>
-                      ))}
-                    </SunmiSelectAdv>
-                  </td>
-                  <td className="px-2 py-1.5 align-top">
-                    <SunmiInput
-                      value={editCodigo}
-                      onChange={(e) => setEditCodigo(e.target.value)}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 align-top">
-                    <SunmiInput
-                      value={editDesc}
-                      onChange={(e) => setEditDesc(e.target.value)}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 align-top">
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="flex gap-1">
-                        <SunmiButton
-                          color="green"
-                          type="button"
-                          onClick={guardarEdicion}
-                          disabled={guardandoEdit}
-                        >
-                          {guardandoEdit ? "Guardando..." : "Guardar"}
-                        </SunmiButton>
-                        <SunmiButton color="slate" type="button" onClick={cancelarEdicion}>
-                          Cancelar
-                        </SunmiButton>
-                      </div>
-                      {errorEdit && (
-                        <span className="text-xs text-red-500">{errorEdit}</span>
-                      )}
+                <div
+                  key={item.id}
+                  className="rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[12px] sunmi-label">Proveedor</label>
+                      <SunmiSelectAdv
+                        value={editProv}
+                        onChange={(v) => setEditProv(v)}
+                        searchable
+                        placeholder="Proveedor..."
+                      >
+                        {proveedores.map((p) => (
+                          <SunmiSelectOption key={p.id} value={String(p.id)}>
+                            {p.nombre}
+                          </SunmiSelectOption>
+                        ))}
+                      </SunmiSelectAdv>
                     </div>
-                  </td>
-                </SunmiTableRow>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[12px] sunmi-label">Código interno</label>
+                      <SunmiInput
+                        value={editCodigo}
+                        onChange={(e) => setEditCodigo(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[12px] sunmi-label">Descripción</label>
+                      <SunmiInput
+                        value={editDesc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      <SunmiButton
+                        color="green"
+                        type="button"
+                        onClick={guardarEdicion}
+                        disabled={guardandoEdit}
+                      >
+                        {guardandoEdit ? "Guardando..." : "Guardar"}
+                      </SunmiButton>
+                      <SunmiButton color="slate" type="button" onClick={cancelarEdicion}>
+                        Cancelar
+                      </SunmiButton>
+                    </div>
+                  </div>
+                  {errorEdit && (
+                    <p className="text-xs text-red-500 mt-1">{errorEdit}</p>
+                  )}
+                </div>
               );
             }
 
             return (
-              <SunmiTableRow key={item.id}>
-                <td className="px-2 py-1.5">{item.proveedor?.nombre ?? "—"}</td>
-                <td className="px-2 py-1.5 font-mono">{item.codigoInterno}</td>
-                <td className="px-2 py-1.5">{item.descripcionProveedor || "—"}</td>
-                <td className="px-2 py-1.5">
-                  <div className="flex justify-end gap-1">
-                    <SunmiButton color="cyan" type="button" onClick={() => iniciarEdicion(item)}>
-                      Editar
-                    </SunmiButton>
-                    <SunmiButton color="red" type="button" onClick={() => eliminar(item)}>
-                      Quitar
-                    </SunmiButton>
-                  </div>
-                </td>
-              </SunmiTableRow>
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-3 rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring"
+              >
+                <div className="text-[13px] min-w-0 truncate">
+                  <span className="font-medium">{item.proveedor?.nombre ?? "—"}</span>
+                  <span className="sunmi-text-muted"> · Código </span>
+                  <span className="font-mono">{item.codigoInterno}</span>
+                  {item.descripcionProveedor && (
+                    <span className="sunmi-text-muted"> · {item.descripcionProveedor}</span>
+                  )}
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <SunmiButton color="cyan" type="button" onClick={() => iniciarEdicion(item)}>
+                    Editar
+                  </SunmiButton>
+                  <SunmiButton color="red" type="button" onClick={() => eliminar(item)}>
+                    Quitar
+                  </SunmiButton>
+                </div>
+              </div>
             );
-          })
-        )}
-      </SunmiTable>
+          })}
+        </div>
+      )}
     </SunmiPanel>
   );
 }
