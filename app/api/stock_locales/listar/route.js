@@ -2,9 +2,38 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { redondear100 } from "@/lib/precios/redondeo";
 
 const PAGE_SIZE = 25;
+
+// Búsqueda de texto actual de stock (nombre / código de barras / secundario).
+function buildTextOR(q) {
+  return q
+    ? {
+        OR: [
+          { nombre: { contains: q, mode: "insensitive" } },
+          { codigo_barra: { contains: q, mode: "insensitive" } },
+          { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
+        ],
+      }
+    : {};
+}
+
+// Código interno por proveedor (Opción C): SOLO con proveedor + q. Match EXACTO.
+async function getBaseIdsCodigo(grupoWhere, proveedorId, q) {
+  if (!q || !proveedorId || !grupoWhere) return [];
+  const m = await prisma.productoCodigoProveedor.findMany({
+    where: {
+      grupoId: grupoWhere,
+      proveedorId,
+      activo: true,
+      codigoInterno: { equals: q, mode: "insensitive" },
+    },
+    select: { productoBaseId: true },
+  });
+  return [...new Set(m.map((x) => x.productoBaseId))];
+}
 
 export async function GET(req) {
   try {
@@ -78,24 +107,33 @@ export async function GET(req) {
     // 🟦 VISTA LOCAL → PRECIO UNITARIO + REDONDEO A 100
     // ======================================================
     if (!esDeposito) {
+      // Opción C — código interno por proveedor SOLO con proveedor + q.
+      // Como la consulta es sobre ProductoLocal del local, una base que matchee
+      // por código pero sin ProductoLocal en este local NO devuelve fila
+      // (no aparece y no se crea nada).
+      const provNum = proveedor ? Number(proveedor) : null;
+      const grupoIdLocal = await getGrupoIdDeLocal(localId);
+      const baseIdsCodigo = await getBaseIdsCodigo(grupoIdLocal, provNum, q);
+      const proveedorBaseFilter = provNum ? { proveedor_id: provNum } : {};
+      let baseClause;
+      if (q) {
+        const proveedorYTexto = { AND: [proveedorBaseFilter, buildTextOR(q)] };
+        baseClause = baseIdsCodigo.length
+          ? { OR: [proveedorYTexto, { id: { in: baseIdsCodigo } }] }
+          : proveedorYTexto;
+      } else {
+        baseClause = proveedorBaseFilter;
+      }
+
       const rows = await prisma.productoLocal.findMany({
         where: {
           localId,
           activo: true,
           base: {
             activo: true,
-            ...(q
-              ? {
-                  OR: [
-                    { nombre: { contains: q, mode: "insensitive" } },
-                    { codigo_barra: { contains: q, mode: "insensitive" } },
-                    { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
-                  ],
-                }
-              : {}),
             categoria_id: categoria ? Number(categoria) : undefined,
-            proveedor_id: proveedor ? Number(proveedor) : undefined,
             area_fisica_id: area ? Number(area) : undefined,
+            AND: [baseClause],
           },
         },
         orderBy: { id: "desc" },
@@ -304,6 +342,78 @@ export async function GET(req) {
           pesoEsFijo: (pl.base?.pesoEsFijo ?? b.pesoEsFijo) === true,
           modoVentaDeposito: (pl.base?.modoVentaDeposito ?? b.modoVentaDeposito) || "PESO",
         });
+      }
+
+      // Opción C — código interno por proveedor en depósito.
+      // Suma bases vinculadas por código (proveedor + q) que YA tengan
+      // ProductoLocal en este depósito. NO auto-crea ProductoLocal por código:
+      // si no tiene ProductoLocal, no aparece y no se crea nada.
+      const provNumDep = proveedor ? Number(proveedor) : null;
+      if (q && provNumDep) {
+        const codigoBaseIds = await getBaseIdsCodigo({ in: grupoIds }, provNumDep, q);
+        const yaIncluidos = new Set(final.map((f) => f.baseId));
+        const faltantes = codigoBaseIds.filter((id) => !yaIncluidos.has(id));
+
+        if (faltantes.length) {
+          const extras = await prisma.productoLocal.findMany({
+            where: {
+              localId,
+              activo: true,
+              baseId: { in: faltantes },
+              base: { activo: true },
+            },
+            include: {
+              stock: true,
+              base: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  codigo_barra: true,
+                  categoria_id: true,
+                  proveedor_id: true,
+                  area_fisica_id: true,
+                  unidad_medida: true,
+                  factor_pack: true,
+                  precio_costo: true,
+                  precio_venta: true,
+                  margen: true,
+                  modoCompraProveedor: true,
+                  pesoReferenciaKg: true,
+                  pesoEsFijo: true,
+                  modoVentaDeposito: true,
+                },
+              },
+            },
+          });
+
+          for (const pl of extras) {
+            const b = pl.base;
+            const stock = pl.stock?.[0] || { cantidad: 0, stockMin: 0, stockMax: 0 };
+            final.push({
+              id: pl.id,
+              localId,
+              baseId: b.id,
+              nombre: b.nombre,
+              codigoBarra: b.codigo_barra,
+              categoriaId: b.categoria_id,
+              proveedorId: b.proveedor_id,
+              areaFisicaId: b.area_fisica_id,
+              unidadMedida: b.unidad_medida,
+              factorPack: b.factor_pack,
+              precioCosto: Number(pl.precio_costo ?? b.precio_costo),
+              precioVenta: Number(pl.precio_venta ?? b.precio_venta),
+              margen: pl.margen ?? b.margen,
+              stock: Number(stock.cantidad || 0),
+              stockMin: Number(stock.stockMin || 0),
+              stockMax: Number(stock.stockMax || 0),
+              faltante: Number(stock.cantidad || 0) < Number(stock.stockMin || 0),
+              modoCompraProveedor: b.modoCompraProveedor,
+              pesoReferenciaKg: b.pesoReferenciaKg ? Number(b.pesoReferenciaKg) : null,
+              pesoEsFijo: b.pesoEsFijo === true,
+              modoVentaDeposito: b.modoVentaDeposito || "PESO",
+            });
+          }
+        }
       }
     }
 
