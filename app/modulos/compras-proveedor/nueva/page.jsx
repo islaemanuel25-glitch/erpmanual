@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
@@ -19,6 +19,7 @@ import { Search } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
+import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCodigo";
 import {
   recibeHoy,
   formatDiaLabel,
@@ -51,6 +52,11 @@ export default function NuevaCompraProveedorPage() {
 
   // Códigos internos encontrados sin ProductoLocal habilitado en el depósito (Etapa 4)
   const [avisoSinDeposito, setAvisoSinDeposito] = useState([]);
+
+  // Vincular al vuelo (Etapa 5)
+  const [vincularOpen, setVincularOpen] = useState(false);
+  const [postVinculoMsg, setPostVinculoMsg] = useState("");
+  const justLinkedRef = useRef(null);
 
   // Items del pedido
   const [items, setItems] = useState([]);
@@ -189,6 +195,19 @@ export default function NuevaCompraProveedorPage() {
       if (data.ok) {
         setProductos(data.items || []);
         setAvisoSinDeposito(data.codigosSinDeposito || []);
+
+        // Mensaje específico tras vincular al vuelo (Etapa 5)
+        if (justLinkedRef.current && justLinkedRef.current === search) {
+          const sinDep = (data.codigosSinDeposito || []).some(
+            (c) => c.codigoInterno === justLinkedRef.current
+          );
+          setPostVinculoMsg(
+            sinDep
+              ? "Producto vinculado, pero no está habilitado en el depósito."
+              : "Producto vinculado. Ya podés agregarlo."
+          );
+          justLinkedRef.current = null;
+        }
       }
     } finally {
       setLoadingProds(false);
@@ -530,7 +549,10 @@ export default function NuevaCompraProveedorPage() {
                 <SunmiInput
                   placeholder="Buscar por código interno, nombre, SKU o código de barra..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPostVinculoMsg("");
+                  }}
                   className="!pl-9 !border-2 pulse-neon"
                   style={{ borderColor: "var(--pos-link)" }}
                 />
@@ -546,7 +568,11 @@ export default function NuevaCompraProveedorPage() {
               </label>
             </div>
 
-            {avisoSinDeposito.length > 0 && (
+            {postVinculoMsg ? (
+              <div className="mb-3 rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring text-xs sunmi-text-accent">
+                {postVinculoMsg}
+              </div>
+            ) : avisoSinDeposito.length > 0 ? (
               <div className="mb-3 rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring text-xs sunmi-text-accent">
                 {avisoSinDeposito.map((c) => (
                   <div key={c.codigoInterno}>
@@ -558,6 +584,42 @@ export default function NuevaCompraProveedorPage() {
                   </div>
                 ))}
               </div>
+            ) : null}
+
+            {/* Vincular al vuelo: el código buscado no existe para este proveedor */}
+            {proveedorId &&
+              search.trim() &&
+              !loadingProds &&
+              productos.length === 0 &&
+              avisoSinDeposito.length === 0 &&
+              !postVinculoMsg && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="sunmi-text-muted">
+                    No se encontró “{search.trim()}” para este proveedor.
+                  </span>
+                  <SunmiButton color="slate" type="button" onClick={() => setVincularOpen(true)}>
+                    Vincular código interno a producto existente
+                  </SunmiButton>
+                </div>
+              )}
+
+            {vincularOpen && (
+              <ModalVincularCodigo
+                open={vincularOpen}
+                onClose={() => setVincularOpen(false)}
+                proveedorId={proveedorId}
+                proveedorNombre={
+                  proveedorNombre ||
+                  proveedores.find((p) => String(p.id) === String(proveedorId))?.nombre ||
+                  ""
+                }
+                codigoInicial={search.trim()}
+                onVinculado={(cod) => {
+                  justLinkedRef.current = cod;
+                  setPostVinculoMsg("");
+                  setSearch(cod);
+                }}
+              />
             )}
 
             <div className="max-h-80 overflow-y-auto rounded border sunmi-border">
