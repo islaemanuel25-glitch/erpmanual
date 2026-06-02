@@ -56,7 +56,7 @@ export default function ModalVincularCodigo({
   useEffect(() => {
     if (!open) return;
     const term = baseSearch.trim();
-    if (!term) {
+    if (!term || !proveedorId) {
       setBaseResults([]);
       return;
     }
@@ -65,7 +65,9 @@ export default function ModalVincularCodigo({
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/compras-proveedor/buscar-base?search=${encodeURIComponent(term)}`,
+          `/api/compras-proveedor/buscar-base?proveedorId=${encodeURIComponent(
+            proveedorId
+          )}&search=${encodeURIComponent(term)}`,
           { credentials: "include" }
         );
         const data = await res.json();
@@ -81,7 +83,7 @@ export default function ModalVincularCodigo({
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [baseSearch, open]);
+  }, [baseSearch, open, proveedorId]);
 
   if (!open) return null;
 
