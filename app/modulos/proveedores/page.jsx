@@ -18,6 +18,7 @@ import SunmiPill from "@/components/sunmi/SunmiPill"; // 🔥 agregado para chip
 import { Search } from "lucide-react";
 
 import ModalProveedor from "@/components/proveedores/ModalProveedor";
+import ModalCodigosProveedor from "@/components/proveedores/ModalCodigosProveedor";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -46,6 +47,9 @@ export default function ProveedoresPage() {
   const [page, setPage] = useState(1);
 
   const [editData, setEditData] = useState(null);
+
+  // Vista solo lectura de productos vinculados por código interno
+  const [vinculadosProv, setVinculadosProv] = useState(null);
 
   // =========================================================
   // CARGAR LISTA
@@ -318,6 +322,16 @@ export default function ProveedoresPage() {
                     <div className="flex gap-3 justify-end text-[15px]">
                       <button
                         onClick={() =>
+                          setVinculadosProv({ id: item.id, nombre: item.nombre })
+                        }
+                        className="sunmi-link-accent"
+                        title="Productos vinculados por código interno"
+                      >
+                        🔗
+                      </button>
+
+                      <button
+                        onClick={() =>
                           router.push(`/modulos/proveedores?editar=${item.id}`)
                         }
                         className="sunmi-link-accent"
@@ -377,6 +391,14 @@ export default function ProveedoresPage() {
             initialData={editData}
             onClose={cerrarModal}
             onSubmit={guardarEdicion}
+          />
+        )}
+
+        {vinculadosProv && (
+          <ModalCodigosProveedor
+            open={true}
+            proveedor={vinculadosProv}
+            onClose={() => setVinculadosProv(null)}
           />
         )}
       </SunmiCard>
