@@ -29,6 +29,7 @@ model Grupo {
   contadoresVenta PosVentaCounter[]
   configuracion   ConfiguracionGrupo?
   listasPrecio    ListaPrecio[]
+  codigosProveedor ProductoCodigoProveedor[]
 }
 
 model GrupoDeposito {
@@ -155,6 +156,7 @@ model Proveedor {
   productos2        ProductoBase[]    @relation("productoProveedor2")
   productos3        ProductoBase[]    @relation("productoProveedor3")
   pedidosProveedor  PedidoProveedor[]
+  codigosProveedor  ProductoCodigoProveedor[]
 }
 
 model AreaFisica {
@@ -221,6 +223,7 @@ model ProductoBase {
   preciosPorLista ProductoListaPrecio[]
   locales         ProductoLocal[]
   ventaDetalles   VentaDetalle[]
+  codigosProveedor ProductoCodigoProveedor[]
 
   @@unique([grupoId, codigo_barra])
   @@index([grupoId])
@@ -231,6 +234,27 @@ model ProductoBase {
   @@index([proveedor2_id])
   @@index([proveedor3_id])
   @@index([area_fisica_id])
+}
+
+model ProductoCodigoProveedor {
+  id                   Int      @id @default(autoincrement())
+  grupoId              Int
+  productoBaseId       Int
+  proveedorId          Int
+  codigoInterno        String
+  descripcionProveedor String?
+  activo               Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  grupo        Grupo        @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  productoBase ProductoBase @relation(fields: [productoBaseId], references: [id], onDelete: Cascade)
+  proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
+
+  @@unique([grupoId, proveedorId, codigoInterno], name: "codigo_interno_unico_por_proveedor")
+  @@index([grupoId, proveedorId, codigoInterno])
+  @@index([productoBaseId])
+  @@index([proveedorId])
 }
 
 model ProductoLocal {
