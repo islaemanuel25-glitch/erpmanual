@@ -105,11 +105,11 @@ export async function GET(req) {
 
     const incompletos = searchParams.get("incompletos") === "true";
 
-    // WHERE — snake_case SOLO dentro de Prisma
-    const baseFilters = [
+    // WHERE — snake_case SOLO dentro de Prisma.
+    // Filtros generales (sin proveedor): aplican siempre.
+    const generalFilters = [
       { grupoId },
       categoriaId ? { categoria_id: categoriaId } : {},
-      proveedorId ? { proveedor_id: proveedorId } : {},
       areaFisicaId ? { area_fisica_id: areaFisicaId } : {},
       activoFilter !== undefined ? { activo: activoFilter } : {},
       ...(incompletos
@@ -124,13 +124,18 @@ export async function GET(req) {
         : []),
     ];
 
-    // Busqueda: prioridad a match exacto por codigo_barra/codigo_barra_secundario/sku (alineado con POS)
+    // Filtro de proveedor (proveedor 1), igual que siempre.
+    const proveedorFilter = proveedorId ? { proveedor_id: proveedorId } : {};
+
+    // Busqueda: prioridad a match exacto por codigo_barra/codigo_barra_secundario/sku (alineado con POS).
+    // El exact-vs-contains se evalúa dentro del alcance del proveedor (como hoy).
     let searchFilter = {};
     if (q) {
       const exactCount = await prisma.productoBase.count({
         where: {
           AND: [
-            ...baseFilters,
+            ...generalFilters,
+            proveedorFilter,
             { OR: [
               { codigo_barra: { equals: q, mode: "insensitive" } },
               { codigo_barra_secundario: { equals: q, mode: "insensitive" } },
@@ -154,7 +159,37 @@ export async function GET(req) {
           ] };
     }
 
-    const where = { AND: [...baseFilters, searchFilter] };
+    // Código interno por proveedor (Opción C): SOLO si hay proveedorId + q.
+    // Trae ProductoBase vinculados a ese proveedor por codigoInterno EXACTO,
+    // aunque no tengan proveedor_id = proveedorId.
+    let baseIdsCodigo = [];
+    if (q && proveedorId) {
+      const matches = await prisma.productoCodigoProveedor.findMany({
+        where: {
+          grupoId,
+          proveedorId,
+          activo: true,
+          codigoInterno: { equals: q, mode: "insensitive" },
+        },
+        select: { productoBaseId: true },
+      });
+      baseIdsCodigo = [...new Set(matches.map((m) => m.productoBaseId))];
+    }
+
+    // Opción C:
+    //   (generales) AND ( (proveedor AND búsqueda) OR (id IN códigos internos) )
+    // Sin q: solo aplica el filtro de proveedor (comportamiento actual, sin ampliar).
+    let searchClause;
+    if (q) {
+      const proveedorYTexto = { AND: [proveedorFilter, searchFilter] };
+      searchClause = baseIdsCodigo.length
+        ? { OR: [proveedorYTexto, { id: { in: baseIdsCodigo } }] }
+        : proveedorYTexto;
+    } else {
+      searchClause = proveedorFilter;
+    }
+
+    const where = { AND: [...generalFilters, searchClause] };
 
     const total = await prisma.productoBase.count({ where });
 
