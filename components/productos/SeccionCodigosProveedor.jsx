@@ -221,31 +221,32 @@ export default function SeccionCodigosProveedor({
         <h3 className="text-[13px] sunmi-section-title">Códigos internos por proveedor</h3>
       </div>
 
-      <p className="text-xs text-slate-500 mb-3">
+      <p className="text-xs sunmi-text-muted mb-3">
         Cada proveedor puede identificar este producto con su propio código interno.
         No duplica el producto ni su stock; solo lo asocia. (Por ahora es gestión manual.)
       </p>
 
-      {/* Alta */}
+      {/* Proveedores del producto: texto con acceso rápido sutil (link del theme) */}
       {sugeridos.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 mb-2 text-xs">
-          <span className="sunmi-text-muted">Proveedores del producto:</span>
+        <p className="text-xs sunmi-text-muted mb-2">
+          Proveedores del producto:{" "}
           {sugeridos.map((s, i) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setNuevoProv(String(s.id))}
-              className={`px-2 py-0.5 rounded-full border text-[11px] transition-colors ${
-                String(s.id) === nuevoProv
-                  ? "bg-cyan-600 text-white border-cyan-600"
-                  : "sunmi-text-muted border-slate-600 hover:border-cyan-500"
-              }`}
-            >
-              {s.nombre}{i === 0 ? " · principal" : ""}
-            </button>
+            <span key={s.id}>
+              {i > 0 && ", "}
+              <button
+                type="button"
+                onClick={() => setNuevoProv(String(s.id))}
+                className="sunmi-link-accent"
+              >
+                {s.nombre}
+              </button>
+              {i === 0 ? " (principal)" : ""}
+            </span>
           ))}
-        </div>
+        </p>
       )}
+
+      {/* Alta */}
       <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end mb-3">
         <div className="flex flex-col gap-1.5">
           <label className="text-[12px] sunmi-label">Proveedor</label>
@@ -283,36 +284,31 @@ export default function SeccionCodigosProveedor({
           />
         </div>
 
-        <SunmiButton color="green" type="button" onClick={crear} disabled={creando}>
+        <SunmiButton type="button" onClick={crear} disabled={creando}>
           {creando ? "Agregando..." : "Agregar"}
         </SunmiButton>
       </div>
 
       {errorAlta && (
-        <p className="text-xs text-red-500 mb-3">{errorAlta}</p>
+        <p className="text-xs sunmi-text-danger mb-3">{errorAlta}</p>
       )}
-
-      {/* Listado */}
       {loadError && (
-        <p className="text-xs text-red-500 mb-2">{loadError}</p>
+        <p className="text-xs sunmi-text-danger mb-2">{loadError}</p>
       )}
 
-      {/* Listado: filas simples, sin tabla ni encabezado */}
+      {/* Listado liviano: filas separadas por divisor del theme, sin cards */}
       {loading ? (
         <p className="text-xs sunmi-text-muted italic">Cargando...</p>
       ) : items.length === 0 ? (
         <p className="text-xs sunmi-text-muted italic">Sin códigos internos cargados.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="divide-y sunmi-divide border-t sunmi-divider">
           {items.map((item) => {
             const enEdicion = editId === item.id;
 
             if (enEdicion) {
               return (
-                <div
-                  key={item.id}
-                  className="rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring"
-                >
+                <div key={item.id} className="py-2">
                   <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[12px] sunmi-label">Proveedor</label>
@@ -343,9 +339,8 @@ export default function SeccionCodigosProveedor({
                         onChange={(e) => setEditDesc(e.target.value)}
                       />
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-2">
                       <SunmiButton
-                        color="green"
                         type="button"
                         onClick={guardarEdicion}
                         disabled={guardandoEdit}
@@ -358,7 +353,7 @@ export default function SeccionCodigosProveedor({
                     </div>
                   </div>
                   {errorEdit && (
-                    <p className="text-xs text-red-500 mt-1">{errorEdit}</p>
+                    <p className="text-xs sunmi-text-danger mt-1">{errorEdit}</p>
                   )}
                 </div>
               );
@@ -367,7 +362,7 @@ export default function SeccionCodigosProveedor({
             return (
               <div
                 key={item.id}
-                className="flex items-center justify-between gap-3 rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring"
+                className="flex items-center justify-between gap-3 py-2"
               >
                 <div className="text-[13px] min-w-0 truncate">
                   <span className="font-medium">{item.proveedor?.nombre ?? "—"}</span>
@@ -377,13 +372,21 @@ export default function SeccionCodigosProveedor({
                     <span className="sunmi-text-muted"> · {item.descripcionProveedor}</span>
                   )}
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  <SunmiButton color="cyan" type="button" onClick={() => iniciarEdicion(item)}>
+                <div className="flex gap-3 shrink-0 text-[13px]">
+                  <button
+                    type="button"
+                    onClick={() => iniciarEdicion(item)}
+                    className="sunmi-link-accent"
+                  >
                     Editar
-                  </SunmiButton>
-                  <SunmiButton color="red" type="button" onClick={() => eliminar(item)}>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => eliminar(item)}
+                    className="sunmi-link-danger"
+                  >
                     Quitar
-                  </SunmiButton>
+                  </button>
                 </div>
               </div>
             );
