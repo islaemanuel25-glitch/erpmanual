@@ -45,7 +45,27 @@ export async function GET(req) {
 
     const depositoId = gd.localId;
 
-    // Buscar ProductoLocal del depósito donde el base pertenece al proveedor
+    // Vínculos activos de códigos internos para este proveedor (Etapa 4).
+    // Amplían el universo comprable y permiten buscar por código interno.
+    // No alteran la resolución de ProductoLocal del depósito.
+    const vinculos = await prisma.productoCodigoProveedor.findMany({
+      where: { grupoId, proveedorId, activo: true },
+      select: {
+        productoBaseId: true,
+        codigoInterno: true,
+        productoBase: { select: { nombre: true } },
+      },
+    });
+    const baseIdsVinculados = [...new Set(vinculos.map((v) => v.productoBaseId))];
+
+    // Match exacto por código interno del proveedor (case-insensitive).
+    const searchNorm = search.toLowerCase();
+    const matchCodigo = search
+      ? vinculos.filter((v) => String(v.codigoInterno).toLowerCase() === searchNorm)
+      : [];
+    const baseIdsMatchCodigo = [...new Set(matchCodigo.map((v) => v.productoBaseId))];
+
+    // Universo comprable: proveedor 1/2/3 + bases vinculadas por código interno.
     const baseWhere = {
       grupoId,
       activo: true,
@@ -53,6 +73,7 @@ export async function GET(req) {
         { proveedor_id: proveedorId },
         { proveedor2_id: proveedorId },
         { proveedor3_id: proveedorId },
+        ...(baseIdsVinculados.length ? [{ id: { in: baseIdsVinculados } }] : []),
       ],
     };
 
@@ -64,6 +85,7 @@ export async function GET(req) {
             { sku: { contains: search, mode: "insensitive" } },
             { codigo_barra: { contains: search, mode: "insensitive" } },
             { codigo_barra_secundario: { contains: search, mode: "insensitive" } },
+            ...(baseIdsMatchCodigo.length ? [{ id: { in: baseIdsMatchCodigo } }] : []),
           ],
         },
       ];
@@ -177,7 +199,23 @@ export async function GET(req) {
       };
     });
 
-    return NextResponse.json({ ok: true, items });
+    // Priorizar arriba los que matchean exacto por código interno (Etapa 4).
+    // sort es estable: dentro de cada grupo se preserva el orden por nombre.
+    if (baseIdsMatchCodigo.length) {
+      const prioridad = new Set(baseIdsMatchCodigo);
+      items.sort(
+        (a, b) => (prioridad.has(a.baseId) ? 0 : 1) - (prioridad.has(b.baseId) ? 0 : 1)
+      );
+    }
+
+    // Códigos internos que matchean pero cuyo ProductoBase no tiene ProductoLocal
+    // habilitado en el depósito: no se agregan, se informan (Etapa 4).
+    const baseIdsEnDeposito = new Set(items.map((it) => it.baseId));
+    const codigosSinDeposito = matchCodigo
+      .filter((v) => !baseIdsEnDeposito.has(v.productoBaseId))
+      .map((v) => ({ codigoInterno: v.codigoInterno, nombre: v.productoBase?.nombre ?? null }));
+
+    return NextResponse.json({ ok: true, items, codigosSinDeposito });
   } catch (err) {
     console.error("Error compras-proveedor/productos:", err);
     return NextResponse.json(

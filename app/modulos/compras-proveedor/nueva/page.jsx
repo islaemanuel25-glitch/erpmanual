@@ -49,6 +49,9 @@ export default function NuevaCompraProveedorPage() {
   const [search, setSearch] = useState("");
   const [loadingProds, setLoadingProds] = useState(false);
 
+  // Códigos internos encontrados sin ProductoLocal habilitado en el depósito (Etapa 4)
+  const [avisoSinDeposito, setAvisoSinDeposito] = useState([]);
+
   // Items del pedido
   const [items, setItems] = useState([]);
   const [soloFaltantes, setSoloFaltantes] = useState(true);
@@ -170,6 +173,7 @@ export default function NuevaCompraProveedorPage() {
   const cargarProductos = useCallback(async () => {
     if (!proveedorId) {
       setProductos([]);
+      setAvisoSinDeposito([]);
       return;
     }
 
@@ -182,7 +186,10 @@ export default function NuevaCompraProveedorPage() {
         credentials: "include",
       });
       const data = await res.json();
-      if (data.ok) setProductos(data.items || []);
+      if (data.ok) {
+        setProductos(data.items || []);
+        setAvisoSinDeposito(data.codigosSinDeposito || []);
+      }
     } finally {
       setLoadingProds(false);
     }
@@ -521,7 +528,7 @@ export default function NuevaCompraProveedorPage() {
                   style={{ color: "var(--pos-link)" }}
                 />
                 <SunmiInput
-                  placeholder="Buscar por nombre, SKU o código de barra..."
+                  placeholder="Buscar por código interno, nombre, SKU o código de barra..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="!pl-9 !border-2 pulse-neon"
@@ -538,6 +545,20 @@ export default function NuevaCompraProveedorPage() {
                 Solo faltantes
               </label>
             </div>
+
+            {avisoSinDeposito.length > 0 && (
+              <div className="mb-3 rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring text-xs sunmi-text-accent">
+                {avisoSinDeposito.map((c) => (
+                  <div key={c.codigoInterno}>
+                    Producto encontrado por código interno, pero no está habilitado en el depósito.
+                    <span className="sunmi-text-muted">
+                      {" "}(Código {c.codigoInterno}
+                      {c.nombre ? ` · ${c.nombre}` : ""})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="max-h-80 overflow-y-auto rounded border sunmi-border">
               <SunmiTable headers={["Nombre", "SKU", "Actual", "Min", "Max", "Faltante", "Sugerido", "Costo", ""]}>
