@@ -91,6 +91,7 @@ export default function PanelComprasPage() {
       desc: "Borrador + confirmado + enviado",
       valor: activos,
       href: `${COMPRAS}?vista=activos`,
+      boton: "Ver activos",
     },
     {
       key: "enviados",
@@ -98,6 +99,7 @@ export default function PanelComprasPage() {
       desc: "Esperando recibir mercadería",
       valor: conteos.ENVIADO,
       href: `${COMPRAS}?vista=activos&estado=ENVIADO`,
+      boton: "Recibir",
     },
     {
       key: "confirmados",
@@ -105,6 +107,7 @@ export default function PanelComprasPage() {
       desc: "Listos para enviar al proveedor",
       valor: conteos.CONFIRMADO,
       href: `${COMPRAS}?vista=activos&estado=CONFIRMADO`,
+      boton: "Enviar pedidos",
     },
     {
       key: "borradores",
@@ -112,6 +115,7 @@ export default function PanelComprasPage() {
       desc: "Pedidos en curso",
       valor: conteos.BORRADOR,
       href: `${COMPRAS}?vista=activos&estado=BORRADOR`,
+      boton: "Continuar",
     },
     {
       key: "historial",
@@ -119,6 +123,7 @@ export default function PanelComprasPage() {
       desc: "Recibido + anulado",
       valor: historial,
       href: `${COMPRAS}?vista=historial`,
+      boton: "Ver historial",
     },
     {
       key: "proveedoresHoy",
@@ -126,6 +131,7 @@ export default function PanelComprasPage() {
       desc: "Configurados para pedido hoy",
       valor: proveedoresHoy,
       href: "/modulos/proveedores",
+      boton: "Ver proveedores",
     },
   ];
 
@@ -152,7 +158,7 @@ export default function PanelComprasPage() {
               <div className="text-[11px] sunmi-text-muted">{c.desc}</div>
               <div className="mt-2">
                 <SunmiButton color="cyan" onClick={() => router.push(c.href)}>
-                  Ver
+                  {c.boton}
                 </SunmiButton>
               </div>
             </SunmiPanel>
