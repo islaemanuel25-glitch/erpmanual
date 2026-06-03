@@ -86,6 +86,21 @@ export default function ComprasProveedorPage() {
   const estadoParam = searchParams.get("estado") || "";
   const proveedorIdParam = searchParams.get("proveedorId") || "";
 
+  // Modo recepción: entrada desde "Recepción de mercadería" (?vista=activos&estado=ENVIADO).
+  // Solo adapta la UX; la lógica de filtrado/listado no cambia.
+  const modoRecepcion = vista === "activos" && estadoParam === "ENVIADO";
+
+  const titulo = modoRecepcion
+    ? "Recepción de mercadería"
+    : vista === "historial"
+    ? "Historial de compras"
+    : "Pedidos activos";
+  const subtitulo = modoRecepcion
+    ? "Pedidos enviados pendientes de recibir"
+    : vista === "historial"
+    ? "Pedidos recibidos o anulados"
+    : "Pedidos pendientes de gestión";
+
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
@@ -206,38 +221,43 @@ export default function ComprasProveedorPage() {
         color="cyan"
         onClick={() => router.push(`/modulos/compras-proveedor/${item.id}`)}
       >
-        Ver
+        {modoRecepcion ? "Ver / recibir" : "Ver"}
       </SunmiButton>
     );
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-        <div className="flex items-center justify-between mb-4">
-          <SunmiHeader title="Compras a Proveedor" />
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <SunmiHeader title={titulo} />
+            <p className="text-xs sunmi-text-muted px-1">{subtitulo}</p>
+          </div>
           <SunmiButton onClick={() => router.push("/modulos/compras-proveedor/nueva")}>
             ＋ Nuevo pedido
           </SunmiButton>
         </div>
 
-        {/* Toggle Activos / Historial */}
-        <div className="flex gap-2 mb-4">
-          <SunmiButton
-            color={vista === "activos" ? "cyan" : "slate"}
-            onClick={() => irAVista("activos")}
-          >
-            Pedidos activos
-          </SunmiButton>
-          <SunmiButton
-            color={vista === "historial" ? "cyan" : "slate"}
-            onClick={() => irAVista("historial")}
-          >
-            Historial
-          </SunmiButton>
-        </div>
+        {/* Toggle Activos / Historial (oculto en modo recepción) */}
+        {!modoRecepcion && (
+          <div className="flex gap-2 mb-4">
+            <SunmiButton
+              color={vista === "activos" ? "cyan" : "slate"}
+              onClick={() => irAVista("activos")}
+            >
+              Pedidos activos
+            </SunmiButton>
+            <SunmiButton
+              color={vista === "historial" ? "cyan" : "slate"}
+              onClick={() => irAVista("historial")}
+            >
+              Historial
+            </SunmiButton>
+          </div>
+        )}
 
-        {/* Strip: proveedores que reciben pedido hoy (solo en activos) */}
-        {vista === "activos" && (
+        {/* Strip: proveedores que reciben pedido hoy (solo en activos, no en recepción) */}
+        {vista === "activos" && !modoRecepcion && (
           <div
             className="rounded-2xl border p-3 mb-4"
             style={{ borderColor: "var(--pos-link)" }}
@@ -276,6 +296,8 @@ export default function ComprasProveedorPage() {
           </div>
         )}
 
+        {!modoRecepcion && (
+        <>
         <SunmiSeparator label="Filtros" className="my-4" />
 
         <div className="flex flex-col md:flex-row md:flex-wrap gap-3 px-2 mb-4 items-end">
@@ -344,6 +366,8 @@ export default function ComprasProveedorPage() {
             </>
           )}
         </div>
+        </>
+        )}
 
         <SunmiSeparator label="Listado" className="my-4" />
 
