@@ -1,54 +1,29 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-05-30 01:30
+**Fecha:** 2026-06-02 23:40
 
 ## Módulos modificados recientemente
 
-### pos-ventas
-- fix: decrement stock by factor_pack when selling pack from warehouse, feat(ui): aplicar patrón de buscador con lupa, --pos-link y pulse-neon en POS-ventas, style(ui): aplicar color --pos-link a date inputs, selects y botones de filtro en auditoria, compras, reportes, transferencias y turnos
-- Archivos: 6 modificados (6 total)
-
-### proveedores
-- feat: show suppliers scheduled for today, fix: normalize supplier order days, fix: aplicar layout de productos en categorias, operadores, pedidos/historial y proveedores
-- Archivos: 3 modificados (3 total)
-
-### grupos
-- feat(ui): aplicar patrón de buscador y filtros con --pos-link en grupos, pedidos, clientes/analytics, compras-proveedor y pos-transferencias
-- Archivos: 1 modificados (1 total)
-
-### pos-transferencias
-- feat(ui): aplicar patrón de buscador y filtros con --pos-link en grupos, pedidos, clientes/analytics, compras-proveedor y pos-transferencias
-- Archivos: 2 modificados (2 total)
-
-### transferencias
-- style(ui): aplicar color --pos-link a date inputs, selects y botones de filtro en auditoria, compras, reportes, transferencias y turnos
-- Archivos: 1 modificados (1 total)
-
-### locales
-- feat(ui): aplicar patrón de buscador con lupa, borde --pos-link y pulse-neon en productos, stock, usuarios, roles y locales
-- Archivos: 1 modificados (1 total)
-
-### roles
-- feat(ui): aplicar patrón de buscador con lupa, borde --pos-link y pulse-neon en productos, stock, usuarios, roles y locales
-- Archivos: 1 modificados (1 total)
-
-### usuarios
-- feat(ui): aplicar patrón de buscador con lupa, borde --pos-link y pulse-neon en productos, stock, usuarios, roles y locales
+### stock
+- feat: buscar por codigo interno del proveedor en Stock (Opcion C) [mejora codigos]
 - Archivos: 1 modificados (1 total)
 
 ### productos
-- feat(ui): aplicar patrón de buscador con lupa, borde --pos-link y pulse-neon en productos, stock, usuarios, roles y locales
-- Archivos: 1 modificados (1 total)
+- feat: buscar por codigo interno del proveedor en Productos (Opcion C) [mejora codigos], style: integrar SeccionCodigosProveedor al theme (sin colores hardcodeados) [etapa 2], fix: codigos internos como filas simples, sin tabla ni header naranja [etapa 2]
+- Archivos: 5 nuevos, 2 modificados (7 total)
 
-### stock
-- feat(ui): aplicar patrón de buscador con lupa, borde --pos-link y pulse-neon en productos, stock, usuarios, roles y locales
-- Archivos: 1 modificados (1 total)
-
-### categorias
-- fix: aplicar layout de productos en categorias, operadores, pedidos/historial y proveedores
-- Archivos: 1 modificados (1 total)
+### proveedores
+- feat: vista solo lectura de productos vinculados por proveedor [etapa 3]
+- Archivos: 1 nuevos, 1 modificados (2 total)
 
 
+## Archivos nuevos desde última sincronización
+- components/productos/SeccionCodigosProveedor.jsx
+- app/api/productos/codigos-proveedor/crear/route.js
+- app/api/productos/codigos-proveedor/editar/route.js
+- app/api/productos/codigos-proveedor/eliminar/route.js
+- app/api/productos/codigos-proveedor/listar/route.js
+- app/api/proveedores/codigos/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
