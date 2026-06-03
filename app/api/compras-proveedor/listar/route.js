@@ -24,6 +24,13 @@ export async function GET(req) {
 
     const proveedorId = Number(url.searchParams.get("proveedorId") || 0) || undefined;
     const estado = url.searchParams.get("estado") || undefined;
+    // Soporte opcional de grupo de estados (CSV). Si viene, tiene prioridad sobre
+    // `estado` simple. Mantiene compatibilidad con el filtro de estado único.
+    const estadosCsv = url.searchParams.get("estados") || "";
+    const estadosArr = estadosCsv
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     const fechaDesde = url.searchParams.get("fechaDesde") || "";
     const fechaHasta = url.searchParams.get("fechaHasta") || "";
     const page = Math.max(1, Number(url.searchParams.get("page") || 1));
@@ -31,7 +38,11 @@ export async function GET(req) {
 
     const where = { grupoId };
     if (proveedorId) where.proveedorId = proveedorId;
-    if (estado) where.estado = estado;
+    if (estadosArr.length) {
+      where.estado = { in: estadosArr };
+    } else if (estado) {
+      where.estado = estado;
+    }
 
     // Filtro por rango de fecha de creación (AR). Solo aplica si vienen ambos.
     if (fechaDesde && fechaHasta) {
