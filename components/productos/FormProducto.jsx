@@ -211,25 +211,41 @@ export default function FormProducto({
   const onChangeMargen = (val) => {
     if (val === "") return setForm((p) => ({ ...p, margen: "" }));
     const m = Number(val);
-    if (!Number.isFinite(m) || m < 0) return;
+    if (!Number.isFinite(m)) return; // margen negativo es válido (no se persiste "-" suelto)
     setForm((p) => {
       const pc = Number(p.precio_costo) || 0;
-      let pv = pc > 0 ? Math.round(pc * (1 + m / 100) * 100) / 100 : 0;
-      if (p.redondeo_100 && pv > 0) pv = roundUp100(pv);
+      // Venta derivada del margen (permite margen negativo → venta < costo).
+      // No se redondea al tipear: roundUp100 se difiere al blur y al guardar.
+      const pv = pc > 0 ? Math.max(0, Math.round(pc * (1 + m / 100) * 100) / 100) : 0;
       return { ...p, margen: m, precio_venta: pv };
     });
   };
 
   const onChangeVenta = (val) => {
     if (val === "") return setForm((p) => ({ ...p, precio_venta: "" }));
-    const pvRaw = Number(val);
-    if (!Number.isFinite(pvRaw) || pvRaw < 0) return;
+    const pv = Number(val);
+    if (!Number.isFinite(pv) || pv < 0) return; // no precio negativo; venta baja o 0 permitido
     setForm((p) => {
-      let pv = pvRaw;
-      if (p.redondeo_100) pv = roundUp100(pv);
       const pc = Number(p.precio_costo) || 0;
-      const m = pc > 0 ? (pv / pc - 1) * 100 : 0;
-      return { ...p, precio_venta: pv, margen: Number(m.toFixed(2)) };
+      // Margen puede quedar negativo (venta < costo); punto decimal interno (-99.58).
+      // No se redondea al tipear para no pisar la escritura del usuario.
+      const m = pc > 0 ? Number(((pv / pc - 1) * 100).toFixed(2)) : 0;
+      return { ...p, precio_venta: pv, margen: m };
+    });
+  };
+
+  // Redondeo a múltiplos de 100 diferido al blur: mantiene redondeo_100 sin
+  // impedir escribir valores intermedios en Venta/Margen.
+  const aplicarRedondeoVenta = () => {
+    setForm((p) => {
+      if (!p.redondeo_100) return p;
+      const pv = Number(p.precio_venta);
+      if (!Number.isFinite(pv) || pv <= 0) return p;
+      const pvR = roundUp100(pv);
+      if (pvR === pv) return p;
+      const pc = Number(p.precio_costo) || 0;
+      const m = pc > 0 ? Number(((pvR / pc - 1) * 100).toFixed(2)) : 0;
+      return { ...p, precio_venta: pvR, margen: m };
     });
   };
 
@@ -710,9 +726,10 @@ export default function FormProducto({
           </div>
         </Section>
 
-        {/* PRECIOS */}
+        {/* PRECIOS — orden lógico: costo → margen → venta */}
         <Section title="Precios">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Fila 1: Costo (+ costo unitario ref. en pack/cajón) */}
             <Field label={`Costo * ${labelEscalaPrecio}`} fieldKey="precio_costo">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
@@ -736,7 +753,7 @@ export default function FormProducto({
               </div>
             </Field>
 
-            {showPreciosRef ? (
+            {showPreciosRef && (
               <Field label="Costo unitario ref." fieldKey="precio_costo_unitario_ref">
                 <SunmiInput
                   type="number"
@@ -748,17 +765,20 @@ export default function FormProducto({
                   Referencia: costo del bulto ÷ {factorPackPrecios} uds.
                 </p>
               </Field>
-            ) : (
-              <Field label="Margen %" fieldKey="margen">
-                <SunmiInput
-                  type="number"
-                  value={form.margen}
-                  onWheel={(e) => e.target.blur()}
-                  onChange={(e) => onChangeMargen(e.target.value)}
-                />
-              </Field>
             )}
 
+            {/* Fila 2: Margen % (fila propia cuando hay refs) */}
+            <Field label="Margen %" fieldKey="margen" colSpan={showPreciosRef}>
+              <SunmiInput
+                type="number"
+                value={form.margen}
+                onWheel={(e) => e.target.blur()}
+                onChange={(e) => onChangeMargen(e.target.value)}
+                onBlur={aplicarRedondeoVenta}
+              />
+            </Field>
+
+            {/* Fila 3: Venta (+ venta unitario ref. en pack/cajón) */}
             <Field label={`Venta * ${labelEscalaPrecio}`} fieldKey="precio_venta">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
@@ -767,6 +787,7 @@ export default function FormProducto({
                     value={form.precio_venta}
                     onWheel={(e) => e.target.blur()}
                     onChange={(e) => onChangeVenta(e.target.value)}
+                    onBlur={aplicarRedondeoVenta}
                   />
                 </div>
                 {enableVoiceInputs && (
@@ -782,7 +803,7 @@ export default function FormProducto({
               </div>
             </Field>
 
-            {showPreciosRef ? (
+            {showPreciosRef && (
               <Field label="Venta unitario ref." fieldKey="precio_venta_unitario_ref">
                 <SunmiInput
                   type="number"
@@ -794,38 +815,21 @@ export default function FormProducto({
                   Referencia: venta del bulto ÷ {factorPackPrecios} uds.
                 </p>
               </Field>
-            ) : (
-              <Field label="IVA %" fieldKey="iva_porcentaje">
-                <SunmiInput
-                  type="number"
-                  value={form.iva_porcentaje}
-                  onWheel={(e) => e.target.blur()}
-                  onChange={(e) => setNumber("iva_porcentaje", e.target.value)}
-                />
-              </Field>
             )}
+          </div>
+        </Section>
 
-            {showPreciosRef && (
-              <>
-                <Field label="Margen %" fieldKey="margen">
-                  <SunmiInput
-                    type="number"
-                    value={form.margen}
-                    onWheel={(e) => e.target.blur()}
-                    onChange={(e) => onChangeMargen(e.target.value)}
-                  />
-                </Field>
-
-                <Field label="IVA %" fieldKey="iva_porcentaje">
-                  <SunmiInput
-                    type="number"
-                    value={form.iva_porcentaje}
-                    onWheel={(e) => e.target.blur()}
-                    onChange={(e) => setNumber("iva_porcentaje", e.target.value)}
-                  />
-                </Field>
-              </>
-            )}
+        {/* DATOS FISCALES — IVA no participa en el cálculo de precios */}
+        <Section title="Datos fiscales">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="IVA %" fieldKey="iva_porcentaje">
+              <SunmiInput
+                type="number"
+                value={form.iva_porcentaje}
+                onWheel={(e) => e.target.blur()}
+                onChange={(e) => setNumber("iva_porcentaje", e.target.value)}
+              />
+            </Field>
           </div>
         </Section>
 
