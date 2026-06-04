@@ -60,7 +60,7 @@ export default function RecepcionMercaderiaPage() {
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
         <div className="mb-4">
-          <SunmiHeader title="Recepción de mercadería" />
+          <SunmiHeader title="Recibir mercadería" />
           <p className="text-xs sunmi-text-muted px-1">Pedidos enviados pendientes de recibir</p>
         </div>
 

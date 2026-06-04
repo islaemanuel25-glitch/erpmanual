@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 // Redirige a los submódulos reales preservando links viejos:
 //   ?vista=historial                 → /historial
 //   ?vista=activos&estado=ENVIADO     → /recepcion
-//   (resto)                          → /activos
+//   (resto)                          → /pendientes
 // Preserva proveedorId si viene.
 export default async function ComprasProveedorRedirect({ searchParams }) {
   const sp = (await searchParams) || {};
@@ -18,7 +18,7 @@ export default async function ComprasProveedorRedirect({ searchParams }) {
   } else if (vista === "activos" && estado === "ENVIADO") {
     dest = "/modulos/compras-proveedor/recepcion";
   } else {
-    dest = "/modulos/compras-proveedor/activos";
+    dest = "/modulos/compras-proveedor/pendientes";
   }
 
   if (proveedorId) {

@@ -11,11 +11,12 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
-import usePedidosProveedor, { ESTADOS_HISTORIAL, isoHaceDias, hoyLocalISO } from "@/components/compras-proveedor/usePedidosProveedor";
+import usePedidosProveedor, { ESTADOS_PENDIENTES } from "@/components/compras-proveedor/usePedidosProveedor";
 import FiltrosPedidosProveedor from "@/components/compras-proveedor/FiltrosPedidosProveedor";
 import ListadoPedidosProveedor from "@/components/compras-proveedor/ListadoPedidosProveedor";
+import ProveedoresPedidoHoy from "@/components/compras-proveedor/ProveedoresPedidoHoy";
 
-export default function HistorialComprasPage() {
+export default function PedidosPendientesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -24,17 +25,17 @@ export default function HistorialComprasPage() {
 
   const [estado, setEstado] = useState(searchParams.get("estado") || "");
   const [proveedorId, setProveedorId] = useState(searchParams.get("proveedorId") || "");
-  // Historial arranca por defecto en los últimos 7 días (el usuario puede "Ver todo").
-  const [fechaDesde, setFechaDesde] = useState(() => isoHaceDias(7));
-  const [fechaHasta, setFechaHasta] = useState(() => hoyLocalISO());
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
 
   const { loading, items, page, setPage, totalPages } = usePedidosProveedor({
-    estados: ESTADOS_HISTORIAL,
+    estados: ESTADOS_PENDIENTES,
     estado,
     proveedorId,
     fechaDesde,
     fechaHasta,
-    pageSize: 20,
+    pageSize: 50,
+    ordenar: true,
   });
 
   useEffect(() => {
@@ -48,26 +49,45 @@ export default function HistorialComprasPage() {
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("compras.ver")) return <SinPermisos />;
 
-  const renderAccion = (item) => (
-    <SunmiButton
-      color="cyan"
-      onClick={() => router.push(`/modulos/compras-proveedor/${item.id}`)}
-    >
-      Ver detalle
-    </SunmiButton>
-  );
+  const renderAccion = (item) => {
+    if (item.estado === "BORRADOR") {
+      return (
+        <SunmiButton
+          color="green"
+          onClick={() => router.push(`/modulos/compras-proveedor/nueva?pedidoId=${item.id}`)}
+        >
+          Continuar pedido
+        </SunmiButton>
+      );
+    }
+    return (
+      <SunmiButton
+        color="cyan"
+        onClick={() => router.push(`/modulos/compras-proveedor/${item.id}`)}
+      >
+        Ver / enviar
+      </SunmiButton>
+    );
+  };
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-        <div className="mb-4">
-          <SunmiHeader title="Historial" />
-          <p className="text-xs sunmi-text-muted px-1">Compras recibidas o anuladas</p>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <SunmiHeader title="Pedidos pendientes" />
+            <p className="text-xs sunmi-text-muted px-1">Pedidos en preparación o listos para enviar</p>
+          </div>
+          <SunmiButton onClick={() => router.push("/modulos/compras-proveedor/nueva")}>
+            ＋ Nuevo pedido
+          </SunmiButton>
         </div>
 
+        <ProveedoresPedidoHoy />
+
         <FiltrosPedidosProveedor
-          estadoOpciones={ESTADOS_HISTORIAL}
-          estadoTodosLabel="Todo el historial"
+          estadoOpciones={ESTADOS_PENDIENTES}
+          estadoTodosLabel="Todos los pendientes"
           estado={estado}
           onEstado={setEstado}
           proveedorId={proveedorId}
@@ -88,6 +108,7 @@ export default function HistorialComprasPage() {
           items={items}
           loading={loading}
           renderAccion={renderAccion}
+          marcarAtrasados
           page={page}
           totalPages={totalPages}
           onPrev={() => setPage((p) => p - 1)}

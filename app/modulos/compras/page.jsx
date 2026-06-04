@@ -11,7 +11,6 @@ import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { recibeHoy } from "@/lib/proveedores/diasPedido";
 
 const COMPRAS = "/modulos/compras-proveedor";
 
@@ -29,9 +28,6 @@ export default function PanelComprasPage() {
     RECIBIDO: 0,
     ANULADO: 0,
   });
-  const [activos, setActivos] = useState(0);
-  const [historial, setHistorial] = useState(0);
-  const [proveedoresHoy, setProveedoresHoy] = useState(0);
 
   useEffect(() => {
     const cargar = async () => {
@@ -41,36 +37,12 @@ export default function PanelComprasPage() {
           credentials: "include",
         });
         const data = await res.json();
-        if (data.ok) {
-          setConteos(data.conteos || conteos);
-          setActivos(data.activos || 0);
-          setHistorial(data.historial || 0);
-        }
+        if (data.ok && data.conteos) setConteos(data.conteos);
       } finally {
         setLoading(false);
       }
     };
     cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Proveedores que reciben pedido hoy (misma lógica que la lista de compras).
-  useEffect(() => {
-    const cargarHoy = async () => {
-      try {
-        const res = await fetch(
-          "/api/proveedores/listar?estado=activos&pageSize=200",
-          { credentials: "include" }
-        );
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.items)) {
-          setProveedoresHoy(data.items.filter((p) => recibeHoy(p.dias_pedido)).length);
-        }
-      } catch {
-        // Silenciar: queda en 0.
-      }
-    };
-    cargarHoy();
   }, []);
 
   useEffect(() => {
@@ -84,52 +56,43 @@ export default function PanelComprasPage() {
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("compras.ver")) return <SinPermisos />;
 
+  // Tarjetas orientadas a tareas (no a estados técnicos).
   const cards = [
     {
-      key: "activos",
-      titulo: "Pedidos activos",
-      desc: "Borrador + confirmado + enviado",
-      valor: activos,
-      href: `${COMPRAS}/activos`,
-      boton: "Ver activos",
+      key: "nuevo",
+      titulo: "Nuevo pedido",
+      desc: "Cargar un pedido a proveedor",
+      href: `${COMPRAS}/nueva`,
+      boton: "Crear pedido",
     },
     {
-      key: "enviados",
-      titulo: "Enviados pendientes de recepción",
-      desc: "Esperando recibir mercadería",
+      key: "pendientes",
+      titulo: "Pedidos pendientes",
+      desc: "En preparación o listos para enviar",
+      valor: conteos.BORRADOR + conteos.CONFIRMADO,
+      href: `${COMPRAS}/pendientes`,
+      boton: "Ver pendientes",
+    },
+    {
+      key: "recibir",
+      titulo: "Recibir mercadería",
+      desc: "Enviados pendientes de recibir",
       valor: conteos.ENVIADO,
       href: `${COMPRAS}/recepcion`,
       boton: "Recibir",
     },
     {
-      key: "confirmados",
-      titulo: "Confirmados sin enviar",
-      desc: "Listos para enviar al proveedor",
-      valor: conteos.CONFIRMADO,
-      href: `${COMPRAS}/activos?estado=CONFIRMADO`,
-      boton: "Enviar pedidos",
-    },
-    {
-      key: "borradores",
-      titulo: "Borradores",
-      desc: "Pedidos en curso",
-      valor: conteos.BORRADOR,
-      href: `${COMPRAS}/activos?estado=BORRADOR`,
-      boton: "Continuar",
-    },
-    {
       key: "historial",
-      titulo: "Historial / compras cerradas",
-      desc: "Recibido + anulado",
-      valor: historial,
+      titulo: "Historial",
+      desc: "Compras recibidas o anuladas",
+      valor: conteos.RECIBIDO + conteos.ANULADO,
       href: `${COMPRAS}/historial`,
       boton: "Ver historial",
     },
     {
-      key: "proveedoresHoy",
-      titulo: "Proveedores que reciben hoy",
-      desc: "Configurados para pedido hoy",
-      valor: proveedoresHoy,
+      key: "proveedores",
+      titulo: "Proveedores",
+      desc: "Administrar proveedores",
       href: "/modulos/proveedores",
       boton: "Ver proveedores",
     },
@@ -152,9 +115,11 @@ export default function PanelComprasPage() {
               className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm flex flex-col gap-2"
             >
               <div className="text-[12px] sunmi-text-muted">{c.titulo}</div>
-              <div className="text-3xl font-bold sunmi-text-strong leading-none">
-                {loading ? "—" : c.valor}
-              </div>
+              {c.valor !== undefined && (
+                <div className="text-3xl font-bold sunmi-text-strong leading-none">
+                  {loading ? "—" : c.valor}
+                </div>
+              )}
               <div className="text-[11px] sunmi-text-muted">{c.desc}</div>
               <div className="mt-2">
                 <SunmiButton color="cyan" onClick={() => router.push(c.href)}>

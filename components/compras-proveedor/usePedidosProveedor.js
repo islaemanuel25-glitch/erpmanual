@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 export const ESTADOS_ACTIVOS = ["BORRADOR", "CONFIRMADO", "ENVIADO"];
+export const ESTADOS_PENDIENTES = ["BORRADOR", "CONFIRMADO"];
 export const ESTADOS_HISTORIAL = ["RECIBIDO", "ANULADO"];
 
 // Umbral operativo: lo normal son los últimos 7 días.
