@@ -890,7 +890,7 @@ export default function NuevaCompraProveedorPage() {
               // (en mobile el contenedor scrollea, como "Agregar productos").
               const gridCols = {
                 gridTemplateColumns:
-                  "minmax(180px,1.4fr) 160px 110px minmax(300px,1fr) 110px 92px",
+                  "minmax(160px,1.2fr) 160px 110px minmax(320px,1.1fr) 110px 92px",
               };
 
               return (
@@ -949,7 +949,7 @@ export default function NuevaCompraProveedorPage() {
                             {/* Costo */}
                             <div className="min-w-0">
                               {esPackItem(item) ? (
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <div className="flex items-center gap-3 whitespace-nowrap">
                                   <label className="flex items-center gap-1">
                                     <span className="sunmi-text-muted text-[10px]">Unidad</span>
                                     <span className="sunmi-text-muted text-xs">$</span>
