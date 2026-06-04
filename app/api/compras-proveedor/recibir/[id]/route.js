@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 
 export async function POST(req, { params }) {
   try {
@@ -189,10 +190,12 @@ export async function POST(req, { params }) {
             });
           }
         } else {
-          // BULTO: StockLocal del depósito SIEMPRE en UNIDADES.
-          // cantRecibida viene en bultos → convertir a unidades.
+          // No-fiambre: el StockLocal del depósito SIEMPRE se guarda en UNIDADES.
+          // Respeta la unidad de la línea (Opción A): BULTO entra ×factor_pack,
+          // UNIDAD entra ×1. factor_pack solo afecta la ENTRADA de stock, no el dinero.
           const factorPack = Math.max(1, Number(base?.factor_pack || 1));
-          incremento = cantRecibida * factorPack;
+          const multiplicador = det.unidad === "UNIDAD" ? 1 : factorPack;
+          incremento = cantRecibida * multiplicador;
         }
 
         // productoLocalId ya apunta directo al ProductoLocal del depósito
@@ -233,11 +236,18 @@ export async function POST(req, { params }) {
           data: detData,
         });
 
-        // Acumular totalFactura: cantRecibida * costo final del detalle
+        // Acumular totalFactura con la fórmula económica única.
+        // Fiambre: kg × costo (kg reales recibidos); resto: cantRecibida × costo.
         const costoFinal = detData.precioCosto !== undefined
           ? Number(detData.precioCosto)
           : Number(det.precioCosto || 0);
-        totalFacturaComputed += cantRecibida * costoFinal;
+        const { subtotal: subtotalEconomico } = subtotalLinea({
+          base,
+          cantidad: cantRecibida,
+          costo: costoFinal,
+          kg: kgReales,
+        });
+        totalFacturaComputed += subtotalEconomico || 0;
       }
 
       // Marcar pedido como RECIBIDO + guardar factura/ganancia

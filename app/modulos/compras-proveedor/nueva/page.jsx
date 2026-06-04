@@ -20,6 +20,7 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCodigo";
+import { subtotalLinea, unidadDisplay } from "@/lib/compras-proveedor/calculoPedido";
 import {
   recibeHoy,
   formatDiaLabel,
@@ -231,6 +232,7 @@ export default function NuevaCompraProveedorPage() {
       nombre: prod.nombre,
       sku: prod.sku,
       modoCompra: prod.modoCompra || "BULTO",
+      unidad_medida: prod.unidad_medida,
       cantidad: cantidadInicial,
       precioCosto: Number(prod.precio_costo || 0),
       factorPack: Number(prod.factor_pack) || 1,
@@ -343,7 +345,47 @@ export default function NuevaCompraProveedorPage() {
     }
   };
 
-  // Unidad fija BULTO para compras a proveedor (depósito)
+  // Editar costo de línea (en modo continuar persiste vía editar-item).
+  const updateItemCosto = (productoLocalId, rawValue) => {
+    const raw = String(rawValue).replace(",", ".");
+    setItems((prev) =>
+      prev.map((i) =>
+        i.productoLocalId === productoLocalId ? { ...i, precioCosto: raw } : i
+      )
+    );
+  };
+
+  const handleBlurCosto = async (productoLocalId) => {
+    const item = items.find((i) => i.productoLocalId === productoLocalId);
+    if (!item) return;
+    const v = Number(item.precioCosto);
+    const final = !Number.isFinite(v) || v < 0 ? 0 : v;
+    setItems((prev) =>
+      prev.map((i) =>
+        i.productoLocalId === productoLocalId ? { ...i, precioCosto: final } : i
+      )
+    );
+    if (esContinuar && item.detalleId) {
+      try {
+        const res = await fetch(
+          `/api/compras-proveedor/editar-item/${pedidoIdParam}`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              detalleId: item.detalleId,
+              precioCosto: final > 0 ? final : null,
+            }),
+          }
+        );
+        const data = await res.json();
+        if (!data.ok) alert(data.error || "No se pudo guardar el costo");
+      } catch {
+        alert("Error de conexión al guardar el costo");
+      }
+    }
+  };
 
   // Crear pedido
   const crearPedido = async () => {
@@ -371,7 +413,7 @@ export default function NuevaCompraProveedorPage() {
             productoLocalId: i.productoLocalId,
             cantidad: i.cantidad,
             unidad: i.modoCompra || "BULTO",
-            precioCosto: i.precioCosto || null,
+            precioCosto: Number(i.precioCosto) || null,
           })),
         }),
       });
@@ -731,97 +773,130 @@ export default function NuevaCompraProveedorPage() {
               </h3>
             </div>
 
-            <div className="overflow-x-auto rounded border sunmi-border">
-              <SunmiTable headers={["Producto", "Cant.", "Costo (por bulto)", "Subtotal", ""]}>
-                {items.map((item, index) => {
-                  const subtotalItem = (Number(item.cantidad) || 0) * item.precioCosto;
-                  const esFiambre = item.modoCompra === "UNIDAD";
-                  const unidadLabel = esFiambre ? "uds" : "bultos";
-                  const costoLabel = esFiambre ? "unidad" : "bulto";
-                  return (
-                    <SunmiTableRow
-                      key={
-                        item.detalleId
-                          ? `detalle-${item.detalleId}`
-                          : `producto-${item.productoLocalId}-${index}`
-                      }
-                    >
-                      <td className="px-3 py-1.5 text-sm">
-                        {item.nombre}
-                        {item.sku && (
-                          <span className="text-xs sunmi-text-muted ml-2">
-                            {item.sku}
-                          </span>
-                        )}
-                        {esFiambre && (
-                          <span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const cur = Number(item.cantidad) || 1;
-                              updateItemCantidad(item.productoLocalId, String(Math.max(1, cur - 1)));
-                            }}
-                            className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center"
-                          >−</button>
-                          <SunmiInput
-                            type="text"
-                            inputMode="numeric"
-                            value={item.cantidad}
-                            onChange={(e) =>
-                              updateItemCantidad(item.productoLocalId, e.target.value)
-                            }
-                            onBlur={() => handleBlurCantidad(item.productoLocalId)}
-                            className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const cur = Number(item.cantidad) || 0;
-                              updateItemCantidad(item.productoLocalId, String(cur + 1));
-                            }}
-                            className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center"
-                          >+</button>
-                          <span className="text-[10px] sunmi-text-muted">{unidadLabel}</span>
-                        </div>
-                        {esFiambre && item.pesoRefKg > 0 && (
-                          <div className="text-[10px] sunmi-text-muted mt-0.5">
-                            ~{((Number(item.cantidad) || 0) * item.pesoRefKg).toFixed(1)} kg
+            {(() => {
+              const itemBase = (i) => ({
+                modoCompraProveedor: i.modoCompra,
+                unidad_medida: i.unidad_medida,
+                factor_pack: i.factorPack,
+                pesoReferenciaKg: i.pesoRefKg,
+              });
+              const calc = (i) =>
+                subtotalLinea({ base: itemBase(i), cantidad: i.cantidad, costo: i.precioCosto });
+              const total = items.reduce((acc, i) => acc + (calc(i).subtotal || 0), 0);
+
+              return (
+                <>
+                  {/* DESKTOP: tabla */}
+                  <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
+                    <SunmiTable headers={["Producto", "Cantidad", "Unidad", "Costo", "Subtotal", ""]}>
+                      {items.map((item, index) => {
+                        const r = calc(item);
+                        const esFiambre = item.modoCompra === "UNIDAD";
+                        return (
+                          <SunmiTableRow key={item.detalleId ? `d-${item.detalleId}` : `p-${item.productoLocalId}-${index}`}>
+                            <td className="px-3 py-1.5 text-sm">
+                              {item.nombre}
+                              {item.sku && <span className="text-xs sunmi-text-muted ml-2">{item.sku}</span>}
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-1">
+                                <SunmiButton color="slate" type="button" onClick={() => updateItemCantidad(item.productoLocalId, String(Math.max(1, (Number(item.cantidad) || 1) - 1)))}>−</SunmiButton>
+                                <SunmiInput type="text" inputMode="numeric" value={item.cantidad}
+                                  onChange={(e) => updateItemCantidad(item.productoLocalId, e.target.value)}
+                                  onBlur={() => handleBlurCantidad(item.productoLocalId)}
+                                  className="w-[64px] text-center" />
+                                <SunmiButton color="slate" type="button" onClick={() => updateItemCantidad(item.productoLocalId, String((Number(item.cantidad) || 0) + 1))}>+</SunmiButton>
+                              </div>
+                              {esFiambre && Number(item.pesoRefKg) > 0 && (
+                                <div className="text-[10px] sunmi-text-muted mt-0.5">~{((Number(item.cantidad) || 0) * Number(item.pesoRefKg)).toFixed(1)} kg</div>
+                              )}
+                            </td>
+                            <td className="px-3 py-1.5 text-xs sunmi-text-muted">{unidadDisplay(itemBase(item), item.modoCompra)}</td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-0.5">
+                                <span className="sunmi-text-muted text-xs">$</span>
+                                <SunmiInput type="text" inputMode="decimal" value={item.precioCosto}
+                                  onChange={(e) => updateItemCosto(item.productoLocalId, e.target.value)}
+                                  onBlur={() => handleBlurCosto(item.productoLocalId)}
+                                  className="w-[80px] text-center" />
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-xs text-right font-medium">
+                              {r.subtotal != null ? `$${r.subtotal.toFixed(2)}` : (
+                                <span className="sunmi-text-accent" title={r.advertencia || ""}>⚠ {r.advertencia}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-1.5 text-right">
+                              <SunmiButton color="red" type="button" onClick={() => quitarItem(item.productoLocalId)}>Quitar</SunmiButton>
+                            </td>
+                          </SunmiTableRow>
+                        );
+                      })}
+                      <tr className="border-t sunmi-divider">
+                        <td colSpan={4} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">TOTAL ESTIMADO</td>
+                        <td className="px-3 py-2 text-sm font-bold text-right sunmi-text-accent">${total.toFixed(2)}</td>
+                        <td />
+                      </tr>
+                    </SunmiTable>
+                  </div>
+
+                  {/* MOBILE: cards */}
+                  <div className="md:hidden flex flex-col gap-2">
+                    {items.map((item, index) => {
+                      const r = calc(item);
+                      const esFiambre = item.modoCompra === "UNIDAD";
+                      return (
+                        <div key={item.detalleId ? `dm-${item.detalleId}` : `pm-${item.productoLocalId}-${index}`} className="rounded-xl border sunmi-border p-3 sunmi-surface flex flex-col gap-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="font-medium sunmi-text-strong truncate">{item.nombre}</div>
+                              <div className="text-[11px] sunmi-text-muted">{item.sku ? `${item.sku} · ` : ""}{unidadDisplay(itemBase(item), item.modoCompra)}</div>
+                            </div>
+                            <SunmiButton color="red" type="button" onClick={() => quitarItem(item.productoLocalId)}>Quitar</SunmiButton>
                           </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-xs text-right">
-                        ${item.precioCosto.toFixed(2)}
-                        <span className="text-[10px] sunmi-text-muted ml-0.5">/{costoLabel}</span>
-                      </td>
-                      <td className="px-3 py-1.5 text-xs text-right font-medium">
-                        ${subtotalItem.toFixed(2)}
-                      </td>
-                      <td className="px-3 py-1.5 text-right">
-                        <button
-                          onClick={() => quitarItem(item.productoLocalId)}
-                          className="sunmi-link-danger text-sm"
-                        >
-                          Quitar
-                        </button>
-                      </td>
-                    </SunmiTableRow>
-                  );
-                })}
-                <tr className="border-t sunmi-divider">
-                  <td colSpan={3} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">
-                    TOTAL ESTIMADO
-                  </td>
-                  <td className="px-3 py-2 text-sm font-bold text-right sunmi-text-accent">
-                    ${items.reduce((acc, i) => acc + (Number(i.cantidad) || 0) * i.precioCosto, 0).toFixed(2)}
-                  </td>
-                  <td />
-                </tr>
-              </SunmiTable>
-            </div>
+                          <div className="flex items-end justify-between gap-2 flex-wrap">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[11px] sunmi-text-muted">Cantidad</span>
+                              <div className="flex items-center gap-1">
+                                <SunmiButton color="slate" type="button" onClick={() => updateItemCantidad(item.productoLocalId, String(Math.max(1, (Number(item.cantidad) || 1) - 1)))}>−</SunmiButton>
+                                <SunmiInput type="text" inputMode="numeric" value={item.cantidad}
+                                  onChange={(e) => updateItemCantidad(item.productoLocalId, e.target.value)}
+                                  onBlur={() => handleBlurCantidad(item.productoLocalId)}
+                                  className="w-[64px] text-center" />
+                                <SunmiButton color="slate" type="button" onClick={() => updateItemCantidad(item.productoLocalId, String((Number(item.cantidad) || 0) + 1))}>+</SunmiButton>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[11px] sunmi-text-muted">Costo</span>
+                              <div className="flex items-center gap-0.5">
+                                <span className="sunmi-text-muted text-xs">$</span>
+                                <SunmiInput type="text" inputMode="decimal" value={item.precioCosto}
+                                  onChange={(e) => updateItemCosto(item.productoLocalId, e.target.value)}
+                                  onBlur={() => handleBlurCosto(item.productoLocalId)}
+                                  className="w-[90px] text-center" />
+                              </div>
+                            </div>
+                          </div>
+                          {esFiambre && Number(item.pesoRefKg) > 0 && (
+                            <div className="text-[10px] sunmi-text-muted">~{((Number(item.cantidad) || 0) * Number(item.pesoRefKg)).toFixed(1)} kg</div>
+                          )}
+                          <div className="flex items-center justify-between border-t sunmi-divider pt-2">
+                            <span className="text-xs sunmi-text-muted">Subtotal</span>
+                            <span className="text-sm font-bold sunmi-text-accent">
+                              {r.subtotal != null ? `$${r.subtotal.toFixed(2)}` : `⚠ ${r.advertencia}`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between rounded-xl border sunmi-border p-3 sunmi-surface">
+                      <span className="text-sm font-semibold sunmi-text-strong">TOTAL ESTIMADO</span>
+                      <span className="text-base font-bold sunmi-text-accent">${total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </SunmiPanel>
         )}
 

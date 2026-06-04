@@ -21,6 +21,11 @@ import {
   generarTextoWhatsApp,
   normalizarTelefonoWa,
 } from "@/lib/compras-proveedor/whatsappTexto";
+import {
+  subtotalLinea,
+  permiteToggleUnidad,
+  unidadDisplay,
+} from "@/lib/compras-proveedor/calculoPedido";
 
 const ESTADO_BADGE = {
   BORRADOR: "sunmi-badge-muted",
@@ -372,22 +377,35 @@ export default function DetallePedidoProveedorPage({ params }) {
     (d) => d.producto?.base?.modoCompraProveedor === "UNIDAD"
   );
 
-  // Total estimado/factura reactivo. Usa local edits en BORRADOR y recepción,
-  // y los valores guardados del detalle en otros estados.
-  const computedTotalFactura = (pedido?.detalles || []).reduce((acc, d) => {
-    let cant, costo;
+  // Subtotal económico de una línea según el estado (fuente única: calculoPedido).
+  // Fiambre → kg × costo (kg reales en recepción/recibido, piezas×pesoRef en borrador).
+  const calcLineaDetalle = (d) => {
+    const base = d.producto?.base;
+    let cant, costo, kg;
     if (esBorrador) {
       cant = Number(cantidadesEdit[d.id] ?? d.cantidad) || 0;
       costo = Number(costos[d.id] ?? d.precioCosto ?? 0) || 0;
+      kg = null; // se deriva piezas × pesoRef dentro de subtotalLinea
     } else if (esRecepcion) {
       cant = Number(recibidos[d.id]) || 0;
-      costo = Number(costos[d.id]) || 0;
+      costo = Number(costos[d.id] ?? d.precioCosto ?? 0) || 0;
+      kg =
+        kgRecibidos[d.id] != null && kgRecibidos[d.id] !== ""
+          ? Number(kgRecibidos[d.id])
+          : null;
     } else {
       cant = Number(d.cantidadRecibida ?? d.cantidad) || 0;
       costo = Number(d.precioCosto) || 0;
+      kg = d.kgRecibidos != null ? Number(d.kgRecibidos) : null;
     }
-    return acc + cant * costo;
-  }, 0);
+    return subtotalLinea({ base, cantidad: cant, costo, kg });
+  };
+
+  // Total estimado/factura reactivo = suma de subtotales económicos.
+  const computedTotalFactura = (pedido?.detalles || []).reduce(
+    (acc, d) => acc + (calcLineaDetalle(d).subtotal || 0),
+    0
+  );
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
@@ -589,7 +607,8 @@ export default function DetallePedidoProveedorPage({ params }) {
             </h3>
           </div>
 
-          <div className="overflow-x-auto rounded border sunmi-border">
+          {/* DESKTOP: tabla */}
+          <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
             <SunmiTable
               headers={[
                 "Producto",
@@ -601,6 +620,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                 ...(esRecepcion && tieneFiambre ? ["Kg recibidos"] : []),
                 ...(pedido.estado === "RECIBIDO" ? ["Recibido"] : []),
                 ...(pedido.estado === "RECIBIDO" && tieneFiambre ? ["Kg reales"] : []),
+                "Subtotal",
                 ...((esRecepcion || esBorrador) ? [""] : []),
               ]}
             >
@@ -608,61 +628,48 @@ export default function DetallePedidoProveedorPage({ params }) {
                 <SunmiTableEmpty label="Sin items" />
               ) : (
                 pedido.detalles.map((det) => {
-                  const esFiambre = det.producto?.base?.modoCompraProveedor === "UNIDAD";
+                  const base = det.producto?.base;
+                  const esFiambre = base?.modoCompraProveedor === "UNIDAD";
+                  const r = calcLineaDetalle(det);
+                  const puedeToggle = esBorrador && permiteToggleUnidad(base);
                   return (
                     <SunmiTableRow key={det.id}>
                       <td className="px-3 py-1.5 text-sm">
-                        {det.producto?.base?.nombre || "-"}
+                        {base?.nombre || "-"}
                         {esFiambre && (
                           <span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>
                         )}
                       </td>
-                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">
-                        {det.producto?.base?.sku || "-"}
-                      </td>
+                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">{base?.sku || "-"}</td>
                       <td className="px-3 py-1.5 text-center">
                         {esBorrador ? (
                           <SunmiInput
                             type="text"
                             inputMode="numeric"
                             value={cantidadesEdit[det.id] ?? ""}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              setCantidadesEdit((prev) => ({
-                                ...prev,
-                                [det.id]: raw,
-                              }));
-                            }}
+                            onChange={(e) =>
+                              setCantidadesEdit((prev) => ({ ...prev, [det.id]: e.target.value }))
+                            }
                             onBlur={() => {
                               const v = parseInt(cantidadesEdit[det.id], 10);
                               const final = isNaN(v) || v < 1 ? 1 : v;
-                              setCantidadesEdit((prev) => ({
-                                ...prev,
-                                [det.id]: String(final),
-                              }));
-                              if (final !== Number(det.cantidad)) {
-                                editarItemAPI(det.id, { cantidad: final });
-                              }
+                              setCantidadesEdit((prev) => ({ ...prev, [det.id]: String(final) }));
+                              if (final !== Number(det.cantidad)) editarItemAPI(det.id, { cantidad: final });
                             }}
-                            className="w-[60px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-[64px] text-center"
                           />
                         ) : (
                           Number(det.cantidad)
                         )}
                       </td>
                       <td className="px-3 py-1.5 text-xs">
-                        {esBorrador ? (
-                          <div className="w-24">
+                        {puedeToggle ? (
+                          <div className="w-28">
                             <SunmiSelectAdv
                               value={unidadesEdit[det.id] || "BULTO"}
                               onChange={(v) => {
-                                setUnidadesEdit((prev) => ({
-                                  ...prev,
-                                  [det.id]: v,
-                                }));
-                                if (v !== det.unidad) {
-                                  editarItemAPI(det.id, { unidad: v });
-                                }
+                                setUnidadesEdit((prev) => ({ ...prev, [det.id]: v }));
+                                if (v !== det.unidad) editarItemAPI(det.id, { unidad: v });
                               }}
                             >
                               <SunmiSelectOption value="BULTO">BULTO</SunmiSelectOption>
@@ -670,7 +677,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                             </SunmiSelectAdv>
                           </div>
                         ) : (
-                          det.unidad
+                          <span className="sunmi-text-muted">{unidadDisplay(base, det.unidad)}</span>
                         )}
                       </td>
                       <td className="px-3 py-1.5 text-xs">
@@ -681,167 +688,230 @@ export default function DetallePedidoProveedorPage({ params }) {
                               type="text"
                               inputMode="decimal"
                               value={costos[det.id] ?? ""}
-                              onChange={(e) => {
-                                const raw = e.target.value.replace(",", ".");
-                                setCostos((prev) => ({ ...prev, [det.id]: raw }));
-                              }}
+                              onChange={(e) =>
+                                setCostos((prev) => ({ ...prev, [det.id]: e.target.value.replace(",", ".") }))
+                              }
                               onBlur={() => {
                                 const v = Number(costos[det.id]);
                                 const final = isNaN(v) || v < 0 ? 0 : v;
                                 setCostos((prev) => ({ ...prev, [det.id]: String(final) }));
                                 if (esBorrador) {
                                   const prevCosto = Number(det.precioCosto);
-                                  if (final !== prevCosto) {
-                                    editarItemAPI(det.id, {
-                                      precioCosto: final > 0 ? final : null,
-                                    });
-                                  }
+                                  if (final !== prevCosto) editarItemAPI(det.id, { precioCosto: final > 0 ? final : null });
                                 }
                               }}
-                              className="w-[70px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-[80px] text-center"
                             />
                           </div>
                         ) : (
-                          det.precioCosto
-                            ? `$${Number(det.precioCosto).toFixed(2)}`
-                            : "-"
+                          det.precioCosto ? `$${Number(det.precioCosto).toFixed(2)}` : "-"
                         )}
                       </td>
 
-                      {/* Cant. recibida (en recepción) */}
                       {esRecepcion && (
                         <td className="px-3 py-1.5">
                           <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const cur = Number(recibidos[det.id]) || 0;
-                                setRecibidos((prev) => ({
-                                  ...prev,
-                                  [det.id]: Math.max(0, cur - 1),
-                                }));
-                              }}
-                              className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center"
-                            >−</button>
+                            <SunmiButton color="slate" type="button" onClick={() => { const cur = Number(recibidos[det.id]) || 0; setRecibidos((prev) => ({ ...prev, [det.id]: Math.max(0, cur - 1) })); }}>−</SunmiButton>
                             <SunmiInput
                               type="text"
                               inputMode="numeric"
                               value={recibidos[det.id] ?? ""}
                               onChange={(e) => {
                                 const raw = e.target.value;
-                                if (raw === "") {
-                                  setRecibidos((prev) => ({ ...prev, [det.id]: "" }));
-                                  return;
-                                }
+                                if (raw === "") { setRecibidos((prev) => ({ ...prev, [det.id]: "" })); return; }
                                 const val = parseInt(raw, 10);
-                                setRecibidos((prev) => ({
-                                  ...prev,
-                                  [det.id]: isNaN(val) ? "" : Math.max(0, val),
-                                }));
+                                setRecibidos((prev) => ({ ...prev, [det.id]: isNaN(val) ? "" : Math.max(0, val) }));
                               }}
-                              onBlur={() => {
-                                const cur = Number(recibidos[det.id]);
-                                if (isNaN(cur) || cur < 0) {
-                                  setRecibidos((prev) => ({ ...prev, [det.id]: 0 }));
-                                }
-                              }}
-                              className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              onBlur={() => { const cur = Number(recibidos[det.id]); if (isNaN(cur) || cur < 0) setRecibidos((prev) => ({ ...prev, [det.id]: 0 })); }}
+                              className="w-[56px] text-center"
                             />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const cur = Number(recibidos[det.id]) || 0;
-                                setRecibidos((prev) => ({
-                                  ...prev,
-                                  [det.id]: cur + 1,
-                                }));
-                              }}
-                              className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center"
-                            >+</button>
+                            <SunmiButton color="slate" type="button" onClick={() => { const cur = Number(recibidos[det.id]) || 0; setRecibidos((prev) => ({ ...prev, [det.id]: cur + 1 })); }}>+</SunmiButton>
                           </div>
                         </td>
                       )}
 
-                      {/* Kg recibidos (fiambre, en recepción) */}
                       {esRecepcion && tieneFiambre && (
                         <td className="px-3 py-1.5 w-28">
                           {esFiambre ? (
-                            <SunmiInput
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={kgRecibidos[det.id] ?? ""}
-                              onChange={(e) =>
-                                setKgRecibidos((prev) => ({
-                                  ...prev,
-                                  [det.id]: e.target.value,
-                                }))
-                              }
-                              className="w-24 text-center"
-                              placeholder="kg"
-                            />
-                          ) : (
-                            <span className="sunmi-text-muted text-xs">-</span>
-                          )}
+                            <SunmiInput type="number" min="0" step="0.01" value={kgRecibidos[det.id] ?? ""}
+                              onChange={(e) => setKgRecibidos((prev) => ({ ...prev, [det.id]: e.target.value }))}
+                              className="w-24 text-center" placeholder="kg" />
+                          ) : (<span className="sunmi-text-muted text-xs">-</span>)}
                         </td>
                       )}
 
-                      {/* Estado RECIBIDO: mostrar valores finales */}
                       {pedido.estado === "RECIBIDO" && (
                         <td className="px-3 py-1.5 text-center sunmi-text-success">
-                          {det.cantidadRecibida != null
-                            ? Number(det.cantidadRecibida)
-                            : "-"}
+                          {det.cantidadRecibida != null ? Number(det.cantidadRecibida) : "-"}
                         </td>
                       )}
                       {pedido.estado === "RECIBIDO" && tieneFiambre && (
                         <td className="px-3 py-1.5 text-center sunmi-text-success">
-                          {esFiambre && det.kgRecibidos != null
-                            ? `${Number(det.kgRecibidos).toFixed(2)} kg`
-                            : "-"}
+                          {esFiambre && det.kgRecibidos != null ? `${Number(det.kgRecibidos).toFixed(2)} kg` : "-"}
                         </td>
                       )}
 
+                      <td className="px-3 py-1.5 text-xs text-right font-medium">
+                        {r.subtotal != null ? `$${r.subtotal.toFixed(2)}` : (
+                          <span className="sunmi-text-accent" title={r.advertencia || ""}>⚠ {r.advertencia}</span>
+                        )}
+                      </td>
+
                       {(esRecepcion || esBorrador) && (
                         <td className="px-3 py-1.5 text-center">
-                          <button
-                            type="button"
-                            disabled={deleting === det.id}
-                            onClick={() => eliminarDetalle(det.id)}
-                            className="sunmi-link-danger text-xs font-medium disabled:opacity-40"
-                          >
-                            {deleting === det.id ? "..." : "✕"}
-                          </button>
+                          <SunmiButton color="red" type="button" disabled={deleting === det.id} onClick={() => eliminarDetalle(det.id)}>
+                            {deleting === det.id ? "..." : "Quitar"}
+                          </SunmiButton>
                         </td>
                       )}
                     </SunmiTableRow>
                   );
                 })
               )}
-              {/* TOTAL ESTIMADO — siempre visible, reactivo en recepción y borrador */}
               {(pedido.detalles || []).length > 0 && (() => {
-                const totalEstimado = computedTotalFactura;
-                // Contar columnas visibles antes de esta fila
-                const baseCols = 5; // Producto, SKU, Cant. pedida, Unidad, Costo
+                const baseCols = 5;
                 const extraCols =
-                  (esRecepcion ? 1 : 0) + // Cant. recibida
-                  (esRecepcion && tieneFiambre ? 1 : 0) + // Kg recibidos
-                  (pedido.estado === "RECIBIDO" ? 1 : 0) + // Recibido
-                  (pedido.estado === "RECIBIDO" && tieneFiambre ? 1 : 0) + // Kg reales
-                  ((esRecepcion || esBorrador) ? 1 : 0); // Acción (delete)
-                const totalCols = baseCols + extraCols;
+                  (esRecepcion ? 1 : 0) +
+                  (esRecepcion && tieneFiambre ? 1 : 0) +
+                  (pedido.estado === "RECIBIDO" ? 1 : 0) +
+                  (pedido.estado === "RECIBIDO" && tieneFiambre ? 1 : 0);
+                const accionCol = (esRecepcion || esBorrador) ? 1 : 0;
                 return (
                   <tr className="border-t sunmi-divider">
-                    <td colSpan={totalCols - 1} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">
+                    <td colSpan={baseCols + extraCols} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">
                       TOTAL ESTIMADO
                     </td>
                     <td className="px-3 py-2 text-sm font-bold text-right sunmi-text-accent">
-                      ${totalEstimado.toFixed(2)}
+                      ${computedTotalFactura.toFixed(2)}
                     </td>
+                    {accionCol ? <td /> : null}
                   </tr>
                 );
               })()}
             </SunmiTable>
+          </div>
+
+          {/* MOBILE: cards */}
+          <div className="md:hidden flex flex-col gap-2">
+            {(pedido.detalles || []).length === 0 ? (
+              <p className="text-xs sunmi-text-muted italic px-1">Sin items</p>
+            ) : (
+              pedido.detalles.map((det) => {
+                const base = det.producto?.base;
+                const esFiambre = base?.modoCompraProveedor === "UNIDAD";
+                const r = calcLineaDetalle(det);
+                const puedeToggle = esBorrador && permiteToggleUnidad(base);
+                return (
+                  <div key={`m-${det.id}`} className="rounded-xl border sunmi-border p-3 sunmi-surface flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium sunmi-text-strong truncate">
+                          {base?.nombre || "-"}
+                          {esFiambre && (<span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>)}
+                        </div>
+                        <div className="text-[11px] sunmi-text-muted">{base?.sku || ""}</div>
+                      </div>
+                      {(esRecepcion || esBorrador) && (
+                        <SunmiButton color="red" type="button" disabled={deleting === det.id} onClick={() => eliminarDetalle(det.id)}>
+                          {deleting === det.id ? "..." : "Quitar"}
+                        </SunmiButton>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] sunmi-text-muted">Cant. pedida</span>
+                        {esBorrador ? (
+                          <SunmiInput type="text" inputMode="numeric" value={cantidadesEdit[det.id] ?? ""}
+                            onChange={(e) => setCantidadesEdit((prev) => ({ ...prev, [det.id]: e.target.value }))}
+                            onBlur={() => {
+                              const v = parseInt(cantidadesEdit[det.id], 10);
+                              const final = isNaN(v) || v < 1 ? 1 : v;
+                              setCantidadesEdit((prev) => ({ ...prev, [det.id]: String(final) }));
+                              if (final !== Number(det.cantidad)) editarItemAPI(det.id, { cantidad: final });
+                            }}
+                            className="w-[80px] text-center" />
+                        ) : (<span className="sunmi-text-strong">{Number(det.cantidad)}</span>)}
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] sunmi-text-muted">Unidad</span>
+                        {puedeToggle ? (
+                          <div className="w-28">
+                            <SunmiSelectAdv value={unidadesEdit[det.id] || "BULTO"}
+                              onChange={(v) => { setUnidadesEdit((prev) => ({ ...prev, [det.id]: v })); if (v !== det.unidad) editarItemAPI(det.id, { unidad: v }); }}>
+                              <SunmiSelectOption value="BULTO">BULTO</SunmiSelectOption>
+                              <SunmiSelectOption value="UNIDAD">UNIDAD</SunmiSelectOption>
+                            </SunmiSelectAdv>
+                          </div>
+                        ) : (<span className="sunmi-text-muted">{unidadDisplay(base, det.unidad)}</span>)}
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] sunmi-text-muted">Costo</span>
+                        {(esRecepcion || esBorrador) ? (
+                          <div className="flex items-center gap-0.5">
+                            <span className="sunmi-text-muted text-xs">$</span>
+                            <SunmiInput type="text" inputMode="decimal" value={costos[det.id] ?? ""}
+                              onChange={(e) => setCostos((prev) => ({ ...prev, [det.id]: e.target.value.replace(",", ".") }))}
+                              onBlur={() => {
+                                const v = Number(costos[det.id]); const final = isNaN(v) || v < 0 ? 0 : v;
+                                setCostos((prev) => ({ ...prev, [det.id]: String(final) }));
+                                if (esBorrador) { const prevCosto = Number(det.precioCosto); if (final !== prevCosto) editarItemAPI(det.id, { precioCosto: final > 0 ? final : null }); }
+                              }}
+                              className="w-[90px] text-center" />
+                          </div>
+                        ) : (<span className="sunmi-text-strong">{det.precioCosto ? `$${Number(det.precioCosto).toFixed(2)}` : "-"}</span>)}
+                      </div>
+                    </div>
+
+                    {esRecepcion && (
+                      <div className="flex flex-wrap items-end gap-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[11px] sunmi-text-muted">Cant. recibida</span>
+                          <div className="flex items-center gap-1">
+                            <SunmiButton color="slate" type="button" onClick={() => { const cur = Number(recibidos[det.id]) || 0; setRecibidos((prev) => ({ ...prev, [det.id]: Math.max(0, cur - 1) })); }}>−</SunmiButton>
+                            <SunmiInput type="text" inputMode="numeric" value={recibidos[det.id] ?? ""}
+                              onChange={(e) => { const raw = e.target.value; if (raw === "") { setRecibidos((prev) => ({ ...prev, [det.id]: "" })); return; } const val = parseInt(raw, 10); setRecibidos((prev) => ({ ...prev, [det.id]: isNaN(val) ? "" : Math.max(0, val) })); }}
+                              onBlur={() => { const cur = Number(recibidos[det.id]); if (isNaN(cur) || cur < 0) setRecibidos((prev) => ({ ...prev, [det.id]: 0 })); }}
+                              className="w-[64px] text-center" />
+                            <SunmiButton color="slate" type="button" onClick={() => { const cur = Number(recibidos[det.id]) || 0; setRecibidos((prev) => ({ ...prev, [det.id]: cur + 1 })); }}>+</SunmiButton>
+                          </div>
+                        </div>
+                        {esFiambre && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[11px] sunmi-text-muted">Kg recibidos</span>
+                            <SunmiInput type="number" min="0" step="0.01" value={kgRecibidos[det.id] ?? ""}
+                              onChange={(e) => setKgRecibidos((prev) => ({ ...prev, [det.id]: e.target.value }))}
+                              className="w-28 text-center" placeholder="kg" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {pedido.estado === "RECIBIDO" && (
+                      <div className="text-[12px] sunmi-text-success">
+                        Recibido: {det.cantidadRecibida != null ? Number(det.cantidadRecibida) : "-"}
+                        {esFiambre && det.kgRecibidos != null ? ` · ${Number(det.kgRecibidos).toFixed(2)} kg` : ""}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between border-t sunmi-divider pt-2">
+                      <span className="text-xs sunmi-text-muted">Subtotal</span>
+                      <span className="text-sm font-bold sunmi-text-accent">
+                        {r.subtotal != null ? `$${r.subtotal.toFixed(2)}` : `⚠ ${r.advertencia}`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            {(pedido.detalles || []).length > 0 && (
+              <div className="flex items-center justify-between rounded-xl border sunmi-border p-3 sunmi-surface">
+                <span className="text-sm font-semibold sunmi-text-strong">TOTAL ESTIMADO</span>
+                <span className="text-base font-bold sunmi-text-accent">${computedTotalFactura.toFixed(2)}</span>
+              </div>
+            )}
           </div>
         </SunmiPanel>
 
@@ -968,7 +1038,6 @@ export default function DetallePedidoProveedorPage({ params }) {
             <SunmiButton
               color="amber"
               disabled={acting}
-              className="!border !border-[var(--pos-warning,#f59e0b)]"
               title="Solo continuar si la mercadería llegó físicamente al depósito"
               onClick={() => {
                 if (!confirm("Solo continuar si la mercadería llegó físicamente.\n\n¿Confirmás la recepción de este pedido?")) return;
