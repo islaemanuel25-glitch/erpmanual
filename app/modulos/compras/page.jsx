@@ -90,7 +90,7 @@ export default function PanelComprasPage() {
       titulo: "Pedidos activos",
       desc: "Borrador + confirmado + enviado",
       valor: activos,
-      href: `${COMPRAS}?vista=activos`,
+      href: `${COMPRAS}/activos`,
       boton: "Ver activos",
     },
     {
@@ -98,7 +98,7 @@ export default function PanelComprasPage() {
       titulo: "Enviados pendientes de recepción",
       desc: "Esperando recibir mercadería",
       valor: conteos.ENVIADO,
-      href: `${COMPRAS}?vista=activos&estado=ENVIADO`,
+      href: `${COMPRAS}/recepcion`,
       boton: "Recibir",
     },
     {
@@ -106,7 +106,7 @@ export default function PanelComprasPage() {
       titulo: "Confirmados sin enviar",
       desc: "Listos para enviar al proveedor",
       valor: conteos.CONFIRMADO,
-      href: `${COMPRAS}?vista=activos&estado=CONFIRMADO`,
+      href: `${COMPRAS}/activos?estado=CONFIRMADO`,
       boton: "Enviar pedidos",
     },
     {
@@ -114,7 +114,7 @@ export default function PanelComprasPage() {
       titulo: "Borradores",
       desc: "Pedidos en curso",
       valor: conteos.BORRADOR,
-      href: `${COMPRAS}?vista=activos&estado=BORRADOR`,
+      href: `${COMPRAS}/activos?estado=BORRADOR`,
       boton: "Continuar",
     },
     {
@@ -122,7 +122,7 @@ export default function PanelComprasPage() {
       titulo: "Historial / compras cerradas",
       desc: "Recibido + anulado",
       valor: historial,
-      href: `${COMPRAS}?vista=historial`,
+      href: `${COMPRAS}/historial`,
       boton: "Ver historial",
     },
     {
