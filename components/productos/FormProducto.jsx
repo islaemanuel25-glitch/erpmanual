@@ -233,6 +233,41 @@ export default function FormProducto({
     });
   };
 
+  const showPreciosRef =
+    ["pack", "cajon"].includes(form.unidad_medida) && Number(form.factor_pack) > 1;
+  const factorPackPrecios = Number(form.factor_pack) || 1;
+
+  const toPrecioUnitarioRef = (precioBulto) => {
+    if (precioBulto === "" || precioBulto === null || precioBulto === undefined)
+      return "";
+    const b = Number(precioBulto);
+    if (!Number.isFinite(b)) return "";
+    return Number((b / factorPackPrecios).toFixed(2));
+  };
+
+  const onChangeCostoUnitarioRef = (val) => {
+    if (val === "") return onChangeCosto("");
+    const ref = Number(val);
+    if (!Number.isFinite(ref) || ref < 0) return;
+    const bulto = Math.round(ref * factorPackPrecios * 100) / 100;
+    onChangeCosto(bulto);
+  };
+
+  const onChangeVentaUnitarioRef = (val) => {
+    if (val === "") return onChangeVenta("");
+    const ref = Number(val);
+    if (!Number.isFinite(ref) || ref < 0) return;
+    const bulto = Math.round(ref * factorPackPrecios * 100) / 100;
+    onChangeVenta(bulto);
+  };
+
+  const labelEscalaPrecio =
+    form.unidad_medida === "kg"
+      ? "(por kg)"
+      : ["pack", "cajon"].includes(form.unidad_medida)
+      ? "(por bulto)"
+      : "(por unidad)";
+
   const validar = () => {
     if (!String(form.nombre).trim()) return "Completá el nombre.";
     if (!form.unidad_medida) return "Seleccioná unidad.";
@@ -678,7 +713,7 @@ export default function FormProducto({
         {/* PRECIOS */}
         <Section title="Precios">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label={`Costo * ${form.unidad_medida === "kg" ? "(por kg)" : ["pack", "cajon"].includes(form.unidad_medida) ? "(por bulto)" : "(por unidad)"}`} fieldKey="precio_costo">
+            <Field label={`Costo * ${labelEscalaPrecio}`} fieldKey="precio_costo">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
                   <SunmiInput
@@ -701,16 +736,30 @@ export default function FormProducto({
               </div>
             </Field>
 
-            <Field label="Margen %" fieldKey="margen">
-              <SunmiInput
-                type="number"
-                value={form.margen}
-                onWheel={(e) => e.target.blur()}
-                onChange={(e) => onChangeMargen(e.target.value)}
-              />
-            </Field>
+            {showPreciosRef ? (
+              <Field label="Costo unitario ref." fieldKey="precio_costo_unitario_ref">
+                <SunmiInput
+                  type="number"
+                  value={toPrecioUnitarioRef(form.precio_costo)}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => onChangeCostoUnitarioRef(e.target.value)}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Referencia: costo del bulto ÷ {factorPackPrecios} uds.
+                </p>
+              </Field>
+            ) : (
+              <Field label="Margen %" fieldKey="margen">
+                <SunmiInput
+                  type="number"
+                  value={form.margen}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => onChangeMargen(e.target.value)}
+                />
+              </Field>
+            )}
 
-            <Field label={`Venta * ${form.unidad_medida === "kg" ? "(por kg)" : ["pack", "cajon"].includes(form.unidad_medida) ? "(por bulto)" : "(por unidad)"}`} fieldKey="precio_venta">
+            <Field label={`Venta * ${labelEscalaPrecio}`} fieldKey="precio_venta">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
                   <SunmiInput
@@ -733,14 +782,50 @@ export default function FormProducto({
               </div>
             </Field>
 
-            <Field label="IVA %" fieldKey="iva_porcentaje">
-              <SunmiInput
-                type="number"
-                value={form.iva_porcentaje}
-                onWheel={(e) => e.target.blur()}
-                onChange={(e) => setNumber("iva_porcentaje", e.target.value)}
-              />
-            </Field>
+            {showPreciosRef ? (
+              <Field label="Venta unitario ref." fieldKey="precio_venta_unitario_ref">
+                <SunmiInput
+                  type="number"
+                  value={toPrecioUnitarioRef(form.precio_venta)}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => onChangeVentaUnitarioRef(e.target.value)}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Referencia: venta del bulto ÷ {factorPackPrecios} uds.
+                </p>
+              </Field>
+            ) : (
+              <Field label="IVA %" fieldKey="iva_porcentaje">
+                <SunmiInput
+                  type="number"
+                  value={form.iva_porcentaje}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => setNumber("iva_porcentaje", e.target.value)}
+                />
+              </Field>
+            )}
+
+            {showPreciosRef && (
+              <>
+                <Field label="Margen %" fieldKey="margen">
+                  <SunmiInput
+                    type="number"
+                    value={form.margen}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => onChangeMargen(e.target.value)}
+                  />
+                </Field>
+
+                <Field label="IVA %" fieldKey="iva_porcentaje">
+                  <SunmiInput
+                    type="number"
+                    value={form.iva_porcentaje}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => setNumber("iva_porcentaje", e.target.value)}
+                  />
+                </Field>
+              </>
+            )}
           </div>
         </Section>
 
