@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 
 export async function POST(req) {
   try {
@@ -94,7 +95,17 @@ export async function POST(req) {
         detalles: {
           include: {
             producto: {
-              include: { base: { select: { id: true, nombre: true } } },
+              include: {
+                base: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                    factor_pack: true,
+                    modoCompraProveedor: true,
+                    unidad_medida: true,
+                  },
+                },
+              },
             },
           },
         },
@@ -102,6 +113,24 @@ export async function POST(req) {
         deposito: { select: { id: true, nombre: true } },
       },
     });
+
+    // Propagar el costo de cada línea al costo real/maestro del producto (solo costo).
+    for (const det of pedido.detalles) {
+      const costo = det.precioCosto != null ? Number(det.precioCosto) : null;
+      if (!costo || costo <= 0) continue;
+      const base = det.producto?.base;
+      const costoMaestro = costoLineaAMaestro({
+        precioCosto: costo,
+        unidad: det.unidad,
+        factorPack: base?.factor_pack,
+        modoCompraProveedor: base?.modoCompraProveedor,
+        unidadMedida: base?.unidad_medida,
+      });
+      await actualizarCostoRealProducto(prisma, {
+        productoLocalId: det.productoLocalId,
+        costoMaestro,
+      });
+    }
 
     return NextResponse.json({ ok: true, item: pedido });
   } catch (err) {

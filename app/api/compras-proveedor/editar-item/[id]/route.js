@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 
 export async function POST(req, { params }) {
   try {
@@ -131,6 +132,31 @@ export async function POST(req, { params }) {
       where: { id: Number(detalleId) },
       data,
     });
+
+    // Si se editó el costo, propagarlo al costo real/maestro del producto (solo costo).
+    if (data.precioCosto != null && data.precioCosto > 0) {
+      const pl = await prisma.productoLocal.findUnique({
+        where: { id: updated.productoLocalId },
+        select: {
+          base: {
+            select: { factor_pack: true, modoCompraProveedor: true, unidad_medida: true },
+          },
+        },
+      });
+      if (pl?.base) {
+        const costoMaestro = costoLineaAMaestro({
+          precioCosto: data.precioCosto,
+          unidad: updated.unidad,
+          factorPack: pl.base.factor_pack,
+          modoCompraProveedor: pl.base.modoCompraProveedor,
+          unidadMedida: pl.base.unidad_medida,
+        });
+        await actualizarCostoRealProducto(prisma, {
+          productoLocalId: updated.productoLocalId,
+          costoMaestro,
+        });
+      }
+    }
 
     return NextResponse.json({ ok: true, detalle: updated });
   } catch (err) {

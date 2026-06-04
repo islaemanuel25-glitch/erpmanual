@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
+import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 
 export async function POST(req, { params }) {
   try {
@@ -42,6 +43,7 @@ export async function POST(req, { params }) {
                     id: true,
                     factor_pack: true,
                     modoCompraProveedor: true,
+                    unidad_medida: true,
                     pesoReferenciaKg: true,
                     pesoEsFijo: true,
                     pesoPromedioKg: true,
@@ -248,6 +250,19 @@ export async function POST(req, { params }) {
           kg: kgReales,
         });
         totalFacturaComputed += subtotalEconomico || 0;
+
+        // Reconfirmar el costo real/maestro del producto con el costo recibido (solo costo).
+        const costoMaestro = costoLineaAMaestro({
+          precioCosto: costoFinal,
+          unidad: det.unidad,
+          factorPack: base?.factor_pack,
+          modoCompraProveedor: base?.modoCompraProveedor,
+          unidadMedida: base?.unidad_medida,
+        });
+        await actualizarCostoRealProducto(tx, {
+          productoLocalId: det.productoLocalId,
+          costoMaestro,
+        });
       }
 
       // Marcar pedido como RECIBIDO + guardar factura/ganancia
