@@ -483,7 +483,7 @@ export default function NuevaCompraProveedorPage() {
                 : "Nuevo pedido a proveedor"
             }
           />
-          <SunmiBackButton href="/modulos/compras-proveedor" />
+          <SunmiBackButton href="/modulos/inicio" />
         </div>
 
         {/* Selección de proveedor */}
@@ -614,7 +614,7 @@ export default function NuevaCompraProveedorPage() {
               </h3>
             </div>
 
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 mb-3">
               <div className="relative flex-1">
                 <Search
                   size={16}
@@ -632,6 +632,7 @@ export default function NuevaCompraProveedorPage() {
                   style={{ borderColor: "var(--pos-link)" }}
                 />
               </div>
+              <div className="flex items-center gap-3 shrink-0">
               <label className="flex items-center gap-1.5 text-xs sunmi-text-muted whitespace-nowrap cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -660,6 +661,7 @@ export default function NuevaCompraProveedorPage() {
                     ))}
                   </div>
                 )}
+              </div>
               </div>
             </div>
 
@@ -968,13 +970,15 @@ export default function NuevaCompraProveedorPage() {
                                   </label>
                                 </div>
                               ) : (
-                                <label className="flex items-center gap-1 whitespace-nowrap">
+                                <label className="inline-flex items-center gap-1 whitespace-nowrap">
                                   <span className="sunmi-text-muted text-[10px]">{esKgFiambre ? "kg" : "Unidad"}</span>
                                   <span className="sunmi-text-muted text-xs">$</span>
-                                  <SunmiInput type="text" inputMode="decimal" value={item.precioCosto}
-                                    onChange={(e) => updateItemCosto(item.productoLocalId, e.target.value)}
-                                    onBlur={() => handleBlurCosto(item.productoLocalId)}
-                                    className="w-[95px] text-center" />
+                                  <div className="w-[120px]">
+                                    <SunmiInput type="text" inputMode="decimal" value={item.precioCosto}
+                                      onChange={(e) => updateItemCosto(item.productoLocalId, e.target.value)}
+                                      onBlur={() => handleBlurCosto(item.productoLocalId)}
+                                      className="text-center" />
+                                  </div>
                                 </label>
                               )}
                             </div>
