@@ -1,12 +1,8 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-06-04 02:48
+**Fecha:** 2026-06-08 19:35
 
 ## Módulos modificados recientemente
-
-### productos
-- feat: precio unitario de referencia en productos pack/cajon
-- Archivos: 1 modificados (1 total)
 
 
 
