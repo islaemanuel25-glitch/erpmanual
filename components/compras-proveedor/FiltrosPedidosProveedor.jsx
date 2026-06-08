@@ -26,6 +26,8 @@ export default function FiltrosPedidosProveedor({
   estadoTodosLabel = "Todos",
   estado = "",
   onEstado,
+  mostrarEstado = true,
+  separadorLabel = "Filtros",
   proveedorId = "",
   onProveedor,
   fechaDesde = "",
@@ -54,11 +56,11 @@ export default function FiltrosPedidosProveedor({
 
   return (
     <>
-      <SunmiSeparator label="Filtros" className="my-4" />
+      {separadorLabel && <SunmiSeparator label={separadorLabel} className="my-4" />}
 
       <div className="flex flex-col md:flex-row md:flex-wrap gap-3 px-2 mb-4 items-end">
         {/* Estado */}
-        {estadoFijoLabel ? (
+        {mostrarEstado && (estadoFijoLabel ? (
           <div className="w-full md:w-48">
             <label className="block text-[11px] sunmi-text-muted mb-1">Estado</label>
             <div className="px-3 py-1.5 rounded-md sunmi-surface ring-1 ring-inset sunmi-ring text-[13px] sunmi-text-muted">
@@ -81,7 +83,7 @@ export default function FiltrosPedidosProveedor({
               ))}
             </SunmiSelectAdv>
           </div>
-        )}
+        ))}
 
         {/* Proveedor */}
         <div className="w-full md:w-56">

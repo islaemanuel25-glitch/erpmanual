@@ -14,7 +14,6 @@ import SinPermisos from "@/components/auth/SinPermisos";
 import usePedidosProveedor, { ESTADOS_PENDIENTES } from "@/components/compras-proveedor/usePedidosProveedor";
 import FiltrosPedidosProveedor from "@/components/compras-proveedor/FiltrosPedidosProveedor";
 import ListadoPedidosProveedor from "@/components/compras-proveedor/ListadoPedidosProveedor";
-import ProveedoresPedidoHoy from "@/components/compras-proveedor/ProveedoresPedidoHoy";
 
 export default function PedidosPendientesPage() {
   const router = useRouter();
@@ -28,7 +27,7 @@ export default function PedidosPendientesPage() {
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
 
-  const { loading, items, page, setPage, totalPages } = usePedidosProveedor({
+  const { loading, items, page, setPage, totalPages, recargar } = usePedidosProveedor({
     estados: ESTADOS_PENDIENTES,
     estado,
     proveedorId,
@@ -49,47 +48,65 @@ export default function PedidosPendientesPage() {
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("compras.ver")) return <SinPermisos />;
 
+  const anularPedido = async (item) => {
+    if (!window.confirm("¿Seguro que querés anular este pedido?")) return;
+    try {
+      const res = await fetch(`/api/compras-proveedor/anular/${item.id}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        recargar();
+      } else {
+        alert(data.error || "No se pudo anular el pedido");
+      }
+    } catch {
+      alert("Error de conexión al anular el pedido");
+    }
+  };
+
   const renderAccion = (item) => {
-    if (item.estado === "BORRADOR") {
-      return (
+    const principal =
+      item.estado === "BORRADOR" ? (
         <SunmiButton
-          color="green"
+          type="button"
+          color="cyan"
           onClick={() => router.push(`/modulos/compras-proveedor/nueva?pedidoId=${item.id}`)}
         >
           Continuar pedido
         </SunmiButton>
+      ) : (
+        <SunmiButton
+          type="button"
+          color="cyan"
+          onClick={() => router.push(`/modulos/compras-proveedor/${item.id}`)}
+        >
+          Ver / enviar
+        </SunmiButton>
       );
-    }
+
     return (
-      <SunmiButton
-        color="cyan"
-        onClick={() => router.push(`/modulos/compras-proveedor/${item.id}`)}
-      >
-        Ver / enviar
-      </SunmiButton>
+      <div className="flex flex-wrap items-center gap-2 justify-end">
+        {principal}
+        <SunmiButton type="button" color="red" onClick={() => anularPedido(item)}>
+          Anular
+        </SunmiButton>
+      </div>
     );
   };
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="min-w-0">
-            <SunmiHeader title="Pedidos pendientes" />
-            <p className="text-xs sunmi-text-muted px-1">Pedidos en preparación o listos para enviar</p>
-          </div>
-          <SunmiButton onClick={() => router.push("/modulos/compras-proveedor/nueva")}>
-            ＋ Nuevo pedido
-          </SunmiButton>
+        <div className="mb-4">
+          <SunmiHeader title="Pedidos pendientes" />
+          <p className="text-xs sunmi-text-muted px-1">Pedidos en preparación o listos para enviar</p>
         </div>
 
-        <ProveedoresPedidoHoy />
-
         <FiltrosPedidosProveedor
-          estadoOpciones={ESTADOS_PENDIENTES}
-          estadoTodosLabel="Todos los pendientes"
-          estado={estado}
-          onEstado={setEstado}
+          mostrarEstado={false}
+          separadorLabel={null}
           proveedorId={proveedorId}
           onProveedor={setProveedorId}
           fechaDesde={fechaDesde}
@@ -109,6 +126,7 @@ export default function PedidosPendientesPage() {
           loading={loading}
           renderAccion={renderAccion}
           marcarAtrasados
+          agruparPorDia
           page={page}
           totalPages={totalPages}
           onPrev={() => setPage((p) => p - 1)}
