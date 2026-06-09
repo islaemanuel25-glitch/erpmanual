@@ -12,7 +12,8 @@ const ESTADO_LABEL = {
 };
 
 export default function PushControls() {
-  const { soportado, estado, busy, activar, enviarPrueba } = usePushNotifications();
+  const { soportado, estado, subscription, busy, activar, renovar, desactivar, enviarPrueba } =
+    usePushNotifications();
 
   return (
     <div className="rounded-xl border sunmi-border p-3 sunmi-surface mb-4">
@@ -35,24 +36,37 @@ export default function PushControls() {
           configuración del navegador y recargá.
         </p>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <SunmiButton
-            color="cyan"
-            type="button"
-            disabled={busy || estado === "activo"}
-            onClick={activar}
-          >
-            {estado === "activo" ? "Notificaciones activas" : "Activar notificaciones en este dispositivo"}
-          </SunmiButton>
-          <SunmiButton
-            color="slate"
-            type="button"
-            disabled={busy || estado !== "activo"}
-            onClick={enviarPrueba}
-          >
-            Enviar prueba
-          </SunmiButton>
-        </div>
+        <>
+          <div className="flex flex-wrap gap-2">
+            <SunmiButton
+              color="cyan"
+              type="button"
+              disabled={busy || estado === "activo"}
+              onClick={activar}
+            >
+              {estado === "activo" ? "Notificaciones activas" : "Activar notificaciones en este dispositivo"}
+            </SunmiButton>
+            <SunmiButton color="slate" type="button" disabled={busy} onClick={renovar}>
+              Renovar suscripción
+            </SunmiButton>
+            <SunmiButton
+              color="slate"
+              type="button"
+              disabled={busy || estado !== "activo"}
+              onClick={enviarPrueba}
+            >
+              Enviar prueba
+            </SunmiButton>
+            {subscription && (
+              <SunmiButton color="red" type="button" disabled={busy} onClick={desactivar}>
+                Desactivar este dispositivo
+              </SunmiButton>
+            )}
+          </div>
+          <p className="text-[11px] sunmi-text-muted mt-2">
+            Si rotaste las claves o ves un error de credenciales, usá <b>Renovar suscripción</b>.
+          </p>
+        </>
       )}
     </div>
   );
