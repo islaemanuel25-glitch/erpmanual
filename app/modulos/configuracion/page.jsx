@@ -5,7 +5,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { Palette, PackageOpen, Receipt, Wrench, Tags, ShoppingCart } from "lucide-react";
+import { Palette, PackageOpen, Receipt, Wrench, Tags, ShoppingCart, BellRing } from "lucide-react";
 
 const SECCIONES = [
   {
@@ -37,6 +37,12 @@ const SECCIONES = [
     href: "/modulos/configuracion/listas-precios",
     icon: Tags,
     descripcion: "Administrá listas de precios comerciales del grupo (minorista, mayorista, costos).",
+  },
+  {
+    label: "Alertas del dispositivo",
+    href: "/modulos/configuracion/alertas-dispositivo",
+    icon: BellRing,
+    descripcion: "Notificaciones push en este dispositivo (activar, renovar, probar).",
   },
   {
     label: "Mantenimiento",

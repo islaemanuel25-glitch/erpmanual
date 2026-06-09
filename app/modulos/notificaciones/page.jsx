@@ -10,13 +10,12 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import PushControls from "@/components/notificaciones/PushControls";
 
 const PAGE_SIZE = 20;
 
-// Estado: "Todas del rango" no trae todo el historial, solo todo dentro del rango de fechas.
+// Estado: "Todas" no trae todo el historial, solo todo dentro del rango de fechas.
 const TABS = [
-  { key: "todas", label: "Todas del rango" },
+  { key: "todas", label: "Todas" },
   { key: "noleidas", label: "No leídas" },
   { key: "leidas", label: "Leídas" },
 ];
@@ -199,17 +198,15 @@ export default function NotificacionesPage() {
           </SunmiButton>
         </div>
 
-        {/* Push en este dispositivo (Etapa 0) */}
-        <PushControls />
-
-        {/* Filtros por estado */}
-        <div className="flex flex-wrap gap-2 mb-3">
+        {/* Filtros por estado — mobile: 3 en una fila (grid); desktop: ancho natural */}
+        <div className="grid grid-cols-3 gap-1.5 mb-3 sm:flex sm:flex-wrap sm:gap-2">
           {TABS.map((t) => (
             <SunmiButton
               key={t.key}
               type="button"
               color={filtro === t.key ? "cyan" : "slate"}
               onClick={() => cambiarTab(t.key)}
+              className="w-full text-xs whitespace-nowrap !px-2 sm:w-auto sm:text-[13px] sm:!px-4"
             >
               {t.label}
             </SunmiButton>
@@ -254,34 +251,38 @@ export default function NotificacionesPage() {
                   {g.items.map((n) => (
                     <div
                       key={n.id}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 ${n.leida ? "" : "sunmi-surface"}`}
+                      className={`flex flex-col sm:flex-row sm:items-center gap-2 px-3 py-2.5 ${
+                        n.leida ? "" : "sunmi-surface"
+                      }`}
                     >
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          n.leida ? "bg-transparent" : "bg-[color:var(--pos-accent)]"
-                        }`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className={`text-[13px] truncate ${
-                            n.leida ? "sunmi-text-muted" : "font-semibold sunmi-text-strong"
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <span
+                          className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
+                            n.leida ? "bg-transparent" : "bg-[color:var(--pos-accent)]"
                           }`}
-                        >
-                          {n.titulo}
-                        </div>
-                        {n.cuerpo && (
-                          <div className="text-[11px] sunmi-text-muted truncate">{n.cuerpo}</div>
-                        )}
-                        <div className="text-[10px] sunmi-text-muted mt-0.5">
-                          {fmtHora(n.createdAt)}{n.tipo ? ` · ${n.tipo}` : ""}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className={`text-[13px] truncate ${
+                              n.leida ? "sunmi-text-muted" : "font-semibold sunmi-text-strong"
+                            }`}
+                          >
+                            {n.titulo}
+                          </div>
+                          {n.cuerpo && (
+                            <div className="text-[11px] sunmi-text-muted truncate">{n.cuerpo}</div>
+                          )}
+                          <div className="text-[10px] sunmi-text-muted mt-0.5">
+                            {fmtHora(n.createdAt)}{n.tipo ? ` · ${n.tipo}` : ""}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
                         {n.href && (
                           <button
                             type="button"
                             onClick={() => abrir(n)}
-                            className="text-[11px] font-medium sunmi-text-accent px-2 py-1 rounded hover:bg-[var(--table-row-hover)]"
+                            className="text-[11px] font-medium sunmi-text-accent px-2.5 py-1.5 rounded hover:bg-[var(--table-row-hover)] whitespace-nowrap"
                           >
                             Abrir
                           </button>
@@ -289,7 +290,7 @@ export default function NotificacionesPage() {
                         <button
                           type="button"
                           onClick={() => toggleLeida(n)}
-                          className="text-[11px] sunmi-text-muted px-2 py-1 rounded hover:bg-[var(--table-row-hover)] whitespace-nowrap"
+                          className="text-[11px] sunmi-text-muted px-2.5 py-1.5 rounded hover:bg-[var(--table-row-hover)] whitespace-nowrap"
                         >
                           {n.leida ? "Marcar no leída" : "Marcar leída"}
                         </button>

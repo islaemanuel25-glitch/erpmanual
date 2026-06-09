@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
 
 const MAX_DROPDOWN = 5;
 const DIAS_CAMPANITA = 7;
@@ -124,6 +124,32 @@ export default function CampanaNotificaciones({ iconClassName = "" }) {
 
   const restantes = count - items.length;
 
+  // Lista de ítems reutilizada por el dropdown (desktop) y el sheet (mobile).
+  const listaItems =
+    items.length === 0 ? (
+      <p className="px-3 py-6 text-xs sunmi-text-muted text-center">
+        Sin notificaciones nuevas
+      </p>
+    ) : (
+      items.map((n) => (
+        <button
+          key={n.id}
+          type="button"
+          onClick={() => abrirNotif(n)}
+          className="w-full text-left px-3 py-3 sm:py-2 hover:bg-[var(--table-row-hover)] transition"
+        >
+          <div className="flex items-start gap-2">
+            <span className="mt-1.5 w-2 h-2 rounded-full bg-[color:var(--pos-accent)] shrink-0" />
+            <div className="min-w-0">
+              <div className="text-[13px] font-medium sunmi-text-strong truncate">{n.titulo}</div>
+              {n.cuerpo && <div className="text-[11px] sunmi-text-muted">{n.cuerpo}</div>}
+              <div className="text-[10px] sunmi-text-muted mt-0.5">{fmtFecha(n.createdAt)}</div>
+            </div>
+          </div>
+        </button>
+      ))
+    );
+
   return (
     <div className="relative" ref={wrapRef}>
       <button
@@ -140,8 +166,9 @@ export default function CampanaNotificaciones({ iconClassName = "" }) {
         )}
       </button>
 
+      {/* DESKTOP: dropdown flotante */}
       {open && (
-        <div className="absolute right-0 mt-2 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] sm:w-80 sm:max-w-none rounded-xl border sunmi-border sunmi-surface shadow-xl z-[9999] overflow-hidden">
+        <div className="hidden sm:block absolute right-0 mt-2 w-80 rounded-xl border sunmi-border sunmi-surface shadow-xl z-[9999] overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b sunmi-divider">
             <span className="text-sm font-semibold sunmi-text-strong">Notificaciones</span>
             {count > 0 && (
@@ -155,33 +182,7 @@ export default function CampanaNotificaciones({ iconClassName = "" }) {
             )}
           </div>
 
-          <div className="max-h-72 overflow-y-auto divide-y sunmi-divide">
-            {items.length === 0 ? (
-              <p className="px-3 py-4 text-xs sunmi-text-muted text-center">
-                Sin notificaciones nuevas
-              </p>
-            ) : (
-              items.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => abrirNotif(n)}
-                  className="w-full text-left px-3 py-2 hover:bg-[var(--table-row-hover)] transition"
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="mt-1.5 w-2 h-2 rounded-full bg-[color:var(--pos-accent)] shrink-0" />
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium sunmi-text-strong truncate">{n.titulo}</div>
-                      {n.cuerpo && (
-                        <div className="text-[11px] sunmi-text-muted">{n.cuerpo}</div>
-                      )}
-                      <div className="text-[10px] sunmi-text-muted mt-0.5">{fmtFecha(n.createdAt)}</div>
-                    </div>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
+          <div className="max-h-72 overflow-y-auto divide-y sunmi-divide">{listaItems}</div>
 
           {restantes > 0 && (
             <div className="px-3 py-1.5 text-[11px] sunmi-text-muted text-center border-t sunmi-divider">
@@ -197,6 +198,55 @@ export default function CampanaNotificaciones({ iconClassName = "" }) {
             >
               Ver todas
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE: sheet/drawer inferior con backdrop */}
+      {open && (
+        <div className="sm:hidden">
+          <div
+            className="fixed inset-0 bg-black/50 z-[9998]"
+            onClick={() => setOpen(false)}
+          />
+          <div className="fixed inset-x-0 bottom-0 z-[9999] flex flex-col max-h-[80vh] rounded-t-2xl border-t sunmi-border sunmi-surface shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b sunmi-divider">
+              <span className="text-sm font-semibold sunmi-text-strong">Notificaciones</span>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Cerrar"
+                className="p-1 -m-1 sunmi-text-muted hover:opacity-80"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto divide-y sunmi-divide">{listaItems}</div>
+
+            {restantes > 0 && (
+              <div className="px-4 py-1.5 text-[11px] sunmi-text-muted text-center border-t sunmi-divider">
+                + {restantes} más
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 p-3 border-t sunmi-divider">
+              <button
+                type="button"
+                onClick={marcarTodas}
+                disabled={count === 0}
+                className="rounded-lg border sunmi-border py-2.5 text-xs font-medium sunmi-text-strong disabled:opacity-40"
+              >
+                Marcar todas leídas
+              </button>
+              <button
+                type="button"
+                onClick={verTodas}
+                className="rounded-lg py-2.5 text-xs font-semibold text-white bg-[color:var(--pos-accent)]"
+              >
+                Ver todas
+              </button>
+            </div>
           </div>
         </div>
       )}
