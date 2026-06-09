@@ -1,0 +1,205 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Bell } from "lucide-react";
+
+const MAX_DROPDOWN = 5;
+const DIAS_CAMPANITA = 7;
+
+// ISO de hace N días (hora local del navegador, AR).
+function desdeHaceDias(dias) {
+  const d = new Date();
+  d.setDate(d.getDate() - dias);
+  return d.toISOString();
+}
+
+function fmtFecha(f) {
+  if (!f) return "";
+  return new Date(f).toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// Campanita = acceso rápido (NO historial completo).
+// Badge = total no leídas. Dropdown = hasta 5 no leídas + "Ver todas".
+// Polling cada 60s + refetch al volver el foco.
+export default function CampanaNotificaciones({ iconClassName = "" }) {
+  const router = useRouter();
+  const [count, setCount] = useState(0);
+  const [items, setItems] = useState([]);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  const fetchItems = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/notificaciones/listar?filtro=noleidas&pageSize=${MAX_DROPDOWN}&desde=${encodeURIComponent(desdeHaceDias(DIAS_CAMPANITA))}`,
+        { credentials: "include", cache: "no-store" }
+      );
+      const data = await res.json();
+      if (data.ok) setItems(Array.isArray(data.items) ? data.items : []);
+    } catch {
+      // silenciar
+    }
+  }, []);
+
+  // Polling 60s + refetch al foco. Fetch inline (no setState sincrónico en el effect).
+  useEffect(() => {
+    let activo = true;
+    const cargar = async () => {
+      try {
+        const res = await fetch(
+          `/api/notificaciones/contar?desde=${encodeURIComponent(desdeHaceDias(DIAS_CAMPANITA))}`,
+          { credentials: "include", cache: "no-store" }
+        );
+        const data = await res.json();
+        if (activo && data.ok) setCount(Number(data.count) || 0);
+      } catch {
+        // silenciar: la campanita no debe romper el header
+      }
+    };
+    cargar();
+    const id = setInterval(cargar, 60000);
+    const onFocus = () => cargar();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      activo = false;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+
+  // Cerrar al click afuera.
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next) fetchItems();
+  };
+
+  const abrirNotif = async (n) => {
+    setOpen(false);
+    try {
+      await fetch(`/api/notificaciones/marcar-leida/${n.id}`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // navegar igual aunque falle el marcado
+    }
+    setItems((prev) => prev.filter((x) => x.id !== n.id));
+    setCount((c) => Math.max(0, c - 1));
+    if (n.href) router.push(n.href);
+  };
+
+  const marcarTodas = async () => {
+    try {
+      await fetch("/api/notificaciones/marcar-todas", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // silenciar
+    }
+    setItems([]);
+    setCount(0);
+  };
+
+  const verTodas = () => {
+    setOpen(false);
+    router.push("/modulos/notificaciones");
+  };
+
+  const restantes = count - items.length;
+
+  return (
+    <div className="relative hidden sm:block" ref={wrapRef}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label="Notificaciones"
+        className={`relative ${iconClassName} hover:opacity-80 transition cursor-pointer`}
+      >
+        <Bell size={20} />
+        {count > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-[color:var(--pos-danger)] text-white text-[10px] font-bold leading-[16px] text-center">
+            {count > 9 ? "9+" : count}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl border sunmi-border sunmi-surface shadow-xl z-[9999] overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b sunmi-divider">
+            <span className="text-sm font-semibold sunmi-text-strong">Notificaciones</span>
+            {count > 0 && (
+              <button
+                type="button"
+                onClick={marcarTodas}
+                className="text-[11px] sunmi-text-accent hover:underline"
+              >
+                Marcar todas leídas
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-72 overflow-y-auto divide-y sunmi-divide">
+            {items.length === 0 ? (
+              <p className="px-3 py-4 text-xs sunmi-text-muted text-center">
+                Sin notificaciones nuevas
+              </p>
+            ) : (
+              items.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => abrirNotif(n)}
+                  className="w-full text-left px-3 py-2 hover:bg-[var(--table-row-hover)] transition"
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="mt-1.5 w-2 h-2 rounded-full bg-[color:var(--pos-accent)] shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium sunmi-text-strong truncate">{n.titulo}</div>
+                      {n.cuerpo && (
+                        <div className="text-[11px] sunmi-text-muted">{n.cuerpo}</div>
+                      )}
+                      <div className="text-[10px] sunmi-text-muted mt-0.5">{fmtFecha(n.createdAt)}</div>
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+
+          {restantes > 0 && (
+            <div className="px-3 py-1.5 text-[11px] sunmi-text-muted text-center border-t sunmi-divider">
+              + {restantes} más
+            </div>
+          )}
+
+          <div className="border-t sunmi-divider p-2">
+            <button
+              type="button"
+              onClick={verTodas}
+              className="w-full text-center text-xs font-medium sunmi-text-accent hover:underline py-1"
+            >
+              Ver todas
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

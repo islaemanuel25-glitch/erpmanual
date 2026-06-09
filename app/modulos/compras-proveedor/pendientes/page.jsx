@@ -11,9 +11,13 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
-import usePedidosProveedor, { ESTADOS_PENDIENTES } from "@/components/compras-proveedor/usePedidosProveedor";
+import usePedidosProveedor from "@/components/compras-proveedor/usePedidosProveedor";
 import FiltrosPedidosProveedor from "@/components/compras-proveedor/FiltrosPedidosProveedor";
 import ListadoPedidosProveedor from "@/components/compras-proveedor/ListadoPedidosProveedor";
+
+// Referencia ESTABLE (fuera del componente): pasar el array inline al hook
+// recreaba la dependencia en cada render → loop de fetch/render.
+const ESTADOS_EN_CURSO = ["BORRADOR"];
 
 export default function PedidosPendientesPage() {
   const router = useRouter();
@@ -28,7 +32,7 @@ export default function PedidosPendientesPage() {
   const [fechaHasta, setFechaHasta] = useState("");
 
   const { loading, items, page, setPage, totalPages, recargar } = usePedidosProveedor({
-    estados: ESTADOS_PENDIENTES,
+    estados: ESTADOS_EN_CURSO,
     estado,
     proveedorId,
     fechaDesde,
@@ -66,35 +70,20 @@ export default function PedidosPendientesPage() {
     }
   };
 
-  const renderAccion = (item) => {
-    const principal =
-      item.estado === "BORRADOR" ? (
-        <SunmiButton
-          type="button"
-          color="cyan"
-          onClick={() => router.push(`/modulos/compras-proveedor/nueva?pedidoId=${item.id}`)}
-        >
-          Continuar pedido
-        </SunmiButton>
-      ) : (
-        <SunmiButton
-          type="button"
-          color="cyan"
-          onClick={() => router.push(`/modulos/compras-proveedor/${item.id}`)}
-        >
-          Ver / enviar
-        </SunmiButton>
-      );
-
-    return (
-      <div className="flex flex-wrap items-center gap-2 justify-end">
-        {principal}
-        <SunmiButton type="button" color="red" onClick={() => anularPedido(item)}>
-          Anular
-        </SunmiButton>
-      </div>
-    );
-  };
+  const renderAccion = (item) => (
+    <div className="flex flex-wrap items-center gap-2 justify-end">
+      <SunmiButton
+        type="button"
+        color="cyan"
+        onClick={() => router.push(`/modulos/compras-proveedor/nueva?pedidoId=${item.id}`)}
+      >
+        Continuar pedido
+      </SunmiButton>
+      <SunmiButton type="button" color="red" onClick={() => anularPedido(item)}>
+        Anular
+      </SunmiButton>
+    </div>
+  );
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">

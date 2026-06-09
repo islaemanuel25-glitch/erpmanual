@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { crearNotificacion } from "@/lib/notificaciones/crearNotificacion";
 
 export async function POST(req, { params }) {
   try {
@@ -31,6 +32,7 @@ export async function POST(req, { params }) {
 
     const pedido = await prisma.pedidoProveedor.findUnique({
       where: { id: pedidoId },
+      include: { proveedor: { select: { nombre: true } } },
     });
 
     if (!pedido || pedido.grupoId !== grupoId) {
@@ -53,6 +55,17 @@ export async function POST(req, { params }) {
         estado: "ENVIADO",
         fechaEnviado: new Date(),
       },
+    });
+
+    // Notificación interna (no rompe el flujo si falla).
+    await crearNotificacion({
+      grupoId,
+      tipo: "PEDIDO_PROVEEDOR_ENVIADO",
+      titulo: "Pedido enviado a proveedor",
+      cuerpo: `Pedido #${pedidoId}${pedido.proveedor?.nombre ? ` — ${pedido.proveedor.nombre}` : ""} marcado como enviado.`,
+      href: `/modulos/compras-proveedor/${pedidoId}`,
+      entidadTipo: "COMPRA_PROVEEDOR",
+      entidadId: pedidoId,
     });
 
     return NextResponse.json({ ok: true, item: updated });

@@ -78,7 +78,7 @@ export default function FiltrosPedidosProveedor({
               <SunmiSelectOption value="">{estadoTodosLabel}</SunmiSelectOption>
               {estadoOpciones.map((e) => (
                 <SunmiSelectOption key={e} value={e}>
-                  {e === "BORRADOR" ? "EN CURSO (Borrador)" : e}
+                  {e === "BORRADOR" ? "EN CURSO" : e}
                 </SunmiSelectOption>
               ))}
             </SunmiSelectAdv>

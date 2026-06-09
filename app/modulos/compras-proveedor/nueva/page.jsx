@@ -19,6 +19,7 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCodigo";
+import ModalEnviarPedido from "@/components/compras-proveedor/ModalEnviarPedido";
 import { subtotalLinea, unidadDisplay, naturalezaLinea } from "@/lib/compras-proveedor/calculoPedido";
 import {
   recibeHoy,
@@ -79,6 +80,10 @@ export default function NuevaCompraProveedorPage() {
     faltante: true, sugerido: true, costo: true,
   });
   const [colsMenuOpen, setColsMenuOpen] = useState(false);
+
+  // Modal de envío (Enviar pedido).
+  const [modalEnvioOpen, setModalEnvioOpen] = useState(false);
+  const [pedidoEnvio, setPedidoEnvio] = useState(null);
 
   const [saving, setSaving] = useState(false);
 
@@ -420,17 +425,18 @@ export default function NuevaCompraProveedorPage() {
     );
   };
 
-  // Crear pedido
-  const crearPedido = async () => {
-    if (!proveedorId) return alert("Selecciona un proveedor");
-    if (items.length === 0) return alert("Agrega al menos un producto");
+  // Crea el pedido como PENDIENTE (estado interno BORRADOR). Devuelve el item creado o null.
+  const crearBorrador = async () => {
+    if (!proveedorId) { alert("Selecciona un proveedor"); return null; }
+    if (items.length === 0) { alert("Agrega al menos un producto"); return null; }
 
     const itemInvalido = items.find((i) => {
       const c = Number(i.cantidad);
       return !Number.isFinite(c) || !Number.isInteger(c) || c < 1;
     });
     if (itemInvalido) {
-      return alert(`Cantidad invalida en "${itemInvalido.nombre}". Debe ser un entero >= 1.`);
+      alert(`Cantidad invalida en "${itemInvalido.nombre}". Debe ser un entero >= 1.`);
+      return null;
     }
 
     setSaving(true);
@@ -450,15 +456,49 @@ export default function NuevaCompraProveedorPage() {
           })),
         }),
       });
-
       const data = await res.json();
-      if (data.ok) {
-        router.push(`/modulos/compras-proveedor/${data.item.id}`);
-      } else {
-        alert(data.error || "Error al crear pedido");
-      }
+      if (data.ok) return data.item;
+      alert(data.error || "Error al crear pedido");
+      return null;
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Guardar pendiente: deja el pedido guardado (PENDIENTE) y vuelve a Inicio.
+  // Después se encuentra desde Compras → Pedidos pendientes.
+  const guardarPendiente = async () => {
+    if (!window.confirm("¿Guardar el pedido como pendiente?")) return;
+    if (esContinuar) {
+      router.push("/modulos/inicio");
+      return;
+    }
+    const item = await crearBorrador();
+    if (item) router.push("/modulos/inicio");
+  };
+
+  // Enviar pedido: asegura que exista (crea si es nuevo), trae el pedido completo
+  // (teléfono + detalles) y abre el modal de envío.
+  const enviarPedido = async () => {
+    let pedidoId = pedidoIdParam;
+    if (!esContinuar) {
+      const item = await crearBorrador();
+      if (!item) return;
+      pedidoId = item.id;
+    }
+    try {
+      const res = await fetch(`/api/compras-proveedor/obtener?id=${pedidoId}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPedidoEnvio(data.item);
+        setModalEnvioOpen(true);
+      } else {
+        alert(data.error || "No se pudo cargar el pedido");
+      }
+    } catch {
+      alert("Error de conexión al cargar el pedido");
     }
   };
 
@@ -1019,44 +1059,38 @@ export default function NuevaCompraProveedorPage() {
           </SunmiPanel>
         )}
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 mt-4">
-          {esContinuar ? (
-            <>
-              <SunmiButton
-                color="slate"
-                onClick={() => router.push("/modulos/compras-proveedor")}
-              >
-                Volver al listado
-              </SunmiButton>
-              <SunmiButton
-                color="cyan"
-                onClick={() =>
-                  router.push(`/modulos/compras-proveedor/${pedidoIdParam}`)
-                }
-              >
-                Ir al detalle
-              </SunmiButton>
-            </>
-          ) : (
-            <>
-              <SunmiButton
-                color="slate"
-                onClick={() => router.push("/modulos/compras-proveedor")}
-              >
-                Cancelar
-              </SunmiButton>
-              <SunmiButton
-                color="cyan"
-                disabled={saving || items.length === 0 || !proveedorId}
-                onClick={crearPedido}
-              >
-                {saving ? "Guardando..." : "Guardar borrador"}
-              </SunmiButton>
-            </>
-          )}
+        {/* Footer: Cancelar | Guardar pendiente | Enviar pedido */}
+        <div className="flex flex-wrap justify-end gap-3 mt-4">
+          <SunmiButton
+            color="slate"
+            onClick={() => router.push("/modulos/inicio")}
+          >
+            Cancelar
+          </SunmiButton>
+          <SunmiButton
+            color="cyan"
+            disabled={saving || items.length === 0 || !proveedorId}
+            onClick={guardarPendiente}
+          >
+            {saving ? "Guardando..." : "Guardar pendiente"}
+          </SunmiButton>
+          <SunmiButton
+            color="amber"
+            disabled={saving || items.length === 0 || !proveedorId}
+            onClick={enviarPedido}
+          >
+            Enviar pedido
+          </SunmiButton>
         </div>
       </SunmiCard>
+
+      {modalEnvioOpen && pedidoEnvio && (
+        <ModalEnviarPedido
+          pedido={pedidoEnvio}
+          onClose={() => setModalEnvioOpen(false)}
+          onEnviado={() => router.push("/modulos/compras-proveedor/recepcion")}
+        />
+      )}
     </div>
   );
 }

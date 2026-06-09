@@ -17,10 +17,7 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
-import {
-  generarTextoWhatsApp,
-  normalizarTelefonoWa,
-} from "@/lib/compras-proveedor/whatsappTexto";
+import useAccionesEnvioPedido from "@/hooks/useAccionesEnvioPedido";
 import {
   subtotalLinea,
   permiteToggleUnidad,
@@ -141,6 +138,14 @@ export default function DetallePedidoProveedorPage({ params }) {
   useEffect(() => {
     if (id) cargar();
   }, [id]);
+
+  // BORRADOR (PENDIENTE) se edita SOLO en /nueva. Si el pedido está en borrador,
+  // redirigir al editor único en vez de mantener un editor duplicado acá.
+  useEffect(() => {
+    if (pedido?.estado === "BORRADOR") {
+      router.replace(`/modulos/compras-proveedor/nueva?pedidoId=${pedido.id}`);
+    }
+  }, [pedido, router]);
 
   const ejecutarAccion = async (accion) => {
     setActing(true);
@@ -263,38 +268,8 @@ export default function DetallePedidoProveedorPage({ params }) {
     }
   };
 
-  // Salida del pedido al proveedor (PDF / WhatsApp / copia).
-  // No cambian estado ni stock — solo lectura y exportación.
-  const descargarPDF = () => {
-    // Misma origin → cookies viajan. Nueva pestaña dispara el "attachment" del header.
-    window.open(`/api/compras-proveedor/exportar-pdf/${id}`, "_blank");
-  };
-
-  const copiarPedido = async () => {
-    if (!pedido) return;
-    const texto = generarTextoWhatsApp(pedido);
-    try {
-      await navigator.clipboard.writeText(texto);
-      alert("Pedido copiado al portapapeles");
-    } catch {
-      alert("No se pudo copiar al portapapeles (¿permisos del navegador?)");
-    }
-  };
-
-  const enviarWhatsApp = () => {
-    if (!pedido) return;
-    const tel = normalizarTelefonoWa(pedido.proveedor?.telefono);
-    if (!tel) {
-      alert("El proveedor no tiene teléfono cargado.");
-      return;
-    }
-    const texto = encodeURIComponent(generarTextoWhatsApp(pedido));
-    // Desktop: usa WhatsApp Web directo (sin pantalla intermedia de api.whatsapp.com).
-    window.open(
-      `https://web.whatsapp.com/send?phone=${tel}&text=${texto}`,
-      "_blank"
-    );
-  };
+  // Compartir el pedido al proveedor (PDF / copia) — hook compartido con el modal de /nueva.
+  const { descargarPDF, copiarPedido } = useAccionesEnvioPedido(pedido);
 
   // Persiste cambios de cantidad/unidad/precioCosto de una línea en BORRADOR.
   // Optimista: actualiza local state primero, después manda al server.
@@ -371,6 +346,9 @@ export default function DetallePedidoProveedorPage({ params }) {
     );
   }
 
+  // BORRADOR redirige a /nueva (efecto de arriba); no renderizar el detalle mientras tanto.
+  if (pedido.estado === "BORRADOR") return null;
+
   const esRecepcion = pedido.estado === "ENVIADO";
   const esBorrador = pedido.estado === "BORRADOR";
   const tieneFiambre = (pedido?.detalles || []).some(
@@ -418,7 +396,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                 ESTADO_BADGE[pedido.estado] || ""
               }`}
             >
-              {pedido.estado}
+              {pedido.estado === "BORRADOR" ? "EN CURSO" : pedido.estado}
             </span>
           </div>
 
@@ -1008,18 +986,6 @@ export default function DetallePedidoProveedorPage({ params }) {
               </SunmiButton>
               <SunmiButton color="slate" onClick={copiarPedido}>
                 Copiar pedido
-              </SunmiButton>
-              <SunmiButton
-                color="green"
-                disabled={!pedido.proveedor?.telefono}
-                title={
-                  !pedido.proveedor?.telefono
-                    ? "El proveedor no tiene teléfono cargado"
-                    : "Abre WhatsApp con el pedido listo para enviar"
-                }
-                onClick={enviarWhatsApp}
-              >
-                Enviar por WhatsApp
               </SunmiButton>
               <SunmiButton
                 color="cyan"

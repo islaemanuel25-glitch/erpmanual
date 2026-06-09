@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, ChevronDown, LogOut, ArrowLeftRight, Store, Warehouse, Menu, UserCheck, Home } from "lucide-react";
+import { ChevronDown, LogOut, ArrowLeftRight, Store, Warehouse, Menu, UserCheck, Home } from "lucide-react";
+import CampanaNotificaciones from "@/components/notificaciones/CampanaNotificaciones";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -128,14 +129,7 @@ export default function Header({ onOpenMobileMenu }) {
       <div className="flex items-center gap-3 sm:gap-4">
 
         {/* NOTIFICACIONES */}
-        <Bell
-          className={`
-            hidden sm:block
-            ${theme.header.text}
-            hover:opacity-80
-            transition cursor-pointer
-          `}
-        />
+        <CampanaNotificaciones iconClassName={theme.header.text} />
 
         {/* CONTEXTO ACTIVO (solo admin) */}
         {esAdmin && contexto && (

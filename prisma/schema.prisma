@@ -991,3 +991,27 @@ enum TipoPrecioAplicado {
   MANUAL_AUTORIZADO
   OVERRIDE_PRODUCTO
 }
+
+// ---------------------------------------------------------------------------
+// NOTIFICACIONES INTERNAS (v1)
+// Tabla standalone (sin FK) para no acoplar a Grupo/Usuario. Scope por grupoId;
+// usuarioId null = notificación para todo el grupo. tipo/entidadTipo como String
+// para evitar migraciones de enum por cada tipo nuevo.
+// ---------------------------------------------------------------------------
+model Notificacion {
+  id          Int      @id @default(autoincrement())
+  grupoId     Int
+  usuarioId   Int?
+  tipo        String
+  titulo      String
+  cuerpo      String?
+  href        String?
+  entidadTipo String?
+  entidadId   Int?
+  leida       Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([grupoId])
+  @@index([usuarioId])
+  @@index([grupoId, leida])
+}
