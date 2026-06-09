@@ -1015,3 +1015,26 @@ model Notificacion {
   @@index([usuarioId])
   @@index([grupoId, leida])
 }
+
+// ---------------------------------------------------------------------------
+// SUSCRIPCIONES WEB PUSH (Etapa 1) — un registro por dispositivo/navegador.
+// Standalone (sin FK). Scope por grupoId; usuarioId = dueño de la suscripción.
+// No se borra físico: activo=false al desuscribir o si el push service da 404/410.
+// ---------------------------------------------------------------------------
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  grupoId   Int
+  usuarioId Int?
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([grupoId])
+  @@index([usuarioId])
+  @@index([endpoint])
+  @@index([grupoId, activo])
+}

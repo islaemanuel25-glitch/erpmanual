@@ -18,8 +18,8 @@ async function getPublicKey() {
   return d?.publicKey || null;
 }
 
-// Etapa 0: registra SW push-only, pide permiso, suscribe/des-suscribe el dispositivo.
-// No persiste en DB (la prueba manda la subscription viva al endpoint /probar).
+// Etapa 1: registra SW push-only, suscribe/des-suscribe el dispositivo y PERSISTE
+// la suscripción en el servidor (/api/push/suscribir|desuscribir).
 export default function usePushNotifications() {
   const [soportado, setSoportado] = useState(false);
   const [permiso, setPermiso] = useState("default"); // default | granted | denied
@@ -44,9 +44,43 @@ export default function usePushNotifications() {
       .catch(() => {});
   }, []);
 
-  // Des-suscribe la suscripción anterior (si hay) y crea una NUEVA con la pública actual.
+  // Persiste la suscripción en el servidor (no rompe la UI si falla).
+  const persistir = useCallback(async (sub) => {
+    try {
+      const j = sub.toJSON();
+      await fetch("/api/push/suscribir", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: j.endpoint,
+          keys: j.keys,
+          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        }),
+      });
+    } catch {
+      // best-effort
+    }
+  }, []);
+
+  const desuscribirServer = useCallback(async (endpoint) => {
+    if (!endpoint) return;
+    try {
+      await fetch("/api/push/desuscribir", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint }),
+      });
+    } catch {
+      // best-effort
+    }
+  }, []);
+
+  // Des-suscribe la anterior (devuelve su endpoint) y crea una NUEVA con la pública actual.
   const suscribirNueva = useCallback(async (reg) => {
     const prev = await reg.pushManager.getSubscription();
+    const prevEndpoint = prev?.endpoint || null;
     if (prev) {
       try {
         await prev.unsubscribe();
@@ -57,56 +91,47 @@ export default function usePushNotifications() {
     const publicKey = await getPublicKey();
     if (!publicKey) {
       alert("Push no configurado en el servidor (faltan claves VAPID).");
-      return null;
+      return { sub: null, prevEndpoint };
     }
-    return reg.pushManager.subscribe({
+    const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey),
     });
+    return { sub, prevEndpoint };
   }, []);
 
-  const activar = useCallback(async () => {
-    if (!soportado || busy) return;
-    setBusy(true);
-    try {
-      const perm = await Notification.requestPermission();
-      setPermiso(perm);
-      if (perm !== "granted") return;
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-      const sub = await suscribirNueva(reg);
-      if (sub) setSubscription(sub);
-    } catch (e) {
-      console.error("push activar:", e);
-      alert("No se pudo activar notificaciones: " + (e?.message || e));
-    } finally {
-      setBusy(false);
-    }
-  }, [soportado, busy, suscribirNueva]);
-
-  const renovar = useCallback(async () => {
-    if (!soportado || busy) return;
-    setBusy(true);
-    try {
-      if (Notification.permission !== "granted") {
-        const perm = await Notification.requestPermission();
-        setPermiso(perm);
-        if (perm !== "granted") return;
-      }
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-      const sub = await suscribirNueva(reg);
-      if (sub) {
+  const activarOrenovar = useCallback(
+    async (esRenovar) => {
+      if (!soportado || busy) return;
+      setBusy(true);
+      try {
+        if (Notification.permission !== "granted") {
+          const perm = await Notification.requestPermission();
+          setPermiso(perm);
+          if (perm !== "granted") return;
+        }
+        const reg = await navigator.serviceWorker.register("/sw.js");
+        await navigator.serviceWorker.ready;
+        const { sub, prevEndpoint } = await suscribirNueva(reg);
+        if (!sub) return;
+        if (prevEndpoint && prevEndpoint !== sub.endpoint) {
+          await desuscribirServer(prevEndpoint);
+        }
+        await persistir(sub);
         setSubscription(sub);
-        alert("Suscripción renovada");
+        if (esRenovar) alert("Suscripción renovada");
+      } catch (e) {
+        console.error("push activar/renovar:", e);
+        alert("No se pudo " + (esRenovar ? "renovar" : "activar") + ": " + (e?.message || e));
+      } finally {
+        setBusy(false);
       }
-    } catch (e) {
-      console.error("push renovar:", e);
-      alert("No se pudo renovar la suscripción: " + (e?.message || e));
-    } finally {
-      setBusy(false);
-    }
-  }, [soportado, busy, suscribirNueva]);
+    },
+    [soportado, busy, suscribirNueva, desuscribirServer, persistir]
+  );
+
+  const activar = useCallback(() => activarOrenovar(false), [activarOrenovar]);
+  const renovar = useCallback(() => activarOrenovar(true), [activarOrenovar]);
 
   const desactivar = useCallback(async () => {
     if (!soportado || busy) return;
@@ -114,6 +139,7 @@ export default function usePushNotifications() {
     try {
       const reg = await navigator.serviceWorker.getRegistration("/sw.js");
       const sub = reg ? await reg.pushManager.getSubscription() : null;
+      const endpoint = sub?.endpoint || null;
       if (sub) {
         try {
           await sub.unsubscribe();
@@ -121,31 +147,33 @@ export default function usePushNotifications() {
           // ignorar
         }
       }
+      if (endpoint) await desuscribirServer(endpoint);
       setSubscription(null);
     } catch (e) {
       console.error("push desactivar:", e);
     } finally {
       setBusy(false);
     }
-  }, [soportado, busy]);
+  }, [soportado, busy, desuscribirServer]);
 
   const enviarPrueba = useCallback(async () => {
     if (busy) return;
     setBusy(true);
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const live = await reg.pushManager.getSubscription();
-      if (!live) {
-        setSubscription(null);
-        alert("Primero activá (o renová) las notificaciones en este dispositivo.");
-        return;
+      // El servidor usa las suscripciones guardadas; mandamos la viva solo como fallback.
+      let live = null;
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        live = await reg.pushManager.getSubscription();
+        if (live) setSubscription(live);
+      } catch {
+        // sin SW listo
       }
-      setSubscription(live);
       const res = await fetch("/api/push/probar", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: live }),
+        body: JSON.stringify(live ? { subscription: live } : {}),
       });
       const data = await res.json();
       if (!data.ok) alert("Error al enviar prueba: " + (data.error || ""));

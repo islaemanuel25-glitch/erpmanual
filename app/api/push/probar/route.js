@@ -1,48 +1,69 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import webpush from "web-push";
-import { getUsuarioSession } from "@/lib/auth";
-
-const PUBLIC_KEY = process.env.WEB_PUSH_PUBLIC_KEY || process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY;
-const PRIVATE_KEY = process.env.WEB_PUSH_PRIVATE_KEY;
-const SUBJECT = process.env.WEB_PUSH_SUBJECT || "mailto:admin@erpazul";
+import prisma from "@/lib/prisma";
+import { resolverScopeNotif } from "@/lib/notificaciones/scope";
+import { enviarPush, pushConfigurado } from "@/lib/notificaciones/enviarPush";
 
 export async function POST(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
-      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    const scope = await resolverScopeNotif(req);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
-
-    if (!PUBLIC_KEY || !PRIVATE_KEY) {
+    if (!pushConfigurado()) {
       return NextResponse.json(
         { ok: false, error: "VAPID no configurado (faltan WEB_PUSH_*_KEY)" },
         { status: 500 }
       );
     }
-    webpush.setVapidDetails(SUBJECT, PUBLIC_KEY, PRIVATE_KEY);
 
-    const body = await req.json().catch(() => ({}));
-    const sub = body?.subscription;
-    if (!sub || !sub.endpoint) {
-      return NextResponse.json({ ok: false, error: "subscription requerida" }, { status: 400 });
-    }
-
-    const payload = JSON.stringify({
+    const payload = {
       titulo: "Prueba — ERP Azul",
       cuerpo: "Si ves esto, las notificaciones push funcionan ✔",
       href: "/modulos/notificaciones",
       tag: "push-prueba",
-    });
+    };
 
-    await webpush.sendNotification(sub, payload);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("push/probar:", err?.statusCode, err?.body || err?.message);
+    // Primario: suscripciones activas guardadas del usuario actual.
+    let subs = [];
+    if (scope.grupoId) {
+      subs = await prisma.pushSubscription.findMany({
+        where: { grupoId: scope.grupoId, usuarioId: scope.userId ?? null, activo: true },
+      });
+    }
+
+    if (subs.length > 0) {
+      const r = await enviarPush(subs, payload);
+      if (r.enviadas === 0) {
+        return NextResponse.json(
+          { ok: false, error: "No se pudo entregar a ningún dispositivo (suscripciones vencidas, renová)." },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json({ ok: true, enviadas: r.enviadas });
+    }
+
+    // Fallback: subscription viva enviada en el body (cuando no hay guardadas todavía).
+    const body = await req.json().catch(() => ({}));
+    const bodySub = body?.subscription;
+    if (bodySub?.endpoint) {
+      const r = await enviarPush([bodySub], payload);
+      if (r.enviadas === 0) {
+        return NextResponse.json(
+          { ok: false, error: "No se pudo entregar al dispositivo (renová la suscripción)." },
+          { status: 502 }
+        );
+      }
+      return NextResponse.json({ ok: true, enviadas: r.enviadas });
+    }
+
     return NextResponse.json(
-      { ok: false, error: err?.body || err?.message || "Error al enviar push" },
-      { status: 500 }
+      { ok: false, error: "No hay dispositivos activos para este usuario. Activá notificaciones primero." },
+      { status: 400 }
     );
+  } catch (err) {
+    console.error("push/probar:", err);
+    return NextResponse.json({ ok: false, error: "Error al enviar push" }, { status: 500 });
   }
 }
