@@ -10,6 +10,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import PushControls from "@/components/notificaciones/PushControls";
 
 const PAGE_SIZE = 20;
 
@@ -197,6 +198,9 @@ export default function NotificacionesPage() {
             Marcar todas leídas
           </SunmiButton>
         </div>
+
+        {/* Push en este dispositivo (Etapa 0) */}
+        <PushControls />
 
         {/* Filtros por estado */}
         <div className="flex flex-wrap gap-2 mb-3">

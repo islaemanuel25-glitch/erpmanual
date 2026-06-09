@@ -125,12 +125,12 @@ export default function CampanaNotificaciones({ iconClassName = "" }) {
   const restantes = count - items.length;
 
   return (
-    <div className="relative hidden sm:block" ref={wrapRef}>
+    <div className="relative" ref={wrapRef}>
       <button
         type="button"
         onClick={toggle}
         aria-label="Notificaciones"
-        className={`relative ${iconClassName} hover:opacity-80 transition cursor-pointer`}
+        className={`relative ${iconClassName} hover:opacity-80 transition cursor-pointer p-1.5 -m-1.5`}
       >
         <Bell size={20} />
         {count > 0 && (
@@ -141,7 +141,7 @@ export default function CampanaNotificaciones({ iconClassName = "" }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl border sunmi-border sunmi-surface shadow-xl z-[9999] overflow-hidden">
+        <div className="absolute right-0 mt-2 w-[calc(100vw-24px)] max-w-[calc(100vw-24px)] sm:w-80 sm:max-w-none rounded-xl border sunmi-border sunmi-surface shadow-xl z-[9999] overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b sunmi-divider">
             <span className="text-sm font-semibold sunmi-text-strong">Notificaciones</span>
             {count > 0 && (
