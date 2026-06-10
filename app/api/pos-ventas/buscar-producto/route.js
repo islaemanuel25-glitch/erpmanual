@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo, kgToPiezas } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
@@ -392,7 +392,11 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         precioVentaUnitarioReal,
         precioCostoFormatoDepositoReal,
         precioCostoUnitarioReal,
-        stock,
+        // Fiambre fijo: el depósito guarda stock en KG pero vende por PIEZA.
+        // Devolver el stock convertido a piezas para que stockMax del carrito
+        // (escala de piezas) no permita sobreventa. El descuento real sigue en kg
+        // del lado del server (crear/route.js). No fiambre: stock crudo sin cambios.
+        stock: fiambreFijo ? kgToPiezas(stock, pesoReferenciaKg) : stock,
         sinStock,
         allowNegativeStock,
         disponibleParaVenta,
