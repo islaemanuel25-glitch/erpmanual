@@ -13,7 +13,7 @@ function formatPrecio(n) {
   });
 }
 
-// Etiqueta del formato según unidad de medida (display de stock en depósito)
+// Etiqueta del formato según unidad de medida (display descriptivo de stock — desktop)
 function labelFormato(unidad) {
   switch (unidad) {
     case "cajon": return "cajones";
@@ -22,6 +22,27 @@ function labelFormato(unidad) {
     case "carton": return "cartones";
     default: return "formatos";
   }
+}
+
+// Letra compacta del formato (chip de stock mobile): cajon→c, pack→p, caja→cj, carton→ct
+function letraFormato(unidad) {
+  switch (unidad) {
+    case "cajon": return "c";
+    case "pack": return "p";
+    case "caja": return "cj";
+    case "carton": return "ct";
+    default: return "f";
+  }
+}
+
+// Texto compacto del chip de stock (mobile). Stock real en unidades (stockMax).
+// Positivo → "Stock: 2p + 10u". Negativo → "Stock: -13u" (sin desglose en bultos).
+function stockChipText(item) {
+  const factor = Number(item.factorPack) || 1;
+  const total = Number(item.stockMax) || 0;
+  if (total < 0) return `Stock: ${total}u`;
+  const { bultos, sueltas } = fromUnidades({ unidades: total, factorPack: factor });
+  return `Stock: ${bultos}${letraFormato(item.unidadMedida)} + ${sueltas}u`;
 }
 
 // ¿Mostrar desglose de stock para esta línea? Solo depósito, pack real (>1),
@@ -34,13 +55,16 @@ function mostrarStockDeposito(item, esDeposito) {
   );
 }
 
-// Línea chica "Stock disponible: X formatos xN + Y uds" (solo display, no recalcula)
+// Línea descriptiva de stock (DESKTOP). Negativo → solo unidades (sin "-2 cajones + -1 uds").
 function StockDeposito({ item }) {
   const factor = Number(item.factorPack) || 1;
-  const { bultos, sueltas } = fromUnidades({
-    unidades: Number(item.stockMax) || 0,
-    factorPack: factor,
-  });
+  const total = Number(item.stockMax) || 0;
+  if (total < 0) {
+    return (
+      <div className="text-[10px] pos-text-muted mt-0.5">Stock disponible: {total} uds</div>
+    );
+  }
+  const { bultos, sueltas } = fromUnidades({ unidades: total, factorPack: factor });
   return (
     <div className="text-[10px] pos-text-muted mt-0.5">
       Stock disponible: {bultos} {labelFormato(item.unidadMedida)} x{factor} + {sueltas} uds
@@ -158,6 +182,48 @@ function admiteRemanente(item, esDeposito) {
   );
 }
 
+/* ── Fila horizontal scrolleable de chips (MOBILE): selector Formato/Unidad +
+      chip de stock compacto. Compacta la altura del card. Solo display/selector,
+      no toca cálculo de venta/precio/stock. ── */
+function ChipsRowMobile({ item, idx, esDeposito, onModoVentaChange }) {
+  const mostrarToggle = admiteRemanente(item, esDeposito) && !!onModoVentaChange;
+  const mostrarStock = mostrarStockDeposito(item, esDeposito);
+  if (!mostrarToggle && !mostrarStock) return null;
+
+  const factor = Number(item.factorPack) || 1;
+  const modo = item.modoVentaLinea || "NORMAL";
+  const chip =
+    "shrink-0 text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap select-none";
+  const activo = "pos-control font-bold";
+  const inactivo = "pos-text-muted";
+
+  return (
+    <div className="flex items-center gap-1 mt-1 overflow-x-auto -mx-0.5 px-0.5">
+      {mostrarToggle && (
+        <>
+          <button
+            type="button"
+            onClick={() => onModoVentaChange(idx, "NORMAL")}
+            className={`${chip} ${modo === "NORMAL" ? activo : inactivo}`}
+          >
+            Formato x{factor}
+          </button>
+          <button
+            type="button"
+            onClick={() => onModoVentaChange(idx, "UNIDAD_REMANENTE")}
+            className={`${chip} ${modo === "UNIDAD_REMANENTE" ? activo : inactivo}`}
+          >
+            Unidad suelta
+          </button>
+        </>
+      )}
+      {mostrarStock && (
+        <span className={`${chip} pos-text-muted border-dashed`}>{stockChipText(item)}</span>
+      )}
+    </div>
+  );
+}
+
 function CarritoVenta({
   items,
   onCantidadChange,
@@ -254,52 +320,55 @@ function CarritoVenta({
         </div>
       </div>
 
-      {/* MOBILE: lista compacta */}
+      {/* MOBILE: lista compacta (altura reducida + fila de chips scrolleable) */}
       <div className="block lg:hidden space-y-1">
         {items.map((item, idx) => (
           <div
             key={`${item.productoBaseId}-${idx}`}
-            className="p-2 rounded-lg pos-bg-surface animate-fade-in"
+            className="p-1.5 rounded-lg pos-bg-surface animate-fade-in"
           >
-            <div className="flex items-start gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm truncate">{item.nombre}</div>
-                {item.listaPrecioNombre && item.tipoPrecioAplicado && item.tipoPrecioAplicado !== "PRECIO_VENTA" && (
-                  <span className="block text-[10px] sunmi-text-muted truncate">
-                    {item.listaPrecioNombre}
-                  </span>
-                )}
-                <div className="text-xs pos-text-muted mt-1 flex items-center gap-2">
-                  <span>${formatPrecio(item.precio)}</span>
-                  <span>x</span>
-                  <CantidadStepper
-                    item={item}
-                    idx={idx}
-                    onCantidadChange={onCantidadChange}
-                    compact
-                  />
-                </div>
-                {admiteRemanente(item, esDeposito) && onModoVentaChange && (
-                  <ModoVentaToggle
-                    item={item}
-                    idx={idx}
-                    onModoVentaChange={onModoVentaChange}
-                  />
-                )}
-                {mostrarStockDeposito(item, esDeposito) && <StockDeposito item={item} />}
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-sm font-bold pos-text-accent">
-                  ${formatPrecio(item.precio * (Number(item.cantidad) || 0))}
-                </div>
-                <button
-                  onClick={() => onEliminar(idx)}
-                  className="text-xs pos-text-danger mt-1"
-                >
-                  Quitar
-                </button>
-              </div>
+            {/* Fila 1: nombre + total + quitar */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0 font-medium text-sm truncate">{item.nombre}</div>
+              <span className="shrink-0 text-sm font-bold pos-text-accent">
+                ${formatPrecio(item.precio * (Number(item.cantidad) || 0))}
+              </span>
+              <button
+                onClick={() => onEliminar(idx)}
+                className="shrink-0 pos-text-danger text-base leading-none px-1"
+                title="Quitar"
+                aria-label="Quitar"
+              >
+                ✕
+              </button>
             </div>
+
+            {item.listaPrecioNombre && item.tipoPrecioAplicado && item.tipoPrecioAplicado !== "PRECIO_VENTA" && (
+              <span className="block text-[10px] sunmi-text-muted truncate">
+                {item.listaPrecioNombre}
+              </span>
+            )}
+
+            {/* Fila 2: precio unitario (texto chico) + stepper compacto */}
+            <div className="flex items-center justify-between gap-2 mt-1">
+              <span className="text-[11px] pos-text-muted whitespace-nowrap">
+                $ {formatPrecio(item.precio)} c/u
+              </span>
+              <CantidadStepper
+                item={item}
+                idx={idx}
+                onCantidadChange={onCantidadChange}
+                compact
+              />
+            </div>
+
+            {/* Fila 3: chips scrolleables (selector Formato/Unidad + stock compacto) */}
+            <ChipsRowMobile
+              item={item}
+              idx={idx}
+              esDeposito={esDeposito}
+              onModoVentaChange={onModoVentaChange}
+            />
           </div>
         ))}
       </div>
