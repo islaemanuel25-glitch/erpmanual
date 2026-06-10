@@ -1650,6 +1650,7 @@ export default function PosVentasPage() {
               localId={localActual}
               clienteId={state.clienteSeleccionado?.id ?? null}
               onAgregar={handleAgregar}
+              esDeposito={contexto?.esDeposito === true}
             />
             <div className="flex-1 min-h-0 lg:overflow-auto">
               <CarritoVenta

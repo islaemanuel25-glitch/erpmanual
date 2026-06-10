@@ -4,12 +4,48 @@ import { memo, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import { fromUnidades } from "@/lib/conversiones/stock";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+// Etiqueta del formato según unidad de medida (display de stock en depósito)
+function labelFormato(unidad) {
+  switch (unidad) {
+    case "cajon": return "cajones";
+    case "pack": return "packs";
+    case "caja": return "cajas";
+    case "carton": return "cartones";
+    default: return "formatos";
+  }
+}
+
+// ¿Mostrar desglose de stock para esta línea? Solo depósito, pack real (>1),
+// excluyendo kg. Usa el stock real (stockMax = unidades) que ya trae la línea.
+function mostrarStockDeposito(item, esDeposito) {
+  return (
+    esDeposito === true &&
+    Number(item.factorPack) > 1 &&
+    item.unidadMedida !== "kg"
+  );
+}
+
+// Línea chica "Stock disponible: X formatos xN + Y uds" (solo display, no recalcula)
+function StockDeposito({ item }) {
+  const factor = Number(item.factorPack) || 1;
+  const { bultos, sueltas } = fromUnidades({
+    unidades: Number(item.stockMax) || 0,
+    factorPack: factor,
+  });
+  return (
+    <div className="text-[10px] pos-text-muted mt-0.5">
+      Stock disponible: {bultos} {labelFormato(item.unidadMedida)} x{factor} + {sueltas} uds
+    </div>
+  );
 }
 
 /* ── Stepper de cantidad (− input +) ── */
@@ -250,6 +286,7 @@ function CarritoVenta({
                     onModoVentaChange={onModoVentaChange}
                   />
                 )}
+                {mostrarStockDeposito(item, esDeposito) && <StockDeposito item={item} />}
               </div>
               <div className="text-right shrink-0">
                 <div className="text-sm font-bold pos-text-accent">
@@ -291,6 +328,7 @@ function CarritoVenta({
                     onModoVentaChange={onModoVentaChange}
                   />
                 )}
+                {mostrarStockDeposito(item, esDeposito) && <StockDeposito item={item} />}
               </td>
               <td className="px-2 py-1.5">
                 <CantidadStepper

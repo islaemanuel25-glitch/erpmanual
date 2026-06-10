@@ -5,10 +5,22 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { showError } from "@/components/sunmi/SunmiToast";
 import { Search } from "lucide-react";
+import { fromUnidades } from "@/lib/conversiones/stock";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
 const SIN_STOCK_MSG = "Producto sin stock disponible";
 
-function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
+// Etiqueta del formato según unidad de medida (solo display de stock en depósito)
+function labelFormato(unidad) {
+  switch (unidad) {
+    case "cajon": return "cajones";
+    case "pack": return "packs";
+    case "caja": return "cajas";
+    case "carton": return "cartones";
+    default: return "formatos";
+  }
+}
+
+function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDeposito = false }) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -312,6 +324,25 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
         <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
           {resultados.map((p) => {
             const noDisponible = p.disponibleParaVenta === false;
+            // Desglose de stock "X formatos x{factor} + Y uds": solo en depósito,
+            // para productos con pack real (factorPack > 1), excluyendo kg/fiambre.
+            // Usa el stock real en unidades que ya viene de la API (no recalcula).
+            const factorPack = Number(p.factorPack) || 1;
+            const mostrarDesglose =
+              esDeposito && factorPack > 1 && p.unidadMedida !== "kg" && !p.esFiambreFijo;
+            let stockNode;
+            if (p.sinStock && p.disponibleParaVenta === false) {
+              stockNode = <span className="pos-text-danger font-semibold">Sin stock</span>;
+            } else if (mostrarDesglose) {
+              const { bultos, sueltas } = fromUnidades({ unidades: Number(p.stock), factorPack });
+              stockNode = (
+                <span>Stock: {bultos} {labelFormato(p.unidadMedida)} x{factorPack} + {sueltas} uds</span>
+              );
+            } else {
+              stockNode = (
+                <span>Stock: {p.unidadMedida === "kg" ? `${Number(p.stock).toFixed(3)} kg` : p.stock}</span>
+              );
+            }
             return (
               <div
                 key={p.productoBaseId}
@@ -324,11 +355,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath }) {
                     {p.codigoBarra && (
                       <span className="mr-3">Cod: {p.codigoBarra}</span>
                     )}
-                    {p.sinStock && p.disponibleParaVenta === false ? (
-                      <span className="pos-text-danger font-semibold">Sin stock</span>
-                    ) : (
-                      <span>Stock: {p.unidadMedida === "kg" ? `${Number(p.stock).toFixed(3)} kg` : p.stock}</span>
-                    )}
+                    {stockNode}
                   </div>
                 </div>
                 <div className="text-sm font-semibold pos-text-accent shrink-0">
