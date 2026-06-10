@@ -477,6 +477,15 @@ export default function PosVentasPage() {
   }, [state.carrito]);
 
   // ---------------------------------------------------------------------------
+  // Cambiar modo de venta de una línea (formato pack ↔ unidad suelta).
+  // Solo aplica en depósito; el backend valida factorPack y stock contra DB.
+  // ---------------------------------------------------------------------------
+  const handleModoVentaChange = useCallback((idx, modo) => {
+    setPreviousCarrito([...state.carrito]);
+    dispatch({ type: ActionTypes.SET_MODO_VENTA_LINEA, payload: { idx, modo } });
+  }, [state.carrito]);
+
+  // ---------------------------------------------------------------------------
   // Eliminar item
   // ---------------------------------------------------------------------------
   const handleEliminar = useCallback((idx) => {
@@ -670,6 +679,7 @@ export default function PosVentasPage() {
         precio: item.precio,
         cantidad: item.cantidad,
         precioCosto: item.precioCosto ?? null,
+        modoVentaLinea: item.modoVentaLinea ?? "NORMAL",
         listaPrecioId: item.listaPrecioId ?? null,
         tipoPrecioAplicado: item.tipoPrecioAplicado ?? "PRECIO_VENTA",
         margenAplicado: item.margenAplicado ?? null,
@@ -1166,6 +1176,7 @@ export default function PosVentasPage() {
             precio: item.precio,
             cantidad: item.cantidad,
             precioCosto: item.precioCosto ?? null,
+            modoVentaLinea: item.modoVentaLinea ?? "NORMAL",
             listaPrecioId: item.listaPrecioId ?? null,
             tipoPrecioAplicado: item.tipoPrecioAplicado ?? "PRECIO_VENTA",
             margenAplicado: item.margenAplicado ?? null,
@@ -1652,6 +1663,8 @@ export default function PosVentasPage() {
                 onAbrirDescuento={handleAbrirDescuento}
                 clienteSeleccionado={state.clienteSeleccionado}
                 onAbrirCliente={handleAbrirPickerCliente}
+                esDeposito={contexto?.esDeposito === true}
+                onModoVentaChange={handleModoVentaChange}
               />
             </div>
           </div>

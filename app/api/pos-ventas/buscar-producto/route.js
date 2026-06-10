@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esBultoMode, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
@@ -228,21 +228,39 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
       const precioDB = Number(pl.precio_venta || pl.base?.precio_venta || 0);
       const precioCosto = Number(pl.precio_costo || pl.base?.precio_costo || 0);
 
-      // Calcular ambos precios
+      // ¿El producto opera por BULTO con pack? En ese caso precio_venta y
+      // precio_costo en DB están en escala de BULTO y hay que derivar el unitario.
+      // Generaliza el viejo guard `unidadMedida !== "unidad"` (que dejaba afuera a
+      // productos con unidad_medida="unidad" pero modo_envio SOLO_BULTO/MIXTO):
+      // ahora el criterio es el modo de envío efectivo, igual que modoSalida y que
+      // el descuento de stock. esBultoMode(): SOLO_BULTO/MIXTO/null(→default) → true.
+      const modoEnvioEfectivo = modoEnvio || defaultModoEnvio(unidadMedida);
+      const esBultoConPack =
+        !fiambreFijo && factorPack > 1 && precioDB > 0 && esBultoMode(modoEnvioEfectivo);
+
+      // Cuatro escalas explícitas: la API es la fuente autoritativa del precio/costo
+      // unitario real y del de bulto. El frontend NO debe re-derivar dividiendo.
       let precioVentaBulto = precioDB;
       let precioVentaUnitario = precioDB;
+      let precioCostoBulto = precioCosto;
+      let precioCostoUnitario = precioCosto;
 
       if (fiambreFijo) {
-        // Fiambre fijo en depósito: precio por pieza = precioPerKg × pesoReferencia
+        // Fiambre fijo en depósito: precio/costo por pieza = valor por kg × pesoRef.
         const precioPorPieza = Number((precioDB * pesoReferenciaKg).toFixed(2));
+        const costoPorPieza = Number((precioCosto * pesoReferenciaKg).toFixed(2));
         precioVentaUnitario = precioPorPieza;
         precioVentaBulto = precioPorPieza;
+        precioCostoUnitario = costoPorPieza;
+        precioCostoBulto = costoPorPieza;
         // Cambiar unidadMedida para que el frontend no abra modal kg
         unidadMedida = "unidad";
-      } else if (factorPack > 1 && unidadMedida !== "unidad" && precioDB > 0) {
-        // DB guarda precio del bulto → derivar unitario
-        precioVentaUnitario = Number((precioDB / factorPack).toFixed(2));
+      } else if (esBultoConPack) {
+        // DB guarda precio/costo del bulto → derivar unitario real (÷ factorPack).
         precioVentaBulto = Number(precioDB.toFixed(2));
+        precioVentaUnitario = Number((precioDB / factorPack).toFixed(2));
+        precioCostoBulto = Number(precioCosto.toFixed(2));
+        precioCostoUnitario = Number((precioCosto / factorPack).toFixed(2));
       }
 
       // Misma regla que stock_locales/listar: redondeo a 100 hacia arriba (helper compartido)
@@ -254,26 +272,14 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         ? "UNIDAD"
         : calcularModoSalida(esDeposito, modoEnvio, unidadMedida);
 
-      // precioVenta = el precio que corresponde según el modo de salida default
+      // precioVenta / precioCostoEnEscala = los que corresponden al modo de salida
+      // default (lo que se muestra/cobra si no se togglea la línea).
       let precioVenta = modoSalidaDefault === "BULTO"
         ? precioVentaBulto
         : precioVentaUnitario;
-
-      // Costo escalado a la MISMA unidad que precioVenta (unitario/bulto/pieza).
-      // El precio_costo en DB está en la misma escala que precio_venta (bulto si
-      // factor_pack>1, por kg si fiambre fijo). Lo escalamos una sola vez para que:
-      //   - calcularPrecioConLista reciba un costo consistente con precioVenta.
-      //   - el POS lo mande al crear la venta y la ganancia se calcule en escala.
-      let precioCostoEnEscala = precioCosto;
-      if (fiambreFijo) {
-        precioCostoEnEscala = Number((precioCosto * pesoReferenciaKg).toFixed(2));
-      } else if (
-        factorPack > 1 &&
-        unidadMedida !== "unidad" &&
-        modoSalidaDefault === "UNIDAD"
-      ) {
-        precioCostoEnEscala = Number((precioCosto / factorPack).toFixed(2));
-      }
+      let precioCostoEnEscala = modoSalidaDefault === "BULTO"
+        ? precioCostoBulto
+        : precioCostoUnitario;
 
       // Aplicar lista de precios (si hay una resuelta)
       let aplicacionLista = null;
@@ -319,6 +325,53 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         }
       }
 
+      // ── Precios/costos REALES para POS Depósito (NORMAL vs UNIDAD_REMANENTE) ──
+      // El modelo guarda UN solo precio_venta y UN solo precio_costo (escala de
+      // bulto para productos pack). NO existe columna separada de precio unitario:
+      // el "precio unidad" del producto ES precio_venta / factor_pack — EXACTAMENTE
+      // lo que muestra el módulo Productos como "Venta unitario ref."
+      // (FormProducto.jsx → toPrecioUnitarioRef, sin redondeo propio).
+      //
+      // La lista de precios del cliente SE RESPETA en ambos modos, igual que la
+      // venta normal, pero aplicada en LA ESCALA QUE CORRESPONDE:
+      //   NORMAL (formato depósito): bulto con lista = el MISMO valor que cobra hoy
+      //     la venta normal (precioVentaBulto, ya calculado con la lista arriba).
+      //   UNIDAD_REMANENTE: se aplica la MISMA lista sobre la base unitaria real
+      //     (precio_venta/factor), NO dividiendo el pack ya alterado/redondeado por
+      //     la lista (eso distorsiona: daba 1010 cuando la unidad correcta es 1000).
+      //     Sin lista → 1000. Con lista PRECIO_VENTA → 1000. Con lista COSTO+margen →
+      //     el unitario que define esa lista. Sin redondeo extra de producto.
+      const baseUnitariaVenta = esBultoConPack ? precioDB / factorPack : precioDB;
+      const baseUnitariaCosto = esBultoConPack ? precioCosto / factorPack : precioCosto;
+
+      let precioVentaUnitarioReal;
+      if (fiambreFijo) {
+        // Fiambre fijo: el "unitario" es la pieza, ya calculada con lista arriba.
+        precioVentaUnitarioReal = Number(precioVentaUnitario.toFixed(2));
+      } else if (listaAplicable) {
+        try {
+          const calcUnit = calcularPrecioConLista({
+            precioVenta: baseUnitariaVenta,
+            costo: baseUnitariaCosto,
+            lista: listaAplicable,
+          });
+          precioVentaUnitarioReal = Number(Number(calcUnit.precioFinal).toFixed(2));
+        } catch {
+          // MANUAL_AUTORIZADO u otro caso → unitario clásico sin lista (igual que NORMAL)
+          precioVentaUnitarioReal = Number(baseUnitariaVenta.toFixed(2));
+        }
+      } else {
+        precioVentaUnitarioReal = Number(baseUnitariaVenta.toFixed(2));
+      }
+
+      // NORMAL: el MISMO valor que cobra hoy la venta normal (bulto con lista).
+      const precioVentaFormatoDepositoReal = Number(precioVentaBulto.toFixed(2));
+      // Costo: no lleva lista (es costo), escala real cruda en cada modo.
+      const precioCostoFormatoDepositoReal = Number(precioCostoBulto.toFixed(2));
+      const precioCostoUnitarioReal = fiambreFijo
+        ? Number(precioCostoUnitario.toFixed(2))
+        : Number(baseUnitariaCosto.toFixed(2));
+
       return {
         productoBaseId: pl.baseId,
         productoLocalId: pl.id,
@@ -329,6 +382,13 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         precioVentaUnitario,
         precioVentaBulto,
         precioCosto: precioCostoEnEscala,
+        precioCostoUnitario,
+        precioCostoBulto,
+        // Escalas REALES (sin lista/redondeo en el unitario) para el toggle de depósito
+        precioVentaFormatoDepositoReal,
+        precioVentaUnitarioReal,
+        precioCostoFormatoDepositoReal,
+        precioCostoUnitarioReal,
         stock,
         sinStock,
         allowNegativeStock,

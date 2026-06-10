@@ -17,6 +17,9 @@ const STORAGE_KEY = "posVentasOfflineQueue_v1";
  *   clienteId: number | null,
  *   items: Array<{
  *     productoBaseId, nombre, precio, cantidad,
+ *     // Modo de venta de la línea (depósito + pack). "NORMAL" | "UNIDAD_REMANENTE".
+ *     // Opcional: ítems legacy sin este campo se procesan como "NORMAL".
+ *     modoVentaLinea: 'NORMAL' | 'UNIDAD_REMANENTE',
  *     // Trazabilidad de lista de precios (Etapa 4 — opcional, tolerar legacy sin estos campos):
  *     listaPrecioId: number | null,
  *     tipoPrecioAplicado: 'PRECIO_VENTA' | 'COSTO_MAS_MARGEN' | 'COSTO_PURO' | 'MANUAL_AUTORIZADO' | 'OVERRIDE_PRODUCTO',

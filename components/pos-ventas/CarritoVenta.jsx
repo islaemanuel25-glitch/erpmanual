@@ -83,6 +83,45 @@ function CantidadStepper({ item, idx, onCantidadChange, compact }) {
   );
 }
 
+/* ── Toggle formato pack / unidad suelta (solo depósito + pack) ── */
+function ModoVentaToggle({ item, idx, onModoVentaChange }) {
+  const factor = Number(item.factorPack) || 1;
+  const modo = item.modoVentaLinea || "NORMAL";
+  const base =
+    "text-[10px] px-1.5 py-0.5 rounded border transition-colors select-none";
+  const activo = "pos-control font-bold";
+  const inactivo = "pos-text-muted";
+  return (
+    <div className="flex items-center gap-1 mt-1">
+      <span className="text-[10px] pos-text-muted">Venta:</span>
+      <button
+        type="button"
+        onClick={() => onModoVentaChange(idx, "NORMAL")}
+        className={`${base} ${modo === "NORMAL" ? activo : inactivo}`}
+      >
+        Formato x{factor}
+      </button>
+      <button
+        type="button"
+        onClick={() => onModoVentaChange(idx, "UNIDAD_REMANENTE")}
+        className={`${base} ${modo === "UNIDAD_REMANENTE" ? activo : inactivo}`}
+      >
+        Unidad suelta
+      </button>
+    </div>
+  );
+}
+
+// ¿Esta línea admite venta por unidad suelta? Solo en depósito, con pack real
+// (factorPack > 1) y cuya salida normal del depósito es por bulto.
+function admiteRemanente(item, esDeposito) {
+  return (
+    esDeposito === true &&
+    Number(item.factorPack) > 1 &&
+    item.modoSalida === "BULTO"
+  );
+}
+
 function CarritoVenta({
   items,
   onCantidadChange,
@@ -94,6 +133,8 @@ function CarritoVenta({
   onAbrirDescuento,
   clienteSeleccionado = null,
   onAbrirCliente,
+  esDeposito = false,
+  onModoVentaChange,
 }) {
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false);
   if (items.length === 0) {
@@ -202,6 +243,13 @@ function CarritoVenta({
                     compact
                   />
                 </div>
+                {admiteRemanente(item, esDeposito) && onModoVentaChange && (
+                  <ModoVentaToggle
+                    item={item}
+                    idx={idx}
+                    onModoVentaChange={onModoVentaChange}
+                  />
+                )}
               </div>
               <div className="text-right shrink-0">
                 <div className="text-sm font-bold pos-text-accent">
@@ -235,6 +283,13 @@ function CarritoVenta({
                   <span className="block text-[10px] sunmi-text-muted truncate">
                     {item.listaPrecioNombre}
                   </span>
+                )}
+                {admiteRemanente(item, esDeposito) && onModoVentaChange && (
+                  <ModoVentaToggle
+                    item={item}
+                    idx={idx}
+                    onModoVentaChange={onModoVentaChange}
+                  />
                 )}
               </td>
               <td className="px-2 py-1.5">

@@ -481,13 +481,23 @@ export async function POST(req) {
           // PIEZA fiambre: cantidad en piezas → kg para stock.
           cantidadParaStock = Math.round(Number(item.cantidad) * baseStock.pesoReferenciaKg * 1000) / 1000;
         } else if (esDeposito && factorPackItem > 1) {
-          // Depósito con pack: replicar la lógica de calcularModoSalida() de buscar-producto.
-          // SOLO_UNIDAD → vende por unidad; SOLO_BULTO / MIXTO / null → vende por bulto.
-          const modoEnvioEfectivo = baseStock.modo_envio || defaultModoEnvio(baseStock.unidad_medida);
-          const modoSalida = modoEnvioEfectivo === "SOLO_UNIDAD" ? "UNIDAD" : "BULTO";
-          cantidadParaStock = modoSalida === "BULTO"
-            ? Number(item.cantidad) * factorPackItem
-            : Number(item.cantidad);
+          // Depósito con pack. El factorPack y el stock se validan SIEMPRE contra DB
+          // (factorPackItem viene de baseStockMap, no del cliente).
+          if (item.modoVentaLinea === "UNIDAD_REMANENTE") {
+            // Remanente/excepción: vender unidades sueltas sin tocar la config del
+            // producto. item.cantidad ya está expresada en unidades reales → no se
+            // multiplica por el pack. La validación de stock disponible (más abajo)
+            // garantiza que no se vendan más unidades de las que hay.
+            cantidadParaStock = Number(item.cantidad);
+          } else {
+            // NORMAL: replicar la lógica de calcularModoSalida() de buscar-producto.
+            // SOLO_UNIDAD → vende por unidad; SOLO_BULTO / MIXTO / null → vende por bulto.
+            const modoEnvioEfectivo = baseStock.modo_envio || defaultModoEnvio(baseStock.unidad_medida);
+            const modoSalida = modoEnvioEfectivo === "SOLO_UNIDAD" ? "UNIDAD" : "BULTO";
+            cantidadParaStock = modoSalida === "BULTO"
+              ? Number(item.cantidad) * factorPackItem
+              : Number(item.cantidad);
+          }
         } else {
           // Local normal, o producto sin factor_pack: cantidad directa.
           cantidadParaStock = Number(item.cantidad);

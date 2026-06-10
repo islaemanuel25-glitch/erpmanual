@@ -41,6 +41,7 @@ export const ActionTypes = {
   SET_PUNTOS: "SET_PUNTOS",
   REMOVE_PUNTOS: "REMOVE_PUNTOS",
   SET_FORMA_PAGO: "SET_FORMA_PAGO",
+  SET_MODO_VENTA_LINEA: "SET_MODO_VENTA_LINEA",
   SET_COBRANDO: "SET_COBRANDO",
   OPEN_MODAL: "OPEN_MODAL",
   CLOSE_MODAL: "CLOSE_MODAL",
@@ -85,6 +86,22 @@ export function posVentaReducer(state, action) {
             precioVentaUnitario: producto.precioVentaUnitario ?? producto.precioVenta,
             precioVentaBulto: producto.precioVentaBulto ?? producto.precioVenta,
             unidadMedida: producto.unidadMedida || "unidad",
+            // Venta por remanente (solo depósito + pack): factor real y modo elegido por línea.
+            // Escalas REALES tal como las devuelve la API (fuente autoritativa). El toggle
+            // solo elige cuál usar; NO re-deriva. La API ya aplicó la lista de precios del
+            // cliente en cada escala (bulto y unidad), respetando la lista igual que la venta
+            // normal. El unitario parte de precio_venta ÷ factor_pack (= "Venta unitario ref."
+            // de Productos) con la lista aplicada en escala unitaria, no dividiendo el pack.
+            factorPack: Number(producto.factorPack) || 1,
+            modoVentaLinea: "NORMAL", // "NORMAL" (formato pack) | "UNIDAD_REMANENTE" (unidad suelta)
+            precioVentaFormatoDepositoReal:
+              producto.precioVentaFormatoDepositoReal ?? producto.precioVentaBulto ?? producto.precioVenta,
+            precioVentaUnitarioReal:
+              producto.precioVentaUnitarioReal ?? producto.precioVentaUnitario ?? producto.precioVenta,
+            precioCostoFormatoDepositoReal:
+              producto.precioCostoFormatoDepositoReal ?? producto.precioCostoBulto ?? producto.precioCosto ?? 0,
+            precioCostoUnitarioReal:
+              producto.precioCostoUnitarioReal ?? producto.precioCostoUnitario ?? producto.precioCosto ?? 0,
             // Trazabilidad de lista de precios (Etapa 4) — capturada al momento de agregar
             listaPrecioId: producto.aplicacionLista?.listaPrecioId ?? null,
             listaPrecioNombre: producto.aplicacionLista?.listaPrecioNombre ?? null,
@@ -182,6 +199,53 @@ export function posVentaReducer(state, action) {
         ...state,
         formaPago: action.payload,
       };
+    }
+
+    case ActionTypes.SET_MODO_VENTA_LINEA: {
+      // Cambia el modo de venta de una línea entre formato pack (NORMAL) y
+      // unidad suelta (UNIDAD_REMANENTE). Ajusta precio y costo a la escala
+      // correspondiente. El descuento de stock real lo recalcula el backend
+      // contra la DB; acá solo afecta lo que se muestra y cobra.
+      const { idx, modo } = action.payload;
+      const item = state.carrito[idx];
+      if (!item) return state;
+      const factorPack = Number(item.factorPack) || 1;
+      const next = [...state.carrito];
+
+      if (modo === "UNIDAD_REMANENTE") {
+        // Precio/costo unitario REAL del producto (con la lista del cliente ya
+        // aplicada por la API en escala unitaria). FALLBACK LEGACY: si el ítem no
+        // trae el campo real (cola offline vieja), recién ahí se divide bulto ÷ factor.
+        const precioUnit =
+          item.precioVentaUnitarioReal != null
+            ? item.precioVentaUnitarioReal
+            : factorPack > 1
+              ? Math.round(((item.precioVentaFormatoDepositoReal ?? item.precio ?? 0) / factorPack) * 100) / 100
+              : (item.precioVentaFormatoDepositoReal ?? item.precio ?? 0);
+        const costoUnit =
+          item.precioCostoUnitarioReal != null
+            ? item.precioCostoUnitarioReal
+            : factorPack > 1
+              ? Math.round(((item.precioCostoFormatoDepositoReal ?? item.precioCosto ?? 0) / factorPack) * 100) / 100
+              : (item.precioCostoFormatoDepositoReal ?? item.precioCosto ?? 0);
+        next[idx] = {
+          ...item,
+          modoVentaLinea: "UNIDAD_REMANENTE",
+          precio: precioUnit,
+          precioCosto: costoUnit,
+          cantidad: 1, // la cantidad pasa a significar unidades reales
+        };
+      } else {
+        next[idx] = {
+          ...item,
+          modoVentaLinea: "NORMAL",
+          // Formato depósito: el MISMO precio/costo que cobra hoy la venta normal.
+          precio: item.precioVentaFormatoDepositoReal ?? item.precio,
+          precioCosto: item.precioCostoFormatoDepositoReal ?? item.precioCosto ?? 0,
+          cantidad: 1, // la cantidad vuelve a significar packs/bultos/cajones
+        };
+      }
+      return { ...state, carrito: next };
     }
 
     case ActionTypes.SET_COBRANDO: {
