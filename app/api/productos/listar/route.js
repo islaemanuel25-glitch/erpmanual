@@ -224,6 +224,11 @@ export async function GET(req) {
             descripcion: true,
           },
         },
+        // Código interno por proveedor (distinto del código de barras).
+        codigosProveedor: {
+          where: { activo: true },
+          select: { codigoInterno: true, proveedorId: true },
+        },
       },
     });
 
@@ -251,6 +256,15 @@ export async function GET(req) {
 
         // codigo de barras uniforme
         codigoBarra: p.codigo_barra ?? null,
+
+        // Código interno por proveedor (preferir el del proveedor principal;
+        // si no, el primero activo disponible). NO es el código de barras.
+        codigoInterno: (() => {
+          const cods = p.codigosProveedor ?? [];
+          if (cods.length === 0) return null;
+          const principal = cods.find((c) => c.proveedorId === p.proveedor_id);
+          return (principal ?? cods[0]).codigoInterno ?? null;
+        })(),
       };
     });
 

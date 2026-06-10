@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
@@ -25,6 +27,7 @@ export default function SunmiTablaProductos({
   totalItems = 0,
   onNext,
   onPrev,
+  onGoToPage,
   onPageSizeChange,
   sortKey,
   sortDir,
@@ -32,6 +35,8 @@ export default function SunmiTablaProductos({
   onEditar,
   onEliminar,
   catalogos,
+  selectedProductId = null,
+  onSelectProducto,
 }) {
   const CAT = Object.fromEntries(
     (catalogos?.CATEGORIAS ?? []).map((c) => [String(c.id), c.nombre])
@@ -42,6 +47,17 @@ export default function SunmiTablaProductos({
   const AREA = Object.fromEntries(
     (catalogos?.AREAS ?? []).map((a) => [String(a.id), a.nombre])
   );
+
+  // "Ir a página": valida 1..totalPages y delega en onGoToPage.
+  const [goToValue, setGoToValue] = useState("");
+  const submitGoTo = () => {
+    if (goToValue === "" || !onGoToPage) return;
+    let n = parseInt(goToValue, 10);
+    if (Number.isNaN(n)) { setGoToValue(""); return; }
+    n = Math.min(Math.max(1, n), totalPages || 1);
+    onGoToPage(n);
+    setGoToValue("");
+  };
 
   const money = (v) => {
     if (v === null || v === undefined) return "-";
@@ -73,6 +89,7 @@ export default function SunmiTablaProductos({
     },
 
     codigoBarra: { titulo: "Código", thClass: "w-[140px]", tdClass: "truncate overflow-hidden sunmi-text-muted", titleKey: "codigoBarra" },
+    codigoInterno: { titulo: "Cód. interno", thClass: "w-[120px]", tdClass: "truncate overflow-hidden sunmi-text-muted", titleKey: "codigoInterno" },
     sku: { titulo: "SKU", thClass: "w-[90px]" },
     nombre: {
       titulo: "Nombre",
@@ -230,13 +247,22 @@ export default function SunmiTablaProductos({
   const colSpan = headers.length;
 
   return (
-    <div className="overflow-x-auto rounded-xl border sunmi-border">
-      <SunmiTable headers={headers}>
+    <div className="rounded-xl border sunmi-border overflow-hidden">
+      <SunmiTable headers={headers} stickyHeader scrollId="productos-scroll">
         {rows.length === 0 ? (
           <SunmiTableEmpty message="No hay productos disponibles" colSpan={colSpan} />
         ) : (
-          rows.map((row) => (
-            <SunmiTableRow key={row.id}>
+          rows.map((row) => {
+            const isSelected =
+              selectedProductId != null && row.id === selectedProductId;
+            return (
+            <SunmiTableRow
+              key={row.id}
+              onClick={onSelectProducto ? () => onSelectProducto(row.id) : undefined}
+              // Seleccionado: amarillo suave persistente (!important para que gane
+              // al hover). No seleccionado: hover normal de SunmiTableRow.
+              className={`transition-colors ${isSelected ? "!bg-amber-400/30" : ""}`}
+            >
               {columnas.map((c) => (
                 <td
                   key={c.key}
@@ -269,7 +295,10 @@ export default function SunmiTablaProductos({
                 </button>
 
                 <button
-                  onClick={() => onEliminar(row.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEliminar(row.id);
+                  }}
                   className="
                     w-[26px] h-[26px]
                     flex items-center justify-center
@@ -284,7 +313,8 @@ export default function SunmiTablaProductos({
                 </button>
               </td>
             </SunmiTableRow>
-          ))
+            );
+          })
         )}
       </SunmiTable>
 
@@ -302,6 +332,26 @@ export default function SunmiTablaProductos({
           <SunmiButton color="slate" disabled={page >= totalPages} onClick={onNext}>
             Siguiente »
           </SunmiButton>
+
+          {/* Ir directo a una página (valida 1..totalPages) */}
+          {onGoToPage && totalPages > 1 && (
+            <form
+              onSubmit={(e) => { e.preventDefault(); submitGoTo(); }}
+              className="flex items-center gap-1"
+            >
+              <span className="sunmi-text-muted text-[11px] whitespace-nowrap">Ir a</span>
+              <SunmiInput
+                type="text"
+                inputMode="numeric"
+                value={goToValue}
+                onChange={(e) => setGoToValue(e.target.value.replace(/[^\d]/g, ""))}
+                onBlur={submitGoTo}
+                placeholder={String(totalPages)}
+                className="w-16 !text-center !py-1 text-[12px]"
+                aria-label="Ir a página"
+              />
+            </form>
+          )}
         </div>
 
         <SunmiPageSizer value={pageSize} onChange={(size) => onPageSizeChange?.(size)} />

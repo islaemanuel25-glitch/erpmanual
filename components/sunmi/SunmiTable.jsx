@@ -2,11 +2,23 @@
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
 
-export default function SunmiTable({ headers = [], children }) {
+export default function SunmiTable({
+  headers = [],
+  children,
+  // Header fijo: el contenedor se vuelve scrolleable (vertical + horizontal) con
+  // altura máxima y el thead queda sticky. Default off → no afecta a otras tablas.
+  stickyHeader = false,
+  maxHeightClass = "max-h-[70dvh]",
+  scrollId,
+}) {
   const { theme } = useSunmiTheme();
-  
+  const theadBase = theme.table?.headerClass || "sunmi-thead";
+
   return (
-    <div className="overflow-x-auto">
+    <div
+      id={scrollId}
+      className={stickyHeader ? `overflow-auto ${maxHeightClass}` : "overflow-x-auto"}
+    >
       <table
         className="
           w-full
@@ -16,7 +28,7 @@ export default function SunmiTable({ headers = [], children }) {
       >
         {/* ===== HEADER ===== */}
         {headers.length > 0 && (
-          <thead className={theme.table?.headerClass || "sunmi-thead"}>
+          <thead className={stickyHeader ? `${theadBase} sticky top-0 z-20` : theadBase}>
             <tr>
               {headers.map((h, i) => {
                 const label = typeof h === "string" ? h : h.label;

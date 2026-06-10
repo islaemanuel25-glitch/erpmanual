@@ -29,6 +29,13 @@ const TABS = [
   { key: "importexport", label: "Import / Export" },
 ];
 
+// Contenedor scrolleable de la lista: con header sticky el scroll vive en
+// #productos-scroll (la tabla). Fallback al <main> de LayoutBase.
+function getProductosScrollEl() {
+  if (typeof document === "undefined") return null;
+  return document.getElementById("productos-scroll") || document.querySelector("main");
+}
+
 export default function ProductosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -61,6 +68,24 @@ export default function ProductosPage() {
   const [totalItems, setTotalItems] = useState(0);
   const [sortKey, setSortKey] = useState(searchParams.get("sortKey") || "nombre");
   const [sortDir, setSortDir] = useState(searchParams.get("sortDir") || "asc");
+
+  // Selección persistente de fila + restauración de scroll al volver de editar.
+  // El contenedor scrolleable es el <main> de LayoutBase (no window).
+  const restoredScrollRef = useRef(false);
+  const [selectedProductId, setSelectedProductId] = useState(() => {
+    if (typeof window === "undefined") return null;
+    // Conservar la selección SOLO si venimos de editar (hay scroll guardado).
+    // En una entrada fresca al módulo, arrancar sin selección.
+    if (sessionStorage.getItem("productos:scrollY") == null) return null;
+    const v = sessionStorage.getItem("productos:selectedProductId");
+    return v ? Number(v) : null;
+  });
+
+  // Click en una fila (fuera de los botones) → marca persistente.
+  const handleSelectProducto = useCallback((id) => {
+    setSelectedProductId(id);
+    try { sessionStorage.setItem("productos:selectedProductId", String(id)); } catch {}
+  }, []);
 
   const localId = contexto?.localId || 0;
 
@@ -111,6 +136,7 @@ export default function ProductosPage() {
     { key: "imagenUrl", label: "Imagen" },
     { key: "nombre", label: "Nombre" },
     { key: "codigoBarra", label: "Código barra" },
+    { key: "codigoInterno", label: "Código interno" },
     { key: "sku", label: "SKU" },
     { key: "categoriaId", label: "Categoría" },
     { key: "proveedorId", label: "Proveedor" },
@@ -143,7 +169,9 @@ export default function ProductosPage() {
         return parsed;
       }
     }
-    return allColumns.map((c) => c.key);
+    // Por defecto, "Código interno" arranca oculta (opt-in desde el selector de
+    // columnas) para no ensanchar la tabla por defecto.
+    return allColumns.map((c) => c.key).filter((k) => k !== "codigoInterno");
   });
 
   const handleVisibleColsChange = (next) => {
@@ -312,6 +340,30 @@ export default function ProductosPage() {
     setEditing(null);
   }, [nuevo, editarId, localId]);
 
+  // Al volver de editar (hay scroll guardado): restaurar la posición de scroll y
+  // CONSERVAR la selección. En una entrada fresca: limpiar la selección residual.
+  // Se ejecuta una sola vez, cuando terminó el loading y la lista ya está en el DOM.
+  useEffect(() => {
+    if (loading || restoredScrollRef.current) return;
+    restoredScrollRef.current = true;
+    let savedY = null;
+    try { savedY = sessionStorage.getItem("productos:scrollY"); } catch {}
+    if (savedY != null) {
+      const y = Number(savedY) || 0;
+      // Doble rAF: esperar layout/paint para que la altura de la lista ya exista.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const sc = getProductosScrollEl();
+          if (sc) sc.scrollTop = y;
+        })
+      );
+      try { sessionStorage.removeItem("productos:scrollY"); } catch {}
+    } else {
+      // Entrada fresca al módulo: no conservar selección de sesiones previas.
+      try { sessionStorage.removeItem("productos:selectedProductId"); } catch {}
+    }
+  }, [loading]);
+
   const cerrarModal = () => {
     setModalOpen(false);
     setEditing(null);
@@ -392,6 +444,14 @@ export default function ProductosPage() {
       alert("Error: ID de producto inválido");
       return;
     }
+    // Marcar el producto abierto y guardar la posición de scroll (del <main>),
+    // para restaurar el contexto al volver del editor. La página viaja en la URL.
+    setSelectedProductId(Number(id));
+    try {
+      const sc = getProductosScrollEl();
+      sessionStorage.setItem("productos:scrollY", String(sc ? sc.scrollTop : 0));
+      sessionStorage.setItem("productos:selectedProductId", String(Number(id)));
+    } catch {}
     // Pasar query del listado para poder volver al mismo contexto
     const listingUrl = buildListingUrl();
     const qs = listingUrl.includes("?") ? listingUrl.split("?")[1] : "";
@@ -761,6 +821,9 @@ export default function ProductosPage() {
                     totalItems={totalItems}
                     onNext={() => setPage((p) => p + 1)}
                     onPrev={() => setPage((p) => Math.max(1, p - 1))}
+                    onGoToPage={(n) =>
+                      setPage(Math.min(Math.max(1, Number(n) || 1), totalPages || 1))
+                    }
                     onPageSizeChange={(size) => {
                       setPageSize(size);
                       setPage(1);
@@ -780,6 +843,8 @@ export default function ProductosPage() {
                     onEliminar={handleEliminar}
                     catalogos={catalogos}
                     loading={loading || loadingEditar}
+                    selectedProductId={selectedProductId}
+                    onSelectProducto={handleSelectProducto}
                   />
               </div>
 
