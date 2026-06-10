@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-10] - Actualización: productos, pos-ventas
+
+### Modificado
+- **productos**: feat: productos — go-to-page, sticky header and optional internal code column
+- **pos-ventas**: fix: derive unit price by unidad_medida, not modo_envio, in depot POS
+- **pos-ventas**: feat: compact mobile cart with scrollable chips row in depot POS
+- **pos-ventas**: feat: show depot stock breakdown (packs + units) in POS search and cart
+
 ## [2026-02-13] - Sistema de Auto-documentación
 
 ### Agregado

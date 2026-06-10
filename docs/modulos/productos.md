@@ -1,5 +1,7 @@
 # Modulo: Productos
 
+**Última actualización:** 2026-06-10
+
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
 - APIs: `app/api/productos/`
@@ -98,3 +100,6 @@ model ProductoLocal {
   @@unique([localId, baseId])
 }
 ```
+
+## Cambios recientes
+- 2026-06-10: feat: productos — go-to-page, sticky header and optional internal code column

@@ -201,27 +201,34 @@ function actualizarDocModulo(modulo, data) {
 
   let contenido = fs.readFileSync(docPath, 'utf-8');
 
-  // Actualizar fecha de última actualización si existe la línea
+  // Fecha de última actualización: actualizar si existe; si no, crearla justo
+  // después del primer encabezado H1 (tolera CRLF).
   const fechaRegex = /\*\*Última actualización:\*\*\s*.*/;
   if (fechaRegex.test(contenido)) {
     contenido = contenido.replace(
       fechaRegex,
       `**Última actualización:** ${ahora()}`
     );
+  } else {
+    contenido = contenido.replace(
+      /^(#\s.*(?:\r?\n))/,
+      `$1\n**Última actualización:** ${ahora()}\n`
+    );
   }
 
-  // Agregar cambios recientes en la sección correspondiente
+  // Cambios recientes: insertar bajo la sección; si NO existe, crearla al final
+  // del archivo (así el doc del módulo se mantiene aunque no la tuviera).
   const cambiosSection = '## Cambios recientes';
+  const nuevosEntries = data.commits
+    .map(c => `- ${c.date}: ${c.subject}`)
+    .join('\n');
   if (contenido.includes(cambiosSection)) {
-    const nuevosEntries = data.commits
-      .map(c => `- ${c.date}: ${c.subject}`)
-      .join('\n');
-
-    // Insertar después del header de la sección
     contenido = contenido.replace(
       cambiosSection,
       `${cambiosSection}\n${nuevosEntries}`
     );
+  } else {
+    contenido = `${contenido.replace(/\s*$/, '')}\n\n${cambiosSection}\n${nuevosEntries}\n`;
   }
 
   if (dryRun) {
@@ -318,11 +325,13 @@ function actualizarChangelog(modulosAfectados) {
     return;
   }
 
-  // Insertar después del título
-  const nuevoContenido = actual.replace(
-    '# Changelog\n',
-    `# Changelog\n\n${cambios}`
-  );
+  // Insertar después del título. Tolera CRLF ('# Changelog\r\n' o '\n');
+  // el replace literal con '\n' fallaba en archivos con saltos CRLF (no-op).
+  // Fallback: si no hay header reconocible, prepend el bloque.
+  const headerRe = /# Changelog\r?\n/;
+  const nuevoContenido = headerRe.test(actual)
+    ? actual.replace(headerRe, (m) => `${m}\n${cambios}`)
+    : `# Changelog\n\n${cambios}${actual}`;
 
   if (dryRun) {
     console.log('[DRY-RUN] Actualizaría: CHANGELOG.md');
