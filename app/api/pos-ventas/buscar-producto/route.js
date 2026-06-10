@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { defaultModoEnvio, esBultoMode, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
@@ -228,15 +228,18 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
       const precioDB = Number(pl.precio_venta || pl.base?.precio_venta || 0);
       const precioCosto = Number(pl.precio_costo || pl.base?.precio_costo || 0);
 
-      // ¿El producto opera por BULTO con pack? En ese caso precio_venta y
-      // precio_costo en DB están en escala de BULTO y hay que derivar el unitario.
-      // Generaliza el viejo guard `unidadMedida !== "unidad"` (que dejaba afuera a
-      // productos con unidad_medida="unidad" pero modo_envio SOLO_BULTO/MIXTO):
-      // ahora el criterio es el modo de envío efectivo, igual que modoSalida y que
-      // el descuento de stock. esBultoMode(): SOLO_BULTO/MIXTO/null(→default) → true.
-      const modoEnvioEfectivo = modoEnvio || defaultModoEnvio(unidadMedida);
+      // ¿precio_venta/precio_costo están guardados en escala de BULTO (hay que
+      // derivar el unitario ÷ factor_pack)? Eso depende SOLO de unidad_medida
+      // (FormProducto guarda "Venta (por bulto)" para pack/cajón), NO de modo_envio.
+      // modo_envio decide el MODO DE SALIDA (modoSalidaDefault), no la escala del
+      // precio: un pack + SOLO_UNIDAD igual tiene el precio guardado en bulto y debe
+      // dividirse para mostrar el unitario. Mezclar ambos (esBultoMode) hacía que
+      // pack+SOLO_UNIDAD cobrara el precio de bulto.
       const esBultoConPack =
-        !fiambreFijo && factorPack > 1 && precioDB > 0 && esBultoMode(modoEnvioEfectivo);
+        !fiambreFijo &&
+        factorPack > 1 &&
+        precioDB > 0 &&
+        ["pack", "cajon", "caja", "carton"].includes(unidadMedida);
 
       // Cuatro escalas explícitas: la API es la fuente autoritativa del precio/costo
       // unitario real y del de bulto. El frontend NO debe re-derivar dividiendo.
