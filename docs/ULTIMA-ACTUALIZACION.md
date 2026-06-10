@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-06-09 20:39
+**Fecha:** 2026-06-09 22:52
 
 ## Módulos modificados recientemente
+
+### pos-ventas
+- feat: allow unit remnant sales in depot POS
+- Archivos: 6 modificados (6 total)
 
 
 
