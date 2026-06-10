@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-06-10 13:07
+**Última actualización:** 2026-06-10 20:33
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,7 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-06-10: fix(fiambre): mostrar piezas reales en depósito y topar carrito por piezas
 - 2026-06-10: fix: derive unit price by unidad_medida, not modo_envio, in depot POS
 - 2026-06-10: feat: compact mobile cart with scrollable chips row in depot POS
 - 2026-06-09: feat: show depot stock breakdown (packs + units) in POS search and cart

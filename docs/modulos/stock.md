@@ -1,5 +1,7 @@
 # Modulo: Stock Locales
 
+**Última actualización:** 2026-06-10 20:33
+
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
 - APIs: `app/api/stock_locales/`
@@ -74,3 +76,6 @@ Depositos almacenan en bultos, locales en unidades:
 precioUnitario = precioCosto / factor_pack
 stockUnidades = stockBultos * factor_pack
 ```
+
+## Cambios recientes
+- 2026-06-10: fix(fiambre): mostrar piezas reales en depósito y topar carrito por piezas
