@@ -44,7 +44,7 @@ function saveVisibleCols(cols) {
 // ── Helpers de formato ──────────────────────────────────────────────────
 function formatCantidad(valor, unidadMedida, opts = {}) {
   const n = Number(valor || 0);
-  if (opts.esFiambreFijo && opts.esDeposito) return `${Math.round(kgToPiezas(n, opts.pesoReferenciaKg))} pzs`;
+  if (opts.esFiambreFijo && opts.esDeposito) return `${Math.round(n)} pzs`;
   if (unidadMedida === "kg") return `${n.toFixed(3)} kg`;
   return `${Math.round(n)} uds`;
 }
@@ -241,7 +241,7 @@ export default function TablaStock({
         )}
         {isFiambreFijo && localEsDeposito && (
           <span className="block text-[10px] sunmi-text-muted">
-            = {Number(p.stock || 0).toFixed(3)} kg
+            = {(Number(p.stock || 0) * p.pesoReferenciaKg).toFixed(3)} kg
           </span>
         )}
         {isFiambreFijo && !localEsDeposito && (
@@ -335,7 +335,7 @@ export default function TablaStock({
             {items.map((p) => {
               const presentacionDep = getPresentacionDeposito(p);
               const isFiambreFijo = p.unidadMedida === "kg" && p.modoCompraProveedor === "UNIDAD" && p.pesoReferenciaKg > 0 && (p.modoVentaDeposito === "PIEZA" || p.pesoEsFijo === true);
-              const fmtOpts = { esFiambreFijo: isFiambreFijo, esDeposito: localEsDeposito, pesoReferenciaKg: p.pesoReferenciaKg };
+              const fmtOpts = { esFiambreFijo: isFiambreFijo, esDeposito: localEsDeposito };
               return (
                 <tr key={p.id} className="hover:bg-[var(--table-row-hover)]">
                   {isVisible("producto") && (

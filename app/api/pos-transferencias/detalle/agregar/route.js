@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { defaultModoEnvio, esProductoFiambre, piezasToKg } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -135,13 +135,14 @@ export async function POST(req) {
       unidadPreparada = unidadBody;
     }
 
-    // Fiambre: si vino PIEZA, convertir SIEMPRE a kg antes de persistir (stock real en kg)
+    // Fiambre fijo: el depósito opera en PIEZAS → se persiste la cantidad en piezas
+    // tal cual (NO se convierte a kg). Se etiqueta UNIDAD para que enviar/validarEnvio
+    // la traten como cantidad simple; confirmar-recepcion hace piezas→kg sólo al
+    // sumar al local destino. El stock del depósito se descuenta en piezas.
     if (unidadBody === "PIEZA") {
       if (!esFiambre || pesoReferenciaKg <= 0) {
         return NextResponse.json({ ok: false, error: "Este producto no admite cantidad en piezas (solo fiambres con peso de referencia)" }, { status: 400 });
       }
-      sugerido = piezasToKg(sugerido, pesoReferenciaKg);
-      preparado = piezasToKg(preparado, pesoReferenciaKg);
       unidadSugerida = "UNIDAD";
       unidadPreparada = "UNIDAD";
     }

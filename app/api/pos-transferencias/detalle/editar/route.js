@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { defaultModoEnvio, esProductoFiambre, piezasToKg } from "@/lib/conversiones/stock";
+import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
   try {
@@ -121,7 +121,8 @@ export async function POST(req) {
               { status: 400 }
             );
           }
-          data.preparado = piezasToKg(preparado, pesoReferenciaKg);
+          // Depósito opera en PIEZAS: guardar la cantidad en piezas tal cual.
+          data.preparado = preparado;
           data.unidadPreparada = "UNIDAD";
         } else {
           data.preparado = preparado;
@@ -145,7 +146,8 @@ export async function POST(req) {
               { status: 400 }
             );
           }
-          data.sugerido = piezasToKg(sugerido, pesoReferenciaKg);
+          // Depósito opera en PIEZAS: guardar la cantidad en piezas tal cual.
+          data.sugerido = sugerido;
           data.unidadSugerida = "UNIDAD";
         } else {
           data.sugerido = sugerido;

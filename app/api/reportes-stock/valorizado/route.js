@@ -14,6 +14,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { redondear100 } from "@/lib/precios/redondeo";
+import { esFiambreFijo } from "@/lib/conversiones/stock";
 
 function safeNum(n) {
   const v = Number(n);
@@ -83,6 +84,11 @@ export async function obtenerReporte(req) {
           precio_costo: true,
           precio_venta: true,
           redondeo_100: true,
+          unidad_medida: true,
+          modoCompraProveedor: true,
+          modoVentaDeposito: true,
+          pesoReferenciaKg: true,
+          pesoEsFijo: true,
           categoria: { select: { id: true, nombre: true } },
           proveedor: { select: { id: true, nombre: true } },
         },
@@ -101,7 +107,7 @@ export async function obtenerReporte(req) {
     // Costo: ProductoLocal override → ProductoBase fallback.
     // Si factor_pack > 1, el precio en DB es del bulto → dividir.
     const precioCostoBase = safeNum(p.precio_costo ?? base.precio_costo);
-    const precioCostoUnitario =
+    let precioCostoUnitario =
       factor > 1 ? precioCostoBase / factor : precioCostoBase;
 
     // Venta: idem. Luego aplicar redondeo a 100 si corresponde (igual que stock_locales/listar).
@@ -110,6 +116,17 @@ export async function obtenerReporte(req) {
       factor > 1 ? precioVentaBase / factor : precioVentaBase;
     if (base.redondeo_100 === true) {
       precioVentaUnitario = redondear100(precioVentaUnitario);
+    }
+
+    // Fiambre fijo en DEPÓSITO: la cantidad está en PIEZAS, pero precio_costo /
+    // precio_venta están guardados por KG. El valor por pieza = precioPorKg ×
+    // pesoReferenciaKg. (En locales el stock sigue en kg → no se ajusta.)
+    if (local.es_deposito && esFiambreFijo(base)) {
+      const pesoRef = safeNum(base.pesoReferenciaKg);
+      if (pesoRef > 0) {
+        precioCostoUnitario = precioCostoUnitario * pesoRef;
+        precioVentaUnitario = precioVentaUnitario * pesoRef;
+      }
     }
 
     const sinCosto = !(precioCostoUnitario > 0);

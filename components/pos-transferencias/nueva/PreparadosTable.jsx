@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import { kgToPiezas } from "@/lib/conversiones/stock";
+import { kgToPiezas, piezasToKg } from "@/lib/conversiones/stock";
 export default function PreparadosTable({
   datos = [],
   onDesmarcar,
@@ -185,8 +185,9 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
       const prepUds = muestraEnBulto ? preparadoVal * factorPack : preparadoVal;
       setMixBultos(Math.floor(prepUds / factorPack));
       setMixUds(prepUds % factorPack);
-    } else if (esFiambre && inputEnPiezas) {
-      setInputVal(kgToPiezas(preparadoVal, pesoRefKg));
+    } else if (esFiambre && ventaDepositoPieza && !inputEnPiezas) {
+      // preparadoVal ya está en PIEZAS → en modo kg se muestra la equivalencia.
+      setInputVal(piezasToKg(preparadoVal, pesoRefKg));
     } else {
       setInputVal(preparadoVal);
     }
@@ -219,19 +220,21 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
   const handleChange = (val) => {
     const v = Math.max(0, Number(val) || 0);
     setInputVal(v);
-    emitDebounced(v, unidadEmitNormal);
+    if (esFiambre && ventaDepositoPieza) {
+      // Depósito opera en PIEZAS. Si el input está en kg, convertir a piezas antes de emitir.
+      const piezas = inputEnPiezas ? v : (pesoRefKg > 0 ? kgToPiezas(v, pesoRefKg) : v);
+      emitDebounced(piezas, "PIEZA");
+    } else {
+      emitDebounced(v, unidadEmitNormal);
+    }
   };
 
-  // --- Fiambre: toggle piezas/kg ---
+  // --- Fiambre: toggle piezas/kg (solo cambia la unidad de VISUALIZACIÓN) ---
   const togglePiezas = () => {
     const next = !inputEnPiezas;
     setInputEnPiezas(next);
-    if (next) {
-      setInputVal(kgToPiezas(preparadoVal, pesoRefKg));
-    } else {
-      setInputVal(preparadoVal);
-    }
-    if (!next) emitDebounced(preparadoVal, "UNIDAD");
+    // preparadoVal ya está en piezas; el valor persistido no cambia al togglear.
+    setInputVal(next ? preparadoVal : piezasToKg(preparadoVal, pesoRefKg));
   };
 
   // --- Handlers modo rotura ---
@@ -447,8 +450,8 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
                 {esFiambre && !muestraEnBulto && (
                   <span className="text-[10px] sunmi-text-muted">
                     {inputEnPiezas
-                      ? `= ${Number(preparadoVal || 0).toFixed(2)} kg`
-                      : `= ${kgToPiezas(preparadoVal, pesoRefKg)} pzs`}
+                      ? `= ${(Number(inputVal || 0) * pesoRefKg).toFixed(2)} kg`
+                      : `≈ ${kgToPiezas(Number(inputVal || 0), pesoRefKg)} pzs`}
                   </span>
                 )}
                 {esFiambre && ventaDepositoPieza && !bloqueado && (

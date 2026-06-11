@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import { kgToPiezas } from "@/lib/conversiones/stock";
+import { kgToPiezas, piezasToKg } from "@/lib/conversiones/stock";
 
 const DEBUG_FILTROS_SUGERIDOS = false;
 
@@ -237,9 +237,8 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
       ? sugeridoCantidad
       : Math.floor(sugeridoCantidad / factorPack);
   });
-  const [uds, setUds] = useState(
-    bultoMode ? 0 : (esFiambre && sugeridoUnidad === "PIEZA" ? kgToPiezas(sugeridoCantidad, pesoRefKg) : sugeridoCantidad)
-  );
+  // Fiambre fijo: el backend ya devuelve sugeridoCantidad en PIEZAS → directo.
+  const [uds, setUds] = useState(bultoMode ? 0 : sugeridoCantidad);
 
   // Guard: no pisar state local mientras el usuario edita
   const [isEditing, setIsEditing] = useState(false);
@@ -259,8 +258,10 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
         if (rotura) setUds(sugeridoCantidad % factorPack);
       }
     } else {
-      if (esFiambre && inputEnPiezas) {
-        setUds(sugeridoUnidad === "PIEZA" ? sugeridoCantidad : kgToPiezas(sugeridoCantidad, pesoRefKg));
+      // Fiambre fijo: sugeridoCantidad ya está en PIEZAS.
+      // En modo piezas se muestra directo; en modo kg se muestra la equivalencia.
+      if (esFiambre && ventaDepositoPieza && !inputEnPiezas) {
+        setUds(piezasToKg(sugeridoCantidad, pesoRefKg));
       } else {
         setUds(sugeridoCantidad);
       }
@@ -309,8 +310,10 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
     setUds(nu);
     if (bultoMode && rotura) {
       emitirDebounced(bultos * factorPack + nu, "UNIDAD");
-    } else if (esFiambre && inputEnPiezas) {
-      emitirDebounced(nu, "PIEZA");
+    } else if (esFiambre && ventaDepositoPieza) {
+      // Depósito opera en PIEZAS. Si el input está en kg, convertir a piezas antes de emitir.
+      const piezas = inputEnPiezas ? nu : (pesoRefKg > 0 ? kgToPiezas(nu, pesoRefKg) : nu);
+      emitirDebounced(piezas, "PIEZA");
     } else {
       emitirDebounced(nu, "UNIDAD");
     }
@@ -442,20 +445,22 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
             {esFiambre && !bultoMode && (
               <span className="sunmi-text-muted">
                 {inputEnPiezas
-                  ? `= ${(sugeridoCantidad || 0).toFixed(2)} kg`
-                  : `= ${kgToPiezas(sugeridoCantidad, pesoRefKg)} pzs`}
+                  ? `= ${(Number(uds || 0) * pesoRefKg).toFixed(2)} kg`
+                  : `≈ ${kgToPiezas(Number(uds || 0), pesoRefKg)} pzs`}
               </span>
             )}
             {esFiambre && ventaDepositoPieza && !bultoMode && (
               <button
                 type="button"
                 onClick={() => {
+                  // Solo cambia la UNIDAD DE VISUALIZACIÓN. El valor persistido sigue en
+                  // piezas (no se re-emite). sugeridoCantidad ya está en piezas.
                   if (!inputEnPiezas) {
                     setInputEnPiezas(true);
-                    onEditSugerido(p.productoLocalDestinoId, kgToPiezas(sugeridoCantidad, pesoRefKg), "PIEZA");
+                    setUds(sugeridoCantidad);
                   } else {
                     setInputEnPiezas(false);
-                    onEditSugerido(p.productoLocalDestinoId, (uds * pesoRefKg), "UNIDAD");
+                    setUds(piezasToKg(sugeridoCantidad, pesoRefKg));
                   }
                 }}
                 className={`px-2 py-0.5 rounded text-[10px] font-semibold transition ${inputEnPiezas ? "sunmi-btn sunmi-btn-primary" : "sunmi-control"}`}

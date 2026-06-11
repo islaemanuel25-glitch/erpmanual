@@ -5,6 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
+import { esFiambreFijo } from "@/lib/conversiones/stock";
 
 export async function POST(req, { params }) {
   try {
@@ -43,6 +44,7 @@ export async function POST(req, { params }) {
                     id: true,
                     factor_pack: true,
                     modoCompraProveedor: true,
+                    modoVentaDeposito: true,
                     unidad_medida: true,
                     pesoReferenciaKg: true,
                     pesoEsFijo: true,
@@ -181,7 +183,11 @@ export async function POST(req, { params }) {
             kgReales = cantRecibida * pesoRef;
           }
 
-          incremento = kgReales;
+          // Stock operativo del depósito:
+          // - Fiambre fijo (entra por pieza/barra, peso fijo): se cuenta en PIEZAS.
+          //   Recibir 10 piezas suma +10 (NO +60). Los kg son solo equivalencia.
+          // - Fiambre variable (por peso): se cuenta en kg (kgReales).
+          incremento = esFiambreFijo(base) ? cantRecibida : kgReales;
 
           // Actualizar pesoPromedioKg si está habilitado
           if (base.actualizaPromedioPorRecepcion && cantRecibida > 0 && kgReales > 0) {

@@ -478,8 +478,9 @@ export async function POST(req) {
 
         let cantidadParaStock;
         if (vendePorPieza) {
-          // PIEZA fiambre: cantidad en piezas → kg para stock.
-          cantidadParaStock = Math.round(Number(item.cantidad) * baseStock.pesoReferenciaKg * 1000) / 1000;
+          // PIEZA fiambre fijo: el stock operativo del depósito está en PIEZAS.
+          // Se descuenta la cantidad en piezas tal cual (sin multiplicar por pesoReferenciaKg).
+          cantidadParaStock = Number(item.cantidad);
         } else if (esDeposito && factorPackItem > 1) {
           // Depósito con pack. El factorPack y el stock se validan SIEMPRE contra DB
           // (factorPackItem viene de baseStockMap, no del cliente).
