@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-06-10 20:33
+**Última actualización:** 2026-06-10 21:06
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -78,4 +78,5 @@ stockUnidades = stockBultos * factor_pack
 ```
 
 ## Cambios recientes
+- 2026-06-10: fix(fiambre): stock operativo del deposito en PIEZAS para fiambre fijo por pieza
 - 2026-06-10: fix(fiambre): mostrar piezas reales en depósito y topar carrito por piezas

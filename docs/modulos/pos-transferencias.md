@@ -1,5 +1,7 @@
 # Modulo: POS Transferencias
 
+**Última actualización:** 2026-06-10 21:06
+
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
 - APIs: `app/api/pos-transferencias/`
@@ -93,3 +95,6 @@ model PosTransferenciaDetalle {
 5. Enviar → crea Transferencia formal con estado "Enviada"
 6. POS se elimina despues del envio
 ```
+
+## Cambios recientes
+- 2026-06-10: fix(fiambre): stock operativo del deposito en PIEZAS para fiambre fijo por pieza
