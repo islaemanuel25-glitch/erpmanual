@@ -465,16 +465,38 @@ export default function NuevaCompraProveedorPage() {
     }
   };
 
-  // Guardar pendiente: deja el pedido guardado (PENDIENTE) y vuelve a Inicio.
-  // Después se encuentra desde Compras → Pedidos pendientes.
+  // Tras guardar/enviar, el usuario arma pedidos uno atrás de otro: dejamos la
+  // pantalla Nuevo pedido lista y vacía. Reseteamos el estado del pedido actual
+  // y limpiamos los params de la URL (sale de modo "continuar" sin recargar:
+  // los effects guardan con !esContinuar / !proveedorId, así que no repueblan).
+  const resetParaNuevoPedido = useCallback(() => {
+    setProveedorId("");
+    setProveedorNombre("");
+    setNotas("");
+    setProductos([]);
+    setSearch("");
+    setAvisoSinDeposito([]);
+    setVincularOpen(false);
+    setPostVinculoMsg("");
+    justLinkedRef.current = null;
+    setItems([]);
+    setSoloFaltantes(true);
+    setModalEnvioOpen(false);
+    setPedidoEnvio(null);
+    setBorradorExistente(null);
+    router.replace("/modulos/compras-proveedor/nueva");
+  }, [router]);
+
+  // Guardar pendiente: deja el pedido guardado (PENDIENTE) y vuelve a Nuevo pedido
+  // listo para cargar otro. Después el pendiente se encuentra desde Compras → Pendientes.
   const guardarPendiente = async () => {
     if (!window.confirm("¿Guardar el pedido como pendiente?")) return;
     if (esContinuar) {
-      router.push("/modulos/inicio");
+      resetParaNuevoPedido();
       return;
     }
     const item = await crearBorrador();
-    if (item) router.push("/modulos/inicio");
+    if (item) resetParaNuevoPedido();
   };
 
   // Enviar pedido: asegura que exista (crea si es nuevo), trae el pedido completo
@@ -1088,7 +1110,7 @@ export default function NuevaCompraProveedorPage() {
         <ModalEnviarPedido
           pedido={pedidoEnvio}
           onClose={() => setModalEnvioOpen(false)}
-          onEnviado={() => router.push("/modulos/compras-proveedor/pendientes")}
+          onEnviado={() => resetParaNuevoPedido()}
         />
       )}
     </div>
