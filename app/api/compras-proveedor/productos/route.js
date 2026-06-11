@@ -58,10 +58,24 @@ export async function GET(req) {
     });
     const baseIdsVinculados = [...new Set(vinculos.map((v) => v.productoBaseId))];
 
-    // Match exacto por código interno del proveedor (case-insensitive).
-    const searchNorm = search.toLowerCase();
-    const matchCodigo = search
-      ? vinculos.filter((v) => String(v.codigoInterno).toLowerCase() === searchNorm)
+    // Match por código interno del proveedor.
+    // Se normaliza a SOLO dígitos (quita espacios, guiones y no-numéricos) para
+    // tolerar formatos del proveedor (ej. "10-023456" vs "10023456").
+    // Exacto o por SUFIJO: algunos proveedores informan el código sin el prefijo
+    // que tenemos cargado (ej. ERP "10023456", proveedor manda "23456"). El sufijo
+    // se permite solo con query >= 4 dígitos para evitar falsos positivos (ej. "56").
+    // Acotado a los vínculos del proveedor seleccionado → no afecta otros proveedores.
+    const normalizeCodigoInterno = (value) =>
+      String(value || "").trim().toLowerCase().replace(/\D/g, "");
+    const query = normalizeCodigoInterno(search);
+    const matchCodigo = query
+      ? vinculos.filter((v) => {
+          const code = normalizeCodigoInterno(v.codigoInterno);
+          return (
+            !!code &&
+            (code === query || (query.length >= 4 && code.endsWith(query)))
+          );
+        })
       : [];
     const baseIdsMatchCodigo = [...new Set(matchCodigo.map((v) => v.productoBaseId))];
 

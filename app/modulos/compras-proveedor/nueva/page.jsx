@@ -1088,7 +1088,7 @@ export default function NuevaCompraProveedorPage() {
         <ModalEnviarPedido
           pedido={pedidoEnvio}
           onClose={() => setModalEnvioOpen(false)}
-          onEnviado={() => router.push("/modulos/compras-proveedor/recepcion")}
+          onEnviado={() => router.push("/modulos/compras-proveedor/pendientes")}
         />
       )}
     </div>
