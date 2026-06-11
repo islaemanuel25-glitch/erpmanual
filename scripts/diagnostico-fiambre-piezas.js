@@ -110,10 +110,24 @@ async function main() {
       if (!st) continue;
       const stock = Number(st.cantidad || 0);
       const posiblePiezasSiKg = r2(stock / pesoRef);
+      const esEntero = Math.abs(stock - Math.round(stock)) < 1e-6;
       const multiploExacto = pesoRef > 0 && Math.abs(stock % pesoRef) < 1e-6;
-      // Heurística "sospechoso de estar en kg": el valor es múltiplo exacto del
-      // peso de referencia y/o es mayor de lo razonable para piezas.
-      const probableEnKg = stock > 0 && (multiploExacto || stock >= pesoRef);
+
+      // Clasificación (sin excluir negativos):
+      //  - pesoRef <= 1     → kg == piezas, no hay conversión.
+      //  - stock == 0       → nada que convertir.
+      //  - NO entero        → está en KG (las piezas son enteras) → DIVIDIR.
+      //  - entero múltiplo de pesoRef (|stock| >= pesoRef) → PROBABLE KG → DIVIDIR.
+      //  - entero chico (|stock| < pesoRef) → PROBABLE YA EN PIEZAS → revisar.
+      //  - resto            → AMBIGUO → revisar manual.
+      let clase;
+      if (Math.abs(pesoRef - 1) < 1e-9 || stock === 0) clase = "SIN_CAMBIO";
+      else if (!esEntero) clase = "EN_KG";
+      else if (multiploExacto && Math.abs(stock) >= pesoRef) clase = "PROBABLE_KG";
+      else if (Math.abs(stock) < pesoRef) clase = "PROBABLE_PIEZAS";
+      else clase = "AMBIGUO";
+
+      const migrar = clase === "EN_KG" || clase === "PROBABLE_KG";
 
       filas.push({
         baseId: b.id,
@@ -121,13 +135,13 @@ async function main() {
         deposito: depNombre.get(pl.localId) || pl.localId,
         stockActual: stock,
         pesoRef,
-        kgEquivSiYaEsPiezas: r2(stock * pesoRef),
-        piezasSiEstaEnKg: posiblePiezasSiKg,
-        multiploExacto: multiploExacto ? "sí" : "no",
-        sospechosoEnKg: probableEnKg ? "⚠️ kg?" : "ok",
+        siEsPiezas_kg: r2(stock * pesoRef),
+        siEsKg_piezas: posiblePiezasSiKg,
+        clase,
+        accion: migrar ? "→ dividir" : "(revisar)",
       });
 
-      if (probableEnKg) {
+      if (migrar) {
         planMigracion.push({
           stockLocalProductoId: pl.id,
           localId: pl.localId,
@@ -153,11 +167,12 @@ async function main() {
   console.table(filas);
 
   console.log("");
-  console.log(`Filas sospechosas de estar en kg (candidatas a migrar): ${planMigracion.length}`);
+  console.log(`Filas a convertir (clase EN_KG / PROBABLE_KG): ${planMigracion.length}`);
+  console.log("Las clases PROBABLE_PIEZAS / AMBIGUO NO se migran: revisá el stock físico real.");
 
   if (!MIGRAR) {
     console.log("");
-    console.log("➡️  Revisá la columna 'sospechosoEnKg'. Para ver el plan de conversión:");
+    console.log("➡️  Revisá la columna 'clase'. Para ver el plan de conversión (EN_KG/PROBABLE_KG):");
     console.log("    node scripts/diagnostico-fiambre-piezas.js --migrar");
     return;
   }
