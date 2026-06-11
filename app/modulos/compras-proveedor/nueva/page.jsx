@@ -88,8 +88,11 @@ export default function NuevaCompraProveedorPage() {
   const [vincularOpen, setVincularOpen] = useState(false);
   const [postVinculoMsg, setPostVinculoMsg] = useState("");
   const justLinkedRef = useRef(null);
+  // Proveedor para el que ya se sembraron los sugeridos (evita re-sembrar y que
+  // un sugerido quitado vuelva solo en la misma sesión).
+  const autofillRef = useRef(null);
 
-  // Items del pedido (SOLO los agregados con el botón Agregar).
+  // Items del pedido (sugeridos precargados + los agregados manualmente).
   const [items, setItems] = useState([]);
   // Cantidad de borrador por fila NO agregada (productoLocalId → valor). Default = sugerido.
   const [draftCant, setDraftCant] = useState({});
@@ -268,9 +271,32 @@ export default function NuevaCompraProveedorPage() {
         setProductos(data.items || []);
         setAvisoSinDeposito(data.codigosSinDeposito || []);
 
-        // NOTA: ya no se auto-agrega el pedido. Las cantidades sugeridas se
-        // muestran como BORRADOR editable en cada fila; el producto entra al
-        // pedido recién al tocar "Agregar".
+        // Sugeridos por stock bajo/faltante = ítems PRECARGADOS del pedido (no
+        // borradores). Se siembran UNA vez por proveedor; si el usuario quita un
+        // sugerido, no vuelve solo (ref guard). Reset/Nuevo recalcula desde cero.
+        // Los productos NO sugeridos siguen requiriendo "Agregar" (modelo borrador).
+        if (!esContinuar && !search && autofillRef.current !== String(proveedorId)) {
+          autofillRef.current = String(proveedorId);
+          const sembrado = (data.items || [])
+            .filter((pr) => pr.sugerido > 0)
+            .map((pr) => ({
+              productoLocalId: pr.productoLocalId,
+              nombre: pr.nombre,
+              sku: pr.sku,
+              codigo_barra: pr.codigo_barra,
+              codigoInterno: pr.codigoInterno || null,
+              modoCompra: pr.modoCompra || "BULTO",
+              unidadPedido: pr.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO",
+              unidad_medida: pr.unidad_medida,
+              cantidad: pr.sugerido,
+              precioCosto: Number(pr.precio_costo || 0),
+              factorPack: Number(pr.factor_pack) || 1,
+              sugerido: pr.sugerido,
+              sinParametros: pr.sinParametros,
+              pesoRefKg: pr.pesoRefKg,
+            }));
+          setItems(sembrado);
+        }
 
         // Mensaje específico tras vincular al vuelo (Etapa 5)
         if (justLinkedRef.current && justLinkedRef.current === search) {
@@ -631,6 +657,7 @@ export default function NuevaCompraProveedorPage() {
     setVincularOpen(false);
     setPostVinculoMsg("");
     justLinkedRef.current = null;
+    autofillRef.current = null;
     setItems([]);
     setDraftCant({});
     setVista("sugeridos");
@@ -699,6 +726,49 @@ export default function NuevaCompraProveedorPage() {
     factor_pack: prod.factor_pack ?? item?.factorPack,
     pesoReferenciaKg: prod.pesoRefKg ?? item?.pesoRefKg,
   });
+
+  // Variables computadas de una fila (compartidas por la tabla desktop y las
+  // cards mobile). enPedido = item cargado; activa = item o borrador en preparación.
+  const rowVars = (p) => {
+    const item = itemsMap.get(p.productoLocalId);
+    const enPedido = !!item;
+    const base = baseDe(p, item);
+    const esFiambre = naturalezaLinea(base) === "FIAMBRE";
+    const puedeToggle = permiteToggleUnidad(base) && !esContinuar;
+    const factor = Math.max(1, Number(p.factor_pack ?? item?.factorPack) || 1);
+    const d = enPedido ? null : getDraft(p);
+    const cantidadVal = enPedido ? item.cantidad : d.cant;
+    const cantNum = Number(cantidadVal) || 0;
+    const enPreparacion = !enPedido && cantNum > 0;
+    const activa = enPedido || enPreparacion;
+    const costoActual = enPedido ? item.precioCosto : d.costo;
+    const unidadActual = enPedido ? item.unidadPedido : d.unidad;
+    const r = activa ? subtotalLinea({ base, cantidad: cantNum, costo: costoActual }) : null;
+    const pesoRef = Number(p.pesoRefKg ?? item?.pesoRefKg) || 0;
+    const codigo = p.codigo_barra || p.sku || "—";
+    const disp = unidadDisplay(base, unidadActual);
+    const bultoNombre =
+      base.unidad_medida === "cajon" || base.unidad_medida === "caja"
+        ? "Caja"
+        : base.unidad_medida === "carton"
+        ? "Cartón"
+        : base.unidad_medida === "pack"
+        ? "Pack"
+        : "Bulto";
+    const unidadLabel =
+      disp === "BULTO" ? bultoNombre : disp === "PIEZA / por kg" ? "Pieza" : disp;
+    const costoUnidad =
+      esFiambre || base.unidad_medida === "kg"
+        ? "kg"
+        : disp === "BULTO"
+        ? bultoNombre.toLowerCase()
+        : "u";
+    return {
+      item, enPedido, base, esFiambre, puedeToggle, factor, d, cantidadVal,
+      cantNum, enPreparacion, activa, costoActual, unidadActual, r, pesoRef,
+      codigo, disp, bultoNombre, unidadLabel, costoUnidad,
+    };
+  };
 
   // Total y cantidad de ítems del pedido (barra inferior).
   const total = useMemo(
@@ -984,8 +1054,8 @@ export default function NuevaCompraProveedorPage() {
               </div>
             </div>
 
-            {/* Presets de vista + selector de columnas + tamaño de página */}
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            {/* Presets + columnas + page-size: SOLO desktop. */}
+            <div className="hidden md:flex flex-wrap items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-1">
                 <span className="text-[10px] sunmi-text-muted mr-0.5">Vista:</span>
                 {[
@@ -1070,7 +1140,8 @@ export default function NuevaCompraProveedorPage() {
               />
             )}
 
-            {/* Una sola tabla editable, densidad estilo módulo Productos. */}
+            {/* Tabla densa estilo Productos — SOLO desktop (oculta en mobile). */}
+            <div className="hidden md:block">
             <SunmiTable
               stickyHeader
               maxHeightClass="max-h-[56dvh]"
@@ -1095,45 +1166,12 @@ export default function NuevaCompraProveedorPage() {
                 </tr>
               ) : (
                 pageRows.map((p) => {
-                  const item = itemsMap.get(p.productoLocalId);
-                  const enPedido = !!item;
-                  const base = baseDe(p, item);
-                  const esFiambre = naturalezaLinea(base) === "FIAMBRE";
-                  const puedeToggle = permiteToggleUnidad(base) && !esContinuar;
-                  const factor = Math.max(1, Number(p.factor_pack ?? item?.factorPack) || 1);
-                  // Borrador (solo si no está agregado): { cant, costo, unidad }.
-                  const d = enPedido ? null : getDraft(p);
-                  const cantidadVal = enPedido ? item.cantidad : d.cant;
-                  const cantNum = Number(cantidadVal) || 0;
-                  // "En preparación": no agregado pero con cantidad > 0 → edición habilitada.
-                  const enPreparacion = !enPedido && cantNum > 0;
-                  const activa = enPedido || enPreparacion;
-                  const costoActual = enPedido ? item.precioCosto : d.costo;
-                  const unidadActual = enPedido ? item.unidadPedido : d.unidad;
-                  const r = activa
-                    ? subtotalLinea({ base, cantidad: cantNum, costo: costoActual })
-                    : null;
-                  const pesoRef = Number(p.pesoRefKg ?? item?.pesoRefKg) || 0;
-                  const codigo = p.codigo_barra || p.sku || "—";
-
-                  // "Unidad" usa la unidad de pedido (item o borrador), no la naturaleza.
-                  const disp = unidadDisplay(base, unidadActual);
-                  const bultoNombre =
-                    base.unidad_medida === "cajon" || base.unidad_medida === "caja"
-                      ? "Caja"
-                      : base.unidad_medida === "carton"
-                      ? "Cartón"
-                      : base.unidad_medida === "pack"
-                      ? "Pack"
-                      : "Bulto";
-                  const unidadLabel =
-                    disp === "BULTO" ? bultoNombre : disp === "PIEZA / por kg" ? "Pieza" : disp;
-                  const costoUnidad =
-                    esFiambre || base.unidad_medida === "kg"
-                      ? "kg"
-                      : disp === "BULTO"
-                      ? bultoNombre.toLowerCase()
-                      : "u";
+                  const {
+                    item, enPedido, base, esFiambre, puedeToggle, factor, d,
+                    cantidadVal, cantNum, enPreparacion, activa, costoActual,
+                    unidadActual, r, pesoRef, codigo, disp, bultoNombre,
+                    unidadLabel, costoUnidad,
+                  } = rowVars(p);
 
                   return (
                     <SunmiTableRow key={p.productoLocalId} selected={enPedido}>
@@ -1371,6 +1409,171 @@ export default function NuevaCompraProveedorPage() {
                 })
               )}
             </SunmiTable>
+            </div>
+
+            {/* Cards — SOLO mobile (la tabla desktop no entra en pantalla chica). */}
+            <div className="md:hidden rounded border sunmi-border divide-y sunmi-divider">
+              {loadingProds && productos.length === 0 ? (
+                <div className="px-3 py-6 text-center text-xs sunmi-text-muted">Buscando...</div>
+              ) : listaRender.length === 0 ? (
+                <div className="px-3 py-6 text-center text-xs sunmi-text-muted">
+                  {vista === "cargados"
+                    ? "No hay productos cargados."
+                    : vista === "sugeridos"
+                    ? "Sin sugeridos. Cambiá a “Todos”."
+                    : "Sin productos."}
+                </div>
+              ) : (
+                pageRows.map((p) => {
+                  const {
+                    item, enPedido, esFiambre, puedeToggle, factor, d,
+                    cantidadVal, enPreparacion, activa, r, codigo,
+                    unidadLabel, costoUnidad,
+                  } = rowVars(p);
+                  return (
+                    <div
+                      key={p.productoLocalId}
+                      className={`p-2 ${enPedido ? "bg-[var(--table-row-hover)]" : ""}`}
+                    >
+                      {/* Línea 1: nombre + badges + acción */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap leading-tight">
+                            <span className="text-[13px] sunmi-text-strong">{p.nombre}</span>
+                            {esFiambre && (
+                              <span className="px-1 py-0.5 text-[9px] font-bold uppercase rounded bg-red-600 text-white leading-none">
+                                Fiambre
+                              </span>
+                            )}
+                            {p.bajoMin && (
+                              <span className="px-1 py-0.5 text-[9px] font-bold uppercase rounded bg-amber-500 text-black leading-none">
+                                Bajo min
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] sunmi-text-muted mt-0.5">
+                            {codigo !== "—" ? `${codigo} · ` : ""}
+                            {!p.sinParametros && p.faltante > 0
+                              ? `Faltan ${esFiambre ? Number(p.faltante).toFixed(1) : p.faltante} · `
+                              : ""}
+                            {!p.sinParametros && p.sugerido > 0 ? `Sug. ${p.sugerido} · ` : ""}
+                            {unidadLabel}
+                            {factor > 1 ? ` ×${factor}` : ""}
+                          </div>
+                        </div>
+                        {enPedido ? (
+                          <button
+                            type="button"
+                            onClick={() => quitarItem(p.productoLocalId)}
+                            aria-label="Quitar del pedido"
+                            className="shrink-0 w-[30px] h-[30px] inline-flex items-center justify-center rounded-md sunmi-btn-red"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => agregarDesdeFila(p)}
+                            disabled={!enPreparacion}
+                            aria-label="Agregar al pedido"
+                            className="shrink-0 w-[30px] h-[30px] inline-flex items-center justify-center rounded-md sunmi-btn-secondary disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Línea 2: cantidad + unidad + costo + subtotal */}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              enPedido
+                                ? fijarCantidadItem(p, (Number(item.cantidad) || 1) - 1)
+                                : stepDraftCant(p, -1)
+                            }
+                            className="w-[28px] h-[28px] flex items-center justify-center rounded sunmi-control text-[16px] leading-none"
+                          >
+                            −
+                          </button>
+                          <SunmiInput
+                            type="text"
+                            inputMode="numeric"
+                            value={cantidadVal}
+                            placeholder="0"
+                            onChange={(e) =>
+                              enPedido
+                                ? updateItemCantidad(p.productoLocalId, e.target.value)
+                                : setDraftField(p, "cant", e.target.value.replace(/[^\d]/g, ""))
+                            }
+                            onBlur={enPedido ? () => handleBlurCantidad(p.productoLocalId) : undefined}
+                            className="w-[48px] !py-1 text-center text-[13px] tabular-nums"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              enPedido
+                                ? fijarCantidadItem(p, (Number(item.cantidad) || 0) + 1)
+                                : stepDraftCant(p, 1)
+                            }
+                            className="w-[28px] h-[28px] flex items-center justify-center rounded sunmi-control text-[16px] leading-none"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {puedeToggle && (
+                          <button
+                            type="button"
+                            onClick={() => (enPedido ? toggleUnidadFila(p) : toggleUnidadDraft(p))}
+                            disabled={!activa}
+                            className={`px-2 py-1 rounded text-[11px] font-semibold ${
+                              activa ? "sunmi-control" : "sunmi-text-muted opacity-60"
+                            }`}
+                          >
+                            {unidadLabel}
+                          </button>
+                        )}
+
+                        <div className="flex items-center gap-0.5">
+                          <span className="text-[10px] sunmi-text-muted">{costoUnidad}$</span>
+                          <SunmiInput
+                            type="text"
+                            inputMode="decimal"
+                            value={
+                              enPedido
+                                ? item.precioCosto
+                                : enPreparacion
+                                ? d.costo
+                                : Number(d.costo) > 0
+                                ? Number(d.costo).toFixed(2)
+                                : ""
+                            }
+                            disabled={!activa}
+                            onChange={
+                              !activa
+                                ? undefined
+                                : enPedido
+                                ? (e) => updateItemCosto(p.productoLocalId, e.target.value)
+                                : (e) => setDraftField(p, "costo", e.target.value.replace(",", "."))
+                            }
+                            onBlur={enPedido ? () => handleBlurCosto(p.productoLocalId) : undefined}
+                            className="w-[84px] !py-1 text-right tabular-nums text-[13px]"
+                          />
+                        </div>
+
+                        {activa && r && (
+                          <span className="ml-auto text-[13px] font-semibold tabular-nums">
+                            {r.subtotal != null ? `$${r.subtotal.toFixed(2)}` : "⚠"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
             {/* Paginación del listado (Mostrar 25/50/100). */}
             {listaRender.length > pageSize && (
@@ -1400,24 +1603,30 @@ export default function NuevaCompraProveedorPage() {
 
       {/* Barra inferior fija: resumen + acciones del pedido */}
       <div className="sticky bottom-0 z-40 -mx-4 -mb-24 mt-3 border-t sunmi-divider sunmi-surface px-4 py-1.5 shadow-[0_-4px_12px_rgba(0,0,0,0.18)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-4 text-[13px]">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-[13px]">
             <span className="sunmi-text-strong">
               <b>{items.length}</b> {items.length === 1 ? "ítem" : "ítems"}
             </span>
+            <span className="sunmi-text-muted">·</span>
             <span className="sunmi-text-strong">
-              Total: <b className="sunmi-text-accent">${total.toFixed(2)}</b>
+              Total <b className="sunmi-text-accent tabular-nums">${total.toFixed(2)}</b>
             </span>
           </div>
-          <div className="flex flex-wrap gap-2 justify-end">
-            <SunmiButton color="slate" onClick={() => router.push("/modulos/inicio")}>
+          <div className="flex gap-2 justify-end">
+            {/* Cancelar secundario: oculto en mobile (el back/arriba ya permite salir). */}
+            <SunmiButton
+              color="slate"
+              className="hidden sm:inline-flex"
+              onClick={() => router.push("/modulos/inicio")}
+            >
               Cancelar
             </SunmiButton>
             <SunmiButton color="cyan" disabled={sinProveedorBtns} onClick={guardarPendiente}>
-              {saving ? "Guardando..." : "Guardar pendiente"}
+              {saving ? "Guardando..." : "Guardar"}
             </SunmiButton>
             <SunmiButton color="amber" disabled={sinProveedorBtns} onClick={enviarPedido}>
-              Enviar pedido
+              Enviar
             </SunmiButton>
           </div>
         </div>
