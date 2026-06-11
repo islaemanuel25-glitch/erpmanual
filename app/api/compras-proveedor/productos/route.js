@@ -58,6 +58,15 @@ export async function GET(req) {
     });
     const baseIdsVinculados = [...new Set(vinculos.map((v) => v.productoBaseId))];
 
+    // Código interno del proveedor por base (el primero si hubiera más de uno).
+    // Solo para mostrar como columna; no afecta la búsqueda ni la resolución.
+    const codigoInternoPorBase = new Map();
+    for (const v of vinculos) {
+      if (!codigoInternoPorBase.has(v.productoBaseId)) {
+        codigoInternoPorBase.set(v.productoBaseId, v.codigoInterno);
+      }
+    }
+
     // Match por código interno del proveedor.
     // Se normaliza a SOLO dígitos (quita espacios, guiones y no-numéricos) para
     // tolerar formatos del proveedor (ej. "10-023456" vs "10023456").
@@ -141,7 +150,9 @@ export async function GET(req) {
         },
       },
       orderBy: { base: { nombre: "asc" } },
-      take: 100,
+      // Rediseño Nuevo pedido: el catálogo se arma en una sola pantalla, así que
+      // hay que poder mostrar pedidos grandes (100-300 productos) sin paginar.
+      take: 1000,
     });
 
     const items = productosLocal.map((pl) => {
@@ -194,6 +205,7 @@ export async function GET(req) {
         sku: pl.base.sku,
         codigo_barra: pl.base.codigo_barra,
         codigo_barra_secundario: pl.base.codigo_barra_secundario || null,
+        codigoInterno: codigoInternoPorBase.get(pl.base.id) || null,
         unidad_medida: pl.base.unidad_medida,
         factor_pack: factorPack,
         modoCompra,

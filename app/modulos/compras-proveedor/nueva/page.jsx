@@ -9,34 +9,53 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
+import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
-import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiPill from "@/components/sunmi/SunmiPill";
-import { Search } from "lucide-react";
+import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
+import ColumnManager from "@/components/productos/ColumnManager";
+import { Search, Trash2, Plus } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCodigo";
 import ModalEnviarPedido from "@/components/compras-proveedor/ModalEnviarPedido";
-import { subtotalLinea, unidadDisplay, naturalezaLinea } from "@/lib/compras-proveedor/calculoPedido";
+import {
+  subtotalLinea,
+  unidadDisplay,
+  naturalezaLinea,
+  permiteToggleUnidad,
+} from "@/lib/compras-proveedor/calculoPedido";
 import {
   recibeHoy,
   formatDiaLabel,
   diaActualEnum,
 } from "@/lib/proveedores/diasPedido";
 
-// Columnas opcionales de "Agregar productos" (Nombre y acción + siempre visibles).
-const COLUMNAS_AGREGAR = [
-  { key: "sku", label: "SKU" },
-  { key: "actual", label: "Actual" },
-  { key: "min", label: "Min" },
-  { key: "max", label: "Max" },
-  { key: "faltante", label: "Faltante" },
-  { key: "sugerido", label: "Sugerido" },
-  { key: "costo", label: "Costo" },
+// Definición de columnas del listado (estilo módulo Productos). `locked` = no ocultable.
+const COLUMNAS = [
+  { key: "producto", label: "Producto", th: "min-w-[200px]", td: "align-top", locked: true },
+  { key: "codigo", label: "Código", th: "w-[116px]", td: "" },
+  { key: "codInterno", label: "Cód. interno", th: "w-[108px]", td: "" },
+  { key: "unidad", label: "Unidad", th: "w-[100px]", td: "" },
+  { key: "pack", label: "Pack", th: "w-[48px] text-center", td: "text-center" },
+  { key: "faltan", label: "Faltan", th: "w-[66px] text-right", td: "text-right" },
+  { key: "sugerido", label: "Sug.", th: "w-[58px] text-right", td: "text-right" },
+  { key: "cantidad", label: "Cantidad", th: "w-[104px] text-center", td: "", locked: true },
+  { key: "costo", label: "Costo", th: "w-[144px] text-right", td: "", locked: true },
+  { key: "subtotal", label: "Subtotal", th: "w-[120px] text-right", td: "text-right tabular-nums" },
+  { key: "accion", label: "Acc.", th: "w-[44px] text-right", td: "text-right", locked: true },
 ];
+const COLS_OPCIONALES = COLUMNAS.filter((c) => !c.locked).map((c) => c.key);
+const COLS_LOCKED = COLUMNAS.filter((c) => c.locked).map((c) => c.key);
+const PRESETS_VISTA = {
+  compacta: ["subtotal"],
+  rapida: ["unidad", "pack"],
+  completa: [...COLS_OPCIONALES],
+};
+const COLS_DEFAULT = ["codigo", "unidad", "pack", "subtotal"];
 
 export default function NuevaCompraProveedorPage() {
   const router = useRouter();
@@ -70,16 +89,42 @@ export default function NuevaCompraProveedorPage() {
   const [postVinculoMsg, setPostVinculoMsg] = useState("");
   const justLinkedRef = useRef(null);
 
-  // Items del pedido
+  // Items del pedido (SOLO los agregados con el botón Agregar).
   const [items, setItems] = useState([]);
-  const [soloFaltantes, setSoloFaltantes] = useState(true);
+  // Cantidad de borrador por fila NO agregada (productoLocalId → valor). Default = sugerido.
+  const [draftCant, setDraftCant] = useState({});
+  // Vista del listado: "sugeridos" (sugerencia>0), "todos", "cargados" (cantidad>0).
+  // Arranca en "sugeridos": el pedido aparece prácticamente armado al abrir el proveedor.
+  const [vista, setVista] = useState("sugeridos");
 
-  // Columnas visibles en "Agregar productos" (solo UI, no persiste).
-  const [colsVisibles, setColsVisibles] = useState({
-    sku: true, actual: true, min: true, max: true,
-    faltante: true, sugerido: true, costo: true,
-  });
-  const [colsMenuOpen, setColsMenuOpen] = useState(false);
+  // Columnas opcionales visibles + tamaño de página (estilo módulo Productos).
+  const [visibleCols, setVisibleCols] = useState(COLS_DEFAULT);
+  const [pageSize, setPageSize] = useState(25);
+  const [pageNum, setPageNum] = useState(1);
+
+  // Cargar preferencias persistidas (cliente).
+  useEffect(() => {
+    try {
+      const c = JSON.parse(localStorage.getItem("comprasNuevaCols") || "null");
+      if (Array.isArray(c)) {
+        setVisibleCols(c.filter((k) => COLS_OPCIONALES.includes(k)));
+      }
+      const ps = Number(localStorage.getItem("comprasNuevaPageSize"));
+      if ([25, 50, 100].includes(ps)) setPageSize(ps);
+    } catch {
+      // sin preferencias guardadas → defaults
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("comprasNuevaCols", JSON.stringify(visibleCols));
+    } catch {}
+  }, [visibleCols]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("comprasNuevaPageSize", String(pageSize));
+    } catch {}
+  }, [pageSize]);
 
   // Modal de envío (Enviar pedido).
   const [modalEnvioOpen, setModalEnvioOpen] = useState(false);
@@ -150,6 +195,9 @@ export default function NuevaCompraProveedorPage() {
             nombre: base.nombre || "",
             sku: base.sku || "",
             modoCompra,
+            // Unidad de pedido de la línea (separada de la naturaleza del producto).
+            unidadPedido: d.unidad || (modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO"),
+            unidad_medida: base.unidad_medida,
             cantidad: Number(d.cantidad) || 1,
             precioCosto: Number(d.precioCosto) || 0,
             factorPack,
@@ -173,6 +221,7 @@ export default function NuevaCompraProveedorPage() {
   // En modo continuar no aplica: ya estamos editando ese borrador.
   useEffect(() => {
     setBorradorExistente(null); // reset en cada cambio de proveedor
+    setDraftCant({}); // limpiar borradores de cantidad al cambiar de proveedor
     if (esContinuar) return;
     if (!proveedorId) return;
 
@@ -219,6 +268,10 @@ export default function NuevaCompraProveedorPage() {
         setProductos(data.items || []);
         setAvisoSinDeposito(data.codigosSinDeposito || []);
 
+        // NOTA: ya no se auto-agrega el pedido. Las cantidades sugeridas se
+        // muestran como BORRADOR editable en cada fila; el producto entra al
+        // pedido recién al tocar "Agregar".
+
         // Mensaje específico tras vincular al vuelo (Etapa 5)
         if (justLinkedRef.current && justLinkedRef.current === search) {
           const sinDep = (data.codigosSinDeposito || []).some(
@@ -235,28 +288,41 @@ export default function NuevaCompraProveedorPage() {
     } finally {
       setLoadingProds(false);
     }
-  }, [proveedorId, search]);
+  }, [proveedorId, search, esContinuar]);
 
   useEffect(() => {
     const timer = setTimeout(cargarProductos, 300);
     return () => clearTimeout(timer);
   }, [cargarProductos]);
 
-  // Agregar producto al pedido
+  // ── Carga de un producto al pedido ─────────────────────────────────────
   // modoCompra es la ÚNICA fuente de verdad: "BULTO" (depósito) o "UNIDAD" (fiambre)
   // En modo continuar, persiste inmediatamente vía /agregar-item.
-  const agregarItem = async (prod) => {
+  // cantidadParam / costoParam / unidadParam: valores ya editados en el borrador
+  // de la fila (rediseño inline). Si no vienen, usa los del producto.
+  const agregarItem = async (prod, cantidadParam, costoParam, unidadParam) => {
     if (items.find((i) => i.productoLocalId === prod.productoLocalId)) return;
 
-    const cantidadInicial = prod.sugerido > 0 ? prod.sugerido : 1;
+    const cantidadInicial =
+      cantidadParam != null
+        ? Math.max(1, Math.floor(Number(cantidadParam) || 1))
+        : prod.sugerido > 0
+        ? prod.sugerido
+        : 1;
+    const costoInicial =
+      costoParam != null ? Number(costoParam) || 0 : Number(prod.precio_costo || 0);
+    const unidadInicial =
+      unidadParam || (prod.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO");
     const nuevoItemBase = {
       productoLocalId: prod.productoLocalId,
       nombre: prod.nombre,
       sku: prod.sku,
       modoCompra: prod.modoCompra || "BULTO",
+      // Unidad de pedido de la línea (separada de la naturaleza del producto).
+      unidadPedido: unidadInicial,
       unidad_medida: prod.unidad_medida,
       cantidad: cantidadInicial,
-      precioCosto: Number(prod.precio_costo || 0),
+      precioCosto: costoInicial,
       factorPack: Number(prod.factor_pack) || 1,
       sugerido: prod.sugerido,
       sinParametros: prod.sinParametros,
@@ -274,8 +340,8 @@ export default function NuevaCompraProveedorPage() {
             body: JSON.stringify({
               productoLocalId: prod.productoLocalId,
               cantidad: cantidadInicial,
-              precioCosto: prod.precio_costo || null,
-              unidad: prod.modoCompra || "BULTO",
+              precioCosto: costoInicial > 0 ? costoInicial : null,
+              unidad: unidadInicial,
             }),
           }
         );
@@ -284,14 +350,14 @@ export default function NuevaCompraProveedorPage() {
           alert(data.error || "No se pudo agregar el producto al borrador");
           return;
         }
-        setItems((prev) => [{ ...nuevoItemBase, detalleId: data.detalle.id }, ...prev]);
+        setItems((prev) => [...prev, { ...nuevoItemBase, detalleId: data.detalle.id }]);
       } catch {
         alert("Error de conexión al agregar el producto");
       }
       return;
     }
 
-    setItems((prev) => [nuevoItemBase, ...prev]);
+    setItems((prev) => [...prev, nuevoItemBase]);
   };
 
   const quitarItem = async (productoLocalId) => {
@@ -367,6 +433,92 @@ export default function NuevaCompraProveedorPage() {
     }
   };
 
+  // Persiste una cantidad concreta de un detalle (modo continuar). No lee state,
+  // recibe el valor explícito para evitar closures stale en steppers.
+  const persistirCantidad = async (detalleId, cantidad) => {
+    if (!esContinuar || !detalleId) return;
+    try {
+      const res = await fetch(
+        `/api/compras-proveedor/editar-item/${pedidoIdParam}`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ detalleId, cantidad }),
+        }
+      );
+      const data = await res.json();
+      if (!data.ok) alert(data.error || "No se pudo guardar la cantidad");
+    } catch {
+      alert("Error de conexión al guardar la cantidad");
+    }
+  };
+
+  // Stepper de un item YA agregado: clampa a >= 1. La baja del pedido es SOLO
+  // por el botón Quitar (no por poner cantidad en 0).
+  const fijarCantidadItem = async (prod, nuevoValor) => {
+    const item = items.find((i) => i.productoLocalId === prod.productoLocalId);
+    if (!item) return;
+    const v = Math.max(1, Math.floor(Number(nuevoValor) || 1));
+    setItems((prev) =>
+      prev.map((i) =>
+        i.productoLocalId === prod.productoLocalId ? { ...i, cantidad: v } : i
+      )
+    );
+    await persistirCantidad(item.detalleId, v);
+  };
+
+  // ── Borrador de una fila NO agregada: { cant, costo, unidad } ───────────
+  // Apenas cant > 0 la fila queda "en preparación": se puede editar costo y
+  // unidad acá mismo. Editar el borrador NO agrega el producto al pedido.
+  const unidadDefault = (prod) => (prod.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO");
+  const getDraft = (prod) => {
+    const d = draftCant[prod.productoLocalId] || {};
+    return {
+      cant: d.cant !== undefined ? d.cant : prod.sugerido > 0 ? prod.sugerido : "",
+      costo: d.costo !== undefined ? d.costo : Number(prod.precio_costo || 0),
+      unidad: d.unidad !== undefined ? d.unidad : unidadDefault(prod),
+    };
+  };
+  const setDraftField = (prod, field, value) =>
+    setDraftCant((prev) => ({
+      ...prev,
+      [prod.productoLocalId]: { ...prev[prod.productoLocalId], [field]: value },
+    }));
+  const stepDraftCant = (prod, delta) => {
+    const cur = Number(getDraft(prod).cant) || 0;
+    setDraftField(prod, "cant", Math.max(0, cur + delta));
+  };
+  // Toggle Bulto/Unidad en el borrador (reexpresa el costo por factor, como el item).
+  const toggleUnidadDraft = (prod) => {
+    const d = getDraft(prod);
+    const f = Math.max(1, Number(prod.factor_pack) || 1);
+    const nueva = d.unidad === "UNIDAD" ? "BULTO" : "UNIDAD";
+    let costo = Number(d.costo) || 0;
+    if (f > 1) costo = nueva === "UNIDAD" ? costo / f : costo * f;
+    setDraftCant((prev) => ({
+      ...prev,
+      [prod.productoLocalId]: {
+        ...prev[prod.productoLocalId],
+        unidad: nueva,
+        costo: Math.round(costo * 100) / 100,
+      },
+    }));
+  };
+
+  // Agregar al pedido con los valores editados del borrador (requiere cant > 0).
+  const agregarDesdeFila = (prod) => {
+    const d = getDraft(prod);
+    const q = Math.floor(Number(d.cant) || 0);
+    if (q < 1) return;
+    agregarItem(prod, q, d.costo, d.unidad);
+    setDraftCant((prev) => {
+      const next = { ...prev };
+      delete next[prod.productoLocalId];
+      return next;
+    });
+  };
+
   // Editar costo de línea (en modo continuar persiste vía editar-item).
   const updateItemCosto = (productoLocalId, rawValue) => {
     const raw = String(rawValue).replace(",", ".");
@@ -409,18 +561,18 @@ export default function NuevaCompraProveedorPage() {
     }
   };
 
-  // Editar el costo POR UNIDAD (productos PACK): persiste precioCosto por bulto = unidad × factor_pack.
-  // Mantiene la convención del detalle (precioCosto en la unidad de la línea, que para PACK es BULTO).
-  const updateItemCostoUnidad = (productoLocalId, rawValue) => {
-    const raw = String(rawValue).replace(",", ".");
+  // Alternar la UNIDAD DE PEDIDO (Bulto ↔ Unidad) de una línea PACK. NO toca
+  // `modoCompra` (la naturaleza del producto), así no se confunde con fiambre.
+  // El costo se reexpresa por factor para mantener el dinero coherente.
+  const toggleUnidadFila = (prod) => {
     setItems((prev) =>
       prev.map((i) => {
-        if (i.productoLocalId !== productoLocalId) return i;
-        if (raw === "") return { ...i, precioCosto: "" };
-        const u = Number(raw);
-        if (!Number.isFinite(u)) return i;
+        if (i.productoLocalId !== prod.productoLocalId) return i;
         const f = Math.max(1, Number(i.factorPack) || 1);
-        return { ...i, precioCosto: f > 1 ? u * f : u };
+        const nuevaUnidad = i.unidadPedido === "UNIDAD" ? "BULTO" : "UNIDAD";
+        let costo = Number(i.precioCosto) || 0;
+        if (f > 1) costo = nuevaUnidad === "UNIDAD" ? costo / f : costo * f;
+        return { ...i, unidadPedido: nuevaUnidad, precioCosto: Math.round(costo * 100) / 100 };
       })
     );
   };
@@ -451,7 +603,7 @@ export default function NuevaCompraProveedorPage() {
           items: items.map((i) => ({
             productoLocalId: i.productoLocalId,
             cantidad: i.cantidad,
-            unidad: i.modoCompra || "BULTO",
+            unidad: i.unidadPedido || i.modoCompra || "BULTO",
             precioCosto: Number(i.precioCosto) || null,
           })),
         }),
@@ -480,7 +632,8 @@ export default function NuevaCompraProveedorPage() {
     setPostVinculoMsg("");
     justLinkedRef.current = null;
     setItems([]);
-    setSoloFaltantes(true);
+    setDraftCant({});
+    setVista("sugeridos");
     setModalEnvioOpen(false);
     setPedidoEnvio(null);
     setBorradorExistente(null);
@@ -524,6 +677,143 @@ export default function NuevaCompraProveedorPage() {
     }
   };
 
+  // ── Derivados de render ────────────────────────────────────────────────
+  // Map de items por productoLocalId para enlazar cada fila del catálogo.
+  const itemsMap = useMemo(() => {
+    const m = new Map();
+    for (const i of items) m.set(i.productoLocalId, i);
+    return m;
+  }, [items]);
+
+  // Orden de AGREGADO (índice en items). Para ordenar los cargados.
+  const itemOrder = useMemo(() => {
+    const m = new Map();
+    items.forEach((i, idx) => m.set(i.productoLocalId, idx));
+    return m;
+  }, [items]);
+
+  // Base "lógica" para cálculos (naturaleza/unidad/subtotal) desde catálogo + item.
+  const baseDe = (prod, item) => ({
+    modoCompraProveedor: (item?.modoCompra ?? prod.modoCompra) || "BULTO",
+    unidad_medida: prod.unidad_medida,
+    factor_pack: prod.factor_pack ?? item?.factorPack,
+    pesoReferenciaKg: prod.pesoRefKg ?? item?.pesoRefKg,
+  });
+
+  // Total y cantidad de ítems del pedido (barra inferior).
+  const total = useMemo(
+    () =>
+      items.reduce((acc, i) => {
+        const r = subtotalLinea({
+          base: {
+            modoCompraProveedor: i.modoCompra,
+            unidad_medida: i.unidad_medida,
+            factor_pack: i.factorPack,
+            pesoReferenciaKg: i.pesoRefKg,
+          },
+          cantidad: i.cantidad,
+          costo: i.precioCosto,
+        });
+        return acc + (r.subtotal || 0);
+      }, 0),
+    [items]
+  );
+
+  // ¿Hay búsqueda activa? Con búsqueda, el buscador MANDA.
+  const buscando = search.trim().length > 0;
+
+  // Orden por URGENCIA: mayor faltante primero, luego mayor sugerido, luego nombre.
+  const ordenarUrgencia = (a, b) => {
+    const fa = a.faltante || 0;
+    const fb = b.faltante || 0;
+    if (fb !== fa) return fb - fa;
+    const sa = a.sugerido || 0;
+    const sb = b.sugerido || 0;
+    if (sb !== sa) return sb - sa;
+    return String(a.nombre || "").localeCompare(String(b.nombre || ""));
+  };
+
+  // Lista a renderizar.
+  const listaRender = useMemo(() => {
+    // Con búsqueda activa: SOLO los productos que matchean (la API ya filtró por
+    // search). No se agregan huérfanos ni se fuerzan los cargados arriba.
+    if (buscando) {
+      return [...productos].sort(ordenarUrgencia);
+    }
+
+    // Sin búsqueda: catálogo + items "huérfanos" (cargados fuera del catálogo
+    // visible, p. ej. en continuar), aplicando el filtro de vista.
+    const enCatalogo = new Set(productos.map((p) => p.productoLocalId));
+    const huerfanos = items
+      .filter((i) => !enCatalogo.has(i.productoLocalId))
+      .map((i) => ({
+        productoLocalId: i.productoLocalId,
+        nombre: i.nombre,
+        sku: i.sku,
+        codigo_barra: i.codigo_barra || null,
+        codigoInterno: i.codigoInterno || null,
+        modoCompra: i.modoCompra,
+        unidad_medida: i.unidad_medida,
+        factor_pack: i.factorPack,
+        precio_costo: i.precioCosto,
+        pesoRefKg: i.pesoRefKg,
+        sugerido: 0,
+        faltante: 0,
+        sinParametros: true,
+        bajoMin: false,
+        stockActual: null,
+        stockMin: null,
+        stockMax: null,
+      }));
+
+    let lista = [...huerfanos, ...productos];
+
+    if (vista === "sugeridos") {
+      lista = lista.filter((p) => p.sugerido > 0 || itemsMap.has(p.productoLocalId));
+    } else if (vista === "cargados") {
+      // Filtro REAL del array (no CSS): solo cantidad > 0 → quedan compactos.
+      lista = lista.filter((p) => itemsMap.has(p.productoLocalId));
+    }
+
+    // Orden sin búsqueda: 1) cargados (por orden de agregado), 2) sugeridos/
+    // faltantes, 3) resto.
+    const cargado = (p) => itemsMap.has(p.productoLocalId);
+    const tier = (p) => (cargado(p) ? 2 : p.sugerido > 0 || p.faltante > 0 ? 1 : 0);
+    return lista.sort((a, b) => {
+      const t = tier(b) - tier(a);
+      if (t !== 0) return t;
+      if (cargado(a) && cargado(b)) {
+        return (
+          (itemOrder.get(a.productoLocalId) ?? 0) -
+          (itemOrder.get(b.productoLocalId) ?? 0)
+        );
+      }
+      return ordenarUrgencia(a, b);
+    });
+  }, [productos, items, vista, itemsMap, itemOrder, buscando]);
+
+  // Columnas a renderizar (locked + opcionales visibles), en orden.
+  const colsVisibles = useMemo(
+    () => COLUMNAS.filter((c) => c.locked || visibleCols.includes(c.key)),
+    [visibleCols]
+  );
+
+  // Paginación cliente del listado (Mostrar 25/50/100).
+  const totalPages = Math.max(1, Math.ceil(listaRender.length / pageSize));
+  const pageEff = Math.min(pageNum, totalPages);
+  const pageRows = useMemo(
+    () => listaRender.slice((pageEff - 1) * pageSize, pageEff * pageSize),
+    [listaRender, pageEff, pageSize]
+  );
+
+  // Resetear a la primera página cuando cambia el conjunto/orden.
+  useEffect(() => {
+    setPageNum(1);
+  }, [search, vista, proveedorId, pageSize]);
+
+  // Aplicar un preset de vista (cambia qué columnas opcionales se ven).
+  const aplicarPreset = (preset) => setVisibleCols([...(PRESETS_VISTA[preset] || [])]);
+
   if (!perfil || loadingCtx) return null;
   if (needsContexto) {
     router.push("/inicio");
@@ -534,8 +824,10 @@ export default function NuevaCompraProveedorPage() {
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("compras.crear")) return <SinPermisos />;
 
+  const sinProveedorBtns = saving || items.length === 0 || !proveedorId;
+
   return (
-    <div className="sunmi-bg w-full min-h-full p-4">
+    <div className="sunmi-bg w-full min-h-full p-4 pb-24">
       <SunmiCard>
         <div className="flex items-center justify-between mb-4">
           <SunmiHeader
@@ -596,49 +888,33 @@ export default function NuevaCompraProveedorPage() {
           </div>
         </SunmiPanel>
 
-        {/* Aviso: ya hay BORRADOR pendiente para este proveedor */}
+        {/* Aviso compacto: ya hay BORRADOR pendiente para este proveedor */}
         {borradorExistente && (
           <div
-            className="rounded-2xl border p-3 mb-4"
+            className="rounded-lg border px-3 py-2 mb-3 flex items-center justify-between gap-3 flex-wrap"
             style={{ borderColor: "var(--pos-warning, #f59e0b)" }}
           >
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <div
-                  className="text-[13px] font-semibold mb-1"
-                  style={{ color: "var(--pos-warning, #f59e0b)" }}
-                >
-                  Ya hay un pedido en curso para este proveedor.
-                </div>
-                <div className="text-[12px] sunmi-text-muted">
-                  Pedido #{borradorExistente.id} ·{" "}
-                  {borradorExistente.cantItems}{" "}
-                  {borradorExistente.cantItems === 1 ? "ítem" : "ítems"} · creado el{" "}
-                  {new Date(borradorExistente.createdAt).toLocaleDateString("es-AR", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <SunmiButton
-                  color="cyan"
-                  onClick={() =>
-                    router.push(`/modulos/compras-proveedor/nueva?pedidoId=${borradorExistente.id}`)
-                  }
-                >
-                  Continuar pedido
-                </SunmiButton>
-                <SunmiButton
-                  color="slate"
-                  onClick={() => setBorradorExistente(null)}
-                >
-                  Crear pedido nuevo
-                </SunmiButton>
-              </div>
+            <div className="text-[12px] min-w-0">
+              <span className="font-semibold" style={{ color: "var(--pos-warning, #f59e0b)" }}>
+                Ya hay un pedido en curso
+              </span>
+              <span className="sunmi-text-muted">
+                {" "}· #{borradorExistente.id} · {borradorExistente.cantItems}{" "}
+                {borradorExistente.cantItems === 1 ? "ítem" : "ítems"}
+              </span>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <SunmiButton
+                color="cyan"
+                onClick={() =>
+                  router.push(`/modulos/compras-proveedor/nueva?pedidoId=${borradorExistente.id}`)
+                }
+              >
+                Continuar
+              </SunmiButton>
+              <SunmiButton color="slate" onClick={() => setBorradorExistente(null)}>
+                Nuevo
+              </SunmiButton>
             </div>
           </div>
         )}
@@ -667,20 +943,14 @@ export default function NuevaCompraProveedorPage() {
           </div>
         )}
 
-        {/* Buscador de productos */}
+        {/* Lista única: el pedido se arma desde acá (cantidad > 0 = en el pedido). */}
         {proveedorId && (
           <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
-              <h3 className="text-[13px] font-semibold sunmi-text-strong">
-                Agregar productos
-              </h3>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 mb-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2 mb-2">
               <div className="relative flex-1">
                 <Search
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                  size={15}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-10"
                   style={{ color: "var(--pos-link)" }}
                 />
                 <SunmiInput
@@ -690,40 +960,59 @@ export default function NuevaCompraProveedorPage() {
                     setSearch(e.target.value);
                     setPostVinculoMsg("");
                   }}
-                  className="!pl-9 !border-2 pulse-neon"
+                  className="!pl-8 !py-1 !border-2 pulse-neon"
                   style={{ borderColor: "var(--pos-link)" }}
                 />
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-              <label className="flex items-center gap-1.5 text-xs sunmi-text-muted whitespace-nowrap cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={soloFaltantes}
-                  onChange={(e) => setSoloFaltantes(e.target.checked)}
-                  className="accent-[var(--pos-accent)]"
-                />
-                Solo faltantes
-              </label>
-              <div className="relative">
-                <SunmiButton color="slate" type="button" onClick={() => setColsMenuOpen((o) => !o)}>
-                  Columnas
-                </SunmiButton>
-                {colsMenuOpen && (
-                  <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border sunmi-border sunmi-surface shadow-lg p-1.5 flex flex-col gap-0.5">
-                    {COLUMNAS_AGREGAR.map((c) => (
-                      <button
-                        key={c.key}
-                        type="button"
-                        onClick={() => setColsVisibles((v) => ({ ...v, [c.key]: !v[c.key] }))}
-                        className={`flex items-center justify-between gap-2 px-2 py-1 rounded text-xs text-left hover:bg-[var(--table-row-hover)] ${colsVisibles[c.key] ? "sunmi-text-strong" : "sunmi-text-muted"}`}
-                      >
-                        <span>{c.label}</span>
-                        <span className="sunmi-text-accent">{colsVisibles[c.key] ? "✓" : ""}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="flex items-center gap-1 shrink-0">
+                {[
+                  ["sugeridos", "Sugeridos"],
+                  ["todos", "Todos"],
+                  ["cargados", "Cargados"],
+                ].map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setVista(v)}
+                    className={`px-2.5 py-1 rounded text-[11px] font-medium transition ${
+                      vista === v ? "sunmi-btn sunmi-btn-primary" : "sunmi-control"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
+            </div>
+
+            {/* Presets de vista + selector de columnas + tamaño de página */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] sunmi-text-muted mr-0.5">Vista:</span>
+                {[
+                  ["compacta", "Compacta"],
+                  ["rapida", "Carga rápida"],
+                  ["completa", "Completa"],
+                ].map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => aplicarPreset(k)}
+                    className="px-2 py-0.5 rounded text-[11px] font-medium sunmi-control"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <SunmiPageSizer value={pageSize} onChange={setPageSize} />
+                <ColumnManager
+                  allColumns={COLUMNAS.map((c) => ({ key: c.key, label: c.label }))}
+                  visibleKeys={[...COLS_LOCKED, ...visibleCols]}
+                  lockedKeys={COLS_LOCKED}
+                  onChange={(next) =>
+                    setVisibleCols(next.filter((k) => COLS_OPCIONALES.includes(k)))
+                  }
+                />
               </div>
             </div>
 
@@ -781,330 +1070,358 @@ export default function NuevaCompraProveedorPage() {
               />
             )}
 
-            {/* El contenedor scrollea; el thead queda fijo arriba (sticky). */}
-            <div className="max-h-80 overflow-auto rounded border sunmi-border">
-              <table className="w-full text-[12px] table-auto">
-                <thead className="sunmi-thead sticky top-0 z-10">
-                  <tr>
-                    <th className="px-2 py-1.5 text-left font-semibold whitespace-nowrap">Nombre</th>
-                    {COLUMNAS_AGREGAR.map((c) =>
-                      colsVisibles[c.key] ? (
-                        <th key={c.key} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap">{c.label}</th>
-                      ) : null
-                    )}
-                    <th className="px-2 py-1.5 text-left font-semibold whitespace-nowrap" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y sunmi-divide">
-                {loadingProds ? (
-                  <SunmiTableEmpty label="Buscando..." colSpan={2 + COLUMNAS_AGREGAR.filter((c) => colsVisibles[c.key]).length} />
-                ) : productos.length === 0 ? (
-                  <SunmiTableEmpty label="Sin productos" colSpan={2 + COLUMNAS_AGREGAR.filter((c) => colsVisibles[c.key]).length} />
-                ) : (
-                  (() => {
-                    const filtered = soloFaltantes
-                      ? productos.filter((p) => p.faltante > 0 || p.sinParametros)
-                      : productos;
-                    const sorted = [...filtered].sort((a, b) => b.faltante - a.faltante);
-                    if (sorted.length === 0) {
-                      return <SunmiTableEmpty label="Sin productos faltantes" colSpan={2 + COLUMNAS_AGREGAR.filter((c) => colsVisibles[c.key]).length} />;
-                    }
-                    return sorted.map((p) => {
-                      const yaAgregado = items.some(
-                        (i) => i.productoLocalId === p.productoLocalId
-                      );
-                      const esFiambre = p.modoCompra === "UNIDAD";
-                      const unidadSufijo = esFiambre ? "kg" : "";
-                      const rowClass = p.bajoMin ? "sunmi-state-danger-soft" : "";
-                      return (
-                        <SunmiTableRow key={p.productoLocalId} className={rowClass}>
-                          <td className="px-3 py-1.5 text-sm">
-                            {p.nombre}
-                            {esFiambre && (
-                              <span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>
-                            )}
-                            {p.bajoMin && (
-                              <span className="ml-2 text-[10px] sunmi-text-danger font-medium">BAJO MIN</span>
-                            )}
-                          </td>
-                          {colsVisibles.sku && (
-                            <td className="px-3 py-1.5 text-xs sunmi-text-muted">
-                              {p.sku || "-"}
-                            </td>
-                          )}
-                          {colsVisibles.actual && (
-                            <td className={`px-3 py-1.5 text-xs text-center ${p.bajoMin ? "sunmi-text-danger font-medium" : ""}`}>
-                              {p.stockActual}{unidadSufijo && <span className="text-[10px] sunmi-text-muted ml-0.5">{unidadSufijo}</span>}
-                            </td>
-                          )}
-                          {colsVisibles.min && (
-                            <td className="px-3 py-1.5 text-xs text-center">
-                              {p.stockMin != null ? <>{p.stockMin}{unidadSufijo && <span className="text-[10px] sunmi-text-muted ml-0.5">{unidadSufijo}</span>}</> : <span className="sunmi-text-muted">—</span>}
-                            </td>
-                          )}
-                          {colsVisibles.max && (
-                            <td className="px-3 py-1.5 text-xs text-center">
-                              {p.stockMax != null ? <>{p.stockMax}{unidadSufijo && <span className="text-[10px] sunmi-text-muted ml-0.5">{unidadSufijo}</span>}</> : <span className="sunmi-text-muted">—</span>}
-                            </td>
-                          )}
-                          {colsVisibles.faltante && (
-                            <td className="px-3 py-1.5 text-xs text-center">
-                              {p.sinParametros ? (
-                                <span className="sunmi-text-muted">—</span>
-                              ) : p.faltante > 0 ? (
-                                <span className="sunmi-text-danger">
-                                  {esFiambre ? Number(p.faltante).toFixed(1) : p.faltante}
-                                  {" "}<span className="text-[10px] sunmi-text-muted">{esFiambre ? "kg" : "bultos"}</span>
-                                </span>
-                              ) : (
-                                <span className="sunmi-text-success">0</span>
-                              )}
-                            </td>
-                          )}
-                          {colsVisibles.sugerido && (
-                            <td className="px-3 py-1.5 text-xs text-center">
-                              {p.sinParametros ? (
-                                <span className="sunmi-text-accent text-[10px]" title="Sin stockMin/stockMax configurados">
-                                  Sin min/max
-                                </span>
-                              ) : p.sugerido > 0 ? (
-                                <span className="sunmi-text-accent font-medium">
-                                  {p.sugerido} <span className="text-[10px] sunmi-text-muted">{esFiambre ? "uds" : "bultos"}</span>
-                                  {esFiambre && p.pesoRefKg > 0 && (
-                                    <span className="text-[10px] sunmi-text-muted ml-1">
-                                      (~{(p.sugerido * p.pesoRefKg).toFixed(1)}kg)
-                                    </span>
-                                  )}
-                                </span>
-                              ) : (
-                                <span className="sunmi-text-success">OK</span>
-                              )}
-                            </td>
-                          )}
-                          {colsVisibles.costo && (
-                            <td className="px-3 py-1.5 text-xs">
-                              ${Number(p.precio_costo || 0).toFixed(2)}
-                              {esFiambre && p.pesoRefKg > 0 && (
-                                <div className="text-[10px] sunmi-text-muted">~{p.pesoRefKg.toFixed(1)}kg/u{p.pesoEsFijo ? "" : " (var)"}</div>
-                              )}
-                            </td>
-                          )}
-                          <td className="px-3 py-1.5 text-right">
-                            <SunmiButton
-                              type="button"
-                              color={yaAgregado ? "slate" : "cyan"}
-                              disabled={yaAgregado}
-                              onClick={() => agregarItem(p)}
-                            >
-                              {yaAgregado ? "Agregado" : "+"}
-                            </SunmiButton>
-                          </td>
-                        </SunmiTableRow>
-                      );
-                    });
-                  })()
-                )}
-                </tbody>
-              </table>
-            </div>
-          </SunmiPanel>
-        )}
+            {/* Una sola tabla editable, densidad estilo módulo Productos. */}
+            <SunmiTable
+              stickyHeader
+              maxHeightClass="max-h-[56dvh]"
+              scrollId="nueva-compra-scroll"
+              headers={colsVisibles.map((c) => ({ label: c.label, className: c.th }))}
+            >
+              {loadingProds && productos.length === 0 ? (
+                <tr>
+                  <td colSpan={colsVisibles.length} className="px-3 py-6 text-center text-xs sunmi-text-muted">
+                    Buscando...
+                  </td>
+                </tr>
+              ) : listaRender.length === 0 ? (
+                <tr>
+                  <td colSpan={colsVisibles.length} className="px-3 py-6 text-center text-xs sunmi-text-muted">
+                    {vista === "cargados"
+                      ? "No hay productos cargados."
+                      : vista === "sugeridos"
+                      ? "Sin sugeridos. Cambiá a “Todos”."
+                      : "Sin productos."}
+                  </td>
+                </tr>
+              ) : (
+                pageRows.map((p) => {
+                  const item = itemsMap.get(p.productoLocalId);
+                  const enPedido = !!item;
+                  const base = baseDe(p, item);
+                  const esFiambre = naturalezaLinea(base) === "FIAMBRE";
+                  const puedeToggle = permiteToggleUnidad(base) && !esContinuar;
+                  const factor = Math.max(1, Number(p.factor_pack ?? item?.factorPack) || 1);
+                  // Borrador (solo si no está agregado): { cant, costo, unidad }.
+                  const d = enPedido ? null : getDraft(p);
+                  const cantidadVal = enPedido ? item.cantidad : d.cant;
+                  const cantNum = Number(cantidadVal) || 0;
+                  // "En preparación": no agregado pero con cantidad > 0 → edición habilitada.
+                  const enPreparacion = !enPedido && cantNum > 0;
+                  const activa = enPedido || enPreparacion;
+                  const costoActual = enPedido ? item.precioCosto : d.costo;
+                  const unidadActual = enPedido ? item.unidadPedido : d.unidad;
+                  const r = activa
+                    ? subtotalLinea({ base, cantidad: cantNum, costo: costoActual })
+                    : null;
+                  const pesoRef = Number(p.pesoRefKg ?? item?.pesoRefKg) || 0;
+                  const codigo = p.codigo_barra || p.sku || "—";
 
-        {/* Items del pedido */}
-        {items.length > 0 && (
-          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
-              <h3 className="text-[13px] font-semibold sunmi-text-strong">
-                Detalle del pedido ({items.length} items)
-              </h3>
-            </div>
+                  // "Unidad" usa la unidad de pedido (item o borrador), no la naturaleza.
+                  const disp = unidadDisplay(base, unidadActual);
+                  const bultoNombre =
+                    base.unidad_medida === "cajon" || base.unidad_medida === "caja"
+                      ? "Caja"
+                      : base.unidad_medida === "carton"
+                      ? "Cartón"
+                      : base.unidad_medida === "pack"
+                      ? "Pack"
+                      : "Bulto";
+                  const unidadLabel =
+                    disp === "BULTO" ? bultoNombre : disp === "PIEZA / por kg" ? "Pieza" : disp;
+                  const costoUnidad =
+                    esFiambre || base.unidad_medida === "kg"
+                      ? "kg"
+                      : disp === "BULTO"
+                      ? bultoNombre.toLowerCase()
+                      : "u";
 
-            {(() => {
-              const itemBase = (i) => ({
-                modoCompraProveedor: i.modoCompra,
-                unidad_medida: i.unidad_medida,
-                factor_pack: i.factorPack,
-                pesoReferenciaKg: i.pesoRefKg,
-              });
-              const calc = (i) =>
-                subtotalLinea({ base: itemBase(i), cantidad: i.cantidad, costo: i.precioCosto });
-              const total = items.reduce((acc, i) => acc + (calc(i).subtotal || 0), 0);
-
-              // Etiqueta de unidad: BULTO incluye el factor real ("BULTO x 6 uds").
-              const unidadLabel = (i) => {
-                const disp = unidadDisplay(itemBase(i), i.modoCompra);
-                const factor = Math.max(1, Number(i.factorPack) || 1);
-                return disp === "BULTO" && factor > 1 ? `BULTO x ${factor} uds` : disp;
-              };
-
-              // Producto PACK (factor > 1, no fiambre/kg) → costo editable por bulto Y por unidad.
-              const esPackItem = (i) => naturalezaLinea(itemBase(i)) === "PACK";
-
-              // Valor mostrado del input "por unidad" = precioCosto (por bulto) / factor_pack.
-              const costoUnitarioVal = (i) => {
-                if (i.precioCosto === "" || i.precioCosto == null) return "";
-                const c = Number(i.precioCosto);
-                if (!Number.isFinite(c)) return "";
-                const f = Math.max(1, Number(i.factorPack) || 1);
-                return Math.round((f > 1 ? c / f : c) * 100) / 100;
-              };
-
-              // Columnas del detalle: Producto | Cantidad | Unidad | Costo | Subtotal | Quitar.
-              // Suma de mínimos ~960px → entra en desktop sin scroll horizontal
-              // (en mobile el contenedor scrollea, como "Agregar productos").
-              const gridCols = {
-                gridTemplateColumns:
-                  "minmax(160px,1.2fr) 160px 110px minmax(320px,1.1fr) 110px 92px",
-              };
-
-              return (
-                <>
-                  {/* Detalle: grid de columnas fijas (compacto). En mobile scrollea horizontal. */}
-                  <div className="overflow-x-auto rounded border sunmi-border">
-                    <div className="min-w-[952px]">
-                      {/* Encabezado */}
-                      <div
-                        className="grid items-center gap-2 px-3 py-2 sunmi-thead text-[11px] font-semibold whitespace-nowrap"
-                        style={gridCols}
-                      >
-                        <div>Producto</div>
-                        <div className="text-center">Cantidad</div>
-                        <div>Unidad</div>
-                        <div>Costo</div>
-                        <div className="text-right">Subtotal</div>
-                        <div />
-                      </div>
-
-                      {/* Filas */}
-                      {items.map((item, index) => {
-                        const r = calc(item);
-                        const esFiambre = item.modoCompra === "UNIDAD";
-                        const esKgFiambre = esFiambre || item.unidad_medida === "kg";
-                        return (
-                          <div
-                            key={item.detalleId ? `d-${item.detalleId}` : `p-${item.productoLocalId}-${index}`}
-                            className="grid items-center gap-2 px-3 py-1.5 border-t sunmi-divider hover:bg-[var(--table-row-hover)]"
-                            style={gridCols}
+                  return (
+                    <SunmiTableRow key={p.productoLocalId} selected={enPedido}>
+                      {/* Producto */}
+                      <td className="px-2 py-1 align-top">
+                        <div className="flex items-center gap-1.5 leading-tight">
+                          <span
+                            className="text-[12px] sunmi-text-strong truncate max-w-[280px]"
+                            title={p.nombre}
                           >
-                            {/* Producto */}
-                            <div className="min-w-0">
-                              <div className="text-sm truncate" title={item.nombre}>{item.nombre}</div>
-                              {item.sku && <div className="text-[11px] sunmi-text-muted truncate">{item.sku}</div>}
+                            {p.nombre}
+                          </span>
+                          {esFiambre && (
+                            <span className="px-1 py-0.5 text-[9px] font-bold uppercase rounded bg-red-600 text-white leading-none">
+                              Fiambre
+                            </span>
+                          )}
+                          {p.bajoMin && (
+                            <span className="px-1 py-0.5 text-[9px] font-bold uppercase rounded bg-amber-500 text-black leading-none">
+                              Bajo min
+                            </span>
+                          )}
+                        </div>
+                        {!visibleCols.includes("faltan") &&
+                          !visibleCols.includes("sugerido") &&
+                          !p.sinParametros &&
+                          (p.faltante > 0 || p.sugerido > 0) && (
+                            <div className="text-[10px] sunmi-text-muted leading-tight">
+                              {p.faltante > 0
+                                ? `Faltan ${esFiambre ? Number(p.faltante).toFixed(1) : p.faltante}`
+                                : ""}
+                              {p.sugerido > 0
+                                ? `${p.faltante > 0 ? " · " : ""}Sug. ${p.sugerido}`
+                                : ""}
                             </div>
+                          )}
+                      </td>
 
-                            {/* Cantidad */}
-                            <div>
-                              <div className="flex items-center gap-1">
-                                <SunmiButton color="slate" type="button" onClick={() => updateItemCantidad(item.productoLocalId, String(Math.max(1, (Number(item.cantidad) || 1) - 1)))}>−</SunmiButton>
-                                <SunmiInput type="text" inputMode="numeric" value={item.cantidad}
-                                  onChange={(e) => updateItemCantidad(item.productoLocalId, e.target.value)}
-                                  onBlur={() => handleBlurCantidad(item.productoLocalId)}
-                                  className="w-[56px] text-center" />
-                                <SunmiButton color="slate" type="button" onClick={() => updateItemCantidad(item.productoLocalId, String((Number(item.cantidad) || 0) + 1))}>+</SunmiButton>
-                              </div>
-                              {esFiambre && Number(item.pesoRefKg) > 0 && (
-                                <div className="text-[10px] sunmi-text-muted mt-0.5">~{((Number(item.cantidad) || 0) * Number(item.pesoRefKg)).toFixed(1)} kg</div>
-                              )}
-                            </div>
+                      {/* Código */}
+                      {visibleCols.includes("codigo") && (
+                        <td
+                          className="px-2 py-1 text-[11px] sunmi-text-muted truncate"
+                          title={String(codigo)}
+                        >
+                          {codigo}
+                        </td>
+                      )}
 
-                            {/* Unidad */}
-                            <div className="text-xs sunmi-text-muted">{unidadLabel(item)}</div>
+                      {/* Cód. interno */}
+                      {visibleCols.includes("codInterno") && (
+                        <td
+                          className="px-2 py-1 text-[11px] sunmi-text-muted truncate"
+                          title={p.codigoInterno || ""}
+                        >
+                          {p.codigoInterno || "—"}
+                        </td>
+                      )}
 
-                            {/* Costo */}
-                            <div className="min-w-0">
-                              {esPackItem(item) ? (
-                                <div className="flex items-center gap-3 whitespace-nowrap">
-                                  <label className="flex items-center gap-1">
-                                    <span className="sunmi-text-muted text-[10px]">Unidad</span>
-                                    <span className="sunmi-text-muted text-xs">$</span>
-                                    <SunmiInput type="text" inputMode="decimal" value={costoUnitarioVal(item)}
-                                      onChange={(e) => updateItemCostoUnidad(item.productoLocalId, e.target.value)}
-                                      onBlur={() => handleBlurCosto(item.productoLocalId)}
-                                      className="w-[95px] text-center" />
-                                  </label>
-                                  <label className="flex items-center gap-1">
-                                    <span className="sunmi-text-muted text-[10px]">Bulto</span>
-                                    <span className="sunmi-text-muted text-xs">$</span>
-                                    <SunmiInput type="text" inputMode="decimal" value={item.precioCosto}
-                                      onChange={(e) => updateItemCosto(item.productoLocalId, e.target.value)}
-                                      onBlur={() => handleBlurCosto(item.productoLocalId)}
-                                      className="w-[95px] text-center" />
-                                  </label>
-                                </div>
-                              ) : (
-                                <label className="inline-flex items-center gap-1 whitespace-nowrap">
-                                  <span className="sunmi-text-muted text-[10px]">{esKgFiambre ? "kg" : "Unidad"}</span>
-                                  <span className="sunmi-text-muted text-xs">$</span>
-                                  <div className="w-[120px]">
-                                    <SunmiInput type="text" inputMode="decimal" value={item.precioCosto}
-                                      onChange={(e) => updateItemCosto(item.productoLocalId, e.target.value)}
-                                      onBlur={() => handleBlurCosto(item.productoLocalId)}
-                                      className="text-center" />
-                                  </div>
-                                </label>
-                              )}
-                            </div>
+                      {/* Unidad */}
+                      {visibleCols.includes("unidad") && (
+                      <td className="px-2 py-1">
+                        {puedeToggle ? (
+                          <button
+                            type="button"
+                            onClick={() => (enPedido ? toggleUnidadFila(p) : toggleUnidadDraft(p))}
+                            disabled={!activa}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                              activa ? "sunmi-control" : "sunmi-text-muted opacity-60 cursor-default"
+                            }`}
+                            title={activa ? "Cambiar Bulto / Unidad" : "Poné una cantidad para elegir la unidad"}
+                          >
+                            {unidadLabel}
+                          </button>
+                        ) : (
+                          <SunmiPill color="slate">{unidadLabel}</SunmiPill>
+                        )}
+                      </td>
+                      )}
 
-                            {/* Subtotal */}
-                            <div className="text-xs text-right font-medium">
-                              {r.subtotal != null ? `$${r.subtotal.toFixed(2)}` : (
-                                <span className="sunmi-text-accent" title={r.advertencia || ""}>⚠ {r.advertencia}</span>
-                              )}
-                            </div>
+                      {/* Pack */}
+                      {visibleCols.includes("pack") && (
+                        <td className="px-2 py-1 text-center text-[11px] sunmi-text-muted">
+                          {factor > 1 ? `×${factor}` : "—"}
+                        </td>
+                      )}
 
-                            {/* Quitar */}
-                            <div className="text-right">
-                              <SunmiButton color="red" type="button" onClick={() => quitarItem(item.productoLocalId)}>Quitar</SunmiButton>
-                            </div>
+                      {/* Faltan */}
+                      {visibleCols.includes("faltan") && (
+                        <td className="px-2 py-1 text-right text-[11px]">
+                          {p.sinParametros ? (
+                            <span className="sunmi-text-muted">—</span>
+                          ) : p.faltante > 0 ? (
+                            <span className="sunmi-text-danger">
+                              {esFiambre ? Number(p.faltante).toFixed(1) : p.faltante}
+                            </span>
+                          ) : (
+                            <span className="sunmi-text-success">0</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Sugerido */}
+                      {visibleCols.includes("sugerido") && (
+                        <td className="px-2 py-1 text-right text-[11px]">
+                          {p.sinParametros ? (
+                            <span className="sunmi-text-muted">—</span>
+                          ) : p.sugerido > 0 ? (
+                            <span className="sunmi-text-accent font-medium">{p.sugerido}</span>
+                          ) : (
+                            <span className="sunmi-text-success">OK</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Cantidad (borrador editable; no implica estar agregado) */}
+                      <td className="px-2 py-1">
+                        <div className="flex items-center justify-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              enPedido
+                                ? fijarCantidadItem(p, (Number(item.cantidad) || 1) - 1)
+                                : stepDraftCant(p, -1)
+                            }
+                            className="w-[22px] h-[22px] flex items-center justify-center rounded sunmi-control text-[14px] leading-none"
+                          >
+                            −
+                          </button>
+                          <SunmiInput
+                            type="text"
+                            inputMode="numeric"
+                            value={cantidadVal}
+                            placeholder="0"
+                            onChange={(e) =>
+                              enPedido
+                                ? updateItemCantidad(p.productoLocalId, e.target.value)
+                                : setDraftField(p, "cant", e.target.value.replace(/[^\d]/g, ""))
+                            }
+                            onBlur={enPedido ? () => handleBlurCantidad(p.productoLocalId) : undefined}
+                            className="w-[42px] !py-0.5 text-center text-[12px] tabular-nums"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              enPedido
+                                ? fijarCantidadItem(p, (Number(item.cantidad) || 0) + 1)
+                                : stepDraftCant(p, 1)
+                            }
+                            className="w-[22px] h-[22px] flex items-center justify-center rounded sunmi-control text-[14px] leading-none"
+                          >
+                            +
+                          </button>
+                        </div>
+                        {esFiambre && pesoRef > 0 && (Number(cantidadVal) || 0) > 0 && (
+                          <div className="text-[10px] sunmi-text-muted text-center mt-0.5">
+                            ~{((Number(cantidadVal) || 0) * pesoRef).toFixed(1)} kg
                           </div>
-                        );
-                      })}
+                        )}
+                      </td>
 
-                      {/* Total */}
-                      <div
-                        className="grid items-center gap-2 px-3 py-2 border-t sunmi-divider"
-                        style={gridCols}
-                      >
-                        <div />
-                        <div />
-                        <div />
-                        <div className="text-sm font-semibold text-right sunmi-text-strong">TOTAL ESTIMADO</div>
-                        <div className="text-sm font-bold text-right sunmi-text-accent">${total.toFixed(2)}</div>
-                        <div />
-                      </div>
-                    </div>
-                  </div>
+                      {/* Costo: mismo layout en todas las filas (prefijo + input). */}
+                      <td className="px-2 py-1">
+                        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+                          <span className="w-[40px] shrink-0 text-right text-[9px] leading-none sunmi-text-muted">
+                            {costoUnidad} $
+                          </span>
+                          <SunmiInput
+                            type="text"
+                            inputMode="decimal"
+                            value={
+                              enPedido
+                                ? item.precioCosto
+                                : enPreparacion
+                                ? d.costo
+                                : Number(d.costo) > 0
+                                ? Number(d.costo).toFixed(2)
+                                : ""
+                            }
+                            disabled={!activa}
+                            onChange={
+                              !activa
+                                ? undefined
+                                : enPedido
+                                ? (e) => updateItemCosto(p.productoLocalId, e.target.value)
+                                : (e) => setDraftField(p, "costo", e.target.value.replace(",", "."))
+                            }
+                            onBlur={enPedido ? () => handleBlurCosto(p.productoLocalId) : undefined}
+                            className="w-[84px] !py-0.5 text-right tabular-nums text-[12px]"
+                          />
+                        </div>
+                      </td>
 
-                </>
-              );
-            })()}
+                      {/* Subtotal */}
+                      {visibleCols.includes("subtotal") && (
+                        <td className="px-2 py-1 text-right text-[12px] font-medium tabular-nums">
+                          {!activa ? (
+                            <span className="sunmi-text-muted">—</span>
+                          ) : r.subtotal != null ? (
+                            `$${r.subtotal.toFixed(2)}`
+                          ) : (
+                            <span className="sunmi-text-accent" title={r.advertencia || ""}>
+                              ⚠
+                            </span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Acción: Agregar (no agregado) / Quitar (agregado) */}
+                      <td className="px-2 py-1 text-right">
+                        {enPedido ? (
+                          <button
+                            type="button"
+                            onClick={() => quitarItem(p.productoLocalId)}
+                            aria-label="Quitar del pedido"
+                            title="Quitar del pedido"
+                            className="w-[26px] h-[26px] inline-flex items-center justify-center rounded-md sunmi-btn-red transition"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => agregarDesdeFila(p)}
+                            disabled={!enPreparacion}
+                            aria-label="Agregar al pedido"
+                            title={enPreparacion ? "Agregar al pedido" : "Poné una cantidad para agregar"}
+                            className="w-[26px] h-[26px] inline-flex items-center justify-center rounded-md sunmi-btn-secondary transition disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <Plus size={15} />
+                          </button>
+                        )}
+                      </td>
+                    </SunmiTableRow>
+                  );
+                })
+              )}
+            </SunmiTable>
+
+            {/* Paginación del listado (Mostrar 25/50/100). */}
+            {listaRender.length > pageSize && (
+              <div className="flex items-center justify-center gap-2 mt-2 text-[11px]">
+                <SunmiButton
+                  color="slate"
+                  disabled={pageEff <= 1}
+                  onClick={() => setPageNum((n) => Math.max(1, n - 1))}
+                >
+                  « Ant.
+                </SunmiButton>
+                <span className="sunmi-text-muted whitespace-nowrap">
+                  Pág. {pageEff} / {totalPages} · {listaRender.length} prod.
+                </span>
+                <SunmiButton
+                  color="slate"
+                  disabled={pageEff >= totalPages}
+                  onClick={() => setPageNum((n) => Math.min(totalPages, n + 1))}
+                >
+                  Sig. »
+                </SunmiButton>
+              </div>
+            )}
           </SunmiPanel>
         )}
-
-        {/* Footer: Cancelar | Guardar pendiente | Enviar pedido */}
-        <div className="flex flex-wrap justify-end gap-3 mt-4">
-          <SunmiButton
-            color="slate"
-            onClick={() => router.push("/modulos/inicio")}
-          >
-            Cancelar
-          </SunmiButton>
-          <SunmiButton
-            color="cyan"
-            disabled={saving || items.length === 0 || !proveedorId}
-            onClick={guardarPendiente}
-          >
-            {saving ? "Guardando..." : "Guardar pendiente"}
-          </SunmiButton>
-          <SunmiButton
-            color="amber"
-            disabled={saving || items.length === 0 || !proveedorId}
-            onClick={enviarPedido}
-          >
-            Enviar pedido
-          </SunmiButton>
-        </div>
       </SunmiCard>
+
+      {/* Barra inferior fija: resumen + acciones del pedido */}
+      <div className="sticky bottom-0 z-40 -mx-4 -mb-24 mt-3 border-t sunmi-divider sunmi-surface px-4 py-1.5 shadow-[0_-4px_12px_rgba(0,0,0,0.18)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-4 text-[13px]">
+            <span className="sunmi-text-strong">
+              <b>{items.length}</b> {items.length === 1 ? "ítem" : "ítems"}
+            </span>
+            <span className="sunmi-text-strong">
+              Total: <b className="sunmi-text-accent">${total.toFixed(2)}</b>
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2 justify-end">
+            <SunmiButton color="slate" onClick={() => router.push("/modulos/inicio")}>
+              Cancelar
+            </SunmiButton>
+            <SunmiButton color="cyan" disabled={sinProveedorBtns} onClick={guardarPendiente}>
+              {saving ? "Guardando..." : "Guardar pendiente"}
+            </SunmiButton>
+            <SunmiButton color="amber" disabled={sinProveedorBtns} onClick={enviarPedido}>
+              Enviar pedido
+            </SunmiButton>
+          </div>
+        </div>
+      </div>
 
       {modalEnvioOpen && pedidoEnvio && (
         <ModalEnviarPedido
