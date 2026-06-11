@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-06-11] - Actualización: 
+
+### Modificado
+
+
 ## [2026-06-10] - Actualización: productos, pos-ventas
 
 ### Modificado
