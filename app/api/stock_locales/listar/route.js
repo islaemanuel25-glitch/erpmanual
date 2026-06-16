@@ -125,10 +125,22 @@ export async function GET(req) {
         baseClause = proveedorBaseFilter;
       }
 
+      // Pre-filtro de estado de stock EN BASE DE DATOS (solo rama local).
+      // Equivale a los filtros JS de más abajo, que se mantienen como autoridad
+      // final (la salida no cambia). Faltantes NO se mueve: sigue 100% en JS.
+      const estadoStockClauses = [];
+      if (conStock) estadoStockClauses.push({ stock: { some: { cantidad: { gt: 0 } } } });
+      if (sinStock)
+        estadoStockClauses.push({
+          OR: [{ stock: { none: {} } }, { stock: { some: { cantidad: 0 } } }],
+        });
+      if (negativo) estadoStockClauses.push({ stock: { some: { cantidad: { lt: 0 } } } });
+
       const rows = await prisma.productoLocal.findMany({
         where: {
           localId,
           activo: true,
+          ...(estadoStockClauses.length ? { AND: estadoStockClauses } : {}),
           base: {
             activo: true,
             categoria_id: categoria ? Number(categoria) : undefined,
