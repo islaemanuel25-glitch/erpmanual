@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-06-15 23:48
+**Última actualización:** 2026-06-16 10:16
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -78,6 +78,10 @@ stockUnidades = stockBultos * factor_pack
 ```
 
 ## Cambios recientes
+- 2026-06-16: perf: paginar stock deposito en base de datos
+- 2026-06-15: perf: paginar stock locales en base de datos
+- 2026-06-15: perf: filtrar estados de stock locales en base de datos
+- 2026-06-15: refactor: ordenar stock locales sin cambiar comportamiento
 - 2026-06-15: perf: paginar stock locales en base de datos
 - 2026-06-15: perf: filtrar estados de stock locales en base de datos
 - 2026-06-15: refactor: ordenar stock locales sin cambiar comportamiento

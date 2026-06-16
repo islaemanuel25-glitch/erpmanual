@@ -1,12 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-06-15 23:48
+**Fecha:** 2026-06-16 10:16
 
 ## Módulos modificados recientemente
 
 ### stock
-- perf: paginar stock locales en base de datos, perf: filtrar estados de stock locales en base de datos, refactor: ordenar stock locales sin cambiar comportamiento
+- perf: paginar stock deposito en base de datos, perf: paginar stock locales en base de datos, perf: filtrar estados de stock locales en base de datos
 - Archivos: 1 nuevos, 9 modificados (10 total)
+
+### productos
+- fix: asegurar productos del deposito al crear producto
+- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización

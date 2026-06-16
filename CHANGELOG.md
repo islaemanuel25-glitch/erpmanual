@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-06-16] - Actualización: stock, productos
+
+### Modificado
+- **stock**: perf: paginar stock deposito en base de datos
+- **stock**: perf: paginar stock locales en base de datos
+- **stock**: perf: filtrar estados de stock locales en base de datos
+- **stock**: refactor: ordenar stock locales sin cambiar comportamiento
+- **productos**: fix: asegurar productos del deposito al crear producto
+
+
 ## [2026-06-15] - Actualización: stock
 
 ### Modificado
