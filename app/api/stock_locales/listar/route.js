@@ -101,8 +101,6 @@ export async function GET(req) {
 
     const esDeposito = local.es_deposito === true;
 
-    let final = [];
-
     // ======================================================
     // 🟦 VISTA LOCAL → PRECIO UNITARIO + REDONDEO A 100
     // ======================================================
@@ -231,151 +229,130 @@ export async function GET(req) {
         });
       }
 
-      const bases = await prisma.productoBase.findMany({
-        where: {
-          grupoId: { in: grupoIds },
+      // ── Guard self-healing: materializar en BATCH los ProductoLocal de
+      // depósito faltantes (bases activas del grupo sin PL en el depósito) y su
+      // StockLocal. Reemplaza la auto-creación secuencial dentro del GET. Si no
+      // hay faltantes → CERO escrituras. Idempotente por @@unique + skipDuplicates.
+      const faltantesBases = await prisma.productoBase.findMany({
+        where: { grupoId: { in: grupoIds }, activo: true, locales: { none: { localId } } },
+        select: { id: true, precio_costo: true, precio_venta: true, margen: true, activo: true },
+      });
+      if (faltantesBases.length) {
+        await prisma.productoLocal.createMany({
+          data: faltantesBases.map((b) => ({
+            localId,
+            baseId: b.id,
+            precio_costo: b.precio_costo,
+            precio_venta: b.precio_venta,
+            margen: b.margen,
+            activo: b.activo,
+          })),
+          skipDuplicates: true,
+        });
+
+        const nuevos = await prisma.productoLocal.findMany({
+          where: { localId, baseId: { in: faltantesBases.map((b) => b.id) }, stock: { none: {} } },
+          select: { id: true },
+        });
+        if (nuevos.length) {
+          await prisma.stockLocal.createMany({
+            data: nuevos.map((pl) => ({ localId, productoId: pl.id, cantidad: 0, stockMin: 0, stockMax: 0 })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
+      // ── Depósito consulta ProductoLocal del depósito y pagina en DB igual que
+      // la rama LOCAL (mismo patrón de filtros), pero con precio de bulto
+      // (mapStockItemDeposito). Como el guard garantiza un PL por cada base activa
+      // del grupo, el universo es el mismo que antes (depósito ve todas las bases).
+      const provNumDep = proveedor ? Number(proveedor) : null;
+      const baseIdsCodigoDepo = await getBaseIdsCodigo({ in: grupoIds }, provNumDep, q);
+      const proveedorBaseFilterDepo = provNumDep ? { proveedor_id: provNumDep } : {};
+      let baseClauseDepo;
+      if (q) {
+        const proveedorYTextoDepo = { AND: [proveedorBaseFilterDepo, buildTextOR(q)] };
+        baseClauseDepo = baseIdsCodigoDepo.length
+          ? { OR: [proveedorYTextoDepo, { id: { in: baseIdsCodigoDepo } }] }
+          : proveedorYTextoDepo;
+      } else {
+        baseClauseDepo = proveedorBaseFilterDepo;
+      }
+
+      const estadoStockClausesDepo = [];
+      if (conStock) estadoStockClausesDepo.push({ stock: { some: { cantidad: { gt: 0 } } } });
+      if (sinStock)
+        estadoStockClausesDepo.push({
+          OR: [{ stock: { none: {} } }, { stock: { some: { cantidad: 0 } } }],
+        });
+      if (negativo) estadoStockClausesDepo.push({ stock: { some: { cantidad: { lt: 0 } } } });
+
+      const whereDepo = {
+        localId,
+        activo: true,
+        ...(estadoStockClausesDepo.length ? { AND: estadoStockClausesDepo } : {}),
+        base: {
           activo: true,
-          ...(q
-            ? {
-                OR: [
-                  { nombre: { contains: q, mode: "insensitive" } },
-                  { codigo_barra: { contains: q, mode: "insensitive" } },
-                  { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
-                ],
-              }
-            : {}),
           categoria_id: categoria ? Number(categoria) : undefined,
-          proveedor_id: proveedor ? Number(proveedor) : undefined,
           area_fisica_id: area ? Number(area) : undefined,
+          AND: [baseClauseDepo],
         },
-        orderBy: { id: "desc" },
-        include: {
-          locales: {
-            where: { localId, activo: true },
-            include: {
-              stock: true,
-              base: {
-                select: {
-                  unidad_medida: true,
-                  factor_pack: true,
-                  modoCompraProveedor: true,
-                  pesoReferenciaKg: true,
-                  pesoEsFijo: true,
-                  modoVentaDeposito: true,
-                },
-              },
-            },
+      };
+
+      const includeDepo = {
+        base: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo_barra: true,
+            categoria_id: true,
+            proveedor_id: true,
+            area_fisica_id: true,
+            unidad_medida: true,
+            factor_pack: true,
+            precio_costo: true,
+            precio_venta: true,
+            margen: true,
+            modoCompraProveedor: true,
+            pesoReferenciaKg: true,
+            pesoEsFijo: true,
+            modoVentaDeposito: true,
           },
         },
+        stock: { take: 1, select: { cantidad: true, stockMin: true, stockMax: true } },
+      };
+
+      const orderByDepo = { base: { nombre: "asc" } };
+
+      // Faltantes (cantidad < stockMin = 2 columnas) → hybrid JS, igual que LOCAL.
+      if (faltantes) {
+        const rows = await prisma.productoLocal.findMany({
+          where: whereDepo,
+          orderBy: orderByDepo,
+          include: includeDepo,
+        });
+        const mapped = rows
+          .map((p) => mapStockItemDeposito(p, p.base, p.stock?.[0], localId))
+          .filter((p) => p.faltante);
+        const total = mapped.length;
+        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        const items = mapped.slice(offset, offset + PAGE_SIZE);
+        return NextResponse.json({ ok: true, items, total, totalPages });
+      }
+
+      // Resto: filtros + orden + paginación + count 100% en DB.
+      const total = await prisma.productoLocal.count({ where: whereDepo });
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      const rows = await prisma.productoLocal.findMany({
+        where: whereDepo,
+        orderBy: orderByDepo,
+        skip: offset,
+        take: PAGE_SIZE,
+        include: includeDepo,
       });
-
-      final = [];
-
-      for (const b of bases) {
-        let pl = b.locales[0] || null;
-
-        if (!pl) {
-          pl = await prisma.productoLocal.create({
-            data: {
-              baseId: b.id,
-              localId,
-              precio_costo: b.precio_costo,
-              precio_venta: b.precio_venta,
-              margen: b.margen,
-              activo: b.activo,
-            },
-            include: {
-              stock: true,
-              base: { select: { unidad_medida: true, factor_pack: true, modoCompraProveedor: true, pesoReferenciaKg: true, modoVentaDeposito: true } },
-            },
-          });
-
-          await prisma.stockLocal.create({
-            data: {
-              localId,
-              productoId: pl.id,
-              cantidad: 0,
-              stockMin: 0,
-              stockMax: 0,
-            },
-          });
-        }
-
-        const stock = pl.stock?.[0] || {
-          cantidad: 0,
-          stockMin: 0,
-          stockMax: 0,
-        };
-
-        // `b` es la ProductoBase completa; pl.base (select acotado) referencia
-        // la misma base → mapStockItemDeposito(pl, b, ...) da el mismo resultado.
-        final.push(mapStockItemDeposito(pl, b, stock, localId));
-      }
-
-      // Opción C — código interno por proveedor en depósito.
-      // Suma bases vinculadas por código (proveedor + q) que YA tengan
-      // ProductoLocal en este depósito. NO auto-crea ProductoLocal por código:
-      // si no tiene ProductoLocal, no aparece y no se crea nada.
-      const provNumDep = proveedor ? Number(proveedor) : null;
-      if (q && provNumDep) {
-        const codigoBaseIds = await getBaseIdsCodigo({ in: grupoIds }, provNumDep, q);
-        const yaIncluidos = new Set(final.map((f) => f.baseId));
-        const faltantes = codigoBaseIds.filter((id) => !yaIncluidos.has(id));
-
-        if (faltantes.length) {
-          const extras = await prisma.productoLocal.findMany({
-            where: {
-              localId,
-              activo: true,
-              baseId: { in: faltantes },
-              base: { activo: true },
-            },
-            include: {
-              stock: true,
-              base: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  codigo_barra: true,
-                  categoria_id: true,
-                  proveedor_id: true,
-                  area_fisica_id: true,
-                  unidad_medida: true,
-                  factor_pack: true,
-                  precio_costo: true,
-                  precio_venta: true,
-                  margen: true,
-                  modoCompraProveedor: true,
-                  pesoReferenciaKg: true,
-                  pesoEsFijo: true,
-                  modoVentaDeposito: true,
-                },
-              },
-            },
-          });
-
-          for (const pl of extras) {
-            const b = pl.base;
-            const stock = pl.stock?.[0] || { cantidad: 0, stockMin: 0, stockMax: 0 };
-            final.push(mapStockItemDeposito(pl, b, stock, localId));
-          }
-        }
-      }
+      const items = rows.map((p) => mapStockItemDeposito(p, p.base, p.stock?.[0], localId));
+      return NextResponse.json({ ok: true, items, total, totalPages });
     }
-
-    if (conStock) final = final.filter((p) => p.stock > 0);
-    if (sinStock) final = final.filter((p) => p.stock === 0);
-    if (faltantes) final = final.filter((p) => p.faltante);
-    if (negativo) final = final.filter((p) => p.stock < 0);
-
-    // Orden alfabético por nombre
-    final.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"));
-
-    const total = final.length;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    const items = final.slice(offset, offset + PAGE_SIZE);
-
-    return NextResponse.json({ ok: true, items, total, totalPages });
   } catch (err) {
     console.error("❌ ERROR STOCK LISTAR:", err);
     return NextResponse.json(
