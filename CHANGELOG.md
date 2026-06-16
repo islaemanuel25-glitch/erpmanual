@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-15] - Actualización: stock
+
+### Modificado
+- **stock**: perf: paginar stock locales en base de datos
+- **stock**: perf: filtrar estados de stock locales en base de datos
+- **stock**: refactor: ordenar stock locales sin cambiar comportamiento
+
+
 ## [2026-06-11] - Actualización: 
 
 ### Modificado

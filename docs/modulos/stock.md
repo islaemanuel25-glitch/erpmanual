@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-06-10 21:06
+**Última actualización:** 2026-06-15 23:48
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -78,5 +78,8 @@ stockUnidades = stockBultos * factor_pack
 ```
 
 ## Cambios recientes
+- 2026-06-15: perf: paginar stock locales en base de datos
+- 2026-06-15: perf: filtrar estados de stock locales en base de datos
+- 2026-06-15: refactor: ordenar stock locales sin cambiar comportamiento
 - 2026-06-10: fix(fiambre): stock operativo del deposito en PIEZAS para fiambre fijo por pieza
 - 2026-06-10: fix(fiambre): mostrar piezas reales en depósito y topar carrito por piezas
