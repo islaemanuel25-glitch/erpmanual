@@ -198,14 +198,13 @@ export async function POST(req) {
       // --------------------------------------------------------
       if (creador?.es_deposito) {
         const localesGrupo = await getLocalesDeGrupo(grupoId);
-        const localIds = localesGrupo.map((l) => l.id);
+        // getLocalesDeGrupo EXCLUYE depósitos → incluir SIEMPRE el propio
+        // depósito (localId) además de los locales satélites, para que la base
+        // nazca con su ProductoLocal+StockLocal de depósito (antes se creaba
+        // recién en el GET de stock). Sin satélites igual se crea el del depósito.
+        const localIds = [localId, ...localesGrupo.map((l) => l.id)];
 
-        if (localIds.length === 0) {
-          // No hay locales (solo depósito en el grupo). Base creada igual.
-          return { base, replicatedTo: 0 };
-        }
-
-        // A) Crear ProductoLocal para todos los locales (idempotente)
+        // A) Crear ProductoLocal para depósito + locales (idempotente)
         await tx.productoLocal.createMany({
           data: localIds.map((id) => ({
             localId: id,
@@ -238,7 +237,8 @@ export async function POST(req) {
           skipDuplicates: true,
         });
 
-        return { base, replicatedTo: localIds.length };
+        // replicatedTo = locales satélites alcanzados (el depósito es el origen)
+        return { base, replicatedTo: localesGrupo.length };
       }
 
       // --------------------------------------------------------
