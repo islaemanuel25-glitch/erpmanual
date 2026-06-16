@@ -125,9 +125,7 @@ export async function GET(req) {
         baseClause = proveedorBaseFilter;
       }
 
-      // Pre-filtro de estado de stock EN BASE DE DATOS (solo rama local).
-      // Equivale a los filtros JS de más abajo, que se mantienen como autoridad
-      // final (la salida no cambia). Faltantes NO se mueve: sigue 100% en JS.
+      // Estados de stock movidos a la BASE DE DATOS.
       const estadoStockClauses = [];
       if (conStock) estadoStockClauses.push({ stock: { some: { cantidad: { gt: 0 } } } });
       if (sinStock)
@@ -136,48 +134,81 @@ export async function GET(req) {
         });
       if (negativo) estadoStockClauses.push({ stock: { some: { cantidad: { lt: 0 } } } });
 
-      const rows = await prisma.productoLocal.findMany({
-        where: {
-          localId,
+      // WHERE único, compartido por count(), findMany paginado y camino hybrid.
+      const whereLocal = {
+        localId,
+        activo: true,
+        ...(estadoStockClauses.length ? { AND: estadoStockClauses } : {}),
+        base: {
           activo: true,
-          ...(estadoStockClauses.length ? { AND: estadoStockClauses } : {}),
-          base: {
-            activo: true,
-            categoria_id: categoria ? Number(categoria) : undefined,
-            area_fisica_id: area ? Number(area) : undefined,
-            AND: [baseClause],
-          },
+          categoria_id: categoria ? Number(categoria) : undefined,
+          area_fisica_id: area ? Number(area) : undefined,
+          AND: [baseClause],
         },
-        orderBy: { id: "desc" },
-        include: {
-          base: {
-            select: {
-              id: true,
-              nombre: true,
-              codigo_barra: true,
-              categoria_id: true,
-              proveedor_id: true,
-              area_fisica_id: true,
-              unidad_medida: true,
-              factor_pack: true,
-              precio_costo: true,
-              precio_venta: true,
-              redondeo_100: true,
-              modoCompraProveedor: true,
-              pesoReferenciaKg: true,
-              pesoEsFijo: true,
-              modoVentaDeposito: true,
-            },
-          },
-          stock: {
-            take: 1,
-            select: { cantidad: true, stockMin: true, stockMax: true },
-          },
-        },
-      });
+      };
 
-      // Armado del item centralizado en lib/stock/mapItem (mismo JSON de salida).
-      final = rows.map((p) => mapStockItemLocal(p, p.base, p.stock?.[0]));
+      const includeLocal = {
+        base: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo_barra: true,
+            categoria_id: true,
+            proveedor_id: true,
+            area_fisica_id: true,
+            unidad_medida: true,
+            factor_pack: true,
+            precio_costo: true,
+            precio_venta: true,
+            redondeo_100: true,
+            modoCompraProveedor: true,
+            pesoReferenciaKg: true,
+            pesoEsFijo: true,
+            modoVentaDeposito: true,
+          },
+        },
+        stock: {
+          take: 1,
+          select: { cantidad: true, stockMin: true, stockMax: true },
+        },
+      };
+
+      // Orden movido a DB. Acepta variación menor de collation respecto al
+      // localeCompare("es") JS anterior (aceptado explícitamente).
+      const orderByLocal = { base: { nombre: "asc" } };
+
+      // Faltantes (cantidad < stockMin = comparación entre 2 columnas) no se
+      // puede expresar limpio en Prisma sin $queryRaw → camino HYBRID: la DB ya
+      // recortó por filtros de texto/categoría/proveedor/área/estado; el filtro
+      // faltante y la paginación quedan en JS. Único caso que aún trae el set
+      // completo (acotado) antes de cortar; el resto pagina 100% en DB.
+      if (faltantes) {
+        const rows = await prisma.productoLocal.findMany({
+          where: whereLocal,
+          orderBy: orderByLocal,
+          include: includeLocal,
+        });
+        const mapped = rows
+          .map((p) => mapStockItemLocal(p, p.base, p.stock?.[0]))
+          .filter((p) => p.faltante);
+        const total = mapped.length;
+        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        const items = mapped.slice(offset, offset + PAGE_SIZE);
+        return NextResponse.json({ ok: true, items, total, totalPages });
+      }
+
+      // Resto de casos: filtros + orden + paginación + count 100% en DB.
+      const total = await prisma.productoLocal.count({ where: whereLocal });
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      const rows = await prisma.productoLocal.findMany({
+        where: whereLocal,
+        orderBy: orderByLocal,
+        skip: offset,
+        take: PAGE_SIZE,
+        include: includeLocal,
+      });
+      const items = rows.map((p) => mapStockItemLocal(p, p.base, p.stock?.[0]));
+      return NextResponse.json({ ok: true, items, total, totalPages });
     }
 
     // ======================================================
