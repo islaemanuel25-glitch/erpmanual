@@ -1,4 +1,7 @@
 // app/api/stock_locales/limites/route.js
+// ⚠️ REVISIÓN (refactor Stock — Etapa 1): hoy NO se consume desde el módulo
+//    Stock Locales y DUPLICA la rama `modo: "limites"` de `ajustar/route.js`
+//    (los modales usan `ajustar`). Candidato a unificar/eliminar en Etapa 3.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";

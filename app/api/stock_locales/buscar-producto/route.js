@@ -1,3 +1,6 @@
+// ⚠️ REVISIÓN (refactor Stock — Etapa 1): hoy NO se consume desde el módulo
+//    Stock Locales (la pantalla usa solo `listar` y `ajustar`). Candidato a
+//    documentar / eliminar / cablear en Etapa 3. NO se borra todavía.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";

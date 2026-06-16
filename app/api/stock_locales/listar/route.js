@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { redondear100 } from "@/lib/precios/redondeo";
+import { mapStockItemLocal, mapStockItemDeposito } from "@/lib/stock/mapItem";
 
 const PAGE_SIZE = 25;
 
@@ -164,61 +164,8 @@ export async function GET(req) {
         },
       });
 
-      final = rows.map((p) => {
-        const base = p.base;
-        const s = p.stock?.[0] ?? { cantidad: 0, stockMin: 0, stockMax: 0 };
-
-        const factor = Number(base.factor_pack || 1);
-
-        // 🟦 COSTO UNITARIO
-        const costoUnit =
-          factor > 1
-            ? Number(p.precio_costo || base.precio_costo) / factor
-            : Number(p.precio_costo || base.precio_costo);
-
-        // 🟦 VENTA UNITARIA (antes de redondeo)
-        let ventaUnit =
-          factor > 1
-            ? Number(p.precio_venta || base.precio_venta) / factor
-            : Number(p.precio_venta || base.precio_venta);
-
-        // 🟩 REDONDEO A 100 HACIA ARRIBA (helper compartido con POS)
-        if (base.redondeo_100 === true) {
-          ventaUnit = redondear100(ventaUnit);
-        }
-
-        return {
-          id: p.id,
-          localId: p.localId,
-          baseId: base.id,
-
-          nombre: base.nombre,
-          codigoBarra: base.codigo_barra,
-          categoriaId: base.categoria_id,
-          proveedorId: base.proveedor_id,
-          areaFisicaId: base.area_fisica_id,
-          unidadMedida: base.unidad_medida,
-          factorPack: factor,
-
-          precioUnitario: costoUnit,
-          precioCosto: Number(p.precio_costo || base.precio_costo),
-
-          // 🟦 PRECIO DE VENTA UNITARIO FINAL
-          precioVentaUnitario: ventaUnit,
-
-          precioVenta: Number(p.precio_venta || base.precio_venta),
-
-          margen: p.margen,
-          stock: Number(s.cantidad || 0),
-          stockMin: Number(s.stockMin || 0),
-          stockMax: Number(s.stockMax || 0),
-          faltante: Number(s.cantidad || 0) < Number(s.stockMin || 0),
-          modoCompraProveedor: base.modoCompraProveedor,
-          pesoReferenciaKg: base.pesoReferenciaKg ? Number(base.pesoReferenciaKg) : null,
-          pesoEsFijo: base.pesoEsFijo === true,
-          modoVentaDeposito: base.modoVentaDeposito || "PESO",
-        };
-      });
+      // Armado del item centralizado en lib/stock/mapItem (mismo JSON de salida).
+      final = rows.map((p) => mapStockItemLocal(p, p.base, p.stock?.[0]));
     }
 
     // ======================================================
@@ -317,31 +264,9 @@ export async function GET(req) {
           stockMax: 0,
         };
 
-        final.push({
-          id: pl.id,
-          localId,
-          baseId: b.id,
-          nombre: b.nombre,
-          codigoBarra: b.codigo_barra,
-          categoriaId: b.categoria_id,
-          proveedorId: b.proveedor_id,
-          areaFisicaId: b.area_fisica_id,
-          unidadMedida: pl.base?.unidad_medida ?? b.unidad_medida,
-          factorPack: pl.base?.factor_pack ?? b.factor_pack,
-
-          precioCosto: Number(pl.precio_costo ?? b.precio_costo),
-          precioVenta: Number(pl.precio_venta ?? b.precio_venta),
-
-          margen: pl.margen ?? b.margen,
-          stock: Number(stock.cantidad || 0),
-          stockMin: Number(stock.stockMin || 0),
-          stockMax: Number(stock.stockMax || 0),
-          faltante: Number(stock.cantidad || 0) < Number(stock.stockMin || 0),
-          modoCompraProveedor: pl.base?.modoCompraProveedor ?? b.modoCompraProveedor,
-          pesoReferenciaKg: (pl.base?.pesoReferenciaKg ?? b.pesoReferenciaKg) ? Number(pl.base?.pesoReferenciaKg ?? b.pesoReferenciaKg) : null,
-          pesoEsFijo: (pl.base?.pesoEsFijo ?? b.pesoEsFijo) === true,
-          modoVentaDeposito: (pl.base?.modoVentaDeposito ?? b.modoVentaDeposito) || "PESO",
-        });
+        // `b` es la ProductoBase completa; pl.base (select acotado) referencia
+        // la misma base → mapStockItemDeposito(pl, b, ...) da el mismo resultado.
+        final.push(mapStockItemDeposito(pl, b, stock, localId));
       }
 
       // Opción C — código interno por proveedor en depósito.
@@ -389,29 +314,7 @@ export async function GET(req) {
           for (const pl of extras) {
             const b = pl.base;
             const stock = pl.stock?.[0] || { cantidad: 0, stockMin: 0, stockMax: 0 };
-            final.push({
-              id: pl.id,
-              localId,
-              baseId: b.id,
-              nombre: b.nombre,
-              codigoBarra: b.codigo_barra,
-              categoriaId: b.categoria_id,
-              proveedorId: b.proveedor_id,
-              areaFisicaId: b.area_fisica_id,
-              unidadMedida: b.unidad_medida,
-              factorPack: b.factor_pack,
-              precioCosto: Number(pl.precio_costo ?? b.precio_costo),
-              precioVenta: Number(pl.precio_venta ?? b.precio_venta),
-              margen: pl.margen ?? b.margen,
-              stock: Number(stock.cantidad || 0),
-              stockMin: Number(stock.stockMin || 0),
-              stockMax: Number(stock.stockMax || 0),
-              faltante: Number(stock.cantidad || 0) < Number(stock.stockMin || 0),
-              modoCompraProveedor: b.modoCompraProveedor,
-              pesoReferenciaKg: b.pesoReferenciaKg ? Number(b.pesoReferenciaKg) : null,
-              pesoEsFijo: b.pesoEsFijo === true,
-              modoVentaDeposito: b.modoVentaDeposito || "PESO",
-            });
+            final.push(mapStockItemDeposito(pl, b, stock, localId));
           }
         }
       }

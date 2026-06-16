@@ -1,4 +1,6 @@
 // app/api/stock_locales/nuevo/route.js
+// ⚠️ REVISIÓN (refactor Stock — Etapa 1): hoy NO se consume desde el módulo
+//    Stock Locales. Candidato a documentar / eliminar / cablear en Etapa 3.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";

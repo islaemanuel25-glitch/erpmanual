@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
+import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
 
 export default function ModalLimites({ open, onClose, producto, local }) {
   const [minimo, setMinimo] = useState("");
@@ -35,23 +36,8 @@ export default function ModalLimites({ open, onClose, producto, local }) {
     }
   }, [open, producto]);
 
-  // Bloquear scroll del body cuando el cursor está en un input number
-  const handleWheel = (e) => {
-    e.target.focus();
-    e.stopPropagation();
-  };
-  const handleFocus = (e) => {
-    e.target.select();
-    document.body.style.overflow = "hidden";
-  };
-  const handleBlur = () => {
-    document.body.style.overflow = "";
-  };
-
-  // Limpiar overflow al cerrar
-  useEffect(() => {
-    if (!open) document.body.style.overflow = "";
-  }, [open]);
+  // Handlers de input numérico + lock de scroll del body (hook compartido).
+  const { handleWheel, handleFocus, handleBlur } = useNumberInputHandlers(open);
 
   if (!open || !producto) return null;
 
