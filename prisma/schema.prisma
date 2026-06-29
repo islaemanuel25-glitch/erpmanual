@@ -727,14 +727,14 @@ model Turno {
   cerradoPorId Int?
   apertura     DateTime  @default(now())
   cierre       DateTime?
-  montoInicial Decimal   @db.Decimal(10, 2)
+  montoInicial Decimal   @db.Decimal(12, 2)
 
-  montoEsperadoEfectivo Decimal? @db.Decimal(10, 2)
-  montoRealEfectivo     Decimal? @db.Decimal(10, 2)
-  diferenciaEfectivo    Decimal? @db.Decimal(10, 2)
+  montoEsperadoEfectivo Decimal? @db.Decimal(12, 2)
+  montoRealEfectivo     Decimal? @db.Decimal(12, 2)
+  diferenciaEfectivo    Decimal? @db.Decimal(12, 2)
 
-  totalVentasEfectivo Decimal? @db.Decimal(10, 2)
-  totalVentasDigital  Decimal? @db.Decimal(10, 2)
+  totalVentasEfectivo Decimal? @db.Decimal(12, 2)
+  totalVentasDigital  Decimal? @db.Decimal(12, 2)
   cantidadVentas      Int?
 
   observaciones String?
