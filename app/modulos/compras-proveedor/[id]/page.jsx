@@ -302,6 +302,12 @@ export default function DetallePedidoProveedorPage({ params }) {
       });
       const data = await res.json();
       if (data.ok) {
+        // Si era el último ítem de un BORRADOR, el pedido se eliminó en la base:
+        // no intentar recargarlo, volver al listado.
+        if (data.pedidoEliminado) {
+          router.push("/modulos/compras-proveedor");
+          return;
+        }
         await cargar();
       } else {
         alert(data.error || "Error al eliminar ítem");

@@ -68,13 +68,28 @@ export async function POST(req, { params }) {
       );
     }
 
+    let pedidoEliminado = false;
+
     await prisma.$transaction(async (tx) => {
       await tx.pedidoProveedorDetalle.delete({
         where: { id: Number(detalleId) },
       });
+
+      // Prevención de borradores vacíos: si era el ÚLTIMO ítem de un BORRADOR,
+      // se elimina el pedido (no dejamos borradores sin nada para continuar).
+      // Solo aplica a BORRADOR — no se tocan pedidos ENVIADO ni otros estados.
+      if (pedido.estado === "BORRADOR") {
+        const restantes = await tx.pedidoProveedorDetalle.count({
+          where: { pedidoId },
+        });
+        if (restantes === 0) {
+          await tx.pedidoProveedor.delete({ where: { id: pedidoId } });
+          pedidoEliminado = true;
+        }
+      }
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, pedidoEliminado });
   } catch (err) {
     console.error("Error compras-proveedor/eliminar-item:", err);
     return NextResponse.json(

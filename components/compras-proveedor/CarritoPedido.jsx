@@ -1,0 +1,279 @@
+"use client";
+
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
+import { Trash2, X } from "lucide-react";
+import { subtotalLinea, unidadDisplay, naturalezaLinea } from "@/lib/compras-proveedor/calculoPedido";
+
+/**
+ * Carrito del pedido a proveedor (rediseño "cart-first").
+ * Lista SOLO las líneas con cantidad > 0 y permite editar cantidad/costo y
+ * quitar, reusando los mismos handlers de la página (no duplica lógica ni
+ * cambia estados del pedido). Se usa en dos variantes:
+ *   - variant="aside"  → panel lateral sticky en desktop
+ *   - variant="sheet"  → bottom-sheet desplegable en mobile
+ */
+export default function CarritoPedido({
+  variant = "aside",
+  proveedorNombre,
+  items,
+  total,
+  notas,
+  setNotas,
+  notasReadonly = false,
+  onCantidad,
+  onBlurCantidad,
+  onSetCantidad,
+  onCosto,
+  onBlurCosto,
+  onQuitar,
+  onGuardar,
+  onConfirmar,
+  saving = false,
+  accionesDeshabilitadas = false,
+  onClose,
+}) {
+  const lineas = items.filter((i) => Number(i.cantidad) > 0);
+  const esSheet = variant === "sheet";
+
+  // El costo se guarda a full precisión (fuente de verdad del subtotal); acá se
+  // redondea SOLO para mostrar/editar (≤4 decimales, sin ceros sobrantes).
+  const fmtCosto = (v) => {
+    if (v === "" || v == null) return "";
+    if (typeof v === "string") return v;
+    if (!Number.isFinite(v)) return "";
+    return String(Math.round(v * 10000) / 10000);
+  };
+  const esDrawer = variant === "drawer";
+  const listMax = esDrawer
+    ? "max-h-[calc(100dvh-300px)]"
+    : esSheet
+    ? "max-h-[46dvh]"
+    : "max-h-[42dvh]";
+
+  const baseDe = (i) => ({
+    modoCompraProveedor: i.modoCompra,
+    unidad_medida: i.unidad_medida,
+    factor_pack: i.factorPack,
+    pesoReferenciaKg: i.pesoRefKg,
+  });
+
+  const linea = (i) => {
+    const base = baseDe(i);
+    const r = subtotalLinea({ base, cantidad: i.cantidad, costo: i.precioCosto });
+    const disp = unidadDisplay(base, i.unidadPedido);
+    const unidadTxt = disp === "PIEZA / por kg" ? "pieza" : disp.toLowerCase();
+    const esPack = naturalezaLinea(base) === "PACK";
+    const factor = Math.max(1, Number(i.factorPack) || 1);
+    const qtyNum = Number(i.cantidad) || 0;
+    return (
+      <div key={i.productoLocalId} className="px-2.5 py-2">
+        <div className="flex items-start justify-between gap-2">
+          <span
+            className="text-[12.5px] font-medium sunmi-text-strong leading-tight min-w-0"
+            title={i.nombre}
+          >
+            {i.nombre}
+          </span>
+          <button
+            type="button"
+            onClick={() => onQuitar(i.productoLocalId)}
+            aria-label={`Quitar ${i.nombre}`}
+            title="Quitar del pedido"
+            className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-md sunmi-btn-red shrink-0"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5 mt-1.5">
+          {/* Stepper cantidad */}
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => onSetCantidad(i.productoLocalId, (Number(i.cantidad) || 1) - 1)}
+              aria-label="Restar cantidad"
+              className="w-[24px] h-[24px] flex items-center justify-center rounded sunmi-control text-[15px] leading-none"
+            >
+              −
+            </button>
+            <SunmiInput
+              type="text"
+              inputMode="numeric"
+              value={i.cantidad}
+              onChange={(e) => onCantidad(i.productoLocalId, e.target.value)}
+              onBlur={() => onBlurCantidad(i.productoLocalId)}
+              className="w-[46px] !py-0.5 text-center text-[12px] tabular-nums"
+              aria-label="Cantidad"
+            />
+            <button
+              type="button"
+              onClick={() => onSetCantidad(i.productoLocalId, (Number(i.cantidad) || 0) + 1)}
+              aria-label="Sumar cantidad"
+              className="w-[24px] h-[24px] flex items-center justify-center rounded sunmi-control text-[15px] leading-none"
+            >
+              +
+            </button>
+          </div>
+          <span className="text-[10px] sunmi-text-muted shrink-0">{unidadTxt}</span>
+          <span className="text-[10px] sunmi-text-muted shrink-0">×</span>
+          <SunmiInput
+            type="text"
+            inputMode="decimal"
+            value={fmtCosto(i.precioCosto)}
+            onChange={(e) => onCosto(i.productoLocalId, e.target.value)}
+            onBlur={() => onBlurCosto(i.productoLocalId)}
+            className="w-[74px] !py-0.5 text-right text-[12px] tabular-nums"
+            aria-label="Costo"
+          />
+          <span className="ml-auto text-[12.5px] font-semibold tabular-nums sunmi-text-strong shrink-0">
+            {r.subtotal != null ? (
+              `$${r.subtotal.toFixed(2)}`
+            ) : (
+              <span className="sunmi-text-accent" title={r.advertencia || ""}>
+                ⚠
+              </span>
+            )}
+          </span>
+        </div>
+        {esPack && (
+          <div className="text-[10px] sunmi-text-muted mt-1">
+            1 pack = {factor} un
+            {disp === "BULTO" && qtyNum > 0 && (
+              <span className="sunmi-text-accent"> · equivale a {qtyNum * factor} un</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const cuerpo = (
+    <>
+      {/* Encabezado */}
+      <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b sunmi-divider">
+        <div className="min-w-0">
+          <h3 className="text-[13px] font-semibold sunmi-text-strong leading-tight">
+            Resumen del pedido
+          </h3>
+          {proveedorNombre && (
+            <p className="text-[11px] sunmi-text-muted truncate" title={proveedorNombre}>
+              {proveedorNombre}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] sunmi-text-muted">
+            {lineas.length} {lineas.length === 1 ? "producto" : "productos"}
+          </span>
+          {(esSheet || esDrawer) && onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar resumen"
+              title="Volver a editar"
+              className="w-[26px] h-[26px] inline-flex items-center justify-center rounded-md sunmi-control"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Líneas editables */}
+      <div
+        className={`${listMax} overflow-y-auto border rounded-lg sunmi-border divide-y sunmi-divide`}
+      >
+        {lineas.length === 0 ? (
+          <div className="px-3 py-6 text-center text-xs sunmi-text-muted">
+            Todavía no cargaste productos. Ajustá cantidades en el catálogo.
+          </div>
+        ) : (
+          lineas.map(linea)
+        )}
+      </div>
+
+      {/* Total */}
+      <div className="flex items-center justify-between mt-3">
+        <span className="text-[12px] sunmi-text-muted">Total estimado</span>
+        <b className="text-[16px] sunmi-text-accent tabular-nums">${total.toFixed(2)}</b>
+      </div>
+
+      {/* Notas */}
+      <div className="mt-2">
+        <label className="block text-[11px] sunmi-text-muted mb-0.5">Notas</label>
+        {notasReadonly ? (
+          <div className="px-2.5 py-1 rounded-md sunmi-control text-[12px] sunmi-text-muted">
+            {notas || "—"}
+          </div>
+        ) : (
+          <SunmiInput
+            placeholder="Notas opcionales..."
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            className="!py-1 text-[12px]"
+          />
+        )}
+      </div>
+
+      {/* Acciones */}
+      <div className="flex flex-col gap-1.5 mt-3">
+        <SunmiButton
+          color="cyan"
+          type="button"
+          className="w-full"
+          disabled={accionesDeshabilitadas}
+          onClick={onGuardar}
+        >
+          {saving ? "Guardando..." : "Guardar borrador"}
+        </SunmiButton>
+        <SunmiButton
+          color="amber"
+          type="button"
+          className="w-full"
+          disabled={accionesDeshabilitadas}
+          onClick={onConfirmar}
+        >
+          Confirmar pedido ▸
+        </SunmiButton>
+      </div>
+    </>
+  );
+
+  if (esSheet) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col justify-end">
+        <button
+          type="button"
+          aria-label="Cerrar"
+          onClick={onClose}
+          className="absolute inset-0 bg-black/60"
+        />
+        <div className="relative sunmi-surface rounded-t-2xl border-t sunmi-divider p-3 shadow-[0_-2px_20px_rgba(0,0,0,0.35)]">
+          {cuerpo}
+        </div>
+      </div>
+    );
+  }
+
+  if (esDrawer) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex justify-end">
+        <button
+          type="button"
+          aria-label="Cerrar"
+          onClick={onClose}
+          className="absolute inset-0 bg-black/50"
+        />
+        <div className="relative sunmi-surface h-full w-full max-w-[420px] border-l sunmi-divider p-4 shadow-[-2px_0_24px_rgba(0,0,0,0.35)] overflow-y-auto">
+          {cuerpo}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm p-3">
+      {cuerpo}
+    </div>
+  );
+}
