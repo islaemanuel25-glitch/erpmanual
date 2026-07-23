@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-23] - Actualización: pos-transferencias, pos-ventas
+
+### Modificado
+- **pos-transferencias**: feat(pos): exigir operario activo para operar el POS
+- **pos-ventas**: feat(pos): exigir operario activo para operar el POS
+
+
 ## [2026-06-16] - Actualización: stock, productos
 
 ### Modificado
