@@ -27,6 +27,25 @@ export function useOperadorActivo() {
     refrescar();
   }, [refrescar]);
 
+  // Revalidación: el token de operador dura 8h y antes nadie se enteraba de que
+  // vencía hasta que fallaba una acción. Revalidamos cada 2 min (respaldo) y —lo
+  // que más pega en uso real— al volver el foco/visibilidad a la pestaña.
+  useEffect(() => {
+    const REVALIDAR_MS = 2 * 60 * 1000;
+    const id = setInterval(refrescar, REVALIDAR_MS);
+    const onFocus = () => refrescar();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refrescar();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refrescar]);
+
   const login = useCallback(async (operadorId, pin) => {
     const res = await fetch("/api/operador/login", {
       method: "POST",

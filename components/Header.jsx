@@ -8,7 +8,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser } from "@/app/context/UserContext";
 import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
-import { useOperadorActivo } from "@/hooks/useOperadorActivo";
+import { useOperadorContext } from "@/app/context/OperadorContext";
 import OperadorSelector from "@/components/operador/OperadorSelector";
 import { getDefaultRoute } from "@/lib/getDefaultRoute";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -24,7 +24,7 @@ export default function Header({ onOpenMobileMenu }) {
   const homeRoute = getDefaultRoute(menuMode);
   const showHomeBtn = pathname !== homeRoute;
   const isLauncher = menuMode === "launcher";
-  const { operador, login: loginOperador, logout: logoutOperador } = useOperadorActivo();
+  const { operador, login: loginOperador, logout: logoutOperador } = useOperadorContext();
   const [showOperadorSelector, setShowOperadorSelector] = useState(false);
   const operadorRef = useRef(null);
 

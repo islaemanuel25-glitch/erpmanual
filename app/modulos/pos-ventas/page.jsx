@@ -7,7 +7,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import { useOperadorActivo } from "@/hooks/useOperadorActivo";
+import { useOperadorContext } from "@/app/context/OperadorContext";
 import { showError, showSuccess } from "@/components/sunmi/SunmiToast";
 import { posVentaReducer, initialState, ActionTypes } from "./reducer/posVentaReducer";
 import { loadQueue, saveQueue, enqueue, dequeueById, getQueueLength, clearQueue } from "./helpers/offlineQueue";
@@ -38,10 +38,10 @@ export default function PosVentasPage() {
   // Contexto global (local activo)
   const { loading: cargandoContexto, contexto, needsContexto } = useContextoActivo();
 
-  // Operador activo + su voucher firmado: se adjuntan a las ventas encoladas
-  // offline para conservar la atribución al sincronizar aunque el token ya haya
-  // vencido. La barrera dura (bloquear la pantalla) la aplica layout.jsx.
-  const { operador: operadorActivo, voucher: operadorVoucherActivo } = useOperadorActivo();
+  // Operador activo + su voucher firmado (adjuntados a las ventas encoladas
+  // offline para conservar la atribución al sincronizar) y requerirOperador
+  // (levanta el modal de PIN encima de la venta ante un 428, sin navegar).
+  const { operador: operadorActivo, voucher: operadorVoucherActivo, requerirOperador } = useOperadorContext();
 
   // Estado del POS con reducer
   const [state, dispatch] = useReducer(posVentaReducer, initialState);
@@ -1206,9 +1206,10 @@ export default function PosVentasPage() {
       }
 
       // Sin operario activo (token vencido o "cambiar operador" sin elegir):
-      // la venta no opera, va al bloqueo de operario.
+      // pedimos el PIN en un modal ENCIMA de la venta. El carrito queda intacto;
+      // al identificarse el usuario vuelve a apretar Cobrar (sin auto-reintento).
       if (res.status === 428) {
-        router.replace("/bloqueo-operador");
+        requerirOperador();
         return;
       }
 

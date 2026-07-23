@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import { useOperadorActivo } from "@/hooks/useOperadorActivo";
 import { LayoutSettingsProvider } from "@/app/context/LayoutSettingsContext";
+import { OperadorProvider } from "@/app/context/OperadorContext";
 import LayoutBase from "@/components/LayoutBase";
 
 export default function ModulosLayout({ children }) {
@@ -13,11 +13,6 @@ export default function ModulosLayout({ children }) {
   const { perfil, cargando } = useUser();
   // Barrera global de contexto activo (Etapa 1): reutiliza el hook existente.
   const { loading: cargandoContexto, needsContexto } = useContextoActivo();
-  const { operador, loading: cargandoOp } = useOperadorActivo();
-
-  const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esExentoDeOperador =
-    permisos.includes("*") || permisos.includes("modulos.acceso_sin_operador");
 
   useEffect(() => {
     // 1) Esperar perfil + contexto antes de decidir.
@@ -28,38 +23,25 @@ export default function ModulosLayout({ children }) {
       return;
     }
 
-    // 2) Barrera de contexto: sin contexto activo válido → /inicio (antes que operador).
+    // 2) Barrera de contexto: sin contexto activo válido → /inicio.
     //    /inicio está fuera de /modulos, así que no reentra a este layout (evita loops).
     if (needsContexto) {
       router.replace("/inicio");
       return;
     }
-
-    // 3) Operador (como ya existía): requiere su propia carga.
-    if (cargandoOp) return;
-    if (!esExentoDeOperador && !operador) {
-      router.replace("/bloqueo-operador");
-    }
-  }, [
-    cargando,
-    cargandoContexto,
-    cargandoOp,
-    perfil,
-    needsContexto,
-    esExentoDeOperador,
-    operador,
-    router,
-  ]);
+    // 3) La barrera de operario vive ahora en OperadorProvider: decide entre
+    //    redirect (ingreso inicial) y modal de PIN (caída a mitad de sesión).
+  }, [cargando, cargandoContexto, perfil, needsContexto, router]);
 
   if (cargando || cargandoContexto) return null;
   if (!perfil) return null;
   if (needsContexto) return null;
-  if (cargandoOp) return null;
-  if (!esExentoDeOperador && !operador) return null;
 
   return (
     <LayoutSettingsProvider>
-      <LayoutBase>{children}</LayoutBase>
+      <OperadorProvider>
+        <LayoutBase>{children}</LayoutBase>
+      </OperadorProvider>
     </LayoutSettingsProvider>
   );
 }

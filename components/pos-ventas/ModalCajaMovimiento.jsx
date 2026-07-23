@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useOperadorContext } from "@/app/context/OperadorContext";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
 export default function ModalCajaMovimiento({ turnoId, onClose, onSuccess }) {
-  const router = useRouter();
+  const { requerirOperador } = useOperadorContext();
   const [tipo, setTipo] = useState("INGRESO");
   const [monto, setMonto] = useState("");
   const [motivo, setMotivo] = useState("");
@@ -35,9 +35,9 @@ export default function ModalCajaMovimiento({ turnoId, onClose, onSuccess }) {
         body: JSON.stringify({ turnoId, tipo, monto: montoNum, motivo: motivo.trim() }),
       });
 
-      // Sin operario activo → bloqueo de operario (parejo con la pantalla de venta).
+      // Sin operario activo → modal de PIN encima (sin cerrar el de movimiento).
       if (res.status === 428) {
-        router.replace("/bloqueo-operador");
+        requerirOperador();
         return;
       }
 

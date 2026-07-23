@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useOperadorContext } from "@/app/context/OperadorContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -11,7 +11,7 @@ export default function ModalAperturaTurno({
   vendedorNombre,
   onApertura,
 }) {
-  const router = useRouter();
+  const { requerirOperador } = useOperadorContext();
   const [montoInicial, setMontoInicial] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -39,9 +39,9 @@ export default function ModalAperturaTurno({
         }),
       });
 
-      // Sin operario activo → bloqueo de operario (parejo con la pantalla de venta).
+      // Sin operario activo → modal de PIN encima (sin sacar del modal de turno).
       if (res.status === 428) {
-        router.replace("/bloqueo-operador");
+        requerirOperador();
         return;
       }
 

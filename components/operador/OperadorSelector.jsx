@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
-export default function OperadorSelector({ operador, onLogin, onLogout }) {
+export default function OperadorSelector({ operador, onLogin, onLogout, forzado = false }) {
   const [operadores, setOperadores] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [abierto, setAbierto] = useState(false);
+  // forzado (modo modal obligatorio): arranca con el formulario abierto.
+  const [abierto, setAbierto] = useState(Boolean(forzado));
 
   useEffect(() => {
     if (abierto) {
@@ -37,7 +38,9 @@ export default function OperadorSelector({ operador, onLogin, onLogout }) {
     } else {
       setPin("");
       setSelectedId("");
-      setAbierto(false);
+      // En modo forzado no colapsamos: el modal se desmonta solo cuando el
+      // provider detecta que ya hay operario (evita flash del botón colapsado).
+      if (!forzado) setAbierto(false);
     }
   };
 
@@ -61,7 +64,7 @@ export default function OperadorSelector({ operador, onLogin, onLogout }) {
     );
   }
 
-  if (!abierto) {
+  if (!abierto && !forzado) {
     return (
       <button
         onClick={() => setAbierto(true)}
@@ -114,9 +117,11 @@ export default function OperadorSelector({ operador, onLogin, onLogout }) {
         <SunmiButton color="amber" onClick={handleLogin} disabled={loading} className="!py-1 text-xs flex-1">
           {loading ? "..." : "Ingresar"}
         </SunmiButton>
-        <SunmiButton color="neutral" onClick={() => { setAbierto(false); setError(""); }} className="!py-1 text-xs">
-          Cancelar
-        </SunmiButton>
+        {!forzado && (
+          <SunmiButton color="neutral" onClick={() => { setAbierto(false); setError(""); }} className="!py-1 text-xs">
+            Cancelar
+          </SunmiButton>
+        )}
       </div>
     </div>
   );
