@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import prisma from "@/lib/prisma";
 import { requireAuth } from "@/lib/authorize";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { firmarTokenOperador, OperadorCookie } from "@/lib/operador";
+import { firmarTokenOperador, firmarVoucherOperador, OperadorCookie } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -49,9 +49,17 @@ export async function POST(req) {
       localId: scope.localId,
     });
 
+    // Voucher offline: acompaña a la venta encolada para conservar la atribución
+    // al sincronizar aunque el token de operador ya haya vencido.
+    const voucher = firmarVoucherOperador({
+      operadorId: asignacion.operador.id,
+      localId: scope.localId,
+    });
+
     const res = NextResponse.json({
       ok: true,
       operador: { id: asignacion.operador.id, nombre: asignacion.operador.nombre },
+      voucher,
     });
 
     res.cookies.set(OperadorCookie.nombre, token, OperadorCookie.opciones);

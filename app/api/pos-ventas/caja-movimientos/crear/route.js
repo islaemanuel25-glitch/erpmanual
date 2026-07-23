@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
+import { requireOperadorSalvoDueno } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -21,6 +22,15 @@ export async function POST(req) {
     }
 
     const { localId, session } = scope;
+
+    const gateOp = requireOperadorSalvoDueno(req, session);
+    if (!gateOp.ok) {
+      return NextResponse.json(
+        { ok: false, error: gateOp.error, needsOperador: true },
+        { status: gateOp.status }
+      );
+    }
+
     const body = await req.json();
     const { turnoId, tipo, monto, motivo } = body;
 

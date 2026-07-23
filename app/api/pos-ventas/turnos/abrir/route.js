@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { getOperadorActivo } from "@/lib/operador";
+import { requireOperadorSalvoDueno } from "@/lib/operador";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 export async function POST(req) {
@@ -45,13 +45,19 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error }, { status: 400 });
     }
 
-    const opActivo = getOperadorActivo(req);
+    const gateOp = requireOperadorSalvoDueno(req, session);
+    if (!gateOp.ok) {
+      return NextResponse.json(
+        { ok: false, error: gateOp.error, needsOperador: true },
+        { status: gateOp.status }
+      );
+    }
 
     const turno = await prisma.turno.create({
       data: {
         localId,
         vendedorId: session.id,
-        operadorId: opActivo?.operadorId || null,
+        operadorId: gateOp.operadorId,
         montoInicial: Number(montoInicial) || 0,
       },
     });

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
-import { getOperadorActivo } from "@/lib/operador";
+import { requireOperadorSalvoDueno, verificarVoucherOperador } from "@/lib/operador";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
@@ -36,12 +36,38 @@ export async function POST(req) {
 
     const { grupoId, localId, session } = scope;
 
-    // Operador activo (opcional, desde cookie)
-    const opActivo = getOperadorActivo(req);
-    const operadorId = opActivo?.operadorId || null;
-
     const body = await req.json();
-    const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, esFiado, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje } = body;
+    const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, esFiado, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje, origenOffline, operadorVoucher } = body;
+
+    // Resolver operador de la venta.
+    // - Venta online: se exige operador activo salvo dueño (permiso "*").
+    // - Replay de cola offline (origenOffline): la venta YA se cobró con un
+    //   operador identificado en su momento. NUNCA se rechaza por operario
+    //   vencido. La atribución NO se toma de un id crudo del cliente (sería
+    //   falsificable: el mismo agujero por otra puerta) sino de un VOUCHER
+    //   firmado por el server al identificarse el operador. Sin voucher válido
+    //   (ítems legacy, o venta genuinamente sin operador) se persiste con null
+    //   antes que perder una venta cobrada — queda logueado para auditoría.
+    let operadorId = null;
+    if (origenOffline === true) {
+      operadorId = verificarVoucherOperador(operadorVoucher, localId);
+      if (!operadorId) {
+        console.warn(
+          "[pos-ventas/crear] replay offline sin operador verificable (voucher ausente/inválido) — se graba con operador null. localId=%s clientTxnId=%s",
+          localId,
+          clientTxnId || clientVentaId || "?"
+        );
+      }
+    } else {
+      const gateOp = requireOperadorSalvoDueno(req, session);
+      if (!gateOp.ok) {
+        return NextResponse.json(
+          { ok: false, error: gateOp.error, needsOperador: true },
+          { status: gateOp.status }
+        );
+      }
+      operadorId = gateOp.operadorId;
+    }
 
     // Validar turnoId obligatorio
     if (!turnoId) {

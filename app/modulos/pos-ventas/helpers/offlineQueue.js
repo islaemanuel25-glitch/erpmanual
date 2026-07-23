@@ -15,6 +15,11 @@ const STORAGE_KEY = "posVentasOfflineQueue_v1";
  *   descuentoPorPuntos: number,
  *   total: number,
  *   clienteId: number | null,
+ *   // Operador identificado al cobrar (referencia/legibilidad) + voucher firmado
+ *   // por el server. Al sincronizar el server atribuye la venta con el VOUCHER
+ *   // (infalsificable), no con operadorId. Ítems legacy sin voucher → operador null.
+ *   operadorId: number | null,
+ *   operadorVoucher: string | null,
  *   items: Array<{
  *     productoBaseId, nombre, precio, cantidad,
  *     // Modo de venta de la línea (depósito + pack). "NORMAL" | "UNIDAD_REMANENTE".

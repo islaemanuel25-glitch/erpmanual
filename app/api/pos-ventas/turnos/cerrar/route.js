@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { requireOperadorSalvoDueno } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -15,6 +16,14 @@ export async function POST(req) {
 
     const perm = checkPerm(session, "pos.usar");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
+    const gateOp = requireOperadorSalvoDueno(req, session);
+    if (!gateOp.ok) {
+      return NextResponse.json(
+        { ok: false, error: gateOp.error, needsOperador: true },
+        { status: gateOp.status }
+      );
+    }
 
     const { turnoId, montoRealEfectivo, observaciones } = await req.json();
 

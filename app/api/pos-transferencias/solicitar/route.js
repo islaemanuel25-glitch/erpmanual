@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { requireOperadorSalvoDueno } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -10,6 +11,14 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "No autenticado" },
         { status: 401 }
+      );
+    }
+
+    const gateOp = requireOperadorSalvoDueno(req, session);
+    if (!gateOp.ok) {
+      return NextResponse.json(
+        { ok: false, error: gateOp.error, needsOperador: true },
+        { status: gateOp.status }
       );
     }
 

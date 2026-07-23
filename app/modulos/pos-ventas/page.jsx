@@ -7,6 +7,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import { useOperadorActivo } from "@/hooks/useOperadorActivo";
 import { showError, showSuccess } from "@/components/sunmi/SunmiToast";
 import { posVentaReducer, initialState, ActionTypes } from "./reducer/posVentaReducer";
 import { loadQueue, saveQueue, enqueue, dequeueById, getQueueLength, clearQueue } from "./helpers/offlineQueue";
@@ -36,6 +37,11 @@ export default function PosVentasPage() {
 
   // Contexto global (local activo)
   const { loading: cargandoContexto, contexto, needsContexto } = useContextoActivo();
+
+  // Operador activo + su voucher firmado: se adjuntan a las ventas encoladas
+  // offline para conservar la atribución al sincronizar aunque el token ya haya
+  // vencido. La barrera dura (bloquear la pantalla) la aplica layout.jsx.
+  const { operador: operadorActivo, voucher: operadorVoucherActivo } = useOperadorActivo();
 
   // Estado del POS con reducer
   const [state, dispatch] = useReducer(posVentaReducer, initialState);
@@ -673,6 +679,11 @@ export default function PosVentasPage() {
       descuentoPorPuntos: state.descuentoPorPuntos,
       total: datos.total,
       clienteId: state.clienteSeleccionado?.id || null,
+      // Operador identificado al cobrar + su voucher firmado. El voucher es la
+      // prueba infalsificable que el server usa al sincronizar (ver crear); el
+      // operadorId queda solo para referencia/legibilidad de la cola.
+      operadorId: operadorActivo?.operadorId ?? null,
+      operadorVoucher: operadorVoucherActivo ?? null,
       items: state.carrito.map((item) => ({
         productoBaseId: item.productoBaseId,
         nombre: item.nombre,
@@ -733,7 +744,7 @@ export default function PosVentasPage() {
 
     showSuccess("Venta guardada offline. Ticket generado.");
     setSuccessMsg(`Venta guardada pendiente. Total en cola: ${nuevaLongitud}`);
-  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre]);
+  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorVoucherActivo]);
 
   // ---------------------------------------------------------------------------
   // Procesar cola offline
@@ -780,6 +791,11 @@ export default function PosVentasPage() {
             descuento: ventaPendiente.descuento,
             descuentoPorPuntos: ventaPendiente.descuentoPorPuntos,
             puntosCanje: 0, // No guardamos puntos en cola offline
+            // Replay offline: nunca se rechaza por operario vencido. La atribución
+            // la resuelve el server con el voucher firmado (no con un id crudo).
+            // Legacy sin voucher → el server graba con operador null.
+            origenOffline: true,
+            operadorVoucher: ventaPendiente.operadorVoucher ?? null,
             items: ventaPendiente.items,
           }),
         });
@@ -1186,6 +1202,13 @@ export default function PosVentasPage() {
 
       if (res.status === 401) {
         router.replace("/login");
+        return;
+      }
+
+      // Sin operario activo (token vencido o "cambiar operador" sin elegir):
+      // la venta no opera, va al bloqueo de operario.
+      if (res.status === 428) {
+        router.replace("/bloqueo-operador");
         return;
       }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -13,6 +14,7 @@ function formatPrecio(n) {
 }
 
 export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
+  const router = useRouter();
   const [montoReal, setMontoReal] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,6 +56,12 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
           observaciones,
         }),
       });
+
+      // Sin operario activo → bloqueo de operario (parejo con la pantalla de venta).
+      if (res.status === 428) {
+        router.replace("/bloqueo-operador");
+        return;
+      }
 
       const data = await res.json();
       if (!data.ok) {
