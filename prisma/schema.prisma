@@ -970,18 +970,19 @@ model AuditoriaStock {
 // Sin FK duras (Int? standalone, patrón de PrecioUpdate.usuarioId): el log es
 // inmutable y desacoplado, no bloquea el borrado de usuarios/locales/operadores.
 model AuditoriaBitacora {
-  id         Int      @id @default(autoincrement())
-  createdAt  DateTime @default(now())
-  usuarioId  Int? // autor (acceso). null = contexto no sembrado (script/fail-open)
-  operadorId Int? // identidad operativa. null a propósito (dueño exento / acción admin)
-  localId    Int?
-  grupoId    Int?
-  accion     String // p.ej. "pedido.anular", "usuario.editar"
-  entidad    String // modelo Prisma afectado, p.ej. "PedidoProveedor"
-  entidadId  String? // id afectado (String: soporta PK compuestas / bulk)
-  metodo     String? // operación cruda: create/update/delete/updateMany/...
-  antes      Json? // solo campos que cambiaron (secretos redactados)
-  despues    Json? // solo campos que cambiaron (secretos redactados)
+  id            Int      @id @default(autoincrement())
+  createdAt     DateTime @default(now())
+  usuarioId     Int? // autor (acceso). null = contexto no sembrado (script/fail-open)
+  operadorId    Int? // identidad operativa. null a propósito (dueño exento / acción admin)
+  localId       Int?
+  grupoId       Int?
+  accion        String // p.ej. "producto.editar", "pedido.anular"
+  entidad       String // dominio en criollo, p.ej. "Producto", "Usuario", "Pedido"
+  entidadId     String? // id primario afectado
+  entidadNombre String? // nombre humano de la entidad, p.ej. "Coca Cola 500ml"
+  // Cambios ya legibles. Una fila por acción de negocio (agrupada por request):
+  // [{ entidad, nombre, campos: [{ campo, label, antes, despues }] }]
+  cambios       Json?
 
   @@index([createdAt])
   @@index([localId])

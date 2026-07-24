@@ -86,12 +86,11 @@ export async function GET(req) {
       accion: r.accion,
       entidad: r.entidad,
       entidadId: r.entidadId,
-      metodo: r.metodo,
+      entidadNombre: r.entidadNombre,
       usuario: r.usuarioId ? { id: r.usuarioId, nombre: uMap[r.usuarioId] || `#${r.usuarioId}` } : null,
       operador: r.operadorId ? { id: r.operadorId, nombre: oMap[r.operadorId] || `#${r.operadorId}` } : null,
       local: r.localId ? { id: r.localId, nombre: lMap[r.localId] || `#${r.localId}` } : null,
-      antes: r.antes,
-      despues: r.despues,
+      cambios: r.cambios,
     }));
 
     return NextResponse.json({

@@ -25,21 +25,40 @@ function fmtFecha(iso) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// Render compacto de un objeto JSON de diff (antes/después)
-function DiffBloque({ titulo, data }) {
-  const vacio = !data || (typeof data === "object" && Object.keys(data).length === 0);
+// Render legible de los cambios: por entidad, campo por campo "antes → después".
+function CambiosView({ cambios }) {
+  if (!Array.isArray(cambios) || cambios.length === 0) {
+    return <div className="text-xs opacity-60 p-2">Sin cambios de campos registrados.</div>;
+  }
   return (
-    <div className="flex-1 min-w-0">
-      <div className="text-xs font-semibold mb-1" style={{ color: "var(--pos-link)" }}>
-        {titulo}
-      </div>
-      {vacio ? (
-        <div className="text-xs opacity-60">—</div>
-      ) : (
-        <pre className="text-xs whitespace-pre-wrap break-words m-0 p-2 rounded" style={{ background: "var(--pos-bg-soft, rgba(127,127,127,0.08))" }}>
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      )}
+    <div className="flex flex-col gap-3 p-2">
+      {cambios.map((grupo, gi) => (
+        <div key={gi}>
+          {(grupo.nombre || grupo.entidad) && (
+            <div className="text-xs font-semibold mb-1" style={{ color: "var(--pos-link)" }}>
+              {grupo.entidad}{grupo.nombre ? `: ${grupo.nombre}` : ""}
+            </div>
+          )}
+          {Array.isArray(grupo.campos) && grupo.campos.length > 0 ? (
+            <div className="flex flex-col gap-0.5">
+              {grupo.campos.map((c, ci) => (
+                <div key={ci} className="text-[13px]">
+                  <span className="opacity-70">{c.label}: </span>
+                  {c.antes != null && (
+                    <>
+                      <span className="line-through opacity-60">{String(c.antes)}</span>
+                      <span className="opacity-60"> → </span>
+                    </>
+                  )}
+                  <span className="font-semibold">{c.despues != null ? String(c.despues) : "—"}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs opacity-60">—</div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -180,7 +199,7 @@ export default function BitacoraAuditoria() {
         {/* LISTADO */}
         <SunmiSeparator label={`Registros${total ? ` (${total})` : ""}`} />
 
-        <SunmiTable headers={["", "Fecha", "Acción", "Entidad", "ID", "Usuario", "Operador", "Local"]}>
+        <SunmiTable headers={["", "Fecha", "Acción", "Entidad", "Usuario", "Operador", "Local"]}>
           {items.length === 0 ? (
             <SunmiTableEmpty message={cargando ? "Cargando..." : "No hay registros para los filtros aplicados"} />
           ) : (
@@ -199,22 +218,20 @@ export default function BitacoraAuditoria() {
                         {r.accion}
                       </span>
                     </td>
-                    <td>{r.entidad}</td>
-                    <td>{r.entidadId || "—"}</td>
+                    <td>
+                      <div className="font-semibold">{r.entidadNombre || r.entidad || "—"}</div>
+                      {r.entidadNombre && (
+                        <div className="text-[11px] opacity-60">{r.entidad}</div>
+                      )}
+                    </td>
                     <td>{r.usuario?.nombre || "—"}</td>
                     <td>{r.operador?.nombre || "—"}</td>
                     <td>{r.local?.nombre || "—"}</td>
                   </SunmiTableRow>
                   {abierta && (
                     <tr>
-                      <td colSpan={8}>
-                        <div className="flex flex-col md:flex-row gap-4 p-2">
-                          <DiffBloque titulo="Antes" data={r.antes} />
-                          <DiffBloque titulo="Después" data={r.despues} />
-                        </div>
-                        <div className="text-xs opacity-60 px-2 pb-2">
-                          método: {r.metodo || "—"}
-                        </div>
+                      <td colSpan={7}>
+                        <CambiosView cambios={r.cambios} />
                       </td>
                     </tr>
                   )}
