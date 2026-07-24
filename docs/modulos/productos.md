@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-06-16 10:16
+**Última actualización:** 2026-07-24 11:51
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,5 +102,6 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-07-23: feat(productos,proveedores): visibilidad depósito ↔ locales
 - 2026-06-16: fix: asegurar productos del deposito al crear producto
 - 2026-06-10: feat: productos — go-to-page, sticky header and optional internal code column

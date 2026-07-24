@@ -1,5 +1,7 @@
 # Modulo: Proveedores
 
+**Última actualización:** 2026-07-24 11:51
+
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
 - APIs: `app/api/proveedores/`
@@ -67,3 +69,6 @@ enum DiaPedido {
   Domingo
 }
 ```
+
+## Cambios recientes
+- 2026-07-23: feat(productos,proveedores): visibilidad depósito ↔ locales

@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-07-23 17:17
+**Última actualización:** 2026-07-24 11:51
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -97,5 +97,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-07-23: feat(productos,proveedores): visibilidad depósito ↔ locales
+- 2026-07-23: feat(pos): exigir operario activo para operar el POS
 - 2026-07-23: feat(pos): exigir operario activo para operar el POS
 - 2026-06-10: fix(fiambre): stock operativo del deposito en PIEZAS para fiambre fijo por pieza

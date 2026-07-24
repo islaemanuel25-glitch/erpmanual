@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-07-24] - Actualización: auditoria, pos-transferencias, productos, proveedores, stock, pos-ventas
+
+### Modificado
+- **auditoria**: feat(auditoria): bitácora de auditoría central por interceptor de Prisma
+- **pos-transferencias**: feat(productos,proveedores): visibilidad depósito ↔ locales
+- **pos-transferencias**: feat(pos): exigir operario activo para operar el POS
+- **productos**: feat(productos,proveedores): visibilidad depósito ↔ locales
+- **proveedores**: feat(productos,proveedores): visibilidad depósito ↔ locales
+- **stock**: feat(productos,proveedores): visibilidad depósito ↔ locales
+- **pos-ventas**: feat(pos): revalidar operario y pedir PIN en modal sin perder la pantalla
+- **pos-ventas**: feat(pos): exigir operario activo para operar el POS
+
+
 ## [2026-07-23] - Actualización: pos-transferencias, pos-ventas
 
 ### Modificado
