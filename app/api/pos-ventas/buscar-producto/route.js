@@ -73,19 +73,25 @@ export async function GET(req) {
       allowNegativeStock = configGrupo?.allowNegativeStock === true;
     }
 
-    // Resolver lista de precios aplicable (una sola vez por request)
-    // Fallback silencioso: si no se puede resolver, cae al precioVenta clásico del producto.
+    // Resolver lista aplicable según UBICACIÓN (una sola vez por request), pasando localId.
+    //  - Fallback COMERCIAL legítimo (cliente sin lista, local sin default, depósito sin
+    //    default válida) → lista = null → el POS usa ProductoLocal.precio_venta.
+    //  - Error de CONTEXTO (local inexistente / cross-group / params) → NO se oculta: se
+    //    responde con su status (400/403/404) en vez de degradar a precio normal.
     let listaAplicable = null;
+    let origenLista = "PRECIO_LOCAL";
     if (grupoId) {
+      let resolucion;
       try {
-        listaAplicable = await resolverListaCliente({ clienteId, grupoId, prisma });
+        resolucion = await resolverListaCliente({ clienteId, grupoId, localId, prisma });
       } catch (e) {
-        console.warn(
-          `[pos-ventas/buscar-producto] No se pudo resolver lista (grupoId=${grupoId}, clienteId=${clienteId}):`,
-          e.message
+        return NextResponse.json(
+          { ok: false, error: e.message },
+          { status: e.status || 400 }
         );
-        listaAplicable = null;
       }
+      listaAplicable = resolucion.lista;
+      origenLista = resolucion.origen;
     }
 
     // Prioridad: match exacto por codigo_barra (retorno inmediato)
@@ -112,7 +118,7 @@ export async function GET(req) {
 
     if (exacto.length > 0) {
       const items = mapProductos(exacto, esDeposito, allowNegativeStock, listaAplicable);
-      return NextResponse.json({ ok: true, items });
+      return NextResponse.json({ ok: true, items, origenLista });
     }
 
     // Manual y voz comparten universo: el catálogo real del local. Antes el
@@ -180,6 +186,7 @@ export async function GET(req) {
     return NextResponse.json({
       ok: true,
       items,
+      origenLista,
       ...(fromVoice ? { queryInterpretada } : {}),
     });
   } catch (err) {

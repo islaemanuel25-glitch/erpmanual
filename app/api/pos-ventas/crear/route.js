@@ -248,40 +248,32 @@ export async function POST(req) {
       }
     }
 
-    // Resolver lista de precios aplicable para trazabilidad (server-authoritative).
-    // Fallback silencioso si no se puede resolver — NO bloquea la venta.
+    // Resolver lista según UBICACIÓN (server-authoritative), pasando localId.
+    //  - Fallback COMERCIAL legítimo → lista = null (trazabilidad sin lista; precio normal).
+    //  - Error de CONTEXTO (cross-group / local inválido / params) → NO se oculta: se
+    //    rechaza el request con su status. Un local cross-group NO vende por fallback.
     let listaResuelta = null;
     try {
-      listaResuelta = await resolverListaCliente({ clienteId, grupoId, prisma });
+      const resolucion = await resolverListaCliente({ clienteId, grupoId, localId, prisma });
+      listaResuelta = resolucion.lista;
     } catch (e) {
-      console.warn(
-        `[pos-ventas/crear] No se pudo resolver lista (grupoId=${grupoId}, clienteId=${clienteId}):`,
-        e.message
+      return NextResponse.json(
+        { ok: false, error: e.message },
+        { status: e.status || 400 }
       );
-      listaResuelta = null;
     }
 
-    // Validar listaPrecioId que viene de cada item: debe pertenecer al grupoId.
-    // Si no pertenece o no existe, se descarta y queda null.
-    const idsListasPorValidar = new Set();
+    // Guarda server-side: la ÚNICA lista válida es la resuelta por el server (cliente +
+    // ubicación). Si un item declara otra lista (stale entre buscar y crear, desactivada,
+    // de otro grupo o manipulada), se rechaza: no se cobra/registra con una lista inválida.
+    const listaResueltaId = listaResuelta?.id ?? null;
     for (const item of items) {
       const itemListaId = Number.isInteger(item?.listaPrecioId) ? item.listaPrecioId : null;
-      if (itemListaId && (!listaResuelta || listaResuelta.id !== itemListaId)) {
-        idsListasPorValidar.add(itemListaId);
-      }
-    }
-    let listasValidadasPorGrupo = new Map();
-    if (idsListasPorValidar.size > 0) {
-      const listas = await prisma.listaPrecio.findMany({
-        where: { id: { in: Array.from(idsListasPorValidar) }, grupoId },
-        select: { id: true, tipoBase: true, margenPorcentaje: true },
-      });
-      for (const lp of listas) {
-        listasValidadasPorGrupo.set(lp.id, {
-          id: lp.id,
-          tipoBase: lp.tipoBase,
-          margenPorcentaje: lp.margenPorcentaje,
-        });
+      if (itemListaId !== null && itemListaId !== listaResueltaId) {
+        return NextResponse.json(
+          { ok: false, error: "La lista de precios cambió. Refrescá el POS y volvé a intentar." },
+          { status: 409 }
+        );
       }
     }
 
@@ -605,23 +597,10 @@ export async function POST(req) {
               const shareLinea = total > 0 ? lineaSubtotal / total : 0;
               const comisionLinea = comisionBancaria * shareLinea;
 
-              // Resolver lista para este item (trazabilidad por línea):
-              // 1) Si el item trae listaPrecioId y coincide con listaResuelta → usarla
-              // 2) Si trae listaPrecioId distinta, validada contra el grupo → usarla
-              // 3) Si el item no trae listaPrecioId pero hay listaResuelta → usar listaResuelta
-              // 4) Sino → null
-              const itemListaId = Number.isInteger(item?.listaPrecioId) ? item.listaPrecioId : null;
-              let itemListaValida = null;
-              if (itemListaId) {
-                if (listaResuelta && listaResuelta.id === itemListaId) {
-                  itemListaValida = listaResuelta;
-                } else if (listasValidadasPorGrupo.has(itemListaId)) {
-                  itemListaValida = listasValidadasPorGrupo.get(itemListaId);
-                }
-              }
-              if (!itemListaValida && listaResuelta) {
-                itemListaValida = listaResuelta;
-              }
+              // Trazabilidad por línea: la lista es SIEMPRE la resuelta por el server
+              // (cliente + ubicación). Si un item hubiera declarado otra, la venta ya
+              // fue rechazada por la guarda de arriba.
+              const itemListaValida = listaResuelta;
 
               return {
                 productoBaseId: item.productoBaseId,

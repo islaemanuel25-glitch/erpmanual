@@ -23,6 +23,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import ModalListaPrecio from "@/components/listas-precios/ModalListaPrecio";
 import ModalPreviewPrecio from "@/components/listas-precios/ModalPreviewPrecio";
+import CardDefaultDeposito from "@/components/listas-precios/CardDefaultDeposito";
 
 // ============================================================
 // Helpers
@@ -233,6 +234,9 @@ export default function ListasPreciosPage() {
   // =========================
   return (
     <div className="p-3 space-y-4">
+      {/* Lista predeterminada del depósito (o aclaración en local) */}
+      <CardDefaultDeposito puedeEditar={puedeEditar} />
+
       <SunmiCard className="p-0 overflow-hidden">
         <div className="p-3">
           <SunmiCardHeader title="Listas de precios">

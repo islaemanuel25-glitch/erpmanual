@@ -36,12 +36,18 @@ model GrupoDeposito {
   id        Int      @id @default(autoincrement())
   grupoId   Int
   localId   Int
+  /// Lista comercial default de ESTE depósito en ESTE grupo (opcional).
+  /// Solo se aplica en el POS del depósito cuando la venta NO tiene lista de cliente.
+  /// Nunca se aplica en los locales.
+  listaPrecioDefaultId Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   grupo     Grupo    @relation(fields: [grupoId], references: [id], onDelete: Cascade)
   local     Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
+  listaPrecioDefault ListaPrecio? @relation(fields: [listaPrecioDefaultId], references: [id], onDelete: SetNull)
 
   @@unique([grupoId, localId], name: "grupodeposito_unique")
+  @@index([listaPrecioDefaultId])
 }
 
 model GrupoLocal {
@@ -334,6 +340,7 @@ model ListaPrecio {
   clientes      Cliente[]
   ventas        Venta[]
   ventaDetalles VentaDetalle[]
+  depositosDefault GrupoDeposito[]
 
   @@unique([localId, nombre], name: "lista_unica_por_local")
   @@unique([grupoId, nombre], name: "lista_unica_por_grupo")

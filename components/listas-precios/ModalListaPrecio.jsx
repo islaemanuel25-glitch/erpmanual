@@ -268,12 +268,18 @@ export default function ModalListaPrecio({
           <SunmiSeparator />
 
           {/* TOGGLE DEFAULT */}
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] sunmi-label">Default del grupo</span>
-            <SunmiToggle
-              value={form.esDefault}
-              onChange={(v) => setForm((f) => ({ ...f, esDefault: v }))}
-            />
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] sunmi-label">Default del grupo</span>
+              <SunmiToggle
+                value={form.esDefault}
+                onChange={(v) => setForm((f) => ({ ...f, esDefault: v }))}
+              />
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">
+              Marca de referencia del grupo. No define la lista automática del depósito: eso se
+              configura en “Lista predeterminada del depósito”.
+            </p>
           </div>
 
           {/* TOGGLE REDONDEO */}
