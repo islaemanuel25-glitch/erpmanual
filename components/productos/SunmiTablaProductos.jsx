@@ -10,7 +10,7 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
 
-import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Warehouse } from "lucide-react";
 
 // Campos que se pueden ordenar desde el backend
 const SORTABLE_KEYS = [
@@ -34,6 +34,9 @@ export default function SunmiTablaProductos({
   onSort,
   onEditar,
   onEliminar,
+  onSubirDeposito,
+  localId,
+  esDeposito,
   catalogos,
   selectedProductId = null,
   onSelectProducto,
@@ -274,6 +277,25 @@ export default function SunmiTablaProductos({
               ))}
 
               <td className="px-3 py-1.5 w-[80px] text-right flex gap-1 justify-end">
+                {/* Regla A: "subir al depósito" solo para un producto propio del
+                    local (no desde el depósito, no sobre productos del depósito). */}
+                {onSubirDeposito && !esDeposito && row.creadoEnLocalId &&
+                  Number(row.creadoEnLocalId) === Number(localId) && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onSubirDeposito(row.id);
+                    }}
+                    className="w-[26px] h-[26px] flex items-center justify-center rounded-md sunmi-btn-secondary transition cursor-pointer"
+                    type="button"
+                    aria-label="Subir al depósito"
+                    title="Subir al catálogo del depósito"
+                  >
+                    <Warehouse size={14} />
+                  </button>
+                )}
+
                 <button
                   onClick={(e) => {
                     e.preventDefault();

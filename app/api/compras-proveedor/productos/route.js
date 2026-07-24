@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 import { checkPerm } from "@/lib/authorize";
 
 export async function GET(req) {
@@ -98,6 +99,8 @@ export async function GET(req) {
         { proveedor3_id: proveedorId },
         ...(baseIdsVinculados.length ? [{ id: { in: baseIdsVinculados } }] : []),
       ],
+      // Regla A: el depósito no arma pedidos con productos creados por un local.
+      ...productoVisibleWhere(depositoId),
     };
 
     if (search) {

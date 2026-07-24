@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
 
 const PAGE_SIZE = 50;
@@ -91,6 +92,9 @@ export async function GET(req) {
                 ],
               }
             : {},
+          // Regla A: el catálogo que el local le pide al depósito son productos
+          // del depósito; no incluye lo creado por locales.
+          productoVisibleWhere(depositoId),
         ],
       },
     };

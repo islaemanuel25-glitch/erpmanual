@@ -77,6 +77,7 @@ model Local {
   grupoLocales          GrupoLocal?
   listasPrecio          ListaPrecio[]
   productosCreados      ProductoBase[]  @relation("ProductoBaseCreador")
+  proveedoresCreados    Proveedor[]     @relation("ProveedorCreador")
   productos             ProductoLocal[]
   stock                 StockLocal[]
   transferenciasDestino Transferencia[] @relation("destino")
@@ -147,16 +148,24 @@ model Proveedor {
   email     String?
   direccion String?
 
+  // Local donde se dio de alta el proveedor. Se usa solo como fallback de
+  // visibilidad cuando el proveedor todavía no tiene productos (Regla B): lo ve
+  // quien lo creó. Con productos, la visibilidad se deriva de ellos.
+  creadoEnLocalId Int?
+
   dias_pedido DiaPedido[] @default([])
 
   activo    Boolean        @default(true)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+  creadoEnLocal     Local?            @relation("ProveedorCreador", fields: [creadoEnLocalId], references: [id])
   productos         ProductoBase[]    @relation("productoProveedor1")
   productos2        ProductoBase[]    @relation("productoProveedor2")
   productos3        ProductoBase[]    @relation("productoProveedor3")
   pedidosProveedor  PedidoProveedor[]
   codigosProveedor  ProductoCodigoProveedor[]
+
+  @@index([creadoEnLocalId])
 }
 
 model AreaFisica {

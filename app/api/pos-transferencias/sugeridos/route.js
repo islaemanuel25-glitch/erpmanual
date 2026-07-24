@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 
 export async function GET(req) {
@@ -106,7 +107,9 @@ export async function GET(req) {
     // 4) Obtener TODOS los ProductoLocal del depósito en una sola query
     // ============================================================
     const productosOrigen = await prisma.productoLocal.findMany({
-      where: { localId: depositoId },
+      // Regla A: el origen (depósito) solo ofrece productos del depósito, no los
+      // creados por locales.
+      where: { localId: depositoId, base: productoVisibleWhere(depositoId) },
       include: {
         stock: {
           where: { localId: depositoId },

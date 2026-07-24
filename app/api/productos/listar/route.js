@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
@@ -109,6 +110,9 @@ export async function GET(req) {
     // Filtros generales (sin proveedor): aplican siempre.
     const generalFilters = [
       { grupoId },
+      // Regla A: el depósito no ve productos creados por locales; cada local ve
+      // los del depósito + los suyos, no los de otros locales.
+      productoVisibleWhere(localId),
       categoriaId ? { categoria_id: categoriaId } : {},
       areaFisicaId ? { area_fisica_id: areaFisicaId } : {},
       activoFilter !== undefined ? { activo: activoFilter } : {},

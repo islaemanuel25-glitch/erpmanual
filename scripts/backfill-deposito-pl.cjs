@@ -1,6 +1,8 @@
 /**
- * Backfill idempotente: garantiza que TODO ProductoBase activo del grupo de un
- * depósito tenga su ProductoLocal del depósito + StockLocal asociado.
+ * Backfill idempotente: garantiza que todo ProductoBase activo del grupo QUE LE
+ * CORRESPONDE AL DEPÓSITO (creado por el depósito o sin creador — Regla A) tenga
+ * su ProductoLocal del depósito + StockLocal asociado. NO sube los productos
+ * creados por un local: esos existen solo en ese local.
  *
  * Reemplaza la materialización perezosa que hacía el GET de /api/stock_locales/listar.
  * Es idempotente por las @@unique (ProductoLocal[localId,baseId], StockLocal[localId,productoId])
@@ -35,11 +37,15 @@ const APPLY = process.argv.includes("--apply");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
+// Regla A: para un depósito, "sus" bases son las creadas por él o sin creador;
+// se excluyen las creadas por cualquier local no-depósito.
+const SOLO_DEPOSITO = { NOT: { creadoEnLocal: { es_deposito: false } } };
+
 async function counts(dep, grupoIds) {
   const [basesActivas, plDeposito, faltantesPL, stockDeposito, plSinStock] = await Promise.all([
     prisma.productoBase.count({ where: { grupoId: { in: grupoIds }, activo: true } }),
     prisma.productoLocal.count({ where: { localId: dep } }),
-    prisma.productoBase.count({ where: { grupoId: { in: grupoIds }, activo: true, locales: { none: { localId: dep } } } }),
+    prisma.productoBase.count({ where: { grupoId: { in: grupoIds }, activo: true, locales: { none: { localId: dep } }, ...SOLO_DEPOSITO } }),
     prisma.stockLocal.count({ where: { localId: dep } }),
     prisma.productoLocal.count({ where: { localId: dep, stock: { none: {} } } }),
   ]);
@@ -72,7 +78,7 @@ async function counts(dep, grupoIds) {
 
     // A) ProductoLocal faltantes del depósito
     const faltantes = await prisma.productoBase.findMany({
-      where: { grupoId: { in: grupoIds }, activo: true, locales: { none: { localId: d.id } } },
+      where: { grupoId: { in: grupoIds }, activo: true, locales: { none: { localId: d.id } }, ...SOLO_DEPOSITO },
       select: { id: true, precio_costo: true, precio_venta: true, margen: true, activo: true },
     });
     if (faltantes.length) {

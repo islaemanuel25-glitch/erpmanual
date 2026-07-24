@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 import {
   rankearLiteral,
   resolverContraCatalogo,
@@ -65,7 +66,9 @@ export async function GET(req) {
     // Sin query: comportamiento previo — lista corta de todos los productos del local.
     if (!q) {
       const productos = await prisma.productoLocal.findMany({
-        where: { localId: origenId },
+        // Regla A: no se ofrecen productos creados por otro local (relevante
+        // cuando el origen es el depósito).
+        where: { localId: origenId, base: productoVisibleWhere(origenId) },
         include: {
           base: { include: { categoria: true, area_fisica: true } },
           stock: { where: { localId: origenId }, select: { cantidad: true } },
@@ -85,7 +88,8 @@ export async function GET(req) {
     // en memoria sobre todo el catálogo para no perder matches válidos por
     // efecto de un take fijo (ej. "leche" no encontraba "Leche Cotar").
     const candidatos = await prisma.productoLocal.findMany({
-      where: { localId: origenId },
+      // Regla A: mismo filtro que arriba.
+      where: { localId: origenId, base: productoVisibleWhere(origenId) },
       select: {
         id: true,
         nombre: true,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
 
 export async function POST(req) {
   try {
@@ -11,6 +12,11 @@ export async function POST(req) {
         { status: 401 }
       );
     }
+
+    // Regla B: marcar el local que da de alta el proveedor (fallback de
+    // visibilidad hasta que tenga productos). Admin sin contexto activo → null.
+    const scope = await resolveLocalAndGrupo(req);
+    const creadoEnLocalId = scope.error ? null : scope.localId ?? null;
 
     const body = await req.json();
     const {
@@ -48,6 +54,7 @@ export async function POST(req) {
         direccion: direccion || null,
         dias_pedido: diasEnum,
         activo: Boolean(activo),
+        creadoEnLocalId,
       },
     });
 

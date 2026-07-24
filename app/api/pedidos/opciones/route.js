@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { proveedorVisibleWhere } from "@/lib/visibilidad";
 
 export async function GET(req) {
   try {
@@ -69,11 +70,10 @@ export async function GET(req) {
         select: { id: true, nombre: true },
         orderBy: { nombre: "asc" },
       }),
+      // Regla B: el local ve sus proveedores (los de los productos que creó),
+      // no los del depósito — aunque pueda pedir productos del depósito.
       prisma.proveedor.findMany({
-        where: {
-          activo: true,
-          productos: { some: { grupoId } },
-        },
+        where: { AND: [{ activo: true }, proveedorVisibleWhere(localId, grupoId)] },
         select: { id: true, nombre: true },
         orderBy: { nombre: "asc" },
       }),

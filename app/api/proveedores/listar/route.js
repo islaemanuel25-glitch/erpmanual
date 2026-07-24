@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { proveedorVisibleWhere } from "@/lib/visibilidad";
 
 export async function GET(req) {
   try {
@@ -18,6 +20,10 @@ export async function GET(req) {
     const page = Number(searchParams.get("page") || 1);
     const pageSize = Number(searchParams.get("pageSize") || 20);
 
+    // Regla B: visibilidad por local activo. Admin sin contexto → todos.
+    const scope = await resolveLocalAndGrupo(req);
+    const visFilter = scope.error ? [] : [proveedorVisibleWhere(scope.localId, scope.grupoId)];
+
     const where = {
       AND: [
         estado === "activos" ? { activo: true } : {},
@@ -31,6 +37,7 @@ export async function GET(req) {
               ],
             }
           : {},
+        ...visFilter,
       ],
     };
 

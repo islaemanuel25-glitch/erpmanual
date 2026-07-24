@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 import { mapStockItemLocal, mapStockItemDeposito } from "@/lib/stock/mapItem";
 
 const PAGE_SIZE = 25;
@@ -233,8 +234,16 @@ export async function GET(req) {
       // depósito faltantes (bases activas del grupo sin PL en el depósito) y su
       // StockLocal. Reemplaza la auto-creación secuencial dentro del GET. Si no
       // hay faltantes → CERO escrituras. Idempotente por @@unique + skipDuplicates.
+      // Regla A: el guard self-healing solo materializa PL de productos que le
+      // corresponden al depósito (los suyos + los sin creador). NO sube los
+      // creados por un local — esos existen solo en ese local.
       const faltantesBases = await prisma.productoBase.findMany({
-        where: { grupoId: { in: grupoIds }, activo: true, locales: { none: { localId } } },
+        where: {
+          grupoId: { in: grupoIds },
+          activo: true,
+          locales: { none: { localId } },
+          ...productoVisibleWhere(localId),
+        },
         select: { id: true, precio_costo: true, precio_venta: true, margen: true, activo: true },
       });
       if (faltantesBases.length) {
@@ -296,6 +305,9 @@ export async function GET(req) {
           categoria_id: categoria ? Number(categoria) : undefined,
           area_fisica_id: area ? Number(area) : undefined,
           AND: [baseClauseDepo],
+          // Regla A: defensa por si quedara alguna PL cáscara de un producto de
+          // local en el depósito — no se lista.
+          ...productoVisibleWhere(localId),
         },
       };
 

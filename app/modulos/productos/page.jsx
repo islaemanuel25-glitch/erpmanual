@@ -427,6 +427,33 @@ export default function ProductosPage() {
     }
   };
 
+  // Regla A: subir un producto propio del local al catálogo del depósito.
+  const subirADeposito = async (baseId) => {
+    if (
+      !confirm(
+        "¿Subir este producto al catálogo del depósito? Pasa a ser un producto del depósito y baja a todos los locales."
+      )
+    )
+      return;
+    try {
+      const r = await fetch(`/api/productos/promover-a-deposito?localId=${localId}`, {
+        credentials: "include",
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseId }),
+      });
+      if (r.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      const data = await r.json();
+      if (data.ok) fetchProductos();
+      else alert(data.error || "No se pudo subir al depósito");
+    } catch (err) {
+      console.error("Error subiendo al depósito:", err);
+    }
+  };
+
   const abrirNuevo = () => {
     router.push("/modulos/productos/nuevo");
   };
@@ -841,6 +868,9 @@ export default function ProductosPage() {
                     }}
                     onEditar={abrirEditar}
                     onEliminar={handleEliminar}
+                    onSubirDeposito={subirADeposito}
+                    localId={localId}
+                    esDeposito={contexto?.esDeposito}
                     catalogos={catalogos}
                     loading={loading || loadingEditar}
                     selectedProductId={selectedProductId}
