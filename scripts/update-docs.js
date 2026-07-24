@@ -27,6 +27,12 @@ const MODULO_MAP = {
   'components/auditoria-pos-ventas':  'pos-ventas',
   'app/api/auditoria-pos-ventas':     'pos-ventas',
   'lib/auditoria-pos-ventas':         'pos-ventas',
+  // Bitácora de auditoría central. DEBE ir DESPUÉS de auditoria-pos-ventas:
+  // detectarModulo usa startsWith y "auditoria" es prefijo de "auditoria-pos-ventas".
+  'app/modulos/auditoria':            'auditoria',
+  'components/auditoria':             'auditoria',
+  'app/api/auditoria':                'auditoria',
+  'lib/auditoria':                    'auditoria',
   'app/modulos/pos-transferencias': 'pos-transferencias',
   'components/pos-transferencias':  'pos-transferencias',
   'app/api/pos-transferencias':     'pos-transferencias',
