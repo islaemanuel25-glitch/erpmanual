@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { requireOperadorSalvoDueno } from "@/lib/operador";
+import { requireOperadorSegunConfig } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -17,7 +17,7 @@ export async function POST(req) {
     // Local autorizado = el de la sesión (identidad del JWT, no del body). El
     // scope de propiedad del POS (origen/destino) se valida más abajo. Para
     // DUEÑO_LOCAL el bypass de operario solo aplica en su propio local.
-    const gateOp = requireOperadorSalvoDueno(req, session, { localId: session.localId });
+    const gateOp = await requireOperadorSegunConfig(req, session, { localId: session.localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },

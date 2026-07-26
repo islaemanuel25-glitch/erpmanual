@@ -34,6 +34,8 @@ export function UserProvider({ children }) {
           esDuenoLocal: p.esDuenoLocal === true,
           localId: p.localId ?? null,
           esDeposito: p.esDeposito ?? false,
+          // Operario obligatorio efectivo del local (null/ausente = true).
+          exigirOperador: p.exigirOperador !== false,
         });
       } else {
         setPerfil(null);

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
-import { requireOperadorSalvoDueno } from "@/lib/operador";
+import { requireOperadorSegunConfig } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -23,7 +23,7 @@ export async function POST(req) {
 
     const { localId, session } = scope;
 
-    const gateOp = requireOperadorSalvoDueno(req, session, { localId });
+    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },

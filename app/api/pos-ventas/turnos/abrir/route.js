@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
-import { requireOperadorSalvoDueno } from "@/lib/operador";
+import { requireOperadorSegunConfig } from "@/lib/operador";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 export async function POST(req) {
@@ -51,7 +51,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error }, { status: 400 });
     }
 
-    const gateOp = requireOperadorSalvoDueno(req, session, { localId });
+    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },

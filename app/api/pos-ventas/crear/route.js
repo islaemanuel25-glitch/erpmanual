@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
-import { requireOperadorSalvoDueno, verificarVoucherOperador } from "@/lib/operador";
+import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
@@ -60,7 +60,7 @@ export async function POST(req) {
         );
       }
     } else {
-      const gateOp = requireOperadorSalvoDueno(req, session, { localId });
+      const gateOp = await requireOperadorSegunConfig(req, session, { localId });
       if (!gateOp.ok) {
         return NextResponse.json(
           { ok: false, error: gateOp.error, needsOperador: true },

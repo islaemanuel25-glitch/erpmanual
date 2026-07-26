@@ -14,13 +14,14 @@ export async function GET(req) {
     const auth = requireAuth(req);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
-    const scope = await resolveLocalAndGrupo(req);
+    // Lectura de config: recurso ajeno → 404 (no revelar la config de otra ubicación).
+    const scope = await resolveLocalAndGrupo(req, { lecturaAjena: true });
     if (scope.error) {
       return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
     const { localId, grupoId } = scope;
 
-    const [{ exigirClienteVenta }, cg] = await Promise.all([
+    const [{ exigirClienteVenta, exigirOperador }, cg] = await Promise.all([
       getConfigLocalEfectiva(localId, grupoId),
       prisma.configuracionGrupo.findUnique({
         where: { grupoId },
@@ -31,6 +32,7 @@ export async function GET(req) {
     return NextResponse.json({
       ok: true,
       exigirClienteVenta,
+      exigirOperador,
       // Legacy (grupo) — sólo lectura, para compatibilidad transitoria.
       exigirClienteVentasDeposito: cg?.exigirClienteVentasDeposito ?? false,
       exigirClienteVentasLocal: cg?.exigirClienteVentasLocal ?? false,
@@ -64,11 +66,15 @@ export async function POST(req) {
 
     const body = await req.json();
 
-    // Valor canónico per-local. Backward-compat: aceptar el flag legacy que
+    // Ambos flags son PER LOCAL (config_local.pos). Se construye el update solo
+    // con los que vengan en el body. Server-authoritative: el local sale del
+    // scope, nunca del body.
+    const data = {};
+
+    // Cliente obligatorio. Backward-compat: aceptar el flag legacy que
     // corresponda al tipo del local (depósito vs local).
-    let valor;
     if (body.exigirClienteVenta !== undefined) {
-      valor = !!body.exigirClienteVenta;
+      data.exigirClienteVenta = !!body.exigirClienteVenta;
     } else if (
       body.exigirClienteVentasDeposito !== undefined ||
       body.exigirClienteVentasLocal !== undefined
@@ -77,12 +83,17 @@ export async function POST(req) {
         where: { id: localId },
         select: { es_deposito: true },
       });
-      valor = loc?.es_deposito
+      data.exigirClienteVenta = loc?.es_deposito
         ? !!body.exigirClienteVentasDeposito
         : !!body.exigirClienteVentasLocal;
     }
 
-    if (valor === undefined) {
+    // Operario obligatorio en el POS de este local.
+    if (body.exigirOperador !== undefined) {
+      data.exigirOperador = !!body.exigirOperador;
+    }
+
+    if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { ok: false, error: "Nada para actualizar" },
         { status: 400 }
@@ -91,12 +102,12 @@ export async function POST(req) {
 
     await prisma.configuracionLocal.upsert({
       where: { localId },
-      update: { exigirClienteVenta: valor },
-      create: { localId, exigirClienteVenta: valor },
+      update: data,
+      create: { localId, ...data },
     });
 
-    const { exigirClienteVenta } = await getConfigLocalEfectiva(localId, grupoId);
-    return NextResponse.json({ ok: true, exigirClienteVenta });
+    const { exigirClienteVenta, exigirOperador } = await getConfigLocalEfectiva(localId, grupoId);
+    return NextResponse.json({ ok: true, exigirClienteVenta, exigirOperador });
   } catch (error) {
     console.error("Error actualizando config pos-ventas-cliente:", error);
     return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });

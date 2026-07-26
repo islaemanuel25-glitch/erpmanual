@@ -7,9 +7,9 @@ import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { Store } from "lucide-react";
+import { Store, UserCheck } from "lucide-react";
 
-// Cliente obligatorio es PER LOCAL: un único toggle canónico por local.
+// Reglas de POS PER LOCAL (config_local.pos): un toggle canónico por regla.
 const TOGGLES = [
   {
     key: "exigirClienteVenta",
@@ -22,12 +22,24 @@ const TOGGLES = [
     msgOn: "Cliente obligatorio activado en este local",
     msgOff: "Cliente ahora es opcional en este local",
   },
+  {
+    key: "exigirOperador",
+    label: "Exigir operario para operar el POS",
+    descripcion:
+      "Si la opción está activa, este local requiere un operario activo (PIN) para vender, abrir/cerrar caja y transferir. Admin y dueño del local siempre están exentos. El cambio aplica solo a este local.",
+    icon: UserCheck,
+    onLabel: "Obligatorio",
+    offLabel: "Opcional",
+    msgOn: "Operario obligatorio activado en este local",
+    msgOff: "Operario ahora es opcional en este local",
+  },
 ];
 
 export default function ConfigPosVentasPage() {
   const { perfil, cargando: cargandoUser } = useUser();
   const [config, setConfig] = useState({
     exigirClienteVenta: false,
+    exigirOperador: true, // default histórico: operario obligatorio
   });
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(null);
@@ -43,7 +55,10 @@ export default function ConfigPosVentasPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.ok) {
-          setConfig({ exigirClienteVenta: data.exigirClienteVenta ?? false });
+          setConfig({
+            exigirClienteVenta: data.exigirClienteVenta ?? false,
+            exigirOperador: data.exigirOperador ?? true,
+          });
         }
       })
       .catch(() => {})

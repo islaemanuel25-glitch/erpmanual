@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { requireOperadorSalvoDueno } from "@/lib/operador";
+import { requireOperadorSegunConfig } from "@/lib/operador";
 
 export async function POST(req) {
   try {
@@ -40,7 +40,7 @@ export async function POST(req) {
     // Gate de operario. El local autorizado es el del turno (ya validado por
     // vendedorId === session.id), no un valor crudo del cliente. Para DUEÑO_LOCAL
     // el bypass solo aplica si ese local es el suyo (puedeOperarSinOperador).
-    const gateOp = requireOperadorSalvoDueno(req, session, { localId: turno.localId });
+    const gateOp = await requireOperadorSegunConfig(req, session, { localId: turno.localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },
