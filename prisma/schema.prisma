@@ -947,6 +947,10 @@ model PedidoProveedor {
   id              Int                    @id @default(autoincrement())
   grupoId         Int
   depositoId      Int
+  // Ubicación que CREÓ el pedido (aislamiento por ubicación). Se llena con el
+  // localId del contexto al crear; puede ser un local o el depósito. `depositoId`
+  // sigue siendo "dónde entra el stock". Backfill: creadoEnLocalId ← depositoId.
+  creadoEnLocalId Int?
   proveedorId     Int
   estado          EstadoPedidoProveedor  @default(BORRADOR)
   notas           String?
@@ -968,6 +972,7 @@ model PedidoProveedor {
 
   @@index([grupoId])
   @@index([depositoId])
+  @@index([creadoEnLocalId])
   @@index([proveedorId])
   @@index([estado])
   @@index([createdAt])
@@ -1141,6 +1146,20 @@ enum TipoPrecioAplicado {
 // usuarioId null = notificación para todo el grupo. tipo/entidadTipo como String
 // para evitar migraciones de enum por cada tipo nuevo.
 // ---------------------------------------------------------------------------
+// Alcance real de una notificación (aislamiento por ubicación).
+//  - USUARIO: solo el usuarioId destinatario.
+//  - LOCAL: usuarios cuya ubicación activa == localId.
+//  - DEPOSITO: usuarios cuya ubicación activa == localId (que es un depósito).
+//  - PARTICIPANTES: usuarios en origenLocalId o destinoLocalId (transferencias).
+//  - GRUPO: todo el grupo (anuncios globales; comportamiento legacy).
+enum AlcanceNotificacion {
+  USUARIO
+  LOCAL
+  DEPOSITO
+  PARTICIPANTES
+  GRUPO
+}
+
 model Notificacion {
   id          Int      @id @default(autoincrement())
   grupoId     Int
@@ -1154,9 +1173,38 @@ model Notificacion {
   leida       Boolean  @default(false)
   createdAt   DateTime @default(now())
 
+  // Aislamiento por ubicación. `alcance` define cómo se combinan estos campos con
+  // la ubicación activa del lector (ver lib/notificaciones/scope.js).
+  localId          Int?
+  origenLocalId    Int?
+  destinoLocalId   Int?
+  alcance          AlcanceNotificacion @default(GRUPO)
+  permisoRequerido String?
+
+  // Estado de lectura POR USUARIO. La columna `leida` de arriba quedó LEGACY (no
+  // se usa para el estado por-usuario): una notif general no puede quedar leída
+  // para todos cuando un usuario la abre. Ver lib/notificaciones/scope.js.
+  lecturas NotificacionLectura[]
+
   @@index([grupoId])
   @@index([usuarioId])
   @@index([grupoId, leida])
+  @@index([localId])
+  @@index([alcance])
+}
+
+// Lectura por usuario de una notificación. Su AUSENCIA = no leída para ese
+// usuario; su presencia = leída. Nunca se muta el estado global de la notif.
+model NotificacionLectura {
+  id             Int      @id @default(autoincrement())
+  notificacionId Int
+  usuarioId      Int
+  leidaAt        DateTime @default(now())
+
+  notificacion Notificacion @relation(fields: [notificacionId], references: [id], onDelete: Cascade)
+
+  @@unique([notificacionId, usuarioId])
+  @@index([usuarioId])
 }
 
 // ---------------------------------------------------------------------------
@@ -1168,6 +1216,7 @@ model PushSubscription {
   id        Int      @id @default(autoincrement())
   grupoId   Int
   usuarioId Int?
+  localId   Int?
   endpoint  String   @unique
   p256dh    String
   auth      String
@@ -1178,6 +1227,7 @@ model PushSubscription {
 
   @@index([grupoId])
   @@index([usuarioId])
+  @@index([localId])
   @@index([endpoint])
   @@index([grupoId, activo])
 }
