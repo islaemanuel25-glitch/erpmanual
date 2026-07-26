@@ -1,5 +1,7 @@
 # Modulo: Transferencias
 
+**Última actualización:** 2026-07-25 21:21
+
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
 - APIs: `app/api/transferencias/`
@@ -87,3 +89,6 @@ model TransferenciaDetalle {
 Pendiente → Enviada → Recibiendo → Recibida
                                   → (con diferencias)
 ```
+
+## Cambios recientes
+- 2026-07-25: feat(combos): módulo de combos exclusivos por local

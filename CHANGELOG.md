@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-07-25] - Actualización: pos-transferencias, pos-ventas, productos, stock, transferencias
+
+### Modificado
+- **pos-transferencias**: feat(combos): módulo de combos exclusivos por local
+- **pos-ventas**: feat(combos): módulo de combos exclusivos por local
+- **productos**: feat(combos): módulo de combos exclusivos por local
+- **stock**: feat(combos): módulo de combos exclusivos por local
+- **transferencias**: feat(combos): módulo de combos exclusivos por local
+
+
 ## [2026-07-24] - Actualización: auditoria, pos-transferencias, productos, proveedores, stock, pos-ventas
 
 ### Modificado

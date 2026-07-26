@@ -1,16 +1,36 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-07-24 12:48
+**Fecha:** 2026-07-25 21:21
 
 ## Módulos modificados recientemente
 
-### auditoria
-- fix(auditoria): una fila por acción, diff correcto y contexto completo
-- Archivos: 1 nuevos, 4 modificados (5 total)
+### pos-transferencias
+- feat(combos): módulo de combos exclusivos por local
+- Archivos: 5 modificados (5 total)
+
+### pos-ventas
+- feat(combos): módulo de combos exclusivos por local
+- Archivos: 3 modificados (3 total)
+
+### productos
+- feat(combos): módulo de combos exclusivos por local
+- Archivos: 5 nuevos, 9 modificados (14 total)
+
+### stock
+- feat(combos): módulo de combos exclusivos por local
+- Archivos: 5 modificados (5 total)
+
+### transferencias
+- feat(combos): módulo de combos exclusivos por local
+- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización
-- lib/auditoria/formato.js
+- app/modulos/productos/editar-combo/[productoLocalId]/page.jsx
+- app/modulos/productos/nuevo-combo/page.jsx
+- components/productos/EditorComponentesCombo.jsx
+- components/productos/FormCombo.jsx
+- components/productos/ModalVerComposicion.jsx
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

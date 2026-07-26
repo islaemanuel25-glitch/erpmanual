@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-07-24 11:51
+**Última actualización:** 2026-07-25 21:21
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -78,6 +78,7 @@ stockUnidades = stockBultos * factor_pack
 ```
 
 ## Cambios recientes
+- 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-23: feat(productos,proveedores): visibilidad depósito ↔ locales
 - 2026-06-16: perf: paginar stock deposito en base de datos
 - 2026-06-15: perf: paginar stock locales en base de datos
