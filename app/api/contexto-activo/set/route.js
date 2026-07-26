@@ -15,6 +15,30 @@ export async function POST(req) {
     }
 
     const body = await req.json();
+
+    // VISTA GLOBAL EXPLÍCITA: solo admin, y acotada a su grupo activo.
+    if (body.global === true) {
+      if (!session.esAdmin) {
+        return NextResponse.json(
+          { ok: false, error: "Solo un administrador puede usar la vista global" },
+          { status: 403 }
+        );
+      }
+      if (!session.grupoId) {
+        return NextResponse.json(
+          { ok: false, error: "Seleccioná un grupo activo antes de la vista global" },
+          { status: 400 }
+        );
+      }
+      const response = NextResponse.json({ ok: true, global: true });
+      response.cookies.set(
+        ContextoActivoCookie.nombre,
+        JSON.stringify({ global: true }),
+        ContextoActivoCookie.opciones
+      );
+      return response;
+    }
+
     const localId = Number(body.localId);
 
     if (!localId || Number.isNaN(localId) || localId <= 0) {
@@ -44,9 +68,10 @@ export async function POST(req) {
       );
     }
 
-    // No-admin: solo puede elegir su propio local
+    // No-admin: solo puede elegir su propio local. Fail-closed: sin local asignado
+    // (o distinto al asignado) → 403 (antes, sin session.localId el guard se salteaba).
     if (!session.esAdmin) {
-      if (session.localId && session.localId !== localId) {
+      if (!session.localId || session.localId !== localId) {
         return NextResponse.json(
           { ok: false, error: "No podés elegir un local distinto al asignado" },
           { status: 403 }

@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
+import { resolveVistaOperativa, getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function GET(req) {
   try {
@@ -43,8 +44,12 @@ export async function GET(req) {
       },
     };
 
-    // Scope estricto por local. No-admin: SIEMPRE su local; un localId ajeno por
-    // query → 403 (no se ignora en silencio). Admin: filtro opcional o ve todo.
+    // Scope estricto por UBICACIÓN. Nunca queda sin filtro (antes: admin sin
+    // localId veía TODOS los grupos).
+    //  - No-admin: SIEMPRE su local; localId ajeno por query → 403.
+    //  - Admin con qLocal: debe ser un local de SU grupo activo → filtra por él.
+    //  - Admin sin qLocal: contexto (vista global explícita = todo el grupo;
+    //    contexto de un local = ese local; sin contexto → 409).
     const qLocal = Number(localIdParam) || 0;
     if (!session.esAdmin) {
       const propio = Number(session.localId) || 0;
@@ -56,9 +61,21 @@ export async function GET(req) {
       }
       where.localId = propio;
     } else if (qLocal) {
+      const g = await getGrupoIdDeLocal(qLocal);
+      if (!session.grupoId || g !== session.grupoId) {
+        return NextResponse.json({ ok: false, error: "Local fuera de tu grupo activo." }, { status: 403 });
+      }
       where.localId = qLocal;
+    } else {
+      const vista = await resolveVistaOperativa(req);
+      if (vista.error) {
+        return NextResponse.json(
+          { ok: false, error: vista.error, needsContexto: vista.needsContexto },
+          { status: vista.status }
+        );
+      }
+      where.localId = vista.modo === "GLOBAL" ? { in: vista.localIds } : vista.localId;
     }
-    // Admin sin filtro de local: ve todo (no filtra por localId)
 
     if (formaPagoParam) {
       where.formaPago = formaPagoParam;

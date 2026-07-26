@@ -1,8 +1,9 @@
 // app/api/transferencias/listar/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession, getCookieValue } from "@/lib/auth";
+import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { resolveVistaOperativa } from "@/lib/grupos";
 
 const PAGE_SIZE = 25;
 
@@ -24,22 +25,15 @@ export async function GET(req) {
       );
     }
 
-    // Resolver localId: cookie de contexto > JWT
-    let localId = null;
-
-    // 1. Intentar cookie de contexto activo
-    const raw = getCookieValue(req, "erpazul_contexto_activo");
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        const ctx = Number(parsed.localId);
-        if (ctx > 0) localId = ctx;
-      } catch {}
-    }
-
-    // 2. Fallback: localId del JWT
-    if (!localId && session.localId) {
-      localId = Number(session.localId);
+    // Vista operativa por UBICACIÓN (antes: sin localId no filtraba → veía TODOS
+    // los grupos). No-admin → su local; admin → contexto (local o global explícito
+    // del grupo activo); admin sin contexto → 409.
+    const vista = await resolveVistaOperativa(req);
+    if (vista.error) {
+      return NextResponse.json(
+        { ok: false, items: [], total: 0, totalPages: 1, error: vista.error, needsContexto: vista.needsContexto },
+        { status: vista.status }
+      );
     }
 
     const { searchParams } = new URL(req.url);
@@ -59,17 +53,15 @@ export async function GET(req) {
       if (fechaHasta) where.fechaEnvio.lte = new Date(fechaHasta + "T23:59:59");
     }
 
-    // Filtrar por contexto activo
-    if (localId) {
-      const local = await prisma.local.findUnique({
-        where: { id: localId },
-        select: { es_deposito: true },
-      });
-
-      if (local?.es_deposito) where.origenId = localId;
-      else where.destinoId = localId;
+    // Filtro por PARTICIPACIÓN (origen o destino), acotado a la vista.
+    if (vista.modo === "GLOBAL") {
+      where.OR = [
+        { origenId: { in: vista.localIds } },
+        { destinoId: { in: vista.localIds } },
+      ];
+    } else {
+      where.OR = [{ origenId: vista.localId }, { destinoId: vista.localId }];
     }
-    // Si no hay localId (admin sin contexto): no filtra por local, ve todas
 
     // ======================================
     // CONSULTA PRINCIPAL CORREGIDA
