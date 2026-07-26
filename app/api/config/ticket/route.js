@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth, checkPerm } from "@/lib/authorize";
-import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
+
+// Config de ticket por local (TicketConfig, @unique localId). El local se resuelve
+// SIEMPRE con resolveLocalAndGrupo (server-authoritative): no-admin → su local
+// (ajeno → 403); admin → su contexto activo (local/depósito), nunca un localId del
+// request. Escritura: admin o config_local.ticket.
 
 export async function GET(req) {
   try {
-    const auth = requireAuth(req);
-    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
-
-    const { localId } = auth.session;
-    if (!localId) return NextResponse.json({ ok: false, error: "Sin local asignado" }, { status: 400 });
+    // Lectura de config: recurso ajeno → 404 (no revelar la config de otra ubicación).
+    const scope = await resolveLocalAndGrupo(req, { lecturaAjena: true });
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
+    }
+    const { localId } = scope;
 
     const row = await prisma.ticketConfig.findUnique({ where: { localId } });
 
@@ -25,18 +31,15 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
-      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
-    // Config de ticket por local: admin o config_local.ticket. El scope es intrínseco:
-    // se usa SIEMPRE session.localId, nunca un localId del request.
+    const { localId, session } = scope;
+
     if (!session.esAdmin && !checkPerm(session, "config_local.ticket").ok) {
       return NextResponse.json({ ok: false, error: "Sin permiso: config_local.ticket" }, { status: 403 });
     }
-
-    const { localId } = session;
-    if (!localId) return NextResponse.json({ ok: false, error: "Sin local asignado" }, { status: 400 });
 
     const body = await req.json();
     const configJson = body.config;

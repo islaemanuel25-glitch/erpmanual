@@ -14,7 +14,8 @@ export async function GET(req) {
     const auth = requireAuth(req);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
-    const scope = await resolveLocalAndGrupo(req);
+    // Lectura de config: recurso ajeno → 404 (no revelar la config de otra ubicación).
+    const scope = await resolveLocalAndGrupo(req, { lecturaAjena: true });
     if (scope.error) {
       return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
