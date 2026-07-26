@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-07-24 11:51
+**Última actualización:** 2026-07-26 01:08
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,4 +71,5 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
 - 2026-07-23: feat(productos,proveedores): visibilidad depósito ↔ locales

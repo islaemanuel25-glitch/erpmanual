@@ -1,5 +1,7 @@
 # Modulo: Grupos
 
+**Última actualización:** 2026-07-26 01:08
+
 ## Ubicacion
 - UI: `app/modulos/grupos/page.jsx`, `app/modulos/grupos/[id]/page.jsx`
 - APIs: `app/api/grupos/`
@@ -77,3 +79,6 @@ model GrupoLocal {
   @@unique([grupoId, localId])
 }
 ```
+
+## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores

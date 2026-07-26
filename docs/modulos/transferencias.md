@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-07-25 21:21
+**Última actualización:** 2026-07-26 01:08
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -91,4 +91,5 @@ Pendiente → Enviada → Recibiendo → Recibida
 ```
 
 ## Cambios recientes
+- 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local

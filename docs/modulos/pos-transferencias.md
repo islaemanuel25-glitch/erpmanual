@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-07-25 21:21
+**Última actualización:** 2026-07-26 01:08
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -97,6 +97,8 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-23: feat(productos,proveedores): visibilidad depósito ↔ locales
 - 2026-07-23: feat(pos): exigir operario activo para operar el POS

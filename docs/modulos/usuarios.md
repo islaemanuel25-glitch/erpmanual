@@ -1,5 +1,7 @@
 # Modulo: Usuarios
 
+**Última actualización:** 2026-07-26 01:08
+
 ## Ubicacion
 - UI: `app/modulos/usuarios/page.jsx`
 - APIs: `app/api/usuarios/`
@@ -72,3 +74,6 @@ model Usuario {
 - No se puede eliminar usuarios con rol Admin
 - Eliminacion es soft (activo=false), no hard delete
 - Password se hashea con bcrypt antes de guardar
+
+## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores

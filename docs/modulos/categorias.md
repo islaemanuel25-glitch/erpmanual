@@ -1,5 +1,7 @@
 # Modulo: Categorias
 
+**Última actualización:** 2026-07-26 01:08
+
 ## Ubicacion
 - UI: `app/modulos/categorias/page.jsx`
 - APIs: `app/api/categorias/`
@@ -50,3 +52,6 @@ model Categoria {
   activo  Boolean @default(true)
 }
 ```
+
+## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores

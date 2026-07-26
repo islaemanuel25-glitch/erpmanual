@@ -1,5 +1,7 @@
 # Modulo: Roles
 
+**Última actualización:** 2026-07-26 01:08
+
 ## Ubicacion
 - UI: `app/modulos/roles/page.jsx`
 - APIs: `app/api/roles/`
@@ -62,3 +64,6 @@ reportes.ver
 ```
 
 El permiso `"*"` otorga acceso total (admin).
+
+## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores

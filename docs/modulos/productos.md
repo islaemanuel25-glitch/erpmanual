@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-07-25 21:21
+**Última actualización:** 2026-07-26 01:08
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,9 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- 2026-07-25: feat(combos): permitir activar y desactivar combos por local
+- 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-23: feat(productos,proveedores): visibilidad depósito ↔ locales
 - 2026-06-16: fix: asegurar productos del deposito al crear producto

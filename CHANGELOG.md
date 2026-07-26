@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-07-26] - Actualización: categorias, grupos, locales, pos-ventas, proveedores, roles, usuarios, pos-transferencias, productos, stock, transferencias
+
+### Modificado
+- **categorias**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **grupos**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **locales**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **pos-ventas**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **pos-ventas**: feat(combos): módulo de combos exclusivos por local
+- **proveedores**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **roles**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **usuarios**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **pos-transferencias**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **pos-transferencias**: feat(combos): módulo de combos exclusivos por local
+- **productos**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **productos**: feat(combos): permitir activar y desactivar combos por local
+- **productos**: feat(combos): módulo de combos exclusivos por local
+- **stock**: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- **stock**: feat(combos): módulo de combos exclusivos por local
+- **transferencias**: feat(combos): módulo de combos exclusivos por local
+
+
 ## [2026-07-25] - Actualización: pos-transferencias, pos-ventas, productos, stock, transferencias
 
 ### Modificado

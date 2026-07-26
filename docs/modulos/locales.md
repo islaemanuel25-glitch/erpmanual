@@ -1,5 +1,7 @@
 # Modulo: Locales
 
+**Última actualización:** 2026-07-26 01:08
+
 ## Ubicacion
 - UI: `app/modulos/locales/page.jsx`
 - APIs: `app/api/locales/`
@@ -79,3 +81,6 @@ model Local {
 | Stock en | Unidades | Bultos |
 | Crea productos | No | Si |
 | Rol en transferencias | Recibe | Envia |
+
+## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores

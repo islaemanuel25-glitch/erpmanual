@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-07-25 21:21
+**Última actualización:** 2026-07-26 01:08
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,8 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
+- 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-23: feat(pos): revalidar operario y pedir PIN en modal sin perder la pantalla
 - 2026-07-23: feat(pos): exigir operario activo para operar el POS
