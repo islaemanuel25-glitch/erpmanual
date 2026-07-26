@@ -11,6 +11,9 @@ model Rol {
   id        Int       @id @default(autoincrement())
   nombre    String    @unique
   permisos  Json      @default("[]")
+  // Roles de sistema (Admin, CAJERO, ENCARGADO, DUEÑO_LOCAL): no se eliminan ni
+  // renombran. Admin conserva ["*"]; los demás tienen permisos ajustables por Admin.
+  esSistema Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   usuarios  Usuario[]

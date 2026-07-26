@@ -41,34 +41,35 @@ export async function PUT(req, context) {
       data.permisos = body.permisos;
     }
 
-    // Protección interina del privilegio universal "*" (pre-esSistema):
+    // Guards de rol de sistema y del privilegio universal "*".
     const actual = await prisma.rol.findUnique({
       where: { id: rolId },
-      select: { nombre: true, permisos: true },
+      select: { nombre: true, permisos: true, esSistema: true },
     });
     if (!actual) {
       return NextResponse.json({ ok: false, error: "Rol no encontrado" }, { status: 404 });
     }
     const actualEsUniversal = Array.isArray(actual.permisos) && actual.permisos.includes("*");
     const nuevoPermisos = data.permisos; // undefined si no se envió
-    // 1) No agregar "*" a un rol que no lo tiene (escalada por payload).
+    // 1) No agregar "*" a NINGÚN rol que no lo tenga (común o de sistema ≠ Admin).
     if (!actualEsUniversal && Array.isArray(nuevoPermisos) && nuevoPermisos.includes("*")) {
       return NextResponse.json(
         { ok: false, error: "No se puede otorgar el privilegio universal (*)." },
         { status: 400 }
       );
     }
-    // 2) No retirar "*" de un rol que lo tiene (evita auto-lockout del admin).
+    // 2) No retirar "*" del rol Admin (evita auto-lockout).
     if (actualEsUniversal && Array.isArray(nuevoPermisos) && !nuevoPermisos.includes("*")) {
       return NextResponse.json(
         { ok: false, error: "No se puede retirar el privilegio universal del rol administrador." },
         { status: 400 }
       );
     }
-    // 3) No renombrar el rol administrador.
-    if (actualEsUniversal && data.nombre !== undefined && data.nombre !== actual.nombre) {
+    // 3) No renombrar un rol de sistema (Admin/CAJERO/ENCARGADO/DUEÑO_LOCAL).
+    //    Sus permisos SÍ pueden ajustarse (salvo el "*", cubierto por 1 y 2).
+    if (actual.esSistema && data.nombre !== undefined && data.nombre !== actual.nombre) {
       return NextResponse.json(
-        { ok: false, error: "No se puede renombrar el rol administrador." },
+        { ok: false, error: "No se puede renombrar un rol de sistema." },
         { status: 400 }
       );
     }

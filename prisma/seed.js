@@ -1,18 +1,36 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt"; // ✅ USAR BCRYPT NATIVO (NO bcryptjs)
+import { DEFAULT_PERMISOS_SISTEMA } from "../lib/rbac/systemRoles.js";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("🌱 Seed ERP AZUL…");
 
-  // 1️⃣ ROL ADMIN
+  // 1️⃣ ROL ADMIN (rol de sistema, siempre ["*"])
   const rolAdmin = await prisma.rol.upsert({
     where: { nombre: "Admin" },
-    update: { permisos: ["*"] },
-    create: { nombre: "Admin", permisos: ["*"] },
+    update: { permisos: ["*"], esSistema: true },
+    create: { nombre: "Admin", permisos: ["*"], esSistema: true },
   });
   console.log("✅ Rol Admin OK");
+
+  // 1️⃣.bis ROLES DE SISTEMA POR-LOCAL (CAJERO, ENCARGADO, DUEÑO_LOCAL)
+  // Idempotente y sin clobber: si el rol ya existe NO se repisan sus permisos
+  // (respeta ajustes del admin); solo se asegura la marca esSistema. La matriz
+  // default se aplica únicamente en la creación inicial.
+  for (const [nombre, permisos] of Object.entries(DEFAULT_PERMISOS_SISTEMA)) {
+    const existing = await prisma.rol.findUnique({ where: { nombre } });
+    if (!existing) {
+      await prisma.rol.create({ data: { nombre, permisos, esSistema: true } });
+      console.log(`✅ Rol ${nombre} creado (${permisos.length} permisos)`);
+    } else {
+      if (!existing.esSistema) {
+        await prisma.rol.update({ where: { nombre }, data: { esSistema: true } });
+      }
+      console.log(`↷ Rol ${nombre} ya existe: permisos personalizados preservados`);
+    }
+  }
 
   // 2️⃣ GRUPO BASE
   const grupoBase = await prisma.grupo.upsert({
