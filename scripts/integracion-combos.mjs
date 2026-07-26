@@ -7,7 +7,7 @@
 // rollback total, concurrencia real (FOR UPDATE + advisory) y no-regresión normal.
 
 import { PrismaClient } from "@prisma/client";
-import { crearCombo, getCombo } from "../lib/combos/service.js";
+import { crearCombo, getCombo, cambiarEstadoCombo } from "../lib/combos/service.js";
 import { construirLineasComerciales, aplicarConsumoStock } from "../lib/combos/ventaConsumo.js";
 
 const url = process.env.DATABASE_URL || "";
@@ -366,6 +366,108 @@ async function main() {
     assert(!ids.includes(combo.productoLocalId), "combo excluido (es_combo=false)");
     assert(!ids.includes(S.fernet.plId), "producto inactivo excluido");
     assert(!ids.includes(S.plB), "producto de otro local excluido");
+  });
+
+  // ═══════════ ESTADO: activar / desactivar combos ═══════════
+  await run("EST-1) desactivar: PL.activo=false, base.activo intacta, composición y stock intactos", async () => {
+    await sembrar();
+    await setStock(S.coca.plId, 10); await setStock(S.fernet.plId, 10);
+    const combo = await crearComboTest({ nombre: "C-est", componentes: [{ componenteProductoLocalId: S.coca.plId, cantidad: 2 }, { componenteProductoLocalId: S.fernet.plId, cantidad: 1 }] });
+    const baseActivoAntes = (await prisma.productoBase.findUnique({ where: { id: combo.baseId }, select: { activo: true } })).activo;
+    const ccAntes = await prisma.comboComponente.count({ where: { comboProductoLocalId: combo.productoLocalId } });
+    const dto = await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: false });
+    assert(dto.activo === false, "dto.activo=false");
+    const pl = await prisma.productoLocal.findUnique({ where: { id: combo.productoLocalId }, select: { activo: true } });
+    assert(pl.activo === false, "PL.activo=false");
+    const baseDespues = (await prisma.productoBase.findUnique({ where: { id: combo.baseId }, select: { activo: true } })).activo;
+    assert(baseDespues === baseActivoAntes, "base.activo NO cambió");
+    eq(await prisma.comboComponente.count({ where: { comboProductoLocalId: combo.productoLocalId } }), ccAntes, "composición intacta");
+    eq(await getStock(S.coca.plId), 10, "stock coca intacto");
+    eq(await getStock(S.fernet.plId), 10, "stock fernet intacto");
+  });
+
+  await run("EST-2) combo inactivo NO aparece en el universo del POS (activo:true, base.activo:true)", async () => {
+    await sembrar();
+    await setStock(S.coca.plId, 10);
+    const combo = await crearComboTest({ nombre: "C-pos", componentes: [{ componenteProductoLocalId: S.coca.plId, cantidad: 1 }] });
+    const enPos = async () => (await prisma.productoLocal.findMany({ where: { localId: S.localA, activo: true, base: { activo: true } }, select: { id: true } })).some((r) => r.id === combo.productoLocalId);
+    assert(await enPos(), "combo activo presente en el universo del POS");
+    await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: false });
+    assert(!(await enPos()), "combo inactivo ausente del universo del POS");
+  });
+
+  await run("EST-3) vender combo desactivado → rechazado con 'está desactivado' y stock intacto", async () => {
+    await sembrar();
+    await setStock(S.coca.plId, 10);
+    const combo = await crearComboTest({ nombre: "C-venta-off", componentes: [{ componenteProductoLocalId: S.coca.plId, cantidad: 2 }] });
+    await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: false });
+    let err = null;
+    try { await venderVenta({ localId: S.localA, items: [{ productoBaseId: combo.baseId, precio: 1000, cantidad: 1, nombre: "C-venta-off" }] }); } catch (e) { err = e; }
+    assert(err && /está desactivado/.test(err.message), "debía rechazar por combo desactivado");
+    eq(await getStock(S.coca.plId), 10, "stock intacto (no vendió)");
+  });
+
+  await run("EST-4) reactivar combo válido → vuelve vendible", async () => {
+    await sembrar();
+    await setStock(S.coca.plId, 10);
+    const combo = await crearComboTest({ nombre: "C-react", componentes: [{ componenteProductoLocalId: S.coca.plId, cantidad: 2 }] });
+    await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: false });
+    const dto = await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: true });
+    assert(dto.activo === true, "combo activo tras reactivar");
+    await venderVenta({ localId: S.localA, items: [{ productoBaseId: combo.baseId, precio: 1000, cantidad: 1, nombre: "C-react" }] });
+    eq(await getStock(S.coca.plId), 8, "vendió tras reactivar (10-2)");
+  });
+
+  await run("EST-5) reactivar combo con componente inactivo → rechazado (sigue inactivo)", async () => {
+    await sembrar();
+    await setStock(S.coca.plId, 10);
+    const combo = await crearComboTest({ nombre: "C-broken", componentes: [{ componenteProductoLocalId: S.coca.plId, cantidad: 1 }] });
+    await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: false });
+    await prisma.productoLocal.update({ where: { id: S.coca.plId }, data: { activo: false } }); // componente se desactiva
+    let err = null;
+    try { await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: true }); } catch (e) { err = e; }
+    assert(err && /No se puede reactivar/.test(err.message), "debía rechazar reactivar combo roto");
+    const pl = await prisma.productoLocal.findUnique({ where: { id: combo.productoLocalId }, select: { activo: true } });
+    assert(pl.activo === false, "el combo sigue inactivo");
+  });
+
+  await run("EST-6) cross-local: no se puede cambiar el estado desde otro local", async () => {
+    await sembrar();
+    await setStock(S.coca.plId, 10);
+    const combo = await crearComboTest({ nombre: "C-xloc", componentes: [{ componenteProductoLocalId: S.coca.plId, cantidad: 1 }] });
+    let err = null;
+    try { await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localB, productoLocalId: combo.productoLocalId, activo: false }); } catch (e) { err = e; }
+    assert(err && /no pertenece a este local/.test(err.message), "debía rechazar cross-local");
+  });
+
+  await run("EST-7) historial de ventas intacto tras desactivar el combo", async () => {
+    await sembrar();
+    await setStock(S.coca.plId, 10);
+    const combo = await crearComboTest({ nombre: "C-hist2", componentes: [{ componenteProductoLocalId: S.coca.plId, cantidad: 2 }] });
+    const v = await venderVenta({ localId: S.localA, items: [{ productoBaseId: combo.baseId, precio: 1000, cantidad: 1, nombre: "C-hist2" }] });
+    const detAntes = await prisma.ventaDetalle.findMany({ where: { ventaId: v.ventaId }, orderBy: { id: "asc" } });
+    const vdcAntes = await prisma.ventaDetalleComponente.count();
+    await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: false });
+    const detDespues = await prisma.ventaDetalle.findMany({ where: { ventaId: v.ventaId }, orderBy: { id: "asc" } });
+    eq(detDespues.length, detAntes.length, "misma cantidad de VentaDetalle");
+    eq(await prisma.ventaDetalleComponente.count(), vdcAntes, "VentaDetalleComponente intacto");
+    eq(Number(detDespues[0].precioCosto), Number(detAntes[0].precioCosto), "precioCosto histórico intacto");
+  });
+
+  await run("EST-8) filtro Estado del listado funciona con combos (por ProductoLocal.activo)", async () => {
+    await sembrar();
+    await setStock(S.coca.plId, 10);
+    const combo = await crearComboTest({ nombre: "C-filtro-estado", componentes: [{ componenteProductoLocalId: S.coca.plId, cantidad: 1 }] });
+    // Réplica del filtro de app/api/productos/listar para combos.
+    const apareceEn = async (activo) => (await prisma.productoBase.findMany({
+      where: { grupoId: S.grupo, es_combo: true, locales: { some: { localId: S.localA, activo } } },
+      select: { id: true },
+    })).some((b) => b.id === combo.baseId);
+    assert((await apareceEn(true)) === true, "activo aparece en 'activos'");
+    assert((await apareceEn(false)) === false, "activo NO aparece en 'inactivos'");
+    await cambiarEstadoCombo({ prisma, grupoId: S.grupo, localId: S.localA, productoLocalId: combo.productoLocalId, activo: false });
+    assert((await apareceEn(false)) === true, "inactivo aparece en 'inactivos'");
+    assert((await apareceEn(true)) === false, "inactivo NO aparece en 'activos'");
   });
 
   await limpiar();

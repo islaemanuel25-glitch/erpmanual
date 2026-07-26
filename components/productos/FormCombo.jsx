@@ -81,7 +81,12 @@ export default function FormCombo({ mode = "crear", initial = null, localId, loc
   const nombreOk = !!nombre.trim();
   const margenValido = modoPrecio !== "margen" || (margen !== "" && Number.isFinite(Number(margen)));
   const precioOk = precioFinal > 0 && margenValido;
-  const puedeGuardar = nombreOk && precioOk && valComp.ok && !saving;
+  // Desactivar (en edición) SIEMPRE se puede, aunque la composición sea inválida o el
+  // precio no dé: el backend conserva composición/precio y solo apaga el combo.
+  const desactivando = mode === "editar" && !activo;
+  const puedeGuardar = desactivando
+    ? nombreOk && !saving
+    : nombreOk && precioOk && valComp.ok && !saving;
 
   const handleGuardar = async () => {
     setSubmitted(true);
@@ -114,7 +119,7 @@ export default function FormCombo({ mode = "crear", initial = null, localId, loc
   };
 
   const showNombreError = (touched.nombre || submitted) && !nombreOk;
-  const showPrecioError = (touched.precio || submitted) && !precioOk;
+  const showPrecioError = !desactivando && (touched.precio || submitted) && !precioOk;
   const avisoPrecio =
     precioFinal > 0 && precioFinal < costoTotal ? "MARGEN_NEGATIVO" : precioFinal > 0 && precioFinal === costoTotal ? "GANANCIA_CERO" : null;
 

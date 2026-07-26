@@ -6,6 +6,7 @@ import { productoVisibleWhere } from "@/lib/visibilidad";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { evaluarEstructuraCombo } from "@/lib/combos/service";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
@@ -126,7 +127,17 @@ export async function GET(req) {
       tipoFilter,
       categoriaId ? { categoria_id: categoriaId } : {},
       areaFisicaId ? { area_fisica_id: areaFisicaId } : {},
-      activoFilter !== undefined ? { activo: activoFilter } : {},
+      // Estado (activos/inactivos): un PRODUCTO normal lo lleva en ProductoBase.activo;
+      // un COMBO lo lleva SOLO en su ProductoLocal.activo (la base del combo no cambia).
+      // Por eso el filtro se ramifica por tipo para que "Estado" funcione con combos.
+      activoFilter !== undefined
+        ? {
+            OR: [
+              { es_combo: false, activo: activoFilter },
+              { es_combo: true, locales: { some: { localId, activo: activoFilter } } },
+            ],
+          }
+        : {},
       ...(incompletos
         ? [{
             OR: [
@@ -282,6 +293,34 @@ export async function GET(req) {
         })(),
       };
     });
+
+    // Enriquecer combos de la página con su estado ESTRUCTURAL: un combo activo cuya
+    // composición esté rota (componente inactivo/sin stock/cantidad inválida) se marca
+    // "No disponible" (bloqueadoEstructural) para el badge del listado. Solo se resuelve
+    // para los combos de la página (pocos), no para todo el catálogo.
+    const comboRows = items.filter((it) => it.esCombo && it.localProductoId);
+    if (comboRows.length) {
+      await Promise.all(
+        comboRows.map(async (it) => {
+          try {
+            const est = await evaluarEstructuraCombo(prisma, {
+              localId,
+              comboProductoLocalId: it.localProductoId,
+            });
+            it.bloqueadoEstructural = est.bloqueadoEstructural;
+            it.disponibilidad = est.disponibilidad;
+            // "No disponible": ACTIVO pero estructuralmente bloqueado.
+            it.noDisponible = it.activo === true && est.bloqueadoEstructural === true;
+            it.motivoNoDisponible = it.noDisponible ? est.motivo : null;
+          } catch {
+            // Ante cualquier problema resolviendo el combo, no romper el listado.
+            it.bloqueadoEstructural = false;
+            it.noDisponible = false;
+            it.motivoNoDisponible = null;
+          }
+        })
+      );
+    }
 
     return NextResponse.json({
       ok: true,

@@ -479,6 +479,35 @@ export default function ProductosPage() {
     if (row?.localProductoId) setVerCombo({ productoLocalId: row.localProductoId });
   };
 
+  // Acción rápida: activar/desactivar un combo (solo ProductoLocal.activo).
+  const toggleEstadoCombo = async (row) => {
+    if (!row?.localProductoId) return;
+    const activar = !row.activo;
+    const verbo = activar ? "Activar" : "Desactivar";
+    if (!confirm(`¿${verbo} el combo "${row.nombre}"?`)) return;
+    try {
+      const r = await fetch(`/api/combos/${row.localProductoId}/estado?localId=${localId}`, {
+        credentials: "include",
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activo: activar }),
+      });
+      if (r.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      const data = await r.json();
+      if (!data.ok) {
+        alert(data.error || `No se pudo ${verbo.toLowerCase()} el combo`);
+        return;
+      }
+      fetchProductos();
+    } catch (err) {
+      console.error("Error cambiando estado del combo:", err);
+      alert(`No se pudo ${verbo.toLowerCase()} el combo`);
+    }
+  };
+
   const abrirActualizacionPrecios = () => {
     router.push("/modulos/productos/actualizacion-precios");
   };
@@ -896,6 +925,7 @@ export default function ProductosPage() {
                     onSubirDeposito={subirADeposito}
                     onEditarCombo={abrirEditarCombo}
                     onVerComposicion={abrirVerComposicion}
+                    onToggleEstadoCombo={toggleEstadoCombo}
                     localId={localId}
                     esDeposito={contexto?.esDeposito}
                     catalogos={catalogos}

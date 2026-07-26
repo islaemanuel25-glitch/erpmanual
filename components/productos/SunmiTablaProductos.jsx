@@ -10,7 +10,7 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
 
-import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Warehouse, Eye } from "lucide-react";
+import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Warehouse, Eye, Power, PowerOff } from "lucide-react";
 
 // Campos que se pueden ordenar desde el backend
 const SORTABLE_KEYS = [
@@ -37,6 +37,7 @@ export default function SunmiTablaProductos({
   onSubirDeposito,
   onEditarCombo,
   onVerComposicion,
+  onToggleEstadoCombo,
   localId,
   esDeposito,
   catalogos,
@@ -104,6 +105,11 @@ export default function SunmiTablaProductos({
       render: (v, row) => (
         <span>
           {v}
+          {row.esCombo && (
+            <span className="ml-1.5 inline-block px-1.5 py-[2px] text-[9px] font-bold uppercase rounded sunmi-badge-accent leading-none align-middle">
+              Combo
+            </span>
+          )}
           {row.modoCompraProveedor === "UNIDAD" && (
             <span className="ml-1.5 inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-red-600 text-white leading-none align-middle">
               Fiambre
@@ -202,8 +208,20 @@ export default function SunmiTablaProductos({
 
     activo: {
       titulo: "Estado",
-      thClass: "w-[80px]",
-      render: (v) => <SunmiBadgeEstado value={v} />,
+      thClass: "w-[90px]",
+      // Combo ACTIVO pero estructuralmente roto → "No disponible" (con motivo en el
+      // tooltip). En cualquier otro caso, el badge Activo/Inactivo estándar.
+      render: (v, row) =>
+        row?.esCombo && row?.noDisponible ? (
+          <span
+            title={row.motivoNoDisponible || "Composición inválida"}
+            className="px-1.5 py-[1px] rounded-md text-[10.5px] font-semibold leading-none sunmi-badge-danger"
+          >
+            No disponible
+          </span>
+        ) : (
+          <SunmiBadgeEstado value={v} />
+        ),
     },
   };
 
@@ -309,6 +327,22 @@ export default function SunmiTablaProductos({
                     >
                       <Pencil size={14} />
                     </button>
+                    {/* Acción rápida: Activar (si está inactivo) / Desactivar (si está activo). */}
+                    {onToggleEstadoCombo && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onToggleEstadoCombo(row);
+                        }}
+                        className="w-[26px] h-[26px] flex items-center justify-center rounded-md sunmi-btn-secondary transition cursor-pointer"
+                        type="button"
+                        aria-label={row.activo ? "Desactivar combo" : "Activar combo"}
+                        title={row.activo ? "Desactivar combo" : "Activar combo"}
+                      >
+                        {row.activo ? <PowerOff size={14} /> : <Power size={14} />}
+                      </button>
+                    )}
                   </>
                 ) : (
                   <>

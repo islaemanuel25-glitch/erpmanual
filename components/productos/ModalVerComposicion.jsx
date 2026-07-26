@@ -87,7 +87,22 @@ export default function ModalVerComposicion({ open, productoLocalId, localId, on
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[14px] font-semibold">{combo.nombre}</p>
-            <SunmiPill color="cyan">Combo</SunmiPill>
+            <div className="flex items-center gap-1.5">
+              <SunmiPill color="cyan">Combo</SunmiPill>
+              {combo.activo === false ? (
+                <span className="px-1.5 py-[1px] rounded-md text-[10.5px] font-semibold leading-none sunmi-badge-muted">
+                  Inactivo
+                </span>
+              ) : combo.bloqueadoEstructural ? (
+                <span className="px-1.5 py-[1px] rounded-md text-[10.5px] font-semibold leading-none sunmi-badge-danger">
+                  No disponible
+                </span>
+              ) : (
+                <span className="px-1.5 py-[1px] rounded-md text-[10.5px] font-semibold leading-none sunmi-badge-success">
+                  Activo
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-lg border sunmi-divider">
@@ -133,6 +148,12 @@ export default function ModalVerComposicion({ open, productoLocalId, localId, on
           </div>
 
           <div className="rounded-lg border sunmi-divider p-2">
+            {combo.activo === false && (
+              <p className="text-[12px] sunmi-text-muted mb-1">
+                Este combo está <span className="font-semibold">desactivado</span>: no se ofrece ni se puede vender
+                en el POS. Se puede reactivar desde el listado o la edición (requiere composición válida).
+              </p>
+            )}
             {combo.bloqueadoEstructural ? (
               <p className="text-[12px] sunmi-text-danger">
                 Composición inválida (componente desactivado / sin stock / cantidad inválida). No se puede vender hasta corregirla.
