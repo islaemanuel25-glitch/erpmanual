@@ -10,6 +10,7 @@ import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
 import SeccionCodigosProveedor from "@/components/productos/SeccionCodigosProveedor";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { useUser } from "@/app/context/UserContext";
 
 function parseVoiceNumber(text) {
   if (text === null || text === undefined) return null;
@@ -60,6 +61,12 @@ export default function FormProducto({
   onCatalogoCreado,
 }) {
   const scrollRef = useRef(null);
+
+  // Crear categorías/proveedores/áreas (entidades globales) es solo para admin: el
+  // backend exige requireAdmin. Para no-admin ocultamos el "+ Nuevo" (puede seguir
+  // seleccionando existentes) y NO usamos productos.crear como autorización indirecta.
+  const { perfil } = useUser();
+  const esAdmin = Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
 
   const toNum = (v) => {
     if (v === "" || v === null || v === undefined) return "";
@@ -501,6 +508,7 @@ export default function FormProducto({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Categoría" fieldKey="categoria_id">
               <SunmiSelectConCrearRapido
+                puedeCrear={esAdmin}
                 value={form.categoria_id === "" ? "" : String(form.categoria_id)}
                 onChange={(v) =>
                   setField("categoria_id", v === "" ? "" : Number(v))
@@ -514,6 +522,7 @@ export default function FormProducto({
 
             <Field label="Área física" fieldKey="area_fisica_id">
               <SunmiSelectConCrearRapido
+                puedeCrear={esAdmin}
                 value={form.area_fisica_id === "" ? "" : String(form.area_fisica_id)}
                 onChange={(v) =>
                   setField("area_fisica_id", v === "" ? "" : Number(v))
@@ -538,6 +547,7 @@ export default function FormProducto({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Proveedor 1" fieldKey="proveedor_id">
               <SunmiSelectConCrearRapido
+                puedeCrear={esAdmin}
                 value={form.proveedor_id === "" ? "" : String(form.proveedor_id)}
                 onChange={(v) =>
                   setField("proveedor_id", v === "" ? "" : Number(v))
@@ -559,6 +569,7 @@ export default function FormProducto({
 
             <Field label="Proveedor 2" fieldKey="proveedor2_id">
               <SunmiSelectConCrearRapido
+                puedeCrear={esAdmin}
                 value={form.proveedor2_id === "" ? "" : String(form.proveedor2_id)}
                 onChange={(v) =>
                   setField("proveedor2_id", v === "" ? "" : Number(v))
@@ -580,6 +591,7 @@ export default function FormProducto({
 
             <Field label="Proveedor 3" fieldKey="proveedor3_id">
               <SunmiSelectConCrearRapido
+                puedeCrear={esAdmin}
                 value={form.proveedor3_id === "" ? "" : String(form.proveedor3_id)}
                 onChange={(v) =>
                   setField("proveedor3_id", v === "" ? "" : Number(v))

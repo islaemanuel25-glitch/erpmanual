@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { resolveScope } from "@/lib/grupos";
 import { requireOperadorSalvoDueno } from "@/lib/operador";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
@@ -18,14 +19,19 @@ export async function POST(req) {
     const perm = checkPerm(session, "pos.usar");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    const { localId, montoInicial } = await req.json();
+    const body = await req.json();
+    const montoInicial = body?.montoInicial;
 
-    if (!localId) {
+    // Alcance seguro: un no-admin abre caja SOLO en su local de sesión; un body.localId
+    // ajeno → 403 (no abrir silenciosamente en el local equivocado). Admin: contexto.
+    const scope = await resolveScope(req, { explicitLocalId: body?.localId });
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "localId requerido" },
-        { status: 400 }
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
       );
     }
+    const localId = scope.localId;
 
     // Verificar que no tenga turno abierto
     const turnoAbierto = await prisma.turno.findFirst({

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 
 export async function POST(req) {
@@ -11,6 +12,11 @@ export async function POST(req) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    const perm = checkPerm(session, "pos_transferencias.enviar");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     const body = await req.json();
@@ -38,7 +44,7 @@ export async function POST(req) {
       where: { id: detalleId },
       include: {
         pos: {
-          select: { id: true, estado: true, origenId: true },
+          select: { id: true, estado: true, origenId: true, destinoId: true },
         },
         producto: {
           include: { base: true },
@@ -50,6 +56,19 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "Detalle no encontrado" },
         { status: 404 }
+      );
+    }
+
+    // Scope: no-admin solo puede operar sobre POS de su local (origen o destino).
+    // ESCRITURA sobre recurso ajeno → 403.
+    if (
+      !session.esAdmin &&
+      Number(session.localId) !== detalle.pos.origenId &&
+      Number(session.localId) !== detalle.pos.destinoId
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "No autorizado para esta transferencia" },
+        { status: 403 }
       );
     }
 

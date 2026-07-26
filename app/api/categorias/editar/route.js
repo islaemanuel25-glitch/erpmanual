@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authorize";
 
 // Helper para parsear booleanos robustamente
 function parseBoolean(value, defaultValue = null) {
@@ -18,6 +19,9 @@ function parseBoolean(value, defaultValue = null) {
 
 export async function PUT(req) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const session = getUsuarioSession(req);
     if (!session) {
       return NextResponse.json(

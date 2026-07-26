@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal, getLocalesDeGrupo } from "@/lib/grupos";
 
 export async function GET(req) {
@@ -13,6 +14,11 @@ export async function GET(req) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    const perm = checkPerm(session, "pos_transferencias.ver");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     // ======================================================

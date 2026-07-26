@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 
@@ -15,6 +16,11 @@ export async function GET(req) {
       );
     }
 
+    const perm = checkPerm(session, "pos_transferencias.ver");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+    }
+
     const { searchParams } = new URL(req.url);
 
     const destinoId = Number(searchParams.get("destinoId") || 0);
@@ -27,6 +33,15 @@ export async function GET(req) {
           error: "destinoId y posId requeridos",
         },
         { status: 400 }
+      );
+    }
+
+    // Scope: no-admin solo puede consultar sugeridos de su propio local (destino).
+    // LECTURA de recurso ajeno → 404 (no revelar).
+    if (!session.esAdmin && destinoId !== Number(session.localId)) {
+      return NextResponse.json(
+        { ok: false, error: "Destino no encontrado" },
+        { status: 404 }
       );
     }
 

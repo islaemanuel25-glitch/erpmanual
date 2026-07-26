@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { getContextoActivo } from "@/lib/contexto";
+import { resolveScope } from "@/lib/grupos";
 
 function toNumber(value) {
   const n = Number(value);
@@ -22,27 +21,18 @@ export async function POST(req) {
 
     const body = await req.json();
     
-    // Resolver grupoId: session → body.localId → session.localId → contexto cookie
+    // Alcance seguro. Admin: usa su grupo activo (cookie). No-admin: se deriva de la
+    // sesión y un body.localId ajeno se rechaza (→403), NO se ejecuta sobre otro grupo.
     let grupoId = Number(session.grupoId) || 0;
     if (!grupoId) {
-      let localId = Number(body?.localId) || 0;
-      if (!localId && session.localId) localId = Number(session.localId);
-      if (!localId && session.esAdmin) {
-        const ctx = getContextoActivo(req, session);
-        if (ctx.localId) localId = Number(ctx.localId);
+      const scope = await resolveScope(req, { explicitLocalId: body?.localId });
+      if (scope.error) {
+        return NextResponse.json(
+          { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+          { status: scope.status }
+        );
       }
-      if (localId) grupoId = await getGrupoIdDeLocal(localId);
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[precios/apply] CTX:", { sessionGrupoId: session.grupoId, grupoIdResolved: grupoId });
-    }
-
-    if (!grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "Seleccioná un grupo activo para trabajar." },
-        { status: 400 }
-      );
+      grupoId = scope.grupoId;
     }
     const proveedorId = toNumber(body?.proveedorId);
     const metodo = body?.metodo;

@@ -39,6 +39,10 @@ export default function SunmiSelectConCrearRapido({
   onCrear,
   disabled = false,
   searchable = true,
+  // Crear entidades globales (categoría/proveedor/área) es solo para admin. Para
+  // no-admin se pasa puedeCrear=false: se oculta el "+ Nuevo" (backend igual exige
+  // requireAdmin); el usuario puede seguir seleccionando registros existentes.
+  puedeCrear = true,
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [formValues, setFormValues] = useState({});
@@ -119,20 +123,22 @@ export default function SunmiSelectConCrearRapido({
             ))}
           </SunmiSelectAdv>
         </div>
-        <button
-          type="button"
-          onClick={openModal}
-          disabled={disabled}
-          className="shrink-0 inline-flex items-center gap-1 px-2 sunmi-control hover:sunmi-control-hover rounded-md text-[11px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label={crearLabel}
-          title={crearLabel}
-        >
-          <Plus size={14} />
-          <span className="hidden sm:inline">Nuevo</span>
-        </button>
+        {puedeCrear && (
+          <button
+            type="button"
+            onClick={openModal}
+            disabled={disabled}
+            className="shrink-0 inline-flex items-center gap-1 px-2 sunmi-control hover:sunmi-control-hover rounded-md text-[11px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={crearLabel}
+            title={crearLabel}
+          >
+            <Plus size={14} />
+            <span className="hidden sm:inline">Nuevo</span>
+          </button>
+        )}
       </div>
 
-      {modalOpen && (
+      {puedeCrear && modalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3">
           <form
             onSubmit={handleSubmit}

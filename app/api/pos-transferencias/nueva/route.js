@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function GET(req) {
@@ -13,6 +14,11 @@ export async function GET(req) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    const perm = checkPerm(session, "pos_transferencias.ver");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     const { searchParams } = new URL(req.url);
@@ -27,6 +33,19 @@ export async function GET(req) {
       });
 
       if (!posExistente) {
+        return NextResponse.json(
+          { ok: false, error: "POS no encontrada" },
+          { status: 404 }
+        );
+      }
+
+      // Scope: no-admin solo puede leer POS de su propio local (origen o destino).
+      // LECTURA de recurso ajeno → 404 (no revelar existencia).
+      if (
+        !session.esAdmin &&
+        Number(session.localId) !== posExistente.origenId &&
+        Number(session.localId) !== posExistente.destinoId
+      ) {
         return NextResponse.json(
           { ok: false, error: "POS no encontrada" },
           { status: 404 }

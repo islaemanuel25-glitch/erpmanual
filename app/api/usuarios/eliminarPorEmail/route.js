@@ -1,27 +1,27 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authorize";
+import { resolveScope, getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function DELETE(req) {
   try {
-    // 1) Auth
-    const session = getUsuarioSession(req);
-
-    if (!session) {
+    // 1) Auth + admin
+    const auth = requireAdmin(req);
+    if (!auth.ok) {
       return NextResponse.json(
-        { ok: false, error: "No autenticado." },
-        { status: 401 }
+        { ok: false, error: auth.error },
+        { status: auth.status }
       );
     }
+    const session = auth.session;
 
-    // 2) Permisos
-    const permisos = Array.isArray(session.permisos) ? session.permisos : [];
-    const esAdmin = permisos.includes("*");
-
-    if (!esAdmin && !permisos.includes("usuarios.eliminar")) {
+    // 2) Alcance: un admin global sin contexto no puede borrar cualquier
+    // usuario por email. Resolvemos el grupo del admin actuante.
+    const scope = await resolveScope(req);
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "No tenés permisos para eliminar usuarios." },
-        { status: 403 }
+        { ok: false, error: scope.error },
+        { status: scope.status }
       );
     }
 
@@ -46,6 +46,17 @@ export async function DELETE(req) {
       return NextResponse.json(
         { ok: false, error: "Usuario no encontrado." },
         { status: 404 }
+      );
+    }
+
+    // 4b) Alcance: el usuario objetivo debe pertenecer al grupo del contexto.
+    const grupoObjetivo = usuario.localId
+      ? await getGrupoIdDeLocal(usuario.localId)
+      : null;
+    if (!grupoObjetivo || grupoObjetivo !== scope.grupoId) {
+      return NextResponse.json(
+        { ok: false, error: "El usuario no pertenece a tu alcance." },
+        { status: 403 }
       );
     }
 

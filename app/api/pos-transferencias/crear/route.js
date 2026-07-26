@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function POST(req) {
   try {
@@ -12,6 +14,11 @@ export async function POST(req) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    const perm = checkPerm(session, "pos_transferencias.enviar");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     const body = await req.json();
@@ -74,6 +81,7 @@ export async function POST(req) {
       // -------------------------
       // DEPÓSITO NORMAL
       // -------------------------
+      // Scope: el origen SIEMPRE es el local de la sesión (no se confía en el body).
       origenId = Number(session.localId);
 
       const origen = await prisma.local.findUnique({
@@ -85,6 +93,17 @@ export async function POST(req) {
         return NextResponse.json(
           { ok: false, error: "El usuario no pertenece a un depósito" },
           { status: 400 }
+        );
+      }
+
+      // Scope: el destino debe pertenecer al MISMO grupo que el local de sesión.
+      const grupoOrigen = await getGrupoIdDeLocal(origenId);
+      const grupoDestino = await getGrupoIdDeLocal(destinoId);
+
+      if (!grupoOrigen || !grupoDestino || grupoOrigen !== grupoDestino) {
+        return NextResponse.json(
+          { ok: false, error: "El destino no pertenece a tu grupo" },
+          { status: 403 }
         );
       }
     }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
-import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { resolveScope } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 
@@ -29,23 +29,17 @@ export async function GET(req) {
       );
     }
 
-    // ✅ LOCAL ID DESDE QUERYSTRING (NO HEADER)
-    const localId = Number(url.searchParams.get("localId") || 0);
-    if (!localId || Number.isNaN(localId)) {
+    // Alcance seguro: no-admin no puede indicar un localId ajeno (→403); admin usa
+    // contexto explícito. El grupo se deriva del alcance, NUNCA del cliente.
+    const qLocal = url.searchParams.get("localId");
+    const scope = await resolveScope(req, { explicitLocalId: qLocal });
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "localId requerido" },
-        { status: 400 }
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
       );
     }
-
-    // ✅ Grupo
-    const grupoId = await getGrupoIdDeLocal(localId);
-    if (!grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "El local no pertenece a ningún grupo" },
-        { status: 400 }
-      );
-    }
+    const { grupoId, localId } = scope;
 
     // ✅ Base + override
     const base = await prisma.productoBase.findUnique({
@@ -58,17 +52,11 @@ export async function GET(req) {
       },
     });
 
-    if (!base) {
+    // Lectura por ID: producto inexistente O de otro grupo → 404 (no revelar existencia).
+    if (!base || base.grupoId !== grupoId) {
       return NextResponse.json(
         { ok: false, error: "Producto no encontrado" },
         { status: 404 }
-      );
-    }
-
-    if (base.grupoId !== grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "Producto fuera del grupo del local" },
-        { status: 403 }
       );
     }
 

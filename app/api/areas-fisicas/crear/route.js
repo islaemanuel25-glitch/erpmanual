@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authorize";
 
 function parseBoolean(value, defaultValue = true) {
   if (value === undefined || value === null) return defaultValue;
@@ -16,6 +17,9 @@ function parseBoolean(value, defaultValue = true) {
 
 export async function POST(req) {
   try {
+    const auth = requireAdmin(req);
+    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+
     const session = getUsuarioSession(req);
     if (!session) {
       return NextResponse.json(

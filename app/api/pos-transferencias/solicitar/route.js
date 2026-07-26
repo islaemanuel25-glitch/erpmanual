@@ -62,6 +62,19 @@ export async function POST(req) {
       );
     }
 
+    // Scope: no-admin solo puede solicitar POS de su local (origen o destino).
+    // ESCRITURA sobre recurso ajeno → 403.
+    if (
+      !esAdmin &&
+      Number(session.localId) !== pos.origenId &&
+      Number(session.localId) !== pos.destinoId
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "No autorizado para esta transferencia" },
+        { status: 403 }
+      );
+    }
+
     if (!["Borrador", "Preparando"].includes(pos.estado)) {
       return NextResponse.json(
         { ok: false, error: `No se puede solicitar una POS en estado "${pos.estado}"` },

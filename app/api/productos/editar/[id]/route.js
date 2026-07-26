@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { mergeBaseLocalToUi, splitUiToDb } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { resolveScope } from "@/lib/grupos";
 import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 import { esComboBase } from "@/lib/combos/guards";
 
@@ -79,26 +79,31 @@ export async function PUT(req, context) {
     }
 
     const url = new URL(req.url);
-    const localId = Number(url.searchParams.get("localId") || "0");
+    const qLocal = url.searchParams.get("localId");
 
-    // Scope check: verificar que el producto pertenece al grupo del usuario
-    let grupoId = Number(session.grupoId) || 0;
-    if (!grupoId && localId > 0) {
-      grupoId = await getGrupoIdDeLocal(localId);
-    } else if (!grupoId && session.localId) {
-      grupoId = await getGrupoIdDeLocal(Number(session.localId));
+    // Alcance seguro: no-admin no puede indicar un localId ajeno (→403); admin usa
+    // contexto explícito. El grupo se deriva del alcance, NUNCA del cliente.
+    const scope = await resolveScope(req, { explicitLocalId: qLocal });
+    if (scope.error) {
+      return NextResponse.json(
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
+      );
     }
-    if (grupoId) {
-      const productoScope = await prisma.productoBase.findFirst({
-        where: { id: baseId, grupoId },
-        select: { id: true },
-      });
-      if (!productoScope) {
-        return NextResponse.json(
-          { ok: false, error: "Producto no encontrado" },
-          { status: 404 }
-        );
-      }
+    const { grupoId } = scope;
+    const localId = Number(qLocal || "0");
+
+    // Existencia + pertenencia al grupo del alcance.
+    const baseScope = await prisma.productoBase.findUnique({
+      where: { id: baseId },
+      select: { id: true, grupoId: true, es_combo: true },
+    });
+    if (!baseScope) {
+      return NextResponse.json({ ok: false, error: "Producto no encontrado" }, { status: 404 });
+    }
+    if (baseScope.grupoId !== grupoId) {
+      // Recurso de otro grupo en una MODIFICACIÓN → 403.
+      return NextResponse.json({ ok: false, error: "Producto fuera de tu alcance." }, { status: 403 });
     }
 
     const payload = await req.json();
@@ -127,11 +132,7 @@ export async function PUT(req, context) {
       return NextResponse.json({ ok: false, error: norm.error }, { status: 400 });
     }
 
-    // Resolver grupoId del producto para validar unicidad cruzada
-    const baseScope = await prisma.productoBase.findUnique({
-      where: { id: baseId },
-      select: { grupoId: true, es_combo: true },
-    });
+    // baseScope ya resuelto arriba (existencia + pertenencia al grupo del alcance).
     if (baseScope) {
       // Impedir convertir un producto en combo (o viceversa) desde este editor.
       if (Boolean(payload.es_combo) !== esComboBase(baseScope)) {

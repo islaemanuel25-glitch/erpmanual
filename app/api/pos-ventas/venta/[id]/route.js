@@ -30,7 +30,9 @@ export async function GET(req, { params }) {
       },
     });
 
-    if (!venta) {
+    // Lectura por ID: inexistente O de otro local → 404 (no revelar existencia).
+    // Admin ("*") ve cualquier venta; un no-admin solo las de su local de sesión.
+    if (!venta || (!perm.session?.esAdmin && venta.localId !== perm.session?.localId)) {
       return NextResponse.json(
         { ok: false, error: "Venta no encontrada" },
         { status: 404 }

@@ -19,6 +19,14 @@ export async function POST(req) {
       );
     }
 
+    // No se puede crear un rol con privilegio universal "*" desde un payload arbitrario.
+    if (permisos.includes("*")) {
+      return NextResponse.json(
+        { ok: false, error: "No se puede crear un rol con privilegio universal (*)." },
+        { status: 400 }
+      );
+    }
+
     const item = await prisma.rol.create({
       data: { nombre, permisos }
     });

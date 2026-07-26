@@ -41,6 +41,38 @@ export async function PUT(req, context) {
       data.permisos = body.permisos;
     }
 
+    // Protección interina del privilegio universal "*" (pre-esSistema):
+    const actual = await prisma.rol.findUnique({
+      where: { id: rolId },
+      select: { nombre: true, permisos: true },
+    });
+    if (!actual) {
+      return NextResponse.json({ ok: false, error: "Rol no encontrado" }, { status: 404 });
+    }
+    const actualEsUniversal = Array.isArray(actual.permisos) && actual.permisos.includes("*");
+    const nuevoPermisos = data.permisos; // undefined si no se envió
+    // 1) No agregar "*" a un rol que no lo tiene (escalada por payload).
+    if (!actualEsUniversal && Array.isArray(nuevoPermisos) && nuevoPermisos.includes("*")) {
+      return NextResponse.json(
+        { ok: false, error: "No se puede otorgar el privilegio universal (*)." },
+        { status: 400 }
+      );
+    }
+    // 2) No retirar "*" de un rol que lo tiene (evita auto-lockout del admin).
+    if (actualEsUniversal && Array.isArray(nuevoPermisos) && !nuevoPermisos.includes("*")) {
+      return NextResponse.json(
+        { ok: false, error: "No se puede retirar el privilegio universal del rol administrador." },
+        { status: 400 }
+      );
+    }
+    // 3) No renombrar el rol administrador.
+    if (actualEsUniversal && data.nombre !== undefined && data.nombre !== actual.nombre) {
+      return NextResponse.json(
+        { ok: false, error: "No se puede renombrar el rol administrador." },
+        { status: 400 }
+      );
+    }
+
     const item = await prisma.rol.update({
       where: { id: rolId },
       data

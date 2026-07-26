@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 // ── Helper: auth + tenancy sin depender de ?localId ─────
@@ -94,6 +95,9 @@ export async function GET(req, context) {
 // ========================================================
 export async function PUT(req, context) {
   try {
+    const admin = requireAdmin(req);
+    if (!admin.ok) return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+
     const { id } = await context.params;
     const numId = Number(id);
 
@@ -150,6 +154,9 @@ export async function PUT(req, context) {
 // ========================================================
 export async function DELETE(req, context) {
   try {
+    const admin = requireAdmin(req);
+    if (!admin.ok) return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+
     const { id } = await context.params;
     const numId = Number(id);
 

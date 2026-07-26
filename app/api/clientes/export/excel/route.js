@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import * as XLSX from "xlsx";
 
 export async function GET(req) {
   try {
+    const session = getUsuarioSession(req);
+    if (!session) return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    const perm = checkPerm(session, "clientes.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
     const scope = await resolveLocalAndGrupo(req);
     if (scope.error) {
       return NextResponse.json(

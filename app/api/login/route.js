@@ -104,9 +104,10 @@ export async function POST(req) {
     // ============================
     // 4) Permisos del rol
     // ============================
-    const permisos = Array.isArray(user.rol?.permisos)
-      ? user.rol.permisos
-      : ["*"];
+    // Seguridad: si permisos no es un array válido (null/objeto/string/JSON inválido),
+    // NO otorgar admin. Fail-closed → sin permisos. El rol Admin real guarda ["*"]
+    // (array) y se conserva tal cual.
+    const permisos = Array.isArray(user.rol?.permisos) ? user.rol.permisos : [];
 
     // ============================
     // 5) Payload del JWT
