@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 
 export async function GET(req) {
@@ -11,6 +12,11 @@ export async function GET(req) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    const perm = checkPerm(session, "reportes.ver");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     const { searchParams } = req.nextUrl;
@@ -37,12 +43,20 @@ export async function GET(req) {
       },
     };
 
-    // Filtrar por local
-    if (localIdParam) {
-      where.localId = Number(localIdParam);
-    } else if (session.localId) {
-      // Usuario no admin: solo su local
-      where.localId = session.localId;
+    // Scope estricto por local. No-admin: SIEMPRE su local; un localId ajeno por
+    // query → 403 (no se ignora en silencio). Admin: filtro opcional o ve todo.
+    const qLocal = Number(localIdParam) || 0;
+    if (!session.esAdmin) {
+      const propio = Number(session.localId) || 0;
+      if (!propio) {
+        return NextResponse.json({ ok: false, error: "Sin alcance autorizado." }, { status: 403 });
+      }
+      if (qLocal && qLocal !== propio) {
+        return NextResponse.json({ ok: false, error: "Local fuera de tu alcance." }, { status: 403 });
+      }
+      where.localId = propio;
+    } else if (qLocal) {
+      where.localId = qLocal;
     }
     // Admin sin filtro de local: ve todo (no filtra por localId)
 

@@ -1,7 +1,7 @@
 // app/api/productos/listar/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { resolveScope } from "@/lib/grupos";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
@@ -39,23 +39,17 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
 
-    // localId requerido
-    const localId = Number(searchParams.get("localId") || 0);
-    if (!localId || Number.isNaN(localId)) {
+    // Scope estricto por local. No-admin: SIEMPRE su local; un localId ajeno por
+    // query → 403. Admin: puede indicar el local a ver (o su contexto activo).
+    const qLocal = Number(searchParams.get("localId") || 0) || null;
+    const scope = await resolveScope(req, { explicitLocalId: qLocal });
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "localId requerido" },
-        { status: 400 }
+        { ok: false, error: scope.error, ...(scope.needsContexto ? { needsContexto: true } : {}) },
+        { status: scope.status }
       );
     }
-
-    // Grupo del local
-    const grupoId = await getGrupoIdDeLocal(localId);
-    if (!grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "El local no pertenece a ningún grupo" },
-        { status: 400 }
-      );
-    }
+    const { localId, grupoId } = scope;
 
     // Paginación
     const page = Math.max(Number(searchParams.get("page") || 1), 1);

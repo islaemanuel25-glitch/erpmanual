@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 export async function GET(req) {
   try {
@@ -17,6 +18,15 @@ export async function GET(req) {
           error: "No autenticado",
         },
         { status: 401 }
+      );
+    }
+
+    // Las categorías son parte del catálogo de productos.
+    const perm = checkPerm(session, "productos.ver");
+    if (!perm.ok) {
+      return NextResponse.json(
+        { ok: false, items: [], total: 0, totalPages: 1, tieneSinCategoria: false, error: perm.error },
+        { status: perm.status }
       );
     }
 

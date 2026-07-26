@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 
 const DEFAULT_LIMIT = 50;
@@ -14,6 +15,11 @@ export async function GET(req) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    const perm = checkPerm(session, "reportes.ver");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     const { searchParams } = req.nextUrl;
@@ -47,10 +53,20 @@ export async function GET(req) {
       },
     };
 
-    if (localIdParam) {
-      where.localId = Number(localIdParam);
-    } else if (session.localId) {
-      where.localId = session.localId;
+    // Scope estricto por local. No-admin: SIEMPRE su local; localId ajeno por
+    // query → 403. Admin: filtro opcional o ve todo.
+    const qLocal = Number(localIdParam) || 0;
+    if (!session.esAdmin) {
+      const propio = Number(session.localId) || 0;
+      if (!propio) {
+        return NextResponse.json({ ok: false, error: "Sin alcance autorizado." }, { status: 403 });
+      }
+      if (qLocal && qLocal !== propio) {
+        return NextResponse.json({ ok: false, error: "Local fuera de tu alcance." }, { status: 403 });
+      }
+      where.localId = propio;
+    } else if (qLocal) {
+      where.localId = qLocal;
     }
 
     if (formaPagoParam) {

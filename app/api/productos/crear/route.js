@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getGrupoIdDeLocal, getLocalesDeGrupo } from "@/lib/grupos";
+import { resolveScope, getLocalesDeGrupo } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
@@ -30,15 +30,19 @@ export async function POST(req) {
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const url = new URL(req.url);
-    const localId = Number(url.searchParams.get("localId") || 0);
-    const body = await req.json();
-
-    if (!localId) {
+    // Scope estricto por local. No-admin: SIEMPRE su local; localId ajeno por query
+    // → 403 (no crea en local ajeno). Admin: local explícito o contexto activo.
+    const qLocal = Number(url.searchParams.get("localId") || 0) || null;
+    const scope = await resolveScope(req, { explicitLocalId: qLocal });
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "localId requerido" },
-        { status: 400 }
+        { ok: false, error: scope.error, ...(scope.needsContexto ? { needsContexto: true } : {}) },
+        { status: scope.status }
       );
     }
+    const localId = scope.localId;
+    const grupoId = scope.grupoId;
+    const body = await req.json();
 
     // Guard combos: el alta normal de productos NO crea combos. Un combo es un
     // ProductoBase(es_combo) exclusivo de un local, sin StockLocal, y se crea por
@@ -58,15 +62,6 @@ export async function POST(req) {
       v === "" || v === null || v === undefined || Number.isNaN(Number(v))
         ? null
         : Number(v);
-
-    // 1) Obtener grupo del local creador
-    const grupoId = await getGrupoIdDeLocal(localId);
-    if (!grupoId) {
-      return NextResponse.json(
-        { ok: false, error: "El local no pertenece a ningún grupo" },
-        { status: 400 }
-      );
-    }
 
     // 2) Validar proveedores no repetidos
     const provIds = [num(body.proveedor_id), num(body.proveedor2_id), num(body.proveedor3_id)]

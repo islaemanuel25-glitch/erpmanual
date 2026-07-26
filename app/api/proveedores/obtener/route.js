@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
+import { resolveGrupo } from "@/lib/grupos";
 
 export async function GET(req) {
   try {
@@ -10,6 +12,20 @@ export async function GET(req) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    // Lectura de proveedor: se usa tanto en Proveedores como en flujos de Compras.
+    // Aceptar cualquiera de los dos permisos para no romper roles operativos.
+    const permProv = checkPerm(session, "proveedores.ver");
+    const permCompras = checkPerm(session, "compras.ver");
+    if (!permProv.ok && !permCompras.ok) {
+      return NextResponse.json({ ok: false, error: permProv.error }, { status: permProv.status });
+    }
+
+    // Scope de grupo: solo proveedores del grupo de la sesión (ajeno → 404, no revela).
+    const scope = await resolveGrupo(req);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
 
     const { searchParams } = new URL(req.url);
@@ -22,8 +38,8 @@ export async function GET(req) {
       );
     }
 
-    const item = await prisma.proveedor.findUnique({
-      where: { id },
+    const item = await prisma.proveedor.findFirst({
+      where: { id, grupoId: scope.grupoId },
       select: {
         id: true,
         nombre: true,
