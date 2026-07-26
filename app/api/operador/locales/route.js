@@ -4,13 +4,24 @@ import { requirePerm } from "@/lib/authorize";
 
 export async function GET(req) {
   try {
-    const perm = requirePerm(req, "usuarios.gestionar");
+    const perm = requirePerm(req, "config_local.operadores");
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
+    const session = perm.session;
+
+    // Scope: un no-admin solo ve SU local como destino de asignación.
+    const where = { activo: true };
+    if (!session.esAdmin) {
+      const propio = Number(session.localId) || 0;
+      if (!propio) {
+        return NextResponse.json({ ok: false, error: "Sin alcance autorizado." }, { status: 403 });
+      }
+      where.id = propio;
+    }
 
     const locales = await prisma.local.findMany({
-      where: { activo: true },
+      where,
       select: { id: true, nombre: true, es_deposito: true },
       orderBy: { nombre: "asc" },
     });

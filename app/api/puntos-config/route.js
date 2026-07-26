@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/authorize";
+import { checkPerm } from "@/lib/authorize";
+import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 
 // GET /api/puntos-config?localId=...
@@ -36,9 +37,15 @@ export async function GET(req) {
 // PUT /api/puntos-config
 export async function PUT(req) {
   try {
-    const auth = requireAdmin(req);
-    if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+    const session = getUsuarioSession(req);
+    if (!session) {
+      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    }
+    if (!session.esAdmin && !checkPerm(session, "config_local.fidelidad").ok) {
+      return NextResponse.json({ ok: false, error: "Sin permiso: config_local.fidelidad" }, { status: 403 });
+    }
 
+    // Scope estricto por local (no-admin atado a session.localId; ajeno → 403).
     const scope = await resolveLocalAndGrupo(req);
     if (scope.error) {
       return NextResponse.json(

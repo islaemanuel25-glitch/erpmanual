@@ -6,6 +6,7 @@ import { requireOperadorSalvoDueno, verificarVoucherOperador } from "@/lib/opera
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
+import { getConfigLocalEfectiva } from "@/lib/config/local";
 
 // Mapea lista.tipoBase a VentaDetalle.tipoPrecioAplicado.
 // MANUAL_AUTORIZADO y casos desconocidos caen a PRECIO_VENTA (fallback).
@@ -161,17 +162,15 @@ export async function POST(req) {
     // Gate "cliente obligatorio" según contexto + config del grupo.
     // Se evalúa antes de la regla de fiado para mensaje más específico.
     if (!clienteId) {
-      const [localCtx, configGrupo] = await Promise.all([
-        prisma.local.findUnique({ where: { id: localId }, select: { es_deposito: true } }),
-        prisma.configuracionGrupo.findUnique({
-          where: { grupoId },
-          select: { exigirClienteVentasDeposito: true, exigirClienteVentasLocal: true },
-        }),
-      ]);
+      const localCtx = await prisma.local.findUnique({
+        where: { id: localId },
+        select: { es_deposito: true },
+      });
       const esDeposito = localCtx?.es_deposito === true;
-      const exigir = esDeposito
-        ? configGrupo?.exigirClienteVentasDeposito === true
-        : configGrupo?.exigirClienteVentasLocal === true;
+      // Config EFECTIVA por local (config_local.pos), con herencia al grupo.
+      const { exigirClienteVenta: exigir } = await getConfigLocalEfectiva(localId, grupoId, {
+        esDeposito,
+      });
       if (exigir) {
         return NextResponse.json(
           {
@@ -417,12 +416,12 @@ export async function POST(req) {
     // DENTRO de la transacción (más abajo), porque los combos requieren cargar su
     // composición desde la base para consolidar el consumo físico de componentes.
 
-    // Leer config de stock negativo desde DB
-    const configGrupo = await prisma.configuracionGrupo.findUnique({
-      where: { grupoId },
-      select: { allowNegativeStock: true },
-    });
-    const ALLOW_NEGATIVE_STOCK = configGrupo?.allowNegativeStock === true;
+    // Config EFECTIVA por local de "vender sin stock" (config_local.stock),
+    // con herencia al grupo (fase 1 de la migración group→local).
+    const { allowNegativeStock: ALLOW_NEGATIVE_STOCK } = await getConfigLocalEfectiva(
+      localId,
+      grupoId
+    );
 
     // Transaccion: crear venta + descontar stock + movimiento CC si fiado
     const txResult = await prisma.$transaction(async (tx) => {

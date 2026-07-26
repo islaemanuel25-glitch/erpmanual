@@ -5,10 +5,11 @@ import { requirePerm } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
-    const perm = requirePerm(req, "usuarios.gestionar");
+    const perm = requirePerm(req, "config_local.operadores");
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
+    const session = perm.session;
 
     const body = await req.json();
     const { nombre, pin, localIds } = body;
@@ -21,6 +22,20 @@ export async function POST(req) {
     }
     if (!Array.isArray(localIds) || localIds.length === 0) {
       return NextResponse.json({ ok: false, error: "Seleccioná al menos un local." }, { status: 400 });
+    }
+
+    // Scope: un no-admin solo puede asignar operadores a SU local. Un localId
+    // ajeno → 403 (no se ignora). Admin puede asignar a cualquier local.
+    let asignLocalIds = localIds.map(Number);
+    if (!session.esAdmin) {
+      const propio = Number(session.localId) || 0;
+      if (!propio) {
+        return NextResponse.json({ ok: false, error: "Sin alcance autorizado." }, { status: 403 });
+      }
+      if (asignLocalIds.some((id) => id !== propio)) {
+        return NextResponse.json({ ok: false, error: "Local fuera de tu alcance." }, { status: 403 });
+      }
+      asignLocalIds = [propio];
     }
 
     const nombreNorm = nombre.trim();
@@ -40,7 +55,7 @@ export async function POST(req) {
     });
 
     await prisma.operadorEnLocal.createMany({
-      data: localIds.map((lid) => ({ operadorId: operador.id, localId: Number(lid) })),
+      data: asignLocalIds.map((lid) => ({ operadorId: operador.id, localId: Number(lid) })),
     });
 
     return NextResponse.json({ ok: true, operador });

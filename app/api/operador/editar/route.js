@@ -5,10 +5,11 @@ import { requirePerm } from "@/lib/authorize";
 
 export async function POST(req) {
   try {
-    const perm = requirePerm(req, "usuarios.gestionar");
+    const perm = requirePerm(req, "config_local.operadores");
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
+    const session = perm.session;
 
     const body = await req.json();
     const { id, nombre, pin, activo, localIds } = body;
@@ -19,9 +20,23 @@ export async function POST(req) {
 
     const operador = await prisma.operadorLocal.findUnique({
       where: { id: Number(id) },
+      include: { locales: { select: { localId: true } } },
     });
     if (!operador) {
       return NextResponse.json({ ok: false, error: "Operador no encontrado." }, { status: 404 });
+    }
+
+    // Scope: un no-admin solo gestiona operadores que pertenecen a SU local, y no
+    // puede reasignar locales (evita clobbear la membresía en otros locales).
+    if (!session.esAdmin) {
+      const propio = Number(session.localId) || 0;
+      const localesOp = operador.locales.map((l) => l.localId);
+      if (!propio || !localesOp.includes(propio)) {
+        return NextResponse.json({ ok: false, error: "No autorizado para este operador." }, { status: 403 });
+      }
+      if (Array.isArray(localIds) && localIds.map(Number).some((lid) => lid !== propio)) {
+        return NextResponse.json({ ok: false, error: "Local fuera de tu alcance." }, { status: 403 });
+      }
     }
 
     const data = {};
@@ -56,7 +71,9 @@ export async function POST(req) {
       data,
     });
 
-    if (Array.isArray(localIds)) {
+    // La reasignación completa de locales es solo para admin. Un no-admin ya quedó
+    // acotado a su local (validado arriba) y no reescribe la membresía multi-local.
+    if (session.esAdmin && Array.isArray(localIds)) {
       await prisma.operadorEnLocal.deleteMany({ where: { operadorId: operador.id } });
       if (localIds.length > 0) {
         await prisma.operadorEnLocal.createMany({

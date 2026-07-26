@@ -107,7 +107,29 @@ model Local {
   pedidosProveedor   PedidoProveedor[]
   auditoriaStock     AuditoriaStock[]
   ticketConfig       TicketConfig?
+  configuracionLocal ConfiguracionLocal?
   operadorAsignaciones OperadorEnLocal[]
+}
+
+// Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
+// campos group-scoped de ConfiguracionGrupo para "vender sin stock" y "cliente
+// obligatorio". Un campo null = heredar el valor efectivo del grupo (transición
+// en dos fases: los campos de ConfiguracionGrupo se conservan en fase 1).
+model ConfiguracionLocal {
+  id                 Int      @id @default(autoincrement())
+  localId            Int      @unique
+  allowNegativeStock Boolean? // vender sin stock (config_local.stock)
+  exigirClienteVenta Boolean? // cliente obligatorio en POS (config_local.pos)
+  // Apariencia INSTITUCIONAL del local (config_local.apariencia): tema + opciones
+  // de visualización de negocio que aplican a TODOS los dispositivos del local.
+  // Distinta de la preferencia personal por navegador (localStorage).
+  aparienciaJson     Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  local Local @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  @@index([localId])
 }
 
 model Usuario {
