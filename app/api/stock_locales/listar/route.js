@@ -140,6 +140,7 @@ export async function GET(req) {
         ...(estadoStockClauses.length ? { AND: estadoStockClauses } : {}),
         base: {
           activo: true,
+          es_combo: false,
           categoria_id: categoria ? Number(categoria) : undefined,
           area_fisica_id: area ? Number(area) : undefined,
           AND: [baseClause],
@@ -243,6 +244,8 @@ export async function GET(req) {
           activo: true,
           locales: { none: { localId } },
           ...productoVisibleWhere(localId),
+          // Los combos NUNCA reciben ProductoLocal/StockLocal físico.
+          es_combo: false,
         },
         select: { id: true, precio_costo: true, precio_venta: true, margen: true, activo: true },
       });
@@ -302,6 +305,7 @@ export async function GET(req) {
         ...(estadoStockClausesDepo.length ? { AND: estadoStockClausesDepo } : {}),
         base: {
           activo: true,
+          es_combo: false,
           categoria_id: categoria ? Number(categoria) : undefined,
           area_fisica_id: area ? Number(area) : undefined,
           AND: [baseClauseDepo],

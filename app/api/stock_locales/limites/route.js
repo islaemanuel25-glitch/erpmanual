@@ -94,13 +94,21 @@ export async function POST(req) {
     // ======================================================
     const prodLocal = await prisma.productoLocal.findUnique({
       where: { id: productoLocalId },
-      select: { id: true, localId: true },
+      select: { id: true, localId: true, base: { select: { es_combo: true } } },
     });
 
     if (!prodLocal || prodLocal.localId !== localId) {
       return NextResponse.json(
         { ok: false, error: "Producto/local inválido." },
         { status: 404 }
+      );
+    }
+
+    // Los combos no tienen stock físico: no se les fijan límites.
+    if (prodLocal.base?.es_combo) {
+      return NextResponse.json(
+        { ok: false, error: "Los combos no tienen stock físico: operá sus componentes." },
+        { status: 400 }
       );
     }
 

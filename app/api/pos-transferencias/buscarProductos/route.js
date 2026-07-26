@@ -68,7 +68,10 @@ export async function GET(req) {
       const productos = await prisma.productoLocal.findMany({
         // Regla A: no se ofrecen productos creados por otro local (relevante
         // cuando el origen es el depósito).
-        where: { localId: origenId, base: productoVisibleWhere(origenId) },
+        where: {
+          localId: origenId,
+          base: { AND: [productoVisibleWhere(origenId), { es_combo: false }] },
+        },
         include: {
           base: { include: { categoria: true, area_fisica: true } },
           stock: { where: { localId: origenId }, select: { cantidad: true } },
@@ -89,7 +92,10 @@ export async function GET(req) {
     // efecto de un take fijo (ej. "leche" no encontraba "Leche Cotar").
     const candidatos = await prisma.productoLocal.findMany({
       // Regla A: mismo filtro que arriba.
-      where: { localId: origenId, base: productoVisibleWhere(origenId) },
+      where: {
+        localId: origenId,
+        base: { AND: [productoVisibleWhere(origenId), { es_combo: false }] },
+      },
       select: {
         id: true,
         nombre: true,

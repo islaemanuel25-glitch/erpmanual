@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
+import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req) {
   try {
@@ -94,6 +95,10 @@ export async function POST(req) {
         if (!cantidadRaw || cantidadRaw <= 0) return null;
 
         const base = detalle.producto?.base;
+        // Los combos no se transfieren: se transfieren sus componentes.
+        if (esComboBase(base)) {
+          throw new Error("COMBO_NO_TRANSFERIBLE");
+        }
         const factorPack = Number(base?.factor_pack || 1);
 
         const modoEnvio =
@@ -323,6 +328,12 @@ export async function POST(req) {
     if (err.message === "ALREADY_SENT") {
       return NextResponse.json(
         { ok: false, error: "Esta transferencia ya fue enviada." },
+        { status: 400 }
+      );
+    }
+    if (err.message === "COMBO_NO_TRANSFERIBLE") {
+      return NextResponse.json(
+        { ok: false, error: "Los combos no se transfieren; se transfieren sus componentes." },
         { status: 400 }
       );
     }

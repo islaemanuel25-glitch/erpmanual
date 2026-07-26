@@ -107,6 +107,16 @@ export async function POST(req) {
       );
     }
 
+    // Guard combos: este endpoint crea ProductoLocal + StockLocal para todos los
+    // locales. Un combo NO debe tener StockLocal ni replicarse; se crea por
+    // /api/combos/crear. Bloqueamos el passthrough esCombo aquí.
+    if (data.esCombo) {
+      return NextResponse.json(
+        { ok: false, error: "Los combos no se crean desde stock: usá el módulo de combos (/api/combos/crear)." },
+        { status: 400 }
+      );
+    }
+
     // --------------------------------------------
     // 3. Validar duplicado (código de barras)
     // --------------------------------------------

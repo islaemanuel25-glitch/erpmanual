@@ -10,7 +10,7 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
 
-import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Warehouse } from "lucide-react";
+import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Warehouse, Eye } from "lucide-react";
 
 // Campos que se pueden ordenar desde el backend
 const SORTABLE_KEYS = [
@@ -35,6 +35,8 @@ export default function SunmiTablaProductos({
   onEditar,
   onEliminar,
   onSubirDeposito,
+  onEditarCombo,
+  onVerComposicion,
   localId,
   esDeposito,
   catalogos,
@@ -277,62 +279,84 @@ export default function SunmiTablaProductos({
               ))}
 
               <td className="px-3 py-1.5 w-[80px] text-right flex gap-1 justify-end">
-                {/* Regla A: "subir al depósito" solo para un producto propio del
-                    local (no desde el depósito, no sobre productos del depósito). */}
-                {onSubirDeposito && !esDeposito && row.creadoEnLocalId &&
-                  Number(row.creadoEnLocalId) === Number(localId) && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onSubirDeposito(row.id);
-                    }}
-                    className="w-[26px] h-[26px] flex items-center justify-center rounded-md sunmi-btn-secondary transition cursor-pointer"
-                    type="button"
-                    aria-label="Subir al depósito"
-                    title="Subir al catálogo del depósito"
-                  >
-                    <Warehouse size={14} />
-                  </button>
+                {row.esCombo ? (
+                  <>
+                    {/* Combo: solo editar combo + ver composición. Sin stock,
+                        límites, transferencia, compra ni promoción. */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onVerComposicion) onVerComposicion(row);
+                      }}
+                      className="w-[26px] h-[26px] flex items-center justify-center rounded-md sunmi-btn-secondary transition cursor-pointer"
+                      type="button"
+                      aria-label="Ver composición"
+                      title="Ver composición"
+                    >
+                      <Eye size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onEditarCombo && row.localProductoId) onEditarCombo(row.localProductoId);
+                      }}
+                      className="w-[26px] h-[26px] flex items-center justify-center rounded-md sunmi-btn-secondary transition cursor-pointer"
+                      type="button"
+                      aria-label="Editar combo"
+                      title="Editar combo"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* Regla A: "subir al depósito" solo para un producto propio del
+                        local (no desde el depósito, no sobre productos del depósito). */}
+                    {onSubirDeposito && !esDeposito && row.creadoEnLocalId &&
+                      Number(row.creadoEnLocalId) === Number(localId) && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onSubirDeposito(row.id);
+                        }}
+                        className="w-[26px] h-[26px] flex items-center justify-center rounded-md sunmi-btn-secondary transition cursor-pointer"
+                        type="button"
+                        aria-label="Subir al depósito"
+                        title="Subir al catálogo del depósito"
+                      >
+                        <Warehouse size={14} />
+                      </button>
+                    )}
+
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onEditar && row.id) onEditar(row.id);
+                      }}
+                      className="w-[26px] h-[26px] flex items-center justify-center rounded-md sunmi-btn-secondary transition cursor-pointer"
+                      type="button"
+                      aria-label="Editar"
+                    >
+                      <Pencil size={14} />
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEliminar(row.id);
+                      }}
+                      className="w-[26px] h-[26px] flex items-center justify-center rounded-md sunmi-btn-red transition"
+                      type="button"
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
                 )}
-
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (onEditar && row.id) onEditar(row.id);
-                  }}
-                  className="
-                    w-[26px] h-[26px]
-                    flex items-center justify-center
-                    rounded-md
-                    sunmi-btn-secondary
-                    transition
-                    cursor-pointer
-                  "
-                  type="button"
-                  aria-label="Editar"
-                >
-                  <Pencil size={14} />
-                </button>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEliminar(row.id);
-                  }}
-                  className="
-                    w-[26px] h-[26px]
-                    flex items-center justify-center
-                    rounded-md
-                    sunmi-btn-red
-                    transition
-                  "
-                  type="button"
-                  aria-label="Eliminar"
-                >
-                  <Trash2 size={14} />
-                </button>
               </td>
             </SunmiTableRow>
             );

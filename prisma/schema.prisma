@@ -239,6 +239,7 @@ model ProductoBase {
   locales         ProductoLocal[]
   ventaDetalles   VentaDetalle[]
   codigosProveedor ProductoCodigoProveedor[]
+  componenteEnVentas VentaDetalleComponente[]
 
   @@unique([grupoId, codigo_barra])
   @@index([grupoId])
@@ -294,7 +295,13 @@ model ProductoLocal {
   posDetalles             PosTransferenciaDetalle[]
   pedidoProveedorDetalles PedidoProveedorDetalle[]
 
+  // Combos exclusivos por local (E1). Las FK son COMPUESTAS a (id, localId).
+  combosComoCombo         ComboComponente[]        @relation("ComboComponente_comboPL")
+  combosComoComponente    ComboComponente[]        @relation("ComboComponente_componentePL")
+  ventaDetalleComponentes VentaDetalleComponente[]
+
   @@unique([localId, baseId])
+  @@unique([id, localId]) // destino de las FK compuestas de ComboComponente
   @@index([localId])
   @@index([baseId])
 }
@@ -316,6 +323,35 @@ model StockLocal {
   @@unique([localId, productoId])
   @@index([localId])
   @@index([productoId])
+}
+
+// ---------------------------------------------------------------------------
+// COMBOS EXCLUSIVOS POR LOCAL (E1)
+// ---------------------------------------------------------------------------
+// Composición de un combo (ProductoBase.es_combo = true) atada a UNA ubicación.
+// El combo y cada componente son ProductoLocal del MISMO local: se garantiza
+// con dos FK COMPUESTAS a ProductoLocal(id, localId) + un CHECK de igualdad
+// (comboLocalId = componenteLocalId) que se agrega en la migración.
+// El combo NO tiene StockLocal propio; su disponibilidad se calcula (etapas
+// posteriores) a partir del stock de sus componentes en ese local.
+model ComboComponente {
+  id                        Int      @id @default(autoincrement())
+  comboProductoLocalId      Int
+  comboLocalId              Int
+  componenteProductoLocalId Int
+  componenteLocalId         Int
+  cantidad                  Decimal  @db.Decimal(12, 3)
+  createdAt                 DateTime @default(now())
+
+  // Borrar el ProductoLocal del combo elimina su composición (Cascade).
+  comboPL      ProductoLocal @relation("ComboComponente_comboPL", fields: [comboProductoLocalId, comboLocalId], references: [id, localId], onDelete: Cascade, map: "ComboComponente_comboPL_fkey")
+  // No se puede borrar un ProductoLocal que es componente de un combo (Restrict).
+  componentePL ProductoLocal @relation("ComboComponente_componentePL", fields: [componenteProductoLocalId, componenteLocalId], references: [id, localId], onDelete: Restrict, map: "ComboComponente_componentePL_fkey")
+
+  // Nombres explícitos (map): algunos superan los 63 chars y Prisma los truncaría.
+  @@unique([comboProductoLocalId, componenteProductoLocalId], map: "ComboComponente_combo_componente_key") // sin componentes duplicados
+  @@index([componenteProductoLocalId, componenteLocalId], map: "ComboComponente_componentePL_idx")
+  @@index([comboLocalId])
 }
 
 model ListaPrecio {
@@ -726,10 +762,41 @@ model VentaDetalle {
   venta        Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   productoBase ProductoBase @relation(fields: [productoBaseId], references: [id])
   listaPrecio  ListaPrecio? @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
+  componentes  VentaDetalleComponente[]
 
   @@index([ventaId])
   @@index([productoBaseId])
   @@index([listaPrecioId])
+}
+
+// COMPONENTES CONSUMIDOS POR UNA LÍNEA DE VENTA DE COMBO (E1)
+// ---------------------------------------------------------------------------
+// Congela QUÉ stock se descontó al vender un combo, para poder (a futuro)
+// anular reponiendo cada componente y para trazabilidad/ticket. Una fila por
+// componente consumido. Se puebla recién en la etapa del POS; la tabla nace en E1.
+model VentaDetalleComponente {
+  id              Int      @id @default(autoincrement())
+  ventaDetalleId  Int
+  productoBaseId  Int // identidad comercial/histórica del componente
+  productoLocalId Int? // fila exacta de stock descontada
+  cantidad        Decimal  @db.Decimal(12, 3) // ya multiplicada por la cantidad de combos vendidos
+  precioCosto     Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+
+  // Cascade: borrar la línea de venta borra sus componentes congelados.
+  ventaDetalle VentaDetalle @relation(fields: [ventaDetalleId], references: [id], onDelete: Cascade)
+  // Restrict (intencional): si un ProductoBase participó como componente vendido,
+  // NO puede eliminarse físicamente mientras exista este historial —preserva
+  // identidad y trazabilidad—. El producto igual puede DESACTIVARSE (activo=false).
+  productoBase ProductoBase @relation(fields: [productoBaseId], references: [id])
+  // SetNull: la fila de stock exacta se conserva mientras exista; si algún día se
+  // borra el ProductoLocal, la referencia queda null sin bloquear ni borrar el
+  // historial (fallback: resolver por Venta.localId + productoBaseId).
+  productoLocal ProductoLocal? @relation(fields: [productoLocalId], references: [id], onDelete: SetNull)
+
+  @@index([ventaDetalleId])
+  @@index([productoBaseId])
+  @@index([productoLocalId])
 }
 
 // TURNOS DE CAJA

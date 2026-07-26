@@ -18,6 +18,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import FiltrosProductos from "@/components/productos/FiltrosProductos";
 import ColumnManager from "@/components/productos/ColumnManager";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
+import ModalVerComposicion from "@/components/productos/ModalVerComposicion";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
@@ -103,6 +104,8 @@ export default function ProductosPage() {
         : searchParams.get("activo") === "true"
         ? "activos"
         : "activos"),
+    // tipo: todos (default) | productos | combos.
+    tipo: searchParams.get("tipo") || "todos",
   });
 
   // =========================================================
@@ -120,6 +123,9 @@ export default function ProductosPage() {
     // Sólo persistir estado en URL cuando no es el default "activos".
     if (filtros.estado && filtros.estado !== "activos") {
       params.set("estado", filtros.estado);
+    }
+    if (filtros.tipo && filtros.tipo !== "todos") {
+      params.set("tipo", filtros.tipo);
     }
     const qs = params.toString();
     return qs ? `/modulos/productos?${qs}` : "/modulos/productos";
@@ -195,6 +201,7 @@ export default function ProductosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [loadingEditar, setLoadingEditar] = useState(false);
+  const [verCombo, setVerCombo] = useState(null); // Ver composición: { productoLocalId } | null
 
   // =========================================================
   // ESTADO IMPORT/EXPORT
@@ -261,6 +268,7 @@ export default function ProductosPage() {
         proveedorId: filtros.proveedor,
         areaFisicaId: filtros.area,
         estado: filtros.estado || "activos",
+        tipo: filtros.tipo || "todos",
         localId: String(localId),
       });
 
@@ -456,6 +464,19 @@ export default function ProductosPage() {
 
   const abrirNuevo = () => {
     router.push("/modulos/productos/nuevo");
+  };
+
+  const abrirNuevoCombo = () => {
+    router.push("/modulos/productos/nuevo-combo");
+  };
+
+  const abrirEditarCombo = (productoLocalId) => {
+    if (!productoLocalId) return;
+    router.push(`/modulos/productos/editar-combo/${productoLocalId}`);
+  };
+
+  const abrirVerComposicion = (row) => {
+    if (row?.localProductoId) setVerCombo({ productoLocalId: row.localProductoId });
   };
 
   const abrirActualizacionPrecios = () => {
@@ -803,7 +824,8 @@ export default function ProductosPage() {
                     f.categoria !== filtros.categoria ||
                     f.proveedor !== filtros.proveedor ||
                     f.area !== filtros.area ||
-                    f.estado !== filtros.estado;
+                    f.estado !== filtros.estado ||
+                    f.tipo !== filtros.tipo;
                   if (changed) {
                     setPage(1);
                     setFiltros(f);
@@ -815,7 +837,10 @@ export default function ProductosPage() {
               <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full mt-1">
                 <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                   <SunmiButton color="amber" onClick={abrirNuevo}>
-                    + Nuevo producto
+                    + Producto
+                  </SunmiButton>
+                  <SunmiButton color="amber" onClick={abrirNuevoCombo}>
+                    + Combo
                   </SunmiButton>
                   <SunmiButton color="cyan" onClick={abrirActualizacionPrecios}>
                     Actualización de precios
@@ -869,6 +894,8 @@ export default function ProductosPage() {
                     onEditar={abrirEditar}
                     onEliminar={handleEliminar}
                     onSubirDeposito={subirADeposito}
+                    onEditarCombo={abrirEditarCombo}
+                    onVerComposicion={abrirVerComposicion}
                     localId={localId}
                     esDeposito={contexto?.esDeposito}
                     catalogos={catalogos}
@@ -1221,6 +1248,17 @@ export default function ProductosPage() {
           catalogos={catalogos}
           initialData={editing}
           localId={localId}
+        />
+
+        <ModalVerComposicion
+          open={!!verCombo}
+          productoLocalId={verCombo?.productoLocalId}
+          localId={localId}
+          onClose={() => setVerCombo(null)}
+          onEditar={(plId) => {
+            setVerCombo(null);
+            abrirEditarCombo(plId);
+          }}
         />
       </SunmiCard>
     </div>

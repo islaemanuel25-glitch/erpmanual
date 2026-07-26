@@ -79,6 +79,7 @@ export async function GET(req) {
         AND: [
           { grupoId },
           { activo: true },
+          { es_combo: false },
           categoriaId ? { categoria_id: categoriaId } : {},
           proveedorId ? { proveedor_id: proveedorId } : {},
           areaId ? { area_fisica_id: areaId } : {},

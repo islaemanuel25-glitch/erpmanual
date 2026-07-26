@@ -39,6 +39,15 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "Producto no encontrado en el grupo" }, { status: 404 });
     }
 
+    // Guard combos: un combo es exclusivo del local que lo creó y no tiene stock
+    // físico; no puede promoverse ni replicarse al depósito/otros locales.
+    if (base.es_combo) {
+      return NextResponse.json(
+        { ok: false, error: "Un combo no puede promoverse al depósito: es exclusivo del local que lo creó." },
+        { status: 400 }
+      );
+    }
+
     // Ya es de depósito (o sin creador = de depósito) → no-op idempotente.
     const yaEsDeposito = base.creadoEnLocalId == null || base.creadoEnLocal?.es_deposito === true;
 

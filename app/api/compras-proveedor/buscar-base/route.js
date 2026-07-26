@@ -49,6 +49,7 @@ export async function GET(req) {
       where: {
         grupoId,
         activo: true,
+        es_combo: false,
         AND: [
           {
             OR: [

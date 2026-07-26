@@ -17,6 +17,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
+import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req, { params }) {
   try {
@@ -139,11 +140,12 @@ export async function POST(req, { params }) {
         where: { id: updated.productoLocalId },
         select: {
           base: {
-            select: { factor_pack: true, modoCompraProveedor: true, unidad_medida: true },
+            select: { factor_pack: true, modoCompraProveedor: true, unidad_medida: true, es_combo: true },
           },
         },
       });
-      if (pl?.base) {
+      // Los combos no propagan costo: no tienen stock físico ni se compran.
+      if (pl?.base && !esComboBase(pl.base)) {
         const costoMaestro = costoLineaAMaestro({
           precioCosto: data.precioCosto,
           unidad: updated.unidad,

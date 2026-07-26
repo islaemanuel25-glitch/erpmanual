@@ -6,6 +6,7 @@ import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
+import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req, { params }) {
   try {
@@ -42,6 +43,7 @@ export async function POST(req, { params }) {
                 base: {
                   select: {
                     id: true,
+                    es_combo: true,
                     factor_pack: true,
                     modoCompraProveedor: true,
                     modoVentaDeposito: true,
@@ -166,6 +168,8 @@ export async function POST(req, { params }) {
         if (cantRecibida <= 0) continue;
 
         const base = det.producto?.base;
+        // Los combos no reciben StockLocal ni actualizan costo físico.
+        if (esComboBase(base)) continue;
         const modoCompra = base?.modoCompraProveedor || "BULTO";
 
         let incremento;

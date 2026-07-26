@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal, getLocalesDeGrupo, inheritDepositoProductsToLocal } from "@/lib/grupos";
 import { getContextoActivo } from "@/lib/contexto";
 import { validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
+import { esComboBase } from "@/lib/combos/guards";
 
 const CHUNK_SIZE = 50;
 
@@ -187,6 +188,15 @@ export async function POST(req) {
           }
 
           await prisma.$transaction(async (tx) => {
+            // Los combos no tienen stock físico: no se materializa ProductoLocal/StockLocal.
+            const baseActual = await tx.productoBase.findUnique({
+              where: { id: p.productoBaseId },
+              select: { es_combo: true },
+            });
+            if (esComboBase(baseActual)) {
+              throw new Error("Los combos no se materializan por stock: operá sus componentes.");
+            }
+
             // Defensa: el estado pudo cambiar entre preview y apply.
             const v = await validarUnicidadCodigos({
               prisma: tx,

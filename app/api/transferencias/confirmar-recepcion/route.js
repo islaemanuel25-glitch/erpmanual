@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
+import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req) {
   try {
@@ -102,6 +103,9 @@ export async function POST(req) {
       let tieneDiferencias = false;
 
       for (const d of transferencia.detalle) {
+        // Defensa: los combos no tienen stock físico, no se procesan aquí.
+        if (esComboBase(d.producto.base)) continue;
+
         const enviada = Number(d.cantidad || 0);
 
         const recibida =

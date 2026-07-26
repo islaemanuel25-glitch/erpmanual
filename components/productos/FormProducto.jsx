@@ -881,13 +881,8 @@ export default function FormProducto({
               />
             </div>
 
-            <div data-field="es_combo" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
-              <label className="text-[12px] sunmi-label">Es combo</label>
-              <SunmiToggleEstado
-                value={form.es_combo}
-                onChange={(v) => setField("es_combo", v)}
-              />
-            </div>
+            {/* El toggle "Es combo" se removió: los combos se crean/editan por su
+                flujo propio (+ Combo). El alta/edición normal nunca cambia es_combo. */}
 
             <div data-field="activo" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
               <label className="text-[12px] sunmi-label">Activo</label>
@@ -962,7 +957,7 @@ export default function FormProducto({
               </SunmiSelectAdv>
               {form.unidad_medida !== "kg" && (
                 <p className="text-xs text-amber-500 mt-1">
-                  "Por pieza / barra" solo disponible para productos con tipo de venta Kg.
+                  &quot;Por pieza / barra&quot; solo disponible para productos con tipo de venta Kg.
                 </p>
               )}
               {form.unidad_medida === "kg" && form.modoCompraProveedor === "UNIDAD" && (

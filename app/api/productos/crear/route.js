@@ -40,6 +40,20 @@ export async function POST(req) {
       );
     }
 
+    // Guard combos: el alta normal de productos NO crea combos. Un combo es un
+    // ProductoBase(es_combo) exclusivo de un local, sin StockLocal, y se crea por
+    // /api/combos/crear (lib/combos). Evita crear un "combo" con StockLocal aquí.
+    if (Boolean(body.es_combo)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Los combos se crean desde el módulo de combos (/api/combos/crear), no desde el alta de productos.",
+        },
+        { status: 400 }
+      );
+    }
+
     const num = (v) =>
       v === "" || v === null || v === undefined || Number.isNaN(Number(v))
         ? null

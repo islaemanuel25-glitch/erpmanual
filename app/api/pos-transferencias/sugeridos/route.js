@@ -88,7 +88,8 @@ export async function GET(req) {
     // 3) Productos del destino
     // ============================================================
     const productosDestino = await prisma.productoLocal.findMany({
-      where: { localId: destinoId },
+      // Los combos no se transfieren: se transfieren sus componentes.
+      where: { localId: destinoId, base: { es_combo: false } },
       include: {
         base: {
           include: {
@@ -109,7 +110,10 @@ export async function GET(req) {
     const productosOrigen = await prisma.productoLocal.findMany({
       // Regla A: el origen (depósito) solo ofrece productos del depósito, no los
       // creados por locales.
-      where: { localId: depositoId, base: productoVisibleWhere(depositoId) },
+      where: {
+        localId: depositoId,
+        base: { AND: [productoVisibleWhere(depositoId), { es_combo: false }] },
+      },
       include: {
         stock: {
           where: { localId: depositoId },

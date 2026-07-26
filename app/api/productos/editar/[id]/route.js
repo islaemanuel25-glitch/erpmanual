@@ -5,6 +5,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
+import { esComboBase } from "@/lib/combos/guards";
 
 // Sincronizar precioCosto/activo a overrides, recalculando precio_venta por margen
 async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
@@ -129,9 +130,16 @@ export async function PUT(req, context) {
     // Resolver grupoId del producto para validar unicidad cruzada
     const baseScope = await prisma.productoBase.findUnique({
       where: { id: baseId },
-      select: { grupoId: true },
+      select: { grupoId: true, es_combo: true },
     });
     if (baseScope) {
+      // Impedir convertir un producto en combo (o viceversa) desde este editor.
+      if (Boolean(payload.es_combo) !== esComboBase(baseScope)) {
+        return NextResponse.json(
+          { ok: false, error: "No se puede convertir un producto en combo ni un combo en producto normal." },
+          { status: 400 }
+        );
+      }
       const vUnic = await validarUnicidadCodigos({
         prisma,
         grupoId: baseScope.grupoId,

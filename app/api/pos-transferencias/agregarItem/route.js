@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
+import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req) {
   try {
@@ -72,6 +73,14 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "Producto del origen inexistente" },
         { status: 404 }
+      );
+    }
+
+    // Los combos no se transfieren: se transfieren sus componentes.
+    if (esComboBase(productoLocal.base)) {
+      return NextResponse.json(
+        { ok: false, error: "Los combos no se transfieren; se transfieren sus componentes." },
+        { status: 400 }
       );
     }
 

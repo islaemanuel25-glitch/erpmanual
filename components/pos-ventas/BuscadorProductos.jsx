@@ -6,6 +6,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import { showError } from "@/components/sunmi/SunmiToast";
 import { Search } from "lucide-react";
 import { fromUnidades } from "@/lib/conversiones/stock";
+import { rankearProductos } from "@/lib/pos-ventas/rankearProductos";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
 const SIN_STOCK_MSG = "Producto sin stock disponible";
 
@@ -20,7 +21,7 @@ function labelFormato(unidad) {
   }
 }
 
-function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDeposito = false }) {
+function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDeposito = false, wrapCard = true }) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -36,28 +37,6 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
   // Autofocus al montar
   useEffect(() => {
     inputRef.current?.focus();
-  }, []);
-
-  // Rankear resultados por relevancia respecto al texto buscado
-  const rankear = useCallback((items, texto) => {
-    const q = texto.trim().toLowerCase();
-    if (!q) return items;
-    return [...items].sort((a, b) => {
-      const scoreOf = (p) => {
-        const nombre = (p.nombre || "").toLowerCase();
-        const codigo = (p.codigoBarra || "").toLowerCase();
-        const codigoSec = (p.codigoBarraSecundario || "").toLowerCase();
-        if (codigo === q || codigoSec === q) return 0; // código exacto (primario o secundario)
-        if (nombre === q) return 1; // nombre exacto
-        if (nombre.startsWith(q)) return 2; // nombre empieza con
-        // alguna palabra del nombre empieza con q
-        const palabras = nombre.split(/\s+/);
-        if (palabras.some((w) => w.startsWith(q))) return 3;
-        if (nombre.includes(q)) return 4; // contiene
-        return 5;
-      };
-      return scoreOf(a) - scoreOf(b);
-    });
   }, []);
 
   // Buscar productos
@@ -79,7 +58,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
         });
         const data = await res.json();
         if (data.ok) {
-          const items = rankear(data.items || [], texto);
+          const items = rankearProductos(data.items || [], texto);
           // El backend devuelve queryInterpretada solo en fromVoice cuando la
           // transcripción no coincide con ninguna palabra real del catálogo.
           setQueryInterpretada(
@@ -131,7 +110,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
         setLoading(false);
       }
     },
-    [localId, clienteId, rankear, onAgregar, searchApi]
+    [localId, clienteId, onAgregar, searchApi]
   );
 
   // Busqueda por voz
@@ -262,8 +241,8 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
     typeof window !== "undefined" &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  return (
-    <SunmiCard className="p-2 lg:p-3">
+  const contenido = (
+    <>
       {/* Input con boton de voz */}
       <div className="relative">
         <Search
@@ -374,8 +353,10 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
           No se encontraron productos.
         </div>
       )}
-    </SunmiCard>
+    </>
   );
+
+  return wrapCard ? <SunmiCard className="p-2 lg:p-3">{contenido}</SunmiCard> : contenido;
 }
 
 export default memo(BuscadorProductos);

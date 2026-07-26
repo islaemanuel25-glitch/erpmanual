@@ -106,6 +106,11 @@ export async function GET(req) {
 
     const incompletos = searchParams.get("incompletos") === "true";
 
+    // Filtro Tipo: todos (default) | productos | combos.
+    const tipo = (searchParams.get("tipo") || "todos").toLowerCase();
+    const tipoFilter =
+      tipo === "combos" ? { es_combo: true } : tipo === "productos" ? { es_combo: false } : {};
+
     // WHERE — snake_case SOLO dentro de Prisma.
     // Filtros generales (sin proveedor): aplican siempre.
     const generalFilters = [
@@ -113,6 +118,12 @@ export async function GET(req) {
       // Regla A: el depósito no ve productos creados por locales; cada local ve
       // los del depósito + los suyos, no los de otros locales.
       productoVisibleWhere(localId),
+      // Combos: visibilidad ESTRICTA por local dueño. A diferencia de los productos
+      // normales (donde lo creado en el depósito baja a todos los locales), un combo
+      // solo se ve en el local que lo creó — incluso si nació en el depósito.
+      { OR: [{ es_combo: false }, { es_combo: true, creadoEnLocalId: localId }] },
+      // Filtro Tipo (Todos/Productos/Combos).
+      tipoFilter,
       categoriaId ? { categoria_id: categoriaId } : {},
       areaFisicaId ? { area_fisica_id: areaFisicaId } : {},
       activoFilter !== undefined ? { activo: activoFilter } : {},

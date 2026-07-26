@@ -5,7 +5,7 @@ import { requirePerm } from "@/lib/authorize";
 import { requireOperadorSalvoDueno, verificarVoucherOperador } from "@/lib/operador";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
 
 // Mapea lista.tipoBase a VentaDetalle.tipoPrecioAplicado.
 // MANUAL_AUTORIZADO y casos desconocidos caen a PRECIO_VENTA (fallback).
@@ -387,7 +387,7 @@ export async function POST(req) {
     const productoBaseIds = items.map((i) => i.productoBaseId);
     const productosBase = await prisma.productoBase.findMany({
       where: { id: { in: productoBaseIds } },
-      select: { id: true, precio_costo: true, factor_pack: true, categoria_id: true, modoVentaDeposito: true, pesoReferenciaKg: true, modo_envio: true, unidad_medida: true },
+      select: { id: true, precio_costo: true, factor_pack: true, categoria_id: true, modoVentaDeposito: true, pesoReferenciaKg: true, modo_envio: true, unidad_medida: true, es_combo: true },
     });
     const localInfo = await prisma.local.findUnique({
       where: { id: localId },
@@ -397,11 +397,13 @@ export async function POST(req) {
     const costosMap = {};
     const pbMap = {};
     const baseStockMap = {};
+    const productosBaseMap = {}; // { es_combo } por productoBaseId (server-authoritative)
     productosBase.forEach((p) => {
       const costoBulto = Number(p.precio_costo) || 0;
       const factorPack = Math.max(1, Number(p.factor_pack) || 1);
       costosMap[p.id] = { costoBulto, factorPack };
       pbMap[p.id] = { categoria_id: p.categoria_id };
+      productosBaseMap[p.id] = { es_combo: p.es_combo === true };
       baseStockMap[p.id] = {
         modoVentaDeposito: p.modoVentaDeposito || "PESO",
         pesoReferenciaKg: Number(p.pesoReferenciaKg || 0),
@@ -411,31 +413,9 @@ export async function POST(req) {
       };
     });
 
-    // Calcular costo total y detalle con ganancia.
-    //
-    // Fuente de verdad: item.precioCosto (lo manda el POS desde buscar-producto,
-    // ya en la MISMA escala que item.precio — unitario, bulto o pieza según el
-    // modo de salida). Esto evita el bug de calcular costo unitario dividiendo
-    // costoBulto/factorPack cuando la línea se vendió como bulto (factor_pack
-    // x ganancia falsa). Fallback al cálculo legacy si el item no trae costo
-    // (cola offline pre-fix o clientes viejos).
-    let costoTotal = 0;
-    const itemsConCosto = items.map((item) => {
-      const { costoBulto, factorPack } = costosMap[item.productoBaseId] || { costoBulto: 0, factorPack: 1 };
-      const costoFromClient = Number(item.precioCosto);
-      const costoUnitarioDeLinea =
-        Number.isFinite(costoFromClient) && costoFromClient >= 0
-          ? costoFromClient
-          : costoBulto / factorPack;
-      const subtotalItem = item.precio * item.cantidad;
-      const costoItem = costoUnitarioDeLinea * item.cantidad;
-      const ganancia = subtotalItem - costoItem;
-      costoTotal += costoItem;
-      return { ...item, precioCosto: costoUnitarioDeLinea, subtotalItem, ganancia };
-    });
-
-    const gananciaBruta = total - costoTotal;
-    const gananciaNeta = netoRecibido - costoTotal;
+    // El costo total, la ganancia y el descuento consolidado de stock se calculan
+    // DENTRO de la transacción (más abajo), porque los combos requieren cargar su
+    // composición desde la base para consolidar el consumo físico de componentes.
 
     // Leer config de stock negativo desde DB
     const configGrupo = await prisma.configuracionGrupo.findUnique({
@@ -474,99 +454,37 @@ export async function POST(req) {
         console.warn("Error actualizando contador (no crítico):", err);
       }
 
-      // Validar y descontar stock con locks atómicos
-      const stockValidations = [];
-      let allowNegativeStockUsed = false;
-      for (const item of items) {
-        const productoLocal = await tx.productoLocal.findFirst({
-          where: { localId, baseId: item.productoBaseId },
-          select: { id: true },
-        });
+      // === Líneas comerciales + plan consolidado de consumo físico ===
+      // Los combos se resuelven y validan contra la base DENTRO de la tx (no se
+      // confía en componentes/costos/disponibilidad del cliente). El plan agrupa por
+      // ProductoLocal.id: un producto vendido suelto y como componente de uno o más
+      // combos se descuenta UNA sola vez con el total consolidado.
+      const { lineasComerciales, consumoFisicoConsolidado } = await construirLineasComerciales(tx, {
+        items,
+        productosBaseMap,
+        costosMap,
+        baseStockMap,
+        localId,
+        esDeposito,
+      });
 
-        if (!productoLocal) {
-          throw new Error(`Producto ${item.nombre || item.productoBaseId} no encontrado en este local`);
-        }
+      // Costo y ganancia totales desde las líneas (combos: costo desde componentes).
+      let costoTotal = 0;
+      for (const l of lineasComerciales) costoTotal += l.costoLinea;
+      costoTotal = Math.round((costoTotal + Number.EPSILON) * 100) / 100;
+      const gananciaBruta = total - costoTotal;
+      const gananciaNeta = netoRecibido - costoTotal;
 
-        // Convertir cantidad del carrito a la escala de StockLocal.
-        // StockLocal SIEMPRE en UNIDADES en depósito (excepto PIEZA fiambre que va en KG).
-        // El POS envía cantidad en la unidad de venta efectiva (BULTO, UNIDAD o PIEZA).
-        const baseStock = baseStockMap[item.productoBaseId] || {};
-        const factorPackItem = Math.max(1, Number(baseStock.factorPack) || 1);
-        const vendePorPieza = esDeposito && baseStock.modoVentaDeposito === "PIEZA" && baseStock.pesoReferenciaKg > 0;
+      // Bloqueo determinístico (FOR UPDATE por productoLocalId asc) + validación +
+      // descuento consolidado. Insuficiencia respeta ALLOW_NEGATIVE_STOCK; la
+      // invalidez ESTRUCTURAL del combo ya abortó antes (en construirLineasComerciales).
+      const { allowNegativeStockUsed } = await aplicarConsumoStock(tx, {
+        localId,
+        consumoFisicoConsolidado,
+        allowNegativeStock: ALLOW_NEGATIVE_STOCK,
+      });
 
-        let cantidadParaStock;
-        if (vendePorPieza) {
-          // PIEZA fiambre fijo: el stock operativo del depósito está en PIEZAS.
-          // Se descuenta la cantidad en piezas tal cual (sin multiplicar por pesoReferenciaKg).
-          cantidadParaStock = Number(item.cantidad);
-        } else if (esDeposito && factorPackItem > 1) {
-          // Depósito con pack. El factorPack y el stock se validan SIEMPRE contra DB
-          // (factorPackItem viene de baseStockMap, no del cliente).
-          if (item.modoVentaLinea === "UNIDAD_REMANENTE") {
-            // Remanente/excepción: vender unidades sueltas sin tocar la config del
-            // producto. item.cantidad ya está expresada en unidades reales → no se
-            // multiplica por el pack. La validación de stock disponible (más abajo)
-            // garantiza que no se vendan más unidades de las que hay.
-            cantidadParaStock = Number(item.cantidad);
-          } else {
-            // NORMAL: replicar la lógica de calcularModoSalida() de buscar-producto.
-            // SOLO_UNIDAD → vende por unidad; SOLO_BULTO / MIXTO / null → vende por bulto.
-            const modoEnvioEfectivo = baseStock.modo_envio || defaultModoEnvio(baseStock.unidad_medida);
-            const modoSalida = modoEnvioEfectivo === "SOLO_UNIDAD" ? "UNIDAD" : "BULTO";
-            cantidadParaStock = modoSalida === "BULTO"
-              ? Number(item.cantidad) * factorPackItem
-              : Number(item.cantidad);
-          }
-        } else {
-          // Local normal, o producto sin factor_pack: cantidad directa.
-          cantidadParaStock = Number(item.cantidad);
-        }
-
-        // Lockear stock con FOR UPDATE
-        const stockLocked = await tx.$queryRaw`
-          SELECT cantidad 
-          FROM "StockLocal" 
-          WHERE "localId" = ${localId} 
-            AND "productoId" = ${productoLocal.id}
-          FOR UPDATE
-        `;
-
-        const stockActual = stockLocked && Array.isArray(stockLocked) && stockLocked.length > 0 
-          ? Number(stockLocked[0].cantidad || 0)
-          : 0;
-        
-        if (stockActual < cantidadParaStock) {
-          if (!ALLOW_NEGATIVE_STOCK) {
-            throw new Error(
-              `Stock insuficiente para ${item.nombre || "producto"}. Disponible: ${stockActual}, Solicitado: ${cantidadParaStock}`
-            );
-          }
-          allowNegativeStockUsed = true;
-          console.log(
-            "[POS venta con stock negativo] productoBaseId=%s productoLocalId=%s localId=%s cantidad=%s stockActual=%s",
-            item.productoBaseId,
-            productoLocal.id,
-            localId,
-            cantidadParaStock,
-            stockActual
-          );
-        }
-
-        // Descontar stock (permite negativo si ALLOW_NEGATIVE_STOCK=1). VentaDetalle sigue con item.cantidad (piezas o kg según corresponda).
-        await tx.stockLocal.updateMany({
-          where: {
-            localId,
-            productoId: productoLocal.id,
-          },
-          data: {
-            cantidad: { decrement: cantidadParaStock },
-          },
-        });
-
-        stockValidations.push({ productoLocalId: productoLocal.id, cantidad: cantidadParaStock });
-      }
-
-      // Crear venta
+      // Crear venta (header)
       const nuevaVenta = await tx.venta.create({
         data: {
           localId,
@@ -591,37 +509,51 @@ export async function POST(req) {
           gananciaNeta,
           formaPago,
           esFiado: !!esFiado,
-          detalles: {
-            create: itemsConCosto.map((item) => {
-              const lineaSubtotal = item.subtotalItem;
-              const shareLinea = total > 0 ? lineaSubtotal / total : 0;
-              const comisionLinea = comisionBancaria * shareLinea;
-
-              // Trazabilidad por línea: la lista es SIEMPRE la resuelta por el server
-              // (cliente + ubicación). Si un item hubiera declarado otra, la venta ya
-              // fue rechazada por la guarda de arriba.
-              const itemListaValida = listaResuelta;
-
-              return {
-                productoBaseId: item.productoBaseId,
-                nombre: item.nombre,
-                precio: item.precio,
-                precioCosto: item.precioCosto,
-                cantidad: item.cantidad,
-                subtotal: item.subtotalItem,
-                ganancia: item.ganancia,
-                comisionLinea: comisionLinea > 0 ? Number(comisionLinea.toFixed(2)) : null,
-                listaPrecioId: itemListaValida?.id ?? null,
-                tipoPrecioAplicado: mapTipoPrecioAplicado(itemListaValida),
-                margenAplicado:
-                  itemListaValida && itemListaValida.tipoBase === "COSTO"
-                    ? itemListaValida.margenPorcentaje
-                    : null,
-              };
-            }),
-          },
         },
       });
+
+      // VentaDetalle por LÍNEA COMERCIAL (el combo es UNA línea, no una por
+      // componente). Para combos se congela el consumo en VentaDetalleComponente.
+      for (const l of lineasComerciales) {
+        const lineaSubtotal = l.subtotal;
+        const shareLinea = total > 0 ? lineaSubtotal / total : 0;
+        const comisionLinea = comisionBancaria * shareLinea;
+        const esComboLinea = l.tipo === "COMBO";
+        // Combos: precio manual, sin lista. Normales: la lista resuelta por el server.
+        const itemListaValida = esComboLinea ? null : listaResuelta;
+
+        const detalle = await tx.ventaDetalle.create({
+          data: {
+            ventaId: nuevaVenta.id,
+            productoBaseId: l.productoBaseId,
+            nombre: l.nombre,
+            precio: l.precio,
+            precioCosto: l.costoUnitario, // combo: costo unitario TOTAL del combo
+            cantidad: l.cantidad,
+            subtotal: lineaSubtotal,
+            ganancia: Math.round((lineaSubtotal - l.costoLinea + Number.EPSILON) * 100) / 100,
+            comisionLinea: comisionLinea > 0 ? Number(comisionLinea.toFixed(2)) : null,
+            listaPrecioId: itemListaValida?.id ?? null,
+            tipoPrecioAplicado: mapTipoPrecioAplicado(itemListaValida),
+            margenAplicado:
+              itemListaValida && itemListaValida.tipoBase === "COSTO"
+                ? itemListaValida.margenPorcentaje
+                : null,
+          },
+        });
+
+        if (esComboLinea && l.componentesCongelables?.length) {
+          await tx.ventaDetalleComponente.createMany({
+            data: l.componentesCongelables.map((c) => ({
+              ventaDetalleId: detalle.id,
+              productoBaseId: c.productoBaseId,
+              productoLocalId: c.productoLocalId,
+              cantidad: c.cantidad, // cantidad por combo × combos vendidos
+              precioCosto: c.costoUnitario,
+            })),
+          });
+        }
+      }
 
       // Si es fiado, crear MovimientoCuenta DEBITO
       if (esFiado && clienteId) {
@@ -767,11 +699,21 @@ export async function POST(req) {
   } catch (err) {
     console.error("Error crear venta POS:", err);
     
-    // Manejo de errores específicos
-    if (err.message && err.message.includes("Stock insuficiente")) {
+    // Combo estructuralmente inválido (componente inactivo/inexistente/combo/
+    // cantidad inválida/composición vacía): bloquea la venta SIEMPRE, incluso con
+    // allowNegativeStock.
+    if (err.esErrorVentaCombo) {
       return NextResponse.json(
         { ok: false, error: err.message },
-        { status: 409 }
+        { status: err.status || 400 }
+      );
+    }
+
+    // Stock insuficiente: incluir el producto/componente limitante para el cajero.
+    if ((err.message && err.message.includes("Stock insuficiente")) || err.limitante) {
+      return NextResponse.json(
+        { ok: false, error: err.message, limitante: err.limitante || undefined },
+        { status: err.status || 409 }
       );
     }
     

@@ -11,6 +11,7 @@ import {
   rankearLiteral,
   resolverContraCatalogo,
 } from "@/lib/productos/busquedaFuzzyProducto";
+import { getCombo } from "@/lib/combos/service";
 
 const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_TOP_RESULTS = 10;
@@ -117,7 +118,7 @@ export async function GET(req) {
     });
 
     if (exacto.length > 0) {
-      const items = mapProductos(exacto, esDeposito, allowNegativeStock, listaAplicable);
+      const items = await construirItems(exacto, { esDeposito, allowNegativeStock, listaAplicable, grupoId, localId });
       return NextResponse.json({ ok: true, items, origenLista });
     }
 
@@ -177,12 +178,13 @@ export async function GET(req) {
     const orderMap = new Map(topIds.map((id, idx) => [id, idx]));
     productosFull.sort((a, b) => orderMap.get(a.id) - orderMap.get(b.id));
 
-    const items = mapProductos(
-      productosFull,
+    const items = await construirItems(productosFull, {
       esDeposito,
       allowNegativeStock,
-      listaAplicable
-    );
+      listaAplicable,
+      grupoId,
+      localId,
+    });
     return NextResponse.json({
       ok: true,
       items,
@@ -416,4 +418,83 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         aplicacionLista,
       };
     });
+}
+
+// ── Combos ──────────────────────────────────────────────────────────────────
+// Un combo es un ProductoLocal con base.es_combo=true. NO tiene StockLocal propio:
+// su "stock" mostrado es la disponibilidad calculada del componente limitante.
+// El precio es MANUAL (sin lista). Reutiliza el DTO validado de lib/combos/getCombo.
+function mapComboItem(combo, allowNegativeStock) {
+  const disp = Number(combo.disponibilidad) || 0;
+  const bloqueado = combo.bloqueadoEstructural === true;
+  const disponibleParaVenta = !bloqueado && (disp > 0 || allowNegativeStock);
+  const precio = Number(combo.precio_venta) || 0;
+  const costo = Number(combo.costoTotal) || 0;
+  return {
+    esCombo: true,
+    productoBaseId: combo.baseId,
+    productoLocalId: combo.productoLocalId,
+    nombre: combo.nombre,
+    codigoBarra: combo.codigo_barra || "",
+    codigoBarraSecundario: combo.codigo_barra_secundario || "",
+    precioVenta: precio,
+    precioVentaUnitario: precio,
+    precioVentaBulto: precio,
+    precioCosto: costo,
+    precioCostoUnitario: costo,
+    precioCostoBulto: costo,
+    costoTotal: costo,
+    // Disponibilidad CALCULADA (no stock propio). El carrito la usa como stockMax.
+    stock: disp,
+    disponibilidad: disp,
+    sinStock: disp <= 0,
+    allowNegativeStock: !!allowNegativeStock,
+    disponibleParaVenta,
+    inconsistente: !!combo.inconsistente,
+    bloqueadoEstructural: bloqueado,
+    advertencias: combo.advertencias || [],
+    unidadMedida: "unidad",
+    factorPack: 1,
+    modoEnvio: null,
+    modoSalidaDefault: "UNIDAD",
+    esFiambreFijo: false,
+    aplicacionLista: null, // combos: precio manual, sin lista
+    ganancia: combo.ganancia,
+    margen: combo.margen,
+    componentes: (combo.componentes || []).map((c) => ({
+      productoLocalId: c.componenteProductoLocalId,
+      productoBaseId: c.componenteBaseId,
+      nombre: c.nombre,
+      cantidad: c.cantidad,
+      activo: c.activo,
+      tieneStockLocal: c.tieneStockLocal,
+      stock: c.stock,
+      advertencias: c.advertencias,
+    })),
+  };
+}
+
+// Construye los items de respuesta separando NORMALES (mapProductos, sin cambios)
+// de COMBOS (disponibilidad/costo calculados vía lib/combos), preservando el orden.
+async function construirItems(lista, { esDeposito, allowNegativeStock, listaAplicable, grupoId, localId }) {
+  const combos = lista.filter((pl) => pl.base?.es_combo === true);
+  const normales = lista.filter((pl) => pl.base?.es_combo !== true);
+
+  const itemsNormales = mapProductos(normales, esDeposito, allowNegativeStock, listaAplicable);
+
+  const byId = new Map();
+  for (const it of itemsNormales) byId.set(it.productoLocalId, it);
+
+  for (const pl of combos) {
+    if (!grupoId) continue; // sin grupo no se puede resolver el combo
+    try {
+      const combo = await getCombo({ prisma, grupoId, localId, productoLocalId: pl.id });
+      byId.set(pl.id, mapComboItem(combo, allowNegativeStock));
+    } catch (e) {
+      // Combo inválido para este contexto (otro local, etc.) → se omite del listado.
+      console.warn("[pos-ventas/buscar-producto] combo omitido:", e.message);
+    }
+  }
+
+  return lista.map((pl) => byId.get(pl.id)).filter(Boolean);
 }

@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
+import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req) {
   try {
@@ -72,6 +73,18 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "Proveedor no encontrado" },
         { status: 404 }
+      );
+    }
+
+    // Los combos no se compran a proveedor: se compran sus componentes.
+    const productosLocales = await prisma.productoLocal.findMany({
+      where: { id: { in: items.map((i) => Number(i.productoLocalId)) } },
+      select: { id: true, base: { select: { es_combo: true } } },
+    });
+    if (productosLocales.some((pl) => esComboBase(pl.base))) {
+      return NextResponse.json(
+        { ok: false, error: "Los combos no se compran a proveedor; se compran sus componentes." },
+        { status: 400 }
       );
     }
 

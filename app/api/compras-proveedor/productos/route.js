@@ -101,6 +101,8 @@ export async function GET(req) {
       ],
       // Regla A: el depósito no arma pedidos con productos creados por un local.
       ...productoVisibleWhere(depositoId),
+      // Los combos no se compran a proveedor: se compran sus componentes.
+      es_combo: false,
     };
 
     if (search) {

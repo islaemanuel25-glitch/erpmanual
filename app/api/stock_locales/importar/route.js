@@ -34,6 +34,14 @@ export async function POST(req) {
       );
     }
 
+    // Los combos no tienen stock físico: no se importan por stock.
+    if (productos.some((p) => p.esCombo)) {
+      return NextResponse.json(
+        { ok: false, error: "Los combos no se importan por stock." },
+        { status: 400 }
+      );
+    }
+
     // ================================
     // 2) MAPEO camelCase → snake_case
     // precioCosto = precio del bulto

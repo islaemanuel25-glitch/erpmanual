@@ -15,6 +15,8 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
   const [area, setArea] = useState(initial.area || "");
   // estado: activos | inactivos | todos. Por defecto solo activos.
   const [estado, setEstado] = useState(initial.estado || "activos");
+  // tipo: todos | productos | combos.
+  const [tipo, setTipo] = useState(initial.tipo || "todos");
 
   const [open, setOpen] = useState(false);
 
@@ -36,19 +38,19 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
   // ============================
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
-      onChange({ search, categoria, proveedor, area, estado });
+      onChange({ search, categoria, proveedor, area, estado, tipo });
     }, 250);
 
     return () => clearTimeout(debounceRef.current);
-  }, [search, categoria, proveedor, area, estado]);
+  }, [search, categoria, proveedor, area, estado, tipo]);
 
   // Busqueda inmediata (bypass debounce) — para Enter, scanner y voz
   const buscarInmediato = useCallback(
     (texto) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      onChange({ search: texto, categoria, proveedor, area, estado });
+      onChange({ search: texto, categoria, proveedor, area, estado, tipo });
     },
-    [onChange, categoria, proveedor, area, estado]
+    [onChange, categoria, proveedor, area, estado, tipo]
   );
 
   // ============================
@@ -133,6 +135,7 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
     setProveedor("");
     setArea("");
     setEstado("activos");
+    setTipo("todos");
   };
 
   return (
@@ -184,6 +187,20 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
             Escuchando...
           </span>
         )}
+
+        {/* SELECT TIPO (todos / productos / combos) */}
+        <div className="w-full md:w-40 md:shrink-0">
+          <SunmiSelectAdv
+            value={tipo}
+            onChange={setTipo}
+            placeholder="Tipo..."
+            className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+          >
+            <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
+            <SunmiSelectOption value="productos">Productos</SunmiSelectOption>
+            <SunmiSelectOption value="combos">Combos</SunmiSelectOption>
+          </SunmiSelectAdv>
+        </div>
 
         {/* SELECT ESTADO (activos / inactivos / todos) */}
         <div className="w-full md:w-44 md:shrink-0">

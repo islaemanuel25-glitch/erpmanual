@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
+import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req) {
   try {
@@ -83,6 +84,10 @@ export async function POST(req) {
 
     if (!productoOrigen)
       return NextResponse.json({ ok: false, error: "El depósito no tiene este producto" }, { status: 400 });
+
+    // Los combos no se transfieren: se transfieren sus componentes.
+    if (esComboBase(productoOrigen.base))
+      return NextResponse.json({ ok: false, error: "Los combos no se transfieren; se transfieren sus componentes." }, { status: 400 });
 
     // Inferir unidad si no vino en el body (respetar modo_envio)
     const factorPack = Number(productoOrigen.base.factor_pack || 1);

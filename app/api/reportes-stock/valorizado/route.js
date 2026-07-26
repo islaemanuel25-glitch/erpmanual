@@ -60,6 +60,7 @@ export async function obtenerReporte(req) {
       activo: true,
       base: {
         activo: true,
+        es_combo: false,
         ...(q
           ? {
               OR: [

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req, { params }) {
   try {
@@ -63,7 +64,7 @@ export async function POST(req, { params }) {
       where: { id: Number(productoLocalId) },
       include: {
         base: {
-          select: { modoCompraProveedor: true },
+          select: { modoCompraProveedor: true, es_combo: true },
         },
       },
     });
@@ -71,6 +72,13 @@ export async function POST(req, { params }) {
     if (!pl || pl.localId !== pedido.depositoId) {
       return NextResponse.json(
         { ok: false, error: "Producto no pertenece al depósito del pedido" },
+        { status: 400 }
+      );
+    }
+
+    if (esComboBase(pl.base)) {
+      return NextResponse.json(
+        { ok: false, error: "Los combos no se compran a proveedor; se compran sus componentes." },
         { status: 400 }
       );
     }
