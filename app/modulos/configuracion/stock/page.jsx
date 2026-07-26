@@ -55,9 +55,12 @@ export default function ConfigStockPage() {
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+  // "Vender sin stock" es per-local (config_local.stock). Los "motivos" siguen
+  // siendo config de grupo (admin). Un no-admin ve solo el toggle per-local.
+  const puede = esAdmin || permisos.includes("config_local.stock");
 
   useEffect(() => {
-    if (!esAdmin) return;
+    if (!puede) return;
     fetch("/api/config/stock-negativo")
       .then((r) => r.json())
       .then((data) => {
@@ -71,7 +74,7 @@ export default function ConfigStockPage() {
       })
       .catch(() => {})
       .finally(() => setCargando(false));
-  }, [esAdmin]);
+  }, [puede]);
 
   const handleToggle = async (key, valor, toggle) => {
     setGuardando(key);
@@ -100,7 +103,12 @@ export default function ConfigStockPage() {
   };
 
   if (cargandoUser) return null;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puede) return <SinPermisos />;
+
+  // No-admin (config_local.stock) solo ve el toggle per-local; los motivos son admin.
+  const togglesVisibles = esAdmin
+    ? TOGGLES
+    : TOGGLES.filter((t) => t.key === "allowNegativeStock");
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -113,7 +121,7 @@ export default function ConfigStockPage() {
         <SunmiLoader />
       ) : (
         <div className="flex flex-col gap-4">
-          {TOGGLES.map((t) => (
+          {togglesVisibles.map((t) => (
             <SunmiCard key={t.key} className="flex flex-col gap-3">
               <div className="flex items-start gap-3">
                 <t.icon size={24} className="sunmi-text-accent mt-0.5" />

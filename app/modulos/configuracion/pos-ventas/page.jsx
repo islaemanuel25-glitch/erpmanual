@@ -7,38 +7,27 @@ import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { Warehouse, Store } from "lucide-react";
+import { Store } from "lucide-react";
 
+// Cliente obligatorio es PER LOCAL: un único toggle canónico por local.
 const TOGGLES = [
   {
-    key: "exigirClienteVentasDeposito",
-    label: "Exigir cliente en ventas desde depósito",
+    key: "exigirClienteVenta",
+    label: "Exigir cliente para cerrar la venta",
     descripcion:
-      "Si la opción está activa, el POS no permitirá cerrar una venta si no hay cliente seleccionado.",
-    icon: Warehouse,
-    onLabel: "Obligatorio",
-    offLabel: "Opcional",
-    msgOn: "Cliente obligatorio en ventas de depósito activado",
-    msgOff: "Cliente ahora es opcional en ventas de depósito",
-  },
-  {
-    key: "exigirClienteVentasLocal",
-    label: "Exigir cliente en ventas desde local",
-    descripcion:
-      "Si la opción está activa, el POS no permitirá cerrar una venta si no hay cliente seleccionado.",
+      "Si la opción está activa, el POS de este local no permitirá cerrar una venta si no hay cliente seleccionado.",
     icon: Store,
     onLabel: "Obligatorio",
     offLabel: "Opcional",
-    msgOn: "Cliente obligatorio en ventas de local activado",
-    msgOff: "Cliente ahora es opcional en ventas de local",
+    msgOn: "Cliente obligatorio activado en este local",
+    msgOff: "Cliente ahora es opcional en este local",
   },
 ];
 
 export default function ConfigPosVentasPage() {
   const { perfil, cargando: cargandoUser } = useUser();
   const [config, setConfig] = useState({
-    exigirClienteVentasDeposito: false,
-    exigirClienteVentasLocal: false,
+    exigirClienteVenta: false,
   });
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(null);
@@ -46,22 +35,20 @@ export default function ConfigPosVentasPage() {
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+  const puede = esAdmin || permisos.includes("config_local.pos");
 
   useEffect(() => {
-    if (!esAdmin) return;
+    if (!puede) return;
     fetch("/api/config/pos-ventas-cliente")
       .then((r) => r.json())
       .then((data) => {
         if (data.ok) {
-          setConfig({
-            exigirClienteVentasDeposito: data.exigirClienteVentasDeposito ?? false,
-            exigirClienteVentasLocal: data.exigirClienteVentasLocal ?? false,
-          });
+          setConfig({ exigirClienteVenta: data.exigirClienteVenta ?? false });
         }
       })
       .catch(() => {})
       .finally(() => setCargando(false));
-  }, [esAdmin]);
+  }, [puede]);
 
   const handleToggle = async (key, valor, toggle) => {
     setGuardando(key);
@@ -90,7 +77,7 @@ export default function ConfigPosVentasPage() {
   };
 
   if (cargandoUser) return null;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puede) return <SinPermisos />;
 
   return (
     <div className="max-w-2xl mx-auto">

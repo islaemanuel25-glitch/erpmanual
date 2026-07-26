@@ -28,7 +28,7 @@ export default function OperadoresPage() {
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
-  const puede = esAdmin || permisos.includes("usuarios.gestionar");
+  const puede = esAdmin || permisos.includes("config_local.operadores");
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");

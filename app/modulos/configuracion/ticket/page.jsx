@@ -35,7 +35,7 @@ export default function TicketConfigPage() {
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
-  if (!esAdmin) return <SinPermisos />;
+  if (!esAdmin && !permisos.includes("config_local.ticket")) return <SinPermisos />;
 
   const handleSave = async () => {
     setSaving(true);

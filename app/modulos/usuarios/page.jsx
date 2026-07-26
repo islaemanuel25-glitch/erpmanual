@@ -32,7 +32,10 @@ export default function UsuariosPage() {
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
-  const puede = esAdmin || permisos.includes("usuarios.ver");
+  const puede =
+    esAdmin ||
+    permisos.includes("usuarios.ver") ||
+    permisos.includes("usuarios.gestionar_local");
 
   const nuevo = searchParams.get("nuevo");
   const editar = searchParams.get("editar");

@@ -1,6 +1,7 @@
 import "./globals.css";
 import { UserProvider } from "@/app/context/UserContext";
 import ThemeClientWrapper from "@/components/sunmi/ThemeClientWrapper";
+import AparienciaInstitucionalSync from "@/components/sunmi/AparienciaInstitucionalSync";
 
 export const metadata = {
   title: "ERP Azul",
@@ -19,7 +20,10 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         <ThemeClientWrapper>
-          <UserProvider>{children}</UserProvider>
+          <UserProvider>
+            <AparienciaInstitucionalSync />
+            {children}
+          </UserProvider>
         </ThemeClientWrapper>
       </body>
     </html>
