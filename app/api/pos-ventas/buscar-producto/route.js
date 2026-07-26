@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
@@ -63,15 +64,17 @@ export async function GET(req) {
     });
     const esDeposito = local?.es_deposito === true;
 
-    // Leer config de stock negativo desde DB
+    // Leer config de "vender sin stock" EFECTIVA POR LOCAL (con herencia a grupo),
+    // la MISMA fuente que usa la creación de venta (pos-ventas/crear →
+    // getConfigLocalEfectiva). Antes se leía ConfiguracionGrupo directo, lo que
+    // hacía divergir el gate visual (botón) del enforcement real por ubicación:
+    // un local que overridea el flag mostraba el botón según el grupo y luego la
+    // venta respondía distinto. Ahora ambos usan el valor local-efectivo.
     const grupoId = await getGrupoIdDeLocal(localId);
     let allowNegativeStock = false;
     if (grupoId) {
-      const configGrupo = await prisma.configuracionGrupo.findUnique({
-        where: { grupoId },
-        select: { allowNegativeStock: true },
-      });
-      allowNegativeStock = configGrupo?.allowNegativeStock === true;
+      const eff = await getConfigLocalEfectiva(localId, grupoId, { esDeposito });
+      allowNegativeStock = eff.allowNegativeStock === true;
     }
 
     // Resolver lista aplicable según UBICACIÓN (una sola vez por request), pasando localId.
