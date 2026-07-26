@@ -18,7 +18,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 import { esComboBase } from "@/lib/combos/guards";
-import { pedidoEnAlcance } from "@/lib/compras/scope";
+import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 
 export async function POST(req, { params }) {
   try {
@@ -164,6 +164,9 @@ export async function POST(req, { params }) {
         await actualizarCostoRealProducto(prisma, {
           productoLocalId: updated.productoLocalId,
           costoMaestro,
+          // Propiedad del costo: solo el dueño del producto mueve el costo.
+          operadoDesdeLocalId: ownerLocalIdDePedido(pedido),
+          depositoLocalId: pedido.depositoId,
         });
       }
     }

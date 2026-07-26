@@ -143,6 +143,11 @@ export async function POST(req) {
       await actualizarCostoRealProducto(prisma, {
         productoLocalId: det.productoLocalId,
         costoMaestro,
+        // Propiedad del costo: la ubicación dueña del pedido (creadoEnLocalId=localId)
+        // solo mueve el costo si es dueña del producto. Un local comprando un
+        // producto del depósito NO toca el costo.
+        operadoDesdeLocalId: localId,
+        depositoLocalId: depId,
       });
     }
 

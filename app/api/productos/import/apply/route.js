@@ -3,9 +3,11 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal, getLocalesDeGrupo, inheritDepositoProductsToLocal } from "@/lib/grupos";
+import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { getContextoActivo } from "@/lib/contexto";
 import { validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 import { esComboBase } from "@/lib/combos/guards";
+import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
 
 const CHUNK_SIZE = 50;
 
@@ -56,6 +58,11 @@ export async function POST(req) {
     if (!grupoId) {
       return NextResponse.json({ ok: false, error: "No se pudo determinar el grupo del local seleccionado" }, { status: 400 });
     }
+
+    // Depósito del grupo, para la regla de propiedad del costo (abajo).
+    const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
+    // Filas cuyo costo se salteó por no ser dueño (producto del depósito desde un local).
+    const costoSaltado = [];
 
     if (!Array.isArray(productos) || productos.length === 0) {
       return NextResponse.json({ ok: false, error: "No se recibieron productos" }, { status: 400 });
@@ -187,15 +194,24 @@ export async function POST(req) {
             continue;
           }
 
-          await prisma.$transaction(async (tx) => {
+          const costoSaltadoRow = await prisma.$transaction(async (tx) => {
             // Los combos no tienen stock físico: no se materializa ProductoLocal/StockLocal.
             const baseActual = await tx.productoBase.findUnique({
               where: { id: p.productoBaseId },
-              select: { es_combo: true },
+              select: { es_combo: true, creadoEnLocalId: true, grupoId: true },
             });
+            // Pertenencia al grupo del importador (cierra el hueco cross-grupo del update de la base).
+            if (!baseActual || baseActual.grupoId !== grupoId) {
+              throw new Error("Producto fuera de tu alcance");
+            }
             if (esComboBase(baseActual)) {
               throw new Error("Los combos no se materializan por stock: operá sus componentes.");
             }
+
+            // Propiedad del costo: solo el dueño puede cambiar el costo. Si un local
+            // importa un producto del DEPÓSITO, se saltea el costo (base y override) y
+            // se reporta; el resto de la fila (venta, margen, stock, etc.) se aplica.
+            const puedeCosto = puedeEditarCosto(localId, baseActual.creadoEnLocalId, depositoLocalId);
 
             // Defensa: el estado pudo cambiar entre preview y apply.
             const v = await validarUnicidadCodigos({
@@ -210,11 +226,11 @@ export async function POST(req) {
             const updateData = {
               nombre: p.nombre,
               unidad_medida: p.unidad_medida || "unidad",
-              precio_costo: p.precio_costo,
               precio_venta: p.precio_venta,
               activo: p.activo !== false,
               codigo_barra_secundario: p.codigo_barra_secundario || null,
             };
+            if (puedeCosto) updateData.precio_costo = p.precio_costo;
 
             if (p.factor_pack) updateData.factor_pack = p.factor_pack;
             if (p.margen !== null && p.margen !== undefined) updateData.margen = p.margen;
@@ -235,14 +251,15 @@ export async function POST(req) {
             });
 
             if (existingLocal) {
+              const localUpd = {
+                precio_venta: p.precio_venta,
+                margen: p.margen,
+                activo: p.activo !== false,
+              };
+              if (puedeCosto) localUpd.precio_costo = p.precio_costo;
               await tx.productoLocal.update({
                 where: { id: existingLocal.id },
-                data: {
-                  precio_costo: p.precio_costo,
-                  precio_venta: p.precio_venta,
-                  margen: p.margen,
-                  activo: p.activo !== false,
-                },
+                data: localUpd,
               });
 
               if (p.stock_inicial != null && p.stock_inicial !== "" && !isNaN(Number(p.stock_inicial))) {
@@ -256,7 +273,8 @@ export async function POST(req) {
                 data: {
                   localId,
                   baseId: p.productoBaseId,
-                  precio_costo: p.precio_costo,
+                  // Si no es dueño, el override de costo queda null → hereda el maestro.
+                  precio_costo: puedeCosto ? p.precio_costo : null,
                   precio_venta: p.precio_venta,
                   margen: p.margen,
                   activo: p.activo !== false,
@@ -273,9 +291,14 @@ export async function POST(req) {
                 },
               });
             }
+
+            return !puedeCosto;
           }, { timeout: 60000 });
 
           actualizados++;
+          if (costoSaltadoRow) {
+            costoSaltado.push({ fila: p.fila, nombre: p.nombre, codigo_barra: p.codigo_barra });
+          }
         } catch (e) {
           erroresDetalle.push({
             fila: p.fila,
@@ -317,14 +340,19 @@ export async function POST(req) {
       console.error("Error en sync post-import:", syncErr);
     }
 
+    const costoMsg =
+      costoSaltado.length > 0
+        ? ` ${costoSaltado.length} con costo NO modificado (lo administra el depósito).`
+        : "";
     return NextResponse.json({
       ok: true,
-      message: `Importación completada: ${creados} creados, ${actualizados} actualizados.${sincronizados > 0 ? ` Sincronizados a ${sincronizados} local(es).` : ""}`,
+      message: `Importación completada: ${creados} creados, ${actualizados} actualizados.${sincronizados > 0 ? ` Sincronizados a ${sincronizados} local(es).` : ""}${costoMsg}`,
       creados,
       actualizados,
       sincronizados,
       errores: erroresDetalle.length,
       detalles: erroresDetalle,
+      costoSaltado,
     });
   } catch (e) {
     console.error("ERROR productos/import/apply:", e);

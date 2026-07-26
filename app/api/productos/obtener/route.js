@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { resolveScope } from "@/lib/grupos";
+import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { puedeEditarCosto, esProductoDeDeposito } from "@/lib/productos/propiedadCosto";
 
 export async function GET(req) {
   try {
@@ -62,9 +64,18 @@ export async function GET(req) {
 
     const override = base.locales?.[0] ?? null;
 
+    // Propiedad del costo: el front usa este flag para mostrar el costo como
+    // solo-lectura cuando se edita un producto del depósito desde un local. El
+    // backend igual revalida en la edición (defensa en profundidad).
+    const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
+    const puedeCosto = puedeEditarCosto(Number(localId), base.creadoEnLocalId, depositoLocalId);
+    const costoDeDeposito = esProductoDeDeposito(base.creadoEnLocalId, depositoLocalId);
+
     return NextResponse.json({
       ok: true,
       item: mergeBaseLocalToUi(base, override),
+      puedeEditarCosto: puedeCosto,
+      costoDeDeposito,
     });
   } catch (error) {
     console.error("❌ obtener()", error);

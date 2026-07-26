@@ -314,6 +314,10 @@ export async function POST(req, { params }) {
         await actualizarCostoRealProducto(tx, {
           productoLocalId: plDestino,
           costoMaestro,
+          // Propiedad del costo: solo el dueño del producto mueve el costo. Un local
+          // que recibe una compra de un producto del depósito NO toca el costo.
+          operadoDesdeLocalId: ownerLocalId,
+          depositoLocalId: pedido.depositoId,
         });
       }
 

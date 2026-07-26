@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
+import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
 
 function toNumber(value) {
   const n = Number(value);
@@ -21,19 +23,19 @@ export async function POST(req) {
 
     const body = await req.json();
     
-    // Alcance seguro. Admin: usa su grupo activo (cookie). No-admin: se deriva de la
-    // sesión y un body.localId ajeno se rechaza (→403), NO se ejecuta sobre otro grupo.
-    let grupoId = Number(session.grupoId) || 0;
-    if (!grupoId) {
-      const scope = await resolveScope(req, { explicitLocalId: body?.localId });
-      if (scope.error) {
-        return NextResponse.json(
-          { ok: false, error: scope.error, needsContexto: scope.needsContexto },
-          { status: scope.status }
-        );
-      }
-      grupoId = scope.grupoId;
+    // Alcance seguro. Se resuelve SIEMPRE la ubicación que opera (server-side) para
+    // aplicar la regla de propiedad del costo: un local no puede cambiar el costo de
+    // productos del depósito. No-admin → su local; admin → contexto/localId validado.
+    const scope = await resolveScope(req, { explicitLocalId: body?.localId });
+    if (scope.error) {
+      return NextResponse.json(
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
+      );
     }
+    const grupoId = scope.grupoId;
+    const operatingLocalId = Number(scope.localId);
+    const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     const proveedorId = toNumber(body?.proveedorId);
     const metodo = body?.metodo;
     const pricingMode = body?.pricingMode;
@@ -79,6 +81,7 @@ export async function POST(req) {
       });
 
       let applied = 0;
+      const saltados = [];
       for (const item of items) {
         const productoBaseId = toNumber(item?.productoBaseId);
         const costoAnterior = toNumber(item?.costoAnterior);
@@ -94,6 +97,21 @@ export async function POST(req) {
           ventaNueva === null
         ) {
           throw new Error("Item inválido");
+        }
+
+        // Propiedad del costo: si la ubicación que opera NO es dueña del producto
+        // (p. ej. un local sobre un producto del depósito), se SALTEA su costo y se
+        // reporta; el resto del lote sigue. No se toca el maestro ajeno.
+        const baseInfo = await tx.productoBase.findUnique({
+          where: { id: productoBaseId },
+          select: { creadoEnLocalId: true, grupoId: true },
+        });
+        if (!baseInfo || baseInfo.grupoId !== grupoId) {
+          throw new Error(`Producto ${productoBaseId} fuera de alcance`);
+        }
+        if (!puedeEditarCosto(operatingLocalId, baseInfo.creadoEnLocalId, depositoLocalId)) {
+          saltados.push({ productoBaseId, motivo: "costo administrado por otra ubicación (depósito)" });
+          continue;
         }
 
         const productoWhere = {
@@ -155,17 +173,22 @@ export async function POST(req) {
         applied += 1;
       }
 
-      return { updateId: update.id, applied };
+      return { updateId: update.id, applied, saltados };
     }, {
       maxWait: 10000,
       timeout: 120000,
     });
 
+    const saltadosMsg =
+      result.saltados.length > 0
+        ? ` ${result.saltados.length} salteado(s): el costo lo administra el depósito.`
+        : "";
     return NextResponse.json({
       ok: true,
-      message: `Actualización aplicada: ${result.applied} productos.`,
+      message: `Actualización aplicada: ${result.applied} productos.${saltadosMsg}`,
       updateId: result.updateId,
       applied: result.applied,
+      saltados: result.saltados,
     });
   } catch (e) {
     console.error("ERROR productos/precios/apply:", e);

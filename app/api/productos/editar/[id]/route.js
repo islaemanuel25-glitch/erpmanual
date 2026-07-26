@@ -4,8 +4,10 @@ import { mergeBaseLocalToUi, splitUiToDb } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
+import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 import { esComboBase } from "@/lib/combos/guards";
+import { puedeEditarCosto, mensajeCostoNoEditable, mismoCosto } from "@/lib/productos/propiedadCosto";
 
 // Sincronizar precioCosto/activo a overrides, recalculando precio_venta por margen
 async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
@@ -96,7 +98,7 @@ export async function PUT(req, context) {
     // Existencia + pertenencia al grupo del alcance.
     const baseScope = await prisma.productoBase.findUnique({
       where: { id: baseId },
-      select: { id: true, grupoId: true, es_combo: true },
+      select: { id: true, grupoId: true, es_combo: true, creadoEnLocalId: true, precio_costo: true },
     });
     if (!baseScope) {
       return NextResponse.json({ ok: false, error: "Producto no encontrado" }, { status: 404 });
@@ -107,6 +109,39 @@ export async function PUT(req, context) {
     }
 
     const payload = await req.json();
+
+    // ── PROPIEDAD DEL COSTO ──────────────────────────────────────────────
+    // El costo (base y override) solo lo administra el DUEÑO del producto:
+    // el depósito para productos de depósito; el local creador para exclusivos.
+    // La ubicación que opera se toma del alcance autorizado (server-side), nunca
+    // de un flag del cliente. Un intento de un no-dueño de CAMBIAR el costo → 403;
+    // si el costo viene igual al actual (reenvío del form), se ignora sin error.
+    const operandoEnLocalId = Number(scope.localId);
+    const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
+    const puedeCosto = puedeEditarCosto(operandoEnLocalId, baseScope.creadoEnLocalId, depositoLocalId);
+    if (!puedeCosto) {
+      // Costo efectivo actual en la ubicación que opera (override ?? maestro).
+      let overrideCost = null;
+      if (operandoEnLocalId > 0) {
+        const ov = await prisma.productoLocal.findFirst({
+          where: { baseId, localId: operandoEnLocalId },
+          select: { precio_costo: true },
+        });
+        overrideCost = ov?.precio_costo ?? null;
+      }
+      const currentCost = overrideCost ?? baseScope.precio_costo;
+      const submitted = payload.precio_costo;
+      const intentaCambiar =
+        submitted !== undefined && submitted !== null && submitted !== "" && !mismoCosto(submitted, currentCost);
+      if (intentaCambiar) {
+        return NextResponse.json(
+          { ok: false, error: mensajeCostoNoEditable(baseScope.creadoEnLocalId, depositoLocalId) },
+          { status: 403 }
+        );
+      }
+      // No es dueño y no cambia el costo → seguir editando el resto SIN tocar el costo.
+      payload.precio_costo = undefined;
+    }
 
     // Validar proveedores no repetidos
     const toNum = (v) =>
@@ -210,7 +245,10 @@ async function editarBase(baseId, baseData) {
     peso_kg: baseData.peso_kg,
     volumen_ml: baseData.volumen_ml,
 
-    precio_costo: baseData.precio_costo,
+    // `?? undefined`: el costo es NOT NULL en el schema, así que un null (costo
+    // ausente o bloqueado por propiedad) significa "no cambiar", nunca "borrar".
+    // Elimina el borrado accidental del costo al editar sin tocarlo.
+    precio_costo: baseData.precio_costo ?? undefined,
     precio_venta: baseData.precio_venta,
     margen: baseData.margen,
 

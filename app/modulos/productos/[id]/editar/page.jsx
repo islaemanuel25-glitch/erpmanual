@@ -32,6 +32,7 @@ export default function EditarProductoPage({ params }) {
     AREAS: [],
   });
   const [initialData, setInitialData] = useState(null);
+  const [puedeEditarCosto, setPuedeEditarCosto] = useState(true);
   const [loadingCat, setLoadingCat] = useState(true);
   const [loadingProd, setLoadingProd] = useState(true);
   const [prodId, setProdId] = useState(null);
@@ -102,6 +103,8 @@ export default function EditarProductoPage({ params }) {
         }
 
         setInitialData(data.item);
+        // Costo editable solo si el backend lo autoriza (dueño del producto).
+        setPuedeEditarCosto(data.puedeEditarCosto !== false);
       } catch (err) {
         console.error("Error cargando producto:", err);
         router.push(returnUrl);
@@ -181,6 +184,7 @@ export default function EditarProductoPage({ params }) {
             submitLabel="Guardar cambios"
             enableVoiceInputs={true}
             onCatalogoCreado={handleCatalogoCreado}
+            puedeEditarCosto={puedeEditarCosto}
           />
         ) : (
           <p className="sunmi-text-muted text-sm">Producto no encontrado.</p>

@@ -123,6 +123,20 @@ export default function EdicionRapidaPage() {
   const puedeEditar = esAdmin || permisos.includes("productos.editar");
 
   const localId = contexto?.localId || 0;
+  const esDeposito = contexto?.esDeposito === true;
+
+  // ¿Se puede editar el COSTO de esta fila desde la ubicación actual?
+  // Desde el depósito: sí (solo ve productos de depósito). Desde un local: solo
+  // sus productos exclusivos (creadoEnLocalId === local actual); los del depósito
+  // son solo-lectura. Espeja la regla del backend (puedeEditarCosto), que sigue
+  // siendo la fuente de verdad.
+  const puedeEditarCostoRow = useCallback(
+    (row) => {
+      if (esDeposito) return true;
+      return row?.creadoEnLocalId != null && Number(row.creadoEnLocalId) === Number(localId);
+    },
+    [esDeposito, localId]
+  );
 
   // =========================================================
   // Estado listado
@@ -341,6 +355,10 @@ export default function EdicionRapidaPage() {
     // Merge row original + edits
     const merged = { ...row, ...changes };
     const payload = uiToPayload(merged);
+
+    // Costo administrado por el depósito (producto de depósito desde un local):
+    // no enviar precio_costo. El backend igual lo bloquea (fuente de verdad).
+    if (!puedeEditarCostoRow(row)) delete payload.precio_costo;
 
     try {
       const res = await fetch(
@@ -607,7 +625,38 @@ export default function EdicionRapidaPage() {
           />
         );
 
-      case "precioCosto":
+      case "precioCosto": {
+        // Costo administrado por el depósito: solo-lectura desde un local.
+        const costoBloqueado = !puedeEditarCostoRow(row);
+        if (!isEditable || costoBloqueado) {
+          const display = val == null ? "—" : `$ ${Number(val).toLocaleString("es-AR", { minimumFractionDigits: 2 })}`;
+          return (
+            <span
+              className="inline-flex items-center gap-1 justify-end w-24 sunmi-text-muted"
+              title={costoBloqueado ? "Costo administrado por el depósito" : undefined}
+            >
+              {display}
+              {costoBloqueado && <span className="text-[9px]" aria-hidden>🔒</span>}
+            </span>
+          );
+        }
+        return (
+          <SunmiInput
+            type="number"
+            step="0.01"
+            value={val ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              setFieldEdit(row.id, colKey, v === "" ? null : Number(v));
+            }}
+            onKeyDown={handleCellKeyDown}
+            data-row={rowIdx}
+            data-col={colKey}
+            className="text-right w-24"
+          />
+        );
+      }
+
       case "precioVenta":
       case "margen":
         if (!isEditable) {
@@ -866,6 +915,14 @@ export default function EdicionRapidaPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Aviso: costo de productos del depósito es solo-lectura desde un local */}
+          {puedeEditar && !esDeposito && (
+            <p className="text-[11px] sunmi-text-muted flex items-center gap-1">
+              <span aria-hidden>🔒</span>
+              El costo de los productos del depósito es de solo lectura (lo administra el depósito). Podés editar el costo de los productos creados por este local.
+            </p>
           )}
 
           {/* Tabla */}

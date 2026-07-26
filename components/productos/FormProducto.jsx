@@ -50,6 +50,9 @@ const FOCUS_ORDER = [
  *  - onSubmit(payload): callback con payload listo para API
  *  - onCancel(): callback para cancelar
  *  - submitLabel: texto del botón (default según initialData)
+ *  - puedeEditarCosto: si false, el precio de costo se muestra solo-lectura y NO
+ *      se envía (producto del depósito editado desde un local). El backend igual
+ *      revalida. Default true (alta y productos propios del local).
  */
 export default function FormProducto({
   initialData = null,
@@ -59,6 +62,7 @@ export default function FormProducto({
   submitLabel,
   enableVoiceInputs = false,
   onCatalogoCreado,
+  puedeEditarCosto = true,
 }) {
   const scrollRef = useRef(null);
 
@@ -352,6 +356,7 @@ export default function FormProducto({
       volumen_ml: p.volumen_ml === "" ? null : Number(p.volumen_ml),
       precio_costo: Number(p.precio_costo),
       precio_venta: precioVentaOut,
+      // se elimina abajo si el costo no es editable (producto del depósito)
       margen: p.margen === "" ? null : Number(p.margen),
       precio_sugerido: p.precio_sugerido === "" ? null : Number(p.precio_sugerido),
       iva_porcentaje: p.iva_porcentaje === "" ? null : Number(p.iva_porcentaje),
@@ -371,6 +376,10 @@ export default function FormProducto({
       modoVentaDeposito: p.modoVentaDeposito || "PESO",
       actualizaPromedioPorRecepcion: p.actualizaPromedioPorRecepcion !== false,
     };
+
+    // Costo administrado por el depósito (producto de depósito editado desde un
+    // local): no enviar el costo. El backend igual lo bloquea (defensa en profundidad).
+    if (!puedeEditarCosto) delete payload.precio_costo;
 
     onSubmit(payload);
   };
@@ -743,29 +752,38 @@ export default function FormProducto({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Fila 1: Costo (+ costo unitario ref. en pack/cajón) */}
             <Field label={`Costo * ${labelEscalaPrecio}`} fieldKey="precio_costo">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <SunmiInput
-                    type="number"
-                    value={form.precio_costo}
-                    onWheel={(e) => e.target.blur()}
-                    onChange={(e) => onChangeCosto(e.target.value)}
-                  />
+              {puedeEditarCosto ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <SunmiInput
+                      type="number"
+                      value={form.precio_costo}
+                      onWheel={(e) => e.target.blur()}
+                      onChange={(e) => onChangeCosto(e.target.value)}
+                    />
+                  </div>
+                  {enableVoiceInputs && (
+                    <VoiceFieldButton
+                      fieldName="precio_costo"
+                      label="Dictar precio de costo"
+                      onResult={(t) => {
+                        const n = parseVoiceNumber(t);
+                        if (n !== null && n >= 0) onChangeCosto(n);
+                      }}
+                    />
+                  )}
                 </div>
-                {enableVoiceInputs && (
-                  <VoiceFieldButton
-                    fieldName="precio_costo"
-                    label="Dictar precio de costo"
-                    onResult={(t) => {
-                      const n = parseVoiceNumber(t);
-                      if (n !== null && n >= 0) onChangeCosto(n);
-                    }}
-                  />
-                )}
-              </div>
+              ) : (
+                <>
+                  <SunmiInput type="number" value={form.precio_costo} readOnly disabled />
+                  <p className="text-xs sunmi-text-muted mt-1">
+                    El costo lo administra el depósito. Podés editar el resto (precio de venta, margen, etc.).
+                  </p>
+                </>
+              )}
             </Field>
 
-            {showPreciosRef && (
+            {puedeEditarCosto && showPreciosRef && (
               <Field label="Costo unitario ref." fieldKey="precio_costo_unitario_ref">
                 <SunmiInput
                   type="number"
