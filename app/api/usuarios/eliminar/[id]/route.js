@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/authorize";
+import { getUsuarioSession } from "@/lib/auth";
+import { autorizarGestionUsuarios, dentroDeAlcance } from "@/lib/usuarios/gestion";
 
 export async function DELETE(req, { params }) {
   try {
-    const auth = requireAdmin(req);
+    const session = getUsuarioSession(req);
+    const auth = autorizarGestionUsuarios(session);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { id } = await params;
-    console.log("🧨 ELIMINAR params.id =", id, "type:", typeof id);
-
     const userId = Number(id);
 
     if (!Number.isFinite(userId)) {
@@ -19,17 +19,23 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    const result = await prisma.usuario.updateMany({
+    const objetivo = await prisma.usuario.findUnique({
+      where: { id: userId },
+      select: { id: true, localId: true },
+    });
+    if (!objetivo) {
+      return NextResponse.json({ ok: false, error: "Usuario no encontrado" }, { status: 404 });
+    }
+
+    // Scope: un gestor por-local solo desactiva usuarios de SU local (ajeno → 403).
+    if (auth.viaLocal && !dentroDeAlcance(auth, objetivo.localId)) {
+      return NextResponse.json({ ok: false, error: "Usuario fuera de tu alcance." }, { status: 403 });
+    }
+
+    await prisma.usuario.update({
       where: { id: userId },
       data: { activo: false },
     });
-
-    if (result.count === 0) {
-      return NextResponse.json(
-        { ok: false, error: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (e) {

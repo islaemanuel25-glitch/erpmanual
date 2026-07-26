@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
 
 const num = (v) => (v == null ? 0 : Number(v));
 
@@ -12,6 +13,11 @@ export async function GET(req, { params }) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    const perm = checkPerm(session, "reportes.ver");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     const { id } = await params;
@@ -66,19 +72,17 @@ export async function GET(req, { params }) {
       );
     }
 
-    // Scope de local: usuario no-admin solo ve ventas de su local
-    if (
-      !session.esAdmin &&
-      session.localId &&
-      venta.localId !== session.localId
-    ) {
+    // Scope de local: un no-admin solo ve ventas de su local. Lectura ajena → 404
+    // (no revela la existencia de la venta).
+    if (!session.esAdmin && venta.localId !== Number(session.localId)) {
       return NextResponse.json(
-        { ok: false, error: "No autorizado" },
-        { status: 403 }
+        { ok: false, error: "Venta no encontrada" },
+        { status: 404 }
       );
     }
 
-    const verCostos = !!session.esAdmin;
+    // Ver costos/rentabilidad: admin o costos.ver (acotado al local por el scope).
+    const verCostos = !!session.esAdmin || checkPerm(session, "costos.ver").ok;
 
     const totales = {
       subtotal: num(venta.subtotal).toFixed(2),

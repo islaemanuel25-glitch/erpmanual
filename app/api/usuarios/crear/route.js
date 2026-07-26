@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcrypt"; // ✅ unificado con seed.js
-import { requireAdmin } from "@/lib/authorize";
+import { getUsuarioSession } from "@/lib/auth";
+import {
+  autorizarGestionUsuarios,
+  validarRolAsignable,
+  validarLocalObligatorio,
+} from "@/lib/usuarios/gestion";
 
 export async function POST(req) {
   try {
-    const auth = requireAdmin(req);
+    const session = getUsuarioSession(req);
+    const auth = autorizarGestionUsuarios(session);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const body = await req.json();
@@ -51,6 +57,22 @@ export async function POST(req) {
         { status: 400 }
       );
     }
+
+    // Scope: un gestor por-local solo crea usuarios en SU local (localId ajeno → 403).
+    if (auth.viaLocal) {
+      if (localId !== null && localId !== auth.localId) {
+        return NextResponse.json({ ok: false, error: "Local fuera de tu alcance." }, { status: 403 });
+      }
+      localId = auth.localId;
+    }
+
+    // Rol asignable (no-admin no puede asignar Admin ni roles con "*").
+    const vRol = await validarRolAsignable(rolId, { esAdmin: auth.esAdmin });
+    if (vRol.error) return NextResponse.json({ ok: false, error: vRol.error }, { status: vRol.status });
+
+    // Los roles de sistema por-local exigen localId.
+    const vLocal = validarLocalObligatorio(vRol.rol.nombre, localId);
+    if (vLocal.error) return NextResponse.json({ ok: false, error: vLocal.error }, { status: vLocal.status });
 
     const passwordHash = await bcrypt.hash(password, 10);
 
