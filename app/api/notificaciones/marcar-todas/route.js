@@ -12,10 +12,21 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "Sin grupo" }, { status: 400 });
     }
 
-    await prisma.notificacion.updateMany({
-      where: { ...whereNotifUsuario(scope.grupoId, scope.userId), leida: false },
-      data: { leida: true },
+    if (!scope.userId) {
+      return NextResponse.json({ ok: false, error: "Sin usuario" }, { status: 401 });
+    }
+    // Marca leídas SOLO para este usuario: crea filas de lectura para las notifs en
+    // su alcance que aún no leyó. Nunca toca el estado global de la notificación.
+    const noLeidas = await prisma.notificacion.findMany({
+      where: { ...whereNotifUsuario(scope), lecturas: { none: { usuarioId: scope.userId } } },
+      select: { id: true },
     });
+    if (noLeidas.length > 0) {
+      await prisma.notificacionLectura.createMany({
+        data: noLeidas.map((n) => ({ notificacionId: n.id, usuarioId: scope.userId })),
+        skipDuplicates: true,
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("notificaciones/marcar-todas:", err);

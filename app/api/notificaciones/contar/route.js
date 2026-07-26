@@ -11,7 +11,11 @@ export async function GET(req) {
     }
     if (!scope.grupoId) return NextResponse.json({ ok: true, count: 0 });
 
-    const where = { ...whereNotifUsuario(scope.grupoId, scope.userId), leida: false };
+    // No leída POR USUARIO = no existe fila de lectura para este usuario.
+    const where = {
+      ...whereNotifUsuario(scope),
+      lecturas: { none: { usuarioId: scope.userId ?? -1 } },
+    };
     const desde = new URL(req.url).searchParams.get("desde");
     if (desde) {
       const d = new Date(desde);

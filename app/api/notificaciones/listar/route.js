@@ -18,12 +18,16 @@ export async function GET(req) {
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("pageSize")) || 20));
 
-    const base = whereNotifUsuario(scope.grupoId, scope.userId);
+    // Estado de lectura POR USUARIO (tabla puente NotificacionLectura):
+    //  - no leída = NO existe fila de lectura para este usuario.
+    //  - leída    = existe.
+    const uid = scope.userId ?? -1;
+    const base = whereNotifUsuario(scope);
     const where =
       filtro === "noleidas"
-        ? { ...base, leida: false }
+        ? { ...base, lecturas: { none: { usuarioId: uid } } }
         : filtro === "leidas"
-        ? { ...base, leida: true }
+        ? { ...base, lecturas: { some: { usuarioId: uid } } }
         : { ...base };
 
     // Rango temporal OBLIGATORIO (módulo de alto volumen). Si no viene `desde`,
@@ -46,15 +50,19 @@ export async function GET(req) {
       if (!isNaN(h.getTime())) where.createdAt.lte = h;
     }
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       prisma.notificacion.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: { lecturas: { where: { usuarioId: uid }, select: { id: true } } },
       }),
       prisma.notificacion.count({ where }),
     ]);
+
+    // `leida` es POR USUARIO (presencia de fila de lectura); nunca el flag global.
+    const items = rows.map(({ lecturas, ...n }) => ({ ...n, leida: lecturas.length > 0 }));
 
     return NextResponse.json({ ok: true, items, total });
   } catch (err) {

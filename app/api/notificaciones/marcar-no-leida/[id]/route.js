@@ -17,9 +17,19 @@ export async function POST(req, { params }) {
       return NextResponse.json({ ok: false, error: "Sin grupo" }, { status: 400 });
     }
 
-    await prisma.notificacion.updateMany({
-      where: { id: notifId, ...whereNotifUsuario(scope.grupoId, scope.userId) },
-      data: { leida: false },
+    if (!scope.userId) {
+      return NextResponse.json({ ok: false, error: "Sin usuario" }, { status: 401 });
+    }
+    const notif = await prisma.notificacion.findFirst({
+      where: { id: notifId, ...whereNotifUsuario(scope) },
+      select: { id: true },
+    });
+    if (!notif) {
+      return NextResponse.json({ ok: false, error: "No encontrada" }, { status: 404 });
+    }
+    // Marca NO leída SOLO para este usuario: borra su fila de lectura (nunca global).
+    await prisma.notificacionLectura.deleteMany({
+      where: { notificacionId: notifId, usuarioId: scope.userId },
     });
     return NextResponse.json({ ok: true });
   } catch (err) {

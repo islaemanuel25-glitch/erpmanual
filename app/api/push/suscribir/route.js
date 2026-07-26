@@ -32,6 +32,7 @@ export async function POST(req) {
       update: {
         grupoId: scope.grupoId,
         usuarioId: scope.userId ?? null,
+        localId: scope.localId ?? null,
         p256dh,
         auth,
         userAgent,
@@ -40,6 +41,7 @@ export async function POST(req) {
       create: {
         grupoId: scope.grupoId,
         usuarioId: scope.userId ?? null,
+        localId: scope.localId ?? null,
         endpoint,
         p256dh,
         auth,
