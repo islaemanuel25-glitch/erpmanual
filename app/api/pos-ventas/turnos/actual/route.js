@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { resolveScope } from "@/lib/grupos";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 export async function GET(req) {
@@ -17,13 +18,17 @@ export async function GET(req) {
     const perm = checkPerm(session, "pos.usar");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    const localId = Number(req.nextUrl.searchParams.get("localId"));
-    if (!localId) {
+    // Scope autorizado (antes: localId crudo del query, sin validar contra sesión).
+    const scope = await resolveScope(req, {
+      explicitLocalId: req.nextUrl.searchParams.get("localId"),
+    });
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "localId requerido" },
-        { status: 400 }
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
       );
     }
+    const localId = scope.localId;
 
     const turno = await prisma.turno.findFirst({
       where: {

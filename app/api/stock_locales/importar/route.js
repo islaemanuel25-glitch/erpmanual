@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { resolveLocalAndGrupo, getLocalIdsDeGrupo } from "@/lib/grupos";
 
 export async function POST(req) {
   try {
@@ -21,6 +22,16 @@ export async function POST(req) {
 
     const perm = checkPerm(session, "stock.editar");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
+    // Alcance por grupo: nunca escribir en locales de otros grupos.
+    const ctx = await resolveLocalAndGrupo(req);
+    if (ctx.error) {
+      return NextResponse.json(
+        { ok: false, error: ctx.error, needsContexto: ctx.needsContexto },
+        { status: ctx.status }
+      );
+    }
+    const localIdsGrupo = await getLocalIdsDeGrupo(ctx.grupoId);
 
     // ================================
     // 1) RECIBIR BODY
@@ -103,7 +114,7 @@ export async function POST(req) {
     // 5) OBTENER LOCALES
     // ================================
     const locales = await prisma.local.findMany({
-      where: { es_deposito: false },
+      where: { es_deposito: false, id: { in: localIdsGrupo } },
       select: { id: true },
     });
 

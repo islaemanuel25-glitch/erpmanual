@@ -31,7 +31,9 @@ export async function POST(req) {
     // Permiso: admin (*) o pedidos.editar
     // ============================
     const permisos = Array.isArray(session.permisos) ? session.permisos : [];
-    const esAdmin = permisos.includes("*");
+    // Admin = "*" SIN local asignado (mismo criterio que solicitados/enviar/opciones).
+    // Un usuario "*" CON local no debe saltarse la validación de propiedad (destino+grupo).
+    const esAdmin = permisos.includes("*") && !session.localId;
 
     if (!esAdmin && !permisos.includes("pedidos.editar")) {
       return NextResponse.json(

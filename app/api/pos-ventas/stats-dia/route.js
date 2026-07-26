@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { resolveScope } from "@/lib/grupos";
 
 export async function GET(req) {
   try {
@@ -16,16 +17,18 @@ export async function GET(req) {
     const perm = checkPerm(session, "pos.usar");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    const localId =
-      session.localId ||
-      Number(req.nextUrl.searchParams.get("localId"));
-
-    if (!localId) {
+    // Scope autorizado: no-admin → su local (localId ajeno del query → 403);
+    // admin → contexto. Antes confiaba en el localId crudo del query.
+    const scope = await resolveScope(req, {
+      explicitLocalId: req.nextUrl.searchParams.get("localId"),
+    });
+    if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: "localId requerido" },
-        { status: 400 }
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
       );
     }
+    const localId = scope.localId;
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);

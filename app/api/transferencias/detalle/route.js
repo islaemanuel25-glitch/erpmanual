@@ -77,9 +77,10 @@ export async function GET(req) {
       if (!localId && session.localId) localId = Number(session.localId);
 
       if (!localId || (transferencia.origenId !== localId && transferencia.destinoId !== localId)) {
+        // Lectura ajena (no participa) → 404: no revela existencia del recurso.
         return NextResponse.json(
-          { ok: false, error: "Sin permiso" },
-          { status: 403 }
+          { ok: false, error: "No encontrada" },
+          { status: 404 }
         );
       }
     }

@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { getContextoActivo } from "@/lib/contexto";
+import { resolveVistaOperativa } from "@/lib/grupos";
 
 export async function GET(req) {
   try {
@@ -15,29 +14,16 @@ export async function GET(req) {
     const perm = checkPerm(session, "productos.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    // Resolver grupoId: session → query localId → session.localId → contexto cookie
-    const { searchParams } = new URL(req.url);
-    let grupoId = Number(session.grupoId) || 0;
-    if (!grupoId) {
-      let localId = Number(searchParams.get("localId")) || 0;
-      if (!localId && session.localId) localId = Number(session.localId);
-      if (!localId && session.esAdmin) {
-        const ctx = getContextoActivo(req, session);
-        if (ctx.localId) localId = Number(ctx.localId);
-      }
-      if (localId) grupoId = await getGrupoIdDeLocal(localId);
-    }
-
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[precios/history] CTX:", { sessionGrupoId: session.grupoId, grupoIdResolved: grupoId });
-    }
-
-    if (!grupoId) {
+    // grupoId SIEMPRE derivado del alcance autorizado (no de un localId crudo del
+    // query: un no-admin podía pasar ?localId=<otro grupo> y leer su historial).
+    const vista = await resolveVistaOperativa(req);
+    if (vista.error) {
       return NextResponse.json(
-        { ok: false, error: "Seleccioná un grupo activo para trabajar." },
-        { status: 400 }
+        { ok: false, error: vista.error, needsContexto: vista.needsContexto },
+        { status: vista.status }
       );
     }
+    const grupoId = vista.grupoId;
 
     const updates = await prisma.precioUpdate.findMany({
       where: { grupoId },

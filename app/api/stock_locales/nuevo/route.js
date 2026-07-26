@@ -176,13 +176,17 @@ export async function POST(req) {
         },
       });
 
-      const locales = await tx.local.findMany({ where: { es_deposito: false }, select: { id: true } });
+      // Solo los locales del MISMO grupo del producto (antes: todos los grupos).
+      const locales = await tx.grupoLocal.findMany({
+        where: { grupoId: Number(data.grupoId) },
+        select: { localId: true },
+      });
 
       for (const l of locales) {
         const pl = await tx.productoLocal.create({
           data: {
             baseId: creado.id,
-            localId: l.id,
+            localId: l.localId,
             precio_costo: creado.precio_costo, // precio del bulto
             precio_venta: creado.precio_venta,
             margen: creado.margen,
@@ -191,7 +195,7 @@ export async function POST(req) {
 
         await tx.stockLocal.create({
           data: {
-            localId: l.id,
+            localId: l.localId,
             productoId: pl.id,
             cantidad: 0,     // 🟢 stock inicial
             stockMin: 0,
