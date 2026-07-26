@@ -120,6 +120,11 @@ model ConfiguracionLocal {
   localId            Int      @unique
   allowNegativeStock Boolean? // vender sin stock (config_local.stock)
   exigirClienteVenta Boolean? // cliente obligatorio en POS (config_local.pos)
+  // Operario obligatorio para operar el POS de ESTE local (config_local.pos).
+  // null = true (obligatorio) = comportamiento histórico; false = el local NO
+  // exige operario (CAJERO/ENCARGADO operan sin PIN). Admin y DUEÑO_LOCAL siguen
+  // exentos por rol en cualquier caso. Aislado por local (no afecta a otros).
+  exigirOperador     Boolean?
   // Apariencia INSTITUCIONAL del local (config_local.apariencia): tema + opciones
   // de visualización de negocio que aplican a TODOS los dispositivos del local.
   // Distinta de la preferencia personal por navegador (localStorage).
