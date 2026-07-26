@@ -426,6 +426,10 @@ export default function FidelidadPage() {
                     value={busqProd}
                     onChange={(e) => setBusqProd(e.target.value)}
                     placeholder="Buscar producto por nombre o código…"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
                   />
                   {buscandoProd && (
                     <div className="text-[10px] sunmi-text-muted">Buscando…</div>

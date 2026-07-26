@@ -154,6 +154,10 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
           <SunmiInput
             ref={inputRef}
             placeholder="Buscar producto, código o categoría..."
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={handleKeyDown}

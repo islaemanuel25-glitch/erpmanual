@@ -148,6 +148,10 @@ export default function ModalCliente({ localId, onSeleccionar, onCerrar }) {
               onChange={(e) => setBusqueda(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && buscarClientes()}
               placeholder="Nombre o documento..."
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               className="flex-1"
               autoFocus
             />

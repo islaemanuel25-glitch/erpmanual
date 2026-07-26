@@ -257,6 +257,10 @@ export default function AnalyticsClientesPage() {
               <SunmiInput
                 type="text"
                 placeholder="Buscar cliente (nombre, tel, email)..."
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 className="!pl-9 !border-2 pulse-neon"

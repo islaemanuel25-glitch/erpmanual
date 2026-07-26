@@ -411,6 +411,10 @@ export default function ClientesPage() {
           <SunmiInput
             type="text"
             placeholder="Buscar por nombre, documento o telefono..."
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="flex-1"

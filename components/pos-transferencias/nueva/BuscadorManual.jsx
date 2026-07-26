@@ -171,6 +171,10 @@ export default function BuscadorManual({
           ref={inputRef}
           type="text"
           placeholder="Buscar producto, escanear o hablar..."
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
           value={texto}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}

@@ -261,6 +261,12 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
           className={`w-full text-base min-h-12 lg:min-h-10 !py-2 !pl-9 !border-2 pulse-neon ${soportaVoz ? "!pr-12" : ""}`}
           style={{ borderColor: "var(--pos-link)" }}
           autoFocus
+          // Sin historial/autocompletado nativo del navegador (no afecta el
+          // desplegable de productos del ERP, que es propio).
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
         />
         {soportaVoz && (
           <button

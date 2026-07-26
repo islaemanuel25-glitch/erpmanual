@@ -190,6 +190,10 @@ export default function RolesPage() {
               />
               <SunmiInput
                 placeholder="Buscar rol..."
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="!pl-9 !border-2 pulse-neon"

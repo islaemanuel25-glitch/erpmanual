@@ -181,6 +181,10 @@ export default function ProveedoresPage() {
               />
               <SunmiInput
                 placeholder="Buscar proveedor..."
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="!pl-9 !border-2 pulse-neon"

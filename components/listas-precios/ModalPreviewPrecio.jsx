@@ -204,6 +204,10 @@ export default function ModalPreviewPrecio({ open, lista, onClose }) {
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   placeholder="Nombre, código o SKU..."
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                 />
               </div>
 

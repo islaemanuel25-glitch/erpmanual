@@ -911,6 +911,10 @@ export default function DetallePedidoProveedorPage({ params }) {
             <SunmiInput
               type="text"
               placeholder="Buscar producto extra (nombre / SKU / código de barra)"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               value={extraSearch}
               onChange={(e) => buscarExtra(e.target.value)}
               className="mb-3"

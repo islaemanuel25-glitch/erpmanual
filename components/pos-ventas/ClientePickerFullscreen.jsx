@@ -64,6 +64,10 @@ export default function ClientePickerFullscreen({
               onChange={(e) => setBusqueda(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && buscarClientes()}
               placeholder="Buscar por nombre, teléfono, documento o email..."
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               className="flex-1"
               autoFocus
             />

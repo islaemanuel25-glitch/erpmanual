@@ -185,6 +185,10 @@ export default function ModalMergeClientes({ localId, onCerrar, onMerged }) {
             <SunmiInput
               type="text"
               placeholder="Buscar cliente principal..."
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               value={busqPrincipal}
               onChange={(e) => setBusqPrincipal(e.target.value)}
               autoFocus
@@ -221,6 +225,10 @@ export default function ModalMergeClientes({ localId, onCerrar, onMerged }) {
               <SunmiInput
                 type="text"
                 placeholder="Buscar duplicados..."
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={busqDuplicados}
                 onChange={(e) => setBusqDuplicados(e.target.value)}
               />

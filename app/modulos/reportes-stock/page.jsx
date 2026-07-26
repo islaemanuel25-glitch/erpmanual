@@ -247,6 +247,10 @@ export default function ReportesStockPage() {
                 />
                 <SunmiInput
                   placeholder="Producto o código..."
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   className="!pl-9 !border-2 pulse-neon"

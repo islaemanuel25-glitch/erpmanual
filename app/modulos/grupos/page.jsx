@@ -273,6 +273,10 @@ export default function PageGrupos() {
           />
           <SunmiInput
             placeholder="Buscar grupo..."
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="!pl-9 !border-2 pulse-neon"

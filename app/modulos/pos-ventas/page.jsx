@@ -1611,6 +1611,7 @@ export default function PosVentasPage() {
             <input
               type="number"
               placeholder="Buscar por monto..."
+              autoComplete="off"
               value={busquedaMonto}
               onChange={(e) => setBusquedaMonto(e.target.value)}
               className="w-full px-2 py-1 rounded text-xs sunmi-pos-panel border"

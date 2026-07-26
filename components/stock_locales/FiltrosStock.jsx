@@ -178,6 +178,10 @@ export default function FiltrosStock({
             ref={inputRef}
             type="text"
             placeholder="Buscar por nombre o código..."
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={handleKeyDown}

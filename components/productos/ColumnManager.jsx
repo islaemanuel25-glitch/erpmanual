@@ -54,6 +54,10 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange, locke
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar columna..."
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
             icon="search"
           />
 

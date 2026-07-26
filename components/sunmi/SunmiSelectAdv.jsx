@@ -145,6 +145,10 @@ export default function SunmiSelectAdv({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar..."
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               className="w-full bg-transparent outline-none text-[12px]"
               style={{ color: "inherit" }}
             />

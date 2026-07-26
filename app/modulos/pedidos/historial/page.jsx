@@ -162,6 +162,10 @@ export default function HistorialPedidosPage() {
               />
               <SunmiInput
                 placeholder="Buscar por nombre o código..."
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 type="text"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}

@@ -169,6 +169,10 @@ export default function ModalVincularCodigo({
               setSelectedBase(null);
             }}
             placeholder="Buscar por nombre, SKU o código de barras..."
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
           />
         </div>
 

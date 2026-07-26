@@ -562,6 +562,10 @@ export default function PedidosCatalogoPage() {
               />
               <SunmiInput
                 placeholder="Buscar por nombre, código de barras, SKU..."
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 type="text"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}

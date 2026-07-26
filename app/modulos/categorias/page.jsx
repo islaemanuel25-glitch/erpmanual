@@ -194,6 +194,10 @@ export default function CategoriasPage() {
             />
             <SunmiInput
               placeholder="Buscar por nombre..."
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="!pl-9 !border-2 pulse-neon"
