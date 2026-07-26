@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
 import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import { useOperadorActivo } from "@/hooks/useOperadorActivo";
+import { perfilExentoDeOperador } from "@/lib/operador-exencion";
 import ModalPedirOperador from "@/components/operador/ModalPedirOperador";
 
 const OperadorContext = createContext(null);
@@ -17,16 +18,15 @@ const OperadorContext = createContext(null);
  * - Handlers de 428 llaman requerirOperador() → revalida; al confirmarse que no
  *   hay operario, aparece el mismo modal.
  *
- * El dueño (permiso *) y quien tenga modulos.acceso_sin_operador quedan exentos.
+ * Exentos: Admin (permiso *) y DUEÑO_LOCAL (rol de sistema, en su local).
+ * Ver lib/operador-exencion.js. modulos.acceso_sin_operador quedó legacy.
  */
 export function OperadorProvider({ children }) {
   const router = useRouter();
   const { perfil } = useUser();
   const { operador, voucher, loading, login, logout, refrescar } = useOperadorActivo();
 
-  const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const exento =
-    permisos.includes("*") || permisos.includes("modulos.acceso_sin_operador");
+  const exento = perfilExentoDeOperador(perfil);
 
   // ¿Hubo operario alguna vez en esta sesión? Distingue "ingreso inicial" (nunca
   // hubo → redirect) de "se cayó a mitad de sesión" (había → modal). Es estado

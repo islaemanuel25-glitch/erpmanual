@@ -9,6 +9,7 @@ import { useUser } from "@/app/context/UserContext";
 import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useOperadorContext } from "@/app/context/OperadorContext";
+import { perfilExentoDeOperador } from "@/lib/operador-exencion";
 import OperadorSelector from "@/components/operador/OperadorSelector";
 import { getDefaultRoute } from "@/lib/getDefaultRoute";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -31,8 +32,9 @@ export default function Header({ onOpenMobileMenu }) {
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
 
-  // Cuenta exenta = admin O tiene permiso explícito → opera sin operador
-  const esCuentaPropia = esAdmin || permisos.includes("modulos.acceso_sin_operador");
+  // Cuenta exenta = Admin o DUEÑO_LOCAL (rol de sistema) → opera sin operador.
+  // Ver lib/operador-exencion.js. modulos.acceso_sin_operador quedó legacy.
+  const esCuentaPropia = perfilExentoDeOperador(perfil);
 
   const [open, setOpen] = useState(false);
   const [contexto, setContexto] = useState(null);

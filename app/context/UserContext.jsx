@@ -31,6 +31,7 @@ export function UserProvider({ children }) {
           rolNombre: p.rolNombre ?? "",
           permisos,
           esAdmin: permisos.includes("*"),
+          esDuenoLocal: p.esDuenoLocal === true,
           localId: p.localId ?? null,
           esDeposito: p.esDeposito ?? false,
         });

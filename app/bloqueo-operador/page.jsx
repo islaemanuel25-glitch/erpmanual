@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import { useOperadorActivo } from "@/hooks/useOperadorActivo";
+import { perfilExentoDeOperador } from "@/lib/operador-exencion";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -22,8 +23,7 @@ export default function BloqueoOperadorPage() {
   const [enviando, setEnviando] = useState(false);
   const [cargandoLista, setCargandoLista] = useState(true);
 
-  const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esExento = permisos.includes("*") || permisos.includes("modulos.acceso_sin_operador");
+  const esExento = perfilExentoDeOperador(perfil);
 
   // Cuenta exenta → directo al dashboard
   useEffect(() => {

@@ -31,11 +31,25 @@ const PASS_LOGIN = "secret123";
 
 function cookieFor(user) {
   const token = jwt.sign(
-    { id: user.id, rolId: user.rolId, permisos: user.permisos, localId: user.localId ?? null, esDeposito: !!user.esDeposito },
+    {
+      id: user.id,
+      rolId: user.rolId,
+      permisos: user.permisos,
+      localId: user.localId ?? null,
+      esDeposito: !!user.esDeposito,
+      // Flag del login (esSistema + nombre DUEÑO_LOCAL) para el bypass de operario.
+      esDuenoLocal: !!user.esDuenoLocal,
+    },
     AUTH_SECRET,
     { expiresIn: "8h" }
   );
   return `erpazul_sesion=${token}`;
+}
+
+// Aserción directa (sin HTTP) para verificar trazabilidad en la DB.
+function assertOk(name, cond) {
+  if (cond) { console.log(`✔ ${name}`); pass++; }
+  else { console.log(`✖ ${name}`); fail++; }
 }
 
 async function req(method, path, { cookie = null, body = null } = {}) {
@@ -129,8 +143,9 @@ async function seed() {
     userAdmin: { ...adminU, permisos: ["*"] },
     cajeroA: { ...cajeroA, permisos: DEFAULT_PERMISOS_SISTEMA[CAJERO] },
     encargadoA: { ...encargadoA, permisos: DEFAULT_PERMISOS_SISTEMA[ENCARGADO] },
-    duenoA: { ...duenoA, permisos: DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL] },
-    duenoB: { ...duenoB, permisos: DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL] },
+    // esDuenoLocal: espejo de lo que computa el login (rol de sistema DUEÑO_LOCAL).
+    duenoA: { ...duenoA, permisos: DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL], esDuenoLocal: true },
+    duenoB: { ...duenoB, permisos: DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL], esDuenoLocal: true },
   });
 }
 
@@ -201,6 +216,57 @@ async function main() {
   await check("Otro usuario del MISMO local ve la misma apariencia institucional", req("GET", `/api/config/apariencia-local`, { cookie: ENC }), 200, (r) => r.json?.apariencia?.tema === "sunmiLight");
   await check("DUEÑO modifica OTRO local (localId ajeno) → 403", req("PUT", `/api/config/apariencia-local?localId=${S.localB}`, { cookie: DUE, body: { apariencia: { tema: "sunmiDark" } } }), 403);
   await check("Admin (contexto localA) modifica apariencia → 200", req("PUT", `/api/config/apariencia-local`, { cookie: ADM_A, body: { apariencia: { tema: "sunmiDark" } } }), 200, (r) => r.json?.apariencia?.tema === "sunmiDark");
+
+  console.log("\n=== BYPASS DE OPERARIO (DUEÑO_LOCAL / Admin sin operario; CAJERO/ENCARGADO siguen exigiéndolo) ===");
+  // Ningún request de esta sección lleva cookie de operador activo.
+  // Reset de config del local A: la venta de prueba NO debe exigir cliente
+  // (un test previo lo puso en true) y habilitamos stock negativo por las dudas.
+  await prisma.configuracionLocal.upsert({
+    where: { localId: S.localA },
+    update: { exigirClienteVenta: false, allowNegativeStock: true },
+    create: { localId: S.localA, exigirClienteVenta: false, allowNegativeStock: true },
+  });
+
+  // CAJERO / ENCARGADO: sin operario → 428 (sigue el flujo normal).
+  await check("CAJERO sin operario abre turno → 428", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: CAJ, body: { localId: S.localA, montoInicial: 0 } }), 428);
+  await check("ENCARGADO sin operario abre turno → 428", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: ENC, body: { localId: S.localA, montoInicial: 0 } }), 428);
+
+  // Admin: exención histórica → abre turno sin operario.
+  await check("Admin abre turno sin operario → 200", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: ADM, body: { localId: S.localA, montoInicial: 0 } }), 200);
+
+  // DUEÑO_LOCAL en SU local: bypass → abre turno sin operario.
+  const rDuenoTurno = await check("DUEÑO abre turno en su local sin operario → 200", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: DUE, body: { localId: S.localA, montoInicial: 0 } }), 200);
+  const turnoDuenoId = rDuenoTurno.json?.turno?.id ?? null;
+  const turnoRow = turnoDuenoId ? await prisma.turno.findUnique({ where: { id: turnoDuenoId } }) : null;
+  assertOk("Turno del DUEÑO: operadorId === null", !!turnoRow && turnoRow.operadorId === null);
+  assertOk("Turno del DUEÑO: vendedorId === DuenoA", !!turnoRow && turnoRow.vendedorId === S.duenoA.id);
+
+  // DUEÑO crea venta sin operario → 200, con operadorId null y vendedorId = DUEÑO.
+  const rVenta = await check("DUEÑO crea venta sin operario → 200", req("POST", `/api/pos-ventas/crear`, { cookie: DUE, body: { turnoId: turnoDuenoId, formaPago: "efectivo", items: [{ productoBaseId: S.baseId, cantidad: 1, precio: 200, nombre: "ProdA" }] } }), 200);
+  const ventaId = rVenta.json?.ventaId ?? null;
+  const ventaRow = ventaId ? await prisma.venta.findUnique({ where: { id: ventaId } }) : null;
+  assertOk("Venta del DUEÑO: operadorId === null", !!ventaRow && ventaRow.operadorId === null);
+  assertOk("Venta del DUEÑO: vendedorId === DuenoA", !!ventaRow && ventaRow.vendedorId === S.duenoA.id);
+
+  // DUEÑO crea movimiento de caja → usuarioId = DUEÑO (trazabilidad del usuario).
+  const rCaja = await check("DUEÑO crea movimiento de caja sin operario → 200", req("POST", `/api/pos-ventas/caja-movimientos/crear`, { cookie: DUE, body: { turnoId: turnoDuenoId, tipo: "INGRESO", monto: 50, motivo: "prueba bypass" } }), 200);
+  const movId = rCaja.json?.item?.id ?? null;
+  const movRow = movId ? await prisma.cajaMovimiento.findUnique({ where: { id: movId } }) : null;
+  assertOk("CajaMovimiento del DUEÑO: usuarioId === DuenoA", !!movRow && movRow.usuarioId === S.duenoA.id);
+
+  // DUEÑO cierra su turno sin operario → 200.
+  await check("DUEÑO cierra turno sin operario → 200", req("POST", `/api/pos-ventas/turnos/cerrar`, { cookie: DUE, body: { turnoId: turnoDuenoId, montoRealEfectivo: 300 } }), 200);
+
+  // Scope: DUEÑO A no puede operar en local ajeno ni sin local (el scope corta antes del gate).
+  await check("DUEÑO A abre turno en local AJENO (B) → 403", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: DUE, body: { localId: S.localB, montoInicial: 0 } }), 403);
+  const DUE_SINLOCAL = cookieFor({ id: S.duenoA.id, rolId: S.duenoA.rolId, permisos: S.duenoA.permisos, localId: null, esDuenoLocal: true });
+  await check("DUEÑO sin local asignado abre turno → 403", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: DUE_SINLOCAL, body: { montoInicial: 0 } }), 403);
+
+  // POS Transferencias: el gate NO bloquea al DUEÑO (bypass) pero el scope/estado siguen; CAJERO sigue exigiendo operario.
+  await check("DUEÑO solicitar POS inexistente → 404 (gate NO bloquea; scope sí)", req("POST", `/api/pos-transferencias/solicitar`, { cookie: DUE, body: { posId: 999999 } }), 404);
+  await check("CAJERO solicitar POS sin operario → 428 (sigue exigiendo operario)", req("POST", `/api/pos-transferencias/solicitar`, { cookie: CAJ, body: { posId: 999999 } }), 428);
+  await check("DUEÑO cancelar POS inexistente → 404 (gate NO bloquea)", req("POST", `/api/pos-transferencias/cancelar`, { cookie: DUE, body: { posId: 999999 } }), 404);
+  await check("CAJERO cancelar POS sin operario → 428", req("POST", `/api/pos-transferencias/cancelar`, { cookie: CAJ, body: { posId: 999999 } }), 428);
 
   console.log(`\nRESULTADO ROLES NUEVOS: ${pass} pass / ${fail} fail`);
   await prisma.$disconnect();
