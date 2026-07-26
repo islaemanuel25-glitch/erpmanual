@@ -57,6 +57,8 @@ export async function GET(req) {
       rolNombre: payload.rolNombre ?? "",
       permisos,
       esAdmin,
+      // Flag para el frontend (perfilExentoDeOperador). JWT viejos → false.
+      esDuenoLocal: payload.esDuenoLocal === true,
 
       // 🔵 localId ahora es CORRECTO SIEMPRE
       localId,

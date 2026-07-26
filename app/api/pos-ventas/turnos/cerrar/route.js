@@ -17,14 +17,6 @@ export async function POST(req) {
     const perm = checkPerm(session, "pos.usar");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    const gateOp = requireOperadorSalvoDueno(req, session);
-    if (!gateOp.ok) {
-      return NextResponse.json(
-        { ok: false, error: gateOp.error, needsOperador: true },
-        { status: gateOp.status }
-      );
-    }
-
     const { turnoId, montoRealEfectivo, observaciones } = await req.json();
 
     const turno = await prisma.turno.findUnique({
@@ -42,6 +34,17 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "Turno ya cerrado" },
         { status: 400 }
+      );
+    }
+
+    // Gate de operario. El local autorizado es el del turno (ya validado por
+    // vendedorId === session.id), no un valor crudo del cliente. Para DUEÑO_LOCAL
+    // el bypass solo aplica si ese local es el suyo (puedeOperarSinOperador).
+    const gateOp = requireOperadorSalvoDueno(req, session, { localId: turno.localId });
+    if (!gateOp.ok) {
+      return NextResponse.json(
+        { ok: false, error: gateOp.error, needsOperador: true },
+        { status: gateOp.status }
       );
     }
 

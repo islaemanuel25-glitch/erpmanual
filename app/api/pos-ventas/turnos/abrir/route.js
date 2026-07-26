@@ -51,7 +51,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error }, { status: 400 });
     }
 
-    const gateOp = requireOperadorSalvoDueno(req, session);
+    const gateOp = requireOperadorSalvoDueno(req, session, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },

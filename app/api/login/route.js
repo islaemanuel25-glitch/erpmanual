@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcrypt";
 import { firmarToken, SesionCookie } from "@/lib/auth";
+import { DUENO_LOCAL } from "@/lib/rbac/systemRoles";
 
 // Rate limit en memoria por IP: máx 10 intentos por 15 min
 const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
@@ -109,6 +110,14 @@ export async function POST(req) {
     // (array) y se conserva tal cual.
     const permisos = Array.isArray(user.rol?.permisos) ? user.rol.permisos : [];
 
+    // Identidad de rol para el bypass de operario de DUEÑO_LOCAL. Se calcula acá
+    // (donde tenemos el rol completo desde la DB) y se snapshotea en el JWT.
+    // Robusto: exige rol de sistema (esSistema) + el nombre canónico; no depende
+    // de un ID fijo de base ni SOLO del texto del nombre. Ver lib/operador.js
+    // (puedeOperarSinOperador). JWT viejos sin este flag → se tratan como false.
+    const esDuenoLocal =
+      user.rol?.esSistema === true && user.rol?.nombre === DUENO_LOCAL;
+
     // ============================
     // 5) Payload del JWT
     // ============================
@@ -120,6 +129,7 @@ export async function POST(req) {
       rolId: user.rolId,
       rolNombre: user.rol?.nombre ?? null,
       permisos,
+      esDuenoLocal,
 
       localId: user.localId ?? null,
       esDeposito: user.local?.es_deposito ?? false,
