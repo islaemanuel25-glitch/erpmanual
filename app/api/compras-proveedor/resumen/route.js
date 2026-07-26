@@ -18,16 +18,17 @@ export async function GET(req) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.ver");
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
+    // Mismo scope por ubicación que el listado.
     const grupos = await prisma.pedidoProveedor.groupBy({
       by: ["estado"],
-      where: { grupoId },
+      where: { grupoId, creadoEnLocalId: localId },
       _count: { _all: true },
     });
 

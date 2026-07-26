@@ -16,13 +16,13 @@ export async function POST(req) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.crear");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const body = await req.json();
-    const { proveedorId, depositoId, notas, items } = body;
+    const { proveedorId, notas, items } = body;
 
     if (!proveedorId) {
       return NextResponse.json(
@@ -31,21 +31,19 @@ export async function POST(req) {
       );
     }
 
-    // Resolver depósito: usar el enviado o buscar el del grupo
-    let depId = Number(depositoId || 0);
-    if (!depId) {
-      const gd = await prisma.grupoDeposito.findFirst({
-        where: { grupoId },
-        select: { localId: true },
-      });
-      if (!gd) {
-        return NextResponse.json(
-          { ok: false, error: "No se encontró depósito para el grupo" },
-          { status: 400 }
-        );
-      }
-      depId = gd.localId;
+    // depositoId = SIEMPRE el depósito del grupo (referencia); NUNCA del body. El
+    // DESTINO de stock lo fija creadoEnLocalId (contexto autorizado), abajo.
+    const gd = await prisma.grupoDeposito.findFirst({
+      where: { grupoId },
+      select: { localId: true },
+    });
+    if (!gd) {
+      return NextResponse.json(
+        { ok: false, error: "No se encontró depósito para el grupo" },
+        { status: 400 }
+      );
     }
+    const depId = gd.localId;
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -92,6 +90,9 @@ export async function POST(req) {
       data: {
         grupoId,
         depositoId: depId,
+        // Ubicación DUEÑA del pedido = contexto activo (server-authoritative, no
+        // del body). Aísla la compra a la ubicación que la creó.
+        creadoEnLocalId: localId,
         proveedorId: Number(proveedorId),
         notas: notas || null,
         creadoPorId: session.id,

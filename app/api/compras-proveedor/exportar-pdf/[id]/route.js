@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { pedidoEnAlcance } from "@/lib/compras/scope";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 function fmt(n) {
@@ -37,7 +38,7 @@ export async function GET(req, { params }) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.ver");
     if (!perm.ok) {
@@ -76,7 +77,8 @@ export async function GET(req, { params }) {
       },
     });
 
-    if (!pedido || pedido.grupoId !== grupoId) {
+    // Export ajeno (otro grupo u otra ubicación) → 404: mismo scope que el listado.
+    if (!pedidoEnAlcance(pedido, { grupoId, localId })) {
       return NextResponse.json(
         { ok: false, error: "Pedido no encontrado" },
         { status: 404 }

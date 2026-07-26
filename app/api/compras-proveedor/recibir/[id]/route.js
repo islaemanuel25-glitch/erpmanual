@@ -7,6 +7,34 @@ import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
+import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
+
+// Resuelve el ProductoLocal DESTINO (de la ubicación dueña del pedido) para una
+// línea. Para el depósito es el mismo que ya trae la línea. Para un local, busca
+// —o crea, heredando precios del PL de origen— el ProductoLocal de ese local para
+// la misma base, de modo que el stock entre en el local y no en el depósito.
+async function resolverProductoLocalDestino(tx, ownerLocalId, depositoId, det, base) {
+  if (Number(ownerLocalId) === Number(depositoId)) return det.productoLocalId;
+  const baseId = base.id;
+  const existing = await tx.productoLocal.findUnique({
+    where: { localId_baseId: { localId: ownerLocalId, baseId } },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+  const src = det.producto; // ProductoLocal del depósito (origen de precios)
+  const created = await tx.productoLocal.create({
+    data: {
+      localId: ownerLocalId,
+      baseId,
+      precio_costo: src?.precio_costo ?? null,
+      precio_venta: src?.precio_venta ?? null,
+      margen: src?.margen ?? null,
+      activo: true,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
 
 export async function POST(req, { params }) {
   try {
@@ -18,7 +46,7 @@ export async function POST(req, { params }) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.crear");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -65,6 +93,13 @@ export async function POST(req, { params }) {
       return NextResponse.json(
         { ok: false, error: "Pedido no encontrado" },
         { status: 404 }
+      );
+    }
+    // Escritura sobre pedido de otra ubicación del mismo grupo → 403.
+    if (!pedidoEnAlcance(pedido, { grupoId, localId })) {
+      return NextResponse.json(
+        { ok: false, error: "Pedido fuera de tu alcance" },
+        { status: 403 }
       );
     }
 
@@ -153,7 +188,10 @@ export async function POST(req, { params }) {
       }
     }
 
-    const depositoId = pedido.depositoId;
+    // El stock entra en la UBICACIÓN DUEÑA del pedido (creadoEnLocalId), fijada
+    // desde el contexto al crear — NO se toma del body ni cambia en la recepción.
+    // Para el depósito coincide con depositoId (caso normal).
+    const ownerLocalId = ownerLocalIdDePedido(pedido);
 
     // Transacción: incrementar stock + marcar recibido
     await prisma.$transaction(async (tx) => {
@@ -210,20 +248,24 @@ export async function POST(req, { params }) {
           incremento = cantRecibida * multiplicador;
         }
 
-        // productoLocalId ya apunta directo al ProductoLocal del depósito
+        // ProductoLocal de la ubicación DESTINO (dueña del pedido).
+        const plDestino = await resolverProductoLocalDestino(
+          tx, ownerLocalId, pedido.depositoId, det, base
+        );
+
         await tx.stockLocal.upsert({
           where: {
             localId_productoId: {
-              localId: depositoId,
-              productoId: det.productoLocalId,
+              localId: ownerLocalId,
+              productoId: plDestino,
             },
           },
           update: {
             cantidad: { increment: incremento },
           },
           create: {
-            localId: depositoId,
-            productoId: det.productoLocalId,
+            localId: ownerLocalId,
+            productoId: plDestino,
             cantidad: incremento,
           },
         });
@@ -270,7 +312,7 @@ export async function POST(req, { params }) {
           unidadMedida: base?.unidad_medida,
         });
         await actualizarCostoRealProducto(tx, {
-          productoLocalId: det.productoLocalId,
+          productoLocalId: plDestino,
           costoMaestro,
         });
       }

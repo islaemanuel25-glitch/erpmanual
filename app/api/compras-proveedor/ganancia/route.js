@@ -14,7 +14,7 @@ export async function GET(req) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -43,6 +43,7 @@ export async function GET(req) {
 
     const where = {
       grupoId,
+      creadoEnLocalId: localId, // mismo scope por ubicación que el listado
       estado: "RECIBIDO",
       fechaRecibido: {
         gte: fechaDesde,

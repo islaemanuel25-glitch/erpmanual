@@ -15,7 +15,7 @@ export async function GET(req) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -36,7 +36,9 @@ export async function GET(req) {
     const page = Math.max(1, Number(url.searchParams.get("page") || 1));
     const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get("pageSize") || 20)));
 
-    const where = { grupoId };
+    // Aislamiento por ubicación: solo pedidos DUEÑOS de la ubicación activa.
+    // (backfill: pedidos viejos → creadoEnLocalId = depositoId).
+    const where = { grupoId, creadoEnLocalId: localId };
     if (proveedorId) where.proveedorId = proveedorId;
     if (estadosArr.length) {
       where.estado = { in: estadosArr };

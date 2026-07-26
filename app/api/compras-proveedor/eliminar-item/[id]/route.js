@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { pedidoEnAlcance } from "@/lib/compras/scope";
 
 export async function POST(req, { params }) {
   try {
@@ -14,7 +15,7 @@ export async function POST(req, { params }) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.crear");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -47,6 +48,13 @@ export async function POST(req, { params }) {
       return NextResponse.json(
         { ok: false, error: "Pedido no encontrado" },
         { status: 404 }
+      );
+    }
+    // Escritura sobre pedido de otra ubicación del mismo grupo → 403.
+    if (!pedidoEnAlcance(pedido, { grupoId, localId })) {
+      return NextResponse.json(
+        { ok: false, error: "Pedido fuera de tu alcance" },
+        { status: 403 }
       );
     }
 

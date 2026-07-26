@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { pedidoEnAlcance } from "@/lib/compras/scope";
 
 export async function GET(req) {
   try {
@@ -14,7 +15,7 @@ export async function GET(req) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -63,7 +64,9 @@ export async function GET(req) {
       },
     });
 
-    if (!pedido || pedido.grupoId !== grupoId) {
+    // Lectura ajena (otro grupo u otra ubicación del mismo grupo) → 404: no revela
+    // existencia. Aísla el detalle (proveedor, costos, factura) por ubicación.
+    if (!pedidoEnAlcance(pedido, { grupoId, localId })) {
       return NextResponse.json(
         { ok: false, error: "Pedido no encontrado" },
         { status: 404 }

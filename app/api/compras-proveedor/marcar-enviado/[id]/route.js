@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { crearNotificacion } from "@/lib/notificaciones/crearNotificacion";
+import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 
 export async function POST(req, { params }) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req, { params }) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.crear");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -35,10 +36,18 @@ export async function POST(req, { params }) {
       include: { proveedor: { select: { nombre: true } } },
     });
 
+    // Lectura ajena (existe pero de otra ubicación) → 404 (no revela existencia).
     if (!pedido || pedido.grupoId !== grupoId) {
       return NextResponse.json(
         { ok: false, error: "Pedido no encontrado" },
         { status: 404 }
+      );
+    }
+    // Escritura sobre pedido de otra ubicación del mismo grupo → 403.
+    if (!pedidoEnAlcance(pedido, { grupoId, localId })) {
+      return NextResponse.json(
+        { ok: false, error: "Pedido fuera de tu alcance" },
+        { status: 403 }
       );
     }
 
@@ -57,9 +66,14 @@ export async function POST(req, { params }) {
       },
     });
 
-    // Notificación interna (no rompe el flujo si falla).
+    // Notificación interna AISLADA a la ubicación dueña del pedido (no al grupo).
+    // Solo la ven usuarios cuya ubicación activa == dueña Y con permiso compras.ver.
+    const ownerLocalId = ownerLocalIdDePedido(pedido);
     await crearNotificacion({
       grupoId,
+      alcance: ownerLocalId === pedido.depositoId ? "DEPOSITO" : "LOCAL",
+      localId: ownerLocalId,
+      permisoRequerido: "compras.ver",
       tipo: "PEDIDO_PROVEEDOR_ENVIADO",
       titulo: "Pedido enviado a proveedor",
       cuerpo: `Pedido #${pedidoId}${pedido.proveedor?.nombre ? ` — ${pedido.proveedor.nombre}` : ""} marcado como enviado.`,
