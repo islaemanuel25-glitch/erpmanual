@@ -1,9 +1,9 @@
 "use client";
 
 import { memo, useState } from "react";
-import { Banknote, CreditCard, Wallet } from "lucide-react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { IconoMedio } from "@/components/pos-ventas/IconosMedios";
 import { showError } from "@/components/sunmi/SunmiToast";
 import { aCentavos } from "@/lib/pos-ventas/pagos";
 import { componerCobroSimple, evaluarDivisionPago } from "@/lib/pos-ventas/servicios";
@@ -28,23 +28,6 @@ const MEDIOS_COBRO = [
 
 // Medios del "Dividir pago" (sin fiado: fiado es tender único, va en el modo simple).
 const MEDIOS_DIVIDIR = MEDIOS_COBRO;
-
-// Íconos de medios — ÚNICA fuente, reutilizada por el cobro simple y por "Dividir pago"
-// para que se vean idénticos: billete verde (efectivo), tarjeta azul (débito),
-// tarjeta violeta (crédito), billetera celeste (Mercado Pago).
-const MEDIO_ICONO = {
-  efectivo: { Icon: Banknote, color: "#22c55e" },
-  debito: { Icon: CreditCard, color: "#3b82f6" },
-  credito: { Icon: CreditCard, color: "#8b5cf6" },
-  mercadopago: { Icon: Wallet, color: "#38bdf8" },
-};
-
-function IconoMedio({ medio, size = 18 }) {
-  const cfg = MEDIO_ICONO[medio];
-  if (!cfg) return null;
-  const { Icon, color } = cfg;
-  return <Icon size={size} color={color} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />;
-}
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -301,8 +284,10 @@ function FormaPago({
               <div className="grid grid-cols-2 gap-2">
                 {MEDIOS_COBRO.map((m) => (
                   <button key={m.key} type="button" onClick={() => cobrarSimple(m.key)} disabled={!puedeVender}
-                    className={`${BTN_MEDIO} flex items-center justify-center gap-2`}>
-                    <IconoMedio medio={m.key} /> {m.label}
+                    className={`${BTN_MEDIO} flex items-center justify-center gap-2 whitespace-nowrap`}>
+                    {/* El logo de MP es un óvalo (más ancho): se achica lo mínimo para que
+                        "Mercado Pago" entre en una sola línea, sin deformarlo. */}
+                    <IconoMedio medio={m.key} size={m.key === "mercadopago" ? 19 : 22} /> {m.label}
                   </button>
                 ))}
               </div>
