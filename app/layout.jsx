@@ -2,6 +2,7 @@ import "./globals.css";
 import { UserProvider } from "@/app/context/UserContext";
 import ThemeClientWrapper from "@/components/sunmi/ThemeClientWrapper";
 import AparienciaInstitucionalSync from "@/components/sunmi/AparienciaInstitucionalSync";
+import ChunkReloadGuard from "@/components/ChunkReloadGuard";
 import { DEFAULT_SUNMI_THEME_KEY } from "@/lib/sunmiThemes";
 import { resolverTemaInstitucionalSSR } from "@/lib/apariencia/temaServidor";
 
@@ -33,6 +34,7 @@ export default async function RootLayout({ children }) {
       <body>
         <ThemeClientWrapper institucionalInicial={temaInstitucional}>
           <UserProvider>
+            <ChunkReloadGuard />
             <AparienciaInstitucionalSync />
             {children}
           </UserProvider>
