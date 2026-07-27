@@ -13,6 +13,7 @@ import {
   resolverContraCatalogo,
 } from "@/lib/productos/busquedaFuzzyProducto";
 import { getCombo } from "@/lib/combos/service";
+import { esModalidadServicio, resolverRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 
 const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_TOP_RESULTS = 10;
@@ -225,6 +226,41 @@ function calcularModoSalida(esDeposito, modoEnvio, unidadMedida) {
 function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplicable = null) {
   return lista
     .map((pl) => {
+      // SERVICIO de importe variable: el importe lo ingresa el cajero en el POS.
+      // No tiene precio almacenado significativo, ni lista, ni redondeo, ni stock.
+      if (esModalidadServicio(pl.base?.modalidad)) {
+        const recargoPct = resolverRecargoServicioPct(
+          pl.recargoServicioPct,
+          pl.base?.recargoServicioDefaultPct
+        );
+        return {
+          productoBaseId: pl.baseId,
+          productoLocalId: pl.id,
+          nombre: pl.nombre || pl.base?.nombre || "",
+          codigoBarra: pl.base?.codigo_barra || "",
+          codigoBarraSecundario: pl.base?.codigo_barra_secundario || "",
+          // Marcadores para que el POS abra el ModalImporteServicio (no agregar con precio fijo).
+          esServicioImporteVariable: true,
+          modalidad: "IMPORTE_VARIABLE",
+          recargoServicioPct: recargoPct,
+          precioVenta: 0,
+          precioVentaUnitario: 0,
+          precioVentaBulto: 0,
+          precioCosto: 0,
+          precioCostoUnitario: 0,
+          precioCostoBulto: 0,
+          stock: 0,
+          sinStock: false,
+          allowNegativeStock,
+          disponibleParaVenta: true, // servicios: siempre disponibles (no controlan stock)
+          unidadMedida: "unidad",
+          factorPack: 1,
+          modoEnvio: null,
+          modoSalidaDefault: "UNIDAD",
+          esFiambreFijo: false,
+          aplicacionLista: null,
+        };
+      }
       const stock = Number(pl.stock?.[0]?.cantidad || 0);
       const sinStock = stock <= 0;
       const disponibleParaVenta = !sinStock || allowNegativeStock;

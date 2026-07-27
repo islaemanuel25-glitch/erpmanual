@@ -11,6 +11,7 @@ export default function ModalProducto({
   onSubmit,
   catalogos,
   initialData = null,
+  editandoOverrideLocal = false,
 }) {
   return (
     <div
@@ -34,6 +35,7 @@ export default function ModalProducto({
               onSubmit={onSubmit}
               onCancel={onClose}
               submitLabel={initialData ? "Guardar cambios" : "Crear producto"}
+              editandoOverrideLocal={editandoOverrideLocal}
             />
           )}
         </div>

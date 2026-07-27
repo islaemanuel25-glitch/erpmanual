@@ -344,9 +344,11 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
                   </div>
                 </div>
                 <div className="text-sm font-semibold pos-text-accent shrink-0">
-                  ${Number(p.precioVenta).toLocaleString("es-AR", {
-                    minimumFractionDigits: 2,
-                  })}
+                  {p.esServicioImporteVariable
+                    ? "Importe variable"
+                    : `$${Number(p.precioVenta).toLocaleString("es-AR", {
+                        minimumFractionDigits: 2,
+                      })}`}
                 </div>
               </div>
             );

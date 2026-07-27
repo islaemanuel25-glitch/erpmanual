@@ -8,6 +8,7 @@ import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 import { esComboBase } from "@/lib/combos/guards";
 import { puedeEditarCosto, mensajeCostoNoEditable, mismoCosto } from "@/lib/productos/propiedadCosto";
+import { validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 
 // Sincronizar precioCosto/activo a overrides, recalculando precio_venta por margen
 async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
@@ -263,6 +264,15 @@ async function editarBase(baseId, baseData) {
     imagen_url: baseData.imagen_url,
     es_combo: baseData.es_combo,
 
+    // Servicios de importe variable: modalidad + recargo default (validado server-side).
+    modalidad: baseData.modalidad === "IMPORTE_VARIABLE" ? "IMPORTE_VARIABLE" : "NORMAL",
+    recargoServicioDefaultPct:
+      baseData.modalidad === "IMPORTE_VARIABLE"
+        ? (validarRecargoServicioPct(baseData.recargoServicioDefaultPct).valido
+            ? validarRecargoServicioPct(baseData.recargoServicioDefaultPct).pct
+            : 0)
+        : null,
+
     categoria_id: baseData.categoria_id ? Number(baseData.categoria_id) : null,
     proveedor_id: baseData.proveedor_id ? Number(baseData.proveedor_id) : null,
     proveedor2_id: baseData.proveedor2_id ? Number(baseData.proveedor2_id) : null,
@@ -386,6 +396,10 @@ async function editarOverride(baseId, localId, localData) {
         precio_venta: localData.precio_venta ?? undefined,
         margen: localData.margen ?? undefined,
         activo: localData.activo ?? undefined,
+        // Override por local del recargo del servicio: null = heredar base.
+        recargoServicioPct: validarRecargoServicioPct(localData.recargoServicioPct).valido
+          ? validarRecargoServicioPct(localData.recargoServicioPct).pct
+          : null,
         nombre: null,
         descripcion: null,
       },

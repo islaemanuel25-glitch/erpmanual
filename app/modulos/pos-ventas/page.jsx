@@ -16,6 +16,8 @@ import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
 import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
+import ModalImporteServicio from "@/components/pos-ventas/ModalImporteServicio";
+import { sumarTotalServicios } from "@/lib/pos-ventas/servicios";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalTicketOffline from "@/components/pos-ventas/ModalTicketOffline";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
@@ -58,6 +60,8 @@ export default function PosVentasPage() {
   const [mostrarCierre, setMostrarCierre] = useState(false);
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
+  // Servicio de importe variable pendiente de ingresar importe en el modal.
+  const [servicioPendiente, setServicioPendiente] = useState(null);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [comisiones, setComisiones] = useState(null);
   const [creditoInfo, setCreditoInfo] = useState(null); // { limiteCredito, saldoActual }
@@ -458,6 +462,12 @@ export default function PosVentasPage() {
   const handleAgregar = useCallback((producto) => {
     setErrorMsg("");
     setSuccessMsg("");
+    // Servicio de importe variable: no se agrega con precio fijo; se abre el modal
+    // para ingresar el importe. Una línea única por carga (no fusiona).
+    if (producto.esServicioImporteVariable || producto.modalidad === "IMPORTE_VARIABLE") {
+      setServicioPendiente(producto);
+      return;
+    }
     if (producto.unidadMedida === "kg") {
       setProductoKgPendiente(producto);
       return;
@@ -497,6 +507,13 @@ export default function PosVentasPage() {
   const handleEliminar = useCallback((idx) => {
     setPreviousCarrito([...state.carrito]);
     dispatch({ type: ActionTypes.REMOVE_ITEM, payload: { idx } });
+  }, [state.carrito]);
+
+  // Confirmar el importe de un servicio → agregar línea única al carrito.
+  const handleConfirmarServicio = useCallback((servicio) => {
+    setPreviousCarrito([...state.carrito]);
+    dispatch({ type: ActionTypes.ADD_SERVICIO, payload: { servicio } });
+    setServicioPendiente(null);
   }, [state.carrito]);
 
   // ---------------------------------------------------------------------------
@@ -570,6 +587,9 @@ export default function PosVentasPage() {
   );
 
   const total = subtotal - state.descuento - state.descuentoPorPuntos;
+
+  // Mínimo a cubrir en efectivo por los servicios de importe variable del carrito.
+  const minEfectivoServicios = sumarTotalServicios(state.carrito);
 
   // ---------------------------------------------------------------------------
   // Descuento
@@ -694,6 +714,9 @@ export default function PosVentasPage() {
         listaPrecioId: item.listaPrecioId ?? null,
         tipoPrecioAplicado: item.tipoPrecioAplicado ?? "PRECIO_VENTA",
         margenAplicado: item.margenAplicado ?? null,
+        // Servicio de importe variable: el backend recalcula todo desde importeBaseServicio.
+        esServicio: item.esServicio ?? false,
+        importeBaseServicio: item.esServicio ? item.importeBaseServicio : null,
       })),
     };
 
@@ -722,6 +745,11 @@ export default function PosVentasPage() {
         nombre: item.nombre,
         precio: item.precio,
         cantidad: item.cantidad,
+        // Desglose del servicio para el ticket (importe/recargo/total).
+        esServicio: item.esServicio ?? false,
+        importeBaseServicio: item.esServicio ? item.importeBaseServicio : null,
+        recargoServicioPct: item.esServicio ? item.recargoServicioPct : null,
+        recargoServicioImporte: item.esServicio ? item.recargoServicioImporte : null,
       })),
       subtotal: subtotal,
       descuento: state.descuento,
@@ -1731,6 +1759,7 @@ export default function PosVentasPage() {
               procesandoCola={procesandoCola}
               comisiones={comisiones}
               clienteSeleccionado={state.clienteSeleccionado}
+              minEfectivoServicios={minEfectivoServicios}
             />
             {/* Mensaje offline */}
             {offlineMode && (
@@ -1875,6 +1904,15 @@ export default function PosVentasPage() {
             setProductoKgPendiente(null);
           }}
           onCancelar={() => setProductoKgPendiente(null)}
+        />
+      )}
+
+      {/* Modal importe de servicio (carga de colectivo / carga virtual) */}
+      {servicioPendiente && (
+        <ModalImporteServicio
+          producto={servicioPendiente}
+          onConfirmar={handleConfirmarServicio}
+          onCancelar={() => setServicioPendiente(null)}
         />
       )}
 

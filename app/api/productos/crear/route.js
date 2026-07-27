@@ -4,6 +4,7 @@ import { resolveScope, getLocalesDeGrupo } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
+import { esModalidadServicio, validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 
 // Validar modo_pedido según unidad_medida y factor_pack
 function validarModoPedido(modoPedido, unidadMedida, factorPack) {
@@ -143,6 +144,15 @@ export async function POST(req) {
       imagen_url: body.imagen_url || null,
       es_combo: Boolean(body.es_combo),
 
+      // Servicios de importe variable (modalidad propia). El % de recargo default se
+      // valida server-side; solo se persiste si el producto es servicio.
+      modalidad: esModalidadServicio(body.modalidad) ? "IMPORTE_VARIABLE" : "NORMAL",
+      recargoServicioDefaultPct: esModalidadServicio(body.modalidad)
+        ? (validarRecargoServicioPct(body.recargoServicioDefaultPct).valido
+            ? validarRecargoServicioPct(body.recargoServicioDefaultPct).pct
+            : 0)
+        : null,
+
       // Fiambre fields
       modoCompraProveedor: body.modoCompraProveedor || "BULTO",
       pesoReferenciaKg: num(body.pesoReferenciaKg),
@@ -184,9 +194,13 @@ export async function POST(req) {
           e.message?.includes("modoVentaDeposito") ||
           e.message?.includes("pesoPromedioKg") ||
           e.message?.includes("actualizaPromedioPorRecepcion") ||
-          e.message?.includes("codigo_barra_secundario")
+          e.message?.includes("codigo_barra_secundario") ||
+          e.message?.includes("modalidad") ||
+          e.message?.includes("recargoServicioDefaultPct")
         ) {
           const fallback = { ...baseData };
+          delete fallback.modalidad;
+          delete fallback.recargoServicioDefaultPct;
           delete fallback.modo_envio;
           delete fallback.modo_stock;
           delete fallback.modoCompraProveedor;

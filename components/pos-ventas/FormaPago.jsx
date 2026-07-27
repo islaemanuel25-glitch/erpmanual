@@ -37,6 +37,7 @@ function FormaPago({
   procesandoCola = false,
   comisiones = null,
   clienteSeleccionado = null,
+  minEfectivoServicios = 0,
 }) {
   const forma = FORMAS_PAGO.find((f) => f.key === formaPago);
   const tieneComision = forma?.tieneComision || false;
@@ -46,6 +47,12 @@ function FormaPago({
   const comisionBancaria = tieneComision ? base * (comisionPct / 100) : 0;
   const netoRecibido = total - comisionBancaria;
   const fiadoSinCliente = formaPago === "fiado" && !clienteSeleccionado;
+
+  // ── Servicios de importe variable: mínimo a cubrir en EFECTIVO ────────────
+  // La venta con servicios no puede fiarse y su total de servicios debe quedar
+  // cubierto en efectivo. El backend es la autoridad final; acá es UX/bloqueo.
+  const hayServicios = Number(minEfectivoServicios) > 0;
+  const minEfCent = aCentavos(minEfectivoServicios || 0);
 
   // ── Pago dividido (múltiples tenders). El backend recalcula todo. ──────────
   const [dividido, setDividido] = useState(false);
@@ -66,7 +73,15 @@ function FormaPago({
   }, [tenders]);
 
   const esFiadoDiv = tenders.length === 1 && tenders[0].medio === "fiado";
-  const puedeCobrarDiv = totalCent > 0 && restanteCent === 0 && (!esFiadoDiv || !!clienteSeleccionado);
+  // Efectivo cubierto por los tenders de efectivo (para la regla de servicios).
+  const efectivoDivCent = tendersConsolidados
+    .filter((t) => t.medio === "efectivo")
+    .reduce((a, t) => a + aCentavos(t.monto), 0);
+  const cumpleEfectivoDiv = !hayServicios || efectivoDivCent >= minEfCent;
+  const puedeCobrarDiv =
+    totalCent > 0 && restanteCent === 0 && (!esFiadoDiv || !!clienteSeleccionado) && cumpleEfectivoDiv && !(hayServicios && esFiadoDiv);
+  // En "un medio": con servicios el único medio válido es efectivo (cubre el total ≥ mínimo).
+  const cumpleEfectivoSingle = !hayServicios || (formaPago === "efectivo" && totalCent >= minEfCent);
 
   const comisionDivPct = (medio) =>
     medio === "efectivo" || medio === "fiado" ? 0 : Number(comisiones?.[medio] ?? COMISION_DEFAULT);
@@ -87,6 +102,7 @@ function FormaPago({
   };
   const quitarTender = (i) => setTenders((prev) => prev.filter((_, idx) => idx !== i));
   const ponerFiadoTotal = () => {
+    if (hayServicios) return showError("No se puede fiar una venta que contiene servicios");
     if (!clienteSeleccionado) return showError("Seleccioná un cliente para vender fiado");
     setTenders([{ medio: "fiado", monto: total }]);
   };
@@ -105,6 +121,20 @@ function FormaPago({
           ${formatPrecio(total)}
         </div>
       </div>
+
+      {/* Servicios: mínimo obligatorio en efectivo */}
+      {hayServicios && (
+        <div
+          className="px-2 py-1.5 rounded-lg text-xs text-center font-medium"
+          style={{
+            background: "color-mix(in srgb, var(--pos-accent) 12%, transparent)",
+            color: "var(--pos-accent)",
+          }}
+        >
+          Esta venta contiene servicios. Debe abonarse al menos{" "}
+          <b>${formatPrecio(minEfectivoServicios)}</b> en efectivo.
+        </div>
+      )}
 
       {/* Toggle un-medio / pago dividido (solo online) */}
       {!offlineMode && (
@@ -194,9 +224,9 @@ function FormaPago({
             </div>
           )}
           <button type="button" onClick={() => onCobrar({ formaPago, total })}
-            disabled={cobrando || disabled || !formaPago || subtotal <= 0 || fiadoSinCliente}
+            disabled={cobrando || disabled || !formaPago || subtotal <= 0 || fiadoSinCliente || !cumpleEfectivoSingle}
             className="sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md">
-            {cobrando ? "Procesando..." : `COBRAR $${formatPrecio(total)}`}
+            {cobrando ? "Procesando..." : hayServicios && !cumpleEfectivoSingle ? "Pagá en efectivo" : `COBRAR $${formatPrecio(total)}`}
           </button>
 
           {queueLength > 0 && onProcesarCola && (
@@ -209,14 +239,21 @@ function FormaPago({
           <div className="grid grid-cols-3 gap-1.5">
             {FORMAS_PAGO.map((fp) => {
               const esEfectivo = fp.key === "efectivo";
-              const estaDeshabilitado = offlineMode && !esEfectivo;
+              // Con servicios, en "un medio" solo efectivo (para pagar parte con digital
+              // usar "Pago dividido"). Fiado nunca con servicios.
+              const bloqueadoServicios = hayServicios && !esEfectivo;
+              const estaDeshabilitado = (offlineMode && !esEfectivo) || bloqueadoServicios;
               const selected = formaPago === fp.key;
               const btnClass = estaDeshabilitado
                 ? "sunmi-btn pos-control opacity-50 cursor-not-allowed"
                 : selected ? "sunmi-btn sunmi-pos-btn-primary" : "sunmi-btn sunmi-pos-btn-secondary";
               return (
                 <button key={fp.key} type="button"
-                  onClick={() => { if (offlineMode && !esEfectivo) { showError("Sin internet: solo efectivo disponible"); return; } onFormaPagoChange(fp.key); }}
+                  onClick={() => {
+                    if (offlineMode && !esEfectivo) { showError("Sin internet: solo efectivo disponible"); return; }
+                    if (bloqueadoServicios) { showError(fp.key === "fiado" ? "No se puede fiar una venta con servicios" : "Con servicios: usá 'Pago dividido' para combinar con digital"); return; }
+                    onFormaPagoChange(fp.key);
+                  }}
                   disabled={estaDeshabilitado} className={`min-h-11 text-xs py-1.5 rounded-md ${btnClass}`}>
                   {fp.label}
                 </button>

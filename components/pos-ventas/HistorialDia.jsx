@@ -6,6 +6,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import { lineasPagoTicket, esPagoDividido } from "@/lib/pos-ventas/pagos";
+import { snapshotServicioTicket } from "@/lib/pos-ventas/servicios";
 
 function fmt(n) {
   return Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -253,20 +254,48 @@ export default function HistorialDia({
 
             {/* Items */}
             <div className="space-y-1 mb-3 max-h-48 overflow-y-auto">
-              {detalle.detalles?.map((d, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between text-sm sunmi-surface-soft px-2 py-1 rounded"
-                >
-                  <span className="truncate flex-1 mr-2">{d.nombre}</span>
-                  <span className="sunmi-text-muted shrink-0">
-                    {d.cantidad} x ${formatPrecio(Number(d.precio))}
-                  </span>
-                  <span className="font-medium ml-2 shrink-0">
-                    ${formatPrecio(Number(d.subtotal))}
-                  </span>
-                </div>
-              ))}
+              {detalle.detalles?.map((d, i) => {
+                if (d.esServicio) {
+                  // Servicio de importe variable: desglose desde el snapshot histórico.
+                  const s = snapshotServicioTicket(d);
+                  return (
+                    <div
+                      key={i}
+                      className="text-sm sunmi-surface-soft px-2 py-1 rounded"
+                    >
+                      <div className="font-medium truncate">{s.nombre}</div>
+                      <div className="flex justify-between text-xs sunmi-text-muted">
+                        <span>Carga solicitada</span>
+                        <span>${formatPrecio(s.importeBase)}</span>
+                      </div>
+                      {s.mostrarRecargo && (
+                        <div className="flex justify-between text-xs sunmi-text-muted">
+                          <span>Recargo {s.recargoPct}%</span>
+                          <span>${formatPrecio(s.recargoImporte)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs font-medium">
+                        <span>Total</span>
+                        <span>${formatPrecio(s.total)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={i}
+                    className="flex justify-between text-sm sunmi-surface-soft px-2 py-1 rounded"
+                  >
+                    <span className="truncate flex-1 mr-2">{d.nombre}</span>
+                    <span className="sunmi-text-muted shrink-0">
+                      {d.cantidad} x ${formatPrecio(Number(d.precio))}
+                    </span>
+                    <span className="font-medium ml-2 shrink-0">
+                      ${formatPrecio(Number(d.subtotal))}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Totales */}
@@ -326,6 +355,11 @@ export default function HistorialDia({
                         nombre: d.nombre,
                         precio: Number(d.precio),
                         cantidad: d.cantidad,
+                        // Snapshot de servicio para el desglose en la reimpresión.
+                        esServicio: d.esServicio,
+                        importeBaseServicio: d.importeBaseServicio,
+                        recargoServicioPct: d.recargoServicioPct,
+                        recargoServicioImporte: d.recargoServicioImporte,
                       })),
                       subtotal: Number(detalle.subtotal),
                       descuento: Number(detalle.descuento),

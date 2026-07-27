@@ -32,6 +32,7 @@ export const initialState = {
 // Action types
 export const ActionTypes = {
   ADD_ITEM: "ADD_ITEM",
+  ADD_SERVICIO: "ADD_SERVICIO",
   UPDATE_CANTIDAD: "UPDATE_CANTIDAD",
   REMOVE_ITEM: "REMOVE_ITEM",
   CLEAR_CART: "CLEAR_CART",
@@ -108,6 +109,37 @@ export function posVentaReducer(state, action) {
             tipoPrecioAplicado: producto.aplicacionLista?.tipoPrecioAplicado ?? "PRECIO_VENTA",
             margenAplicado: producto.aplicacionLista?.margenAplicado ?? null,
             precioCosto: producto.precioCosto ?? 0,
+          },
+          ...state.carrito,
+        ],
+      };
+    }
+
+    case ActionTypes.ADD_SERVICIO: {
+      // Servicio de importe variable: SIEMPRE una línea nueva (nunca fusiona con
+      // otra carga del mismo producto). Cantidad fija = 1, clave única de carrito.
+      // Dos cargas iguales = dos líneas independientes. El precio es el total final
+      // (importe + recargo) ya calculado; el backend lo recalcula server-side.
+      const { servicio } = action.payload;
+      return {
+        ...state,
+        carrito: [
+          {
+            claveCarrito: servicio.claveCarrito,
+            productoBaseId: servicio.productoBaseId,
+            nombre: servicio.nombre,
+            precio: servicio.precioFinal,
+            cantidad: 1,
+            esServicio: true,
+            importeBaseServicio: servicio.importeBaseServicio,
+            recargoServicioPct: servicio.recargoServicioPct,
+            recargoServicioImporte: servicio.recargoServicioImporte,
+            precioCosto: servicio.importeBaseServicio,
+            // No controla stock ni lista.
+            stockMax: Infinity,
+            listaPrecioId: null,
+            tipoPrecioAplicado: "PRECIO_VENTA",
+            margenAplicado: null,
           },
           ...state.carrito,
         ],

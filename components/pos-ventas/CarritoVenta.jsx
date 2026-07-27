@@ -324,7 +324,7 @@ function CarritoVenta({
       <div className="block lg:hidden space-y-1">
         {items.map((item, idx) => (
           <div
-            key={`${item.productoBaseId}-${idx}`}
+            key={item.claveCarrito || `${item.productoBaseId}-${idx}`}
             className="p-1.5 rounded-lg pos-bg-surface animate-fade-in"
           >
             {/* Fila 1: nombre + total + quitar */}
@@ -349,26 +349,43 @@ function CarritoVenta({
               </span>
             )}
 
-            {/* Fila 2: precio unitario (texto chico) + stepper compacto */}
-            <div className="flex items-center justify-between gap-2 mt-1">
-              <span className="text-[11px] pos-text-muted whitespace-nowrap">
-                $ {formatPrecio(item.precio)} c/u
-              </span>
-              <CantidadStepper
-                item={item}
-                idx={idx}
-                onCantidadChange={onCantidadChange}
-                compact
-              />
-            </div>
+            {/* Fila 2: servicio (desglose sin stepper) o producto normal (precio + stepper) */}
+            {item.esServicio ? (
+              <div className="mt-1 text-[11px] pos-text-muted space-y-0.5">
+                <div className="flex justify-between">
+                  <span>Carga solicitada</span>
+                  <span>$ {formatPrecio(item.importeBaseServicio)}</span>
+                </div>
+                {Number(item.recargoServicioPct) > 0 && (
+                  <div className="flex justify-between">
+                    <span>Recargo {item.recargoServicioPct}%</span>
+                    <span>$ {formatPrecio(item.recargoServicioImporte)}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2 mt-1">
+                  <span className="text-[11px] pos-text-muted whitespace-nowrap">
+                    $ {formatPrecio(item.precio)} c/u
+                  </span>
+                  <CantidadStepper
+                    item={item}
+                    idx={idx}
+                    onCantidadChange={onCantidadChange}
+                    compact
+                  />
+                </div>
 
-            {/* Fila 3: chips scrolleables (selector Formato/Unidad + stock compacto) */}
-            <ChipsRowMobile
-              item={item}
-              idx={idx}
-              esDeposito={esDeposito}
-              onModoVentaChange={onModoVentaChange}
-            />
+                {/* Fila 3: chips scrolleables (selector Formato/Unidad + stock compacto) */}
+                <ChipsRowMobile
+                  item={item}
+                  idx={idx}
+                  esDeposito={esDeposito}
+                  onModoVentaChange={onModoVentaChange}
+                />
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -380,31 +397,46 @@ function CarritoVenta({
         >
           {items.map((item, idx) => (
             <tr
-              key={`${item.productoBaseId}-${idx}`}
+              key={item.claveCarrito || `${item.productoBaseId}-${idx}`}
               className="pos-bg-row pos-bg-row-hover animate-fade-in"
             >
               <td className="px-2 py-1.5 truncate max-w-[160px] text-sm">
                 <div className="truncate">{item.nombre}</div>
-                {item.listaPrecioNombre && item.tipoPrecioAplicado && item.tipoPrecioAplicado !== "PRECIO_VENTA" && (
-                  <span className="block text-[10px] sunmi-text-muted truncate">
-                    {item.listaPrecioNombre}
+                {item.esServicio ? (
+                  <span className="block text-[10px] pos-text-muted">
+                    Carga solicitada $ {formatPrecio(item.importeBaseServicio)}
+                    {Number(item.recargoServicioPct) > 0
+                      ? ` · Recargo ${item.recargoServicioPct}% $ ${formatPrecio(item.recargoServicioImporte)}`
+                      : ""}
                   </span>
+                ) : (
+                  <>
+                    {item.listaPrecioNombre && item.tipoPrecioAplicado && item.tipoPrecioAplicado !== "PRECIO_VENTA" && (
+                      <span className="block text-[10px] sunmi-text-muted truncate">
+                        {item.listaPrecioNombre}
+                      </span>
+                    )}
+                    {admiteRemanente(item, esDeposito) && onModoVentaChange && (
+                      <ModoVentaToggle
+                        item={item}
+                        idx={idx}
+                        onModoVentaChange={onModoVentaChange}
+                      />
+                    )}
+                    {mostrarStockDeposito(item, esDeposito) && <StockDeposito item={item} />}
+                  </>
                 )}
-                {admiteRemanente(item, esDeposito) && onModoVentaChange && (
-                  <ModoVentaToggle
-                    item={item}
-                    idx={idx}
-                    onModoVentaChange={onModoVentaChange}
-                  />
-                )}
-                {mostrarStockDeposito(item, esDeposito) && <StockDeposito item={item} />}
               </td>
               <td className="px-2 py-1.5">
-                <CantidadStepper
-                  item={item}
-                  idx={idx}
-                  onCantidadChange={onCantidadChange}
-                />
+                {item.esServicio ? (
+                  <span className="block text-center text-sm">1</span>
+                ) : (
+                  <CantidadStepper
+                    item={item}
+                    idx={idx}
+                    onCantidadChange={onCantidadChange}
+                  />
+                )}
               </td>
               <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm">
                 $ {formatPrecio(item.precio)}

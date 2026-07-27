@@ -4,6 +4,14 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta } from "@/lib/pos-ventas/pagos";
+import {
+  esModalidadServicio,
+  validarImporteServicio,
+  resolverRecargoServicioPct,
+  calcularServicio,
+  sumarTotalServicios,
+  validarCoberturaEfectivo,
+} from "@/lib/pos-ventas/servicios";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
@@ -195,27 +203,97 @@ export async function POST(req) {
       );
     }
 
-    // Validar cada item (cantidad puede ser decimal para KG)
+    // === Clasificación de MODALIDAD server-authoritative (servicios de importe
+    // variable). El backend decide por sí mismo qué producto es servicio (no confía
+    // en flags del cliente) y RECALCULA el importe/recargo/precio/costo/ganancia.
+    const baseIdsModalidad = [...new Set(items.map((i) => i.productoBaseId).filter(Boolean))];
+    const basesModalidad = await prisma.productoBase.findMany({
+      where: { id: { in: baseIdsModalidad } },
+      select: { id: true, modalidad: true, recargoServicioDefaultPct: true },
+    });
+    const modalidadMap = new Map(basesModalidad.map((b) => [b.id, b]));
+    const localesRecargo = await prisma.productoLocal.findMany({
+      where: { localId, baseId: { in: baseIdsModalidad } },
+      select: { baseId: true, recargoServicioPct: true },
+    });
+    const recargoLocalMap = new Map(localesRecargo.map((pl) => [pl.baseId, pl.recargoServicioPct]));
+
+    // Validar cada item (cantidad puede ser decimal para KG en normales; fija=1 en servicios)
     for (const item of items) {
-      const cant = Number(item.cantidad);
-      if (!item.productoBaseId || !cant || cant <= 0) {
+      if (!item.productoBaseId) {
         return NextResponse.json(
           { ok: false, error: `Item invalido: ${item.nombre || "sin nombre"}` },
           { status: 400 }
         );
       }
-      if (!item.precio || item.precio <= 0) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: `Precio invalido para: ${item.nombre || "sin nombre"}`,
-          },
-          { status: 400 }
+      const base = modalidadMap.get(item.productoBaseId);
+      const esServicio = esModalidadServicio(base?.modalidad);
+
+      if (esServicio) {
+        // SERVICIO: importe ingresado por el cajero; TODO lo demás server-side.
+        const val = validarImporteServicio(item.importeBaseServicio);
+        if (!val.valido) {
+          return NextResponse.json(
+            { ok: false, error: `${item.nombre || "Servicio"}: ${val.error}` },
+            { status: 400 }
+          );
+        }
+        // Cantidad fija = 1. Cualquier otra cantidad se rechaza (no multiplicar importe).
+        const cantRaw = item.cantidad == null ? 1 : Number(item.cantidad);
+        if (cantRaw !== 1) {
+          return NextResponse.json(
+            { ok: false, error: `Un servicio se vende de a uno (cantidad = 1): ${item.nombre || "Servicio"}` },
+            { status: 400 }
+          );
+        }
+        const recargoPct = resolverRecargoServicioPct(
+          recargoLocalMap.get(item.productoBaseId),
+          base?.recargoServicioDefaultPct
         );
+        const calc = calcularServicio(val.importe, recargoPct);
+        // Overwrite server-authoritative: se ignora cualquier precio/costo/pct del cliente.
+        item.precio = calc.precioFinal;
+        item.cantidad = 1;
+        item.precioCosto = calc.precioCosto;
+        item.esServicio = true;
+        item.__servicio = {
+          esServicio: true,
+          importeBaseServicio: calc.importeBase,
+          recargoServicioPct: calc.recargoPct,
+          recargoServicioImporte: calc.recargoImporte,
+          precioFinal: calc.precioFinal,
+          precioCosto: calc.precioCosto,
+          ganancia: calc.ganancia,
+        };
+      } else {
+        // NORMAL: rechazar si viene con importe de servicio (producto normal como servicio).
+        if (item.importeBaseServicio != null) {
+          return NextResponse.json(
+            { ok: false, error: `El producto "${item.nombre || item.productoBaseId}" no es un servicio de importe variable.` },
+            { status: 400 }
+          );
+        }
+        const cant = Number(item.cantidad);
+        if (!cant || cant <= 0) {
+          return NextResponse.json(
+            { ok: false, error: `Item invalido: ${item.nombre || "sin nombre"}` },
+            { status: 400 }
+          );
+        }
+        if (!item.precio || item.precio <= 0) {
+          return NextResponse.json(
+            { ok: false, error: `Precio invalido para: ${item.nombre || "sin nombre"}` },
+            { status: 400 }
+          );
+        }
+        item.cantidad = cant;
+        item.esServicio = false;
       }
-      // Normalizar cantidad a número
-      item.cantidad = cant;
     }
+
+    // Total de servicios (server-authoritative). Se ignora cualquier total de
+    // servicios enviado por el frontend.
+    const subtotalServicios = sumarTotalServicios(items);
 
     // Obtener descuento automático del cliente y sus tags
     let descuentoAplicadoPct = 0;
@@ -278,10 +356,27 @@ export async function POST(req) {
       (acc, item) => acc + item.precio * item.cantidad,
       0
     );
+    // Base ELEGIBLE para descuentos/puntos = mercadería (subtotal SIN servicios).
+    // Los servicios de importe variable no reciben descuentos/promos/puntos y su
+    // importe no puede reducirse indirectamente por un descuento global.
+    const baseElegibleDescuento = Math.round((subtotal - subtotalServicios + Number.EPSILON) * 100) / 100;
     const descuentoManual = Number(descuento) || 0;
-    const descuentoAutomatico = subtotal * (descuentoAplicadoPct / 100);
+    const descuentoAutomatico = baseElegibleDescuento * (descuentoAplicadoPct / 100);
     const descuentoPorPuntosVal = Number(descuentoPorPuntosBody) || 0;
     const descuentoTotal = descuentoAutomatico + descuentoManual + descuentoPorPuntosVal;
+
+    // Ningún descuento (manual/automático/puntos) puede exceder la mercadería elegible:
+    // eso equivaldría a descontar sobre servicios. Se rechaza explícitamente.
+    if (Math.round(descuentoTotal * 100) > Math.round(baseElegibleDescuento * 100) + 1) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Los descuentos no pueden aplicarse sobre servicios de importe variable.",
+        },
+        { status: 400 }
+      );
+    }
+
     const total = subtotal - descuentoTotal; // Lo que paga el cliente (SIN comision)
 
     if (total <= 0) {
@@ -325,6 +420,30 @@ export async function POST(req) {
     const pagosConComision = aplicarComisiones(consolidado.pagos, comisionPctPorMedio);
     const derivado = derivarCamposVenta(pagosConComision);
     const esFiadoVenta = derivado.esFiado; // server-authoritative (deriva de los tenders)
+
+    // === REGLAS DE SERVICIOS sobre el cobro ============================
+    if (subtotalServicios > 0) {
+      // Ninguna parte de un servicio puede quedar fiada (v1: FIADO es tender único
+      // por el total → una venta con servicio no puede llevar FIADO).
+      if (esFiadoVenta) {
+        return NextResponse.json(
+          { ok: false, error: "No se puede fiar una venta que contiene servicios de importe variable." },
+          { status: 400 }
+        );
+      }
+      // El total de los servicios debe quedar cubierto ÍNTEGRAMENTE en efectivo.
+      const cobertura = validarCoberturaEfectivo(subtotalServicios, consolidado.pagos);
+      if (!cobertura.valido) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `Esta venta contiene servicios. Debe abonarse al menos $${cobertura.minEfectivo.toFixed(2)} en efectivo.`,
+            minEfectivoServicios: cobertura.minEfectivo,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // FIADO exige cliente (regla derivada del tender, no del body).
     if (esFiadoVenta && !clienteId) {
@@ -554,11 +673,15 @@ export async function POST(req) {
       // componente). Para combos se congela el consumo en VentaDetalleComponente.
       for (const l of lineasComerciales) {
         const lineaSubtotal = l.subtotal;
-        const shareLinea = total > 0 ? lineaSubtotal / total : 0;
-        const comisionLinea = comisionBancaria * shareLinea;
         const esComboLinea = l.tipo === "COMBO";
-        // Combos: precio manual, sin lista. Normales: la lista resuelta por el server.
-        const itemListaValida = esComboLinea ? null : listaResuelta;
+        const esServicioLinea = l.tipo === "SERVICIO";
+        // Servicios: cobrados en efectivo → sin comisión bancaria. Normales/combos:
+        // se prorratea la comisión por participación en el total.
+        const shareLinea = total > 0 ? lineaSubtotal / total : 0;
+        const comisionLinea = esServicioLinea ? 0 : comisionBancaria * shareLinea;
+        // Servicios y combos: sin lista de precios. Normales: la lista resuelta por el server.
+        const itemListaValida = esComboLinea || esServicioLinea ? null : listaResuelta;
+        const svc = esServicioLinea ? l.servicio : null;
 
         const detalle = await tx.ventaDetalle.create({
           data: {
@@ -566,7 +689,7 @@ export async function POST(req) {
             productoBaseId: l.productoBaseId,
             nombre: l.nombre,
             precio: l.precio,
-            precioCosto: l.costoUnitario, // combo: costo unitario TOTAL del combo
+            precioCosto: l.costoUnitario, // combo: costo unitario TOTAL del combo; servicio: importe base
             cantidad: l.cantidad,
             subtotal: lineaSubtotal,
             ganancia: Math.round((lineaSubtotal - l.costoLinea + Number.EPSILON) * 100) / 100,
@@ -577,6 +700,11 @@ export async function POST(req) {
               itemListaValida && itemListaValida.tipoBase === "COSTO"
                 ? itemListaValida.margenPorcentaje
                 : null,
+            // Snapshot histórico del servicio (congelado; null en líneas normales).
+            esServicio: esServicioLinea,
+            importeBaseServicio: svc ? svc.importeBaseServicio : null,
+            recargoServicioPct: svc ? svc.recargoServicioPct : null,
+            recargoServicioImporte: svc ? svc.recargoServicioImporte : null,
           },
         });
 
@@ -682,6 +810,8 @@ export async function POST(req) {
 
           let subtotalElegible = 0;
           for (const item of items) {
+            // Los servicios de importe variable NO acreditan puntos ni entran a la base.
+            if (item.esServicio === true) continue;
             if (exclProds.has(item.productoBaseId)) continue;
             const catId = pbMap[item.productoBaseId]?.categoria_id;
             if (catId != null && exclCats.has(catId)) continue;

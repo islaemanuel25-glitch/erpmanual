@@ -63,6 +63,10 @@ export default function FormProducto({
   enableVoiceInputs = false,
   onCatalogoCreado,
   puedeEditarCosto = true,
+  // true cuando se edita el producto DENTRO de un local (no depósito): se edita el
+  // OVERRIDE por local del recargo. false (alta o edición en depósito/base): se edita
+  // el recargo POR DEFECTO del producto base. Evita mostrar un campo que la API ignora.
+  editandoOverrideLocal = false,
 }) {
   const scrollRef = useRef(null);
 
@@ -113,6 +117,10 @@ export default function FormProducto({
     activo: Boolean(o.activo ?? true),
     imagen_url: o.imagen_url ?? o.imagenUrl ?? "",
     es_combo: Boolean(o.es_combo ?? o.esCombo ?? false),
+    // Servicios de importe variable (carga de colectivo / carga virtual)
+    modalidad: o.modalidad === "IMPORTE_VARIABLE" ? "IMPORTE_VARIABLE" : "NORMAL",
+    recargoServicioDefaultPct: toNum(o.recargoServicioDefaultPct ?? o.recargo_servicio_default_pct ?? ""),
+    recargoServicioPct: toNum(o.recargoServicioPct ?? o.recargo_servicio_pct ?? ""),
     modo_pedido: o.modo_pedido ?? o.modoPedido ?? null,
     modo_envio: o.modo_envio ?? o.modoEnvio ?? defaultModoEnvio(o.unidad_medida ?? o.unidadMedida ?? "unidad"),
     modo_stock: o.modo_stock ?? o.modoStock ?? null,
@@ -295,8 +303,24 @@ export default function FormProducto({
       ? "(por bulto)"
       : "(por unidad)";
 
+  // Servicio de importe variable: el importe se carga en el POS. No controla stock,
+  // no usa lista de precios / margen ni redondeo.
+  const esServicio = form.modalidad === "IMPORTE_VARIABLE";
+
   const validar = () => {
     if (!String(form.nombre).trim()) return "Completá el nombre.";
+
+    // Servicio de importe variable: no requiere unidad, precio ni stock.
+    if (esServicio) {
+      const r = form.recargoServicioDefaultPct;
+      if (r !== "" && (!Number.isFinite(Number(r)) || Number(r) < 0 || Number(r) > 100))
+        return "El recargo por defecto debe estar entre 0 y 100.";
+      const ro = form.recargoServicioPct;
+      if (ro !== "" && (!Number.isFinite(Number(ro)) || Number(ro) < 0 || Number(ro) > 100))
+        return "El recargo por local debe estar entre 0 y 100.";
+      return null;
+    }
+
     if (!form.unidad_medida) return "Seleccioná unidad.";
 
     if (["pack", "cajon"].includes(form.unidad_medida)) {
@@ -367,6 +391,13 @@ export default function FormProducto({
       activo: Boolean(p.activo),
       imagen_url: p.imagen_url || null,
       es_combo: Boolean(p.es_combo),
+      modalidad: esServicio ? "IMPORTE_VARIABLE" : "NORMAL",
+      recargoServicioDefaultPct: esServicio
+        ? (p.recargoServicioDefaultPct === "" ? 0 : Number(p.recargoServicioDefaultPct))
+        : null,
+      recargoServicioPct: esServicio
+        ? (p.recargoServicioPct === "" ? null : Number(p.recargoServicioPct))
+        : null,
       modo_pedido: p.modo_pedido || "BULTO",
       modo_envio: p.modo_envio || defaultModoEnvio(p.unidad_medida),
       modo_stock: p.modo_stock || "BULTO",
@@ -376,6 +407,15 @@ export default function FormProducto({
       modoVentaDeposito: p.modoVentaDeposito || "PESO",
       actualizaPromedioPorRecepcion: p.actualizaPromedioPorRecepcion !== false,
     };
+
+    // Servicio de importe variable: no maneja precio, margen ni redondeo. Se envían
+    // valores neutros para no romper NOT NULL en la base (el importe se define en el POS).
+    if (esServicio) {
+      payload.precio_costo = 0;
+      payload.precio_venta = 0;
+      payload.margen = null;
+      payload.redondeo_100 = false;
+    }
 
     // Costo administrado por el depósito (producto de depósito editado desde un
     // local): no enviar el costo. El backend igual lo bloquea (defensa en profundidad).
@@ -512,6 +552,72 @@ export default function FormProducto({
           </div>
         </Section>
 
+        {/* MODALIDAD — producto normal vs servicio de importe variable */}
+        <Section title="Modalidad">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Modalidad del producto" fieldKey="modalidad">
+              <SunmiSelectAdv
+                value={form.modalidad}
+                onChange={(v) =>
+                  setField("modalidad", v === "IMPORTE_VARIABLE" ? "IMPORTE_VARIABLE" : "NORMAL")
+                }
+              >
+                <SunmiSelectOption value="NORMAL">Producto normal</SunmiSelectOption>
+                <SunmiSelectOption value="IMPORTE_VARIABLE">
+                  Servicio de importe variable
+                </SunmiSelectOption>
+              </SunmiSelectAdv>
+            </Field>
+
+            {/* Recargo POR DEFECTO (producto base): alta o edición en depósito/base. */}
+            {esServicio && !editandoOverrideLocal && (
+              <Field label="Recargo por defecto (%)" fieldKey="recargoServicioDefaultPct">
+                <SunmiInput
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={form.recargoServicioDefaultPct}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => setNumber("recargoServicioDefaultPct", e.target.value)}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Recargo aplicado sobre el importe cargado en el POS (0 a 100).
+                </p>
+              </Field>
+            )}
+
+            {/* Recargo OVERRIDE por local: solo al editar el producto dentro de un local. */}
+            {esServicio && editandoOverrideLocal && (
+              <Field label="Recargo de este local (%)" fieldKey="recargoServicioPct">
+                <SunmiInput
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={form.recargoServicioPct}
+                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => setNumber("recargoServicioPct", e.target.value)}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Override de este local. Vacío = usar el recargo por defecto del producto
+                  {form.recargoServicioDefaultPct !== "" && form.recargoServicioDefaultPct != null
+                    ? ` (${form.recargoServicioDefaultPct}%)`
+                    : ""}
+                  .
+                </p>
+              </Field>
+            )}
+          </div>
+
+          {esServicio && (
+            <p className="text-xs sunmi-text-muted mt-4">
+              El importe se ingresa en el POS al vender. Este servicio no controla stock,
+              no usa lista de precios ni margen, y no aplica redondeo.
+            </p>
+          )}
+        </Section>
+
         {/* CATÁLOGOS */}
         <Section title="Catálogos">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -632,7 +738,9 @@ export default function FormProducto({
           />
         )}
 
-        {/* VENTA EN LOCAL */}
+        {/* VENTA EN LOCAL + PRECIOS — ocultos para servicios de importe variable */}
+        {!esServicio && (
+        <>
         <Section title="Venta en local">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Tipo de venta *" fieldKey="unidad_medida">
@@ -848,6 +956,8 @@ export default function FormProducto({
             )}
           </div>
         </Section>
+        </>
+        )}
 
         {/* DATOS FISCALES — IVA no participa en el cálculo de precios */}
         <Section title="Datos fiscales">
@@ -895,6 +1005,7 @@ export default function FormProducto({
         {/* OPCIONES */}
         <Section title="Opciones">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {!esServicio && (
             <div data-field="redondeo_100" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
               <label className="text-[12px] sunmi-label">Redondeo a $100</label>
               <SunmiToggleEstado
@@ -910,6 +1021,7 @@ export default function FormProducto({
                 }}
               />
             </div>
+            )}
 
             {/* El toggle "Es combo" se removió: los combos se crean/editan por su
                 flujo propio (+ Combo). El alta/edición normal nunca cambia es_combo. */}
@@ -924,7 +1036,9 @@ export default function FormProducto({
           </div>
         </Section>
 
-        {/* REPOSICIÓN AUTOMÁTICA */}
+        {/* REPOSICIÓN AUTOMÁTICA + COMPRA A PROVEEDOR — no aplican a servicios */}
+        {!esServicio && (
+        <>
         <Section title="Reposición automática">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Modo de pedido" fieldKey="modo_pedido">
@@ -1056,6 +1170,8 @@ export default function FormProducto({
             )}
           </div>
         </Section>
+        </>
+        )}
       </div>
 
       <div className="mx-auto w-full max-w-5xl mt-4 pt-4 border-t border-slate-800 flex justify-end gap-2">

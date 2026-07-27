@@ -1278,6 +1278,7 @@ export default function ProductosPage() {
           catalogos={catalogos}
           initialData={editing}
           localId={localId}
+          editandoOverrideLocal={!!editing && localId > 0 && !contexto?.esDeposito}
         />
 
         <ModalVerComposicion

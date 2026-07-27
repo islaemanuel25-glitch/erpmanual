@@ -254,6 +254,14 @@ model ProductoBase {
   activo            Boolean      @default(true)
   imagen_url        String?
   es_combo          Boolean      @default(false)
+
+  // Servicios de importe variable (cargas de colectivo / cargas virtuales).
+  // modalidad = dimensión propia del producto (no simulada con otros flags).
+  // recargoServicioDefaultPct = % de recargo general del servicio (0..100), que
+  // ProductoLocal puede sobrescribir por local. Solo aplica si modalidad = IMPORTE_VARIABLE.
+  modalidad                 ModalidadProducto @default(NORMAL)
+  recargoServicioDefaultPct Decimal?          @db.Decimal(5, 2)
+
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -312,6 +320,9 @@ model ProductoLocal {
   precio_costo Decimal? @db.Decimal(12, 2)
   precio_venta Decimal? @db.Decimal(12, 2)
   margen       Decimal? @db.Decimal(6, 2)
+  // Override por local del recargo del servicio de importe variable (0..100).
+  // null → hereda ProductoBase.recargoServicioDefaultPct (y este, si null, → 0).
+  recargoServicioPct Decimal? @db.Decimal(5, 2)
   activo       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -522,6 +533,15 @@ enum ModoStock {
 enum ModoVentaDeposito {
   PIEZA
   PESO
+}
+
+// Modalidad del producto. NORMAL = producto de precio/stock habitual.
+// IMPORTE_VARIABLE = servicio cuyo importe lo ingresa el cajero en el POS
+// (cargas de colectivo / cargas virtuales). No es un flag simulado (combo/peso/
+// no-stock/lista): es una dimensión propia y explícita del producto.
+enum ModalidadProducto {
+  NORMAL
+  IMPORTE_VARIABLE
 }
 
 enum EstadoPedidoProveedor {
@@ -788,6 +808,15 @@ model VentaDetalle {
   comisionLinea      Decimal?           @db.Decimal(12, 2)
   tipoPrecioAplicado TipoPrecioAplicado @default(PRECIO_VENTA)
   margenAplicado     Decimal?           @db.Decimal(6, 2)
+
+  // Snapshot histórico de SERVICIO de importe variable (nullable en líneas normales).
+  // esServicio permite reconstruir la modalidad de la línea aunque el producto cambie.
+  // El % y el importe del recargo quedan CONGELADOS al vender (no leer el producto actual).
+  esServicio             Boolean  @default(false)
+  importeBaseServicio    Decimal? @db.Decimal(12, 2)
+  recargoServicioPct     Decimal? @db.Decimal(5, 2)
+  recargoServicioImporte Decimal? @db.Decimal(12, 2)
+
   createdAt          DateTime           @default(now())
 
   venta        Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)

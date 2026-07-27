@@ -75,6 +75,11 @@ export async function GET(req, { params }) {
           precio: d.precio,
           cantidad: d.cantidad,
           subtotal: d.subtotal,
+          // Snapshot de servicio de importe variable (para desglose en detalle/reimpresión).
+          esServicio: d.esServicio,
+          importeBaseServicio: d.importeBaseServicio,
+          recargoServicioPct: d.recargoServicioPct,
+          recargoServicioImporte: d.recargoServicioImporte,
         })),
       },
     });

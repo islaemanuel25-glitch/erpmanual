@@ -4,12 +4,14 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
 import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
 
 export default function EditarProductoPage({ params }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = Number(params.id);
   const { perfil } = useUser(); // trae localId del usuario (local o deposito o admin)
+  const { contexto } = useContextoActivo(); // esDeposito para decidir override vs base
 
   // URL de retorno al listado preservando contexto (page, sort, filtros)
   const returnUrl = useMemo(() => {
@@ -131,6 +133,7 @@ export default function EditarProductoPage({ params }) {
       catalogos={catalogos}
       initialData={initialData}
       localId={perfil?.localId || 0}
+      editandoOverrideLocal={(contexto?.localId || 0) > 0 && !contexto?.esDeposito}
     />
   );
 }

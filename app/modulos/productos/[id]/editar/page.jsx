@@ -185,6 +185,7 @@ export default function EditarProductoPage({ params }) {
             enableVoiceInputs={true}
             onCatalogoCreado={handleCatalogoCreado}
             puedeEditarCosto={puedeEditarCosto}
+            editandoOverrideLocal={localId > 0 && !contexto?.esDeposito}
           />
         ) : (
           <p className="sunmi-text-muted text-sm">Producto no encontrado.</p>
