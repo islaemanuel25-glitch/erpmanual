@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 import { resolveVistaOperativa, getGrupoIdDeLocal } from "@/lib/grupos";
+import { getContextoActivo } from "@/lib/contexto";
 import { tendersParaAgregar, normalizarMedio } from "@/lib/pos-ventas/pagos";
 
 export async function GET(req) {
@@ -62,8 +63,18 @@ export async function GET(req) {
       }
       where.localId = propio;
     } else if (qLocal) {
-      const g = await getGrupoIdDeLocal(qLocal);
-      if (!session.grupoId || g !== session.grupoId) {
+      // Grupo EFECTIVO del admin: su grupo activo (cookie erpazul_grupo_activo) o,
+      // si no está seteado, el grupo del LOCAL DEL CONTEXTO ACTIVO (misma fuente de
+      // verdad que resolveVistaOperativa, ver lib/grupos.js). Se deriva del CONTEXTO
+      // del admin, NO del local solicitado, para que no pueda consultar otro grupo
+      // pasando otro localId. El local pedido debe pertenecer a ese grupo efectivo.
+      const gLocal = await getGrupoIdDeLocal(qLocal);
+      let grupoEfectivo = Number(session.grupoId) || 0;
+      if (!grupoEfectivo) {
+        const ctx = getContextoActivo(req, session);
+        if (ctx?.localId) grupoEfectivo = (await getGrupoIdDeLocal(ctx.localId)) || 0;
+      }
+      if (!grupoEfectivo || !gLocal || gLocal !== grupoEfectivo) {
         return NextResponse.json({ ok: false, error: "Local fuera de tu grupo activo." }, { status: 403 });
       }
       where.localId = qLocal;
