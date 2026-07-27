@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuditoriaScope } from "@/lib/auditoria-pos-ventas/scope";
-import { margenPctFromSums, bucketMedioPago } from "@/lib/auditoria-pos-ventas/agregaciones";
+import { margenPctFromSums } from "@/lib/auditoria-pos-ventas/agregaciones";
 import { MEDIOS_CONOCIDOS } from "@/lib/auditoria-pos-ventas/constantes";
+import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
 
 const ORDEN_MEDIOS = [...MEDIOS_CONOCIDOS, "otros"];
 
@@ -27,6 +28,7 @@ async function calcularRango(localId, fechaInicio, fechaFin) {
       gananciaNeta: true,
       formaPago: true,
       esFiado: true,
+      pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
     },
   });
 
@@ -56,13 +58,18 @@ async function calcularRango(localId, fechaInicio, fechaFin) {
     costo += co;
     ganancia += g;
 
-    const b = bucketMedioPago(v);
-    if (!medioMap[b]) medioMap[b] = { medio: b, bruto: 0, comision: 0, neto: 0, costo: 0, ganancia: 0 };
-    medioMap[b].bruto += t;
-    medioMap[b].comision += c;
-    medioMap[b].neto += n;
-    medioMap[b].costo += co;
-    medioMap[b].ganancia += g;
+    // Desglose por medio POR TENDER (bruto/comisión/neto del pago; costo/ganancia
+    // prorrateados por participación). Los totales globales de arriba son de Venta.
+    for (const td of tendersParaAgregar(v)) {
+      const b = td.medio.toLowerCase();
+      if (!medioMap[b]) medioMap[b] = { medio: b, bruto: 0, comision: 0, neto: 0, costo: 0, ganancia: 0 };
+      const share = t > 0 ? td.monto / t : 0;
+      medioMap[b].bruto += td.monto;
+      medioMap[b].comision += td.comision;
+      medioMap[b].neto += td.neto;
+      medioMap[b].costo += co * share;
+      medioMap[b].ganancia += g * share;
+    }
   }
 
   const margenPct = margenPctFromSums(ganancia, neto);

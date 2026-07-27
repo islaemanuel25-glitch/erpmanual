@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
+import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta } from "@/lib/pos-ventas/pagos";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
@@ -38,7 +39,7 @@ export async function POST(req) {
     const { grupoId, localId, session } = scope;
 
     const body = await req.json();
-    const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, esFiado, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje, origenOffline, operadorVoucher } = body;
+    const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje, origenOffline, operadorVoucher } = body;
 
     // Resolver operador de la venta.
     // - Venta online: se exige operador activo salvo dueño (permiso "*").
@@ -184,12 +185,8 @@ export async function POST(req) {
       }
     }
 
-    if (esFiado && !clienteId) {
-      return NextResponse.json(
-        { ok: false, error: "Venta fiado requiere un cliente seleccionado" },
-        { status: 400 }
-      );
-    }
+    // (La regla "fiado requiere cliente" se valida más abajo con el esFiado DERIVADO
+    // de los tenders, server-authoritative — no se confía en body.esFiado.)
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -294,6 +291,49 @@ export async function POST(req) {
       );
     }
 
+    // === PAGOS (pago dividido) ==========================================
+    // Fuente: body.pagos[] (clientes nuevos) o compat legacy formaPago → 1 tender
+    // por el total. Se recalcula TODO server-side: se valida Σ==total (exacto),
+    // medios válidos, montos>0, FIADO único; y se derivan comisión/neto y los
+    // campos legacy de Venta. NO se confía en comisión/neto/pct del cliente.
+    const pagosRaw =
+      Array.isArray(body.pagos) && body.pagos.length > 0
+        ? body.pagos
+        : formaPago
+        ? [{ medio: formaPago, monto: total }]
+        : [];
+
+    const consolidado = normalizarYConsolidarPagos(pagosRaw, total);
+    if (consolidado.error) {
+      return NextResponse.json({ ok: false, error: consolidado.error }, { status: 400 });
+    }
+
+    // % de comisión por medio digital, resueltos de la config del grupo (no hardcode).
+    let comisionPctPorMedio = {};
+    if (consolidado.pagos.some((p) => ["MERCADOPAGO", "DEBITO", "CREDITO"].includes(p.medio))) {
+      const comCfg = await prisma.configuracionGrupo.findUnique({
+        where: { grupoId },
+        select: { comisionDebito: true, comisionCredito: true, comisionMercadopago: true },
+      });
+      comisionPctPorMedio = {
+        DEBITO: Number(comCfg?.comisionDebito ?? 7),
+        CREDITO: Number(comCfg?.comisionCredito ?? 7),
+        MERCADOPAGO: Number(comCfg?.comisionMercadopago ?? 7),
+      };
+    }
+
+    const pagosConComision = aplicarComisiones(consolidado.pagos, comisionPctPorMedio);
+    const derivado = derivarCamposVenta(pagosConComision);
+    const esFiadoVenta = derivado.esFiado; // server-authoritative (deriva de los tenders)
+
+    // FIADO exige cliente (regla derivada del tender, no del body).
+    if (esFiadoVenta && !clienteId) {
+      return NextResponse.json(
+        { ok: false, error: "Venta fiado requiere un cliente seleccionado" },
+        { status: 400 }
+      );
+    }
+
     // Validar saldo de puntos antes de continuar
     if (clienteId && puntosCanje > 0) {
       const aggPuntos = await prisma.clientePuntoMovimiento.groupBy({
@@ -320,7 +360,7 @@ export async function POST(req) {
     }
 
     // Validar límite de crédito si es fiado
-    if (esFiado && clienteId) {
+    if (esFiadoVenta && clienteId) {
       const clienteCC = await prisma.cliente.findFirst({
         where: { id: clienteId, grupoId, localId },
         select: { limiteCredito: true },
@@ -362,25 +402,12 @@ export async function POST(req) {
       }
     }
 
-    // Comision bancaria: solo para pagos digitales, con tasas configurables por grupo
-    const tieneComision = ["mercadopago", "debito", "credito"].includes(formaPago);
-    let comisionPct = 7; // default
-    if (tieneComision) {
-      const comisionConfig = await prisma.configuracionGrupo.findUnique({
-        where: { grupoId },
-        select: { comisionDebito: true, comisionCredito: true, comisionMercadopago: true },
-      });
-      if (comisionConfig) {
-        const mapaCom = {
-          debito: Number(comisionConfig.comisionDebito ?? 7),
-          credito: Number(comisionConfig.comisionCredito ?? 7),
-          mercadopago: Number(comisionConfig.comisionMercadopago ?? 7),
-        };
-        comisionPct = mapaCom[formaPago] ?? 7;
-      }
-    }
-    const comisionBancaria = tieneComision ? total * (comisionPct / 100) : 0;
-    const netoRecibido = total - comisionBancaria;
+    // Comisión y neto: DERIVADOS de los tenders (suma por venta). Congelados por
+    // tender en VentaPago; en Venta quedan como agregados legacy/compat.
+    const comisionBancaria = derivado.comisionBancaria;
+    const netoRecibido = derivado.netoRecibido;
+    const comisionPctVenta = derivado.comisionPct; // pct del único tender, o null si mixto
+    const formaPagoVenta = derivado.formaPago; // medio si 1 tender, "mixto" si ≥2
 
     // Obtener precios de costo y datos para conversión piezas→kg (depósito PIEZA)
     const productoBaseIds = items.map((i) => i.productoBaseId);
@@ -501,14 +528,26 @@ export async function POST(req) {
           descuentoPorPuntos: descuentoPorPuntosVal || null,
           total,
           comisionBancaria,
-          comisionPct: tieneComision ? comisionPct : null,
+          comisionPct: comisionPctVenta,
           netoRecibido,
           costoTotal,
           gananciaBruta,
           gananciaNeta,
-          formaPago,
-          esFiado: !!esFiado,
+          formaPago: formaPagoVenta, // derivado: medio único o "mixto"
+          esFiado: esFiadoVenta,
         },
+      });
+
+      // Pagos (tenders) — fuente de verdad de la distribución del cobro.
+      await tx.ventaPago.createMany({
+        data: pagosConComision.map((t) => ({
+          ventaId: nuevaVenta.id,
+          medio: t.medio,
+          monto: t.monto,
+          comisionPct: t.comisionPct,
+          comision: t.comision,
+          neto: t.neto,
+        })),
       });
 
       // VentaDetalle por LÍNEA COMERCIAL (el combo es UNA línea, no una por
@@ -554,8 +593,8 @@ export async function POST(req) {
         }
       }
 
-      // Si es fiado, crear MovimientoCuenta DEBITO
-      if (esFiado && clienteId) {
+      // Si es fiado, crear MovimientoCuenta DEBITO por el total (v1: fiado global).
+      if (esFiadoVenta && clienteId) {
         try {
           const existente = await tx.movimientoCuenta.findFirst({
             where: { ventaId: nuevaVenta.id },
@@ -686,6 +725,13 @@ export async function POST(req) {
       numero: venta.numero,
       message: `Venta #${venta.numero} registrada correctamente`,
       allowNegativeStockUsed: allowNegativeStockUsed || undefined,
+      // Snapshot de pago para el ticket (valores congelados, server-authoritative).
+      formaPago: formaPagoVenta,
+      comisionBancaria,
+      netoRecibido,
+      pagos: pagosConComision.map((t) => ({
+        medio: t.medio, monto: t.monto, comisionPct: t.comisionPct, comision: t.comision, neto: t.neto,
+      })),
       breakdown: {
         subtotal,
         descuentoAutomatico,

@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 import { resolveVistaOperativa, getGrupoIdDeLocal } from "@/lib/grupos";
+import { tendersParaAgregar, normalizarMedio } from "@/lib/pos-ventas/pagos";
 
 export async function GET(req) {
   try {
@@ -78,7 +79,10 @@ export async function GET(req) {
     }
 
     if (formaPagoParam) {
-      where.formaPago = formaPagoParam;
+      // Filtro por medio: una venta coincide si TIENE al menos un tender de ese medio.
+      const medioNorm = normalizarMedio(formaPagoParam);
+      if (medioNorm) where.pagos = { some: { medio: medioNorm } };
+      else where.formaPago = formaPagoParam; // compat con valores legacy no mapeables
     }
 
     // Obtener ventas con detalles
@@ -95,6 +99,8 @@ export async function GET(req) {
         gananciaBruta: true,
         gananciaNeta: true,
         formaPago: true,
+        esFiado: true,
+        pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
         detalles: {
           select: {
             nombre: true,
@@ -126,22 +132,21 @@ export async function GET(req) {
       gananciaNeta += Number(v.gananciaNeta);
     });
 
-    // Desglose por forma de pago
+    // Desglose por medio de pago — POR TENDER: cada pago aporta SU monto al bucket
+    // de su medio (una venta mixta suma parcialmente en varios). La suma de buckets
+    // coincide con el total de ventas. `cantidad` cuenta tenders de ese medio.
     const desglosePagoMap = {};
     ventas.forEach((v) => {
-      if (!desglosePagoMap[v.formaPago]) {
-        desglosePagoMap[v.formaPago] = {
-          formaPago: v.formaPago,
-          cantidad: 0,
-          total: 0,
-          comision: 0,
-          neto: 0,
-        };
+      for (const t of tendersParaAgregar(v)) {
+        const key = t.medio.toLowerCase();
+        if (!desglosePagoMap[key]) {
+          desglosePagoMap[key] = { formaPago: key, cantidad: 0, total: 0, comision: 0, neto: 0 };
+        }
+        desglosePagoMap[key].cantidad++;
+        desglosePagoMap[key].total += t.monto;
+        desglosePagoMap[key].comision += t.comision;
+        desglosePagoMap[key].neto += t.neto;
       }
-      desglosePagoMap[v.formaPago].cantidad++;
-      desglosePagoMap[v.formaPago].total += Number(v.total);
-      desglosePagoMap[v.formaPago].comision += Number(v.comisionBancaria);
-      desglosePagoMap[v.formaPago].neto += Number(v.netoRecibido);
     });
 
     // Top productos

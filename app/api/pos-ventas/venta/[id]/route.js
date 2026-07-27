@@ -24,6 +24,7 @@ export async function GET(req, { params }) {
       where: { id: ventaId },
       include: {
         detalles: true,
+        pagos: { select: { medio: true, monto: true, comisionPct: true, comision: true, neto: true } },
         cliente: true,
         vendedor: { select: { id: true, nombre: true, email: true } },
         local: { select: { id: true, nombre: true } },
@@ -49,6 +50,16 @@ export async function GET(req, { params }) {
         descuento: venta.descuento,
         total: venta.total,
         formaPago: venta.formaPago,
+        comisionBancaria: venta.comisionBancaria,
+        netoRecibido: venta.netoRecibido,
+        // Tenders congelados (pago dividido). Para venta de 1 medio, un solo pago.
+        pagos: venta.pagos.map((p) => ({
+          medio: p.medio,
+          monto: p.monto,
+          comisionPct: p.comisionPct,
+          comision: p.comision,
+          neto: p.neto,
+        })),
         cliente: venta.cliente
           ? { id: venta.cliente.id, nombre: venta.cliente.nombre }
           : null,

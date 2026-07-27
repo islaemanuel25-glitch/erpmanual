@@ -1052,7 +1052,7 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   // Cobrar desde FormaPago (redirige a iniciarCobro)
   // ---------------------------------------------------------------------------
-  const handleCobrar = async ({ formaPago: fp, total: tot }) => {
+  const handleCobrar = async ({ formaPago: fp, total: tot, pagos }) => {
     // Bloquear cobro sin turno abierto (excepto offline que guarda pendiente)
     if (!turnoActual?.id && !offlineMode) {
       showError("Abrí turno para registrar ventas");
@@ -1085,7 +1085,17 @@ export default function PosVentasPage() {
       const ok = await verificarLimiteCredito(fp, tot);
       if (!ok) return;
     }
-    if (fp === "efectivo") {
+    // Pago dividido: si hay tender efectivo, se abre el modal de efectivo para
+    // "paga con"/vuelto SOBRE EL MONTO EFECTIVO APLICADO (no el total). Los otros
+    // tenders y el restante ya están fijados; el vuelto es solo display.
+    if (Array.isArray(pagos) && pagos.length > 0) {
+      const efectivoTender = pagos.find((p) => p.medio === "efectivo");
+      if (efectivoTender) {
+        dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalEfectivo", data: { total: tot, montoEfectivo: Number(efectivoTender.monto), formaPago: fp, pagos } } });
+      } else {
+        ejecutarCobro({ formaPago: fp, total: tot, pagos });
+      }
+    } else if (fp === "efectivo") {
       dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalEfectivo", data: { total: tot, formaPago: fp } } });
     } else {
       ejecutarCobro({ formaPago: fp, total: tot });
@@ -1103,7 +1113,9 @@ export default function PosVentasPage() {
   const handleConfirmarEfectivo = ({ pagaCon, vuelto }) => {
     const datos = { ...(state.modalEfectivo || {}) };
 
-    if (datos.formaPago !== "efectivo") datos.formaPago = "efectivo";
+    // Pago dividido: preservar formaPago/pagos (el backend deriva y recalcula). Solo
+    // el efectivo simple (sin tenders) fuerza formaPago="efectivo".
+    if (!Array.isArray(datos.pagos) && datos.formaPago !== "efectivo") datos.formaPago = "efectivo";
 
     setDatosPagoEfectivo({ pagaCon, vuelto });
     dispatch({ type: ActionTypes.CLOSE_MODAL, payload: { modal: "modalEfectivo" } });
@@ -1182,6 +1194,9 @@ export default function PosVentasPage() {
           clienteId: state.clienteSeleccionado?.id || null,
           turnoId: turnoActual?.id || null,
           formaPago: datos.formaPago,
+          // Pago dividido: si el panel entrega tenders, el backend los usa y
+          // recalcula todo. Sin `pagos`, cae al compat legacy (1 tender por formaPago).
+          pagos: Array.isArray(datos.pagos) && datos.pagos.length > 0 ? datos.pagos : undefined,
           esFiado: datos.formaPago === "fiado",
           descuento: state.descuento,
           descuentoPorPuntos: state.descuentoPorPuntos,
@@ -1240,7 +1255,11 @@ export default function PosVentasPage() {
           descuentoAutomatico: bd ? bd.descuentoAutomatico : 0,
           descuentoManual: bd ? bd.descuentoManual : state.descuento,
           total: bd ? bd.total : datos.total,
-          formaPago: datos.formaPago,
+          formaPago: data.formaPago ?? datos.formaPago,
+          // Snapshot de pagos para el ticket (del backend; congelado).
+          pagos: Array.isArray(data.pagos) ? data.pagos : (Array.isArray(datos.pagos) ? datos.pagos : null),
+          comisionBancaria: data.comisionBancaria ?? 0,
+          netoRecibido: data.netoRecibido ?? (bd ? bd.total : datos.total),
           vendedor: me?.nombre || "-",
           cliente: state.clienteSeleccionado
             ? {
@@ -1779,7 +1798,8 @@ export default function PosVentasPage() {
       {/* Modal pago efectivo */}
       {state.modalEfectivo && (
         <ModalPagoEfectivo
-          total={state.modalEfectivo.total}
+          total={state.modalEfectivo.montoEfectivo ?? state.modalEfectivo.total}
+          etiquetaMonto={state.modalEfectivo.montoEfectivo != null ? "Efectivo a cubrir" : "Total a cobrar"}
           onConfirmar={handleConfirmarEfectivo}
           onCancelar={() => dispatch({ type: ActionTypes.CLOSE_MODAL, payload: { modal: "modalEfectivo" } })}
         />

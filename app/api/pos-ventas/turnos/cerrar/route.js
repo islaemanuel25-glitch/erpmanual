@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { requireOperadorSegunConfig } from "@/lib/operador";
+import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
 
 export async function POST(req) {
   try {
@@ -55,7 +56,10 @@ export async function POST(req) {
     const [ventas, cajaMovimientos] = await Promise.all([
       prisma.venta.findMany({
         where: { turnoId },
-        select: { total: true, formaPago: true, esFiado: true },
+        select: {
+          total: true, formaPago: true, esFiado: true,
+          pagos: { select: { medio: true, monto: true } },
+        },
       }),
       prisma.cajaMovimiento.findMany({
         where: { turnoId },
@@ -66,16 +70,13 @@ export async function POST(req) {
     let totalEfectivo = 0;
     let totalDigital = 0;
 
+    // Agregación POR TENDER: en una venta mixta, solo el tender efectivo cuenta al
+    // efectivo esperado; el resto va a digital. Fiado no aporta plata real.
     ventas.forEach((v) => {
-      const total = Number(v.total);
-      if (v.esFiado === true) {
-        // fiado: no entró plata real, no suma ni a efectivo ni a digital
-        return;
-      }
-      if (v.formaPago === "efectivo") {
-        totalEfectivo += total;
-      } else {
-        totalDigital += total;
+      for (const t of tendersParaAgregar(v)) {
+        if (t.medio === "FIADO") continue;
+        if (t.medio === "EFECTIVO") totalEfectivo += t.monto;
+        else totalDigital += t.monto;
       }
     });
 

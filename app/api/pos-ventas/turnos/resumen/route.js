@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
 
 export async function GET(req) {
   try {
@@ -46,7 +47,10 @@ export async function GET(req) {
     const [ventas, cajaMovimientos] = await Promise.all([
       prisma.venta.findMany({
         where: { turnoId },
-        select: { total: true, formaPago: true, esFiado: true, comisionBancaria: true, netoRecibido: true },
+        select: {
+          total: true, formaPago: true, esFiado: true, comisionBancaria: true, netoRecibido: true,
+          pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
+        },
       }),
       prisma.cajaMovimiento.findMany({
         where: { turnoId },
@@ -61,25 +65,22 @@ export async function GET(req) {
     let totalFiado = 0;
     const desglose = { mercadopago: 0, debito: 0, credito: 0, fiado: 0 };
 
+    // Agregación POR TENDER: cada pago aporta su monto al bucket de SU medio. Una
+    // venta mixta puede sumar parcialmente en efectivo y en un medio digital.
     ventas.forEach((v) => {
-      const total = Number(v.total);
-      const comision = Number(v.comisionBancaria) || 0;
-      const neto = Number(v.netoRecibido) || total;
-
-      if (v.esFiado === true) {
-        totalFiado += total;
-        desglose.fiado += total;
-        return;
-      }
-
-      if (v.formaPago === "efectivo") {
-        totalEfectivo += total;
-      } else {
-        totalDigital += total;
-        totalComision += comision;
-        netoDigital += neto;
-        if (desglose[v.formaPago] !== undefined) {
-          desglose[v.formaPago] += total;
+      for (const t of tendersParaAgregar(v)) {
+        if (t.medio === "FIADO") {
+          totalFiado += t.monto;
+          desglose.fiado += t.monto;
+        } else if (t.medio === "EFECTIVO") {
+          totalEfectivo += t.monto;
+        } else {
+          // digital (MERCADOPAGO / DEBITO / CREDITO)
+          totalDigital += t.monto;
+          totalComision += t.comision;
+          netoDigital += t.neto;
+          const key = t.medio.toLowerCase();
+          if (desglose[key] !== undefined) desglose[key] += t.monto;
         }
       }
     });

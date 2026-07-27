@@ -5,6 +5,11 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import { lineasPagoTicket, esPagoDividido } from "@/lib/pos-ventas/pagos";
+
+function fmt(n) {
+  return Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -284,9 +289,28 @@ export default function HistorialDia({
                   ${formatPrecio(Number(detalle.total))}
                 </span>
               </div>
-              <div className="text-xs sunmi-text-muted">
-                Pago: {detalle.formaPago}
-              </div>
+              {/* Desglose de pagos por tender (snapshot). 1 medio → línea simple. */}
+              {esPagoDividido(detalle) ? (
+                <div className="text-xs sunmi-text-muted mt-1">
+                  <div className="font-semibold">Pagos:</div>
+                  {lineasPagoTicket(detalle).map((l) => (
+                    <div key={l.medio} className="flex justify-between">
+                      <span>{l.label}</span>
+                      <span className="tabular-nums">${fmt(l.monto)}</span>
+                    </div>
+                  ))}
+                  {Number(detalle.comisionBancaria) > 0 && (
+                    <>
+                      <div className="flex justify-between"><span>Comisión bancaria</span><span className="tabular-nums">-${fmt(detalle.comisionBancaria)}</span></div>
+                      <div className="flex justify-between"><span>Neto recibido</span><span className="tabular-nums">${fmt(detalle.netoRecibido)}</span></div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs sunmi-text-muted">
+                  Pago: {lineasPagoTicket(detalle)[0]?.label || detalle.formaPago}
+                </div>
+              )}
             </div>
 
             {/* Acciones */}
@@ -307,6 +331,10 @@ export default function HistorialDia({
                       descuento: Number(detalle.descuento),
                       total: Number(detalle.total),
                       formaPago: detalle.formaPago,
+                      // Snapshot de tenders para el desglose en la reimpresión.
+                      pagos: Array.isArray(detalle.pagos) ? detalle.pagos : null,
+                      comisionBancaria: detalle.comisionBancaria ?? 0,
+                      netoRecibido: detalle.netoRecibido ?? Number(detalle.total),
                       cliente: detalle.cliente?.nombre
                         ? { nombre: detalle.cliente.nombre }
                         : null,

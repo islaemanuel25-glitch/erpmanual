@@ -758,6 +758,7 @@ model Venta {
   listaPrecio       ListaPrecio?             @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   turno             Turno?                   @relation(fields: [turnoId], references: [id])
   detalles          VentaDetalle[]
+  pagos             VentaPago[]
   movimientoCC      MovimientoCuenta[]
   movimientosPuntos ClientePuntoMovimiento[]
 
@@ -827,6 +828,41 @@ model VentaDetalleComponente {
   @@index([ventaDetalleId])
   @@index([productoBaseId])
   @@index([productoLocalId])
+}
+
+// PAGOS DE LA VENTA (pago dividido / múltiples medios)
+// ---------------------------------------------------------------------------
+// Fuente de verdad de la DISTRIBUCIÓN del cobro de una venta. Una venta tiene 1+
+// tenders cuya suma de `monto` == Venta.total (validado en el backend con Decimal).
+// Los campos de pago en Venta (formaPago/comisionBancaria/comisionPct/netoRecibido/
+// esFiado) se conservan como DERIVADOS/legacy. Cada tender congela su comisión.
+// `monto` del tender efectivo = importe APLICADO a la venta (no el "paga con"/vuelto).
+enum MedioPago {
+  EFECTIVO
+  MERCADOPAGO
+  DEBITO
+  CREDITO
+  FIADO
+}
+
+model VentaPago {
+  id          Int       @id @default(autoincrement())
+  ventaId     Int
+  medio       MedioPago
+  monto       Decimal   @db.Decimal(12, 2) // aplicado a la venta (> 0)
+  comisionPct Decimal?  @db.Decimal(5, 2) // % congelado (null si el medio no tiene comisión)
+  comision    Decimal   @default(0) @db.Decimal(12, 2) // importe de comisión de ESTE tender
+  neto        Decimal   @default(0) @db.Decimal(12, 2) // monto - comision
+  createdAt   DateTime  @default(now())
+
+  // Cascade: la eliminación física de una venta arrastra sus pagos (hoy las ventas
+  // no se anulan/eliminan; queda coherente para el futuro y para recuperación).
+  venta Venta @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  // Un tender por medio como máximo (el backend consolida medios repetidos).
+  @@unique([ventaId, medio])
+  @@index([ventaId])
+  @@index([medio])
 }
 
 // TURNOS DE CAJA

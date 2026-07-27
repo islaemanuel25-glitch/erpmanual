@@ -4,6 +4,7 @@ import { useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { calcularVueltoEfectivo } from "@/lib/pos-ventas/pagos";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -12,10 +13,12 @@ function formatPrecio(n) {
   });
 }
 
-export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
+export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar, etiquetaMonto = "Total a cobrar" }) {
   const [pagaCon, setPagaCon] = useState("");
   const pagaConNum = Number(pagaCon) || 0;
-  const vuelto = pagaConNum >= total ? pagaConNum - total : 0;
+  // `total` acá = monto EFECTIVO a cubrir (en pago dividido, el tender efectivo;
+  // en efectivo simple, el total de la venta). Vuelto = paga con - monto a cubrir.
+  const { vuelto } = calcularVueltoEfectivo(pagaConNum, total);
 
   // Montos sugeridos redondeados
   const montosSugeridos = [
@@ -34,7 +37,7 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar }) {
         <div className="space-y-4">
           {/* Total */}
           <div className="pos-bg-panel p-4 rounded-lg">
-            <div className="text-sm pos-text-muted">Total a cobrar</div>
+            <div className="text-sm pos-text-muted">{etiquetaMonto}</div>
             <div className="text-5xl font-black pos-text-accent">
               ${formatPrecio(total)}
             </div>
