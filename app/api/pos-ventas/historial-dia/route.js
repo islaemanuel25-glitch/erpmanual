@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
+import { getRangoArgentina, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 export async function GET(req) {
   try {
@@ -38,13 +39,15 @@ export async function GET(req) {
       vendedorId = session.id;
     }
 
-    // Ventas de hoy
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    // Ventas del día en hora Argentina. El contenedor corre en UTC; con
+    // new Date().setHours(0,...) la ventana era el día UTC y de noche (después
+    // de las ~21:00 ART) se vaciaba. getRangoArgentina da el día ART correcto.
+    const fechaHoy = hoyArgentinaISO();
+    const { fechaInicio, fechaFin } = getRangoArgentina(fechaHoy, fechaHoy);
 
     const where = {
       localId,
-      fecha: { gte: hoy },
+      fecha: { gte: fechaInicio, lte: fechaFin },
     };
 
     if (vendedorId) {

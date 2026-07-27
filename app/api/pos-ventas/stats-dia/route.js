@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
+import { getRangoArgentina, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 export async function GET(req) {
   try {
@@ -30,14 +31,16 @@ export async function GET(req) {
     }
     const localId = scope.localId;
 
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    // Ventas del día en hora Argentina (mismo rango que historial-dia). El
+    // contenedor corre en UTC; usar el día ART evita el vaciado nocturno.
+    const fechaHoy = hoyArgentinaISO();
+    const { fechaInicio, fechaFin } = getRangoArgentina(fechaHoy, fechaHoy);
 
     // Cantidad de ventas y total
     const agg = await prisma.venta.aggregate({
       where: {
         localId,
-        fecha: { gte: hoy },
+        fecha: { gte: fechaInicio, lte: fechaFin },
       },
       _count: { id: true },
       _sum: { total: true },
@@ -48,7 +51,7 @@ export async function GET(req) {
       where: {
         venta: {
           localId,
-          fecha: { gte: hoy },
+          fecha: { gte: fechaInicio, lte: fechaFin },
         },
       },
       _sum: { cantidad: true },
