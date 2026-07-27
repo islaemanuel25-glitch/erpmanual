@@ -3,9 +3,9 @@
 import { SunmiThemeProvider } from "./SunmiThemeProvider";
 import { SunmiToaster } from "./SunmiToast";
 
-export default function ThemeClientWrapper({ children }) {
+export default function ThemeClientWrapper({ children, institucionalInicial = null }) {
   return (
-    <SunmiThemeProvider>
+    <SunmiThemeProvider institucionalInicial={institucionalInicial}>
       <ThemeBody>{children}</ThemeBody>
     </SunmiThemeProvider>
   );

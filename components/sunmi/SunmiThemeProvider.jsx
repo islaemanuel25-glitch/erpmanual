@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { SUNMI_THEMES, DEFAULT_SUNMI_THEME_KEY } from "@/lib/sunmiThemes";
 import { resolverTemaEfectivo } from "@/lib/apariencia/resolver";
+import { crearSyncDataTheme } from "@/lib/apariencia/syncDataTheme";
 
 const SunmiThemeContext = createContext({
   themeKey: DEFAULT_SUNMI_THEME_KEY,
@@ -27,11 +28,17 @@ const STORAGE_KEY = "erp-sunmi-theme";
 //   → tema predeterminado del sistema
 // La preferencia personal NUNCA se sobrescribe por la institucional; y cambiar la
 // institucional no toca el localStorage de otros dispositivos.
-export function SunmiThemeProvider({ children }) {
-  // Preferencia personal (este navegador). null = sin preferencia.
+export function SunmiThemeProvider({ children, institucionalInicial = null }) {
+  // Preferencia personal (este navegador). null = sin preferencia. Se hidrata en
+  // un efecto (post-hidratación) para no diferir del HTML del server.
   const [personalKey, setPersonalKey] = useState(null);
-  // Apariencia institucional del local (la carga AparienciaInstitucionalSync).
-  const [institucionalKey, setInstitucionalKeyState] = useState(null);
+  // Apariencia institucional del local. Se SIEMBRA con el valor resuelto en SSR
+  // (mismo en server y cliente → sin mismatch de hidratación), así el tema
+  // efectivo del primer render ya coincide con el `data-theme` que pintó el server
+  // y no hay reescritura a default.
+  const [institucionalKey, setInstitucionalKeyState] = useState(
+    institucionalInicial && SUNMI_THEMES[institucionalInicial] ? institucionalInicial : null
+  );
 
   // Hidratar la preferencia personal desde localStorage al montar (el server no
   // puede leerla; el <script> del <head> ya aplicó data-theme para evitar flash).
@@ -51,10 +58,21 @@ export function SunmiThemeProvider({ children }) {
     porDefecto: DEFAULT_SUNMI_THEME_KEY,
   });
 
-  // Reflejar el tema efectivo en <html data-theme>.
+  // Reflejar el tema efectivo en <html data-theme>. En el PRIMER sync NO se pisa:
+  // el <script> pre-hidratación (preferencia personal) o el SSR (institucional) ya
+  // dejaron el data-theme correcto; escribir acá reintroduciría el flash B→A→B. Solo
+  // se escribe ante cambios REALES posteriores (elegir tema, o llegar la institucional
+  // por fetch si difiere de la sembrada). Lógica en lib/apariencia/syncDataTheme.js.
+  // useState con inicializador perezoso → una única instancia estable (no muta refs
+  // en render); el arrow no toca document hasta que el efecto lo invoca (SSR-safe).
+  const [syncDataTheme] = useState(() =>
+    crearSyncDataTheme((key) => {
+      document.documentElement.dataset.theme = key;
+    })
+  );
   useEffect(() => {
-    document.documentElement.dataset.theme = themeKey;
-  }, [themeKey]);
+    syncDataTheme(themeKey);
+  }, [themeKey, syncDataTheme]);
 
   // Preferencia PERSONAL (este dispositivo): persiste en localStorage.
   const setThemeKey = useCallback((key) => {
