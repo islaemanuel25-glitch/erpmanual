@@ -3,7 +3,6 @@
 import { memo, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import { showError } from "@/components/sunmi/SunmiToast";
 import { aCentavos } from "@/lib/pos-ventas/pagos";
 import { componerCobroSimple, evaluarDivisionPago } from "@/lib/pos-ventas/servicios";
@@ -172,11 +171,18 @@ function FormaPago({
             {filas.map((f, idx) => (
               <div key={idx} className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <SunmiSelectAdv value={f.medio} onChange={(v) => cambiarMedio(idx, v)}>
+                  {/* Select NATIVO (picker del SO en móvil): robusto en todo dispositivo,
+                      sin portal ni posicionamiento fijo. Estilizado con la clase sunmi-control. */}
+                  <select
+                    value={f.medio}
+                    onChange={(e) => cambiarMedio(idx, e.target.value)}
+                    aria-label="Medio de pago"
+                    className="sunmi-control w-full min-h-11 rounded-md px-3 text-base cursor-pointer"
+                  >
                     {opcionesPara(idx).map((m) => (
-                      <SunmiSelectOption key={m.key} value={m.key}>{m.label}</SunmiSelectOption>
+                      <option key={m.key} value={m.key}>{m.label}</option>
                     ))}
-                  </SunmiSelectAdv>
+                  </select>
                 </div>
                 <div className="w-28 shrink-0">
                   <SunmiInput type="number" inputMode="decimal" value={f.monto} placeholder="$0"
