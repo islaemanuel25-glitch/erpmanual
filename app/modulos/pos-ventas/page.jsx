@@ -17,7 +17,7 @@ import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
 import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalImporteServicio from "@/components/pos-ventas/ModalImporteServicio";
-import { sumarTotalServicios } from "@/lib/pos-ventas/servicios";
+import { sumarTotalServicios, componerCobroSimple } from "@/lib/pos-ventas/servicios";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalTicketOffline from "@/components/pos-ventas/ModalTicketOffline";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
@@ -990,22 +990,16 @@ export default function PosVentasPage() {
       showError("Sin internet: solo se puede guardar ventas en efectivo");
       return;
     }
-
-    if (state.formaPago === "fiado" && !state.clienteSeleccionado) {
-      const msg = "Para venta fiado debés seleccionar un cliente.";
-      setErrorMsg(msg);
-      showError(msg);
+    // Fiado incompatible con servicios (atajo de teclado; la UI ya lo evita).
+    if (minEfectivoServicios > 0 && state.formaPago === "fiado") {
+      showError("No se puede fiar una venta que contiene servicios");
       return;
     }
-    if (state.formaPago === "fiado") {
-      const ok = await verificarLimiteCredito(state.formaPago, total);
-      if (!ok) return;
-    }
-    if (state.formaPago === "efectivo") {
-      dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalEfectivo", data: { total, formaPago: state.formaPago } } });
-    } else {
-      ejecutarCobro({ formaPago: state.formaPago, total });
-    }
+    // Compone el payload igual que el cobro simple (incluye el mínimo de efectivo
+    // por servicios cuando corresponde) y delega en handleCobrar (turno/fiado/modal).
+    handleCobrar(
+      componerCobroSimple({ medio: state.formaPago, total, minEfectivoServicios })
+    );
   };
 
   // ---------------------------------------------------------------------------

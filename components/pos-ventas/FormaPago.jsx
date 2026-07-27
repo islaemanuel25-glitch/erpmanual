@@ -4,6 +4,7 @@ import { memo, useMemo, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import { showError } from "@/components/sunmi/SunmiToast";
 import { aCentavos } from "@/lib/pos-ventas/pagos";
+import { componerCobroSimple } from "@/lib/pos-ventas/servicios";
 
 const COMISION_DEFAULT = 7;
 
@@ -15,7 +16,15 @@ const FORMAS_PAGO = [
   { key: "fiado", label: "Fiado", tieneComision: false },
 ];
 
-// Medios seleccionables en el pago dividido (fiado se maneja aparte: único tender).
+// Medios grandes del cobro simple (fiado se muestra aparte, solo sin servicios).
+const MEDIOS_COBRO = [
+  { key: "efectivo", label: "Efectivo" },
+  { key: "debito", label: "Débito" },
+  { key: "credito", label: "Crédito" },
+  { key: "mercadopago", label: "Mercado Pago" },
+];
+
+// Medios seleccionables en el modo avanzado (fiado se maneja aparte: único tender).
 const MEDIOS_SPLIT = FORMAS_PAGO.filter((f) => f.key !== "fiado");
 
 function formatPrecio(n) {
@@ -39,33 +48,51 @@ function FormaPago({
   clienteSeleccionado = null,
   minEfectivoServicios = 0,
 }) {
-  const forma = FORMAS_PAGO.find((f) => f.key === formaPago);
-  const tieneComision = forma?.tieneComision || false;
-  const comisionPct = tieneComision ? Number(comisiones?.[formaPago] ?? COMISION_DEFAULT) : 0;
   const base = subtotal - descuento - descuentoPorPuntos;
-  const total = base; // Cliente paga subtotal - descuentos, SIN comision
-  const comisionBancaria = tieneComision ? base * (comisionPct / 100) : 0;
-  const netoRecibido = total - comisionBancaria;
-  const fiadoSinCliente = formaPago === "fiado" && !clienteSeleccionado;
+  const total = base; // Cliente paga subtotal - descuentos, SIN comisión
 
   // ── Servicios de importe variable: mínimo a cubrir en EFECTIVO ────────────
-  // La venta con servicios no puede fiarse y su total de servicios debe quedar
-  // cubierto en efectivo. El backend es la autoridad final; acá es UX/bloqueo.
-  const hayServicios = Number(minEfectivoServicios) > 0;
-  const minEfCent = aCentavos(minEfectivoServicios || 0);
+  const minEf = Math.max(0, Number(minEfectivoServicios) || 0);
+  const totalCent = aCentavos(total);
+  const minEfCent = aCentavos(minEf);
+  const hayServicios = minEfCent > 0;
+  const soloServicios = hayServicios && minEfCent >= totalCent; // totalServicios == totalVenta
+  const restoCent = Math.max(0, totalCent - minEfCent);
+  const resto = restoCent / 100;
+  const puedeVender = !disabled && !cobrando && subtotal > 0;
 
-  // ── Pago dividido (múltiples tenders). El backend recalcula todo. ──────────
-  const [dividido, setDividido] = useState(false);
-  const [tenders, setTenders] = useState([]); // [{ medio, monto }]
+  // ── Modo: simple (por defecto) o avanzado (constructor de pagos) ──────────
+  const [modo, setModo] = useState("simple");
+  const [tenders, setTenders] = useState([]); // [{ medio, monto }] (avanzado)
   const [medioSel, setMedioSel] = useState("efectivo");
   const [montoSel, setMontoSel] = useState("");
 
-  const totalCent = aCentavos(total);
+  // Recalcular ante cambios del carrito: si cambió el total o el mínimo de servicios,
+  // limpiar la distribución avanzada para no arrastrar pagos obsoletos que ya no
+  // coinciden. Patrón React de "ajustar estado al cambiar props durante el render"
+  // (sin useEffect → sin render en cascada).
+  const carritoKey = `${totalCent}-${minEfCent}`;
+  const [prevCarritoKey, setPrevCarritoKey] = useState(carritoKey);
+  if (carritoKey !== prevCarritoKey) {
+    setPrevCarritoKey(carritoKey);
+    if (tenders.length > 0) setTenders([]);
+    if (montoSel !== "") setMontoSel("");
+  }
+
+  // ── Cobro SIMPLE: un medio → componer payload server-authoritative ─────────
+  const cobrarSimple = (medio) => {
+    if (!puedeVender) return;
+    if (medio === "fiado" && hayServicios) {
+      return showError("No se puede fiar una venta que contiene servicios");
+    }
+    onCobrar(componerCobroSimple({ medio, total, minEfectivoServicios: minEf }));
+  };
+
+  // ── Modo AVANZADO (constructor de tenders) ────────────────────────────────
   const pagadoCent = tenders.reduce((a, t) => a + aCentavos(t.monto), 0);
   const restanteCent = totalCent - pagadoCent;
   const restante = restanteCent / 100;
 
-  // Consolidación por medio (máx. 1 por medio) para el payload y el resumen.
   const tendersConsolidados = useMemo(() => {
     const m = new Map();
     for (const t of tenders) m.set(t.medio, (m.get(t.medio) || 0) + Number(t.monto));
@@ -73,22 +100,19 @@ function FormaPago({
   }, [tenders]);
 
   const esFiadoDiv = tenders.length === 1 && tenders[0].medio === "fiado";
-  // Efectivo cubierto por los tenders de efectivo (para la regla de servicios).
   const efectivoDivCent = tendersConsolidados
     .filter((t) => t.medio === "efectivo")
     .reduce((a, t) => a + aCentavos(t.monto), 0);
   const cumpleEfectivoDiv = !hayServicios || efectivoDivCent >= minEfCent;
   const puedeCobrarDiv =
     totalCent > 0 && restanteCent === 0 && (!esFiadoDiv || !!clienteSeleccionado) && cumpleEfectivoDiv && !(hayServicios && esFiadoDiv);
-  // En "un medio": con servicios el único medio válido es efectivo (cubre el total ≥ mínimo).
-  const cumpleEfectivoSingle = !hayServicios || (formaPago === "efectivo" && totalCent >= minEfCent);
 
   const comisionDivPct = (medio) =>
     medio === "efectivo" || medio === "fiado" ? 0 : Number(comisiones?.[medio] ?? COMISION_DEFAULT);
   const comisionDiv = tendersConsolidados.reduce((a, t) => a + t.monto * (comisionDivPct(t.medio) / 100), 0);
 
   const agregarTender = () => {
-    if (esFiadoDiv) return; // fiado ocupa todo
+    if (esFiadoDiv) return;
     const m = Number(montoSel);
     if (!Number.isFinite(m) || m <= 0) return showError("Ingresá un monto válido");
     if (aCentavos(m) > restanteCent) return showError("El monto supera el restante");
@@ -108,57 +132,43 @@ function FormaPago({
   };
   const cobrarDividido = () => {
     if (!puedeCobrarDiv) return;
-    // formaPago="mixto" evita el modal de efectivo del padre; el backend deriva el real.
     const fp = tendersConsolidados.length === 1 ? tendersConsolidados[0].medio : "mixto";
     onCobrar({ formaPago: fp, total, pagos: tendersConsolidados });
   };
+  const volverSimple = () => {
+    setModo("simple");
+    setTenders([]);
+    setMontoSel("");
+  };
+
+  const BTN_PRIMARIO = "sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md";
+  const BTN_MEDIO = "sunmi-btn sunmi-pos-btn-secondary min-h-14 text-sm font-semibold rounded-md";
 
   return (
     <SunmiCard className="p-3 lg:p-4 flex flex-col gap-3">
-      <div className="text-center py-2">
+      {/* 1) TOTAL */}
+      <div className="text-center py-1">
         <div className="text-[11px] pos-text-muted uppercase tracking-widest font-medium">Total a cobrar</div>
         <div className="text-4xl lg:text-5xl font-black pos-text-accent mt-1 tabular-nums tracking-tight">
           ${formatPrecio(total)}
         </div>
       </div>
 
-      {/* Servicios: mínimo obligatorio en efectivo */}
-      {hayServicios && (
-        <div
-          className="px-2 py-1.5 rounded-lg text-xs text-center font-medium"
-          style={{
-            background: "color-mix(in srgb, var(--pos-accent) 12%, transparent)",
-            color: "var(--pos-accent)",
-          }}
-        >
-          Esta venta contiene servicios. Debe abonarse al menos{" "}
-          <b>${formatPrecio(minEfectivoServicios)}</b> en efectivo.
-        </div>
-      )}
-
-      {/* Toggle un-medio / pago dividido (solo online) */}
-      {!offlineMode && (
-        <div className="grid grid-cols-2 gap-1.5">
-          <button type="button" onClick={() => setDividido(false)}
-            className={`sunmi-btn min-h-10 text-xs rounded-md ${!dividido ? "sunmi-pos-btn-primary" : "sunmi-pos-btn-secondary"}`}>
-            Un medio
-          </button>
-          <button type="button" onClick={() => setDividido(true)}
-            className={`sunmi-btn min-h-10 text-xs rounded-md ${dividido ? "sunmi-pos-btn-primary" : "sunmi-pos-btn-secondary"}`}>
-            Pago dividido
-          </button>
-        </div>
-      )}
-
       {offlineMode ? (
-        <button type="button" onClick={() => onCobrar({ formaPago, total })}
-          disabled={cobrando || disabled || formaPago !== "efectivo" || subtotal <= 0}
-          className="sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md">
+        /* OFFLINE: solo efectivo, guardar pendiente */
+        <button type="button" onClick={() => onCobrar({ formaPago: "efectivo", total })}
+          disabled={!puedeVender}
+          className={BTN_PRIMARIO}>
           {cobrando ? "Guardando..." : `GUARDAR PENDIENTE $${formatPrecio(total)}`}
         </button>
-      ) : dividido ? (
+      ) : modo === "avanzado" ? (
+        /* ───────── MODO AVANZADO: constructor de pagos ───────── */
         <>
-          {/* Constructor de tenders */}
+          {hayServicios && (
+            <div className="text-xs text-center pos-text-muted">
+              Efectivo mínimo por servicios: <b className="pos-text-accent">${formatPrecio(minEf)}</b>
+            </div>
+          )}
           <div className="flex flex-col gap-2 rounded-lg border border-[var(--app-border)] p-2">
             <div className="grid grid-cols-2 gap-1.5">
               <select value={medioSel} onChange={(e) => setMedioSel(e.target.value)} disabled={esFiadoDiv}
@@ -192,7 +202,7 @@ function FormaPago({
             )}
 
             <div className="flex justify-between text-xs pt-1 border-t border-[var(--app-border)]">
-              <span>Pagado: <b className="tabular-nums">${formatPrecio((pagadoCent / 100))}</b></span>
+              <span>Pagado: <b className="tabular-nums">${formatPrecio(pagadoCent / 100)}</b></span>
               <span className={restanteCent === 0 ? "pos-text-success-soft" : "pos-text-danger"}>
                 Restante: <b className="tabular-nums">${formatPrecio(restante)}</b>
               </span>
@@ -203,83 +213,106 @@ function FormaPago({
               </div>
             )}
 
-            {/* Fiado: único tender por el total */}
-            <button type="button" onClick={ponerFiadoTotal}
-              className={`sunmi-btn min-h-9 text-xs rounded-md ${esFiadoDiv ? "sunmi-pos-btn-primary" : "sunmi-pos-btn-secondary"}`}>
-              {esFiadoDiv ? "Fiado (todo el total) ✓" : "Fiado (todo el total)"}
-            </button>
+            {!hayServicios && (
+              <button type="button" onClick={ponerFiadoTotal}
+                className={`sunmi-btn min-h-9 text-xs rounded-md ${esFiadoDiv ? "sunmi-pos-btn-primary" : "sunmi-pos-btn-secondary"}`}>
+                {esFiadoDiv ? "Fiado (todo el total) ✓" : "Fiado (todo el total)"}
+              </button>
+            )}
           </div>
 
-          <button type="button" onClick={cobrarDividido}
-            disabled={cobrando || disabled || !puedeCobrarDiv}
-            className="sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md">
-            {cobrando ? "Procesando..." : restanteCent === 0 ? `COBRAR $${formatPrecio(total)}` : `Falta $${formatPrecio(restante)}`}
+          <button type="button" onClick={cobrarDividido} disabled={cobrando || disabled || !puedeCobrarDiv}
+            className={BTN_PRIMARIO}>
+            {cobrando ? "Procesando..." : restanteCent === 0 ? `COBRAR $${formatPrecio(total)}` : "COMPLETAR PAGO"}
+          </button>
+
+          <button type="button" onClick={volverSimple}
+            className="text-xs pos-text-link text-center underline-offset-2 hover:underline">
+            Volver al pago simple
+          </button>
+        </>
+      ) : soloServicios ? (
+        /* ───────── CASO A: venta 100% servicios → efectivo ───────── */
+        <>
+          <div className="text-sm text-center pos-text-muted">
+            Este servicio debe abonarse en efectivo
+          </div>
+          <button type="button" onClick={() => cobrarSimple("efectivo")} disabled={!puedeVender}
+            className={BTN_PRIMARIO}>
+            {cobrando ? "Procesando..." : "COBRAR EN EFECTIVO"}
           </button>
         </>
       ) : (
+        /* ───────── CASO B (normal) / CASO C (servicios + mercadería) ───────── */
         <>
-          {fiadoSinCliente && subtotal > 0 && (
-            <div className="px-2 py-1.5 rounded-lg text-xs text-center font-medium" style={{ background: "color-mix(in srgb, var(--pos-danger) 12%, transparent)", color: "var(--pos-danger)" }}>
-              Seleccione un cliente para vender fiado
+          {hayServicios && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg px-3 py-2 text-center"
+                style={{ background: "color-mix(in srgb, var(--pos-accent) 12%, transparent)" }}>
+                <div className="text-[10px] pos-text-muted uppercase tracking-wide">Efectivo obligatorio</div>
+                <div className="text-lg font-bold pos-text-accent tabular-nums">${formatPrecio(minEf)}</div>
+              </div>
+              <div className="rounded-lg px-3 py-2 text-center pos-bg-panel">
+                <div className="text-[10px] pos-text-muted uppercase tracking-wide">Resta pagar</div>
+                <div className="text-lg font-bold tabular-nums">${formatPrecio(resto)}</div>
+              </div>
             </div>
           )}
-          <button type="button" onClick={() => onCobrar({ formaPago, total })}
-            disabled={cobrando || disabled || !formaPago || subtotal <= 0 || fiadoSinCliente || !cumpleEfectivoSingle}
-            className="sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md">
-            {cobrando ? "Procesando..." : hayServicios && !cumpleEfectivoSingle ? "Pagá en efectivo" : `COBRAR $${formatPrecio(total)}`}
+
+          <div className="text-sm font-medium text-center pos-text-muted-strong">
+            {hayServicios ? `Elegí cómo pagar $${formatPrecio(resto)}` : "Elegí cómo cobrar"}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {MEDIOS_COBRO.map((m) => (
+              <button key={m.key} type="button" onClick={() => cobrarSimple(m.key)} disabled={!puedeVender}
+                className={BTN_MEDIO}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Fiado: solo en venta sin servicios */}
+          {!hayServicios && (
+            <>
+              {formaPago === "fiado" && !clienteSeleccionado && subtotal > 0 && (
+                <div className="px-2 py-1.5 rounded-lg text-xs text-center font-medium"
+                  style={{ background: "color-mix(in srgb, var(--pos-danger) 12%, transparent)", color: "var(--pos-danger)" }}>
+                  Seleccioná un cliente para vender fiado
+                </div>
+              )}
+              <button type="button" onClick={() => cobrarSimple("fiado")} disabled={!puedeVender}
+                className="sunmi-btn sunmi-pos-btn-secondary w-full min-h-11 text-sm rounded-md">
+                Fiado
+              </button>
+            </>
+          )}
+
+          {/* Acción avanzada discreta */}
+          <button type="button" onClick={() => setModo("avanzado")}
+            className="text-xs pos-text-link text-center underline-offset-2 hover:underline">
+            {hayServicios ? "Dividir de otra manera" : "Dividir pago"}
           </button>
 
           {queueLength > 0 && onProcesarCola && (
             <button type="button" onClick={onProcesarCola} disabled={procesandoCola || offlineMode}
-              className="sunmi-btn sunmi-pos-btn-secondary w-full min-h-12 text-base font-semibold mt-2 rounded-md">
+              className="sunmi-btn sunmi-pos-btn-secondary w-full min-h-12 text-base font-semibold rounded-md">
               {procesandoCola ? "Procesando..." : `PROCESAR COLA (${queueLength})`}
             </button>
           )}
-
-          <div className="grid grid-cols-3 gap-1.5">
-            {FORMAS_PAGO.map((fp) => {
-              const esEfectivo = fp.key === "efectivo";
-              // Con servicios, en "un medio" solo efectivo (para pagar parte con digital
-              // usar "Pago dividido"). Fiado nunca con servicios.
-              const bloqueadoServicios = hayServicios && !esEfectivo;
-              const estaDeshabilitado = (offlineMode && !esEfectivo) || bloqueadoServicios;
-              const selected = formaPago === fp.key;
-              const btnClass = estaDeshabilitado
-                ? "sunmi-btn pos-control opacity-50 cursor-not-allowed"
-                : selected ? "sunmi-btn sunmi-pos-btn-primary" : "sunmi-btn sunmi-pos-btn-secondary";
-              return (
-                <button key={fp.key} type="button"
-                  onClick={() => {
-                    if (offlineMode && !esEfectivo) { showError("Sin internet: solo efectivo disponible"); return; }
-                    if (bloqueadoServicios) { showError(fp.key === "fiado" ? "No se puede fiar una venta con servicios" : "Con servicios: usá 'Pago dividido' para combinar con digital"); return; }
-                    onFormaPagoChange(fp.key);
-                  }}
-                  disabled={estaDeshabilitado} className={`min-h-11 text-xs py-1.5 rounded-md ${btnClass}`}>
-                  {fp.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="space-y-1.5">
-            {descuento > 0 && (
-              <div className="px-2 py-1.5 rounded-lg pos-success-box text-xs text-center">
-                Descuento: <span className="font-semibold pos-text-success-soft">-${formatPrecio(descuento)}</span>
-              </div>
-            )}
-            {descuentoPorPuntos > 0 && (
-              <div className="px-2 py-1.5 rounded-lg pos-points-box text-xs text-center">
-                Puntos: <span className="font-semibold pos-text-points">-${formatPrecio(descuentoPorPuntos)}</span>
-              </div>
-            )}
-            {tieneComision && subtotal > 0 && (
-              <div className="px-2 py-1.5 rounded-lg pos-commission-box text-xs text-center pos-text-muted">
-                Comision {comisionPct}%: <span className="font-semibold pos-text-muted-strong">-${formatPrecio(comisionBancaria)}</span>
-                <span className="ml-1 text-[10px]">(neto: ${formatPrecio(netoRecibido)})</span>
-              </div>
-            )}
-          </div>
         </>
+      )}
+
+      {/* Info compacta de descuentos/puntos (si aplica) */}
+      {(descuento > 0 || descuentoPorPuntos > 0) && (
+        <div className="flex flex-wrap justify-center gap-2 text-[11px]">
+          {descuento > 0 && (
+            <span className="pos-text-success-soft">Descuento -${formatPrecio(descuento)}</span>
+          )}
+          {descuentoPorPuntos > 0 && (
+            <span className="pos-text-points">Puntos -${formatPrecio(descuentoPorPuntos)}</span>
+          )}
+        </div>
       )}
     </SunmiCard>
   );
