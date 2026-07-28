@@ -12,6 +12,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import VentaDetalleAdmin from "@/components/reportes-ventas/VentaDetalleAdmin";
 import AccionesTicket from "@/components/reportes-ventas/AccionesTicket";
+import ReporteVentasPorCliente from "@/components/reportes-ventas/ReporteVentasPorCliente";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -76,6 +77,9 @@ export default function ReportesVentasPage() {
   const [reporte, setReporte] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Vista del período: "venta" (venta por venta) | "cliente" (agrupada por cliente)
+  const [vista, setVista] = useState("venta");
 
   // Listado venta por venta
   const LIMIT_VENTAS = 50;
@@ -397,6 +401,21 @@ export default function ReportesVentasPage() {
           <SunmiCard className="p-3">
             <SunmiSeparator label="Ventas del período" />
 
+            {/* Selector de vista: por venta / por cliente */}
+            <div className="flex gap-1 mt-2">
+              <SunmiButton color={vista === "venta" ? "amber" : "slate"} onClick={() => setVista("venta")} className="text-xs">
+                Por venta
+              </SunmiButton>
+              <SunmiButton color={vista === "cliente" ? "amber" : "slate"} onClick={() => setVista("cliente")} className="text-xs">
+                Por cliente
+              </SunmiButton>
+            </div>
+
+            {vista === "cliente" && (
+              <ReporteVentasPorCliente filtros={filtrosVigentes} onVerTicket={abrirDetalle} />
+            )}
+
+            {vista === "venta" && (<>
             {loadingListado && (
               <div className="text-center py-6">
                 <SunmiLoader />
@@ -580,6 +599,7 @@ export default function ReportesVentasPage() {
                 )}
               </>
             )}
+            </>)}
           </SunmiCard>
 
           {/* Top productos */}

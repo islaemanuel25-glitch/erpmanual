@@ -144,7 +144,9 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
   if (!montado) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 sunmi-bg flex flex-col" style={{ overflowX: "hidden" }}>
+    // z por encima de SunmiModalLayout (z-[9999]): el editor se abre desde el
+    // modal de detalle, así que debe quedar por ARRIBA o queda oculto detrás.
+    <div className="fixed inset-0 z-[10000] sunmi-bg flex flex-col" style={{ overflowX: "hidden" }}>
       {/* Header */}
       <div className="flex items-center justify-between gap-2 p-3 border-b sunmi-divider shrink-0">
         <div className="min-w-0">
@@ -300,7 +302,7 @@ function ModalRevisarCambios({ revision, motivo, setMotivo, error, confirmando, 
   const dp = revision.diff?.productos || {};
   const puede = revision.puedeConfirmar === true;
   return (
-    <div className="fixed inset-0 z-[60] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ overflowX: "hidden" }}>
+    <div className="fixed inset-0 z-[10001] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ overflowX: "hidden" }}>
       <div className="sunmi-bg w-full sm:max-w-lg sm:rounded-lg max-h-[90vh] overflow-y-auto p-4 space-y-3">
         <div className="text-base font-bold">Revisar cambios</div>
 
