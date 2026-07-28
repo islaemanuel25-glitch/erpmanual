@@ -1,28 +1,42 @@
 "use client";
 
-// EditorVentaCorreccion — corrección COMPLETA de una venta (Fase B), rediseñado
-// con el patrón visual de Compras → Ver compra → Recibir mercadería:
-//   · Encabezado con metadatos (ticket, cliente, local, fecha, estado, versión,
-//     badge turno abierto).
-//   · Tarjetas por producto (original → corregido) con estados de consumo legacy.
-//   · Pagos en tarjeta separada.
-//   · Resumen final + footer fijo "Revisar cambios" (safe-area Android).
-// Fullscreen por portal (z-[10000], por encima de SunmiModalLayout z-[9999]).
+// EditorVentaCorreccion — corrección COMPLETA de una venta (Fase B) con el MISMO
+// sistema responsive que Compras → Ver compra → Recibir mercadería. Se copia la
+// estructura/clases/breakpoints de esa pantalla y solo se adaptan los datos de
+// ventas:
+//   · Página (overlay por portal, scrolleable) → SunmiCard → SunmiPanels.
+//   · Encabezado: flex justify-between (SunmiHeader "Corregir venta" + badge estado
+//     / botón Volver) + panel de metadatos grid-cols-2 md:grid-cols-4.
+//   · Detalle: DESKTOP tabla (hidden md:block) · MÓVIL cards (md:hidden), con el
+//     control de cantidad − [n] + idéntico a "Recibir mercadería".
+//   · "Agregar producto": SunmiPanel inline (SunmiInput + tabla de resultados).
+//   · Pagos: SunmiPanel con SunmiSelectAdv + SunmiInput.
+//   · Resumen (Total original / corregido / Diferencia) + acciones inline
+//     (flex justify-end gap-3). SIN footer flotante — scrollea con el contenido.
+// Overlay por portal (z-[10000], por encima de SunmiModalLayout z-[9999]).
 // Solo habilitado si el turno ORIGINAL sigue abierto (lo decide el backend).
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { ArrowLeft } from "lucide-react";
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
+import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import LineaEditableCard from "@/components/reportes-ventas/LineaEditableCard";
-import ModalBuscarProducto from "@/components/reportes-ventas/ModalBuscarProducto";
 
 const TZ_AR = "America/Argentina/Cordoba";
 const money = (n) => `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtCant = (n) => { const x = Number(n); return Number.isInteger(x) ? String(x) : x.toLocaleString("es-AR", { maximumFractionDigits: 3 }); };
 const MEDIOS = ["EFECTIVO", "DEBITO", "CREDITO", "MERCADOPAGO", "FIADO"];
 const MEDIO_LABEL = { EFECTIVO: "Efectivo", DEBITO: "Débito", CREDITO: "Crédito", MERCADOPAGO: "Mercado Pago", FIADO: "Fiado" };
+const ESTADO_BADGE = { cobrado: "sunmi-badge-success", fiado: "sunmi-badge-accent" };
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 function fmtFecha(iso) {
   if (!iso) return "—";
@@ -42,12 +56,19 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
   const [pagos, setPagos] = useState([]);
   const [buscaCli, setBuscaCli] = useState("");
   const [resCli, setResCli] = useState([]);
-  const [buscadorAbierto, setBuscadorAbierto] = useState(false);
   const [revision, setRevision] = useState(null);
   const [motivo, setMotivo] = useState("");
   const [revisando, setRevisando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [montado, setMontado] = useState(false);
+
+  // Buscar producto (bloque "Agregar producto" inline)
+  const [extraSearch, setExtraSearch] = useState("");
+  const [extraResults, setExtraResults] = useState([]);
+  const [extraLoading, setExtraLoading] = useState(false);
+  const [extraAdding, setExtraAdding] = useState(null);
+  const debounceRef = useRef(null);
+
   useEffect(() => { setMontado(true); }, []);
 
   useEffect(() => {
@@ -78,6 +99,9 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
   const bloqueado = data && !c.puedeCorregirCompleta;
   const activas = lineas.filter((l) => !l.removed);
   const total = useMemo(() => lineas.filter((l) => !l.removed).reduce((a, l) => a + num(l.precio) * num(l.cantidad), 0), [lineas]);
+  const sumSubOrig = activas.reduce((a, l) => a + num(l.precioOriginal) * num(l.cantidadOriginal), 0);
+  const totalOriginalVenta = num(data?.venta?.total);
+  const difVsVenta = total - totalOriginalVenta;
   const sumaPagos = pagos.reduce((a, p) => a + num(p.monto), 0);
   const pagosCuadran = Math.abs(sumaPagos - total) < 0.01;
   const permiteEditarPrecio = !!data?.permisos?.editarPrecioManual;
@@ -97,14 +121,34 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
     if (!q || q.length < 2) { setResCli([]); return; }
     try { const r = await fetch(`/api/clientes/buscar?q=${encodeURIComponent(q)}`, { credentials: "include" }); const d = await r.json(); setResCli((d.items || []).slice(0, 6)); } catch { setResCli([]); }
   }
+
+  // --- Buscar producto extra (debounced) — mismo patrón que Recibir mercadería ---
+  const buscarExtra = useCallback((text) => {
+    setExtraSearch(text);
+    setExtraResults([]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!text.trim() || !data?.venta?.local?.id) { setExtraLoading(false); return; }
+    setExtraLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/pos-ventas/buscar-producto?q=${encodeURIComponent(text.trim())}&localId=${data.venta.local.id}`, { credentials: "include" });
+        const d = await r.json();
+        const items = (d.items || d.productos || []);
+        setExtraResults(items.slice(0, 10));
+      } catch { /* silenciar */ }
+      finally { setExtraLoading(false); }
+    }, 350);
+  }, [data]);
+
   function agregarProducto(item) {
+    setExtraAdding(item.key);
     setLineas((ls) => [...ls, {
       key: nextKey(), origenDetalleId: null, productoBaseId: item.productoBaseId, nombre: item.nombre,
       codigo: null, presentacion: null, cantidad: 1, precio: num(item.precio), precioCosto: undefined,
       cantidadOriginal: 0, precioOriginal: num(item.precio), esServicio: !!item.esServicio, esCombo: !!item.esCombo,
       reconstruccion: null, modalidadConfirmada: null, removed: false,
     }]);
-    setBuscadorAbierto(false);
+    setExtraSearch(""); setExtraResults([]); setExtraAdding(null);
   }
 
   function payloadLineas() {
@@ -150,113 +194,342 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
 
   if (!montado) return null;
 
+  const idsEnLineas = new Set(activas.map((l) => l.productoBaseId));
+
   return createPortal(
-    <div className="fixed inset-0 z-[10000] sunmi-bg flex flex-col" style={{ overflowX: "hidden" }}>
-      {/* Encabezado */}
-      <div className="shrink-0 border-b sunmi-divider p-3">
-        <div className="flex items-center justify-between gap-2">
-          <SunmiButton color="slate" onClick={onClose} className="text-sm">← Volver</SunmiButton>
-          <SunmiHeader title="Corregir venta" />
-          <div className="w-16" />
-        </div>
-        {data?.venta && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 mt-2 text-[11px]">
-            <div><span className="sunmi-text-muted">Ticket</span> <span className="font-mono font-semibold">#{data.venta.numero}</span></div>
-            <div><span className="sunmi-text-muted">Cliente</span> <span className="font-medium">{clienteSel?.nombre || "Consumidor final"}</span></div>
-            <div><span className="sunmi-text-muted">Local</span> <span className="font-medium">{data.venta.local?.nombre || "—"}</span></div>
-            <div><span className="sunmi-text-muted">Fecha</span> {fmtFecha(data.venta.fecha)}</div>
-            <div><span className="sunmi-text-muted">Estado</span> <span className="capitalize">{data.venta.estado}</span></div>
-            <div><span className="sunmi-text-muted">Versión</span> {data.venta.version}</div>
-            {data.turno?.turnoAbierto && <div className="px-1.5 py-0.5 rounded-full sunmi-state-success sunmi-text-success text-[10px] w-fit">● Turno abierto</div>}
+    <div className="fixed inset-0 z-[10000] sunmi-bg overflow-y-auto" style={{ overflowX: "hidden" }}>
+      <div className="w-full min-h-full p-4">
+        <SunmiCard>
+          {/* Encabezado — patrón Ver / Recibir compra */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <SunmiHeader title="Corregir venta" />
+              {data?.venta && (
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${ESTADO_BADGE[data.venta.estado] || ""}`}>
+                  {String(data.venta.estado || "").toUpperCase()}
+                </span>
+              )}
+            </div>
+            <button type="button" onClick={onClose} className="sunmi-btn-base sunmi-btn-slate inline-flex items-center gap-1.5">
+              <ArrowLeft size={15} /> Volver
+            </button>
           </div>
-        )}
-      </div>
 
-      {cargando && <div className="flex-1 grid place-items-center"><SunmiLoader /></div>}
-      {!cargando && error && !revision && <div className="p-3"><div className="text-[13px] sunmi-state-danger sunmi-text-danger rounded px-2 py-1.5">{error}</div></div>}
-      {!cargando && data && bloqueado && (
-        <div className="p-4"><div className="sunmi-state-warning sunmi-text-accent rounded p-3 text-sm">
-          No se puede corregir esta venta.{" "}
-          {c.motivoBloqueo === "turno_cerrado_no_corregible" ? "El turno original ya está cerrado."
-            : c.motivoBloqueo === "fuera_de_ventana" ? "Pasó la ventana de 30 días."
-            : c.motivoBloqueo === "flag_no_habilitado" ? "Función en beta: no habilitada para tu usuario."
-            : c.motivoBloqueo === "sin_permiso" ? "No tenés permiso." : "Turno no disponible."}
-        </div></div>
-      )}
+          {cargando && <SunmiLoader />}
+          {!cargando && error && !revision && (
+            <div className="text-[13px] sunmi-state-danger sunmi-text-danger rounded px-2 py-1.5">{error}</div>
+          )}
 
-      {!cargando && data && !bloqueado && (
-        <>
-          <div className="flex-1 overflow-y-auto p-3 space-y-4" style={{ overflowX: "hidden" }}>
-            {/* Cliente */}
-            <div>
-              <div className="text-[11px] sunmi-text-muted mb-1">Cliente</div>
-              <div className="flex items-center gap-2 mb-1 text-sm">
-                <span className="font-medium">{clienteSel ? clienteSel.nombre : "Consumidor final"}</span>
-                {clienteSel && <button type="button" className="text-[11px] sunmi-text-link underline" onClick={() => setClienteSel(null)}>quitar</button>}
+          {!cargando && data && bloqueado && (
+            <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+              <div className="sunmi-state-warning sunmi-text-accent rounded p-3 text-sm">
+                No se puede corregir esta venta.{" "}
+                {c.motivoBloqueo === "turno_cerrado_no_corregible" ? "El turno original ya está cerrado."
+                  : c.motivoBloqueo === "fuera_de_ventana" ? "Pasó la ventana de 30 días."
+                  : c.motivoBloqueo === "flag_no_habilitado" ? "Función en beta: no habilitada para tu usuario."
+                  : c.motivoBloqueo === "sin_permiso" ? "No tenés permiso." : "Turno no disponible."}
               </div>
-              <SunmiInput value={buscaCli} onChange={(e) => buscarCliente(e.target.value)} placeholder="Buscar cliente…" className="text-sm" />
-              {resCli.length > 0 && (
-                <div className="mt-1 sunmi-surface rounded max-h-40 overflow-auto">
-                  {resCli.map((cl) => (
-                    <button key={cl.id} type="button" className="block w-full text-left px-2 py-1.5 text-[12px]" onClick={() => { setClienteSel({ id: cl.id, nombre: cl.nombre }); setResCli([]); setBuscaCli(""); }}>
-                      {cl.nombre}{cl.documento ? <span className="sunmi-text-muted ml-1">({cl.documento})</span> : null}
-                    </button>
+            </SunmiPanel>
+          )}
+
+          {!cargando && data && !bloqueado && (
+            <>
+              {/* Metadatos del ticket */}
+              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Ticket</span>
+                    <p className="sunmi-text-strong font-mono">#{data.venta.numero}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Cliente</span>
+                    <p className="sunmi-text-strong">{clienteSel?.nombre || "Consumidor final"}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Local</span>
+                    <p className="sunmi-text-strong">{data.venta.local?.nombre || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Fecha</span>
+                    <p className="sunmi-text-strong">{fmtFecha(data.venta.fecha)}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Estado</span>
+                    <p className="sunmi-text-strong capitalize">{data.venta.estado}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Versión</span>
+                    <p className="sunmi-text-strong">{data.venta.version}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Turno</span>
+                    <p className={data.turno?.turnoAbierto ? "sunmi-text-success font-medium" : "sunmi-text-danger font-medium"}>
+                      {data.turno?.turnoAbierto ? "● Abierto" : "Cerrado"}
+                    </p>
+                  </div>
+                </div>
+              </SunmiPanel>
+
+              {/* Cliente */}
+              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+                <div className="flex items-center justify-between pb-2 mb-3 border-b sunmi-divider">
+                  <h3 className="text-[13px] font-semibold sunmi-text-strong">Cliente</h3>
+                  <span className="text-xs sunmi-text-muted">{clienteSel ? clienteSel.nombre : "Consumidor final"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <SunmiInput value={buscaCli} onChange={(e) => buscarCliente(e.target.value)} placeholder="Buscar cliente…" />
+                  {clienteSel && <SunmiButton color="slate" type="button" onClick={() => setClienteSel(null)}>Quitar</SunmiButton>}
+                </div>
+                {resCli.length > 0 && (
+                  <div className="mt-2 overflow-x-auto rounded border sunmi-border">
+                    <SunmiTable headers={["Cliente", "Documento", ""]}>
+                      {resCli.map((cl) => (
+                        <SunmiTableRow key={cl.id}>
+                          <td className="px-3 py-1.5 text-sm">{cl.nombre}</td>
+                          <td className="px-3 py-1.5 text-xs sunmi-text-muted">{cl.documento || "-"}</td>
+                          <td className="px-3 py-1.5">
+                            <SunmiButton color="cyan" size="xs" onClick={() => { setClienteSel({ id: cl.id, nombre: cl.nombre }); setResCli([]); setBuscaCli(""); }}>Elegir</SunmiButton>
+                          </td>
+                        </SunmiTableRow>
+                      ))}
+                    </SunmiTable>
+                  </div>
+                )}
+              </SunmiPanel>
+
+              {/* Detalle de productos */}
+              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+                <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+                  <h3 className="text-[13px] font-semibold sunmi-text-strong">Detalle ({activas.length} items)</h3>
+                </div>
+
+                {/* DESKTOP: tabla */}
+                <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
+                  <SunmiTable headers={["Producto", "Cant. original", "Cant. corregida", "Precio original", "Precio corregido", "Subtotal orig.", "Subtotal corr.", "Diferencia", ""]}>
+                    {activas.length === 0 ? (
+                      <SunmiTableEmpty message="Sin items" />
+                    ) : (
+                      activas.map((l) => {
+                        const subOrig = num(l.precioOriginal) * num(l.cantidadOriginal);
+                        const subCorr = num(l.precio) * num(l.cantidad);
+                        const dif = subCorr - subOrig;
+                        const rec = l.reconstruccion || null;
+                        const precioDeshab = l.esCombo || l.esServicio || !permiteEditarPrecio;
+                        const esNuevo = l.origenDetalleId == null;
+                        return (
+                          <SunmiTableRow key={l.key}>
+                            <td className="px-3 py-1.5 text-sm">
+                              <div className="font-medium sunmi-text-strong">
+                                {l.nombre}
+                                {l.esCombo && <span className="ml-2 text-[10px] sunmi-text-link font-medium">COMBO</span>}
+                                {l.esServicio && <span className="ml-2 text-[10px] sunmi-text-link font-medium">SERVICIO</span>}
+                                {esNuevo && <span className="ml-2 text-[10px] sunmi-text-success font-medium">NUEVO</span>}
+                              </div>
+                              {rec?.estado === "reconstruido" && (
+                                <div className="text-[10px] sunmi-text-success mt-0.5">✓ Consumo reconstruido — {rec.modalidad} · {fmtCant(rec.cantidadFisica)} u</div>
+                              )}
+                              {rec?.estado === "ambiguo" && (
+                                <div className="mt-1 max-w-[240px] space-y-1">
+                                  <div className="text-[10px] sunmi-text-accent">⚠ Consumo original no registrado</div>
+                                  <SunmiSelectAdv value={l.modalidadConfirmada || ""} onChange={(v) => setLinea(l.key, { modalidadConfirmada: v || null })}>
+                                    <SunmiSelectOption value="">Elegí la modalidad…</SunmiSelectOption>
+                                    {(rec.modalidadesPosibles || []).map((m) => (
+                                      <SunmiSelectOption key={m.modalidad} value={m.modalidad}>{m.label}{rec.recomendada === m.modalidad ? " — recomendado" : ""}</SunmiSelectOption>
+                                    ))}
+                                  </SunmiSelectAdv>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-1.5 text-center sunmi-text-muted line-through tabular-nums">{esNuevo ? "—" : fmtCant(l.cantidadOriginal)}</td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-1 justify-center">
+                                <SunmiButton color="slate" type="button" onClick={() => setLinea(l.key, { cantidad: Math.max(0, num(l.cantidad) - 1) })}>−</SunmiButton>
+                                <SunmiInput
+                                  type="text" inputMode="decimal" value={l.cantidad}
+                                  onChange={(e) => { const raw = e.target.value; if (raw === "") { setLinea(l.key, { cantidad: "" }); return; } const v = Number(raw.replace(",", ".")); setLinea(l.key, { cantidad: Number.isFinite(v) ? Math.max(0, v) : 0 }); }}
+                                  onBlur={() => { const cur = Number(l.cantidad); if (!Number.isFinite(cur) || cur < 0) setLinea(l.key, { cantidad: 0 }); }}
+                                  className="w-[56px] text-center"
+                                />
+                                <SunmiButton color="slate" type="button" onClick={() => setLinea(l.key, { cantidad: num(l.cantidad) + 1 })}>+</SunmiButton>
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-center sunmi-text-muted line-through tabular-nums">{esNuevo ? "—" : money(l.precioOriginal)}</td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-0.5 justify-center">
+                                <span className="sunmi-text-muted text-xs">$</span>
+                                <SunmiInput
+                                  type="text" inputMode="decimal" value={l.precio} disabled={precioDeshab}
+                                  onChange={(e) => setLinea(l.key, { precio: e.target.value === "" ? 0 : Number(e.target.value.replace(",", ".")) })}
+                                  className="w-[90px] text-center"
+                                />
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-right tabular-nums sunmi-text-muted">{money(subOrig)}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums font-medium">{money(subCorr)}</td>
+                            <td className={`px-3 py-1.5 text-right tabular-nums font-medium ${dif < 0 ? "sunmi-text-danger" : dif > 0 ? "sunmi-text-accent" : "sunmi-text-muted"}`}>{dif > 0 ? "+" : ""}{money(dif)}</td>
+                            <td className="px-3 py-1.5 text-center">
+                              <SunmiButton color="red" type="button" onClick={() => setLinea(l.key, { removed: true })}>Quitar</SunmiButton>
+                            </td>
+                          </SunmiTableRow>
+                        );
+                      })
+                    )}
+                    {activas.length > 0 && (
+                      <tr className="border-t sunmi-divider">
+                        <td colSpan={5} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">TOTAL CORREGIDO</td>
+                        <td className="px-3 py-2 text-sm text-right tabular-nums sunmi-text-muted">{money(sumSubOrig)}</td>
+                        <td className="px-3 py-2 text-sm font-bold text-right sunmi-text-accent">{money(total)}</td>
+                        <td className={`px-3 py-2 text-sm font-bold text-right tabular-nums ${(total - sumSubOrig) < 0 ? "sunmi-text-danger" : (total - sumSubOrig) > 0 ? "sunmi-text-accent" : "sunmi-text-muted"}`}>{(total - sumSubOrig) > 0 ? "+" : ""}{money(total - sumSubOrig)}</td>
+                        <td />
+                      </tr>
+                    )}
+                  </SunmiTable>
+                </div>
+
+                {/* MÓVIL: cards */}
+                <div className="md:hidden flex flex-col gap-2">
+                  {activas.length === 0 ? (
+                    <p className="text-xs sunmi-text-muted italic px-1">Sin items</p>
+                  ) : (
+                    activas.map((l) => (
+                      <LineaEditableCard
+                        key={l.key} linea={l} permiteEditarPrecio={permiteEditarPrecio}
+                        onChange={(patch) => setLinea(l.key, patch)} onRemove={() => setLinea(l.key, { removed: true })}
+                      />
+                    ))
+                  )}
+                  {activas.length > 0 && (
+                    <div className="flex items-center justify-between rounded-xl border sunmi-border p-3 sunmi-surface">
+                      <span className="text-sm font-semibold sunmi-text-strong">TOTAL CORREGIDO</span>
+                      <span className="text-base font-bold sunmi-text-accent">{money(total)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {ambiguasSinResolver.length > 0 && (
+                  <div className="text-[11px] sunmi-text-danger mt-2">Resolvé el consumo original de las líneas marcadas para poder revisar.</div>
+                )}
+              </SunmiPanel>
+
+              {/* Agregar producto — bloque inline (patrón "Agregar producto extra") */}
+              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+                <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+                  <h3 className="text-[13px] font-semibold sunmi-text-strong">Agregar producto</h3>
+                </div>
+
+                <SunmiInput
+                  type="text" placeholder="Buscar producto (nombre / código de barra)"
+                  autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false}
+                  value={extraSearch} onChange={(e) => buscarExtra(e.target.value)} className="mb-3"
+                />
+
+                {extraLoading && <p className="text-xs sunmi-text-muted">Buscando...</p>}
+                {!extraLoading && extraSearch.trim() && extraResults.length === 0 && <p className="text-xs sunmi-text-muted">Sin resultados</p>}
+
+                {extraResults.length > 0 && (
+                  <div className="overflow-x-auto rounded border sunmi-border">
+                    <SunmiTable headers={["Producto", "Cód. barra", "Presentación", "Precio", ""]}>
+                      {extraResults.map((p) => {
+                        const baseId = p.productoBaseId ?? p.baseId;
+                        const precio = Number(p.precioVenta ?? p.precio ?? p.precio_venta ?? 0);
+                        const presentacion = p.esServicioImporteVariable ? "Servicio" : (p.modoSalidaDefault === "BULTO" ? "Bulto" : "Unidad");
+                        const rowKey = p.productoLocalId ?? baseId;
+                        const yaEsta = idsEnLineas.has(baseId);
+                        return (
+                          <SunmiTableRow key={rowKey}>
+                            <td className="px-3 py-1.5 text-sm">{p.nombre}</td>
+                            <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.codigoBarra || "-"}</td>
+                            <td className="px-3 py-1.5 text-xs">{presentacion}</td>
+                            <td className="px-3 py-1.5 text-xs">{precio > 0 ? money(precio) : "-"}</td>
+                            <td className="px-3 py-1.5">
+                              <SunmiButton
+                                color="cyan" size="xs" disabled={extraAdding === rowKey || yaEsta}
+                                onClick={() => agregarProducto({ productoBaseId: baseId, nombre: p.nombre, precio, esServicio: !!p.esServicioImporteVariable, esCombo: !!p.esCombo, key: rowKey })}
+                              >
+                                {yaEsta ? "Ya está" : extraAdding === rowKey ? "..." : "Agregar"}
+                              </SunmiButton>
+                            </td>
+                          </SunmiTableRow>
+                        );
+                      })}
+                    </SunmiTable>
+                  </div>
+                )}
+              </SunmiPanel>
+
+              {/* Pagos */}
+              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+                <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+                  <h3 className="text-[13px] font-semibold sunmi-text-strong">Pagos</h3>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {pagos.map((p, i) => (
+                    <div key={i} className="flex flex-wrap items-end gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] sunmi-text-muted">Medio</span>
+                        <div className="w-40">
+                          <SunmiSelectAdv value={p.medio} onChange={(v) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, medio: v } : x)))}>
+                            {MEDIOS.map((m) => <SunmiSelectOption key={m} value={m}>{MEDIO_LABEL[m]}</SunmiSelectOption>)}
+                          </SunmiSelectAdv>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] sunmi-text-muted">Monto</span>
+                        <div className="flex items-center gap-0.5">
+                          <span className="sunmi-text-muted text-xs">$</span>
+                          <SunmiInput
+                            type="text" inputMode="decimal" value={p.monto}
+                            onChange={(e) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, monto: e.target.value === "" ? 0 : Number(e.target.value.replace(",", ".")) } : x)))}
+                            className="w-[110px] text-center"
+                          />
+                        </div>
+                      </div>
+                      <SunmiButton color="red" type="button" onClick={() => setPagos((ps) => ps.filter((_, j) => j !== i))}>Quitar</SunmiButton>
+                    </div>
                   ))}
                 </div>
-              )}
-            </div>
 
-            {/* Productos */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] sunmi-text-muted">Productos</div>
-                <SunmiButton color="cyan" onClick={() => setBuscadorAbierto(true)} className="text-xs">+ Agregar producto</SunmiButton>
-              </div>
-              {activas.map((l) => (
-                <LineaEditableCard key={l.key} linea={l} permiteEditarPrecio={permiteEditarPrecio}
-                  onChange={(patch) => setLinea(l.key, patch)} onRemove={() => setLinea(l.key, { removed: true })} />
-              ))}
-              {ambiguasSinResolver.length > 0 && (
-                <div className="text-[11px] sunmi-text-danger">Resolvé el consumo original de las líneas marcadas para poder revisar.</div>
-              )}
-            </div>
-
-            {/* Pagos (tarjeta separada) */}
-            <div className="sunmi-surface rounded-lg p-3 space-y-2">
-              <div className="text-[11px] sunmi-text-muted">Pagos</div>
-              {pagos.map((p, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <select value={p.medio} onChange={(e) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, medio: e.target.value } : x)))} className="sunmi-input text-sm">
-                    {MEDIOS.map((m) => <option key={m} value={m}>{MEDIO_LABEL[m]}</option>)}
-                  </select>
-                  <input type="number" min="0" step="0.01" value={p.monto} onChange={(e) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, monto: e.target.value === "" ? 0 : Number(e.target.value) } : x)))} className="sunmi-input w-28 text-sm" />
-                  <button type="button" className="text-[11px] sunmi-text-danger underline" onClick={() => setPagos((ps) => ps.filter((_, j) => j !== i))}>quitar</button>
+                <div className="flex items-center justify-between mt-3 pt-3 border-t sunmi-divider">
+                  <SunmiButton color="slate" type="button" onClick={() => setPagos((ps) => [...ps, { medio: "EFECTIVO", monto: 0 }])}>+ Medio de pago</SunmiButton>
+                  <span className={`text-sm font-bold ${pagosCuadran ? "sunmi-text-success" : "sunmi-text-danger"}`}>
+                    Σ {money(sumaPagos)} {pagosCuadran ? "= total" : `≠ ${money(total)}`}
+                  </span>
                 </div>
-              ))}
-              <div className="flex items-center justify-between">
-                <SunmiButton color="slate" onClick={() => setPagos((ps) => [...ps, { medio: "EFECTIVO", monto: 0 }])} className="text-xs">+ medio</SunmiButton>
-                <span className={`text-[12px] ${pagosCuadran ? "sunmi-text-success" : "sunmi-text-danger"}`}>Σ {money(sumaPagos)} {pagosCuadran ? "= total" : `≠ ${money(total)}`}</span>
+              </SunmiPanel>
+
+              {/* Resumen */}
+              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Total original</span>
+                    <p className="sunmi-text-strong tabular-nums">{money(totalOriginalVenta)}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Total corregido</span>
+                    <p className="text-lg font-bold sunmi-text-accent tabular-nums">{money(total)}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Diferencia</span>
+                    <p className={`font-bold tabular-nums ${difVsVenta < 0 ? "sunmi-text-danger" : difVsVenta > 0 ? "sunmi-text-accent" : "sunmi-text-muted"}`}>{difVsVenta > 0 ? "+" : ""}{money(difVsVenta)}</p>
+                  </div>
+                </div>
+              </SunmiPanel>
+
+              {error && <div className="text-[13px] sunmi-state-danger sunmi-text-danger rounded px-2 py-1.5 mb-4">{error}</div>}
+
+              {/* Acciones — inline (flex justify-end gap-3), como Compras */}
+              <div className="flex justify-end gap-3">
+                <SunmiButton color="slate" onClick={onClose}>Volver</SunmiButton>
+                <SunmiButton color="amber" onClick={revisar} disabled={revisando || !puedeRevisar}>
+                  {revisando ? "Revisando..." : "Revisar cambios"}
+                </SunmiButton>
               </div>
-            </div>
-          </div>
+            </>
+          )}
+        </SunmiCard>
+      </div>
 
-          {/* Footer fijo con safe-area */}
-          <div className="shrink-0 border-t sunmi-divider p-3 space-y-2" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
-            <div className="flex justify-between items-baseline">
-              <span className="text-sm sunmi-text-muted">Total corregido</span>
-              <span className="text-lg font-bold tabular-nums">{money(total)}</span>
-            </div>
-            {error && <div className="text-[12px] sunmi-text-danger">{error}</div>}
-            <SunmiButton color="amber" onClick={revisar} disabled={revisando || !puedeRevisar} className="w-full">
-              {revisando ? "Revisando…" : "Revisar cambios"}
-            </SunmiButton>
-          </div>
-        </>
-      )}
-
-      {buscadorAbierto && data?.venta?.local && (
-        <ModalBuscarProducto localId={data.venta.local.id} onSelect={agregarProducto} onClose={() => setBuscadorAbierto(false)} />
-      )}
       {revision && (
         <ModalRevisarCambios revision={revision} motivo={motivo} setMotivo={setMotivo} error={error} confirmando={confirmando}
           onCancel={() => { setRevision(null); setError(""); }} onConfirm={confirmar} />
@@ -269,7 +542,6 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
 function ModalRevisarCambios({ revision, motivo, setMotivo, error, confirmando, onCancel, onConfirm }) {
   const t = revision.totales || {};
   const dp = revision.diff?.productos || {};
-  const cl = revision.diff?.clasificacion || {};
   const puede = revision.puedeConfirmar === true;
   const unidadesMas = (dp.agregadas || []).reduce((a, l) => a + Number(l.cantidad || 0), 0) + (dp.modificadas || []).reduce((a, l) => a + Math.max(0, Number(l.cantidadDespues) - Number(l.cantidadAntes)), 0);
   const unidadesMenos = (dp.eliminadas || []).reduce((a, l) => a + Number(l.cantidad || 0), 0) + (dp.modificadas || []).reduce((a, l) => a + Math.max(0, Number(l.cantidadAntes) - Number(l.cantidadDespues)), 0);
