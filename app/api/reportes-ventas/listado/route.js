@@ -116,6 +116,9 @@ export async function GET(req) {
           total: true,
           formaPago: true,
           esFiado: true,
+          // Corrección de ventas: flags para el badge "Corregida · vN" en la card.
+          corregida: true,
+          version: true,
           cliente: { select: { id: true, nombre: true } },
           vendedor: { select: { id: true, nombre: true } },
           local: { select: { id: true, nombre: true } },
@@ -139,6 +142,9 @@ export async function GET(req) {
         : null,
       local: v.local ? { id: v.local.id, nombre: v.local.nombre } : null,
       items: v._count?.detalles ?? 0,
+      // Corrección: la card muestra "Corregida · vN" cuando corregida=true.
+      corregida: !!v.corregida,
+      version: v.version ?? 0,
     }));
 
     return NextResponse.json({

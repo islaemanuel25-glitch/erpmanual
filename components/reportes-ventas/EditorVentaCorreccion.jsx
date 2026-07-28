@@ -35,6 +35,10 @@ import {
   recomputar, setMontoCent, setAjustador, agregarPago, quitarPago, cambiarMedio,
   payloadPagos, payloadValido,
 } from "@/lib/pos-ventas/pagosAjuste";
+import {
+  MODO_PACK, MODO_UNIDAD, permiteToggleDeposito, inferirModo,
+  escalasDeLineaExistente, rescalarLinea, cantidadStockLinea, costoResoluble,
+} from "@/lib/pos-ventas/lineaModoDeposito";
 
 const TZ_AR = "America/Argentina/Cordoba";
 const money = (n) => `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -84,14 +88,29 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
         if (!vivo) return;
         if (!d.ok) { setError(d.error || "No se pudo cargar."); return; }
         setData(d);
-        setLineas((d.venta.lineas || []).map((l) => ({
-          key: nextKey(), origenDetalleId: l.detalleId, productoBaseId: l.productoBaseId, nombre: l.nombre,
-          codigo: l.codigo || null, presentacion: l.unidad || null,
-          cantidad: num(l.cantidad), precio: num(l.precio), precioCosto: num(l.precioCosto),
-          cantidadOriginal: num(l.cantidad), precioOriginal: num(l.precio),
-          esServicio: l.esServicio, esCombo: l.esCombo, reconstruccion: l.reconstruccion || null,
-          modalidadConfirmada: null, removed: false,
-        })));
+        const esDepositoVenta = d.venta.local?.esDeposito === true;
+        setLineas((d.venta.lineas || []).map((l) => {
+          const factorPack = Math.max(1, Number(l.baseStock?.factorPack) || 1);
+          const modoEnvio = l.baseStock?.modo_envio || null;
+          const puedeToggle = permiteToggleDeposito({ esDeposito: esDepositoVenta, factorPack, modoEnvio }) && !l.esServicio && !l.esCombo;
+          // Modo con el que se persistió la línea (inferido de cantidadStock físico).
+          const modoActual = puedeToggle
+            ? inferirModo({ cantidad: num(l.cantidad), cantidadStock: l.cantidadStock, factorPack })
+            : MODO_PACK;
+          // Escalas bulto/unidad DERIVADAS del precio/costo congelado (sin re-consultar maestro).
+          const escalas = escalasDeLineaExistente({ precio: num(l.precio), precioCosto: num(l.precioCosto), modoActual, factorPack });
+          return {
+            key: nextKey(), origenDetalleId: l.detalleId, productoBaseId: l.productoBaseId, nombre: l.nombre,
+            codigo: l.codigo || null, presentacion: l.unidad || null,
+            cantidad: num(l.cantidad), precio: num(l.precio), precioCosto: num(l.precioCosto),
+            cantidadOriginal: num(l.cantidad), precioOriginal: num(l.precio),
+            esServicio: l.esServicio, esCombo: l.esCombo, reconstruccion: l.reconstruccion || null,
+            modalidadConfirmada: null, removed: false,
+            // Depósito pack/unidad (Opción A): un modo por línea + escalas congeladas.
+            esDeposito: esDepositoVenta, factorPack, modoEnvio, puedeToggle,
+            modoVentaLinea: modoActual, ...escalas, costoResoluble: true,
+          };
+        }));
         setClienteSel(d.venta.cliente ? { id: d.venta.cliente.id, nombre: d.venta.cliente.nombre } : null);
         setPagos(normalizarAjustador((d.venta.pagos || []).map((p) => crearPago(String(p.medio).toUpperCase(), aCent(num(p.monto)), false))));
       })
@@ -120,9 +139,11 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
     (l.removed || num(l.cantidad) !== num(l.cantidadOriginal) || num(l.precio) !== num(l.precioOriginal)) &&
     !l.modalidadConfirmada
   );
+  // Líneas agregadas sin costo resoluble → bloquean Revisar (no guardar costo 0 silencioso).
+  const agregadasSinCosto = lineas.filter((l) => !l.removed && l.origenDetalleId == null && !l.esServicio && l.costoResoluble === false);
   // La UI impide pagos != total; este guard defensivo evita enviar un estado inválido.
   const pagosOk = payloadValido(pagosCalc.pagos, totalCent) && !pagosCalc.negativo;
-  const puedeRevisar = activas.length > 0 && ambiguasSinResolver.length === 0 && pagosOk;
+  const puedeRevisar = activas.length > 0 && ambiguasSinResolver.length === 0 && pagosOk && agregadasSinCosto.length === 0;
 
   const setLinea = (key, patch) => setLineas((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
@@ -169,20 +190,48 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
     }, 350);
   }, [data]);
 
+  // Cambia el modo Pack/Unidad de una línea de depósito, reescalando precio/costo
+  // con las escalas ya congeladas en la línea (no divide/multiplica a mano).
+  const onModoVenta = (key, modo) => setLinea(key, rescalarLinea(lineas.find((l) => l.key === key) || {}, modo));
+
   function agregarProducto(item) {
     setExtraAdding(item.key);
+    const esDeposito = data?.venta?.local?.esDeposito === true;
+    const factorPack = Math.max(1, Number(item.factorPack) || 1);
+    const modoEnvio = item.modoEnvio || null;
+    const puedeToggle = permiteToggleDeposito({ esDeposito, factorPack, modoEnvio }) && !item.esServicio && !item.esCombo;
+    // Modo inicial = el de salida por defecto del POS (BULTO en depósito, UNIDAD en local/solo_unidad).
+    const modoInicial = String(item.modoSalidaDefault || "").toUpperCase() === "UNIDAD" ? MODO_UNIDAD : MODO_PACK;
+    // Congelar escalas capturadas de buscar-producto (precio/costo de pack y unidad).
+    const precioBulto = num(item.precioVentaBulto ?? item.precio);
+    const precioUnitario = num(item.precioVentaUnitario ?? item.precio);
+    const costoBulto = item.precioCostoBulto != null ? num(item.precioCostoBulto) : null;
+    const costoUnitario = item.precioCostoUnitario != null ? num(item.precioCostoUnitario) : null;
+    const resoluble = item.esServicio ? true : costoResoluble({ precioCostoBulto: costoBulto, precioCostoUnitario: costoUnitario });
+    const precio = modoInicial === MODO_UNIDAD ? precioUnitario : precioBulto;
+    const precioCosto = item.esServicio ? undefined : (modoInicial === MODO_UNIDAD ? costoUnitario : costoBulto);
     setLineas((ls) => [...ls, {
       key: nextKey(), origenDetalleId: null, productoBaseId: item.productoBaseId, nombre: item.nombre,
-      codigo: null, presentacion: null, cantidad: 1, precio: num(item.precio), precioCosto: undefined,
-      cantidadOriginal: 0, precioOriginal: num(item.precio), esServicio: !!item.esServicio, esCombo: !!item.esCombo,
+      codigo: null, presentacion: null, cantidad: 1, precio, precioCosto: precioCosto ?? undefined,
+      cantidadOriginal: 0, precioOriginal: precio, esServicio: !!item.esServicio, esCombo: !!item.esCombo,
       reconstruccion: null, modalidadConfirmada: null, removed: false,
+      esDeposito, factorPack, modoEnvio, puedeToggle, modoVentaLinea: modoInicial,
+      precioBulto, precioUnitario, costoBulto, costoUnitario, costoResoluble: resoluble,
     }]);
     setExtraSearch(""); setExtraResults([]); setExtraAdding(null);
   }
 
   function payloadLineas() {
     return activas.map((l) => {
-      const base = { origenDetalleId: l.origenDetalleId, productoBaseId: l.productoBaseId, cantidad: num(l.cantidad), precio: num(l.precio) };
+      const cantidad = num(l.cantidad);
+      const base = {
+        origenDetalleId: l.origenDetalleId, productoBaseId: l.productoBaseId,
+        cantidad, precio: num(l.precio),
+        // Modo explícito (Pack/Unidad) — el backend recalcula cantidadStock, no confía en el front.
+        modoVentaLinea: l.modoVentaLinea || MODO_PACK,
+        factorPack: Math.max(1, Number(l.factorPack) || 1),
+        cantidadStock: l.esServicio || l.esCombo ? null : cantidadStockLinea({ cantidad, modoVentaLinea: l.modoVentaLinea, factorPack: l.factorPack, modoEnvio: l.modoEnvio, esDeposito: l.esDeposito }),
+      };
       if (l.precioCosto != null && Number.isFinite(l.precioCosto)) base.precioCosto = l.precioCosto;
       if (l.esServicio) base.importeServicio = num(l.precio);
       return base;
@@ -354,6 +403,20 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
                                 {l.esServicio && <span className="ml-2 text-[10px] sunmi-text-link font-medium">SERVICIO</span>}
                                 {esNuevo && <span className="ml-2 text-[10px] sunmi-text-success font-medium">NUEVO</span>}
                               </div>
+                              {l.puedeToggle && (
+                                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                  <div className="inline-flex rounded-lg overflow-hidden border sunmi-border">
+                                    <button type="button" onClick={() => setLinea(l.key, rescalarLinea(l, MODO_PACK))}
+                                      className={`px-2 py-0.5 text-[11px] font-medium ${(l.modoVentaLinea || MODO_PACK) === MODO_PACK ? "sunmi-state-success sunmi-text-success" : "sunmi-text-muted"}`}>Pack</button>
+                                    <button type="button" onClick={() => setLinea(l.key, rescalarLinea(l, MODO_UNIDAD))}
+                                      className={`px-2 py-0.5 text-[11px] font-medium ${l.modoVentaLinea === MODO_UNIDAD ? "sunmi-state-success sunmi-text-success" : "sunmi-text-muted"}`}>Unidad</button>
+                                  </div>
+                                  <span className="text-[10px] sunmi-text-muted">1 pack = {Math.max(1, Number(l.factorPack) || 1)} u</span>
+                                </div>
+                              )}
+                              {l.costoResoluble === false && (
+                                <div className="text-[10px] sunmi-text-danger mt-0.5">⚠ Sin costo resoluble — no se puede revisar</div>
+                              )}
                               {rec?.estado === "reconstruido" && (
                                 <div className="text-[10px] sunmi-text-success mt-0.5">✓ Consumo reconstruido — {rec.modalidad} · {fmtCant(rec.cantidadFisica)} u</div>
                               )}
@@ -424,6 +487,7 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
                       <LineaEditableCard
                         key={l.key} linea={l} permiteEditarPrecio={permiteEditarPrecio}
                         onChange={(patch) => setLinea(l.key, patch)} onRemove={() => setLinea(l.key, { removed: true })}
+                        onModoVenta={(modo) => onModoVenta(l.key, modo)}
                       />
                     ))
                   )}
@@ -463,19 +527,27 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
                         const precio = Number(p.precioVenta ?? p.precio ?? p.precio_venta ?? 0);
                         const presentacion = p.esServicioImporteVariable ? "Servicio" : (p.modoSalidaDefault === "BULTO" ? "Bulto" : "Unidad");
                         const rowKey = p.productoLocalId ?? baseId;
+                        // Se permiten productos repetidos (Pack y Unidad son líneas distintas).
                         const yaEsta = idsEnLineas.has(baseId);
                         return (
                           <SunmiTableRow key={rowKey}>
-                            <td className="px-3 py-1.5 text-sm">{p.nombre}</td>
+                            <td className="px-3 py-1.5 text-sm">{p.nombre}{yaEsta ? <span className="ml-1 text-[10px] sunmi-text-muted">(en carrito)</span> : null}</td>
                             <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.codigoBarra || "-"}</td>
                             <td className="px-3 py-1.5 text-xs">{presentacion}</td>
                             <td className="px-3 py-1.5 text-xs">{precio > 0 ? money(precio) : "-"}</td>
                             <td className="px-3 py-1.5">
                               <SunmiButton
-                                color="cyan" size="xs" disabled={extraAdding === rowKey || yaEsta}
-                                onClick={() => agregarProducto({ productoBaseId: baseId, nombre: p.nombre, precio, esServicio: !!p.esServicioImporteVariable, esCombo: !!p.esCombo, key: rowKey })}
+                                color="cyan" size="xs" disabled={extraAdding === rowKey}
+                                onClick={() => agregarProducto({
+                                  productoBaseId: baseId, nombre: p.nombre, precio,
+                                  esServicio: !!p.esServicioImporteVariable, esCombo: !!p.esCombo, key: rowKey,
+                                  // Escalas para congelar precio/costo de pack y unidad + modo.
+                                  factorPack: p.factorPack, modoEnvio: p.modoEnvio, modoSalidaDefault: p.modoSalidaDefault,
+                                  precioVentaBulto: p.precioVentaBulto, precioVentaUnitario: p.precioVentaUnitario,
+                                  precioCostoBulto: p.precioCostoBulto, precioCostoUnitario: p.precioCostoUnitario,
+                                })}
                               >
-                                {yaEsta ? "Ya está" : extraAdding === rowKey ? "..." : "Agregar"}
+                                {extraAdding === rowKey ? "..." : "Agregar"}
                               </SunmiButton>
                             </td>
                           </SunmiTableRow>

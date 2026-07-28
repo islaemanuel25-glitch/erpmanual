@@ -439,8 +439,15 @@ export default function ReportesVentasPage() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="font-mono font-bold text-sm">
-                            #{v.numero ?? v.id}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-bold text-sm">
+                              #{v.numero ?? v.id}
+                            </span>
+                            {v.corregida && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
+                                ✎ Corregida{v.version ? ` · v${v.version}` : ""}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] sunmi-text-muted">
                             {formatFechaHoraAR(v.fecha)}
@@ -528,8 +535,13 @@ export default function ReportesVentasPage() {
                         <td className="px-2 py-1.5 font-mono text-[11px] whitespace-nowrap">
                           {formatFechaHoraAR(v.fecha)}
                         </td>
-                        <td className="px-2 py-1.5 font-mono">
+                        <td className="px-2 py-1.5 font-mono whitespace-nowrap">
                           #{v.numero ?? v.id}
+                          {v.corregida && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent">
+                              ✎ Corregida{v.version ? ` · v${v.version}` : ""}
+                            </span>
+                          )}
                         </td>
                         <td className="px-2 py-1.5 truncate max-w-[160px]">
                           {v.cliente?.nombre || "—"}
@@ -701,7 +713,12 @@ export default function ReportesVentasPage() {
           <>
             <AccionesTicket
               venta={detalleData}
-              onCorregido={() => abrirDetalle(detalleData.id)}
+              onCorregido={() => {
+                // Tras corregir: refrescar el listado (total/estado/badge vigentes)
+                // y recargar el detalle abierto (sin recargar la página).
+                cargarListado(pageVentas);
+                abrirDetalle(detalleData.id);
+              }}
             />
             <VentaDetalleAdmin
               venta={detalleData}

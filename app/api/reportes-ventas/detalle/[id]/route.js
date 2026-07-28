@@ -159,9 +159,36 @@ export async function GET(req, { params }) {
     else if (!turnoAbierto) motivoCompleta = "turno_cerrado_no_corregible";
     else if (ventana.fueraDeVentana) motivoCompleta = "fuera_de_ventana";
 
+    // Última corrección aplicada (para el bloque "Venta corregida" del ticket:
+    // fecha/usuario/motivo/versiones). Auditoría detallada (snapshots) vive aparte.
+    let ultimaCorreccion = null;
+    if (venta.corregida && venta.ultimaCorreccionId) {
+      const c = await prisma.ventaCorreccion.findUnique({
+        where: { id: venta.ultimaCorreccionId },
+        select: { id: true, tipo: true, motivo: true, createdAt: true, versionAntes: true, versionDespues: true, usuarioId: true },
+      });
+      if (c) {
+        let usuarioNombre = null;
+        if (c.usuarioId) {
+          const u = await prisma.usuario.findUnique({ where: { id: c.usuarioId }, select: { nombre: true } });
+          usuarioNombre = u?.nombre ?? null;
+        }
+        ultimaCorreccion = {
+          id: c.id,
+          tipo: c.tipo,
+          motivo: c.motivo,
+          fecha: c.createdAt,
+          usuario: usuarioNombre,
+          versionAntes: c.versionAntes,
+          versionDespues: c.versionDespues,
+        };
+      }
+    }
+
     const correccion = {
       version: venta.version ?? 0,
       corregida: !!venta.corregida,
+      ultimaCorreccion,
       observaciones: venta.observaciones ?? null,
       referenciaInterna: venta.referenciaInterna ?? null,
       diasTranscurridos: Number.isFinite(ventana.diasTranscurridos) ? ventana.diasTranscurridos : null,

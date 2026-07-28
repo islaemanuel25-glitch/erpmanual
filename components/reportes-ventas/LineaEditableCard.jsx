@@ -12,12 +12,13 @@
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import { MODO_PACK, MODO_UNIDAD, cantidadStockLinea } from "@/lib/pos-ventas/lineaModoDeposito";
 
 const money = (n) => `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const fmtCant = (n) => { const x = Number(n); return Number.isInteger(x) ? String(x) : x.toLocaleString("es-AR", { maximumFractionDigits: 3 }); };
 
-export default function LineaEditableCard({ linea, onChange, onRemove, permiteEditarPrecio }) {
+export default function LineaEditableCard({ linea, onChange, onRemove, onModoVenta, permiteEditarPrecio }) {
   const l = linea;
   const rec = l.reconstruccion || null;
   const esAmbiguo = rec?.estado === "ambiguo";
@@ -27,10 +28,14 @@ export default function LineaEditableCard({ linea, onChange, onRemove, permiteEd
   const dif = subtotalCorr - subtotalOrig;
   const precioDeshab = l.esCombo || l.esServicio || !permiteEditarPrecio;
   const setCant = (v) => onChange({ cantidad: v });
+  // Depósito pack/unidad (Opción A): un modo por línea.
+  const esPack = (l.modoVentaLinea || MODO_PACK) === MODO_PACK;
+  const factorPack = Math.max(1, Number(l.factorPack) || 1);
+  const stockFisico = l.esServicio || l.esCombo ? null : cantidadStockLinea({ cantidad: num(l.cantidad), modoVentaLinea: l.modoVentaLinea, factorPack, modoEnvio: l.modoEnvio, esDeposito: l.esDeposito });
 
   return (
     <div className="rounded-xl border sunmi-border p-3 sunmi-surface flex flex-col gap-2">
-      {/* Cabecera: nombre + Quitar */}
+      {/* Cabecera: nombre + badge de modo + Quitar */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-medium sunmi-text-strong truncate">
@@ -38,11 +43,36 @@ export default function LineaEditableCard({ linea, onChange, onRemove, permiteEd
             {l.esCombo && <span className="ml-2 text-[10px] sunmi-text-link font-medium">COMBO</span>}
             {l.esServicio && <span className="ml-2 text-[10px] sunmi-text-link font-medium">SERVICIO</span>}
             {esNuevo && <span className="ml-2 text-[10px] sunmi-text-success font-medium">NUEVO</span>}
+            {l.puedeToggle && (
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full sunmi-surface sunmi-text-accent font-medium">
+                {esPack ? "Pack" : "Unidad suelta"}
+              </span>
+            )}
           </div>
           <div className="text-[11px] sunmi-text-muted">{l.codigo || l.presentacion || ""}</div>
         </div>
         <SunmiButton color="red" type="button" onClick={onRemove}>Quitar</SunmiButton>
       </div>
+
+      {/* Toggle Pack | Unidad suelta (depósito con factor > 1) */}
+      {l.puedeToggle && (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="inline-flex rounded-lg overflow-hidden border sunmi-border">
+            <button type="button" onClick={() => onModoVenta && onModoVenta(MODO_PACK)}
+              className={`px-3 py-1 text-[12px] font-medium ${esPack ? "sunmi-state-success sunmi-text-success" : "sunmi-text-muted"}`}>Pack</button>
+            <button type="button" onClick={() => onModoVenta && onModoVenta(MODO_UNIDAD)}
+              className={`px-3 py-1 text-[12px] font-medium ${!esPack ? "sunmi-state-success sunmi-text-success" : "sunmi-text-muted"}`}>Unidad suelta</button>
+          </div>
+          <span className="text-[10px] sunmi-text-muted">1 pack = {factorPack} u · físico: {fmtCant(stockFisico)} u</span>
+        </div>
+      )}
+
+      {/* Aviso: producto agregado sin costo resoluble → bloquea revisar */}
+      {l.costoResoluble === false && (
+        <div className="text-[11px] sunmi-state-danger sunmi-text-danger rounded px-2 py-1">
+          ⚠ Este producto no tiene costo resoluble. No se puede revisar hasta definir un costo.
+        </div>
+      )}
 
       {/* Consumo histórico legacy */}
       {rec?.estado === "reconstruido" && (
@@ -73,7 +103,7 @@ export default function LineaEditableCard({ linea, onChange, onRemove, permiteEd
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
           <span className="text-[11px] sunmi-text-muted">
-            Cant. corregida
+            {l.puedeToggle ? (esPack ? "Packs corregidos" : "Unidades corregidas") : "Cant. corregida"}
             {!esNuevo && <> · orig. <span className="line-through">{fmtCant(l.cantidadOriginal)}</span></>}
           </span>
           <div className="flex items-center gap-1">

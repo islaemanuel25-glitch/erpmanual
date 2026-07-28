@@ -135,13 +135,26 @@ export default function AccionesTicket({ venta, onCorregido }) {
 
   return (
     <SunmiCard className="p-3">
-      {/* Estado de corrección */}
+      {/* Estado de corrección + datos de la última corrección aplicada */}
       {c.corregida && (
-        <div className="mb-2 flex items-center gap-2 text-[12px]">
-          <span className="px-2 py-0.5 rounded-full sunmi-state-warning sunmi-text-accent font-medium">
-            ✎ Venta corregida
-          </span>
-          <span className="sunmi-text-muted">versión {c.version}</span>
+        <div className="mb-3 sunmi-state-warning rounded-lg px-3 py-2 text-[12px] space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2 py-0.5 rounded-full sunmi-text-accent font-medium">
+              ✎ Venta corregida
+            </span>
+            <span className="sunmi-text-muted">versión {c.version}</span>
+          </div>
+          {c.ultimaCorreccion && (
+            <div className="sunmi-text-muted space-y-0.5 pt-0.5">
+              <div>Corregida el: <span className="sunmi-text-strong">{new Date(c.ultimaCorreccion.fecha).toLocaleString("es-AR")}</span></div>
+              {c.ultimaCorreccion.usuario && (
+                <div>Por: <span className="sunmi-text-strong">{c.ultimaCorreccion.usuario}</span></div>
+              )}
+              {c.ultimaCorreccion.motivo && (
+                <div>Motivo: <span className="sunmi-text-strong">{c.ultimaCorreccion.motivo}</span></div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
