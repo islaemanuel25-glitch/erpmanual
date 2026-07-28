@@ -27,6 +27,27 @@ function parseVoiceCodigoBarra(text) {
   return String(text || "").replace(/\D+/g, "");
 }
 
+/**
+ * Envuelve subárboles de campos MAESTROS. Cuando `locked`, los deshabilita:
+ * combina fieldset[disabled] (inputs/botones nativos → teclado + mouse) con
+ * pointer-events:none (toggles/selects basados en <div>, que el fieldset no
+ * alcanza). Cuando NO está bloqueado, devuelve los hijos tal cual (sin envoltorio)
+ * para no alterar el layout ni provocar remontes. Definido a nivel de módulo para
+ * mantener identidad estable (no remontar los inputs en cada tecla).
+ */
+function MaestroLock({ locked, children }) {
+  if (!locked) return <>{children}</>;
+  return (
+    <fieldset
+      disabled
+      aria-disabled="true"
+      style={{ pointerEvents: "none", opacity: 0.55, minWidth: 0, border: 0, margin: 0, padding: 0 }}
+    >
+      {children}
+    </fieldset>
+  );
+}
+
 /* ============================================================
    FOCUS ORDER — Enter avanza al siguiente campo
    ============================================================ */
@@ -63,11 +84,18 @@ export default function FormProducto({
   enableVoiceInputs = false,
   onCatalogoCreado,
   puedeEditarCosto = true,
+  // false cuando el local NO es dueño del producto (producto de depósito visto desde
+  // un local): la FICHA MAESTRA se bloquea y solo quedan editables los campos locales
+  // (precio de venta, margen, estado y recargo del local). Default true (alta y
+  // productos propios). El backend revalida (defensa en profundidad).
+  puedeEditarBase = true,
   // true cuando se edita el producto DENTRO de un local (no depósito): se edita el
   // OVERRIDE por local del recargo. false (alta o edición en depósito/base): se edita
   // el recargo POR DEFECTO del producto base. Evita mostrar un campo que la API ignora.
   editandoOverrideLocal = false,
 }) {
+  // Bloqueo de ficha maestra: producto de depósito editado desde un local no dueño.
+  const soloLocal = !puedeEditarBase;
   const scrollRef = useRef(null);
 
   // Crear categorías/proveedores/áreas (entidades globales) es solo para admin: el
@@ -465,8 +493,18 @@ export default function FormProducto({
         onKeyDown={handleFormKeyDown}
         className="mx-auto w-full max-w-5xl space-y-5"
       >
+        {soloLocal && (
+          <div className="rounded-lg border sunmi-border sunmi-state-warning px-3 py-2 text-[12px] sunmi-text-accent">
+            Este producto es administrado por el depósito. En tu local solo podés
+            editar el <strong>precio de venta</strong>, el <strong>margen</strong>,
+            el <strong>estado</strong> y el recargo del local. La ficha maestra
+            (nombre, códigos, categoría, proveedores, medidas, etc.) está bloqueada.
+          </div>
+        )}
+
         {/* IDENTIDAD */}
         <Section title="Identidad">
+          <MaestroLock locked={soloLocal}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nombre *" fieldKey="nombre">
               <div className="flex items-center gap-2">
@@ -550,11 +588,13 @@ export default function FormProducto({
               </div>
             </Field>
           </div>
+          </MaestroLock>
         </Section>
 
         {/* MODALIDAD — producto normal vs servicio de importe variable */}
         <Section title="Modalidad">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <MaestroLock locked={soloLocal}>
             <Field label="Modalidad del producto" fieldKey="modalidad">
               <SunmiSelectAdv
                 value={form.modalidad}
@@ -586,6 +626,7 @@ export default function FormProducto({
                 </p>
               </Field>
             )}
+            </MaestroLock>
 
             {/* Recargo OVERRIDE por local: solo al editar el producto dentro de un local. */}
             {esServicio && editandoOverrideLocal && (
@@ -620,6 +661,7 @@ export default function FormProducto({
 
         {/* CATÁLOGOS */}
         <Section title="Catálogos">
+          <MaestroLock locked={soloLocal}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Categoría" fieldKey="categoria_id">
               <SunmiSelectConCrearRapido
@@ -655,10 +697,12 @@ export default function FormProducto({
               />
             </Field>
           </div>
+          </MaestroLock>
         </Section>
 
         {/* PROVEEDORES */}
         <Section title="Proveedores">
+          <MaestroLock locked={soloLocal}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Proveedor 1" fieldKey="proveedor_id">
               <SunmiSelectConCrearRapido
@@ -726,22 +770,26 @@ export default function FormProducto({
               />
             </Field>
           </div>
+          </MaestroLock>
         </Section>
 
         {/* CÓDIGOS INTERNOS POR PROVEEDOR — identificación del producto por proveedor,
             junto al resto de datos principales. Solo en producto existente. */}
         {initialData?.id && (
+          <MaestroLock locked={soloLocal}>
           <SeccionCodigosProveedor
             productoBaseId={initialData.id}
             proveedores={catalogos?.PROVEEDORES || []}
             proveedoresSugeridos={[form.proveedor_id, form.proveedor2_id, form.proveedor3_id]}
           />
+          </MaestroLock>
         )}
 
         {/* VENTA EN LOCAL + PRECIOS — ocultos para servicios de importe variable */}
         {!esServicio && (
         <>
         <Section title="Venta en local">
+          <MaestroLock locked={soloLocal}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Tipo de venta *" fieldKey="unidad_medida">
               <SunmiSelectAdv
@@ -853,6 +901,7 @@ export default function FormProducto({
               </div>
             </Field>
           </div>
+          </MaestroLock>
         </Section>
 
         {/* PRECIOS — orden lógico: costo → margen → venta */}
@@ -961,6 +1010,7 @@ export default function FormProducto({
 
         {/* DATOS FISCALES — IVA no participa en el cálculo de precios */}
         <Section title="Datos fiscales">
+          <MaestroLock locked={soloLocal}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="IVA %" fieldKey="iva_porcentaje">
               <SunmiInput
@@ -971,10 +1021,12 @@ export default function FormProducto({
               />
             </Field>
           </div>
+          </MaestroLock>
         </Section>
 
         {/* OTROS */}
         <Section title="Otros">
+          <MaestroLock locked={soloLocal}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Precio sugerido" fieldKey="precio_sugerido">
               <SunmiInput
@@ -1000,12 +1052,14 @@ export default function FormProducto({
               />
             </Field>
           </div>
+          </MaestroLock>
         </Section>
 
         {/* OPCIONES */}
         <Section title="Opciones">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {!esServicio && (
+            <MaestroLock locked={soloLocal}>
             <div data-field="redondeo_100" tabIndex={0} className="flex flex-col gap-1.5 outline-none focus:ring-1 focus:ring-amber-400/50 rounded-md p-1 -m-1">
               <label className="text-[12px] sunmi-label">Redondeo a $100</label>
               <SunmiToggleEstado
@@ -1021,6 +1075,7 @@ export default function FormProducto({
                 }}
               />
             </div>
+            </MaestroLock>
             )}
 
             {/* El toggle "Es combo" se removió: los combos se crean/editan por su
@@ -1040,6 +1095,7 @@ export default function FormProducto({
         {!esServicio && (
         <>
         <Section title="Reposición automática">
+          <MaestroLock locked={soloLocal}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Modo de pedido" fieldKey="modo_pedido">
               <SunmiSelectAdv
@@ -1076,6 +1132,7 @@ export default function FormProducto({
               </p>
             </Field>
           </div>
+          </MaestroLock>
         </Section>
 
         {/* COMPRA A PROVEEDOR */}
@@ -1089,6 +1146,7 @@ export default function FormProducto({
             )}
           </span>
         }>
+          <MaestroLock locked={soloLocal}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Modo compra proveedor" fieldKey="modoCompraProveedor">
               <SunmiSelectAdv
@@ -1169,6 +1227,7 @@ export default function FormProducto({
               </>
             )}
           </div>
+          </MaestroLock>
         </Section>
         </>
         )}

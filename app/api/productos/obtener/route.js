@@ -5,7 +5,7 @@ import { resolveScope } from "@/lib/grupos";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { puedeEditarCosto, esProductoDeDeposito } from "@/lib/productos/propiedadCosto";
+import { puedeEditarCosto, esProductoDeDeposito, resolverRutaEdicion } from "@/lib/productos/propiedadCosto";
 
 export async function GET(req) {
   try {
@@ -71,10 +71,32 @@ export async function GET(req) {
     const puedeCosto = puedeEditarCosto(Number(localId), base.creadoEnLocalId, depositoLocalId);
     const costoDeDeposito = esProductoDeDeposito(base.creadoEnLocalId, depositoLocalId);
 
+    // Ruta de edición por propiedad (misma función que usa la API de edición, para
+    // que el front y el backend nunca se contradigan). `puedeEditarBase` habilita el
+    // formulario completo; si es false, el front bloquea la ficha maestra.
+    const esAdmin = !!scope.session?.esAdmin;
+    const ruta = resolverRutaEdicion({
+      esAdmin,
+      operandoEnLocalId: Number(localId),
+      esDepositoContext: depositoLocalId != null && Number(localId) === depositoLocalId,
+      creadoEnLocalId: base.creadoEnLocalId,
+      depositoLocalId,
+    });
+
+    // Producto exclusivo de otro local → no se puede abrir (aislamiento multi-local).
+    // No revelar existencia: 404 (coherente con "otro grupo").
+    if (ruta === "deny") {
+      return NextResponse.json(
+        { ok: false, error: "Producto no encontrado" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       item: mergeBaseLocalToUi(base, override),
       puedeEditarCosto: puedeCosto,
+      puedeEditarBase: ruta === "base",
       costoDeDeposito,
     });
   } catch (error) {

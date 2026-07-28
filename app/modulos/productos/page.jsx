@@ -200,6 +200,9 @@ export default function ProductosPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  // Propiedad resuelta por el BACKEND (obtener) — no inferir en el front. Default
+  // true para el alta; en edición viene del endpoint según dueño del producto.
+  const [editFlags, setEditFlags] = useState({ puedeEditarCosto: true, puedeEditarBase: true });
   const [loadingEditar, setLoadingEditar] = useState(false);
   const [verCombo, setVerCombo] = useState(null); // Ver composición: { productoLocalId } | null
 
@@ -306,6 +309,7 @@ export default function ProductosPage() {
   useEffect(() => {
     if (nuevo === "1") {
       setEditing(null);
+      setEditFlags({ puedeEditarCosto: true, puedeEditarBase: true }); // alta → ficha completa
       setModalOpen(true);
       return;
     }
@@ -331,7 +335,16 @@ export default function ProductosPage() {
 
           if (data.ok) {
             setEditing(data.item);
+            // Flags de propiedad resueltos por el backend (dueño del producto).
+            setEditFlags({
+              puedeEditarCosto: data.puedeEditarCosto !== false,
+              puedeEditarBase: data.puedeEditarBase !== false,
+            });
             setModalOpen(true);
+          } else {
+            // Producto de otro local (404) u otro error → no abrir el modal.
+            alert(data.error || "No se pudo abrir el producto");
+            router.push(buildListingUrl());
           }
         } catch (err) {
           console.error("Error al editar:", err);
@@ -1279,6 +1292,8 @@ export default function ProductosPage() {
           initialData={editing}
           localId={localId}
           editandoOverrideLocal={!!editing && localId > 0 && !contexto?.esDeposito}
+          puedeEditarCosto={editFlags.puedeEditarCosto}
+          puedeEditarBase={editFlags.puedeEditarBase}
         />
 
         <ModalVerComposicion

@@ -7,8 +7,83 @@ import { resolveScope } from "@/lib/grupos";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 import { esComboBase } from "@/lib/combos/guards";
-import { puedeEditarCosto, mensajeCostoNoEditable, mismoCosto } from "@/lib/productos/propiedadCosto";
+import {
+  puedeEditarCosto,
+  mensajeCostoNoEditable,
+  mismoCosto,
+  resolverRutaEdicion,
+  mensajeProductoAjeno,
+  mensajeFichaMaestraNoEditable,
+} from "@/lib/productos/propiedadCosto";
 import { validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
+
+// ── Detección de "guardado engañoso" ────────────────────────────────────────
+// Cuando la ruta es 'override' (un local edita un producto de depósito), SOLO se
+// persiste el override de ProductoLocal. Si el payload trae cambios en la FICHA
+// MAESTRA (que ese alcance NO guarda), hay que RECHAZAR en vez de descartarlos en
+// silencio. Se comparan con normalización por tipo para no dar falsos positivos
+// por formato (el front reenvía los valores actuales de la base).
+const _eqNum = (a, b) => {
+  const na = a === null || a === undefined || a === "" ? null : Number(a);
+  const nb = b === null || b === undefined || b === "" ? null : Number(b);
+  if (na === null && nb === null) return true;
+  if (na === null || nb === null) return false;
+  if (Number.isNaN(na) || Number.isNaN(nb)) return false;
+  return Math.abs(na - nb) < 1e-6;
+};
+const _eqStr = (a, b) => {
+  const sa = a === null || a === undefined ? "" : String(a).trim();
+  const sb = b === null || b === undefined ? "" : String(b).trim();
+  return sa === sb;
+};
+const _eqBool = (a, b) => Boolean(a) === Boolean(b);
+const _dayOf = (v) => {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+};
+const _eqDate = (a, b) => _dayOf(a) === _dayOf(b);
+
+// Campos MAESTROS que edita `editarBase` y NO edita `editarOverride`. Se comparan
+// SOLO campos que el formulario reenvía fielmente (sin inyección de defaults que
+// falsee un cambio): quedan fuera los recompuestos por el front (modo_pedido,
+// modo_envio, recargoServicioDefaultPct) y los que no viajan (modo_stock,
+// pesoPromedioKg). `factor_pack` se trata aparte (el form lo fuerza a 1 en "unidad").
+// Los overrides locales (precio_venta/margen/activo/recargoServicioPct) NO son maestros.
+const CAMPOS_FICHA_MAESTRA = [
+  ["nombre", _eqStr], ["descripcion", _eqStr], ["sku", _eqStr],
+  ["codigo_barra", _eqStr], ["codigo_barra_secundario", _eqStr],
+  ["categoria_id", _eqNum], ["proveedor_id", _eqNum], ["proveedor2_id", _eqNum],
+  ["proveedor3_id", _eqNum], ["area_fisica_id", _eqNum],
+  ["unidad_medida", _eqStr],
+  ["peso_kg", _eqNum], ["volumen_ml", _eqNum],
+  ["modoCompraProveedor", _eqStr], ["pesoReferenciaKg", _eqNum],
+  ["pesoEsFijo", _eqBool], ["modoVentaDeposito", _eqStr],
+  ["actualizaPromedioPorRecepcion", _eqBool],
+  ["precio_sugerido", _eqNum], ["iva_porcentaje", _eqNum],
+  ["fecha_vencimiento", _eqDate],
+  ["redondeo_100", _eqBool], ["imagen_url", _eqStr],
+  ["modalidad", _eqStr],
+];
+
+// factor_pack: el formulario lo fuerza a 1 cuando la unidad es "unidad" (donde el
+// factor es irrelevante). Normalizamos ambos lados con la unidad ALMACENADA para no
+// marcar un cambio inexistente.
+function _factorNorm(v, unidadAlmacenada) {
+  if (unidadAlmacenada === "unidad") return 1;
+  return v === null || v === undefined || v === "" ? null : Number(v);
+}
+
+/** Devuelve el nombre del primer campo maestro cambiado respecto de la base, o null. */
+function detectarCambioFichaMaestra(baseData, base) {
+  for (const [k, eq] of CAMPOS_FICHA_MAESTRA) {
+    if (!eq(baseData[k], base[k])) return k;
+  }
+  if (!_eqNum(_factorNorm(baseData.factor_pack, base?.unidad_medida), _factorNorm(base?.factor_pack, base?.unidad_medida))) {
+    return "factor_pack";
+  }
+  return null;
+}
 
 // Sincronizar precioCosto/activo a overrides, recalculando precio_venta por margen
 async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
@@ -94,7 +169,6 @@ export async function PUT(req, context) {
       );
     }
     const { grupoId } = scope;
-    const localId = Number(qLocal || "0");
 
     // Existencia + pertenencia al grupo del alcance.
     const baseScope = await prisma.productoBase.findUnique({
@@ -195,16 +269,40 @@ export async function PUT(req, context) {
     // separar base vs local con snake_case
     const { baseData, localData } = splitUiToDb(payload);
 
-    // depósito o sin localId → edita BASE
-    if (localId <= 0) return await editarBase(baseId, baseData);
-
-    const local = await prisma.local.findUnique({
-      where: { id: localId },
+    // ── RUTEO POR PROPIEDAD (no por es_deposito) ──────────────────────────
+    // Dueño → edita la ficha maestra (base). Local NO dueño de un producto de
+    // depósito → solo su override. Producto exclusivo de otro local → denegado.
+    // El admin conserva su comportamiento vigente por ubicación.
+    const esDepositoContext = depositoLocalId != null && operandoEnLocalId === depositoLocalId;
+    const ruta = resolverRutaEdicion({
+      esAdmin: !!scope.session?.esAdmin,
+      operandoEnLocalId,
+      esDepositoContext,
+      creadoEnLocalId: baseScope.creadoEnLocalId,
+      depositoLocalId,
     });
 
-    if (local?.es_deposito) return await editarBase(baseId, baseData);
+    if (ruta === "deny") {
+      return NextResponse.json({ ok: false, error: mensajeProductoAjeno() }, { status: 403 });
+    }
 
-    return await editarOverride(baseId, localId, localData);
+    if (ruta === "base") {
+      return await editarBase(baseId, baseData);
+    }
+
+    // ruta === "override": producto de depósito editado desde un local. Solo se
+    // persiste el override. Si el payload intenta cambiar la ficha maestra (que
+    // este alcance NO guarda), rechazar en vez de devolver un éxito engañoso.
+    const baseFull = await prisma.productoBase.findUnique({ where: { id: baseId } });
+    const campoMaestro = detectarCambioFichaMaestra(baseData, baseFull || {});
+    if (campoMaestro) {
+      return NextResponse.json(
+        { ok: false, error: mensajeFichaMaestraNoEditable(), campo: campoMaestro },
+        { status: 403 }
+      );
+    }
+
+    return await editarOverride(baseId, operandoEnLocalId, localData);
   } catch (e) {
     console.error("ERROR productos/editar:", e);
     return NextResponse.json(

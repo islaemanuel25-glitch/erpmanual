@@ -3,15 +3,14 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
-import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 export default function EditarProductoPage({ params }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = Number(params.id);
-  const { perfil } = useUser(); // trae localId del usuario (local o deposito o admin)
-  const { contexto } = useContextoActivo(); // esDeposito para decidir override vs base
+  const { contexto } = useContextoActivo(); // localId activo + esDeposito
+  const localId = contexto?.localId || 0;
 
   // URL de retorno al listado preservando contexto (page, sort, filtros)
   const returnUrl = useMemo(() => {
@@ -31,6 +30,9 @@ export default function EditarProductoPage({ params }) {
 
   const [initialData, setInitialData] = useState(null);
   const [open, setOpen] = useState(true);
+  // Propiedad resuelta por el BACKEND (obtener) — no inferir en el front.
+  const [puedeEditarCosto, setPuedeEditarCosto] = useState(true);
+  const [puedeEditarBase, setPuedeEditarBase] = useState(true);
 
   // ============================
   // Cargar catálogos
@@ -58,19 +60,27 @@ export default function EditarProductoPage({ params }) {
   }, []);
 
   // ============================
-  // Cargar producto según localId
+  // Cargar producto según localId (endpoint canónico: obtener)
   // ============================
   useEffect(() => {
+    if (!id || !localId) return;
+
     const cargarProducto = async () => {
       try {
         const res = await fetch(
-          `/api/productos/${id}?localId=${perfil?.localId || 0}`,
+          `/api/productos/obtener?id=${id}&localId=${localId}`,
           { credentials: "include" }
         );
+
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
 
         const data = await res.json();
 
         if (!data.ok) {
+          // Producto de otro local → 404 (aislamiento): no abrir el editor.
           alert(data.error || "Producto no encontrado");
           router.push(returnUrl);
           return;
@@ -78,14 +88,17 @@ export default function EditarProductoPage({ params }) {
 
         // La API devuelve `item`, no `producto`
         setInitialData(data.item);
+        // Propiedad resuelta por el backend (dueño del producto).
+        setPuedeEditarCosto(data.puedeEditarCosto !== false);
+        setPuedeEditarBase(data.puedeEditarBase !== false);
       } catch (err) {
         console.error("Error cargando producto:", err);
         router.push(returnUrl);
       }
     };
 
-    if (perfil) cargarProducto();
-  }, [id, perfil]);
+    cargarProducto();
+  }, [id, localId]);
 
   // ============================
   // Guardar cambios (PUT)
@@ -93,7 +106,7 @@ export default function EditarProductoPage({ params }) {
   const handleSubmit = async (form) => {
     try {
       const res = await fetch(
-        `/api/productos/${id}?localId=${perfil?.localId || 0}`,
+        `/api/productos/editar/${id}?localId=${localId}`,
         {
           credentials: "include",
           method: "PUT",
@@ -132,8 +145,10 @@ export default function EditarProductoPage({ params }) {
       onSubmit={handleSubmit}
       catalogos={catalogos}
       initialData={initialData}
-      localId={perfil?.localId || 0}
-      editandoOverrideLocal={(contexto?.localId || 0) > 0 && !contexto?.esDeposito}
+      localId={localId}
+      editandoOverrideLocal={localId > 0 && !contexto?.esDeposito}
+      puedeEditarCosto={puedeEditarCosto}
+      puedeEditarBase={puedeEditarBase}
     />
   );
 }

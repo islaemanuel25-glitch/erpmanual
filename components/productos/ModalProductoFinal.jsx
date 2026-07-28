@@ -12,6 +12,10 @@ export default function ModalProducto({
   catalogos,
   initialData = null,
   editandoOverrideLocal = false,
+  // Propiedad resuelta por el BACKEND (no inferir en el front). Defaults true para
+  // el alta y productos propios. El backend revalida en la edición.
+  puedeEditarCosto = true,
+  puedeEditarBase = true,
 }) {
   return (
     <div
@@ -36,6 +40,8 @@ export default function ModalProducto({
               onCancel={onClose}
               submitLabel={initialData ? "Guardar cambios" : "Crear producto"}
               editandoOverrideLocal={editandoOverrideLocal}
+              puedeEditarCosto={puedeEditarCosto}
+              puedeEditarBase={puedeEditarBase}
             />
           )}
         </div>

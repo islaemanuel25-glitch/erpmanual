@@ -33,6 +33,7 @@ export default function EditarProductoPage({ params }) {
   });
   const [initialData, setInitialData] = useState(null);
   const [puedeEditarCosto, setPuedeEditarCosto] = useState(true);
+  const [puedeEditarBase, setPuedeEditarBase] = useState(true);
   const [loadingCat, setLoadingCat] = useState(true);
   const [loadingProd, setLoadingProd] = useState(true);
   const [prodId, setProdId] = useState(null);
@@ -105,6 +106,8 @@ export default function EditarProductoPage({ params }) {
         setInitialData(data.item);
         // Costo editable solo si el backend lo autoriza (dueño del producto).
         setPuedeEditarCosto(data.puedeEditarCosto !== false);
+        // Ficha maestra editable solo si el local es dueño del producto.
+        setPuedeEditarBase(data.puedeEditarBase !== false);
       } catch (err) {
         console.error("Error cargando producto:", err);
         router.push(returnUrl);
@@ -185,6 +188,7 @@ export default function EditarProductoPage({ params }) {
             enableVoiceInputs={true}
             onCatalogoCreado={handleCatalogoCreado}
             puedeEditarCosto={puedeEditarCosto}
+            puedeEditarBase={puedeEditarBase}
             editandoOverrideLocal={localId > 0 && !contexto?.esDeposito}
           />
         ) : (
