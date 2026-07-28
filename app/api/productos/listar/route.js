@@ -151,6 +151,8 @@ export async function GET(req) {
     // El exact-vs-contains se evalúa dentro del alcance del proveedor (como hoy).
     let searchFilter = {};
     if (q) {
+      // Código propio por ubicación: se matchea vía relación `locales.some` acotada
+      // al localId activo (por-local). No reemplaza los globales de la base.
       const exactCount = await prisma.productoBase.count({
         where: {
           AND: [
@@ -159,6 +161,7 @@ export async function GET(req) {
             { OR: [
               { codigo_barra: { equals: q, mode: "insensitive" } },
               { codigo_barra_secundario: { equals: q, mode: "insensitive" } },
+              { locales: { some: { localId, codigo_barra_propio: { equals: q, mode: "insensitive" } } } },
               { sku: { equals: q, mode: "insensitive" } },
             ] },
           ],
@@ -169,12 +172,14 @@ export async function GET(req) {
         ? { OR: [
             { codigo_barra: { equals: q, mode: "insensitive" } },
             { codigo_barra_secundario: { equals: q, mode: "insensitive" } },
+            { locales: { some: { localId, codigo_barra_propio: { equals: q, mode: "insensitive" } } } },
             { sku: { equals: q, mode: "insensitive" } },
           ] }
         : { OR: [
             { nombre: { contains: q, mode: "insensitive" } },
             { codigo_barra: { contains: q, mode: "insensitive" } },
             { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
+            { locales: { some: { localId, codigo_barra_propio: { contains: q, mode: "insensitive" } } } },
             { sku: { contains: q, mode: "insensitive" } },
           ] };
     }

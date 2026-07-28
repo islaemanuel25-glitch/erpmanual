@@ -8,6 +8,7 @@ import {
   rankearLiteral,
   resolverContraCatalogo,
 } from "@/lib/productos/busquedaFuzzyProducto";
+import { codigosDeProductoLocal } from "@/lib/productos/busquedaCodigoBarra";
 
 const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_TOP_RESULTS = 10;
@@ -21,6 +22,7 @@ function mapItem(productoLocal) {
     nombre: productoLocal.nombre || base?.nombre || "",
     codigoBarra: base?.codigo_barra || "",
     codigoBarraSecundario: base?.codigo_barra_secundario || "",
+    codigoBarraPropio: productoLocal?.codigo_barra_propio || "",
     stockActual,
     precioCosto: Number(
       productoLocal.precio_costo || base?.precio_costo || 0
@@ -105,13 +107,14 @@ export async function GET(req) {
       select: {
         id: true,
         nombre: true,
+        codigo_barra_propio: true,
         base: { select: { nombre: true, codigo_barra: true, codigo_barra_secundario: true } },
       },
       take: FUZZY_CANDIDATE_LIMIT,
     });
 
     const getNombre = (p) => p.nombre || p.base?.nombre || "";
-    const getCodigo = (p) => [p.base?.codigo_barra, p.base?.codigo_barra_secundario].filter(Boolean);
+    const getCodigo = (p) => codigosDeProductoLocal(p);
 
     let rankings;
     let queryInterpretada = null;

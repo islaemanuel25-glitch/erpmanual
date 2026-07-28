@@ -15,6 +15,12 @@ import {
   mensajeProductoAjeno,
   mensajeFichaMaestraNoEditable,
 } from "@/lib/productos/propiedadCosto";
+import {
+  normalizarCodigoPropio,
+  esRedundanteConGlobalPropio,
+  buscarColisionCodigoPropio,
+  mensajeColisionCodigoPropio,
+} from "@/lib/productos/codigoBarraPropio";
 import { validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 
 // ── Detección de "guardado engañoso" ────────────────────────────────────────
@@ -269,6 +275,20 @@ export async function PUT(req, context) {
     // separar base vs local con snake_case
     const { baseData, localData } = splitUiToDb(payload);
 
+    // ── CÓDIGO DE BARRAS PROPIO POR UBICACIÓN (opcional) ──────────────────
+    // Tercer código, independiente de los dos globales de la base; vive en el
+    // ProductoLocal de la ubicación que opera. Se procesa SOLO si el cliente lo envió
+    // (undefined = no tocar → compat con clientes que no lo manejan). Se normaliza y
+    // se colapsa a null si es redundante con un código global del propio producto.
+    const propioEnviado = payload.codigo_barra_propio !== undefined;
+    let codigoPropio = null;
+    if (propioEnviado) {
+      codigoPropio = normalizarCodigoPropio(payload.codigo_barra_propio);
+      if (esRedundanteConGlobalPropio(codigoPropio, norm.principal, norm.secundario)) {
+        codigoPropio = null;
+      }
+    }
+
     // ── RUTEO POR PROPIEDAD (no por es_deposito) ──────────────────────────
     // Dueño → edita la ficha maestra (base). Local NO dueño de un producto de
     // depósito → solo su override. Producto exclusivo de otro local → denegado.
@@ -286,23 +306,63 @@ export async function PUT(req, context) {
       return NextResponse.json({ ok: false, error: mensajeProductoAjeno() }, { status: 403 });
     }
 
+    // Validar COLISIÓN del código propio dentro de la ubicación operante, ANTES de
+    // persistir (contra código propio de otro producto + globales de otros productos
+    // visibles acá). El índice único (localId, codigo_barra_propio) es el respaldo
+    // ante concurrencia (P2002, más abajo).
+    if (propioEnviado && codigoPropio != null) {
+      const colision = await buscarColisionCodigoPropio({
+        db: prisma, localId: operandoEnLocalId, codigo: codigoPropio, baseIdExcluir: baseId,
+      });
+      if (colision) {
+        return NextResponse.json(
+          { ok: false, error: mensajeColisionCodigoPropio(colision, codigoPropio) },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Editar la base o el override (capturamos la respuesta para luego persistir el
+    // código propio en la MISMA ubicación operante, cualquiera sea la ruta).
+    let resp;
     if (ruta === "base") {
-      return await editarBase(baseId, baseData);
+      resp = await editarBase(baseId, baseData);
+    } else {
+      // ruta === "override": producto de depósito editado desde un local. Solo se
+      // persiste el override. Si el payload intenta cambiar la ficha maestra (que este
+      // alcance NO guarda), rechazar en vez de devolver un éxito engañoso.
+      const baseFull = await prisma.productoBase.findUnique({ where: { id: baseId } });
+      const campoMaestro = detectarCambioFichaMaestra(baseData, baseFull || {});
+      if (campoMaestro) {
+        return NextResponse.json(
+          { ok: false, error: mensajeFichaMaestraNoEditable(), campo: campoMaestro },
+          { status: 403 }
+        );
+      }
+      resp = await editarOverride(baseId, operandoEnLocalId, localData);
     }
 
-    // ruta === "override": producto de depósito editado desde un local. Solo se
-    // persiste el override. Si el payload intenta cambiar la ficha maestra (que
-    // este alcance NO guarda), rechazar en vez de devolver un éxito engañoso.
-    const baseFull = await prisma.productoBase.findUnique({ where: { id: baseId } });
-    const campoMaestro = detectarCambioFichaMaestra(baseData, baseFull || {});
-    if (campoMaestro) {
-      return NextResponse.json(
-        { ok: false, error: mensajeFichaMaestraNoEditable(), campo: campoMaestro },
-        { status: 403 }
-      );
+    // Persistir el código propio en el ProductoLocal de la ubicación operante (existe
+    // siempre: el producto está materializado en el local que lo edita). P2002 = otro
+    // producto tomó ese código propio concurrentemente → colisión.
+    if (propioEnviado) {
+      try {
+        await prisma.productoLocal.update({
+          where: { localId_baseId: { localId: operandoEnLocalId, baseId } },
+          data: { codigo_barra_propio: codigoPropio },
+        });
+      } catch (e) {
+        if (e?.code === "P2002") {
+          return NextResponse.json(
+            { ok: false, error: `El código ${codigoPropio} ya está asignado como código propio de otro producto en esta ubicación.` },
+            { status: 409 }
+          );
+        }
+        throw e;
+      }
     }
 
-    return await editarOverride(baseId, operandoEnLocalId, localData);
+    return resp;
   } catch (e) {
     console.error("ERROR productos/editar:", e);
     return NextResponse.json(

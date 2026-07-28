@@ -65,14 +65,17 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
             fromVoice && data.queryInterpretada ? data.queryInterpretada : null
           );
 
-          // Auto-agregar si match exacto por código de barras (primario o secundario)
+          // Auto-agregar si match exacto por código de barras: código PROPIO de esta
+          // ubicación, principal o secundario global. Los tres habilitan el auto-scan.
           const queryLower = texto.trim().toLowerCase();
           const matchCodigoExacto =
             items.length >= 1 &&
             ((items[0].codigoBarra &&
               items[0].codigoBarra.toLowerCase() === queryLower) ||
               (items[0].codigoBarraSecundario &&
-                items[0].codigoBarraSecundario.toLowerCase() === queryLower));
+                items[0].codigoBarraSecundario.toLowerCase() === queryLower) ||
+              (items[0].codigoBarraPropio &&
+                items[0].codigoBarraPropio.toLowerCase() === queryLower));
           if (matchCodigoExacto) {
             if (items[0].disponibleParaVenta === false) {
               showError(SIN_STOCK_MSG);

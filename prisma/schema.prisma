@@ -323,6 +323,10 @@ model ProductoLocal {
   // Override por local del recargo del servicio de importe variable (0..100).
   // null → hereda ProductoBase.recargoServicioDefaultPct (y este, si null, → 0).
   recargoServicioPct Decimal? @db.Decimal(5, 2)
+  // Código de barras PROPIO de esta ubicación (opcional). NO reemplaza los dos
+  // códigos globales de ProductoBase: es un tercer código que solo funciona en este
+  // local. null = sin código propio (default para productos existentes, sin backfill).
+  codigo_barra_propio String?
   activo       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -343,6 +347,11 @@ model ProductoLocal {
 
   @@unique([localId, baseId])
   @@unique([id, localId]) // destino de las FK compuestas de ComboComponente
+  // Unicidad del código propio POR LOCAL: dos productos del mismo local no pueden
+  // compartir codigo_barra_propio. En Postgres los NULL son distintos entre sí, así
+  // que múltiples productos SIN código propio conviven sin chocar. El mismo código
+  // propio SÍ puede repetirse en locales distintos (localId difiere).
+  @@unique([localId, codigo_barra_propio])
   @@index([localId])
   @@index([baseId])
 }

@@ -121,6 +121,7 @@ export default function FormProducto({
     sku: o.sku ?? "",
     codigo_barra: o.codigo_barra ?? o.codigoBarra ?? "",
     codigo_barra_secundario: o.codigo_barra_secundario ?? o.codigoBarraSecundario ?? "",
+    codigo_barra_propio: o.codigo_barra_propio ?? o.codigoBarraPropio ?? "",
     categoria_id: o.categoria_id ?? o.categoriaId ?? "",
     proveedor_id: o.proveedor_id ?? o.proveedorId ?? "",
     proveedor2_id: o.proveedor2_id ?? o.proveedor2Id ?? "",
@@ -392,6 +393,10 @@ export default function FormProducto({
       sku: p.sku || null,
       codigo_barra: p.codigo_barra || null,
       codigo_barra_secundario: p.codigo_barra_secundario || null,
+      // Código propio de esta ubicación (ProductoLocal). Siempre se envía cuando el
+      // form lo gestiona (edición): "" → el backend lo normaliza a null. El backend
+      // lo aplica al ProductoLocal operante, independiente de los globales.
+      codigo_barra_propio: p.codigo_barra_propio ?? "",
       categoria_id: p.categoria_id ? Number(p.categoria_id) : null,
       proveedor_id: p.proveedor_id ? Number(p.proveedor_id) : null,
       proveedor2_id: p.proveedor2_id ? Number(p.proveedor2_id) : null,
@@ -590,6 +595,36 @@ export default function FormProducto({
           </div>
           </MaestroLock>
         </Section>
+
+        {/* CÓDIGO PROPIO DE ESTA UBICACIÓN — tercer código, editable SIEMPRE por el
+            local activo (incluso cuando la ficha maestra está bloqueada). No modifica
+            los dos códigos generales de la base. Solo en producto existente. */}
+        {initialData?.id && (
+          <Section title="Código propio de esta ubicación">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Field label="Código propio (opcional)" fieldKey="codigo_barra_propio">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <SunmiInput
+                      value={form.codigo_barra_propio}
+                      placeholder="Agregar código propio"
+                      onChange={(e) => setField("codigo_barra_propio", e.target.value)}
+                    />
+                  </div>
+                  {String(form.codigo_barra_propio || "").trim() !== "" && (
+                    <SunmiButton color="red" type="button" onClick={() => setField("codigo_barra_propio", "")}>
+                      Quitar
+                    </SunmiButton>
+                  )}
+                </div>
+                <p className="text-xs sunmi-text-muted mt-1">
+                  Este código funciona solamente en esta ubicación y no modifica los
+                  códigos generales del producto.
+                </p>
+              </Field>
+            </div>
+          </Section>
+        )}
 
         {/* MODALIDAD — producto normal vs servicio de importe variable */}
         <Section title="Modalidad">

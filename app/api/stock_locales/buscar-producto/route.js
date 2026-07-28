@@ -11,6 +11,7 @@ import {
   rankearLiteral,
   resolverContraCatalogo,
 } from "@/lib/productos/busquedaFuzzyProducto";
+import { orCodigoBarraProductoLocal, codigosDeProductoLocal } from "@/lib/productos/busquedaCodigoBarra";
 
 const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_TOP_RESULTS = 10;
@@ -64,18 +65,14 @@ export async function GET(req) {
     });
     const esDeposito = local?.es_deposito === true;
 
-    // Match exacto por código de barras (primario o secundario)
+    // Match exacto por código de barras: código propio del local + los dos globales
+    // de la base (helper centralizado, mismos códigos que el POS).
     const exacto = await prisma.productoLocal.findMany({
       where: {
         localId,
         activo: true,
-        base: {
-          activo: true,
-          OR: [
-            { codigo_barra: q },
-            { codigo_barra_secundario: q },
-          ],
-        },
+        base: { activo: true },
+        OR: orCodigoBarraProductoLocal(q),
       },
       include: {
         base: true,
@@ -97,13 +94,14 @@ export async function GET(req) {
       select: {
         id: true,
         nombre: true,
+        codigo_barra_propio: true,
         base: { select: { nombre: true, codigo_barra: true, codigo_barra_secundario: true } },
       },
       take: FUZZY_CANDIDATE_LIMIT,
     });
 
     const getNombre = (p) => p.nombre || p.base?.nombre || "";
-    const getCodigo = (p) => [p.base?.codigo_barra, p.base?.codigo_barra_secundario].filter(Boolean);
+    const getCodigo = (p) => codigosDeProductoLocal(p);
 
     let rankings;
     let queryInterpretada = null;
@@ -202,6 +200,7 @@ function mapProductos(lista, esDeposito) {
       nombre: pl.nombre || pl.base?.nombre || "",
       codigoBarra: pl.base?.codigo_barra || "",
       codigoBarraSecundario: pl.base?.codigo_barra_secundario || "",
+      codigoBarraPropio: pl.codigo_barra_propio || "",
       precioVenta: Number(precioVenta.toFixed(2)),
       precioVentaUnitario,
       precioVentaBulto,
