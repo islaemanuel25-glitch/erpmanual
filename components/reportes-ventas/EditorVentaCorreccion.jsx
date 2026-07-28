@@ -30,6 +30,11 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import LineaEditableCard from "@/components/reportes-ventas/LineaEditableCard";
+import {
+  aCent, desdeCent, totalCentDeLineas, crearPago, esFiado, normalizarAjustador,
+  recomputar, setMontoCent, setAjustador, agregarPago, quitarPago, cambiarMedio,
+  payloadPagos, payloadValido,
+} from "@/lib/pos-ventas/pagosAjuste";
 
 const TZ_AR = "America/Argentina/Cordoba";
 const money = (n) => `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -88,7 +93,7 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
           modalidadConfirmada: null, removed: false,
         })));
         setClienteSel(d.venta.cliente ? { id: d.venta.cliente.id, nombre: d.venta.cliente.nombre } : null);
-        setPagos((d.venta.pagos || []).map((p) => ({ medio: String(p.medio).toUpperCase(), monto: num(p.monto) })));
+        setPagos(normalizarAjustador((d.venta.pagos || []).map((p) => crearPago(String(p.medio).toUpperCase(), aCent(num(p.monto)), false))));
       })
       .catch(() => { if (vivo) setError("Error de conexión."); })
       .finally(() => { if (vivo) setCargando(false); });
@@ -98,12 +103,15 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
   const c = data?.correccion || {};
   const bloqueado = data && !c.puedeCorregirCompleta;
   const activas = lineas.filter((l) => !l.removed);
-  const total = useMemo(() => lineas.filter((l) => !l.removed).reduce((a, l) => a + num(l.precio) * num(l.cantidad), 0), [lineas]);
+  // Total corregido en CENTAVOS (fuente de verdad; redondeo por línea = backend).
+  const totalCent = useMemo(() => totalCentDeLineas(lineas), [lineas]);
+  const total = desdeCent(totalCent);
   const sumSubOrig = activas.reduce((a, l) => a + num(l.precioOriginal) * num(l.cantidadOriginal), 0);
   const totalOriginalVenta = num(data?.venta?.total);
   const difVsVenta = total - totalOriginalVenta;
-  const sumaPagos = pagos.reduce((a, p) => a + num(p.monto), 0);
-  const pagosCuadran = Math.abs(sumaPagos - total) < 0.01;
+  // Pagos SIEMPRE == total: el tender "Saldo automático" (ajustador) absorbe la
+  // diferencia. Se recalcula al cambiar líneas o pagos. Todo en centavos.
+  const pagosCalc = useMemo(() => recomputar(pagos, totalCent), [pagos, totalCent]);
   const permiteEditarPrecio = !!data?.permisos?.editarPrecioManual;
 
   // Líneas legacy ambiguas TOCADAS (modificadas/eliminadas) sin modalidad resuelta → bloquean Revisar.
@@ -112,9 +120,30 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
     (l.removed || num(l.cantidad) !== num(l.cantidadOriginal) || num(l.precio) !== num(l.precioOriginal)) &&
     !l.modalidadConfirmada
   );
-  const puedeRevisar = pagosCuadran && activas.length > 0 && ambiguasSinResolver.length === 0;
+  // La UI impide pagos != total; este guard defensivo evita enviar un estado inválido.
+  const pagosOk = payloadValido(pagosCalc.pagos, totalCent) && !pagosCalc.negativo;
+  const puedeRevisar = activas.length > 0 && ambiguasSinResolver.length === 0 && pagosOk;
 
   const setLinea = (key, patch) => setLineas((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
+  // --- Handlers de pagos (operan sobre la lista YA sincronizada) ---
+  const onPagoMonto = (id, valueStr) => {
+    const cents = valueStr === "" ? 0 : aCent(Number(String(valueStr).replace(",", ".")));
+    setPagos(setMontoCent(pagosCalc.pagos, id, cents, totalCent));
+  };
+  const onPagoAjustar = (id) => setPagos(setAjustador(pagosCalc.pagos, id));
+  const onPagoQuitar = (id) => setPagos(quitarPago(pagosCalc.pagos, id));
+  const onPagoAgregar = () => {
+    const usados = new Set(pagos.map((p) => p.medio));
+    const medio = MEDIOS.find((m) => m !== "FIADO" && !usados.has(m)) || "EFECTIVO";
+    setPagos(agregarPago(pagosCalc.pagos, medio));
+  };
+  const onPagoMedio = (id, medio) => {
+    if (medio === "FIADO" && pagos.length > 1) {
+      if (!window.confirm("FIADO debe ser el único medio de pago. Se reemplazará la distribución actual por FIADO = total corregido. ¿Continuar?")) return;
+    }
+    setPagos(cambiarMedio(pagosCalc.pagos, id, medio, totalCent));
+  };
 
   async function buscarCliente(q) {
     setBuscaCli(q);
@@ -168,7 +197,7 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
     try {
       const r = await fetch(`/api/pos-ventas/venta/${ventaId}/revisar`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ version: data.venta.version, cliente: clienteSel ? { id: clienteSel.id } : null, lineas: payloadLineas(), pagos, confirmaciones: payloadConfirmaciones() }),
+        body: JSON.stringify({ version: data.venta.version, cliente: clienteSel ? { id: clienteSel.id } : null, lineas: payloadLineas(), pagos: payloadPagos(pagosCalc.pagos), confirmaciones: payloadConfirmaciones() }),
       });
       const d = await r.json();
       if (!d.ok) { setError(d.error || "No se pudo revisar."); setRevisando(false); return; }
@@ -183,7 +212,7 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
       const idempotencyKey = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `idem-${ventaId}-${Math.round(performance.now())}`;
       const r = await fetch(`/api/pos-ventas/venta/${ventaId}/corregir`, {
         method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ motivo: motivo.trim(), idempotencyKey, version: data.venta.version, cliente: clienteSel ? { id: clienteSel.id } : null, lineas: payloadLineas(), pagos, confirmaciones: payloadConfirmaciones() }),
+        body: JSON.stringify({ motivo: motivo.trim(), idempotencyKey, version: data.venta.version, cliente: clienteSel ? { id: clienteSel.id } : null, lineas: payloadLineas(), pagos: payloadPagos(pagosCalc.pagos), confirmaciones: payloadConfirmaciones() }),
       });
       const d = await r.json();
       if (!d.ok) { setError(d.error || "No se pudo aplicar la corrección."); setConfirmando(false); return; }
@@ -464,36 +493,48 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  {pagos.map((p, i) => (
-                    <div key={i} className="flex flex-wrap items-end gap-3">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] sunmi-text-muted">Medio</span>
-                        <div className="w-40">
-                          <SunmiSelectAdv value={p.medio} onChange={(v) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, medio: v } : x)))}>
-                            {MEDIOS.map((m) => <SunmiSelectOption key={m} value={m}>{MEDIO_LABEL[m]}</SunmiSelectOption>)}
-                          </SunmiSelectAdv>
+                  {pagosCalc.pagos.map((p) => {
+                    const esAj = p.id === pagosCalc.ajustadorId;
+                    const varios = pagosCalc.pagos.length > 1;
+                    const esFiadoRow = p.medio === "FIADO";
+                    return (
+                      <div key={p.id} className="flex flex-wrap items-end gap-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[11px] sunmi-text-muted">Medio</span>
+                          <div className="w-40">
+                            <SunmiSelectAdv value={p.medio} onChange={(v) => onPagoMedio(p.id, v)}>
+                              {MEDIOS.map((m) => <SunmiSelectOption key={m} value={m}>{MEDIO_LABEL[m]}</SunmiSelectOption>)}
+                            </SunmiSelectAdv>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[11px] sunmi-text-muted">
+                            Importe{esAj && varios ? <span className="sunmi-text-accent font-medium"> · Saldo automático</span> : null}
+                          </span>
+                          <div className="flex items-center gap-0.5">
+                            <span className="sunmi-text-muted text-xs">$</span>
+                            <SunmiInput
+                              type="text" inputMode="decimal" value={desdeCent(p.montoCent)} disabled={esAj}
+                              onChange={(e) => onPagoMonto(p.id, e.target.value)}
+                              className="w-[110px] text-center"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 pb-1.5">
+                          {!esAj && !esFiadoRow && (
+                            <button type="button" className="text-[11px] sunmi-text-link underline" onClick={() => onPagoAjustar(p.id)}>Ajustar saldo aquí</button>
+                          )}
+                          <SunmiButton color="red" type="button" disabled={pagosCalc.pagos.length === 1} onClick={() => onPagoQuitar(p.id)}>Quitar</SunmiButton>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] sunmi-text-muted">Monto</span>
-                        <div className="flex items-center gap-0.5">
-                          <span className="sunmi-text-muted text-xs">$</span>
-                          <SunmiInput
-                            type="text" inputMode="decimal" value={p.monto}
-                            onChange={(e) => setPagos((ps) => ps.map((x, j) => (j === i ? { ...x, monto: e.target.value === "" ? 0 : Number(e.target.value.replace(",", ".")) } : x)))}
-                            className="w-[110px] text-center"
-                          />
-                        </div>
-                      </div>
-                      <SunmiButton color="red" type="button" onClick={() => setPagos((ps) => ps.filter((_, j) => j !== i))}>Quitar</SunmiButton>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
-                <div className="flex items-center justify-between mt-3 pt-3 border-t sunmi-divider">
-                  <SunmiButton color="slate" type="button" onClick={() => setPagos((ps) => [...ps, { medio: "EFECTIVO", monto: 0 }])}>+ Medio de pago</SunmiButton>
-                  <span className={`text-sm font-bold ${pagosCuadran ? "sunmi-text-success" : "sunmi-text-danger"}`}>
-                    Σ {money(sumaPagos)} {pagosCuadran ? "= total" : `≠ ${money(total)}`}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t sunmi-divider gap-2 flex-wrap">
+                  <SunmiButton color="slate" type="button" disabled={esFiado(pagos)} onClick={onPagoAgregar}>+ Medio de pago</SunmiButton>
+                  <span className={`text-sm ${pagosCalc.negativo ? "sunmi-text-danger font-bold" : "sunmi-text-muted"}`}>
+                    Disponible para asignar: <span className="font-semibold tabular-nums">{money(desdeCent(pagosCalc.disponibleCent))}</span>
                   </span>
                 </div>
               </SunmiPanel>
