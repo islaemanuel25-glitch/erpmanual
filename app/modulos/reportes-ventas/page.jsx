@@ -11,6 +11,7 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import VentaDetalleAdmin from "@/components/reportes-ventas/VentaDetalleAdmin";
+import AccionesTicket from "@/components/reportes-ventas/AccionesTicket";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -677,10 +678,16 @@ export default function ReportesVentasPage() {
         )}
 
         {!loadingDetalle && !errorDetalle && detalleData && (
-          <VentaDetalleAdmin
-            venta={detalleData}
-            permisos={detallePermisos}
-          />
+          <>
+            <AccionesTicket
+              venta={detalleData}
+              onCorregido={() => abrirDetalle(detalleData.id)}
+            />
+            <VentaDetalleAdmin
+              venta={detalleData}
+              permisos={detallePermisos}
+            />
+          </>
         )}
       </SunmiModalLayout>
     </div>

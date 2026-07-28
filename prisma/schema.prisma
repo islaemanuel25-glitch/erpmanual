@@ -722,6 +722,11 @@ model MovimientoCuenta {
   direccion String // "DEBITO" | "CREDITO"
   monto     Decimal  @db.Decimal(12, 2)
   ventaId   Int?
+  // Corrección de ventas (Fase B): discrimina los movimientos compensatorios de
+  // una corrección. 0 = movimiento original (venta/pago/ajuste normal). >0 = id
+  // de VentaCorreccion que lo generó. Permite reversas + nuevos débitos sin borrar
+  // historial, preservando la idempotencia del alta (VENTA con correccionId=0).
+  correccionId Int   @default(0)
   userId    Int?
   nota      String?
   createdAt DateTime @default(now())
@@ -732,7 +737,7 @@ model MovimientoCuenta {
   venta   Venta?   @relation(fields: [ventaId], references: [id])
   user    Usuario? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@unique([ventaId])
+  @@unique([ventaId, tipo, correccionId])
   @@index([grupoId, localId, clienteId])
   @@index([clienteId])
   @@index([localId])
@@ -768,6 +773,16 @@ model Venta {
   gananciaNeta     Decimal  @default(0) @db.Decimal(12, 2)
   formaPago        String
   esFiado          Boolean  @default(false)
+
+  // Corrección de ventas (in-place versionada; ver model VentaCorreccion).
+  // version = token de bloqueo optimista (se incrementa en cada corrección).
+  version            Int      @default(0)
+  corregida          Boolean  @default(false)
+  ultimaCorreccionId Int?
+  // Campos descriptivos editables por corrección SIMPLE (sin stock ni dinero).
+  observaciones      String?
+  referenciaInterna  String?
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -790,6 +805,47 @@ model Venta {
   @@index([clientTxnId])
   @@index([operadorId])
   @@index([listaPrecioId])
+}
+
+// LIBRO DE CORRECCIONES DE VENTA (antes/después) — inmutable, sin FKs duras
+// (mismo patrón que AuditoriaBitacora). Una fila por corrección aplicada.
+// Soporta desde el inicio la corrección de turno cerrado (movimientos
+// compensatorios en el turno actual), aunque su UI se habilite en otra etapa.
+model VentaCorreccion {
+  id                Int      @id @default(autoincrement())
+  ventaId           Int
+  tipo              String // "SIMPLE" | "COMPLETA"
+  motivo            String
+  // Idempotencia de la corrección COMPLETA: dos POST con la misma clave no la
+  // aplican dos veces (se devuelve la corrección ya registrada).
+  idempotencyKey    String?
+  usuarioId         Int? // autor de la corrección
+  operadorId        Int?
+  localId           Int?
+  grupoId           Int?
+  turnoIdOriginal   Int? // turno de la venta al momento de corregir
+  turnoIdCorreccion Int? // turno actual abierto donde impacta la diferencia (si hay)
+  turnoCerrado      Boolean  @default(false)
+  versionAntes      Int
+  versionDespues    Int
+  totalAnterior     Decimal  @db.Decimal(12, 2)
+  totalNuevo        Decimal  @db.Decimal(12, 2)
+  diferencia        Decimal  @db.Decimal(12, 2) // totalNuevo - totalAnterior
+  // Snapshots completos (venta + detalles + componentes + pagos + CC) para
+  // reconstruir el estado original y el resultante. JSON legible.
+  snapshotAntes     Json
+  snapshotDespues   Json
+  diffProductos     Json? // [{productoBaseId, nombre, cantidadAntes, cantidadDespues, estado}]
+  diffPagos         Json? // [{medio, montoAntes, montoDespues}]
+  impactoStock      Json? // [{productoLocalId, nombre, delta, resultante}]
+  impactoCaja       Json? // {signo, monto, medios, movimientoIds, cajaMovimientoIds}
+  createdAt         DateTime @default(now())
+
+  @@unique([ventaId, idempotencyKey])
+  @@index([ventaId])
+  @@index([usuarioId])
+  @@index([createdAt])
+  @@index([tipo])
 }
 
 model VentaDetalle {
@@ -816,6 +872,13 @@ model VentaDetalle {
   importeBaseServicio    Decimal? @db.Decimal(12, 2)
   recargoServicioPct     Decimal? @db.Decimal(5, 2)
   recargoServicioImporte Decimal? @db.Decimal(12, 2)
+
+  // Consumo físico CONGELADO de la línea (para reversión exacta al corregir).
+  // productoLocalId = fila ProductoLocal descontada de StockLocal (junto a venta.localId).
+  // cantidadStock = cantidad exacta descontada, en escala de StockLocal.
+  // NULL en combos (su consumo vive en VentaDetalleComponente) y en servicios (sin stock).
+  productoLocalId    Int?
+  cantidadStock      Decimal? @db.Decimal(12, 3)
 
   createdAt          DateTime           @default(now())
 
@@ -976,6 +1039,10 @@ model ClientePuntoMovimiento {
   tipo      String // "ACREDITACION" | "CANJE" | "AJUSTE" | "EXPIRACION"
   puntos    Int
   ventaId   Int?
+  // Corrección de ventas (Fase B): 0 = movimiento original; >0 = id de
+  // VentaCorreccion. Habilita ajustes de puntos por corrección (delta / traslado
+  // por cambio de cliente) sin romper la idempotencia del alta (correccionId=0).
+  correccionId Int   @default(0)
   userId    Int?
   nota      String?
   createdAt DateTime @default(now())
@@ -985,7 +1052,7 @@ model ClientePuntoMovimiento {
   usuario Usuario? @relation(fields: [userId], references: [id])
   local   Local    @relation(fields: [localId], references: [id])
 
-  @@unique([ventaId, tipo])
+  @@unique([ventaId, tipo, correccionId])
   @@index([grupoId, localId, clienteId])
   @@index([localId])
   @@index([createdAt])

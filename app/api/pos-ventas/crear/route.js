@@ -705,6 +705,11 @@ export async function POST(req) {
             importeBaseServicio: svc ? svc.importeBaseServicio : null,
             recargoServicioPct: svc ? svc.recargoServicioPct : null,
             recargoServicioImporte: svc ? svc.recargoServicioImporte : null,
+            // Consumo físico CONGELADO de la línea (para reversión exacta al corregir).
+            // NORMAL → {productoLocalId, cantidadStock} del plan; COMBO → null (su
+            // consumo vive en VentaDetalleComponente); SERVICIO → null (sin stock).
+            productoLocalId: l.consumoFisico?.productoLocalId ?? null,
+            cantidadStock: l.consumoFisico?.cantidadStock ?? null,
           },
         });
 
