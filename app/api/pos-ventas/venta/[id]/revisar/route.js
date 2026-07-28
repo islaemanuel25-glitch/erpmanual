@@ -18,7 +18,8 @@ import { evaluarCorreccion } from "@/lib/pos-ventas/motorCorreccion";
 import { enBetaCorreccionCompleta, COD_FLAG_OFF, MSG_FLAG_OFF } from "@/lib/pos-ventas/correccionBeta";
 import {
   cargarVentaOriginal, estadoTurnoCorreccion, detallesParaMotor,
-  resolverLineasCorregidas, leerStockActual, COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
+  resolverLineasCorregidas, leerStockActual, enriquecerReconstruccion,
+  COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
 } from "@/lib/pos-ventas/correccionCompletaServer";
 import { normalizarMedio } from "@/lib/pos-ventas/pagos";
 
@@ -95,9 +96,12 @@ export async function POST(req, { params }) {
 
     // Stock actual de todos los productoLocalId involucrados (originales + nuevos).
     const detMotor = detallesParaMotor(venta);
+    // Enriquecer legacy con reconstrucción + modalidades confirmadas por el admin.
+    await enriquecerReconstruccion(prisma, venta, detMotor, body.confirmaciones);
     const plsInvolucrados = new Set();
     for (const d of detMotor) {
-      if (d.productoLocalId != null) plsInvolucrados.add(d.productoLocalId);
+      const plOrig = d.productoLocalId ?? d.productoLocalIdResuelto;
+      if (plOrig != null) plsInvolucrados.add(plOrig);
       for (const c of d.componentes) if (c.productoLocalId != null) plsInvolucrados.add(c.productoLocalId);
     }
     for (const l of lineasCorregidas) {

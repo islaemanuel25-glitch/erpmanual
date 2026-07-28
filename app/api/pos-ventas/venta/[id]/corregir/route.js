@@ -24,8 +24,10 @@ import { enBetaCorreccionCompleta, COD_FLAG_OFF, MSG_FLAG_OFF } from "@/lib/pos-
 import {
   cargarVentaOriginal, estadoTurnoCorreccion, detallesParaMotor, resolverLineasCorregidas,
   lockStockActual, aplicarDeltaStock, ajustarCuentaCorriente, ajustarPuntosCorreccion,
-  subtotalElegiblePuntos, cargarMapsProductos, COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
+  subtotalElegiblePuntos, cargarMapsProductos, enriquecerReconstruccion,
+  COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
 } from "@/lib/pos-ventas/correccionCompletaServer";
+import { reconstruirConsumoOriginal } from "@/lib/pos-ventas/motorCorreccion";
 
 const j = (b, s = 200) => NextResponse.json(b, { status: s });
 
@@ -98,10 +100,12 @@ export async function POST(req, { params }) {
       const { infoMap } = await cargarMapsProductos(tx, lineasCorregidas.map((l) => l.productoBaseId));
 
       const detMotor = detallesParaMotor(venta);
+      // Enriquecer legacy con reconstrucción + modalidades confirmadas por el admin.
+      await enriquecerReconstruccion(tx, venta, detMotor, body.confirmaciones);
 
       // Lock de stock de todos los productoLocalId involucrados (originales + nuevos).
       const pls = new Set();
-      for (const d of detMotor) { if (d.productoLocalId != null) pls.add(d.productoLocalId); for (const c of d.componentes) if (c.productoLocalId != null) pls.add(c.productoLocalId); }
+      for (const d of detMotor) { const plO = d.productoLocalId ?? d.productoLocalIdResuelto; if (plO != null) pls.add(plO); for (const c of d.componentes) if (c.productoLocalId != null) pls.add(c.productoLocalId); }
       for (const l of lineasCorregidas) { if (l.tipo === "NORMAL") pls.add(l.productoLocalId); if (l.tipo === "COMBO") for (const c of l.componentes) pls.add(c.productoLocalId); }
       const stockActual = await lockStockActual(tx, localId, [...pls]);
 
@@ -138,7 +142,28 @@ export async function POST(req, { params }) {
       const gananciaNeta = round2(gananciaBruta - comisionBancaria);
 
       // VentaCorreccion (fuente) — se crea primero para tener correccionId en los movimientos.
-      const snapAntes = snapshotVenta(venta, { detalles: venta.detalles, pagos: venta.pagos, cliente: venta.clienteId, total: Number(venta.total) });
+      // Registro de la reconstrucción del consumo histórico (auditoría explícita):
+      // por cada línea legacy, cómo se reconstruyó (auto o manual), modalidad,
+      // cantidad física y quién la confirmó.
+      const reconstruccionLegacy = detMotor
+        .filter((d) => !d.esServicio && (d.componentes || []).length === 0 && d.cantidadStock == null)
+        .map((d) => {
+          const r = reconstruirConsumoOriginal(d);
+          return {
+            detalleId: d.id, productoBaseId: d.productoBaseId, nombre: d.nombre,
+            reconstruccion: r.reconstruccion || (r.ambigua ? "AMBIGUA" : null),
+            modalidad: r.modalidad || null,
+            cantidadStock: !r.ambigua && r.consumo?.length ? r.consumo.reduce((a, c) => a + Number(c.cantidad), 0) : null,
+            confirmadaManualmente: r.reconstruccion === "MANUAL",
+            confirmadaPor: r.reconstruccion === "MANUAL" ? (session.id ?? null) : null,
+            evidencia: { esDeposito: d.esDeposito, factorPack: d.reconFactorPack, modoEnvio: d.reconModoEnvio, costoBulto: d.reconCostoBulto, precioCostoCongelado: d.precioCosto },
+          };
+        });
+
+      const snapAntes = {
+        ...snapshotVenta(venta, { detalles: venta.detalles, pagos: venta.pagos, cliente: venta.clienteId, total: Number(venta.total) }),
+        reconstruccionLegacy: reconstruccionLegacy.length ? reconstruccionLegacy : undefined,
+      };
       const snapDespues = snapshotVenta(venta, { detalles: lineasComerciales.map((l) => ({ productoBaseId: l.productoBaseId, nombre: l.nombre, cantidad: l.cantidad, precio: l.precio, subtotal: l.subtotal })), pagos: consol.pagos, cliente: clienteDespues, total: totalNuevo });
       const totalAnterior = round2(Number(venta.total));
       const diferencia = round2(totalNuevo - totalAnterior);

@@ -178,16 +178,18 @@ console.log("=== STOCK ===");
   const r = evaluar({ orig, corr, stockActual: { 1: 0 }, allowNegative: true });
   ok("allowNegative: permite confirmar", r.stockInsuficiente.length === 0 && r.puedeConfirmar === true);
 }
-// 16) legacy ambiguo bloqueado (si se toca)
+// 16) legacy GENUINAMENTE ambiguo bloqueado (si se toca): depósito MIXTO factor 2
+//     con precioCosto que no coincide con bulto ni unidad → no reconstruible.
 {
-  const orig = [oNormal(1, 10, 1, 2, 100, { cantidadStock: null })]; // legacy sin congelar
+  const legAmbiguo = { ...oNormal(1, 10, 1, 2, 100, { cantidadStock: null }), esDeposito: true, reconFactorPack: 2, reconModoEnvio: "MIXTO", reconCostoBulto: 999 };
+  const orig = [legAmbiguo]; // precioCosto=50 no matchea 999 ni 499.5 → ambiguo
   const corrTocada = [cNormal(10, 1, 3, 100, 1)]; // modifica → requiere revertir → ambigua
   const r1 = evaluar({ orig, corr: corrTocada, stockActual: { 1: 5 } });
-  ok("legacy tocado: bloqueo + no confirmar", r1.bloqueos.length === 1 && r1.bloqueos[0].detalleId === 1 && r1.puedeConfirmar === false);
+  ok("legacy ambiguo tocado: bloqueo + no confirmar", r1.bloqueos.length === 1 && r1.bloqueos[0].detalleId === 1 && r1.puedeConfirmar === false);
 
   const corrPreservada = [cNormal(10, 1, 2, 100, 1), cNormal(20, 2, 1, 50)]; // legacy preservada, se agrega otra
   const r2 = evaluar({ orig, corr: corrPreservada, stockActual: { 1: 5, 2: 5 } });
-  ok("legacy preservado: NO bloquea", r2.bloqueos.length === 0 && deltaDe(r2, 2) === -1);
+  ok("legacy ambiguo preservado: NO bloquea", r2.bloqueos.length === 0 && deltaDe(r2, 2) === -1);
 }
 
 console.log("\n=== PAGOS / TOTALES ===");
@@ -237,10 +239,55 @@ console.log("\n=== PAGOS / TOTALES ===");
 
 console.log("\n=== reconstruirConsumoOriginal (unit) ===");
 ok("normal congelado", reconstruirConsumoOriginal(oNormal(1, 1, 5, 2, 10, { cantidadStock: 2 })).consumo[0].cantidad === 2);
-ok("normal legacy null → ambigua", reconstruirConsumoOriginal(oNormal(1, 1, 5, 2, 10, { cantidadStock: null })).ambigua === true);
+ok("normal legacy LOCAL → auto-reconstruye (cantidad)", reconstruirConsumoOriginal(oNormal(1, 1, 5, 2, 10, { cantidadStock: null })).reconstruccion === "AUTO_LOCAL");
 ok("combo componentes → consumo", reconstruirConsumoOriginal(oCombo(1, 9, 1, 10, [{ productoBaseId: 2, productoLocalId: 5, cantidad: 3 }])).consumo[0].cantidad === 3);
 ok("combo sin componentes → ambigua", reconstruirConsumoOriginal({ id: 1, nombre: "c", esServicio: false, componentes: [], esCombo: true, cantidadStock: null, productoLocalId: null }).ambigua === true);
 ok("servicio → sin consumo", reconstruirConsumoOriginal(oNormal(1, 1, null, 1, 10, { servicio: true })).consumo.length === 0);
+
+console.log("\n=== RECONSTRUCCIÓN LEGACY (consumo histórico) ===");
+// det legacy enriquecido (cantidadStock null, con config de reconstrucción).
+function legDet(o = {}) {
+  return {
+    id: o.id || 1, esServicio: false, componentes: [], cantidadStock: null,
+    productoLocalId: null, productoLocalIdResuelto: o.pl ?? 5, cantidad: o.cantidad ?? 1,
+    precioCosto: o.precioCosto, esDeposito: o.esDeposito ?? true,
+    reconFactorPack: o.factor ?? 2, reconModoEnvio: o.modoEnvio ?? "SOLO_BULTO",
+    reconCostoBulto: o.costoBulto ?? 82000, reconEsPiezaFiambre: o.pieza ?? false,
+    modalidadConfirmada: o.modalidad ?? null,
+  };
+}
+const R = (o) => reconstruirConsumoOriginal(legDet(o));
+
+// #823 equivalente: depósito, factor 2, SOLO_BULTO, precioCosto 82000 == costoBulto → BULTO, cantidadStock 2
+{
+  const r = R({ esDeposito: true, factor: 2, modoEnvio: "SOLO_BULTO", cantidad: 1, precioCosto: 82000, costoBulto: 82000 });
+  ok("#823: reconstruye BULTO, cantidadStock=2, no ambigua", !r.ambigua && r.modalidad === "BULTO" && r.consumo[0].cantidad === 2 && r.reconstruccion === "AUTO_COSTO", JSON.stringify(r));
+}
+// Decimal sin float: costoBulto 100 factor 3 → unidad 33.33
+ok("costo unidad coincide (100/3=33.33) → UNIDAD", (() => { const r = R({ modoEnvio: "MIXTO", factor: 3, costoBulto: 100, precioCosto: 33.33, cantidad: 1 }); return !r.ambigua && r.modalidad === "UNIDAD" && r.consumo[0].cantidad === 1; })());
+ok("costo bulto coincide (100) → BULTO (×3=3)", (() => { const r = R({ modoEnvio: "MIXTO", factor: 3, costoBulto: 100, precioCosto: 100, cantidad: 1 }); return !r.ambigua && r.modalidad === "BULTO" && r.consumo[0].cantidad === 3; })());
+// MIXTO ninguna coincidencia (drift) → ambiguo
+ok("MIXTO sin coincidencia de costo → ambiguo", R({ modoEnvio: "MIXTO", factor: 2, costoBulto: 82000, precioCosto: 999, cantidad: 1 }).ambigua === true);
+// coincidencia doble (costos minúsculos donde bulto y unidad redondean igual) → ambiguo
+ok("coincidencia doble → ambiguo", (() => { const r = R({ modoEnvio: "MIXTO", factor: 2, costoBulto: 0.01, precioCosto: 0.01, cantidad: 1 }); return r.ambigua && r.motivo === "coincidencia_doble"; })());
+// drift factor_pack: precioCosto = costoBulto/2 pero factor actual 6 → no matchea ni bulto ni /6 → ambiguo
+ok("drift factor_pack → ambiguo", R({ modoEnvio: "MIXTO", factor: 6, costoBulto: 120000, precioCosto: 60000, cantidad: 1 }).ambigua === true);
+// SOLO_BULTO invalida UNIDAD: precioCosto matchea unidad (contradicción) → ambiguo
+ok("SOLO_BULTO + costo de unidad (contradicción) → ambiguo", (() => { const r = R({ modoEnvio: "SOLO_BULTO", factor: 2, costoBulto: 82000, precioCosto: 41000, cantidad: 1 }); return r.ambigua && r.motivo === "contradiccion_costo_modo_envio"; })());
+ok("SOLO_BULTO: manual UNIDAD → modalidad inválida", R({ modoEnvio: "SOLO_BULTO", factor: 2, costoBulto: 82000, precioCosto: 82000, modalidad: "UNIDAD" }).motivo === "modalidad_invalida_para_producto");
+// SOLO_UNIDAD invalida BULTO: auto UNIDAD (cantidad), manual BULTO inválido
+ok("SOLO_UNIDAD (factor>1) → auto UNIDAD (cantidad)", (() => { const r = R({ modoEnvio: "SOLO_UNIDAD", factor: 6, costoBulto: 60000, precioCosto: 10000, cantidad: 2 }); return !r.ambigua && r.modalidad === "UNIDAD" && r.consumo[0].cantidad === 2; })());
+ok("SOLO_UNIDAD: manual BULTO → inválido", R({ modoEnvio: "SOLO_UNIDAD", factor: 6, costoBulto: 60000, precioCosto: 10000, modalidad: "BULTO" }).motivo === "modalidad_invalida_para_producto");
+// modalidad manual válida (MIXTO ambiguo + admin elige BULTO) → cantidadStock ×factor
+ok("manual BULTO válido → cantidadStock ×factor", (() => { const r = R({ modoEnvio: "MIXTO", factor: 2, costoBulto: 500, precioCosto: 999, cantidad: 3, modalidad: "BULTO" }); return !r.ambigua && r.modalidad === "BULTO" && r.consumo[0].cantidad === 6 && r.reconstruccion === "MANUAL"; })());
+// local → AUTO_LOCAL cantidad
+ok("local (no depósito) → AUTO_LOCAL cantidad", (() => { const r = R({ esDeposito: false, cantidad: 4 }); return !r.ambigua && r.reconstruccion === "AUTO_LOCAL" && r.consumo[0].cantidad === 4; })());
+// depósito factor<=1 → AUTO_SIN_PACK
+ok("depósito factor<=1 → AUTO_SIN_PACK", (() => { const r = R({ esDeposito: true, factor: 1, cantidad: 5, modoEnvio: "SOLO_BULTO", costoBulto: 100, precioCosto: 100 }); return !r.ambigua && r.reconstruccion === "AUTO_SIN_PACK" && r.consumo[0].cantidad === 5; })());
+// sin ProductoLocal → ambiguo
+ok("sin ProductoLocal → ambiguo sin_producto_local", (() => { const d = legDet({}); d.productoLocalIdResuelto = null; const r = reconstruirConsumoOriginal(d); return r.ambigua && r.motivo === "sin_producto_local"; })());
+// congelado (nueva) → CONGELADO
+ok("congelado (cantidadStock set) → CONGELADO", (() => { const d = legDet({}); d.cantidadStock = 7; d.productoLocalId = 5; const r = reconstruirConsumoOriginal(d); return !r.ambigua && r.reconstruccion === "CONGELADO" && r.consumo[0].cantidad === 7; })());
 
 console.log(`\nRESULTADO MOTOR-CORRECCIÓN (B1): ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

@@ -60,13 +60,14 @@ async function run() {
 
   // Click
   await evalJS(`(function(){var b=[...document.querySelectorAll('button')].find(function(x){return x.textContent.trim().indexOf('Corregir venta')!==-1 && !x.disabled;}); if(b){b.click();return true;} return false;})()`);
-  for (let i = 0; i < 30; i++) { if (await evalJS(`!!document.querySelector('input[placeholder*="Agregar producto"]')`)) break; await sleep(150); }
+  const editorPresente = `document.body.textContent.indexOf('Total corregido')!==-1 && [...document.querySelectorAll('button')].some(function(b){return b.textContent.indexOf('Revisar cambios')!==-1;})`;
+  for (let i = 0; i < 80; i++) { if (await evalJS(editorPresente)) break; await sleep(200); }
 
-  // El editor se montó
-  const editorMontado = await evalJS(`!!document.querySelector('input[placeholder*="Agregar producto"]') && document.body.textContent.indexOf('Total corregido')!==-1`);
-  ok("editor montado tras click", editorMontado === true);
+  // El editor se montó (rediseño: header + tarjetas + pagos + footer)
+  ok("editor montado tras click (nuevo diseño)", (await evalJS(editorPresente)) === true);
+  ok("encabezado 'Corregir venta' + 'Agregar producto' + 'Pagos'", (await evalJS(`document.body.textContent.indexOf('Corregir venta')!==-1 && document.body.textContent.indexOf('Agregar producto')!==-1 && document.body.textContent.indexOf('Pagos')!==-1`)) === true);
 
-  // CLAVE: el elemento superior en el centro pertenece a un fixed con z-index 10000 (editor por encima del modal 9999)
+  // CLAVE (regresión z-index): el elemento superior en el centro es un fixed z-index 10000 (editor sobre modal 9999)
   const zTop = await evalJS(`(function(){
     var el = document.elementFromPoint(Math.floor(window.innerWidth/2), Math.floor(window.innerHeight/2));
     var z = 0, n = el;
@@ -74,18 +75,27 @@ async function run() {
     return z;
   })()`);
   console.log(`  z-index del elemento superior en el centro: ${zTop}`);
-  ok("editor POR ENCIMA del modal (z=10000 en el centro, no 9999)", zTop === 10000, `z=${zTop}`);
+  ok("regresión z-index: editor POR ENCIMA del modal (z=10000)", zTop === 10000, `z=${zTop}`);
 
-  // Interactivo: el header "Cerrar" del editor es clickeable y cierra
-  const cerrado = await evalJS(`(function(){var b=[...document.querySelectorAll('button')].find(function(x){return x.textContent.trim()==='Cerrar' && x.closest('.fixed') && getComputedStyle(x.closest('.fixed')).zIndex==='10000';}); if(b){b.click();return true;} return false;})()`);
-  await sleep(300);
-  const editorCerrado = await evalJS(`!document.querySelector('input[placeholder*="Agregar producto"]')`);
-  ok("editor interactivo (Cerrar del editor funciona)", cerrado === true && editorCerrado === true);
-
-  ok("sin errores de consola", consoleErrs.length === 0, consoleErrs.join(" | "));
+  // Responsive: sin overflow horizontal en 360 y 412
+  for (const w of [360, 412]) {
+    await send("Emulation.setDeviceMetricsOverride", { width: w, height: 780, deviceScaleFactor: 2, mobile: true });
+    await sleep(200);
+    const ox = await evalJS(`Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)`);
+    ok(`sin overflow horizontal @ ${w}px`, ox === 0, `overflowX=${ox}`);
+  }
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 780, deviceScaleFactor: 2, mobile: true });
 
   const { data } = await send("Page.captureScreenshot", { format: "png" });
   fs.writeFileSync(path.join(OUT, "boton-fix.png"), Buffer.from(data, "base64"));
+
+  // Interactivo: el header "Volver" del editor cierra
+  const cerrado = await evalJS(`(function(){var b=[...document.querySelectorAll('button')].find(function(x){return x.textContent.trim().indexOf('Volver')!==-1 && x.closest('.fixed') && getComputedStyle(x.closest('.fixed')).zIndex==='10000';}); if(b){b.click();return true;} return false;})()`);
+  await sleep(300);
+  const editorCerrado = await evalJS(`document.body.textContent.indexOf('Total corregido')===-1`);
+  ok("editor interactivo (Volver cierra)", cerrado === true && editorCerrado === true);
+
+  ok("sin errores de consola", consoleErrs.length === 0, consoleErrs.join(" | "));
 
   console.log(`\nRESULTADO BOTÓN-FIX: ${pass} pass / ${fail} fail`);
   try { await send("Browser.close", {}, false); } catch {}

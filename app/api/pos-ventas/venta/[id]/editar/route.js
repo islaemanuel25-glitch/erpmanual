@@ -15,7 +15,8 @@ import { reconstruirConsumoOriginal } from "@/lib/pos-ventas/motorCorreccion";
 import { enBetaCorreccionCompleta, COD_FLAG_OFF, MSG_FLAG_OFF } from "@/lib/pos-ventas/correccionBeta";
 import {
   cargarVentaOriginal, estadoTurnoCorreccion, detallesParaMotor,
-  cargarMapsProductos, COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
+  cargarMapsProductos, enriquecerReconstruccion, estadoReconstruccionUI,
+  COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
 } from "@/lib/pos-ventas/correccionCompletaServer";
 
 const j = (b, s = 200) => NextResponse.json(b, { status: s });
@@ -43,6 +44,8 @@ export async function GET(req, { params }) {
     const turno = estadoTurnoCorreccion(venta);
     const ventana = estadoVentanaCorreccion(venta);
     const detMotor = detallesParaMotor(venta);
+    // Enriquecer líneas legacy con el contexto de reconstrucción (determinístico o ambiguo).
+    await enriquecerReconstruccion(prisma, venta, detMotor);
 
     // Config de producto por línea (para reconstruir baseStock/modalidad en el editor).
     const { infoMap, baseStockMap } = await cargarMapsProductos(prisma, detMotor.map((d) => d.productoBaseId));
@@ -83,7 +86,10 @@ export async function GET(req, { params }) {
         componentes: (d.componentes || []).map((c) => ({
           productoBaseId: c.productoBaseId, productoLocalId: c.productoLocalId ?? null, cantidad: Number(c.cantidad),
         })),
-        // Legacy: si el consumo no se puede reconstruir, esta línea bloquea si se toca.
+        // Estado de reconstrucción del consumo histórico:
+        //   congelado (venta nueva) | reconstruido (auto, determinístico) | ambiguo (requiere confirmación).
+        reconstruccion: estadoReconstruccionUI(rec),
+        // Compat: bandera para líneas realmente ambiguas (bloquean si se tocan sin confirmar).
         legacyAmbiguo: rec.ambigua === true,
         legacyMotivo: rec.ambigua ? rec.motivo : null,
       };

@@ -114,7 +114,7 @@ async function run() {
 
   // 3) editar V3 (legacy)
   const e3 = await get(`/api/pos-ventas/venta/${S.v3}/editar`, ck);
-  ok("editar V3: hay línea legacy ambigua", e3.j?.correccion?.hayLineasLegacyAmbiguas === true && e3.j.venta.lineas[0].legacyAmbiguo === true);
+  ok("editar V3: legacy LOCAL auto-reconstruido (no ambiguo)", e3.j.venta.lineas[0].reconstruccion?.estado === "reconstruido" && e3.j.venta.lineas[0].legacyAmbiguo === false);
 
   // 4) revisar V1: reducir A 2→1 (B y C preservados), pagos 550
   const r4 = await post(`/api/pos-ventas/venta/${S.v1}/revisar`, ck, {
@@ -154,9 +154,9 @@ async function run() {
   });
   ok("revisar V1 agregar D: agregadas 1 + delta D -2 + diff +140", r7.j?.diff?.clasificacion?.agregadas === 1 && deltaDe(r7.j?.impactoStock, S.D.plId) === -2 && r7.j?.totales?.diferencia === 140);
 
-  // 8) revisar V3 legacy tocado → bloqueo
+  // 8) revisar V3 legacy LOCAL tocado → auto-reconstruido, sin bloqueo
   const r8 = await post(`/api/pos-ventas/venta/${S.v3}/revisar`, ck, { version: 0, lineas: [{ origenDetalleId: S.d3, productoBaseId: S.A.baseId, cantidad: 1, precio: 100 }], pagos: [{ medio: "EFECTIVO", monto: 100 }] });
-  ok("revisar V3 legacy tocado: bloqueoLegacy + no confirmar", (r8.j?.bloqueosLegacy || []).length === 1 && r8.j?.puedeConfirmar === false);
+  ok("revisar V3 legacy LOCAL: auto-reconstruido, sin bloqueo", (r8.j?.bloqueosLegacy || []).length === 0 && r8.j?.puedeConfirmar === true);
 
   // 9) revisar V1 pagos no cuadran
   const r9 = await post(`/api/pos-ventas/venta/${S.v1}/revisar`, ck, {

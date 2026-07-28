@@ -183,8 +183,8 @@ async function run() {
 
   // 9) Legacy bloqueado + rollback.
   const r9 = await post(`/api/pos-ventas/venta/${S.v3}/corregir`, { motivo: "x", idempotencyKey: "k-v3", version: 0, lineas: [L(S.v3_d, S.A.baseId, 1, 100)], pagos: [{ medio: "EFECTIVO", monto: 100 }] });
-  ok("legacy tocado → 409 bloqueo_legacy", r9.status === 409 && r9.j?.code === "bloqueo_legacy");
-  ok("legacy: rollback (version 0)", (await prisma.venta.findUnique({ where: { id: S.v3 } }))?.version === 0);
+  ok("legacy LOCAL auto-reconstruido → 200 (corrige)", r9.status === 200, JSON.stringify(r9.j?.code));
+  ok("legacy: aplicado (version 1)", (await prisma.venta.findUnique({ where: { id: S.v3 } }))?.version === 1);
 
   // 10) Pago mixto: corregir Vc (ya fiada v1) — usar V1 (version1) agregar D y pagar mixto.
   const r10 = await post(`/api/pos-ventas/venta/${S.v1}/corregir`, {
