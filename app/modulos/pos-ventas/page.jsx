@@ -18,6 +18,7 @@ import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalImporteServicio from "@/components/pos-ventas/ModalImporteServicio";
 import { sumarTotalServicios, componerCobroSimple } from "@/lib/pos-ventas/servicios";
+import { itemsCrearPayload } from "@/lib/pos-ventas/payloadVenta";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalTicketOffline from "@/components/pos-ventas/ModalTicketOffline";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
@@ -704,20 +705,8 @@ export default function PosVentasPage() {
       // operadorId queda solo para referencia/legibilidad de la cola.
       operadorId: operadorActivo?.operadorId ?? null,
       operadorVoucher: operadorVoucherActivo ?? null,
-      items: state.carrito.map((item) => ({
-        productoBaseId: item.productoBaseId,
-        nombre: item.nombre,
-        precio: item.precio,
-        cantidad: item.cantidad,
-        precioCosto: item.precioCosto ?? null,
-        modoVentaLinea: item.modoVentaLinea ?? "NORMAL",
-        listaPrecioId: item.listaPrecioId ?? null,
-        tipoPrecioAplicado: item.tipoPrecioAplicado ?? "PRECIO_VENTA",
-        margenAplicado: item.margenAplicado ?? null,
-        // Servicio de importe variable: el backend recalcula todo desde importeBaseServicio.
-        esServicio: item.esServicio ?? false,
-        importeBaseServicio: item.esServicio ? item.importeBaseServicio : null,
-      })),
+      // Payload canónico (mismo helper que el path online).
+      items: itemsCrearPayload(state.carrito),
     };
 
     enqueue(ventaPendiente);
@@ -1223,17 +1212,9 @@ export default function PosVentasPage() {
           descuento: state.descuento,
           descuentoPorPuntos: state.descuentoPorPuntos,
           puntosCanje: state.puntosCanje,
-          items: state.carrito.map((item) => ({
-            productoBaseId: item.productoBaseId,
-            nombre: item.nombre,
-            precio: item.precio,
-            cantidad: item.cantidad,
-            precioCosto: item.precioCosto ?? null,
-            modoVentaLinea: item.modoVentaLinea ?? "NORMAL",
-            listaPrecioId: item.listaPrecioId ?? null,
-            tipoPrecioAplicado: item.tipoPrecioAplicado ?? "PRECIO_VENTA",
-            margenAplicado: item.margenAplicado ?? null,
-          })),
+          // Payload canónico (mismo helper que el path offline): incluye
+          // esServicio + importeBaseServicio para los servicios de importe variable.
+          items: itemsCrearPayload(state.carrito),
         }),
       });
 
