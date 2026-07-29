@@ -39,6 +39,7 @@ import {
   MODO_PACK, MODO_UNIDAD, permiteToggleDeposito, inferirModo,
   escalasDeLineaExistente, rescalarLinea, cantidadStockLinea, costoResoluble,
 } from "@/lib/pos-ventas/lineaModoDeposito";
+import { firmaCorreccion } from "@/lib/reportes-ventas/correccionDirty";
 
 const TZ_AR = "America/Argentina/Cordoba";
 const money = (n) => `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -83,6 +84,14 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
   // Guard SÍNCRONO anti-doble-submit (el estado `confirmando` es async y queda stale
   // ante dos clicks síncronos; el ref evita disparar /corregir dos veces).
   const confirmandoRef = useRef(false);
+
+  // Advertencia de cambios sin guardar (dirty guard). firmaInicial = firma del
+  // payload tomada tras cargar /editar (null = aún sin cargar). confirmSalida =
+  // panel inline de confirmación al intentar salir con cambios.
+  const [firmaInicial, setFirmaInicial] = useState(null);
+  const [confirmSalida, setConfirmSalida] = useState(false);
+  const bypassSalidaRef = useRef(false); // salida ya autorizada (no re-preguntar)
+  const sentinelRef = useRef(false); // centinela de history ya insertado (botón atrás)
 
   // Buscar producto (bloque "Agregar producto" inline)
   const [extraSearch, setExtraSearch] = useState("");
@@ -253,6 +262,64 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
     return lineas.filter((l) => l.origenDetalleId != null && l.modalidadConfirmada).map((l) => ({ origenDetalleId: l.origenDetalleId, modalidad: l.modalidadConfirmada }));
   }
 
+  // ── Dirty guard ─────────────────────────────────────────────────────────────
+  // Firma del PAYLOAD funcional actual (mismo que se enviaría a /revisar y /corregir).
+  // Se recalcula ante cambios de líneas, pagos, cliente o motivo (incluye la edición
+  // del motivo dentro de la etapa de revisión).
+  const firmaActual = useMemo(
+    () => firmaCorreccion({ lineas: payloadLineas(), pagos: payloadPagos(pagosCalc.pagos), cliente: clienteSel, motivo }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lineas, pagosCalc, clienteSel, motivo]
+  );
+  // dirty = el payload actual difiere del snapshot inicial (post-/editar). Antes de
+  // tener snapshot (firmaInicial===null) nunca es dirty.
+  const dirty = firmaInicial !== null && firmaActual !== firmaInicial;
+
+  // Snapshot inicial: se toma UNA vez tras la primera carga exitosa (o tras recargar,
+  // cuando firmaInicial se reseteó a null). No comparamos contra un snapshot anterior.
+  useEffect(() => {
+    if (data && !cargando && firmaInicial === null) setFirmaInicial(firmaActual);
+  }, [data, cargando, firmaActual, firmaInicial]);
+
+  // beforeunload: advertencia nativa SOLO mientras hay cambios (recarga/cerrar pestaña
+  // o navegador). El mensaje no se personaliza (los navegadores modernos lo ignoran).
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ""; return ""; };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  // Botón atrás (App Router no ofrece bloqueador): centinela de history + popstate.
+  // Al entrar en dirty insertamos UNA entrada centinela; el primer "atrás" la consume
+  // y, en vez de salir, mostramos la confirmación inline y reponemos el centinela.
+  useEffect(() => {
+    if (!dirty || typeof window === "undefined") return;
+    if (!sentinelRef.current) { window.history.pushState({ correccionSalida: true }, ""); sentinelRef.current = true; }
+    const onPop = () => {
+      if (bypassSalidaRef.current) return; // salida ya autorizada → no interferir
+      window.history.pushState({ correccionSalida: true }, ""); // reponer centinela
+      setConfirmSalida(true);
+      const el = getEditorScrollEl();
+      if (el) el.scrollTop = 0; else window.scrollTo(0, 0);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [dirty]);
+
+  // Handlers de salida controlada (botón "Volver a la venta" + confirmación inline).
+  const salirAhora = useCallback(() => {
+    bypassSalidaRef.current = true;
+    setConfirmSalida(false);
+    onVolver && onVolver();
+  }, [onVolver]);
+  const solicitarSalida = useCallback(() => {
+    if (!dirty) { onVolver && onVolver(); return; }
+    setConfirmSalida(true);
+    const el = getEditorScrollEl();
+    if (el) el.scrollTop = 0; else if (typeof window !== "undefined") window.scrollTo(0, 0);
+  }, [dirty, onVolver]);
+
   async function revisar() {
     if (revisando) return;
     // Guardar la posición del editor para restaurarla al "Volver a editar".
@@ -284,6 +351,8 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
       // Error (409/403/…): NO abandonar la revisión; mostrar mensaje + code, sin
       // limpiar el formulario. El code habilita "Recargar venta" ante conflicto.
       if (!d.ok) { setError(d.error || "No se pudo aplicar la corrección."); setErrorCode(d.code || null); setConfirmando(false); return; }
+      // Éxito: autorizar la salida (sin advertencia espuria) y navegar al detalle.
+      bypassSalidaRef.current = true;
       onCorregido && onCorregido(d); onVolver && onVolver();
     } catch { setError("Error de conexión."); }
     finally { setConfirmando(false); confirmandoRef.current = false; }
@@ -291,8 +360,11 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
 
   // "Recargar venta": re-carga /editar (re-dispara el effect). Explícito — solo se
   // usa ante conflicto de versión; el usuario decide (no se recarga automáticamente).
+  // Resetea el snapshot inicial (firmaInicial=null): tras la nueva carga exitosa se
+  // toma un baseline limpio → dirty=false (no comparamos contra el snapshot anterior).
   const recargarVenta = useCallback(() => {
     setRevision(null); setError(""); setErrorCode(null); setCargando(true);
+    setConfirmSalida(false); setFirmaInicial(null);
     setReloadKey((k) => k + 1);
   }, []);
 
@@ -334,7 +406,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
                 </span>
               )}
             </div>
-            <button type="button" onClick={onVolver} className="sunmi-btn-base sunmi-btn-slate inline-flex items-center gap-1.5">
+            <button type="button" onClick={solicitarSalida} className="sunmi-btn-base sunmi-btn-slate inline-flex items-center gap-1.5">
               <ArrowLeft size={15} /> Volver a la venta
             </button>
           </div>
@@ -679,7 +751,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
 
               {/* Acciones: barra inferior STICKY (Volver a la venta / Revisar). */}
               <div className="sticky bottom-0 z-10 mt-4 py-3 sunmi-bg border-t sunmi-divider flex justify-end gap-3">
-                <SunmiButton color="slate" onClick={onVolver}>
+                <SunmiButton color="slate" onClick={solicitarSalida}>
                   Volver a la venta
                 </SunmiButton>
                 <SunmiButton color="amber" onClick={revisar} disabled={revisando || !puedeRevisar}>
@@ -692,25 +764,73 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
     </div>
   );
 
+  // Confirmación INLINE de salida con cambios (no es un modal grande ni un overlay
+  // fixed): se renderiza al tope del contenido, en ambas vistas (editor y revisión),
+  // para cubrir el botón "Volver a la venta" y el botón atrás del navegador.
+  const salidaBanner = confirmSalida ? (
+    <ConfirmarSalida onSeguir={() => setConfirmSalida(false)} onSalir={salirAhora} />
+  ) : null;
+
   // Contenido de página (scroll normal del documento, sin overlay ni modal).
   // revision !== null → la ETAPA de revisión REEMPLAZA al editor (misma URL/documento).
   if (revision) {
     return (
-      <RevisionVentaCorreccion
-        revision={revision}
-        venta={data?.venta}
-        motivo={motivo}
-        setMotivo={setMotivo}
-        confirmando={confirmando}
-        error={error}
-        errorCode={errorCode}
-        onVolverEditar={volverAEditar}
-        onConfirmar={confirmar}
-        onRecargar={recargarVenta}
-      />
+      <>
+        {salidaBanner}
+        <RevisionVentaCorreccion
+          revision={revision}
+          venta={data?.venta}
+          motivo={motivo}
+          setMotivo={setMotivo}
+          confirmando={confirmando}
+          error={error}
+          errorCode={errorCode}
+          onVolverEditar={volverAEditar}
+          onConfirmar={confirmar}
+          onRecargar={recargarVenta}
+        />
+      </>
     );
   }
-  return contenido;
+  return (<>{salidaBanner}{contenido}</>);
+}
+
+// ---------------------------------------------------------------------------
+// Confirmación de "cambios sin guardar" — panel INLINE accesible (no modal grande,
+// sin overlay fixed ni fondo negro). role="alertdialog", foco inicial en "Seguir
+// editando", Escape cancela. Botones grandes (mobile-friendly).
+// ---------------------------------------------------------------------------
+function ConfirmarSalida({ onSeguir, onSalir }) {
+  // SunmiButton no reenvía ref → enfocamos "Seguir editando" por id. Escape cancela.
+  useEffect(() => {
+    if (typeof document !== "undefined") document.getElementById("salida-seguir")?.focus();
+    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onSeguir(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onSeguir]);
+  return (
+    <div
+      role="alertdialog"
+      aria-labelledby="salida-titulo"
+      aria-describedby="salida-desc"
+      className="mb-3 rounded-lg sunmi-state-warning border sunmi-divider p-3 sm:p-4"
+    >
+      <div id="salida-titulo" className="text-sm font-semibold sunmi-text-accent">
+        Cambios sin guardar
+      </div>
+      <div id="salida-desc" className="mt-1 text-[13px] sunmi-text-strong">
+        Hay cambios sin guardar. Si salís ahora, se perderán.
+      </div>
+      <div className="mt-3 flex flex-col sm:flex-row sm:justify-end gap-2">
+        <SunmiButton id="salida-seguir" color="slate" onClick={onSeguir} className="w-full sm:w-auto">
+          Seguir editando
+        </SunmiButton>
+        <SunmiButton color="red" onClick={onSalir} className="w-full sm:w-auto">
+          Salir sin guardar
+        </SunmiButton>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
