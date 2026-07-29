@@ -11,7 +11,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { buildVolverUrl } from "@/lib/reportes-ventas/returnParams";
+import { buildVolverUrl, buildCorregirUrl, parseReturnParams } from "@/lib/reportes-ventas/returnParams";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
@@ -29,6 +29,12 @@ export default function VerVentaPage() {
   // "Volver a ventas" reconstruido desde el contexto de retorno validado (whitelist).
   // Si no hay params válidos, queda igual a la base y caemos a back()/fallback.
   const volverUrl = useMemo(() => buildVolverUrl(searchParams), [searchParams]);
+
+  // URL de la página de corrección, preservando el contexto de retorno.
+  const corregirUrl = useMemo(
+    () => buildCorregirUrl(ventaId, parseReturnParams(searchParams)),
+    [ventaId, searchParams]
+  );
 
   const [venta, setVenta] = useState(null);
   const [permisos, setPermisos] = useState(null);
@@ -145,7 +151,12 @@ export default function VerVentaPage() {
         {/* Contenido: acciones + detalle completo (reutilizados sin duplicar) */}
         {venta && (
           <>
-            <AccionesTicket venta={venta} onCorregido={() => cargarDetalle()} />
+            <AccionesTicket
+              venta={venta}
+              onCorregido={() => cargarDetalle()}
+              correccionMode="page"
+              onCorregirCompleta={() => router.push(corregirUrl)}
+            />
             <VentaDetalleAdmin venta={venta} permisos={permisos} />
           </>
         )}

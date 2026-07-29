@@ -56,7 +56,7 @@ function fmtFecha(iso) {
 let _k = 0;
 const nextKey = () => `l${++_k}`;
 
-export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido }) {
+export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, mode = "modal" }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
@@ -270,14 +270,15 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
     finally { setConfirmando(false); }
   }
 
-  if (!montado) return null;
-
   const idsEnLineas = new Set(activas.map((l) => l.productoBaseId));
+  const esPage = mode === "page";
 
-  return createPortal(
-    <div className="fixed inset-0 z-[10000] sunmi-bg overflow-y-auto" style={{ overflowX: "hidden" }}>
-      <div className="w-full min-h-full p-4">
-        <SunmiCard>
+  // Contenido interno del editor, IDÉNTICO en ambos modos. En mode="page" se renderiza
+  // directo (scroll normal del documento, sin overlay); en mode="modal" va adentro del
+  // overlay por portal (comportamiento anterior).
+  const contenido = (
+    <div className={esPage ? "w-full" : "w-full min-h-full p-4"}>
+      <SunmiCard>
           {/* Encabezado — patrón Ver / Recibir compra */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -289,7 +290,7 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
               )}
             </div>
             <button type="button" onClick={onClose} className="sunmi-btn-base sunmi-btn-slate inline-flex items-center gap-1.5">
-              <ArrowLeft size={15} /> Volver
+              <ArrowLeft size={15} /> {esPage ? "Volver a la venta" : "Volver"}
             </button>
           </div>
 
@@ -631,9 +632,13 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
 
               {error && <div className="text-[13px] sunmi-state-danger sunmi-text-danger rounded px-2 py-1.5 mb-4">{error}</div>}
 
-              {/* Acciones — inline (flex justify-end gap-3), como Compras */}
-              <div className="flex justify-end gap-3">
-                <SunmiButton color="slate" onClick={onClose}>Volver</SunmiButton>
+              {/* Acciones. En página: barra inferior STICKY (Volver a la venta / Revisar). */}
+              <div className={esPage
+                ? "sticky bottom-0 z-10 mt-4 py-3 sunmi-bg border-t sunmi-divider flex justify-end gap-3"
+                : "flex justify-end gap-3"}>
+                <SunmiButton color="slate" onClick={onClose}>
+                  {esPage ? "Volver a la venta" : "Volver"}
+                </SunmiButton>
                 <SunmiButton color="amber" onClick={revisar} disabled={revisando || !puedeRevisar}>
                   {revisando ? "Revisando..." : "Revisar cambios"}
                 </SunmiButton>
@@ -641,12 +646,29 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido })
             </>
           )}
         </SunmiCard>
-      </div>
+    </div>
+  );
 
-      {revision && (
-        <ModalRevisarCambios revision={revision} motivo={motivo} setMotivo={setMotivo} error={error} confirmando={confirmando}
-          onCancel={() => { setRevision(null); setError(""); }} onConfirm={confirmar} />
-      )}
+  // La REVISIÓN sigue como modal temporal (ModalRevisarCambios, z-[10001]) en AMBOS
+  // modos. En un commit posterior se convierte en etapa in-page para mode="page".
+  const revisarOverlay = revision ? (
+    <ModalRevisarCambios revision={revision} motivo={motivo} setMotivo={setMotivo} error={error} confirmando={confirmando}
+      onCancel={() => { setRevision(null); setError(""); }} onConfirm={confirmar} />
+  ) : null;
+
+  if (esPage) {
+    // Página real: SIN createPortal, SIN fixed inset-0, SIN z-modal. La revisión sigue
+    // como modal temporal por encima del contenido (mismo flujo que mode="modal").
+    return (<>{contenido}{revisarOverlay}</>);
+  }
+
+  // mode="modal": overlay por portal (comportamiento anterior) + revisión modal
+  // (z-[10001]) — se retira junto con el flujo viejo en un commit posterior.
+  if (!montado) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] sunmi-bg overflow-y-auto" style={{ overflowX: "hidden" }}>
+      {contenido}
+      {revisarOverlay}
     </div>,
     document.body
   );

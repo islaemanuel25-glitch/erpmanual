@@ -56,7 +56,7 @@ function construirTicket(venta) {
   };
 }
 
-export default function AccionesTicket({ venta, onCorregido }) {
+export default function AccionesTicket({ venta, onCorregido, correccionMode = "modal", onCorregirCompleta }) {
   const c = venta?.correccion || {};
   const [msg, setMsg] = useState(null); // { tipo: "ok"|"error"|"info", texto }
   const [panel, setPanel] = useState(null); // "simple" | "historial" | null
@@ -179,11 +179,21 @@ export default function AccionesTicket({ venta, onCorregido }) {
           </SunmiButton>
         )}
 
-        {/* Corregir venta (completa) — solo con turno original abierto */}
+        {/* Corregir venta (completa) — solo con turno original abierto.
+            correccionMode="page" → NAVEGA a /[ventaId]/corregir (sin abrir modal).
+            correccionMode="modal" (default) → abre EditorVentaCorreccion como modal
+            (convivencia temporal con el modal viejo del listado). */}
         {c.puedeCorregirCompleta ? (
           <SunmiButton
             color="amber"
-            onClick={() => { setEditorAbierto(true); setMsg(null); }}
+            onClick={() => {
+              if (correccionMode === "page") {
+                onCorregirCompleta && onCorregirCompleta();
+              } else {
+                setEditorAbierto(true);
+                setMsg(null);
+              }
+            }}
             className="text-sm"
           >
             🧾 Corregir venta
