@@ -432,86 +432,66 @@ export default function ReportesVentasPage() {
               <>
                 {/* Mobile: cards */}
                 <div className="md:hidden mt-3 space-y-2">
-                  {listado.map((v) => (
+                  {listado.map((v) => {
+                    const esFiado = v.estado === "fiado";
+                    return (
                     <div
                       key={v.id}
-                      className="sunmi-surface rounded-lg p-3 space-y-2"
+                      className="sunmi-surface border sunmi-border rounded-lg p-3 space-y-1.5"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono font-bold text-sm">
-                              #{v.numero ?? v.id}
-                            </span>
-                            {v.corregida && (
-                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
-                                ✎ Corregida{v.version ? ` · v${v.version}` : ""}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] sunmi-text-muted">
-                            {formatFechaHoraAR(v.fecha)}
-                          </div>
+                      {/* Fila 1: cliente (dominante) + total (dominante) */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 font-semibold sunmi-text-strong text-[15px] leading-tight truncate">
+                          {v.cliente?.nombre || "Consumidor final"}
                         </div>
-                        <div className="text-right">
-                          <div className="font-mono font-bold text-base">
-                            ${formatPrecio(v.total)}
-                          </div>
-                          <div className="flex flex-wrap justify-end gap-1 mt-0.5 text-[10px]">
-                            <span
-                              className={`px-1.5 py-0.5 rounded-full capitalize ${
-                                v.estado === "fiado"
-                                  ? "sunmi-state-warning sunmi-text-accent"
-                                  : "sunmi-state-success sunmi-text-success"
-                              }`}
-                            >
-                              {v.estado}
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded-full sunmi-surface capitalize">
-                              {v.formaPago}
-                            </span>
-                          </div>
+                        <div className="font-mono font-bold text-[17px] sunmi-text-strong whitespace-nowrap tabular-nums">
+                          ${formatPrecio(v.total)}
                         </div>
                       </div>
 
-                      <div className="text-[12px] space-y-0.5">
-                        <div className="flex gap-1">
-                          <span className="sunmi-text-muted">Cajero:</span>
-                          <span className="font-medium truncate">
-                            {v.vendedor?.nombre || "—"}
+                      {/* Fila 2: ticket (referencia secundaria) + fecha/hora */}
+                      <div className="text-[11px] sunmi-text-muted">
+                        Ticket #{v.numero ?? v.id} · {formatFechaHoraAR(v.fecha)}
+                      </div>
+
+                      {/* Fila 3: local · cajero · ítems */}
+                      <div className="text-[12px] sunmi-text-muted truncate">
+                        {v.local?.nombre || "—"} · {v.vendedor?.nombre || "—"} ·{" "}
+                        {v.items} ítem{v.items === 1 ? "" : "s"}
+                      </div>
+
+                      {/* Estado: badge Cobrado/Pendiente + forma de pago + Corregida */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                            esFiado
+                              ? "sunmi-state-warning sunmi-text-accent"
+                              : "sunmi-state-success sunmi-text-success"
+                          }`}
+                        >
+                          {esFiado ? "Pendiente" : "Cobrado"}
+                        </span>
+                        <span className="text-[12px] sunmi-text-muted capitalize">
+                          {v.formaPago}
+                        </span>
+                        {v.corregida && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
+                            ✎ Corregida{v.version ? ` · v${v.version}` : ""}
                           </span>
-                        </div>
-                        {v.cliente?.nombre && (
-                          <div className="flex gap-1">
-                            <span className="sunmi-text-muted">Cliente:</span>
-                            <span className="font-medium truncate">
-                              {v.cliente.nombre}
-                            </span>
-                          </div>
                         )}
-                        <div className="flex justify-between">
-                          <span>
-                            <span className="sunmi-text-muted">Local:</span>{" "}
-                            <span className="font-medium">
-                              {v.local?.nombre || "—"}
-                            </span>
-                          </span>
-                          <span className="sunmi-text-muted">
-                            {v.items} item{v.items === 1 ? "" : "s"}
-                          </span>
-                        </div>
                       </div>
 
                       <SunmiButton
                         color="amber"
                         size="sm"
                         onClick={() => abrirDetalle(v.id)}
-                        className="w-full"
+                        className="w-full mt-1"
                       >
-                        Ver ticket
+                        Ver venta
                       </SunmiButton>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Desktop: tabla */}
@@ -519,68 +499,76 @@ export default function ReportesVentasPage() {
                   <SunmiTable
                     headers={[
                       "Fecha/hora",
-                      "Ticket",
-                      "Cliente",
-                      "Cajero",
+                      "Cliente / Ticket",
                       "Local",
-                      "Items",
-                      "Forma pago",
+                      { label: "Ítems", className: "text-center" },
+                      "Forma de pago",
                       "Estado",
-                      "Total",
+                      { label: "Total", className: "text-right" },
                       "",
                     ]}
                   >
-                    {listado.map((v) => (
-                      <tr key={v.id} className="hover:bg-[var(--hover-bg)]">
-                        <td className="px-2 py-1.5 font-mono text-[11px] whitespace-nowrap">
+                    {listado.map((v) => {
+                      const esFiado = v.estado === "fiado";
+                      return (
+                      <tr
+                        key={v.id}
+                        className="align-middle transition-colors even:sunmi-surface-soft hover:bg-[var(--hover-bg)]"
+                      >
+                        <td className="px-3 py-3 font-mono text-[11px] whitespace-nowrap sunmi-text-muted">
                           {formatFechaHoraAR(v.fecha)}
                         </td>
-                        <td className="px-2 py-1.5 font-mono whitespace-nowrap">
-                          #{v.numero ?? v.id}
-                          {v.corregida && (
-                            <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent">
-                              ✎ Corregida{v.version ? ` · v${v.version}` : ""}
+                        {/* Cliente (negrita) + ticket (secundario, debajo) */}
+                        <td className="px-3 py-3 max-w-[220px]">
+                          <div className="font-semibold sunmi-text-strong truncate">
+                            {v.cliente?.nombre || "Consumidor final"}
+                          </div>
+                          <div className="font-mono text-[11px] sunmi-text-muted">
+                            #{v.numero ?? v.id}
+                          </div>
+                        </td>
+                        {/* Local + cajero (secundario, debajo) */}
+                        <td className="px-3 py-3 max-w-[170px]">
+                          <div className="truncate">{v.local?.nombre || "—"}</div>
+                          <div className="text-[11px] sunmi-text-muted truncate">
+                            {v.vendedor?.nombre || "—"}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-center tabular-nums">{v.items}</td>
+                        <td className="px-3 py-3 capitalize">{v.formaPago}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${
+                                esFiado
+                                  ? "sunmi-state-warning sunmi-text-accent"
+                                  : "sunmi-state-success sunmi-text-success"
+                              }`}
+                            >
+                              {esFiado ? "Pendiente" : "Cobrado"}
                             </span>
-                          )}
+                            {v.corregida && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
+                                ✎ Corregida{v.version ? ` · v${v.version}` : ""}
+                              </span>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-2 py-1.5 truncate max-w-[160px]">
-                          {v.cliente?.nombre || "—"}
-                        </td>
-                        <td className="px-2 py-1.5 truncate max-w-[140px]">
-                          {v.vendedor?.nombre || "—"}
-                        </td>
-                        <td className="px-2 py-1.5 truncate max-w-[140px]">
-                          {v.local?.nombre || "—"}
-                        </td>
-                        <td className="px-2 py-1.5 text-center">{v.items}</td>
-                        <td className="px-2 py-1.5 capitalize">
-                          {v.formaPago}
-                        </td>
-                        <td className="px-2 py-1.5 text-center">
-                          <span
-                            className={
-                              v.estado === "fiado"
-                                ? "sunmi-text-accent"
-                                : "sunmi-text-success"
-                            }
-                          >
-                            {v.estado}
-                          </span>
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-mono font-bold">
+                        <td className="px-3 py-3 text-right font-mono font-bold text-[13px] sunmi-text-strong whitespace-nowrap tabular-nums">
                           ${formatPrecio(v.total)}
                         </td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className="px-3 py-3 text-right">
                           <SunmiButton
-                            color="slate"
+                            color="amber"
                             size="sm"
                             onClick={() => abrirDetalle(v.id)}
                           >
-                            Ver ticket
+                            Ver venta
                           </SunmiButton>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </SunmiTable>
                 </div>
 
