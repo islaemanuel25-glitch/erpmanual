@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-07-26 01:08
+**Última actualización:** 2026-07-29 08:16
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,24 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-07-28: feat(productos): codigo de barras propio por ubicacion
+- 2026-07-28: fix(pos): enviar importe de servicios variables al cobrar
+- 2026-07-27: fix(pos): reconstruir consumo legacy y mejorar editor de corrección
+- 2026-07-27: feat(pos): corrección de ventas completa con beta controlada
+- 2026-07-27: fix(pos): usar día de Argentina en historial y estadísticas
+- 2026-07-27: style(pos): mejorar iconos de medios de pago
+- 2026-07-27: style(pos): agregar iconos a medios de pago
+- 2026-07-27: fix(pos): robustecer division de pagos en dispositivos moviles
+- 2026-07-27: fix(pos): simplificar division de pagos
+- 2026-07-27: feat(pos): simplificar flujo de cobro
+- 2026-07-27: feat(pos): agregar servicios de importe variable
+- 2026-07-26: feat(pos): agregar pagos múltiples por venta
+- 2026-07-26: fix(pos): aislar "vender sin stock" por local en el buscador
+- 2026-07-26: feat(operario): operario obligatorio configurable por local
+- 2026-07-26: fix(security): cerrar fugas operativas entre ubicaciones
+- 2026-07-26: fix(operadores): eximir dueño local con alcance seguro
+- 2026-07-26: feat(config): agregar configuracion persistente por local
+- 2026-07-26: fix(security): endurecer permisos y aislamiento entre grupos y locales
 - 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local

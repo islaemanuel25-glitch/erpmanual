@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-07-26 01:08
+**Última actualización:** 2026-07-29 08:16
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,13 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-07-28: feat(productos): codigo de barras propio por ubicacion
+- 2026-07-28: fix(productos): permitir editar la ficha al local propietario
+- 2026-07-27: feat(pos): agregar servicios de importe variable
+- 2026-07-26: fix(productos): aislar el precio de costo según origen y propietario
+- 2026-07-26: fix(security): cerrar fugas operativas entre ubicaciones
+- 2026-07-26: fix(security): completar aislamiento y permisos por local
+- 2026-07-26: fix(security): endurecer permisos y aislamiento entre grupos y locales
 - 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
 - 2026-07-25: feat(combos): permitir activar y desactivar combos por local
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local

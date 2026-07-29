@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-07-26 01:08
+**Última actualización:** 2026-07-29 08:16
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -97,6 +97,12 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-07-28: feat(productos): codigo de barras propio por ubicacion
+- 2026-07-27: feat(pos): agregar servicios de importe variable
+- 2026-07-26: feat(operario): operario obligatorio configurable por local
+- 2026-07-26: fix(security): cerrar fugas operativas entre ubicaciones
+- 2026-07-26: fix(operadores): eximir dueño local con alcance seguro
+- 2026-07-26: fix(security): endurecer permisos y aislamiento entre grupos y locales
 - 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local
 - 2026-07-25: feat(combos): módulo de combos exclusivos por local

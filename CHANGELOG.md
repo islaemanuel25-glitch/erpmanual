@@ -1,5 +1,59 @@
 # Changelog
 
+## [2026-07-29] - Actualización: pos-transferencias, pos-ventas, productos, stock, configuracion, transferencias, usuarios, categorias, proveedores, roles, grupos, locales
+
+### Modificado
+- **pos-transferencias**: feat(productos): codigo de barras propio por ubicacion
+- **pos-transferencias**: feat(pos): agregar servicios de importe variable
+- **pos-transferencias**: feat(operario): operario obligatorio configurable por local
+- **pos-transferencias**: fix(security): cerrar fugas operativas entre ubicaciones
+- **pos-transferencias**: fix(operadores): eximir dueño local con alcance seguro
+- **pos-transferencias**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+- **pos-ventas**: feat(productos): codigo de barras propio por ubicacion
+- **pos-ventas**: fix(pos): enviar importe de servicios variables al cobrar
+- **pos-ventas**: fix(pos): reconstruir consumo legacy y mejorar editor de corrección
+- **pos-ventas**: feat(pos): corrección de ventas completa con beta controlada
+- **pos-ventas**: fix(pos): usar día de Argentina en historial y estadísticas
+- **pos-ventas**: style(pos): mejorar iconos de medios de pago
+- **pos-ventas**: style(pos): agregar iconos a medios de pago
+- **pos-ventas**: fix(pos): robustecer division de pagos en dispositivos moviles
+- **pos-ventas**: fix(pos): simplificar division de pagos
+- **pos-ventas**: feat(pos): simplificar flujo de cobro
+- **pos-ventas**: feat(pos): agregar servicios de importe variable
+- **pos-ventas**: feat(pos): agregar pagos múltiples por venta
+- **pos-ventas**: fix(pos): aislar "vender sin stock" por local en el buscador
+- **pos-ventas**: feat(operario): operario obligatorio configurable por local
+- **pos-ventas**: fix(security): cerrar fugas operativas entre ubicaciones
+- **pos-ventas**: fix(operadores): eximir dueño local con alcance seguro
+- **pos-ventas**: feat(config): agregar configuracion persistente por local
+- **pos-ventas**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+- **productos**: feat(productos): codigo de barras propio por ubicacion
+- **productos**: fix(productos): permitir editar la ficha al local propietario
+- **productos**: feat(pos): agregar servicios de importe variable
+- **productos**: fix(productos): aislar el precio de costo según origen y propietario
+- **productos**: fix(security): cerrar fugas operativas entre ubicaciones
+- **productos**: fix(security): completar aislamiento y permisos por local
+- **productos**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+- **stock**: feat(productos): codigo de barras propio por ubicacion
+- **stock**: fix(security): cerrar fugas operativas entre ubicaciones
+- **configuracion**: feat(operario): operario obligatorio configurable por local
+- **configuracion**: fix(configuracion): habilitar acceso a config del local por permiso, no por esAdmin
+- **configuracion**: feat(ui): adaptar menu y pantallas a roles locales
+- **transferencias**: fix(security): cerrar fugas operativas entre ubicaciones
+- **transferencias**: fix(scope): exigir contexto operativo y vista global explícita
+- **usuarios**: feat(ui): adaptar menu y pantallas a roles locales
+- **usuarios**: feat(users): permitir gestion y costos por local
+- **usuarios**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+- **categorias**: fix(security): completar aislamiento y permisos por local
+- **categorias**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+- **proveedores**: fix(security): completar aislamiento y permisos por local
+- **proveedores**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+- **roles**: feat(rbac): registrar roles y permisos de sistema
+- **roles**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+- **grupos**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+- **locales**: fix(security): endurecer permisos y aislamiento entre grupos y locales
+
+
 ## [2026-07-26] - Actualización: categorias, grupos, locales, pos-ventas, proveedores, roles, usuarios, pos-transferencias, productos, stock, transferencias
 
 ### Modificado

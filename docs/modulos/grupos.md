@@ -1,6 +1,6 @@
 # Modulo: Grupos
 
-**Última actualización:** 2026-07-26 01:08
+**Última actualización:** 2026-07-29 08:16
 
 ## Ubicacion
 - UI: `app/modulos/grupos/page.jsx`, `app/modulos/grupos/[id]/page.jsx`
@@ -81,4 +81,5 @@ model GrupoLocal {
 ```
 
 ## Cambios recientes
+- 2026-07-26: fix(security): endurecer permisos y aislamiento entre grupos y locales
 - 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores

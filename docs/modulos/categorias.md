@@ -1,6 +1,6 @@
 # Modulo: Categorias
 
-**Última actualización:** 2026-07-26 01:08
+**Última actualización:** 2026-07-29 08:16
 
 ## Ubicacion
 - UI: `app/modulos/categorias/page.jsx`
@@ -54,4 +54,6 @@ model Categoria {
 ```
 
 ## Cambios recientes
+- 2026-07-26: fix(security): completar aislamiento y permisos por local
+- 2026-07-26: fix(security): endurecer permisos y aislamiento entre grupos y locales
 - 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
