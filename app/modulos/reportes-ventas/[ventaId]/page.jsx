@@ -12,13 +12,27 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { buildVolverUrl, buildCorregirUrl, parseReturnParams } from "@/lib/reportes-ventas/returnParams";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AccionesTicket from "@/components/reportes-ventas/AccionesTicket";
 import VentaDetalleAdmin from "@/components/reportes-ventas/VentaDetalleAdmin";
 
 const FALLBACK_VENTAS = "/modulos/reportes-ventas";
+const TZ_AR = "America/Argentina/Cordoba";
+
+function fmtFechaHoraAR(iso) {
+  if (!iso) return "—";
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: TZ_AR,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
 
 export default function VerVentaPage() {
   const router = useRouter();
@@ -98,17 +112,52 @@ export default function VerVentaPage() {
 
   const tituloVenta = venta ? `Venta #${venta.numero ?? venta.id}` : "Ver venta";
 
+  const c = venta?.correccion || {};
+
   return (
-    <div className="sunmi-bg w-full min-h-full p-2 sm:p-4">
-      <div className="mx-auto w-full max-w-3xl space-y-3">
-        {/* Encabezado de página: Volver + título (sin barra de modal) */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <SunmiButton color="slate" onClick={volver} className="text-sm">
-            ← Volver a ventas
-          </SunmiButton>
-          <SunmiHeader title={tituloVenta} />
-          {loading && venta && (
-            <span className="text-[11px] sunmi-text-muted">Actualizando…</span>
+    // Mismo patrón de contenedor que POS Ventas y el listado de reportes:
+    // `w-full min-h-full p-2 lg:p-3`. Antes el contenido iba dentro de
+    // `mx-auto w-full max-w-3xl`, que lo recortaba a 672 px (48rem con raíz de
+    // 14px) y lo centraba, dejando el resto del ancho vacío.
+    <div className="sunmi-bg w-full min-h-full p-2 lg:p-3">
+      <div className="w-full space-y-3">
+        {/* Franja de encabezado: Volver + título + estado/corregida + fecha.
+            Una sola fila en desktop, con wrap en pantallas chicas. */}
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+            <SunmiButton color="slate" onClick={volver} className="text-sm shrink-0">
+              ← Volver a ventas
+            </SunmiButton>
+            <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
+              {tituloVenta}
+            </h1>
+            {venta && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${
+                  venta.estado === "fiado"
+                    ? "sunmi-state-warning sunmi-text-accent"
+                    : "sunmi-state-success sunmi-text-success"
+                }`}
+              >
+                {venta.estado === "fiado" ? "Pendiente" : "Cobrado"}
+              </span>
+            )}
+            {c.corregida && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
+                ✎ Corregida{c.version ? ` · v${c.version}` : ""}
+              </span>
+            )}
+            {loading && venta && (
+              <span className="text-[11px] sunmi-text-muted">Actualizando…</span>
+            )}
+          </div>
+          {venta && (
+            <div className="text-right shrink-0">
+              <div className="text-[11px] sunmi-text-muted leading-tight">Fecha y hora</div>
+              <div className="text-sm font-medium tabular-nums leading-tight">
+                {fmtFechaHoraAR(venta.fecha)}
+              </div>
+            </div>
           )}
         </div>
 

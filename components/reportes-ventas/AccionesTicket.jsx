@@ -133,26 +133,36 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
 
   return (
     <SunmiCard className="p-3">
-      {/* Estado de corrección + datos de la última corrección aplicada */}
+      {/* Estado de corrección + datos de la última corrección aplicada.
+          En desktop los metadatos van en una fila; en móvil se apilan. */}
       {c.corregida && (
-        <div className="mb-3 sunmi-state-warning rounded-lg px-3 py-2 text-[12px] space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2 py-0.5 rounded-full sunmi-text-accent font-medium">
+        <div className="mb-3 sunmi-state-warning rounded-lg px-3 py-2 text-[12px]">
+          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap">
+            <span className="px-2 py-0.5 rounded-full sunmi-text-accent font-medium whitespace-nowrap">
               ✎ Venta corregida
             </span>
-            <span className="sunmi-text-muted">versión {c.version}</span>
+            <span className="sunmi-text-muted whitespace-nowrap">versión {c.version}</span>
+            {c.ultimaCorreccion && (
+              <>
+                <span className="sunmi-text-muted whitespace-nowrap">
+                  Corregida el:{" "}
+                  <span className="sunmi-text-strong">
+                    {new Date(c.ultimaCorreccion.fecha).toLocaleString("es-AR")}
+                  </span>
+                </span>
+                {c.ultimaCorreccion.usuario && (
+                  <span className="sunmi-text-muted whitespace-nowrap">
+                    Por: <span className="sunmi-text-strong">{c.ultimaCorreccion.usuario}</span>
+                  </span>
+                )}
+                {c.ultimaCorreccion.motivo && (
+                  <span className="sunmi-text-muted min-w-0">
+                    Motivo: <span className="sunmi-text-strong">{c.ultimaCorreccion.motivo}</span>
+                  </span>
+                )}
+              </>
+            )}
           </div>
-          {c.ultimaCorreccion && (
-            <div className="sunmi-text-muted space-y-0.5 pt-0.5">
-              <div>Corregida el: <span className="sunmi-text-strong">{new Date(c.ultimaCorreccion.fecha).toLocaleString("es-AR")}</span></div>
-              {c.ultimaCorreccion.usuario && (
-                <div>Por: <span className="sunmi-text-strong">{c.ultimaCorreccion.usuario}</span></div>
-              )}
-              {c.ultimaCorreccion.motivo && (
-                <div>Motivo: <span className="sunmi-text-strong">{c.ultimaCorreccion.motivo}</span></div>
-              )}
-            </div>
-          )}
         </div>
       )}
 
@@ -320,6 +330,9 @@ function FormularioCorreccionSimple({ venta, busy, setBusy, onCancel, onSaved, o
     <div className="mt-3 border-t sunmi-divider pt-3 space-y-3">
       <div className="text-[13px] font-semibold">Corrección simple</div>
 
+      {/* Campos en 2 columnas desde sm. `max-w-5xl` evita inputs de una línea
+          estirados a todo el ancho de la página, que quedan ilegibles. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-5xl">
       {/* Cliente */}
       <div>
         <div className="text-[11px] sunmi-text-muted mb-1">Cliente</div>
@@ -404,8 +417,9 @@ function FormularioCorreccionSimple({ venta, busy, setBusy, onCancel, onSaved, o
           maxLength={300}
         />
       </div>
+      </div>
 
-      <div className="flex gap-2 justify-end pt-1">
+      <div className="flex gap-2 justify-end pt-1 max-w-5xl">
         <SunmiButton color="slate" onClick={onCancel} disabled={busy} className="text-sm">
           Cancelar
         </SunmiButton>
@@ -449,9 +463,10 @@ function HistorialCorrecciones({ ventaId }) {
       {!loading && !error && (items?.length ?? 0) === 0 && (
         <div className="text-[12px] sunmi-text-muted">Sin correcciones registradas.</div>
       )}
-      <div className="space-y-2">
+      {/* Grilla: con el ancho completo entran varias correcciones por fila. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
         {(items || []).map((it) => (
-          <div key={it.id} className="sunmi-surface rounded p-2 text-[12px] space-y-0.5">
+          <div key={it.id} className="sunmi-surface-soft sunmi-border rounded-lg p-2.5 text-[12px] space-y-0.5">
             <div className="flex justify-between">
               <span className="font-medium capitalize">{String(it.tipo).toLowerCase()}</span>
               <span className="sunmi-text-muted">{new Date(it.fecha).toLocaleString("es-AR")}</span>
