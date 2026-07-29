@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  buildDetalleUrl,
+  parseReturnParams,
+  contextoReconstruible,
+} from "@/lib/reportes-ventas/returnParams";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -63,8 +68,17 @@ function formatFechaHoraAR(iso) {
   }).format(d);
 }
 
+// Restauración de scroll acotada al módulo (por tab). El contenedor scrolleable del
+// layout es <main> (mismo criterio que Productos).
+const SCROLL_KEY = "reportes-ventas:scroll";
+function getVentasScrollEl() {
+  if (typeof document === "undefined") return null;
+  return document.querySelector("main");
+}
+
 export default function ReportesVentasPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { perfil } = useUser();
   const { loading: loadingCtx, contexto, needsContexto } = useContextoActivo();
 
@@ -130,11 +144,81 @@ export default function ReportesVentasPage() {
     setErrorDetalle("");
   };
 
+  // Fecha por defecto = hoy, SALVO que volvamos con contexto (query params con
+  // fechas válidas): en ese caso no pisamos, la hidratación las restaura.
   useEffect(() => {
+    const ctx = parseReturnParams(searchParams);
+    if (ctx.fechaDesde && ctx.fechaHasta) return;
     const hoy = hoyArgentinaISO();
     setFechaDesde(hoy);
     setFechaHasta(hoy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Hidratación desde el contexto de retorno (UNA sola vez). Reconstruye el reporte
+  // automáticamente cuando los params son válidos; sin params, flujo manual normal.
+  // No escribe la URL (evita loops estado↔URL).
+  const hidratadoRef = useRef(false);
+  useEffect(() => {
+    if (hidratadoRef.current) return;
+    if (loadingCtx) return; // esperar a que el contexto (localId) esté resuelto
+    hidratadoRef.current = true;
+    const ctx = parseReturnParams(searchParams);
+    if (contextoReconstruible(ctx)) {
+      cargarReporte({
+        fechaDesde: ctx.fechaDesde,
+        fechaHasta: ctx.fechaHasta,
+        formaPago: ctx.formaPago ?? "",
+        vista: ctx.tab ?? "venta",
+        page: ctx.tab === "cliente" ? 1 : (ctx.page ?? 1),
+        localId: ctx.localId ?? contexto?.localId ?? null,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingCtx, searchParams]);
+
+  // Restauración de scroll ACOTADA: solo si venimos de "Ver venta" (hay marca), la
+  // tab coincide, y ya terminó de cargar el listado. Se limpia tras restaurar.
+  useEffect(() => {
+    if (loadingListado) return;
+    let raw = null;
+    try { raw = sessionStorage.getItem(SCROLL_KEY); } catch {}
+    if (!raw) return;
+    let saved = null;
+    try { saved = JSON.parse(raw); } catch {}
+    try { sessionStorage.removeItem(SCROLL_KEY); } catch {}
+    if (!saved || saved.tab !== vista) return;
+    const y = Number(saved.y) || 0;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const el = getVentasScrollEl();
+        if (el) el.scrollTop = y;
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingListado, listado]);
+
+  // Navega a la página "Ver venta" con el contexto actual del listado, guardando
+  // scroll + venta seleccionada para restaurar al volver. `tab` permite marcar el
+  // origen ("venta" o "cliente").
+  const irADetalle = (ventaId, tab = vista) => {
+    try {
+      const el = getVentasScrollEl();
+      sessionStorage.setItem(
+        SCROLL_KEY,
+        JSON.stringify({ y: el ? el.scrollTop : 0, ventaId, tab })
+      );
+    } catch {}
+    const ctx = {
+      tab,
+      page: pageVentas,
+      fechaDesde,
+      fechaHasta,
+      localId: contexto?.localId ?? null,
+      formaPago,
+    };
+    router.push(buildDetalleUrl(ventaId, ctx));
+  };
 
   const cargarListado = async (page, filtrosOverride) => {
     const filtros = filtrosOverride || filtrosVigentes;
@@ -167,10 +251,26 @@ export default function ReportesVentasPage() {
     }
   };
 
-  const cargarReporte = async () => {
-    if (!fechaDesde || !fechaHasta) {
+  // Sin argumentos usa el ESTADO (botón "Generar Reporte"). Con `over` (hidratación
+  // desde query params de retorno) usa esos valores, sincroniza los inputs/tab
+  // visibles y carga la PÁGINA exacta — reconstruyendo el reporte tal como estaba.
+  const cargarReporte = async (over = null) => {
+    const fd = over?.fechaDesde ?? fechaDesde;
+    const fh = over?.fechaHasta ?? fechaHasta;
+    const fp = over?.formaPago ?? formaPago;
+    const lid = over?.localId ?? contexto?.localId ?? null;
+    const pg = over?.page ?? 1;
+
+    if (!fd || !fh) {
       setErrorMsg("Selecciona las fechas");
       return;
+    }
+
+    if (over) {
+      if (over.fechaDesde != null) setFechaDesde(over.fechaDesde);
+      if (over.fechaHasta != null) setFechaHasta(over.fechaHasta);
+      if (over.formaPago != null) setFormaPago(over.formaPago);
+      if (over.vista != null) setVista(over.vista);
     }
 
     setErrorMsg("");
@@ -178,16 +278,11 @@ export default function ReportesVentasPage() {
     setReporte(null);
     setListado(null);
     setPaginacion(null);
-    setPageVentas(1);
+    setPageVentas(pg);
 
     // Snapshot de filtros para que la paginación use estos valores aunque el
     // usuario cambie los inputs después.
-    const filtros = {
-      fechaDesde,
-      fechaHasta,
-      formaPago,
-      localId: contexto?.localId ?? null,
-    };
+    const filtros = { fechaDesde: fd, fechaHasta: fh, formaPago: fp, localId: lid };
     setFiltrosVigentes(filtros);
 
     try {
@@ -210,8 +305,8 @@ export default function ReportesVentasPage() {
       }
 
       setReporte(data);
-      // Pasa filtros directo para no depender del state recién seteado.
-      cargarListado(1, filtros);
+      // Carga la PÁGINA solicitada (pg) del listado venta-por-venta.
+      cargarListado(pg, filtros);
     } catch (error) {
       console.error("Error:", error);
       setErrorMsg("Error de conexion al generar reporte");
@@ -287,7 +382,7 @@ export default function ReportesVentasPage() {
         <div className="flex gap-2 mt-3">
           <SunmiButton
             color="amber"
-            onClick={cargarReporte}
+            onClick={() => cargarReporte()}
             disabled={loading}
             className="flex-1"
           >
@@ -412,7 +507,7 @@ export default function ReportesVentasPage() {
             </div>
 
             {vista === "cliente" && (
-              <ReporteVentasPorCliente filtros={filtrosVigentes} onVerTicket={abrirDetalle} />
+              <ReporteVentasPorCliente filtros={filtrosVigentes} onVerTicket={(id) => irADetalle(id, "cliente")} />
             )}
 
             {vista === "venta" && (<>
@@ -484,7 +579,7 @@ export default function ReportesVentasPage() {
                       <SunmiButton
                         color="amber"
                         size="sm"
-                        onClick={() => abrirDetalle(v.id)}
+                        onClick={() => irADetalle(v.id)}
                         className="w-full mt-1"
                       >
                         Ver venta
@@ -561,7 +656,7 @@ export default function ReportesVentasPage() {
                           <SunmiButton
                             color="amber"
                             size="sm"
-                            onClick={() => abrirDetalle(v.id)}
+                            onClick={() => irADetalle(v.id)}
                           >
                             Ver venta
                           </SunmiButton>

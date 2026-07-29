@@ -9,8 +9,9 @@
 // NO usa: fixed inset-0, createPortal, fondo de overlay, z-index de modal, botón
 // "Cerrar", ni el estado detalleAbierto. Es una ruta navegable/directa por URL.
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { buildVolverUrl } from "@/lib/reportes-ventas/returnParams";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
@@ -22,7 +23,12 @@ const FALLBACK_VENTAS = "/modulos/reportes-ventas";
 export default function VerVentaPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const ventaId = params?.ventaId;
+
+  // "Volver a ventas" reconstruido desde el contexto de retorno validado (whitelist).
+  // Si no hay params válidos, queda igual a la base y caemos a back()/fallback.
+  const volverUrl = useMemo(() => buildVolverUrl(searchParams), [searchParams]);
 
   const [venta, setVenta] = useState(null);
   const [permisos, setPermisos] = useState(null);
@@ -67,15 +73,22 @@ export default function VerVentaPage() {
     cargarDetalle();
   }, [cargarDetalle]);
 
-  // "Volver a ventas": si la página se abrió navegando desde el reporte, volver
-  // atrás; en carga directa por URL (sin historial propio), fallback seguro.
+  // "Volver a ventas":
+  //  1) si hay contexto de retorno válido en la URL → navegar EXPLÍCITO al listado
+  //     con esos params (restaura tab/página/fechas/local/forma de pago);
+  //  2) si no, router.back() cuando sea razonable (no dependemos SOLO de esto);
+  //  3) fallback seguro al listado.
   const volver = useCallback(() => {
+    if (volverUrl !== FALLBACK_VENTAS) {
+      router.push(volverUrl);
+      return;
+    }
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
-    } else {
-      router.push(FALLBACK_VENTAS);
+      return;
     }
-  }, [router]);
+    router.push(FALLBACK_VENTAS);
+  }, [router, volverUrl]);
 
   const tituloVenta = venta ? `Venta #${venta.numero ?? venta.id}` : "Ver venta";
 
