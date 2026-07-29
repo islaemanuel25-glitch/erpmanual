@@ -284,7 +284,11 @@ export default function ReportesVentasPage() {
   const r = reporte?.resumen;
 
   return (
-    <div className="p-2 sm:p-3 lg:p-4 space-y-3 max-w-7xl mx-auto">
+    // Mismo patrón de contenedor que POS Ventas: ancho completo del área útil y
+    // padding p-2 / lg:p-3. Antes tenía `max-w-7xl mx-auto`, que recortaba la
+    // página a 1120 px (80rem con raíz de 14px) y la centraba, mientras el POS
+    // usaba todo el ancho disponible.
+    <div className="w-full min-h-full p-2 lg:p-3 space-y-3">
       {/* Encabezado + filtros en una franja compacta (una sola fila en desktop) */}
       <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
         <div className="mb-3">
