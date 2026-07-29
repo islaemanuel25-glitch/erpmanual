@@ -12,7 +12,6 @@ import { useState, useEffect } from "react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import EditorVentaCorreccion from "@/components/reportes-ventas/EditorVentaCorreccion";
 
 function num(v) {
   const n = Number(v);
@@ -56,12 +55,11 @@ function construirTicket(venta) {
   };
 }
 
-export default function AccionesTicket({ venta, onCorregido, correccionMode = "modal", onCorregirCompleta }) {
+export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta }) {
   const c = venta?.correccion || {};
   const [msg, setMsg] = useState(null); // { tipo: "ok"|"error"|"info", texto }
   const [panel, setPanel] = useState(null); // "simple" | "historial" | null
   const [busy, setBusy] = useState(false);
-  const [editorAbierto, setEditorAbierto] = useState(false);
 
   const flash = (tipo, texto) => setMsg({ tipo, texto });
 
@@ -180,20 +178,11 @@ export default function AccionesTicket({ venta, onCorregido, correccionMode = "m
         )}
 
         {/* Corregir venta (completa) — solo con turno original abierto.
-            correccionMode="page" → NAVEGA a /[ventaId]/corregir (sin abrir modal).
-            correccionMode="modal" (default) → abre EditorVentaCorreccion como modal
-            (convivencia temporal con el modal viejo del listado). */}
+            Navega a /modulos/reportes-ventas/[ventaId]/corregir (página real). */}
         {c.puedeCorregirCompleta ? (
           <SunmiButton
             color="amber"
-            onClick={() => {
-              if (correccionMode === "page") {
-                onCorregirCompleta && onCorregirCompleta();
-              } else {
-                setEditorAbierto(true);
-                setMsg(null);
-              }
-            }}
+            onClick={() => { setMsg(null); onCorregirCompleta && onCorregirCompleta(); }}
             className="text-sm"
           >
             🧾 Corregir venta
@@ -265,18 +254,6 @@ export default function AccionesTicket({ venta, onCorregido, correccionMode = "m
       )}
 
       {panel === "historial" && <HistorialCorrecciones ventaId={venta.id} />}
-
-      {editorAbierto && (
-        <EditorVentaCorreccion
-          ventaId={venta.id}
-          onClose={() => setEditorAbierto(false)}
-          onCorregido={(info) => {
-            setEditorAbierto(false);
-            flash("ok", "Venta corregida.");
-            onCorregido && onCorregido(info);
-          }}
-        />
-      )}
     </SunmiCard>
   );
 }

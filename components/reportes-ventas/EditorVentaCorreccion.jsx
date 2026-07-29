@@ -4,20 +4,20 @@
 // sistema responsive que Compras → Ver compra → Recibir mercadería. Se copia la
 // estructura/clases/breakpoints de esa pantalla y solo se adaptan los datos de
 // ventas:
-//   · Página (overlay por portal, scrolleable) → SunmiCard → SunmiPanels.
+//   · Contenido de PÁGINA (sin overlay/portal): SunmiCard → SunmiPanels, scroll
+//     normal del documento (<main>). Se monta en /[ventaId]/corregir.
 //   · Encabezado: flex justify-between (SunmiHeader "Corregir venta" + badge estado
-//     / botón Volver) + panel de metadatos grid-cols-2 md:grid-cols-4.
+//     / botón Volver a la venta) + panel de metadatos grid-cols-2 md:grid-cols-4.
 //   · Detalle: DESKTOP tabla (hidden md:block) · MÓVIL cards (md:hidden), con el
 //     control de cantidad − [n] + idéntico a "Recibir mercadería".
 //   · "Agregar producto": SunmiPanel inline (SunmiInput + tabla de resultados).
 //   · Pagos: SunmiPanel con SunmiSelectAdv + SunmiInput.
-//   · Resumen (Total original / corregido / Diferencia) + acciones inline
-//     (flex justify-end gap-3). SIN footer flotante — scrollea con el contenido.
-// Overlay por portal (z-[10000], por encima de SunmiModalLayout z-[9999]).
+//   · Resumen (Total original / corregido / Diferencia) + barra de acciones sticky.
+//   · Revisión de cambios: etapa in-page (RevisionVentaCorreccion) que reemplaza al
+//     editor en la misma URL (sin modal).
 // Solo habilitado si el turno ORIGINAL sigue abierto (lo decide el backend).
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { ArrowLeft } from "lucide-react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
@@ -56,14 +56,13 @@ function fmtFecha(iso) {
 let _k = 0;
 const nextKey = () => `l${++_k}`;
 
-// Contenedor scrolleable en mode="page" (el <main> del layout, como Productos).
+// Contenedor scrolleable de la página (el <main> del layout, como Productos).
 function getEditorScrollEl() {
   if (typeof document === "undefined") return null;
   return document.querySelector("main");
 }
 
-export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, mode = "modal" }) {
-  const esPage = mode === "page";
+export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }) {
   const editorScrollRef = useRef(0);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -77,7 +76,6 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, m
   const [motivo, setMotivo] = useState("");
   const [revisando, setRevisando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
-  const [montado, setMontado] = useState(false);
   // code del último error de confirmar (conflicto_version, fuera_de_ventana, …) para
   // ofrecer "Recargar venta" cuando corresponde. reloadKey re-dispara la carga /editar.
   const [errorCode, setErrorCode] = useState(null);
@@ -92,8 +90,6 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, m
   const [extraLoading, setExtraLoading] = useState(false);
   const [extraAdding, setExtraAdding] = useState(null);
   const debounceRef = useRef(null);
-
-  useEffect(() => { setMontado(true); }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -259,8 +255,8 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, m
 
   async function revisar() {
     if (revisando) return;
-    // Guardar la posición del editor para restaurarla al "Volver a editar" (page).
-    if (esPage) { const el = getEditorScrollEl(); editorScrollRef.current = el ? el.scrollTop : 0; }
+    // Guardar la posición del editor para restaurarla al "Volver a editar".
+    { const el = getEditorScrollEl(); editorScrollRef.current = el ? el.scrollTop : 0; }
     setRevisando(true); setError("");
     try {
       const r = await fetch(`/api/pos-ventas/venta/${ventaId}/revisar`, {
@@ -288,7 +284,7 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, m
       // Error (409/403/…): NO abandonar la revisión; mostrar mensaje + code, sin
       // limpiar el formulario. El code habilita "Recargar venta" ante conflicto.
       if (!d.ok) { setError(d.error || "No se pudo aplicar la corrección."); setErrorCode(d.code || null); setConfirmando(false); return; }
-      onCorregido && onCorregido(d); onClose && onClose();
+      onCorregido && onCorregido(d); onVolver && onVolver();
     } catch { setError("Error de conexión."); }
     finally { setConfirmando(false); confirmandoRef.current = false; }
   }
@@ -316,19 +312,17 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, m
     );
   }, []);
 
-  // Al ENTRAR en revisión (page): llevar al inicio (encabezado de revisión). Sin
-  // contenedor overflow propio: usamos el scroll del documento/<main>.
+  // Al ENTRAR en revisión: llevar al inicio (encabezado de revisión). Sin contenedor
+  // overflow propio: usamos el scroll del documento/<main>.
   useEffect(() => {
-    if (!esPage || !revision) return;
+    if (!revision) return;
     const el = getEditorScrollEl();
     if (el) el.scrollTop = 0; else if (typeof window !== "undefined") window.scrollTo(0, 0);
-  }, [esPage, revision]);
+  }, [revision]);
 
-  // Contenido interno del editor, IDÉNTICO en ambos modos. En mode="page" se renderiza
-  // directo (scroll normal del documento, sin overlay); en mode="modal" va adentro del
-  // overlay por portal (comportamiento anterior).
+  // Contenido del editor (contenido de página, scroll normal del documento).
   const contenido = (
-    <div className={esPage ? "w-full" : "w-full min-h-full p-4"}>
+    <div className="w-full">
       <SunmiCard>
           {/* Encabezado — patrón Ver / Recibir compra */}
           <div className="flex items-center justify-between mb-4">
@@ -340,8 +334,8 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, m
                 </span>
               )}
             </div>
-            <button type="button" onClick={onClose} className="sunmi-btn-base sunmi-btn-slate inline-flex items-center gap-1.5">
-              <ArrowLeft size={15} /> {esPage ? "Volver a la venta" : "Volver"}
+            <button type="button" onClick={onVolver} className="sunmi-btn-base sunmi-btn-slate inline-flex items-center gap-1.5">
+              <ArrowLeft size={15} /> Volver a la venta
             </button>
           </div>
 
@@ -683,12 +677,10 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, m
 
               {error && <div className="text-[13px] sunmi-state-danger sunmi-text-danger rounded px-2 py-1.5 mb-4">{error}</div>}
 
-              {/* Acciones. En página: barra inferior STICKY (Volver a la venta / Revisar). */}
-              <div className={esPage
-                ? "sticky bottom-0 z-10 mt-4 py-3 sunmi-bg border-t sunmi-divider flex justify-end gap-3"
-                : "flex justify-end gap-3"}>
-                <SunmiButton color="slate" onClick={onClose}>
-                  {esPage ? "Volver a la venta" : "Volver"}
+              {/* Acciones: barra inferior STICKY (Volver a la venta / Revisar). */}
+              <div className="sticky bottom-0 z-10 mt-4 py-3 sunmi-bg border-t sunmi-divider flex justify-end gap-3">
+                <SunmiButton color="slate" onClick={onVolver}>
+                  Volver a la venta
                 </SunmiButton>
                 <SunmiButton color="amber" onClick={revisar} disabled={revisando || !puedeRevisar}>
                   {revisando ? "Revisando..." : "Revisar cambios"}
@@ -700,94 +692,29 @@ export default function EditorVentaCorreccion({ ventaId, onClose, onCorregido, m
     </div>
   );
 
-  // Overlay de revisión: SOLO en mode="modal" (temporal). En mode="page" NO se usa:
-  // la revisión es una ETAPA in-page (RevisionVentaCorreccion) que reemplaza el editor.
-  const revisarOverlay = revision ? (
-    <ModalRevisarCambios revision={revision} motivo={motivo} setMotivo={setMotivo} error={error} confirmando={confirmando}
-      onCancel={() => { setRevision(null); setError(""); }} onConfirm={confirmar} />
-  ) : null;
-
-  if (esPage) {
-    // Página real: SIN createPortal, SIN fixed inset-0, SIN z-modal, SIN overlay.
-    // revision !== null → la ETAPA de revisión REEMPLAZA al editor (mismo documento).
-    if (revision) {
-      return (
-        <RevisionVentaCorreccion
-          revision={revision}
-          venta={data?.venta}
-          motivo={motivo}
-          setMotivo={setMotivo}
-          confirmando={confirmando}
-          error={error}
-          errorCode={errorCode}
-          onVolverEditar={volverAEditar}
-          onConfirmar={confirmar}
-          onRecargar={recargarVenta}
-        />
-      );
-    }
-    return contenido;
+  // Contenido de página (scroll normal del documento, sin overlay ni modal).
+  // revision !== null → la ETAPA de revisión REEMPLAZA al editor (misma URL/documento).
+  if (revision) {
+    return (
+      <RevisionVentaCorreccion
+        revision={revision}
+        venta={data?.venta}
+        motivo={motivo}
+        setMotivo={setMotivo}
+        confirmando={confirmando}
+        error={error}
+        errorCode={errorCode}
+        onVolverEditar={volverAEditar}
+        onConfirmar={confirmar}
+        onRecargar={recargarVenta}
+      />
+    );
   }
-
-  // mode="modal": overlay por portal (comportamiento anterior) + revisión modal
-  // (z-[10001]) — se retira junto con el flujo viejo en un commit posterior.
-  if (!montado) return null;
-  return createPortal(
-    <div className="fixed inset-0 z-[10000] sunmi-bg overflow-y-auto" style={{ overflowX: "hidden" }}>
-      {contenido}
-      {revisarOverlay}
-    </div>,
-    document.body
-  );
-}
-
-function ModalRevisarCambios({ revision, motivo, setMotivo, error, confirmando, onCancel, onConfirm }) {
-  const t = revision.totales || {};
-  const dp = revision.diff?.productos || {};
-  const puede = revision.puedeConfirmar === true;
-  const unidadesMas = (dp.agregadas || []).reduce((a, l) => a + Number(l.cantidad || 0), 0) + (dp.modificadas || []).reduce((a, l) => a + Math.max(0, Number(l.cantidadDespues) - Number(l.cantidadAntes)), 0);
-  const unidadesMenos = (dp.eliminadas || []).reduce((a, l) => a + Number(l.cantidad || 0), 0) + (dp.modificadas || []).reduce((a, l) => a + Math.max(0, Number(l.cantidadAntes) - Number(l.cantidadDespues)), 0);
-  return (
-    <div className="fixed inset-0 z-[10001] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ overflowX: "hidden" }}>
-      <div className="sunmi-bg w-full sm:max-w-lg sm:rounded-lg max-h-[90vh] overflow-y-auto p-4 space-y-3">
-        <div className="text-base font-bold">Revisar cambios</div>
-        <div className="sunmi-surface rounded p-2 text-sm space-y-1">
-          <div className="flex justify-between"><span className="sunmi-text-muted">Total anterior</span><span className="tabular-nums">{money(t.totalAnterior)}</span></div>
-          <div className="flex justify-between"><span className="sunmi-text-muted">Total nuevo</span><span className="tabular-nums font-semibold">{money(t.totalNuevo)}</span></div>
-          <div className="flex justify-between"><span className="sunmi-text-muted">Diferencia</span>
-            <span className={`tabular-nums font-semibold ${Number(t.diferencia) < 0 ? "sunmi-text-danger" : Number(t.diferencia) > 0 ? "sunmi-text-accent" : ""}`}>{Number(t.diferencia) > 0 ? "+" : ""}{money(t.diferencia)}</span></div>
-          <div className="flex justify-between text-[11px] sunmi-text-muted"><span>Unidades + {unidadesMas} · − {unidadesMenos}</span><span>{Number(t.diferencia) < 0 ? "A devolver" : Number(t.diferencia) > 0 ? "A cobrar" : ""}</span></div>
-        </div>
-        <div className="text-[12px] space-y-1">
-          {(dp.agregadas || []).map((l, i) => <div key={`a${i}`} className="sunmi-text-success">+ {l.nombre} × {l.cantidad} ({money(l.subtotal)})</div>)}
-          {(dp.eliminadas || []).map((l, i) => <div key={`e${i}`} className="sunmi-text-danger">− {l.nombre} × {l.cantidad}</div>)}
-          {(dp.modificadas || []).map((l, i) => <div key={`m${i}`} className="sunmi-text-accent">~ {l.nombre}: {l.cantidadAntes}→{l.cantidadDespues} u, {money(l.precioAntes)}→{money(l.precioDespues)}</div>)}
-        </div>
-        {(revision.impactoStock || []).length > 0 && (
-          <div className="text-[11px] sunmi-text-muted">Stock: {revision.impactoStock.map((s) => `#${s.productoLocalId} ${s.delta > 0 ? "+" : ""}${s.delta}`).join(" · ")}</div>
-        )}
-        {revision.cuentaCorriente?.aplica && <div className="text-[12px] sunmi-state-warning sunmi-text-accent rounded px-2 py-1.5">Cuenta corriente: {String(revision.cuentaCorriente.tipo).replaceAll("_", " ")}</div>}
-        {revision.diff?.cambioCliente && <div className="text-[12px] sunmi-text-muted">Cliente: {revision.diff.cambioCliente.antes ?? "consumidor final"} → {revision.diff.cambioCliente.despues ?? "consumidor final"}</div>}
-        {(revision.bloqueosLegacy || []).length > 0 && <div className="text-[12px] sunmi-state-danger sunmi-text-danger rounded px-2 py-1.5">Hay líneas sin consumo resuelto: {revision.bloqueosLegacy.map((b) => b.nombre).join(", ")}</div>}
-        {(revision.advertencias || []).map((a, i) => (
-          <div key={i} className="text-[12px] sunmi-text-danger">{a.tipo === "pagos_no_cuadran" ? "Los pagos no cuadran con el total." : a.tipo === "fiado_sin_cliente" ? "Una venta fiada requiere cliente." : a.tipo === "stock_insuficiente" ? "Stock insuficiente." : a.detalle || a.tipo}</div>
-        ))}
-        <div>
-          <div className="text-[11px] sunmi-text-muted mb-1">Motivo de la corrección *</div>
-          <SunmiInput value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Por qué se corrige (obligatorio)" className="text-sm" maxLength={300} />
-        </div>
-        {error && <div className="text-[12px] sunmi-text-danger">{error}</div>}
-        <div className="flex gap-2 justify-end pt-1">
-          <SunmiButton color="slate" onClick={onCancel} disabled={confirmando} className="text-sm">Volver</SunmiButton>
-          <SunmiButton color="amber" onClick={onConfirm} disabled={confirmando || !puede || !motivo.trim()} className="text-sm">{confirmando ? "Aplicando…" : "Confirmar corrección"}</SunmiButton>
-        </div>
-      </div>
-    </div>
-  );
+  return contenido;
 }
 
 // ---------------------------------------------------------------------------
-// Etapa de REVISIÓN in-page (mode="page"). Reemplaza al editor; SIN overlay, portal,
+// Etapa de REVISIÓN in-page. Reemplaza al editor en la misma URL; SIN overlay, portal,
 // fondo negro, z-index ni scroll interno. Solo RENDERIZA el objeto `revision` que ya
 // devolvió /revisar (no re-arma ni re-consulta). Los campos Pack/Unidad y cantidadStock
 // por línea NO vienen hoy en la respuesta de revisar (ver informe).

@@ -1,9 +1,8 @@
 "use client";
 
-// Página de CORRECCIÓN completa (Commit 3). Monta EditorVentaCorreccion en
-// mode="page": contenido de página real, SIN overlay principal (sin fixed inset-0,
-// sin createPortal, sin z-modal, scroll normal del documento). La REVISIÓN sigue
-// como modal temporal dentro del editor (se migra en el Commit 4).
+// Página de CORRECCIÓN completa. Monta EditorVentaCorreccion como contenido de
+// página real: sin overlay/portal/z-modal, scroll normal del documento. La REVISIÓN
+// de cambios es una etapa in-page del propio editor (misma URL, sin modal).
 //
 // El editor ya trae la venta desde /editar y muestra los 403/409 (beta, permiso,
 // turno cerrado, fuera de ventana) → no duplicamos el fetch del detalle.
@@ -42,8 +41,7 @@ export default function CorregirVentaPage() {
       <div className="mx-auto w-full max-w-5xl">
         <EditorVentaCorreccion
           ventaId={ventaId}
-          mode="page"
-          onClose={volverALaVenta}
+          onVolver={volverALaVenta}
           onCorregido={alCorregir}
         />
       </div>

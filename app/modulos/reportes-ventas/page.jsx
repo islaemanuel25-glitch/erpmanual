@@ -14,9 +14,6 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
-import VentaDetalleAdmin from "@/components/reportes-ventas/VentaDetalleAdmin";
-import AccionesTicket from "@/components/reportes-ventas/AccionesTicket";
 import ReporteVentasPorCliente from "@/components/reportes-ventas/ReporteVentasPorCliente";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -104,45 +101,6 @@ export default function ReportesVentasPage() {
   // Filtros usados en el último "Generar Reporte". La paginación los usa para
   // no desincronizarse del resumen si el usuario cambia inputs sin re-generar.
   const [filtrosVigentes, setFiltrosVigentes] = useState(null);
-
-  // Detalle de ticket (modal)
-  const [detalleAbierto, setDetalleAbierto] = useState(false);
-  const [detalleData, setDetalleData] = useState(null);
-  const [detallePermisos, setDetallePermisos] = useState(null);
-  const [loadingDetalle, setLoadingDetalle] = useState(false);
-  const [errorDetalle, setErrorDetalle] = useState("");
-
-  const abrirDetalle = async (ventaId) => {
-    setDetalleAbierto(true);
-    setDetalleData(null);
-    setDetallePermisos(null);
-    setErrorDetalle("");
-    setLoadingDetalle(true);
-    try {
-      const res = await fetch(`/api/reportes-ventas/detalle/${ventaId}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setDetalleData(data.venta);
-        setDetallePermisos(data.permisos || null);
-      } else {
-        setErrorDetalle(data.error || "No se pudo cargar el ticket");
-      }
-    } catch (error) {
-      console.error("Error detalle venta:", error);
-      setErrorDetalle("Error de conexión");
-    } finally {
-      setLoadingDetalle(false);
-    }
-  };
-
-  const cerrarDetalle = () => {
-    setDetalleAbierto(false);
-    setDetalleData(null);
-    setDetallePermisos(null);
-    setErrorDetalle("");
-  };
 
   // Fecha por defecto = hoy, SALVO que volvamos con contexto (query params con
   // fechas válidas): en ese caso no pisamos, la hidratación las restaura.
@@ -767,49 +725,6 @@ export default function ReportesVentasPage() {
         </SunmiCard>
       )}
 
-      {/* Modal detalle de ticket */}
-      <SunmiModalLayout
-        open={detalleAbierto}
-        title={
-          detalleData
-            ? `Ticket #${detalleData.numero ?? detalleData.id}`
-            : "Detalle de venta"
-        }
-        subtitle={detalleData ? detalleData.local?.nombre : null}
-        color="amber"
-        maxWidth="max-w-2xl"
-        onClose={cerrarDetalle}
-      >
-        {loadingDetalle && (
-          <div className="text-center py-8">
-            <SunmiLoader />
-          </div>
-        )}
-
-        {!loadingDetalle && errorDetalle && (
-          <div className="text-center py-6 text-xs sunmi-text-danger sunmi-state-danger rounded px-2 py-1.5">
-            {errorDetalle}
-          </div>
-        )}
-
-        {!loadingDetalle && !errorDetalle && detalleData && (
-          <>
-            <AccionesTicket
-              venta={detalleData}
-              onCorregido={() => {
-                // Tras corregir: refrescar el listado (total/estado/badge vigentes)
-                // y recargar el detalle abierto (sin recargar la página).
-                cargarListado(pageVentas);
-                abrirDetalle(detalleData.id);
-              }}
-            />
-            <VentaDetalleAdmin
-              venta={detalleData}
-              permisos={detallePermisos}
-            />
-          </>
-        )}
-      </SunmiModalLayout>
     </div>
   );
 }

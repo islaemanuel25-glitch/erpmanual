@@ -154,7 +154,6 @@ export default function VerVentaPage() {
             <AccionesTicket
               venta={venta}
               onCorregido={() => cargarDetalle()}
-              correccionMode="page"
               onCorregirCompleta={() => router.push(corregirUrl)}
             />
             <VentaDetalleAdmin venta={venta} permisos={permisos} />
