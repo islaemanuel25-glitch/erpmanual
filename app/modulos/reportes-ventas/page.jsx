@@ -11,10 +11,10 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import ReporteVentasPorCliente from "@/components/reportes-ventas/ReporteVentasPorCliente";
+import { ShoppingCart, Banknote, Scissors, Wallet, TrendingUp } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -27,6 +27,7 @@ function formatPrecio(n) {
     maximumFractionDigits: 2,
   });
 }
+const money = (n) => `$ ${formatPrecio(n)}`;
 
 // Cantidad en es-AR: enteros sin decimales, fraccionarios con máx 3 útiles.
 function formatCantidad(n) {
@@ -280,25 +281,22 @@ export default function ReportesVentasPage() {
   const esAdminR = Array.isArray(permisosR) && permisosR.includes("*");
   if (!esAdminR && !permisosR.includes("reportes.ver")) return <SinPermisos />;
 
+  const r = reporte?.resumen;
+
   return (
-    <div className="p-2 lg:p-3 space-y-3 max-w-7xl mx-auto">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold">Ventas</h1>
-        <p className="text-sm sunmi-text-muted">
-          Analisis de ventas, comisiones y rentabilidad
-        </p>
-      </div>
-
-      {/* Filtros */}
+    <div className="p-2 sm:p-3 lg:p-4 space-y-3 max-w-7xl mx-auto">
+      {/* Encabezado + filtros en una franja compacta (una sola fila en desktop) */}
       <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
-        <SunmiSeparator label="Filtros" />
+        <div className="mb-3">
+          <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">Ventas</h1>
+          <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
+            Análisis de ventas, comisiones y rentabilidad
+          </p>
+        </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 relative">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 items-end">
           <div>
-            <label className="text-[11px] sunmi-text-muted mb-1 block">
-              Desde
-            </label>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Desde</label>
             <SunmiInput
               type="date"
               value={fechaDesde}
@@ -308,9 +306,7 @@ export default function ReportesVentasPage() {
           </div>
 
           <div>
-            <label className="text-[11px] sunmi-text-muted mb-1 block">
-              Hasta
-            </label>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Hasta</label>
             <SunmiInput
               type="date"
               value={fechaHasta}
@@ -319,10 +315,8 @@ export default function ReportesVentasPage() {
             />
           </div>
 
-          <div className="relative">
-            <label className="text-[11px] sunmi-text-muted mb-1 block">
-              Forma de pago
-            </label>
+          <div className="col-span-2 lg:col-span-1 relative">
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Forma de pago</label>
             <SunmiSelectAdv
               value={formaPago}
               onChange={(val) => setFormaPago(val)}
@@ -335,17 +329,17 @@ export default function ReportesVentasPage() {
               <option value="credito">Credito</option>
             </SunmiSelectAdv>
           </div>
-        </div>
 
-        <div className="flex gap-2 mt-3">
-          <SunmiButton
-            color="amber"
-            onClick={() => cargarReporte()}
-            disabled={loading}
-            className="flex-1"
-          >
-            {loading ? "Cargando..." : "Generar Reporte"}
-          </SunmiButton>
+          <div className="col-span-2 lg:col-span-1">
+            <SunmiButton
+              color="amber"
+              onClick={() => cargarReporte()}
+              disabled={loading}
+              className="w-full font-semibold"
+            >
+              {loading ? "Cargando…" : "Generar reporte"}
+            </SunmiButton>
+          </div>
         </div>
 
         {errorMsg && (
@@ -365,353 +359,257 @@ export default function ReportesVentasPage() {
       {/* Reporte */}
       {reporte && !loading && (
         <>
-          {/* Resumen General */}
-          <SunmiCard className="p-3">
-            <SunmiSeparator label="Resumen Financiero" />
-
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3">
-              <div className="sunmi-surface p-3 rounded-lg text-center">
-                <div className="text-[10px] sunmi-text-muted">Ventas</div>
-                <div className="text-xl font-bold sunmi-text-link">
-                  {reporte.resumen.cantidadVentas}
-                </div>
-              </div>
-
-              <div className="sunmi-surface p-3 rounded-lg text-center">
-                <div className="text-[10px] sunmi-text-muted">Total Bruto</div>
-                <div className="text-xl font-bold sunmi-text-accent">
-                  ${formatPrecio(reporte.resumen.totalBruto)}
-                </div>
-              </div>
-
-              <div className="sunmi-surface p-3 rounded-lg text-center">
-                <div className="text-[10px] sunmi-text-muted">Comisiones</div>
-                <div className="text-xl font-bold sunmi-text-accent">
-                  -${formatPrecio(reporte.resumen.totalComisiones)}
-                </div>
-              </div>
-
-              <div className="sunmi-surface p-3 rounded-lg text-center">
-                <div className="text-[10px] sunmi-text-muted">Neto Recibido</div>
-                <div className="text-xl font-bold sunmi-text-success">
-                  ${formatPrecio(reporte.resumen.totalNeto)}
-                </div>
-              </div>
-
-              <div className="sunmi-state-success p-3 rounded-lg text-center">
-                <div className="text-[10px] sunmi-text-success">
-                  Ganancia Neta
-                </div>
-                <div className="text-xl font-bold sunmi-text-success">
-                  ${formatPrecio(reporte.resumen.gananciaNeta)}
-                </div>
-              </div>
+          {/* 2 · Resumen financiero — grilla de cards */}
+          <section className="space-y-2">
+            <SectionHead title="Resumen financiero" />
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3">
+              <MetricCard icon={ShoppingCart} tone="link" label="Ventas" value={r.cantidadVentas} />
+              <MetricCard icon={Banknote} tone="accent" label="Total bruto" value={money(r.totalBruto)} />
+              <MetricCard icon={Scissors} tone="warning" label="Comisiones" value={`- ${money(r.totalComisiones)}`} />
+              <MetricCard icon={Wallet} tone="success" label="Neto recibido" value={money(r.totalNeto)} />
+              <MetricCard
+                icon={TrendingUp}
+                tone="success"
+                highlight
+                label="Ganancia neta"
+                value={money(r.gananciaNeta)}
+                className="col-span-2 md:col-span-1"
+              />
             </div>
-          </SunmiCard>
+          </section>
 
-          {/* Desglose por forma de pago */}
+          {/* 3 · Desglose por forma de pago — bloque secundario */}
           {reporte.desglosePago && reporte.desglosePago.length > 0 && (
-            <SunmiCard className="p-3">
-              <SunmiSeparator label="Desglose por Forma de Pago" />
-
-              <div className="overflow-x-auto mt-3">
-                <SunmiTable
-                  headers={[
-                    "Forma de Pago",
-                    "Ventas",
-                    "Total Bruto",
-                    "Comision",
-                    "Neto Recibido",
-                  ]}
-                >
-                  {reporte.desglosePago.map((item) => (
-                    <tr key={item.formaPago} className="hover:bg-[var(--hover-bg)]">
-                      <td className="px-2 py-1.5 font-medium capitalize">
-                        {item.formaPago}
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        {item.cantidad}
-                      </td>
-                      <td className="px-2 py-1.5 text-right font-mono">
-                        ${formatPrecio(item.total)}
-                      </td>
-                      <td className="px-2 py-1.5 text-right font-mono sunmi-text-accent">
-                        {item.comision > 0
-                          ? `-$${formatPrecio(item.comision)}`
-                          : "-"}
-                      </td>
-                      <td className="px-2 py-1.5 text-right font-mono sunmi-text-success font-bold">
-                        ${formatPrecio(item.neto)}
-                      </td>
-                    </tr>
-                  ))}
-                </SunmiTable>
-              </div>
-            </SunmiCard>
-          )}
-
-          {/* Ventas del período (venta por venta) */}
-          <SunmiCard className="p-3">
-            <SunmiSeparator label="Ventas del período" />
-
-            {/* Selector de vista: por venta / por cliente */}
-            <div className="flex gap-1 mt-2">
-              <SunmiButton color={vista === "venta" ? "amber" : "slate"} onClick={() => setVista("venta")} className="text-xs">
-                Por venta
-              </SunmiButton>
-              <SunmiButton color={vista === "cliente" ? "amber" : "slate"} onClick={() => setVista("cliente")} className="text-xs">
-                Por cliente
-              </SunmiButton>
-            </div>
-
-            {vista === "cliente" && (
-              <ReporteVentasPorCliente filtros={filtrosVigentes} onVerTicket={(id) => irADetalle(id, "cliente")} />
-            )}
-
-            {vista === "venta" && (<>
-            {loadingListado && (
-              <div className="text-center py-6">
-                <SunmiLoader />
-              </div>
-            )}
-
-            {!loadingListado && listado && listado.length === 0 && (
-              <div className="text-center py-8 sunmi-text-muted text-sm">
-                No hay ventas en el período seleccionado
-              </div>
-            )}
-
-            {!loadingListado && listado && listado.length > 0 && (
-              <>
-                {/* Mobile: cards */}
-                <div className="md:hidden mt-3 space-y-2">
-                  {listado.map((v) => {
-                    const esFiado = v.estado === "fiado";
-                    return (
-                    <div
-                      key={v.id}
-                      className="sunmi-surface border sunmi-border rounded-lg p-3 space-y-1.5"
-                    >
-                      {/* Fila 1: cliente (dominante) + total (dominante) */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 font-semibold sunmi-text-strong text-[15px] leading-tight truncate">
-                          {v.cliente?.nombre || "Consumidor final"}
-                        </div>
-                        <div className="font-mono font-bold text-[17px] sunmi-text-strong whitespace-nowrap tabular-nums">
-                          ${formatPrecio(v.total)}
-                        </div>
-                      </div>
-
-                      {/* Fila 2: ticket (referencia secundaria) + fecha/hora */}
-                      <div className="text-[11px] sunmi-text-muted">
-                        Ticket #{v.numero ?? v.id} · {formatFechaHoraAR(v.fecha)}
-                      </div>
-
-                      {/* Fila 3: local · cajero · ítems */}
-                      <div className="text-[12px] sunmi-text-muted truncate">
-                        {v.local?.nombre || "—"} · {v.vendedor?.nombre || "—"} ·{" "}
-                        {v.items} ítem{v.items === 1 ? "" : "s"}
-                      </div>
-
-                      {/* Estado: badge Cobrado/Pendiente + forma de pago + Corregida */}
-                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                            esFiado
-                              ? "sunmi-state-warning sunmi-text-accent"
-                              : "sunmi-state-success sunmi-text-success"
-                          }`}
-                        >
-                          {esFiado ? "Pendiente" : "Cobrado"}
-                        </span>
-                        <span className="text-[12px] sunmi-text-muted capitalize">
-                          {v.formaPago}
-                        </span>
-                        {v.corregida && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
-                            ✎ Corregida{v.version ? ` · v${v.version}` : ""}
-                          </span>
-                        )}
-                      </div>
-
-                      <SunmiButton
-                        color="amber"
-                        size="sm"
-                        onClick={() => irADetalle(v.id)}
-                        className="w-full mt-1"
-                      >
-                        Ver venta
-                      </SunmiButton>
-                    </div>
-                    );
-                  })}
-                </div>
-
-                {/* Desktop: tabla */}
-                <div className="hidden md:block overflow-x-auto mt-3">
+            <section className="space-y-2">
+              <SectionHead title="Desglose por forma de pago" />
+              <SunmiCard>
+                <div className="overflow-x-auto">
                   <SunmiTable
                     headers={[
-                      "Fecha/hora",
-                      "Cliente / Ticket",
-                      "Local",
-                      { label: "Ítems", className: "text-center" },
                       "Forma de pago",
-                      "Estado",
-                      { label: "Total", className: "text-right" },
-                      "",
+                      { label: "Ventas", className: "text-center" },
+                      { label: "Total bruto", className: "text-right" },
+                      { label: "Comisión", className: "text-right" },
+                      { label: "Neto recibido", className: "text-right" },
                     ]}
                   >
-                    {listado.map((v) => {
-                      const esFiado = v.estado === "fiado";
-                      return (
-                      <tr
-                        key={v.id}
-                        className="align-middle transition-colors even:sunmi-surface-soft hover:bg-[var(--hover-bg)]"
-                      >
-                        <td className="px-3 py-3 font-mono text-[11px] whitespace-nowrap sunmi-text-muted">
-                          {formatFechaHoraAR(v.fecha)}
+                    {reporte.desglosePago.map((item) => (
+                      <tr key={item.formaPago} className="sunmi-row-hover transition-colors border-t sunmi-divider">
+                        <td className="px-3 py-2.5 font-medium capitalize">{item.formaPago}</td>
+                        <td className="px-3 py-2.5 text-center tabular-nums">{item.cantidad}</td>
+                        <td className="px-3 py-2.5 text-right font-mono tabular-nums">{money(item.total)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono tabular-nums sunmi-text-warning">
+                          {item.comision > 0 ? `- ${money(item.comision)}` : "—"}
                         </td>
-                        {/* Cliente (negrita) + ticket (secundario, debajo) */}
-                        <td className="px-3 py-3 max-w-[220px]">
-                          <div className="font-semibold sunmi-text-strong truncate">
-                            {v.cliente?.nombre || "Consumidor final"}
-                          </div>
-                          <div className="font-mono text-[11px] sunmi-text-muted">
-                            #{v.numero ?? v.id}
-                          </div>
-                        </td>
-                        {/* Local + cajero (secundario, debajo) */}
-                        <td className="px-3 py-3 max-w-[170px]">
-                          <div className="truncate">{v.local?.nombre || "—"}</div>
-                          <div className="text-[11px] sunmi-text-muted truncate">
-                            {v.vendedor?.nombre || "—"}
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-center tabular-nums">{v.items}</td>
-                        <td className="px-3 py-3 capitalize">{v.formaPago}</td>
-                        <td className="px-3 py-3">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${
-                                esFiado
-                                  ? "sunmi-state-warning sunmi-text-accent"
-                                  : "sunmi-state-success sunmi-text-success"
-                              }`}
-                            >
-                              {esFiado ? "Pendiente" : "Cobrado"}
-                            </span>
-                            {v.corregida && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
-                                ✎ Corregida{v.version ? ` · v${v.version}` : ""}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-right font-mono font-bold text-[13px] sunmi-text-strong whitespace-nowrap tabular-nums">
-                          ${formatPrecio(v.total)}
-                        </td>
-                        <td className="px-3 py-3 text-right">
-                          <SunmiButton
-                            color="amber"
-                            size="sm"
-                            onClick={() => irADetalle(v.id)}
-                          >
-                            Ver venta
-                          </SunmiButton>
+                        <td className="px-3 py-2.5 text-right font-mono tabular-nums sunmi-text-success font-semibold">
+                          {money(item.neto)}
                         </td>
                       </tr>
+                    ))}
+                  </SunmiTable>
+                </div>
+              </SunmiCard>
+            </section>
+          )}
+
+          {/* 4 · Ventas del período — sección protagonista */}
+          <section className="space-y-2">
+            <div className="flex items-end justify-between gap-3 flex-wrap">
+              <SectionHead
+                title="Ventas del período"
+                subtitle={paginacion ? `${paginacion.total} venta${paginacion.total === 1 ? "" : "s"}` : null}
+              />
+              {/* Tabs segmentadas con estado activo claro */}
+              <div className="inline-flex p-0.5 rounded-lg sunmi-surface-soft sunmi-border shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setVista("venta")}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${vista === "venta" ? "sunmi-pill-link shadow-sm" : "sunmi-text-muted hover:sunmi-text-strong"}`}
+                >
+                  Por venta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVista("cliente")}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${vista === "cliente" ? "sunmi-pill-link shadow-sm" : "sunmi-text-muted hover:sunmi-text-strong"}`}
+                >
+                  Por cliente
+                </button>
+              </div>
+            </div>
+
+            <SunmiCard>
+              {vista === "cliente" && (
+                <ReporteVentasPorCliente filtros={filtrosVigentes} onVerTicket={(id) => irADetalle(id, "cliente")} />
+              )}
+
+              {vista === "venta" && (<>
+                {loadingListado && (
+                  <div className="text-center py-8"><SunmiLoader /></div>
+                )}
+
+                {!loadingListado && listado && listado.length === 0 && (
+                  <div className="text-center py-10 sunmi-text-muted text-sm">
+                    No hay ventas en el período seleccionado
+                  </div>
+                )}
+
+                {!loadingListado && listado && listado.length > 0 && (
+                  <>
+                    {/* Mobile: cards (cliente + total protagonistas) */}
+                    <div className="md:hidden space-y-2">
+                      {listado.map((v) => {
+                        const esFiado = v.estado === "fiado";
+                        return (
+                          <div key={v.id} className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1.5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 font-semibold sunmi-text-strong text-[15px] leading-tight truncate">
+                                {v.cliente?.nombre || "Consumidor final"}
+                              </div>
+                              <div className="font-mono font-bold text-[17px] sunmi-text-strong whitespace-nowrap tabular-nums">
+                                {money(v.total)}
+                              </div>
+                            </div>
+                            <div className="text-[11px] sunmi-text-muted">
+                              Ticket #{v.numero ?? v.id} · {formatFechaHoraAR(v.fecha)}
+                            </div>
+                            <div className="text-[12px] sunmi-text-muted truncate">
+                              {v.local?.nombre || "—"} · {v.vendedor?.nombre || "—"} · {v.items} ítem{v.items === 1 ? "" : "s"}
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                              <EstadoBadge fiado={esFiado} />
+                              <span className="text-[12px] sunmi-text-muted capitalize">{v.formaPago}</span>
+                              {v.corregida && <CorregidaBadge version={v.version} />}
+                            </div>
+                            <SunmiButton color="amber" size="sm" onClick={() => irADetalle(v.id)} className="w-full mt-1">
+                              Ver venta
+                            </SunmiButton>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Desktop: tabla */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <SunmiTable
+                        headers={[
+                          "Fecha / hora",
+                          "Cliente",
+                          "Local",
+                          { label: "Ítems", className: "text-center" },
+                          "Forma de pago",
+                          "Estado",
+                          { label: "Total", className: "text-right" },
+                          { label: "", className: "text-right" },
+                        ]}
+                      >
+                        {listado.map((v) => {
+                          const esFiado = v.estado === "fiado";
+                          return (
+                            <tr key={v.id} className="align-middle sunmi-row-hover transition-colors border-t sunmi-divider">
+                              <td className="px-2.5 py-3 font-mono text-[11px] whitespace-nowrap sunmi-text-muted">
+                                {formatFechaHoraAR(v.fecha)}
+                              </td>
+                              {/* Cliente protagonista + ticket secundario debajo */}
+                              <td className="px-2.5 py-3 max-w-[200px]">
+                                <div className="font-semibold sunmi-text-strong truncate text-[13px]">
+                                  {v.cliente?.nombre || "Consumidor final"}
+                                </div>
+                                <div className="font-mono text-[11px] sunmi-text-muted">
+                                  Ticket #{v.numero ?? v.id}
+                                </div>
+                              </td>
+                              {/* Local + cajero (subtítulo muted) */}
+                              <td className="px-2.5 py-3 max-w-[150px]">
+                                <div className="truncate sunmi-text-strong">{v.local?.nombre || "—"}</div>
+                                <div className="text-[11px] sunmi-text-muted truncate">{v.vendedor?.nombre || "—"}</div>
+                              </td>
+                              <td className="px-2.5 py-3 text-center tabular-nums">{v.items}</td>
+                              <td className="px-2.5 py-3 capitalize">{v.formaPago}</td>
+                              <td className="px-2.5 py-3">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <EstadoBadge fiado={esFiado} />
+                                  {v.corregida && <CorregidaBadge version={v.version} />}
+                                </div>
+                              </td>
+                              <td className="px-2.5 py-3 text-right font-mono font-bold text-[14px] sunmi-text-strong whitespace-nowrap tabular-nums">
+                                {money(v.total)}
+                              </td>
+                              <td className="px-2.5 py-3 text-right">
+                                <SunmiButton color="amber" size="sm" onClick={() => irADetalle(v.id)} className="whitespace-nowrap">
+                                  Ver venta
+                                </SunmiButton>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </SunmiTable>
+                    </div>
+
+                    {paginacion && paginacion.totalPaginas > 1 && (
+                      <div className="flex items-center justify-between gap-2 flex-wrap mt-3 pt-3 border-t sunmi-divider text-xs sunmi-text-muted">
+                        <div>
+                          Página {paginacion.page} de {paginacion.totalPaginas} · {paginacion.total} venta{paginacion.total === 1 ? "" : "s"}
+                        </div>
+                        <div className="flex gap-2">
+                          <SunmiButton onClick={() => cargarListado(pageVentas - 1)} disabled={pageVentas <= 1 || loadingListado}>
+                            Anterior
+                          </SunmiButton>
+                          <SunmiButton
+                            onClick={() => cargarListado(pageVentas + 1)}
+                            disabled={pageVentas >= paginacion.totalPaginas || loadingListado}
+                          >
+                            Siguiente
+                          </SunmiButton>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>)}
+            </SunmiCard>
+          </section>
+
+          {/* Top productos */}
+          {reporte.topProductos && reporte.topProductos.length > 0 && (
+            <section className="space-y-2">
+              <SectionHead title="Productos más vendidos" />
+              <SunmiCard>
+                <div className="overflow-x-auto">
+                  <SunmiTable
+                    headers={[
+                      "Producto",
+                      { label: "Cant", className: "text-center" },
+                      { label: "Total venta", className: "text-right" },
+                      { label: "Costo", className: "text-right" },
+                      { label: "Ganancia", className: "text-right" },
+                      { label: "Margen %", className: "text-right" },
+                    ]}
+                  >
+                    {reporte.topProductos.map((item, idx) => {
+                      const margen =
+                        item.totalVenta > 0
+                          ? ((item.ganancia / item.totalVenta) * 100).toFixed(1)
+                          : "0.0";
+                      return (
+                        <tr key={idx} className="sunmi-row-hover transition-colors border-t sunmi-divider">
+                          <td className="px-3 py-2.5 font-medium truncate max-w-[220px]">{item.nombre}</td>
+                          <td className="px-3 py-2.5 text-center tabular-nums">{formatCantidad(item.cantidad)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono tabular-nums">{money(item.totalVenta)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono tabular-nums sunmi-text-muted">{money(item.totalCosto)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono tabular-nums sunmi-text-success">{money(item.ganancia)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono tabular-nums">
+                            <span className={margen > 30 ? "sunmi-text-success" : margen > 15 ? "sunmi-text-accent" : "sunmi-text-danger"}>
+                              {margen}%
+                            </span>
+                          </td>
+                        </tr>
                       );
                     })}
                   </SunmiTable>
                 </div>
-
-                {paginacion && paginacion.totalPaginas > 1 && (
-                  <div className="flex items-center justify-between mt-3 text-xs sunmi-text-muted">
-                    <div>
-                      Página {paginacion.page} de {paginacion.totalPaginas} ·{" "}
-                      {paginacion.total} venta{paginacion.total === 1 ? "" : "s"}
-                    </div>
-                    <div className="flex gap-2">
-                      <SunmiButton
-                        onClick={() => cargarListado(pageVentas - 1)}
-                        disabled={pageVentas <= 1 || loadingListado}
-                      >
-                        Anterior
-                      </SunmiButton>
-                      <SunmiButton
-                        onClick={() => cargarListado(pageVentas + 1)}
-                        disabled={
-                          pageVentas >= paginacion.totalPaginas ||
-                          loadingListado
-                        }
-                      >
-                        Siguiente
-                      </SunmiButton>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-            </>)}
-          </SunmiCard>
-
-          {/* Top productos */}
-          {reporte.topProductos && reporte.topProductos.length > 0 && (
-            <SunmiCard className="p-3">
-              <SunmiSeparator label="Productos Mas Vendidos" />
-
-              <div className="overflow-x-auto mt-3">
-                <SunmiTable
-                  headers={[
-                    "Producto",
-                    "Cant",
-                    "Total Venta",
-                    "Costo",
-                    "Ganancia",
-                    "Margen %",
-                  ]}
-                >
-                  {reporte.topProductos.map((item, idx) => {
-                    const margen =
-                      item.totalVenta > 0
-                        ? ((item.ganancia / item.totalVenta) * 100).toFixed(1)
-                        : "0.0";
-                    return (
-                      <tr key={idx} className="hover:bg-[var(--hover-bg)]">
-                        <td className="px-2 py-1.5 font-medium truncate max-w-[200px]">
-                          {item.nombre}
-                        </td>
-                        <td className="px-2 py-1.5 text-center tabular-nums">
-                          {formatCantidad(item.cantidad)}
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-mono">
-                          ${formatPrecio(item.totalVenta)}
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-mono sunmi-text-muted">
-                          ${formatPrecio(item.totalCosto)}
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-mono sunmi-text-success">
-                          ${formatPrecio(item.ganancia)}
-                        </td>
-                        <td className="px-2 py-1.5 text-right font-mono">
-                          <span
-                            className={
-                              margen > 30
-                                ? "sunmi-text-success"
-                                : margen > 15
-                                ? "sunmi-text-accent"
-                                : "sunmi-text-danger"
-                            }
-                          >
-                            {margen}%
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </SunmiTable>
-              </div>
-            </SunmiCard>
+              </SunmiCard>
+            </section>
           )}
         </>
       )}
@@ -720,11 +618,69 @@ export default function ReportesVentasPage() {
       {!reporte && !loading && (
         <SunmiCard className="p-3">
           <div className="text-center py-12 sunmi-text-muted">
-            Selecciona las fechas y genera el reporte
+            Seleccioná las fechas y generá el reporte
           </div>
         </SunmiCard>
       )}
-
     </div>
+  );
+}
+
+// ── Subcomponentes de presentación (solo UI) ─────────────────────────────────
+
+// Título de sección: reemplaza el separador centrado por un encabezado alineado a
+// la izquierda, más legible y con jerarquía clara.
+function SectionHead({ title, subtitle }) {
+  return (
+    <div className="min-w-0">
+      <h2 className="text-sm font-bold sunmi-text-strong leading-tight">{title}</h2>
+      {subtitle && <p className="text-[11px] sunmi-text-muted leading-tight">{subtitle}</p>}
+    </div>
+  );
+}
+
+// Card de métrica del resumen financiero: icono + label muted + valor fuerte, con
+// color semántico. `highlight` resalta la Ganancia neta con fondo de estado.
+function MetricCard({ icon: Icon, label, value, tone = "neutral", highlight = false, className = "" }) {
+  const toneColor = {
+    neutral: "sunmi-text-strong",
+    link: "sunmi-text-link",
+    accent: "sunmi-text-accent",
+    warning: "sunmi-text-warning",
+    success: "sunmi-text-success",
+  }[tone] || "sunmi-text-strong";
+  const box = highlight ? "sunmi-state-success" : "sunmi-surface sunmi-border";
+  return (
+    // Móvil: icono arriba y valor a ancho completo (no se truncan importes grandes).
+    // Desktop (sm+): icono a la izquierda con el texto al lado.
+    <div className={`${box} rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 ${className}`}>
+      <div className={`shrink-0 grid place-items-center w-9 h-9 rounded-lg sunmi-surface-soft ${toneColor}`}>
+        <Icon size={18} strokeWidth={2} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[11px] sunmi-text-muted leading-tight">{label}</div>
+        <div className={`text-base sm:text-lg font-bold tabular-nums leading-tight ${toneColor}`}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+// Badge de estado de la venta (Cobrado / Pendiente).
+function EstadoBadge({ fiado }) {
+  return (
+    <span
+      className={`px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${fiado ? "sunmi-state-warning sunmi-text-accent" : "sunmi-state-success sunmi-text-success"}`}
+    >
+      {fiado ? "Pendiente" : "Cobrado"}
+    </span>
+  );
+}
+
+// Badge de venta corregida (limpio, sin duplicar).
+function CorregidaBadge({ version }) {
+  return (
+    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
+      ✎ Corregida{version ? ` · v${version}` : ""}
+    </span>
   );
 }
