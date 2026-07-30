@@ -30,6 +30,11 @@ const MODULO_MAP = {
   'app/modulos/pos-ventas':       'pos-ventas',
   'components/pos-ventas':        'pos-ventas',
   'app/api/pos-ventas':           'pos-ventas',
+  // Librería compartida del POS (generador de comprobantes, pagos, servicios,
+  // consumo de stock…). La usan también otros módulos, pero la implementación
+  // vive acá, así que se documenta en pos-ventas. No colisiona con
+  // lib/auditoria-pos-ventas: ese prefijo no empieza con "lib/pos-ventas".
+  'lib/pos-ventas':               'pos-ventas',
   'app/modulos/auditoria-pos-ventas': 'pos-ventas',
   'components/auditoria-pos-ventas':  'pos-ventas',
   'app/api/auditoria-pos-ventas':     'pos-ventas',

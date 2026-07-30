@@ -50,6 +50,41 @@ test("archivos ajenos NO mapean a reportes-ventas", () => {
   assert.equal(detectarModulo("app/modulos/reportes-stock/page.jsx"), null);
 });
 
+test("la librería compartida lib/pos-ventas mapea a pos-ventas", () => {
+  assert.equal(detectarModulo("lib/pos-ventas/generarTicketPDF.js"), "pos-ventas");
+  assert.equal(detectarModulo("lib/pos-ventas/presentacionLinea.js"), "pos-ventas");
+  // Tests colocados al lado del código también cuentan para el módulo.
+  assert.equal(detectarModulo("lib/pos-ventas/generarTicketPDF.test.mjs"), "pos-ventas");
+  assert.equal(detectarModulo("lib/pos-ventas/presentacionLinea.test.mjs"), "pos-ventas");
+});
+
+test("rutas anidadas dentro de lib/pos-ventas también mapean", () => {
+  assert.equal(detectarModulo("lib/pos-ventas/correccion/motor.js"), "pos-ventas");
+  assert.equal(detectarModulo("lib/pos-ventas/a/b/c/d.js"), "pos-ventas");
+  assert.equal(detectarModulo("lib\\pos-ventas\\lineaModoDeposito.js"), "pos-ventas");
+});
+
+test("lib/reportes-ventas sigue yendo a reportes-ventas", () => {
+  assert.equal(detectarModulo("lib/reportes-ventas/modoLineaDeposito.js"), "reportes-ventas");
+  assert.equal(detectarModulo("lib/reportes-ventas/returnParams.js"), "reportes-ventas");
+  assert.equal(detectarModulo("lib/reportes-ventas/correccionDirty.test.mjs"), "reportes-ventas");
+});
+
+test("el nuevo prefijo no pisa mappings más específicos", () => {
+  // lib/auditoria-pos-ventas NO empieza con "lib/pos-ventas": sigue resolviendo
+  // por su propia entrada (que apunta a pos-ventas, pero por otro camino).
+  assert.equal(detectarModulo("lib/auditoria-pos-ventas/consulta.js"), "pos-ventas");
+  // Y la bitácora central sigue siendo auditoria, no pos-ventas.
+  assert.equal(detectarModulo("lib/auditoria/interceptor.js"), "auditoria");
+  assert.equal(detectarModulo("lib/auditoria/contexto.js"), "auditoria");
+  // Otras raíces de lib/ no se ven afectadas.
+  assert.equal(detectarModulo("lib/conversiones/stock.js"), "productos");
+  assert.equal(detectarModulo("lib/precios/calcularPrecioConLista.js"), null);
+  assert.equal(detectarModulo("lib/combos/planConsumoVenta.js"), null);
+  // Un directorio que solo comparte el prefijo textual no debe capturarse.
+  assert.equal(detectarModulo("lib/pos-transferencias/algo.js"), null);
+});
+
 test("no se rompieron los mappings existentes", () => {
   assert.equal(detectarModulo("app/modulos/pos-ventas/page.jsx"), "pos-ventas");
   assert.equal(detectarModulo("app/api/pos-ventas/crear/route.js"), "pos-ventas");
