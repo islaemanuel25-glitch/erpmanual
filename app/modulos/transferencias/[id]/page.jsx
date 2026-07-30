@@ -83,10 +83,12 @@ export default function TransferenciaDetallePage() {
         json.item.items.map((d) => ({
           id: d.id,
           enviado: d.cantidadEnviada,
+          // null = todavía no se cargó recepción → se propone lo enviado.
+          // 0 = no llegó ninguna unidad → se muestra 0. Son cosas distintas, y
+          // usar truthiness acá hacía que un 0 guardado reapareciera como el
+          // total enviado y se pudiera sobrescribir sin querer.
           recibido:
-            d.cantidadRecibida && d.cantidadRecibida > 0
-              ? d.cantidadRecibida
-              : d.cantidadEnviada,
+            d.cantidadRecibida == null ? d.cantidadEnviada : d.cantidadRecibida,
           motivoPrincipal: d.motivoPrincipal || "",
           motivoDetalle: d.motivoDetalle || "",
         }))

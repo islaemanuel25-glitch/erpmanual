@@ -5,6 +5,11 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
+import {
+  validarDetalleRecepcion,
+  mensajeRecepcion,
+  statusRecepcion,
+} from "@/lib/transferencias/recepcion";
 
 export async function POST(req) {
   try {
@@ -82,6 +87,43 @@ export async function POST(req) {
     }
 
     // ============================================================
+    // 🟦 VALIDACIÓN PREVIA — antes de tocar una sola fila
+    //
+    // Se validan TODOS los detalles primero: si uno solo es inválido, la
+    // recepción no empieza y el stock queda intacto. Antes la aritmética se
+    // resolvía dentro del loop de mutación, así que un detalle malo podía
+    // encontrarse con detalles anteriores ya aplicados (la transacción los
+    // revertía, pero el estado quedaba en "Confirmando" hasta el rollback).
+    // ============================================================
+    const planes = new Map(); // detalleId → resultado validado
+
+    for (const d of transferencia.detalle) {
+      // Los combos no tienen stock físico: no se reciben (igual que antes).
+      if (esComboBase(d.producto.base)) continue;
+
+      const plan = validarDetalleRecepcion({
+        detalle: {
+          cantidad: d.cantidad,
+          recibido: d.recibido,
+          unidadEnviada: d.unidadEnviada,
+          motivoPrincipal: d.motivoPrincipal,
+          motivoDetalle: d.motivoDetalle,
+        },
+        factorPack: Number(d.producto.base.factor_pack || 1),
+      });
+
+      if (!plan.ok) {
+        const nombre = d.producto.base.nombre || d.producto.nombre || null;
+        return NextResponse.json(
+          { ok: false, codigo: plan.error, error: mensajeRecepcion(plan.error, { nombre }) },
+          { status: statusRecepcion(plan.error) }
+        );
+      }
+
+      planes.set(d.id, plan);
+    }
+
+    // ============================================================
     // TODO en transacción para consistencia de stock
     // ============================================================
     await prisma.$transaction(async (tx) => {
@@ -106,25 +148,17 @@ export async function POST(req) {
         // Defensa: los combos no tienen stock físico, no se procesan aquí.
         if (esComboBase(d.producto.base)) continue;
 
-        const enviada = Number(d.cantidad || 0);
+        // Plan ya validado arriba: cantidades dentro de rango, unidad conocida y
+        // motivo presente si hay diferencia. Acá solo se aplica.
+        const plan = planes.get(d.id);
+        const { recibida, recibidaUnidades } = plan;
 
-        const recibida =
-          d.recibido && Number(d.recibido) > 0 ? Number(d.recibido) : enviada;
+        if (plan.hayDiferencia) tieneDiferencias = true;
 
-        if (recibida !== enviada) tieneDiferencias = true;
-
-        // ============================================================
-        // 🟦 CONVERSIÓN: TransferenciaDetalle.cantidad está en la unidad
-        // indicada por d.unidadEnviada (BULTO/UNIDAD).
         // StockLocal SIEMPRE en UNIDADES (o kg para local de fiambre fijo).
-        // ============================================================
-        const factor = Number(d.producto.base.factor_pack || 1);
-        const unidadEnviada = d.unidadEnviada || "BULTO"; // compat
+        // La conversión BULTO→unidades ya la hizo validarDetalleRecepcion, una
+        // sola vez y solo si unidadEnviada es BULTO.
         const esFijo = esFiambreFijo(d.producto.base);
-
-        // Unidades para descontar del depósito (piezas para fiambre fijo, unidades normal)
-        const recibidaUnidades =
-          unidadEnviada === "BULTO" && factor > 1 ? recibida * factor : recibida;
 
         // Unidades para sumar al local (KG para fiambre fijo, unidades normal)
         const incrementoLocal = esFijo
@@ -188,10 +222,20 @@ export async function POST(req) {
 
         // ============================================================
         // 🟥 DESCONTAR enTransito DEL ORIGEN (por lo ENVIADO, no lo recibido)
-        // La cantidad ya se descontó al enviar. Aquí solo limpiamos tránsito.
+        //
+        // La cantidad ya se descontó del origen al vender/enviar. Acá solo se
+        // limpia el tránsito, y se limpia por lo ENVIADO: la mercadería salió
+        // del depósito, así que el tránsito tiene que quedar en cero aunque no
+        // haya llegado todo.
+        //
+        // FALTANTE LOGÍSTICO (decisión explícita de esta etapa): si recibido <
+        // enviado, la diferencia NO se devuelve a origen.cantidad ni se ajusta
+        // en ningún lado. Queda como faltante pendiente de resolución MANUAL,
+        // con rastro documental en TransferenciaDetalle (cantidad vs recibido +
+        // motivo) y en Transferencia.tieneDiferencias. Resolverlo contablemente
+        // (crédito, devolución, merma) es la Etapa B, todavía no diseñada.
         // ============================================================
-        const enviadaUnidades =
-          unidadEnviada === "BULTO" && factor > 1 ? enviada * factor : enviada;
+        const { enviadaUnidades } = plan;
 
         const productoOrigen = await tx.productoLocal.findUnique({
           where: {

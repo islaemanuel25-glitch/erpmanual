@@ -94,7 +94,12 @@ export async function GET(req) {
 
     const items = transferencia.detalle.map((d) => {
       const cantidadEnviada = toNumber(d.cantidad);
-      const cantidadRecibida = toNumber(d.recibido);
+      // `null` (todavía no se cargó recepción) y `0` (no llegó ninguna unidad)
+      // son estados operativos DISTINTOS. toNumber() los colapsaba a 0, así que
+      // la pantalla no podía distinguirlos y tenía que adivinar con truthiness:
+      // un 0 explícito se re-mostraba como la cantidad enviada y podía
+      // sobrescribirse al volver a guardar. Se preserva el null.
+      const cantidadRecibida = d.recibido == null ? null : toNumber(d.recibido);
 
       const precioCosto =
         d.precioCosto != null
@@ -105,12 +110,13 @@ export async function GET(req) {
           ? toNumber(d.producto.base.precio_costo)
           : 0;
 
+      // Sin recepción cargada se valoriza lo enviado; con recepción cargada, lo
+      // recibido — incluido 0, que ahora vale 0 y no el total enviado.
       const subtotal =
-        precioCosto *
-        (cantidadRecibida > 0 ? cantidadRecibida : cantidadEnviada);
+        precioCosto * (cantidadRecibida == null ? cantidadEnviada : cantidadRecibida);
 
       itemsEnviados += cantidadEnviada;
-      itemsRecibidos += cantidadRecibida;
+      itemsRecibidos += cantidadRecibida ?? 0;
       costoTotal += subtotal;
 
       return {
