@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-07-29] - Actualización: reportes-ventas
+
+### Modificado
+- **reportes-ventas**: feat(reportes): mostrar modo y consumo físico de venta
+- **reportes-ventas**: fix(reportes): ampliar y reorganizar detalle de venta
+- **reportes-ventas**: fix(reportes): usar el mismo ancho útil que POS Ventas
+- **reportes-ventas**: feat(reportes): rediseñar visualmente el listado de ventas
+- **reportes-ventas**: feat(reportes): advertir cambios sin guardar en la corrección
+- **reportes-ventas**: refactor(reportes): eliminar flujo modal de ventas
+
 ## [2026-07-29] - Actualización: pos-transferencias, pos-ventas, productos, stock, configuracion, transferencias, usuarios, categorias, proveedores, roles, grupos, locales
 
 ### Modificado
