@@ -1,18 +1,14 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-07-29 22:09
+**Fecha:** 2026-07-30 08:03
 
 ## Módulos modificados recientemente
 
 ### reportes-ventas
-- feat(reportes): mostrar modo y consumo físico de venta, fix(reportes): ampliar y reorganizar detalle de venta, fix(reportes): usar el mismo ancho útil que POS Ventas
-- Archivos: 3 nuevos, 8 modificados (11 total)
+- fix(reportes): paginar comprobantes y ampliar corrección de ventas
+- Archivos: 4 modificados (4 total)
 
 
-## Archivos nuevos desde última sincronización
-- lib/reportes-ventas/modoLineaDeposito.js
-- lib/reportes-ventas/correccionDirty.js
-- lib/reportes-ventas/correccionDirty.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-07-30] - Actualización: reportes-ventas
+
+### Modificado
+- **reportes-ventas**: fix(reportes): mejorar resumen y unidades del comprobante
+- **reportes-ventas**: fix(reportes): paginar comprobantes y ampliar corrección de ventas
+
+
 ## [2026-07-29] - Actualización: reportes-ventas
 
 ### Modificado
