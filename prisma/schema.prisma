@@ -99,6 +99,9 @@ model Local {
   ventas            Venta[]
   turnos            Turno[]
   clientes          Cliente[]
+  /// Cliente que representa a ESTE local en la agenda comercial (inversa de
+  /// Cliente.localVinculadoId). El campo es @unique, así que hay a lo sumo uno.
+  clienteVinculado  Cliente?                 @relation("ClienteLocalVinculado")
   tagsCliente       TagCliente[]
   movimientosCC     MovimientoCuenta[]
   puntosConfig      PuntosConfigLocal?
@@ -461,6 +464,12 @@ model Transferencia {
   fechaRecepcion     DateTime?
   creadaPor          Int?
   posTransferenciaId Int?
+  /// Venta que originó este envío. NULL = transferencia manual (todas las de hoy,
+  /// originadas en PosTransferencia). Uno a uno: una venta no puede generar dos
+  /// remitos, así que aporta idempotencia estructural. El @unique ya crea el
+  /// índice, no hace falta un @@index aparte. Convive con posTransferenciaId;
+  /// todavía sin constraint de exclusión entre ambos.
+  ventaId            Int?      @unique
 
   tieneDiferencias Boolean @default(false)
 
@@ -470,6 +479,7 @@ model Transferencia {
   destino          Local                  @relation("destino", fields: [destinoId], references: [id])
   origen           Local                  @relation("origen", fields: [origenId], references: [id])
   posTransferencia PosTransferencia?      @relation(fields: [posTransferenciaId], references: [id], onDelete: SetNull)
+  venta            Venta?                 @relation("VentaTransferencia", fields: [ventaId], references: [id], onDelete: SetNull)
   detalle          TransferenciaDetalle[]
 
   @@index([origenId])
@@ -666,7 +676,15 @@ model PrecioUpdateItem {
 model Cliente {
   id                  Int      @id @default(autoincrement())
   grupoId             Int
+  /// Local PROPIETARIO de la ficha (ámbito de la agenda de clientes). NO indica
+  /// que el cliente "sea" ese local: para eso está localVinculadoId.
   localId             Int?
+  /// Local INTERNO del grupo que este cliente representa. NULL = cliente externo
+  /// (el caso normal; en Postgres los NULL son distintos entre sí, así que todos
+  /// los externos conviven bajo el @unique). Uno a uno: un local no puede estar
+  /// representado por dos clientes. El @unique ya crea el índice, no hace falta
+  /// un @@index aparte. Vínculo EXPLÍCITO: el local nunca se infiere por el nombre.
+  localVinculadoId    Int?     @unique
   listaPrecioId       Int?
   nombre              String
   documento           String?
@@ -682,6 +700,7 @@ model Cliente {
 
   grupo             Grupo                    @relation(fields: [grupoId], references: [id])
   local             Local?                   @relation(fields: [localId], references: [id])
+  localVinculado    Local?                   @relation("ClienteLocalVinculado", fields: [localVinculadoId], references: [id], onDelete: SetNull)
   listaPrecio       ListaPrecio?             @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   ventas            Venta[]
   tags              ClienteTag[]
@@ -805,6 +824,11 @@ model Venta {
   pagos             VentaPago[]
   movimientoCC      MovimientoCuenta[]
   movimientosPuntos ClientePuntoMovimiento[]
+  /// Remito generado por esta venta (inversa de Transferencia.ventaId). Uno a uno:
+  /// el campo del otro lado es @unique, así que hay a lo sumo un remito por venta.
+  /// Si algún día se admite despacho parcial, se retira ese @unique, se agrega un
+  /// número de remito y este campo pasa a lista.
+  transferencia     Transferencia?           @relation("VentaTransferencia")
 
   @@unique([localId, numero])
   @@index([localId])
