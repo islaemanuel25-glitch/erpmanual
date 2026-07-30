@@ -21,6 +21,7 @@ import { evaluarCorreccion } from "@/lib/pos-ventas/motorCorreccion";
 import { planConsumoVenta } from "@/lib/combos/planConsumoVenta";
 import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta, round2 } from "@/lib/pos-ventas/pagos";
 import { enBetaCorreccionCompleta, COD_FLAG_OFF, MSG_FLAG_OFF } from "@/lib/pos-ventas/correccionBeta";
+import { bloqueoCorreccion } from "@/lib/ventas-internas/integracionVenta";
 import {
   cargarVentaOriginal, estadoTurnoCorreccion, detallesParaMotor, resolverLineasCorregidas,
   lockStockActual, aplicarDeltaStock, ajustarCuentaCorriente, ajustarPuntosCorreccion,
@@ -69,6 +70,12 @@ export async function POST(req, { params }) {
     const ventaPre = await cargarVentaOriginal(prisma, ventaId);
     if (!ventaPre) return j({ ok: false, error: "Venta no encontrada" }, 404);
     if (!session.esAdmin && ventaPre.localId !== Number(session.localId)) return j({ ok: false, error: "Venta no encontrada" }, 404);
+
+    // Venta interna con remito: la corrección revierte y reaplica el consumo sin
+    // saber nada de la transferencia, que quedaría enviada por cantidades que ya no
+    // existen. Se bloquea hasta que exista la sincronización.
+    const bloqTransf = bloqueoCorreccion(ventaPre);
+    if (bloqTransf) return j({ ok: false, error: bloqTransf.error, code: bloqTransf.code }, bloqTransf.status);
 
     const previa = await prisma.ventaCorreccion.findUnique({ where: { ventaId_idempotencyKey: { ventaId, idempotencyKey } } }).catch(() => null);
     if (previa) return j({ ok: true, yaAplicada: true, correccionId: previa.id, version: previa.versionDespues, diferencia: Number(previa.diferencia) });

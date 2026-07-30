@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { requirePerm } from "@/lib/authorize";
+import { resolveLocalAndGrupo, getLocalIdsDeGrupo } from "@/lib/grupos";
+import { requirePerm, checkPerm } from "@/lib/authorize";
+import { evaluarVinculoVentaInterna } from "@/lib/ventas-internas/vinculo";
+import {
+  esSinVinculo,
+  respuestaVinculoInvalido,
+  construirSnapshots,
+  idsParaSnapshots,
+  bloqueoReintentoHuerfana,
+} from "@/lib/ventas-internas/integracionVenta";
+import { mapearVentaATransferencia } from "@/lib/ventas-internas/mapearVentaATransferencia";
+import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
+import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta } from "@/lib/pos-ventas/pagos";
 import {
@@ -133,10 +144,29 @@ export async function POST(req) {
           fecha: true,
           subtotal: true,
           descuento: true,
+          // Venta interna: el reintento no puede devolver "ok, duplicada" si la
+          // transferencia falta. Ver bloqueoReintentoHuerfana.
+          cliente: { select: { localVinculadoId: true } },
+          transferencia: { select: { id: true } },
+          detalles: { select: { cantidadStock: true } },
         },
       });
 
       if (ventaExistente) {
+        // Segunda barrera de idempotencia: Transferencia.ventaId @unique. Si la
+        // venta interna ya tiene su transferencia, este reintento no crea nada.
+        const huerfana = bloqueoReintentoHuerfana({
+          esInterna: ventaExistente.cliente?.localVinculadoId != null,
+          tieneFisico: ventaExistente.detalles.some((d) => d.cantidadStock != null),
+          tieneTransferencia: ventaExistente.transferencia != null,
+        });
+        if (huerfana) {
+          return NextResponse.json(
+            { ok: false, error: huerfana.error, code: huerfana.code },
+            { status: huerfana.status }
+          );
+        }
+
         // Calcular breakdown desde venta existente
         const descuentoAutomatico = 0; // No lo tenemos guardado, usar 0
         const descuentoManual = Number(ventaExistente.descuento) || 0;
@@ -558,6 +588,69 @@ export async function POST(req) {
       };
     });
 
+    // === VENTA INTERNA: ¿esta venta despacha mercadería a un local propio? ===
+    //
+    // El destino sale EXCLUSIVAMENTE de Cliente.localVinculadoId. Nunca del nombre
+    // del cliente, su dirección, su código ni de Cliente.localId (que es el local
+    // PROPIETARIO de la ficha, otra cosa).
+    //
+    // El scope de esta consulta es el GRUPO, no el local: las demás consultas de
+    // cliente de esta ruta filtran además por localId (dueño de la ficha), pero
+    // usar ese filtro acá haría que un cliente interno de otra ficha se leyera como
+    // "sin cliente" y la venta degradara en silencio a común — justo lo que hay que
+    // evitar, porque generaría deuda sin transferencia.
+    //
+    // Sin clienteId no se consulta nada: es una venta común y no cuesta una query.
+    let ventaInterna = null;
+    if (clienteId) {
+      const clienteVinculo = await prisma.cliente.findFirst({
+        where: { id: clienteId, grupoId },
+        select: {
+          id: true,
+          localId: true,
+          grupoId: true,
+          localVinculadoId: true,
+          localVinculado: {
+            select: { id: true, nombre: true, activo: true, es_deposito: true },
+          },
+        },
+      });
+
+      // Solo si hay vínculo DECLARADO se paga el costo de resolver grupo y permiso.
+      if (clienteVinculo?.localVinculadoId != null) {
+        const idsGrupo = await getLocalIdsDeGrupo(grupoId);
+        const enGrupo = new Set(idsGrupo);
+        // El permiso se valida contra la sesión ya resuelta: sin consulta extra.
+        const permTransf = checkPerm(session, "transferencias.crear");
+
+        const evaluacion = evaluarVinculoVentaInterna({
+          cliente: clienteVinculo,
+          localOrigen: { id: localId, es_deposito: esDeposito },
+          localDestino: clienteVinculo.localVinculado,
+          perteneceOrigenAlGrupo: enGrupo.has(localId),
+          perteneceDestinoAlGrupo: enGrupo.has(Number(clienteVinculo.localVinculadoId)),
+          tienePermisoCrearTransferencia: permTransf.ok === true,
+        });
+
+        if (evaluacion.activa) {
+          ventaInterna = {
+            destinoId: evaluacion.localDestinoId,
+            destinoNombre: clienteVinculo.localVinculado?.nombre || null,
+          };
+        } else if (!esSinVinculo(evaluacion.codigo)) {
+          // Vínculo declarado pero estructuralmente inválido: se RECHAZA la venta
+          // entera. Degradar a venta común dejaría deuda sin mercadería en viaje.
+          const rechazo = respuestaVinculoInvalido(evaluacion.codigo, {
+            nombreLocal: clienteVinculo.localVinculado?.nombre || null,
+          });
+          return NextResponse.json(
+            { ok: false, error: rechazo.error, code: rechazo.code },
+            { status: rechazo.status }
+          );
+        }
+      }
+    }
+
     // El costo total, la ganancia y el descuento consolidado de stock se calculan
     // DENTRO de la transacción (más abajo), porque los combos requieren cargar su
     // composición desde la base para consolidar el consumo físico de componentes.
@@ -726,6 +819,50 @@ export async function POST(req) {
         }
       }
 
+      // === Transferencia de la venta interna ===
+      //
+      // DENTRO de la misma transacción, a propósito: si algo falla después (cuenta
+      // corriente, puntos), la venta, sus detalles, el stock y la transferencia
+      // vuelven atrás juntos. Nunca queda una venta interna sin su transferencia.
+      //
+      // Stock: la venta YA descontó `cantidad` en aplicarConsumoStock. Por eso acá
+      // va SOLO_TRANSITO, que únicamente incrementa `enTransito`. Un solo descuento
+      // real del depósito. La recepción existente hará el resto.
+      let transferenciaVenta = null;
+      if (ventaInterna) {
+        const idsOrigen = idsParaSnapshots(consumoFisicoConsolidado);
+        // UNA sola consulta para todos los snapshots (nada de N+1). crearTransferencia
+        // los usa para crear el ProductoLocal del destino y congelar precioCosto.
+        const productosOrigen = idsOrigen.length
+          ? await tx.productoLocal.findMany({
+              where: { id: { in: idsOrigen } },
+              include: { base: true },
+            })
+          : [];
+
+        const mapeo = mapearVentaATransferencia({
+          consumoFisicoConsolidado,
+          lineasComerciales,
+          snapshots: construirSnapshots(productosOrigen),
+        });
+
+        // Venta 100% de servicios: se completa normalmente y no genera
+        // transferencia. No es un error.
+        if (mapeo.debeCrearTransferencia) {
+          const { transferencia } = await crearTransferencia({
+            tx,
+            origenId: localId,
+            destinoId: ventaInterna.destinoId,
+            creadoPorId: session.id,
+            posTransferenciaId: null,
+            ventaId: nuevaVenta.id,
+            politicaStockOrigen: SOLO_TRANSITO,
+            items: mapeo.items,
+          });
+          transferenciaVenta = transferencia;
+        }
+      }
+
       // Si es fiado, crear MovimientoCuenta DEBITO por el total (v1: fiado global).
       if (esFiadoVenta && clienteId) {
         try {
@@ -791,11 +928,24 @@ export async function POST(req) {
         });
       }
 
-      return { venta: nuevaVenta, allowNegativeStockUsed };
+      return { venta: nuevaVenta, allowNegativeStockUsed, transferenciaVenta };
     });
 
     const venta = txResult.venta;
     const allowNegativeStockUsed = txResult.allowNegativeStockUsed === true;
+
+    // La respuesta pública NO cambia en esta etapa: la cola offline y el POS
+    // comparan campos concretos y no hay UI que muestre la transferencia todavía.
+    // Queda el rastro en el log para poder auditar el flujo recién activado.
+    if (txResult.transferenciaVenta) {
+      console.log(
+        "[pos-ventas/crear] venta interna: venta=%s → transferencia=%s destino=%s items=%s",
+        venta.id,
+        txResult.transferenciaVenta.id,
+        txResult.transferenciaVenta.destinoId,
+        txResult.transferenciaVenta.detalle?.length ?? 0
+      );
+    }
 
     // Post-transacción: puntos de fidelidad
     if (clienteId) {

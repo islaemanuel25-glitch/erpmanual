@@ -16,6 +16,7 @@ import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { estadoVentanaCorreccion, esVentaFiada } from "@/lib/pos-ventas/correccion";
 import { evaluarCorreccion } from "@/lib/pos-ventas/motorCorreccion";
 import { enBetaCorreccionCompleta, COD_FLAG_OFF, MSG_FLAG_OFF } from "@/lib/pos-ventas/correccionBeta";
+import { bloqueoCorreccion } from "@/lib/ventas-internas/integracionVenta";
 import {
   cargarVentaOriginal, estadoTurnoCorreccion, detallesParaMotor,
   resolverLineasCorregidas, leerStockActual, enriquecerReconstruccion,
@@ -59,6 +60,11 @@ export async function POST(req, { params }) {
     if (!session.esAdmin && venta.localId !== Number(session.localId)) {
       return j({ ok: false, error: "Venta no encontrada" }, 404);
     }
+
+    // Mismo bloqueo que corregir: se avisa acá, en la revisión, para que el usuario
+    // no arme toda la corrección y recién falle al confirmar.
+    const bloqTransf = bloqueoCorreccion(venta);
+    if (bloqTransf) return j({ ok: false, error: bloqTransf.error, code: bloqTransf.code }, bloqTransf.status);
 
     // REGLA CENTRAL: turno original abierto (fail-closed).
     const turno = estadoTurnoCorreccion(venta);

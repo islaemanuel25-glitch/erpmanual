@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { requirePerm } from "@/lib/authorize";
 import { getCookieValue } from "@/lib/auth";
 import { toUnidades } from "@/lib/conversiones/stock";
+import { bloqueoCancelacion } from "@/lib/ventas-internas/integracionVenta";
 
 export async function POST(req) {
   try {
@@ -62,6 +63,18 @@ export async function POST(req) {
           { status: 403 }
         );
       }
+    }
+
+    // Generada desde una venta: cancelar haría `cantidad += enviado`, pero la venta
+    // ya hizo el `cantidad -=` (la transferencia usa SOLO_TRANSITO). Devolvería
+    // mercadería que la venta sigue cobrando: stock inventado y deuda viva.
+    // Se rechaza ANTES de la transacción: no se toca stock ni estado.
+    const bloqueo = bloqueoCancelacion(transferencia);
+    if (bloqueo) {
+      return NextResponse.json(
+        { ok: false, error: bloqueo.error, code: bloqueo.code },
+        { status: bloqueo.status }
+      );
     }
 
     if (transferencia.estado !== "Enviada") {

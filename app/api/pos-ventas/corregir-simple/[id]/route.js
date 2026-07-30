@@ -14,6 +14,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { bloqueoCorreccion } from "@/lib/ventas-internas/integracionVenta";
 import {
   esVentaFiada,
   estadoVentanaCorreccion,
@@ -64,9 +65,14 @@ export async function POST(req, { params }) {
         referenciaInterna: true, version: true, operadorId: true,
         pagos: { select: { medio: true } },
         cliente: { select: { id: true, nombre: true } },
+        transferencia: { select: { id: true, estado: true } },
       },
     });
     if (!venta) return j({ ok: false, error: "Venta no encontrada" }, 404);
+
+    // Venta interna con remito: la corrección sincronizada todavía no existe.
+    const bloqTransf = bloqueoCorreccion(venta);
+    if (bloqTransf) return j({ ok: false, error: bloqTransf.error, code: bloqTransf.code }, bloqTransf.status);
 
     // Scope de local: un no-admin solo corrige ventas de SU local. Ajeno → 404
     // (no revela existencia), consistente con reportes-ventas/detalle.
