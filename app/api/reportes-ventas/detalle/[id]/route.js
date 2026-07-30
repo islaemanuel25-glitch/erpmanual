@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { lineasPagoTicket, esPagoDividido } from "@/lib/pos-ventas/pagos";
 import { esVentaFiada, estadoVentanaCorreccion } from "@/lib/pos-ventas/correccion";
 import { enBetaCorreccionCompleta } from "@/lib/pos-ventas/correccionBeta";
+import { descriptorDeposito } from "@/lib/reportes-ventas/modoLineaDeposito";
 
 const num = (v) => (v == null ? 0 : Number(v));
 
@@ -59,7 +60,9 @@ export async function GET(req, { params }) {
         turno: { select: { cierre: true } },
         cliente: { select: { id: true, nombre: true, documento: true, telefono: true, direccion: true } },
         vendedor: { select: { id: true, nombre: true } },
-        local: { select: { id: true, nombre: true } },
+        // es_deposito: necesario para saber si la línea se vendió en un depósito
+        // (Pack/Unidad suelta solo aplica ahí).
+        local: { select: { id: true, nombre: true, es_deposito: true } },
         pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
         detalles: {
           select: {
@@ -77,6 +80,19 @@ export async function GET(req, { params }) {
             importeBaseServicio: true,
             recargoServicioPct: true,
             recargoServicioImporte: true,
+            // Consumo físico CONGELADO de la línea. Junto con el factor de pack del
+            // producto permite inferir si se vendió por Pack o por Unidad suelta.
+            // NULL en líneas legacy, combos y servicios → presentación neutra.
+            cantidadStock: true,
+            productoBase: {
+              select: {
+                unidad_medida: true,
+                factor_pack: true,
+                modoVentaDeposito: true,
+                // modo_envio SOLO_UNIDAD ⇒ la línea nunca pudo ser un pack.
+                modo_envio: true,
+              },
+            },
           },
         },
       },
@@ -114,6 +130,9 @@ export async function GET(req, { params }) {
       totales.gananciaNeta = num(venta.gananciaNeta).toFixed(2);
     }
 
+    // ¿La venta ocurrió en un depósito? Pack / Unidad suelta solo aplica ahí.
+    const ventaEnDeposito = venta.local?.es_deposito === true;
+
     const detalles = venta.detalles.map((d) => {
       const subtotalLinea = num(d.subtotal);
       const base = {
@@ -122,6 +141,13 @@ export async function GET(req, { params }) {
         cantidad: num(d.cantidad),
         precio: num(d.precio).toFixed(2),
         subtotal: subtotalLinea.toFixed(2),
+        // --- Modo de venta y consumo físico (presentación del detalle) ---------
+        // `modo` sale de inferirModo() (lib/pos-ventas/lineaModoDeposito), el MISMO
+        // helper que usa la corrección: compara cantidadStock con cantidad×factor.
+        // Es null cuando no hay datos suficientes (línea legacy sin cantidadStock,
+        // combo, servicio, producto sin pack o modo_envio SOLO_UNIDAD): en ese caso
+        // el frontend muestra una presentación neutra, sin inventar el modo.
+        deposito: descriptorDeposito(d, ventaEnDeposito),
         // Snapshot de servicio (para reimpresión). No expone costos.
         esServicio: !!d.esServicio,
         importeBaseServicio: d.importeBaseServicio != null ? num(d.importeBaseServicio).toFixed(2) : null,

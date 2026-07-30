@@ -48,6 +48,62 @@ function fmtCantidad(n) {
   return num.toLocaleString("es-AR", { maximumFractionDigits: 3 });
 }
 
+// ── Modo de venta de depósito (Pack / Unidad suelta / Pieza) ─────────────────
+// El endpoint ya resolvió `d.deposito.modo` con el helper canónico; acá solo se
+// traduce a texto. `modo === null` ⇒ presentación neutra (no se inventa nada).
+
+const MODO_LABEL = { PACK: "Pack/Bulto", UNIDAD: "Unidad suelta", PIEZA: "Piezas" };
+
+// Unidad física en la que se cuenta el consumo, para leer "= 36 u" / "= 4 pz".
+function unidadFisica(dep) {
+  if (dep?.modo === "PIEZA") return "pz";
+  if (dep?.unidadMedida === "kg") return "kg";
+  return "u";
+}
+
+// Escala del precio/costo de la línea: en PACK el importe es por bulto.
+function escalaPrecio(dep) {
+  if (dep?.modo === "PACK") return "por pack";
+  if (dep?.modo === "PIEZA") return "por pieza";
+  if (dep?.modo === "UNIDAD") return "por unidad";
+  return null;
+}
+
+function BadgeModo({ dep }) {
+  if (!dep?.modo) return null;
+  const esPack = dep.modo === "PACK";
+  return (
+    <span
+      className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${
+        esPack ? "sunmi-state-success sunmi-text-success" : "sunmi-surface-soft sunmi-text-link"
+      }`}
+    >
+      {MODO_LABEL[dep.modo]}
+      {esPack && dep.factorPack > 1 ? ` ×${dep.factorPack}` : ""}
+    </span>
+  );
+}
+
+// "1 pack = N unidades" — solo cuando la línea es un pack real.
+function TextoFactor({ dep }) {
+  if (dep?.modo !== "PACK" || !(dep.factorPack > 1)) return null;
+  return (
+    <span className="text-[11px] sunmi-text-muted whitespace-nowrap">
+      1 pack = {dep.factorPack} unidades
+    </span>
+  );
+}
+
+// Consumo físico congelado de la línea ("= 36 u"). Ausente en legacy/servicios.
+function ConsumoFisico({ dep, className = "" }) {
+  if (!dep || dep.cantidadStock == null) return null;
+  return (
+    <span className={`text-[11px] sunmi-text-muted whitespace-nowrap ${className}`}>
+      = {fmtCantidad(dep.cantidadStock)} {unidadFisica(dep)}
+    </span>
+  );
+}
+
 function fmtFechaHoraAR(iso) {
   if (!iso) return "—";
   const d = iso instanceof Date ? iso : new Date(iso);
@@ -204,21 +260,30 @@ export default function VentaDetalleAdmin({ venta, permisos }) {
                       {fmtMoneda(d.subtotal)}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <BadgeModo dep={d.deposito} />
                     {d.esServicio && <BadgeServicio />}
                     {verCostos && <BadgeTipoPrecio tipo={d.tipoPrecioAplicado} />}
+                    <TextoFactor dep={d.deposito} />
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] sunmi-text-muted">
                     <span>
                       Cant.{" "}
-                      <span className="tabular-nums sunmi-text-link">{fmtCantidad(d.cantidad)}</span>
+                      <span className="tabular-nums sunmi-text-link">{fmtCantidad(d.cantidad)}</span>{" "}
+                      <ConsumoFisico dep={d.deposito} />
                     </span>
                     <span>
-                      P. unit. <span className="tabular-nums">{fmtMoneda(d.precio)}</span>
+                      Precio <span className="tabular-nums">{fmtMoneda(d.precio)}</span>
+                      {escalaPrecio(d.deposito) && (
+                        <span className="sunmi-text-muted"> {escalaPrecio(d.deposito)}</span>
+                      )}
                     </span>
                     {verCostos && d.precioCosto != null && (
                       <span>
-                        Costo unit. <span className="tabular-nums">{fmtMoneda(d.precioCosto)}</span>
+                        Costo <span className="tabular-nums">{fmtMoneda(d.precioCosto)}</span>
+                        {escalaPrecio(d.deposito) && (
+                          <span className="sunmi-text-muted"> {escalaPrecio(d.deposito)}</span>
+                        )}
                       </span>
                     )}
                     {verCostos && d.ganancia != null && (
@@ -251,10 +316,10 @@ export default function VentaDetalleAdmin({ venta, permisos }) {
                 headers={[
                   "Producto",
                   { label: "Cant.", className: "text-center" },
-                  { label: "P. unit.", className: "text-right" },
+                  { label: "Precio", className: "text-right" },
                   ...(verCostos
                     ? [
-                        { label: "Costo unit.", className: "text-right" },
+                        { label: "Costo", className: "text-right" },
                         { label: "Ganancia", className: "text-right" },
                         { label: "Margen", className: "text-right" },
                       ]
@@ -269,8 +334,10 @@ export default function VentaDetalleAdmin({ venta, permisos }) {
                         {d.nombre}
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <BadgeModo dep={d.deposito} />
                         {d.esServicio && <BadgeServicio />}
                         {verCostos && <BadgeTipoPrecio tipo={d.tipoPrecioAplicado} />}
+                        <TextoFactor dep={d.deposito} />
                         {d.esServicio && d.importeBaseServicio != null && (
                           <span className="text-[11px] sunmi-text-muted">
                             Base {fmtMoneda(d.importeBaseServicio)}
@@ -279,16 +346,30 @@ export default function VentaDetalleAdmin({ venta, permisos }) {
                         )}
                       </div>
                     </td>
-                    <td className="px-2.5 py-3 text-center tabular-nums sunmi-text-link font-medium whitespace-nowrap">
-                      {fmtCantidad(d.cantidad)}
+                    {/* Cantidad comercial + consumo físico congelado debajo */}
+                    <td className="px-2.5 py-3 text-center whitespace-nowrap">
+                      <div className="tabular-nums sunmi-text-link font-medium">
+                        {fmtCantidad(d.cantidad)}
+                      </div>
+                      <ConsumoFisico dep={d.deposito} className="block" />
                     </td>
-                    <td className="px-2.5 py-3 text-right font-mono tabular-nums whitespace-nowrap">
-                      {fmtMoneda(d.precio)}
+                    <td className="px-2.5 py-3 text-right whitespace-nowrap">
+                      <div className="font-mono tabular-nums">{fmtMoneda(d.precio)}</div>
+                      {escalaPrecio(d.deposito) && (
+                        <div className="text-[11px] sunmi-text-muted">{escalaPrecio(d.deposito)}</div>
+                      )}
                     </td>
                     {verCostos && (
                       <>
-                        <td className="px-2.5 py-3 text-right font-mono tabular-nums sunmi-text-muted whitespace-nowrap">
-                          {fmtMoneda(d.precioCosto)}
+                        <td className="px-2.5 py-3 text-right whitespace-nowrap">
+                          <div className="font-mono tabular-nums sunmi-text-muted">
+                            {fmtMoneda(d.precioCosto)}
+                          </div>
+                          {escalaPrecio(d.deposito) && (
+                            <div className="text-[11px] sunmi-text-muted">
+                              {escalaPrecio(d.deposito)}
+                            </div>
+                          )}
                         </td>
                         <td className="px-2.5 py-3 text-right font-mono tabular-nums sunmi-text-success whitespace-nowrap">
                           {fmtMoneda(d.ganancia)}
