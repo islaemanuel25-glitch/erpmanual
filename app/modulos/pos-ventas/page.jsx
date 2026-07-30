@@ -32,6 +32,7 @@ import ModalConfirmacion from "@/components/pos-ventas/ModalConfirmacion";
 import ModalPendientesOffline from "@/components/pos-ventas/ModalPendientesOffline";
 import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
 import HistorialDia from "@/components/pos-ventas/HistorialDia";
+import AvisoVentaInterna from "@/components/pos-ventas/AvisoVentaInterna";
 import { ClipboardList, Printer, Undo2 } from "lucide-react";
 
 export default function PosVentasPage() {
@@ -1554,6 +1555,13 @@ export default function PosVentasPage() {
             </SunmiButton>
           </div>
         </div>
+
+        {/* Venta interna: el cliente representa a un local propio y la venta va a
+            generar una transferencia. Depende del MISMO state.clienteSeleccionado,
+            así que desaparece solo al cambiar o limpiar el cliente. Va acá —fuera
+            del split lg: de abajo— para que se vea igual en móvil y en escritorio,
+            antes de cobrar. */}
+        <AvisoVentaInterna cliente={state.clienteSeleccionado} />
 
         {/* Info crédito cliente (fiado) */}
         {state.formaPago === "fiado" && state.clienteSeleccionado && creditoInfo && (

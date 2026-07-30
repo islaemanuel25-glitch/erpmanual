@@ -50,6 +50,19 @@ export async function GET(req) {
             redondeo_100: true,
           },
         },
+        // Local interno que el cliente representa (Cliente.localVinculadoId, que ya
+        // viaja como escalar del modelo). Alimenta el aviso "Venta interna" del POS,
+        // que necesita el NOMBRE para no mostrar un id pelado.
+        //
+        // Solo id, nombre y activo: la UI no necesita —ni debe recibir— dirección,
+        // teléfono ni el resto de la ficha del local. `activo` viene porque un
+        // vínculo histórico con un local dado de baja hace que el backend rechace la
+        // venta, y conviene avisarlo antes de cobrar.
+        //
+        // Es aditivo: null en todo cliente externo.
+        localVinculado: {
+          select: { id: true, nombre: true, activo: true },
+        },
       },
     });
 
