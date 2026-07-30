@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-07-29 08:16
+**Última actualización:** 2026-07-30 08:09
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -33,6 +33,8 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-07-30: fix(reportes): mejorar resumen y unidades del comprobante
+- 2026-07-29: fix(reportes): paginar comprobantes y ampliar corrección de ventas
 - 2026-07-28: feat(productos): codigo de barras propio por ubicacion
 - 2026-07-28: fix(pos): enviar importe de servicios variables al cobrar
 - 2026-07-27: fix(pos): reconstruir consumo legacy y mejorar editor de corrección
@@ -390,6 +392,58 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - 2026-02-12: Crear modulo POS Ventas (MVP Fase 1)
 - 2026-02-13: Agregado selector de local para admin padre en POS Ventas
 - 2026-02-13: Creación inicial del módulo POS Ventas (MVP Fase 1)
+
+## Comprobante de venta — implementación compartida (`lib/pos-ventas/`)
+
+La generación del comprobante vive acá porque la comparten el ticket en vivo del POS y el detalle de ventas de Reportes. **Es una sola implementación, no dos.**
+
+- `lib/pos-ventas/generarTicketPDF.js` — comprobante A4 paginado. Lo usan por igual la acción "PDF" (descarga) y "Compartir" (`output: "blob"`, con fallback a descarga si el dispositivo no soporta la Web Share API): el archivo descargado y el compartido son el mismo documento. Nombre: `venta-{numero}[-copia].pdf`.
+- `lib/pos-ventas/presentacionLinea.js` — helper único de etiqueta de presentación y formato de cantidad.
+- `lib/pos-ventas/imprimirTicketTermico.js` — impresión térmica, camino aparte, con su propia marca de copia.
+
+### Flujo: medir → planificar → dibujar
+No se dibuja al vuelo. Primero se **mide** cada fila (líneas del nombre según el wrap, alto de la presentación, desglose del servicio) y el bloque de resumen; después se **planifica** el reparto en páginas (`planificarPaginas`, exportada y testeada aparte); recién entonces se **dibuja**. Es lo que permite garantizar que ninguna fila se corte entre páginas y decidir dónde va el resumen antes de pintar nada.
+
+### Paginación
+- Tantas páginas A4 como hagan falta; ninguna fila se parte entre páginas.
+- El encabezado de columnas se repite completo en cada página con productos, sobre un divisor de fondo suave.
+- Pie por página: `Ticket #N · Página X de Y`, escrito en una segunda pasada cuando ya se conoce el total.
+- Totales y "Gracias por su compra" aparecen **una sola vez**, al final.
+- **Regla contra la página huérfana de totales:** la hoja que lleva el resumen exige al menos 40 mm de productos; si no llega, se bajan filas del final de la página anterior hasta alcanzarlo, siempre que las filas movidas más el resumen entren y que la página anterior conserve al menos una fila. Solo mueve índices: no corta, no duplica, no reordena y no toca importes. Ejemplo: 30 ítems pasó de `29 productos | 1 producto + total` a `24 productos | 6 productos + resumen`. Un "Resumen de la venta" en página propia queda como *fallback excepcional*, para cuando el bloque no admita ni una fila.
+
+### Columnas
+```
+Producto | Presentación | Cantidad | Precio | Subtotal
+```
+El nombre admite hasta dos líneas con wrap y se corta con puntos suspensivos. La presentación tiene columna propia de ancho fijo (no va debajo del nombre). Cantidad, precio y subtotal a la derecha.
+
+### Presentaciones y cantidades
+`presentacionLinea.js` resuelve etiqueta y unidad desde el descriptor `deposito` que ya devuelve el detalle (`modo`, `factorPack`, `unidadMedida`) más el flag `esServicio`. No infiere nada del nombre del producto.
+
+| Condición | Presentación | Cantidad |
+|---|---|---|
+| `modo === PIEZA` (gana sobre kg) | `Pieza` | `1 pz`, `4 pz` |
+| `unidadMedida === "kg"` | `Kg` | `1 kg`, `1,920 kg`, `3,285 kg` |
+| `modo === PACK` + `factorPack > 1` | `Pack xN` | `1 pack`, `3 packs` |
+| `modo === PACK` + `unidadMedida === "cajon"` | `Caja xN` | `2 cajas` |
+| `modo === UNIDAD` / `modo_envio SOLO_UNIDAD` | `Unidad` | `3 u`, `20 u` |
+| `esServicio` | `Servicio` | según el contrato del servicio |
+| sin datos suficientes | `—` (neutro) | solo el número |
+
+- Los productos por peso **nunca** se muestran como unidades: la fuente es `unidad_medida` del producto.
+- Formato es-AR: coma decimal, punto solo para miles. Enteros sin decimales (nunca `3,000`); en kg, con parte fraccionaria se muestran los tres decimales (`1,920`).
+- El factor no se inventa: si `factor_pack` falta o no es mayor a 1, la etiqueta queda en `Pack` sin `xN`.
+- No hay campo que distinga **Bulto** de Pack (el enum `UnidadMedida` es `unidad | pack | cajon | kg`), así que `Pack xN` es el fallback neutral y `Caja xN` solo aplica a cajones.
+
+### Encabezado y resumen
+Título `COMPROBANTE DE VENTA`; en reimpresiones se aclara `Copia del comprobante` de forma secundaria (ya no se usa "REIMPRESIÓN — COPIA" como título principal). Debajo: origen (`Origen (Depósito)` / `Origen (Local)` solo si la venta lo informa, `Origen:` neutro si no), destino (cliente o `Consumidor final`), documento, ticket, fecha, vendedor, forma de pago, estado y `Venta corregida · versión N`.
+
+El resumen lleva separador, etiquetas a la izquierda e importes a la derecha con el TOTAL destacado: subtotal, descuento si existe, desglose de pagos con nombres legibles (Efectivo, Débito, Crédito, Mercado Pago, Transferencia, Cuenta corriente), TOTAL, comisión bancaria y neto recibido. Un único pago en efectivo por el total no genera desglose redundante.
+
+El ticket en vivo del POS no envía los campos nuevos (`origenEsDeposito`, `estado`, `correccion`, `deposito` por línea): en ese caso el comprobante degrada a presentación neutra en vez de inventar datos.
+
+### Tests
+`lib/pos-ventas/generarTicketPDF.test.mjs` (28) parsea el PDF real y verifica paginación, encabezado repetido, columnas, unidades, colisiones entre columnas medidas con el ancho real del texto, totales una sola vez y equivalencia entre descargado y compartido. `lib/pos-ventas/presentacionLinea.test.mjs` (17) cubre etiquetas y formato de cantidades.
 
 ## APIs
 ### Endpoints
