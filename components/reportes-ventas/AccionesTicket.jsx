@@ -34,6 +34,13 @@ function construirTicket(venta) {
           direccion: venta.cliente.direccion || null,
         }
       : null,
+    // Origen: el comprobante lo etiqueta "Depósito"/"Local" según este flag. Si el
+    // detalle no lo informa queda undefined y el PDF no afirma el tipo.
+    origenEsDeposito: venta.local?.esDeposito,
+    estado: venta.estado,
+    correccion: venta.correccion
+      ? { corregida: !!venta.correccion.corregida, version: venta.correccion.version }
+      : null,
     items: (venta.detalles || []).map((d) => ({
       nombre: d.nombre,
       cantidad: num(d.cantidad),
@@ -42,6 +49,9 @@ function construirTicket(venta) {
       importeBaseServicio: d.importeBaseServicio != null ? num(d.importeBaseServicio) : null,
       recargoServicioPct: d.recargoServicioPct != null ? num(d.recargoServicioPct) : null,
       recargoServicioImporte: d.recargoServicioImporte != null ? num(d.recargoServicioImporte) : null,
+      // Modo de depósito (Pack/Unidad/Pieza) para el comprobante. Ya viene resuelto
+      // por el endpoint; el PDF no infiere nada.
+      deposito: d.deposito || null,
     })),
     subtotal: num(venta.totales?.subtotal),
     descuento: num(venta.totales?.descuento),
@@ -84,7 +94,7 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
   }
 
   async function compartir() {
-    let blob = null, nombreArchivo = `ticket-${venta.numero}-copia.pdf`;
+    let blob = null, nombreArchivo = `venta-${venta.numero}-copia.pdf`;
     try {
       const { default: generarTicketPDF } = await import("@/lib/pos-ventas/generarTicketPDF");
       const out = generarTicketPDF(construirTicket(venta), { copia: true, output: "blob" });

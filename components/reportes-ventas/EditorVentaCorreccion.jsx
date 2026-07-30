@@ -432,7 +432,8 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
             <>
               {/* Metadatos del ticket */}
               <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                {/* 7 campos: en pantallas anchas entran en una sola fila. */}
+                <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 text-sm">
                   <div>
                     <span className="sunmi-text-muted text-xs">Ticket</span>
                     <p className="sunmi-text-strong font-mono">#{data.venta.numero}</p>

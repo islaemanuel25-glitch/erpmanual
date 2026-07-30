@@ -260,7 +260,12 @@ export async function GET(req, { params }) {
           ? { id: venta.vendedor.id, nombre: venta.vendedor.nombre }
           : null,
         local: venta.local
-          ? { id: venta.local.id, nombre: venta.local.nombre }
+          ? {
+              id: venta.local.id,
+              nombre: venta.local.nombre,
+              // Aditivo: el comprobante PDF etiqueta el origen como Depósito o Local.
+              esDeposito: venta.local.es_deposito === true,
+            }
           : null,
         totales,
         detalles,

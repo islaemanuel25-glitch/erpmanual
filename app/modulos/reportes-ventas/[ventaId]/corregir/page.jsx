@@ -37,8 +37,12 @@ export default function CorregirVentaPage() {
   }, [router, detalleUrl]);
 
   return (
-    <div className="sunmi-bg w-full min-h-full p-2 sm:p-4">
-      <div className="mx-auto w-full max-w-5xl">
+    // Mismo patrón de contenedor que POS Ventas, el listado y el detalle:
+    // `w-full min-h-full p-2 lg:p-3`. Antes el editor iba dentro de
+    // `mx-auto w-full max-w-5xl`, que lo recortaba a 896 px (64rem con raíz de
+    // 14px) y comprimía la tabla de líneas en desktop.
+    <div className="sunmi-bg w-full min-h-full p-2 lg:p-3">
+      <div className="w-full">
         <EditorVentaCorreccion
           ventaId={ventaId}
           onVolver={volverALaVenta}
