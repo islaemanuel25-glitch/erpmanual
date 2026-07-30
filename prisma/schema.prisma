@@ -1226,11 +1226,20 @@ model AuditoriaStock {
   userId           Int
   accion           String
   // Son snapshots DIRECTOS de StockLocal.cantidad (ajustar/route.js), así que
-  // siguen su escala: con 2 decimales la auditoría registraría 8.08 mientras el
+  // siguen su ESCALA: con 2 decimales la auditoría registraría 8.08 mientras el
   // stock vale 8.075. Los umbrales de abajo copian stockMin/stockMax, que siguen
   // en 2 decimales: cada columna de auditoría mantiene la escala de su origen.
-  cantidadAnterior Decimal? @db.Decimal(12, 3)
-  cantidadNueva    Decimal? @db.Decimal(12, 3)
+  //
+  // Pero la PRECISIÓN es mayor a propósito: 14 dígitos, no 12. La auditoría es
+  // historia y no se reescribe. Producción tiene una fila real de 9.999.999.999
+  // (un AJUSTE_SUMAR erróneo de 2026-06-16) que no entra en numeric(12,3) —máximo
+  // 999.999.999,999— y haría fallar el ALTER. Con (14,3) el registro histórico se
+  // conserva intacto y los ajustes nuevos igual guardan sus tres decimales.
+  //
+  // StockLocal NO acompaña esta ampliación: ahí (12,3) es el rango operativo
+  // correcto, y el valor absurdo se corrige por el flujo normal de ajuste.
+  cantidadAnterior Decimal? @db.Decimal(14, 3)
+  cantidadNueva    Decimal? @db.Decimal(14, 3)
   stockMinAnterior Decimal? @db.Decimal(12, 2)
   stockMinNuevo    Decimal? @db.Decimal(12, 2)
   stockMaxAnterior Decimal? @db.Decimal(12, 2)

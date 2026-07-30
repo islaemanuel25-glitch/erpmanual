@@ -12,34 +12,51 @@
 -- El mismo movimiento entraba y salía con cantidades distintas, y vender+corregir
 -- dejaba 10.00 → 10.01, inventando stock.
 --
--- Es una AMPLIACIÓN de escala: (12,2) → (12,3). No hay pérdida (8.08 → 8.080) ni
--- backfill: PostgreSQL reescribe la columna conservando el valor.
+-- Es una AMPLIACIÓN de escala. No hay pérdida (8.08 → 8.080) ni backfill:
+-- PostgreSQL reescribe la columna conservando el valor.
 --
--- OJO con el único límite real: la precisión TOTAL sigue siendo 12, así que los
--- dígitos ENTEROS máximos bajan de 10 a 9. Un valor >= 1.000.000.000 haría fallar
--- el ALTER con "numeric field overflow". Verificar antes de aplicar en producción:
+-- DOS DESTINOS DISTINTOS, A PROPÓSITO:
 --
---   SELECT count(*) FROM "StockLocal" WHERE abs(cantidad) >= 1000000000
---                                        OR abs("enTransito") >= 1000000000;
---   SELECT count(*) FROM "TransferenciaDetalle" WHERE abs(cantidad) >= 1000000000
---                                        OR abs(recibido) >= 1000000000;
---   SELECT count(*) FROM "AuditoriaStock" WHERE abs("cantidadAnterior") >= 1000000000
---                                        OR abs("cantidadNueva") >= 1000000000;
+--   · Las CUATRO columnas operativas van a DECIMAL(12,3) —máximo
+--     999.999.999,999—, que es el rango real de trabajo del inventario.
+--   · Las DOS columnas de AuditoriaStock van a DECIMAL(14,3) —máximo
+--     99.999.999.999,999—. La auditoría es historia y no se reescribe:
+--     producción tiene una fila de 9.999.999.999,00 (AJUSTE_SUMAR erróneo del
+--     2026-06-16, AuditoriaStock id=3621) que NO entra en (12,3) y haría fallar
+--     este ALTER. Ampliar solo la precisión conserva el registro tal cual.
+--
+-- El valor absurdo equivalente en StockLocal (productoLocalId 6294) se corrige por
+-- el flujo normal de ajuste ANTES de aplicar esta migración; no se lo acomoda
+-- ampliando el rango operativo.
+--
+-- VERIFICAR ANTES DE APLICAR EN PRODUCCIÓN — los límites son distintos por grupo:
+--
+--   -- (12,3): deben dar 0
+--   SELECT count(*) FROM "StockLocal"
+--    WHERE abs(cantidad) >= 1000000000 OR abs("enTransito") >= 1000000000;
+--   SELECT count(*) FROM "TransferenciaDetalle"
+--    WHERE abs(cantidad) >= 1000000000 OR abs(coalesce(recibido,0)) >= 1000000000;
+--
+--   -- (14,3): debe dar 0
+--   SELECT count(*) FROM "AuditoriaStock"
+--    WHERE abs("cantidadAnterior") >= 100000000000
+--       OR abs("cantidadNueva")    >= 100000000000;
 --
 -- Cambiar la escala de numeric obliga a PostgreSQL a REESCRIBIR la tabla con un
 -- lock ACCESS EXCLUSIVE. El tiempo es proporcional al tamaño de cada tabla.
 --
 -- NO se tocan campos monetarios (precio, precioCosto, subtotal, total…) ni los
 -- umbrales stockMin/stockMax, que no son cantidades movidas sino configuración de
--- alertas.
+-- alertas, ni las columnas stockMin*/stockMax* de AuditoriaStock que los copian.
 
+-- Columnas OPERATIVAS: rango de inventario, 12 dígitos.
 ALTER TABLE "StockLocal" ALTER COLUMN "cantidad" TYPE DECIMAL(12,3);
 ALTER TABLE "StockLocal" ALTER COLUMN "enTransito" TYPE DECIMAL(12,3);
 
 ALTER TABLE "TransferenciaDetalle" ALTER COLUMN "cantidad" TYPE DECIMAL(12,3);
 ALTER TABLE "TransferenciaDetalle" ALTER COLUMN "recibido" TYPE DECIMAL(12,3);
 
--- Snapshots directos de StockLocal.cantidad: si no acompañan, la auditoría
--- registraría un valor distinto del que quedó en el stock.
-ALTER TABLE "AuditoriaStock" ALTER COLUMN "cantidadAnterior" TYPE DECIMAL(12,3);
-ALTER TABLE "AuditoriaStock" ALTER COLUMN "cantidadNueva" TYPE DECIMAL(12,3);
+-- Columnas HISTÓRICAS: snapshots directos de StockLocal.cantidad. Misma escala (3
+-- decimales) pero mayor precisión (14), para no perder ni truncar lo ya registrado.
+ALTER TABLE "AuditoriaStock" ALTER COLUMN "cantidadAnterior" TYPE DECIMAL(14,3);
+ALTER TABLE "AuditoriaStock" ALTER COLUMN "cantidadNueva" TYPE DECIMAL(14,3);
