@@ -46,6 +46,12 @@ export async function GET(req) {
         listaPrecio: {
           select: { id: true, nombre: true, esDefault: true, activo: true },
         },
+        // Local interno que el cliente representa (Cliente.localVinculadoId).
+        // Alimenta la etiqueta "Local interno" del listado y el valor inicial del
+        // selector en el modal de edición. null en los clientes externos.
+        localVinculado: {
+          select: { id: true, nombre: true, activo: true },
+        },
       },
     });
 

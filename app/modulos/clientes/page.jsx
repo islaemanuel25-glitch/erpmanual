@@ -15,6 +15,7 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import ModalMergeClientes from "@/components/clientes/ModalMergeClientes";
 import SinPermisos from "@/components/auth/SinPermisos";
+import { construirOpcionesVinculo } from "@/lib/ventas-internas/configurarVinculo";
 
 export default function ClientesPage() {
   const router = useRouter();
@@ -739,7 +740,18 @@ export default function ClientesPage() {
             ) : (
               clientesFiltrados.map((cliente) => (
                 <SunmiTableRow key={cliente.id}>
-                  <td className="px-2 py-1.5 font-medium">{cliente.nombre}</td>
+                  <td className="px-2 py-1.5 font-medium">
+                    {cliente.nombre}
+                    {/* Marca discreta: este cliente representa a un local interno. */}
+                    {cliente.localVinculado && (
+                      <span
+                        className="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium sunmi-surface-soft sunmi-text-link whitespace-nowrap"
+                        title={`Cliente vinculado al local interno ${cliente.localVinculado.nombre}`}
+                      >
+                        Local interno · {cliente.localVinculado.nombre}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-2 py-1.5 font-mono text-sm">
                     {cliente.documento || "-"}
                   </td>
@@ -890,6 +902,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
     limiteCredito: cliente?.limiteCredito != null ? String(cliente.limiteCredito) : "",
     descuentoPorcentaje: cliente?.descuentoPorcentaje != null ? String(cliente.descuentoPorcentaje) : "",
     listaPrecioId: cliente?.listaPrecio?.id ?? null,
+    localVinculadoId: cliente?.localVinculado?.id ?? null,
   });
 
   const [tags, setTags] = useState([]);
@@ -902,6 +915,12 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
   const [errorMsg, setErrorMsg] = useState("");
 
   const [listasOpciones, setListasOpciones] = useState([]);
+
+  // Locales internos vinculables. La carga es independiente del resto del
+  // formulario: si falla, el cliente se sigue pudiendo editar y solo se bloquea
+  // CAMBIAR el vínculo (no se puede ofrecer una lista que no se pudo validar).
+  const [localesVinc, setLocalesVinc] = useState([]);
+  const [localesVincEstado, setLocalesVincEstado] = useState("cargando"); // cargando | ok | error
 
   useEffect(() => {
     if (localId) {
@@ -936,6 +955,57 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
       cancelado = true;
     };
   }, [localId]);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      setLocalesVincEstado("cargando");
+      try {
+        const params = new URLSearchParams();
+        if (localId) params.set("localId", String(localId));
+        if (cliente?.id) params.set("clienteId", String(cliente.id));
+        const res = await fetch(`/api/clientes/locales-vinculables?${params}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = res.ok ? await res.json() : null;
+        if (cancelado) return;
+        if (data?.ok && Array.isArray(data.items)) {
+          setLocalesVinc(data.items);
+          setLocalesVincEstado("ok");
+        } else {
+          setLocalesVinc([]);
+          setLocalesVincEstado("error");
+        }
+      } catch {
+        if (!cancelado) {
+          setLocalesVinc([]);
+          setLocalesVincEstado("error");
+        }
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [localId, cliente?.id]);
+
+  // Opciones del selector: el vínculo actual siempre visible (aunque el local esté
+  // inactivo) y los locales tomados por otro cliente deshabilitados.
+  const opcionesVinculo = construirOpcionesVinculo({
+    locales: localesVinc,
+    vinculoActual: form.localVinculadoId,
+    localActual: cliente?.localVinculado
+      ? {
+          id: cliente.localVinculado.id,
+          nombre: cliente.localVinculado.nombre,
+          activo: cliente.localVinculado.activo,
+          esDeposito: false,
+          clienteVinculadoId: cliente.id,
+          clienteVinculadoNombre: cliente.nombre,
+        }
+      : null,
+    clienteIdActual: cliente?.id ?? null,
+  });
 
   const cargarTags = async () => {
     if (!localId) return;
@@ -1146,6 +1216,53 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
                   </option>
                 )}
             </SunmiSelectAdv>
+          </div>
+
+          {/* Local interno vinculado (Cliente.localVinculadoId). Distinto del local
+              propietario de la ficha: acá se declara que este cliente REPRESENTA a
+              un local de la empresa. */}
+          <div>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">
+              Local interno vinculado
+            </label>
+            <SunmiSelectAdv
+              value={form.localVinculadoId == null ? "" : form.localVinculadoId}
+              onChange={(val) => {
+                if (val === "" || val === null || val === undefined) {
+                  handleChange("localVinculadoId", null);
+                } else {
+                  handleChange("localVinculadoId", Number(val));
+                }
+              }}
+              // Si la lista no se pudo cargar, no se ofrece cambiar el vínculo: no
+              // se puede proponer algo que no se validó. El resto del formulario
+              // sigue editable.
+              disabled={localesVincEstado === "error"}
+              placeholder="Ningún local interno"
+            >
+              <option value="">Ningún local interno</option>
+              {opcionesVinculo.map((o) => (
+                <option key={o.id} value={o.id} disabled={o.deshabilitada}>
+                  {o.etiqueta}
+                </option>
+              ))}
+            </SunmiSelectAdv>
+            {localesVincEstado === "cargando" && (
+              <p className="text-[11px] sunmi-text-muted mt-1">Cargando locales…</p>
+            )}
+            {localesVincEstado === "error" && (
+              <p className="text-[11px] sunmi-text-danger mt-1">
+                No se pudieron cargar los locales. Podés guardar el resto de los datos;
+                el vínculo actual se conserva.
+              </p>
+            )}
+            {localesVincEstado === "ok" && (
+              <p className="text-[11px] sunmi-text-muted mt-1">
+                Usá esta opción únicamente cuando este cliente represente a un local de
+                la empresa. Las ventas a este cliente podrán generar una transferencia
+                interna.
+              </p>
+            )}
           </div>
 
           <div>
