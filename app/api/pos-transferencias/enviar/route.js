@@ -6,6 +6,8 @@ import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
+import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
+import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
 
 export async function POST(req) {
   try {
@@ -239,93 +241,24 @@ export async function POST(req) {
         throw new Error("ALREADY_SENT");
       }
 
-      const detallesTransferencia = [];
-
-      for (const item of items) {
-        if (!item.baseId) {
-          throw new Error("Producto sin baseId asignado");
-        }
-
-        const base = item.productoLocalOrigen?.base;
-
-        // Producto en el destino
-        const productoLocalDestino = await tx.productoLocal.upsert({
-          where: {
-            localId_baseId: {
-              localId: pos.destinoId,
-              baseId: item.baseId,
-            },
-          },
-          update: {},
-          create: {
-            localId: pos.destinoId,
-            baseId: item.baseId,
-            nombre: item.productoLocalOrigen?.nombre || base?.nombre || "",
-            descripcion:
-              item.productoLocalOrigen?.descripcion || base?.descripcion || "",
-            precio_costo:
-              item.productoLocalOrigen?.precio_costo || base?.precio_costo,
-            precio_venta:
-              item.productoLocalOrigen?.precio_venta || base?.precio_venta,
-          },
-        });
-
-        // Calcular unidades para stock (misma lógica que confirmar-recepcion)
-        const unidadesStock = toUnidades({
-          cantidad: item.cantidadRaw,
-          unidad: item.unidadEnviada,
-          factorPack: item.factorPack,
-        });
-
-        // Descontar cantidad del origen + incrementar enTransito
-        await tx.stockLocal.upsert({
-          where: {
-            localId_productoId: {
-              localId: pos.origenId,
-              productoId: item.detalle.productoId,
-            },
-          },
-          update: {
-            cantidad: { decrement: unidadesStock },
-            enTransito: { increment: unidadesStock },
-          },
-          create: {
-            localId: pos.origenId,
-            productoId: item.detalle.productoId,
-            cantidad: -unidadesStock,
-            enTransito: unidadesStock,
-          },
-        });
-
-        detallesTransferencia.push({
-          productoId: productoLocalDestino.id,
+      // Creación de la transferencia + política de stock del origen: servicio
+      // compartido (lib/transferencias/crearTransferencia). El flujo manual usa
+      // DESCONTAR_Y_TRANSITO, que es el comportamiento histórico de esta ruta.
+      const { transferencia: nuevaTransferencia } = await crearTransferencia({
+        tx,
+        origenId: pos.origenId,
+        destinoId: pos.destinoId,
+        creadoPorId: pos.usuarioId,
+        posTransferenciaId: pos.id,
+        politicaStockOrigen: DESCONTAR_Y_TRANSITO,
+        items: items.map((item) => ({
+          baseId: item.baseId,
+          productoLocalOrigenId: item.detalle.productoId,
           cantidad: item.cantidadRaw,
           unidadEnviada: item.unidadEnviada,
-          precioCosto: item.productoLocalOrigen?.precio_costo || base?.precio_costo || 0,
-        });
-      }
-
-      if (!detallesTransferencia.length) {
-        throw new Error(
-          "No se generaron detalles válidos para la transferencia"
-        );
-      }
-
-      const nuevaTransferencia = await tx.transferencia.create({
-        data: {
-          origenId: pos.origenId,
-          destinoId: pos.destinoId,
-          creadaPor: pos.usuarioId,
-          posTransferenciaId: pos.id,
-
-          estado: "Enviada",
-          fechaEnvio: new Date(),
-
-          detalle: {
-            create: detallesTransferencia,
-          },
-        },
-        include: { detalle: true },
+          factorPack: item.factorPack,
+          productoLocalOrigen: item.productoLocalOrigen,
+        })),
       });
 
       await tx.posTransferencia.update({
