@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { resolveLocalAndGrupo, getLocalIdsDeGrupo } from "@/lib/grupos";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm, checkPerm } from "@/lib/authorize";
-import { evaluarVinculoVentaInterna } from "@/lib/ventas-internas/vinculo";
 import {
   esSinVinculo,
   respuestaVinculoInvalido,
   construirSnapshots,
   idsParaSnapshots,
   bloqueoReintentoHuerfana,
+  resolverVentaInterna,
+  confirmarVinculoTransaccional,
 } from "@/lib/ventas-internas/integracionVenta";
 import { mapearVentaATransferencia } from "@/lib/ventas-internas/mapearVentaATransferencia";
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
@@ -601,54 +602,38 @@ export async function POST(req) {
     // evitar, porque generaría deuda sin transferencia.
     //
     // Sin clienteId no se consulta nada: es una venta común y no cuesta una query.
+    //
+    // Esta resolución NO es la fuente de verdad: sirve para fallar temprano y
+    // evitar trabajo inútil. La decisión definitiva se vuelve a tomar DENTRO de la
+    // transacción, con `tx`, justo antes de crear la transferencia.
+    //
+    // El permiso se evalúa contra la sesión ya resuelta (checkPerm), no contra la
+    // base: depende del usuario logueado, no de una fila mutable de Cliente o
+    // Local, así que no puede cambiar por debajo durante la venta y no hace falta
+    // releerlo dentro de la transacción.
+    const permTransferencias = checkPerm(session, "transferencias.crear").ok === true;
+    const argsVinculo = {
+      clienteId,
+      grupoId,
+      localOrigenId: localId,
+      esDeposito,
+      tienePermisoCrearTransferencia: permTransferencias,
+    };
+
+    const previo = await resolverVentaInterna(prisma, argsVinculo);
     let ventaInterna = null;
-    if (clienteId) {
-      const clienteVinculo = await prisma.cliente.findFirst({
-        where: { id: clienteId, grupoId },
-        select: {
-          id: true,
-          localId: true,
-          grupoId: true,
-          localVinculadoId: true,
-          localVinculado: {
-            select: { id: true, nombre: true, activo: true, es_deposito: true },
-          },
-        },
+    if (previo.activa) {
+      ventaInterna = { destinoId: previo.destinoId, destinoNombre: previo.destinoNombre };
+    } else if (!esSinVinculo(previo.codigo)) {
+      // Vínculo declarado pero estructuralmente inválido: se RECHAZA la venta
+      // entera. Degradar a venta común dejaría deuda sin mercadería en viaje.
+      const rechazo = respuestaVinculoInvalido(previo.codigo, {
+        nombreLocal: previo.destinoNombre,
       });
-
-      // Solo si hay vínculo DECLARADO se paga el costo de resolver grupo y permiso.
-      if (clienteVinculo?.localVinculadoId != null) {
-        const idsGrupo = await getLocalIdsDeGrupo(grupoId);
-        const enGrupo = new Set(idsGrupo);
-        // El permiso se valida contra la sesión ya resuelta: sin consulta extra.
-        const permTransf = checkPerm(session, "transferencias.crear");
-
-        const evaluacion = evaluarVinculoVentaInterna({
-          cliente: clienteVinculo,
-          localOrigen: { id: localId, es_deposito: esDeposito },
-          localDestino: clienteVinculo.localVinculado,
-          perteneceOrigenAlGrupo: enGrupo.has(localId),
-          perteneceDestinoAlGrupo: enGrupo.has(Number(clienteVinculo.localVinculadoId)),
-          tienePermisoCrearTransferencia: permTransf.ok === true,
-        });
-
-        if (evaluacion.activa) {
-          ventaInterna = {
-            destinoId: evaluacion.localDestinoId,
-            destinoNombre: clienteVinculo.localVinculado?.nombre || null,
-          };
-        } else if (!esSinVinculo(evaluacion.codigo)) {
-          // Vínculo declarado pero estructuralmente inválido: se RECHAZA la venta
-          // entera. Degradar a venta común dejaría deuda sin mercadería en viaje.
-          const rechazo = respuestaVinculoInvalido(evaluacion.codigo, {
-            nombreLocal: clienteVinculo.localVinculado?.nombre || null,
-          });
-          return NextResponse.json(
-            { ok: false, error: rechazo.error, code: rechazo.code },
-            { status: rechazo.status }
-          );
-        }
-      }
+      return NextResponse.json(
+        { ok: false, error: rechazo.error, code: rechazo.code },
+        { status: rechazo.status }
+      );
     }
 
     // El costo total, la ganancia y el descuento consolidado de stock se calculan
@@ -847,12 +832,23 @@ export async function POST(req) {
         });
 
         // Venta 100% de servicios: se completa normalmente y no genera
-        // transferencia. No es un error.
+        // transferencia. No es un error. Y como no hay mercadería que despachar,
+        // NO se revalida el vínculo: sería introducir una dependencia logística en
+        // una venta que no mueve stock. Se revalida solo si hay algo que enviar.
         if (mapeo.debeCrearTransferencia) {
+          // FUENTE DE VERDAD del destino: relectura DENTRO de la transacción.
+          // Entre la validación previa y este punto, otro usuario pudo desvincular
+          // el cliente, apuntarlo a otro local, desactivarlo o sacarlo del grupo.
+          // Si algo de eso pasó, se aborta TODO (venta, pagos, detalles, stock).
+          const confirmado = confirmarVinculoTransaccional(
+            await resolverVentaInterna(tx, argsVinculo),
+            ventaInterna.destinoId
+          );
+
           const { transferencia } = await crearTransferencia({
             tx,
             origenId: localId,
-            destinoId: ventaInterna.destinoId,
+            destinoId: confirmado.destinoId,
             creadoPorId: session.id,
             posTransferenciaId: null,
             ventaId: nuevaVenta.id,
@@ -1029,6 +1025,16 @@ export async function POST(req) {
   } catch (err) {
     console.error("Error crear venta POS:", err);
     
+    // Venta interna: el vínculo cambió o dejó de ser válido DENTRO de la
+    // transacción. Ya hizo rollback de venta, pagos, detalles, stock y
+    // transferencia; acá solo se traduce el error tipado a la respuesta HTTP.
+    if (err.esErrorVentaInterna) {
+      return NextResponse.json(
+        { ok: false, error: err.message, code: err.code },
+        { status: err.status || 409 }
+      );
+    }
+
     // Combo estructuralmente inválido (componente inactivo/inexistente/combo/
     // cantidad inválida/composición vacía): bloquea la venta SIEMPRE, incluso con
     // allowNegativeStock.
