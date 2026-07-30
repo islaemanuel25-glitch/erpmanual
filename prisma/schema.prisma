@@ -363,8 +363,13 @@ model StockLocal {
   id         Int      @id @default(autoincrement())
   localId    Int
   productoId Int
-  cantidad   Decimal  @db.Decimal(12, 2)
-  enTransito Decimal  @default(0) @db.Decimal(12, 2)
+  // Escala FÍSICA: 3 decimales, la misma que VentaDetalle.cantidadStock y que
+  // piezasToKg(). Con 2 decimales una venta de 1.925 kg descontaba 1.92 pero
+  // acreditaba 1.93 a enTransito, y vender+corregir dejaba 10.00 → 10.01.
+  cantidad   Decimal  @db.Decimal(12, 3)
+  enTransito Decimal  @default(0) @db.Decimal(12, 3)
+  // stockMin/stockMax NO son cantidades movidas sino umbrales de alerta: quedan
+  // en 2 decimales, alineados con AuditoriaStock.stockMin*/stockMax*.
   stockMin   Decimal? @db.Decimal(12, 2)
   stockMax   Decimal? @db.Decimal(12, 2)
   createdAt  DateTime @default(now())
@@ -493,8 +498,10 @@ model TransferenciaDetalle {
   id              Int         @id @default(autoincrement())
   transferenciaId Int
   productoId      Int
-  cantidad        Decimal     @db.Decimal(12, 2)
-  recibido        Decimal?    @db.Decimal(12, 2)
+  // Escala FÍSICA: 3 decimales, igual que StockLocal.cantidad. Enviar y recibir
+  // tienen que poder expresar exactamente lo que el inventario movió.
+  cantidad        Decimal     @db.Decimal(12, 3)
+  recibido        Decimal?    @db.Decimal(12, 3)
   precioCosto     Decimal?    @db.Decimal(12, 2)
   unidadEnviada   ModoPedido? // BULTO o UNIDAD según cómo se envió
 
@@ -1218,8 +1225,12 @@ model AuditoriaStock {
   productoLocalId  Int
   userId           Int
   accion           String
-  cantidadAnterior Decimal? @db.Decimal(12, 2)
-  cantidadNueva    Decimal? @db.Decimal(12, 2)
+  // Son snapshots DIRECTOS de StockLocal.cantidad (ajustar/route.js), así que
+  // siguen su escala: con 2 decimales la auditoría registraría 8.08 mientras el
+  // stock vale 8.075. Los umbrales de abajo copian stockMin/stockMax, que siguen
+  // en 2 decimales: cada columna de auditoría mantiene la escala de su origen.
+  cantidadAnterior Decimal? @db.Decimal(12, 3)
+  cantidadNueva    Decimal? @db.Decimal(12, 3)
   stockMinAnterior Decimal? @db.Decimal(12, 2)
   stockMinNuevo    Decimal? @db.Decimal(12, 2)
   stockMaxAnterior Decimal? @db.Decimal(12, 2)
