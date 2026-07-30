@@ -5,6 +5,13 @@
  * correspondiente en docs/modulos/ y CHANGELOG.md
  *
  * Uso: node scripts/update-docs.js [--since="2025-01-01"] [--dry-run]
+ *
+ * --since acepta YYYY-MM-DD (se toma desde las 00:00:00 hora local),
+ * "YYYY-MM-DD HH:MM[:SS]", ISO con zona, o una expresión relativa de git.
+ * Ver normalizarSince(): una fecha sin hora NO puede pasarse cruda a
+ * `git log --since`, porque git le rellena la hora actual.
+ *
+ * Tests: node --test scripts/update-docs.test.mjs
  */
 
 const { execSync } = require('child_process');
@@ -36,6 +43,13 @@ const MODULO_MAP = {
   'app/modulos/pos-transferencias': 'pos-transferencias',
   'components/pos-transferencias':  'pos-transferencias',
   'app/api/pos-transferencias':     'pos-transferencias',
+  // Reportes de ventas: listado, detalle "Ver venta" y corrección. Las 4 raíces
+  // apuntan al mismo doc (docs/modulos/reportes-ventas.md). No colisiona con
+  // reportes-stock porque startsWith compara el nombre completo del módulo.
+  'app/modulos/reportes-ventas':  'reportes-ventas',
+  'components/reportes-ventas':   'reportes-ventas',
+  'app/api/reportes-ventas':      'reportes-ventas',
+  'lib/reportes-ventas':          'reportes-ventas',
   'app/modulos/productos':        'productos',
   'components/productos':         'productos',
   'app/api/productos':            'productos',
@@ -98,19 +112,110 @@ function gitExec(cmd) {
   }
 }
 
+// Fecha local YYYY-MM-DD (no usar toISOString: eso convierte a UTC y en zonas
+// negativas como AR devuelve el día anterior).
+function fechaLocalISO(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+const RE_SOLO_FECHA = /^(\d{4})-(\d{2})-(\d{2})$/;
+const RE_FECHA_HORA = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/;
+// Expresiones relativas de git (approxidate): se pasan tal cual.
+const RE_RELATIVA = /(\bago\b|\byesterday\b|\btoday\b|\bnoon\b|\bmidnight\b|\blast\s)/i;
+// ISO con zona explícita (Z u offset): ya trae su propio huso, no se toca.
+const RE_ISO_CON_ZONA = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
+
+function esFechaCalendarioValida(y, m, d, hh = 0, mi = 0, ss = 0) {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  if (hh > 23 || mi > 59 || ss > 59) return false;
+  // Construir en hora LOCAL y verificar que no hubo rollover (ej: 2026-02-30).
+  const dt = new Date(y, m - 1, d, hh, mi, ss);
+  return (
+    dt.getFullYear() === y &&
+    dt.getMonth() === m - 1 &&
+    dt.getDate() === d &&
+    dt.getHours() === hh &&
+    dt.getMinutes() === mi &&
+    dt.getSeconds() === ss
+  );
+}
+
+/**
+ * Normaliza el valor de `--since` (o la fecha derivada de docs/) a algo que git
+ * interprete de forma determinista, en la ZONA LOCAL del servidor.
+ *
+ * El bug que corrige: `git log --since="2026-07-29"` no significa "desde el
+ * comienzo del 29". Git usa approxidate y rellena la hora que falta con la HORA
+ * ACTUAL, así que corriendo el script a las 21:53 se saltea todos los commits de
+ * ese mismo día anteriores a las 21:53.
+ *
+ *   'YYYY-MM-DD'                 → 'YYYY-MM-DD 00:00:00'
+ *   'YYYY-MM-DD HH:MM[:SS]'      → se respeta (se completan los segundos)
+ *   'YYYY-MM-DDTHH:MM[:SS]'      → idem, con espacio en lugar de T
+ *   ISO con Z u offset           → tal cual (ya trae huso propio)
+ *   relativas de git ("2 days ago", "yesterday") → tal cual
+ *   cualquier otra cosa          → Error con mensaje claro
+ *
+ * No se agrega sufijo de zona: sin él, git la interpreta en la zona local, que es
+ * el criterio que usa el resto del script (ahora()/hoy() son locales).
+ */
+function normalizarSince(valor) {
+  const raw = String(valor == null ? '' : valor).trim();
+  if (!raw) {
+    throw new Error('--since vacío. Formato esperado: YYYY-MM-DD o "YYYY-MM-DD HH:MM[:SS]".');
+  }
+
+  if (RE_ISO_CON_ZONA.test(raw) || RE_RELATIVA.test(raw)) return raw;
+
+  const soloFecha = raw.match(RE_SOLO_FECHA);
+  if (soloFecha) {
+    const [, y, m, d] = soloFecha.map(Number);
+    if (!esFechaCalendarioValida(y, m, d)) {
+      throw new Error(`Fecha inválida en --since: "${raw}" (no existe en el calendario).`);
+    }
+    return `${raw} 00:00:00`;
+  }
+
+  const conHora = raw.match(RE_FECHA_HORA);
+  if (conHora) {
+    const [, y, m, d, hh, mi, ss] = conHora;
+    const seg = ss == null ? '00' : ss;
+    if (!esFechaCalendarioValida(+y, +m, +d, +hh, +mi, +seg)) {
+      throw new Error(`Fecha u hora inválida en --since: "${raw}".`);
+    }
+    return `${y}-${m}-${d} ${hh}:${mi}:${seg}`;
+  }
+
+  throw new Error(
+    `Formato de --since no reconocido: "${raw}".\n` +
+    '   Formatos aceptados:\n' +
+    '     YYYY-MM-DD                 (se toma desde las 00:00:00 hora local)\n' +
+    '     "YYYY-MM-DD HH:MM"         o "YYYY-MM-DD HH:MM:SS"\n' +
+    '     ISO con zona               (2026-07-29T08:16:00-03:00)\n' +
+    '     relativa de git            ("2 days ago", "yesterday")'
+  );
+}
+
 function getUltimaActualizacionDocs() {
   if (sinceArg) {
-    return sinceArg.split('=')[1];
+    // Todo lo que venga del CLI pasa por la normalización (y su validación).
+    return normalizarSince(sinceArg.slice('--since='.length));
   }
   // Buscar el último commit que tocó docs/
   const hash = gitExec('git log -1 --format=%H -- docs/');
   if (hash) {
-    return gitExec(`git log -1 --format=%aI ${hash}`).split('T')[0];
+    const fecha = gitExec(`git log -1 --format=%aI ${hash}`).split('T')[0];
+    // Desde el COMIENZO de ese día: si se documentó a las 08:16 y después hubo
+    // más commits ese mismo día, deben entrar igual.
+    if (fecha) return normalizarSince(fecha);
   }
-  // Fallback: 30 días atrás
+  // Fallback: 30 días atrás (fecha local, no UTC).
   const d = new Date();
   d.setDate(d.getDate() - 30);
-  return d.toISOString().split('T')[0];
+  return normalizarSince(fechaLocalISO(d));
 }
 
 function getCommitsDesde(since) {
@@ -364,7 +469,14 @@ function main() {
     fs.mkdirSync(MODULOS_DIR, { recursive: true });
   }
 
-  const resultado = analizarCambios();
+  let resultado;
+  try {
+    resultado = analizarCambios();
+  } catch (e) {
+    // Fecha inválida en --since y similares: mensaje claro, sin stack trace.
+    console.error(`❌ ${e.message}`);
+    process.exit(1);
+  }
   if (!resultado) return;
 
   const { modulosAfectados } = resultado;
@@ -392,4 +504,10 @@ function main() {
   }
 }
 
-main();
+// Solo corre como CLI. Al requerirlo desde un test no ejecuta nada.
+if (require.main === module) {
+  main();
+}
+
+// Exportado para los tests (scripts/update-docs.test.mjs). Funciones puras.
+module.exports = { detectarModulo, normalizarSince, MODULO_MAP, fechaLocalISO };
