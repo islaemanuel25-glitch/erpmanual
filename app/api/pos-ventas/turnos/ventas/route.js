@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 
 export async function GET(req) {
   try {
@@ -74,7 +75,8 @@ export async function GET(req) {
 
     // Obtener ventas del turno
     const ventas = await prisma.venta.findMany({
-      where: { turnoId },
+      // Vista operativa del turno: los mismos tickets que cuenta el cierre.
+      where: whereVentaComercial({ turnoId }),
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

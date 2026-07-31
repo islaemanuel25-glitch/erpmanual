@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 
 export async function GET(req) {
@@ -104,7 +105,7 @@ export async function GET(req) {
 
     const grouped = await prisma.venta.groupBy({
       by: ["clienteId"],
-      where: ventaWhere,
+      where: whereVentaComercial(ventaWhere),
       _sum: { total: true },
       _count: { id: true },
       _max: { fecha: true },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { getRangoArgentina, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
@@ -69,7 +70,7 @@ export async function GET(req) {
     const limit = params.get("limit") ? Number(params.get("limit")) : undefined;
 
     const ventas = await prisma.venta.findMany({
-      where,
+      where: whereVentaComercial(where),
       orderBy: { fecha: "desc" },
       ...(limit && { take: limit }),
       select: {

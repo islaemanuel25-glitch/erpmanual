@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 
 export async function GET(req) {
   try {
@@ -46,7 +47,9 @@ export async function GET(req) {
 
     const [ventas, cajaMovimientos] = await Promise.all([
       prisma.venta.findMany({
-        where: { turnoId },
+        // Mismo criterio que turnos/cerrar: el operador tiene que ver exactamente
+        // el mismo esperado que después calcula el cierre.
+        where: whereVentaComercial({ turnoId }),
         select: {
           total: true, formaPago: true, esFiado: true, comisionBancaria: true, netoRecibido: true,
           pagos: { select: { medio: true, monto: true, comision: true, neto: true } },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { getUsuarioSession } from "@/lib/auth";
 import { getContextoActivo } from "@/lib/contexto";
 
@@ -25,7 +26,7 @@ export async function GET(req) {
     const limite = Number(req.nextUrl.searchParams.get("limite")) || 10;
 
     const ventas = await prisma.venta.findMany({
-      where: { localId },
+      where: whereVentaComercial({ localId }),
       orderBy: { fecha: "desc" },
       take: limite,
       select: {

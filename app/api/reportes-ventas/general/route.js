@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
@@ -98,7 +99,7 @@ export async function GET(req) {
 
     // Obtener ventas con detalles
     const ventas = await prisma.venta.findMany({
-      where,
+      where: whereVentaComercial(where),
       select: {
         id: true,
         total: true,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
@@ -103,9 +104,9 @@ export async function GET(req) {
     }
 
     const [total, ventas] = await Promise.all([
-      prisma.venta.count({ where }),
+      prisma.venta.count({ where: whereVentaComercial(where) }),
       prisma.venta.findMany({
-        where,
+        where: whereVentaComercial(where),
         orderBy: { fecha: "desc" },
         skip,
         take: limit,

@@ -12,6 +12,7 @@
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
@@ -72,7 +73,7 @@ export async function GET(req) {
     if (formaPagoParam) where.formaPago = formaPagoParam;
 
     const ventas = await prisma.venta.findMany({
-      where,
+      where: whereVentaComercial(where),
       take: MAX_VENTAS,
       orderBy: { fecha: "desc" },
       select: {

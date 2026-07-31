@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { requireOperadorSegunConfig } from "@/lib/operador";
 import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 
 export async function POST(req) {
   try {
@@ -55,7 +56,10 @@ export async function POST(req) {
     // persiste — sólo se evita que contamine totalVentasDigital).
     const [ventas, cajaMovimientos] = await Promise.all([
       prisma.venta.findMany({
-        where: { turnoId },
+        // Las operaciones internas (venta con remito vinculado) no son cobros:
+        // sumarlas al efectivo esperado produce un faltante de caja que nunca
+        // ocurrió. Mismo criterio que turnos/resumen y turnos/ventas.
+        where: whereVentaComercial({ turnoId }),
         select: {
           total: true, formaPago: true, esFiado: true,
           pagos: { select: { medio: true, monto: true } },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { getUsuarioSession } from "@/lib/auth";
 import { getContextoActivo } from "@/lib/contexto";
 
@@ -28,10 +29,10 @@ export async function GET(req) {
 
     // Ventas del día: cantidad y total
     const aggVentas = await prisma.venta.aggregate({
-      where: {
+      where: whereVentaComercial({
         localId,
         fecha: { gte: hoy },
-      },
+      }),
       _count: { id: true },
       _sum: { total: true, gananciaNeta: true },
     });
@@ -39,10 +40,10 @@ export async function GET(req) {
     // Items vendidos hoy
     const aggItems = await prisma.ventaDetalle.aggregate({
       where: {
-        venta: {
+        venta: whereVentaComercial({
           localId,
           fecha: { gte: hoy },
-        },
+        }),
       },
       _sum: { cantidad: true },
     });
