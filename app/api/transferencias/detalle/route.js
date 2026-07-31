@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession, getCookieValue } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
+import { resolverCostoTransferencia } from "@/lib/transferencias/costoTransferencia";
 
 function toNumber(v) {
   const n = Number(v);
@@ -110,10 +111,20 @@ export async function GET(req) {
           ? toNumber(d.producto.base.precio_costo)
           : 0;
 
+      // El costo persistido está en la escala COMERCIAL del producto (por bulto
+      // si la presentación es pack/cajón); la cantidad, en la de unidadEnviada.
+      // Se normaliza el costo a la escala del envío antes de multiplicar.
+      const costoNormalizado = resolverCostoTransferencia({
+        precioCosto,
+        unidadEnviada: d.unidadEnviada,
+        unidadMedida: d.producto?.base?.unidad_medida,
+        factorPack: d.producto?.base?.factor_pack,
+      });
+
       // Sin recepción cargada se valoriza lo enviado; con recepción cargada, lo
       // recibido — incluido 0, que ahora vale 0 y no el total enviado.
       const subtotal =
-        precioCosto * (cantidadRecibida == null ? cantidadEnviada : cantidadRecibida);
+        costoNormalizado * (cantidadRecibida == null ? cantidadEnviada : cantidadRecibida);
 
       itemsEnviados += cantidadEnviada;
       itemsRecibidos += cantidadRecibida ?? 0;
@@ -128,7 +139,10 @@ export async function GET(req) {
         codigoBarra: d.producto?.base?.codigo_barra || null,
         cantidadEnviada,
         cantidadRecibida,
-        precioCosto,
+        // Costo YA normalizado a la escala de unidadEnviada: es lo que la
+        // pantalla muestra y lo que hace cuadrar `subtotal`. El valor crudo
+        // persistido no se modifica ni se expone.
+        precioCosto: costoNormalizado,
         subtotal,
 
         motivoPrincipal: d.motivoPrincipal || "",

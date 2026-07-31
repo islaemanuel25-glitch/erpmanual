@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requireAuth } from "@/lib/authorize";
+import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
 
 export async function GET(req) {
   try {
@@ -156,18 +157,25 @@ export async function GET(req) {
       const codigo = d.producto?.codigo_barra ?? "-";
 
       const enviado = Number(d.cantidad) || 0;
-      const recibido = Number(d.recibido ?? enviado);
-      const costo =
-        Number(d.precioCosto) ||
-        Number(d.producto?.base?.precio_costo) ||
-        0;
+      // Acta de RECEPCIÓN: valoriza lo recibido (0 incluido) y cae a lo enviado
+      // solo si todavía no se cargó recepción. Mismo helper que detalle, lista
+      // y remito, con el costo bajado a la escala de unidadEnviada.
+      const { costoUnitario: costo, cantidad: recibido, subtotal } = valorizarDetalle(
+        {
+          cantidad: d.cantidad,
+          recibido: d.recibido,
+          unidadEnviada: d.unidadEnviada,
+          precioCosto:
+            d.precioCosto ?? d.producto?.base?.precio_costo ?? 0,
+        },
+        d.producto?.base
+      );
 
       const motivo =
         d.motivoPrincipal === "Otro"
           ? d.motivoDetalle || "Otro"
           : d.motivoPrincipal || "-";
 
-      const subtotal = recibido * costo;
       total += subtotal;
 
       // Fila gris

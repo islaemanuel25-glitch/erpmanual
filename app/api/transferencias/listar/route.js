@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
+import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
 
 const PAGE_SIZE = 25;
 
@@ -84,12 +85,16 @@ export async function GET(req) {
               cantidad: true,
               recibido: true,          // ← 🔥 AGREGADO
               precioCosto: true,
+              unidadEnviada: true,     // escala en la que está `cantidad`
               producto: {
                 select: {
                   precio_costo: true,  // productoLocal
                   base: {
                     select: {
                       precio_costo: true, // ← 🔥 AGREGADO productoBase
+                      // Escala en la que está cargado el costo del producto.
+                      unidad_medida: true,
+                      factor_pack: true,
                     },
                   },
                 },
@@ -109,19 +114,28 @@ export async function GET(req) {
       let totalCosto = 0;
 
       t.detalle.forEach((d) => {
-        const cantidadEnviada = Number(d.cantidad || 0);
-        const cantidadRecibida = Number(d.recibido || 0);
-
         const precioCosto =
           d.precioCosto ??
           d.producto?.precio_costo ??
           d.producto?.base?.precio_costo ??
           0;
 
-        const cantidadReal =
-          cantidadRecibida > 0 ? cantidadRecibida : cantidadEnviada;
+        // Misma semántica que el detalle, del mismo helper: el costo se baja a
+        // la escala de unidadEnviada, y la cantidad que valoriza es la recibida
+        // cuando hay recepción cargada (incluido 0) o la enviada si no la hay.
+        // Antes se decidía con `cantidadRecibida > 0`, así que una recepción de
+        // 0 se valorizaba como si hubiera llegado todo.
+        const { subtotal } = valorizarDetalle(
+          {
+            cantidad: d.cantidad,
+            recibido: d.recibido,
+            unidadEnviada: d.unidadEnviada,
+            precioCosto,
+          },
+          d.producto?.base
+        );
 
-        totalCosto += precioCosto * cantidadReal;
+        totalCosto += subtotal;
       });
 
       return {

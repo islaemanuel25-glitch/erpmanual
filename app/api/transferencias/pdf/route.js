@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requireAuth } from "@/lib/authorize";
+import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
 
 export async function GET(req) {
   try {
@@ -144,12 +145,19 @@ export async function GET(req) {
     for (const d of transferencia.detalle) {
       const nombre = d.producto?.nombre ?? d.producto?.base?.nombre ?? "-";
       const codigo = d.producto?.codigo_barra ?? "-";
-      const cantidad = Number(d.cantidad) || 0;
-      const costo =
-        Number(d.precioCosto) ||
-        Number(d.producto?.base?.precio_costo) ||
-        0;
-      const subtotal = cantidad * costo;
+      // Remito de ENVÍO: valoriza siempre lo enviado, no lo recibido.
+      // El costo se baja a la escala de unidadEnviada con el mismo helper que
+      // usan el detalle y la lista, para que los tres documentos coincidan.
+      const { costoUnitario: costo, cantidad, subtotal } = valorizarDetalle(
+        {
+          cantidad: d.cantidad,
+          unidadEnviada: d.unidadEnviada,
+          precioCosto:
+            d.precioCosto ?? d.producto?.base?.precio_costo ?? 0,
+        },
+        d.producto?.base,
+        { cantidadModo: "ENVIADA" }
+      );
 
       total += subtotal;
 
