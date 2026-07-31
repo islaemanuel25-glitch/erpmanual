@@ -5,6 +5,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
+import { inicioDiaArgentina, finDiaArgentina } from "@/lib/fechas/rangoArgentina";
 
 const PAGE_SIZE = 25;
 
@@ -48,10 +49,18 @@ export async function GET(req) {
 
     if (estado) where.estado = estado;
 
-    if (fechaDesde || fechaHasta) {
+    // La UI manda días calendario (YYYY-MM-DD) tal como los ve el usuario. Hay
+    // que convertirlos a límites de día ARGENTINO, no del proceso: el contenedor
+    // corre en UTC, así que `new Date(fechaHasta + "T23:59:59")` cortaba a las
+    // 20:59:59 hora argentina y escondía todo lo enviado entre las 21:00 y la
+    // medianoche —una transferencia de las 22:19 del 30/07 caía en el 31/07 UTC
+    // y no aparecía filtrando por el 30/07—.
+    const desde = inicioDiaArgentina(fechaDesde);
+    const hasta = finDiaArgentina(fechaHasta);
+    if (desde || hasta) {
       where.fechaEnvio = {};
-      if (fechaDesde) where.fechaEnvio.gte = new Date(fechaDesde + "T00:00:00");
-      if (fechaHasta) where.fechaEnvio.lte = new Date(fechaHasta + "T23:59:59");
+      if (desde) where.fechaEnvio.gte = desde;
+      if (hasta) where.fechaEnvio.lte = hasta;
     }
 
     // Filtro por PARTICIPACIÓN (origen o destino), acotado a la vista.
