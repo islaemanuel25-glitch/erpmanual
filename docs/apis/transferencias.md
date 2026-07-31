@@ -99,11 +99,32 @@ Confirma recepcion y actualiza stock. Opera en transaccion.
 ```
 
 **Logica:**
-1. Descuenta stock del origen
-2. Suma stock al destino (convirtiendo bultos a unidades si corresponde)
-3. Crea ProductoLocal/StockLocal si no existen en destino
-4. Marca transferencia como "Recibida"
-5. Si hay diferencias, marca `tieneDiferencias: true`
+1. Valida TODOS los detalles antes de abrir la transaccion (rango, unidad, motivo,
+   usuario de sesion y grupo del origen). Si algo falla, no se toca stock.
+2. Toma la barrera de estado (`updateMany` condicional) como primera escritura.
+3. Suma al destino **solo la cantidad recibida** (convirtiendo bultos a unidades, o
+   piezas a kg en fiambre fijo si corresponde).
+4. Crea ProductoLocal/StockLocal si no existen en destino.
+5. En el origen, en **una sola escritura atomica**: `enTransito -= enviado` y
+   `cantidad += (enviado - recibido)`. La diferencia vuelve al stock del origen.
+6. Si la devolucion es mayor a cero, crea `AuditoriaStock` con
+   `accion = DIFERENCIA_RECEPCION_TRANSFERENCIA`, dentro de la misma transaccion.
+7. Persiste `recibido` y `confirmadoPorId`; la `cantidad` enviada no se modifica.
+8. Marca transferencia como "Recibida" y, si hubo diferencias, `tieneDiferencias: true`.
+
+**Errores especificos:**
+
+| Codigo | Status | Cuando |
+|---|---|---|
+| `USUARIO_SESION_INVALIDO` | 401 | La sesion no identifica un usuario (la auditoria lo exige) |
+| `GRUPO_ORIGEN_NO_RESUELTO` | 409 | Hay diferencias para devolver y no se pudo resolver el grupo del origen |
+| `STOCK_ORIGEN_NO_ENCONTRADO` | 409 | El producto o su StockLocal no existen en el local de origen |
+| `CANTIDAD_RECIBIDA_SUPERA_ENVIADA` | 400 | Se intento recibir mas de lo enviado |
+| `CANTIDAD_RECIBIDA_INVALIDA` | 400 | Negativo, NaN, string invalido, boolean, array u objeto |
+| `UNIDAD_ENVIADA_AUSENTE` / `_DESCONOCIDA` | 409 | El detalle no dice si se envio en BULTO o UNIDAD |
+| `DEVOLUCION_DIFERENCIA_INVALIDA` | 409 | No se pudo calcular la diferencia a devolver |
+
+Todos abortan la transaccion completa: no quedan mutaciones parciales.
 
 ### GET /api/transferencias/pdf?id=
 

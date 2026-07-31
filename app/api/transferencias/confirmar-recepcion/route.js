@@ -5,11 +5,32 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 import {
   validarDetalleRecepcion,
   mensajeRecepcion,
   statusRecepcion,
 } from "@/lib/transferencias/recepcion";
+
+/** Acción de AuditoriaStock para la devolución del faltante al origen. */
+const ACCION_DEVOLUCION = "DIFERENCIA_RECEPCION_TRANSFERENCIA";
+
+/** Cantidades siempre con la escala física de StockLocal (3 decimales). */
+const fmt = (n) => Number(n || 0).toFixed(3);
+
+/**
+ * Error tipado que se lanza DENTRO de la transacción para abortarla entera. El
+ * catch exterior lo traduce a HTTP: nunca se devuelve un NextResponse desde
+ * adentro de `$transaction`.
+ */
+class ErrorRecepcion extends Error {
+  constructor(code, message, status = 409) {
+    super(message);
+    this.name = "ErrorRecepcion";
+    this.code = code;
+    this.status = status;
+  }
+}
 
 export async function POST(req) {
   try {
@@ -26,6 +47,22 @@ export async function POST(req) {
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const esAdmin = session.esAdmin;
+
+    // Usuario REAL, resuelto antes de tocar nada. AuditoriaStock.userId es
+    // obligatorio y con FK: sin un id válido la auditoría de la devolución
+    // fallaría DENTRO de la transacción y voltearía una recepción ya empezada.
+    // Mejor rechazar acá, con el stock intacto.
+    const usuarioId = Number(session.id || 0);
+    if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          codigo: "USUARIO_SESION_INVALIDO",
+          error: "Tu sesión no identifica un usuario válido. Volvé a iniciar sesión para confirmar la recepción.",
+        },
+        { status: 401 }
+      );
+    }
 
     const body = await req.json();
     const transferenciaId = Number(body.transferenciaId || 0);
@@ -121,6 +158,32 @@ export async function POST(req) {
       }
 
       planes.set(d.id, plan);
+    }
+
+    // ============================================================
+    // 🟦 GRUPO DEL ORIGEN — también antes de la transacción
+    //
+    // Solo hace falta si hay algo que devolver: la auditoría de la devolución
+    // lo exige (AuditoriaStock.grupoId es obligatorio). Si no se puede resolver,
+    // la recepción se detiene: devolver stock sin dejar rastro sería exactamente
+    // la "corrección silenciosa" que este cambio viene a eliminar.
+    // ============================================================
+    const hayDevolucion = [...planes.values()].some((p) => p.devolucionUnidades > 0);
+    let grupoOrigenId = null;
+
+    if (hayDevolucion) {
+      grupoOrigenId = await getGrupoIdDeLocal(transferencia.origenId);
+      if (!grupoOrigenId) {
+        return NextResponse.json(
+          {
+            ok: false,
+            codigo: "GRUPO_ORIGEN_NO_RESUELTO",
+            error:
+              "No se pudo determinar el grupo del local de origen. Hay diferencias para devolver y no se puede auditar la devolución.",
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // ============================================================
@@ -221,21 +284,26 @@ export async function POST(req) {
         });
 
         // ============================================================
-        // 🟥 DESCONTAR enTransito DEL ORIGEN (por lo ENVIADO, no lo recibido)
+        // 🟥 ORIGEN — limpiar tránsito y DEVOLVER la diferencia
         //
-        // La cantidad ya se descontó del origen al vender/enviar. Acá solo se
-        // limpia el tránsito, y se limpia por lo ENVIADO: la mercadería salió
-        // del depósito, así que el tránsito tiene que quedar en cero aunque no
-        // haya llegado todo.
+        // El origen ya perdió la cantidad enviada antes de llegar acá: en
+        // DESCONTAR_Y_TRANSITO la descontó la transferencia al enviarse, en
+        // SOLO_TRANSITO la descontó la Venta al crearse. Por eso la recepción NO
+        // distingue política: en los dos casos el neto correcto es que el origen
+        // pierda solo lo que el destino efectivamente recibió.
         //
-        // FALTANTE LOGÍSTICO (decisión explícita de esta etapa): si recibido <
-        // enviado, la diferencia NO se devuelve a origen.cantidad ni se ajusta
-        // en ningún lado. Queda como faltante pendiente de resolución MANUAL,
-        // con rastro documental en TransferenciaDetalle (cantidad vs recibido +
-        // motivo) y en Transferencia.tieneDiferencias. Resolverlo contablemente
-        // (crédito, devolución, merma) es la Etapa B, todavía no diseñada.
+        //   enTransito -= enviado     (la mercadería salió: el tránsito queda en 0)
+        //   cantidad   += enviado - recibido   (lo que no llegó vuelve al stock)
+        //
+        // Las dos van en UNA sola escritura atómica sobre la fila: partirlas en
+        // dos updates abre una ventana donde el stock del origen está a medio
+        // corregir.
+        //
+        // La devolución es de INVENTARIO, no comercial: si la transferencia nació
+        // de una venta interna, esa venta sigue facturando lo enviado. Resolver
+        // el desfase (nota de crédito, merma, imputación) es una etapa aparte.
         // ============================================================
-        const { enviadaUnidades } = plan;
+        const { enviadaUnidades, devolucionUnidades } = plan;
 
         const productoOrigen = await tx.productoLocal.findUnique({
           where: {
@@ -246,13 +314,72 @@ export async function POST(req) {
           },
         });
 
-        if (productoOrigen) {
-          await tx.stockLocal.updateMany({
-            where: {
+        // Antes esto era un `if (productoOrigen)`: sin fila de origen no se
+        // limpiaba el tránsito y nadie se enteraba. Con devolución de por medio
+        // ese salteo silencioso perdería mercadería, así que ahora aborta todo.
+        if (!productoOrigen) {
+          throw new ErrorRecepcion(
+            "STOCK_ORIGEN_NO_ENCONTRADO",
+            `El producto "${d.producto.base.nombre || d.producto.nombre || d.producto.base.id}" no existe en el local de origen. No se puede confirmar la recepción sin poder ajustar su stock.`
+          );
+        }
+
+        const stockOrigen = await tx.stockLocal.findUnique({
+          where: {
+            localId_productoId: {
               localId: transferencia.origenId,
               productoId: productoOrigen.id,
             },
-            data: { enTransito: { decrement: enviadaUnidades } },
+          },
+        });
+
+        if (!stockOrigen) {
+          throw new ErrorRecepcion(
+            "STOCK_ORIGEN_NO_ENCONTRADO",
+            `El producto "${d.producto.base.nombre || d.producto.nombre || productoOrigen.id}" no tiene stock registrado en el local de origen. No se puede confirmar la recepción sin poder ajustar su stock.`
+          );
+        }
+
+        const origenActualizado = await tx.stockLocal.update({
+          where: {
+            localId_productoId: {
+              localId: transferencia.origenId,
+              productoId: productoOrigen.id,
+            },
+          },
+          data: {
+            cantidad: { increment: devolucionUnidades },
+            enTransito: { decrement: enviadaUnidades },
+          },
+        });
+
+        // ============================================================
+        // 🟪 AUDITORÍA DE LA DEVOLUCIÓN — dentro de la transacción
+        //
+        // Sin `.catch()` a propósito, al revés que las auditorías de
+        // stock_locales/ajustar: acá la auditoría no es un extra, es el único
+        // rastro de que ese stock volvió solo. Si no se puede escribir, la
+        // recepción entera se revierte.
+        // ============================================================
+        if (devolucionUnidades > 0) {
+          await tx.auditoriaStock.create({
+            data: {
+              grupoId: grupoOrigenId,
+              localId: transferencia.origenId,
+              productoLocalId: productoOrigen.id,
+              userId: usuarioId,
+              accion: ACCION_DEVOLUCION,
+              cantidadAnterior: Number(stockOrigen.cantidad),
+              cantidadNueva: Number(origenActualizado.cantidad),
+              // Enviado y recibido van en la unidad del REMITO (puede ser BULTO);
+              // lo devuelto, en unidades de stock. Se explicita para que la
+              // auditoría no se lea como "2 bultos" cuando son 2 unidades.
+              motivo:
+                `Devolución por diferencia de recepción — transferencia #${transferenciaId}, ` +
+                `detalle #${d.id}, enviado ${fmt(plan.enviada)} ${plan.unidad}, ` +
+                `recibido ${fmt(plan.recibida)} ${plan.unidad}, ` +
+                `devuelto ${fmt(devolucionUnidades)} (unidades de stock)`,
+            },
           });
         }
 
@@ -263,7 +390,7 @@ export async function POST(req) {
           where: { id: d.id },
           data: {
             recibido: recibida, // en la misma unidad que 'enviada'
-            confirmadoPorId: session.id || null,
+            confirmadoPorId: usuarioId,
             fechaRecepcion: new Date(),
           },
         });
@@ -288,6 +415,13 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "Esta transferencia ya fue confirmada." },
         { status: 400 }
+      );
+    }
+    // Abortos deliberados desde adentro de la transacción: nada quedó escrito.
+    if (err.name === "ErrorRecepcion") {
+      return NextResponse.json(
+        { ok: false, codigo: err.code, error: err.message },
+        { status: err.status || 409 }
       );
     }
     console.error("ERROR confirmar recepcion:", err);
