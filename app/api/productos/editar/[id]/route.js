@@ -22,6 +22,7 @@ import {
   mensajeColisionCodigoPropio,
 } from "@/lib/productos/codigoBarraPropio";
 import { validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
+import { precioDesdeMargen, hayReglaAutomatica } from "@/lib/precios/precioDesdeMargen";
 
 // ── Detección de "guardado engañoso" ────────────────────────────────────────
 // Cuando la ruta es 'override' (un local edita un producto de depósito), SOLO se
@@ -113,17 +114,25 @@ async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
       const costo = Number(precioCosto);
       data.precio_costo = costo;
 
-      const margen = local.margen !== null && local.margen !== undefined
-        ? Number(local.margen)
-        : (base.margen !== null && base.margen !== undefined ? Number(base.margen) : 0);
+      // Margen CONFIGURADO: override del local, o el de la base. Ya NO cae a 0
+      // cuando no hay ninguno: ese fallback calculaba venta = costo × 1 y
+      // convertía el precio de venta en el precio de costo, borrando precios
+      // cargados a mano. Sin margen no hay regla automática y el precio no se
+      // toca — misma semántica que lib/compras-proveedor/costoMaestro.js.
+      const margenConfigurado =
+        local.margen !== null && local.margen !== undefined ? local.margen : base.margen;
 
-      let venta = costo * (1 + margen / 100);
-
-      if (base.redondeo_100) {
-        venta = Math.round(venta / 100) * 100;
+      if (hayReglaAutomatica(margenConfigurado)) {
+        // Única fórmula del ERP. Antes acá había un Math.round que podía
+        // redondear HACIA ABAJO y dejar el precio por debajo de costo+margen,
+        // justo lo contrario de lo que promete el margen configurado.
+        const { aplica, precioFinal } = precioDesdeMargen({
+          costo,
+          margenConfigurado,
+          redondeo100: base.redondeo_100 === true,
+        });
+        if (aplica) data.precio_venta = precioFinal;
       }
-
-      data.precio_venta = venta;
     }
 
     if (activo !== undefined) {

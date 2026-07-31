@@ -3,14 +3,15 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
+import {
+  precioDesdeMargen,
+  hayReglaAutomatica,
+  redondearA100Arriba,
+} from "@/lib/precios/precioDesdeMargen";
 
 function toNumber(value) {
   const n = Number(value);
   return Number.isNaN(n) ? null : n;
-}
-
-function roundUpTo100(value) {
-  return Math.ceil(value / 100) * 100;
 }
 
 function normalizedText(value) {
@@ -246,12 +247,19 @@ export async function POST(req) {
       }
 
       if (pricingMode === "RECALC_BY_MARGIN") {
-        const margen = p.margen === null ? 0 : Number(p.margen);
-        ventaNueva = costoNuevo * (1 + margen / 100);
-      }
-
-      if (p.redondeo_100) {
-        ventaNueva = roundUpTo100(ventaNueva);
+        // Única fórmula del ERP, desde el margen CONFIGURADO. Antes un margen
+        // ausente se leía como 0 y proponía venta = costo, borrando el precio.
+        // Sin margen no hay regla automática: la venta anterior se respeta.
+        const { aplica, precioFinal } = precioDesdeMargen({
+          costo: costoNuevo,
+          margenConfigurado: hayReglaAutomatica(p.margen) ? p.margen : null,
+          redondeo100: p.redondeo_100 === true,
+        });
+        if (aplica) ventaNueva = precioFinal;
+      } else if (p.redondeo_100) {
+        // Los otros modos (KEEP_VENTA / SET_VENTA) siguen redondeando el precio
+        // que traen; RECALC ya salió redondeado del helper.
+        ventaNueva = redondearA100Arriba(ventaNueva);
       }
 
       const alertas = buildAlerts({ costoAnterior, costoNuevo, ventaAnterior, ventaNueva });
@@ -342,8 +350,14 @@ async function handleMargenMasivoPreview({ body, grupoId }) {
       continue;
     }
 
-    let ventaNueva = precioCosto * (1 + margenPorcentaje / 100);
-    if (redondeo === "CIEN_ARRIBA") ventaNueva = roundUpTo100(ventaNueva);
+    // Margen masivo: el margen lo tipea el usuario en esta corrida (no sale de
+    // la ficha), pero el precio se arma con la misma fórmula que todo el resto.
+    const calculo = precioDesdeMargen({
+      costo: precioCosto,
+      margenConfigurado: margenPorcentaje,
+      redondeo100: redondeo === "CIEN_ARRIBA",
+    });
+    let ventaNueva = calculo.precioFinal;
     ventaNueva = Math.round(ventaNueva * 100) / 100;
 
     items.push({

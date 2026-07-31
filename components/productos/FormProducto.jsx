@@ -10,6 +10,11 @@ import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
 import SeccionCodigosProveedor from "@/components/productos/SeccionCodigosProveedor";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import {
+  precioDesdeMargen,
+  redondearA100Arriba,
+  margenEfectivoDe,
+} from "@/lib/precios/precioDesdeMargen";
 import { useUser } from "@/app/context/UserContext";
 
 function parseVoiceNumber(text) {
@@ -110,10 +115,10 @@ export default function FormProducto({
     return Number.isFinite(n) ? n : "";
   };
 
-  const roundUp100 = (n) => {
-    if (!Number.isFinite(n) || n <= 0) return n;
-    return Math.ceil(n / 100) * 100;
-  };
+  // El redondeo a 100 vive en lib/precios/precioDesdeMargen.js (redondearA100Arriba):
+  // una sola regla para el form, las compras y la propagación depósito→locales.
+  // Acá solo queda el redondeo a centavos, que es de PERSISTENCIA (Decimal(12,2)).
+  const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
   const camelToForm = (o = {}) => ({
     nombre: o.nombre ?? "",
@@ -246,13 +251,15 @@ export default function FormProducto({
     const pc = Number(val);
     if (!Number.isFinite(pc) || pc < 0) return;
     setForm((p) => {
-      const m = Number(p.margen) || 0;
-      if (m > 0) {
-        let pv = Math.round(pc * (1 + m / 100) * 100) / 100;
-        if (p.redondeo_100 && pv > 0) pv = roundUp100(pv);
-        return { ...p, precio_costo: pc, precio_venta: pv };
-      }
-      return { ...p, precio_costo: pc };
+      // Sin margen configurado no hay regla automática: se cambia el costo y el
+      // precio de venta cargado a mano queda como está.
+      const r = precioDesdeMargen({
+        costo: pc,
+        margenConfigurado: Number(p.margen) > 0 ? p.margen : null,
+        redondeo100: p.redondeo_100,
+      });
+      if (!r.aplica) return { ...p, precio_costo: pc };
+      return { ...p, precio_costo: pc, precio_venta: round2(r.precioFinal) };
     });
   };
 
@@ -263,8 +270,10 @@ export default function FormProducto({
     setForm((p) => {
       const pc = Number(p.precio_costo) || 0;
       // Venta derivada del margen (permite margen negativo → venta < costo).
-      // No se redondea al tipear: roundUp100 se difiere al blur y al guardar.
-      const pv = pc > 0 ? Math.max(0, Math.round(pc * (1 + m / 100) * 100) / 100) : 0;
+      // No se redondea al tipear: el redondeo a 100 se difiere al blur y al
+      // guardar, y cuando ocurre YA NO reescribe este margen.
+      const r = precioDesdeMargen({ costo: pc, margenConfigurado: m, redondeo100: false });
+      const pv = pc > 0 && r.aplica ? Math.max(0, round2(r.precioBase)) : 0;
       return { ...p, margen: m, precio_venta: pv };
     });
   };
@@ -284,18 +293,31 @@ export default function FormProducto({
 
   // Redondeo a múltiplos de 100 diferido al blur: mantiene redondeo_100 sin
   // impedir escribir valores intermedios en Venta/Margen.
+  //
+  // SOLO toca precio_venta. Antes también reescribía `margen` con el margen
+  // EFECTIVO del precio redondeado: escribir 30 y salir del campo lo convertía
+  // en 33,33, y a partir de ahí todo recálculo por costo salía del 33,33. El
+  // margen configurado es un dato del usuario, no una consecuencia del redondeo.
   const aplicarRedondeoVenta = () => {
     setForm((p) => {
       if (!p.redondeo_100) return p;
       const pv = Number(p.precio_venta);
       if (!Number.isFinite(pv) || pv <= 0) return p;
-      const pvR = roundUp100(pv);
+      const pvR = redondearA100Arriba(pv);
       if (pvR === pv) return p;
-      const pc = Number(p.precio_costo) || 0;
-      const m = pc > 0 ? Number(((pvR / pc - 1) * 100).toFixed(2)) : 0;
-      return { ...p, precio_venta: pvR, margen: m };
+      return { ...p, precio_venta: pvR };
     });
   };
+
+  // Margen EFECTIVO: solo informativo. Se deriva del precio final que se va a
+  // guardar (ya redondeado) y nunca entra al payload ni al campo Margen.
+  const margenEfectivoInfo = (() => {
+    const pc = Number(form.precio_costo);
+    let pv = Number(form.precio_venta);
+    if (!Number.isFinite(pv)) return null;
+    if (form.redondeo_100 && pv > 0) pv = redondearA100Arriba(pv);
+    return margenEfectivoDe(pc, pv);
+  })();
 
   const showPreciosRef =
     ["pack", "cajon"].includes(form.unidad_medida) && Number(form.factor_pack) > 1;
@@ -385,7 +407,7 @@ export default function FormProducto({
 
     let precioVentaOut = Number(p.precio_venta);
     if (p.redondeo_100 && precioVentaOut > 0)
-      precioVentaOut = roundUp100(precioVentaOut);
+      precioVentaOut = redondearA100Arriba(precioVentaOut);
 
     const payload = {
       nombre: p.nombre,
@@ -998,6 +1020,20 @@ export default function FormProducto({
                 onChange={(e) => onChangeMargen(e.target.value)}
                 onBlur={aplicarRedondeoVenta}
               />
+              {/* Margen EFECTIVO: consecuencia del redondeo, no un dato editable.
+                  Va en texto muted y con etiqueta propia para que no se lea como
+                  un segundo campo de margen. No viaja en el payload. */}
+              <p className="text-xs sunmi-text-muted mt-1">
+                Margen efectivo tras redondeo:{" "}
+                <span className="tabular-nums">
+                  {margenEfectivoInfo === null
+                    ? "—"
+                    : `${margenEfectivoInfo.toLocaleString("es-AR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}%`}
+                </span>
+              </p>
             </Field>
 
             {/* Fila 3: Venta (+ venta unitario ref. en pack/cajón) */}
@@ -1103,7 +1139,7 @@ export default function FormProducto({
                   setForm((p) => {
                     const next = { ...p, redondeo_100: v };
                     if (v && Number(p.precio_venta) > 0) {
-                      next.precio_venta = roundUp100(Number(p.precio_venta));
+                      next.precio_venta = redondearA100Arriba(Number(p.precio_venta));
                     }
                     return next;
                   });
