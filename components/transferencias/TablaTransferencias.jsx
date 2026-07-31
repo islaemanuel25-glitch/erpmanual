@@ -1,9 +1,12 @@
 "use client";
 
 // Tabla desktop del listado (se monta solo desde 1024 px; debajo la página usa
-// CardTransferencia). Ya no fuerza `min-w-[1000px]`: el ancho lo resuelven las
+// CardTransferencia). No fuerza `min-w-[1000px]`: el ancho lo resuelven las
 // columnas, y la página envuelve en overflow-x-auto por si un nombre de local
 // muy largo empuja de más.
+//
+// Las filas ya no se despliegan: el detalle es una página propia y el único
+// acceso es el botón "Ver" de cada fila.
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import FilaTransferencia from "./FilaTransferencia";
@@ -11,8 +14,6 @@ import FilaTransferencia from "./FilaTransferencia";
 export default function TablaTransferencias({
   items,
   columns,
-  filaAbierta,
-  setFilaAbierta,
   onVer,
   fechaHoraAR,
   formatCantidad,
@@ -32,10 +33,6 @@ export default function TablaTransferencias({
     columns.acciones && { label: "", className: "text-right" },
   ].filter(Boolean);
 
-  // colSpan del panel expandible: tiene que cubrir exactamente las columnas
-  // visibles para que MiniInfo no rompa la grilla al ocultar columnas.
-  const colSpan = headers.length || 1;
-
   return (
     <SunmiTable headers={headers}>
       {items.map((t) => (
@@ -43,9 +40,6 @@ export default function TablaTransferencias({
           key={t.id}
           t={t}
           columns={columns}
-          colSpan={colSpan}
-          filaAbierta={filaAbierta}
-          setFilaAbierta={setFilaAbierta}
           onVer={onVer}
           fechaHoraAR={fechaHoraAR}
           formatCantidad={formatCantidad}

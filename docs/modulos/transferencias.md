@@ -40,12 +40,19 @@ Transferencias formales de mercaderia entre depositos y locales. Incluye workflo
 - `GET /api/transferencias/pdf-recepcion?id=` — PDF de recepcion
 
 ## Componentes principales
-- `TablaTransferencias`: Tabla con filas expandibles
-- `FilaTransferencia`: Fila individual con detalle inline
+- `TablaTransferencias`: Tabla del listado (solo desde 1024 px)
+- `FilaTransferencia`: Fila individual; no se expande, el acceso al detalle es el boton "Ver"
+- `CardTransferencia`: Tarjeta del listado en mobile y tablet (hasta 1023 px)
+- `EstadoTransferenciaBadge`: Badge de estado + badge de diferencias, compartido por listado y detalle
+- `ColumnSettingsPanel`: Panel integrado (sin modal) para elegir columnas de la tabla desktop
 - `TablaDetalleTransferencia`: Detalle de items
 - `TransferenciaHeader`: Encabezado del detalle
 - `AccionesRecepcion`: Botones de recepcion/confirmacion
-- `ColumnSettingsModal`: Configuracion de columnas visibles
+
+El detalle completo vive en `app/modulos/transferencias/[id]/page.jsx`: el
+listado solo muestra el resumen (fecha, numero, origen -> destino, items,
+enviada, recibida, estado y diferencias). Al pulsar "Ver" se guardan filtros,
+pagina y scroll para restaurarlos al volver.
 
 ## Estado y hooks
 - Estado local con `useState`

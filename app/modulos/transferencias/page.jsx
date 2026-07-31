@@ -9,10 +9,15 @@
 // están duplicadas a propósito al final de este archivo: en Ventas viven dentro
 // de su propia page.jsx y extraerlas a components/ obligaría a modificar Ventas.
 //
+// El detalle NO se despliega debajo de la fila: vive en su propia página
+// (/modulos/transferencias/[id]) y el único acceso es el botón "Ver", que guarda
+// filtros, página y scroll para restaurarlos al volver. La configuración de
+// columnas tampoco abre un modal: es un panel integrado en esta misma sección.
+//
 // Lo que NO cambia respecto de la versión anterior: carga automática, filtro por
 // estado, rango de fechas, "Quitar filtros", configuración de columnas
-// persistida, fila expandible con MiniInfo, permisos y alcance por ubicación
-// (que resuelve la API, no la pantalla).
+// persistida, permisos y alcance por ubicación (que resuelve la API, no la
+// pantalla).
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -28,7 +33,7 @@ import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 
-import ColumnSettingsModal from "@/components/transferencias/ColumnSettingsModal";
+import ColumnSettingsPanel from "@/components/transferencias/ColumnSettingsPanel";
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
 import CardTransferencia from "@/components/transferencias/CardTransferencia";
 
@@ -57,8 +62,67 @@ const COLUMN_DEFAULTS = {
   acciones: true,
 };
 
+// Etiquetas de las columnas configurables. Viven acá —junto a COLUMN_DEFAULTS—
+// para que agregar una columna sea un solo lugar a tocar.
+const COLUMN_LABELS = {
+  fecha: "Fecha / hora",
+  numero: "Nº",
+  ruta: "Origen → destino",
+  items: "Ítems",
+  enviada: "Cantidad enviada",
+  recibida: "Cantidad recibida",
+  estado: "Estado",
+  importe: "Importe",
+  acciones: "Acción",
+};
+
 const COLUMNS_KEY = "transferencias-columns";
-const SCROLL_KEY = "transferencias:scroll";
+const RETORNO_KEY = "transferencias:retorno";
+
+// Contexto de retorno, con WHITELIST explícita — mismo criterio que
+// lib/reportes-ventas/returnParams.js, implementado acá para no importar ni
+// modificar nada de Ventas. Solo estos campos viajan y solo estos se leen: un
+// valor inesperado en sessionStorage no puede inyectar estado arbitrario en la
+// pantalla.
+//
+// Las columnas NO viajan en el contexto: ya persisten por su cuenta en
+// localStorage, así que sobreviven a la navegación (y a cerrar el navegador).
+function leerContextoRetorno() {
+  let raw = null;
+  try { raw = sessionStorage.getItem(RETORNO_KEY); } catch {}
+  if (!raw) return null;
+  try { sessionStorage.removeItem(RETORNO_KEY); } catch {}
+
+  let ctx = null;
+  try { ctx = JSON.parse(raw); } catch {}
+  if (!ctx || typeof ctx !== "object") return null;
+
+  const esFecha = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const pagina = Number(ctx.page);
+
+  return {
+    estado: ESTADOS.some((e) => e.value === ctx.estado) ? ctx.estado : null,
+    fechaDesde: esFecha(ctx.fechaDesde) ? ctx.fechaDesde : null,
+    fechaHasta: esFecha(ctx.fechaHasta) ? ctx.fechaHasta : null,
+    page: Number.isInteger(pagina) && pagina > 0 ? pagina : null,
+    y: Number.isFinite(Number(ctx.y)) ? Number(ctx.y) : 0,
+  };
+}
+
+function guardarContextoRetorno(ctx) {
+  try {
+    sessionStorage.setItem(
+      RETORNO_KEY,
+      JSON.stringify({
+        y: ctx.y,
+        estado: ctx.estado,
+        fechaDesde: ctx.fechaDesde,
+        fechaHasta: ctx.fechaHasta,
+        page: ctx.page,
+      })
+    );
+  } catch {}
+}
 
 // Preferencias guardadas + columnas nuevas. Las claves viejas que ya no existen
 // se descartan; las que sobreviven (estado, items, importe, acciones) conservan
@@ -151,15 +215,13 @@ export default function TransferenciasPage() {
   });
 
   const [openCols, setOpenCols] = useState(false);
-  const [filaAbierta, setFilaAbierta] = useState(null);
 
   // ==============================
   // CONTEXTO DE RETORNO
   //
-  // Al abrir el detalle se guarda la posición de scroll y los filtros vigentes;
-  // al volver (botón del detalle o back del navegador) se restauran. Mismo
-  // criterio que Ventas: sessionStorage, sin escribir la URL (evita loops
-  // estado↔URL).
+  // Al abrir el detalle se guardan filtros, página y posición de scroll; al
+  // volver (botón del detalle o back del navegador) se restauran. Mismo criterio
+  // que Ventas: sessionStorage, sin escribir la URL (evita loops estado↔URL).
   // ==============================
   const hidratadoRef = useRef(false);
   const [scrollPendiente, setScrollPendiente] = useState(null);
@@ -167,18 +229,13 @@ export default function TransferenciasPage() {
   useEffect(() => {
     if (hidratadoRef.current) return;
     hidratadoRef.current = true;
-    let raw = null;
-    try { raw = sessionStorage.getItem(SCROLL_KEY); } catch {}
-    if (!raw) return;
-    try { sessionStorage.removeItem(SCROLL_KEY); } catch {}
-    let ctx = null;
-    try { ctx = JSON.parse(raw); } catch {}
+    const ctx = leerContextoRetorno();
     if (!ctx) return;
-    if (typeof ctx.estado === "string") setEstado(ctx.estado);
+    if (ctx.estado != null) setEstado(ctx.estado);
     if (ctx.fechaDesde) setFechaDesde(ctx.fechaDesde);
     if (ctx.fechaHasta) setFechaHasta(ctx.fechaHasta);
-    if (Number(ctx.page) > 0) setPage(Number(ctx.page));
-    setScrollPendiente(Number(ctx.y) || 0);
+    if (ctx.page) setPage(ctx.page);
+    setScrollPendiente(ctx.y);
   }, []);
 
   // Restauración del scroll: recién cuando el listado terminó de cargar.
@@ -194,14 +251,17 @@ export default function TransferenciasPage() {
     );
   }, [scrollPendiente, loading]);
 
+  // ÚNICA vía de acceso al detalle. La fila y la card no navegan por sí mismas:
+  // el detalle completo es una página propia, no un panel debajo de la fila.
   const irADetalle = (id) => {
-    try {
-      const el = getScrollEl();
-      sessionStorage.setItem(
-        SCROLL_KEY,
-        JSON.stringify({ y: el ? el.scrollTop : 0, id, estado, fechaDesde, fechaHasta, page })
-      );
-    } catch {}
+    const el = getScrollEl();
+    guardarContextoRetorno({
+      y: el ? el.scrollTop : 0,
+      estado,
+      fechaDesde,
+      fechaHasta,
+      page,
+    });
     router.push(`/modulos/transferencias/${id}`);
   };
 
@@ -362,10 +422,28 @@ export default function TransferenciasPage() {
             subtitle={total ? `${total} transferencia${total === 1 ? "" : "s"}` : null}
           />
           {/* La configuración de columnas aplica SOLO a la tabla desktop; en cards
-              la composición es fija, por eso el botón se oculta debajo de lg. */}
-          <SunmiButton color="slate" onClick={() => setOpenCols(true)} className="hidden lg:inline-flex shrink-0">
+              la composición es fija, por eso el botón se oculta debajo de lg.
+              El botón alterna el panel: volver a pulsarlo lo cierra. */}
+          <SunmiButton
+            color="slate"
+            onClick={() => setOpenCols((v) => !v)}
+            aria-expanded={openCols}
+            className="hidden lg:inline-flex shrink-0"
+          >
             <Settings2 size={14} className="inline -mt-0.5" /> Columnas
           </SunmiButton>
+        </div>
+
+        {/* Panel integrado, sin overlay: se despliega debajo del encabezado de la
+            sección y no bloquea la lectura de la tabla. */}
+        <div className="hidden lg:block">
+          <ColumnSettingsPanel
+            open={openCols}
+            onClose={() => setOpenCols(false)}
+            columns={columns}
+            setColumns={setColumns}
+            labels={COLUMN_LABELS}
+          />
         </div>
 
         <SunmiCard>
@@ -399,8 +477,6 @@ export default function TransferenciasPage() {
                 <TablaTransferencias
                   items={items}
                   columns={columns}
-                  filaAbierta={filaAbierta}
-                  setFilaAbierta={setFilaAbierta}
                   onVer={irADetalle}
                   fechaHoraAR={fechaHoraAR}
                   formatCantidad={formatCantidad}
@@ -427,13 +503,6 @@ export default function TransferenciasPage() {
           )}
         </SunmiCard>
       </section>
-
-      <ColumnSettingsModal
-        open={openCols}
-        onClose={() => setOpenCols(false)}
-        columns={columns}
-        setColumns={setColumns}
-      />
     </div>
   );
 }
