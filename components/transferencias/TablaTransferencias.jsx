@@ -21,10 +21,12 @@ export default function TablaTransferencias({
 }) {
   // Orden fijo, alineado con el de la fila. Las columnas ocultas por
   // configuración se sacan del header y de la fila en el mismo orden.
+  // Mismo criterio de encabezados que la tabla de Ventas: etiquetas a la
+  // izquierda salvo las numéricas, y la columna de acción con etiqueta vacía.
   const headers = [
     columns.fecha && "Fecha / hora",
-    columns.numero && "Nº",
-    columns.ruta && "Origen → destino",
+    columns.numero && "Transferencia",
+    columns.ruta && "Origen / destino",
     columns.items && { label: "Ítems", className: "text-center" },
     columns.enviada && { label: "Enviada", className: "text-right" },
     columns.recibida && { label: "Recibida", className: "text-right" },

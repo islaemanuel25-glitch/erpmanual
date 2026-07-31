@@ -1,8 +1,11 @@
 "use client";
 
-// Fila de la tabla desktop, con el mismo lenguaje visual que la fila de Ventas:
-// dato protagonista + subtítulo muted en la misma celda, números en mono
-// tabular, badges de estado y botón explícito "Ver".
+// Fila de la tabla desktop. Calcada de la fila de Ventas
+// (app/modulos/reportes-ventas/page.jsx): mismo `align-middle sunmi-row-hover
+// transition-colors border-t sunmi-divider`, mismo padding `px-2.5 py-3` en
+// todas las celdas, fecha en mono 11px muted a la izquierda, dos celdas de
+// "dato protagonista + subtítulo muted", importe en mono bold 14px como ancla
+// derecha y botón ámbar al final.
 //
 // La fila NO se despliega ni navega: el detalle completo vive en su propia
 // página (/modulos/transferencias/[id]) y el único acceso es el botón. Se
@@ -27,24 +30,31 @@ export default function FilaTransferencia({
     : Number(t.cantidadEnviada || 0) - Number(t.cantidadRecibida || 0);
 
   return (
-    <tr className="align-middle border-t sunmi-divider sunmi-row-hover transition-colors">
+    <tr className="align-middle sunmi-row-hover transition-colors border-t sunmi-divider">
       {columns.fecha && (
         <td className="px-2.5 py-3 font-mono text-[11px] whitespace-nowrap sunmi-text-muted">
           {fechaHoraAR(t.fechaEnvio ?? t.createdAt)}
         </td>
       )}
 
+      {/* Nº protagonista + autor del remito debajo, igual que "Cliente / Ticket".
+          El tope baja en lg y se suelta en xl: a 1024 px las nueve columnas
+          compiten por 874 px y sin tope el texto largo empuja la tabla. */}
       {columns.numero && (
-        <td className="px-2.5 py-3">
-          <div className="font-semibold sunmi-text-strong text-[13px]">#{t.id}</div>
-          <div className="text-[11px] sunmi-text-muted">
-            Ítems: {formatCantidad(t.cantidadItems)}
+        <td className="px-2.5 py-3 max-w-[110px] xl:max-w-[180px]">
+          <div className="font-semibold sunmi-text-strong truncate text-[13px]">
+            #{t.id}
+          </div>
+          <div className="text-[11px] sunmi-text-muted truncate">
+            {t.creadaPorNombre || "—"}
           </div>
         </td>
       )}
 
+      {/* Origen protagonista + destino como subtítulo muted, igual que
+          "Local / Usuario": una sola celda, no dos columnas separadas. */}
       {columns.ruta && (
-        <td className="px-2.5 py-3 max-w-[260px]">
+        <td className="px-2.5 py-3 max-w-[130px] xl:max-w-[200px]">
           <div className="truncate sunmi-text-strong">
             {t.origenNombre || "—"}
             {t.origenEsDeposito && (
@@ -91,8 +101,9 @@ export default function FilaTransferencia({
         </td>
       )}
 
+      {/* Ancla derecha de la fila, con el mismo peso que el "Total" de Ventas. */}
       {columns.importe && (
-        <td className="px-2.5 py-3 text-right font-mono tabular-nums whitespace-nowrap sunmi-text-strong">
+        <td className="px-2.5 py-3 text-right font-mono font-bold text-[14px] sunmi-text-strong whitespace-nowrap tabular-nums">
           {money ? money(t.totalCosto) : t.totalCosto}
         </td>
       )}
@@ -105,7 +116,7 @@ export default function FilaTransferencia({
             className="whitespace-nowrap"
             onClick={() => onVer?.(t.id)}
           >
-            Ver
+            Ver transferencia
           </SunmiButton>
         </td>
       )}

@@ -19,22 +19,46 @@ Listado de transferencias con filtros.
   "items": [
     {
       "id": 1,
-      "origenId": 1,
       "origenNombre": "Deposito Central",
-      "destinoId": 2,
+      "origenEsDeposito": true,
       "destinoNombre": "Local Norte",
       "estado": "Enviada",
+      "createdAt": "2025-01-15T09:58:00Z",
       "fechaEnvio": "2025-01-15T10:00:00Z",
       "fechaRecepcion": null,
-      "itemsEnviados": 15,
-      "costoTotal": 45000.00
+      "tieneDiferencias": false,
+      "cantidadItems": 15,
+      "cantidadEnviada": 120.5,
+      "cantidadRecibida": null,
+      "totalCosto": 45000.00,
+      "creadaPorNombre": "Ana Gomez"
     }
   ],
   "total": 30,
   "totalPages": 2,
-  "totalCostoGlobal": 1500000.00
+  "totalCostoGlobal": 1500000.00,
+  "resumen": {
+    "total": 30,
+    "enviadas": 8,
+    "recibidas": 19,
+    "conDiferencias": 3,
+    "importeTotal": 1500000.00
+  }
 }
 ```
+
+Notas:
+
+- `cantidadRecibida` distingue `null` (nadie registró recepción todavía) de `0`
+  (se registró que no llegó nada). La pantalla muestra `—` y `0` respectivamente.
+- `resumen` y `totalCostoGlobal` cubren **todo el período filtrado**, no la
+  página visible: usan el mismo `where` que el listado, sin paginar. Antes
+  `totalCostoGlobal` sumaba solo la página y cambiaba al pasar de página pese a
+  llamarse "global".
+- `creadaPorNombre` resuelve `Transferencia.creadaPor` (un id de usuario) contra
+  `Usuario` en una sola consulta por página.
+- El importe de cada remito y el del período salen del **mismo** helper
+  (`importeDeDetalle`), así la columna "Importe" y la métrica no pueden divergir.
 
 ### GET /api/transferencias/detalle?id=
 

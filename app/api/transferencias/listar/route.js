@@ -13,6 +13,36 @@ import { aMilesimas, desdeMilesimas } from "@/lib/transferencias/recepcion";
 
 const PAGE_SIZE = 25;
 
+// Importe de un remito a partir de su detalle. Vive suelto —y no dentro del
+// map— porque lo usan dos consumidores: la fila visible y el agregado del
+// período. Duplicar la fórmula haría que la métrica de arriba y la columna
+// "Importe" pudieran divergir.
+//
+// Misma semántica que /api/transferencias/detalle, del mismo helper: el costo se
+// baja a la escala de `unidadEnviada`, y la cantidad que valoriza es la recibida
+// cuando hay recepción cargada (incluido 0) o la enviada si todavía no la hay.
+function importeDeDetalle(detalle = []) {
+  return detalle.reduce((acc, d) => {
+    const precioCosto =
+      d.precioCosto ??
+      d.producto?.precio_costo ??
+      d.producto?.base?.precio_costo ??
+      0;
+
+    const { subtotal } = valorizarDetalle(
+      {
+        cantidad: d.cantidad,
+        recibido: d.recibido,
+        unidadEnviada: d.unidadEnviada,
+        precioCosto,
+      },
+      d.producto?.base
+    );
+
+    return acc + subtotal;
+  }, 0);
+}
+
 export async function GET(req) {
   try {
     const session = getUsuarioSession(req);
@@ -77,10 +107,28 @@ export async function GET(req) {
       where.OR = [{ origenId: vista.localId }, { destinoId: vista.localId }];
     }
 
+    // Selección mínima para valorizar un remito. Se usa dos veces: en la página
+    // visible y en el agregado del período, así las dos suman exactamente lo
+    // mismo con las mismas reglas.
+    const selectValorizacion = {
+      cantidad: true,
+      recibido: true,
+      precioCosto: true,
+      unidadEnviada: true,
+      producto: {
+        select: {
+          precio_costo: true,
+          base: {
+            select: { precio_costo: true, unidad_medida: true, factor_pack: true },
+          },
+        },
+      },
+    };
+
     // ======================================
     // CONSULTA PRINCIPAL CORREGIDA
     // ======================================
-    const [total, registros] = await Promise.all([
+    const [total, registros, porEstado, conDiferencias, valorizacionPeriodo] = await Promise.all([
       prisma.transferencia.count({ where }),
 
       prisma.transferencia.findMany({
@@ -92,40 +140,48 @@ export async function GET(req) {
           origen: { select: { id: true, nombre: true, es_deposito: true } },
           destino: { select: { id: true, nombre: true } },
 
-          detalle: {
-            select: {
-              id: true,
-              cantidad: true,
-              recibido: true,          // ← 🔥 AGREGADO
-              precioCosto: true,
-              unidadEnviada: true,     // escala en la que está `cantidad`
-              producto: {
-                select: {
-                  precio_costo: true,  // productoLocal
-                  base: {
-                    select: {
-                      precio_costo: true, // ← 🔥 AGREGADO productoBase
-                      // Escala en la que está cargado el costo del producto.
-                      unidad_medida: true,
-                      factor_pack: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
+          detalle: { select: selectValorizacion },
         },
+      }),
+
+      // Métricas del PERÍODO completo, no de la página. Con PAGE_SIZE 25 y un
+      // filtro que devuelve más, contar sobre `registros` daría cifras que no
+      // cierran contra el total que se muestra al lado.
+      prisma.transferencia.groupBy({
+        by: ["estado"],
+        where,
+        _count: { _all: true },
+      }),
+
+      prisma.transferencia.count({ where: { ...where, tieneDiferencias: true } }),
+
+      // Importe del período: mismo `where`, sin paginar y sin traer relaciones
+      // que no valorizan (origen/destino/id). Es el único agregado que no puede
+      // resolverse con un count porque el costo depende de la unidad enviada.
+      prisma.transferencia.findMany({
+        where,
+        select: { detalle: { select: selectValorizacion } },
       }),
     ]);
 
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+    // Autor del remito. `Transferencia.creadaPor` guarda el id del usuario, no su
+    // nombre: sin esta resolución la tabla solo podría mostrar un número. Una
+    // sola consulta por página (como máximo 25 ids distintos).
+    const idsCreadores = [...new Set(registros.map((t) => t.creadaPor).filter((v) => v != null))];
+    const creadores = idsCreadores.length
+      ? await prisma.usuario.findMany({
+          where: { id: { in: idsCreadores } },
+          select: { id: true, nombre: true },
+        })
+      : [];
+    const nombrePorCreador = new Map(creadores.map((u) => [u.id, u.nombre]));
+
     // ======================================
     // CÁLCULO EXACTO DEL DETALLE (COPIADO)
     // ======================================
     const items = registros.map((t) => {
-      let totalCosto = 0;
-
       // Cantidades AGREGADAS del remito, en milésimas enteras.
       //
       // `recibidaM` arranca en null y solo deja de serlo si ALGÚN detalle tiene
@@ -145,29 +201,6 @@ export async function GET(req) {
       let recibidaM = null;
 
       t.detalle.forEach((d) => {
-        const precioCosto =
-          d.precioCosto ??
-          d.producto?.precio_costo ??
-          d.producto?.base?.precio_costo ??
-          0;
-
-        // Misma semántica que el detalle, del mismo helper: el costo se baja a
-        // la escala de unidadEnviada, y la cantidad que valoriza es la recibida
-        // cuando hay recepción cargada (incluido 0) o la enviada si no la hay.
-        // Antes se decidía con `cantidadRecibida > 0`, así que una recepción de
-        // 0 se valorizaba como si hubiera llegado todo.
-        const { subtotal } = valorizarDetalle(
-          {
-            cantidad: d.cantidad,
-            recibido: d.recibido,
-            unidadEnviada: d.unidadEnviada,
-            precioCosto,
-          },
-          d.producto?.base
-        );
-
-        totalCosto += subtotal;
-
         const envM = aMilesimas(d.cantidad);
         if (envM !== null) enviadaM += envM;
 
@@ -193,14 +226,22 @@ export async function GET(req) {
         tieneDiferencias: t.tieneDiferencias === true,
         cantidadEnviada: desdeMilesimas(enviadaM),
         cantidadRecibida: recibidaM === null ? null : desdeMilesimas(recibidaM),
-        totalCosto,
+        totalCosto: importeDeDetalle(t.detalle),
+        // Autor del remito, para el subtítulo de la columna "Transferencia".
+        creadaPorNombre: nombrePorCreador.get(t.creadaPor) || null,
       };
     });
 
-    const totalCostoGlobal = items.reduce(
-      (acc, t) => acc + Number(t.totalCosto || 0),
+    // Importe de TODO el período filtrado. Antes esta clave sumaba solo la
+    // página visible pese a llamarse "global": con más de 25 resultados el
+    // importe cambiaba al pasar de página.
+    const totalCostoGlobal = valorizacionPeriodo.reduce(
+      (acc, t) => acc + importeDeDetalle(t.detalle),
       0
     );
+
+    const cuentaEstado = (nombre) =>
+      porEstado.find((g) => g.estado === nombre)?._count?._all || 0;
 
     return NextResponse.json({
       ok: true,
@@ -208,6 +249,15 @@ export async function GET(req) {
       total,
       totalPages,
       totalCostoGlobal,
+      // Métricas del período completo (mismo `where` que el listado), para la
+      // franja superior de la pantalla.
+      resumen: {
+        total,
+        enviadas: cuentaEstado("Enviada"),
+        recibidas: cuentaEstado("Recibida"),
+        conDiferencias,
+        importeTotal: totalCostoGlobal,
+      },
       error: null,
     });
 

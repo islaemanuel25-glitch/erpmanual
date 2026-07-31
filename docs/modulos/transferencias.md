@@ -11,8 +11,9 @@
 Transferencias formales de mercaderia entre depositos y locales. Incluye workflow completo: envio → recepcion → confirmacion con control de diferencias.
 
 ## Funcionalidad principal
-- Listado con filtros (estado, local, rango de fechas)
-- Detalle expandible con items
+- Listado con filtros (estado, rango de fechas)
+- Metricas del periodo: total, enviadas, recibidas, con diferencias e importe
+- Detalle en pagina propia (`[id]`), sin modales ni filas desplegables
 - Recepcion: registrar cantidades recibidas y motivos de diferencia
 - Confirmacion: actualiza stock de destino en transaccion
 - Generacion de PDF (envio y recepcion)
@@ -40,8 +41,11 @@ Transferencias formales de mercaderia entre depositos y locales. Incluye workflo
 - `GET /api/transferencias/pdf-recepcion?id=` — PDF de recepcion
 
 ## Componentes principales
-- `TablaTransferencias`: Tabla del listado (solo desde 1024 px)
-- `FilaTransferencia`: Fila individual; no se expande, el acceso al detalle es el boton "Ver"
+- `TablaTransferencias`: Tabla del listado (solo desde 1024 px). Columnas: Fecha /
+  hora, Transferencia, Origen / destino, Items, Enviada, Recibida, Estado,
+  Importe y Accion
+- `FilaTransferencia`: Fila individual; no se expande, el acceso al detalle es el
+  boton "Ver transferencia"
 - `CardTransferencia`: Tarjeta del listado en mobile y tablet (hasta 1023 px)
 - `EstadoTransferenciaBadge`: Badge de estado + badge de diferencias, compartido por listado y detalle
 - `ColumnSettingsPanel`: Panel integrado (sin modal) para elegir columnas de la tabla desktop
@@ -50,9 +54,43 @@ Transferencias formales de mercaderia entre depositos y locales. Incluye workflo
 - `AccionesRecepcion`: Botones de recepcion/confirmacion
 
 El detalle completo vive en `app/modulos/transferencias/[id]/page.jsx`: el
-listado solo muestra el resumen (fecha, numero, origen -> destino, items,
-enviada, recibida, estado y diferencias). Al pulsar "Ver" se guardan filtros,
-pagina y scroll para restaurarlos al volver.
+listado solo muestra el resumen. Al pulsar "Ver transferencia" se guardan
+filtros, pagina y scroll para restaurarlos al volver.
+
+## Composicion visual: copia literal de Reportes de Ventas
+
+La pantalla no "se inspira" en `app/modulos/reportes-ventas/page.jsx`: reusa su
+misma estructura de bloques, en el mismo orden y con los mismos valores.
+
+```
+contenedor    w-full min-h-full p-2 lg:p-3 space-y-3
+1 · franja    SunmiCard p-3 overflow-visible !backdrop-blur-0 -> titulo + filtros
+2 · metricas  section space-y-2 -> SectionHead + grid 2 / md:3 / xl:5
+3 · listado   section space-y-2 -> SectionHead + accion a la derecha, SunmiCard
+4 · paginado  dentro de la card, mt-3 pt-3 border-t sunmi-divider
+```
+
+Medido en el navegador, los dos modulos coinciden en: padding del contenedor
+(10,5 px), grilla y gap de metricas, padding y radio de la card de metrica,
+tamano de `h1` y `h2`, padding de `th` (5,25 / 7 px) y de `td` (10,5 / 8,75 px),
+alto de fila (58 px) y padding, tipografia y radio del boton de accion.
+
+Diferencias deliberadas, y por que:
+
+- **Dos secciones en vez de cuatro.** Ventas suma "Desglose por forma de pago" y
+  "Productos mas vendidos"; transferencias no tiene equivalente.
+- **Corte a `lg` (1024 px) en vez de `md`.** Con nueve columnas la tabla no es
+  legible a 768 px; hasta 1023 px se usan cards (una columna hasta 767, dos
+  desde 768).
+- **Boton "Volver" en la fila del titulo.** Ventas no tiene; ponerlo suelto sobre
+  la card rompia el ritmo vertical.
+- **Titulo de la card en `line-clamp-2` y tercera linea sin `truncate`.** En
+  Ventas el titulo es un solo nombre; aca son origen y destino, y con `truncate`
+  el destino desaparecia por completo debajo de 768 px.
+- **A 1024 px la tabla desborda ~61 px** y el contenedor `overflow-x-auto`
+  scrollea (Ventas desborda 7 px con una columna menos y una etiqueta de accion
+  mas corta). Desde 1280 px entra completa sin scroll. Ocultar "Items" en el
+  panel de columnas la hace entrar exacto.
 
 ## Estado y hooks
 - Estado local con `useState`
