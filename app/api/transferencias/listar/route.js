@@ -6,6 +6,10 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
 import { inicioDiaArgentina, finDiaArgentina } from "@/lib/fechas/rangoArgentina";
+// Misma escala entera que usa la recepción desplegada. Sumar cantidades con `+`
+// sobre Decimal→Number arrastra residuo binario a la tercera decimal; acá se
+// acumula en milésimas enteras y se convierte una sola vez al final.
+import { aMilesimas, desdeMilesimas } from "@/lib/transferencias/recepcion";
 
 const PAGE_SIZE = 25;
 
@@ -122,6 +126,24 @@ export async function GET(req) {
     const items = registros.map((t) => {
       let totalCosto = 0;
 
+      // Cantidades AGREGADAS del remito, en milésimas enteras.
+      //
+      // `recibidaM` arranca en null y solo deja de serlo si ALGÚN detalle tiene
+      // recepción cargada. Esa distinción es la que la pantalla necesita:
+      //   null → todavía nadie registró recepción  → se muestra "—"
+      //   0    → se registró que no llegó nada     → se muestra "0"
+      // Colapsar el null a 0 haría que una transferencia recién enviada se vea
+      // igual que una que llegó vacía.
+      //
+      // Nota deliberada: se suman las cantidades tal como están en el remito
+      // (cada detalle en la unidad de su `unidadEnviada`), igual que hace
+      // `resumen.itemsEnviados` en /api/transferencias/detalle. Es un total de
+      // documento, no de unidades físicas: un remito con bultos y unidades suma
+      // ambos. Convertir a unidades físicas cambiaría el número que el detalle
+      // ya viene mostrando.
+      let enviadaM = 0;
+      let recibidaM = null;
+
       t.detalle.forEach((d) => {
         const precioCosto =
           d.precioCosto ??
@@ -145,6 +167,14 @@ export async function GET(req) {
         );
 
         totalCosto += subtotal;
+
+        const envM = aMilesimas(d.cantidad);
+        if (envM !== null) enviadaM += envM;
+
+        if (d.recibido != null) {
+          const recM = aMilesimas(d.recibido);
+          if (recM !== null) recibidaM = (recibidaM ?? 0) + recM;
+        }
       });
 
       return {
@@ -154,8 +184,15 @@ export async function GET(req) {
         destinoNombre: t.destino?.nombre,
         estado: t.estado,
         cantidadItems: t.detalle.length,
+        createdAt: t.createdAt,
         fechaEnvio: t.fechaEnvio,
         fechaRecepcion: t.fechaRecepcion,
+        // Faltaba en la serialización aunque la fila ya lo traía: la pantalla lo
+        // leía como `undefined` y mostraba "Correcta" en TODA transferencia
+        // recibida, incluidas las que tenían faltantes.
+        tieneDiferencias: t.tieneDiferencias === true,
+        cantidadEnviada: desdeMilesimas(enviadaM),
+        cantidadRecibida: recibidaM === null ? null : desdeMilesimas(recibidaM),
         totalCosto,
       };
     });

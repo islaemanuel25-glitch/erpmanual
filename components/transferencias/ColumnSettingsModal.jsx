@@ -17,17 +17,19 @@ export default function ColumnSettingsModal({
     }));
   };
 
+  // Mismo orden que la tabla. Las claves viejas (id/origen/destino/recepcion/
+  // fechaEnvio/fechaRecepcion) se descartan al normalizar en la página: acá solo
+  // quedan las columnas que la tabla realmente puede mostrar.
   const LABELS = {
-    id: "ID",
-    origen: "Origen",
-    destino: "Destino",
-    estado: "Estado",
-    recepcion: "Recepción",
+    fecha: "Fecha / hora",
+    numero: "Nº",
+    ruta: "Origen → destino",
     items: "Ítems",
+    enviada: "Cantidad enviada",
+    recibida: "Cantidad recibida",
+    estado: "Estado",
     importe: "Importe",
-    fechaEnvio: "Fecha envío",
-    fechaRecepcion: "Fecha recepción",
-    acciones: "Acciones",
+    acciones: "Acción",
   };
 
   return (
@@ -49,7 +51,9 @@ export default function ColumnSettingsModal({
           <div>
             <h2 className="text-lg font-semibold">Configurar columnas</h2>
             <p className="sunmi-text-muted text-xs mt-1">
-              Mostrá u ocultá columnas de la tabla de transferencias.
+              Mostrá u ocultá columnas de la tabla. Solo aplica a la vista de
+              escritorio: en pantallas chicas el listado usa tarjetas de
+              composición fija.
             </p>
           </div>
           <button

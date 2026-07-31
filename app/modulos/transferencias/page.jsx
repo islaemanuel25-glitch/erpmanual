@@ -1,25 +1,44 @@
 // app/modulos/transferencias/page.jsx
+//
+// Listado de transferencias con el MISMO patrón visual y responsive que
+// app/modulos/reportes-ventas/page.jsx: franja de filtros, métricas, cards hasta
+// 1023 px y tabla desde 1024 px, badges de estado y navegación explícita al
+// detalle con botón "Ver".
+//
+// Las piezas de presentación (SectionHead, MetricCard, EstadoTransferenciaBadge)
+// están duplicadas a propósito al final de este archivo: en Ventas viven dentro
+// de su propia page.jsx y extraerlas a components/ obligaría a modificar Ventas.
+//
+// Lo que NO cambia respecto de la versión anterior: carga automática, filtro por
+// estado, rango de fechas, "Quitar filtros", configuración de columnas
+// persistida, fila expandible con MiniInfo, permisos y alcance por ubicación
+// (que resuelve la API, no la pantalla).
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Settings2 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Settings2, ArrowLeftRight, Boxes, Banknote } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 
 import ColumnSettingsModal from "@/components/transferencias/ColumnSettingsModal";
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
+import CardTransferencia from "@/components/transferencias/CardTransferencia";
 
+const TZ_AR = "America/Argentina/Cordoba";
+
+// Estados OFRECIDOS como filtro. "Confirmando" y "Cancelando" son transitorios
+// (viven dentro de una transacción) y no se ofrecen; "Pendiente" es el default
+// del schema y ningún flujo lo escribe.
 const ESTADOS = [
   { value: "", label: "Todos" },
-  { value: "Pendiente", label: "Pendiente" },
   { value: "Enviada", label: "Enviada" },
   { value: "Recibiendo", label: "Recibiendo" },
   { value: "Recibida", label: "Recibida" },
@@ -27,36 +46,95 @@ const ESTADOS = [
 ];
 
 const COLUMN_DEFAULTS = {
-  id: true,
-  origen: true,
-  destino: true,
-  estado: true,
-  recepcion: true,
+  fecha: true,
+  numero: true,
+  ruta: true,
   items: true,
-  importe: true,
-  fechaEnvio: false,
-  fechaRecepcion: false,
+  enviada: true,
+  recibida: true,
+  estado: true,
+  importe: false,
   acciones: true,
 };
 
+const COLUMNS_KEY = "transferencias-columns";
+const SCROLL_KEY = "transferencias:scroll";
+
+// Preferencias guardadas + columnas nuevas. Las claves viejas que ya no existen
+// se descartan; las que sobreviven (estado, items, importe, acciones) conservan
+// la elección del usuario en vez de resetearse.
+function normalizarColumnas(guardado) {
+  const base = { ...COLUMN_DEFAULTS };
+  if (!guardado || typeof guardado !== "object") return base;
+  for (const clave of Object.keys(base)) {
+    if (typeof guardado[clave] === "boolean") base[clave] = guardado[clave];
+  }
+  return base;
+}
+
+function fechaHoraAR(iso) {
+  if (!iso) return "—";
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: TZ_AR,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
+// Cantidades: enteros sin decimales, fraccionarios con hasta 3 útiles (la escala
+// física de StockLocal).
+function formatCantidad(n) {
+  const num = Number(n);
+  if (!isFinite(num)) return "0";
+  if (Number.isInteger(num)) return num.toLocaleString("es-AR");
+  return num.toLocaleString("es-AR", { maximumFractionDigits: 3 });
+}
+
+function money(n) {
+  return `$ ${Number(n || 0).toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+// El contenedor scrolleable del layout es <main> (mismo criterio que Ventas).
+function getScrollEl() {
+  if (typeof document === "undefined") return null;
+  return document.querySelector("main");
+}
+
+function hoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function hace30ISO() {
+  const d = new Date();
+  const p = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 30);
+  return `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`;
+}
+
 export default function TransferenciasPage() {
+  const router = useRouter();
   const { perfil: perfilTr, cargando: cargandoTr } = useUser();
   const permisosTr = perfilTr?.permisos || [];
   const esAdminTr = Array.isArray(permisosTr) && permisosTr.includes("*");
 
-  const _d = new Date();
-  const hoy = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
-  const _d30 = new Date(_d.getFullYear(), _d.getMonth(), _d.getDate() - 30);
-  const hace30 = `${_d30.getFullYear()}-${String(_d30.getMonth() + 1).padStart(2, "0")}-${String(_d30.getDate()).padStart(2, "0")}`;
+  const hoy = hoyISO();
 
   const [items, setItems] = useState([]);
   const [estado, setEstado] = useState("");
-
-  const [fechaDesde, setFechaDesde] = useState(hace30);
-  const [fechaHasta, setFechaHasta] = useState(hoy);
+  const [fechaDesde, setFechaDesde] = useState(hace30ISO);
+  const [fechaHasta, setFechaHasta] = useState(hoyISO);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [totalCostoGlobal, setTotalCostoGlobal] = useState(0);
 
   const [loading, setLoading] = useState(false);
@@ -64,10 +142,10 @@ export default function TransferenciasPage() {
 
   const [columns, setColumns] = useState(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("transferencias-columns");
-      if (saved) {
-        try { return JSON.parse(saved); } catch {}
-      }
+      try {
+        const saved = localStorage.getItem(COLUMNS_KEY);
+        if (saved) return normalizarColumnas(JSON.parse(saved));
+      } catch {}
     }
     return COLUMN_DEFAULTS;
   });
@@ -75,14 +153,63 @@ export default function TransferenciasPage() {
   const [openCols, setOpenCols] = useState(false);
   const [filaAbierta, setFilaAbierta] = useState(null);
 
-  // 🔥 SE ELIMINÓ EL USEEFFECT QUE PROVOCABA EL FLASH
-  // (ya no es necesario porque las fechas están inicializadas correctamente)
+  // ==============================
+  // CONTEXTO DE RETORNO
+  //
+  // Al abrir el detalle se guarda la posición de scroll y los filtros vigentes;
+  // al volver (botón del detalle o back del navegador) se restauran. Mismo
+  // criterio que Ventas: sessionStorage, sin escribir la URL (evita loops
+  // estado↔URL).
+  // ==============================
+  const hidratadoRef = useRef(false);
+  const [scrollPendiente, setScrollPendiente] = useState(null);
+
+  useEffect(() => {
+    if (hidratadoRef.current) return;
+    hidratadoRef.current = true;
+    let raw = null;
+    try { raw = sessionStorage.getItem(SCROLL_KEY); } catch {}
+    if (!raw) return;
+    try { sessionStorage.removeItem(SCROLL_KEY); } catch {}
+    let ctx = null;
+    try { ctx = JSON.parse(raw); } catch {}
+    if (!ctx) return;
+    if (typeof ctx.estado === "string") setEstado(ctx.estado);
+    if (ctx.fechaDesde) setFechaDesde(ctx.fechaDesde);
+    if (ctx.fechaHasta) setFechaHasta(ctx.fechaHasta);
+    if (Number(ctx.page) > 0) setPage(Number(ctx.page));
+    setScrollPendiente(Number(ctx.y) || 0);
+  }, []);
+
+  // Restauración del scroll: recién cuando el listado terminó de cargar.
+  useEffect(() => {
+    if (scrollPendiente == null || loading) return;
+    const y = scrollPendiente;
+    setScrollPendiente(null);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const el = getScrollEl();
+        if (el) el.scrollTop = y;
+      })
+    );
+  }, [scrollPendiente, loading]);
+
+  const irADetalle = (id) => {
+    try {
+      const el = getScrollEl();
+      sessionStorage.setItem(
+        SCROLL_KEY,
+        JSON.stringify({ y: el ? el.scrollTop : 0, id, estado, fechaDesde, fechaHasta, page })
+      );
+    } catch {}
+    router.push(`/modulos/transferencias/${id}`);
+  };
 
   // ==============================
   // PERSISTENCIA DE COLUMNAS
   // ==============================
   useEffect(() => {
-    localStorage.setItem("transferencias-columns", JSON.stringify(columns));
+    try { localStorage.setItem(COLUMNS_KEY, JSON.stringify(columns)); } catch {}
   }, [columns]);
 
   // ==============================
@@ -94,7 +221,6 @@ export default function TransferenciasPage() {
       setError("");
 
       const url = new URL("/api/transferencias/listar", window.location.origin);
-
       url.searchParams.set("page", String(page));
       if (estado) url.searchParams.set("estado", estado);
       if (fechaDesde) url.searchParams.set("fechaDesde", fechaDesde);
@@ -107,14 +233,15 @@ export default function TransferenciasPage() {
         setError(json.error || "Error al cargar transferencias");
         setItems([]);
         setTotalPages(1);
+        setTotal(0);
         setTotalCostoGlobal(0);
         return;
       }
 
       setItems(json.items || []);
       setTotalPages(json.totalPages || 1);
+      setTotal(json.total || 0);
       setTotalCostoGlobal(json.totalCostoGlobal || 0);
-
     } catch {
       setError("Error al cargar transferencias");
     } finally {
@@ -122,16 +249,14 @@ export default function TransferenciasPage() {
     }
   };
 
+  // Carga automática al montar y ante cualquier cambio de filtro o página.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [page, estado, fechaDesde, fechaHasta]);
 
   const quitarFiltros = () => {
-    const d = new Date();
-    const h = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const d30 = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 30);
-    const h30 = `${d30.getFullYear()}-${String(d30.getMonth() + 1).padStart(2, "0")}-${String(d30.getDate()).padStart(2, "0")}`;
     setEstado("");
-    setFechaDesde(h30);
-    setFechaHasta(h);
+    setFechaDesde(hace30ISO());
+    setFechaHasta(hoyISO());
     setPage(1);
   };
 
@@ -142,25 +267,25 @@ export default function TransferenciasPage() {
   if (!esAdminTr && !permisosTr.includes("transferencias.ver")) return <SinPermisos />;
 
   return (
-    <div className="p-2 sm:p-4 max-w-6xl mx-auto space-y-3">
-      <SunmiBackButton href="/inicio" />
+    // Ancho útil completo, igual que Ventas (que quitó su `max-w` a propósito).
+    <div className="w-full min-h-full p-2 lg:p-3 space-y-3">
+      <div className="flex justify-end">
+        <SunmiBackButton href="/inicio" />
+      </div>
 
-      <SunmiCard>
-        <SunmiHeader title="Transferencias">
-          <div className="text-xs sm:text-sm sunmi-text-muted">
+      {/* Encabezado + filtros en una franja compacta */}
+      <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
+        <div className="mb-3">
+          <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
+            Transferencias
+          </h1>
+          <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
             Historial de transferencias entre Depósito y Locales
-          </div>
-        </SunmiHeader>
+          </p>
+        </div>
 
-        {/* ======================
-            FILTROS
-        ======================= */}
-        <SunmiSeparator label="Filtros" />
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 px-2 pb-2">
-
-          {/* ESTADO */}
-          <div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 items-end">
+          <div className="col-span-2 lg:col-span-1">
             <label className="text-[11px] sunmi-text-muted mb-1 block">Estado</label>
             <SunmiSelectAdv
               value={estado}
@@ -173,8 +298,7 @@ export default function TransferenciasPage() {
             </SunmiSelectAdv>
           </div>
 
-          {/* PERÍODO */}
-          <div>
+          <div className="col-span-2 lg:col-span-2">
             <label className="text-[11px] sunmi-text-muted mb-1 block">Período</label>
             <SunmiDateRangePicker
               valueDesde={fechaDesde}
@@ -190,79 +314,161 @@ export default function TransferenciasPage() {
             />
           </div>
 
-          <div className="flex items-end">
-            <SunmiButton color="slate" className="!border !border-[var(--pos-link)]" onClick={quitarFiltros}>
+          <div className="col-span-2 lg:col-span-1">
+            <SunmiButton
+              color="slate"
+              onClick={quitarFiltros}
+              className="w-full font-semibold !border !border-[var(--pos-link)]"
+            >
               Quitar filtros
             </SunmiButton>
           </div>
-
         </div>
 
-        {/* ======================
-            LISTADO + BOTÓN DE COLUMNAS
-        ======================= */}
-        <div className="flex items-center justify-between px-2">
-          <SunmiSeparator label="Listado" />
+        {error && (
+          <div className="mt-2 text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5">
+            {error}
+          </div>
+        )}
+      </SunmiCard>
 
-          <SunmiButton
-            color="slate"
-            onClick={() => setOpenCols(true)}
-          >
+      {/* Resumen */}
+      <section className="space-y-2">
+        <SectionHead title="Resumen del período" />
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+          <MetricCard icon={ArrowLeftRight} tone="link" label="Transferencias" value={formatCantidad(total)} />
+          <MetricCard
+            icon={Boxes}
+            tone="accent"
+            label="Con diferencias"
+            value={formatCantidad(items.filter((t) => t.tieneDiferencias).length)}
+          />
+          <MetricCard
+            icon={Banknote}
+            tone="success"
+            highlight
+            label="Importe total transferido"
+            value={money(totalCostoGlobal)}
+            className="col-span-2 lg:col-span-1"
+          />
+        </div>
+      </section>
+
+      {/* Listado */}
+      <section className="space-y-2">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <SectionHead
+            title="Transferencias"
+            subtitle={total ? `${total} transferencia${total === 1 ? "" : "s"}` : null}
+          />
+          {/* La configuración de columnas aplica SOLO a la tabla desktop; en cards
+              la composición es fija, por eso el botón se oculta debajo de lg. */}
+          <SunmiButton color="slate" onClick={() => setOpenCols(true)} className="hidden lg:inline-flex shrink-0">
             <Settings2 size={14} className="inline -mt-0.5" /> Columnas
           </SunmiButton>
         </div>
 
-        {/* ======================
-            TABLA REAL (componente)
-        ======================= */}
-        <TablaTransferencias
-          items={items}
-          columns={columns}
-          filaAbierta={filaAbierta}
-          setFilaAbierta={setFilaAbierta}
-        />
+        <SunmiCard>
+          {loading && (
+            <div className="text-center py-8"><SunmiLoader /></div>
+          )}
 
-        {/* ======================
-            TOTAL GLOBAL
-        ======================= */}
-        <SunmiCard className="mx-1 mt-3">
-          <div className="sunmi-text-muted text-sm px-3 py-2 flex justify-between">
-            <span className="font-semibold">Importe total transferido:</span>
-            <span className="sunmi-text-accent font-bold">
-              ${Number(totalCostoGlobal).toFixed(2)}
-            </span>
-          </div>
+          {!loading && items.length === 0 && (
+            <div className="text-center py-10 sunmi-text-muted text-sm">
+              No hay transferencias en el período seleccionado
+            </div>
+          )}
+
+          {!loading && items.length > 0 && (
+            <>
+              {/* Hasta 1023 px: cards. Una por fila en 360/412, dos desde 768. */}
+              <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-2">
+                {items.map((t) => (
+                  <CardTransferencia
+                    key={t.id}
+                    t={t}
+                    onVer={() => irADetalle(t.id)}
+                    fechaHoraAR={fechaHoraAR}
+                    formatCantidad={formatCantidad}
+                  />
+                ))}
+              </div>
+
+              {/* Desde 1024 px: tabla */}
+              <div className="hidden lg:block overflow-x-auto">
+                <TablaTransferencias
+                  items={items}
+                  columns={columns}
+                  filaAbierta={filaAbierta}
+                  setFilaAbierta={setFilaAbierta}
+                  onVer={irADetalle}
+                  fechaHoraAR={fechaHoraAR}
+                  formatCantidad={formatCantidad}
+                  money={money}
+                />
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between gap-2 flex-wrap mt-3 pt-3 border-t sunmi-divider text-xs sunmi-text-muted">
+                  <div>
+                    Página {page} de {totalPages} · {total} transferencia{total === 1 ? "" : "s"}
+                  </div>
+                  <div className="flex gap-2">
+                    <SunmiButton onClick={prev} disabled={page <= 1 || loading}>
+                      Anterior
+                    </SunmiButton>
+                    <SunmiButton onClick={next} disabled={page >= totalPages || loading}>
+                      Siguiente
+                    </SunmiButton>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </SunmiCard>
+      </section>
 
-        {/* ======================
-            PAGINACIÓN
-        ======================= */}
-        <div className="flex justify-between items-center flex-wrap gap-2 px-2 pb-2">
-          <div className="flex items-center gap-2">
-            <SunmiButton color="slate" onClick={prev} disabled={page <= 1}>
-              Anterior
-            </SunmiButton>
-            <span className="sunmi-text-muted text-[11px]">
-              Página {page} de {totalPages}
-            </span>
-            <SunmiButton color="slate" onClick={next} disabled={page >= totalPages}>
-              Siguiente
-            </SunmiButton>
-          </div>
-        </div>
-
-      </SunmiCard>
-
-      {/* ======================
-          MODAL DE COLUMNAS
-      ======================= */}
       <ColumnSettingsModal
         open={openCols}
         onClose={() => setOpenCols(false)}
         columns={columns}
         setColumns={setColumns}
       />
+    </div>
+  );
+}
 
+// ── Subcomponentes de presentación (solo UI) ─────────────────────────────────
+// Duplicados del patrón de Ventas a propósito: allá viven dentro de su page.jsx
+// y extraerlos a components/ obligaría a modificar Ventas.
+
+function SectionHead({ title, subtitle }) {
+  return (
+    <div className="min-w-0">
+      <h2 className="text-sm font-bold sunmi-text-strong leading-tight">{title}</h2>
+      {subtitle && <p className="text-[11px] sunmi-text-muted leading-tight">{subtitle}</p>}
+    </div>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, tone = "neutral", highlight = false, className = "" }) {
+  const toneColor = {
+    neutral: "sunmi-text-strong",
+    link: "sunmi-text-link",
+    accent: "sunmi-text-accent",
+    warning: "sunmi-text-warning",
+    success: "sunmi-text-success",
+  }[tone] || "sunmi-text-strong";
+  const box = highlight ? "sunmi-state-success" : "sunmi-surface sunmi-border";
+  return (
+    <div className={`${box} rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 ${className}`}>
+      <div className={`shrink-0 grid place-items-center w-9 h-9 rounded-lg sunmi-surface-soft ${toneColor}`}>
+        <Icon size={18} strokeWidth={2} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-[11px] sunmi-text-muted leading-tight">{label}</div>
+        <div className={`text-base sm:text-lg font-bold tabular-nums leading-tight ${toneColor}`}>{value}</div>
+      </div>
     </div>
   );
 }

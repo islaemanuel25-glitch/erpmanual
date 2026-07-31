@@ -5,6 +5,10 @@ import { getUsuarioSession, getCookieValue } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
 import { resolverCostoTransferencia } from "@/lib/transferencias/costoTransferencia";
+// EL MISMO helper que usa la recepción para devolver el faltante al origen. Se
+// importa en vez de replicar la fórmula: si la regla cambia, la pantalla no
+// puede quedar mostrando otro número que el que el stock realmente movió.
+import { calcularDevolucionUnidades, aMilesimas, desdeMilesimas } from "@/lib/transferencias/recepcion";
 
 function toNumber(v) {
   const n = Number(v);
@@ -49,6 +53,9 @@ export async function GET(req) {
             producto: {
               include: { base: true },
             },
+            // Relación YA existente en el schema (TransferenciaDetalle.confirmadoPor).
+            // Viaja en la misma consulta: no agrega una query por línea.
+            confirmadoPor: { select: { id: true, nombre: true } },
           },
         },
       },
@@ -92,6 +99,9 @@ export async function GET(req) {
     let itemsEnviados = 0;
     let itemsRecibidos = 0;
     let costoTotal = 0;
+    // Devolución al origen, acumulada en milésimas enteras (misma escala que el
+    // stock). Solo suma las líneas que YA tienen recepción cargada.
+    let devolucionTotalM = 0;
 
     const items = transferencia.detalle.map((d) => {
       const cantidadEnviada = toNumber(d.cantidad);
@@ -130,6 +140,28 @@ export async function GET(req) {
       itemsRecibidos += cantidadRecibida ?? 0;
       costoTotal += subtotal;
 
+      // Devolución al origen en UNIDADES FÍSICAS de StockLocal:
+      //   (enviadaMilésimas - recibidaMilésimas) × factorFisico
+      // Es exactamente lo que confirmar-recepcion acredita al origen. Sin
+      // recepción cargada todavía no hay devolución que informar → null (no 0:
+      // 0 significa "llegó todo").
+      //
+      // INFORMATIVO Y DE SOLA LECTURA: este endpoint no mueve stock.
+      const devolucionOrigen =
+        cantidadRecibida == null
+          ? null
+          : calcularDevolucionUnidades({
+              enviada: d.cantidad,
+              recibida: d.recibido,
+              unidad: d.unidadEnviada,
+              factorPack: d.producto?.base?.factor_pack,
+            });
+
+      if (devolucionOrigen != null) {
+        const devM = aMilesimas(devolucionOrigen);
+        if (devM !== null) devolucionTotalM += devM;
+      }
+
       return {
         id: d.id,
         nombre:
@@ -145,6 +177,12 @@ export async function GET(req) {
         precioCosto: costoNormalizado,
         subtotal,
 
+        devolucionOrigen,
+        confirmadoPor: d.confirmadoPor
+          ? { id: d.confirmadoPor.id, nombre: d.confirmadoPor.nombre }
+          : null,
+        fechaRecepcion: d.fechaRecepcion,
+
         motivoPrincipal: d.motivoPrincipal || "",
         motivoDetalle: d.motivoDetalle || "",
         unidadEnviada: d.unidadEnviada || null,
@@ -155,6 +193,34 @@ export async function GET(req) {
     });
 
     const diferenciaTotal = itemsRecibidos - itemsEnviados;
+
+    // ======================================================
+    // USUARIOS
+    //
+    // `Transferencia.creadaPor` es un Int SIN relación declarada en el schema,
+    // así que Prisma no lo puede incluir: se resuelve con UNA consulta puntual
+    // (no por línea). Agregarle la relación sería tocar el schema.
+    //
+    // Los confirmadores salen de la relación que YA existe en
+    // TransferenciaDetalle.confirmadoPor, traída en la consulta principal. Se
+    // deduplican porque una recepción larga la confirma una sola persona pero el
+    // dato está por línea.
+    // ======================================================
+    const creadaPor = transferencia.creadaPor
+      ? await prisma.usuario.findUnique({
+          where: { id: Number(transferencia.creadaPor) },
+          select: { id: true, nombre: true },
+        })
+      : null;
+
+    const confirmadores = [];
+    const vistos = new Set();
+    for (const d of transferencia.detalle) {
+      const u = d.confirmadoPor;
+      if (!u || vistos.has(u.id)) continue;
+      vistos.add(u.id);
+      confirmadores.push({ id: u.id, nombre: u.nombre });
+    }
 
     const item = {
       id: transferencia.id,
@@ -173,11 +239,17 @@ export async function GET(req) {
         id: transferencia.destino.id,
         nombre: transferencia.destino.nombre,
       },
+      // Usuario al que se atribuye el envío. `null` cuando la transferencia no
+      // guardó autor o el usuario ya no existe: la pantalla muestra "—".
+      creadaPor: creadaPor ? { id: creadaPor.id, nombre: creadaPor.nombre } : null,
+      confirmadores,
       resumen: {
         itemsEnviados,
         itemsRecibidos,
         diferenciaTotal,
         costoTotal,
+        // Unidades físicas devueltas al stock del origen por el faltante.
+        devolucionOrigenTotal: desdeMilesimas(devolucionTotalM),
       },
       items,
     };
