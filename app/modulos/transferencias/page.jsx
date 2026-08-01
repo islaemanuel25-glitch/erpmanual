@@ -23,6 +23,12 @@
 // transferencia", que guarda filtros, página y scroll para restaurarlos al
 // volver. La configuración de columnas tampoco abre un modal: es un panel
 // integrado dentro de la card del listado.
+//
+// FLUJO: es un REPORTE, no un listado reactivo. Igual que Ventas, la pantalla
+// arranca vacía y no consulta nada hasta que el usuario pulsa "Generar reporte".
+// Cambiar Desde, Hasta o Estado después NO dispara la búsqueda: los valores
+// nuevos recién se aplican al volver a generar. Ver `reporteGenerado` y
+// `filtrosVigentes` más abajo.
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -40,10 +46,9 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
-import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
-import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 
 import ColumnSettingsPanel from "@/components/transferencias/ColumnSettingsPanel";
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
@@ -115,6 +120,10 @@ function leerContextoRetorno() {
   const pagina = Number(ctx.page);
 
   return {
+    // `generado` es lo que distingue "vuelvo del detalle" de "entro del menú".
+    // Sin esta marca la pantalla arranca vacía, que es el comportamiento por
+    // defecto: solo un retorno legítimo reconstruye el reporte solo.
+    generado: ctx.generado === true,
     estado: ESTADOS.some((e) => e.value === ctx.estado) ? ctx.estado : null,
     fechaDesde: esFecha(ctx.fechaDesde) ? ctx.fechaDesde : null,
     fechaHasta: esFecha(ctx.fechaHasta) ? ctx.fechaHasta : null,
@@ -129,6 +138,7 @@ function guardarContextoRetorno(ctx) {
       RETORNO_KEY,
       JSON.stringify({
         y: ctx.y,
+        generado: ctx.generado,
         estado: ctx.estado,
         fechaDesde: ctx.fechaDesde,
         fechaHasta: ctx.fechaHasta,
@@ -186,15 +196,20 @@ function getScrollEl() {
   return document.querySelector("main");
 }
 
-function hoyISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function hace30ISO() {
-  const d = new Date();
-  const p = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 30);
-  return `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, "0")}-${String(p.getDate()).padStart(2, "0")}`;
+// Fecha de hoy en Argentina como YYYY-MM-DD (sin tocar UTC). Misma función que
+// usa Ventas: el día lo define TZ_AR, no el reloj del dispositivo, así que un
+// equipo con la zona mal configurada no corre el período un día.
+function hoyArgentinaISO() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ_AR,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  const d = parts.find((p) => p.type === "day")?.value;
+  return `${y}-${m}-${d}`;
 }
 
 const RESUMEN_VACIO = {
@@ -211,12 +226,19 @@ export default function TransferenciasPage() {
   const permisosTr = perfilTr?.permisos || [];
   const esAdminTr = Array.isArray(permisosTr) && permisosTr.includes("*");
 
-  const hoy = hoyISO();
-
   const [items, setItems] = useState([]);
   const [estado, setEstado] = useState("");
-  const [fechaDesde, setFechaDesde] = useState(hace30ISO);
-  const [fechaHasta, setFechaHasta] = useState(hoyISO);
+  const [fechaDesde, setFechaDesde] = useState(hoyArgentinaISO);
+  const [fechaHasta, setFechaHasta] = useState(hoyArgentinaISO);
+
+  // Interruptor del flujo manual. Mientras sea false no se consulta la API y no
+  // se renderiza ningún resultado: solo el mensaje inicial.
+  const [reporteGenerado, setReporteGenerado] = useState(false);
+
+  // Filtros del último "Generar reporte". La paginación usa ESTOS, no los
+  // inputs: si el usuario cambia una fecha y pagina sin regenerar, la página 2
+  // seguiría siendo del mismo reporte que está viendo.
+  const [filtrosVigentes, setFiltrosVigentes] = useState(null);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -255,17 +277,23 @@ export default function TransferenciasPage() {
     if (hidratadoRef.current) return;
     hidratadoRef.current = true;
     const ctx = leerContextoRetorno();
-    if (!ctx) return;
-    if (ctx.estado != null) setEstado(ctx.estado);
-    if (ctx.fechaDesde) setFechaDesde(ctx.fechaDesde);
-    if (ctx.fechaHasta) setFechaHasta(ctx.fechaHasta);
-    if (ctx.page) setPage(ctx.page);
+    // Sin contexto (entrada desde el menú) o con un contexto sin reporte
+    // generado, la pantalla arranca vacía. No se consulta nada.
+    if (!ctx || !ctx.generado) return;
     setScrollPendiente(ctx.y);
+    generarReporte({
+      estado: ctx.estado ?? "",
+      fechaDesde: ctx.fechaDesde ?? undefined,
+      fechaHasta: ctx.fechaHasta ?? undefined,
+      page: ctx.page ?? 1,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Restauración del scroll: recién cuando el listado terminó de cargar.
+  // Restauración del scroll: recién cuando el listado terminó de cargar. La
+  // guarda de `reporteGenerado` evita restaurar sobre una pantalla vacía.
   useEffect(() => {
-    if (scrollPendiente == null || loading) return;
+    if (scrollPendiente == null || loading || !reporteGenerado) return;
     const y = scrollPendiente;
     setScrollPendiente(null);
     requestAnimationFrame(() =>
@@ -274,17 +302,22 @@ export default function TransferenciasPage() {
         if (el) el.scrollTop = y;
       })
     );
-  }, [scrollPendiente, loading]);
+  }, [scrollPendiente, loading, reporteGenerado, items]);
 
   // ÚNICA vía de acceso al detalle. La fila y la card no navegan por sí mismas:
   // el detalle completo es una página propia, no un panel debajo de la fila.
   const irADetalle = (id) => {
     const el = getScrollEl();
+    // Se guardan los filtros VIGENTES —los que produjeron lo que está en
+    // pantalla—, no los inputs: si el usuario tocó una fecha sin regenerar, al
+    // volver debe reaparecer el reporte que estaba viendo, no otro.
+    const f = filtrosVigentes || { estado, fechaDesde, fechaHasta };
     guardarContextoRetorno({
       y: el ? el.scrollTop : 0,
-      estado,
-      fechaDesde,
-      fechaHasta,
+      generado: reporteGenerado,
+      estado: f.estado,
+      fechaDesde: f.fechaDesde,
+      fechaHasta: f.fechaHasta,
       page,
     });
     router.push(`/modulos/transferencias/${id}`);
@@ -299,17 +332,24 @@ export default function TransferenciasPage() {
 
   // ==============================
   // CARGA DE TRANSFERENCIAS
+  //
+  // No hay ningún useEffect que dispare esto. Se llama desde dos lugares y
+  // nada más: "Generar reporte" (vía generarReporte) y la paginación. Cambiar
+  // un input no ejecuta nada.
   // ==============================
-  const fetchData = async () => {
+  const cargarPagina = async (pagina, filtrosOverride) => {
+    const filtros = filtrosOverride || filtrosVigentes;
+    if (!filtros) return;
+
     try {
       setLoading(true);
       setError("");
 
       const url = new URL("/api/transferencias/listar", window.location.origin);
-      url.searchParams.set("page", String(page));
-      if (estado) url.searchParams.set("estado", estado);
-      if (fechaDesde) url.searchParams.set("fechaDesde", fechaDesde);
-      if (fechaHasta) url.searchParams.set("fechaHasta", fechaHasta);
+      url.searchParams.set("page", String(pagina));
+      if (filtros.estado) url.searchParams.set("estado", filtros.estado);
+      if (filtros.fechaDesde) url.searchParams.set("fechaDesde", filtros.fechaDesde);
+      if (filtros.fechaHasta) url.searchParams.set("fechaHasta", filtros.fechaHasta);
 
       const res = await fetch(url.toString(), { cache: "no-store" });
       const json = await res.json();
@@ -327,6 +367,7 @@ export default function TransferenciasPage() {
       setTotalPages(json.totalPages || 1);
       setTotal(json.total || 0);
       setResumen({ ...RESUMEN_VACIO, ...(json.resumen || {}) });
+      setPage(pagina);
     } catch {
       setError("Error al cargar transferencias");
     } finally {
@@ -334,19 +375,57 @@ export default function TransferenciasPage() {
     }
   };
 
-  // Carga automática al montar y ante cualquier cambio de filtro o página.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData(); }, [page, estado, fechaDesde, fechaHasta]);
+  // Único punto de entrada del reporte. Sin argumentos usa el ESTADO de los
+  // inputs (botón "Generar reporte"); con `over` usa esos valores y sincroniza
+  // los inputs — así reconstruye el reporte al volver del detalle, en la página
+  // exacta en la que estaba.
+  const generarReporte = async (over = null) => {
+    const fd = over?.fechaDesde ?? fechaDesde;
+    const fh = over?.fechaHasta ?? fechaHasta;
+    const es = over?.estado ?? estado;
+    const pg = over?.page ?? 1;
 
-  const quitarFiltros = () => {
-    setEstado("");
-    setFechaDesde(hace30ISO());
-    setFechaHasta(hoyISO());
-    setPage(1);
+    if (!fd || !fh) {
+      setError("Selecciona las fechas");
+      return;
+    }
+    if (fd > fh) {
+      setError("La fecha Desde no puede ser posterior a Hasta");
+      return;
+    }
+
+    if (over) {
+      if (over.fechaDesde != null) setFechaDesde(over.fechaDesde);
+      if (over.fechaHasta != null) setFechaHasta(over.fechaHasta);
+      if (over.estado != null) setEstado(over.estado);
+    }
+
+    setError("");
+    const filtros = { estado: es, fechaDesde: fd, fechaHasta: fh };
+    setFiltrosVigentes(filtros);
+    setReporteGenerado(true);
+    await cargarPagina(pg, filtros);
   };
 
-  const prev = () => setPage((p) => Math.max(1, p - 1));
-  const next = () => setPage((p) => Math.min(totalPages, p + 1));
+  // Acción secundaria: vuelve los inputs a su estado inicial y borra el reporte
+  // en pantalla. No sustituye a "Generar reporte" — solo aparece una vez que
+  // hay un reporte que limpiar.
+  const limpiar = () => {
+    setEstado("");
+    setFechaDesde(hoyArgentinaISO());
+    setFechaHasta(hoyArgentinaISO());
+    setReporteGenerado(false);
+    setFiltrosVigentes(null);
+    setItems([]);
+    setTotalPages(1);
+    setTotal(0);
+    setResumen(RESUMEN_VACIO);
+    setPage(1);
+    setError("");
+  };
+
+  const prev = () => cargarPagina(Math.max(1, page - 1));
+  const next = () => cargarPagina(Math.min(totalPages, page + 1));
 
   if (cargandoTr) return null;
   if (!esAdminTr && !permisosTr.includes("transferencias.ver")) return <SinPermisos />;
@@ -357,27 +436,48 @@ export default function TransferenciasPage() {
     <div className="w-full min-h-full p-2 lg:p-3 space-y-3">
       {/* 1 · Encabezado + filtros en una franja compacta (una sola fila en desktop) */}
       <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
-        {/* El botón Volver comparte fila con el título en lugar de flotar sobre la
-            card: así la página arranca con el mismo bloque que Ventas y no con
-            una franja suelta que rompe el ritmo vertical. */}
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
-              Transferencias
-            </h1>
-            <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
-              Historial de transferencias entre Depósito y Locales
-            </p>
-          </div>
-          <SunmiBackButton href="/inicio" className="shrink-0" />
+        {/* Encabezado idéntico al de Ventas: solo título y subtítulo. No lleva
+            botón Volver — la barra superior ya ofrece "Inicio" en las dos
+            pantallas, y agregarlo acá rompía la simetría de la franja. */}
+        <div className="mb-3">
+          <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
+            Transferencias
+          </h1>
+          <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
+            Historial de transferencias entre Depósito y Locales
+          </p>
         </div>
 
+        {/* Misma grilla que Ventas: 2 columnas en móvil, 4 en lg, alineadas al
+            pie. Los tres primeros huecos son Desde / Hasta / tercer filtro y el
+            cuarto es el botón que genera. Acá el tercer filtro es Estado; en
+            Ventas es Forma de pago. */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 items-end">
-          <div className="col-span-2 lg:col-span-1">
+          <div>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Desde</label>
+            <SunmiInput
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              className="!border !border-[var(--pos-link)]"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] sunmi-text-muted mb-1 block">Hasta</label>
+            <SunmiInput
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="!border !border-[var(--pos-link)]"
+            />
+          </div>
+
+          <div className="col-span-2 lg:col-span-1 relative">
             <label className="text-[11px] sunmi-text-muted mb-1 block">Estado</label>
             <SunmiSelectAdv
               value={estado}
-              onChange={(val) => { setEstado(val); setPage(1); }}
+              onChange={(val) => setEstado(val)}
               className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               {ESTADOS.map((e) => (
@@ -386,32 +486,31 @@ export default function TransferenciasPage() {
             </SunmiSelectAdv>
           </div>
 
-          <div className="col-span-2 lg:col-span-2">
-            <label className="text-[11px] sunmi-text-muted mb-1 block">Período</label>
-            <SunmiDateRangePicker
-              valueDesde={fechaDesde}
-              valueHasta={fechaHasta}
-              onChangeDesde={setFechaDesde}
-              onChangeHasta={setFechaHasta}
-              onApply={(desde, hasta) => {
-                setFechaDesde(desde);
-                setFechaHasta(hasta);
-                setPage(1);
-              }}
-              maxDate={hoy}
-            />
-          </div>
-
           <div className="col-span-2 lg:col-span-1">
             <SunmiButton
-              color="slate"
-              onClick={quitarFiltros}
-              className="w-full font-semibold !border !border-[var(--pos-link)]"
+              color="amber"
+              onClick={() => generarReporte()}
+              disabled={loading}
+              className="w-full font-semibold"
             >
-              Quitar filtros
+              {loading ? "Cargando…" : "Generar reporte"}
             </SunmiButton>
           </div>
         </div>
+
+        {/* Acción secundaria, deliberadamente discreta y solo cuando hay algo
+            que limpiar: no compite con "Generar reporte" ni ocupa la grilla. */}
+        {reporteGenerado && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={limpiar}
+              className="text-[11px] sunmi-text-muted hover:sunmi-text-strong underline underline-offset-2"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        )}
 
         {error && (
           <div className="mt-2 text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5">
@@ -420,6 +519,17 @@ export default function TransferenciasPage() {
         )}
       </SunmiCard>
 
+      {/* Loader entre la franja y los resultados, igual que Ventas. */}
+      {loading && (
+        <div className="text-center py-8">
+          <SunmiLoader />
+        </div>
+      )}
+
+      {/* Resultados: SOLO después de generar. Mismo gate que Ventas usa con
+          `reporte && !loading`. */}
+      {reporteGenerado && !loading && (
+        <>
       {/* 2 · Resumen del período — misma grilla de métricas que el resumen
           financiero de Ventas: 2 columnas en móvil, 3 en md y 5 en xl, con la
           última destacada y ocupando el ancho sobrante en móvil. */}
@@ -501,17 +611,13 @@ export default function TransferenciasPage() {
             </div>
           )}
 
-          {loading && (
-            <div className="text-center py-8"><SunmiLoader /></div>
-          )}
-
-          {!loading && items.length === 0 && (
+          {items.length === 0 && (
             <div className="text-center py-10 sunmi-text-muted text-sm">
               No hay transferencias en el período seleccionado
             </div>
           )}
 
-          {!loading && items.length > 0 && (
+          {items.length > 0 && (
             <>
               {/* Hasta 1023 px: cards. Una por fila en 360/412, dos desde 768. */}
               <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -558,6 +664,18 @@ export default function TransferenciasPage() {
           )}
         </SunmiCard>
       </section>
+        </>
+      )}
+
+      {/* Estado inicial: mismo bloque, mismo texto y mismo espaciado que el
+          "sin datos" de Ventas. Es lo único que se ve al entrar. */}
+      {!reporteGenerado && !loading && (
+        <SunmiCard className="p-3">
+          <div className="text-center py-12 sunmi-text-muted">
+            Seleccioná las fechas y generá el reporte
+          </div>
+        </SunmiCard>
+      )}
     </div>
   );
 }
