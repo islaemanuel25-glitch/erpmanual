@@ -49,6 +49,38 @@ El rollback de migraciones Prisma es **manual**. Pasos:
 
 > **Importante:** Siempre hacer backup de la base de datos antes de aplicar migraciones en producción.
 
+## 3.bis Build de producción — el SHA es obligatorio
+
+El build **debe** recibir el SHA del commit desplegado. Es la identidad que usa
+el guard de versión para detectar pestañas que quedaron con un bundle anterior
+(ver `lib/version/compararBuild.js`).
+
+```bash
+APP_BUILD_ID="$(git rev-parse HEAD)" \
+  docker compose -f docker-compose.prod.yml build app
+```
+
+Sin la variable el build **falla** con un mensaje explícito: `docker-compose.prod.yml`
+pasa `REQUIRE_BUILD_ID=1` y el `Dockerfile` corta antes de compilar. Es a
+propósito — un guard inactivo por un argumento olvidado da falsa sensación de
+protección.
+
+El mismo valor viaja a los dos lados:
+
+| Destino | Variable | Cuándo |
+|---|---|---|
+| Bundle del navegador | `NEXT_PUBLIC_BUILD_ID` | build time, etapa *builder* |
+| Proceso del servidor | `APP_BUILD_ID` | runtime, etapa *runner* |
+
+Verificación post-deploy (ambos deben devolver el SHA desplegado):
+
+```bash
+curl -s http://127.0.0.1:3000/api/version
+docker exec erpazul_app sh -c 'grep -c "$(git -C /srv/produccion/erpazul rev-parse HEAD)" /app/.next/static/chunks/*.js | grep -v ":0" | head'
+```
+
+En desarrollo local la variable no existe y el guard queda inactivo: no molesta.
+
 ## 4. Notas de deploy
 
 - El deploy reconstruye la imagen Docker en el VPS. Un deploy típico tarda

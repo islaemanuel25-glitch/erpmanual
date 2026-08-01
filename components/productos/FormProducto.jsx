@@ -15,6 +15,8 @@ import {
   redondearA100Arriba,
   margenEfectivoDe,
 } from "@/lib/precios/precioDesdeMargen";
+import useVersionGuard from "@/hooks/useVersionGuard";
+import AvisoVersionNueva from "@/components/version/AvisoVersionNueva";
 import { useUser } from "@/app/context/UserContext";
 
 function parseVoiceNumber(text) {
@@ -107,6 +109,10 @@ export default function FormProducto({
   // backend exige requireAdmin. Para no-admin ocultamos el "+ Nuevo" (puede seguir
   // seleccionando existentes) y NO usamos productos.crear como autorización indirecta.
   const { perfil } = useUser();
+
+  // Guard de versión. `puedeGuardar()` consulta /api/version SIEMPRE, sin
+  // reutilizar el chequeo oportunista de visibilidad.
+  const { versionNueva, verificando: verificandoVersion, puedeGuardar } = useVersionGuard();
   const esAdmin = Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
 
   const toNum = (v) => {
@@ -399,9 +405,15 @@ export default function FormProducto({
     return null;
   };
 
-  const handleSubmit = () => {
+  // Barrera de versión: si esta pestaña quedó con un bundle anterior a un
+  // deploy, el submit se cancela ANTES de construir y enviar el payload. Un
+  // bundle viejo puede calcular precios con reglas que ya no existen —pasó de
+  // verdad con el margen— y el servidor solo persiste lo que recibe.
+  const handleSubmit = async () => {
     const err = validar();
     if (err) return alert(err);
+
+    if (!(await puedeGuardar())) return; // el aviso ya quedó visible
 
     const p = form;
 
@@ -1304,14 +1316,20 @@ export default function FormProducto({
         )}
       </div>
 
-      <div className="mx-auto w-full max-w-5xl mt-4 pt-4 border-t border-slate-800 flex justify-end gap-2">
-        <SunmiButton color="cyan" onClick={onCancel}>
-          Cancelar
-        </SunmiButton>
+      <div className="mx-auto w-full max-w-5xl mt-4 pt-4 border-t border-slate-800 space-y-3">
+        <AvisoVersionNueva visible={versionNueva} />
 
-        <SunmiButton onClick={handleSubmit}>
-          {label}
-        </SunmiButton>
+        <div className="flex justify-end gap-2">
+          <SunmiButton color="cyan" onClick={onCancel}>
+            Cancelar
+          </SunmiButton>
+
+          {/* Bloqueado mientras se verifica (evita el doble clic) y mientras
+              haya versión nueva sin recargar. */}
+          <SunmiButton onClick={handleSubmit} disabled={verificandoVersion || versionNueva}>
+            {verificandoVersion ? "Verificando…" : label}
+          </SunmiButton>
+        </div>
       </div>
     </>
   );

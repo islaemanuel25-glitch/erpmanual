@@ -14,6 +14,8 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiRow from "@/components/sunmi/SunmiRow";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import useVersionGuard from "@/hooks/useVersionGuard";
+import AvisoVersionNueva from "@/components/version/AvisoVersionNueva";
 import * as XLSX from 'xlsx';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +60,11 @@ export default function ActualizacionPreciosPage() {
 
   const { perfil } = useUser();
   const { loading: loadingCtx, needsContexto, contexto } = useContextoActivo();
+
+  // Guard de versión: las tres vías de aplicación (proveedor, Excel y margen
+  // masivo) escriben precios, así que las tres consultan /api/version fresco
+  // antes de mandar nada.
+  const { versionNueva, verificando: verificandoVersion, puedeGuardar } = useVersionGuard();
 
   // Estado compartido
   const [tab, setTab] = useState("proveedor");
@@ -328,6 +335,9 @@ export default function ActualizacionPreciosPage() {
       return;
     }
 
+    // Barrera de versión antes de cualquier escritura.
+    if (!(await puedeGuardar())) return;
+
     setApplying(true);
     try {
       const res = await fetch("/api/productos/precios/apply", {
@@ -534,6 +544,9 @@ export default function ActualizacionPreciosPage() {
       return;
     }
 
+    // Barrera de versión antes de cualquier escritura.
+    if (!(await puedeGuardar())) return;
+
     setApplyingExcel(true);
     try {
       const res = await fetch("/api/productos/precios/apply", {
@@ -652,6 +665,9 @@ export default function ActualizacionPreciosPage() {
     setMargenConfirmOpen(false);
     setErrorMsg("");
     setSuccessMsg("");
+
+    // Barrera de versión antes de cualquier escritura.
+    if (!(await puedeGuardar())) return;
 
     const items = margenItems.map((it) => ({
       productoBaseId: it.productoBaseId,
@@ -818,7 +834,7 @@ export default function ActualizacionPreciosPage() {
                       <SunmiButton
                         color="amber"
                         onClick={handleAplicar}
-                        disabled={applying || !itemsConCambios.length}
+                        disabled={applying || verificandoVersion || versionNueva || !itemsConCambios.length}
                       >
                         {applying
                           ? "Aplicando..."
@@ -1041,7 +1057,7 @@ export default function ActualizacionPreciosPage() {
                   <SunmiButton
                     color="amber"
                     onClick={handleAplicarExcel}
-                    disabled={applyingExcel}
+                    disabled={applyingExcel || verificandoVersion || versionNueva}
                   >
                     {applyingExcel
                       ? "Aplicando..."
@@ -1172,7 +1188,7 @@ export default function ActualizacionPreciosPage() {
                   <SunmiButton
                     color="amber"
                     onClick={() => setMargenConfirmOpen(true)}
-                    disabled={margenApplying}
+                    disabled={margenApplying || verificandoVersion || versionNueva}
                   >
                     {margenApplying
                       ? "Aplicando..."
@@ -1293,14 +1309,14 @@ export default function ActualizacionPreciosPage() {
                       <SunmiButton
                         color="amber"
                         onClick={handleMargenAplicar}
-                        disabled={margenApplying}
+                        disabled={margenApplying || verificandoVersion || versionNueva}
                       >
                         {margenApplying ? "Aplicando..." : "Confirmar"}
                       </SunmiButton>
                       <SunmiButton
                         color="slate"
                         onClick={() => setMargenConfirmOpen(false)}
-                        disabled={margenApplying}
+                        disabled={margenApplying || verificandoVersion || versionNueva}
                       >
                         Cancelar
                       </SunmiButton>
@@ -1310,6 +1326,9 @@ export default function ActualizacionPreciosPage() {
               )}
             </>
           )}
+
+          {/* Bundle viejo tras un deploy: bloquea la aplicación de precios. */}
+          <AvisoVersionNueva visible={versionNueva} />
 
           {/* Mensajes de error / exito */}
           {errorMsg && (

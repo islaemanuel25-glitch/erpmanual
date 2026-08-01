@@ -21,6 +21,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # SHA del commit desplegado. Debe pasarse en el build:
+        #   APP_BUILD_ID="$(git rev-parse HEAD)" \
+        #     docker compose -f docker-compose.prod.yml build app
+        # Se deja con default vacío para que `up`, `ps` y `logs` sigan
+        # funcionando sin la variable; quien exige el valor es el Dockerfile,
+        # vía REQUIRE_BUILD_ID, y solo durante el build.
+        APP_BUILD_ID: "${APP_BUILD_ID:-}"
+        REQUIRE_BUILD_ID: "1"
     container_name: erpazul_app
     restart: unless-stopped
     env_file:
