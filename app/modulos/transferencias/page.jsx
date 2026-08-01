@@ -50,9 +50,11 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 
+import SunmiTable from "@/components/sunmi/SunmiTable";
 import ColumnSettingsPanel from "@/components/transferencias/ColumnSettingsPanel";
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
 import CardTransferencia from "@/components/transferencias/CardTransferencia";
+import ReporteTransferenciasPorDestino from "@/components/transferencias/ReporteTransferenciasPorDestino";
 
 const TZ_AR = "America/Argentina/Cordoba";
 
@@ -95,6 +97,21 @@ const COLUMN_LABELS = {
   acciones: "Acción",
 };
 
+// Modos de visualización del listado (las tabs). Mismo par que Ventas:
+// documento por documento, o agrupado.
+const VISTAS = ["transferencia", "destino"];
+
+// Ordenamientos de la vista agrupada. Duplicados como literal —en vez de
+// importarlos de lib/— porque este archivo es un componente cliente y la lista
+// solo se usa para validar lo que vuelve de sessionStorage.
+const ORDENES_DESTINO = [
+  "mayorImporte",
+  "menorImporte",
+  "masTransferencias",
+  "masReciente",
+  "nombreAZ",
+];
+
 const COLUMNS_KEY = "transferencias-columns";
 const RETORNO_KEY = "transferencias:retorno";
 
@@ -124,6 +141,10 @@ function leerContextoRetorno() {
     // Sin esta marca la pantalla arranca vacía, que es el comportamiento por
     // defecto: solo un retorno legítimo reconstruye el reporte solo.
     generado: ctx.generado === true,
+    // Tab y orden también viajan: volver del detalle a "Por transferencia"
+    // cuando se salió desde "Por destino" pierde el contexto de lectura.
+    tab: VISTAS.includes(ctx.tab) ? ctx.tab : null,
+    orden: ORDENES_DESTINO.includes(ctx.orden) ? ctx.orden : null,
     estado: ESTADOS.some((e) => e.value === ctx.estado) ? ctx.estado : null,
     fechaDesde: esFecha(ctx.fechaDesde) ? ctx.fechaDesde : null,
     fechaHasta: esFecha(ctx.fechaHasta) ? ctx.fechaHasta : null,
@@ -139,6 +160,8 @@ function guardarContextoRetorno(ctx) {
       JSON.stringify({
         y: ctx.y,
         generado: ctx.generado,
+        tab: ctx.tab,
+        orden: ctx.orden,
         estado: ctx.estado,
         fechaDesde: ctx.fechaDesde,
         fechaHasta: ctx.fechaHasta,
@@ -188,6 +211,23 @@ function money(n) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+// `null` = ninguna línea del producto tiene recepción cargada → "—".
+// `0`    = se registró que no llegó nada                      → "0".
+// Los dos casos NO se colapsan: uno significa "todavía no se sabe" y el otro
+// "se sabe que no llegó".
+function cantidadOGuion(n) {
+  if (n === null || n === undefined) return "—";
+  return formatCantidad(n);
+}
+
+// Color de la diferencia: solo un faltante real merece alarma. Sin recepción
+// cargada no hay diferencia que juzgar.
+function claseDiferencia(n) {
+  if (n === null || n === undefined) return "sunmi-text-muted";
+  if (Number(n) > 0) return "sunmi-text-warning";
+  return "sunmi-text-muted";
 }
 
 // El contenedor scrolleable del layout es <main> (mismo criterio que Ventas).
@@ -240,6 +280,11 @@ export default function TransferenciasPage() {
   // seguiría siendo del mismo reporte que está viendo.
   const [filtrosVigentes, setFiltrosVigentes] = useState(null);
 
+  // Modo de visualización del listado, igual que las tabs de Ventas
+  // ("Por venta" / "Por cliente"). El inicial es "Por transferencia".
+  const [vista, setVista] = useState("transferencia");
+  const [ordenDestino, setOrdenDestino] = useState("mayorImporte");
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -247,6 +292,11 @@ export default function TransferenciasPage() {
   // listado). Contarlas sobre `items` daría cifras de la página visible, que no
   // cerrarían contra el total mostrado al lado.
   const [resumen, setResumen] = useState(RESUMEN_VACIO);
+  // Agregados del período completo, tal como los devuelve la API. La pantalla
+  // NO los recalcula desde `items`: `items` son 25 filas.
+  const [desgloseEstado, setDesgloseEstado] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [truncado, setTruncado] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -281,6 +331,8 @@ export default function TransferenciasPage() {
     // generado, la pantalla arranca vacía. No se consulta nada.
     if (!ctx || !ctx.generado) return;
     setScrollPendiente(ctx.y);
+    if (ctx.tab) setVista(ctx.tab);
+    if (ctx.orden) setOrdenDestino(ctx.orden);
     generarReporte({
       estado: ctx.estado ?? "",
       fechaDesde: ctx.fechaDesde ?? undefined,
@@ -315,6 +367,8 @@ export default function TransferenciasPage() {
     guardarContextoRetorno({
       y: el ? el.scrollTop : 0,
       generado: reporteGenerado,
+      tab: vista,
+      orden: ordenDestino,
       estado: f.estado,
       fechaDesde: f.fechaDesde,
       fechaHasta: f.fechaHasta,
@@ -360,6 +414,9 @@ export default function TransferenciasPage() {
         setTotalPages(1);
         setTotal(0);
         setResumen(RESUMEN_VACIO);
+        setDesgloseEstado([]);
+        setProductos([]);
+        setTruncado(false);
         return;
       }
 
@@ -367,6 +424,10 @@ export default function TransferenciasPage() {
       setTotalPages(json.totalPages || 1);
       setTotal(json.total || 0);
       setResumen({ ...RESUMEN_VACIO, ...(json.resumen || {}) });
+      // Los tres vienen calculados sobre el barrido completo del período.
+      setDesgloseEstado(json.resumenPorEstado || []);
+      setProductos(json.productosMasTransferidos || []);
+      setTruncado(json.truncado === true);
       setPage(pagina);
     } catch {
       setError("Error al cargar transferencias");
@@ -420,6 +481,10 @@ export default function TransferenciasPage() {
     setTotalPages(1);
     setTotal(0);
     setResumen(RESUMEN_VACIO);
+    setDesgloseEstado([]);
+    setProductos([]);
+    setTruncado(false);
+    setVista("transferencia");
     setPage(1);
     setError("");
   };
@@ -530,6 +595,18 @@ export default function TransferenciasPage() {
           `reporte && !loading`. */}
       {reporteGenerado && !loading && (
         <>
+      {/* Truncamiento explícito del período. Nunca en silencio. */}
+      {truncado && (
+        <div className="sunmi-state-warning sunmi-border rounded-lg px-3 py-2 flex items-start gap-2 text-[12px]">
+          <TriangleAlert size={15} className="shrink-0 mt-0.5 sunmi-text-warning" />
+          <span className="sunmi-text-strong">
+            El período supera las 5000 transferencias. El resumen, el desglose y los
+            productos se calcularon sobre las 5000 más recientes: acotá el rango de
+            fechas para ver el total completo.
+          </span>
+        </div>
+      )}
+
       {/* 2 · Resumen del período — misma grilla de métricas que el resumen
           financiero de Ventas: 2 columnas en móvil, 3 en md y 5 en xl, con la
           última destacada y ocupando el ancho sobrante en móvil. */}
@@ -571,7 +648,49 @@ export default function TransferenciasPage() {
         </div>
       </section>
 
-      {/* 3 · Transferencias del período — sección protagonista. El encabezado y
+      {/* 3 · Desglose por estado — bloque secundario, mismo lugar y misma
+          composición que "Desglose por forma de pago" en Ventas: SectionHead,
+          SunmiCard, overflow-x-auto y SunmiTable.
+
+          NO hay fila "Con diferencias": sería un estado inventado y rompería que
+          la columna Transferencias sume el total del período. Las diferencias
+          van como texto secundario debajo del nombre del estado, con el mismo
+          recurso tipográfico que la tabla de Ventas usa para Cliente / Ticket. */}
+      {desgloseEstado.length > 0 && (
+        <section className="space-y-2">
+          <SectionHead title="Desglose por estado" />
+          <SunmiCard>
+            <div className="overflow-x-auto">
+              <SunmiTable
+                headers={[
+                  "Estado",
+                  { label: "Transferencias", className: "text-center" },
+                  { label: "Ítems", className: "text-center" },
+                  { label: "Importe", className: "text-right" },
+                ]}
+              >
+                {desgloseEstado.map((f) => (
+                  <tr key={f.estado} className="sunmi-row-hover transition-colors border-t sunmi-divider">
+                    <td className="px-3 py-2.5">
+                      <div className="font-medium sunmi-text-strong">{f.estado}</div>
+                      {f.conDiferencias > 0 && (
+                        <div className="text-[11px] sunmi-text-warning">
+                          {f.conDiferencias} con diferencia{f.conDiferencias === 1 ? "" : "s"}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-center tabular-nums">{f.cantidadTransferencias}</td>
+                    <td className="px-3 py-2.5 text-center tabular-nums">{f.cantidadItems}</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{money(f.importeTotal)}</td>
+                  </tr>
+                ))}
+              </SunmiTable>
+            </div>
+          </SunmiCard>
+        </section>
+      )}
+
+      {/* 4 · Transferencias del período — sección protagonista. El encabezado y
           las acciones comparten fila, igual que el título de Ventas y sus tabs. */}
       <section className="space-y-2">
         <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -579,24 +698,57 @@ export default function TransferenciasPage() {
             title="Transferencias del período"
             subtitle={`${total} transferencia${total === 1 ? "" : "s"}`}
           />
-          {/* Mismo contenedor segmentado que usan las tabs de Ventas, para que la
-              acción quede alineada con el título y no suelta al costado. La
-              configuración de columnas aplica SOLO a la tabla desktop; en cards
-              la composición es fija, por eso se oculta debajo de lg. */}
-          <div className="hidden lg:inline-flex p-0.5 rounded-lg sunmi-surface-soft sunmi-border shrink-0">
-            <button
-              type="button"
-              onClick={() => setOpenCols((v) => !v)}
-              aria-expanded={openCols}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors inline-flex items-center gap-1.5 ${openCols ? "sunmi-pill-link shadow-sm" : "sunmi-text-muted hover:sunmi-text-strong"}`}
-            >
-              <Settings2 size={14} />
-              Columnas
-            </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Tabs segmentadas idénticas a las de Ventas (Por venta / Por cliente). */}
+            <div className="inline-flex p-0.5 rounded-lg sunmi-surface-soft sunmi-border shrink-0">
+              <button
+                type="button"
+                onClick={() => setVista("transferencia")}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${vista === "transferencia" ? "sunmi-pill-link shadow-sm" : "sunmi-text-muted hover:sunmi-text-strong"}`}
+              >
+                Por transferencia
+              </button>
+              <button
+                type="button"
+                onClick={() => setVista("destino")}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${vista === "destino" ? "sunmi-pill-link shadow-sm" : "sunmi-text-muted hover:sunmi-text-strong"}`}
+              >
+                Por destino
+              </button>
+            </div>
+
+            {/* Columnas solo aplica a la tabla de "Por transferencia": en el
+                agrupado no hay columnas que configurar, y en cards la
+                composición es fija (por eso también se oculta debajo de lg). */}
+            {vista === "transferencia" && (
+              <div className="hidden lg:inline-flex p-0.5 rounded-lg sunmi-surface-soft sunmi-border shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setOpenCols((v) => !v)}
+                  aria-expanded={openCols}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors inline-flex items-center gap-1.5 ${openCols ? "sunmi-pill-link shadow-sm" : "sunmi-text-muted hover:sunmi-text-strong"}`}
+                >
+                  <Settings2 size={14} />
+                  Columnas
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         <SunmiCard>
+          {/* Vista agrupada por destino. Se monta SOLO cuando la tab está
+              activa: el endpoint no se consulta mientras se mira la tabla. */}
+          {vista === "destino" && (
+            <ReporteTransferenciasPorDestino
+              filtros={filtrosVigentes}
+              orden={ordenDestino}
+              onOrdenChange={setOrdenDestino}
+              onVerTransferencia={irADetalle}
+            />
+          )}
+
+          {vista === "transferencia" && (<>
           {/* Panel integrado, sin overlay: se despliega DENTRO de la card, arriba
               de la tabla, y no bloquea la lectura. */}
           {openCols && (
@@ -662,8 +814,87 @@ export default function TransferenciasPage() {
               )}
             </>
           )}
+          </>)}
         </SunmiCard>
       </section>
+
+      {/* 5 · Productos más transferidos — mismo bloque de cierre que "Productos
+          más vendidos" en Ventas. Sale del barrido del período, no de la página.
+
+          Desktop: tabla desde md. Móvil: cards, para no obligar a scrollear en
+          horizontal una tabla de 5 columnas numéricas. */}
+      {productos.length > 0 && (
+        <section className="space-y-2">
+          <SectionHead
+            title="Productos más transferidos"
+            subtitle={`${productos.length} producto${productos.length === 1 ? "" : "s"} · ordenados por importe`}
+          />
+          <SunmiCard>
+            {/* Hasta 767 px: cards */}
+            <div className="md:hidden space-y-2">
+              {productos.map((p, idx) => (
+                <div key={p.productoId ?? `n${idx}`} className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 font-semibold sunmi-text-strong text-[14px] leading-tight">
+                      {p.nombre}
+                    </div>
+                    <div className="font-mono font-bold text-[15px] sunmi-text-strong whitespace-nowrap tabular-nums">
+                      {money(p.importeTransferido)}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-[12px]">
+                    <div>
+                      <div className="text-[10px] sunmi-text-muted">Enviada</div>
+                      <div className="tabular-nums sunmi-text-strong">{formatCantidad(p.cantidadEnviada)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] sunmi-text-muted">Recibida</div>
+                      <div className={`tabular-nums ${p.cantidadRecibida == null ? "sunmi-text-muted" : "sunmi-text-strong"}`}>
+                        {cantidadOGuion(p.cantidadRecibida)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] sunmi-text-muted">Diferencia</div>
+                      <div className={`tabular-nums ${claseDiferencia(p.diferencia)}`}>
+                        {cantidadOGuion(p.diferencia)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desde 768 px: tabla */}
+            <div className="hidden md:block overflow-x-auto">
+              <SunmiTable
+                headers={[
+                  "Producto",
+                  { label: "Enviada", className: "text-right" },
+                  { label: "Recibida", className: "text-right" },
+                  { label: "Diferencia", className: "text-right" },
+                  { label: "Importe transferido", className: "text-right" },
+                ]}
+              >
+                {productos.map((p, idx) => (
+                  <tr key={p.productoId ?? `n${idx}`} className="sunmi-row-hover transition-colors border-t sunmi-divider">
+                    <td className="px-3 py-2.5 font-medium truncate max-w-[260px]">{p.nombre}</td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums">{formatCantidad(p.cantidadEnviada)}</td>
+                    <td className={`px-3 py-2.5 text-right font-mono tabular-nums ${p.cantidadRecibida == null ? "sunmi-text-muted" : ""}`}>
+                      {cantidadOGuion(p.cantidadRecibida)}
+                    </td>
+                    <td className={`px-3 py-2.5 text-right font-mono tabular-nums ${claseDiferencia(p.diferencia)}`}>
+                      {cantidadOGuion(p.diferencia)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono tabular-nums sunmi-text-strong font-semibold">
+                      {money(p.importeTransferido)}
+                    </td>
+                  </tr>
+                ))}
+              </SunmiTable>
+            </div>
+          </SunmiCard>
+        </section>
+      )}
         </>
       )}
 

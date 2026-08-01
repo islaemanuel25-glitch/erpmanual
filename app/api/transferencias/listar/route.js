@@ -4,44 +4,23 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
-import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
 import { inicioDiaArgentina, finDiaArgentina } from "@/lib/fechas/rangoArgentina";
-// Misma escala entera que usa la recepción desplegada. Sumar cantidades con `+`
-// sobre Decimal→Number arrastra residuo binario a la tercera decimal; acá se
-// acumula en milésimas enteras y se convierte una sola vez al final.
-import { aMilesimas, desdeMilesimas } from "@/lib/transferencias/recepcion";
+// Agregados del período. Viven en lib/ —puros, sin Prisma— para que la regla que
+// importa se pueda probar: TODO agregado se calcula sobre el barrido completo,
+// nunca sobre `items`, que es solo la página visible. El mismo módulo lo usa
+// /api/transferencias/por-destino, así que las dos pantallas no pueden divergir.
+import {
+  importeDeDetalle,
+  importeDeDetalleCentavos,
+  cantidadesDeDetalle,
+  desdeCentavos,
+  resumenPorEstado,
+  productosMasTransferidos,
+  MAX_TRANSFERENCIAS,
+  MAX_PRODUCTOS,
+} from "@/lib/transferencias/agregadosPeriodo";
 
 const PAGE_SIZE = 25;
-
-// Importe de un remito a partir de su detalle. Vive suelto —y no dentro del
-// map— porque lo usan dos consumidores: la fila visible y el agregado del
-// período. Duplicar la fórmula haría que la métrica de arriba y la columna
-// "Importe" pudieran divergir.
-//
-// Misma semántica que /api/transferencias/detalle, del mismo helper: el costo se
-// baja a la escala de `unidadEnviada`, y la cantidad que valoriza es la recibida
-// cuando hay recepción cargada (incluido 0) o la enviada si todavía no la hay.
-function importeDeDetalle(detalle = []) {
-  return detalle.reduce((acc, d) => {
-    const precioCosto =
-      d.precioCosto ??
-      d.producto?.precio_costo ??
-      d.producto?.base?.precio_costo ??
-      0;
-
-    const { subtotal } = valorizarDetalle(
-      {
-        cantidad: d.cantidad,
-        recibido: d.recibido,
-        unidadEnviada: d.unidadEnviada,
-        precioCosto,
-      },
-      d.producto?.base
-    );
-
-    return acc + subtotal;
-  }, 0);
-}
 
 export async function GET(req) {
   try {
@@ -115,11 +94,23 @@ export async function GET(req) {
       recibido: true,
       precioCosto: true,
       unidadEnviada: true,
+      // `productoId` y los dos nombres alimentan "Productos más transferidos".
+      // El join a producto→base YA existía para valorizar (precio_costo,
+      // unidad_medida, factor_pack): pedir `nombre` no agrega una consulta, solo
+      // dos columnas al mismo SELECT. Sin esto habría que resolver los nombres
+      // aparte, una vez por producto, que es exactamente el N+1 a evitar.
+      productoId: true,
       producto: {
         select: {
           precio_costo: true,
+          nombre: true,
           base: {
-            select: { precio_costo: true, unidad_medida: true, factor_pack: true },
+            select: {
+              precio_costo: true,
+              unidad_medida: true,
+              factor_pack: true,
+              nombre: true,
+            },
           },
         },
       },
@@ -155,12 +146,27 @@ export async function GET(req) {
 
       prisma.transferencia.count({ where: { ...where, tieneDiferencias: true } }),
 
-      // Importe del período: mismo `where`, sin paginar y sin traer relaciones
-      // que no valorizan (origen/destino/id). Es el único agregado que no puede
-      // resolverse con un count porque el costo depende de la unidad enviada.
+      // BARRIDO DEL PERÍODO. Mismo `where` que el listado, SIN skip/take: de acá
+      // salen el importe total, el desglose por estado y los productos más
+      // transferidos. Es una sola consulta para los tres bloques.
+      //
+      // `estado` y `tieneDiferencias` se agregaron al select porque el desglose
+      // los necesita por transferencia; antes alcanzaba con el detalle porque el
+      // único agregado era el importe.
+      //
+      // Techo defensivo con el mismo criterio que /api/reportes-ventas/por-cliente:
+      // si el rango supera MAX_TRANSFERENCIAS se corta y se avisa con `truncado`.
+      // Preferimos un reporte explícitamente parcial antes que una consulta que
+      // tumbe el proceso — pero nunca en silencio.
       prisma.transferencia.findMany({
         where,
-        select: { detalle: { select: selectValorizacion } },
+        orderBy: { createdAt: "desc" },
+        take: MAX_TRANSFERENCIAS,
+        select: {
+          estado: true,
+          tieneDiferencias: true,
+          detalle: { select: selectValorizacion },
+        },
       }),
     ]);
 
@@ -197,18 +203,7 @@ export async function GET(req) {
       // documento, no de unidades físicas: un remito con bultos y unidades suma
       // ambos. Convertir a unidades físicas cambiaría el número que el detalle
       // ya viene mostrando.
-      let enviadaM = 0;
-      let recibidaM = null;
-
-      t.detalle.forEach((d) => {
-        const envM = aMilesimas(d.cantidad);
-        if (envM !== null) enviadaM += envM;
-
-        if (d.recibido != null) {
-          const recM = aMilesimas(d.recibido);
-          if (recM !== null) recibidaM = (recibidaM ?? 0) + recM;
-        }
-      });
+      const { cantidadEnviada, cantidadRecibida } = cantidadesDeDetalle(t.detalle);
 
       return {
         id: t.id,
@@ -224,21 +219,32 @@ export async function GET(req) {
         // leía como `undefined` y mostraba "Correcta" en TODA transferencia
         // recibida, incluidas las que tenían faltantes.
         tieneDiferencias: t.tieneDiferencias === true,
-        cantidadEnviada: desdeMilesimas(enviadaM),
-        cantidadRecibida: recibidaM === null ? null : desdeMilesimas(recibidaM),
+        cantidadEnviada,
+        cantidadRecibida,
         totalCosto: importeDeDetalle(t.detalle),
         // Autor del remito, para el subtítulo de la columna "Transferencia".
         creadaPorNombre: nombrePorCreador.get(t.creadaPor) || null,
       };
     });
 
+    // ======================================
+    // AGREGADOS DEL PERÍODO
+    //
+    // Los tres salen de `valorizacionPeriodo` —el barrido sin paginar—, nunca de
+    // `items`, que trae 25 filas. Calcularlos sobre `items` haría que el
+    // desglose cambiara al pasar de página.
+    // ======================================
+    const truncado = valorizacionPeriodo.length >= MAX_TRANSFERENCIAS;
+
     // Importe de TODO el período filtrado. Antes esta clave sumaba solo la
     // página visible pese a llamarse "global": con más de 25 resultados el
     // importe cambiaba al pasar de página.
-    const totalCostoGlobal = valorizacionPeriodo.reduce(
-      (acc, t) => acc + importeDeDetalle(t.detalle),
-      0
+    const totalCostoGlobal = desdeCentavos(
+      valorizacionPeriodo.reduce((acc, t) => acc + importeDeDetalleCentavos(t.detalle), 0)
     );
+
+    const desgloseEstado = resumenPorEstado(valorizacionPeriodo);
+    const productos = productosMasTransferidos(valorizacionPeriodo, MAX_PRODUCTOS);
 
     const cuentaEstado = (nombre) =>
       porEstado.find((g) => g.estado === nombre)?._count?._all || 0;
@@ -258,6 +264,15 @@ export async function GET(req) {
         conDiferencias,
         importeTotal: totalCostoGlobal,
       },
+      // Una fila por estado realmente presente. `conDiferencias` viaja DENTRO de
+      // la fila (solo es informativo en "Recibida"): no es un estado ni una fila
+      // aparte, así la columna de transferencias sigue sumando `total`.
+      resumenPorEstado: desgloseEstado,
+      // Agrupado por producto real de TODO el período, ordenado por importe.
+      productosMasTransferidos: productos,
+      // El barrido llegó al techo: el reporte es parcial y la UI tiene que
+      // decirlo. Nunca truncar en silencio.
+      truncado,
       error: null,
     });
 
