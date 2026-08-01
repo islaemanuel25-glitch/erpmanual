@@ -22,6 +22,7 @@ import {
   agruparPorDestino,
   ordenarDestinos,
   totalesDeDestinos,
+  recortarPeriodo,
   ORDEN_DESTINO_DEFAULT,
   ORDENES_DESTINO,
   MAX_TRANSFERENCIAS,
@@ -88,10 +89,15 @@ export async function GET(req) {
     // Un solo findMany para todo el agrupado. Los nombres de origen y destino
     // vienen por join en la misma consulta: resolverlos después, por grupo,
     // sería el N+1 que hay que evitar.
-    const transferencias = await prisma.transferencia.findMany({
+    //
+    // MAX + 1 a propósito: con `take: MAX` un período de exactamente MAX
+    // devuelve MAX filas igual que uno de MAX + 500, y se marcaría como
+    // truncado sin faltarle nada. La fila extra distingue los dos casos y
+    // después se descarta.
+    const resultados = await prisma.transferencia.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: MAX_TRANSFERENCIAS,
+      take: MAX_TRANSFERENCIAS + 1,
       select: {
         id: true,
         estado: true,
@@ -120,14 +126,18 @@ export async function GET(req) {
       },
     });
 
-    const grupos = ordenarDestinos(agruparPorDestino(transferencias), orden);
+    // Estrictamente MAYOR: recibir MAX filas de MAX + 1 pedidas significa que el
+    // período entra completo. La fila extra se descarta antes de agrupar.
+    const { truncado, periodo } = recortarPeriodo(resultados, MAX_TRANSFERENCIAS);
+
+    const grupos = ordenarDestinos(agruparPorDestino(periodo), orden);
 
     return NextResponse.json({
       ok: true,
       orden,
       destinos: grupos,
       totales: totalesDeDestinos(grupos),
-      truncado: transferencias.length >= MAX_TRANSFERENCIAS,
+      truncado,
       error: null,
     });
   } catch (err) {

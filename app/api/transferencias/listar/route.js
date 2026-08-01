@@ -16,6 +16,7 @@ import {
   desdeCentavos,
   resumenPorEstado,
   productosMasTransferidos,
+  recortarPeriodo,
   MAX_TRANSFERENCIAS,
   MAX_PRODUCTOS,
 } from "@/lib/transferencias/agregadosPeriodo";
@@ -154,14 +155,19 @@ export async function GET(req) {
       // los necesita por transferencia; antes alcanzaba con el detalle porque el
       // único agregado era el importe.
       //
-      // Techo defensivo con el mismo criterio que /api/reportes-ventas/por-cliente:
-      // si el rango supera MAX_TRANSFERENCIAS se corta y se avisa con `truncado`.
-      // Preferimos un reporte explícitamente parcial antes que una consulta que
-      // tumbe el proceso — pero nunca en silencio.
+      // Techo defensivo: si el rango supera MAX_TRANSFERENCIAS se corta y se
+      // avisa con `truncado`. Preferimos un reporte explícitamente parcial antes
+      // que una consulta que tumbe el proceso — pero nunca en silencio.
+      //
+      // Se piden MAX + 1 a propósito. Con `take: MAX` no hay forma de saber si
+      // el período tenía exactamente MAX o más: en los dos casos vuelven MAX
+      // filas, y un período de exactamente 5000 se marcaría como truncado sin
+      // faltarle nada. La fila extra es la que responde esa pregunta; después se
+      // descarta y los agregados se calculan sobre las primeras MAX.
       prisma.transferencia.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        take: MAX_TRANSFERENCIAS,
+        take: MAX_TRANSFERENCIAS + 1,
         select: {
           estado: true,
           tieneDiferencias: true,
@@ -234,17 +240,20 @@ export async function GET(req) {
     // `items`, que trae 25 filas. Calcularlos sobre `items` haría que el
     // desglose cambiara al pasar de página.
     // ======================================
-    const truncado = valorizacionPeriodo.length >= MAX_TRANSFERENCIAS;
+    // Decide truncamiento y descarta la fila sonda. La comparación es
+    // estrictamente MAYOR: recibir MAX de MAX + 1 pedidas significa que el
+    // período entra completo.
+    const { truncado, periodo } = recortarPeriodo(valorizacionPeriodo, MAX_TRANSFERENCIAS);
 
     // Importe de TODO el período filtrado. Antes esta clave sumaba solo la
     // página visible pese a llamarse "global": con más de 25 resultados el
     // importe cambiaba al pasar de página.
     const totalCostoGlobal = desdeCentavos(
-      valorizacionPeriodo.reduce((acc, t) => acc + importeDeDetalleCentavos(t.detalle), 0)
+      periodo.reduce((acc, t) => acc + importeDeDetalleCentavos(t.detalle), 0)
     );
 
-    const desgloseEstado = resumenPorEstado(valorizacionPeriodo);
-    const productos = productosMasTransferidos(valorizacionPeriodo, MAX_PRODUCTOS);
+    const desgloseEstado = resumenPorEstado(periodo);
+    const productos = productosMasTransferidos(periodo, MAX_PRODUCTOS);
 
     const cuentaEstado = (nombre) =>
       porEstado.find((g) => g.estado === nombre)?._count?._all || 0;
