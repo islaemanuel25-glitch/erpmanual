@@ -1,104 +1,63 @@
 "use client";
 
-// Encabezado del detalle. Muestra quién envió y quién recibió, las fechas en
-// hora argentina explícita y el estado con el mismo mapeo visual que el listado.
+// Sección "Información general" del detalle de transferencia.
+//
+// Calca el primer bloque de components/reportes-ventas/VentaDetalleAdmin.jsx:
+// `section space-y-2` con SectionHead + SunmiCard, y adentro la grilla
+// `grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-x-4 gap-y-3` de campos
+// label-muted / valor-fuerte.
+//
+// Ya NO lleva los botones de PDF ni el ticket: esas acciones se mudaron a la
+// card de acciones que va arriba, igual que AccionesTicket en "Ver venta".
+// Tampoco lleva su propio título ni el badge de estado: eso vive en la franja
+// de encabezado de la página.
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-import SunmiButton from "@/components/sunmi/SunmiButton";
-import EstadoTransferenciaBadge, { DiferenciasBadge } from "./EstadoTransferenciaBadge";
+import EstadoTransferenciaBadge from "./EstadoTransferenciaBadge";
+import { SectionHead, Campo, fmtFechaHoraAR } from "./detallePresentacion";
 
-const TZ_AR = "America/Argentina/Cordoba";
-
-// Antes se usaba `toLocaleString()` sin zona: la hora dependía del huso del
-// navegador, así que la misma transferencia se leía distinto en un equipo con
-// otra configuración regional.
-function fechaHoraAR(iso) {
-  if (!iso) return "—";
-  const d = iso instanceof Date ? iso : new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-}
-
-function Dato({ label, children }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[11px] sunmi-text-muted leading-tight">{label}</div>
-      <div className="text-[13px] sunmi-text-strong leading-tight break-words">{children}</div>
-    </div>
-  );
-}
-
-export default function TransferenciaHeader({ item, id, me }) {
+export default function TransferenciaHeader({ item }) {
   if (!item) return null;
-
-  const handleImprimirTicket = async () => {
-    const { default: imprimirTicketTransferencia } = await import(
-      "@/lib/transferencias/imprimirTicketTransferencia"
-    );
-    imprimirTicketTransferencia(item, me);
-  };
 
   const confirmadores = Array.isArray(item.confirmadores) ? item.confirmadores : [];
 
   return (
-    <div className="space-y-2">
-      {/* BOTONES PDF + TICKET POS */}
-      <div className="flex flex-wrap gap-2 px-2 py-2">
-        <a href={`/api/transferencias/pdf?id=${id}`} target="_blank">
-          <SunmiButton color="amber">PDF Envío</SunmiButton>
-        </a>
-        <a href={`/api/transferencias/pdf-recepcion?id=${id}`} target="_blank">
-          <SunmiButton color="cyan">PDF Recepción</SunmiButton>
-        </a>
-        <SunmiButton color="slate" onClick={handleImprimirTicket}>
-          Imprimir ticket POS
-        </SunmiButton>
-      </div>
+    <section className="space-y-2">
+      <SectionHead title="Información general" />
+      <SunmiCard>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-x-4 gap-y-3">
+          <Campo label="Transferencia">
+            <span className="font-mono">#{item.id}</span>
+          </Campo>
 
-      <SunmiSeparator label="Datos generales" />
+          <Campo label="Origen → destino" className="col-span-2">
+            {item.origen?.nombre || "—"}
+            {item.origen?.esDeposito && (
+              <span className="sunmi-text-accent text-[11px] font-normal ml-1">(Dep.)</span>
+            )}
+            <span className="sunmi-text-muted font-normal"> → </span>
+            {item.destino?.nombre || "—"}
+          </Campo>
 
-      <SunmiCard className="mx-1 p-3 space-y-3">
-        {/* Encabezado: número + estado */}
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <div className="text-base font-bold sunmi-text-strong leading-tight">
-              Transferencia #{item.id}
-            </div>
-            <div className="text-[12px] sunmi-text-muted leading-tight truncate">
-              {item.origen?.nombre || "—"}
-              {item.origen?.esDeposito && (
-                <span className="sunmi-text-accent text-[10px] ml-1">(Dep.)</span>
-              )}
-              {" → "}
-              {item.destino?.nombre || "—"}
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+          <Campo label="Creada">
+            <span className="tabular-nums">{fmtFechaHoraAR(item.fechaCreada)}</span>
+          </Campo>
+          <Campo label="Envío">
+            <span className="tabular-nums">{fmtFechaHoraAR(item.fechaEnvio)}</span>
+          </Campo>
+          <Campo label="Recepción">
+            <span className="tabular-nums">{fmtFechaHoraAR(item.fechaRecepcion)}</span>
+          </Campo>
+
+          <Campo label="Estado">
             <EstadoTransferenciaBadge estado={item.estado} />
-            <DiferenciasBadge estado={item.estado} tieneDiferencias={item.tieneDiferencias} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t sunmi-divider">
-          <Dato label="Enviada por">{item.creadaPor?.nombre || "—"}</Dato>
-          <Dato label={confirmadores.length > 1 ? "Recibida por" : "Recibida por"}>
-            {confirmadores.length
-              ? confirmadores.map((u) => u.nombre).join(", ")
-              : "—"}
-          </Dato>
-          <Dato label="Creada">{fechaHoraAR(item.fechaCreada)}</Dato>
-          <Dato label="Envío">{fechaHoraAR(item.fechaEnvio)}</Dato>
-          <Dato label="Recepción">{fechaHoraAR(item.fechaRecepcion)}</Dato>
+          </Campo>
+          <Campo label="Enviada por">{item.creadaPor?.nombre || "—"}</Campo>
+          <Campo label="Recibida por">
+            {confirmadores.length ? confirmadores.map((u) => u.nombre).join(", ") : "—"}
+          </Campo>
         </div>
       </SunmiCard>
-    </div>
+    </section>
   );
 }
