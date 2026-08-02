@@ -57,6 +57,7 @@ export async function GET(req) {
         apertura: true,
         cierre: true,
         diferenciaEfectivo: true,
+        anuladoEn: true,
         montoEsperadoEfectivo: true,
         montoRealEfectivo: true,
         operador: { select: { id: true, nombre: true } },
@@ -99,7 +100,11 @@ export async function GET(req) {
       const va = ventasMap.get(vid);
       const tList = turnosPorVendedor.get(vid) || [];
 
-      const turnosCerrados = tList.filter((t) => t.cierre !== null);
+      // Un turno ANULADO no es un cierre: se abrió por error o para probar y nunca
+      // hubo plata ni conteo. Contarlo acá le sumaría a esta persona un cierre que
+      // no hizo, y su diferencia (NULL) ensuciaría la métrica.
+      const turnosCerrados = tList.filter((t) => t.cierre !== null && t.anuladoEn == null);
+      const turnosAnulados = tList.filter((t) => t.anuladoEn != null).length;
       const diferenciaTotal = turnosCerrados.reduce(
         (acc, t) => acc + (Number(t.diferenciaEfectivo) || 0), 0
       );
@@ -138,7 +143,9 @@ export async function GET(req) {
         // Turnos
         turnosTrabajados: tList.length,
         turnosCerrados: turnosCerrados.length,
-        turnosAbiertos: tList.length - turnosCerrados.length,
+        turnosAbiertos: tList.filter((t) => t.cierre === null).length,
+        // Se informan aparte: son auditables, pero no son cierres de esta persona.
+        turnosAnulados,
         cierresConDiferencia,
         diferenciaTotal: Number(diferenciaTotal.toFixed(2)),
         // Detalle de turnos

@@ -47,6 +47,8 @@ export async function GET(req) {
         vendedor: { select: { id: true, nombre: true, email: true } },
         operador: { select: { id: true, nombre: true } },
         cerradoPor: { select: { id: true, nombre: true, email: true } },
+        anuladoEn: true,
+        motivoAnulacion: true,
         cajaMovimientos: {
           orderBy: { createdAt: "asc" },
           select: {
@@ -149,6 +151,7 @@ export async function GET(req) {
       });
 
       const montoInicial = Number(t.montoInicial) || 0;
+      const esAnulado = t.anuladoEn != null;
       const esCerrado = t.cierre !== null;
 
       // Para turnos cerrados usamos datos persistidos; para abiertos calculamos en vivo
@@ -164,7 +167,10 @@ export async function GET(req) {
 
       return {
         turnoId: t.id,
-        estado: esCerrado ? "cerrado" : "abierto",
+        // Estado propio: un turno anulado NO es una caja operativa válida.
+        estado: esAnulado ? "anulado" : esCerrado ? "cerrado" : "abierto",
+        anulado: esAnulado,
+        motivoAnulacion: t.motivoAnulacion ?? null,
         apertura: t.apertura,
         cierre: t.cierre,
         responsable: t.vendedor,

@@ -1079,6 +1079,24 @@ model Turno {
   /// Inverso denormalizado: qué turno se llevó el fondo que dejó ESTE cierre.
   fondoConsumidoEnTurnoId  Int?
 
+  // ── ANULACIÓN TÉCNICA ──────────────────────────────────────────────────────
+  //
+  // Un turno que se abrió por error o para probar el sistema NO es un cierre: no
+  // hubo plata, no hubo conteo y no hubo diferencia. Cerrarlo como si fuera uno
+  // normal obliga a inventar un contado —y con un fondo ficticio de $230.000 eso
+  // significaba fabricar un faltante de $230.000 que nadie debe—.
+  //
+  // Con la marca, el turno se conserva ENTERO y auditable: la fila no se borra,
+  // `montoInicial` no se pisa (es la evidencia de qué se cargó) y los importes de
+  // cierre quedan en NULL, que significa "no se contó" y no "contó cero".
+  //
+  // Mismo patrón que ya usa el modelo en EstadoPedidoProveedor.ANULADO +
+  // fechaAnulado. Las vistas los muestran como "Anulado" y los excluyen de las
+  // métricas de caja, pero siguen listándose.
+  anuladoEn       DateTime?
+  anuladoPorId    Int?
+  motivoAnulacion String?
+
   observaciones String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

@@ -188,7 +188,14 @@ export default function TurnosPage() {
                   </td>
                   <td className="px-3 py-2 text-sm">{fmtFecha(t.apertura)}</td>
                   <td className="px-3 py-2 text-sm">
-                    {t.cierre ? (
+                    {/* Un turno ANULADO se cerró para liberar el local, pero no fue
+                        un cierre de caja. Se marca como tal para que nadie lo lea
+                        como una caja válida; sigue listado y auditable. */}
+                    {t.anuladoEn ? (
+                      <span className="sunmi-text-warning font-semibold" title={t.motivoAnulacion || ""}>
+                        Anulado
+                      </span>
+                    ) : t.cierre ? (
                       fmtFecha(t.cierre)
                     ) : (
                       <span className="sunmi-text-success font-semibold">Abierto</span>

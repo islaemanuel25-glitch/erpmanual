@@ -91,6 +91,8 @@ export async function GET(req) {
         observacionFondoApertura: true,
         fondoOrigenTurnoId: true,
         fondoConsumidoEnTurnoId: true,
+        anuladoEn: true,
+        motivoAnulacion: true,
         vendedor: {
           select: { id: true, nombre: true, email: true },
         },
@@ -122,6 +124,9 @@ export async function GET(req) {
       observacionFondoApertura: t.observacionFondoApertura,
       fondoOrigenTurnoId: t.fondoOrigenTurnoId,
       fondoConsumidoEnTurnoId: t.fondoConsumidoEnTurnoId,
+      // Anulación técnica: el turno se muestra, pero no como un cierre válido.
+      anuladoEn: t.anuladoEn,
+      motivoAnulacion: t.motivoAnulacion,
       vendedor: t.vendedor,
     }));
 

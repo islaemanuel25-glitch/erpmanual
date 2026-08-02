@@ -35,6 +35,26 @@ function Cifra({ etiqueta, valor, clase = "", grande = false, signo = false }) {
 export function ResultadoCierre({ turno }) {
   const esperado = turno?.montoEsperadoEfectivo;
   const contado = turno?.montoRealEfectivo;
+
+  // ANULADO: no hubo caja. Mostrar "Caja correcta" o una diferencia de $0 sería
+  // afirmar que se contó y dio bien; acá no se contó nada porque no había plata.
+  if (turno?.anuladoEn) {
+    return (
+      <SunmiCard>
+        <h2 className="text-base font-bold mb-2">Resultado del cierre</h2>
+        <div className="text-2xl sm:text-3xl font-bold mb-2 sunmi-text-warning">Turno anulado</div>
+        <p className="text-sm sunmi-text-muted leading-snug">
+          {turno.motivoAnulacion ||
+            "Este turno fue anulado administrativamente y no registra un cierre de caja."}
+        </p>
+        <p className="text-[12px] sunmi-text-muted mt-2 leading-snug">
+          No hubo conteo de efectivo, así que no tiene esperado, contado ni diferencia. Se conserva
+          para poder auditarlo.
+        </p>
+      </SunmiCard>
+    );
+  }
+
   const r = resultadoCierre({ esperado, contado });
 
   if (!r.cerrado) {

@@ -38,6 +38,9 @@ export async function GET(req) {
         vendedor: { select: { id: true, nombre: true, email: true } },
         operador: { select: { id: true, nombre: true } },
         cerradoPor: { select: { id: true, nombre: true, email: true } },
+        anuladoEn: true,
+        anuladoPorId: true,
+        motivoAnulacion: true,
         cajaMovimientos: {
           orderBy: { createdAt: "asc" },
           select: {

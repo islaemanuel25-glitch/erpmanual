@@ -60,6 +60,8 @@ export async function GET(req) {
         observacionFondoApertura: true,
         fondoOrigenTurnoId: true,
         fondoConsumidoEnTurnoId: true,
+        anuladoEn: true,
+        motivoAnulacion: true,
         vendedor: {
           select: { id: true, nombre: true },
         },
@@ -134,6 +136,8 @@ export async function GET(req) {
         observacionFondoApertura: turno.observacionFondoApertura ?? null,
         fondoOrigenTurnoId: turno.fondoOrigenTurnoId ?? null,
         fondoConsumidoEnTurnoId: turno.fondoConsumidoEnTurnoId ?? null,
+        anuladoEn: turno.anuladoEn,
+        motivoAnulacion: turno.motivoAnulacion,
       },
       ventas: ventas.map((v) => ({
         id: v.id,
