@@ -314,10 +314,18 @@ export default function TurnoDetallePage() {
   const totalVentas =
     (resumen?.totalEfectivo || 0) + (resumen?.totalDigital || 0);
 
-  const totalIngresos = movimientos
+  // El RETIRO DE CIERRE se saca de estos totales. Ocurre DESPUÉS del conteo, así
+  // que no forma parte del efectivo esperado: si entrara, la tarjeta "Cómo se
+  // calculó" mostraría una cuenta que no cierra contra su propio total (con un
+  // retiro de cierre de $70.500 se leía "− Retiros $82.500" arriba de un esperado
+  // de $80.500). Se muestra aparte, en "Entrega del efectivo".
+  const movimientosPrevios = movimientos.filter(
+    (m) => m.id !== (turno?.retiroCierreMovimientoId ?? null)
+  );
+  const totalIngresos = movimientosPrevios
     .filter((m) => m.tipo === "INGRESO")
     .reduce((s, m) => s + m.monto, 0);
-  const totalRetiros = movimientos
+  const totalRetiros = movimientosPrevios
     .filter((m) => m.tipo === "RETIRO")
     .reduce((s, m) => s + m.monto, 0);
 
@@ -428,9 +436,10 @@ export default function TurnoDetallePage() {
           )}
         </div>
 
-        {movimientos.length === 0 ? (
+        {movimientosPrevios.length === 0 ? (
           <p className="text-sm sunmi-text-muted mt-2">
-            No se registraron ingresos ni retiros de caja.
+            No se registraron ingresos ni retiros de caja durante el turno.
+            {turno?.retiroCierreMovimientoId != null && " El retiro del cierre se muestra en “Entrega del efectivo”."}
           </p>
         ) : (
           <>
@@ -455,12 +464,12 @@ export default function TurnoDetallePage() {
             >
               {verMovimientos
                 ? "Ocultar movimientos"
-                : `Ver movimientos de caja (${movimientos.length})`}
+                : `Ver movimientos de caja (${movimientosPrevios.length})`}
             </SunmiButton>
 
             {verMovimientos && (
               <div className="mt-3 space-y-2">
-                {movimientos.map((m) => (
+                {movimientosPrevios.map((m) => (
                   <div key={m.id} className="rounded-lg sunmi-surface-soft p-3">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-sm font-bold">

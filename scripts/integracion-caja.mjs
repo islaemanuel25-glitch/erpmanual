@@ -309,10 +309,17 @@ async function main() {
   chequear("G1 · el turno 170 histórico conserva sus cifras", money(hist.montoEsperadoEfectivo) === 19400 && money(hist.montoRealEfectivo) === 9400);
   chequear("G2 · sus campos nuevos siguen en NULL, no en cero",
     hist.efectivoRetiradoCierre === null && hist.fondoDejadoCierre === null && hist.fondoOrigenTurnoId === null);
-  const historicosConValor = await prisma.turno.count({
-    where: { id: { lt: turnoA.id }, OR: [{ efectivoRetiradoCierre: { not: null } }, { fondoDejadoCierre: { not: null } }] },
+  // La migración no rellenó nada: un turno solo puede tener los campos del
+  // CIERRE si además pasó por la apertura nueva. Comprobarlo así es robusto —
+  // antes se comparaba contra un rango de ids y cualquier turno de prueba
+  // sembrado antes lo hacía fallar sin que hubiera defecto.
+  const rellenadosPorLaMigracion = await prisma.turno.count({
+    where: {
+      fondoSugeridoApertura: null,
+      OR: [{ efectivoRetiradoCierre: { not: null } }, { fondoDejadoCierre: { not: null } }],
+    },
   });
-  chequear("G3 · ningún turno previo fue modificado por la migración", historicosConValor === 0, `con valor: ${historicosConValor}`);
+  chequear("G3 · la migración no rellenó ningún turno existente", rellenadosPorLaMigracion === 0, );
 
   // ── Limpieza ─────────────────────────────────────────────────────────────
   const idsTurnos = (await prisma.turno.findMany({ where: { localId: { in: [localA.id, localB.id] } }, select: { id: true } })).map((t) => t.id);

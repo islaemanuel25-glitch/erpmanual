@@ -82,7 +82,7 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
         <div>
-          <div className="text-[11px] sunmi-text-muted leading-tight">Arqueos</div>
+          <div className="text-[11px] sunmi-text-muted leading-tight">Cortes</div>
           <div className="text-lg font-bold tabular-nums">{r.cantidad}</div>
         </div>
         <div>

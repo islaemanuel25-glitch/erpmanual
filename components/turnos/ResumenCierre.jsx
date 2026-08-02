@@ -18,12 +18,14 @@ import { resultadoCierre, pistaFondoOmitido, CAJA_CORRECTA, CAJA_SOBRANTE } from
 const fmt = (n) =>
   Number(n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function Cifra({ etiqueta, valor, clase = "", grande = false }) {
+function Cifra({ etiqueta, valor, clase = "", grande = false, signo = false }) {
+  const n = Number(valor) || 0;
+  const prefijo = signo && n > 0 ? "+" : "";
   return (
     <div className="min-w-0">
       <div className="text-[11px] sunmi-text-muted leading-tight">{etiqueta}</div>
       <div className={`font-bold tabular-nums ${grande ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"} ${clase}`}>
-        ${fmt(valor)}
+        {prefijo}${fmt(valor)}
       </div>
     </div>
   );
@@ -52,6 +54,8 @@ export function ResultadoCierre({ turno }) {
         : "sunmi-text-danger";
 
   const pista = pistaFondoOmitido({ esperado, contado, montoInicial: turno?.montoInicial });
+  // Con signo: negativo si falta, positivo si sobra. Dice de qué lado está.
+  const diferenciaConSigno = Number(contado ?? 0) - Number(esperado ?? 0);
 
   return (
     <SunmiCard>
@@ -63,12 +67,11 @@ export function ResultadoCierre({ turno }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Cifra etiqueta="Había que tener" valor={esperado} />
         <Cifra etiqueta="Se contó" valor={contado} />
-        <Cifra
-          etiqueta={r.estado === CAJA_CORRECTA ? "Diferencia" : r.estado === CAJA_SOBRANTE ? "Sobran" : "Faltan"}
-          valor={r.estado === CAJA_CORRECTA ? 0 : r.monto}
-          clase={tono}
-          grande
-        />
+        {/* El título ya dice "Sobran $62.500". Repetir acá el mismo número con la
+            misma etiqueta era exactamente la duplicación que este rediseño vino a
+            sacar: la tercera cifra muestra la diferencia CON SIGNO, que es dato
+            nuevo (de qué lado está) y no una copia del encabezado. */}
+        <Cifra etiqueta="Diferencia" valor={diferenciaConSigno} clase={tono} grande signo />
       </div>
 
       <p className="text-[12px] sunmi-text-muted mt-3 leading-snug">{r.explicacion}</p>
