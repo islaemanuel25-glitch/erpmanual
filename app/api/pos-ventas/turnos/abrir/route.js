@@ -37,6 +37,10 @@ export async function GET(req) {
           cierre: { not: null },
           fondoDejadoCierre: { not: null },
           fondoConsumidoEnTurnoId: null,
+          // Un turno ANULADO no entrega fondo: se abrió por error o para probar y nunca
+          // hubo plata. Sin esto, una anulación con fondo 0 se ofrecía como "el cierre
+          // anterior dejó $0" y encima consumía el eslabón de la cadena.
+          anuladoEn: null,
         },
         orderBy: { cierre: "desc" },
         select: { id: true, fondoDejadoCierre: true, cierre: true, cerradoPor: { select: { nombre: true } } },
@@ -163,6 +167,10 @@ export async function POST(req) {
         cierre: { not: null },
         fondoDejadoCierre: { not: null },
         fondoConsumidoEnTurnoId: null,
+        // Un turno ANULADO no entrega fondo: se abrió por error o para probar y nunca
+        // hubo plata. Sin esto, una anulación con fondo 0 se ofrecía como "el cierre
+        // anterior dejó $0" y encima consumía el eslabón de la cadena.
+        anuladoEn: null,
       },
       orderBy: { cierre: "desc" },
       select: { id: true, fondoDejadoCierre: true, cierre: true },
