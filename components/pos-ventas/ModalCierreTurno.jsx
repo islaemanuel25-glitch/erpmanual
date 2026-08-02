@@ -91,8 +91,20 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
 
   const totalIngresos = Number(resumen.totalIngresosCaja) || 0;
   const totalRetiros = Number(resumen.totalRetirosCaja) || 0;
+
+  // El esperado lo calcula el BACKEND (lib/caja/efectivoEsperado) y viene en la
+  // respuesta de turnos/resumen. Antes esta línea rearmaba la fórmula a mano, y
+  // era la tercera copia: cualquier divergencia hacía que el operador viera un
+  // esperado distinto del que después usaba el cierre.
+  //
+  // El `??` es compatibilidad hacia atrás: si una pestaña vieja quedó con un
+  // bundle anterior a que el endpoint devolviera `efectivoEsperado`, sigue
+  // mostrando un número en vez de romperse. Es una estimación de pantalla — el
+  // valor que se persiste siempre lo recalcula el backend al confirmar.
   const esperado =
-    Number(turno.montoInicial) + Number(resumen.totalEfectivo) + totalIngresos - totalRetiros;
+    resumen.efectivoEsperado != null
+      ? Number(resumen.efectivoEsperado)
+      : Number(turno.montoInicial) + Number(resumen.totalEfectivo) + totalIngresos - totalRetiros;
   const diferencia = montoReal ? Number(montoReal) - esperado : 0;
 
   return (
