@@ -50,10 +50,10 @@ export default function CircuitoDelDinero({ turno }) {
   if (!hayApertura && !hayCierre) {
     return (
       <SunmiCard>
-        <h3 className="text-sm font-bold mb-1">Circuito del dinero</h3>
+        <h3 className="text-sm font-bold mb-1">Entrega del efectivo</h3>
         <p className="text-[12px] sunmi-text-muted">
-          Este turno es anterior al registro de retiros y fondos entre turnos, así que no tiene esos
-          datos. Su efectivo esperado, contado y diferencia se muestran arriba y no cambiaron.
+          Este cierre es anterior al circuito de entrega y fondo, así que no registra cuánto se
+          retiró ni cuánto quedó en el cajón. Sus cifras de caja no cambiaron.
         </p>
       </SunmiCard>
     );
@@ -99,23 +99,10 @@ export default function CircuitoDelDinero({ turno }) {
 
       {/* ── CIERRE ── */}
       <SunmiCard>
-        <h3 className="text-sm font-bold mb-2">Al cerrar</h3>
-        <Dato etiqueta="Efectivo esperado">
-          <Monto valor={t.montoEsperadoEfectivo} />
-        </Dato>
-        <Dato etiqueta="Efectivo contado">
-          <Monto valor={t.montoRealEfectivo} />
-        </Dato>
-        <Dato etiqueta="Diferencia">
-          <Monto
-            valor={t.diferenciaEfectivo}
-            clase={
-              t.diferenciaEfectivo == null || Number(t.diferenciaEfectivo) === 0
-                ? "sunmi-text-success"
-                : "sunmi-text-danger"
-            }
-          />
-        </Dato>
+        {/* Esperado, contado y diferencia NO se repiten acá: viven una sola vez,
+            arriba, en "Resultado del cierre". Tenerlos en dos tarjetas obligaba a
+            comparar cifras iguales y era parte de por qué la pantalla no se leía. */}
+        <h3 className="text-sm font-bold mb-2">Entrega del efectivo</h3>
         <Dato etiqueta="Se retiró del cajón">
           <Monto valor={t.efectivoRetiradoCierre} />
         </Dato>

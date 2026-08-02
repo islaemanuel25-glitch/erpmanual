@@ -8,14 +8,13 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import CircuitoDelDinero from "@/components/turnos/CircuitoDelDinero";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-import HistorialArqueos from "@/components/pos-ventas/HistorialArqueos";
+import ArqueosDelTurno from "@/components/turnos/ArqueosDelTurno";
+import { ResultadoCierre, ComoSeCalculo, PagosNoEfectivo } from "@/components/turnos/ResumenCierre";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
-import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { showError, showSuccess } from "@/components/sunmi/SunmiToast";
 
@@ -172,6 +171,10 @@ export default function TurnoDetallePage() {
   const [ventas, setVentas] = useState([]);
   const [resumen, setResumen] = useState(null);
   const [movimientos, setMovimientos] = useState([]);
+  // Secciones colapsadas por defecto: en el turno 175 son 99 ventas y 5 arqueos,
+  // y abrirlos de entrada empujaba el resultado del cierre fuera de la pantalla.
+  const [verVentas, setVerVentas] = useState(false);
+  const [verMovimientos, setVerMovimientos] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -335,8 +338,6 @@ export default function TurnoDetallePage() {
     "Ganancia Neta",
   ];
 
-  const movHeaders = ["Hora", "Tipo", "Motivo", "Monto", "Usuario"];
-
   return (
     <div className="p-3 space-y-3">
       {/* Header del turno */}
@@ -346,14 +347,6 @@ export default function TurnoDetallePage() {
             Turno #{turno.id} - {turno.vendedor?.nombre || "-"}
           </h1>
           <div className="flex gap-2">
-            {estaCerrado && resumen && (
-              <SunmiButton
-                color="cyan"
-                onClick={() => imprimirZReport(turno, resumen, movimientos)}
-              >
-                Imprimir Z Report
-              </SunmiButton>
-            )}
             <SunmiBackButton href="/modulos/turnos" />
           </div>
         </div>
@@ -392,224 +385,183 @@ export default function TurnoDetallePage() {
           </div>
         )}
       </SunmiCard>
+      {/* 2 · RESULTADO DEL CIERRE — lo primero que se busca al abrir la pantalla. */}
+      <ResultadoCierre turno={turno} />
 
-      {/* X Report (siempre visible) */}
+      {/* 3 · CÓMO SE CALCULÓ — solo efectivo. */}
       {resumen && (
-        <SunmiCard>
-          <div className="flex items-center justify-between mb-1">
-            <SunmiSeparator label={estaCerrado ? "Reporte de turno" : "Reporte de turno (X Report)"} />
-            {!estaCerrado && (
-              <span className="text-xs font-semibold sunmi-text-success px-2 py-0.5 rounded-full sunmi-state-success">
-                Turno abierto
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-            <div>
-              <span className="sunmi-text-muted text-xs">Efectivo</span>
-              <p className="font-semibold text-sm">${fmt(resumen.totalEfectivo)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">MercadoPago</span>
-              <p className="font-semibold text-sm">${fmt(resumen.desglose?.mercadopago)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Debito</span>
-              <p className="font-semibold text-sm">${fmt(resumen.desglose?.debito)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Credito</span>
-              <p className="font-semibold text-sm">${fmt(resumen.desglose?.credito)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Fiado</span>
-              <p className="font-semibold text-sm">${fmt(resumen.desglose?.fiado)}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
-            <div>
-              <span className="sunmi-text-muted text-xs">Total Digital (bruto)</span>
-              <p className="font-semibold text-sm">${fmt(resumen.totalDigital)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Comisiones</span>
-              <p className="font-semibold text-sm sunmi-text-danger">-${fmt(resumen.totalComision)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Total Ventas</span>
-              <p className="font-bold text-base sunmi-text-accent">${fmt(totalVentas)}</p>
-            </div>
-          </div>
-        </SunmiCard>
+        <ComoSeCalculo
+          turno={turno}
+          resumen={resumen}
+          ingresos={totalIngresos}
+          retiros={totalRetiros}
+        />
       )}
 
-      {/* Movimientos de Caja */}
+      {/* 4 · PAGOS QUE NO ENTRAN AL CAJÓN — secundaria; se oculta sola si no hay. */}
+      {resumen && <PagosNoEfectivo resumen={resumen} />}
+
+      {/* 5 · ENTREGA DEL EFECTIVO Y FONDO */}
+      {estaCerrado && <CircuitoDelDinero turno={turno} />}
+
+      {/* 6 · ARQUEOS — resumen; el detalle se despliega a pedido. */}
+      <ArqueosDelTurno
+        turnoId={turno?.id}
+        movimientos={movimientos}
+        montoInicial={turno?.montoInicial}
+      />
+
+      {/* 7 · MOVIMIENTOS — una línea si no hay; tabla solo si el usuario la pide.
+          Una tabla vacía ocupando media pantalla era ruido puro. */}
       <SunmiCard>
-        <div className="flex items-center justify-between mb-1">
-          <SunmiSeparator label="Movimientos de Caja" />
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-base font-bold">Movimientos de caja</h2>
           {!estaCerrado && (
             <div className="flex gap-2">
-              <SunmiButton
-                color="cyan"
-                onClick={() => { setModalMov("INGRESO"); setMovMonto(""); setMovMotivo(""); }}
-                className="!text-sm"
-              >
-                + Ingreso
+              <SunmiButton color="green" onClick={() => setModalMov("INGRESO")}>
+                Ingreso
               </SunmiButton>
-              <SunmiButton
-                color="amber"
-                onClick={() => { setModalMov("RETIRO"); setMovMonto(""); setMovMotivo(""); }}
-                className="!text-sm"
-              >
-                + Retiro
+              <SunmiButton color="red" onClick={() => setModalMov("RETIRO")}>
+                Retiro
               </SunmiButton>
             </div>
           )}
         </div>
 
-        {movimientos.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 mb-3 mt-2">
-            <div className="sunmi-surface-soft p-2 rounded-lg text-center">
-              <div className="text-[10px] sunmi-text-muted">Ingresos</div>
-              <div className="text-sm font-bold sunmi-text-success">+${fmt(totalIngresos)}</div>
+        {movimientos.length === 0 ? (
+          <p className="text-sm sunmi-text-muted mt-2">
+            No se registraron ingresos ni retiros de caja.
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div>
+                <div className="text-[11px] sunmi-text-muted leading-tight">Ingresos</div>
+                <div className="text-lg font-bold tabular-nums sunmi-text-success">
+                  +${fmt(totalIngresos)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] sunmi-text-muted leading-tight">Retiros</div>
+                <div className="text-lg font-bold tabular-nums sunmi-text-danger">
+                  -${fmt(totalRetiros)}
+                </div>
+              </div>
             </div>
-            <div className="sunmi-surface-soft p-2 rounded-lg text-center">
-              <div className="text-[10px] sunmi-text-muted">Retiros</div>
-              <div className="text-sm font-bold sunmi-text-danger">-${fmt(totalRetiros)}</div>
-            </div>
-          </div>
+            <SunmiButton
+              color="cyan"
+              onClick={() => setVerMovimientos((v) => !v)}
+              className="!w-full min-h-11 mt-3"
+            >
+              {verMovimientos
+                ? "Ocultar movimientos"
+                : `Ver movimientos de caja (${movimientos.length})`}
+            </SunmiButton>
+
+            {verMovimientos && (
+              <div className="mt-3 space-y-2">
+                {movimientos.map((m) => (
+                  <div key={m.id} className="rounded-lg sunmi-surface-soft p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-bold">
+                        {m.tipo === "INGRESO" ? "Ingreso" : "Retiro"}
+                        <span className="ml-2 text-[11px] font-normal sunmi-text-muted">
+                          {fmtHora(m.createdAt)}
+                        </span>
+                      </span>
+                      <span
+                        className={`text-base font-bold tabular-nums ${
+                          m.tipo === "INGRESO" ? "sunmi-text-success" : "sunmi-text-danger"
+                        }`}
+                      >
+                        {m.tipo === "INGRESO" ? "+" : "-"}${fmt(m.monto)}
+                      </span>
+                    </div>
+                    {m.motivo && <p className="text-[12px] mt-1 leading-snug">{m.motivo}</p>}
+                    {m.usuario?.nombre && (
+                      <p className="text-[11px] sunmi-text-muted mt-0.5">{m.usuario.nombre}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </SunmiCard>
+
+      {/* 8 · VENTAS — no se renderizan 99 filas antes del resumen. */}
+      <SunmiCard>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-base font-bold">
+            {ventas.length} venta{ventas.length === 1 ? "" : "s"} en este turno
+          </h2>
+          {ventas.length > 0 && (
+            <SunmiButton color="cyan" onClick={() => setVerVentas((v) => !v)}>
+              {verVentas ? "Ocultar" : "Ver ventas"}
+            </SunmiButton>
+          )}
+        </div>
+
+        {ventas.length === 0 && (
+          <p className="text-sm sunmi-text-muted mt-2">Este turno no registró ventas.</p>
         )}
 
-        <SunmiTable headers={movHeaders}>
-          {movimientos.length === 0 ? (
-            <SunmiTableEmpty colSpan={movHeaders.length} />
-          ) : (
-            movimientos.map((m) => (
-              <SunmiTableRow key={m.id}>
-                <td className="px-3 py-2 text-sm">{fmtHora(m.createdAt)}</td>
-                <td className="px-3 py-2 text-sm">
-                  <span
-                    className={`font-semibold ${
-                      m.tipo === "INGRESO" ? "sunmi-text-success" : "sunmi-text-danger"
-                    }`}
-                  >
-                    {m.tipo}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-sm">{m.motivo || "-"}</td>
-                <td className="px-3 py-2 text-sm text-right font-semibold">
-                  {m.tipo === "INGRESO" ? "+" : "-"}${fmt(m.monto)}
-                </td>
-                <td className="px-3 py-2 text-sm">{m.usuario?.nombre || "-"}</td>
-              </SunmiTableRow>
-            ))
-          )}
-        </SunmiTable>
+        {verVentas && ventas.length > 0 && (
+          <>
+            {/* Móvil: cards de una columna, sin scroll horizontal. */}
+            <div className="lg:hidden mt-3 space-y-2">
+              {ventas.map((v) => (
+                <div key={v.id} className="rounded-lg sunmi-surface-soft p-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-bold">
+                      #{v.numero}
+                      <span className="ml-2 text-[11px] font-normal sunmi-text-muted">
+                        {fmtHora(v.fecha)}
+                      </span>
+                    </span>
+                    <span className="text-base font-bold tabular-nums">${fmt(v.total)}</span>
+                  </div>
+                  <div className="text-[12px] sunmi-text-muted mt-0.5">
+                    {FORMA_PAGO_LABELS[v.formaPago] || v.formaPago || "-"}
+                    {v.cliente?.nombre ? ` · ${v.cliente.nombre}` : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Escritorio: la tabla de siempre. */}
+            <div className="hidden lg:block mt-3 overflow-x-auto">
+              <SunmiTable headers={ventaHeaders}>
+                {ventas.map((v) => (
+                  <SunmiTableRow key={v.id}>
+                    <td className="px-3 py-2 text-sm">#{v.numero}</td>
+                    <td className="px-3 py-2 text-sm">{fmtHora(v.fecha)}</td>
+                    <td className="px-3 py-2 text-sm">{v.cliente?.nombre || "-"}</td>
+                    <td className="px-3 py-2 text-sm">
+                      {FORMA_PAGO_LABELS[v.formaPago] || v.formaPago || "-"}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-right tabular-nums">${fmt(v.total)}</td>
+                  </SunmiTableRow>
+                ))}
+              </SunmiTable>
+            </div>
+          </>
+        )}
       </SunmiCard>
 
-      {/* Arqueos del turno: cortes de control parciales + el final. */}
-      <SunmiCard className="!p-0 !bg-transparent !border-0">
-        <SunmiSeparator label="Arqueos de caja" />
-        <div className="mt-3">
-          <HistorialArqueos turnoId={turno?.id} />
-        </div>
-      </SunmiCard>
-
-      {/* Tabla de ventas */}
-      <SunmiCard>
-        <SunmiSeparator label="Ventas del Turno" />
-        <SunmiTable headers={ventaHeaders}>
-          {ventas.length === 0 ? (
-            <SunmiTableEmpty colSpan={ventaHeaders.length} />
-          ) : (
-            ventas.map((v) => (
-              <SunmiTableRow key={v.id}>
-                <td className="px-3 py-2 text-sm font-semibold">{v.numero}</td>
-                <td className="px-3 py-2 text-sm">{fmtFecha(v.fecha)}</td>
-                <td className="px-3 py-2 text-sm text-right">${fmt(v.total)}</td>
-                <td className="px-3 py-2 text-sm">
-                  {FORMA_PAGO_LABELS[v.formaPago] || v.formaPago}
-                </td>
-                <td className="px-3 py-2 text-sm text-right">${fmt(v.netoRecibido)}</td>
-                <td className="px-3 py-2 text-sm text-right sunmi-text-danger">
-                  {v.comisionBancaria > 0 ? `-${fmt(v.comisionBancaria)}` : "-"}
-                </td>
-                <td className="px-3 py-2 text-sm text-right">${fmt(v.costoTotal)}</td>
-                <td className="px-3 py-2 text-sm text-right">${fmt(v.gananciaNeta)}</td>
-              </SunmiTableRow>
-            ))
-          )}
-        </SunmiTable>
-      </SunmiCard>
-
-      {/* Z Report (solo turno cerrado) */}
+      {/* 9 · ACCIONES DE IMPRESIÓN. El Z Report se imprime; ya no se repite en
+          pantalla como una cuarta copia de esperado/contado/diferencia. */}
       {estaCerrado && resumen && (
         <SunmiCard>
-          <SunmiSeparator label="Cierre de turno (Z Report)" />
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-            <div>
-              <span className="sunmi-text-muted text-xs">Monto Inicial</span>
-              <p className="font-semibold text-sm">${fmt(turno.montoInicial)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Ventas Efectivo</span>
-              <p className="font-semibold text-sm">${fmt(resumen.totalEfectivo)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Ventas Digital</span>
-              <p className="font-semibold text-sm">${fmt(resumen.totalDigital)}</p>
-            </div>
-          </div>
-
-          {(totalIngresos > 0 || totalRetiros > 0) && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
-              <div>
-                <span className="sunmi-text-muted text-xs">Ingresos Caja</span>
-                <p className="font-semibold text-sm sunmi-text-success">+${fmt(totalIngresos)}</p>
-              </div>
-              <div>
-                <span className="sunmi-text-muted text-xs">Retiros Caja</span>
-                <p className="font-semibold text-sm sunmi-text-danger">-${fmt(totalRetiros)}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
-            <div>
-              <span className="sunmi-text-muted text-xs">Total Ventas</span>
-              <p className="font-bold text-sm">${fmt(totalVentas)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Esperado Efectivo</span>
-              <p className="font-bold text-sm">${fmt(esperadoEfectivo)}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 pt-3 border-t sunmi-divider">
-            <div>
-              <span className="sunmi-text-muted text-xs">Real Contado</span>
-              <p className="font-bold text-sm">${fmt(turno.montoRealEfectivo)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Diferencia</span>
-              <p
-                className={`font-bold text-base ${
-                  turno.diferenciaEfectivo != null && Number(turno.diferenciaEfectivo) !== 0
-                    ? "sunmi-text-danger"
-                    : "sunmi-text-success"
-                }`}
-              >
-                ${fmt(turno.diferenciaEfectivo)}
-              </p>
-            </div>
-          </div>
+          <SunmiButton
+            color="cyan"
+            onClick={() => imprimirZReport(turno, resumen, movimientos)}
+            className="!w-full min-h-12"
+          >
+            Imprimir Z Report
+          </SunmiButton>
         </SunmiCard>
       )}
-
-      <CircuitoDelDinero turno={turno} />
 
       {/* Modal ingreso/retiro */}
       {modalMov && (
