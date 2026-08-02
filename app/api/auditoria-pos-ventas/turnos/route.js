@@ -37,10 +37,10 @@ export async function GET(req) {
       include: {
         vendedor: { select: { id: true, nombre: true, email: true } },
         operador: { select: { id: true, nombre: true } },
+        // `include` ya devuelve TODOS los escalares del Turno —`anuladoEn`,
+        // `anuladoPorId` y `motivoAnulacion` incluidos—, así que acá solo van
+        // relaciones. Listar un escalar en un `include` hace fallar la consulta.
         cerradoPor: { select: { id: true, nombre: true, email: true } },
-        anuladoEn: true,
-        anuladoPorId: true,
-        motivoAnulacion: true,
         cajaMovimientos: {
           orderBy: { createdAt: "asc" },
           select: {

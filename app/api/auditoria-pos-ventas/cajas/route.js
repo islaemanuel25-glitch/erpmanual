@@ -46,9 +46,10 @@ export async function GET(req) {
       include: {
         vendedor: { select: { id: true, nombre: true, email: true } },
         operador: { select: { id: true, nombre: true } },
+        // `include` trae TODOS los escalares del Turno —incluidos `anuladoEn` y
+        // `motivoAnulacion`—, así que acá solo van relaciones. Listar un escalar
+        // en un `include` es un error de validación de Prisma, no una redundancia.
         cerradoPor: { select: { id: true, nombre: true, email: true } },
-        anuladoEn: true,
-        motivoAnulacion: true,
         cajaMovimientos: {
           orderBy: { createdAt: "asc" },
           select: {
