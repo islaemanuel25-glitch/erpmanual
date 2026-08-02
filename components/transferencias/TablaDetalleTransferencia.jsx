@@ -359,17 +359,15 @@ export default function TablaDetalleTransferencia({
           </div>
         )}
 
-        {/* Total devuelto al origen: solo informativo, cuando hubo faltante. */}
-        {item.resumen?.devolucionOrigenTotal > 0 && (
-          <div className="mt-3 flex justify-between items-center gap-2 px-3 py-2 rounded-lg sunmi-state-warning-soft text-[12px]">
-            <span className="sunmi-text-muted font-semibold">
-              Devuelto al stock de origen por diferencias
-            </span>
-            <span className="sunmi-text-accent font-bold font-mono tabular-nums">
-              {fmtCantidad(item.resumen.devolucionOrigenTotal)}
-            </span>
-          </div>
-        )}
+        {/* NO va acá un total de devolución al origen.
+            `resumen.devolucionOrigenTotal` suma las devoluciones de todas las
+            líneas, y esas líneas pueden estar en unidades, bultos, kilos o
+            piezas: el número resultante no es ninguna de esas magnitudes y
+            engaña más de lo que informa.
+            La cantidad exacta vive donde SÍ se conoce la presentación: en la
+            columna "Devuelto al origen" de cada producto. Que hubo devolución
+            ya lo dicen el badge "Con diferencias" del encabezado y el tile
+            "Líneas devueltas al origen" de la sección Totales. */}
 
         {/* Paginación — mismo lugar que en el listado: dentro de la card,
             separada por una línea. */}
