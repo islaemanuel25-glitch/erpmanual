@@ -53,6 +53,11 @@ export default function ConfigArqueoCajaPage() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(null);
   const [mensaje, setMensaje] = useState(null);
+  // Se incrementa DESPUÉS de cada intento de guardado, salga bien o mal.
+  // Forma parte de la `key` de los toggles, así que los remonta y los obliga a
+  // releer el valor confirmado por el backend: si el guardado falló, el switch
+  // vuelve solo a donde estaba en vez de quedar mostrando algo que no se guardó.
+  const [revision, setRevision] = useState(0);
 
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
@@ -98,6 +103,8 @@ export default function ConfigArqueoCajaPage() {
       setMensaje({ tipo: "error", texto: "Error de conexión" });
     } finally {
       setGuardando(null);
+      // Siempre, incluso al fallar: es lo que revierte el switch a su valor real.
+      setRevision((n) => n + 1);
     }
   };
 
@@ -132,22 +139,23 @@ export default function ConfigArqueoCajaPage() {
               <Timer size={18} />
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-bold sunmi-text-strong">Alertas de arqueo</div>
+              <div className="text-sm font-bold sunmi-text-strong">Arqueos de caja</div>
               <p className="text-[12px] sunmi-text-muted leading-snug mt-0.5">
-                Con la opción activa, el POS de este local avisa cada vez que vence el
-                intervalo sin un arqueo. El aviso no bloquea ventas: se puede postergar,
-                y cada postergación queda registrada. El botón de arqueo manual está
-                disponible siempre, esté activa o no.
+                Cuando esta opción está activa, el POS permite realizar arqueos manuales
+                y muestra alertas según el intervalo configurado. Cuando está desactivada,
+                no se muestran el botón ni las alertas.
               </p>
             </div>
           </div>
-          <SunmiToggle
-            checked={!!config?.arqueoCajaActivo}
-            disabled={guardando === "arqueoCajaActivo"}
-            onChange={(v) =>
+          <Interruptor
+            campo="arqueoCajaActivo"
+            valor={config?.arqueoCajaActivo}
+            revision={revision}
+            guardando={guardando}
+            onCambiar={(v) =>
               guardar(
                 { arqueoCajaActivo: v },
-                v ? "Alertas de arqueo activadas en este local" : "Alertas de arqueo desactivadas"
+                v ? "Arqueos activados en este local" : "Arqueos desactivados en este local"
               )
             }
           />
@@ -204,10 +212,12 @@ export default function ConfigArqueoCajaPage() {
               </p>
             </div>
           </div>
-          <SunmiToggle
-            checked={!!config?.requiereAutorizacionPostergacion}
-            disabled={guardando === "requiereAutorizacionPostergacion"}
-            onChange={(v) =>
+          <Interruptor
+            campo="requiereAutorizacionPostergacion"
+            valor={config?.requiereAutorizacionPostergacion}
+            revision={revision}
+            guardando={guardando}
+            onCambiar={(v) =>
               guardar(
                 { requiereAutorizacionPostergacion: v },
                 v ? "Autorización requerida para postergar" : "El cajero puede postergar sin autorización"
@@ -216,6 +226,41 @@ export default function ConfigArqueoCajaPage() {
           />
         </div>
       </SunmiCard>
+    </div>
+  );
+}
+
+/**
+ * Interruptor de configuración, atado al valor confirmado por el backend.
+ *
+ * Envuelve a SunmiToggle porque ese componente tiene dos límites conocidos y no
+ * se toca acá: su prop es `value` (no `checked`), y siembra su estado interno
+ * UNA sola vez, al montar — no vuelve a mirar `value` después. Lo usan otras 14
+ * pantallas, así que cambiarlo por este caso sería mover algo ajeno.
+ *
+ * En su lugar:
+ *   · se le pasa `value`, que es su API real;
+ *   · la `key` incluye el valor confirmado Y la revisión, así que después de
+ *     cada intento de guardado el toggle se remonta y relee el estado del
+ *     servidor. Si el guardado falla, el switch vuelve solo a donde estaba;
+ *   · mientras guarda, el envoltorio bloquea los clics: un doble clic no puede
+ *     disparar dos escrituras.
+ */
+function Interruptor({ campo, valor, revision, guardando, onCambiar }) {
+  const ocupado = guardando === campo;
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <div
+        className={ocupado ? "pointer-events-none opacity-60" : ""}
+        aria-busy={ocupado}
+      >
+        <SunmiToggle
+          key={`${campo}-${String(valor)}-${revision}`}
+          value={valor === true}
+          onChange={onCambiar}
+        />
+      </div>
+      {ocupado && <span className="text-[11px] sunmi-text-muted">Guardando…</span>}
     </div>
   );
 }
