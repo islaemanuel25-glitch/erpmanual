@@ -1,3 +1,5 @@
+import { combinarSubtotalFijado } from "@/lib/pos-ventas/lineaPorImporte";
+
 // Estado inicial del reducer
 export const initialState = {
   // Carrito
@@ -54,7 +56,11 @@ export const ActionTypes = {
 export function posVentaReducer(state, action) {
   switch (action.type) {
     case ActionTypes.ADD_ITEM: {
-      const { producto, cantidadInicial } = action.payload;
+      // `subtotalFijado`: importe tecleado por el cajero en una línea POR PESO
+      // (modo "POR PRECIO" del ModalPesoKg). Cuando viene, ese importe ES el
+      // total de la línea y no se re-deriva del peso redondeado. Null/ausente en
+      // todo lo demás (peso ingresado a mano, unidad, pack, bulto).
+      const { producto, cantidadInicial, subtotalFijado } = action.payload;
       const esKg = producto.unidadMedida === "kg";
       const cantAdd = cantidadInicial ?? 1;
       const idx = state.carrito.findIndex(
@@ -63,13 +69,23 @@ export function posVentaReducer(state, action) {
 
       if (idx >= 0) {
         // Item existente: incrementar cantidad y moverlo al principio
-        const nuevo = { ...state.carrito[idx] };
+        const previo = state.carrito[idx];
+        const nuevo = { ...previo };
         if (esKg) {
           // Kg: sumar el peso ingresado (puede ser decimal)
           nuevo.cantidad = Math.round((nuevo.cantidad + cantAdd) * 1000) / 1000;
         } else {
           nuevo.cantidad += cantAdd;
         }
+        // Si alguna de las dos cargas fue por importe, el total de la línea pasa
+        // a ser la SUMA de lo que mostró cada una. Si ninguna lo fue, la línea
+        // sigue derivándose del peso (comportamiento actual, intacto).
+        const fijadoFusion = combinarSubtotalFijado(previo, {
+          precio: previo.precio,
+          cantidad: cantAdd,
+          subtotalFijado: subtotalFijado ?? null,
+        });
+        if (fijadoFusion != null) nuevo.subtotalFijado = fijadoFusion;
         const resto = state.carrito.filter((_, i) => i !== idx);
         return { ...state, carrito: [nuevo, ...resto] };
       }
@@ -109,6 +125,8 @@ export function posVentaReducer(state, action) {
             tipoPrecioAplicado: producto.aplicacionLista?.tipoPrecioAplicado ?? "PRECIO_VENTA",
             margenAplicado: producto.aplicacionLista?.margenAplicado ?? null,
             precioCosto: producto.precioCosto ?? 0,
+            // Importe fijado por el cajero (línea de peso cargada POR PRECIO).
+            subtotalFijado: subtotalFijado ?? null,
           },
           ...state.carrito,
         ],
@@ -147,9 +165,12 @@ export function posVentaReducer(state, action) {
     }
 
     case ActionTypes.UPDATE_CANTIDAD: {
+      // Editar la cantidad a mano es pasar a "el PESO manda": el importe que se
+      // había tecleado deja de tener sentido (era el de otro peso) y la línea
+      // vuelve a cobrarse como precio × cantidad.
       const { idx, nuevaCantidad } = action.payload;
       const next = [...state.carrito];
-      next[idx] = { ...next[idx], cantidad: nuevaCantidad };
+      next[idx] = { ...next[idx], cantidad: nuevaCantidad, subtotalFijado: null };
       return { ...state, carrito: next };
     }
 
@@ -266,6 +287,7 @@ export function posVentaReducer(state, action) {
           precio: precioUnit,
           precioCosto: costoUnit,
           cantidad: 1, // la cantidad pasa a significar unidades reales
+          subtotalFijado: null, // cambia la escala: el importe anterior ya no aplica
         };
       } else {
         next[idx] = {
@@ -275,6 +297,7 @@ export function posVentaReducer(state, action) {
           precio: item.precioVentaFormatoDepositoReal ?? item.precio,
           precioCosto: item.precioCostoFormatoDepositoReal ?? item.precioCosto ?? 0,
           cantidad: 1, // la cantidad vuelve a significar packs/bultos/cajones
+          subtotalFijado: null, // cambia la escala: el importe anterior ya no aplica
         };
       }
       return { ...state, carrito: next };

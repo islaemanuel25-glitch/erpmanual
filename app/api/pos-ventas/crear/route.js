@@ -24,6 +24,13 @@ import {
   sumarTotalServicios,
   validarCoberturaEfectivo,
 } from "@/lib/pos-ventas/servicios";
+import {
+  esProductoPorPeso,
+  pesoDesdeImporte,
+  validarSubtotalFijado,
+  subtotalLinea,
+  sumarSubtotales,
+} from "@/lib/pos-ventas/lineaPorImporte";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
@@ -240,7 +247,12 @@ export async function POST(req) {
     const baseIdsModalidad = [...new Set(items.map((i) => i.productoBaseId).filter(Boolean))];
     const basesModalidad = await prisma.productoBase.findMany({
       where: { id: { in: baseIdsModalidad } },
-      select: { id: true, modalidad: true, recargoServicioDefaultPct: true },
+      select: {
+        id: true, modalidad: true, recargoServicioDefaultPct: true,
+        // Para decidir server-side si el producto se vende POR PESO (única
+        // modalidad que admite carga por importe).
+        unidad_medida: true, modoVentaDeposito: true, pesoReferenciaKg: true, es_combo: true,
+      },
     });
     const modalidadMap = new Map(basesModalidad.map((b) => [b.id, b]));
     const localesRecargo = await prisma.productoLocal.findMany({
@@ -248,6 +260,15 @@ export async function POST(req) {
       select: { baseId: true, recargoServicioPct: true },
     });
     const recargoLocalMap = new Map(localesRecargo.map((pl) => [pl.baseId, pl.recargoServicioPct]));
+
+    // Se resuelve ACÁ (y no más abajo) porque la validación de las líneas de peso
+    // cargadas por importe necesita saber si el local es depósito: el fiambre de
+    // pieza fija tiene unidad "kg" pero allí se vende por PIEZAS, no por peso.
+    const localInfo = await prisma.local.findUnique({
+      where: { id: localId },
+      select: { es_deposito: true },
+    });
+    const esDeposito = localInfo?.es_deposito === true;
 
     // Validar cada item (cantidad puede ser decimal para KG en normales; fija=1 en servicios)
     for (const item of items) {
@@ -287,6 +308,9 @@ export async function POST(req) {
         item.cantidad = 1;
         item.precioCosto = calc.precioCosto;
         item.esServicio = true;
+        // Un servicio ya tiene su propio importe (importeBaseServicio); el
+        // marcador de peso por importe no aplica y se descarta.
+        item.subtotalFijado = null;
         item.__servicio = {
           esServicio: true,
           importeBaseServicio: calc.importeBase,
@@ -319,6 +343,48 @@ export async function POST(req) {
         }
         item.cantidad = cant;
         item.esServicio = false;
+
+        // === LÍNEA DE PESO CARGADA POR IMPORTE ===
+        //
+        // El cajero tecleó "$2.000" y el peso es el derivado. El importe es la
+        // fuente de verdad del total de la línea; el peso solo sirve para
+        // descontar stock, mostrar, guardar y auditar.
+        //
+        // El backend NO confía en el cliente: revalida que el producto se venda
+        // por peso y RECALCULA el peso él mismo desde el importe. Si el POS mandó
+        // otra cantidad (payload viejo de la cola offline, o manipulado), gana la
+        // del server. Mismo criterio que los servicios de importe variable.
+        if (item.subtotalFijado != null) {
+          const v = validarSubtotalFijado(item.subtotalFijado);
+          if (!v.valido) {
+            return NextResponse.json(
+              { ok: false, error: `${item.nombre || "Producto"}: ${v.error}` },
+              { status: 400 }
+            );
+          }
+          if (base?.es_combo === true || !esProductoPorPeso(base, { esDeposito })) {
+            return NextResponse.json(
+              {
+                ok: false,
+                error: `El producto "${item.nombre || item.productoBaseId}" no se vende por peso: no admite carga por importe.`,
+              },
+              { status: 400 }
+            );
+          }
+          const peso = pesoDesdeImporte(v.importe, item.precio);
+          if (peso == null) {
+            return NextResponse.json(
+              { ok: false, error: `El importe de "${item.nombre || "producto"}" no alcanza para 1 gramo.` },
+              { status: 400 }
+            );
+          }
+          item.cantidad = peso;
+          item.subtotalFijado = v.importe;
+        } else {
+          // Normaliza ausente/undefined a null: ninguna línea por peso queda con
+          // un marcador ambiguo dando vueltas.
+          item.subtotalFijado = null;
+        }
       }
     }
 
@@ -382,11 +448,10 @@ export async function POST(req) {
       }
     }
 
-    // Calcular totales
-    const subtotal = items.reduce(
-      (acc, item) => acc + item.precio * item.cantidad,
-      0
-    );
+    // Calcular totales. Suma en centavos enteros y respeta el importe fijado de
+    // las líneas de peso cargadas por importe: esas NO se re-derivan del peso
+    // redondeado (daría $1.997,50 donde el cajero cobró $2.000).
+    const subtotal = sumarSubtotales(items);
     // Base ELEGIBLE para descuentos/puntos = mercadería (subtotal SIN servicios).
     // Los servicios de importe variable no reciben descuentos/promos/puntos y su
     // importe no puede reducirse indirectamente por un descuento global.
@@ -565,11 +630,6 @@ export async function POST(req) {
       where: { id: { in: productoBaseIds } },
       select: { id: true, precio_costo: true, factor_pack: true, categoria_id: true, modoVentaDeposito: true, pesoReferenciaKg: true, modo_envio: true, unidad_medida: true, es_combo: true },
     });
-    const localInfo = await prisma.local.findUnique({
-      where: { id: localId },
-      select: { es_deposito: true },
-    });
-    const esDeposito = localInfo?.es_deposito === true;
     const costosMap = {};
     const pbMap = {};
     const baseStockMap = {};
@@ -966,7 +1026,7 @@ export async function POST(req) {
             if (exclProds.has(item.productoBaseId)) continue;
             const catId = pbMap[item.productoBaseId]?.categoria_id;
             if (catId != null && exclCats.has(catId)) continue;
-            subtotalElegible += item.precio * item.cantidad;
+            subtotalElegible += subtotalLinea(item);
           }
 
           const puntosAcreditar = Math.floor(subtotalElegible * puntosPorPeso);

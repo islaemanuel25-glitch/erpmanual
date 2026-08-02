@@ -2,6 +2,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { subtotalLinea } from "@/lib/pos-ventas/lineaPorImporte";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -127,7 +128,7 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
               ${ticket.items.map((item, idx) => `
                 <div class="item">
                   <span class="item-name">${item.cantidad}x ${item.nombre}</span>
-                  <span>$${formatPrecio(item.precio * item.cantidad)}</span>
+                  <span>$${formatPrecio(subtotalLinea(item))}</span>
                 </div>
               `).join('')}
             </div>
@@ -214,7 +215,7 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
             {ticket.items.map((item, idx) => (
               <div key={idx} className="flex justify-between text-xs">
                 <span>{item.cantidad}x {item.nombre}</span>
-                <span>${formatPrecio(item.precio * item.cantidad)}</span>
+                <span>${formatPrecio(subtotalLinea(item))}</span>
               </div>
             ))}
           </div>

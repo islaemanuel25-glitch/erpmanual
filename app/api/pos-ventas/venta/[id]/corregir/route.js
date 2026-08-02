@@ -19,6 +19,7 @@ import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { validarMotivo, estadoVentanaCorreccion, esVentaFiada } from "@/lib/pos-ventas/correccion";
 import { evaluarCorreccion } from "@/lib/pos-ventas/motorCorreccion";
 import { planConsumoVenta } from "@/lib/combos/planConsumoVenta";
+import { preservarSubtotalOriginal } from "@/lib/pos-ventas/lineaPorImporte";
 import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta, round2 } from "@/lib/pos-ventas/pagos";
 import { enBetaCorreccionCompleta, COD_FLAG_OFF, MSG_FLAG_OFF } from "@/lib/pos-ventas/correccionBeta";
 import { bloqueoCorreccion } from "@/lib/ventas-internas/integracionVenta";
@@ -102,7 +103,16 @@ export async function POST(req, { params }) {
       if (ventana.fueraDeVentana) { const e = new Error(`Fuera de la ventana de corrección (${ventana.diasTranscurridos} días).`); e.status = 409; e.code = "fuera_de_ventana"; throw e; }
 
       // Resolver líneas + plan de consumo (server-authoritative).
-      const lineasCorregidas = await resolverLineasCorregidas(tx, { localId, esDeposito, lineasEditor });
+      //
+      // preservarSubtotalOriginal: las líneas que el admin NO tocó conservan el
+      // dinero con el que se guardaron. Sin esto, una línea de peso cargada por
+      // importe ($2.000 sobre $8.500/kg) se re-derivaría de su peso cuantizado y
+      // corregir el CLIENTE de la venta movería el total a $1.997,50. Si el admin
+      // sí edita el peso o el precio, la línea vuelve a derivarse (el peso manda).
+      const lineasCorregidas = preservarSubtotalOriginal(
+        await resolverLineasCorregidas(tx, { localId, esDeposito, lineasEditor }),
+        venta.detalles
+      );
       const { lineasComerciales } = planConsumoVenta({ lineas: lineasCorregidas, esDeposito });
       const { infoMap } = await cargarMapsProductos(tx, lineasCorregidas.map((l) => l.productoBaseId));
 

@@ -5,6 +5,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import { fromUnidades } from "@/lib/conversiones/stock";
+import { subtotalLinea } from "@/lib/pos-ventas/lineaPorImporte";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -331,7 +332,7 @@ function CarritoVenta({
             <div className="flex items-center gap-2">
               <div className="flex-1 min-w-0 font-medium text-sm truncate">{item.nombre}</div>
               <span className="shrink-0 text-sm font-bold pos-text-accent">
-                ${formatPrecio(item.precio * (Number(item.cantidad) || 0))}
+                ${formatPrecio(subtotalLinea(item))}
               </span>
               <button
                 onClick={() => onEliminar(idx)}
@@ -442,7 +443,7 @@ function CarritoVenta({
                 $ {formatPrecio(item.precio)}
               </td>
               <td className="px-2 py-1.5 text-right whitespace-nowrap text-sm font-medium">
-                $ {formatPrecio(item.precio * (Number(item.cantidad) || 0))}
+                $ {formatPrecio(subtotalLinea(item))}
               </td>
               <td className="px-2 py-1.5 text-center">
                 <button

@@ -19,6 +19,7 @@ import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalImporteServicio from "@/components/pos-ventas/ModalImporteServicio";
 import { sumarTotalServicios, componerCobroSimple } from "@/lib/pos-ventas/servicios";
 import { itemsCrearPayload } from "@/lib/pos-ventas/payloadVenta";
+import { sumarSubtotales } from "@/lib/pos-ventas/lineaPorImporte";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
 import ModalTicketOffline from "@/components/pos-ventas/ModalTicketOffline";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
@@ -596,10 +597,9 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   // Subtotal y totales
   // ---------------------------------------------------------------------------
-  const subtotal = state.carrito.reduce(
-    (acc, item) => acc + item.precio * (Number(item.cantidad) || 0),
-    0
-  );
+  // Suma en centavos enteros y respeta el importe fijado de las líneas de peso
+  // cargadas por precio (no re-deriva su total desde el peso redondeado).
+  const subtotal = sumarSubtotales(state.carrito);
 
   const total = subtotal - state.descuento - state.descuentoPorPuntos;
 
@@ -748,6 +748,8 @@ export default function PosVentasPage() {
         nombre: item.nombre,
         precio: item.precio,
         cantidad: item.cantidad,
+        // El ticket muestra el importe tecleado, no peso × precio.
+        subtotalFijado: item.subtotalFijado ?? null,
         // Desglose del servicio para el ticket (importe/recargo/total).
         esServicio: item.esServicio ?? false,
         importeBaseServicio: item.esServicio ? item.importeBaseServicio : null,
@@ -1930,11 +1932,16 @@ export default function PosVentasPage() {
       {productoKgPendiente && (
         <ModalPesoKg
           producto={productoKgPendiente}
-          onConfirmar={(cantidadKg) => {
+          onConfirmar={({ cantidad: cantidadKg, subtotalFijado }) => {
             setPreviousCarrito([...state.carrito]);
             dispatch({
               type: ActionTypes.ADD_ITEM,
-              payload: { producto: productoKgPendiente, cantidadInicial: cantidadKg },
+              payload: {
+                producto: productoKgPendiente,
+                cantidadInicial: cantidadKg,
+                // Cargado POR PRECIO: el importe tecleado manda sobre el peso.
+                subtotalFijado,
+              },
             });
             // Alerta de stock bajo (kg)
             const enCarrito = state.carrito.find((i) => i.productoBaseId === productoKgPendiente.productoBaseId);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { pesoDesdeImporte } from "@/lib/pos-ventas/lineaPorImporte";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -18,17 +19,29 @@ export default function ModalPesoKg({ producto, onConfirmar, onCancelar }) {
   const [valor, setValor] = useState("");
 
   const valorNum = Number(valor) || 0;
+  const porImporte = modo === "precio";
 
-  // Cálculos según modo
-  const peso = modo === "peso" ? valorNum : precioPorKg > 0 ? valorNum / precioPorKg : 0;
-  const totalCalc = modo === "peso" ? valorNum * precioPorKg : valorNum;
-  const pesoRedondeado = Math.round(peso * 1000) / 1000;
+  // POR PESO   → el peso manda; el total es peso × precio, como siempre.
+  // POR PRECIO → el importe manda; el peso es un DERIVADO cuantizado al gramo.
+  //              El total NO se recalcula desde ese peso: 2000/8500 = 0,235294…
+  //              kg, y 0,235 × 8500 daría $1.997,50 en vez de los $2.000 tecleados.
+  const pesoRedondeado = porImporte
+    ? (pesoDesdeImporte(valorNum, precioPorKg) ?? 0)
+    : Math.round(valorNum * 1000) / 1000;
+  // Normalizado a centavos: lo que se muestra es exactamente lo que se envía.
+  const totalCalc = Math.round((porImporte ? valorNum : valorNum * precioPorKg) * 100) / 100;
 
   const valido = pesoRedondeado >= 0.001 && totalCalc > 0;
 
   const handleConfirmar = () => {
     if (!valido) return;
-    onConfirmar(pesoRedondeado);
+    // El importe viaja junto al peso: es la fuente de verdad de esta línea.
+    // Cargando por peso no se fija nada (subtotalFijado null) y el
+    // comportamiento actual queda intacto.
+    onConfirmar({
+      cantidad: pesoRedondeado,
+      subtotalFijado: porImporte ? totalCalc : null,
+    });
   };
 
   return (
