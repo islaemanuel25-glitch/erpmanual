@@ -30,6 +30,11 @@ import { estadoArqueo, TIPO_PARCIAL } from "@/lib/caja/arqueo";
 export async function POST(req) {
   try {
     const body = await req.json().catch(() => ({}));
+    // `tipo` NO se lee del body a propósito: esta ruta solo produce PARCIAL.
+    // El arqueo FINAL lo crea exclusivamente el flujo de cierre
+    // (/api/pos-ventas/turnos/cerrar), que es el único que tiene el conteo
+    // definitivo y cierra la caja. Si el tipo viniera del cliente, cualquiera
+    // podría fabricar un "cierre contable" sin cerrar el turno.
     const { turnoId, efectivoContado, observacion, idempotencyKey } = body;
 
     const ctx = await contextoArqueo(req, { turnoId, exigirAbierto: true });
@@ -58,7 +63,21 @@ export async function POST(req) {
       );
     }
 
+    // La configuración se relee del SERVIDOR, no se acepta del cliente.
+    // Ocultar el botón en el POS no alcanza: sin esta barrera, un cajero podría
+    // registrar arqueos parciales llamando la API a mano en un local que tiene
+    // la función apagada.
     const config = await configArqueoDeLocal(localId);
+    if (!config.arqueoCajaActivo) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Los arqueos parciales están desactivados en este local",
+          funcionInactiva: true,
+        },
+        { status: 409 }
+      );
+    }
 
     const arqueo = await prisma.$transaction(async (tx) => {
       // Idempotencia: dos envíos del mismo conteo (doble clic, dos pestañas)

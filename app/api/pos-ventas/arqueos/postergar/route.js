@@ -41,7 +41,21 @@ export async function POST(req) {
       );
     }
 
+    // Misma barrera que en registrar: la configuración manda y se relee acá.
+    // Postergar una alerta que no existe no tiene sentido, y dejarlo pasar
+    // ensuciaría el historial de un local que nunca activó la función.
     const config = await configArqueoDeLocal(localId);
+    if (!config.arqueoCajaActivo) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Los arqueos parciales están desactivados en este local",
+          funcionInactiva: true,
+        },
+        { status: 409 }
+      );
+    }
+
     const ahora = new Date();
 
     const ultimo = await ultimoArqueoDeTurno(turno.id);

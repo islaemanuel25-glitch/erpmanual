@@ -34,9 +34,27 @@ export async function GET(req) {
     const { localId, turno } = ctx;
     const config = await configArqueoDeLocal(localId);
 
+    // Función apagada en este local: se responde temprano y explícito. El POS
+    // usa `activo` para decidir si dibuja algo, así que no hace falta leer ni
+    // el turno ni los arqueos. También evita el trabajo de contar filas que
+    // nadie va a mirar.
+    if (!config.arqueoCajaActivo) {
+      return NextResponse.json({
+        ok: true,
+        activo: false,
+        motivo: "funcion-desactivada",
+        turnoId: turno?.id ?? null,
+        estado: estadoArqueo({ ahora: new Date(), turno, config }),
+        ultimoArqueoEn: null,
+        cantidadArqueos: 0,
+      });
+    }
+
     if (!turno) {
       return NextResponse.json({
         ok: true,
+        activo: true,
+        motivo: "sin-caja-abierta",
         turnoId: null,
         estado: estadoArqueo({ ahora: new Date(), turno: null, config }),
         ultimoArqueoEn: null,
@@ -62,6 +80,8 @@ export async function GET(req) {
 
     return NextResponse.json({
       ok: true,
+      activo: true,
+      motivo: null,
       turnoId: turno.id,
       aperturaEn: turno.apertura,
       ultimoArqueoEn: ultimo?.fechaHora ?? null,

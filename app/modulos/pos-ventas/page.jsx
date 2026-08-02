@@ -1555,9 +1555,12 @@ export default function PosVentasPage() {
                 Caja +/-
               </button>
             )}
-            {/* Arqueo: SIEMPRE disponible con la caja abierta, haya vencido la
-                alerta o no. El punto rojo aparece solo cuando está vencida. */}
-            {turnoActual && (
+            {/* Arqueo: disponible desde la apertura del turno —haya vencido la
+                alerta o no— pero SOLO si el local tiene la función activa.
+                `arqueo.visible` exige que el backend haya respondido, así que el
+                botón no parpadea mientras carga: o no está, o está para quedarse.
+                El punto rojo aparece solo cuando la alerta venció. */}
+            {turnoActual && arqueo.visible && (
               <button
                 onClick={() => setMostrarArqueo(true)}
                 className={`text-[11px] px-2 py-1 rounded transition-colors inline-flex items-center gap-1 ${
@@ -1598,7 +1601,7 @@ export default function PosVentasPage() {
         {/* Arqueo vencido: franja persistente, sin botón de cerrar. Recargar no
             la hace desaparecer porque el estado vive en el servidor. Solo se va
             registrando el arqueo o consiguiendo una postergación válida. */}
-        {turnoActual && (
+        {turnoActual && arqueo.visible && (
           <AvisoArqueo
             estado={arqueo.estado}
             ultimoArqueoEn={arqueo.ultimoArqueoEn}
@@ -1967,7 +1970,7 @@ export default function PosVentasPage() {
         />
       )}
 
-      {mostrarArqueo && turnoActual && (
+      {mostrarArqueo && turnoActual && arqueo.visible && (
         <ModalArqueoCaja
           turnoId={turnoActual.id}
           localId={localActual}

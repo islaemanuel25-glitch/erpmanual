@@ -35,6 +35,11 @@ export default function useArqueoEstado({ turnoId, localId, habilitado = true } 
   const [ultimoArqueoEn, setUltimoArqueoEn] = useState(null);
   const [cantidadArqueos, setCantidadArqueos] = useState(0);
   const [cargando, setCargando] = useState(false);
+  // `null` = todavía no se sabe. Distinto de `false` = el servidor dijo que la
+  // función está apagada. La UI no dibuja nada mientras sea null, así que el
+  // botón nunca aparece y desaparece: solo aparece cuando hay un `true`
+  // confirmado por el backend.
+  const [resuelto, setResuelto] = useState(false);
 
   // Evita que una respuesta lenta pise a una más nueva.
   const peticionRef = useRef(0);
@@ -56,6 +61,7 @@ export default function useArqueoEstado({ turnoId, localId, habilitado = true } 
         setEstado({ ...ESTADO_INICIAL, ...(json.estado || {}) });
         setUltimoArqueoEn(json.ultimoArqueoEn ?? null);
         setCantidadArqueos(json.cantidadArqueos ?? 0);
+        setResuelto(true);
       }
     } catch {
       // Silencioso a propósito: un fallo de red del chequeo de arqueo no puede
@@ -69,11 +75,17 @@ export default function useArqueoEstado({ turnoId, localId, habilitado = true } 
     if (!habilitado || !turnoId) return undefined;
     refrescar();
 
-    const tick = () => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      refrescar();
-    };
-    const id = setInterval(tick, REFRESCO_MS);
+    // Con la función APAGADA no se instala el intervalo: un local que no usa
+    // arqueos no tiene por qué consultar cada 45 s para que le repitan que no
+    // los usa. Los listeners sí quedan, así que si alguien la activa desde
+    // Configuración, la próxima vuelta al foco —o la próxima venta, que llama
+    // a `refrescar()`— la detecta sin necesidad de recargar ni redesplegar.
+    const id = estado.activo
+      ? setInterval(() => {
+          if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+          refrescar();
+        }, REFRESCO_MS)
+      : null;
 
     const alVolver = () => {
       if (typeof document === "undefined") return;
@@ -83,11 +95,15 @@ export default function useArqueoEstado({ turnoId, localId, habilitado = true } 
     window.addEventListener("focus", alVolver);
 
     return () => {
-      clearInterval(id);
+      if (id) clearInterval(id);
       document.removeEventListener("visibilitychange", alVolver);
       window.removeEventListener("focus", alVolver);
     };
-  }, [habilitado, turnoId, refrescar]);
+  }, [habilitado, turnoId, refrescar, estado.activo]);
 
-  return { estado, ultimoArqueoEn, cantidadArqueos, cargando, refrescar };
+  // `visible` es la única señal que la UI debe mirar para dibujar el botón o la
+  // franja: exige que el backend haya respondido Y que la función esté activa.
+  const visible = resuelto && estado.activo === true;
+
+  return { estado, visible, resuelto, ultimoArqueoEn, cantidadArqueos, cargando, refrescar };
 }
