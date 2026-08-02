@@ -7,6 +7,7 @@ import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import CircuitoDelDinero from "@/components/turnos/CircuitoDelDinero";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import HistorialArqueos from "@/components/pos-ventas/HistorialArqueos";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -57,23 +58,52 @@ const FORMA_PAGO_LABELS = {
 function imprimirZReport(turno, resumen, movimientos) {
   const totalVentas =
     (resumen.totalEfectivo || 0) + (resumen.totalDigital || 0);
-  const totalIngresos = (movimientos || [])
-    .filter((m) => m.tipo === "INGRESO")
-    .reduce((s, m) => s + m.monto, 0);
-  const totalRetiros = (movimientos || [])
-    .filter((m) => m.tipo === "RETIRO")
-    .reduce((s, m) => s + m.monto, 0);
+
+  // El RETIRO DE CIERRE se separa del resto. Ocurre DESPUÉS del conteo, así que
+  // no forma parte del efectivo esperado: si se sumara al resto de los retiros,
+  // el comprobante imprimiría un esperado más bajo que el del arqueo FINAL y el
+  // faltante que muestra el papel no coincidiría con el guardado.
+  const idRetiroCierre = turno.retiroCierreMovimientoId ?? null;
+  const previos = (movimientos || []).filter((m) => m.id !== idRetiroCierre);
+  const totalIngresos = previos.filter((m) => m.tipo === "INGRESO").reduce((s, m) => s + m.monto, 0);
+  const totalRetiros = previos.filter((m) => m.tipo === "RETIRO").reduce((s, m) => s + m.monto, 0);
+
+  // El esperado GUARDADO manda. Solo se recalcula en turnos anteriores al
+  // circuito, que no lo tienen persistido.
   const esperado =
-    Number(turno.montoInicial) + (resumen.totalEfectivo || 0) + totalIngresos - totalRetiros;
+    turno.montoEsperadoEfectivo != null
+      ? Number(turno.montoEsperadoEfectivo)
+      : Number(turno.montoInicial) + (resumen.totalEfectivo || 0) + totalIngresos - totalRetiros;
 
   let movHtml = "";
-  if (movimientos && movimientos.length > 0) {
+  if (previos.length > 0) {
     movHtml = `
 <div class="line"></div>
 <div class="center bold">MOVIMIENTOS CAJA</div>
 <div class="row"><span>Ingresos:</span><span>+$${fmt(totalIngresos)}</span></div>
 <div class="row"><span>Retiros:</span><span>-$${fmt(totalRetiros)}</span></div>`;
   }
+
+  // Entrega del efectivo. Solo se imprime en turnos que pasaron por el circuito
+  // nuevo: en los históricos estos campos son NULL y la sección no existe.
+  const hayEntrega = turno.efectivoRetiradoCierre != null || turno.fondoDejadoCierre != null;
+  const entregaHtml = hayEntrega
+    ? `
+<div class="line"></div>
+<div class="center bold">ENTREGA DEL EFECTIVO</div>
+<div class="row"><span>Se retira:</span><span>$${fmt(turno.efectivoRetiradoCierre)}</span></div>
+<div class="row bold"><span>Queda de fondo:</span><span>$${fmt(turno.fondoDejadoCierre)}</span></div>
+${turno.destinoRetiroCierre ? `<div class="row"><span>Destino:</span><span>${turno.destinoRetiroCierre}</span></div>` : ""}
+${turno.recibidoPorCierre ? `<div class="row"><span>Recibe:</span><span>${turno.recibidoPorCierre}</span></div>` : ""}
+<div class="center" style="font-size:10px;margin-top:4px;">El fondo que queda abre el proximo turno</div>`
+    : "";
+
+  const obsHtml = turno.observaciones
+    ? `
+<div class="line"></div>
+<div class="center bold">OBSERVACIONES</div>
+<div style="font-size:11px;">${String(turno.observaciones).replace(/</g, "&lt;")}</div>`
+    : "";
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Z Report - Turno #${turno.id}</title>
@@ -91,6 +121,7 @@ function imprimirZReport(turno, resumen, movimientos) {
 <div class="center">Cierre de Turno</div>
 <div class="line"></div>
 <div class="row"><span>Turno:</span><span>#${turno.id}</span></div>
+<div class="row"><span>Local:</span><span>${turno.local?.nombre || "-"}</span></div>
 <div class="row"><span>Cajero:</span><span>${turno.vendedor?.nombre || "-"}</span></div>
 <div class="row"><span>Apertura:</span><span>${fmtFecha(turno.apertura)}</span></div>
 <div class="row"><span>Cierre:</span><span>${fmtFecha(turno.cierre)}</span></div>
@@ -112,9 +143,11 @@ ${movHtml}
 <div class="row"><span>+ Ventas efectivo:</span><span>$${fmt(resumen.totalEfectivo)}</span></div>
 ${totalIngresos > 0 ? `<div class="row"><span>+ Ingresos:</span><span>$${fmt(totalIngresos)}</span></div>` : ""}
 ${totalRetiros > 0 ? `<div class="row"><span>- Retiros:</span><span>$${fmt(totalRetiros)}</span></div>` : ""}
-<div class="row bold"><span>Esperado:</span><span>$${fmt(esperado)}</span></div>
-<div class="row"><span>Real contado:</span><span>$${fmt(turno.montoRealEfectivo)}</span></div>
+<div class="row bold"><span>Efectivo esperado:</span><span>$${fmt(esperado)}</span></div>
+<div class="row"><span>Efectivo contado:</span><span>$${fmt(turno.montoRealEfectivo)}</span></div>
 <div class="row bold"><span>Diferencia:</span><span>$${fmt(turno.diferenciaEfectivo)}</span></div>
+${entregaHtml}
+${obsHtml}
 <div class="line"></div>
 <div class="center" style="font-size:10px; margin-top:8px;">Impreso: ${new Date().toLocaleString("es-AR")}</div>
 </body></html>`;
@@ -575,6 +608,8 @@ export default function TurnoDetallePage() {
           </div>
         </SunmiCard>
       )}
+
+      <CircuitoDelDinero turno={turno} />
 
       {/* Modal ingreso/retiro */}
       {modalMov && (

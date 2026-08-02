@@ -125,16 +125,15 @@ export async function POST(req) {
       const esViejo = diaApertura && diaApertura !== hoyArgentinaISO();
       const quien = turnoAbierto.vendedor?.nombre || "otro usuario";
 
-      let error;
-      if (propio) {
-        error = esViejo
-          ? `Tenés una caja abierta del ${diaApertura}. Cerrala antes de abrir una nueva.`
-          : "Ya tenés un turno abierto.";
-      } else {
-        error = esViejo
-          ? `${quien} tiene una caja abierta del ${diaApertura} en este local. Hay que cerrarla antes de abrir otra.`
-          : `${quien} tiene la caja abierta en este local. Hay que cerrarla antes de abrir otra.`;
-      }
+      // Hora local argentina: el turno pudo abrirse otro día, así que se incluye
+      // la fecha cuando no es de hoy.
+      const cuando = esViejo
+        ? new Date(turnoAbierto.apertura).toLocaleString("es-AR", { timeZone: "America/Argentina/Cordoba" })
+        : new Date(turnoAbierto.apertura).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Cordoba", hour: "2-digit", minute: "2-digit" });
+
+      const error = propio
+        ? `Ya tenés un turno abierto en este local desde ${cuando}. Debe cerrarse antes de abrir otro.`
+        : `Ya hay un turno abierto en este local por ${quien} desde ${cuando}. Debe cerrarse antes de abrir otro.`;
 
       return NextResponse.json(
         {

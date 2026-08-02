@@ -113,6 +113,8 @@ export default function TurnosPage() {
     "Esperado",
     "Real",
     "Diferencia",
+    "Se retiró",
+    "Fondo dejado",
     "Ventas",
     "Efectivo",
     "Digital",
@@ -203,6 +205,15 @@ export default function TurnosPage() {
                       : ""
                   }`}>
                     {fmt(t.diferenciaEfectivo)}
+                  </td>
+                  {/* Circuito del dinero. "—" cuando el turno es ANTERIOR al circuito:
+                      mostrar 0 haría creer que no se retiró nada, cuando en realidad
+                      nunca hubo registro. */}
+                  <td className="px-3 py-2 text-sm text-right">
+                    {t.efectivoRetiradoCierre != null ? fmt(t.efectivoRetiradoCierre) : <span className="sunmi-text-muted">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-sm text-right sunmi-text-link">
+                    {t.fondoDejadoCierre != null ? fmt(t.fondoDejadoCierre) : <span className="sunmi-text-muted">—</span>}
                   </td>
                   <td className="px-3 py-2 text-sm text-center">{t.cantidadVentas ?? "-"}</td>
                   <td className="px-3 py-2 text-sm text-right">{fmt(t.totalVentasEfectivo)}</td>

@@ -48,9 +48,23 @@ export async function GET(req) {
         totalVentasDigital: true,
         cantidadVentas: true,
         observaciones: true,
+        // Circuito del dinero (NULL en turnos anteriores al circuito).
+        efectivoRetiradoCierre: true,
+        fondoDejadoCierre: true,
+        retiroCierreMovimientoId: true,
+        destinoRetiroCierre: true,
+        recibidoPorCierre: true,
+        fondoSugeridoApertura: true,
+        fondoRecibidoApertura: true,
+        diferenciaFondoApertura: true,
+        observacionFondoApertura: true,
+        fondoOrigenTurnoId: true,
+        fondoConsumidoEnTurnoId: true,
         vendedor: {
           select: { id: true, nombre: true },
         },
+        // Para el encabezado del comprobante de cierre.
+        local: { select: { id: true, nombre: true } },
       },
     });
 
@@ -106,6 +120,20 @@ export async function GET(req) {
         cantidadVentas: turno.cantidadVentas,
         observaciones: turno.observaciones,
         vendedor: turno.vendedor,
+        local: turno.local ? { id: turno.local.id, nombre: turno.local.nombre } : null,
+        // Circuito del dinero. `null` = turno anterior al circuito, NO cero: la
+        // pantalla y el comprobante los distinguen y muestran "—".
+        efectivoRetiradoCierre: turno.efectivoRetiradoCierre != null ? Number(turno.efectivoRetiradoCierre) : null,
+        fondoDejadoCierre: turno.fondoDejadoCierre != null ? Number(turno.fondoDejadoCierre) : null,
+        retiroCierreMovimientoId: turno.retiroCierreMovimientoId ?? null,
+        destinoRetiroCierre: turno.destinoRetiroCierre ?? null,
+        recibidoPorCierre: turno.recibidoPorCierre ?? null,
+        fondoSugeridoApertura: turno.fondoSugeridoApertura != null ? Number(turno.fondoSugeridoApertura) : null,
+        fondoRecibidoApertura: turno.fondoRecibidoApertura != null ? Number(turno.fondoRecibidoApertura) : null,
+        diferenciaFondoApertura: turno.diferenciaFondoApertura != null ? Number(turno.diferenciaFondoApertura) : null,
+        observacionFondoApertura: turno.observacionFondoApertura ?? null,
+        fondoOrigenTurnoId: turno.fondoOrigenTurnoId ?? null,
+        fondoConsumidoEnTurnoId: turno.fondoConsumidoEnTurnoId ?? null,
       },
       ventas: ventas.map((v) => ({
         id: v.id,
