@@ -1041,6 +1041,44 @@ model Turno {
   totalVentasDigital  Decimal? @db.Decimal(12, 2)
   cantidadVentas      Int?
 
+  // ── CIRCUITO DEL DINERO FÍSICO ─────────────────────────────────────────────
+  //
+  // Antes el cierre guardaba cuánto se contó, pero no qué pasaba después con esa
+  // plata. Como no había forma de registrar el retiro, el efectivo se quedaba en
+  // el cajón: el turno siguiente declaraba un fondo de $10.000 mientras el cajón
+  // tenía cientos de miles, y ese arrastre tapaba los faltantes reales.
+  //
+  // Ahora el cierre reparte el efectivo contado, sin resto:
+  //     efectivoRetiradoCierre + fondoDejadoCierre = montoRealEfectivo
+  //
+  // Todo NULLABLE: los turnos cerrados antes de esto no se tocan y siguen
+  // leyéndose igual (ver el test "turno histórico con campos NULL").
+  efectivoRetiradoCierre   Decimal? @db.Decimal(12, 2)
+  fondoDejadoCierre        Decimal? @db.Decimal(12, 2)
+  /// CajaMovimiento RETIRO creado por el cierre. Se crea DESPUÉS del arqueo FINAL
+  /// para que no altere el esperado de su propio cierre.
+  retiroCierreMovimientoId Int?
+  destinoRetiroCierre      String?
+  /// Quién recibió la plata retirada. Texto libre a propósito: muchas veces es
+  /// alguien que no tiene usuario en el sistema (el dueño, un familiar).
+  recibidoPorCierre        String?
+
+  // ── RECEPCIÓN DEL FONDO AL ABRIR ───────────────────────────────────────────
+  //
+  // El fondo sugerido es lo que dejó el cierre anterior; el recibido es lo que el
+  // cajero contó de verdad. `montoInicial` SIEMPRE toma el recibido: si el sistema
+  // impusiera el sugerido, una diferencia de recepción quedaría escondida y
+  // reaparecería como faltante al cerrar, culpando al cajero equivocado.
+  fondoSugeridoApertura    Decimal? @db.Decimal(12, 2)
+  fondoRecibidoApertura    Decimal? @db.Decimal(12, 2)
+  diferenciaFondoApertura  Decimal? @db.Decimal(12, 2)
+  observacionFondoApertura String?
+  /// Turno cuyo cierre dejó este fondo. @unique = el fondo de un cierre lo puede
+  /// tomar UN solo turno: la base lo garantiza, no la aplicación.
+  fondoOrigenTurnoId       Int?     @unique
+  /// Inverso denormalizado: qué turno se llevó el fondo que dejó ESTE cierre.
+  fondoConsumidoEnTurnoId  Int?
+
   observaciones String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

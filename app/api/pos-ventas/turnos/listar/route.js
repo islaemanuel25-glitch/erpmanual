@@ -79,6 +79,18 @@ export async function GET(req) {
         totalVentasDigital: true,
         cantidadVentas: true,
         observaciones: true,
+        // Circuito del dinero físico. NULL en los turnos cerrados antes de que
+        // existiera: el historial los muestra igual que siempre.
+        efectivoRetiradoCierre: true,
+        fondoDejadoCierre: true,
+        destinoRetiroCierre: true,
+        recibidoPorCierre: true,
+        fondoSugeridoApertura: true,
+        fondoRecibidoApertura: true,
+        diferenciaFondoApertura: true,
+        observacionFondoApertura: true,
+        fondoOrigenTurnoId: true,
+        fondoConsumidoEnTurnoId: true,
         vendedor: {
           select: { id: true, nombre: true, email: true },
         },
@@ -98,6 +110,18 @@ export async function GET(req) {
       totalVentasDigital: t.totalVentasDigital != null ? Number(t.totalVentasDigital) : null,
       cantidadVentas: t.cantidadVentas,
       observaciones: t.observaciones,
+      // Circuito del dinero. `null` significa "este turno es anterior al
+      // circuito", no "cero": la pantalla tiene que poder distinguirlo.
+      efectivoRetiradoCierre: t.efectivoRetiradoCierre != null ? Number(t.efectivoRetiradoCierre) : null,
+      fondoDejadoCierre: t.fondoDejadoCierre != null ? Number(t.fondoDejadoCierre) : null,
+      destinoRetiroCierre: t.destinoRetiroCierre,
+      recibidoPorCierre: t.recibidoPorCierre,
+      fondoSugeridoApertura: t.fondoSugeridoApertura != null ? Number(t.fondoSugeridoApertura) : null,
+      fondoRecibidoApertura: t.fondoRecibidoApertura != null ? Number(t.fondoRecibidoApertura) : null,
+      diferenciaFondoApertura: t.diferenciaFondoApertura != null ? Number(t.diferenciaFondoApertura) : null,
+      observacionFondoApertura: t.observacionFondoApertura,
+      fondoOrigenTurnoId: t.fondoOrigenTurnoId,
+      fondoConsumidoEnTurnoId: t.fondoConsumidoEnTurnoId,
       vendedor: t.vendedor,
     }));
 

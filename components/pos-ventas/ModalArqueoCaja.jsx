@@ -54,7 +54,12 @@ const TONOS = {
   },
 };
 
-export default function ModalArqueoCaja({ turnoId, localId, onClose, onRegistrado }) {
+// `montoInicial` es solo para el TEXTO del conteo ("el fondo inicial de $X"): que
+// el cajero vea el número lo ayuda a acordarse de incluirlo. No entra en ningún
+// cálculo — el esperado lo resuelve entero el backend y sigue sin mostrarse antes
+// de confirmar, para que el conteo siga siendo ciego.
+export default function ModalArqueoCaja({ turnoId, localId, montoInicial = 0, onClose, onRegistrado }) {
+  const montoInicialTurno = Number(montoInicial) || 0;
   const [paso, setPaso] = useState("conteo"); // conteo | resultado
   const [contado, setContado] = useState("");
   const [observacion, setObservacion] = useState("");
@@ -118,12 +123,27 @@ export default function ModalArqueoCaja({ turnoId, localId, onClose, onRegistrad
             <div className="text-center">
               <h2 className="text-lg font-bold sunmi-pos-text-accent">Arqueo de caja</h2>
               <p className="text-[12px] sunmi-pos-muted mt-0.5">
-                Contá el efectivo del cajón e ingresá el total. No cierra la caja.
+                No cierra la caja ni mueve dinero. Es solo un control.
               </p>
             </div>
 
+            {/* Mismo texto que el paso 1 del cierre: la causa de los faltantes
+                falsos era contar solo lo vendido y dejar afuera el fondo. */}
+            <div className="sunmi-pos-panel rounded-lg p-3">
+              <div className="text-sm font-bold">
+                ¿Cuánto efectivo físico hay ahora mismo en el cajón?
+              </div>
+              <div className="text-[12px] sunmi-pos-muted mt-1">
+                Contá TODO: el fondo inicial{montoInicialTurno > 0 ? ` de $${money(montoInicialTurno)}` : ""}, lo cobrado
+                en efectivo y lo que haya quedado, menos los retiros que ya registraste.
+              </div>
+              <div className="text-[12px] sunmi-pos-muted mt-1">
+                No cuentes Mercado Pago, débito ni crédito: esa plata no está en el cajón.
+              </div>
+            </div>
+
             <div>
-              <label className="text-xs sunmi-pos-muted mb-1 block">Efectivo contado ($)</label>
+              <label className="text-xs sunmi-pos-muted mb-1 block">Dinero en el cajón ($)</label>
               <SunmiInput
                 type="number"
                 min="0"

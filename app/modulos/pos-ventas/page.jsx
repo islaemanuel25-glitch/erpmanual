@@ -1981,6 +1981,8 @@ export default function PosVentasPage() {
         <ModalArqueoCaja
           turnoId={turnoActual.id}
           localId={localActual}
+          // Solo para el texto del conteo ("incluí el fondo inicial de $X").
+          montoInicial={turnoActual.montoInicial}
           onClose={() => {
             setMostrarArqueo(false);
             arqueo.refrescar();
