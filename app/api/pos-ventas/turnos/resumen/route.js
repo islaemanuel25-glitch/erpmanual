@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
+import { calcularEfectivoEsperado } from "@/lib/caja/efectivoEsperado";
 
 export async function GET(req) {
   try {
@@ -28,7 +29,7 @@ export async function GET(req) {
 
     const turno = await prisma.turno.findUnique({
       where: { id: turnoId },
-      select: { localId: true },
+      select: { localId: true, montoInicial: true },
     });
 
     if (!turno) {
@@ -61,52 +62,39 @@ export async function GET(req) {
       }),
     ]);
 
-    let totalEfectivo = 0;
-    let totalDigital = 0;
-    let totalComision = 0;
-    let netoDigital = 0;
-    let totalFiado = 0;
-    const desglose = { mercadopago: 0, debito: 0, credito: 0, fiado: 0 };
-
-    // Agregación POR TENDER: cada pago aporta su monto al bucket de SU medio. Una
-    // venta mixta puede sumar parcialmente en efectivo y en un medio digital.
-    ventas.forEach((v) => {
-      for (const t of tendersParaAgregar(v)) {
-        if (t.medio === "FIADO") {
-          totalFiado += t.monto;
-          desglose.fiado += t.monto;
-        } else if (t.medio === "EFECTIVO") {
-          totalEfectivo += t.monto;
-        } else {
-          // digital (MERCADOPAGO / DEBITO / CREDITO)
-          totalDigital += t.monto;
-          totalComision += t.comision;
-          netoDigital += t.neto;
-          const key = t.medio.toLowerCase();
-          if (desglose[key] !== undefined) desglose[key] += t.monto;
-        }
-      }
+    // Totales por tender e ingresos/retiros: misma función que usa el cierre y
+    // el arqueo (lib/caja/efectivoEsperado). Antes esta agregación estaba
+    // escrita a mano acá y otra vez en cerrar/route.js.
+    const calculo = calcularEfectivoEsperado({
+      montoInicial: turno?.montoInicial ?? 0,
+      ventas,
+      movimientos: cajaMovimientos,
     });
 
-    // Sumar movimientos de caja (ingresos y retiros)
-    let totalIngresosCaja = 0;
-    let totalRetirosCaja = 0;
-    cajaMovimientos.forEach((m) => {
-      const monto = Number(m.monto) || 0;
-      if (m.tipo === "INGRESO") totalIngresosCaja += monto;
-      else if (m.tipo === "RETIRO") totalRetirosCaja += monto;
+    // El desglose POR MEDIO digital es propio de esta pantalla —el cierre no lo
+    // necesita— así que se arma acá, sobre los mismos tenders.
+    const desglose = { mercadopago: 0, debito: 0, credito: 0, fiado: 0 };
+    ventas.forEach((v) => {
+      for (const t of tendersParaAgregar(v)) {
+        const key = String(t.medio || "").toLowerCase();
+        if (desglose[key] !== undefined) desglose[key] += t.monto;
+      }
     });
 
     return NextResponse.json({
       ok: true,
-      cantidadVentas: ventas.length,
-      totalEfectivo,
-      totalDigital,
-      totalFiado,
-      totalComision,
-      netoDigital,
-      totalIngresosCaja,
-      totalRetirosCaja,
+      cantidadVentas: calculo.cantidadVentas,
+      totalEfectivo: calculo.ventasEfectivo,
+      totalDigital: calculo.ventasDigital,
+      totalFiado: calculo.ventasFiado,
+      totalComision: calculo.comisionDigital,
+      netoDigital: calculo.netoDigital,
+      totalIngresosCaja: calculo.ingresos,
+      totalRetirosCaja: calculo.retiros,
+      // El esperado ya calculado por el backend: el modal de cierre lo muestra
+      // en vez de recalcularlo por su cuenta.
+      montoInicial: calculo.montoInicial,
+      efectivoEsperado: calculo.efectivoEsperado,
       desglose,
     });
   } catch (error) {

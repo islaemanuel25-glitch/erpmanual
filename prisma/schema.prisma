@@ -112,6 +112,8 @@ model Local {
   ticketConfig       TicketConfig?
   configuracionLocal ConfiguracionLocal?
   operadorAsignaciones OperadorEnLocal[]
+  arqueos              ArqueoCaja[]
+  arqueoPostergaciones ArqueoPostergacion[]
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -132,6 +134,22 @@ model ConfiguracionLocal {
   // de visualización de negocio que aplican a TODOS los dispositivos del local.
   // Distinta de la preferencia personal por navegador (localStorage).
   aparienciaJson     Json?
+
+  // Arqueos parciales de caja (config_local.alertas). Todo nullable: un local
+  // sin fila conserva el comportamiento histórico (sin alertas), y por eso el
+  // default efectivo de `arqueoCajaActivo` es false — activar esto en producción
+  // tiene que ser una decisión explícita por local, nunca un efecto de la
+  // migración.
+  arqueoCajaActivo                 Boolean?
+  /// Minutos entre arqueos. Se cuenta desde el último arqueo del turno, o desde
+  /// la apertura si todavía no hubo ninguno.
+  intervaloArqueoMinutos           Int?
+  /// Demora tolerada antes de exigir autorización para postergar.
+  toleranciaPostergacionMinutos    Int?
+  /// Cuánto corre una postergación pedida por el cajero.
+  postergacionCajeroMinutos        Int?
+  requiereAutorizacionPostergacion Boolean?
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -163,6 +181,11 @@ model Usuario {
   turnos            Turno[]
   turnosCerrados    Turno[]            @relation("turnoCerradoPor")
   cajaMovimientos   CajaMovimiento[]
+  arqueosComoCajero      ArqueoCaja[]         @relation("arqueoCajero")
+  arqueosRealizados      ArqueoCaja[]         @relation("arqueoRealizadoPor")
+  arqueosPostergados     ArqueoCaja[]         @relation("arqueoPostergadoPor")
+  postergacionesArqueo   ArqueoPostergacion[] @relation("postergacionPor")
+  postergacionesAutorizadas ArqueoPostergacion[] @relation("postergacionAutorizadaPor")
   movimientosPuntos ClientePuntoMovimiento[]
   movimientosCC     MovimientoCuenta[]
   auditoriaStock    AuditoriaStock[]
@@ -1028,11 +1051,113 @@ model Turno {
   cerradoPor  Usuario?       @relation("turnoCerradoPor", fields: [cerradoPorId], references: [id])
   ventas      Venta[]
   cajaMovimientos CajaMovimiento[]
+  arqueos         ArqueoCaja[]
+  postergaciones  ArqueoPostergacion[]
 
   @@index([localId])
   @@index([vendedorId])
   @@index([apertura])
   @@index([operadorId])
+}
+
+/// Arqueo de caja: foto contable de un conteo físico en un momento del turno.
+///
+/// Un turno puede tener CERO, uno o muchos arqueos PARCIALES y como mucho un
+/// FINAL. El parcial NO cierra la caja ni corrige nada: solo deja registrado
+/// qué esperaba el sistema y qué había realmente en el cajón.
+///
+/// Las diferencias de arqueos anteriores NO son movimientos de dinero y no
+/// entran en el esperado del siguiente: un faltante detectado a las 10:00 sigue
+/// faltando a las 12:00, pero es el MISMO faltante, no dos.
+model ArqueoCaja {
+  id      Int @id @default(autoincrement())
+  turnoId Int
+  localId Int
+
+  /// Cajero responsable del turno (Turno.vendedorId, copiado al momento del arqueo).
+  usuarioId Int
+  /// Operario que estaba operando el POS, si el local los exige.
+  operadorId Int?
+  /// Quién ejecutó materialmente el conteo (puede no ser el responsable del turno).
+  realizadoPorId Int
+
+  fechaHora    DateTime @default(now())
+  /// Ventana controlada por este corte: desde la apertura o el arqueo anterior,
+  /// hasta el instante de confirmación calculado por el BACKEND.
+  periodoDesde DateTime
+  periodoHasta DateTime
+
+  /// Misma precisión monetaria que Turno. Nunca float.
+  efectivoEsperado Decimal @db.Decimal(12, 2)
+  efectivoContado  Decimal @db.Decimal(12, 2)
+  /// contado − esperado. Positiva = sobrante, negativa = faltante.
+  diferencia       Decimal @db.Decimal(12, 2)
+
+  observacion String?
+  /// PARCIAL | FINAL
+  tipo        String  @default("PARCIAL")
+
+  // ── Alerta y auditoría de cumplimiento ──────────────────────────────────
+  alertaProgramadaPara  DateTime?
+  minutosDemora         Int?
+  fuePostergado         Boolean   @default(false)
+  postergadoPorId       Int?
+  motivoPostergacion    String?
+  cantidadPostergaciones Int      @default(0)
+
+  /// Clave de idempotencia del cliente: dos envíos del mismo conteo (doble clic,
+  /// dos pestañas) colapsan en una sola fila en vez de duplicar el arqueo.
+  idempotencyKey String?
+
+  creadoEn     DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  turno        Turno          @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  local        Local          @relation(fields: [localId], references: [id])
+  usuario      Usuario        @relation("arqueoCajero", fields: [usuarioId], references: [id])
+  operador     OperadorLocal? @relation(fields: [operadorId], references: [id])
+  realizadoPor Usuario        @relation("arqueoRealizadoPor", fields: [realizadoPorId], references: [id])
+  postergadoPor Usuario?      @relation("arqueoPostergadoPor", fields: [postergadoPorId], references: [id])
+
+  @@unique([turnoId, idempotencyKey])
+  @@index([turnoId])
+  @@index([localId])
+  @@index([fechaHora])
+  @@index([tipo])
+}
+
+/// Postergación de una alerta de arqueo vencida.
+///
+/// Vive aparte de ArqueoCaja porque ocurre ANTES de que el arqueo exista: es el
+/// acto de posponer el conteo, no el conteo. Al registrarse finalmente el
+/// arqueo, sus contadores se copian a la fila de ArqueoCaja como resumen.
+model ArqueoPostergacion {
+  id      Int @id @default(autoincrement())
+  turnoId Int
+  localId Int
+
+  /// Vencimiento que se estaba postergando.
+  alertaProgramadaPara DateTime
+  /// Hasta cuándo corre esta postergación.
+  venceEn              DateTime
+  minutosDemora        Int      @default(0)
+
+  postergadoPorId Int
+  motivo          String?
+  /// Presente solo cuando la demora superó la tolerancia y el local exige
+  /// autorización: deja registrado QUIÉN habilitó seguir sin contar.
+  autorizadoPorId Int?
+
+  creadoEn DateTime @default(now())
+
+  turno         Turno    @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  local         Local    @relation(fields: [localId], references: [id])
+  postergadoPor Usuario  @relation("postergacionPor", fields: [postergadoPorId], references: [id])
+  autorizadoPor Usuario? @relation("postergacionAutorizadaPor", fields: [autorizadoPorId], references: [id])
+
+  @@index([turnoId])
+  @@index([localId])
+  @@index([venceEn])
 }
 
 model CajaMovimiento {
@@ -1300,6 +1425,7 @@ model OperadorLocal {
   locales OperadorEnLocal[]
   ventas  Venta[]
   turnos  Turno[]
+  arqueos ArqueoCaja[]
 }
 
 model OperadorEnLocal {

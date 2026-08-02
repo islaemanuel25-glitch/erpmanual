@@ -8,6 +8,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import HistorialArqueos from "@/components/pos-ventas/HistorialArqueos";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -473,6 +474,14 @@ export default function TurnoDetallePage() {
             ))
           )}
         </SunmiTable>
+      </SunmiCard>
+
+      {/* Arqueos del turno: cortes de control parciales + el final. */}
+      <SunmiCard className="!p-0 !bg-transparent !border-0">
+        <SunmiSeparator label="Arqueos de caja" />
+        <div className="mt-3">
+          <HistorialArqueos turnoId={turno?.id} />
+        </div>
       </SunmiCard>
 
       {/* Tabla de ventas */}

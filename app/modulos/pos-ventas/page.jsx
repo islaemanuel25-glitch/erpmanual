@@ -27,6 +27,9 @@ import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullsc
 import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
+import ModalArqueoCaja from "@/components/pos-ventas/ModalArqueoCaja";
+import AvisoArqueo from "@/components/pos-ventas/AvisoArqueo";
+import useArqueoEstado from "@/hooks/useArqueoEstado";
 import ModalPesoKg from "@/components/pos-ventas/ModalPesoKg";
 import ModalConfirmacion from "@/components/pos-ventas/ModalConfirmacion";
 import ModalPendientesOffline from "@/components/pos-ventas/ModalPendientesOffline";
@@ -61,6 +64,7 @@ export default function PosVentasPage() {
   const [mensajeTurnoVencido, setMensajeTurnoVencido] = useState("");
   const [mostrarCierre, setMostrarCierre] = useState(false);
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
+  const [mostrarArqueo, setMostrarArqueo] = useState(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
   // Servicio de importe variable pendiente de ingresar importe en el modal.
   const [servicioPendiente, setServicioPendiente] = useState(null);
@@ -114,6 +118,15 @@ export default function PosVentasPage() {
   // Local activo efectivo (del contexto global)
   const localActual = contexto?.localId || null;
   const localNombre = contexto?.nombre || "";
+
+  // Estado de la alerta de arqueo de ESTA caja. Se consulta solo con turno
+  // abierto y siempre acotado a turnoId + localId: la alerta de un local nunca
+  // llega a otro.
+  const arqueo = useArqueoEstado({
+    turnoId: turnoActual?.id || null,
+    localId: localActual,
+    habilitado: !!turnoActual?.id && !turnoVencido,
+  });
   
   // Obtener grupoId del contexto (necesario para cola offline)
   const [grupoId, setGrupoId] = useState(null);
@@ -1245,6 +1258,10 @@ export default function PosVentasPage() {
         const bd = data.breakdown || null;
         setUltimoBreakdown(bd);
 
+        // Una venta cambia el efectivo esperado y puede haber cruzado el
+        // vencimiento del intervalo: se refresca el estado del arqueo.
+        arqueo.refrescar();
+
         // Preparar datos del ticket
         const ventaTicket = {
           numero: data.numero,
@@ -1538,6 +1555,28 @@ export default function PosVentasPage() {
                 Caja +/-
               </button>
             )}
+            {/* Arqueo: SIEMPRE disponible con la caja abierta, haya vencido la
+                alerta o no. El punto rojo aparece solo cuando está vencida. */}
+            {turnoActual && (
+              <button
+                onClick={() => setMostrarArqueo(true)}
+                className={`text-[11px] px-2 py-1 rounded transition-colors inline-flex items-center gap-1 ${
+                  arqueo.estado.vencido
+                    ? "sunmi-pos-btn-danger font-bold"
+                    : "sunmi-pos-btn-secondary sunmi-pos-text-accent"
+                }`}
+                title={
+                  arqueo.estado.vencido
+                    ? `Arqueo vencido hace ${arqueo.estado.minutosDemora} min`
+                    : "Realizar arqueo de caja"
+                }
+              >
+                {arqueo.estado.vencido && (
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                )}
+                Arqueo
+              </button>
+            )}
             {turnoActual && (
               <button
                 onClick={() => setMostrarCierre(true)}
@@ -1555,6 +1594,23 @@ export default function PosVentasPage() {
             </SunmiButton>
           </div>
         </div>
+
+        {/* Arqueo vencido: franja persistente, sin botón de cerrar. Recargar no
+            la hace desaparecer porque el estado vive en el servidor. Solo se va
+            registrando el arqueo o consiguiendo una postergación válida. */}
+        {turnoActual && (
+          <AvisoArqueo
+            estado={arqueo.estado}
+            ultimoArqueoEn={arqueo.ultimoArqueoEn}
+            turnoId={turnoActual.id}
+            localId={localActual}
+            onArquear={() => setMostrarArqueo(true)}
+            onPostergado={() => {
+              showSuccess("Arqueo postergado");
+              arqueo.refrescar();
+            }}
+          />
+        )}
 
         {/* Venta interna: el cliente representa a un local propio y la venta va a
             generar una transferencia. Depende del MISMO state.clienteSeleccionado,
@@ -1905,6 +1961,23 @@ export default function PosVentasPage() {
           onClose={() => setMostrarCajaMovimiento(false)}
           onSuccess={(item) => {
             showSuccess(`${item.tipo === "INGRESO" ? "Ingreso" : "Retiro"} de $${Number(item.monto).toLocaleString("es-AR", { minimumFractionDigits: 2 })} registrado`);
+            // Un movimiento cambia el esperado: se refresca el estado.
+            arqueo.refrescar();
+          }}
+        />
+      )}
+
+      {mostrarArqueo && turnoActual && (
+        <ModalArqueoCaja
+          turnoId={turnoActual.id}
+          localId={localActual}
+          onClose={() => {
+            setMostrarArqueo(false);
+            arqueo.refrescar();
+          }}
+          onRegistrado={() => {
+            showSuccess("Arqueo registrado");
+            arqueo.refrescar();
           }}
         />
       )}

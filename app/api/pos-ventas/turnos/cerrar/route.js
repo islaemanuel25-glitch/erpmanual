@@ -3,8 +3,13 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { requireOperadorSegunConfig } from "@/lib/operador";
-import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
+import { resolveScope } from "@/lib/grupos";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
+// Fórmula única del efectivo esperado. Antes vivía duplicada acá, en
+// turnos/resumen y en ModalCierreTurno; ahora los tres —y los arqueos— usan la
+// misma función, así que el cierre y el arqueo no pueden informar faltantes
+// distintos sobre la misma caja.
+import { calcularEfectivoEsperado, calcularDiferencia } from "@/lib/caja/efectivoEsperado";
 
 export async function POST(req) {
   try {
@@ -36,6 +41,23 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "Turno ya cerrado" },
         { status: 400 }
+      );
+    }
+
+    // Aislamiento por local. Antes solo se validaba `vendedorId === session.id`:
+    // el local del turno nunca se contrastaba contra el alcance de la sesión.
+    // Un usuario reasignado a otro local conservaba la llave de un turno ajeno.
+    const scope = await resolveScope(req, { explicitLocalId: turno.localId });
+    if (scope.error) {
+      return NextResponse.json(
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
+      );
+    }
+    if (scope.localId !== turno.localId) {
+      return NextResponse.json(
+        { ok: false, error: "Turno fuera de tu alcance." },
+        { status: 403 }
       );
     }
 
@@ -71,43 +93,76 @@ export async function POST(req) {
       }),
     ]);
 
-    let totalEfectivo = 0;
-    let totalDigital = 0;
-
     // Agregación POR TENDER: en una venta mixta, solo el tender efectivo cuenta al
     // efectivo esperado; el resto va a digital. Fiado no aporta plata real.
-    ventas.forEach((v) => {
-      for (const t of tendersParaAgregar(v)) {
-        if (t.medio === "FIADO") continue;
-        if (t.medio === "EFECTIVO") totalEfectivo += t.monto;
-        else totalDigital += t.monto;
-      }
+    // Toda esa aritmética vive ahora en lib/caja/efectivoEsperado.
+    const calculo = calcularEfectivoEsperado({
+      montoInicial: turno.montoInicial,
+      ventas,
+      movimientos: cajaMovimientos,
     });
 
-    let totalIngresosCaja = 0;
-    let totalRetirosCaja = 0;
-    cajaMovimientos.forEach((m) => {
-      const monto = Number(m.monto) || 0;
-      if (m.tipo === "INGRESO") totalIngresosCaja += monto;
-      else if (m.tipo === "RETIRO") totalRetirosCaja += monto;
-    });
+    const totalEfectivo = calculo.ventasEfectivo;
+    const totalDigital = calculo.ventasDigital;
+    const montoEsperado = calculo.efectivoEsperado;
+    const diferencia = calcularDiferencia(montoRealEfectivo, montoEsperado);
 
-    const montoEsperado = Number(turno.montoInicial) + totalEfectivo + totalIngresosCaja - totalRetirosCaja;
-    const diferencia = Number(montoRealEfectivo) - montoEsperado;
+    const ahora = new Date();
 
-    const turnoCerrado = await prisma.turno.update({
-      where: { id: turnoId },
-      data: {
-        cierre: new Date(),
-        cerradoPorId: session.id,
-        montoEsperadoEfectivo: montoEsperado,
-        montoRealEfectivo: Number(montoRealEfectivo),
-        diferenciaEfectivo: diferencia,
-        totalVentasEfectivo: totalEfectivo,
-        totalVentasDigital: totalDigital,
-        cantidadVentas: ventas.length,
-        observaciones: observaciones || null,
-      },
+    // El cierre YA pide el efectivo contado, así que ese mismo conteo se guarda
+    // como arqueo FINAL en vez de pedirlo dos veces. Es la MISMA diferencia
+    // persistida en dos lugares con el mismo valor —el turno la conserva para no
+    // romper reportes, el arqueo la incorpora al historial de cortes—, no dos
+    // diferencias distintas sobre el mismo conteo.
+    //
+    // Transacción: si la creación del arqueo fallara, el turno no puede quedar
+    // cerrado sin su corte final.
+    const { turnoCerrado } = await prisma.$transaction(async (tx) => {
+      const actualizado = await tx.turno.update({
+        where: { id: turnoId },
+        data: {
+          cierre: ahora,
+          cerradoPorId: session.id,
+          montoEsperadoEfectivo: montoEsperado,
+          montoRealEfectivo: Number(montoRealEfectivo),
+          diferenciaEfectivo: diferencia,
+          totalVentasEfectivo: totalEfectivo,
+          totalVentasDigital: totalDigital,
+          cantidadVentas: ventas.length,
+          observaciones: observaciones || null,
+        },
+      });
+
+      // El período del corte final arranca donde terminó el último parcial, o en
+      // la apertura si no hubo ninguno.
+      const ultimo = await tx.arqueoCaja.findFirst({
+        where: { turnoId },
+        orderBy: { fechaHora: "desc" },
+        select: { fechaHora: true },
+      });
+
+      await tx.arqueoCaja.create({
+        data: {
+          turnoId,
+          localId: turno.localId,
+          usuarioId: turno.vendedorId,
+          operadorId: turno.operadorId ?? null,
+          realizadoPorId: session.id,
+          fechaHora: ahora,
+          periodoDesde: ultimo?.fechaHora ?? turno.apertura,
+          periodoHasta: ahora,
+          efectivoEsperado: montoEsperado,
+          efectivoContado: Number(montoRealEfectivo),
+          diferencia,
+          observacion: observaciones || null,
+          tipo: "FINAL",
+          // Un turno cerrado no se vuelve a cerrar, así que la clave fija basta
+          // para que un doble envío no genere dos cortes finales.
+          idempotencyKey: `cierre-${turnoId}`,
+        },
+      });
+
+      return { turnoCerrado: actualizado };
     });
 
     return NextResponse.json({ ok: true, turno: turnoCerrado });
