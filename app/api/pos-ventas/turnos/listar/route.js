@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { resolveLocalAndGrupo, getLocalIdsDeGrupo } from "@/lib/grupos";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import {
   construirWhereTurnos,
   normalizarEstado,
   normalizarPaginacion,
+  resolverLocalListado,
   ORDEN_LISTADO,
 } from "@/lib/turnos/filtrosListado";
 
@@ -40,32 +41,25 @@ export async function GET(req) {
       );
     }
 
-    const { grupoId, session } = scope;
-    let localId = scope.localId;
+    const { session } = scope;
     const params = req.nextUrl.searchParams;
 
-    // ── Local explícito ──────────────────────────────────────────────────
-    // Un admin puede mirar otro local del MISMO grupo desde el selector. La
-    // pertenencia se valida contra el grupo del ADMIN, no contra el grupo del
-    // local pedido: si no, cualquier localId de cualquier grupo pasaría, porque
-    // el grupo se derivaría del propio local pedido.
-    const localPedido = toPositiveInt(params.get("localId"));
-    if (localPedido && localPedido !== localId) {
-      if (!session.esAdmin) {
-        return NextResponse.json(
-          { ok: false, error: "No encontrado." },
-          { status: 404 }
-        );
-      }
-      const permitidos = await getLocalIdsDeGrupo(grupoId);
-      if (!permitidos.includes(localPedido)) {
-        return NextResponse.json(
-          { ok: false, error: "Local fuera de tu alcance." },
-          { status: 403 }
-        );
-      }
-      localId = localPedido;
+    // ── Local: SOLO del contexto activo ──────────────────────────────────
+    // La pantalla ya no tiene selector de local. Un `localId` mandado a mano no
+    // puede ampliar ni cambiar el alcance: si no coincide con el contexto, se
+    // rechaza. Para un no-admin, `resolveLocalAndGrupo` ya devolvió 404 antes de
+    // llegar acá si pidió un local ajeno.
+    const resuelto = resolverLocalListado({
+      localContexto: scope.localId,
+      localIdParam: params.get("localId"),
+    });
+    if (resuelto.error) {
+      return NextResponse.json(
+        { ok: false, error: resuelto.error },
+        { status: resuelto.status }
+      );
     }
+    const localId = resuelto.localId;
 
     // ── Vendedor ─────────────────────────────────────────────────────────
     const puedeVerTodos =

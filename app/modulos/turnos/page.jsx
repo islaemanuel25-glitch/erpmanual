@@ -8,13 +8,11 @@ import SinPermisos from "@/components/auth/SinPermisos";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
-import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 const fmt = (n) =>
@@ -72,11 +70,8 @@ function EtiquetaEstado({ turno }) {
 // controles sueltos sin texto: no se podía saber cuál era "desde" y cuál "hasta".
 function Campo({ label, children, htmlFor }) {
   return (
-    <div className="flex flex-col gap-1 min-w-0">
-      <label
-        htmlFor={htmlFor}
-        className="text-[11px] font-semibold sunmi-text-muted uppercase tracking-wide"
-      >
+    <div className="min-w-0">
+      <label htmlFor={htmlFor} className="text-[11px] sunmi-text-muted mb-1 block">
         {label}
       </label>
       {children}
@@ -91,17 +86,19 @@ export default function TurnosPage() {
 
   const [turnos, setTurnos] = useState([]);
   const [vendedores, setVendedores] = useState([]);
-  const [locales, setLocales] = useState([]);
   const [paginacion, setPaginacion] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const hoy = hoyArgentinaISO();
 
-  // Filtros. El estado inicial es deliberado: hoy, local actual y solo las cajas
-  // abiertas. Entrar a la pantalla no debe disparar una consulta de todo el
-  // historial — para eso está ampliar el rango a mano.
-  const [localId, setLocalId] = useState("");
+  // Filtros. El estado inicial es deliberado: hoy y solo las cajas abiertas.
+  // Entrar a la pantalla no debe disparar una consulta de todo el historial —
+  // para eso está ampliar el rango a mano.
+  //
+  // El LOCAL no es un filtro: sale del contexto activo del ERP y no se elige
+  // acá. Que exista una sola forma de cambiar de ubicación evita que la pantalla
+  // muestre un local distinto del que dice la cabecera de la aplicación.
   const [fechaDesde, setFechaDesde] = useState(hoy);
   const [fechaHasta, setFechaHasta] = useState(hoy);
   const [estado, setEstado] = useState(ESTADO_INICIAL);
@@ -113,22 +110,7 @@ export default function TurnosPage() {
   const puedeUsar = esAdmin || permisos.includes("pos.usar");
   const puedeVerTodos = esAdmin || permisos.includes("turnos.ver_todos");
 
-  // El local del contexto es el valor inicial del filtro.
-  useEffect(() => {
-    if (contexto?.localId && !localId) setLocalId(String(contexto.localId));
-  }, [contexto?.localId, localId]);
-
-  // Opciones de local: solo tiene sentido elegir si sos admin. El endpoint ya
-  // acota al grupo activo, y el backend revalida la pertenencia igual.
-  useEffect(() => {
-    if (!esAdmin) return;
-    fetch("/api/locales/opciones", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.ok && Array.isArray(d.items)) setLocales(d.items);
-      })
-      .catch(() => {});
-  }, [esAdmin]);
+  const localId = contexto?.localId ? String(contexto.localId) : "";
 
   const buscar = useCallback(
     async (paginaPedida = 1) => {
@@ -136,8 +118,8 @@ export default function TurnosPage() {
       setLoading(true);
       setError("");
       try {
+        // Sin `localId`: el backend lo resuelve del contexto autenticado.
         const params = new URLSearchParams();
-        params.set("localId", localId);
         params.set("fechaDesde", fechaDesde || hoy);
         params.set("fechaHasta", fechaHasta || hoy);
         params.set("estado", estado);
@@ -183,7 +165,6 @@ export default function TurnosPage() {
     setFechaHasta(hoy);
     setEstado(ESTADO_INICIAL);
     setVendedorId("");
-    setLocalId(contexto?.localId ? String(contexto.localId) : "");
     setPage(1);
   };
 
@@ -215,88 +196,98 @@ export default function TurnosPage() {
   // reales, pero siguen visibles y auditables.
   const claseFila = (t) => (estadoDe(t) === "anulada" ? "opacity-60" : "");
 
+  // Franja compacta: encabezado + filtros. En escritorio entra todo en una fila;
+  // en móvil las fechas van a la par y el resto a ancho completo. Sin separador
+  // "Filtros" y sin selector de Local: el local es el del contexto del ERP.
   const filtros = (
-    <SunmiCard>
-      <h1 className="text-lg font-bold mb-2">Cajas</h1>
-      <SunmiSeparator label="Filtros" />
+    <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
+      <div className="mb-3">
+        <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
+          Cajas
+        </h1>
+        <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
+          Consulta de turnos y cierres
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-3">
-        <Campo label="Local" htmlFor="f-local">
-          {esAdmin ? (
-            <SunmiSelectAdv
-              value={localId}
-              onChange={(v) => setLocalId(v)}
-              placeholder="Seleccioná un local"
-            >
-              {locales.map((l) => (
-                <option key={l.id} value={String(l.id)}>
-                  {l.nombre}
-                </option>
-              ))}
-            </SunmiSelectAdv>
-          ) : (
-            <SunmiInput
-              id="f-local"
-              value={contexto?.nombre || "-"}
-              readOnly
-              disabled
-            />
-          )}
-        </Campo>
-
-        <Campo label="Fecha desde" htmlFor="f-desde">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 sm:gap-3 items-end">
+        <Campo label="Desde" htmlFor="f-desde">
           <SunmiInput
             id="f-desde"
             type="date"
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
+            className="!border !border-[var(--pos-link)]"
           />
         </Campo>
 
-        <Campo label="Fecha hasta" htmlFor="f-hasta">
+        <Campo label="Hasta" htmlFor="f-hasta">
           <SunmiInput
             id="f-hasta"
             type="date"
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
+            className="!border !border-[var(--pos-link)]"
           />
         </Campo>
 
-        <Campo label="Estado">
-          <SunmiSelectAdv value={estado} onChange={(v) => setEstado(v)}>
-            <option value="abiertas">Abiertas</option>
-            <option value="cerradas">Cerradas</option>
-            <option value="anuladas">Anuladas</option>
-            <option value="todas">Todas</option>
-          </SunmiSelectAdv>
-        </Campo>
-
-        <Campo label="Vendedor">
-          {puedeVerTodos ? (
+        <div className="col-span-2 lg:col-span-1 relative">
+          <Campo label="Estado">
             <SunmiSelectAdv
-              value={vendedorId}
-              onChange={(v) => setVendedorId(v)}
+              value={estado}
+              onChange={(v) => setEstado(v)}
+              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
-              <option value="">Todos los vendedores</option>
-              {vendedores.map((v) => (
-                <option key={v.id} value={String(v.id)}>
-                  {v.nombre || v.email}
-                </option>
-              ))}
+              <option value="abiertas">Abiertas</option>
+              <option value="cerradas">Cerradas</option>
+              <option value="anuladas">Anuladas</option>
+              <option value="todas">Todas</option>
             </SunmiSelectAdv>
-          ) : (
-            <SunmiInput value="Solo mis cajas" readOnly disabled />
-          )}
-        </Campo>
-      </div>
+          </Campo>
+        </div>
 
-      <div className="flex flex-wrap gap-2 mt-4">
-        <SunmiButton color="amber" onClick={() => buscar(1)} disabled={!localId}>
-          Buscar
-        </SunmiButton>
-        <SunmiButton color="slate" onClick={limpiar}>
-          Limpiar filtros
-        </SunmiButton>
+        <div className="col-span-2 lg:col-span-1 relative">
+          <Campo label="Vendedor">
+            {puedeVerTodos ? (
+              <SunmiSelectAdv
+                value={vendedorId}
+                onChange={(v) => setVendedorId(v)}
+                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+              >
+                <option value="">Todos los vendedores</option>
+                {vendedores.map((v) => (
+                  <option key={v.id} value={String(v.id)}>
+                    {v.nombre || v.email}
+                  </option>
+                ))}
+              </SunmiSelectAdv>
+            ) : (
+              <SunmiInput value="Solo mis cajas" readOnly disabled />
+            )}
+          </Campo>
+        </div>
+
+        <div className="col-span-2 lg:col-span-1">
+          <SunmiButton
+            color="amber"
+            onClick={() => buscar(1)}
+            disabled={loading || !localId}
+            className="w-full font-semibold"
+          >
+            {loading ? "Buscando…" : "Buscar"}
+          </SunmiButton>
+        </div>
+
+        <div className="col-span-2 lg:col-span-1">
+          <SunmiButton
+            color="slate"
+            onClick={limpiar}
+            disabled={loading}
+            className="w-full"
+          >
+            Limpiar filtros
+          </SunmiButton>
+        </div>
       </div>
     </SunmiCard>
   );
@@ -322,6 +313,17 @@ export default function TurnosPage() {
     <div className="p-3 space-y-3">
       {filtros}
 
+      {/* Panel separado para el vacío: un "Sin datos disponibles" dentro de la
+          tabla no se ve en móvil, donde la tabla ni siquiera se renderiza. */}
+      {!loading && !error && turnos.length === 0 && (
+        <SunmiCard>
+          <p className="text-sm text-center py-8 sunmi-text-muted">
+            No hay cajas para estos filtros.
+          </p>
+        </SunmiCard>
+      )}
+
+      {(loading || error || turnos.length > 0) && (
       <SunmiCard>
         {loading ? (
           <SunmiLoader />
@@ -329,18 +331,16 @@ export default function TurnosPage() {
           <p className="text-sm text-center py-6 sunmi-text-danger">{error}</p>
         ) : (
           <>
-            {/* ===== ESCRITORIO (desde 1024px) =====
-                El corte es `lg`, no `md`: verificado en navegador, a 768px la
-                tabla de 14 columnas deja 25 elementos fuera del viewport. El
-                contenedor tiene overflow-x-auto, así que la pagina no scrollea
-                de lado, pero igual habria que arrastrar para leer una sola caja
-                — y 768 es el ancho tipico de una tablet en mostrador. */}
+            {/* ===== ESCRITORIO (desde 1280px) =====
+                El corte es `xl`, no `md` ni `lg`: medido en navegador, la tabla
+                de 14 columnas deja 25 elementos fuera del viewport a 768px y 11
+                a 1024px. El contenedor tiene overflow-x-auto, así que la página
+                no scrollea de lado, pero igual habría que arrastrar para leer
+                una sola caja — y 768 es el ancho típico de una tablet en
+                mostrador. */}
             <div className="hidden xl:block">
               <SunmiTable headers={headers}>
-                {turnos.length === 0 ? (
-                  <SunmiTableEmpty colSpan={headers.length} />
-                ) : (
-                  turnos.map((t) => (
+                {turnos.map((t) => (
                     <SunmiTableRow key={t.id} className={claseFila(t)}>
                       <td className="px-3 py-2 text-sm">
                         <EtiquetaEstado turno={t} />
@@ -395,22 +395,16 @@ export default function TurnosPage() {
                         </SunmiButton>
                       </td>
                     </SunmiTableRow>
-                  ))
-                )}
+                ))}
               </SunmiTable>
             </div>
 
-            {/* ===== MÓVIL =====
+            {/* ===== MÓVIL Y TABLET (hasta 1279px) =====
                 Una tabla de 14 columnas en un teléfono obliga a desplazarse de
                 lado para leer una sola caja. Acá cada caja es una tarjeta con
                 cada dato etiquetado, y nada se sale del ancho. */}
             <div className="xl:hidden space-y-3">
-              {turnos.length === 0 ? (
-                <p className="text-sm text-center py-6 sunmi-text-muted">
-                  No hay cajas para estos filtros.
-                </p>
-              ) : (
-                turnos.map((t) => (
+              {turnos.map((t) => (
                   <div
                     key={t.id}
                     className={`rounded-lg border sunmi-border p-3 ${claseFila(t)}`}
@@ -469,8 +463,7 @@ export default function TurnosPage() {
                       <Dato k="Digital" v={fmt(t.totalVentasDigital)} />
                     </dl>
                   </div>
-                ))
-              )}
+              ))}
             </div>
 
             {paginacion && paginacion.total > 0 && (
@@ -500,6 +493,7 @@ export default function TurnosPage() {
           </>
         )}
       </SunmiCard>
+      )}
     </div>
   );
 }
