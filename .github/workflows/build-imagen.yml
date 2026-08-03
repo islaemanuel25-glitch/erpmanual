@@ -93,12 +93,21 @@ jobs:
           # Falla el paso si la imagen no existe: no se anuncia un build que
           # despues no se pueda descargar.
           docker buildx imagetools inspect "$REF"
-          DIGEST=$(docker buildx imagetools inspect "$REF" --format '{{.Manifest.Digest}}')
-          PLATAFORMAS=$(docker buildx imagetools inspect "$REF" --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')
+          # El digest se lee de la salida plana, NO con --format.
+          #
+          # Con `provenance: false` y una sola plataforma, buildx publica un
+          # manifiesto SIMPLE (application/vnd.oci.image.manifest.v1+json), no un
+          # indice. Las plantillas que recorren `.Manifest.Manifests` fallan ahi
+          # con error de template, porque ese campo no existe en un manifiesto
+          # simple. La salida plana sirve para las dos formas.
+          DIGEST=$(docker buildx imagetools inspect "$REF" | awk '/^Digest:/ {print $2; exit}')
+          if [ -z "$DIGEST" ]; then
+            echo "ABORTA: no se pudo leer el digest de la imagen publicada"
+            exit 1
+          fi
           echo "----------------------------------------"
           echo "SHA construido : ${{ github.sha }}"
           echo "Digest         : ${DIGEST}"
-          echo "Plataformas    : ${PLATAFORMAS:-linux/amd64 (manifiesto simple)}"
           echo "----------------------------------------"
           {
             echo "### Imagen publicada"
@@ -124,4 +133,16 @@ jobs:
             exit 1
           fi
           echo "OK: coincide con ${{ github.sha }}"
-          echo "- **APP_BUILD_ID verificado**: \`${DENTRO}\`" >> "$GITHUB_STEP_SUMMARY"
+          # La arquitectura se comprueba sobre la imagen ya descargada, que es la
+          # fuente definitiva: el VPS es x86_64 y una imagen de otra arquitectura
+          # no arrancaria ahi.
+          ARCH=$(docker image inspect "$REF" --format '{{.Os}}/{{.Architecture}}')
+          echo "Plataforma de la imagen: ${ARCH}"
+          if [ "$ARCH" != "linux/amd64" ]; then
+            echo "ABORTA: la imagen no es linux/amd64"
+            exit 1
+          fi
+          {
+            echo "- **APP_BUILD_ID verificado**: \`${DENTRO}\`"
+            echo "- **Plataforma**: \`${ARCH}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
