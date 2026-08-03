@@ -329,8 +329,13 @@ export default function TurnosPage() {
           <p className="text-sm text-center py-6 sunmi-text-danger">{error}</p>
         ) : (
           <>
-            {/* ===== ESCRITORIO ===== */}
-            <div className="hidden md:block">
+            {/* ===== ESCRITORIO (desde 1024px) =====
+                El corte es `lg`, no `md`: verificado en navegador, a 768px la
+                tabla de 14 columnas deja 25 elementos fuera del viewport. El
+                contenedor tiene overflow-x-auto, así que la pagina no scrollea
+                de lado, pero igual habria que arrastrar para leer una sola caja
+                — y 768 es el ancho tipico de una tablet en mostrador. */}
+            <div className="hidden xl:block">
               <SunmiTable headers={headers}>
                 {turnos.length === 0 ? (
                   <SunmiTableEmpty colSpan={headers.length} />
@@ -399,7 +404,7 @@ export default function TurnosPage() {
                 Una tabla de 14 columnas en un teléfono obliga a desplazarse de
                 lado para leer una sola caja. Acá cada caja es una tarjeta con
                 cada dato etiquetado, y nada se sale del ancho. */}
-            <div className="md:hidden space-y-3">
+            <div className="xl:hidden space-y-3">
               {turnos.length === 0 ? (
                 <p className="text-sm text-center py-6 sunmi-text-muted">
                   No hay cajas para estos filtros.
