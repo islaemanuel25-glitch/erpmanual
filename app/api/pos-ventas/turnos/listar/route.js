@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { resolveLocalAndGrupo, getLocalIdsDeGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
-import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
+import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
+import {
+  construirWhereTurnos,
+  normalizarEstado,
+  normalizarPaginacion,
+  ORDEN_LISTADO,
+} from "@/lib/turnos/filtrosListado";
+
+function toPositiveInt(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
 
 export async function GET(req) {
   try {
@@ -13,91 +24,137 @@ export async function GET(req) {
         { status: perm.status }
       );
 
-    const scope = await resolveLocalAndGrupo(req);
+    // `lecturaAjena` → un no-admin que pide otro local recibe 404, no 403: no se
+    // le confirma que ese local exista.
+    const scope = await resolveLocalAndGrupo(req, { lecturaAjena: true });
     if (scope.error) {
       return NextResponse.json(
-        { ok: false, error: scope.error },
+        {
+          ok: false,
+          error: scope.error,
+          // La pantalla necesita distinguir "elegí un local" de un error real
+          // para mostrar el cartel en vez de un mensaje de fallo.
+          ...(scope.needsContexto ? { needsContexto: true } : {}),
+        },
         { status: scope.status }
       );
     }
 
-    const { localId, session } = scope;
+    const { grupoId, session } = scope;
+    let localId = scope.localId;
     const params = req.nextUrl.searchParams;
 
-    // Filtros
-    const fechaDesde = params.get("fechaDesde");
-    const fechaHasta = params.get("fechaHasta");
-    const estado = params.get("estado") || "todos";
-    let vendedorId = params.get("vendedorId")
-      ? Number(params.get("vendedorId"))
-      : null;
+    // ── Local explícito ──────────────────────────────────────────────────
+    // Un admin puede mirar otro local del MISMO grupo desde el selector. La
+    // pertenencia se valida contra el grupo del ADMIN, no contra el grupo del
+    // local pedido: si no, cualquier localId de cualquier grupo pasaría, porque
+    // el grupo se derivaría del propio local pedido.
+    const localPedido = toPositiveInt(params.get("localId"));
+    if (localPedido && localPedido !== localId) {
+      if (!session.esAdmin) {
+        return NextResponse.json(
+          { ok: false, error: "No encontrado." },
+          { status: 404 }
+        );
+      }
+      const permitidos = await getLocalIdsDeGrupo(grupoId);
+      if (!permitidos.includes(localPedido)) {
+        return NextResponse.json(
+          { ok: false, error: "Local fuera de tu alcance." },
+          { status: 403 }
+        );
+      }
+      localId = localPedido;
+    }
 
-    // Scope: solo sus turnos si no tiene turnos.ver_todos ni es admin
+    // ── Vendedor ─────────────────────────────────────────────────────────
     const puedeVerTodos =
       session.esAdmin || session.permisos.includes("turnos.ver_todos");
+    let vendedorId = toPositiveInt(params.get("vendedorId"));
     if (!puedeVerTodos) {
+      // Sin `turnos.ver_todos` el alcance es siempre propio, mande lo que mande.
       vendedorId = session.id;
     }
 
-    // Where
-    const where = { localId };
-
-    if (vendedorId) {
-      where.vendedorId = vendedorId;
-    }
-
-    if (estado === "abierto") {
-      where.cierre = null;
-    } else if (estado === "cerrado") {
-      where.cierre = { not: null };
-    }
-
-    if (fechaDesde || fechaHasta) {
-      // Rango en hora Argentina para que turnos cercanos a medianoche no se
-      // corran un día cuando el contenedor corre en UTC.
-      const { fechaInicio, fechaFin } = getRangoArgentina(
-        fechaDesde || fechaHasta,
-        fechaHasta || fechaDesde
-      );
-      where.apertura = {};
-      if (fechaDesde) where.apertura.gte = fechaInicio;
-      if (fechaHasta) where.apertura.lte = fechaFin;
-    }
-
-    const turnos = await prisma.turno.findMany({
-      where,
-      orderBy: { apertura: "desc" },
-      select: {
-        id: true,
-        apertura: true,
-        cierre: true,
-        montoInicial: true,
-        montoEsperadoEfectivo: true,
-        montoRealEfectivo: true,
-        diferenciaEfectivo: true,
-        totalVentasEfectivo: true,
-        totalVentasDigital: true,
-        cantidadVentas: true,
-        observaciones: true,
-        // Circuito del dinero físico. NULL en los turnos cerrados antes de que
-        // existiera: el historial los muestra igual que siempre.
-        efectivoRetiradoCierre: true,
-        fondoDejadoCierre: true,
-        destinoRetiroCierre: true,
-        recibidoPorCierre: true,
-        fondoSugeridoApertura: true,
-        fondoRecibidoApertura: true,
-        diferenciaFondoApertura: true,
-        observacionFondoApertura: true,
-        fondoOrigenTurnoId: true,
-        fondoConsumidoEnTurnoId: true,
-        anuladoEn: true,
-        motivoAnulacion: true,
-        vendedor: {
-          select: { id: true, nombre: true, email: true },
-        },
-      },
+    const estado = normalizarEstado(params.get("estado"));
+    const { where, rango } = construirWhereTurnos({
+      localId,
+      vendedorId,
+      estado,
+      fechaDesde: params.get("fechaDesde"),
+      fechaHasta: params.get("fechaHasta"),
+      hoy: hoyArgentinaISO(),
     });
+
+    const { page, pageSize, skip, take } = normalizarPaginacion({
+      page: params.get("page"),
+      pageSize: params.get("pageSize"),
+    });
+
+    const [total, turnos] = await Promise.all([
+      prisma.turno.count({ where }),
+      prisma.turno.findMany({
+        where,
+        orderBy: ORDEN_LISTADO,
+        skip,
+        take,
+        select: {
+          id: true,
+          apertura: true,
+          cierre: true,
+          montoInicial: true,
+          montoEsperadoEfectivo: true,
+          montoRealEfectivo: true,
+          diferenciaEfectivo: true,
+          totalVentasEfectivo: true,
+          totalVentasDigital: true,
+          cantidadVentas: true,
+          observaciones: true,
+          // Circuito del dinero físico. NULL en los turnos cerrados antes de que
+          // existiera: el historial los muestra igual que siempre.
+          efectivoRetiradoCierre: true,
+          fondoDejadoCierre: true,
+          destinoRetiroCierre: true,
+          recibidoPorCierre: true,
+          fondoSugeridoApertura: true,
+          fondoRecibidoApertura: true,
+          diferenciaFondoApertura: true,
+          observacionFondoApertura: true,
+          fondoOrigenTurnoId: true,
+          fondoConsumidoEnTurnoId: true,
+          anuladoEn: true,
+          motivoAnulacion: true,
+          vendedor: {
+            select: { id: true, nombre: true, email: true },
+          },
+        },
+      }),
+    ]);
+
+    // Opciones del filtro de vendedor. Se calculan sobre TODOS los turnos del
+    // local, sin aplicar los filtros activos: si se calcularan sobre el
+    // resultado, elegir un vendedor dejaría al resto fuera del desplegable y no
+    // se podría volver atrás.
+    let vendedores = [];
+    if (puedeVerTodos) {
+      const filas = await prisma.turno.findMany({
+        where: { localId },
+        distinct: ["vendedorId"],
+        select: {
+          vendedorId: true,
+          vendedor: { select: { id: true, nombre: true, email: true } },
+        },
+      });
+      vendedores = filas
+        .map((f) => f.vendedor)
+        .filter(Boolean)
+        .sort((a, b) =>
+          String(a.nombre || a.email).localeCompare(
+            String(b.nombre || b.email),
+            "es"
+          )
+        );
+    }
 
     // Serializar Decimals
     const items = turnos.map((t) => ({
@@ -130,7 +187,26 @@ export async function GET(req) {
       vendedor: t.vendedor,
     }));
 
-    return NextResponse.json({ ok: true, items });
+    return NextResponse.json({
+      ok: true,
+      items,
+      vendedores,
+      // El rango REALMENTE aplicado, para que la pantalla pueda mostrar qué se
+      // consultó aunque el usuario no haya elegido fechas.
+      filtros: {
+        localId,
+        estado,
+        vendedorId,
+        fechaDesde: rango.desde,
+        fechaHasta: rango.hasta,
+      },
+      paginacion: {
+        page,
+        pageSize,
+        total,
+        totalPaginas: Math.max(1, Math.ceil(total / pageSize)),
+      },
+    });
   } catch (error) {
     console.error("Error listar turnos:", error);
     return NextResponse.json(
