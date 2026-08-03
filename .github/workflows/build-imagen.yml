@@ -1,0 +1,127 @@
+# Construye la imagen de producción FUERA del VPS y la publica en GHCR.
+#
+# POR QUÉ EXISTE
+# El VPS compilaba la imagen él mismo: 15–20 minutos con `next build` tomando
+# hasta 254% de CPU, compartiendo los 8 núcleos y el disco con el ERP y con
+# PostgreSQL. El ERP se ponía lento en cada despliegue. Acá el build ocurre en
+# un runner de GitHub y el VPS pasa a solo descargar la imagen ya hecha.
+#
+# ETAPA 1: este workflow solo CONSTRUYE Y PUBLICA. El VPS todavía compila y
+# despliega como siempre — `docker-compose.prod.yml` no se toca en esta etapa.
+#
+# LA ETIQUETA ES EL SHA COMPLETO, Y ES LA ÚNICA
+# No se publica `latest` a propósito. Una etiqueta móvil no permite saber qué
+# versión está corriendo ni volver a una anterior, y `concurrency` NO garantiza
+# orden estricto de ejecución: GitHub puede reemplazar workflows pendientes y no
+# promete que terminen en el orden en que se hizo push. Con solo el SHA, dos
+# builds que terminen desordenados publican cada uno lo suyo y ninguno pisa al
+# otro. Producción despliega siempre por SHA completo.
+#
+# El `concurrency` de abajo existe para no gastar runners en paralelo sobre la
+# misma rama, no para ordenar nada.
+
+name: Construir y publicar imagen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Serializa los builds de main para no desperdiciar runners. NO se apoya en
+  # esto para ordenar publicaciones: cada imagen se identifica por su SHA.
+  group: publicar-imagen-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGEN: ghcr.io/islaemanuel25-glitch/erpmanual
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Traer el código
+        uses: actions/checkout@v4
+
+      - name: Preparar buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Autenticarse en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN alcanza para publicar en el GHCR de este mismo
+          # repositorio; no hace falta un PAT en el workflow.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y publicar por SHA
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          # El VPS es x86_64. Una sola plataforma: construir para más es tiempo
+          # y espacio que nadie usa.
+          platforms: linux/amd64
+          push: true
+          # Los attestations de buildx crean un índice multi-manifiesto que
+          # confunde a `docker compose pull` en algunas versiones. Se apaga
+          # durante la transición.
+          provenance: false
+          tags: ${{ env.IMAGEN }}:${{ github.sha }}
+          build-args: |
+            APP_BUILD_ID=${{ github.sha }}
+            REQUIRE_BUILD_ID=1
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verificar que el SHA quedó publicado
+        run: |
+          set -euo pipefail
+          REF="${IMAGEN}:${{ github.sha }}"
+          echo "Verificando ${REF}"
+          # Falla el paso si la imagen no existe: no se anuncia un build que
+          # despues no se pueda descargar.
+          docker buildx imagetools inspect "$REF"
+          DIGEST=$(docker buildx imagetools inspect "$REF" --format '{{.Manifest.Digest}}')
+          PLATAFORMAS=$(docker buildx imagetools inspect "$REF" --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')
+          echo "----------------------------------------"
+          echo "SHA construido : ${{ github.sha }}"
+          echo "Digest         : ${DIGEST}"
+          echo "Plataformas    : ${PLATAFORMAS:-linux/amd64 (manifiesto simple)}"
+          echo "----------------------------------------"
+          {
+            echo "### Imagen publicada"
+            echo ""
+            echo "- **Referencia**: \`${REF}\`"
+            echo "- **Digest**: \`${DIGEST}\`"
+            echo "- **Desplegar con**: \`ERP_IMAGE_TAG=${{ github.sha }}\`"
+            echo ""
+            echo "No se publica \`latest\`: producción despliega siempre por SHA completo."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verificar que el APP_BUILD_ID viajó dentro de la imagen
+        run: |
+          set -euo pipefail
+          REF="${IMAGEN}:${{ github.sha }}"
+          docker pull --quiet "$REF"
+          # El ENV de la imagen tiene que coincidir con el commit: si no, la
+          # imagen no es de este codigo y /api/version mentiria en produccion.
+          DENTRO=$(docker image inspect "$REF" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^APP_BUILD_ID=' | cut -d= -f2)
+          echo "APP_BUILD_ID dentro de la imagen: ${DENTRO}"
+          if [ "$DENTRO" != "${{ github.sha }}" ]; then
+            echo "ABORTA: el APP_BUILD_ID de la imagen no coincide con el commit"
+            exit 1
+          fi
+          echo "OK: coincide con ${{ github.sha }}"
+          echo "- **APP_BUILD_ID verificado**: \`${DENTRO}\`" >> "$GITHUB_STEP_SUMMARY"
