@@ -55,6 +55,25 @@ El build **debe** recibir el SHA del commit desplegado. Es la identidad que usa
 el guard de versión para detectar pestañas que quedaron con un bundle anterior
 (ver `lib/version/compararBuild.js`).
 
+> **Desde la Etapa 2 de la migración a GHCR**, el build de producción ya **no se
+> hace en el VPS**: lo hace GitHub Actions y publica la imagen en
+> `ghcr.io/islaemanuel25-glitch/erpmanual:<SHA_COMPLETO>`. El VPS solo descarga.
+>
+> El camino normal pasa a ser definir `APP_IMAGE` y desplegar sin construir:
+>
+> ```bash
+> export APP_IMAGE="ghcr.io/islaemanuel25-glitch/erpmanual:$(git rev-parse HEAD)"
+> docker compose -f docker-compose.prod.yml pull app
+> docker compose -f docker-compose.prod.yml up -d --no-deps app
+> ```
+>
+> `APP_IMAGE` va en el entorno del shell o en el `.env` del proyecto — **nunca en
+> `.env.prod`**: ese archivo es el `env_file` del contenedor, sus variables no se
+> usan para interpolar el compose y además terminarían dentro de la aplicación.
+>
+> El bloque de abajo queda como **camino de emergencia**, para cuando GitHub
+> Actions o GHCR no estén disponibles.
+
 ```bash
 APP_BUILD_ID="$(git rev-parse HEAD)" \
   docker compose -f docker-compose.prod.yml build app

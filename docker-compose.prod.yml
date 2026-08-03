@@ -18,6 +18,32 @@ services:
       retries: 10
 
   app:
+    # === CAMINO NORMAL: imagen ya construida en GHCR, identificada por SHA ===
+    #
+    # `APP_IMAGE` la define quien despliega, NUNCA se fija acá:
+    #   APP_IMAGE=ghcr.io/islaemanuel25-glitch/erpmanual:<SHA_COMPLETO>
+    #
+    # Sin `latest` a propósito: una etiqueta móvil no permite saber qué versión
+    # está corriendo ni volver a una anterior.
+    #
+    # El default `erpazul-app` es el CAMINO DE EMERGENCIA: es el mismo nombre que
+    # produce el build local de siempre. Sin APP_IMAGE, `build` + `up` se comportan
+    # exactamente como hasta hoy, así que el VPS nunca queda sin forma de levantar.
+    image: ${APP_IMAGE:-erpazul-app}
+    # `up` DESCARGA, NO CONSTRUYE.
+    #
+    # Este renglón es lo único que impide que un `docker compose up -d` distraído
+    # dispare un build de 20 minutos en el VPS. Cuando un servicio declara `build`,
+    # el default de Compose pasa a ser construir la imagen si no está presente;
+    # con `missing` solo la busca en el cache local y, si no está, la baja del
+    # registry. Si no puede bajarla, falla — que es lo correcto: mejor un error
+    # claro que una compilación silenciosa encima de producción.
+    pull_policy: missing
+    # === CAMINO DE EMERGENCIA: build local ===
+    #
+    # Se conserva a propósito. Solo se activa con `docker compose build app`
+    # EXPLÍCITO; `up` ya no lo alcanza gracias a pull_policy. Sirve si GitHub
+    # Actions o GHCR no están disponibles y hay que desplegar igual.
     build:
       context: .
       dockerfile: Dockerfile
