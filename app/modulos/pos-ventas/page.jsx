@@ -28,7 +28,7 @@ import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullsc
 import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
-import ModalArqueoCaja from "@/components/pos-ventas/ModalArqueoCaja";
+import ModalRetiroDinero from "@/components/pos-ventas/ModalRetiroDinero";
 import AvisoArqueo from "@/components/pos-ventas/AvisoArqueo";
 import useArqueoEstado from "@/hooks/useArqueoEstado";
 import ModalPesoKg from "@/components/pos-ventas/ModalPesoKg";
@@ -65,7 +65,7 @@ export default function PosVentasPage() {
   const [mensajeTurnoVencido, setMensajeTurnoVencido] = useState("");
   const [mostrarCierre, setMostrarCierre] = useState(false);
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
-  const [mostrarArqueo, setMostrarArqueo] = useState(false);
+  const [mostrarRetiro, setMostrarRetiro] = useState(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
   // Servicio de importe variable pendiente de ingresar importe en el modal.
   const [servicioPendiente, setServicioPendiente] = useState(null);
@@ -1549,22 +1549,28 @@ export default function PosVentasPage() {
                 {state.puntosCanje > 0 ? `Puntos: -${state.puntosCanje}` : `Puntos: ${state.saldoPuntos}`}
               </button>
             )}
+            {/* Egresos manuales: gastos y salidas extraordinarias. La
+                recaudación NO se retira por acá — para eso está "Retirar
+                recaudación", que además crea el movimiento solo. */}
             {turnoActual && (
               <button
                 onClick={() => setMostrarCajaMovimiento(true)}
                 className="text-[11px] sunmi-pos-btn-secondary px-2 py-1 rounded transition-colors sunmi-pos-text-accent"
+                title="Ingreso o egreso puntual de caja (gastos, cambio)"
               >
                 Caja +/-
               </button>
             )}
-            {/* Arqueo: disponible desde la apertura del turno —haya vencido la
-                alerta o no— pero SOLO si el local tiene la función activa.
+            {/* RETIRAR RECAUDACIÓN. Reemplaza al botón "Arqueo": el arqueo solo
+                fotografiaba y el descuento dependía de que el cajero se acordara
+                de crear el movimiento aparte. Acá es una sola operación y el
+                movimiento lo crea el backend en la misma transacción.
                 `arqueo.visible` exige que el backend haya respondido, así que el
-                botón no parpadea mientras carga: o no está, o está para quedarse.
-                El punto rojo aparece solo cuando la alerta venció. */}
+                botón no parpadea mientras carga. El punto rojo sigue marcando la
+                alerta vencida. */}
             {turnoActual && arqueo.visible && (
               <button
-                onClick={() => setMostrarArqueo(true)}
+                onClick={() => setMostrarRetiro(true)}
                 className={`text-[11px] px-2 py-1 rounded transition-colors inline-flex items-center gap-1 ${
                   arqueo.estado.vencido
                     ? "sunmi-pos-btn-danger font-bold"
@@ -1572,14 +1578,19 @@ export default function PosVentasPage() {
                 }`}
                 title={
                   arqueo.estado.vencido
-                    ? `Arqueo vencido hace ${arqueo.estado.minutosDemora} min`
-                    : "Realizar arqueo de caja"
+                    ? `Retiro pendiente hace ${arqueo.estado.minutosDemora} min`
+                    : "Contar la caja y retirar la recaudación"
                 }
               >
                 {arqueo.estado.vencido && (
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 )}
-                Arqueo
+                {/* Etiqueta corta en pantallas chicas: medido en navegador, con
+                    el texto completo la barra de botones del POS se pasa del
+                    ancho a 360px y "Salir" queda fuera de la pantalla. El título
+                    entero está en el `title` y dentro del modal. */}
+                <span className="sm:hidden">Retirar</span>
+                <span className="hidden sm:inline">Retirar recaudación</span>
               </button>
             )}
             {turnoActual && (
@@ -1609,7 +1620,7 @@ export default function PosVentasPage() {
             ultimoArqueoEn={arqueo.ultimoArqueoEn}
             turnoId={turnoActual.id}
             localId={localActual}
-            onArquear={() => setMostrarArqueo(true)}
+            onArquear={() => setMostrarRetiro(true)}
             onPostergado={() => {
               showSuccess("Arqueo postergado");
               arqueo.refrescar();
@@ -1977,18 +1988,25 @@ export default function PosVentasPage() {
         />
       )}
 
-      {mostrarArqueo && turnoActual && arqueo.visible && (
-        <ModalArqueoCaja
+      {/* El modal de ARQUEO PURO ya no se monta desde el POS. El endpoint sigue
+          existiendo por compatibilidad técnica, pero el flujo normal es retirar:
+          dejar los dos caminos accesibles a la vez es justamente lo que permite
+          contar por un lado y descontar por otro. */}
+      {mostrarRetiro && turnoActual && arqueo.visible && (
+        <ModalRetiroDinero
           turnoId={turnoActual.id}
-          localId={localActual}
-          // Solo para el texto del conteo ("incluí el fondo inicial de $X").
+          // Fallback del fondo objetivo cuando el local no lo configuró.
           montoInicial={turnoActual.montoInicial}
           onClose={() => {
-            setMostrarArqueo(false);
+            setMostrarRetiro(false);
             arqueo.refrescar();
           }}
-          onRegistrado={() => {
-            showSuccess("Arqueo registrado");
+          onRegistrado={(r) => {
+            showSuccess(
+              r?.efectivoRetirado > 0
+                ? `Retiro de $${Number(r.efectivoRetirado).toLocaleString("es-AR", { minimumFractionDigits: 2 })} registrado`
+                : "Conteo registrado, sin retiro"
+            );
             arqueo.refrescar();
           }}
         />

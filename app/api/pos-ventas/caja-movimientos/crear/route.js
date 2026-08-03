@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { requireOperadorSegunConfig } from "@/lib/operador";
+import { esMotivoReservado } from "@/lib/caja/retiroDinero";
 
 export async function POST(req) {
   try {
@@ -51,6 +52,23 @@ export async function POST(req) {
     if (!motivo || !motivo.trim()) {
       return NextResponse.json(
         { ok: false, error: "motivo es obligatorio" },
+        { status: 400 }
+      );
+    }
+
+    // El motivo del retiro automático está RESERVADO. Un egreso manual que lo
+    // imite haría que el historial muestre dos "retiros de recaudación" cuando
+    // solo uno tiene registro de conteo detrás — y descontaría dos veces la
+    // misma plata. La recaudación se retira desde "Retirar recaudación", que
+    // crea su movimiento solo.
+    if (esMotivoReservado(motivo)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'Ese motivo está reservado. Para sacar la recaudación usá "Retirar recaudación", que descuenta y deja el registro del conteo.',
+          motivoReservado: true,
+        },
         { status: 400 }
       );
     }
