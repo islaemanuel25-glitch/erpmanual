@@ -7,7 +7,7 @@ import prisma from "@/lib/prisma";
 import { requireAuth, checkPerm } from "@/lib/authorize";
 import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { configArqueoDeLocal } from "@/lib/caja/arqueoServer";
+import { configArqueoDeLocal, fondoObjetivoDeLocal } from "@/lib/caja/arqueoServer";
 import { CONFIG_ARQUEO_DEFAULT } from "@/lib/caja/arqueo";
 
 /** Permiso de escritura. Reutiliza el existente para alertas del local. */
@@ -39,7 +39,18 @@ export async function GET(req) {
     }
 
     const config = await configArqueoDeLocal(scope.localId);
-    return NextResponse.json({ ok: true, localId: scope.localId, config, limites: LIMITES });
+    // El fondo objetivo va SUELTO, fuera de `config`: no es una alerta y no pasa
+    // por `normalizarConfig`, que aplica defaults propios del ritmo de arqueos.
+    // `null` acá significa "no configurado" y el retiro cae al montoInicial del
+    // turno; convertirlo en 0 sugeriría retirar todo y dejar la caja sin cambio.
+    const fondoObjetivoCaja = await fondoObjetivoDeLocal(scope.localId);
+    return NextResponse.json({
+      ok: true,
+      localId: scope.localId,
+      config,
+      fondoObjetivoCaja: fondoObjetivoCaja != null ? Number(fondoObjetivoCaja) : null,
+      limites: LIMITES,
+    });
   } catch (error) {
     console.error("Error obteniendo config de arqueo:", error);
     return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
@@ -93,6 +104,23 @@ export async function POST(req) {
       data[campo] = valor;
     }
 
+    // Fondo objetivo del cajón. `null` explícito es un valor válido: significa
+    // "volver a no configurado", y ahí el retiro cae al montoInicial del turno.
+    if (body.fondoObjetivoCaja !== undefined) {
+      if (body.fondoObjetivoCaja === null || body.fondoObjetivoCaja === "") {
+        data.fondoObjetivoCaja = null;
+      } else {
+        const n = Number(body.fondoObjetivoCaja);
+        if (!Number.isFinite(n) || n < 0) {
+          return NextResponse.json(
+            { ok: false, error: "El fondo objetivo debe ser un importe de cero o más" },
+            { status: 400 }
+          );
+        }
+        data.fondoObjetivoCaja = Number(n.toFixed(2));
+      }
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ ok: false, error: "Nada para actualizar" }, { status: 400 });
     }
@@ -106,7 +134,13 @@ export async function POST(req) {
     });
 
     const config = await configArqueoDeLocal(localId);
-    return NextResponse.json({ ok: true, localId, config });
+    const fondoObjetivoCaja = await fondoObjetivoDeLocal(localId);
+    return NextResponse.json({
+      ok: true,
+      localId,
+      config,
+      fondoObjetivoCaja: fondoObjetivoCaja != null ? Number(fondoObjetivoCaja) : null,
+    });
   } catch (error) {
     console.error("Error actualizando config de arqueo:", error);
     return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });

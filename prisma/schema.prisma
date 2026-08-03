@@ -150,6 +150,13 @@ model ConfiguracionLocal {
   postergacionCajeroMinutos        Int?
   requiereAutorizacionPostergacion Boolean?
 
+  /// Fondo que el local quiere conservar en el cajón después de cada retiro.
+  ///
+  /// Nullable a propósito: `null` significa "no configurado", y ahí el sistema
+  /// cae al `montoInicial` del turno. NUNCA cae a cero — sugerir retirar todo
+  /// dejaría la caja sin cambio para seguir vendiendo.
+  fondoObjetivoCaja                Decimal? @db.Decimal(12, 2)
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -184,6 +191,7 @@ model Usuario {
   arqueosComoCajero      ArqueoCaja[]         @relation("arqueoCajero")
   arqueosRealizados      ArqueoCaja[]         @relation("arqueoRealizadoPor")
   arqueosPostergados     ArqueoCaja[]         @relation("arqueoPostergadoPor")
+  arqueosEntregados      ArqueoCaja[]         @relation("arqueoEntregadoPor")
   postergacionesArqueo   ArqueoPostergacion[] @relation("postergacionPor")
   postergacionesAutorizadas ArqueoPostergacion[] @relation("postergacionAutorizadaPor")
   movimientosPuntos ClientePuntoMovimiento[]
@@ -1177,7 +1185,43 @@ model ArqueoCaja {
 
   /// Clave de idempotencia del cliente: dos envíos del mismo conteo (doble clic,
   /// dos pestañas) colapsan en una sola fila en vez de duplicar el arqueo.
+  ///
+  /// OJO: en Postgres los NULL no colisionan en un UNIQUE, así que una fila sin
+  /// clave NO queda protegida. Para un conteo puro eso era tolerable (duplicar
+  /// una foto molesta); para un RETIRO no lo es, porque duplicaría el descuento.
+  /// Por eso /retiros/registrar EXIGE la clave, a diferencia de /arqueos/registrar.
   idempotencyKey String?
+
+  // ── RETIRO DE DINERO ────────────────────────────────────────────────────
+  //
+  // Todos nullable a propósito. Los ~70 registros históricos fueron conteos
+  // puros: no se sabe cuánto se retiró en ellos, y `0` afirmaría que no se
+  // retiró nada. `null` = "esta operación no registraba retiros"; es la misma
+  // distinción null ≠ 0 que ya sostiene el circuito del dinero en Turno.
+
+  /// Lo que salió del cajón en esta operación.
+  efectivoRetirado Decimal? @db.Decimal(12, 2)
+  /// Fondo que el local quiere conservar. Se COPIA acá en vez de leerse de la
+  /// configuración al mostrar: si mañana el local cambia su fondo objetivo, los
+  /// retiros de ayer tienen que seguir explicándose con el que regía ese día.
+  fondoObjetivo    Decimal? @db.Decimal(12, 2)
+  /// Lo que quedó en el cajón. Invariante: retirado + dejado = contado.
+  fondoDejado      Decimal? @db.Decimal(12, 2)
+
+  /// Movimiento de caja que materializa el retiro. La relación es por ID y es
+  /// 1:1 real (UNIQUE): dos registros no pueden apuntar al mismo movimiento, así
+  /// que la base misma impide el doble descuento.
+  cajaMovimientoRetiroId Int? @unique
+
+  // ── Entrega diferida (etapa 4; acá solo se persiste el estado inicial) ───
+  /// null = conteo histórico sin retiro. No se hace backfill: inventar
+  /// PENDIENTE_ENTREGA en registros viejos afirmaría que hay plata sin rendir.
+  estadoEntrega      EstadoEntregaRetiro?
+  destino            String?
+  recibidoPor        String?
+  entregadoAt        DateTime?
+  entregadoPorId     Int?
+  observacionEntrega String?
 
   creadoEn     DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -1188,12 +1232,24 @@ model ArqueoCaja {
   operador     OperadorLocal? @relation(fields: [operadorId], references: [id])
   realizadoPor Usuario        @relation("arqueoRealizadoPor", fields: [realizadoPorId], references: [id])
   postergadoPor Usuario?      @relation("arqueoPostergadoPor", fields: [postergadoPorId], references: [id])
+  entregadoPor Usuario?       @relation("arqueoEntregadoPor", fields: [entregadoPorId], references: [id])
+  cajaMovimientoRetiro CajaMovimiento? @relation("retiroDeArqueo", fields: [cajaMovimientoRetiroId], references: [id])
 
   @@unique([turnoId, idempotencyKey])
   @@index([turnoId])
   @@index([localId])
   @@index([fechaHora])
   @@index([tipo])
+}
+
+/// Estado de la RENDICIÓN de un retiro, no del retiro en sí.
+///
+/// El dinero sale del cajón al confirmar el retiro; esto solo dice si ya se
+/// documentó a quién se entregó. Un retiro PENDIENTE_ENTREGA ya descontó: no
+/// vuelve a mover plata cuando se completa la entrega.
+enum EstadoEntregaRetiro {
+  PENDIENTE_ENTREGA
+  ENTREGADO
 }
 
 /// Postergación de una alerta de arqueo vencida.
@@ -1235,12 +1291,23 @@ model CajaMovimiento {
   turnoId   Int
   usuarioId Int
   tipo      String   // INGRESO | RETIRO
-  monto     Decimal  @db.Decimal(10, 2)
+  /// Ampliado de (10,2) a (12,2) para igualar al resto del circuito.
+  ///
+  /// Era el ÚNICO campo monetario de caja en (10,2): Turno y ArqueoCaja usan
+  /// (12,2). El retiro automático copia acá un importe que nace en un campo
+  /// (12,2), así que un valor válido en el origen podía no entrar en el destino
+  /// y hacer fallar la transacción entera — convirtiendo un retiro legítimo en
+  /// un error. Ensanchar un `numeric` en Postgres no reescribe la tabla ni
+  /// pierde datos.
+  monto     Decimal  @db.Decimal(12, 2)
   motivo    String?
   createdAt DateTime @default(now())
 
   turno   Turno   @relation(fields: [turnoId], references: [id])
   usuario Usuario @relation(fields: [usuarioId], references: [id])
+  /// Inverso 1:1 del retiro que lo originó. Sin lista: un movimiento pertenece
+  /// a lo sumo a UN retiro.
+  arqueoRetiro ArqueoCaja? @relation("retiroDeArqueo")
 
   @@index([turnoId])
 }
