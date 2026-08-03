@@ -329,11 +329,15 @@ export default function TurnoDetallePage() {
     .filter((m) => m.tipo === "RETIRO")
     .reduce((s, m) => s + m.monto, 0);
 
+  // El esperado lo calcula el BACKEND, con la fórmula única. Esta pantalla
+  // llegó a recalcularlo por su cuenta —una cuarta copia de la regla que decide
+  // si falta plata— porque el endpoint devolvía el retiro de cierre descontado
+  // dos veces. Ese bug se corrigió en `resumen`, así que acá ya no hace falta
+  // repetir la cuenta. El `??` cubre el instante previo a que llegue la
+  // respuesta y a un backend viejo que todavía no exponga el campo.
   const esperadoEfectivo =
-    Number(turno.montoInicial) +
-    (resumen?.totalEfectivo || 0) +
-    totalIngresos -
-    totalRetiros;
+    resumen?.efectivoEsperado ??
+    Number(turno.montoInicial) + (resumen?.totalEfectivo || 0) + totalIngresos - totalRetiros;
 
   const ventaHeaders = [
     "#",

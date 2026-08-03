@@ -29,7 +29,17 @@ export async function GET(req) {
 
     const turno = await prisma.turno.findUnique({
       where: { id: turnoId },
-      select: { localId: true, montoInicial: true },
+      select: {
+        localId: true,
+        montoInicial: true,
+        // El retiro del CIERRE se crea DESPUÉS del corte final, justamente para
+        // que el cierre no se reste a sí mismo. Pero queda en CajaMovimiento, así
+        // que quien recalcule el esperado de un turno cerrado sin excluirlo lo
+        // descuenta una segunda vez.
+        cierre: true,
+        retiroCierreMovimientoId: true,
+        montoEsperadoEfectivo: true,
+      },
     });
 
     if (!turno) {
@@ -57,8 +67,19 @@ export async function GET(req) {
         },
       }),
       prisma.cajaMovimiento.findMany({
-        where: { turnoId },
-        select: { tipo: true, monto: true },
+        where: {
+          turnoId,
+          // EXCLUSIÓN EXPLÍCITA del retiro de cierre. Sin esto, un turno cerrado
+          // devolvía un esperado igual a `montoEsperadoEfectivo − retiroDeCierre`,
+          // es decir un número que no coincidía con el que el propio cierre había
+          // persistido, y que además empeora con cada retiro parcial nuevo.
+          // Se filtra en la CONSULTA y no después, para que ningún consumidor
+          // pueda recibir la lista sin filtrar por descuido.
+          ...(turno?.retiroCierreMovimientoId
+            ? { id: { not: turno.retiroCierreMovimientoId } }
+            : {}),
+        },
+        select: { id: true, tipo: true, monto: true },
       }),
     ]);
 
@@ -95,6 +116,14 @@ export async function GET(req) {
       // en vez de recalcularlo por su cuenta.
       montoInicial: calculo.montoInicial,
       efectivoEsperado: calculo.efectivoEsperado,
+      // Para un turno cerrado, este número tiene que coincidir con el que el
+      // cierre persistió. Se expone para que la pantalla no tenga que
+      // recalcularlo por su cuenta —era la cuarta copia de la fórmula— y para
+      // que una divergencia sea detectable en vez de silenciosa.
+      esperadoPersistido:
+        turno?.montoEsperadoEfectivo != null ? Number(turno.montoEsperadoEfectivo) : null,
+      estaCerrado: turno?.cierre != null,
+      retiroCierreExcluido: turno?.retiroCierreMovimientoId ?? null,
       desglose,
     });
   } catch (error) {
