@@ -31,6 +31,7 @@ import {
   validarRepartoRetiro,
   motivoRetiroRecaudacion,
   validarIdempotencyKey,
+  evaluarRetiro,
 } from "@/lib/caja/retiroDinero";
 
 /** Forma común de respuesta, para que la UI lea siempre lo mismo. */
@@ -63,7 +64,16 @@ export async function POST(req) {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { turnoId, efectivoContado, fondoDejado, observacion, idempotencyKey } = body;
+    const {
+      turnoId,
+      efectivoContado,
+      // Lo que decide la pantalla nueva. `fondoDejado` se sigue aceptando por
+      // compatibilidad con el contrato anterior.
+      efectivoRetirado,
+      fondoDejado,
+      observacion,
+      idempotencyKey,
+    } = body;
     turnoIdRef = Number(turnoId);
     claveRef = String(idempotencyKey ?? "").trim();
 
@@ -139,16 +149,32 @@ export async function POST(req) {
         montoInicial: vigente.montoInicial,
       });
 
-      const sugerido = sugerirRepartoRetiro({ efectivoContado: contado, fondoObjetivo });
-      // El cajero puede dejar un fondo distinto del objetivo (hay días que hace
-      // falta más cambio). Si no lo indica, se usa el sugerido.
-      const dejado = fondoDejado === undefined || fondoDejado === null || fondoDejado === ""
-        ? sugerido.fondoDejado
-        : Number(fondoDejado);
-      const retirado = Number.isFinite(Number(dejado))
-        ? Number((contado - Number(dejado)).toFixed(2))
+      // El sugerido sale del ESPERADO, no del contado: se retira la recaudación,
+      // no la diferencia. Ver el comentario de `calcularRecaudacionEsperada`.
+      const sugerido = sugerirRepartoRetiro({
+        efectivoEsperadoAntes: esperado,
+        fondoObjetivo,
+        efectivoContado: contado,
+      });
+
+      // El cajero puede ajustar cuánto se lleva. Se acepta `efectivoRetirado`
+      // (lo que decide la pantalla nueva) o `fondoDejado` (contrato anterior);
+      // si no viene ninguno, el sugerido. El fondo que queda SIEMPRE se deriva:
+      // es contado − retirado, y puede no coincidir con el objetivo.
+      let retirado;
+      if (efectivoRetirado !== undefined && efectivoRetirado !== null && efectivoRetirado !== "") {
+        retirado = Number(efectivoRetirado);
+      } else if (fondoDejado !== undefined && fondoDejado !== null && fondoDejado !== "") {
+        retirado = Number((contado - Number(fondoDejado)).toFixed(2));
+      } else {
+        retirado = sugerido.efectivoRetirado;
+      }
+      const dejado = Number.isFinite(retirado)
+        ? Number((contado - retirado).toFixed(2))
         : NaN;
 
+      // La invariante no cambia: retirado + fondo físico = contado, y ninguno
+      // puede ser negativo — de ahí sale que retirado nunca supere al contado.
       const reparto = validarRepartoRetiro({
         efectivoContado: contado,
         efectivoRetirado: retirado,
@@ -214,7 +240,19 @@ export async function POST(req) {
         data: { cajaMovimientoRetiroId: movimientoId },
       });
 
-      return { fila: conVinculo, repetido: false, calculo, fondoObjetivo, origenFondo: origen };
+      return {
+        fila: conVinculo,
+        repetido: false,
+        calculo,
+        fondoObjetivo,
+        origenFondo: origen,
+        evaluacion: evaluarRetiro({
+          efectivoEsperadoAntes: esperado,
+          fondoObjetivo,
+          efectivoContado: contado,
+          efectivoRetirado: reparto.efectivoRetirado,
+        }),
+      };
     });
 
     const serializado = serializarRetiro(resultado.fila, {
@@ -227,6 +265,9 @@ export async function POST(req) {
       repetido: resultado.repetido,
       retiro: serializado,
       estadoDiferencia: clasificarDiferencia(serializado.diferencia),
+      // Señales para que la pantalla explique el resultado sin inventar nada:
+      // recaudación esperada, fondo FÍSICO que quedó y si difiere del objetivo.
+      evaluacion: resultado.evaluacion ?? null,
       // Desglose del esperado, para que la pantalla explique de dónde salió el
       // número en vez de mostrarlo suelto.
       desglose: resultado.calculo

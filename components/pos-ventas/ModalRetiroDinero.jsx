@@ -24,6 +24,7 @@ import {
   resolverFondoObjetivo,
   sugerirRepartoRetiro,
   validarRepartoRetiro,
+  evaluarRetiro,
 } from "@/lib/caja/retiroDinero";
 
 const money = (n) =>
@@ -47,7 +48,8 @@ export default function ModalRetiroDinero({ turnoId, montoInicial = 0, onClose, 
   const [fondoConfigurado, setFondoConfigurado] = useState(null);
 
   const [contado, setContado] = useState("");
-  const [fondoEditado, setFondoEditado] = useState(null); // null = usar el sugerido
+  const [retiroEditado, setRetiroEditado] = useState(null); // null = usar el sugerido
+  const [confirmoAjuste, setConfirmoAjuste] = useState(false);
   const [observacion, setObservacion] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -86,22 +88,47 @@ export default function ModalRetiroDinero({ turnoId, montoInicial = 0, onClose, 
   const contadoNum = Number(contado);
   const hayContado = contado !== "" && Number.isFinite(contadoNum) && contadoNum >= 0;
 
+  // El sugerido sale del ESPERADO, no del contado: se retira la recaudación, no
+  // la diferencia. Un sobrante no se lleva como si fuera venta y un faltante no
+  // se tapa dejando menos fondo.
   const sugerido = useMemo(
-    () => (hayContado ? sugerirRepartoRetiro({ efectivoContado: contadoNum, fondoObjetivo }) : null),
-    [hayContado, contadoNum, fondoObjetivo]
+    () =>
+      hayContado && esperado != null
+        ? sugerirRepartoRetiro({
+            efectivoEsperadoAntes: esperado,
+            fondoObjetivo,
+            efectivoContado: contadoNum,
+          })
+        : null,
+    [hayContado, esperado, contadoNum, fondoObjetivo]
   );
 
-  // El fondo que quedará: el sugerido, salvo que el cajero lo haya cambiado.
-  const fondoDejado = fondoEditado === null ? sugerido?.fondoDejado ?? 0 : Number(fondoEditado);
-  const retirado = hayContado ? Number((contadoNum - Number(fondoDejado || 0)).toFixed(2)) : 0;
-  const diferencia = hayContado && esperado != null ? Number((contadoNum - esperado).toFixed(2)) : null;
+  // Lo que se lleva: el sugerido, salvo que el cajero lo haya ajustado.
+  const retirado = retiroEditado === null ? sugerido?.efectivoRetirado ?? 0 : Number(retiroEditado);
+  const fondoFisico = hayContado ? Number((contadoNum - Number(retirado || 0)).toFixed(2)) : 0;
+
+  const evalRetiro = useMemo(
+    () =>
+      hayContado && esperado != null
+        ? evaluarRetiro({
+            efectivoEsperadoAntes: esperado,
+            fondoObjetivo,
+            efectivoContado: contadoNum,
+            efectivoRetirado: Number(retirado || 0),
+          })
+        : null,
+    [hayContado, esperado, fondoObjetivo, contadoNum, retirado]
+  );
+
+  const diferencia = evalRetiro?.diferencia ?? null;
 
   const reparto = hayContado
-    ? validarRepartoRetiro({ efectivoContado: contadoNum, efectivoRetirado: retirado, fondoDejado })
+    ? validarRepartoRetiro({
+        efectivoContado: contadoNum,
+        efectivoRetirado: retirado,
+        fondoDejado: fondoFisico,
+      })
     : { valido: false, error: null };
-
-  const fondoDistinto =
-    hayContado && fondoEditado !== null && Math.round(Number(fondoDejado) * 100) !== Math.round(fondoObjetivo * 100);
 
   const confirmar = async () => {
     setError("");
@@ -111,6 +138,10 @@ export default function ModalRetiroDinero({ turnoId, montoInicial = 0, onClose, 
     }
     if (!reparto.valido) {
       setError(reparto.error || "El reparto no cierra contra el efectivo contado");
+      return;
+    }
+    if (evalRetiro?.retiroDistintoDeRecaudacion && !confirmoAjuste) {
+      setError('Confirmá que querés retirar un importe distinto de la recaudación esperada');
       return;
     }
     if (guardando) return;
@@ -124,7 +155,7 @@ export default function ModalRetiroDinero({ turnoId, montoInicial = 0, onClose, 
         body: JSON.stringify({
           turnoId,
           efectivoContado: contadoNum,
-          fondoDejado: Number(fondoDejado),
+          efectivoRetirado: Number(retirado),
           observacion: observacion.trim() || null,
           idempotencyKey: claveRef.current,
         }),
@@ -180,7 +211,8 @@ export default function ModalRetiroDinero({ turnoId, montoInicial = 0, onClose, 
                 value={contado}
                 onChange={(e) => {
                   setContado(e.target.value);
-                  setFondoEditado(null); // vuelve a seguir el sugerido
+                  setRetiroEditado(null); // vuelve a seguir el sugerido
+                  setConfirmoAjuste(false);
                 }}
                 placeholder="0.00"
                 autoFocus
@@ -192,43 +224,92 @@ export default function ModalRetiroDinero({ turnoId, montoInicial = 0, onClose, 
               </p>
             </div>
 
-            {hayContado && (
+            {hayContado && evalRetiro && (
               <>
+                {/* Las cifras van SEPARADAS a propósito. La recaudación esperada
+                    y la diferencia son cosas distintas, y mezclarlas es lo que
+                    hacía que un sobrante se retirara como si fuera venta. */}
                 <div className="grid grid-cols-2 gap-2">
                   <Cifra
                     label="Diferencia al contar"
-                    valor={diferencia != null ? money(diferencia) : "—"}
+                    valor={money(diferencia)}
                     clase={
-                      diferencia == null || diferencia === 0
+                      diferencia === 0
                         ? "sunmi-text-strong"
                         : diferencia > 0
                         ? "sunmi-text-success"
                         : "sunmi-text-danger"
                     }
                   />
-                  <Cifra label="Se retira" valor={money(retirado)} clase="sunmi-text-accent" destacado />
+                  <Cifra label="Recaudación esperada" valor={money(evalRetiro.recaudacionEsperada)} />
                 </div>
 
                 <div>
                   <label className="text-xs sunmi-pos-muted mb-1 block">
-                    Fondo que queda en el cajón ($)
+                    Se retira ($) — sugerido {money(sugerido?.efectivoRetirado ?? 0)}
                   </label>
                   <SunmiInput
                     type="number"
                     min="0"
+                    max={String(contadoNum)}
                     step="0.01"
                     inputMode="decimal"
-                    value={fondoEditado === null ? String(sugerido?.fondoDejado ?? 0) : fondoEditado}
-                    onChange={(e) => setFondoEditado(e.target.value)}
-                    className="text-center font-bold"
+                    value={retiroEditado === null ? String(sugerido?.efectivoRetirado ?? 0) : retiroEditado}
+                    onChange={(e) => {
+                      setRetiroEditado(e.target.value);
+                      setConfirmoAjuste(false);
+                    }}
+                    className="text-center font-bold text-lg"
                   />
                 </div>
 
-                {fondoDistinto && (
+                {/* El fondo que queda es CONSECUENCIA del retiro, no una
+                    elección: por eso se muestra en vivo y no se edita. */}
+                <div className="sunmi-surface sunmi-border rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                  <span className="text-[12px] sunmi-text-muted">Quedará físicamente en el cajón</span>
+                  <span
+                    className={`text-base font-bold font-mono tabular-nums ${
+                      evalRetiro.fondoFisicoDistinto ? "sunmi-text-warning" : "sunmi-text-strong"
+                    }`}
+                  >
+                    {money(evalRetiro.fondoFisicoRestante)}
+                  </span>
+                </div>
+
+                {/* No afirmar que quedó el fondo objetivo cuando el conteo
+                    demuestra otra cosa. */}
+                {evalRetiro.fondoFisicoDistinto && (
                   <div className="sunmi-state-warning sunmi-border rounded-lg p-2 text-[11px] sunmi-text-warning">
-                    Vas a dejar {money(fondoDejado)} en vez del fondo objetivo de {money(fondoObjetivo)}.
-                    Queda registrado así.
+                    Luego del retiro quedarán {money(evalRetiro.fondoFisicoRestante)}. El fondo
+                    objetivo es {money(fondoObjetivo)}.
                   </div>
+                )}
+
+                {evalRetiro.retiroLimitadoPorFaltante && (
+                  <div className="sunmi-state-danger sunmi-border rounded-lg p-2 text-[11px] sunmi-text-danger">
+                    <strong>Faltante grave.</strong> La recaudación esperada es{" "}
+                    {money(evalRetiro.recaudacionEsperada)} pero en el cajón hay {money(contadoNum)}.
+                    No se puede retirar plata que no está. La diferencia de {money(diferencia)} queda
+                    registrada sin corregir.
+                  </div>
+                )}
+
+                {/* Ajustar el retiro respecto de la recaudación esperada exige
+                    confirmación expresa: es apartarse de lo que el sistema
+                    calculó, y tiene que ser una decisión, no un descuido. */}
+                {evalRetiro.retiroDistintoDeRecaudacion && (
+                  <label className="flex items-start gap-2 text-[11px] sunmi-text-warning cursor-pointer sunmi-state-warning sunmi-border rounded-lg p-2">
+                    <input
+                      type="checkbox"
+                      checked={confirmoAjuste}
+                      onChange={(e) => setConfirmoAjuste(e.target.checked)}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <span>
+                      Confirmo retirar {money(retirado)} en vez de{" "}
+                      {money(Math.min(evalRetiro.recaudacionEsperada, contadoNum))}.
+                    </span>
+                  </label>
                 )}
 
                 {!reparto.valido && reparto.error && (
@@ -255,7 +336,7 @@ export default function ModalRetiroDinero({ turnoId, montoInicial = 0, onClose, 
               <SunmiButton
                 color="amber"
                 onClick={confirmar}
-                disabled={guardando || !hayContado || !reparto.valido}
+                disabled={guardando || !hayContado || !reparto.valido || (evalRetiro?.retiroDistintoDeRecaudacion && !confirmoAjuste)}
                 className="py-3 font-bold"
               >
                 {guardando ? "Registrando…" : "Confirmar retiro"}
