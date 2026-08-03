@@ -5,33 +5,24 @@ import { useOperadorContext } from "@/app/context/OperadorContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import { evaluarRecepcionFondo } from "@/lib/caja/cierreCaja";
-
-function formatPrecio(n) {
-  return Number(n).toLocaleString("es-AR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 /**
- * Apertura de caja con RECEPCIÓN del fondo.
+ * Apertura de caja: el cajero declara cuánto efectivo recibió.
  *
- * Antes se pedía "monto inicial en caja" con botones de $0 / $5.000 / $10.000, sin
- * ninguna relación con lo que había dejado el cierre anterior. Así el fondo real
- * del cajón y el declarado se separaban turno a turno, y esa diferencia se
- * acumulaba hasta aparecer como un sobrante enorme varios turnos después.
+ * La herencia automática del fondo entre turnos está DESACTIVADA. Mientras un
+ * local pueda tener varios cajeros trabajando a la vez, el sistema no sabe qué
+ * cierre corresponde a qué cajón físico: ofrecerle a uno el fondo que dejó otro
+ * sería adivinar, y esa plata aparecería o faltaría en el arqueo equivocado.
+ * Vuelve cuando exista CajaFisica.
  *
- * Ahora la apertura muestra cuánto dejó el cierre anterior y pide confirmar
- * cuánto se recibió DE VERDAD. El turno arranca con lo recibido, no con lo
- * sugerido: si difiere, se pide una explicación en el momento, con la plata en la
- * mano y la persona presente.
+ * Lo único que impide abrir es tener YA un turno propio abierto en este local.
+ * Que haya otros cajeros trabajando se informa, no bloquea.
  */
 export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura }) {
   const { requerirOperador } = useOperadorContext();
   const [montoInicial, setMontoInicial] = useState("");
   const [observacionFondo, setObservacionFondo] = useState("");
-  const [estado, setEstado] = useState(null); // { fondoSugerido, cierrePrevio, cajaOcupada }
+  const [estado, setEstado] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -43,12 +34,7 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
         const res = await fetch("/api/pos-ventas/turnos/abrir", { credentials: "include" });
         const d = await res.json();
         if (!vivo) return;
-        if (d.ok) {
-          setEstado(d);
-          // Se precarga el sugerido para que el caso normal sea un solo toque,
-          // pero el campo queda editable: el que manda es lo que el cajero cuenta.
-          if (d.fondoSugerido > 0) setMontoInicial(String(d.fondoSugerido));
-        }
+        if (d.ok) setEstado(d);
       } catch {
         // Sin estado, la apertura sigue funcionando: se pide el monto a secas.
       } finally {
@@ -58,25 +44,16 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
     return () => { vivo = false; };
   }, []);
 
-  const fondoSugerido = Number(estado?.fondoSugerido) || 0;
-  const recepcion =
-    montoInicial === ""
-      ? { coincide: true, diferencia: 0, requiereObservacion: false, mensaje: null }
-      : evaluarRecepcionFondo({ sugerido: fondoSugerido, recibido: Number(montoInicial) || 0 });
-
-  const faltaObservacion = recepcion.requiereObservacion && !observacionFondo.trim();
+  const otrosTurnos = estado?.otrosTurnosAbiertos || [];
+  const turnoPropio = estado?.turnoPropioAbierto || null;
 
   const handleApertura = async () => {
     if (montoInicial === "") {
-      setError("Ingresá cuánto efectivo recibiste");
+      setError("Ingresá cuánto efectivo recibiste para comenzar");
       return;
     }
     if (Number(montoInicial) < 0) {
       setError("El monto no puede ser negativo");
-      return;
-    }
-    if (faltaObservacion) {
-      setError("Contá de nuevo o explicá por qué el fondo no coincide");
       return;
     }
 
@@ -114,8 +91,6 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
     }
   };
 
-  const ocupada = estado?.cajaOcupada;
-
   return (
     <div className="fixed inset-0 sunmi-overlay-strong flex items-center justify-center p-4 z-50 overflow-y-auto">
       <SunmiCard className="w-full max-w-md p-4 my-4">
@@ -127,44 +102,47 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
         </div>
 
         {cargando ? (
-          <div className="text-center py-6 text-sm sunmi-text-muted">Consultando el cierre anterior...</div>
+          <div className="text-center py-6 text-sm sunmi-text-muted">Cargando…</div>
         ) : (
           <div className="space-y-3">
-            {/* Caja ya abierta por otra persona: un cajón, un turno. */}
-            {ocupada && (
+            {/* ÚNICO caso bloqueante: este mismo usuario ya tiene su caja abierta. */}
+            {turnoPropio && (
               <div className="rounded-lg px-3 py-2 text-sm sunmi-state-danger sunmi-text-danger">
-                {ocupada.esPropio
-                  ? `Ya tenés una caja abierta (turno #${ocupada.turnoId}) desde el ${new Date(ocupada.apertura).toLocaleString("es-AR")}. Cerrala antes de abrir otra.`
-                  : `${ocupada.vendedorNombre} tiene la caja abierta en este local (turno #${ocupada.turnoId}, desde el ${new Date(ocupada.apertura).toLocaleString("es-AR")}). Hay que cerrarla antes de abrir otra.`}
+                Ya tenés un turno abierto en este local (#{turnoPropio.turnoId}) desde el{" "}
+                {new Date(turnoPropio.apertura).toLocaleString("es-AR")}. Cerralo antes de abrir otro.
               </div>
             )}
 
-            {/* Lo que dejó el cierre anterior */}
-            <div className="sunmi-surface-soft rounded-lg p-3">
-              {fondoSugerido > 0 ? (
-                <>
-                  <div className="text-sm font-bold">
-                    El cierre anterior dejó ${formatPrecio(fondoSugerido)} en el cajón.
-                  </div>
-                  {estado?.cierrePrevio?.cerradoPor && (
-                    <div className="text-[11px] sunmi-text-muted mt-0.5">
-                      Turno #{estado.cierrePrevio.turnoId}, cerrado por {estado.cierrePrevio.cerradoPor}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-sm font-bold">
-                  El cierre anterior no dejó fondo registrado en el cajón.
+            {/* Informativo: otros cajeros trabajando. NO impide abrir. */}
+            {!turnoPropio && otrosTurnos.length > 0 && (
+              <div className="rounded-lg px-3 py-2 sunmi-surface-soft">
+                <div className="text-sm font-bold">Hay otros turnos abiertos en este local.</div>
+                <div className="text-[12px] sunmi-text-muted mt-0.5">
+                  {otrosTurnos.map((t) => `${t.vendedorNombre} (#${t.turnoId})`).join(" · ")}
                 </div>
-              )}
-              <div className="text-[12px] sunmi-text-muted mt-1">
-                Contá la plata que hay ahora y confirmá cuánto recibiste de verdad.
+                <div className="text-[12px] sunmi-text-muted mt-1">
+                  Podés abrir el tuyo igual. Cada turno lleva sus propias ventas y su propio arqueo.
+                </div>
+              </div>
+            )}
+
+            {/* Riesgo operativo real: cajón compartido. Avisa, no bloquea. */}
+            <div
+              className="rounded-lg px-3 py-2"
+              style={{
+                background: "color-mix(in srgb, var(--sunmi-warning, #f59e0b) 12%, transparent)",
+                border: "1px solid var(--sunmi-warning, #f59e0b)",
+              }}
+            >
+              <div className="text-[12px] leading-snug">
+                Cada turno debe trabajar con su propio cajón o dinero separado. Si comparten
+                efectivo, los arqueos pueden mostrar diferencias incorrectas.
               </div>
             </div>
 
             <div>
               <label className="text-sm sunmi-label mb-1 block font-semibold">
-                ¿Cuánto efectivo recibiste realmente?
+                ¿Cuánto efectivo recibiste para comenzar?
               </label>
               <SunmiInput
                 type="number"
@@ -175,37 +153,24 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
                 placeholder="0.00"
                 className="text-2xl !text-center"
                 autoFocus
+                disabled={!!turnoPropio}
               />
+              <div className="text-[11px] sunmi-text-muted mt-1 text-center">
+                Contá la plata con la que arrancás. No se hereda del cierre anterior.
+              </div>
             </div>
 
-            {/* Diferencia de recepción */}
-            {montoInicial !== "" && !recepcion.coincide && (
-              <div
-                className="rounded-lg px-3 py-2"
-                style={{ background: "color-mix(in srgb, var(--sunmi-warning, #f59e0b) 12%, transparent)", border: "1px solid var(--sunmi-warning, #f59e0b)" }}
-              >
-                <div className="text-sm font-bold">
-                  {recepcion.diferencia > 0 ? "Recibiste de más" : "Recibiste de menos"}:{" "}
-                  {recepcion.diferencia > 0 ? "+" : ""}${formatPrecio(recepcion.diferencia)}
-                </div>
-                <div className="text-[12px] sunmi-text-muted mt-0.5">{recepcion.mensaje}</div>
-              </div>
-            )}
-
-            {recepcion.requiereObservacion && (
-              <div>
-                <label className="text-sm sunmi-label mb-1 block">
-                  ¿Por qué no coincide? (obligatorio)
-                </label>
-                <textarea
-                  value={observacionFondo}
-                  onChange={(e) => setObservacionFondo(e.target.value)}
-                  placeholder="Ej: el sobre traía 500 menos, lo avisé al encargado"
-                  className="w-full sunmi-input text-sm resize-none"
-                  rows={2}
-                />
-              </div>
-            )}
+            <div>
+              <label className="text-sm sunmi-label mb-1 block">Observación (opcional)</label>
+              <textarea
+                value={observacionFondo}
+                onChange={(e) => setObservacionFondo(e.target.value)}
+                placeholder="Ej: me lo entregó el encargado"
+                className="w-full sunmi-input text-sm resize-none"
+                rows={2}
+                disabled={!!turnoPropio}
+              />
+            </div>
 
             {error && (
               <div className="text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5">
@@ -216,7 +181,7 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
             <SunmiButton
               color="amber"
               onClick={handleApertura}
-              disabled={loading || montoInicial === "" || faltaObservacion || !!ocupada}
+              disabled={loading || montoInicial === "" || !!turnoPropio}
               className="!w-full min-h-14 !text-lg !font-bold"
             >
               {loading ? "Abriendo turno..." : "Abrir Turno"}

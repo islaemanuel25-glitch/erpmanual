@@ -1097,6 +1097,20 @@ model Turno {
   anuladoPorId    Int?
   motivoAnulacion String?
 
+  /// ÍNDICE PARCIAL QUE VIVE SOLO EN SQL — no se puede declarar acá.
+  ///
+  ///   CREATE UNIQUE INDEX "Turno_local_vendedor_abierto_key"
+  ///       ON "Turno" ("localId", "vendedorId") WHERE "cierre" IS NULL;
+  ///
+  /// Garantiza "un turno ABIERTO por usuario y local" incluso ante dos aperturas
+  /// simultáneas. Prisma no soporta `WHERE` en @@unique, y un @@unique común
+  /// romperia todo: impediría que un usuario tenga dos turnos CERRADOS en el
+  /// mismo local, que es lo normal.
+  ///
+  /// Vive en la migración 20260803010000_un_turno_abierto_por_usuario. Si alguna
+  /// vez se corre `prisma migrate dev`, revisar que no lo proponga como drift y
+  /// lo elimine.
+
   observaciones String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

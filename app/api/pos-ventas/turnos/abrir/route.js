@@ -5,13 +5,12 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
 import { requireOperadorSegunConfig } from "@/lib/operador";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { validarApertura } from "@/lib/caja/cierreCaja";
+import { validarFondoManual } from "@/lib/caja/cierreCaja";
 
 /**
- * Estado de la caja ANTES de abrir: cuánto dejó el cierre anterior y si el local
- * ya tiene una caja abierta. Lo consulta la pantalla de apertura para poder
- * mostrar "El cierre anterior dejó $X" y para avisar temprano —con nombre y
- * hora— en vez de dejar que el cajero descubra el bloqueo recién al confirmar.
+ * Estado de la caja ANTES de abrir. Lo consulta la pantalla de apertura para
+ * saber si ESTE usuario ya tiene un turno abierto —lo unico que bloquea— y para
+ * avisar, sin bloquear, que hay otros cajeros trabajando en el mismo local.
  */
 export async function GET(req) {
   try {
@@ -30,48 +29,35 @@ export async function GET(req) {
     }
     const localId = scope.localId;
 
-    const [cierrePrevio, abierto] = await Promise.all([
-      prisma.turno.findFirst({
-        where: {
-          localId,
-          cierre: { not: null },
-          fondoDejadoCierre: { not: null },
-          fondoConsumidoEnTurnoId: null,
-          // Un turno ANULADO no entrega fondo: se abrió por error o para probar y nunca
-          // hubo plata. Sin esto, una anulación con fondo 0 se ofrecía como "el cierre
-          // anterior dejó $0" y encima consumía el eslabón de la cadena.
-          anuladoEn: null,
-        },
-        orderBy: { cierre: "desc" },
-        select: { id: true, fondoDejadoCierre: true, cierre: true, cerradoPor: { select: { nombre: true } } },
-      }),
-      prisma.turno.findFirst({
-        where: { localId, cierre: null },
-        orderBy: { apertura: "asc" },
-        select: { id: true, apertura: true, vendedorId: true, vendedor: { select: { nombre: true } } },
-      }),
-    ]);
+    // Todos los turnos abiertos del local. El PROPIO bloquea; los AJENOS solo
+    // informan: un local puede tener varios dispositivos y varios cajeros
+    // trabajando al mismo tiempo.
+    const abiertos = await prisma.turno.findMany({
+      where: { localId, cierre: null, anuladoEn: null },
+      orderBy: { apertura: "asc" },
+      select: { id: true, apertura: true, vendedorId: true, vendedor: { select: { nombre: true } } },
+    });
+
+    const propio = abiertos.find((t) => t.vendedorId === session.id) || null;
+    const ajenos = abiertos.filter((t) => t.vendedorId !== session.id);
 
     return NextResponse.json({
       ok: true,
-      // 0 cuando no hay cierre previo con fondo: el primer turno del local, o los
-      // turnos cerrados antes de que existiera este circuito (campos en NULL).
-      fondoSugerido: cierrePrevio ? Number(cierrePrevio.fondoDejadoCierre) : 0,
-      cierrePrevio: cierrePrevio
-        ? {
-            turnoId: cierrePrevio.id,
-            cierre: cierrePrevio.cierre,
-            cerradoPor: cierrePrevio.cerradoPor?.nombre || null,
-          }
+      // HERENCIA DE FONDO DESACTIVADA. Con varios turnos simultáneos por local, el
+      // sistema no sabe qué cierre corresponde a qué cajón físico: ofrecer el
+      // fondo de cualquier cierre anterior sería adivinar. Vuelve cuando exista
+      // CajaFisica. Las columnas y los datos históricos quedan intactos.
+      herenciaFondoActiva: false,
+      // Solo el turno del MISMO usuario impide abrir.
+      turnoPropioAbierto: propio
+        ? { turnoId: propio.id, apertura: propio.apertura }
         : null,
-      cajaOcupada: abierto
-        ? {
-            turnoId: abierto.id,
-            apertura: abierto.apertura,
-            vendedorNombre: abierto.vendedor?.nombre || "otro usuario",
-            esPropio: abierto.vendedorId === session.id,
-          }
-        : null,
+      // Informativo, NO bloqueante.
+      otrosTurnosAbiertos: ajenos.map((t) => ({
+        turnoId: t.id,
+        apertura: t.apertura,
+        vendedorNombre: t.vendedor?.nombre || "otro usuario",
+      })),
     });
   } catch (error) {
     console.error("Error consultando estado de apertura:", error);
@@ -106,93 +92,51 @@ export async function POST(req) {
     }
     const localId = scope.localId;
 
-    // UN SOLO TURNO ABIERTO POR LOCAL.
+    // UN TURNO ABIERTO POR USUARIO, NO POR LOCAL.
     //
-    // Antes el candado era por (local + vendedor), así que cada usuario podía
-    // abrir el suyo sobre el MISMO cajón físico. En producción eso dejó 63 pares
-    // de turnos solapados en un local: turnos que alguien abría, usaba para dos
-    // ventas y no cerraba —uno quedó abierto 11 días—, mientras el cajero real
-    // abría y cerraba los suyos. Con un cajón por local, dos turnos abiertos
-    // significan dos contabilidades sobre la misma plata.
+    // Un local puede tener varios dispositivos y varios cajeros trabajando a la
+    // vez, así que bloquear todo el local por existir otro turno abierto dejaba
+    // sin poder operar a gente que no tenía nada que ver. Lo que sí no tiene
+    // sentido es que UNA persona lleve dos cajas suyas al mismo tiempo.
     //
-    // El mensaje dice QUIÉN lo tiene abierto y desde cuándo: si no, el cajero se
-    // queda trabado sin saber qué cerrar.
-    const turnoAbierto = await prisma.turno.findFirst({
-      where: { localId, cierre: null },
+    // Los turnos ajenos no bloquean: se informan y listo.
+    const turnoPropio = await prisma.turno.findFirst({
+      where: { localId, vendedorId: session.id, cierre: null, anuladoEn: null },
       orderBy: { apertura: "asc" },
-      include: { vendedor: { select: { id: true, nombre: true } } },
+      select: { id: true, apertura: true },
     });
 
-    if (turnoAbierto) {
-      const propio = turnoAbierto.vendedorId === session.id;
-      const diaApertura = fechaArgentinaISO(turnoAbierto.apertura);
+    if (turnoPropio) {
+      const diaApertura = fechaArgentinaISO(turnoPropio.apertura);
       const esViejo = diaApertura && diaApertura !== hoyArgentinaISO();
-      const quien = turnoAbierto.vendedor?.nombre || "otro usuario";
-
-      // Hora local argentina: el turno pudo abrirse otro día, así que se incluye
-      // la fecha cuando no es de hoy.
+      // Hora local argentina; con fecha cuando el turno no es de hoy.
       const cuando = esViejo
-        ? new Date(turnoAbierto.apertura).toLocaleString("es-AR", { timeZone: "America/Argentina/Cordoba" })
-        : new Date(turnoAbierto.apertura).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Cordoba", hour: "2-digit", minute: "2-digit" });
-
-      const error = propio
-        ? `Ya tenés un turno abierto en este local desde ${cuando}. Debe cerrarse antes de abrir otro.`
-        : `Ya hay un turno abierto en este local por ${quien} desde ${cuando}. Debe cerrarse antes de abrir otro.`;
+        ? new Date(turnoPropio.apertura).toLocaleString("es-AR", { timeZone: "America/Argentina/Cordoba" })
+        : new Date(turnoPropio.apertura).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Cordoba", hour: "2-digit", minute: "2-digit" });
 
       return NextResponse.json(
         {
           ok: false,
-          error,
-          cajaOcupada: {
-            turnoId: turnoAbierto.id,
-            vendedorId: turnoAbierto.vendedorId,
-            vendedorNombre: quien,
-            apertura: turnoAbierto.apertura,
-            esPropio: propio,
-          },
+          error: `Ya tenés un turno abierto en este local desde ${cuando}. Cerralo antes de abrir otro.`,
+          turnoPropioAbierto: { turnoId: turnoPropio.id, apertura: turnoPropio.apertura },
         },
         { status: 409 }
       );
     }
 
-    // === Fondo que dejó el cierre anterior ===
+    // === FONDO DE APERTURA: DECLARADO A MANO ===
     //
-    // El último turno cerrado del local que todavía no entregó su fondo. Se sugiere
-    // ese monto, pero el que manda es el que el cajero cuenta y confirma: si el
-    // sistema impusiera el sugerido, una diferencia de recepción quedaría escondida
-    // y reaparecería como faltante al cerrar, culpando al cajero equivocado.
-    const cierrePrevio = await prisma.turno.findFirst({
-      where: {
-        localId,
-        cierre: { not: null },
-        fondoDejadoCierre: { not: null },
-        fondoConsumidoEnTurnoId: null,
-        // Un turno ANULADO no entrega fondo: se abrió por error o para probar y nunca
-        // hubo plata. Sin esto, una anulación con fondo 0 se ofrecía como "el cierre
-        // anterior dejó $0" y encima consumía el eslabón de la cadena.
-        anuladoEn: null,
-      },
-      orderBy: { cierre: "desc" },
-      select: { id: true, fondoDejadoCierre: true, cierre: true },
-    });
-    const fondoSugerido = cierrePrevio ? Number(cierrePrevio.fondoDejadoCierre) : 0;
-
-    const ap = validarApertura({
-      sugerido: fondoSugerido,
-      recibido: montoInicial,
-      observacion: body?.observacionFondo,
-    });
+    // La herencia automatica del fondo entre turnos queda DESACTIVADA. Con varios
+    // cajeros abiertos a la vez en un mismo local, el sistema no sabe que cierre
+    // corresponde a que cajon fisico: pasarle a un cajero el fondo que dejo otro
+    // seria adivinar, y esa plata terminaria apareciendo o faltando en el arqueo
+    // equivocado. Vuelve cuando exista CajaFisica.
+    //
+    // Las columnas y los datos historicos NO se tocan: los turnos que ya tienen
+    // fondoOrigenTurnoId conservan su cadena. Simplemente se dejan de escribir.
+    const ap = validarFondoManual(montoInicial);
     if (!ap.valido) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: ap.error,
-          fondoSugerido,
-          diferenciaFondo: ap.diferencia,
-          requiereObservacionFondo: true,
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: ap.error }, { status: 400 });
     }
 
     const gateOp = await requireOperadorSegunConfig(req, session, { localId });
@@ -203,46 +147,41 @@ export async function POST(req) {
       );
     }
 
-    // Apertura + consumo del fondo previo en UNA transacción.
-    //
-    // `fondoOrigenTurnoId` es UNIQUE en la base: si dos aperturas concurrentes
-    // intentan tomar el mismo fondo, la segunda choca con la clave y se rechaza.
-    // No queda a criterio de la aplicación ganar la carrera.
-    const turno = await prisma.$transaction(async (tx) => {
-      const nuevo = await tx.turno.create({
-        data: {
-          localId,
-          vendedorId: session.id,
-          operadorId: gateOp.operadorId,
-          // El monto inicial es lo REALMENTE recibido, nunca lo sugerido.
-          montoInicial: ap.montoInicial,
-          fondoSugeridoApertura: fondoSugerido,
-          fondoRecibidoApertura: ap.montoInicial,
-          diferenciaFondoApertura: ap.diferencia,
-          observacionFondoApertura: String(body?.observacionFondo || "").trim() || null,
-          fondoOrigenTurnoId: cierrePrevio?.id ?? null,
-        },
-      });
-
-      // Marca el inverso en el cierre que entregó el fondo: queda consumido y no
-      // se le vuelve a ofrecer al siguiente turno.
-      if (cierrePrevio) {
-        await tx.turno.update({
-          where: { id: cierrePrevio.id },
-          data: { fondoConsumidoEnTurnoId: nuevo.id },
-        });
-      }
-
-      return nuevo;
+    const turno = await prisma.turno.create({
+      data: {
+        localId,
+        vendedorId: session.id,
+        operadorId: gateOp.operadorId,
+        // Lo que el cajero declara haber recibido. Sin monto sugerido no hay
+        // diferencia de recepcion que calcular, asi que fondoSugeridoApertura y
+        // diferenciaFondoApertura quedan en NULL: significa "no aplica", no cero.
+        montoInicial: ap.montoInicial,
+        fondoRecibidoApertura: ap.montoInicial,
+        observacionFondoApertura: String(body?.observacionFondo || "").trim() || null,
+      },
     });
 
-    return NextResponse.json({ ok: true, turno, fondoSugerido });
+    // Otros turnos abiertos del local: informativo, no bloquea.
+    const otrosAbiertos = await prisma.turno.findMany({
+      where: { localId, cierre: null, anuladoEn: null, id: { not: turno.id } },
+      select: { id: true, vendedor: { select: { nombre: true } } },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      turno,
+      herenciaFondoActiva: false,
+      otrosTurnosAbiertos: otrosAbiertos.map((t) => ({
+        turnoId: t.id,
+        vendedorNombre: t.vendedor?.nombre || "otro usuario",
+      })),
+    });
   } catch (error) {
-    // Choque contra el UNIQUE de fondoOrigenTurnoId: otra apertura se llevó el
-    // mismo fondo mientras esta estaba en vuelo.
+    // Choque contra el indice unico parcial (localId, vendedorId) WHERE cierre IS
+    // NULL: dos aperturas simultaneas del MISMO usuario. Solo una puede ganar.
     if (error?.code === "P2002") {
       return NextResponse.json(
-        { ok: false, error: "Otro turno ya tomó el fondo del cierre anterior. Actualizá y volvé a intentar." },
+        { ok: false, error: "Ya tenés un turno abierto en este local. Actualizá y volvé a intentar." },
         { status: 409 }
       );
     }

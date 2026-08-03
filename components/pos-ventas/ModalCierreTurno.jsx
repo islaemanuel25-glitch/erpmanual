@@ -359,8 +359,15 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
                 <span className="font-bold text-lg">${formatPrecio(contado)}</span>
               </div>
               <div className="text-[12px] sunmi-pos-muted mt-1">
-                Lo que se retira sale del cajón y queda registrado. Lo que queda es el fondo con el que
-                abre el próximo turno.
+                Lo que se retira sale del cajón y queda registrado.
+              </div>
+              {/* La herencia automática está desactivada mientras un local pueda
+                  tener varios cajeros a la vez: el sistema no sabe qué cierre
+                  corresponde a qué cajón. Decirlo evita que el cajero deje plata
+                  esperando que el turno siguiente la reciba sola. */}
+              <div className="text-[12px] sunmi-pos-muted mt-1">
+                Este fondo quedó registrado, pero no se asignará automáticamente hasta configurar
+                cajas físicas.
               </div>
             </div>
 
