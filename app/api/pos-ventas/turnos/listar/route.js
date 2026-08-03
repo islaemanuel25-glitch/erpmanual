@@ -49,9 +49,11 @@ export async function GET(req) {
     // puede ampliar ni cambiar el alcance: si no coincide con el contexto, se
     // rechaza. Para un no-admin, `resolveLocalAndGrupo` ya devolvió 404 antes de
     // llegar acá si pidió un local ajeno.
+    // `has`, no `get`: `?localId=` viene como string vacío y también tiene que
+    // rechazarse. El parámetro no se acepta en ningún caso.
     const resuelto = resolverLocalListado({
       localContexto: scope.localId,
-      localIdParam: params.get("localId"),
+      localIdParam: params.has("localId") ? params.get("localId") : undefined,
     });
     if (resuelto.error) {
       return NextResponse.json(
