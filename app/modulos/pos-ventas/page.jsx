@@ -28,7 +28,6 @@ import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullsc
 import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
-import ModalRetiroDinero from "@/components/pos-ventas/ModalRetiroDinero";
 import AvisoArqueo from "@/components/pos-ventas/AvisoArqueo";
 import useArqueoEstado from "@/hooks/useArqueoEstado";
 import ModalPesoKg from "@/components/pos-ventas/ModalPesoKg";
@@ -65,7 +64,6 @@ export default function PosVentasPage() {
   const [mensajeTurnoVencido, setMensajeTurnoVencido] = useState("");
   const [mostrarCierre, setMostrarCierre] = useState(false);
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
-  const [mostrarRetiro, setMostrarRetiro] = useState(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
   // Servicio de importe variable pendiente de ingresar importe en el modal.
   const [servicioPendiente, setServicioPendiente] = useState(null);
@@ -1570,7 +1568,7 @@ export default function PosVentasPage() {
                 alerta vencida. */}
             {turnoActual && arqueo.visible && (
               <button
-                onClick={() => setMostrarRetiro(true)}
+                onClick={() => router.push("/modulos/pos-ventas/retiros/nuevo")}
                 className={`text-[11px] px-2 py-1 rounded transition-colors inline-flex items-center gap-1 ${
                   arqueo.estado.vencido
                     ? "sunmi-pos-btn-danger font-bold"
@@ -1620,7 +1618,7 @@ export default function PosVentasPage() {
             ultimoArqueoEn={arqueo.ultimoArqueoEn}
             turnoId={turnoActual.id}
             localId={localActual}
-            onArquear={() => setMostrarRetiro(true)}
+            onArquear={() => router.push("/modulos/pos-ventas/retiros/nuevo")}
             onPostergado={() => {
               showSuccess("Retiro postergado");
               arqueo.refrescar();
@@ -1988,29 +1986,11 @@ export default function PosVentasPage() {
         />
       )}
 
-      {/* El modal de ARQUEO PURO ya no se monta desde el POS. El endpoint sigue
-          existiendo por compatibilidad técnica, pero el flujo normal es retirar:
-          dejar los dos caminos accesibles a la vez es justamente lo que permite
-          contar por un lado y descontar por otro. */}
-      {mostrarRetiro && turnoActual && arqueo.visible && (
-        <ModalRetiroDinero
-          turnoId={turnoActual.id}
-          // Fallback del fondo objetivo cuando el local no lo configuró.
-          montoInicial={turnoActual.montoInicial}
-          onClose={() => {
-            setMostrarRetiro(false);
-            arqueo.refrescar();
-          }}
-          onRegistrado={(r) => {
-            showSuccess(
-              r?.efectivoRetirado > 0
-                ? `Retiro de $${Number(r.efectivoRetirado).toLocaleString("es-AR", { minimumFractionDigits: 2 })} registrado`
-                : "Conteo registrado, sin retiro"
-            );
-            arqueo.refrescar();
-          }}
-        />
-      )}
+      {/* Ni el arqueo puro ni el retiro se abren ya como modal desde el POS.
+          El retiro es ahora una pantalla propia (/modulos/pos-ventas/retiros/nuevo):
+          contar un cajón lleva minutos y en un modal el cajero no podía salir a
+          cobrar sin perder el conteo. El carrito ya persiste por local y usuario,
+          así que ir y volver es seguro. */}
 
       {/* Modal cierre de turno */}
       {mostrarCierre && turnoActual && (

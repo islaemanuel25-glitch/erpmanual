@@ -53,7 +53,13 @@ const WHITELIST = [
 ];
 
 // ── Escanear archivos ────────────────────────────────────────
-const ROOT = path.resolve(__dirname, "..", "app", "modulos");
+// Además de las pantallas, se revisan los componentes de caja: son piezas de
+// pantalla completa (grillas, cifras, pasos) y un color fijo ahí se ve mal en la
+// mitad de los temas igual que si estuviera en la página.
+const ROOTS = [
+  path.resolve(__dirname, "..", "app", "modulos"),
+  path.resolve(__dirname, "..", "components", "caja"),
+];
 
 function walk(dir) {
   let results = [];
@@ -68,7 +74,7 @@ function walk(dir) {
   return results;
 }
 
-const files = walk(ROOT);
+const files = ROOTS.filter((r) => fs.existsSync(r)).flatMap((r) => walk(r));
 const violations = [];
 
 for (const file of files) {
