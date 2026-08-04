@@ -221,19 +221,22 @@ export function PanelMovimientos({ movimientos = null, className = "" }) {
 
 // ── Cambio que queda ────────────────────────────────────────────────────────
 
+/**
+ * `ayuda` es prop y no texto fijo porque el cierre y el retiro dejan el cambio
+ * para destinatarios distintos: en el retiro queda en el cajón para seguir la
+ * jornada; en el cierre queda para el operador que releva. La grilla, el tope y
+ * la aritmética son idénticos, así que el componente es el mismo.
+ */
 export function PanelCambio({
   desgloseContado,
   desgloseCambio,
   onDesgloseCambio,
   totalCambio = 0,
   error = null,
+  ayuda = "Elegí los billetes y monedas que quedan en el cajón. Todo lo demás se retira.",
 }) {
   return (
-    <Bloque
-      titulo="Billetes que quedan como cambio"
-      ayuda="Elegí los billetes y monedas que quedan en el cajón. Todo lo demás se retira."
-      alineado
-    >
+    <Bloque titulo="Billetes que quedan como cambio" ayuda={ayuda} alineado>
       <GrillaCambio
         desgloseContado={desgloseContado}
         desgloseCambio={desgloseCambio}
@@ -247,6 +250,22 @@ export function PanelCambio({
 
 // ── Resumen y confirmación ──────────────────────────────────────────────────
 
+/**
+ * Resumen y confirmación, compartido por el retiro y el cierre.
+ *
+ * QUÉ SE PARAMETRIZÓ Y POR QUÉ
+ *
+ * El bloque es el mismo: mismo valor principal ("Total a retirar"), mismas
+ * cifras, misma observación, mismos botones. Lo que cambia entre las dos
+ * pantallas es solo el TEXTO —un cierre no dice "Efectivo esperado" sino
+ * "Efectivo esperado al corte"— y un par de renglones extra que el cierre agrega
+ * (hora del corte y quién cierra). Duplicar 100 líneas de JSX para eso habría
+ * garantizado que las dos pantallas se separaran con el primer arreglo que
+ * tocara una sola.
+ *
+ * Todos los parámetros tienen el valor del retiro como default, así que la
+ * pantalla de retiro no cambia ni una coma.
+ */
 export function PanelResumen({
   esperado = null,
   totalContado = 0,
@@ -265,6 +284,14 @@ export function PanelResumen({
   onGuardar,
   onVolver,
   onConfirmar,
+  etiquetaEsperado = "Efectivo esperado",
+  /** Renglones extra al pie de las cifras (el cierre suma hora y operador). */
+  filasExtra = null,
+  textoConfirmar = "Confirmar retiro",
+  textoConfirmando = "Registrando…",
+  textoGuardar = "Guardar borrador",
+  textoCerrarPestana = "Cerrar esta pestaña",
+  textoVolver = "Guardar y volver al POS",
 }) {
   return (
     <Bloque titulo="Resumen y confirmación">
@@ -277,7 +304,7 @@ export function PanelResumen({
       </div>
 
       <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
-        <Fila label="Efectivo esperado" valor={esperado ?? "—"} />
+        <Fila label={etiquetaEsperado} valor={esperado ?? "—"} />
         <Fila label="Efectivo contado" valor={hayContado ? totalContado : "—"} />
         <Fila
           label="Diferencia al contar"
@@ -286,6 +313,7 @@ export function PanelResumen({
         />
         <Fila label="Cambio que queda" valor={totalCambio} />
         <Fila label="Total a retirar" valor={totalRetiro} clase="sunmi-text-accent" fuerte />
+        {filasExtra}
       </div>
 
       {sinRecaudacion && hayContado && (
@@ -334,7 +362,11 @@ export function PanelResumen({
           disabled={guardando || !puedeConfirmar}
           className="w-full py-3 font-bold"
         >
-          {guardando ? "Registrando…" : cambios?.hayCambios ? "Confirmar con el valor nuevo" : "Confirmar retiro"}
+          {guardando
+            ? textoConfirmando
+            : cambios?.hayCambios
+              ? "Confirmar con el valor nuevo"
+              : textoConfirmar}
         </SunmiButton>
 
         {/* En una pestaña aparte no hay adónde "volver": el POS sigue abierto en
@@ -342,15 +374,15 @@ export function PanelResumen({
         {enPestanaNueva ? (
           <div className="grid grid-cols-2 gap-2">
             <SunmiButton color="slate" onClick={onGuardar} disabled={guardando} className="py-2 !text-xs">
-              Guardar borrador
+              {textoGuardar}
             </SunmiButton>
             <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="py-2 !text-xs">
-              Cerrar esta pestaña
+              {textoCerrarPestana}
             </SunmiButton>
           </div>
         ) : (
           <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="w-full py-2 !text-xs">
-            Guardar y volver al POS
+            {textoVolver}
           </SunmiButton>
         )}
       </div>
@@ -367,10 +399,16 @@ export function ResumenCabecera({
   diferencia = 0,
   totalCambio = 0,
   totalRetiro = 0,
+  /**
+   * "ahora" en el retiro; "al corte" en el cierre. La distinción no es
+   * cosmética: en el cierre ese número quedó congelado y no se mueve aunque el
+   * relevo esté vendiendo, y llamarlo "ahora" sería mentir.
+   */
+  etiquetaEsperado = "Efectivo esperado ahora",
 }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-      <Cifra label="Efectivo esperado ahora" valor={esperado ?? "—"} />
+      <Cifra label={etiquetaEsperado} valor={esperado ?? "—"} />
       <Cifra label="Efectivo contado" valor={hayContado ? totalContado : "—"} />
       <Cifra
         label="Diferencia"

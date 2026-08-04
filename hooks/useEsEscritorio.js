@@ -67,3 +67,13 @@ export default function useEsEscritorio(consulta = CONSULTA_ESCRITORIO) {
 export function nombreVentanaRetiro(turnoId) {
   return `erpazul-retiro-turno-${Number(turnoId) || 0}`;
 }
+
+/**
+ * Nombre de ventana del CIERRE. Distinto del retiro a propósito: son dos
+ * pantallas que pueden convivir sobre el mismo turno —se puede retirar
+ * recaudación a media tarde y cerrar a la noche— y compartir nombre haría que
+ * abrir una pisara la otra.
+ */
+export function nombreVentanaCierre(turnoId) {
+  return `erpazul-cierre-turno-${Number(turnoId) || 0}`;
+}
