@@ -45,8 +45,6 @@ import {
 } from "@/components/caja/PanelesRetiro";
 
 import {
-  MODO_TOTAL,
-  MODO_BILLETES,
   totalDesglose,
   desgloseVacio,
   validarCambioQueQueda,
@@ -97,8 +95,6 @@ export default function NuevoRetiroPage() {
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
 
-  const [modoConteo, setModoConteo] = useState(MODO_TOTAL);
-  const [montoContado, setMontoContado] = useState("");
   const [desgloseContado, setDesgloseContado] = useState({});
   const [desgloseCambio, setDesgloseCambio] = useState({});
   const [observacion, setObservacion] = useState("");
@@ -170,9 +166,12 @@ export default function NuevoRetiroPage() {
         if (usuarioId) {
           limpiarBorradoresViejos(storage, { turnoIdActivo: d.turno.id, usuarioId });
           const b = leerBorrador(storage, { turnoId: d.turno.id, usuarioId });
-          if (b) {
-            setModoConteo(b.modoConteo || MODO_TOTAL);
-            setMontoContado(b.montoContado || "");
+          if (b?.descartado) {
+            // Un borrador viejo que solo tenía el total tipeado: sin billetes no
+            // se puede reconstruir el conteo, y fabricarlo sería inventar el tope
+            // del cambio. Se avisa y se arranca de cero.
+            setAviso(b.avisoCompat);
+          } else if (b) {
             setDesgloseContado(sanearDesglose(b.desgloseContado));
             setDesgloseCambio(sanearDesglose(b.desgloseCambio));
             setObservacion(b.observacion || "");
@@ -200,10 +199,9 @@ export default function NuevoRetiroPage() {
     [fondoConfigurado, turno?.montoInicial]
   );
 
-  const totalContado =
-    modoConteo === MODO_BILLETES ? totalDesglose(desgloseContado) : Number(montoContado) || 0;
-  const hayContado =
-    modoConteo === MODO_BILLETES ? !desgloseVacio(desgloseContado) : montoContado !== "";
+  // El contado sale SOLO del desglose: no hay ningún campo donde escribirlo.
+  const totalContado = totalDesglose(desgloseContado);
+  const hayContado = !desgloseVacio(desgloseContado);
   const totalCambio = totalDesglose(desgloseCambio);
 
   const evaluacion = useMemo(
@@ -218,7 +216,7 @@ export default function NuevoRetiroPage() {
   );
 
   const validacionCambio = validarCambioQueQueda({
-    desgloseContado: modoConteo === MODO_BILLETES ? desgloseContado : {},
+    desgloseContado,
     desgloseCambio,
     totalContado,
   });
@@ -233,10 +231,6 @@ export default function NuevoRetiroPage() {
     setDesgloseCambio((c) => limitarCambioAlConteo(c, nuevo));
     if (!conteoIniciadoEn) setConteoIniciadoEn(new Date().toISOString());
   };
-  const actualizarMonto = (v) => {
-    setMontoContado(v);
-    if (!conteoIniciadoEn) setConteoIniciadoEn(new Date().toISOString());
-  };
 
   // ── Borrador ─────────────────────────────────────────────────────────────
   const persistirBorrador = useCallback(() => {
@@ -246,8 +240,6 @@ export default function NuevoRetiroPage() {
       armarBorrador({
         turnoId: turno.id,
         usuarioId,
-        modoConteo,
-        montoContado,
         desgloseContado,
         desgloseCambio,
         observacion,
@@ -258,8 +250,6 @@ export default function NuevoRetiroPage() {
     turno?.id,
     usuarioId,
     storage,
-    modoConteo,
-    montoContado,
     desgloseContado,
     desgloseCambio,
     observacion,
@@ -463,17 +453,13 @@ export default function NuevoRetiroPage() {
           Sin pasos, sin Anterior ni Siguiente. */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
         <PanelConteo
-          modo={modoConteo}
-          onModo={setModoConteo}
-          monto={montoContado}
-          onMonto={actualizarMonto}
           desglose={desgloseContado}
           onDesglose={actualizarConteo}
           horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
         />
 
         <PanelCambio
-          desgloseContado={modoConteo === MODO_BILLETES ? desgloseContado : {}}
+          desgloseContado={desgloseContado}
           desgloseCambio={desgloseCambio}
           onDesgloseCambio={setDesgloseCambio}
           totalCambio={totalCambio}

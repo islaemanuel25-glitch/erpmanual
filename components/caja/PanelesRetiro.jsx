@@ -16,6 +16,8 @@
 //
 // Ninguno decide: no calculan importes ni validan. Eso vive en lib/caja.
 
+import { useState } from "react";
+
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -24,7 +26,6 @@ import { TriangleAlert } from "lucide-react";
 import TablaDenominaciones from "@/components/caja/TablaDenominaciones";
 import GrillaCambio from "@/components/caja/GrillaCambio";
 import { Cifra, Fila, money, tonoDiferencia } from "@/components/caja/CifrasRetiro";
-import { MODO_TOTAL, MODO_BILLETES } from "@/lib/caja/conteoBilletes";
 
 export function Aviso({ children, tono = "warning" }) {
   const clase =
@@ -53,68 +54,32 @@ function Bloque({ titulo, ayuda, children, className = "" }) {
   );
 }
 
-function SelectorModo({ valor, onCambiar, opciones }) {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {opciones.map((o) => (
-        <button
-          key={o.valor}
-          type="button"
-          onClick={() => onCambiar?.(o.valor)}
-          aria-pressed={valor === o.valor}
-          className={`rounded-lg px-2 py-2 text-[12px] font-semibold sunmi-border text-center ${
-            valor === o.valor ? "sunmi-surface sunmi-text-accent" : "sunmi-surface-soft sunmi-text-muted"
-          }`}
-        >
-          {o.texto}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ── Contar ──────────────────────────────────────────────────────────────────
 
-export function PanelConteo({ modo, onModo, monto, onMonto, desglose, onDesglose, horaConteo }) {
+/**
+ * Contar el cajón. SIEMPRE por denominación.
+ *
+ * El modo "monto total" desapareció. Escribir un número suelto y contar billete
+ * por billete no son dos maneras de hacer lo mismo: del desglose depende el tope
+ * de cuántos billetes pueden quedar como cambio, y sin él ese control no existe.
+ * Un total tipeado también admite el error que el conteo detecta —poner 150.000
+ * de memoria y que en el cajón haya 140.000— y ahí la diferencia aparece recién
+ * en el arqueo siguiente, cuando ya no se sabe de dónde salió.
+ *
+ * El total es SOLO LECTURA: es la suma de las filas, no un dato que se ingrese.
+ */
+export function PanelConteo({ desglose, onDesglose, horaConteo }) {
   return (
     <Bloque
       titulo="Contar todo el efectivo del cajón"
-      ayuda="Incluí el cambio que hay en el cajón. No cuentes Mercado Pago, débito ni crédito."
+      ayuda="Ingresá la cantidad de billetes de cada denominación. El total se calcula automáticamente."
     >
-      <SelectorModo
-        valor={modo}
-        onCambiar={onModo}
-        opciones={[
-          { valor: MODO_TOTAL, texto: "Monto total" },
-          { valor: MODO_BILLETES, texto: "Contar billetes" },
-        ]}
+      <TablaDenominaciones
+        desglose={desglose}
+        onCambiar={onDesglose}
+        idPrefijo="conteo"
+        titulo="Cantidad en el cajón"
       />
-
-      {modo === MODO_BILLETES ? (
-        <TablaDenominaciones
-          desglose={desglose}
-          onCambiar={onDesglose}
-          idPrefijo="conteo"
-          titulo="Cantidad en el cajón"
-        />
-      ) : (
-        <div>
-          <label htmlFor="monto-total" className="text-xs sunmi-text-muted mb-1 block">
-            Monto total contado ($)
-          </label>
-          <SunmiInput
-            id="monto-total"
-            type="number"
-            min="0"
-            step="0.01"
-            inputMode="decimal"
-            value={monto}
-            onChange={(e) => onMonto?.(e.target.value)}
-            placeholder="0.00"
-            className="text-2xl font-bold text-center"
-          />
-        </div>
-      )}
 
       {/* El problema operativo real: si el mismo cajón sigue recibiendo plata
           mientras se cuenta, el conteo ya no describe nada. No se bloquean las
@@ -141,20 +106,98 @@ export function PanelConteo({ modo, onModo, monto, onMonto, desglose, onDesglose
  * propio historial. Mezclarlos haría leer un retiro de $103.400 como si alguien
  * hubiera sacado plata a mano.
  */
+export const MOVIMIENTOS_VISIBLES = 3;
+
+const horaCorta = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+};
+
+/** Una línea del detalle: hora, tipo, motivo e importe. */
+function MovimientoFila({ mov }) {
+  const esIngreso = mov?.tipo === "INGRESO";
+  const monto = Number(mov?.monto) || 0;
+  return (
+    <div className="flex items-start justify-between gap-2 py-1">
+      <div className="min-w-0">
+        <div className="text-[12px] sunmi-text-strong leading-tight break-words">
+          {/* El motivo es obligatorio en Caja +/−; el vacío solo aparece en
+              movimientos históricos, y ahí se dice en vez de dejar el renglón
+              mudo. */}
+          {mov?.motivo || "Sin motivo"}
+        </div>
+        <div className="text-[10px] sunmi-text-muted leading-tight">
+          {horaCorta(mov?.fecha)} · {esIngreso ? "Ingreso" : "Retiro"}
+        </div>
+      </div>
+      <span
+        className={`text-[12px] font-mono tabular-nums shrink-0 ${
+          esIngreso ? "sunmi-text-strong" : "sunmi-text-warning"
+        }`}
+      >
+        {esIngreso ? "+" : "−"} {money(monto)}
+      </span>
+    </div>
+  );
+}
+
 export function PanelMovimientos({ movimientos = null, className = "" }) {
   const ingresos = Number(movimientos?.ingresos) || 0;
   const retiros = Number(movimientos?.retiros) || 0;
   const neto = Number(movimientos?.neto) || 0;
-  const hay = Math.round((ingresos + retiros) * 100) !== 0;
+  const detalle = Array.isArray(movimientos?.detalle) ? movimientos.detalle : [];
+  const hay = detalle.length > 0 || Math.round((ingresos + retiros) * 100) !== 0;
+
+  const [expandido, setExpandido] = useState(false);
+  const visibles = expandido ? detalle : detalle.slice(0, MOVIMIENTOS_VISIBLES);
+  const ocultos = detalle.length - visibles.length;
 
   return (
     <Bloque titulo="Movimientos de caja" className={className}>
       {hay ? (
-        <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
-          <Fila label="Ingresos manuales" valor={ingresos} clase="sunmi-text-strong" />
-          <Fila label="Retiros manuales" valor={-retiros} clase={retiros ? "sunmi-text-warning" : "sunmi-text-strong"} />
-          <Fila label="Neto movimientos" valor={neto} clase={tonoDiferencia(neto)} fuerte />
-        </div>
+        <>
+          <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
+            <Fila label="Ingresos manuales" valor={ingresos} clase="sunmi-text-strong" />
+            <Fila
+              label="Retiros manuales"
+              valor={-retiros}
+              clase={retiros ? "sunmi-text-warning" : "sunmi-text-strong"}
+            />
+            <Fila label="Neto movimientos" valor={neto} clase={tonoDiferencia(neto)} fuerte />
+          </div>
+
+          {detalle.length > 0 && (
+            <div className="divide-y sunmi-border">
+              {visibles.map((m) => (
+                <MovimientoFila key={m.id} mov={m} />
+              ))}
+            </div>
+          )}
+
+          {/* Se despliega DENTRO del bloque: abrir un modal para leer tres
+              renglones obligaría a cerrar algo antes de seguir contando. */}
+          {ocultos > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpandido(true)}
+              className="text-[12px] sunmi-text-accent underline"
+            >
+              Ver todos ({detalle.length})
+            </button>
+          )}
+          {expandido && detalle.length > MOVIMIENTOS_VISIBLES && (
+            <button
+              type="button"
+              onClick={() => setExpandido(false)}
+              className="text-[12px] sunmi-text-muted underline"
+            >
+              Ver menos
+            </button>
+          )}
+        </>
       ) : (
         <p className="text-[12px] sunmi-text-muted leading-snug">
           No hay ingresos ni retiros manuales en este turno.

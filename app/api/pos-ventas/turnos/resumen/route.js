@@ -79,7 +79,12 @@ export async function GET(req) {
             ? { id: { not: turno.retiroCierreMovimientoId } }
             : {}),
         },
-        select: { id: true, tipo: true, monto: true },
+        // `motivo` y `createdAt` alimentan el detalle de "Movimientos de caja"
+        // en la pantalla de retiro. Son los MISMOS campos que escribe Caja +/−
+        // (app/api/pos-ventas/caja-movimientos/crear), donde el motivo es
+        // obligatorio; queda nullable por los movimientos históricos.
+        select: { id: true, tipo: true, monto: true, motivo: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
       }),
     ]);
 
@@ -136,6 +141,16 @@ export async function GET(req) {
         retiros: desdeCentavos(desgloseManual.retirosCentavos),
         neto: desdeCentavos(desgloseManual.ingresosCentavos - desgloseManual.retirosCentavos),
         cantidad: manuales.length,
+        // Detalle en orden cronológico, para que la pantalla no tenga que
+        // ordenar ni adivinar. El motivo va tal cual se guardó: si está vacío
+        // —solo posible en filas viejas— lo resuelve la vista.
+        detalle: manuales.map((m) => ({
+          id: m.id,
+          tipo: m.tipo,
+          monto: Number(m.monto),
+          motivo: m.motivo || null,
+          fecha: m.createdAt,
+        })),
       },
       totalRetirosCaja: calculo.retiros,
       // El esperado ya calculado por el backend: el modal de cierre lo muestra
