@@ -114,6 +114,8 @@ model Local {
   operadorAsignaciones OperadorEnLocal[]
   arqueos              ArqueoCaja[]
   arqueoPostergaciones ArqueoPostergacion[]
+  cierresPreparacion   CierrePreparacion[]
+  cambiosPendientes    CambioPendiente[]
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -1087,6 +1089,32 @@ model Turno {
   /// Inverso denormalizado: qué turno se llevó el fondo que dejó ESTE cierre.
   fondoConsumidoEnTurnoId  Int?
 
+  // ── CIERRE CON RELEVO DE OPERADOR ──────────────────────────────────────────
+  //
+  // Instante en que se tomó el CORTE CONGELADO del turno. Desde acá el turno deja
+  // de operar —no acepta ventas, ni Caja +/−, ni retiros, ni otro cierre— pero
+  // todavía no está cerrado: el cajero saliente cuenta con calma en otra pestaña
+  // mientras el operador que lo releva ya abre su turno y sigue vendiendo.
+  //
+  // POR QUÉ UN CAMPO NULLABLE Y NO UN ENUM `estado`
+  //
+  // El modelo ya expresa el estado del turno por presencia/ausencia: `cierre`
+  // distingue abierto de cerrado y `anuladoEn` marca la anulación. Un enum nuevo
+  // obligaría a backfillear los ~miles de turnos existentes y a mantener dos
+  // fuentes de verdad que pueden discrepar (¿qué pasa si `estado = ABIERTO` y
+  // `cierre != null`?). Con el campo nullable el estado se sigue derivando de los
+  // datos, sin backfill: null = "sin corte", que es exactamente lo que eran todos
+  // los turnos hasta hoy.
+  //
+  // Los tres estados, y son excluyentes en ese orden:
+  //   cierre != null                                → CERRADO
+  //   cierre = null, cierreEnPreparacionEn != null  → CIERRE_EN_PREPARACION
+  //   cierre = null, cierreEnPreparacionEn = null   → ABIERTO
+  //
+  // Se deriva SIEMPRE con `estadoDelTurno()` (lib/caja/cierreRelevo.js), nunca
+  // comparando campos a mano en cada consumidor.
+  cierreEnPreparacionEn DateTime?
+
   // ── ANULACIÓN TÉCNICA ──────────────────────────────────────────────────────
   //
   // Un turno que se abrió por error o para probar el sistema NO es un cierre: no
@@ -1108,14 +1136,20 @@ model Turno {
   /// ÍNDICE PARCIAL QUE VIVE SOLO EN SQL — no se puede declarar acá.
   ///
   ///   CREATE UNIQUE INDEX "Turno_local_vendedor_abierto_key"
-  ///       ON "Turno" ("localId", "vendedorId") WHERE "cierre" IS NULL;
+  ///       ON "Turno" ("localId", "vendedorId")
+  ///    WHERE "cierre" IS NULL AND "cierreEnPreparacionEn" IS NULL;
   ///
-  /// Garantiza "un turno ABIERTO por usuario y local" incluso ante dos aperturas
-  /// simultáneas. Prisma no soporta `WHERE` en @@unique, y un @@unique común
-  /// romperia todo: impediría que un usuario tenga dos turnos CERRADOS en el
-  /// mismo local, que es lo normal.
+  /// Garantiza "un turno OPERATIVO por usuario y local" incluso ante dos
+  /// aperturas simultáneas. Prisma no soporta `WHERE` en @@unique, y un @@unique
+  /// común romperia todo: impediría que un usuario tenga dos turnos CERRADOS en
+  /// el mismo local, que es lo normal.
   ///
-  /// Vive en la migración 20260803010000_un_turno_abierto_por_usuario. Si alguna
+  /// La condición sobre `cierreEnPreparacionEn` NO es un detalle: un turno con el
+  /// corte de cierre tomado sigue con `cierre IS NULL`, así que sin esa cláusula
+  /// la base rechazaría la apertura del relevo y el cierre en dos tiempos sería
+  /// imposible. Se redefinió en 20260804200000_cierre_relevo_operador.
+  ///
+  /// Nació en la migración 20260803010000_un_turno_abierto_por_usuario. Si alguna
   /// vez se corre `prisma migrate dev`, revisar que no lo proponga como drift y
   /// lo elimine.
 
@@ -1131,11 +1165,22 @@ model Turno {
   cajaMovimientos CajaMovimiento[]
   arqueos         ArqueoCaja[]
   postergaciones  ArqueoPostergacion[]
+  /// Cortes de cierre de ESTE turno. Es lista y no uno solo porque un corte
+  /// cancelado deja su fila como evidencia y el turno puede tomar otro; el
+  /// índice parcial garantiza que a lo sumo UNO esté vigente.
+  cierresPreparacion CierrePreparacion[]
+  /// Cambio que el cierre de ESTE turno dejó para el siguiente operador.
+  cambioDejado      CambioPendiente?   @relation("cambioTurnoOrigen")
+  /// Cambio que ESTE turno recibió al abrirse, si abrió tomando uno pendiente.
+  cambioRecibido    CambioPendiente?   @relation("cambioTurnoDestino")
 
   @@index([localId])
   @@index([vendedorId])
   @@index([apertura])
   @@index([operadorId])
+  /// El POS pregunta "¿tengo turno operativo?" en cada carga: localId +
+  /// vendedorId + los dos campos de estado, resuelto por índice.
+  @@index([localId, vendedorId, cierre, cierreEnPreparacionEn])
 }
 
 /// Arqueo de caja: foto contable de un conteo físico en un momento del turno.
@@ -1284,6 +1329,234 @@ model ArqueoPostergacion {
   @@index([turnoId])
   @@index([localId])
   @@index([venceEn])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CIERRE CON RELEVO DE OPERADOR
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// El problema real: cerrar caja bloqueaba el mostrador. El cajero que se va tiene
+// que contar el cajón billete por billete, y mientras tanto nadie puede vender
+// porque el turno sigue abierto y el POS está tomado por el modal de cierre.
+//
+// La solución es partir el cierre en dos actos separados en el tiempo:
+//
+//   1. CORTE  — instantáneo. Congela el efectivo esperado y la frontera de qué
+//               ventas y movimientos pertenecen a este turno. El turno deja de
+//               operar; el relevo ya puede abrir el suyo y seguir vendiendo.
+//   2. CONFIRMACIÓN — cuando el cajero terminó de contar, en su propia pestaña.
+//               Usa el esperado CONGELADO en el paso 1: nunca se recalcula.
+//
+// Que el esperado no se recalcule es la razón de ser de todo esto. Si al
+// confirmar se volviera a calcular, incluiría las ventas que el relevo hizo
+// mientras tanto y el cajero saliente aparecería con un faltante gigante por
+// plata que nunca tuvo en las manos.
+
+/// Estado del CORTE. No describe el dinero —eso es EstadoCambioPendiente—, solo
+/// en qué punto del cierre está el turno.
+enum EstadoCierrePreparacion {
+  /// Corte tomado, conteo pendiente. El turno no opera.
+  PREPARANDO
+  /// Conteo confirmado: existe el arqueo FINAL y el turno quedó cerrado.
+  CONFIRMADO
+  /// Corte anulado antes de confirmar. Solo posible si nada dependía de él.
+  CANCELADO
+  /// Pasó el plazo sin confirmar. VENCIDO NO significa liberado: el corte sigue
+  /// congelado, el turno sigue sin operar y el cierre todavía puede confirmarse.
+  /// Es una marca de ATRASO para que alguien lo resuelva, nada más.
+  VENCIDO
+}
+
+/// Estado del CAMBIO físico que un cierre dejó en el local para el próximo turno.
+enum EstadoCambioPendiente {
+  /// Está en el local y cualquier operador habilitado puede tomarlo.
+  DISPONIBLE
+  /// Alguien lo eligió y está contándolo. La reserva vence sola.
+  RESERVADO
+  /// Ya lo tomó un turno concreto. Es terminal.
+  RECIBIDO
+  CANCELADO
+  /// Sin resolver por demasiado tiempo. Igual que arriba: no libera la plata,
+  /// solo la marca como pendiente de resolución.
+  VENCIDO
+}
+
+/// El CORTE CONGELADO de un turno: la foto del cierre antes de contar.
+///
+/// SOBRE LOS IDs DE ACTORES SIN RELACIÓN PRISMA
+///
+/// `iniciadoPorUsuarioId`, `iniciadoPorOperadorId` y los equivalentes de
+/// CambioPendiente son Int planos, igual que `Turno.anuladoPorId` y
+/// `Turno.retiroCierreMovimientoId`. Es el patrón que ya usa este circuito: son
+/// sellos de autoría histórica, no dueños del registro, y no hay ninguna consulta
+/// que navegue desde el usuario hacia acá.
+model CierrePreparacion {
+  id Int @id @default(autoincrement())
+
+  /// Llave de acceso a la pantalla de cierre. Aleatoria y no adivinable.
+  ///
+  /// POR QUÉ UN TOKEN Y NO EL OPERADOR ACTIVO
+  ///
+  /// El operador vive en una cookie httpOnly del NAVEGADOR, no de la pestaña:
+  /// cuando el relevo hace login en la pestaña del POS, la pestaña del cierre
+  /// —que revalida al recuperar el foco— pasa a ver al operador nuevo. Si el
+  /// cierre dependiera del operador activo, terminaría firmado por quien no
+  /// contó. Con el token, la pantalla del cierre no lee el operador activo en
+  /// absoluto: la autoría es la que quedó grabada acá al tomar el corte.
+  token String @unique
+
+  /// ÍNDICE PARCIAL QUE VIVE SOLO EN SQL — no se puede declarar acá.
+  ///
+  ///   CREATE UNIQUE INDEX "CierrePreparacion_turno_vigente_key"
+  ///       ON "CierrePreparacion" ("turnoId")
+  ///       WHERE "estado" IN ('PREPARANDO', 'CONFIRMADO');
+  ///
+  /// "Un corte VIGENTE por turno", no "un corte por turno". La diferencia
+  /// importa: un corte CANCELADO es un corte que se deshizo, y el turno volvió a
+  /// operar — tiene que poder tomar otro. Con un @unique común, cancelar por
+  /// error quemaba el turno para siempre y no había forma de volver a cerrarlo.
+  ///
+  /// Mismo patrón que "Turno_local_vendedor_abierto_key": Prisma no soporta
+  /// `WHERE` en @@unique. Vive en la migración 20260804200000_cierre_relevo_operador.
+  turnoId Int
+  localId Int
+  grupoId Int
+
+  iniciadoPorUsuarioId  Int
+  iniciadoPorOperadorId Int?
+  iniciadoEn            DateTime @default(now())
+  /// Instante exacto del corte. Es el `periodoHasta` del arqueo FINAL.
+  corteEn               DateTime
+
+  estado EstadoCierrePreparacion @default(PREPARANDO)
+
+  /// EL NÚMERO QUE NO SE RECALCULA. Efectivo esperado al instante del corte,
+  /// con la fórmula única de lib/caja/efectivoEsperado.js.
+  efectivoEsperadoCorte Decimal @db.Decimal(12, 2)
+
+  /// FRONTERA POR ID, NO POR TIMESTAMP.
+  ///
+  /// Dos filas creadas en el mismo milisegundo son indistinguibles por fecha, y
+  /// una venta que entra justo durante el corte caería de los dos lados o de
+  /// ninguno. Con `id <= ultimaVentaId` el universo del turno queda cerrado sin
+  /// ambigüedad. Son Int planos a propósito: una FK impediría borrar una venta
+  /// vieja por el solo hecho de haber sido la última antes de un corte.
+  ultimaVentaId       Int?
+  ultimoMovimientoId  Int?
+  cantidadVentasCorte Int  @default(0)
+
+  /// El conteo, cargado al confirmar. Json como `ConfiguracionLocal.aparienciaJson`
+  /// y los diffs de la bitácora: se lee siempre entero y nunca se consulta "cuántos
+  /// billetes de $10.000 hubo en agosto". Lo valida el servidor con
+  /// `validarDesgloseServidor`; nunca se confía en lo que manda el cliente.
+  desgloseContado Json?
+  desgloseCambio  Json?
+  totalContado    Decimal? @db.Decimal(12, 2)
+  totalCambio     Decimal? @db.Decimal(12, 2)
+  /// contado − cambio. Consecuencia aritmética, no una elección del cajero.
+  retiroFinal     Decimal? @db.Decimal(12, 2)
+  observacion     String?
+
+  /// Misma clave que el ArqueoCaja FINAL: `cierre-<turnoId>`. Que sea la misma
+  /// es deliberado — el cierre clásico y el cierre con relevo compiten por la
+  /// @@unique([turnoId, idempotencyKey]) de ArqueoCaja, así que nunca pueden
+  /// generar dos cortes finales sobre el mismo turno.
+  ///
+  /// No lleva @unique acá, y no hace falta: la clave se deriva del turnoId, así
+  /// que el índice parcial de arriba ya impide dos cortes vigentes con la misma
+  /// clave. Un @unique global habría quemado la clave de un turno cuyo corte se
+  /// canceló, con el mismo efecto que quemar el turnoId. La garantía dura contra
+  /// el doble arqueo FINAL está donde tiene que estar: en ArqueoCaja.
+  idempotencyKey String
+
+  /// Plazo de referencia. Vencer NO libera nada: ver EstadoCierrePreparacion.
+  venceEn      DateTime
+  confirmadoEn DateTime?
+  /// ArqueoCaja FINAL que produjo la confirmación. @unique: un arqueo no puede
+  /// pertenecer a dos cortes.
+  arqueoFinalId Int? @unique
+
+  canceladoEn           DateTime?
+  canceladoPorUsuarioId Int?
+  motivoCancelacion     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  turno           Turno            @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  local           Local            @relation(fields: [localId], references: [id])
+  cambioPendiente CambioPendiente?
+
+  @@index([turnoId])
+  @@index([localId, estado])
+  @@index([grupoId])
+  @@index([venceEn])
+}
+
+/// El CAMBIO físico que quedó en el local esperando al próximo operador.
+///
+/// Es la ÚNICA fuente de verdad del traspaso. Los campos viejos de Turno
+/// (`fondoSugeridoApertura`, `fondoOrigenTurnoId` y compañía) quedan intactos por
+/// compatibilidad histórica pero NO se escriben: aquella cadena era automática
+/// —adivinaba qué cierre correspondía a qué cajón— y por eso se desactivó. Acá el
+/// operador ELIGE de una lista qué sobre de cambio está tomando.
+model CambioPendiente {
+  id      Int @id @default(autoincrement())
+  localId Int
+  grupoId Int
+
+  /// Un corte deja a lo sumo un sobre de cambio.
+  cierrePreparacionId Int @unique
+  /// Y un turno lo deja una sola vez.
+  turnoOrigenId       Int @unique
+  operadorOrigenId    Int?
+  dejadoEn            DateTime @default(now())
+
+  /// Lo que el cierre decidió dejar. Calculado por el servidor desde `desglose`.
+  total       Decimal @db.Decimal(12, 2)
+  desglose    Json
+  observacion String?
+
+  estado EstadoCambioPendiente @default(DISPONIBLE)
+
+  reservadoPorUsuarioId  Int?
+  reservadoPorOperadorId Int?
+  reservadoEn            DateTime?
+  /// La reserva SÍ vence de verdad y vuelve a DISPONIBLE. Es lo contrario del
+  /// vencimiento del cierre, y la diferencia es material: una reserva
+  /// abandonada no movió plata —el sobre sigue físicamente en el local—, así
+  /// que liberarla no pierde nada. Un corte vencido, en cambio, ya congeló un
+  /// turno: liberarlo sí perdería el cierre.
+  reservaVenceEn         DateTime?
+
+  /// LA GARANTÍA DURA CONTRA EL DOBLE CONSUMO. @unique: dos turnos no pueden
+  /// tomar el mismo sobre aunque fallen todas las validaciones de la aplicación.
+  turnoDestinoId Int? @unique
+
+  recibidoPorUsuarioId  Int?
+  recibidoPorOperadorId Int?
+  recibidoEn            DateTime?
+  /// Lo que el operador entrante contó de verdad. `Turno.montoInicial` toma
+  /// SIEMPRE este número, no `total`: si el sistema impusiera lo esperado, una
+  /// diferencia de recepción quedaría escondida y reaparecería como faltante al
+  /// cerrar, culpando al cajero equivocado.
+  totalRecibido    Decimal? @db.Decimal(12, 2)
+  desgloseRecibido Json?
+  /// recibido − esperado. Positiva = sobrante, negativa = faltante.
+  diferencia       Decimal? @db.Decimal(12, 2)
+  motivoDiferencia String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  local             Local             @relation(fields: [localId], references: [id])
+  cierrePreparacion CierrePreparacion @relation(fields: [cierrePreparacionId], references: [id], onDelete: Cascade)
+  turnoOrigen       Turno             @relation("cambioTurnoOrigen", fields: [turnoOrigenId], references: [id], onDelete: Cascade)
+  turnoDestino      Turno?            @relation("cambioTurnoDestino", fields: [turnoDestinoId], references: [id])
+
+  @@index([localId, estado])
+  @@index([grupoId])
+  @@index([reservaVenceEn])
 }
 
 model CajaMovimiento {
