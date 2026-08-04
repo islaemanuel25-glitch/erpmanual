@@ -26,11 +26,15 @@ import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
 import ModalCanjePuntos from "@/components/pos-ventas/ModalCanjePuntos";
 import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullscreen";
 import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
-import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
 import AvisoArqueo from "@/components/pos-ventas/AvisoArqueo";
 import useArqueoEstado from "@/hooks/useArqueoEstado";
-import useEsEscritorio, { nombreVentanaRetiro } from "@/hooks/useEsEscritorio";
+import useEsEscritorio, { nombreVentanaRetiro, nombreVentanaCierre } from "@/hooks/useEsEscritorio";
+import {
+  escucharCorteIniciado,
+  leerSenalVigente,
+  limpiarSenal,
+} from "@/lib/caja/senalCierre";
 import ModalPesoKg from "@/components/pos-ventas/ModalPesoKg";
 import ModalConfirmacion from "@/components/pos-ventas/ModalConfirmacion";
 import ModalPendientesOffline from "@/components/pos-ventas/ModalPendientesOffline";
@@ -49,7 +53,15 @@ export default function PosVentasPage() {
   // Operador activo + su voucher firmado (adjuntados a las ventas encoladas
   // offline para conservar la atribución al sincronizar) y requerirOperador
   // (levanta el modal de PIN encima de la venta ante un 428, sin navegar).
-  const { operador: operadorActivo, voucher: operadorVoucherActivo, requerirOperador } = useOperadorContext();
+  // `logout` se usa al cortar el turno: el mostrador vuelve al ingreso de
+  // operario para que el relevo entre con su PIN. No cambia la autoría de nada
+  // ya registrado — eso vive en el servidor.
+  const {
+    operador: operadorActivo,
+    voucher: operadorVoucherActivo,
+    requerirOperador,
+    logout: logoutOperador,
+  } = useOperadorContext();
 
   // Estado del POS con reducer
   const [state, dispatch] = useReducer(posVentaReducer, initialState);
@@ -63,7 +75,11 @@ export default function PosVentasPage() {
   const [turnoActual, setTurnoActual] = useState(undefined); // undefined=cargando, null=sin turno, object=turno
   const [turnoVencido, setTurnoVencido] = useState(false);
   const [mensajeTurnoVencido, setMensajeTurnoVencido] = useState("");
-  const [mostrarCierre, setMostrarCierre] = useState(false);
+  // Espejo del turno para el listener del corte. Sin la ref, el listener tendría
+  // que resuscribirse en cada cambio de turno y podría perder un aviso que llega
+  // justo entre la baja y el alta.
+  const turnoActualRef = useRef(null);
+  turnoActualRef.current = turnoActual;
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
   // Servicio de importe variable pendiente de ingresar importe en el modal.
@@ -139,10 +155,11 @@ export default function PosVentasPage() {
   // En móvil, en la misma pestaña: no hay lugar para dos, y el borrador local
   // cubre la ida y vuelta.
   const esEscritorio = useEsEscritorio();
-  const abrirRetiro = (turnoId) => {
-    const ruta = "/modulos/pos-ventas/retiros/nuevo";
+
+  /** Abre una pantalla de caja: pestaña aparte en escritorio, misma en móvil. */
+  const abrirPantallaCaja = (ruta, nombreVentana) => {
     if (esEscritorio && typeof window !== "undefined") {
-      const ventana = window.open(`${ruta}?pestana=nueva`, nombreVentanaRetiro(turnoId));
+      const ventana = window.open(`${ruta}?pestana=nueva`, nombreVentana);
       // Si el navegador bloquea la ventana emergente, no se pierde la acción.
       if (ventana) {
         ventana.focus();
@@ -151,6 +168,55 @@ export default function PosVentasPage() {
     }
     router.push(ruta);
   };
+
+  const abrirRetiro = (turnoId) =>
+    abrirPantallaCaja("/modulos/pos-ventas/retiros/nuevo", nombreVentanaRetiro(turnoId));
+
+  // CIERRE DE CAJA: misma lógica de pestañas que el retiro, y por el mismo
+  // motivo —contar lleva minutos— más uno propio: acá el POS se libera de
+  // verdad. Apenas el corte se confirma, esta pestaña suelta el turno y vuelve
+  // al ingreso de operario para que el relevo pueda empezar.
+  const abrirCierre = (turnoId) =>
+    abrirPantallaCaja("/modulos/pos-ventas/cierres/iniciar", nombreVentanaCierre(turnoId));
+
+  // ── El aviso de que el turno acaba de cortarse ───────────────────────────
+  //
+  // Llega desde la pestaña del cierre. Esta pestaña reacciona soltando el turno
+  // y cerrando la sesión de operario: el mostrador queda listo para el
+  // siguiente. NO se toca la autoría del cierre —eso vive en el servidor, en la
+  // fila del corte— así que el login del operador B no cambia quién cerró.
+  const soltarTurnoCortado = useCallback(
+    (senal) => {
+      // Solo si es EL turno que esta pestaña está mostrando. Un corte de otra
+      // caja del mismo local no tiene por qué desloguear a nadie acá.
+      if (!senal?.turnoId || senal.turnoId !== turnoActualRef.current?.id) return;
+      limpiarSenal();
+      setTurnoActual(null);
+      setTurnoVencido(false);
+      setMensajeTurnoVencido("");
+      // Cierra la sesión de operario: el OperadorProvider muestra solo el PIN.
+      logoutOperador?.();
+    },
+    [logoutOperador]
+  );
+
+  useEffect(() => {
+    const dejarDeEscuchar = escucharCorteIniciado(soltarTurnoCortado);
+    // Una pestaña que estuvo dormida no recibe mensajes de canal —no se
+    // encolan—, así que al recuperar el foco se lee la marca escrita.
+    const alVolver = () => {
+      if (document.visibilityState !== "visible") return;
+      const pendiente = leerSenalVigente();
+      if (pendiente) soltarTurnoCortado(pendiente);
+    };
+    window.addEventListener("focus", alVolver);
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      dejarDeEscuchar();
+      window.removeEventListener("focus", alVolver);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, [soltarTurnoCortado]);
 
 
   // Obtener grupoId del contexto (necesario para cola offline)
@@ -1442,26 +1508,17 @@ export default function PosVentasPage() {
           <div className="text-xs sunmi-text-muted text-center">
             Caja abierta el {fechaAperturaTxt}
           </div>
+          {/* Una caja de ayer también se cierra por el flujo nuevo. Es más:
+              es donde más falta hace, porque el local ya está queriendo abrir
+              y con el corte puede hacerlo sin esperar el conteo. */}
           <SunmiButton
             color="amber"
-            onClick={() => setMostrarCierre(true)}
+            onClick={() => abrirCierre(turnoActual.id)}
             className="w-full"
           >
             Cerrar caja
           </SunmiButton>
         </div>
-        {mostrarCierre && (
-          <ModalCierreTurno
-            turno={turnoActual}
-            onCerrar={() => setMostrarCierre(false)}
-            onCerrado={() => {
-              setMostrarCierre(false);
-              setTurnoActual(null);
-              setTurnoVencido(false);
-              setMensajeTurnoVencido("");
-            }}
-          />
-        )}
       </div>
     );
   }
@@ -1619,7 +1676,7 @@ export default function PosVentasPage() {
             )}
             {turnoActual && (
               <button
-                onClick={() => setMostrarCierre(true)}
+                onClick={() => abrirCierre(turnoActual.id)}
                 className="text-[11px] sunmi-pos-btn-danger px-2 py-1 rounded transition-colors"
               >
                 Cerrar Turno
@@ -2012,23 +2069,23 @@ export default function PosVentasPage() {
         />
       )}
 
-      {/* Ni el arqueo puro ni el retiro se abren ya como modal desde el POS.
-          El retiro es ahora una pantalla propia (/modulos/pos-ventas/retiros/nuevo):
-          contar un cajón lleva minutos y en un modal el cajero no podía salir a
-          cobrar sin perder el conteo. El carrito ya persiste por local y usuario,
-          así que ir y volver es seguro. */}
+      {/* Ni el arqueo, ni el retiro, ni el cierre se abren ya como modal desde
+          el POS.
 
-      {/* Modal cierre de turno */}
-      {mostrarCierre && turnoActual && (
-        <ModalCierreTurno
-          turno={turnoActual}
-          onCerrar={() => setMostrarCierre(false)}
-          onCerrado={() => {
-            setMostrarCierre(false);
-            setTurnoActual(null);
-          }}
-        />
-      )}
+          El retiro vive en /modulos/pos-ventas/retiros/nuevo y el cierre en
+          /modulos/pos-ventas/cierres: contar un cajón lleva minutos y en un
+          modal el cajero no podía salir a cobrar sin perder el conteo. El
+          carrito persiste por local y usuario, así que ir y volver es seguro.
+
+          El cierre agrega algo que el modal no podía dar: al cortar, ESTA
+          pestaña suelta el turno y vuelve al ingreso de operario, así que el
+          relevo empieza a vender mientras el saliente cuenta. Ver
+          `soltarTurnoCortado` y lib/caja/senalCierre.js.
+
+          ModalCierreTurno.jsx y /api/pos-ventas/turnos/cerrar siguen en el
+          repositorio como vía administrativa acotada. El endpoint rechaza
+          cualquier turno con corte tomado, así que no puede competir con este
+          flujo ni cerrar por atrás una caja congelada. */}
 
       {/* Modal confirmación (reemplazo de confirm()) */}
       {state.modalConfirmacion && (
