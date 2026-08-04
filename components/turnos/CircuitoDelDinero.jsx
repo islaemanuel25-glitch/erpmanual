@@ -212,7 +212,33 @@ export default function CircuitoDelDinero({ turno, resumen = null }) {
           <Dato etiqueta="Efectivo esperado" ayuda={c.cierre.corteEn ? "Congelado al corte" : undefined}>
             <Monto valor={c.cierre.efectivoEsperado} />
           </Dato>
-          <Dato etiqueta="Efectivo contado">
+
+          {/* ── Las dos cifras del orden nuevo ──
+              Sólo aparecen cuando el cambio se separó ANTES del corte. En un
+              cierre del orden anterior no existieron nunca, y mostrarlas
+              vacías haría creer que faltan datos en vez de que no aplican. */}
+          {c.cierre.cambioSeparadoEnCorte && (
+            <>
+              <Dato etiqueta="Cambio separado" ayuda="Se apartó antes del corte y quedó en el cajón">
+                <Monto valor={c.cierre.cambioDejado} clase="sunmi-text-link" />
+              </Dato>
+              <Dato etiqueta="Retiro esperado" ayuda="Efectivo esperado menos el cambio separado">
+                <Monto valor={c.cierre.retiroEsperado} />
+              </Dato>
+              <Dato etiqueta="Retiro contado" ayuda="La única pila que se contó después del corte">
+                <Monto valor={c.cierre.retiroContado} clase="sunmi-text-accent" />
+              </Dato>
+            </>
+          )}
+
+          <Dato
+            etiqueta="Efectivo contado"
+            ayuda={
+              c.cierre.cambioSeparadoEnCorte
+                ? "Total del cajón al corte: retiro contado más cambio separado"
+                : undefined
+            }
+          >
             <Monto valor={c.cierre.efectivoContado} />
           </Dato>
           <Dato etiqueta="Diferencia">

@@ -6,9 +6,13 @@
 // CANCELAR ES LA EXCEPCIÓN, NO LA SALIDA HABITUAL
 //
 // Solo existe para el caso real de "tomé el corte por error, todavía no conté
-// nada". Apenas alguien dependa del relevo —hay un sobre de cambio publicado,
-// reservado, recibido, o un turno destino— cancelar dejaría plata contada dos
-// veces, y se rechaza.
+// nada". Como el cambio se separa y se publica en el mismo acto del corte, el
+// sobre SIEMPRE existe: encontrarlo no es motivo de rechazo. Lo que bloquea es
+// que alguien ya dependa de él —reservado, recibido o con turno destino—, porque
+// ahí cancelar dejaría la misma plata contada en dos turnos distintos.
+//
+// Cuando sí se cancela, el sobre se marca CANCELADO junto con el corte: dejarlo
+// DISPONIBLE ofrecería al próximo operador un cambio de un cierre que se deshizo.
 //
 // Un cierre VENCIDO no se cancela desde acá. Vencido significa que el cajero se
 // fue sin contar y la plata está en el cajón: eso necesita una resolución
@@ -16,11 +20,12 @@
 // política. Se informa como pendiente y se deja para quien la defina.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { ESTADO_CIERRE, ESTADO_TURNO, estadoDelTurno } from "@/lib/caja/cierreRelevo";
+import { ESTADO_CIERRE, ESTADO_CAMBIO, ESTADO_TURNO, estadoDelTurno } from "@/lib/caja/cierreRelevo";
 import {
   cargarCierrePorToken,
   bloquearTurno,
   bloquearCierre,
+  bloquearCambio,
   serializarCierre,
   OPCIONES_TX,
 } from "@/lib/caja/cierreRelevoServer";
@@ -68,18 +73,39 @@ export async function POST(req, context) {
         throw e;
       }
 
-      // Nada puede depender del relevo. Se consulta la fila real, no el include
-      // de afuera: entre pedidos pudo publicarse un sobre.
+      // ── EL SOBRE: sólo se cancela si NADIE lo tocó ────────────────────────
+      //
+      // Desde que el cambio se separa antes del corte, el sobre existe desde el
+      // primer instante y encontrarlo ya no es motivo para rechazar: lo normal es
+      // que esté ahí, DISPONIBLE y sin que nadie lo haya mirado.
+      //
+      // Lo que sí bloquea es que alguien DEPENDA de él. Si el relevo lo reservó
+      // está contando esos billetes en este momento; si lo recibió, ya abrió su
+      // turno con esa plata como monto inicial. Cancelar en cualquiera de los dos
+      // casos dejaría la misma plata contada dos veces, en dos turnos distintos.
+      //
+      // Se relee la fila real, con lock: entre la lectura de afuera y este punto
+      // el relevo pudo reservarlo.
       const sobre = await tx.cambioPendiente.findUnique({
         where: { cierrePreparacionId: cierre.id },
         select: { id: true, estado: true, turnoDestinoId: true },
       });
       if (sobre) {
-        const e = new Error(
-          "Este cierre ya dejó un cambio para el próximo turno. No se puede cancelar."
-        );
-        e.codigo = "conflicto";
-        throw e;
+        await bloquearCambio(tx, sobre.id);
+        const actual = await tx.cambioPendiente.findUnique({
+          where: { id: sobre.id },
+          select: { id: true, estado: true, turnoDestinoId: true },
+        });
+        const libre = actual.estado === ESTADO_CAMBIO.DISPONIBLE && actual.turnoDestinoId == null;
+        if (!libre) {
+          const e = new Error(
+            actual.estado === ESTADO_CAMBIO.RECIBIDO || actual.turnoDestinoId != null
+              ? "El cambio de este cierre ya fue recibido por otro turno. No se puede cancelar: hace falta una resolución administrativa."
+              : "El cambio de este cierre ya fue tomado por otro operador, que lo está contando. No se puede cancelar."
+          );
+          e.codigo = "conflicto";
+          throw e;
+        }
       }
 
       const turno = await tx.turno.findFirst({
@@ -102,6 +128,16 @@ export async function POST(req, context) {
           motivoCancelacion: motivo,
         },
       });
+
+      // El sobre se marca CANCELADO, no se borra. Que un cambio se publicó y se
+      // retiró de circulación es parte de la historia de la caja: borrar la fila
+      // dejaría un hueco inexplicable entre dos turnos consecutivos.
+      if (sobre) {
+        await tx.cambioPendiente.update({
+          where: { id: sobre.id },
+          data: { estado: ESTADO_CAMBIO.CANCELADO },
+        });
+      }
 
       // El turno vuelve a operar. La fila del corte NO se borra: queda como
       // evidencia de que alguien lo tomó y lo deshizo, con motivo y autor.

@@ -115,6 +115,7 @@ model Local {
   arqueos              ArqueoCaja[]
   arqueoPostergaciones ArqueoPostergacion[]
   cierresPreparacion   CierrePreparacion[]
+  retirosPreparacion   RetiroPreparacion[]
   cambiosPendientes    CambioPendiente[]
 }
 
@@ -1169,8 +1170,15 @@ model Turno {
   /// cancelado deja su fila como evidencia y el turno puede tomar otro; el
   /// índice parcial garantiza que a lo sumo UNO esté vigente.
   cierresPreparacion CierrePreparacion[]
+  /// Retiros de recaudación en preparación o ya confirmados de ESTE turno. Lista
+  /// porque una caja hace varios retiros por jornada; el índice parcial garantiza
+  /// que a lo sumo UNO esté en preparación a la vez.
+  retirosPreparacion RetiroPreparacion[]
   /// Cambio que el cierre de ESTE turno dejó para el siguiente operador.
-  cambioDejado      CambioPendiente?   @relation("cambioTurnoOrigen")
+  /// Los sobres que ESTE turno publicó. Lista y no uno solo porque un corte
+  /// cancelado deja su sobre CANCELADO como evidencia y el turno puede volver a
+  /// cortar; el índice parcial garantiza que a lo sumo UNO esté vigente.
+  cambiosDejados    CambioPendiente[]  @relation("cambioTurnoOrigen")
   /// Cambio que ESTE turno recibió al abrirse, si abrió tomando uno pendiente.
   cambioRecibido    CambioPendiente?   @relation("cambioTurnoDestino")
 
@@ -1279,6 +1287,9 @@ model ArqueoCaja {
   postergadoPor Usuario?      @relation("arqueoPostergadoPor", fields: [postergadoPorId], references: [id])
   entregadoPor Usuario?       @relation("arqueoEntregadoPor", fields: [entregadoPorId], references: [id])
   cajaMovimientoRetiro CajaMovimiento? @relation("retiroDeArqueo", fields: [cajaMovimientoRetiroId], references: [id])
+  /// La preparación que produjo este arqueo, si vino del flujo con corte. `null`
+  /// en los arqueos históricos y en los del cierre, que tienen su propia tabla.
+  retiroPreparacion    RetiroPreparacion? @relation("retiroDePreparacion")
 
   @@unique([turnoId, idempotencyKey])
   @@index([turnoId])
@@ -1367,6 +1378,21 @@ enum EstadoCierrePreparacion {
   VENCIDO
 }
 
+/// Estado de un RETIRO DE RECAUDACIÓN en preparación.
+///
+/// Tres estados y no cuatro: a diferencia del cierre, un retiro NO congela el
+/// turno —la caja sigue vendiendo— así que dejarlo abierto no traba a nadie y no
+/// hace falta una marca de atraso que alguien tenga que resolver.
+enum EstadoRetiroPreparacion {
+  /// Corte tomado y cambio separado. El turno SIGUE OPERANDO.
+  PREPARANDO
+  /// Conteo confirmado: existe el ArqueoCaja PARCIAL y el CajaMovimiento.
+  CONFIRMADO
+  /// Abandonado antes de confirmar. No movió plata: el cambio nunca salió del
+  /// cajón y no se creó ningún movimiento.
+  CANCELADO
+}
+
 /// Estado del CAMBIO físico que un cierre dejó en el local para el próximo turno.
 enum EstadoCambioPendiente {
   /// Está en el local y cualquier operador habilitado puede tomarlo.
@@ -1445,16 +1471,56 @@ model CierrePreparacion {
   ultimoMovimientoId  Int?
   cantidadVentasCorte Int  @default(0)
 
-  /// El conteo, cargado al confirmar. Json como `ConfiguracionLocal.aparienciaJson`
-  /// y los diffs de la bitácora: se lee siempre entero y nunca se consulta "cuántos
-  /// billetes de $10.000 hubo en agosto". Lo valida el servidor con
-  /// `validarDesgloseServidor`; nunca se confía en lo que manda el cliente.
-  desgloseContado Json?
+  /// EL CAMBIO SE SEPARA ANTES DEL CORTE, no al final.
+  ///
+  /// Estos dos se graban al INICIAR, no al confirmar. Ese es el orden físico
+  /// real: primero se aparta el dinero que queda para seguir vendiendo, después
+  /// se corta, y recién entonces se cuenta lo que se retira. Desde el corte son
+  /// INMUTABLES: el sobre ya está publicado y el relevo puede haberlo tomado.
+  ///
+  /// Json como `ConfiguracionLocal.aparienciaJson` y los diffs de la bitácora: se
+  /// lee siempre entero y nunca se consulta "cuántos billetes de $10.000 hubo en
+  /// agosto". Lo valida el servidor con `validarDesgloseServidor`; nunca se
+  /// confía en lo que manda el cliente.
   desgloseCambio  Json?
-  totalContado    Decimal? @db.Decimal(12, 2)
   totalCambio     Decimal? @db.Decimal(12, 2)
-  /// contado − cambio. Consecuencia aritmética, no una elección del cajero.
+
+  /// EL SEGUNDO NÚMERO QUE NO SE RECALCULA: `efectivoEsperadoCorte − totalCambio`.
+  ///
+  /// Es contra éste que se compara el conteo del retiro. Se congela con el corte
+  /// por la misma razón que el esperado: si se recalculara al confirmar traería
+  /// las ventas que hizo el relevo mientras el saliente contaba.
+  ///
+  /// Nullable sólo por compatibilidad: los cortes tomados con el orden anterior
+  /// —cambio elegido al final— no lo tienen, y se confirman por el camino viejo.
+  /// Ver `calcularCierreDesdeConteo`.
+  efectivoRetiradoEsperado Decimal? @db.Decimal(12, 2)
+
+  /// El conteo del RETIRO, cargado al confirmar. Es la única pila que se cuenta
+  /// después del corte: el cambio ya se contó antes y no está en el montón.
+  desgloseRetiroContado Json?
+  totalRetiroContado    Decimal? @db.Decimal(12, 2)
+
+  /// TOTAL EQUIVALENTE DEL CAJÓN: `totalRetiroContado + totalCambio`.
+  ///
+  /// No cambia de significado respecto de la versión anterior —sigue siendo todo
+  /// el efectivo que había en el cajón al momento del corte— y por eso conserva
+  /// el nombre. Es el número que se copia a `ArqueoCaja.efectivoContado` y a
+  /// `Turno.montoRealEfectivo`, para que ningún reporte histórico cambie de
+  /// semántica. Con el orden nuevo se DERIVA en vez de contarse de una sola vez.
+  desgloseContado Json?
+  totalContado    Decimal? @db.Decimal(12, 2)
+
+  /// Lo que efectivamente salió del cajón. Con el orden nuevo es igual a
+  /// `totalRetiroContado`; con el anterior era `contado − cambio`. El mismo
+  /// número por los dos caminos.
   retiroFinal     Decimal? @db.Decimal(12, 2)
+
+  /// `totalRetiroContado − efectivoRetiradoEsperado`. Se persiste en vez de
+  /// derivarse en cada lectura: es el hallazgo del arqueo, y un número que se
+  /// recalcula es un número que puede cambiar de valor con el tiempo.
+  diferencia      Decimal? @db.Decimal(12, 2)
+
   observacion     String?
 
   /// Misma clave que el ArqueoCaja FINAL: `cierre-<turnoId>`. Que sea la misma
@@ -1493,6 +1559,113 @@ model CierrePreparacion {
   @@index([venceEn])
 }
 
+/// El CORTE CONGELADO de un RETIRO DE RECAUDACIÓN.
+///
+/// EN QUÉ SE PARECE AL CIERRE Y EN QUÉ NO
+///
+/// Se parece en lo técnico: congela el efectivo esperado y la frontera de qué
+/// ventas y movimientos entran, se accede por token, y se confirma en una
+/// transacción contra el número congelado.
+///
+/// NO se parece en lo semántico, y por eso es una tabla aparte en vez de un
+/// estado de CierrePreparacion: un retiro NO cierra el turno, NO lo libera y NO
+/// publica ningún sobre de cambio. La caja sigue vendiendo con el cambio que se
+/// separó, y las ventas posteriores se acumulan encima de él. Meter las dos
+/// cosas en la misma tabla habría obligado a que cada consulta del cierre
+/// recordara excluir los retiros, y basta una que se olvide para cerrar un turno
+/// con los datos de un retiro parcial.
+model RetiroPreparacion {
+  id Int @id @default(autoincrement())
+
+  /// Llave de acceso a la pantalla de conteo. Misma decisión que en el cierre: el
+  /// operador vive en una cookie del NAVEGADOR, no de la pestaña, así que la
+  /// pantalla no puede depender de él. La autoría es la grabada acá al cortar.
+  token String @unique
+
+  /// ÍNDICE PARCIAL QUE VIVE SOLO EN SQL — no se puede declarar acá.
+  ///
+  ///   CREATE UNIQUE INDEX "RetiroPreparacion_turno_vigente_key"
+  ///       ON "RetiroPreparacion" ("turnoId")
+  ///       WHERE "estado" = 'PREPARANDO';
+  ///
+  /// "Un retiro EN PREPARACIÓN por turno", no "un retiro por turno": una caja
+  /// hace varios retiros a lo largo del día y todos conviven. Sólo se excluyen
+  /// los que están a medio contar. Mismo patrón que
+  /// "CierrePreparacion_turno_vigente_key". Vive en la migración
+  /// 20260805120000_retiro_preparacion.
+  turnoId Int
+  localId Int
+
+  iniciadoPorUsuarioId  Int
+  iniciadoPorOperadorId Int?
+  /// Instante exacto del corte. Es el `periodoHasta` del ArqueoCaja PARCIAL.
+  corteEn               DateTime
+
+  estado EstadoRetiroPreparacion @default(PREPARANDO)
+
+  /// EL NÚMERO QUE NO SE RECALCULA. Efectivo esperado al instante del corte, con
+  /// la fórmula única de lib/caja/efectivoEsperado.js.
+  efectivoEsperadoCorte Decimal @db.Decimal(12, 2)
+
+  /// FRONTERA POR ID, NO POR TIMESTAMP. Misma razón que en el cierre: dos filas
+  /// del mismo milisegundo son indistinguibles por fecha. Int planos a propósito:
+  /// una FK impediría borrar una venta vieja por haber sido la última antes de un
+  /// corte.
+  ultimaVentaId      Int?
+  ultimoMovimientoId Int?
+
+  /// EL CAMBIO SEPARADO ANTES DEL CORTE. Inmutable desde que se toma el corte.
+  /// A diferencia del cierre, no genera ningún CambioPendiente: esta plata no
+  /// cambia de manos, se queda en el mismo cajón del mismo turno.
+  desgloseCambio Json
+  totalCambio    Decimal @db.Decimal(12, 2)
+
+  /// `efectivoEsperadoCorte − totalCambio`, congelado. Es contra este número que
+  /// se compara el conteo.
+  efectivoRetiradoEsperado Decimal @db.Decimal(12, 2)
+
+  /// El conteo del retiro, cargado al confirmar. La única pila que se cuenta
+  /// después del corte.
+  desgloseRetiroContado Json?
+  totalRetiroContado    Decimal? @db.Decimal(12, 2)
+
+  /// `totalRetiroContado + totalCambio`. Es el total equivalente del cajón, y es
+  /// el que se copia a `ArqueoCaja.efectivoContado` para no cambiarle el
+  /// significado histórico a esa columna.
+  totalCajonDerivado Decimal? @db.Decimal(12, 2)
+
+  /// `totalRetiroContado − efectivoRetiradoEsperado`.
+  diferencia  Decimal? @db.Decimal(12, 2)
+  observacion String?
+
+  /// Clave de idempotencia. A diferencia del cierre NO se deriva del turnoId —una
+  /// caja hace varios retiros por jornada y todos son legítimos—, así que la
+  /// genera el corte y se conserva hasta la confirmación. Es la que termina en
+  /// `ArqueoCaja.idempotencyKey`, donde la @@unique([turnoId, idempotencyKey])
+  /// impide que una confirmación repetida duplique el descuento.
+  idempotencyKey String
+
+  confirmadoEn DateTime?
+  /// ArqueoCaja PARCIAL que produjo la confirmación. @unique: un arqueo no puede
+  /// pertenecer a dos preparaciones.
+  arqueoCajaId Int? @unique
+
+  canceladoEn           DateTime?
+  canceladoPorUsuarioId Int?
+  motivoCancelacion     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  turno Turno      @relation(fields: [turnoId], references: [id], onDelete: Cascade)
+  local Local      @relation(fields: [localId], references: [id])
+  arqueo ArqueoCaja? @relation("retiroDePreparacion", fields: [arqueoCajaId], references: [id])
+
+  @@index([turnoId])
+  @@index([localId, estado])
+  @@index([corteEn])
+}
+
 /// El CAMBIO físico que quedó en el local esperando al próximo operador.
 ///
 /// Es la ÚNICA fuente de verdad del traspaso. Los campos viejos de Turno
@@ -1508,7 +1681,23 @@ model CambioPendiente {
   /// Un corte deja a lo sumo un sobre de cambio.
   cierrePreparacionId Int @unique
   /// Y un turno lo deja una sola vez.
-  turnoOrigenId       Int @unique
+  /// UN SOBRE VIGENTE POR TURNO, no uno solo para siempre.
+  ///
+  /// ÍNDICE PARCIAL QUE VIVE SOLO EN SQL:
+  ///
+  ///   CREATE UNIQUE INDEX "CambioPendiente_turnoOrigen_vigente_key"
+  ///       ON "CambioPendiente" ("turnoOrigenId")
+  ///       WHERE "estado" <> 'CANCELADO';
+  ///
+  /// Era un @unique común hasta que el sobre pasó a publicarse AL CORTAR. Con
+  /// esa unicidad total, un turno que tomaba el corte, lo cancelaba y volvía a
+  /// cortar chocaba contra el sobre cancelado del intento anterior y quedaba
+  /// imposible de cerrar. Reproducido en la integración: el turno se trababa
+  /// para siempre después de una cancelación legítima.
+  ///
+  /// Borrar el sobre cancelado en vez de excluirlo habría perdido la evidencia
+  /// de que un cambio se publicó y se retiró de circulación.
+  turnoOrigenId       Int
   operadorOrigenId    Int?
   dejadoEn            DateTime @default(now())
 
@@ -1557,6 +1746,9 @@ model CambioPendiente {
   @@index([localId, estado])
   @@index([grupoId])
   @@index([reservaVenceEn])
+  /// El único que reemplaza al @unique que tenía `turnoOrigenId`. La unicidad
+  /// real —uno VIGENTE por turno— vive en el índice parcial de la migración.
+  @@index([turnoOrigenId])
 }
 
 model CajaMovimiento {

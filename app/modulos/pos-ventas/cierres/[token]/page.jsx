@@ -1,24 +1,28 @@
 "use client";
 
-// CIERRE DE CAJA — contar y confirmar, con el corte ya tomado.
+// CIERRE DE CAJA — contar el RETIRO y confirmar, con el corte ya tomado.
 //
-// Es la pantalla de retiro con dos diferencias, y las dos importan:
+// SE CUENTA UNA SOLA PILA
 //
-//   1. EL ESPERADO NO SE VUELVE A LEER. El retiro consulta el resumen vivo y
-//      revalida contra el servidor antes de confirmar, porque su número cambia
-//      con cada venta. Acá el número quedó CONGELADO al cortar y no se toca:
-//      mientras el cajero cuenta, el operador que lo relevó está vendiendo, y
-//      releer el resumen le imputaría a este cierre plata que nunca tuvo en la
-//      mano. Todo lo monetario sale de CierrePreparacion.
+// El cambio se separó, se contó y se congeló ANTES del corte, y su sobre ya está
+// publicado: el operador que releva puede haberlo tomado y estar vendiendo con
+// él en este momento. Acá no se vuelve a preguntar por el cambio —se muestra
+// como solo lectura, para poder verificarlo— y lo único que se cuenta es el
+// dinero que se retira.
 //
-//   2. LA IDENTIDAD SALE DEL TOKEN, no del operador activo. La cookie del
-//      operario es del NAVEGADOR ENTERO: cuando el relevo hace login en la
-//      pestaña del POS, esta pestaña —que revalida al recuperar el foco— pasaría
-//      a ver al operador nuevo. Acá no se lee esa cookie en ningún momento; el
-//      operador que figura es el que el servidor grabó al tomar el corte.
+// LOS NÚMEROS NO SE VUELVEN A LEER. El esperado y el retiro esperado quedaron
+// CONGELADOS al cortar. Mientras el cajero cuenta, el relevo está vendiendo, y
+// releer el resumen le imputaría a este cierre plata que nunca tuvo en la mano.
+// Todo lo monetario sale de CierrePreparacion.
 //
-// Todo lo demás —contar por denominación, elegir el cambio, ver los movimientos,
-// el resumen— es exactamente el mismo componente que usa el retiro.
+// LA IDENTIDAD SALE DEL TOKEN, no del operador activo. La cookie del operario es
+// del NAVEGADOR ENTERO: cuando el relevo hace login en la pestaña del POS, esta
+// pestaña pasaría a ver al operador nuevo. Acá no se lee esa cookie en ningún
+// momento; el operador que figura es el que el servidor grabó al tomar el corte.
+//
+// COMPATIBILIDAD: un corte tomado con el orden anterior —cambio elegido al
+// final— no tiene `efectivoRetiradoEsperado` y se sigue contando como antes:
+// todo el cajón y después el cambio. Se detecta por `cambioSeparadoEnCorte`.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -35,15 +39,20 @@ import { Cifra, tonoDiferencia } from "@/components/caja/CifrasRetiro";
 import {
   Aviso,
   PanelConteo,
+  PanelConteoRetiro,
   PanelCambio,
+  PanelCambioSeparado,
   PanelResumen,
+  PanelResumenCorte,
   PanelMovimientos,
   ResumenCabecera,
+  ResumenCabeceraCorte,
 } from "@/components/caja/PanelesRetiro";
 import {
   AvisoCorteHecho,
   FilasResumenCierre,
   TITULO_CIERRE,
+  AVISO_CONTAR_SOLO_RETIRO_CIERRE,
   hora,
 } from "@/components/caja/PanelesCierre";
 
@@ -57,15 +66,30 @@ import {
 import { calcularDiferencia } from "@/lib/caja/efectivoEsperado";
 import {
   armarBorradorCierre,
+  armarBorradorCierreLegado,
+  borradorCompatible,
   guardarBorradorCierre,
   leerBorradorCierre,
   descartarBorradorCierre,
   limpiarBorradoresCierreViejos,
   sanearDesglose,
+  AVISO_BORRADOR_INCOMPATIBLE,
 } from "@/lib/caja/borradorCierre";
 
-const AYUDA_CAMBIO =
+const AYUDA_CAMBIO_LEGADO =
   "Elegí los billetes y monedas que quedan disponibles para el siguiente operador. Todo lo demás se retira.";
+
+/** Nota al pie del bloque de cambio, según lo que el relevo ya haya hecho. */
+function notaSobre(cambioPendiente) {
+  if (!cambioPendiente) return null;
+  if (cambioPendiente.turnoDestinoId || cambioPendiente.estado === "RECIBIDO") {
+    return "El siguiente operador ya recibió este cambio y abrió su turno con él.";
+  }
+  if (cambioPendiente.estado === "RESERVADO") {
+    return "El siguiente operador ya lo tomó y lo está contando.";
+  }
+  return "Está disponible para que lo tome el siguiente operador.";
+}
 
 export default function CierrePorTokenPage() {
   const router = useRouter();
@@ -84,8 +108,12 @@ export default function CierrePorTokenPage() {
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
 
+  // Orden nuevo: se cuenta sólo el retiro.
+  const [desgloseRetiro, setDesgloseRetiro] = useState({});
+  // Orden anterior (compatibilidad): se cuenta el cajón y se elige el cambio.
   const [desgloseContado, setDesgloseContado] = useState({});
   const [desgloseCambio, setDesgloseCambio] = useState({});
+
   const [observacion, setObservacion] = useState("");
   const [conteoIniciadoEn, setConteoIniciadoEn] = useState(null);
 
@@ -95,6 +123,9 @@ export default function CierrePorTokenPage() {
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
   const storage = typeof window !== "undefined" ? window.localStorage : null;
+
+  const cierre = datos?.cierre;
+  const conCorteNuevo = cierre?.cambioSeparadoEnCorte === true;
 
   // ── Carga: UNA sola vez, desde el corte congelado ────────────────────────
   //
@@ -123,7 +154,9 @@ export default function CierrePorTokenPage() {
             totalContado: r.cierre.totalContado,
             totalCambio: r.cierre.totalCambio,
             retiroFinal: r.cierre.retiroFinal,
-            diferencia: calcularDiferencia(r.cierre.totalContado ?? 0, r.cierre.efectivoEsperadoCorte),
+            diferencia:
+              r.cierre.diferencia ??
+              calcularDiferencia(r.cierre.totalContado ?? 0, r.cierre.efectivoEsperadoCorte),
             turnoId: r.cierre.turnoId,
           });
           return;
@@ -133,13 +166,25 @@ export default function CierrePorTokenPage() {
         // contado aunque no sea quien lo empezó.
         limpiarBorradoresCierreViejos(storage);
         const b = leerBorradorCierre(storage, token);
-        if (b) {
+        if (!b) return;
+
+        // Un borrador del otro orden no se traduce: se descarta y se avisa. Ver
+        // `borradorCompatible`.
+        if (!borradorCompatible(b, { cambioSeparadoEnCorte: r.cierre?.cambioSeparadoEnCorte })) {
+          descartarBorradorCierre(storage, token);
+          setAviso(AVISO_BORRADOR_INCOMPATIBLE);
+          return;
+        }
+
+        if (r.cierre?.cambioSeparadoEnCorte) {
+          setDesgloseRetiro(sanearDesglose(b.desgloseRetiroContado));
+        } else {
           setDesgloseContado(sanearDesglose(b.desgloseContado));
           setDesgloseCambio(sanearDesglose(b.desgloseCambio));
-          setObservacion(b.observacion || "");
-          setConteoIniciadoEn(b.conteoIniciadoEn || null);
-          setAviso("Recuperamos lo que habías contado en esta caja.");
         }
+        setObservacion(b.observacion || "");
+        setConteoIniciadoEn(b.conteoIniciadoEn || null);
+        setAviso("Recuperamos lo que habías contado en esta caja.");
       } catch {
         if (vivo) setErrorFatal("No se pudo leer el cierre.");
       } finally {
@@ -151,52 +196,85 @@ export default function CierrePorTokenPage() {
     };
   }, [token, cargandoUser, puedeUsar, storage]);
 
-  // ── Derivados: todo contra el esperado CONGELADO ─────────────────────────
-  const esperado = datos?.cierre?.efectivoEsperadoCorte ?? null;
+  // ── Derivados del ORDEN NUEVO: todo contra los dos números congelados ─────
+  const esperado = cierre?.efectivoEsperadoCorte ?? null;
+  const cambioSeparado = cierre?.totalCambio ?? 0;
+  const retiroEsperado = cierre?.efectivoRetiradoEsperado ?? null;
+
+  const retiroContado = totalDesglose(desgloseRetiro);
+  const hayRetiroContado = !desgloseVacio(desgloseRetiro);
+  const diferenciaRetiro = useMemo(
+    () => calcularDiferencia(retiroContado, retiroEsperado ?? 0),
+    [retiroContado, retiroEsperado]
+  );
+
+  // ── Derivados del ORDEN ANTERIOR (compatibilidad) ────────────────────────
   const totalContado = totalDesglose(desgloseContado);
   const hayContado = !desgloseVacio(desgloseContado);
   const totalCambio = totalDesglose(desgloseCambio);
-
-  const totalRetiro = useMemo(
+  const totalRetiroLegado = useMemo(
     () => calcularRetiroDesdeCambio({ efectivoContado: totalContado, cambioQueQueda: totalCambio }),
     [totalContado, totalCambio]
   );
-  const diferencia = useMemo(
+  const diferenciaLegado = useMemo(
     () => calcularDiferencia(totalContado, esperado ?? 0),
     [totalContado, esperado]
   );
-
   const validacionCambio = validarCambioQueQueda({
     desgloseContado,
     desgloseCambio,
     totalContado,
   });
 
-  // Se puede cerrar con retiro $0 —todo el efectivo queda como cambio—, que en un
-  // cierre es un caso legítimo: el turno siguiente se lleva el cajón entero. Por
-  // eso no se exige recaudación, a diferencia del retiro.
-  const puedeConfirmar = hayContado && validacionCambio.valido && !guardando;
+  // Se puede cerrar con retiro $0 —todo el efectivo quedó como cambio—, que en un
+  // cierre es un caso legítimo: el turno siguiente se lleva el cajón entero.
+  const puedeConfirmar = conCorteNuevo
+    ? hayRetiroContado && !guardando
+    : hayContado && validacionCambio.valido && !guardando;
+
+  const marcarInicioConteo = () => {
+    if (!conteoIniciadoEn) setConteoIniciadoEn(new Date().toISOString());
+  };
+
+  const actualizarRetiro = (nuevo) => {
+    setDesgloseRetiro(nuevo);
+    marcarInicioConteo();
+  };
 
   const actualizarConteo = (nuevo) => {
     setDesgloseContado(nuevo);
     setDesgloseCambio((c) => limitarCambioAlConteo(c, nuevo));
-    if (!conteoIniciadoEn) setConteoIniciadoEn(new Date().toISOString());
+    marcarInicioConteo();
   };
 
   // ── Borrador ─────────────────────────────────────────────────────────────
   const persistir = useCallback(() => {
     if (!token) return false;
-    return guardarBorradorCierre(
-      storage,
-      armarBorradorCierre({
-        token,
-        desgloseContado,
-        desgloseCambio,
-        observacion,
-        conteoIniciadoEn,
-      })
-    );
-  }, [token, storage, desgloseContado, desgloseCambio, observacion, conteoIniciadoEn]);
+    const borrador = conCorteNuevo
+      ? armarBorradorCierre({
+          token,
+          desgloseRetiroContado: desgloseRetiro,
+          observacion,
+          conteoIniciadoEn,
+        })
+      : armarBorradorCierreLegado({
+          token,
+          desgloseContado,
+          desgloseCambio,
+          observacion,
+          conteoIniciadoEn,
+        });
+    return guardarBorradorCierre(storage, borrador);
+  }, [
+    token,
+    storage,
+    conCorteNuevo,
+    desgloseRetiro,
+    desgloseContado,
+    desgloseCambio,
+    observacion,
+    conteoIniciadoEn,
+  ]);
 
   const guardarSolo = () => {
     persistir();
@@ -220,17 +298,17 @@ export default function CierrePorTokenPage() {
     setError("");
     setGuardando(true);
     try {
+      // Solo el desglose. Los totales los calcula el servidor: mandarlos sería
+      // ofrecerle al backend un número que no tiene por qué creer.
+      const cuerpo = conCorteNuevo
+        ? { desgloseRetiroContado: desgloseRetiro, observacion: observacion.trim() || null }
+        : { desgloseContado, desgloseCambio, observacion: observacion.trim() || null };
+
       const res = await fetch(`/api/pos-ventas/cierres/${encodeURIComponent(token)}/confirmar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        // Solo el desglose. Los totales los calcula el servidor: mandarlos sería
-        // ofrecerle al backend un número que no tiene por qué creer.
-        body: JSON.stringify({
-          desgloseContado,
-          desgloseCambio,
-          observacion: observacion.trim() || null,
-        }),
+        body: JSON.stringify(cuerpo),
       });
       const json = await res.json();
       if (!res.ok || !json?.ok) {
@@ -239,11 +317,11 @@ export default function CierrePorTokenPage() {
       }
       descartarBorradorCierre(storage, token);
       setResultado({
-        totalContado: json.cuentas?.totalContado ?? totalContado,
-        totalCambio: json.cuentas?.totalCambio ?? totalCambio,
-        retiroFinal: json.cuentas?.retiroFinal ?? totalRetiro,
-        diferencia: json.cuentas?.diferencia ?? diferencia,
-        turnoId: json.cierre?.turnoId ?? datos?.cierre?.turnoId ?? null,
+        totalContado: json.cuentas?.totalContado ?? null,
+        totalCambio: json.cuentas?.totalCambio ?? cambioSeparado,
+        retiroFinal: json.cuentas?.retiroFinal ?? retiroContado,
+        diferencia: json.cuentas?.diferencia ?? (conCorteNuevo ? diferenciaRetiro : diferenciaLegado),
+        turnoId: json.cierre?.turnoId ?? cierre?.turnoId ?? null,
         repetido: json.repetido === true,
       });
     } catch {
@@ -291,7 +369,7 @@ export default function CierrePorTokenPage() {
             <div className="min-w-0">
               <div className="text-base font-bold sunmi-text-success">Caja cerrada</div>
               <div className="text-[12px] sunmi-text-muted">
-                El cambio quedó disponible para el siguiente operador.
+                El cambio ya estaba disponible para el siguiente operador desde el corte.
               </div>
             </div>
           </div>
@@ -323,8 +401,6 @@ export default function CierrePorTokenPage() {
       </Marco>
     );
   }
-
-  const cierre = datos?.cierre;
 
   return (
     <Marco>
@@ -358,73 +434,143 @@ export default function CierrePorTokenPage() {
 
       {aviso && <Aviso tono="info">{aviso}</Aviso>}
 
-      <ResumenCabecera
-        esperado={esperado}
-        totalContado={totalContado}
-        hayContado={hayContado}
-        diferencia={diferencia}
-        totalCambio={totalCambio}
-        totalRetiro={totalRetiro}
-        etiquetaEsperado="Efectivo esperado al corte"
-      />
+      {conCorteNuevo ? (
+        <>
+          <ResumenCabeceraCorte
+            esperado={esperado}
+            cambioSeparado={cambioSeparado}
+            retiroEsperado={retiroEsperado}
+            retiroContado={retiroContado}
+            hayContado={hayRetiroContado}
+            diferencia={diferenciaRetiro}
+          />
 
-      {/* Misma disposición que el retiro: en móvil los movimientos van arriba,
-          antes de contar, porque explican por qué el esperado no es lo vendido. */}
-      <div className="xl:hidden">
-        <PanelMovimientos movimientos={datos?.movimientos} />
-      </div>
+          {/* En MÓVIL los movimientos van arriba, antes de contar: explican por
+              qué el esperado no es lo que se vendió. */}
+          <div className="xl:hidden">
+            <PanelMovimientos movimientos={datos?.movimientos} />
+          </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
-        <PanelConteo
-          desglose={desgloseContado}
-          onDesglose={actualizarConteo}
-          horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
-        />
-
-        <PanelCambio
-          desgloseContado={desgloseContado}
-          desgloseCambio={desgloseCambio}
-          onDesgloseCambio={setDesgloseCambio}
-          totalCambio={totalCambio}
-          error={validacionCambio.valido ? null : validacionCambio.error}
-          ayuda={AYUDA_CAMBIO}
-        />
-
-        <PanelResumen
-          esperado={esperado}
-          totalContado={totalContado}
-          hayContado={hayContado}
-          totalCambio={totalCambio}
-          totalRetiro={totalRetiro}
-          diferencia={diferencia}
-          observacion={observacion}
-          onObservacion={setObservacion}
-          error={error}
-          guardando={guardando}
-          puedeConfirmar={puedeConfirmar}
-          enPestanaNueva={enPestanaNueva}
-          onGuardar={guardarSolo}
-          onVolver={salir}
-          onConfirmar={confirmar}
-          etiquetaEsperado="Efectivo esperado al corte"
-          filasExtra={
-            <FilasResumenCierre
-              corteEn={cierre?.corteEn}
-              operadorNombre={datos?.operadorCierre?.nombre}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
+            <PanelConteoRetiro
+              desglose={desgloseRetiro}
+              onDesglose={actualizarRetiro}
+              horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
+              aviso={AVISO_CONTAR_SOLO_RETIRO_CIERRE}
             />
-          }
-          textoConfirmar="Confirmar cierre"
-          textoConfirmando="Cerrando…"
-          textoGuardar="Guardar y continuar después"
-          textoCerrarPestana="Cerrar esta pestaña"
-          textoVolver="Guardar y continuar después"
-        />
 
-        <PanelMovimientos
-          movimientos={datos?.movimientos}
-          className="hidden xl:block xl:col-start-3"
-        />
-      </div>
+            <PanelCambioSeparado
+              desglose={cierre?.desgloseCambio ?? {}}
+              total={cambioSeparado}
+              nota={notaSobre(datos?.cambioPendiente)}
+            />
+
+            <PanelResumenCorte
+              esperado={esperado}
+              cambioSeparado={cambioSeparado}
+              retiroEsperado={retiroEsperado}
+              retiroContado={retiroContado}
+              hayContado={hayRetiroContado}
+              diferencia={diferenciaRetiro}
+              observacion={observacion}
+              onObservacion={setObservacion}
+              error={error}
+              guardando={guardando}
+              puedeConfirmar={puedeConfirmar}
+              enPestanaNueva={enPestanaNueva}
+              onGuardar={guardarSolo}
+              onVolver={salir}
+              onConfirmar={confirmar}
+              filasExtra={
+                <FilasResumenCierre
+                  corteEn={cierre?.corteEn}
+                  operadorNombre={datos?.operadorCierre?.nombre}
+                />
+              }
+              textoConfirmar="Confirmar cierre"
+              textoConfirmando="Cerrando…"
+              textoGuardar="Guardar y continuar después"
+              textoCerrarPestana="Cerrar esta pestaña"
+              textoVolver="Guardar y continuar después"
+            />
+
+            <PanelMovimientos
+              movimientos={datos?.movimientos}
+              className="hidden xl:block xl:col-start-3"
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* ORDEN ANTERIOR. Sólo para cortes tomados antes del cambio de flujo:
+              se cuenta todo el cajón y el cambio se elige al final. */}
+          <ResumenCabecera
+            esperado={esperado}
+            totalContado={totalContado}
+            hayContado={hayContado}
+            diferencia={diferenciaLegado}
+            totalCambio={totalCambio}
+            totalRetiro={totalRetiroLegado}
+            etiquetaEsperado="Efectivo esperado al corte"
+          />
+
+          <div className="xl:hidden">
+            <PanelMovimientos movimientos={datos?.movimientos} />
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
+            <PanelConteo
+              desglose={desgloseContado}
+              onDesglose={actualizarConteo}
+              horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
+            />
+
+            <PanelCambio
+              desgloseContado={desgloseContado}
+              desgloseCambio={desgloseCambio}
+              onDesgloseCambio={setDesgloseCambio}
+              totalCambio={totalCambio}
+              error={validacionCambio.valido ? null : validacionCambio.error}
+              ayuda={AYUDA_CAMBIO_LEGADO}
+            />
+
+            <PanelResumen
+              esperado={esperado}
+              totalContado={totalContado}
+              hayContado={hayContado}
+              totalCambio={totalCambio}
+              totalRetiro={totalRetiroLegado}
+              diferencia={diferenciaLegado}
+              observacion={observacion}
+              onObservacion={setObservacion}
+              error={error}
+              guardando={guardando}
+              puedeConfirmar={puedeConfirmar}
+              enPestanaNueva={enPestanaNueva}
+              onGuardar={guardarSolo}
+              onVolver={salir}
+              onConfirmar={confirmar}
+              etiquetaEsperado="Efectivo esperado al corte"
+              filasExtra={
+                <FilasResumenCierre
+                  corteEn={cierre?.corteEn}
+                  operadorNombre={datos?.operadorCierre?.nombre}
+                />
+              }
+              textoConfirmar="Confirmar cierre"
+              textoConfirmando="Cerrando…"
+              textoGuardar="Guardar y continuar después"
+              textoCerrarPestana="Cerrar esta pestaña"
+              textoVolver="Guardar y continuar después"
+            />
+
+            <PanelMovimientos
+              movimientos={datos?.movimientos}
+              className="hidden xl:block xl:col-start-3"
+            />
+          </div>
+        </>
+      )}
     </Marco>
   );
 }

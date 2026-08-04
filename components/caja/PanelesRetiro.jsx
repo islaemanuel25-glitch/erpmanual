@@ -27,6 +27,7 @@ import TablaDenominaciones from "@/components/caja/TablaDenominaciones";
 import GrillaCambio from "@/components/caja/GrillaCambio";
 import { Cifra, Fila, money, tonoDiferencia } from "@/components/caja/CifrasRetiro";
 import { CABECERA_BLOQUE, BLOQUE_ALINEADO } from "@/components/caja/geometriaGrilla";
+import { filasDesglose, CLAVE_MONEDAS } from "@/lib/caja/conteoBilletes";
 
 export function Aviso({ children, tono = "warning" }) {
   const clase =
@@ -244,6 +245,242 @@ export function PanelCambio({
         total={totalCambio}
       />
       {error && <Aviso tono="danger">{error}</Aviso>}
+    </Bloque>
+  );
+}
+
+// ── ORDEN NUEVO: el cambio se separa ANTES del corte ────────────────────────
+//
+// Los cuatro bloques de acá abajo implementan el orden físico correcto, y
+// conviven con los de arriba en vez de reemplazarlos: los de arriba siguen
+// sirviendo a los cortes que se tomaron con el orden anterior, que eligen el
+// cambio recién al final y ya no se pueden rehacer.
+
+/**
+ * Contar el cambio que se SEPARA, antes de cortar.
+ *
+ * Usa la grilla de conteo y no la del cambio, y la diferencia no es estética: la
+ * grilla del cambio tiene una columna "Contadas" y un tope por denominación,
+ * porque nació para elegir qué parte de una pila ya contada se queda. Acá no hay
+ * ninguna pila contada todavía —el cambio es lo PRIMERO que se cuenta— así que
+ * no hay contra qué topear, y mostrar una columna vacía sería inventar una
+ * restricción que no existe.
+ */
+export function PanelCambioPrevio({ desglose, onDesglose, ayuda, error = null }) {
+  return (
+    <Bloque titulo="Cambio que queda en la caja" ayuda={ayuda} alineado>
+      <TablaDenominaciones
+        desglose={desglose}
+        onCambiar={onDesglose}
+        idPrefijo="cambio-previo"
+        titulo="Cantidad que se deja"
+      />
+      {error && <Aviso tono="danger">{error}</Aviso>}
+    </Bloque>
+  );
+}
+
+/**
+ * El cambio ya separado, SOLO LECTURA.
+ *
+ * Después del corte estas cifras no se pueden tocar: el sobre está publicado y
+ * el operador que releva puede haberlo tomado ya. Mostrarlo igual es necesario
+ * —el cajero tiene que poder verificar contra qué se está comparando— pero
+ * ofrecer un input sería ofrecer algo que el servidor va a rechazar.
+ */
+export function PanelCambioSeparado({ desglose = {}, total = 0, nota = null, className = "" }) {
+  const filas = filasDesglose(desglose).filter((f) => f.cantidad > 0);
+  const monedas = Number(desglose?.[CLAVE_MONEDAS]) || 0;
+
+  return (
+    <Bloque
+      titulo="Cambio ya separado"
+      ayuda="Quedó en la caja al tomar el corte. No forma parte de este conteo."
+      className={className}
+    >
+      <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
+        {filas.length === 0 && monedas === 0 ? (
+          <p className="text-[12px] sunmi-text-muted leading-snug">
+            No se dejó cambio: el cajón quedó vacío.
+          </p>
+        ) : (
+          <>
+            {filas.map((f) => (
+              <Fila key={f.valor} label={`${f.etiqueta} × ${f.cantidad}`} valor={f.subtotal} />
+            ))}
+            {monedas > 0 && <Fila label="Monedas / otros" valor={monedas} />}
+          </>
+        )}
+        <div className="pt-1 border-t sunmi-border">
+          <Fila label="Total del cambio" valor={total} fuerte />
+        </div>
+      </div>
+      {nota && <Aviso tono="info">{nota}</Aviso>}
+    </Bloque>
+  );
+}
+
+/**
+ * Contar ÚNICAMENTE el dinero retirado.
+ *
+ * Es la misma grilla que el conteo del cajón entero, con otro rótulo y otro
+ * aviso. La diferencia importante no está en el componente sino en lo que se le
+ * pide a la persona: una sola pila, la que se lleva, sin volver a tocar lo que
+ * ya apartó.
+ */
+export function PanelConteoRetiro({ desglose, onDesglose, horaConteo, aviso }) {
+  return (
+    <Bloque
+      titulo="Contar el dinero retirado"
+      ayuda="Ingresá la cantidad de billetes de cada denominación. El total se calcula automáticamente."
+      alineado
+    >
+      <TablaDenominaciones
+        desglose={desglose}
+        onCambiar={onDesglose}
+        idPrefijo="retiro"
+        titulo="Cantidad retirada"
+      />
+      {aviso && <Aviso tono="info">{aviso}</Aviso>}
+      {horaConteo && (
+        <p className="text-[11px] sunmi-text-muted">Conteo iniciado a las {horaConteo}</p>
+      )}
+    </Bloque>
+  );
+}
+
+/** Cifras de cabecera del orden nuevo: se compara retiro contra retiro. */
+export function ResumenCabeceraCorte({
+  esperado = null,
+  cambioSeparado = 0,
+  retiroEsperado = null,
+  retiroContado = 0,
+  hayContado = false,
+  diferencia = 0,
+  etiquetaEsperado = "Efectivo esperado al corte",
+}) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+      <Cifra label={etiquetaEsperado} valor={esperado ?? "—"} />
+      <Cifra label="Cambio separado" valor={cambioSeparado} />
+      <Cifra label="Retiro esperado" valor={retiroEsperado ?? "—"} />
+      <Cifra
+        label="Retiro contado"
+        valor={hayContado ? retiroContado : "—"}
+        clase="sunmi-text-accent"
+        destacado
+      />
+      <Cifra
+        label="Diferencia"
+        valor={hayContado ? diferencia : "—"}
+        clase={hayContado ? tonoDiferencia(diferencia) : "sunmi-text-muted"}
+      />
+    </div>
+  );
+}
+
+/**
+ * Resumen y confirmación del orden nuevo.
+ *
+ * Convive con `PanelResumen` en vez de parametrizarlo con diez props más: las
+ * cifras que muestra son OTRAS —retiro esperado contra retiro contado, en vez de
+ * esperado contra cajón— y el aviso de "hubo movimientos" desaparece por
+ * completo, porque acá los movimientos posteriores no cambian ningún número y
+ * pedir una reconfirmación por algo que no afecta al retiro sería ruido.
+ */
+export function PanelResumenCorte({
+  esperado = null,
+  cambioSeparado = 0,
+  retiroEsperado = null,
+  retiroContado = 0,
+  hayContado = false,
+  diferencia = 0,
+  observacion = "",
+  onObservacion,
+  avisoPosterior = null,
+  avisoSobrante = null,
+  error = "",
+  guardando = false,
+  puedeConfirmar = false,
+  enPestanaNueva = false,
+  onGuardar,
+  onVolver,
+  onConfirmar,
+  filasExtra = null,
+  etiquetaEsperado = "Efectivo esperado al corte",
+  textoConfirmar = "Confirmar retiro",
+  textoConfirmando = "Registrando…",
+  textoGuardar = "Guardar borrador",
+  textoCerrarPestana = "Cerrar esta pestaña",
+  textoVolver = "Guardar y continuar después",
+}) {
+  return (
+    <Bloque titulo="Resumen y confirmación">
+      {/* El valor principal: lo que la persona tiene en la mano. */}
+      <div className="sunmi-surface sunmi-border rounded-xl px-3 py-3 text-center">
+        <div className="text-[11px] sunmi-text-muted leading-tight">Retiro contado</div>
+        <div className="text-3xl font-bold font-mono tabular-nums sunmi-text-accent leading-tight break-words">
+          {money(hayContado ? retiroContado : 0)}
+        </div>
+      </div>
+
+      <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
+        <Fila label={etiquetaEsperado} valor={esperado ?? "—"} />
+        <Fila label="Cambio separado" valor={cambioSeparado} />
+        <Fila label="Retiro esperado" valor={retiroEsperado ?? "—"} fuerte />
+        <Fila label="Retiro contado" valor={hayContado ? retiroContado : "—"} clase="sunmi-text-accent" />
+        <Fila
+          label="Diferencia"
+          valor={hayContado ? diferencia : "—"}
+          clase={hayContado ? tonoDiferencia(diferencia) : "sunmi-text-muted"}
+          fuerte
+        />
+        {filasExtra}
+      </div>
+
+      {/* Informativo y nada más: los números de arriba no se mueven. */}
+      {avisoPosterior && <Aviso tono="info">{avisoPosterior}</Aviso>}
+      {avisoSobrante && <Aviso>{avisoSobrante}</Aviso>}
+
+      <div>
+        <label htmlFor="obs" className="text-xs sunmi-text-muted mb-1 block">
+          Observación (opcional)
+        </label>
+        <SunmiInput
+          id="obs"
+          value={observacion}
+          onChange={(e) => onObservacion?.(e.target.value)}
+          placeholder="Ej: se lleva Marcela"
+        />
+      </div>
+
+      {error && <div className="text-[12px] sunmi-text-danger text-center">{error}</div>}
+
+      <div className="space-y-2 pt-1">
+        <SunmiButton
+          color="amber"
+          onClick={onConfirmar}
+          disabled={guardando || !puedeConfirmar}
+          className="w-full py-3 font-bold"
+        >
+          {guardando ? textoConfirmando : textoConfirmar}
+        </SunmiButton>
+
+        {enPestanaNueva ? (
+          <div className="grid grid-cols-2 gap-2">
+            <SunmiButton color="slate" onClick={onGuardar} disabled={guardando} className="py-2 !text-xs">
+              {textoGuardar}
+            </SunmiButton>
+            <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="py-2 !text-xs">
+              {textoCerrarPestana}
+            </SunmiButton>
+          </div>
+        ) : (
+          <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="w-full py-2 !text-xs">
+            {textoVolver}
+          </SunmiButton>
+        )}
+      </div>
     </Bloque>
   );
 }

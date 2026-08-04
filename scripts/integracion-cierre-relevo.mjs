@@ -86,7 +86,7 @@ async function main() {
   const { POST: abrirConCambio } = await import("../app/api/pos-ventas/turnos/abrir-con-cambio/route.js");
   const { POST: abrirSinCambio } = await import("../app/api/pos-ventas/turnos/abrir-sin-cambio/route.js");
   const { POST: crearMovimiento } = await import("../app/api/pos-ventas/caja-movimientos/crear/route.js");
-  const { POST: registrarRetiro } = await import("../app/api/pos-ventas/retiros/registrar/route.js");
+  const { POST: iniciarRetiro } = await import("../app/api/pos-ventas/retiros/iniciar/route.js");
   const { GET: turnoActual } = await import("../app/api/pos-ventas/turnos/actual/route.js");
 
   // ── Escenario ────────────────────────────────────────────────────────────
@@ -130,8 +130,23 @@ async function main() {
   // ═══════════════════════════════════════════════════════════════════════
   console.log("── CORTE CONGELADO ──");
 
-  const r1 = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoA.id })));
+  // EL CAMBIO SE SEPARA ANTES DEL CORTE. 2×$2.000 + $500 de monedas = $4.500.
+  // Con el esperado en $35.000, el retiro esperado queda congelado en $30.500.
+  const CAMBIO = { 2000: 2, monedas: 500 };
+
+  const r1 = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, {
+    turnoId: turnoA.id, desgloseCambio: CAMBIO,
+  })));
   chequear("1. iniciar cierre congela el esperado", r1.ok && r1.cierre?.efectivoEsperadoCorte === 35000, f(r1.cierre?.efectivoEsperadoCorte));
+  chequear(
+    "1b. y congela también el cambio separado y el retiro esperado",
+    r1.cierre?.totalCambio === 4500 && r1.cierre?.efectivoRetiradoEsperado === 30500,
+    `cambio ${f(r1.cierre?.totalCambio)} · retiro esperado ${f(r1.cierre?.efectivoRetiradoEsperado)}`
+  );
+  chequear(
+    "1c. el sobre de cambio nace DISPONIBLE en el mismo acto del corte",
+    r1.cambioPendiente?.estado === "DISPONIBLE" && r1.cambioPendiente?.total === 4500
+  );
 
   const movInicial = await prisma.cajaMovimiento.findFirst({ where: { turnoId: turnoA.id }, orderBy: { id: "desc" } });
   chequear(
@@ -175,8 +190,10 @@ async function main() {
   const jMov = await json(rMov);
   chequear("7. turno congelado no admite Caja +/−", rMov.status === 409 && jMov.turnoEnPreparacionDeCierre === true, jMov.error);
 
-  const rRet = await registrarRetiro(pedido(`${BASE}/pos-ventas/retiros/registrar`, A, {
-    turnoId: turnoA.id, efectivoContado: 35000, efectivoRetirado: 5000, idempotencyKey: `ret-${SUFIJO}-1`,
+  // Un turno con el corte de cierre tomado tampoco admite empezar un retiro: los
+  // dos congelarían el mismo esperado.
+  const rRet = await iniciarRetiro(pedido(`${BASE}/pos-ventas/retiros/iniciar`, A, {
+    turnoId: turnoA.id, desgloseCambio: { 10000: 1 },
   }));
   const jRet = await json(rRet);
   chequear("8. turno congelado no admite retiro", rRet.status === 409, jRet.error);
@@ -196,49 +213,59 @@ async function main() {
   if (rAotro.ok) await prisma.turno.delete({ where: { id: rAotro.turno.id } });
 
   // ── Doble corte ──────────────────────────────────────────────────────────
-  const r10 = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoA.id })));
+  const r10 = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, {
+    turnoId: turnoA.id, desgloseCambio: { 20000: 9 },
+  })));
   chequear("10. doble corte bloqueado: devuelve el mismo, no crea otro", r10.ok && r10.repetido === true && r10.cierre.id === r1.cierre.id);
   chequear("10b. hay exactamente UN corte para el turno", (await prisma.cierrePreparacion.count({ where: { turnoId: turnoA.id } })) === 1);
+  chequear(
+    "10c. el segundo intento NO pisa el cambio ya congelado",
+    money(r10.cierre.totalCambio) === 4500,
+    `sigue en ${f(r10.cierre.totalCambio)}, no $180.000`
+  );
 
   // ── Validación de denominaciones en el servidor ──────────────────────────
   console.log("\n── VALIDACIÓN SERVER-SIDE ──");
 
   const malDenom = await confirmarCierre(
-    pedido(`${BASE}/pos-ventas/cierres/${TOKEN}/confirmar`, A, { desgloseContado: { 5000: 3 } }),
+    pedido(`${BASE}/pos-ventas/cierres/${TOKEN}/confirmar`, A, { desgloseRetiroContado: { 5000: 3 } }),
     ctxToken
   );
   chequear("12. denominación inexistente rechazada en el servidor", malDenom.status === 400, (await json(malDenom)).error);
 
-  const malCambio = await confirmarCierre(
+  const conCambioAjeno = await json(await confirmarCierre(
     pedido(`${BASE}/pos-ventas/cierres/${TOKEN}/confirmar`, A, {
-      desgloseContado: { 10000: 3 }, desgloseCambio: { 10000: 5 },
+      desgloseRetiroContado: { 20000: 1, 10000: 1 },
+      // Un intento de reescribir el cambio ya congelado: se IGNORA.
+      desgloseCambio: { 20000: 9 },
+      observacion: "Intento de pisar el cambio",
     }),
     ctxToken
+  ));
+  chequear(
+    "14. el cambio congelado NO se puede reescribir al confirmar",
+    conCambioAjeno.ok && conCambioAjeno.cuentas?.totalCambio === 4500,
+    `quedó en ${f(conCambioAjeno.cuentas?.totalCambio)}`
   );
-  chequear("14. el cambio no puede superar lo contado, por denominación", malCambio.status === 400, (await json(malCambio)).error);
 
   // ── Confirmación ─────────────────────────────────────────────────────────
   console.log("\n── CONFIRMACIÓN ──");
 
-  // Se contó: 1×$20.000 + 1×$10.000 + 2×$2.000 + monedas 500 = 34.500
-  // Queda como cambio: 2×$2.000 + monedas 500 = 4.500 → retiro 30.000
-  const CONTADO = { 20000: 1, 10000: 1, 2000: 2, monedas: 500 };
-  const CAMBIO = { 2000: 2, monedas: 500 };
+  // El cajón al corte tenía: 1×$20.000 + 1×$10.000 + 2×$2.000 + monedas 500.
+  // El cambio ($4.500) ya se apartó, así que sólo se cuenta el retiro: $30.000.
+  const conf = conCambioAjeno;
 
-  const conf = await json(await confirmarCierre(
-    pedido(`${BASE}/pos-ventas/cierres/${TOKEN}/confirmar`, A, {
-      desgloseContado: CONTADO,
-      desgloseCambio: CAMBIO,
-      // Un total mentiroso del cliente: tiene que ser IGNORADO.
-      totalContado: 999999,
-      observacion: "Cierre con relevo",
-    }),
-    ctxToken
-  ));
-
-  chequear("13. el total contado lo calcula el servidor", conf.ok && conf.cuentas.totalContado === 34500, f(conf.cuentas?.totalContado));
-  chequear("15. retiro final = contado − cambio", conf.cuentas?.retiroFinal === 30000, f(conf.cuentas?.retiroFinal));
-  chequear("15b. la diferencia usa el esperado CONGELADO", conf.cuentas?.diferencia === -500, `34.500 − 35.000 = ${f(conf.cuentas?.diferencia)}`);
+  chequear("13. el total del cajón lo DERIVA el servidor", conf.ok && conf.cuentas.totalContado === 34500, f(conf.cuentas?.totalContado));
+  chequear("15. retiro final = lo que se contó de la pila del retiro", conf.cuentas?.retiroFinal === 30000, f(conf.cuentas?.retiroFinal));
+  chequear(
+    "15b. la diferencia usa el RETIRO ESPERADO congelado",
+    conf.cuentas?.diferencia === -500,
+    `30.000 − 30.500 = ${f(conf.cuentas?.diferencia)}`
+  );
+  chequear(
+    "15b2. y da lo mismo que el orden anterior (34.500 − 35.000)",
+    conf.cuentas?.diferencia === 34500 - 35000
+  );
 
   const turnoCerrado = await prisma.turno.findUnique({ where: { id: turnoA.id } });
   chequear(
@@ -268,7 +295,7 @@ async function main() {
 
   // ── Doble confirmación ───────────────────────────────────────────────────
   const conf2 = await json(await confirmarCierre(
-    pedido(`${BASE}/pos-ventas/cierres/${TOKEN}/confirmar`, A, { desgloseContado: { 20000: 5 }, desgloseCambio: {} }),
+    pedido(`${BASE}/pos-ventas/cierres/${TOKEN}/confirmar`, A, { desgloseRetiroContado: { 20000: 5 } }),
     ctxToken
   ));
   chequear("11. doble confirmación idempotente: no cierra dos veces", conf2.ok === true && conf2.repetido === true);
@@ -290,12 +317,13 @@ async function main() {
   const turnoC = await prisma.turno.create({
     data: { localId: local.id, vendedorId: cajeroA.id, montoInicial: 10000, cierreEnPreparacionEn: null },
   });
-  const rC = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoC.id })));
+  const rC = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, {
+    turnoId: turnoC.id, desgloseCambio: { 10000: 1 },
+  })));
   const ctxC = { params: Promise.resolve({ token: rC.cierre.token }) };
+  // Todo el cajón quedó como cambio: no hay nada para retirar.
   await confirmarCierre(
-    pedido(`${BASE}/pos-ventas/cierres/${rC.cierre.token}/confirmar`, A, {
-      desgloseContado: { 10000: 1 }, desgloseCambio: { 10000: 1 },
-    }),
+    pedido(`${BASE}/pos-ventas/cierres/${rC.cierre.token}/confirmar`, A, { desgloseRetiroContado: {} }),
     ctxC
   );
   const lista2 = await json(await listarCambios(pedido(`${BASE}/pos-ventas/cambios-pendientes/listar`, B)));
@@ -374,9 +402,12 @@ async function main() {
 
   // Sobrante: se prueba sobre un tercer sobre.
   const turnoD = await prisma.turno.create({ data: { localId: local.id, vendedorId: cajeroA.id, montoInicial: 5000 } });
-  const rD = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoD.id })));
+  const rD = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, {
+    turnoId: turnoD.id, desgloseCambio: { 1000: 5 },
+  })));
+  // Todo el cajón quedó como cambio: no hay nada para retirar.
   await confirmarCierre(
-    pedido(`${BASE}/pos-ventas/cierres/${rD.cierre.token}/confirmar`, A, { desgloseContado: { 1000: 5 }, desgloseCambio: { 1000: 5 } }),
+    pedido(`${BASE}/pos-ventas/cierres/${rD.cierre.token}/confirmar`, A, { desgloseRetiroContado: {} }),
     { params: Promise.resolve({ token: rD.cierre.token }) }
   );
   const sobre3 = await prisma.cambioPendiente.findFirst({ where: { turnoOrigenId: turnoD.id } });
@@ -403,7 +434,9 @@ async function main() {
   await prisma.turno.update({ where: { id: sobrante.turno.id }, data: { cierre: new Date() } });
 
   const turnoE = await prisma.turno.create({ data: { localId: local.id, vendedorId: cajeroB.id, montoInicial: 7000 } });
-  const rE = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, B, { turnoId: turnoE.id })));
+  const rE = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, B, {
+    turnoId: turnoE.id, desgloseCambio: {},
+  })));
   await prisma.cierrePreparacion.update({
     where: { id: rE.cierre.id },
     data: { venceEn: new Date(Date.now() - 60_000) },
@@ -418,7 +451,7 @@ async function main() {
   );
 
   const confVencido = await json(await confirmarCierre(
-    pedido(`${BASE}/pos-ventas/cierres/${rE.cierre.token}/confirmar`, B, { desgloseContado: { 1000: 7 }, desgloseCambio: {} }),
+    pedido(`${BASE}/pos-ventas/cierres/${rE.cierre.token}/confirmar`, B, { desgloseRetiroContado: { 1000: 7 } }),
     { params: Promise.resolve({ token: rE.cierre.token }) }
   ));
   chequear("26b. pero SÍ se puede confirmar: si no, el turno quedaría trabado", confVencido.ok === true && confVencido.cuentas.totalContado === 7000);
@@ -431,7 +464,9 @@ async function main() {
 
   // ── Cancelación legítima y re-corte ──────────────────────────────────────
   const turnoF = await prisma.turno.create({ data: { localId: local.id, vendedorId: cajeroA.id, montoInicial: 1000 } });
-  const rF = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoF.id })));
+  const rF = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, {
+    turnoId: turnoF.id, desgloseCambio: { 1000: 1 },
+  })));
   const canc = await json(await cancelarCierre(
     pedido(`${BASE}/pos-ventas/cierres/${rF.cierre.token}/cancelar`, A, { motivo: "Lo tomé por error" }),
     { params: Promise.resolve({ token: rF.cierre.token }) }
@@ -439,7 +474,17 @@ async function main() {
   const turnoFtras = await prisma.turno.findUnique({ where: { id: turnoF.id } });
   chequear("26d. cancelar un corte no confirmado devuelve el turno a la operación", canc.ok && turnoFtras.cierreEnPreparacionEn === null);
 
-  const reCorte = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoF.id })));
+  // El sobre que se había publicado al cortar queda CANCELADO, no ofrecido: si
+  // siguiera DISPONIBLE, el próximo operador tomaría el cambio de un cierre que
+  // se deshizo y la misma plata quedaría contada en dos turnos.
+  const sobreCancelado = await prisma.cambioPendiente.findUnique({
+    where: { cierrePreparacionId: rF.cierre.id },
+  });
+  chequear("26d2. y el sobre publicado queda CANCELADO, sin borrarse", sobreCancelado?.estado === "CANCELADO");
+
+  const reCorte = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, {
+    turnoId: turnoF.id, desgloseCambio: { 1000: 1 },
+  })));
   chequear("26e. y el turno puede volver a tomar corte (índice PARCIAL)", reCorte.ok && reCorte.cierre.id !== rF.cierre.id);
 
   // ── Aislamiento y token ──────────────────────────────────────────────────
@@ -472,7 +517,7 @@ async function main() {
     data: { localId: local.id, vendedorId: cajeroB.id, montoInicial: 2000, operadorId: operario.id },
   });
   const opCookie = `${B}; ${cookieOperador(operario.id, operario.nombre, local.id)}`;
-  const rG = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, opCookie, { turnoId: turnoG.id })));
+  const rG = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, opCookie, { turnoId: turnoG.id, desgloseCambio: {} })));
   chequear("A3. el corte graba el operario que lo inició", rG.ok && rG.cierre.iniciadoPorOperadorId === operario.id);
 
   // Ahora el operario ACTIVO cambia (otro relevo hizo login en la pestaña
@@ -482,7 +527,7 @@ async function main() {
   const cookieRelevo = `${B}; ${cookieOperador(otroOperario.id, otroOperario.nombre, local.id)}`;
   await confirmarCierre(
     pedido(`${BASE}/pos-ventas/cierres/${rG.cierre.token}/confirmar`, cookieRelevo, {
-      desgloseContado: { 1000: 2 }, desgloseCambio: {},
+      desgloseRetiroContado: { 1000: 2 },
     }),
     { params: Promise.resolve({ token: rG.cierre.token }) }
   );
@@ -497,16 +542,38 @@ async function main() {
   // ── El retiro normal sigue funcionando ───────────────────────────────────
   console.log("\n── NO ROMPER LO QUE YA ANDABA ──");
 
+  // El retiro con corte convive con el cierre sobre la misma caja: primero se
+  // retira, después se cierra. Con $40.000 esperados y $30.000 de cambio
+  // separado, el retiro esperado queda en $10.000.
   const turnoH = await prisma.turno.create({ data: { localId: local.id, vendedorId: cajeroA.id, montoInicial: 40000 } });
-  const retOk = await json(await registrarRetiro(pedido(`${BASE}/pos-ventas/retiros/registrar`, A, {
-    turnoId: turnoH.id, efectivoContado: 40000, efectivoRetirado: 10000, idempotencyKey: `ret-ok-${SUFIJO}`,
+  const { POST: confirmarRetiro } = await import("../app/api/pos-ventas/retiros/[token]/confirmar/route.js");
+
+  const retIni = await json(await iniciarRetiro(pedido(`${BASE}/pos-ventas/retiros/iniciar`, A, {
+    turnoId: turnoH.id, desgloseCambio: { 10000: 3 },
   })));
-  chequear("28. el retiro normal sigue funcionando", retOk.ok && retOk.retiro.efectivoRetirado === 10000, f(retOk.retiro?.efectivoRetirado));
+  chequear(
+    "28. el retiro toma su corte sin congelar el turno",
+    retIni.ok && retIni.retiro.efectivoRetiradoEsperado === 10000,
+    `retiro esperado ${f(retIni.retiro?.efectivoRetiradoEsperado)}`
+  );
+
+  const retOk = await json(await confirmarRetiro(
+    pedido(`${BASE}/pos-ventas/retiros/${retIni.retiro.token}/confirmar`, A, {
+      desgloseRetiroContado: { 10000: 1 },
+    }),
+    { params: Promise.resolve({ token: retIni.retiro.token }) }
+  ));
+  chequear("28a. el retiro se registra por lo contado", retOk.ok && retOk.cuentas.totalRetiroContado === 10000, f(retOk.cuentas?.totalRetiroContado));
+  chequear(
+    "28a2. y ArqueoCaja guarda el CAJÓN COMPLETO, no sólo el retiro",
+    retOk.cuentas.totalCajonDerivado === 40000,
+    f(retOk.cuentas?.totalCajonDerivado)
+  );
 
   const actualH = await json(await turnoActual(pedido(`${BASE}/pos-ventas/turnos/actual`, A)));
   chequear("28b. turnos/actual devuelve el turno operativo", actualH.ok && actualH.turno?.id === turnoH.id);
 
-  await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoH.id }));
+  await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoH.id, desgloseCambio: {} }));
   const actualTrasCorte = await json(await turnoActual(pedido(`${BASE}/pos-ventas/turnos/actual`, A)));
   chequear(
     "28c. tras el corte, turnos/actual ya no lo da como abierto pero lo informa",
@@ -520,8 +587,8 @@ async function main() {
   // serializa; el segundo tiene que ver el corte del primero, no crear otro.
   const turnoI = await prisma.turno.create({ data: { localId: local.id, vendedorId: cajeroB.id, montoInicial: 3000 } });
   const [c1, c2] = await Promise.all([
-    iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, B, { turnoId: turnoI.id })),
-    iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, B, { turnoId: turnoI.id })),
+    iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, B, { turnoId: turnoI.id, desgloseCambio: { 1000: 1 } })),
+    iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, B, { turnoId: turnoI.id, desgloseCambio: { 1000: 1 } })),
   ]);
   const [j1, j2] = [await json(c1), await json(c2)];
   chequear(
@@ -534,8 +601,8 @@ async function main() {
 
   // Dos confirmaciones EN PARALELO del mismo corte.
   const [d1, d2] = await Promise.all([
-    confirmarCierre(pedido(`${BASE}/pos-ventas/cierres/${tokenI}/confirmar`, B, { desgloseContado: { 1000: 3 }, desgloseCambio: { 1000: 1 } }), ctxI),
-    confirmarCierre(pedido(`${BASE}/pos-ventas/cierres/${tokenI}/confirmar`, B, { desgloseContado: { 1000: 3 }, desgloseCambio: { 1000: 1 } }), ctxI),
+    confirmarCierre(pedido(`${BASE}/pos-ventas/cierres/${tokenI}/confirmar`, B, { desgloseRetiroContado: { 1000: 2 } }), ctxI),
+    confirmarCierre(pedido(`${BASE}/pos-ventas/cierres/${tokenI}/confirmar`, B, { desgloseRetiroContado: { 1000: 2 } }), ctxI),
   ]);
   const arqueosI = await prisma.arqueoCaja.count({ where: { turnoId: turnoI.id } });
   const retirosI = await prisma.cajaMovimiento.count({ where: { turnoId: turnoI.id, tipo: "RETIRO" } });
@@ -551,7 +618,7 @@ async function main() {
   const turnoJ = await prisma.turno.create({ data: { localId: local.id, vendedorId: cajeroA.id, montoInicial: 8000 } });
   const [mv, cj] = await Promise.all([
     crearMovimiento(pedido(`${BASE}/pos-ventas/caja-movimientos/crear`, A, { turnoId: turnoJ.id, tipo: "INGRESO", monto: 2000, motivo: "En paralelo al corte" })),
-    iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoJ.id })),
+    iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, A, { turnoId: turnoJ.id, desgloseCambio: {} })),
   ]);
   const corteJ = await prisma.cierrePreparacion.findFirst({ where: { turnoId: turnoJ.id } });
   const movsJ = await prisma.cajaMovimiento.findMany({ where: { turnoId: turnoJ.id }, orderBy: { id: "asc" } });
@@ -567,7 +634,7 @@ async function main() {
   // Turnos distintos en paralelo: los locks son POR FILA, no globales.
   const turnoK = await prisma.turno.create({ data: { localId: localAjeno.id, vendedorId: intruso.id, montoInicial: 1000 } });
   const [pK, pL] = await Promise.all([
-    iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, cookieDe(intruso, localAjeno.id), { turnoId: turnoK.id })),
+    iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, cookieDe(intruso, localAjeno.id), { turnoId: turnoK.id, desgloseCambio: {} })),
     listarCambios(pedido(`${BASE}/pos-ventas/cambios-pendientes/listar`, A)),
   ]);
   chequear(
@@ -578,9 +645,9 @@ async function main() {
 
   // Liberación explícita de una reserva propia.
   const turnoM = await prisma.turno.create({ data: { localId: local.id, vendedorId: cajeroB.id, montoInicial: 500 } });
-  const rM = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, B, { turnoId: turnoM.id })));
+  const rM = await json(await iniciarCierre(pedido(`${BASE}/pos-ventas/cierres/iniciar`, B, { turnoId: turnoM.id, desgloseCambio: { 500: 1 } })));
   await confirmarCierre(
-    pedido(`${BASE}/pos-ventas/cierres/${rM.cierre.token}/confirmar`, B, { desgloseContado: { 500: 1 }, desgloseCambio: { 500: 1 } }),
+    pedido(`${BASE}/pos-ventas/cierres/${rM.cierre.token}/confirmar`, B, { desgloseRetiroContado: {} }),
     { params: Promise.resolve({ token: rM.cierre.token }) }
   );
   const sobreM = await prisma.cambioPendiente.findFirst({ where: { turnoOrigenId: turnoM.id } });

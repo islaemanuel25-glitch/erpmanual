@@ -50,17 +50,42 @@ relevo, porque un turno cortado sigue con `cierre IS NULL`.
 
 ---
 
+## El orden físico: el cambio se separa ANTES del corte
+
+Éste es el orden, y no es negociable:
+
+1. se aparta físicamente el cambio que queda en la caja para seguir vendiendo;
+2. se cuenta ese cambio por denominaciones;
+3. se toma el corte, que congela esperado, fronteras y cambio;
+4. la caja sigue operando con ese cambio;
+5. se cuenta **únicamente** el dinero retirado;
+6. se compara contra el retiro esperado congelado.
+
+Hasta agosto de 2026 el orden era el inverso: se contaba todo el cajón y el
+cambio se elegía al final, sobre la pila ya contada. Eso obligaba a contar el
+cajón entero mientras el local seguía cobrando sobre ese mismo cajón, y en el
+retiro —que no congelaba nada— producía un faltante por plata que había entrado
+después de que el cajero cerrara la pila.
+
 ## El corte congela el período
 
 Al tomar el corte se guarda en `CierrePreparacion`:
 
 - `efectivoEsperadoCorte`, calculado con la fórmula única de
   `lib/caja/efectivoEsperado.js`. **No se recalcula al confirmar.**
+- `desgloseCambio` y `totalCambio`: el cambio ya apartado. **Inmutable desde
+  acá**, porque su sobre queda publicado en el mismo acto.
+- `efectivoRetiradoEsperado` = `efectivoEsperadoCorte − totalCambio`. Es el
+  segundo número que no se recalcula, y es contra éste que se compara el conteo.
 - `ultimaVentaId` y `ultimoMovimientoId`: la frontera va **por ID, no por
   timestamp**. Dos filas creadas en el mismo milisegundo son indistinguibles por
   fecha y una venta que entra justo durante el corte caería de los dos lados o
   de ninguno.
 - `token`: llave aleatoria de 32 bytes con la que se accede a la pantalla.
+
+`efectivoRetiradoEsperado` **puede dar negativo** y no se recorta: pasa cuando se
+deja como cambio más plata de la que el sistema esperaba encontrar. Recortarlo a
+cero rompería la identidad que hace visible el sobrante.
 
 **Las ventas y los movimientos posteriores al corte pertenecen al turno nuevo.**
 No aparecen en el cierre ni aunque se recargue la pantalla horas después.
@@ -106,20 +131,59 @@ mandado por el cliente se ignora. Una denominación desconocida se rechaza en ve
 de ignorarse: ignorarla convertiría un error de contrato en plata que desaparece
 del conteo sin aviso.
 
-En el cierre, el cajero no elige cuánto retirar: elige **qué billetes deja como
-cambio**, y el retiro es una consecuencia aritmética.
+El cajero no elige cuánto retirar: elige **qué billetes deja como cambio**, y el
+retiro es una consecuencia aritmética. Con el orden actual esa elección se hace
+antes de cortar, así que después sólo queda una pila por contar.
 
-    retiro final = efectivo contado − cambio que queda
+    retiro esperado  = efectivo esperado al corte − cambio separado
+    diferencia       = retiro contado − retiro esperado
+    total del cajón  = retiro contado + cambio separado
 
-El cambio no puede superar lo contado **por denominación**: dejar cinco billetes
-de $10.000 habiendo contado tres es imposible, aunque el total diera menor.
+La diferencia da **exactamente lo mismo** que daba el orden anterior
+(`contado − esperado`), porque `contado = retiro + cambio`. Cambia el trabajo
+físico, no el número.
+
+### Las columnas históricas no cambian de significado
+
+`ArqueoCaja.efectivoContado` y `Turno.montoRealEfectivo` siguen siendo **todo el
+efectivo del cajón** al momento del corte. Lo que cambió es que ahora se
+*derivan* —`retiro contado + cambio separado`— en vez de contarse de una sola
+vez. El retiro contado va a un campo propio, `totalRetiroContado`.
+
+Esto es deliberado y es el riesgo más silencioso de todo el cambio: si los
+registros nuevos guardaran ahí sólo el retiro, quedarían dos semánticas
+conviviendo en la misma columna sin ninguna marca que las distinga, y ningún
+reporte se enteraría.
 
 ---
 
 ## El cambio pendiente
 
-Al confirmar el cierre se crea un `CambioPendiente` en estado `DISPONIBLE` con el
-importe y el desglose que quedaron en el cajón.
+El `CambioPendiente` se crea **al tomar el corte**, no al confirmar, en estado
+`DISPONIBLE` y con el importe y el desglose que se apartaron.
+
+Ésa es la razón de ser del relevo: el operador entrante puede tomar el cambio,
+abrir su turno y vender **mientras el saliente todavía cuenta**. Si el sobre
+naciera al confirmar, el relevo esperaría de brazos cruzados justamente durante
+los diez minutos que este flujo existe para aprovechar.
+
+### El cambio es inmutable desde el corte
+
+Después de cortar no se puede editar ni el total ni las denominaciones. La
+confirmación toma el cambio de la fila congelada e **ignora** cualquier
+`desgloseCambio` que venga en el pedido.
+
+Cancelar el corte sólo se permite si el sobre sigue `DISPONIBLE`, sin reserva y
+sin turno destino. Si el relevo ya lo reservó —lo está contando— o ya lo recibió
+—abrió su turno con esa plata—, cancelar dejaría la misma plata contada en dos
+turnos y se rechaza con 409. Al cancelar, el sobre pasa a `CANCELADO`: no se
+borra, porque que un cambio se publicó y se retiró de circulación es parte de la
+historia de la caja.
+
+Un turno puede tener **varios** sobres a lo largo de su vida —uno por cada corte
+cancelado, más el vigente— así que la unicidad es parcial:
+`CambioPendiente_turnoOrigen_vigente_key` sobre `turnoOrigenId`
+`WHERE estado <> 'CANCELADO'`.
 
 **No se crea ningún CajaMovimiento por el cambio dejado.** Esa plata no salió: se
 queda ahí. Ya está contemplada en el reparto `retiro + cambio = contado`, y

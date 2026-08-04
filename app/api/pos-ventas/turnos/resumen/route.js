@@ -133,13 +133,23 @@ export async function GET(req) {
         where: { turnoDestinoId: turnoId },
         include: { turnoOrigen: { select: { id: true, vendedor: { select: { nombre: true } } } } },
       }),
-      prisma.cambioPendiente.findUnique({
-        where: { turnoOrigenId: turnoId },
+      // El sobre VIGENTE, no cualquiera: un turno que tomó el corte, lo canceló
+      // y volvió a cortar tiene además el sobre CANCELADO del primer intento, y
+      // mostrarlo diría que dejó un cambio que nunca llegó a nadie.
+      prisma.cambioPendiente.findFirst({
+        where: { turnoOrigenId: turnoId, estado: { not: "CANCELADO" } },
         include: { turnoDestino: { select: { id: true, vendedor: { select: { nombre: true } } } } },
       }),
       prisma.cierrePreparacion.findFirst({
         where: { turnoId, estado: { in: ["PREPARANDO", "CONFIRMADO", "VENCIDO"] } },
-        select: { id: true, corteEn: true, estado: true, efectivoEsperadoCorte: true, cantidadVentasCorte: true },
+        select: {
+          id: true, corteEn: true, estado: true, efectivoEsperadoCorte: true,
+          cantidadVentasCorte: true,
+          // Las cifras del orden nuevo. `null` en los cortes tomados antes de
+          // que el cambio se separara por adelantado: ahí no existió un "retiro
+          // esperado" que congelar, y el detalle simplemente no muestra la fila.
+          efectivoRetiradoEsperado: true, totalRetiroContado: true,
+        },
       }),
     ]);
 
@@ -190,6 +200,12 @@ export async function GET(req) {
             corteEn: corte.corteEn,
             efectivoEsperadoCorte: Number(corte.efectivoEsperadoCorte),
             cantidadVentasCorte: corte.cantidadVentasCorte,
+            efectivoRetiradoEsperado:
+              corte.efectivoRetiradoEsperado != null
+                ? Number(corte.efectivoRetiradoEsperado)
+                : null,
+            totalRetiroContado:
+              corte.totalRetiroContado != null ? Number(corte.totalRetiroContado) : null,
           }
         : null,
     };

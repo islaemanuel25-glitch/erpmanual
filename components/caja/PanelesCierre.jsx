@@ -26,6 +26,36 @@ export const TITULO_CIERRE = "Cierre de caja";
 export const AVISO_ANTES_DEL_CORTE =
   "Al iniciar el cierre se hará un corte de este turno. El POS quedará disponible para el siguiente operador y las operaciones posteriores no formarán parte de este cierre.";
 
+/**
+ * La instrucción del orden físico, en la pantalla previa.
+ *
+ * Es lo primero que se lee porque es lo primero que hay que hacer con las manos,
+ * y porque invierte lo que el cajero venía haciendo hasta ayer: antes contaba
+ * todo el cajón y elegía el cambio al final.
+ */
+export const AYUDA_CAMBIO_PREVIO_CIERRE =
+  "Separá primero el cambio que quedará disponible para seguir vendiendo. Después del corte contarás únicamente el dinero retirado.";
+
+/** El cambio que se deja queda para OTRO operador: eso cambia lo que conviene dejar. */
+export const AYUDA_GRILLA_CAMBIO_CIERRE =
+  "Contá los billetes y monedas que dejás en la caja para el siguiente operador.";
+
+export const ACCION_INICIAR_CIERRE = "Separar cambio, iniciar cierre y liberar POS";
+
+export const AVISO_CONTAR_SOLO_RETIRO_CIERRE =
+  "Contá únicamente el dinero que retiraste. El cambio ya quedó separado y no forma parte de este conteo.";
+
+/**
+ * Aviso cuando el cambio separado supera el efectivo esperado.
+ *
+ * El retiro esperado queda negativo, y eso no es un error de cálculo sino un
+ * hallazgo: en el cajón hay más plata de la que el sistema dice que debería
+ * haber. No se bloquea —la plata está y hay que poder cerrar— pero tampoco se
+ * disimula recortando el número a cero, porque eso escondería el sobrante.
+ */
+export const AVISO_CAMBIO_SUPERA_ESPERADO =
+  "El cambio que estás dejando supera el efectivo esperado. Si es correcto, la diferencia va a aparecer como sobrante al confirmar.";
+
 export const AVISO_POSTERIORES =
   "Las operaciones posteriores pertenecen al siguiente turno.";
 
@@ -70,6 +100,10 @@ export function PanelAntesDelCorte({
   operadorNombre,
   localNombre,
   esperado,
+  /** Total del cambio que se está separando, ya contado en el otro bloque. */
+  totalCambio = 0,
+  /** `esperado − cambio`. Es lo que se va a tener que contar después del corte. */
+  retiroEstimado = null,
   confirmando = false,
   iniciando = false,
   error = "",
@@ -77,6 +111,8 @@ export function PanelAntesDelCorte({
   onCancelar,
   onIniciar,
 }) {
+  const superaEsperado = retiroEstimado != null && retiroEstimado < 0;
+
   return (
     <SunmiCard className="p-3 space-y-3">
       <div>
@@ -97,6 +133,26 @@ export function PanelAntesDelCorte({
 
       <Cifra label="Efectivo esperado ahora" valor={esperado ?? "—"} destacado />
 
+      {/* Las dos cifras que resultan de separar el cambio. Se muestran ANTES de
+          cortar porque son la decisión que se está tomando: cuánto queda para
+          seguir vendiendo y cuánto habrá que contar después. */}
+      <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
+        <Fila label="Cambio que queda" valor={totalCambio} />
+        <Fila
+          label="Retiro estimado"
+          valor={retiroEstimado ?? "—"}
+          clase={superaEsperado ? "sunmi-text-warning" : "sunmi-text-accent"}
+          fuerte
+        />
+      </div>
+
+      {superaEsperado && (
+        <div className="sunmi-state-warning sunmi-text-warning sunmi-border rounded-lg p-2 text-[11px] leading-snug flex items-start gap-2">
+          <TriangleAlert size={14} className="shrink-0 mt-0.5" />
+          <div className="min-w-0">{AVISO_CAMBIO_SUPERA_ESPERADO}</div>
+        </div>
+      )}
+
       <div className="sunmi-state-warning sunmi-text-warning sunmi-border rounded-lg p-2 text-[11px] leading-snug flex items-start gap-2">
         <TriangleAlert size={14} className="shrink-0 mt-0.5" />
         <div className="min-w-0">{AVISO_ANTES_DEL_CORTE}</div>
@@ -114,15 +170,16 @@ export function PanelAntesDelCorte({
           disabled={iniciando || !turno?.id}
           className="w-full py-3 font-bold"
         >
-          Iniciar cierre y liberar POS
+          {ACCION_INICIAR_CIERRE}
         </SunmiButton>
       ) : (
         <div className="sunmi-surface sunmi-border rounded-lg p-3 space-y-2">
           <div className="flex items-start gap-2">
             <Lock size={16} className="shrink-0 mt-0.5 sunmi-text-warning" />
             <p className="text-[12px] sunmi-text-strong leading-snug">
-              Después de esto el turno #{turno?.id} no admite más ventas ni movimientos.
-              Vas a poder contar con calma; el POS queda libre para el siguiente operador.
+              Después de esto el turno #{turno?.id} no admite más ventas ni movimientos, y el
+              cambio de {money(totalCambio)} queda publicado para el siguiente operador: no vas a
+              poder cambiarlo. Vas a contar con calma solo el dinero retirado.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -130,7 +187,7 @@ export function PanelAntesDelCorte({
               Volver
             </SunmiButton>
             <SunmiButton color="amber" onClick={onIniciar} disabled={iniciando} className="py-2 !text-xs font-bold">
-              {iniciando ? "Cortando…" : "Sí, cortar el turno"}
+              {iniciando ? "Cortando…" : "Sí, separar cambio y cortar"}
             </SunmiButton>
           </div>
         </div>

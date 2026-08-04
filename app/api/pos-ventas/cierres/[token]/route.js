@@ -114,8 +114,15 @@ export async function GET(req, context) {
           fecha: m.createdAt,
         })),
       },
+      // El sobre ya está publicado desde el corte. Su ESTADO es lo que decide si
+      // este cierre todavía se puede cancelar: apenas el relevo lo reserva o lo
+      // recibe, deshacer el corte dejaría la misma plata en dos turnos.
       cambioPendiente: cierre.cambioPendiente
-        ? { id: cierre.cambioPendiente.id, estado: cierre.cambioPendiente.estado }
+        ? {
+            id: cierre.cambioPendiente.id,
+            estado: cierre.cambioPendiente.estado,
+            turnoDestinoId: cierre.cambioPendiente.turnoDestinoId ?? null,
+          }
         : null,
     });
   } catch (error) {

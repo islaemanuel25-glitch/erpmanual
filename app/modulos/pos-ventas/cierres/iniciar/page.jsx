@@ -1,9 +1,18 @@
 "use client";
 
-// CIERRE DE CAJA — paso previo: tomar el corte.
+// CIERRE DE CAJA — paso previo: SEPARAR EL CAMBIO y tomar el corte.
 //
-// Es la única pantalla del flujo donde todavía no pasó nada. Muestra qué caja se
-// va a cerrar y cuánto se espera encontrar, y pide una confirmación explícita.
+// Es la única pantalla del flujo donde todavía no pasó nada. Acá se decide y se
+// cuenta el dinero que queda en la caja para seguir vendiendo, se ve cuánto va a
+// haber que retirar, y se pide una confirmación explícita.
+//
+// EL CAMBIO VA PRIMERO, Y ESO INVIERTE EL FLUJO ANTERIOR
+//
+// Antes se contaba todo el cajón y el cambio se elegía al final, sobre la pila
+// ya contada. Eso obligaba a contar el cajón entero mientras el local seguía
+// cobrando sobre ese mismo cajón. Ahora el cambio se aparta físicamente ANTES
+// del corte: desde el corte queda congelado, se publica para el relevo, y lo
+// único que queda por contar es el dinero que se retira.
 //
 // POR QUÉ NO CORTA SOLA AL ABRIRSE
 //
@@ -16,7 +25,7 @@
 // pestaña del POS recibe el aviso para soltar el turno y volver al ingreso de
 // operario. Ver lib/caja/senalCierre.js.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, X } from "lucide-react";
 
@@ -29,7 +38,15 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
-import { PanelAntesDelCorte, TITULO_CIERRE } from "@/components/caja/PanelesCierre";
+import { PanelCambioPrevio } from "@/components/caja/PanelesRetiro";
+import {
+  PanelAntesDelCorte,
+  TITULO_CIERRE,
+  AYUDA_GRILLA_CAMBIO_CIERRE,
+  AYUDA_CAMBIO_PREVIO_CIERRE,
+} from "@/components/caja/PanelesCierre";
+import { totalDesglose } from "@/lib/caja/conteoBilletes";
+import { calcularRetiroEsperado } from "@/lib/caja/cierreRelevo";
 import { emitirCorteIniciado } from "@/lib/caja/senalCierre";
 
 export default function IniciarCierrePage() {
@@ -52,8 +69,23 @@ export default function IniciarCierrePage() {
   const [confirmando, setConfirmando] = useState(false);
   const [iniciando, setIniciando] = useState(false);
 
+  // El cambio que se separa. Vive solo en memoria hasta el corte: no hay
+  // borrador acá a propósito, porque esta pantalla se completa en un minuto y
+  // guardar un cambio a medio contar invitaría a retomarlo horas después contra
+  // un efectivo esperado que ya no es el mismo.
+  const [desgloseCambio, setDesgloseCambio] = useState({});
+
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
+
+  const totalCambio = totalDesglose(desgloseCambio);
+  const retiroEstimado = useMemo(
+    () =>
+      esperado == null
+        ? null
+        : calcularRetiroEsperado({ efectivoEsperadoCorte: esperado, totalCambio }),
+    [esperado, totalCambio]
+  );
 
   // ── Estado de la caja, ANTES del corte ──────────────────────────────────
   // Acá sí se lee el resumen vivo: todavía no hay nada congelado, y el número
@@ -133,7 +165,9 @@ export default function IniciarCierrePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ turnoId: turno.id }),
+        // Solo el desglose. El total lo calcula el servidor: mandarlo sería
+        // ofrecerle un número que no tiene por qué creer.
+        body: JSON.stringify({ turnoId: turno.id, desgloseCambio }),
       });
       const json = await res.json();
       if (!res.ok || !json?.ok || !json.cierre?.token) {
@@ -219,6 +253,9 @@ export default function IniciarCierrePage() {
             <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
               Todavía no se cortó nada. La caja sigue operativa.
             </p>
+            <p className="text-[11px] sunmi-text-accent leading-snug mt-0.5">
+              {AYUDA_CAMBIO_PREVIO_CIERRE}
+            </p>
           </div>
           <button
             type="button"
@@ -231,18 +268,30 @@ export default function IniciarCierrePage() {
         </div>
       </SunmiCard>
 
-      <PanelAntesDelCorte
-        turno={turno}
-        operadorNombre={operador?.nombre}
-        localNombre={contexto?.nombre}
-        esperado={esperado}
-        confirmando={confirmando}
-        iniciando={iniciando}
-        error={error}
-        onPedirConfirmacion={() => setConfirmando(true)}
-        onCancelar={() => setConfirmando(false)}
-        onIniciar={iniciar}
-      />
+      {/* Dos columnas en escritorio: se cuenta el cambio a la izquierda y se ven
+          las consecuencias a la derecha, sin scroll entre una cosa y la otra. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+        <PanelCambioPrevio
+          desglose={desgloseCambio}
+          onDesglose={setDesgloseCambio}
+          ayuda={AYUDA_GRILLA_CAMBIO_CIERRE}
+        />
+
+        <PanelAntesDelCorte
+          turno={turno}
+          operadorNombre={operador?.nombre}
+          localNombre={contexto?.nombre}
+          esperado={esperado}
+          totalCambio={totalCambio}
+          retiroEstimado={retiroEstimado}
+          confirmando={confirmando}
+          iniciando={iniciando}
+          error={error}
+          onPedirConfirmacion={() => setConfirmando(true)}
+          onCancelar={() => setConfirmando(false)}
+          onIniciar={iniciar}
+        />
+      </div>
     </Marco>
   );
 }
@@ -254,5 +303,7 @@ function rutaCierre(token, enPestanaNueva) {
 }
 
 function Marco({ children }) {
-  return <div className="p-2 lg:p-3 space-y-3 max-w-[560px] mx-auto">{children}</div>;
+  // Más ancha que antes: ahora hay una grilla de conteo al lado del resumen. En
+  // móvil siguen quedando uno debajo del otro.
+  return <div className="p-2 lg:p-3 space-y-3 max-w-[1000px] mx-auto">{children}</div>;
 }
