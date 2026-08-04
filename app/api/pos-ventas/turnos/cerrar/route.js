@@ -63,6 +63,26 @@ export async function POST(req) {
       );
     }
 
+    // Un turno que ya tomó su corte de cierre NO se cierra por acá.
+    //
+    // Este endpoint recalcula el efectivo esperado con el estado actual, y ese es
+    // justo el número que el corte congeló para no incluir las ventas que hizo el
+    // relevo. Cerrarlo por esta vía le imputaría al cajero saliente plata que
+    // nunca tuvo en la mano. El arqueo FINAL usa la misma `idempotencyKey` en los
+    // dos caminos, así que la base también lo impediría — pero un 409 explicado
+    // es mejor que un choque de índice.
+    if (turno.cierreEnPreparacionEn) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Esta caja tiene un cierre en preparación. Terminá el conteo desde la pantalla de cierre.",
+          turnoEnPreparacionDeCierre: true,
+        },
+        { status: 409 }
+      );
+    }
+
     // Aislamiento por local. Antes solo se validaba `vendedorId === session.id`:
     // el local del turno nunca se contrastaba contra el alcance de la sesión.
     // Un usuario reasignado a otro local conservaba la llave de un turno ajeno.

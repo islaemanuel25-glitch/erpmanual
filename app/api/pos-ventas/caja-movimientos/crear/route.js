@@ -4,6 +4,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { requireOperadorSegunConfig } from "@/lib/operador";
 import { esMotivoReservado } from "@/lib/caja/retiroDinero";
+import { ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
 
 export async function POST(req) {
   try {
@@ -84,7 +85,7 @@ export async function POST(req) {
     // Validar turno: existe, mismo local, abierto
     const turno = await prisma.turno.findUnique({
       where: { id: turnoId },
-      select: { id: true, localId: true, cierre: true },
+      select: { id: true, localId: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
     });
 
     if (!turno || turno.localId !== localId) {
@@ -98,6 +99,17 @@ export async function POST(req) {
       return NextResponse.json(
         { ok: false, error: "El turno ya esta cerrado" },
         { status: 400 }
+      );
+    }
+
+    // Un turno que tomó el corte de cierre tampoco admite movimientos, aunque
+    // `cierre` siga en null. Su universo quedó congelado: un ingreso o un egreso
+    // cargado ahora caería después de la frontera del corte y no lo vería el
+    // cierre que se está confirmando. Es la misma regla que aplica a las ventas.
+    if (turno.cierreEnPreparacionEn !== null) {
+      return NextResponse.json(
+        { ok: false, error: ERROR_TURNO_EN_PREPARACION, turnoEnPreparacionDeCierre: true },
+        { status: 409 }
       );
     }
 

@@ -15,6 +15,7 @@ import { mapearVentaATransferencia } from "@/lib/ventas-internas/mapearVentaATra
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
+import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
 import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta } from "@/lib/pos-ventas/pagos";
 import {
   esModalidadServicio,
@@ -106,20 +107,40 @@ export async function POST(req) {
       );
     }
 
-    // Validar que el turno existe, pertenece al local, al vendedor, y está abierto
+    // Validar que el turno existe, pertenece al local, al vendedor, y está abierto.
+    //
+    // "Abierto" ya no es solo `cierre: null`. Un turno que tomó el corte de cierre
+    // sigue con `cierre` en null —el cajero todavía está contando en otra
+    // pestaña— pero su universo de ventas quedó CONGELADO: una venta nueva sobre
+    // él entraría después de la frontera del corte y no la vería ni el cierre que
+    // se está confirmando ni ningún otro. `WHERE_TURNO_OPERATIVO` es la condición
+    // única, y va en el WHERE y no en un chequeo posterior para que no se pueda
+    // olvidar en una rama.
     const turnoValido = await prisma.turno.findFirst({
       where: {
         id: turnoId,
         localId,
         vendedorId: session.id,
-        cierre: null,
+        ...WHERE_TURNO_OPERATIVO,
       },
       select: { id: true, apertura: true },
     });
 
     if (!turnoValido) {
+      // Se distingue el corte del resto: "turno inválido" no le dice nada a quien
+      // acaba de iniciar un cierre y no entiende por qué no puede vender.
+      const enPreparacion = await prisma.turno.findFirst({
+        where: { id: turnoId, localId, cierre: null, cierreEnPreparacionEn: { not: null } },
+        select: { id: true },
+      });
       return NextResponse.json(
-        { ok: false, error: "Turno inválido, cerrado, o no pertenece a este usuario/local" },
+        {
+          ok: false,
+          error: enPreparacion
+            ? ERROR_TURNO_EN_PREPARACION
+            : "Turno inválido, cerrado, o no pertenece a este usuario/local",
+          turnoEnPreparacionDeCierre: Boolean(enPreparacion),
+        },
         { status: 403 }
       );
     }

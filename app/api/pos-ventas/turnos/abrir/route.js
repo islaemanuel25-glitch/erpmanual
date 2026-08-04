@@ -6,6 +6,7 @@ import { resolveScope } from "@/lib/grupos";
 import { requireOperadorSegunConfig } from "@/lib/operador";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { validarFondoManual } from "@/lib/caja/cierreCaja";
+import { WHERE_TURNO_OPERATIVO } from "@/lib/caja/cierreRelevo";
 
 /**
  * Estado de la caja ANTES de abrir. Lo consulta la pantalla de apertura para
@@ -32,10 +33,24 @@ export async function GET(req) {
     // Todos los turnos abiertos del local. El PROPIO bloquea; los AJENOS solo
     // informan: un local puede tener varios dispositivos y varios cajeros
     // trabajando al mismo tiempo.
+    // Solo los OPERATIVOS. Un turno con el corte tomado no está abierto: no
+    // vende, no bloquea, y presentarlo acá como "abierto" haría que el relevo
+    // crea que no puede empezar.
     const abiertos = await prisma.turno.findMany({
-      where: { localId, cierre: null, anuladoEn: null },
+      where: { localId, ...WHERE_TURNO_OPERATIVO, anuladoEn: null },
       orderBy: { apertura: "asc" },
       select: { id: true, apertura: true, vendedorId: true, vendedor: { select: { nombre: true } } },
+    });
+
+    // Los congelados van aparte, informativos: son cajas a medio cerrar que
+    // alguien tiene que terminar de contar.
+    const enPreparacion = await prisma.turno.findMany({
+      where: { localId, cierre: null, cierreEnPreparacionEn: { not: null }, anuladoEn: null },
+      orderBy: { apertura: "asc" },
+      select: {
+        id: true, apertura: true, cierreEnPreparacionEn: true, vendedorId: true,
+        vendedor: { select: { nombre: true } },
+      },
     });
 
     const propio = abiertos.find((t) => t.vendedorId === session.id) || null;
@@ -57,6 +72,14 @@ export async function GET(req) {
         turnoId: t.id,
         apertura: t.apertura,
         vendedorNombre: t.vendedor?.nombre || "otro usuario",
+      })),
+      // Cajas cortadas esperando conteo. Tampoco bloquean.
+      turnosEnPreparacionDeCierre: enPreparacion.map((t) => ({
+        turnoId: t.id,
+        apertura: t.apertura,
+        iniciadoEn: t.cierreEnPreparacionEn,
+        vendedorNombre: t.vendedor?.nombre || "otro usuario",
+        esPropio: t.vendedorId === session.id,
       })),
     });
   } catch (error) {
@@ -100,8 +123,12 @@ export async function POST(req) {
     // sentido es que UNA persona lleve dos cajas suyas al mismo tiempo.
     //
     // Los turnos ajenos no bloquean: se informan y listo.
+    //
+    // EL TURNO CONGELADO NO BLOQUEA. Un turno que ya tomó su corte de cierre no
+    // está operando: el cajero lo está contando en otra pestaña. Si bloqueara,
+    // el relevo no podría abrir mientras tanto y todo el flujo perdería sentido.
     const turnoPropio = await prisma.turno.findFirst({
-      where: { localId, vendedorId: session.id, cierre: null, anuladoEn: null },
+      where: { localId, vendedorId: session.id, ...WHERE_TURNO_OPERATIVO, anuladoEn: null },
       orderBy: { apertura: "asc" },
       select: { id: true, apertura: true },
     });
@@ -163,7 +190,7 @@ export async function POST(req) {
 
     // Otros turnos abiertos del local: informativo, no bloquea.
     const otrosAbiertos = await prisma.turno.findMany({
-      where: { localId, cierre: null, anuladoEn: null, id: { not: turno.id } },
+      where: { localId, ...WHERE_TURNO_OPERATIVO, anuladoEn: null, id: { not: turno.id } },
       select: { id: true, vendedor: { select: { nombre: true } } },
     });
 

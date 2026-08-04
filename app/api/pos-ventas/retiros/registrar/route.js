@@ -33,6 +33,7 @@ import {
   validarIdempotencyKey,
   evaluarRetiro,
 } from "@/lib/caja/retiroDinero";
+import { WHERE_TURNO_OPERATIVO } from "@/lib/caja/cierreRelevo";
 
 /** Forma común de respuesta, para que la UI lea siempre lo mismo. */
 function serializarRetiro(fila, extra = {}) {
@@ -155,15 +156,17 @@ export async function POST(req) {
       if (previo) return { fila: previo, repetido: true, calculo: null };
 
       // ── El turno se revalida DENTRO de la transacción ────────────────────
-      // Entre el chequeo de arriba y este punto el turno pudo cerrarse. Un
-      // retiro sobre una caja ya cerrada dejaría un movimiento que el cierre no
-      // consideró en su esperado.
+      // Entre el chequeo de arriba y este punto el turno pudo cerrarse, o pudo
+      // tomar su corte de cierre. Un retiro sobre cualquiera de los dos dejaría
+      // un movimiento que el cierre no consideró en su esperado: si la caja ya
+      // está cerrada, quedaría suelto; si tomó el corte, caería después de la
+      // frontera congelada y el cierre en curso no lo vería.
       const vigente = await tx.turno.findFirst({
-        where: { id: turno.id, localId, cierre: null },
+        where: { id: turno.id, localId, ...WHERE_TURNO_OPERATIVO },
         select: { id: true, montoInicial: true, apertura: true, localId: true, vendedorId: true, operadorId: true },
       });
       if (!vigente) {
-        const e = new Error("La caja ya fue cerrada.");
+        const e = new Error("La caja ya fue cerrada o tomó su corte de cierre.");
         e.codigo = "turno_cerrado";
         throw e;
       }
