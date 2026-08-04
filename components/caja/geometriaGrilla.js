@@ -69,6 +69,37 @@ export const BOTON_PASO =
  */
 export const HUECO_BOTON = `${BOTON_PASO} invisible pointer-events-none`;
 
+// ── Alineación vertical entre los dos bloques de grilla (solo escritorio) ────
+//
+// EL PROBLEMA MEDIDO
+//
+// En tres columnas, todo el contenido del bloque de conteo caía 21 px por debajo
+// del de cambio: encabezados, las siete denominaciones, la fila de monedas y el
+// total, los nueve con el MISMO desfase. Un corrimiento constante no es un
+// problema de las filas —miden igual— sino de que arriba había una fila de más:
+// la grilla de conteo dibujaba un rótulo propio ("Cantidad en el cajón") que la
+// del cambio no tiene. Se eliminó: el encabezado de columnas ya dice qué es cada
+// una, y el bloque tiene su título arriba.
+//
+// LO QUE QUEDA RESERVADO
+//
+// La cabecera de cada bloque —título más ayuda— tiene textos de largo distinto,
+// así que a ciertos anchos una envuelve en dos líneas y la otra en tres, y el
+// desfase volvería. Se reserva la MISMA altura para las dos, definida una sola
+// vez acá. No es un margen mágico: es el alto de un título más dos renglones de
+// ayuda en los tamaños que usa el bloque. Solo aplica en escritorio; en móvil
+// los bloques van uno debajo del otro y no hay nada que alinear.
+export const CABECERA_BLOQUE = "xl:min-h-[3.25rem]";
+
+/**
+ * Los dos bloques de grilla se estiran a la misma altura en escritorio.
+ *
+ * La advertencia y la hora del conteo quedan DENTRO del bloque izquierdo,
+ * después del total, sin empujar ninguna fila. El bloque de resumen no lleva
+ * esta clase: es una columna independiente y estirarlo solo dejaría un hueco.
+ */
+export const BLOQUE_ALINEADO = "xl:self-stretch";
+
 /** Importe dentro de la grilla: sin "$", que lo lleva el total del bloque. */
 export function importeGrilla(n) {
   return Number(n || 0).toLocaleString("es-AR", {

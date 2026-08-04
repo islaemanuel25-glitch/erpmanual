@@ -47,7 +47,11 @@ export default function TablaDenominaciones({
 
   return (
     <div className="space-y-2">
-      {titulo && <div className="text-xs sunmi-text-muted">{titulo}</div>}
+      {/* Este rótulo existe SOLO en móvil. En escritorio era una fila de más que
+          la grilla del cambio no tiene, y corría los 21 px que desalineaban las
+          dos tablas fila por fila. Arriba en escritorio el título del bloque y
+          el encabezado de columnas ya dicen lo mismo. */}
+      {titulo && <div className="text-xs sunmi-text-muted xl:hidden">{titulo}</div>}
 
       <div className={`${GRID_CONTEO} text-[10px] sunmi-text-muted uppercase tracking-wide`}>
         <span>Billete</span>

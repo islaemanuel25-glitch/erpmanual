@@ -26,6 +26,7 @@ import { TriangleAlert } from "lucide-react";
 import TablaDenominaciones from "@/components/caja/TablaDenominaciones";
 import GrillaCambio from "@/components/caja/GrillaCambio";
 import { Cifra, Fila, money, tonoDiferencia } from "@/components/caja/CifrasRetiro";
+import { CABECERA_BLOQUE, BLOQUE_ALINEADO } from "@/components/caja/geometriaGrilla";
 
 export function Aviso({ children, tono = "warning" }) {
   const clase =
@@ -42,10 +43,17 @@ export function Aviso({ children, tono = "warning" }) {
   );
 }
 
-function Bloque({ titulo, ayuda, children, className = "" }) {
+/**
+ * Tarjeta de un bloque.
+ *
+ * `alineado` lo usan los DOS bloques de grilla: reserva la misma altura para la
+ * cabecera y estira la tarjeta, para que sus filas queden a la misma altura en
+ * escritorio. Ver geometriaGrilla.
+ */
+function Bloque({ titulo, ayuda, children, className = "", alineado = false }) {
   return (
-    <SunmiCard className={`p-3 space-y-2 ${className}`}>
-      <div>
+    <SunmiCard className={`p-3 space-y-2 ${alineado ? BLOQUE_ALINEADO : ""} ${className}`}>
+      <div className={alineado ? CABECERA_BLOQUE : ""}>
         <h2 className="text-sm font-bold sunmi-text-strong leading-tight">{titulo}</h2>
         {ayuda && <p className="text-[11px] sunmi-text-muted leading-snug mt-0.5">{ayuda}</p>}
       </div>
@@ -73,6 +81,7 @@ export function PanelConteo({ desglose, onDesglose, horaConteo }) {
     <Bloque
       titulo="Contar todo el efectivo del cajón"
       ayuda="Ingresá la cantidad de billetes de cada denominación. El total se calcula automáticamente."
+      alineado
     >
       <TablaDenominaciones
         desglose={desglose}
@@ -223,6 +232,7 @@ export function PanelCambio({
     <Bloque
       titulo="Billetes que quedan como cambio"
       ayuda="Elegí los billetes y monedas que quedan en el cajón. Todo lo demás se retira."
+      alineado
     >
       <GrillaCambio
         desgloseContado={desgloseContado}
