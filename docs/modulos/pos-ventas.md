@@ -11,6 +11,28 @@ Punto de venta para ventas al mostrador. Permite buscar productos, armar un carr
 - APIs: `app/api/pos-ventas/crear/route.js`, `app/api/pos-ventas/buscar-producto/route.js`
 - Componentes: `components/pos-ventas/BuscadorProductos.jsx`, `components/pos-ventas/CarritoVenta.jsx`, `components/pos-ventas/FormaPago.jsx`
 
+
+## Caja: apertura, retiro y cierre con relevo
+
+El circuito del dinero físico está documentado aparte, en
+[docs/modulos/caja-relevo.md](./caja-relevo.md). Lo esencial para quien toque el
+POS:
+
+- El POS **no abre modales** de apertura ni de cierre. "Cerrar Turno" lleva a
+  /modulos/pos-ventas/cierres/iniciar y, sin turno, el POS redirige a
+  /modulos/pos-ventas/aperturas.
+- Un turno tiene **tres** estados operativos. `cierre === null` YA NO significa
+  "abierto": un turno que tomó su corte de cierre también lo tiene en null y no
+  vende. Usar siempre `estadoDelTurno()` de lib/caja/cierreRelevo.js, o
+  `WHERE_TURNO_OPERATIVO` en las consultas.
+- Al confirmarse un corte, el POS **suelta el turno y cierra la sesión de
+  operario** para que el relevo entre con su PIN. Ver `soltarTurnoCortado` y
+  lib/caja/senalCierre.js.
+- La cookie de operario es del **navegador**, no de la pestaña. Ninguna pantalla
+  del cierre puede depender de ella.
+- Todo conteo de efectivo va **por denominaciones** y el total lo calcula el
+  servidor.
+
 ## Funcionalidad principal
 - Búsqueda de productos por código de barras o nombre
 - Detección inteligente de escáner (velocidad de tipeo < 200ms + Enter)
