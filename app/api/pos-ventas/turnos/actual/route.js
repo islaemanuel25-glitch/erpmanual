@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { WHERE_TURNO_OPERATIVO, ESTADO_CIERRE } from "@/lib/caja/cierreRelevo";
+import { ESTADO_RETIRO } from "@/lib/caja/retiroRelevo";
 
 export async function GET(req) {
   try {
@@ -59,6 +60,17 @@ export async function GET(req) {
           },
         });
 
+    // Un RETIRO a medio contar, en cambio, convive con un turno perfectamente
+    // vivo: el retiro no congela la caja. Por eso se busca sobre `turno` y no en
+    // la rama de arriba — si hubiera turno abierto y además un retiro en curso,
+    // los dos datos tienen que viajar juntos.
+    const retiroEnCurso = turno
+      ? await prisma.retiroPreparacion.findFirst({
+          where: { turnoId: turno.id, estado: ESTADO_RETIRO.PREPARANDO },
+          select: { token: true, corteEn: true, efectivoRetiradoEsperado: true },
+        })
+      : null;
+
     // Marcar como vencido si la apertura no cae en el día calendario AR de hoy.
     // El front bloquea la venta y obliga a cerrar caja antes de seguir.
     let requiereCierre = false;
@@ -89,6 +101,18 @@ export async function GET(req) {
             token: enPreparacion.cierresPreparacion[0]?.token ?? null,
             estado: enPreparacion.cierresPreparacion[0]?.estado ?? null,
             venceEn: enPreparacion.cierresPreparacion[0]?.venceEn ?? null,
+          }
+        : null,
+      // Mismo criterio para el retiro: el token viaja para poder ofrecer
+      // "continuá el conteo" sin que el cajero guarde la URL. La caja sigue
+      // vendiendo mientras tanto, así que esto NO bloquea nada — sólo permite
+      // volver, y evita que se intente abrir un segundo corte.
+      retiroEnPreparacion: retiroEnCurso
+        ? {
+            turnoId: turno.id,
+            token: retiroEnCurso.token,
+            corteEn: retiroEnCurso.corteEn,
+            efectivoRetiradoEsperado: Number(retiroEnCurso.efectivoRetiradoEsperado),
           }
         : null,
     });

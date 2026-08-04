@@ -1,32 +1,32 @@
 "use client";
 
-// RETIRO DE RECAUDACIÓN — una sola pantalla.
+// RETIRO DE RECAUDACIÓN — paso previo: SEPARAR EL CAMBIO y tomar el corte.
 //
-// CÓMO FUNCIONA UN RETIRO DE VERDAD
+// CÓMO SE HACE UN RETIRO DE VERDAD
 //
-// 1. Se cuenta todo el efectivo del cajón.
-// 2. Se eligen los billetes y monedas que quedan como cambio.
-// 3. Todo lo demás se retira. El importe es una resta, no una decisión.
+// 1. Se aparta físicamente el cambio que queda en la caja para seguir vendiendo.
+// 2. Se cuenta ese cambio por denominaciones y se toma el corte.
+// 3. La caja sigue vendiendo con ese cambio, y lo que entre después ya no forma
+//    parte de este retiro.
+// 4. Se cuenta únicamente el dinero retirado, con calma, en la otra pantalla.
 //
-// La versión anterior preguntaba cuánto retirar y ofrecía elegir los billetes
-// que salían, repartido en tres pasos con Anterior y Siguiente. Eso pedía la
-// resta mental que la máquina hace sola, y escondía en pantallas distintas las
-// tres cifras que hay que mirar juntas. Acá no hay pasos: en escritorio son tres
-// columnas, en móvil una debajo de la otra.
+// POR QUÉ EL ORDEN IMPORTA
 //
-// EL CAJERO PUEDE SEGUIR VENDIENDO. En escritorio esta pantalla se abre en una
-// pestaña aparte y el POS queda intacto en la suya; en móvil se navega y se
-// vuelve con el borrador. En los dos casos, antes de confirmar se revalida
-// contra el servidor.
+// La versión anterior contaba todo el cajón primero y elegía el cambio al final.
+// Como el POS sigue cobrando sobre ese mismo cajón, el efectivo esperado crecía
+// mientras el cajero contaba, y al confirmar aparecía un faltante por plata que
+// entró después de que cerrara la pila. Separando el cambio antes, el corte
+// congela los dos números y nada de lo que pase después los mueve.
 //
-// Nada se registra hasta "Confirmar retiro": el borrador vive solo en el
-// navegador y no crea filas ni movimientos.
+// Nada se registra hasta "Separar cambio e iniciar retiro". Hasta ahí no hay
+// fila, no hay movimiento y no salió plata.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
+import { useOperadorContext } from "@/app/context/OperadorContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 
@@ -34,46 +34,21 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
-import { Cifra, money, tonoDiferencia } from "@/components/caja/CifrasRetiro";
+import { Cifra, Fila } from "@/components/caja/CifrasRetiro";
+import { Aviso, PanelCambioPrevio, PanelMovimientos } from "@/components/caja/PanelesRetiro";
+import { totalDesglose } from "@/lib/caja/conteoBilletes";
+import { calcularRetiroEsperado } from "@/lib/caja/cierreRelevo";
 import {
-  Aviso,
-  PanelConteo,
-  PanelCambio,
-  PanelResumen,
-  PanelMovimientos,
-  ResumenCabecera,
-} from "@/components/caja/PanelesRetiro";
+  TITULO_PREPARAR_RETIRO,
+  AYUDA_CAMBIO_RETIRO,
+  ACCION_INICIAR_RETIRO,
+} from "@/lib/caja/retiroRelevo";
+import { purgarBorradoresViejos, AVISO_FLUJO_CAMBIADO } from "@/lib/caja/borradorRetiro";
 
-import {
-  totalDesglose,
-  desgloseVacio,
-  validarCambioQueQueda,
-  limitarCambioAlConteo,
-} from "@/lib/caja/conteoBilletes";
-import {
-  armarBorrador,
-  guardarBorrador,
-  leerBorrador,
-  descartarBorrador,
-  limpiarBorradoresViejos,
-  sanearDesglose,
-} from "@/lib/caja/borradorRetiro";
-import {
-  evaluarRetiroPorCambio,
-  huellaDelTurno,
-  compararHuellas,
-  resolverFondoObjetivo,
-} from "@/lib/caja/retiroDinero";
+const AYUDA_GRILLA =
+  "Contá los billetes y monedas que dejás en la caja para seguir vendiendo.";
 
-/** Clave por visita: reintentar el mismo retiro no lo duplica. */
-function nuevaClave(turnoId) {
-  return `retiro-${turnoId}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-const hora = (iso) =>
-  iso ? new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—";
-
-export default function NuevoRetiroPage() {
+export default function PrepararRetiroPage() {
   const router = useRouter();
   const params = useSearchParams();
   // El POS marca la pestaña nueva. No se adivina por user-agent ni por ancho:
@@ -84,64 +59,63 @@ export default function NuevoRetiroPage() {
   const perfil = sesion.perfil;
   const cargandoUser = sesion.cargando !== false;
   const { loading: cargandoCtx, contexto, needsContexto } = useContextoActivo();
+  const { operador } = useOperadorContext() || {};
 
   const [cargando, setCargando] = useState(true);
   const [turno, setTurno] = useState(null);
-  const [huellaInicial, setHuellaInicial] = useState(null);
   const [esperado, setEsperado] = useState(null);
-  const [fondoConfigurado, setFondoConfigurado] = useState(null);
-  const [movimientosManuales, setMovimientosManuales] = useState(null);
+  const [movimientos, setMovimientos] = useState(null);
   const [errorFatal, setErrorFatal] = useState("");
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
+  const [iniciando, setIniciando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
 
-  const [desgloseContado, setDesgloseContado] = useState({});
+  // El cambio que se separa. Vive solo en memoria hasta el corte: guardarlo a
+  // medias invitaría a retomarlo horas después contra un esperado que ya cambió.
   const [desgloseCambio, setDesgloseCambio] = useState({});
-  const [observacion, setObservacion] = useState("");
-  const [conteoIniciadoEn, setConteoIniciadoEn] = useState(null);
-
-  const [guardando, setGuardando] = useState(false);
-  const [cambios, setCambios] = useState(null);
-  const [resultado, setResultado] = useState(null);
-  const claveRef = useRef(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
-  const usuarioId = perfil?.id ?? null;
   const storage = typeof window !== "undefined" ? window.localStorage : null;
 
-  // ── Estado de la caja ────────────────────────────────────────────────────
-  const cargarEstado = useCallback(async () => {
+  const totalCambio = totalDesglose(desgloseCambio);
+  const retiroEstimado = useMemo(
+    () =>
+      esperado == null
+        ? null
+        : calcularRetiroEsperado({ efectivoEsperadoCorte: esperado, totalCambio }),
+    [esperado, totalCambio]
+  );
+  const superaEsperado = retiroEstimado != null && retiroEstimado < 0;
+
+  // ── Estado de la caja, ANTES del corte ───────────────────────────────────
+  // Acá sí se lee el resumen vivo: todavía no hay nada congelado y el número que
+  // se muestra es el de este instante. Después del corte, la otra pantalla lee
+  // exclusivamente de RetiroPreparacion.
+  const cargar = useCallback(async () => {
     const r = await fetch("/api/pos-ventas/turnos/actual", {
       credentials: "include",
       cache: "no-store",
     }).then((x) => x.json());
+
+    // Si esta caja ya tiene un retiro a medio contar, no hay nada que preparar:
+    // se va derecho a terminarlo. Es el caso de quien vuelve a tocar el botón.
+    if (r?.retiroEnPreparacion?.token) {
+      return { yaCortado: r.retiroEnPreparacion };
+    }
     const t = r?.ok ? r.turno : null;
     if (!t?.id) return { turno: null };
 
-    const [res, cfg] = await Promise.all([
-      fetch(`/api/pos-ventas/turnos/resumen?turnoId=${t.id}`, {
-        credentials: "include",
-        cache: "no-store",
-      }).then((x) => x.json()),
-      fetch("/api/config/arqueo-caja", { credentials: "include", cache: "no-store" }).then((x) =>
-        x.json()
-      ),
-    ]);
+    const res = await fetch(`/api/pos-ventas/turnos/resumen?turnoId=${t.id}`, {
+      credentials: "include",
+      cache: "no-store",
+    }).then((x) => x.json());
 
     return {
       turno: t,
       esperado: res?.ok ? Number(res.efectivoEsperado) : null,
-      fondo: cfg?.ok ? cfg.fondoObjetivoCaja : null,
-      movimientosManuales: res?.ok ? res.movimientosManuales ?? null : null,
-      // Huella completa: el esperado solo no distingue una venta de un retiro.
-      huella: huellaDelTurno({
-        turnoId: t.id,
-        efectivoEsperado: res?.efectivoEsperado,
-        totalRetirosCaja: res?.totalRetirosCaja,
-        cantidadVentas: res?.cantidadVentas,
-        estaCerrado: res?.estaCerrado,
-      }),
+      movimientos: res?.ok ? res.movimientosManuales ?? null : null,
     };
   }, []);
 
@@ -150,38 +124,23 @@ export default function NuevoRetiroPage() {
     let vivo = true;
     (async () => {
       try {
-        const d = await cargarEstado();
+        const d = await cargar();
         if (!vivo) return;
+        if (d.yaCortado?.token) {
+          router.replace(rutaRetiro(d.yaCortado.token, enPestanaNueva));
+          return;
+        }
         if (!d.turno) {
           setErrorFatal("No hay una caja abierta a tu nombre en este local.");
           return;
         }
         setTurno(d.turno);
         setEsperado(d.esperado);
-        setFondoConfigurado(d.fondo);
-        setMovimientosManuales(d.movimientosManuales);
-        setHuellaInicial(d.huella);
-        claveRef.current = nuevaClave(d.turno.id);
+        setMovimientos(d.movimientos);
 
-        if (usuarioId) {
-          limpiarBorradoresViejos(storage, { turnoIdActivo: d.turno.id, usuarioId });
-          const b = leerBorrador(storage, { turnoId: d.turno.id, usuarioId });
-          if (b?.descartado) {
-            // Un borrador viejo que solo tenía el total tipeado: sin billetes no
-            // se puede reconstruir el conteo, y fabricarlo sería inventar el tope
-            // del cambio. Se avisa y se arranca de cero.
-            setAviso(b.avisoCompat);
-          } else if (b) {
-            setDesgloseContado(sanearDesglose(b.desgloseContado));
-            setDesgloseCambio(sanearDesglose(b.desgloseCambio));
-            setObservacion(b.observacion || "");
-            setConteoIniciadoEn(b.conteoIniciadoEn || null);
-            setAviso(
-              b.avisoCompat ||
-                "Recuperamos lo que habías contado. Los importes de la caja se volvieron a leer del servidor."
-            );
-          }
-        }
+        // Un conteo del flujo anterior no se traduce: se descarta y se avisa.
+        // Ver el comentario de versiones en borradorRetiro.js.
+        if (purgarBorradoresViejos(storage) > 0) setAviso(AVISO_FLUJO_CAMBIADO);
       } catch {
         if (vivo) setErrorFatal("No se pudo leer el estado de la caja.");
       } finally {
@@ -191,78 +150,9 @@ export default function NuevoRetiroPage() {
     return () => {
       vivo = false;
     };
-  }, [cargarEstado, usuarioId, storage, cargandoUser, cargandoCtx, puedeUsar, needsContexto]);
-
-  // ── Derivados ────────────────────────────────────────────────────────────
-  const { fondoObjetivo } = useMemo(
-    () => resolverFondoObjetivo({ configurado: fondoConfigurado, montoInicial: turno?.montoInicial }),
-    [fondoConfigurado, turno?.montoInicial]
-  );
-
-  // El contado sale SOLO del desglose: no hay ningún campo donde escribirlo.
-  const totalContado = totalDesglose(desgloseContado);
-  const hayContado = !desgloseVacio(desgloseContado);
-  const totalCambio = totalDesglose(desgloseCambio);
-
-  const evaluacion = useMemo(
-    () =>
-      evaluarRetiroPorCambio({
-        efectivoEsperadoAntes: esperado ?? 0,
-        efectivoContado: totalContado,
-        cambioQueQueda: totalCambio,
-        fondoObjetivo,
-      }),
-    [esperado, totalContado, totalCambio, fondoObjetivo]
-  );
-
-  const validacionCambio = validarCambioQueQueda({
-    desgloseContado,
-    desgloseCambio,
-    totalContado,
-  });
-
-  const puedeConfirmar =
-    hayContado && validacionCambio.valido && !evaluacion.sinRecaudacion && !evaluacion.cambioExcedeContado;
-
-  // Corregir el conteo hacia abajo no puede dejar un cambio de billetes que ya
-  // no existen. Se recorta en el momento en que cambia el conteo.
-  const actualizarConteo = (nuevo) => {
-    setDesgloseContado(nuevo);
-    setDesgloseCambio((c) => limitarCambioAlConteo(c, nuevo));
-    if (!conteoIniciadoEn) setConteoIniciadoEn(new Date().toISOString());
-  };
-
-  // ── Borrador ─────────────────────────────────────────────────────────────
-  const persistirBorrador = useCallback(() => {
-    if (!turno?.id || !usuarioId) return false;
-    return guardarBorrador(
-      storage,
-      armarBorrador({
-        turnoId: turno.id,
-        usuarioId,
-        desgloseContado,
-        desgloseCambio,
-        observacion,
-        conteoIniciadoEn,
-      })
-    );
-  }, [
-    turno?.id,
-    usuarioId,
-    storage,
-    desgloseContado,
-    desgloseCambio,
-    observacion,
-    conteoIniciadoEn,
-  ]);
-
-  const guardarSolo = () => {
-    persistirBorrador();
-    setAviso("Borrador guardado. Podés volver cuando quieras.");
-  };
+  }, [cargar, cargandoUser, cargandoCtx, puedeUsar, needsContexto, storage, router, enPestanaNueva]);
 
   const volverAlPos = () => {
-    persistirBorrador();
     // Abierta en pestaña propia: cerrarla devuelve al POS, que nunca se fue.
     if (enPestanaNueva && typeof window !== "undefined" && window.opener) {
       window.close();
@@ -271,65 +161,31 @@ export default function NuevoRetiroPage() {
     router.push("/modulos/pos-ventas");
   };
 
-  // ── Confirmar ────────────────────────────────────────────────────────────
-  const confirmar = async () => {
+  // ── El corte ─────────────────────────────────────────────────────────────
+  const iniciar = async () => {
+    if (iniciando || !turno?.id) return;
+    setIniciando(true);
     setError("");
-    if (!puedeConfirmar || guardando || !turno) return;
-    const yaReconfirmado = Boolean(cambios?.hayCambios);
-
-    setGuardando(true);
     try {
-      // Se revalida contra el servidor: pudieron entrar ventas o pudo haber otro
-      // retiro desde otro dispositivo.
-      const fresco = await cargarEstado();
-      if (!fresco.turno) {
-        setError("La caja ya no está abierta.");
-        return;
-      }
-      const c = compararHuellas(huellaInicial, fresco.huella);
-      if (c.bloquea) {
-        setEsperado(fresco.esperado);
-        setError(
-          c.turnoCerrado
-            ? "La caja se cerró mientras preparabas el retiro. No se puede registrar."
-            : "El turno cambió mientras preparabas el retiro. Volvé a empezar."
-        );
-        return;
-      }
-      if (c.hayCambios && !yaReconfirmado) {
-        // Solo se actualiza el ESPERADO. Lo contado lo contó una persona y no se
-        // toca por detrás.
-        setEsperado(fresco.esperado);
-        setMovimientosManuales(fresco.movimientosManuales);
-        setHuellaInicial(fresco.huella);
-        setCambios(c);
-        return;
-      }
-
-      const res = await fetch("/api/pos-ventas/retiros/registrar", {
+      const res = await fetch("/api/pos-ventas/retiros/iniciar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          turnoId: turno.id,
-          efectivoContado: totalContado,
-          efectivoRetirado: evaluacion.totalRetiro,
-          observacion: observacion.trim() || null,
-          idempotencyKey: claveRef.current,
-        }),
+        // Solo el desglose. El total lo calcula el servidor.
+        body: JSON.stringify({ turnoId: turno.id, desgloseCambio }),
       });
       const json = await res.json();
-      if (!res.ok || !json?.ok) {
-        setError(json?.error || "No se pudo registrar el retiro.");
+      if (!res.ok || !json?.ok || !json.retiro?.token) {
+        setError(json?.error || "No se pudo iniciar el retiro.");
+        setConfirmando(false);
         return;
       }
-      descartarBorrador(storage, { turnoId: turno.id, usuarioId });
-      setCambios(null);
-      setResultado(json.retiro);
+      router.replace(rutaRetiro(json.retiro.token, enPestanaNueva));
     } catch {
       setError("Error de conexión.");
+      setConfirmando(false);
     } finally {
-      setGuardando(false);
+      setIniciando(false);
     }
   };
 
@@ -370,54 +226,21 @@ export default function NuevoRetiroPage() {
     );
   }
 
-  if (resultado) {
-    return (
-      <Marco>
-        <SunmiCard className="space-y-3">
-          <div className="sunmi-state-success sunmi-border rounded-xl p-3 flex items-center gap-3">
-            <Check size={26} className="shrink-0 sunmi-text-success" />
-            <div className="min-w-0">
-              <div className="text-base font-bold sunmi-text-success">Retiro registrado</div>
-              <div className="text-[12px] sunmi-text-muted">
-                El descuento ya está aplicado. La entrega se completa después.
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <Cifra label="Se retiró" valor={resultado.efectivoRetirado} clase="sunmi-text-accent" destacado />
-            <Cifra label="Quedó de cambio" valor={resultado.fondoDejado} />
-            <Cifra
-              label="Diferencia al contar"
-              valor={resultado.diferencia}
-              clase={tonoDiferencia(resultado.diferencia)}
-            />
-          </div>
-          <SunmiButton color="amber" onClick={volverAlPos} className="w-full py-3 font-bold">
-            {enPestanaNueva ? "Cerrar esta pestaña" : "Volver al POS"}
-          </SunmiButton>
-        </SunmiCard>
-      </Marco>
-    );
-  }
-
   return (
     <Marco>
-      {/* Encabezado compacto */}
       <SunmiCard className="p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
-              Retiro de recaudación
+              {TITULO_PREPARAR_RETIRO}
             </h1>
             <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
-              Turno #{turno?.id} · <span className="sunmi-text-success font-semibold">abierto</span> desde{" "}
-              {hora(turno?.apertura)} · {contexto?.nombre || "—"}
+              Turno #{turno?.id} · <span className="sunmi-text-success font-semibold">abierto</span> ·{" "}
+              {contexto?.nombre || "—"}
             </p>
-            {enPestanaNueva && (
-              <p className="text-[11px] sunmi-text-accent leading-tight mt-0.5">
-                Podés seguir vendiendo desde la pestaña del POS.
-              </p>
-            )}
+            <p className="text-[11px] sunmi-text-accent leading-snug mt-0.5">
+              {AYUDA_CAMBIO_RETIRO}
+            </p>
           </div>
           <button
             type="button"
@@ -432,76 +255,103 @@ export default function NuevoRetiroPage() {
 
       {aviso && <Aviso tono="info">{aviso}</Aviso>}
 
-      <ResumenCabecera
-        esperado={esperado}
-        totalContado={totalContado}
-        hayContado={hayContado}
-        diferencia={evaluacion.diferencia}
-        totalCambio={totalCambio}
-        totalRetiro={evaluacion.totalRetiro}
-      />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+        <PanelCambioPrevio
+          desglose={desgloseCambio}
+          onDesglose={setDesgloseCambio}
+          ayuda={AYUDA_GRILLA}
+        />
 
-      {/* Movimientos de caja. En MÓVIL va acá, justo después del resumen y antes
-          de contar: es el contexto que explica por qué el esperado no es lo que
-          se vendió. En escritorio se muestra en la columna del resumen, para no
-          empujar hacia abajo el conteo. */}
-      <div className="xl:hidden">
-        <PanelMovimientos movimientos={movimientosManuales} />
+        <div className="space-y-3">
+          <SunmiCard className="p-3 space-y-3">
+            <div>
+              <h2 className="text-sm font-bold sunmi-text-strong leading-tight">
+                Antes de retirar
+              </h2>
+              <p className="text-[11px] sunmi-text-muted leading-snug mt-0.5">
+                La caja va a seguir vendiendo con el cambio que dejes.
+              </p>
+            </div>
+
+            <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
+              <Fila label="Turno" valor={turno?.id ? `#${turno.id}` : "—"} />
+              <Fila label="Operador" valor={operador?.nombre || "Sin operario"} />
+              <Fila label="Local" valor={contexto?.nombre || "—"} />
+            </div>
+
+            <Cifra label="Efectivo esperado ahora" valor={esperado ?? "—"} destacado />
+
+            <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
+              <Fila label="Cambio que queda" valor={totalCambio} />
+              <Fila
+                label="Retiro estimado"
+                valor={retiroEstimado ?? "—"}
+                clase={superaEsperado ? "sunmi-text-warning" : "sunmi-text-accent"}
+                fuerte
+              />
+            </div>
+
+            {superaEsperado && (
+              <Aviso>
+                El cambio que estás dejando supera el efectivo esperado. Si es correcto, la
+                diferencia va a aparecer como sobrante al confirmar.
+              </Aviso>
+            )}
+
+            {error && <div className="text-[12px] sunmi-text-danger text-center">{error}</div>}
+
+            {/* Confirmación en DOS TIEMPOS: después del corte el cambio queda
+                congelado y no se puede volver a elegir. */}
+            {!confirmando ? (
+              <SunmiButton
+                color="amber"
+                onClick={() => setConfirmando(true)}
+                disabled={iniciando || !turno?.id}
+                className="w-full py-3 font-bold"
+              >
+                {ACCION_INICIAR_RETIRO}
+              </SunmiButton>
+            ) : (
+              <div className="sunmi-surface sunmi-border rounded-lg p-3 space-y-2">
+                <p className="text-[12px] sunmi-text-strong leading-snug">
+                  Después del corte no vas a poder cambiar el cambio separado. La caja sigue
+                  vendiendo y lo que entre después no forma parte de este retiro.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <SunmiButton
+                    color="slate"
+                    onClick={() => setConfirmando(false)}
+                    disabled={iniciando}
+                    className="py-2 !text-xs"
+                  >
+                    Volver
+                  </SunmiButton>
+                  <SunmiButton
+                    color="amber"
+                    onClick={iniciar}
+                    disabled={iniciando}
+                    className="py-2 !text-xs font-bold"
+                  >
+                    {iniciando ? "Cortando…" : "Sí, separar cambio y cortar"}
+                  </SunmiButton>
+                </div>
+              </div>
+            )}
+          </SunmiCard>
+
+          <PanelMovimientos movimientos={movimientos} />
+        </div>
       </div>
-
-      {/* Una sola pantalla: tres columnas en escritorio, una sobre otra en móvil.
-          Sin pasos, sin Anterior ni Siguiente. */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
-        <PanelConteo
-          desglose={desgloseContado}
-          onDesglose={actualizarConteo}
-          horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
-        />
-
-        <PanelCambio
-          desgloseContado={desgloseContado}
-          desgloseCambio={desgloseCambio}
-          onDesgloseCambio={setDesgloseCambio}
-          totalCambio={totalCambio}
-          error={validacionCambio.valido ? null : validacionCambio.error}
-        />
-
-        <PanelResumen
-          esperado={esperado}
-          totalContado={totalContado}
-          hayContado={hayContado}
-          totalCambio={totalCambio}
-          totalRetiro={evaluacion.totalRetiro}
-          diferencia={evaluacion.diferencia}
-          sinRecaudacion={evaluacion.sinRecaudacion}
-          observacion={observacion}
-          onObservacion={setObservacion}
-          cambios={cambios}
-          error={error}
-          guardando={guardando}
-          puedeConfirmar={puedeConfirmar}
-          enPestanaNueva={enPestanaNueva}
-          onGuardar={guardarSolo}
-          onVolver={volverAlPos}
-          onConfirmar={confirmar}
-        />
-
-        {/* En escritorio, debajo de las cifras de la columna de resumen. En
-            móvil ya se mostró arriba, así que acá se oculta: nunca aparece dos
-            veces. Ocupa la tercera columna. */}
-        <PanelMovimientos
-          movimientos={movimientosManuales}
-          className="hidden xl:block xl:col-start-3"
-        />
-      </div>
-
-      <p className="text-[10px] sunmi-text-muted text-center pb-1">
-        Cambio de referencia del local: {money(fondoObjetivo)}. No hace falta dejar ese importe exacto.
-      </p>
     </Marco>
   );
 }
 
+/** Ruta de la pantalla de conteo, conservando la marca de pestaña. */
+function rutaRetiro(token, enPestanaNueva) {
+  const base = `/modulos/pos-ventas/retiros/${encodeURIComponent(token)}`;
+  return enPestanaNueva ? `${base}?pestana=nueva` : base;
+}
+
 function Marco({ children }) {
-  return <div className="p-2 lg:p-3 space-y-3 max-w-[1400px] mx-auto">{children}</div>;
+  return <div className="p-2 lg:p-3 space-y-3 max-w-[1000px] mx-auto">{children}</div>;
 }
