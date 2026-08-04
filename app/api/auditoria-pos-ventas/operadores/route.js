@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { turnoOperativo, estadoDelTurno } from "@/lib/caja/cierreRelevo";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
 
 /**
@@ -56,6 +57,8 @@ export async function GET(req) {
         operadorId: true,
         apertura: true,
         cierre: true,
+        // El tercer estado: sin este campo, una caja cortada se cuenta como abierta.
+        cierreEnPreparacionEn: true,
         diferenciaEfectivo: true,
         anuladoEn: true,
         montoEsperadoEfectivo: true,
@@ -143,7 +146,11 @@ export async function GET(req) {
         // Turnos
         turnosTrabajados: tList.length,
         turnosCerrados: turnosCerrados.length,
-        turnosAbiertos: tList.filter((t) => t.cierre === null).length,
+        // OPERATIVOS, no "sin cerrar". Un turno que tomó su corte de cierre
+        // sigue con "cierre" en null pero ya no vende: contarlo como abierto le
+        // decía al auditor que hay más cajas en la calle de las que hay.
+        turnosAbiertos: tList.filter((t) => turnoOperativo(t)).length,
+        turnosEnCierre: tList.filter((t) => estadoDelTurno(t) === "CIERRE_EN_PREPARACION").length,
         // Se informan aparte: son auditables, pero no son cierres de esta persona.
         turnosAnulados,
         cierresConDiferencia,

@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
+import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
 import {
   construirWhereTurnos,
   normalizarEstado,
@@ -98,6 +99,8 @@ export async function GET(req) {
           id: true,
           apertura: true,
           cierre: true,
+          // El tercer estado: un turno cortado NO es una caja abierta.
+          cierreEnPreparacionEn: true,
           montoInicial: true,
           montoEsperadoEfectivo: true,
           montoRealEfectivo: true,
@@ -157,6 +160,10 @@ export async function GET(req) {
       id: t.id,
       apertura: t.apertura,
       cierre: t.cierre,
+      cierreEnPreparacionEn: t.cierreEnPreparacionEn,
+      // Fuente ÚNICA del estado. El listado ya no puede decidirlo mirando
+      // `cierre`: una caja cortada lo tiene en null y no está abierta.
+      estado: estadoDelTurno(t),
       montoInicial: Number(t.montoInicial),
       montoEsperadoEfectivo: t.montoEsperadoEfectivo != null ? Number(t.montoEsperadoEfectivo) : null,
       montoRealEfectivo: t.montoRealEfectivo != null ? Number(t.montoRealEfectivo) : null,

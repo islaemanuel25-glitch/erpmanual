@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
+import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
 
 export async function GET(req) {
   try {
@@ -40,6 +41,10 @@ export async function GET(req) {
         vendedorId: true,
         apertura: true,
         cierre: true,
+        // El tercer estado del turno: un turno cortado tiene `cierre` en null y
+        // sin este campo es indistinguible de uno operativo. (`anuladoEn` ya
+        // estaba más abajo en este mismo select.)
+        cierreEnPreparacionEn: true,
         montoInicial: true,
         montoEsperadoEfectivo: true,
         montoRealEfectivo: true,
@@ -113,6 +118,10 @@ export async function GET(req) {
         id: turno.id,
         apertura: turno.apertura,
         cierre: turno.cierre,
+        cierreEnPreparacionEn: turno.cierreEnPreparacionEn,
+        // Fuente ÚNICA del estado: la pantalla no compara campos a mano.
+        // (`anuladoEn` ya se devuelve más abajo.)
+        estado: estadoDelTurno(turno),
         montoInicial: Number(turno.montoInicial),
         montoEsperadoEfectivo: turno.montoEsperadoEfectivo != null ? Number(turno.montoEsperadoEfectivo) : null,
         montoRealEfectivo: turno.montoRealEfectivo != null ? Number(turno.montoRealEfectivo) : null,

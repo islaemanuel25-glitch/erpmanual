@@ -208,6 +208,27 @@ export default function TurnosPage() {
         <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
           Consulta de turnos y cierres
         </p>
+
+        {/* Accesos al circuito del relevo. Van acá, en Cajas, porque es donde
+            alguien busca una caja que quedó a medio cerrar o un cambio que
+            nadie tomó: buscarlos en el POS obligaría a tener un turno abierto. */}
+        <div className="flex flex-wrap gap-2 mt-2">
+          <button
+            type="button"
+            onClick={() => router.push("/modulos/pos-ventas/cierres")}
+            className="text-[11px] sunmi-text-link underline"
+          >
+            Cierres pendientes
+          </button>
+          <span className="text-[11px] sunmi-text-muted">·</span>
+          <button
+            type="button"
+            onClick={() => router.push("/modulos/turnos/cambios-pendientes")}
+            className="text-[11px] sunmi-text-link underline"
+          >
+            Cambios pendientes
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 sm:gap-3 items-end">
@@ -239,6 +260,10 @@ export default function TurnosPage() {
               className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
             >
               <option value="abiertas">Abiertas</option>
+              {/* El TERCER estado: cajas que ya cortaron y esperan conteo. Sin esta
+                  opción quedaban invisibles —no salen en Abiertas ni en
+                  Cerradas— y era imposible encontrarlas desde acá. */}
+              <option value="en_preparacion">Cierre en preparación</option>
               <option value="cerradas">Cerradas</option>
               <option value="anuladas">Anuladas</option>
               <option value="todas">Todas</option>

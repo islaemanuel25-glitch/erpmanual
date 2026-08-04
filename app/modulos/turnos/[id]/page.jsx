@@ -8,6 +8,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import CircuitoDelDinero from "@/components/turnos/CircuitoDelDinero";
+import { estadoDelTurno, ESTADO_TURNO } from "@/lib/caja/cierreRelevo";
 import ArqueosDelTurno from "@/components/turnos/ArqueosDelTurno";
 import { ResultadoCierre, ComoSeCalculo, PagosNoEfectivo } from "@/components/turnos/ResumenCierre";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -310,7 +311,13 @@ export default function TurnoDetallePage() {
 
   if (!turno) return null;
 
-  const estaCerrado = turno.cierre != null;
+  // TRES estados, no dos. Un turno que tomó su corte de cierre tiene 'cierre'
+  // en null y NO está abierto: no vende, no admite movimientos y espera que
+  // alguien termine de contarlo. Llamarlo 'Abierto' era mentir sobre la caja.
+  const estado = turno.estado ?? estadoDelTurno(turno);
+  const estaCerrado = estado === ESTADO_TURNO.CERRADO || estado === ESTADO_TURNO.ANULADO;
+  const enPreparacion = estado === ESTADO_TURNO.CIERRE_EN_PREPARACION;
+  const operativo = estado === ESTADO_TURNO.ABIERTO;
   const totalVentas =
     (resumen?.totalEfectivo || 0) + (resumen?.totalDigital || 0);
 
@@ -373,6 +380,8 @@ export default function TurnoDetallePage() {
             <p className="font-semibold text-sm">
               {estaCerrado ? (
                 fmtFecha(turno.cierre)
+              ) : enPreparacion ? (
+                <span className="sunmi-text-warning">Cierre en preparación</span>
               ) : (
                 <span className="sunmi-text-success">Abierto</span>
               )}
@@ -414,7 +423,9 @@ export default function TurnoDetallePage() {
       {resumen && <PagosNoEfectivo resumen={resumen} />}
 
       {/* 5 · ENTREGA DEL EFECTIVO Y FONDO */}
-      {estaCerrado && <CircuitoDelDinero turno={turno} />}
+      {(estaCerrado || enPreparacion || resumen?.relevo?.cambioRecibido) && (
+        <CircuitoDelDinero turno={turno} resumen={resumen} />
+      )}
 
       {/* 6 · ARQUEOS — resumen; el detalle se despliega a pedido. */}
       <ArqueosDelTurno
@@ -428,7 +439,7 @@ export default function TurnoDetallePage() {
       <SunmiCard>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="text-base font-bold">Movimientos de caja</h2>
-          {!estaCerrado && (
+          {operativo && (
             <div className="flex gap-2">
               <SunmiButton color="green" onClick={() => setModalMov("INGRESO")}>
                 Ingreso

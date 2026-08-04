@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { calcularEfectivoEsperado, desglosarMovimientos, desdeCentavos } from "@/lib/caja/efectivoEsperado";
+import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
 
 export async function GET(req) {
   try {
@@ -37,6 +38,10 @@ export async function GET(req) {
         // que quien recalcule el esperado de un turno cerrado sin excluirlo lo
         // descuenta una segunda vez.
         cierre: true,
+        // El tercer estado del turno. Sin este campo, `estadoDelTurno` no puede
+        // distinguir una caja operativa de una que ya tomó su corte.
+        cierreEnPreparacionEn: true,
+        anuladoEn: true,
         retiroCierreMovimientoId: true,
         montoEsperadoEfectivo: true,
       },
@@ -116,6 +121,79 @@ export async function GET(req) {
     const manuales = cajaMovimientos.filter((m) => !idsVinculados.has(m.id));
     const desgloseManual = desglosarMovimientos(manuales);
 
+    // ── EL RELEVO: los dos extremos del traspaso de cambio ─────────────────
+    //
+    // `cambioRecibido` es el sobre que ESTE turno tomó al abrir; `cambioDejado`,
+    // el que dejó al cerrar. Los dos salen de CambioPendiente por su vínculo de
+    // id —`turnoDestinoId` y `turnoOrigenId`— y nunca de comparar importes o
+    // fechas: dos turnos del mismo día pueden dejar $30.000 y adivinar cuál es
+    // cuál sería inventar la cadena.
+    const [cambioRecibido, cambioDejado, corte] = await Promise.all([
+      prisma.cambioPendiente.findUnique({
+        where: { turnoDestinoId: turnoId },
+        include: { turnoOrigen: { select: { id: true, vendedor: { select: { nombre: true } } } } },
+      }),
+      prisma.cambioPendiente.findUnique({
+        where: { turnoOrigenId: turnoId },
+        include: { turnoDestino: { select: { id: true, vendedor: { select: { nombre: true } } } } },
+      }),
+      prisma.cierrePreparacion.findFirst({
+        where: { turnoId, estado: { in: ["PREPARANDO", "CONFIRMADO", "VENCIDO"] } },
+        select: { id: true, corteEn: true, estado: true, efectivoEsperadoCorte: true, cantidadVentasCorte: true },
+      }),
+    ]);
+
+    // Los operarios son Int planos (mismo patrón que Turno.anuladoPorId), así que
+    // los nombres se resuelven aparte.
+    const idsOperador = [
+      cambioRecibido?.operadorOrigenId, cambioRecibido?.recibidoPorOperadorId,
+      cambioDejado?.operadorOrigenId, cambioDejado?.recibidoPorOperadorId,
+    ].filter((x) => Number.isInteger(x));
+    const operadores = idsOperador.length
+      ? await prisma.operadorLocal.findMany({
+          where: { id: { in: [...new Set(idsOperador)] } },
+          select: { id: true, nombre: true },
+        })
+      : [];
+    const nombreOp = new Map(operadores.map((o) => [o.id, o.nombre]));
+
+    const serializarSobre = (x) =>
+      x
+        ? {
+            id: x.id,
+            estado: x.estado,
+            turnoOrigenId: x.turnoOrigenId,
+            turnoDestinoId: x.turnoDestinoId ?? null,
+            dejadoEn: x.dejadoEn,
+            recibidoEn: x.recibidoEn ?? null,
+            total: Number(x.total),
+            desglose: x.desglose ?? {},
+            totalRecibido: x.totalRecibido != null ? Number(x.totalRecibido) : null,
+            desgloseRecibido: x.desgloseRecibido ?? null,
+            diferencia: x.diferencia != null ? Number(x.diferencia) : null,
+            motivoDiferencia: x.motivoDiferencia ?? null,
+            observacion: x.observacion ?? null,
+            operadorOrigen: nombreOp.get(x.operadorOrigenId) ?? null,
+            operadorRecibio: nombreOp.get(x.recibidoPorOperadorId) ?? null,
+            cajeroOrigen: x.turnoOrigen?.vendedor?.nombre ?? null,
+            cajeroDestino: x.turnoDestino?.vendedor?.nombre ?? null,
+          }
+        : null;
+
+    const relevo = {
+      cambioRecibido: serializarSobre(cambioRecibido),
+      cambioDejado: serializarSobre(cambioDejado),
+      corte: corte
+        ? {
+            id: corte.id,
+            estado: corte.estado,
+            corteEn: corte.corteEn,
+            efectivoEsperadoCorte: Number(corte.efectivoEsperadoCorte),
+            cantidadVentasCorte: corte.cantidadVentasCorte,
+          }
+        : null,
+    };
+
     // El desglose POR MEDIO digital es propio de esta pantalla —el cierre no lo
     // necesita— así que se arma acá, sobre los mismos tenders.
     const desglose = { mercadopago: 0, debito: 0, credito: 0, fiado: 0 };
@@ -164,7 +242,16 @@ export async function GET(req) {
       esperadoPersistido:
         turno?.montoEsperadoEfectivo != null ? Number(turno.montoEsperadoEfectivo) : null,
       estaCerrado: turno?.cierre != null,
+      // El TERCER estado. `estaCerrado` se conserva porque lo leen la pantalla de
+      // retiro y `compararHuellas`, pero por sí solo ya no describe al turno: uno
+      // que tomó el corte no está cerrado y tampoco está operativo.
+      estadoTurno: estadoDelTurno(turno),
       retiroCierreExcluido: turno?.retiroCierreMovimientoId ?? null,
+      // ── EL RELEVO ────────────────────────────────────────────────────────
+      //
+      // Los dos extremos del traspaso, cada uno de su fuente. NUNCA se deducen
+      // por coincidencia de importes ni de horarios: el vínculo es por id.
+      relevo,
       desglose,
     });
   } catch (error) {
