@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:theme": "node scripts/check-theme-tokens.js"
+    "check:theme": "node scripts/check-theme-tokens.js",
+    "lint:undef": "eslint app components lib hooks --config eslint.undef.config.mjs --no-inline-config"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -37,6 +38,7 @@
     "baseline-browser-mapping": "^2.9.19",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
+    "globals": "16.4.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18"
   }

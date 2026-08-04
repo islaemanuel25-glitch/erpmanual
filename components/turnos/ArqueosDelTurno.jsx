@@ -15,7 +15,14 @@
 import { useEffect, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import { desglosarEntreArqueos, resumenArqueosVista } from "@/lib/caja/vistaTurno";
+import {
+  desglosarEntreArqueos,
+  resumenArqueosVista,
+  // Se usa abajo para decidir si cada fila es un retiro real o un conteo
+  // histórico. Faltaba: el componente lo llamaba sin importarlo y el bundle
+  // quedaba con un identificador suelto → ReferenceError al desplegar la lista.
+  etiquetaRegistro,
+} from "@/lib/caja/vistaTurno";
 
 const fmt = (n) =>
   Number(n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -111,45 +118,60 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
       {abierto && (
         <div className="mt-3 space-y-2">
           {conDesglose.map((a) => (
-            <div key={a.id} className="rounded-lg sunmi-surface-soft p-3">
-              <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                <span className="text-sm font-bold">
-                  {hora(a.fechaHora)}
-                  <span className="ml-2 text-[11px] font-normal sunmi-text-muted">
-                    {etiquetaRegistro(a)}
-                  </span>
-                </span>
-                <span className={`text-base font-bold tabular-nums ${tono(a.diferencia)}`}>{signo(a.diferencia)}</span>
-              </div>
-
-              <div className="text-[11px] sunmi-text-muted mt-0.5">
-                Período {hora(a.periodoDesde)} a {hora(a.periodoHasta)}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div>
-                  <div className="text-[11px] sunmi-text-muted leading-tight">Esperado</div>
-                  <div className="text-sm font-semibold tabular-nums">${fmt(a.efectivoEsperado)}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] sunmi-text-muted leading-tight">Contado</div>
-                  <div className="text-sm font-semibold tabular-nums">${fmt(a.efectivoContado)}</div>
-                </div>
-              </div>
-
-              {/* La línea que evita tener que restar dos tarjetas a ojo. */}
-              <p className="text-[12px] mt-2 leading-snug">{a.desdeAnterior.texto}</p>
-
-              {a.observacion && (
-                <p className="text-[11px] sunmi-text-muted mt-1 leading-snug">“{a.observacion}”</p>
-              )}
-              {a.realizadoPor && (
-                <p className="text-[11px] sunmi-text-muted mt-0.5">Lo hizo {a.realizadoPor}</p>
-              )}
-            </div>
+            <FilaRegistro key={a.id} a={a} />
           ))}
         </div>
       )}
     </SunmiCard>
+  );
+}
+
+/**
+ * Una fila del detalle: el registro y qué pasó desde el anterior.
+ *
+ * Está separada y EXPORTADA para poder renderizarla en una prueba sin montar
+ * todo el componente —que antes de mostrar esto hace un fetch y espera un
+ * click—. No es un adorno: el import de `etiquetaRegistro` faltaba, el bundle
+ * quedó con un identificador suelto y la sección reventaba con ReferenceError
+ * en producción. Ninguna prueba lo detectó porque ninguna ejecutaba este JSX.
+ */
+export function FilaRegistro({ a }) {
+  return (
+    <div className="rounded-lg sunmi-surface-soft p-3">
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <span className="text-sm font-bold">
+          {hora(a.fechaHora)}
+          <span className="ml-2 text-[11px] font-normal sunmi-text-muted">
+            {etiquetaRegistro(a)}
+          </span>
+        </span>
+        <span className={`text-base font-bold tabular-nums ${tono(a.diferencia)}`}>{signo(a.diferencia)}</span>
+      </div>
+
+      <div className="text-[11px] sunmi-text-muted mt-0.5">
+        Período {hora(a.periodoDesde)} a {hora(a.periodoHasta)}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <div>
+          <div className="text-[11px] sunmi-text-muted leading-tight">Esperado</div>
+          <div className="text-sm font-semibold tabular-nums">${fmt(a.efectivoEsperado)}</div>
+        </div>
+        <div>
+          <div className="text-[11px] sunmi-text-muted leading-tight">Contado</div>
+          <div className="text-sm font-semibold tabular-nums">${fmt(a.efectivoContado)}</div>
+        </div>
+      </div>
+
+      {/* La línea que evita tener que restar dos tarjetas a ojo. */}
+      <p className="text-[12px] mt-2 leading-snug">{a.desdeAnterior?.texto}</p>
+
+      {a.observacion && (
+        <p className="text-[11px] sunmi-text-muted mt-1 leading-snug">“{a.observacion}”</p>
+      )}
+      {a.realizadoPor && (
+        <p className="text-[11px] sunmi-text-muted mt-0.5">Lo hizo {a.realizadoPor}</p>
+      )}
+    </div>
   );
 }

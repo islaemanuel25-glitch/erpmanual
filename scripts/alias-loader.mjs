@@ -50,6 +50,42 @@ export async function resolve(specifier, context, next) {
   return next(specifier, context);
 }
 
+/**
+ * Carga de archivos .jsx para `node --test`.
+ *
+ * Node no sabe qué hacer con la extensión .jsx ni con la sintaxis JSX: falla con
+ * ERR_UNKNOWN_FILE_EXTENSION. Eso dejaba a los componentes SIN posibilidad de
+ * prueba, y por ese hueco se fue a producción un `etiquetaRegistro` sin
+ * importar: el identificador quedó suelto en el bundle y la pantalla de detalle
+ * de turno reventaba con ReferenceError.
+ *
+ * Se transforma con el SWC que Next YA trae (`next/dist/build/swc`), así que no
+ * hace falta agregar esbuild, babel ni ningún transformador nuevo al proyecto.
+ * Es la misma herramienta con la que Next compila el código real.
+ */
+export async function load(url, context, next) {
+  if (!url.startsWith("file:") || !url.endsWith(".jsx")) return next(url, context);
+
+  const archivo = fileURLToPath(url);
+  const fuente = fs.readFileSync(archivo, "utf8");
+  const swc = await import("next/dist/build/swc/index.js");
+  // Los bindings nativos de SWC se cargan a demanda: sin esto, `transform` falla
+  // con "bindings not loaded yet".
+  await swc.loadBindings();
+  const { code } = await swc.transform(fuente, {
+    filename: archivo,
+    jsc: {
+      parser: { syntax: "ecmascript", jsx: true },
+      target: "es2022",
+      transform: { react: { runtime: "automatic" } },
+    },
+    module: { type: "es6" },
+    isModule: true,
+  });
+
+  return { format: "module", shortCircuit: true, source: code };
+}
+
 // El hilo de hooks recibe una copia de process.env, así que la marca evita que
 // el módulo se registre a sí mismo en cadena.
 if (!process.env.__ERPAZUL_ALIAS_LOADER__) {
