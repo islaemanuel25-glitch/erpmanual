@@ -21,6 +21,7 @@ import {
   WHERE_TURNO_OPERATIVO,
   evaluarRecepcionCambio,
   avisoApertura,
+  esReservaPropia,
 } from "@/lib/caja/cierreRelevo";
 import { contextoRelevo, serializarCambio, OPCIONES_TX } from "@/lib/caja/cierreRelevoServer";
 
@@ -86,7 +87,12 @@ export async function POST(req) {
         e.codigo = "conflicto";
         throw e;
       }
-      if (sobre.reservadoPorUsuarioId !== session.id) {
+      // La reserva tiene que ser de ESTA persona, no solo de este dispositivo.
+      //
+      // En una computadora del mostrador todos los operarios comparten
+      // `erpazul_sesion`: comparar solo el usuario dejaba que María abriera
+      // turno con el sobre que Juan estaba contando. Reproducido en una sola PC.
+      if (!esReservaPropia(sobre, { usuarioId: session.id, operadorId: gateOp.operadorId ?? null })) {
         const e = new Error("Este cambio está reservado por otro operador.");
         e.codigo = "conflicto";
         throw e;

@@ -9,7 +9,8 @@
 // adelantar unos segundos algo que se resuelve solo.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { ESTADO_CAMBIO } from "@/lib/caja/cierreRelevo";
+import { getOperadorActivo } from "@/lib/operador";
+import { ESTADO_CAMBIO, esReservaPropia, whereReservaPropia } from "@/lib/caja/cierreRelevo";
 import {
   contextoRelevo,
   liberarReservasVencidas,
@@ -27,6 +28,10 @@ export async function GET(req) {
       );
     }
     const { localId } = ctx;
+    // El operario del PIN es la PERSONA; la sesión es el dispositivo. Acá alcanza
+    // con leerlo: este endpoint no exige operario —listar no opera la caja— pero
+    // si lo hay, es lo que define de quién es cada reserva.
+    const operadorId = getOperadorActivo(req)?.operadorId ?? null;
     const ahora = new Date();
 
     const [liberadas, atrasados] = await Promise.all([
@@ -46,12 +51,19 @@ export async function GET(req) {
     // dos personas crean que están contando lo mismo.
     //
     // Los RECIBIDOS y CANCELADOS tampoco: ya no esperan a nadie.
+    //
+    // "Propia" es del USUARIO Y DEL OPERARIO. En una computadora del mostrador
+    // todos comparten `erpazul_sesion`: comparando solo el usuario, María veía
+    // la reserva de Juan como suya. Reproducido en una sola PC.
     const dondeAbiertos = {
       OR: [
         { estado: { in: [ESTADO_CAMBIO.DISPONIBLE, ESTADO_CAMBIO.VENCIDO] } },
         // La propia, sea cual sea su vencimiento: si volvió dentro del plazo la
         // recupera, y si venció ya la liberó el barrido de arriba.
-        { estado: ESTADO_CAMBIO.RESERVADO, reservadoPorUsuarioId: ctx.session.id },
+        {
+          estado: ESTADO_CAMBIO.RESERVADO,
+          ...whereReservaPropia({ usuarioId: ctx.session.id, operadorId }),
+        },
       ],
     };
 
@@ -77,7 +89,9 @@ export async function GET(req) {
       ...serializarCambio(f),
       // La pantalla necesita saber cuál es "el mío" para ofrecer continuar en vez
       // de tomar. Se resuelve en el servidor y no comparando ids en el cliente.
-      esMio: f.estado === ESTADO_CAMBIO.RESERVADO && f.reservadoPorUsuarioId === ctx.session.id,
+      esMio:
+        f.estado === ESTADO_CAMBIO.RESERVADO &&
+        esReservaPropia(f, { usuarioId: ctx.session.id, operadorId }),
       turnoOrigen: {
         id: f.turnoOrigen.id,
         apertura: f.turnoOrigen.apertura,

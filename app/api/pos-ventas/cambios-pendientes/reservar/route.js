@@ -16,7 +16,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireOperadorSegunConfig } from "@/lib/operador";
-import { ESTADO_CAMBIO, vencimientoReserva } from "@/lib/caja/cierreRelevo";
+import { ESTADO_CAMBIO, vencimientoReserva, whereReservaPropia } from "@/lib/caja/cierreRelevo";
 import {
   contextoRelevo,
   liberarReservasVencidas,
@@ -66,11 +66,14 @@ export async function POST(req) {
     //
     // Se busca después de liberar las vencidas, así una reserva abandonada del
     // propio usuario no lo bloquea a sí mismo.
+    // "Propia" es del usuario Y del operario: en una computadora del mostrador
+    // el usuario es el dispositivo y lo comparten todos, así que comparar solo
+    // por usuario bloquearía a un operario por la reserva de otro.
     const propia = await prisma.cambioPendiente.findFirst({
       where: {
         localId,
         estado: ESTADO_CAMBIO.RESERVADO,
-        reservadoPorUsuarioId: session.id,
+        ...whereReservaPropia({ usuarioId: session.id, operadorId: gateOp.operadorId ?? null }),
         turnoDestinoId: null,
         id: { not: cambioId },
       },
@@ -97,7 +100,8 @@ export async function POST(req) {
     const yaMio = await prisma.cambioPendiente.findFirst({
       where: {
         id: cambioId, localId, estado: ESTADO_CAMBIO.RESERVADO,
-        reservadoPorUsuarioId: session.id, turnoDestinoId: null,
+        ...whereReservaPropia({ usuarioId: session.id, operadorId: gateOp.operadorId ?? null }),
+        turnoDestinoId: null,
       },
       select: { id: true },
     });

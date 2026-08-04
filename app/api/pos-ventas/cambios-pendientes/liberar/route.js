@@ -15,7 +15,8 @@
 // que ya fue RECIBIDO — ese es terminal.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { ESTADO_CAMBIO, reservaVencida } from "@/lib/caja/cierreRelevo";
+import { getOperadorActivo } from "@/lib/operador";
+import { ESTADO_CAMBIO, reservaVencida, esReservaPropia } from "@/lib/caja/cierreRelevo";
 import { contextoRelevo, serializarCambio } from "@/lib/caja/cierreRelevoServer";
 
 export async function POST(req) {
@@ -41,7 +42,7 @@ export async function POST(req) {
     const fila = await prisma.cambioPendiente.findFirst({
       where: { id: cambioId, localId },
       select: {
-        id: true, estado: true, reservadoPorUsuarioId: true,
+        id: true, estado: true, reservadoPorUsuarioId: true, reservadoPorOperadorId: true,
         reservaVenceEn: true, turnoDestinoId: true,
       },
     });
@@ -64,7 +65,11 @@ export async function POST(req) {
     // Quién puede soltar la reserva: quien la tomó, o cualquiera si ya venció.
     // Que un tercero pueda liberar una reserva VIVA significaría que puede
     // arrebatarle el sobre a alguien que lo está contando.
-    const propia = fila.reservadoPorUsuarioId === session.id;
+    //
+    // "Quien la tomó" es el usuario Y el operario: en una computadora del
+    // mostrador el usuario es el dispositivo y lo comparten todos.
+    const operadorId = getOperadorActivo(req)?.operadorId ?? null;
+    const propia = esReservaPropia(fila, { usuarioId: session.id, operadorId });
     if (!propia && !reservaVencida(fila)) {
       return NextResponse.json(
         {
