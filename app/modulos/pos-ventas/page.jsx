@@ -30,6 +30,7 @@ import ModalCierreTurno from "@/components/pos-ventas/ModalCierreTurno";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
 import AvisoArqueo from "@/components/pos-ventas/AvisoArqueo";
 import useArqueoEstado from "@/hooks/useArqueoEstado";
+import useEsEscritorio, { nombreVentanaRetiro } from "@/hooks/useEsEscritorio";
 import ModalPesoKg from "@/components/pos-ventas/ModalPesoKg";
 import ModalConfirmacion from "@/components/pos-ventas/ModalConfirmacion";
 import ModalPendientesOffline from "@/components/pos-ventas/ModalPendientesOffline";
@@ -126,7 +127,32 @@ export default function PosVentasPage() {
     localId: localActual,
     habilitado: !!turnoActual?.id && !turnoVencido,
   });
-  
+
+  // RETIRO DE RECAUDACIÓN: dónde se abre.
+  //
+  // En escritorio, en una PESTAÑA APARTE. Contar un cajón lleva minutos y el POS
+  // no puede quedar inaccesible mientras tanto: acá el cajero atiende en esta
+  // pestaña y cuenta en la otra, sin perder carrito ni cliente. El nombre de
+  // ventana por turno hace que tocar el botón de nuevo reutilice la pestaña ya
+  // abierta en vez de acumular varias contando la misma caja.
+  //
+  // En móvil, en la misma pestaña: no hay lugar para dos, y el borrador local
+  // cubre la ida y vuelta.
+  const esEscritorio = useEsEscritorio();
+  const abrirRetiro = (turnoId) => {
+    const ruta = "/modulos/pos-ventas/retiros/nuevo";
+    if (esEscritorio && typeof window !== "undefined") {
+      const ventana = window.open(`${ruta}?pestana=nueva`, nombreVentanaRetiro(turnoId));
+      // Si el navegador bloquea la ventana emergente, no se pierde la acción.
+      if (ventana) {
+        ventana.focus();
+        return;
+      }
+    }
+    router.push(ruta);
+  };
+
+
   // Obtener grupoId del contexto (necesario para cola offline)
   const [grupoId, setGrupoId] = useState(null);
   useEffect(() => {
@@ -1568,7 +1594,7 @@ export default function PosVentasPage() {
                 alerta vencida. */}
             {turnoActual && arqueo.visible && (
               <button
-                onClick={() => router.push("/modulos/pos-ventas/retiros/nuevo")}
+                onClick={() => abrirRetiro(turnoActual.id)}
                 className={`text-[11px] px-2 py-1 rounded transition-colors inline-flex items-center gap-1 ${
                   arqueo.estado.vencido
                     ? "sunmi-pos-btn-danger font-bold"
@@ -1618,7 +1644,7 @@ export default function PosVentasPage() {
             ultimoArqueoEn={arqueo.ultimoArqueoEn}
             turnoId={turnoActual.id}
             localId={localActual}
-            onArquear={() => router.push("/modulos/pos-ventas/retiros/nuevo")}
+            onArquear={() => abrirRetiro(turnoActual.id)}
             onPostergado={() => {
               showSuccess("Retiro postergado");
               arqueo.refrescar();

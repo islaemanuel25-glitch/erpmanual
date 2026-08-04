@@ -1,25 +1,30 @@
 "use client";
 
-// RETIRO DE RECAUDACIÓN — pantalla propia.
+// RETIRO DE RECAUDACIÓN — una sola pantalla.
 //
-// Reemplaza al modal. Existe como página y no como modal por una razón concreta:
-// contar un cajón lleva minutos, y durante esos minutos el cajero tiene que
-// poder volver a cobrar sin perder lo contado. El carrito del POS ya persiste en
-// localStorage por local y usuario, así que ir y volver es seguro sin tocar nada
-// de su estado.
+// CÓMO FUNCIONA UN RETIRO DE VERDAD
 //
-// La pantalla NO pregunta si se va a retirar: existe para hacer un retiro.
+// 1. Se cuenta todo el efectivo del cajón.
+// 2. Se eligen los billetes y monedas que quedan como cambio.
+// 3. Todo lo demás se retira. El importe es una resta, no una decisión.
 //
-// Nada se registra hasta "Confirmar retiro". El borrador vive solo en el
-// navegador: no crea filas, no crea movimientos, no reserva nada.
+// La versión anterior preguntaba cuánto retirar y ofrecía elegir los billetes
+// que salían, repartido en tres pasos con Anterior y Siguiente. Eso pedía la
+// resta mental que la máquina hace sola, y escondía en pantallas distintas las
+// tres cifras que hay que mirar juntas. Acá no hay pasos: en escritorio son tres
+// columnas, en móvil una debajo de la otra.
 //
-// El JSX de los tres pasos está en components/caja/PasosRetiro para que las
-// pruebas puedan renderizarlo de verdad; acá quedan el estado, los datos y las
-// decisiones.
+// EL CAJERO PUEDE SEGUIR VENDIENDO. En escritorio esta pantalla se abre en una
+// pestaña aparte y el POS queda intacto en la suya; en móvil se navega y se
+// vuelve con el borrador. En los dos casos, antes de confirmar se revalida
+// contra el servidor.
+//
+// Nada se registra hasta "Confirmar retiro": el borrador vive solo en el
+// navegador y no crea filas ni movimientos.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Check } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, Check, X } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -30,16 +35,21 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import { Cifra, money, tonoDiferencia } from "@/components/caja/CifrasRetiro";
-import { PASOS, PasoContar, PasoDefinir, PasoConfirmar } from "@/components/caja/PasosRetiro";
+import {
+  Aviso,
+  PanelConteo,
+  PanelCambio,
+  PanelResumen,
+  ResumenCabecera,
+} from "@/components/caja/PanelesRetiro";
 
 import {
   MODO_TOTAL,
   MODO_BILLETES,
   totalDesglose,
   desgloseVacio,
-  desgloseCoincide,
-  validarRetiroPorBilletes,
-  fondoFisicoRestante,
+  validarCambioQueQueda,
+  limitarCambioAlConteo,
 } from "@/lib/caja/conteoBilletes";
 import {
   armarBorrador,
@@ -47,13 +57,13 @@ import {
   leerBorrador,
   descartarBorrador,
   limpiarBorradoresViejos,
-  detectarEsperadoCambiado,
+  sanearDesglose,
 } from "@/lib/caja/borradorRetiro";
 import {
+  evaluarRetiroPorCambio,
+  huellaDelTurno,
+  compararHuellas,
   resolverFondoObjetivo,
-  sugerirRepartoRetiro,
-  validarRepartoRetiro,
-  evaluarRetiro,
 } from "@/lib/caja/retiroDinero";
 
 /** Clave por visita: reintentar el mismo retiro no lo duplica. */
@@ -66,6 +76,11 @@ const hora = (iso) =>
 
 export default function NuevoRetiroPage() {
   const router = useRouter();
+  const params = useSearchParams();
+  // El POS marca la pestaña nueva. No se adivina por user-agent ni por ancho:
+  // lo sabe con certeza quien la abrió.
+  const enPestanaNueva = params?.get("pestana") === "nueva";
+
   const sesion = useUser() || {};
   const perfil = sesion.perfil;
   const cargandoUser = sesion.cargando !== false;
@@ -73,36 +88,32 @@ export default function NuevoRetiroPage() {
 
   const [cargando, setCargando] = useState(true);
   const [turno, setTurno] = useState(null);
+  const [huellaInicial, setHuellaInicial] = useState(null);
   const [esperado, setEsperado] = useState(null);
   const [fondoConfigurado, setFondoConfigurado] = useState(null);
-  const [error, setError] = useState("");
   const [errorFatal, setErrorFatal] = useState("");
+  const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
 
-  const [paso, setPaso] = useState(1);
   const [modoConteo, setModoConteo] = useState(MODO_TOTAL);
   const [montoContado, setMontoContado] = useState("");
   const [desgloseContado, setDesgloseContado] = useState({});
-  const [modoRetiro, setModoRetiro] = useState(MODO_TOTAL);
-  const [importeRetiro, setImporteRetiro] = useState("");
-  const [desgloseRetiro, setDesgloseRetiro] = useState({});
+  const [desgloseCambio, setDesgloseCambio] = useState({});
   const [observacion, setObservacion] = useState("");
+  const [conteoIniciadoEn, setConteoIniciadoEn] = useState(null);
 
   const [guardando, setGuardando] = useState(false);
-  const [cambioEsperado, setCambioEsperado] = useState(null);
+  const [cambios, setCambios] = useState(null);
   const [resultado, setResultado] = useState(null);
   const claveRef = useRef(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
   const usuarioId = perfil?.id ?? null;
-
   const storage = typeof window !== "undefined" ? window.localStorage : null;
 
-  // ── Estado de la caja: turno propio abierto, esperado y fondo objetivo ────
+  // ── Estado de la caja ────────────────────────────────────────────────────
   const cargarEstado = useCallback(async () => {
-    // `turnos/actual` devuelve el turno completo: hace falta el montoInicial para
-    // resolver el fondo objetivo cuando el local no tiene uno configurado.
     const r = await fetch("/api/pos-ventas/turnos/actual", {
       credentials: "include",
       cache: "no-store",
@@ -111,14 +122,27 @@ export default function NuevoRetiroPage() {
     if (!t?.id) return { turno: null };
 
     const [res, cfg] = await Promise.all([
-      fetch(`/api/pos-ventas/turnos/resumen?turnoId=${t.id}`, { credentials: "include", cache: "no-store" })
-        .then((x) => x.json()),
-      fetch("/api/config/arqueo-caja", { credentials: "include", cache: "no-store" }).then((x) => x.json()),
+      fetch(`/api/pos-ventas/turnos/resumen?turnoId=${t.id}`, {
+        credentials: "include",
+        cache: "no-store",
+      }).then((x) => x.json()),
+      fetch("/api/config/arqueo-caja", { credentials: "include", cache: "no-store" }).then((x) =>
+        x.json()
+      ),
     ]);
+
     return {
       turno: t,
       esperado: res?.ok ? Number(res.efectivoEsperado) : null,
       fondo: cfg?.ok ? cfg.fondoObjetivoCaja : null,
+      // Huella completa: el esperado solo no distingue una venta de un retiro.
+      huella: huellaDelTurno({
+        turnoId: t.id,
+        efectivoEsperado: res?.efectivoEsperado,
+        totalRetirosCaja: res?.totalRetirosCaja,
+        cantidadVentas: res?.cantidadVentas,
+        estaCerrado: res?.estaCerrado,
+      }),
     };
   }, []);
 
@@ -136,24 +160,22 @@ export default function NuevoRetiroPage() {
         setTurno(d.turno);
         setEsperado(d.esperado);
         setFondoConfigurado(d.fondo);
+        setHuellaInicial(d.huella);
         claveRef.current = nuevaClave(d.turno.id);
 
-        // Se recupera SOLO el borrador del turno vigente; los de turnos ya
-        // cerrados se descartan para que no reaparezcan con números de otra
-        // jornada.
         if (usuarioId) {
           limpiarBorradoresViejos(storage, { turnoIdActivo: d.turno.id, usuarioId });
           const b = leerBorrador(storage, { turnoId: d.turno.id, usuarioId });
           if (b) {
             setModoConteo(b.modoConteo || MODO_TOTAL);
             setMontoContado(b.montoContado || "");
-            setDesgloseContado(b.desgloseContado || {});
-            setModoRetiro(b.modoRetiro || MODO_TOTAL);
-            setImporteRetiro(b.importeRetiro || "");
-            setDesgloseRetiro(b.desgloseRetiro || {});
+            setDesgloseContado(sanearDesglose(b.desgloseContado));
+            setDesgloseCambio(sanearDesglose(b.desgloseCambio));
             setObservacion(b.observacion || "");
+            setConteoIniciadoEn(b.conteoIniciadoEn || null);
             setAviso(
-              "Recuperamos lo que habías contado. Los importes de la caja se volvieron a leer del servidor."
+              b.avisoCompat ||
+                "Recuperamos lo que habías contado. Los importes de la caja se volvieron a leer del servidor."
             );
           }
         }
@@ -169,79 +191,48 @@ export default function NuevoRetiroPage() {
   }, [cargarEstado, usuarioId, storage, cargandoUser, cargandoCtx, puedeUsar, needsContexto]);
 
   // ── Derivados ────────────────────────────────────────────────────────────
-  const { fondoObjetivo, origen } = useMemo(
+  const { fondoObjetivo } = useMemo(
     () => resolverFondoObjetivo({ configurado: fondoConfigurado, montoInicial: turno?.montoInicial }),
     [fondoConfigurado, turno?.montoInicial]
   );
 
-  // Cuando el modo elegido es por billetes, el desglose ES el importe: no puede
-  // quedar como una ayuda decorativa que diga otra cosa que el número real.
   const totalContado =
     modoConteo === MODO_BILLETES ? totalDesglose(desgloseContado) : Number(montoContado) || 0;
-  const hayContado = modoConteo === MODO_BILLETES ? !desgloseVacio(desgloseContado) : montoContado !== "";
-
-  const sugerido = useMemo(
-    () =>
-      esperado != null
-        ? sugerirRepartoRetiro({
-            efectivoEsperadoAntes: esperado,
-            fondoObjetivo,
-            efectivoContado: totalContado,
-          })
-        : null,
-    [esperado, fondoObjetivo, totalContado]
-  );
-  const retiroSugerido = sugerido?.efectivoRetirado ?? 0;
-
-  const totalRetiro =
-    modoRetiro === MODO_BILLETES
-      ? totalDesglose(desgloseRetiro)
-      : importeRetiro === ""
-      ? retiroSugerido
-      : Number(importeRetiro) || 0;
-
-  const fondoFisico = fondoFisicoRestante(totalContado, totalRetiro);
+  const hayContado =
+    modoConteo === MODO_BILLETES ? !desgloseVacio(desgloseContado) : montoContado !== "";
+  const totalCambio = totalDesglose(desgloseCambio);
 
   const evaluacion = useMemo(
     () =>
-      esperado != null && hayContado
-        ? evaluarRetiro({
-            efectivoEsperadoAntes: esperado,
-            fondoObjetivo,
-            efectivoContado: totalContado,
-            efectivoRetirado: totalRetiro,
-          })
-        : null,
-    [esperado, hayContado, fondoObjetivo, totalContado, totalRetiro]
+      evaluarRetiroPorCambio({
+        efectivoEsperadoAntes: esperado ?? 0,
+        efectivoContado: totalContado,
+        cambioQueQueda: totalCambio,
+        fondoObjetivo,
+      }),
+    [esperado, totalContado, totalCambio, fondoObjetivo]
   );
 
-  const reparto = validarRepartoRetiro({
-    efectivoContado: totalContado,
-    efectivoRetirado: totalRetiro,
-    fondoDejado: fondoFisico,
-  });
-
-  // El tope por denominación solo existe si el cajón se contó billete por
-  // billete. Con un monto total no hay forma de saber qué billetes hay.
-  const validacionBilletes = validarRetiroPorBilletes({
+  const validacionCambio = validarCambioQueQueda({
     desgloseContado: modoConteo === MODO_BILLETES ? desgloseContado : {},
-    desgloseRetiro: modoRetiro === MODO_BILLETES ? desgloseRetiro : {},
+    desgloseCambio,
     totalContado,
   });
 
-  // Volver a modo manual con un desglose viejo escondido sería sostener dos
-  // totales distintos: se avisa y se ofrece limpiarlo.
-  const desacopleConteo =
-    modoConteo === MODO_TOTAL &&
-    !desgloseVacio(desgloseContado) &&
-    !desgloseCoincide(desgloseContado, Number(montoContado) || 0);
-  const desacopleRetiro =
-    modoRetiro === MODO_TOTAL &&
-    !desgloseVacio(desgloseRetiro) &&
-    !desgloseCoincide(desgloseRetiro, Number(importeRetiro) || retiroSugerido || 0);
-
   const puedeConfirmar =
-    hayContado && reparto.valido && validacionBilletes.valido && !desacopleConteo && !desacopleRetiro;
+    hayContado && validacionCambio.valido && !evaluacion.sinRecaudacion && !evaluacion.cambioExcedeContado;
+
+  // Corregir el conteo hacia abajo no puede dejar un cambio de billetes que ya
+  // no existen. Se recorta en el momento en que cambia el conteo.
+  const actualizarConteo = (nuevo) => {
+    setDesgloseContado(nuevo);
+    setDesgloseCambio((c) => limitarCambioAlConteo(c, nuevo));
+    if (!conteoIniciadoEn) setConteoIniciadoEn(new Date().toISOString());
+  };
+  const actualizarMonto = (v) => {
+    setMontoContado(v);
+    if (!conteoIniciadoEn) setConteoIniciadoEn(new Date().toISOString());
+  };
 
   // ── Borrador ─────────────────────────────────────────────────────────────
   const persistirBorrador = useCallback(() => {
@@ -254,10 +245,9 @@ export default function NuevoRetiroPage() {
         modoConteo,
         montoContado,
         desgloseContado,
-        modoRetiro,
-        importeRetiro,
-        desgloseRetiro,
+        desgloseCambio,
         observacion,
+        conteoIniciadoEn,
       })
     );
   }, [
@@ -267,44 +257,58 @@ export default function NuevoRetiroPage() {
     modoConteo,
     montoContado,
     desgloseContado,
-    modoRetiro,
-    importeRetiro,
-    desgloseRetiro,
+    desgloseCambio,
     observacion,
+    conteoIniciadoEn,
   ]);
 
-  const volverAlPos = () => router.push("/modulos/pos-ventas");
-
-  const guardarYVolver = () => {
+  const guardarSolo = () => {
     persistirBorrador();
-    volverAlPos();
+    setAviso("Borrador guardado. Podés volver cuando quieras.");
+  };
+
+  const volverAlPos = () => {
+    persistirBorrador();
+    // Abierta en pestaña propia: cerrarla devuelve al POS, que nunca se fue.
+    if (enPestanaNueva && typeof window !== "undefined" && window.opener) {
+      window.close();
+      return;
+    }
+    router.push("/modulos/pos-ventas");
   };
 
   // ── Confirmar ────────────────────────────────────────────────────────────
   const confirmar = async () => {
     setError("");
     if (!puedeConfirmar || guardando || !turno) return;
-    const yaReconfirmado = Boolean(cambioEsperado?.cambio);
+    const yaReconfirmado = Boolean(cambios?.hayCambios);
 
     setGuardando(true);
     try {
-      // El esperado SE REVALIDA contra el servidor: entre que se contó y ahora
-      // pueden haber entrado ventas, y confirmar con el número viejo produciría
-      // una diferencia que no es real.
+      // Se revalida contra el servidor: pudieron entrar ventas o pudo haber otro
+      // retiro desde otro dispositivo.
       const fresco = await cargarEstado();
-      if (!fresco.turno || fresco.turno.id !== turno.id) {
-        setError("La caja se cerró mientras preparabas el retiro.");
+      if (!fresco.turno) {
+        setError("La caja ya no está abierta.");
         return;
       }
-      const cambio = detectarEsperadoCambiado({
-        esperadoAlAbrir: esperado,
-        esperadoAhora: fresco.esperado,
-      });
-      if (cambio.cambio && !yaReconfirmado) {
+      const c = compararHuellas(huellaInicial, fresco.huella);
+      if (c.bloquea) {
         setEsperado(fresco.esperado);
-        setCambioEsperado(cambio);
-        setPaso(3);
-        return; // No se confirma en silencio.
+        setError(
+          c.turnoCerrado
+            ? "La caja se cerró mientras preparabas el retiro. No se puede registrar."
+            : "El turno cambió mientras preparabas el retiro. Volvé a empezar."
+        );
+        return;
+      }
+      if (c.hayCambios && !yaReconfirmado) {
+        // Solo se actualiza el ESPERADO. Lo contado lo contó una persona y no se
+        // toca por detrás.
+        setEsperado(fresco.esperado);
+        setHuellaInicial(fresco.huella);
+        setCambios(c);
+        return;
       }
 
       const res = await fetch("/api/pos-ventas/retiros/registrar", {
@@ -314,7 +318,7 @@ export default function NuevoRetiroPage() {
         body: JSON.stringify({
           turnoId: turno.id,
           efectivoContado: totalContado,
-          efectivoRetirado: totalRetiro,
+          efectivoRetirado: evaluacion.totalRetiro,
           observacion: observacion.trim() || null,
           idempotencyKey: claveRef.current,
         }),
@@ -325,7 +329,7 @@ export default function NuevoRetiroPage() {
         return;
       }
       descartarBorrador(storage, { turnoId: turno.id, usuarioId });
-      setCambioEsperado(null);
+      setCambios(null);
       setResultado(json.retiro);
     } catch {
       setError("Error de conexión.");
@@ -356,7 +360,7 @@ export default function NuevoRetiroPage() {
         <SunmiCard className="space-y-3">
           <p className="text-sm text-center py-4 sunmi-text-danger">{errorFatal}</p>
           <SunmiButton color="slate" onClick={volverAlPos} className="w-full py-3">
-            Volver al POS
+            {enPestanaNueva ? "Cerrar" : "Volver al POS"}
           </SunmiButton>
         </SunmiCard>
       </Marco>
@@ -386,7 +390,7 @@ export default function NuevoRetiroPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Cifra label="Se retiró" valor={resultado.efectivoRetirado} clase="sunmi-text-accent" destacado />
-            <Cifra label="Queda de fondo" valor={resultado.fondoDejado} />
+            <Cifra label="Quedó de cambio" valor={resultado.fondoDejado} />
             <Cifra
               label="Diferencia al contar"
               valor={resultado.diferencia}
@@ -394,7 +398,7 @@ export default function NuevoRetiroPage() {
             />
           </div>
           <SunmiButton color="amber" onClick={volverAlPos} className="w-full py-3 font-bold">
-            Volver al POS
+            {enPestanaNueva ? "Cerrar y volver al POS" : "Volver al POS"}
           </SunmiButton>
         </SunmiCard>
       </Marco>
@@ -403,138 +407,94 @@ export default function NuevoRetiroPage() {
 
   return (
     <Marco>
+      {/* Encabezado compacto */}
       <SunmiCard className="p-3">
-        <button
-          type="button"
-          onClick={guardarYVolver}
-          className="text-[12px] sunmi-text-accent inline-flex items-center gap-1 mb-1"
-        >
-          <ArrowLeft size={14} /> Guardar y volver al POS
-        </button>
-        <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
-          Retiro de recaudación
-        </h1>
-        <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
-          Turno #{turno?.id} · abierto desde {hora(turno?.apertura)} · {contexto?.nombre || "—"}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
+              Retiro de recaudación
+            </h1>
+            <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
+              Turno #{turno?.id} · <span className="sunmi-text-success font-semibold">abierto</span> desde{" "}
+              {hora(turno?.apertura)} · {contexto?.nombre || "—"}
+            </p>
+            {enPestanaNueva && (
+              <p className="text-[11px] sunmi-text-accent leading-tight mt-0.5">
+                Podés seguir vendiendo desde la pestaña del POS.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={volverAlPos}
+            className="shrink-0 text-[11px] sunmi-text-muted inline-flex items-center gap-1"
+          >
+            {enPestanaNueva ? <X size={14} /> : <ArrowLeft size={14} />}
+            {enPestanaNueva ? "Cerrar" : "Volver"}
+          </button>
+        </div>
       </SunmiCard>
 
-      {aviso && (
-        <div className="sunmi-surface-soft sunmi-border rounded-lg p-2 text-[12px] sunmi-text-muted">
-          {aviso}
-        </div>
-      )}
+      {aviso && <Aviso tono="info">{aviso}</Aviso>}
 
-      {/* Cifras de referencia, siempre a la vista: el cajero decide cuánto sacar
-          mirando estos números, no de memoria. */}
-      <SunmiCard className="p-3 space-y-2">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          <Cifra label="Efectivo esperado ahora" valor={esperado ?? "—"} />
-          <Cifra
-            label="Fondo objetivo del local"
-            valor={fondoObjetivo}
-            nota={origen === "MONTO_INICIAL" ? "sin configurar: fondo de apertura" : null}
-          />
-          <Cifra label="Efectivo contado" valor={hayContado ? totalContado : "—"} />
-          <Cifra
-            label="Diferencia al contar"
-            valor={evaluacion ? evaluacion.diferencia : "—"}
-            clase={evaluacion ? tonoDiferencia(evaluacion.diferencia) : "sunmi-text-muted"}
-          />
-        </div>
-        {evaluacion && (
-          <p className="text-[11px] sunmi-text-muted leading-snug">
-            Recaudación esperada {money(evaluacion.recaudacionEsperada)} · sugerido a retirar{" "}
-            {money(retiroSugerido)}.
-          </p>
-        )}
-      </SunmiCard>
-
-      <NavPasos paso={paso} onIr={setPaso} />
-
-      <PasoContar
-        visible={paso === 1}
-        modo={modoConteo}
-        onModo={setModoConteo}
-        monto={montoContado}
-        onMonto={setMontoContado}
-        desglose={desgloseContado}
-        onDesglose={setDesgloseContado}
-        desacople={desacopleConteo}
-      />
-
-      <PasoDefinir
-        visible={paso === 2}
-        modo={modoRetiro}
-        onModo={setModoRetiro}
-        importe={importeRetiro === "" ? String(retiroSugerido) : importeRetiro}
-        onImporte={setImporteRetiro}
-        sugerido={retiroSugerido}
-        desglose={desgloseRetiro}
-        onDesglose={setDesgloseRetiro}
-        topes={modoConteo === MODO_BILLETES ? desgloseContado : null}
-        totalContado={totalContado}
-        totalRetiro={totalRetiro}
-        fondoObjetivo={fondoObjetivo}
-        fondoFisico={fondoFisico}
-        evaluacion={evaluacion}
-        errorBilletes={validacionBilletes.valido ? null : validacionBilletes.error}
-        errorReparto={reparto.valido ? null : reparto.error}
-        desacople={desacopleRetiro}
-      />
-
-      <PasoConfirmar
-        visible={paso === 3}
+      <ResumenCabecera
         esperado={esperado}
         totalContado={totalContado}
-        totalRetiro={totalRetiro}
-        fondoObjetivo={fondoObjetivo}
-        fondoFisico={fondoFisico}
-        evaluacion={evaluacion}
-        observacion={observacion}
-        onObservacion={setObservacion}
-        cambioEsperado={cambioEsperado}
-        error={error}
-        guardando={guardando}
-        puedeConfirmar={puedeConfirmar}
-        onGuardarYVolver={guardarYVolver}
-        onConfirmar={confirmar}
+        hayContado={hayContado}
+        diferencia={evaluacion.diferencia}
+        totalCambio={totalCambio}
+        totalRetiro={evaluacion.totalRetiro}
       />
 
-      {/* Avanzar y retroceder no pierde nada: el estado vive en la página, no en
-          el paso visible. */}
-      <div className="xl:hidden grid grid-cols-2 gap-2">
-        <SunmiButton color="slate" onClick={() => setPaso((p) => Math.max(1, p - 1))} disabled={paso === 1}>
-          Anterior
-        </SunmiButton>
-        <SunmiButton color="cyan" onClick={() => setPaso((p) => Math.min(3, p + 1))} disabled={paso === 3}>
-          Siguiente
-        </SunmiButton>
+      {/* Una sola pantalla: tres columnas en escritorio, una sobre otra en móvil.
+          Sin pasos, sin Anterior ni Siguiente. */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
+        <PanelConteo
+          modo={modoConteo}
+          onModo={setModoConteo}
+          monto={montoContado}
+          onMonto={actualizarMonto}
+          desglose={desgloseContado}
+          onDesglose={actualizarConteo}
+          horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
+        />
+
+        <PanelCambio
+          desgloseContado={modoConteo === MODO_BILLETES ? desgloseContado : {}}
+          desgloseCambio={desgloseCambio}
+          onDesgloseCambio={setDesgloseCambio}
+          totalCambio={totalCambio}
+          error={validacionCambio.valido ? null : validacionCambio.error}
+        />
+
+        <PanelResumen
+          esperado={esperado}
+          totalContado={totalContado}
+          hayContado={hayContado}
+          totalCambio={totalCambio}
+          totalRetiro={evaluacion.totalRetiro}
+          diferencia={evaluacion.diferencia}
+          sinRecaudacion={evaluacion.sinRecaudacion}
+          observacion={observacion}
+          onObservacion={setObservacion}
+          cambios={cambios}
+          error={error}
+          guardando={guardando}
+          puedeConfirmar={puedeConfirmar}
+          enPestanaNueva={enPestanaNueva}
+          onGuardar={guardarSolo}
+          onVolver={volverAlPos}
+          onConfirmar={confirmar}
+        />
       </div>
+
+      <p className="text-[10px] sunmi-text-muted text-center pb-1">
+        Fondo de referencia del local: {money(fondoObjetivo)}. No hace falta dejar ese importe exacto.
+      </p>
     </Marco>
   );
 }
 
 function Marco({ children }) {
-  return <div className="p-2 lg:p-3 space-y-3 max-w-5xl mx-auto">{children}</div>;
-}
-
-function NavPasos({ paso, onIr }) {
-  return (
-    <div className="grid grid-cols-3 gap-1 xl:hidden">
-      {PASOS.map((p) => (
-        <button
-          key={p.n}
-          type="button"
-          onClick={() => onIr(p.n)}
-          aria-current={paso === p.n ? "step" : undefined}
-          className={`rounded-md px-2 py-1.5 text-[11px] font-semibold sunmi-border ${
-            paso === p.n ? "sunmi-surface sunmi-text-accent" : "sunmi-surface-soft sunmi-text-muted"
-          }`}
-        >
-          {p.n}. {p.titulo}
-        </button>
-      ))}
-    </div>
-  );
+  return <div className="p-2 lg:p-3 space-y-3 max-w-[1400px] mx-auto">{children}</div>;
 }
