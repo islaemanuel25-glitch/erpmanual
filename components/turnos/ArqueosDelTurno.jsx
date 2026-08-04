@@ -34,6 +34,7 @@ function signo(dif) {
   return `${d > 0 ? "+" : ""}$${fmt(d)}`;
 }
 
+
 export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicial = 0 }) {
   const [arqueos, setArqueos] = useState(null);
   const [abierto, setAbierto] = useState(false);
@@ -58,7 +59,7 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
   if (arqueos === null) {
     return (
       <SunmiCard>
-        <h2 className="text-base font-bold mb-1">Arqueos</h2>
+        <h2 className="text-base font-bold mb-1">Retiros y conteos</h2>
         <p className="text-sm sunmi-text-muted">Cargando…</p>
       </SunmiCard>
     );
@@ -67,8 +68,8 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
   if (arqueos.length === 0) {
     return (
       <SunmiCard>
-        <h2 className="text-base font-bold mb-1">Arqueos</h2>
-        <p className="text-sm sunmi-text-muted">No se hicieron arqueos en este turno.</p>
+        <h2 className="text-base font-bold mb-1">Retiros y conteos</h2>
+        <p className="text-sm sunmi-text-muted">No hubo retiros ni conteos en este turno.</p>
       </SunmiCard>
     );
   }
@@ -78,7 +79,7 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
 
   return (
     <SunmiCard>
-      <h2 className="text-base font-bold mb-3">Arqueos</h2>
+      <h2 className="text-base font-bold mb-3">Retiros y conteos históricos</h2>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
         <div>
@@ -104,7 +105,7 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
       </div>
 
       <SunmiButton color="cyan" onClick={() => setAbierto((v) => !v)} className="!w-full min-h-11">
-        {abierto ? "Ocultar arqueos" : `Ver los ${r.cantidad} arqueo${r.cantidad === 1 ? "" : "s"}`}
+        {abierto ? "Ocultar detalle" : `Ver ${r.cantidad} registro${r.cantidad === 1 ? "" : "s"}`}
       </SunmiButton>
 
       {abierto && (
@@ -115,7 +116,7 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
                 <span className="text-sm font-bold">
                   {hora(a.fechaHora)}
                   <span className="ml-2 text-[11px] font-normal sunmi-text-muted">
-                    {a.tipo === "FINAL" ? "cierre" : "control"}
+                    {etiquetaRegistro(a)}
                   </span>
                 </span>
                 <span className={`text-base font-bold tabular-nums ${tono(a.diferencia)}`}>{signo(a.diferencia)}</span>

@@ -237,7 +237,7 @@ function TurnoRow({ turno }) {
     if (!esCerrado) return null;
     const dif = t.diferenciaEfectivo;
     if (dif === null || dif === undefined)
-      return <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap sunmi-badge-muted">Sin arqueo</span>;
+      return <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap sunmi-badge-muted">Sin control</span>;
     if (dif === 0)
       return <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap sunmi-badge-success">Cuadró ✓</span>;
     if (dif > 0)
@@ -740,7 +740,7 @@ export default function AuditoriaTurnosPage() {
               Cajas
             </h1>
             <p className="text-[13px] sunmi-text-muted mt-1.5">
-              {localNombre || "Cajas y arqueos"}
+              {localNombre || "Cajas y retiros"}
               {rangoLabel && <span className="ml-1">· {rangoLabel}</span>}
             </p>
 

@@ -77,17 +77,15 @@ export async function POST(req) {
     turnoIdRef = Number(turnoId);
     claveRef = String(idempotencyKey ?? "").trim();
 
-    // La clave es OBLIGATORIA, a diferencia del arqueo puro. En Postgres los NULL
-    // no colisionan en un UNIQUE: una fila sin clave quedaría desprotegida, y
-    // duplicar un retiro duplica el descuento. Se valida ANTES de tocar la base.
-    const clave = validarIdempotencyKey(idempotencyKey);
-    if (!clave.valido) {
-      return NextResponse.json({ ok: false, error: clave.error }, { status: 400 });
-    }
-
-    // El local sale del contexto autenticado. `contextoArqueo` ya resuelve
-    // sesión, permiso `pos.usar` y alcance, y ancla el turno al localId: un turno
-    // de otro local simplemente no existe para esta consulta.
+    // AUTENTICAR PRIMERO, después validar el payload.
+    //
+    // Antes la clave de idempotencia se validaba arriba y un pedido sin sesión y
+    // sin clave recibía 400 en lugar de 401: le contaba el contrato del endpoint
+    // a quien todavía no había demostrado quién era. No podía crear nada —el
+    // 401 llegaba igual apenas la clave era válida—, pero el orden estaba mal.
+    //
+    // `contextoArqueo` resuelve sesión, permiso `pos.usar` y alcance, y ancla el
+    // turno al localId: un turno de otro local no existe para esta consulta.
     const ctx = await contextoArqueo(req, { turnoId, exigirAbierto: true });
     if (ctx.error) {
       return NextResponse.json(
@@ -96,6 +94,14 @@ export async function POST(req) {
       );
     }
     const { session, localId, turno } = ctx;
+
+    // La clave es OBLIGATORIA, a diferencia del arqueo puro. En Postgres los NULL
+    // no colisionan en un UNIQUE: una fila sin clave quedaría desprotegida, y
+    // duplicar un retiro duplica el descuento.
+    const clave = validarIdempotencyKey(idempotencyKey);
+    if (!clave.valido) {
+      return NextResponse.json({ ok: false, error: clave.error }, { status: 400 });
+    }
 
     if (!turno) {
       return NextResponse.json(

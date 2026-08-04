@@ -57,7 +57,9 @@ export default function AvisoArqueo({ estado, ultimoArqueoEn, onArquear, onPoste
     }
   };
 
-  const desde = ultimoArqueoEn ? "el último arqueo" : "la apertura de caja";
+  // El registro anterior puede ser un retiro nuevo o un conteo histórico: sin
+  // saberlo, se dice "el último control" y no se afirma que hubo un retiro.
+  const desde = ultimoArqueoEn ? "el último control" : "la apertura de caja";
 
   return (
     <div
@@ -70,8 +72,13 @@ export default function AvisoArqueo({ estado, ultimoArqueoEn, onArquear, onPoste
 
       <div className="min-w-0 flex-1">
         <div className="text-sm font-bold sunmi-text-strong leading-tight">
-          Arqueo de caja pendiente
+          Retiro de recaudación pendiente
         </div>
+        {/* Antes acá se explicaba que el arqueo "solo cuenta y no mueve dinero".
+            Eso dejó de ser cierto: la operación principal ES sacar la plata. */}
+        <p className="text-[12px] sunmi-text-muted leading-snug mt-0.5">
+          Es momento de retirar la recaudación y conservar el fondo de caja.
+        </p>
         <p className="text-[12px] sunmi-text-muted leading-snug mt-0.5 flex flex-wrap items-center gap-x-2">
           <span className="inline-flex items-center gap-1">
             <Clock size={12} />
@@ -96,11 +103,11 @@ export default function AvisoArqueo({ estado, ultimoArqueoEn, onArquear, onPoste
             disabled={postergando}
             className="text-sm whitespace-nowrap"
           >
-            {postergando ? "…" : "Postergar"}
+            {postergando ? "…" : "Postergar retiro"}
           </SunmiButton>
         )}
         <SunmiButton color="amber" onClick={onArquear} className="text-sm font-bold whitespace-nowrap">
-          Realizar arqueo
+          Retirar ahora
         </SunmiButton>
       </div>
     </div>

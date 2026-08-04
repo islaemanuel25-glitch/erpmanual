@@ -1622,7 +1622,7 @@ export default function PosVentasPage() {
             localId={localActual}
             onArquear={() => setMostrarRetiro(true)}
             onPostergado={() => {
-              showSuccess("Arqueo postergado");
+              showSuccess("Retiro postergado");
               arqueo.refrescar();
             }}
           />

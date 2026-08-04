@@ -23,9 +23,9 @@ const PERMISO = "config_local.alertas";
 const NUMERICOS = [
   {
     key: "intervaloArqueoMinutos",
-    label: "Intervalo entre arqueos",
+    label: "Intervalo entre retiros",
     ayuda:
-      "Minutos entre un arqueo y el siguiente. Se cuenta desde el último arqueo del turno, o desde la apertura si todavía no hubo ninguno — nunca desde una hora fija del día.",
+      "Minutos entre un retiro y el siguiente. Se cuenta desde el último control del turno, o desde la apertura si todavía no hubo ninguno — nunca desde una hora fija del día.",
     min: 5,
     max: 1440,
   },
@@ -119,7 +119,7 @@ export default function ConfigArqueoCajaPage() {
 
   return (
     <div className="w-full min-h-full p-2 lg:p-3 space-y-3">
-      <SunmiHeader titulo="Arqueos de caja" subtitulo="Alertas de conteo parcial de este local" />
+      <SunmiHeader titulo="Retiros de recaudación" subtitulo="Alertas de retiro de recaudación de este local" />
 
       {mensaje && (
         <div
@@ -139,9 +139,9 @@ export default function ConfigArqueoCajaPage() {
               <Timer size={18} />
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-bold sunmi-text-strong">Arqueos de caja</div>
+              <div className="text-sm font-bold sunmi-text-strong">Retiros de recaudación</div>
               <p className="text-[12px] sunmi-text-muted leading-snug mt-0.5">
-                Cuando esta opción está activa, el POS permite realizar arqueos manuales
+                Cuando esta opción está activa, el POS permite retirar la recaudación
                 y muestra alertas según el intervalo configurado. Cuando está desactivada,
                 no se muestran el botón ni las alertas.
               </p>
@@ -155,7 +155,7 @@ export default function ConfigArqueoCajaPage() {
             onCambiar={(v) =>
               guardar(
                 { arqueoCajaActivo: v },
-                v ? "Arqueos activados en este local" : "Arqueos desactivados en este local"
+                v ? "Retiros con alerta activados en este local" : "Retiros con alerta desactivados en este local"
               )
             }
           />
@@ -204,7 +204,7 @@ export default function ConfigArqueoCajaPage() {
             </div>
             <div className="min-w-0">
               <div className="text-sm font-bold sunmi-text-strong">
-                Exigir autorización para postergar
+                Exigir autorización para postergar el retiro
               </div>
               <p className="text-[12px] sunmi-text-muted leading-snug mt-0.5">
                 Pasada la tolerancia, postergar deja de estar en manos del cajero y

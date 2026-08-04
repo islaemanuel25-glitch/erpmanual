@@ -14,7 +14,7 @@ const SECCIONES = [
   {
     key: "turnos",
     label: "Cajas",
-    descripcion: "Arqueos, turnos y efectivo",
+    descripcion: "Retiros, turnos y efectivo",
     href: "/modulos/auditoria-pos-ventas/turnos",
     icon: Landmark,
     iconColor: "#60a5fa",
