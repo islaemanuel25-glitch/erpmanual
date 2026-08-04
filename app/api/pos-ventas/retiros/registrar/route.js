@@ -120,7 +120,35 @@ export async function POST(req) {
     }
 
     const resultado = await prisma.$transaction(async (tx) => {
+      // ── BLOQUEO DE LA CAJA ───────────────────────────────────────────────
+      //
+      // Dos retiros simultáneos sobre el MISMO turno —dos pestañas, dos
+      // dispositivos— leían los dos el mismo estado y calculaban el mismo
+      // efectivo esperado. Quedaban dos filas afirmando que en el cajón había lo
+      // mismo, las dos con diferencia $0, cuando el segundo contó plata que el
+      // primero ya se había llevado. Reproducido: con $30.000 en caja, dos POST
+      // en paralelo registraron ambos esperado $30.000 y diferencia $0.
+      //
+      // El lock es por FILA de Turno y vive hasta el commit: serializa los
+      // retiros de ESTA caja y no toca las demás. El segundo espera al primero y
+      // recalcula con el estado nuevo, que es exactamente lo que haría una
+      // persona: contar de nuevo después de que otro sacó plata.
+      //
+      // Va ANTES de leer el turno y antes de calcular el esperado: bloquear
+      // después de leer no sirve de nada, porque la lectura vieja ya se usó.
+      //
+      // `NOWAIT` no se usa a propósito: un retiro dura milisegundos y hacer
+      // esperar al segundo es mejor que rebotarlo. El timeout de la transacción
+      // acota la espera, así que no hay bloqueo indefinido.
+      await tx.$queryRaw`SELECT id FROM "Turno" WHERE id = ${turno.id} FOR UPDATE`;
+
       // ── Idempotencia: un reintento devuelve lo ya hecho ──────────────────
+      // Va DESPUÉS del lock a propósito. Antes, dos envíos simultáneos con la
+      // misma clave leían los dos "no existe", los dos intentaban insertar y el
+      // perdedor se recuperaba por el P2002 de la @@unique. Ese camino sigue
+      // existiendo como red —la unicidad es la garantía dura— pero con el lock
+      // el segundo ya ve la fila cometida por el primero y devuelve el mismo
+      // retiro sin pasar por el error.
       const previo = await tx.arqueoCaja.findFirst({
         where: { turnoId: turno.id, idempotencyKey: clave.clave },
       });
@@ -259,6 +287,14 @@ export async function POST(req) {
           efectivoRetirado: reparto.efectivoRetirado,
         }),
       };
+    }, {
+      // Topes EXPLÍCITOS ahora que la transacción toma un lock de fila. Con el
+      // default implícito, cuánto puede esperar el segundo retiro dependía de la
+      // versión de Prisma; acá es una decisión. Un retiro dura milisegundos:
+      // 10 s de ejecución es holgado y evita que una transacción trabada
+      // retenga el lock de la caja indefinidamente.
+      maxWait: 5000,
+      timeout: 10000,
     });
 
     const serializado = serializarRetiro(resultado.fila, {
