@@ -1,13 +1,13 @@
 "use client";
 
-// Grilla de denominaciones: cantidad por billete, subtotal por fila y total.
+// Grilla de conteo: cantidad por billete, subtotal por fila y total.
 //
-// La usan LOS DOS pasos —contar el cajón y elegir qué sale— porque es la misma
-// operación: traducir "cuántos de cada uno" a un importe. Duplicarla llevaría a
-// que una de las dos se desactualice.
+// La geometría de las columnas NO se define acá: viene de geometriaGrilla, que
+// la comparte con la grilla del cambio. Escribirla dos veces era lo que hacía
+// que las etiquetas y los subtotales de los dos bloques no arrancaran en la
+// misma x.
 //
-// Las denominaciones NO se declaran acá: vienen de lib/caja/conteoBilletes.
-// Dispersarlas es la forma segura de que dejen de coincidir.
+// Las denominaciones tampoco se declaran acá: vienen de lib/caja/conteoBilletes.
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import {
@@ -18,6 +18,15 @@ import {
   totalDesglose,
   ajustarCantidad,
 } from "@/lib/caja/conteoBilletes";
+import {
+  GRID_CONTEO,
+  CELDA_SUBTOTAL,
+  CELDA_ETIQUETA,
+  CELDA_CONTROL,
+  BOTON_PASO,
+  HUECO_BOTON,
+  importeGrilla,
+} from "@/components/caja/geometriaGrilla";
 
 const money = (n) =>
   `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -25,8 +34,7 @@ const money = (n) =>
 export default function TablaDenominaciones({
   desglose = {},
   onCambiar,
-  // Tope por denominación: en el paso de retiro son los billetes contados. Sin
-  // esto se podrían "sacar" billetes que no están en el cajón.
+  // Tope por denominación: en el paso de retiro son los billetes contados.
   topes = null,
   idPrefijo = "den",
   titulo,
@@ -41,24 +49,27 @@ export default function TablaDenominaciones({
     <div className="space-y-2">
       {titulo && <div className="text-xs sunmi-text-muted">{titulo}</div>}
 
+      <div className={`${GRID_CONTEO} text-[10px] sunmi-text-muted uppercase tracking-wide`}>
+        <span>Billete</span>
+        <span className="text-center">Cantidad</span>
+        <span className="text-right">Subtotal</span>
+      </div>
+
       <div className="space-y-1.5">
         {DENOMINACIONES.map(({ valor, etiqueta }) => {
           const cantidad = normalizarCantidad(desglose[valor]);
           const tope = topes ? normalizarCantidad(topes[valor]) : null;
           const excede = tope !== null && cantidad > tope;
           return (
-            <div
-              key={valor}
-              className="grid grid-cols-[4.5rem_1fr_auto] sm:grid-cols-[6rem_1fr_7rem] items-center gap-2"
-            >
+            <div key={valor} className={GRID_CONTEO}>
               <label
                 htmlFor={`${idPrefijo}-${valor}`}
-                className={`text-sm font-semibold tabular-nums ${excede ? "sunmi-text-danger" : "sunmi-text-strong"}`}
+                className={`${CELDA_ETIQUETA} ${excede ? "sunmi-text-danger" : "sunmi-text-strong"}`}
               >
                 {etiqueta}
               </label>
 
-              <div className="flex items-center gap-1 min-w-0">
+              <div className={CELDA_CONTROL}>
                 <BotonPaso
                   signo="−"
                   etiqueta={`Quitar un billete de ${etiqueta}`}
@@ -74,7 +85,7 @@ export default function TablaDenominaciones({
                   value={desglose[valor] ?? ""}
                   onChange={(e) => setCantidad(valor, e.target.value)}
                   placeholder="0"
-                  className="text-center tabular-nums min-w-0"
+                  className="text-center tabular-nums min-w-0 !px-1"
                 />
                 <BotonPaso
                   signo="+"
@@ -84,38 +95,45 @@ export default function TablaDenominaciones({
               </div>
 
               <div
-                className={`text-sm text-right tabular-nums font-mono ${
+                className={`${CELDA_SUBTOTAL} ${
                   excede ? "sunmi-text-danger" : cantidad ? "sunmi-text-strong" : "sunmi-text-muted"
                 }`}
               >
-                {money(subtotalDenominacion(valor, cantidad))}
-                {excede && (
-                  <span className="block text-[10px] leading-tight">contaste {tope}</span>
-                )}
+                {importeGrilla(subtotalDenominacion(valor, cantidad))}
+                {excede && <span className="block text-[10px] leading-tight">contaste {tope}</span>}
               </div>
             </div>
           );
         })}
 
-        {/* Monedas y billetes chicos: se carga el IMPORTE, no una cantidad. Con
-            los valores actuales, contar monedas de $10 una por una no aporta. */}
-        <div className="grid grid-cols-[4.5rem_1fr_auto] sm:grid-cols-[6rem_1fr_7rem] items-center gap-2 pt-1">
-          <label htmlFor={`${idPrefijo}-monedas`} className="text-sm font-semibold sunmi-text-strong leading-tight">
+        {/* Monedas y billetes chicos: se carga el IMPORTE, no una cantidad. Usa
+            la MISMA grilla y un hueco del tamaño de un botón, para que el input
+            arranque en la misma x que los de arriba. Antes ocupaba toda la celda
+            del medio y quedaba corrido 35 px a la izquierda. */}
+        <div className={GRID_CONTEO}>
+          <label
+            htmlFor={`${idPrefijo}-monedas`}
+            className={`${CELDA_ETIQUETA} sunmi-text-strong`}
+          >
             Monedas / otros
           </label>
-          <SunmiInput
-            id={`${idPrefijo}-monedas`}
-            type="number"
-            min="0"
-            step="0.01"
-            inputMode="decimal"
-            value={desglose[CLAVE_MONEDAS] ?? ""}
-            onChange={(e) => setCantidad(CLAVE_MONEDAS, e.target.value)}
-            placeholder="0.00"
-            className="text-center tabular-nums min-w-0"
-          />
-          <div className="text-sm text-right tabular-nums font-mono sunmi-text-muted">
-            {money(Number(desglose[CLAVE_MONEDAS]) || 0)}
+          <div className={CELDA_CONTROL}>
+            <button type="button" tabIndex={-1} aria-hidden="true" className={HUECO_BOTON} />
+            <SunmiInput
+              id={`${idPrefijo}-monedas`}
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={desglose[CLAVE_MONEDAS] ?? ""}
+              onChange={(e) => setCantidad(CLAVE_MONEDAS, e.target.value)}
+              placeholder="0.00"
+              className="text-center tabular-nums min-w-0 !px-1"
+            />
+            <button type="button" tabIndex={-1} aria-hidden="true" className={HUECO_BOTON} />
+          </div>
+          <div className={`${CELDA_SUBTOTAL} sunmi-text-muted`}>
+            {importeGrilla(Number(desglose[CLAVE_MONEDAS]) || 0)}
           </div>
         </div>
       </div>
@@ -128,7 +146,7 @@ export default function TablaDenominaciones({
   );
 }
 
-/** Botón táctil de ±1. Área grande: se usa con el dedo en un mostrador. */
+/** Botón táctil de ±1. Mismo tamaño que en la grilla del cambio. */
 function BotonPaso({ signo, etiqueta, onClick, deshabilitado = false }) {
   return (
     <button
@@ -136,7 +154,7 @@ function BotonPaso({ signo, etiqueta, onClick, deshabilitado = false }) {
       onClick={onClick}
       disabled={deshabilitado}
       aria-label={etiqueta}
-      className="shrink-0 w-9 h-9 rounded-md sunmi-btn-base sunmi-btn-slate text-base font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+      className={BOTON_PASO}
     >
       {signo}
     </button>

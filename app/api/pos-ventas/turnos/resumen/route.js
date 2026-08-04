@@ -4,7 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
-import { calcularEfectivoEsperado } from "@/lib/caja/efectivoEsperado";
+import { calcularEfectivoEsperado, desglosarMovimientos, desdeCentavos } from "@/lib/caja/efectivoEsperado";
 
 export async function GET(req) {
   try {
@@ -92,6 +92,25 @@ export async function GET(req) {
       movimientos: cajaMovimientos,
     });
 
+    // ── Movimientos MANUALES: los de "Caja +/−", sin los retiros de recaudación ──
+    //
+    // `calculo.retiros` incluye TODO lo que salió del cajón, y ahí adentro están
+    // los retiros de recaudación, que ya se muestran en su propia pantalla.
+    // Mezclarlos haría que un retiro de $103.400 apareciera como si alguien
+    // hubiera sacado plata a mano. Se separan por el mismo vínculo que usa el
+    // detalle del turno: un CajaMovimiento referenciado por un ArqueoCaja nació
+    // de un retiro, no de Caja +/−.
+    //
+    // NO hay fórmula nueva: se reusa `desglosarMovimientos` sobre la lista ya
+    // filtrada.
+    const vinculados = await prisma.arqueoCaja.findMany({
+      where: { turnoId, cajaMovimientoRetiroId: { not: null } },
+      select: { cajaMovimientoRetiroId: true },
+    });
+    const idsVinculados = new Set(vinculados.map((a) => a.cajaMovimientoRetiroId));
+    const manuales = cajaMovimientos.filter((m) => !idsVinculados.has(m.id));
+    const desgloseManual = desglosarMovimientos(manuales);
+
     // El desglose POR MEDIO digital es propio de esta pantalla —el cierre no lo
     // necesita— así que se arma acá, sobre los mismos tenders.
     const desglose = { mercadopago: 0, debito: 0, credito: 0, fiado: 0 };
@@ -111,6 +130,13 @@ export async function GET(req) {
       totalComision: calculo.comisionDigital,
       netoDigital: calculo.netoDigital,
       totalIngresosCaja: calculo.ingresos,
+      // Solo lo de Caja +/-: los retiros de recaudacion van aparte.
+      movimientosManuales: {
+        ingresos: desdeCentavos(desgloseManual.ingresosCentavos),
+        retiros: desdeCentavos(desgloseManual.retirosCentavos),
+        neto: desdeCentavos(desgloseManual.ingresosCentavos - desgloseManual.retirosCentavos),
+        cantidad: manuales.length,
+      },
       totalRetirosCaja: calculo.retiros,
       // El esperado ya calculado por el backend: el modal de cierre lo muestra
       // en vez de recalcularlo por su cuenta.

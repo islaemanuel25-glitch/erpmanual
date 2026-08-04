@@ -4,14 +4,14 @@
 //
 // Cada fila muestra tres cosas juntas: cuántos se contaron, cuántos quedan y
 // cuánto suma lo que queda. La columna "contadas" no es decorativa — es lo que
-// hace evidente el tope. Sin ella, "no podés dejar 5" aparece como una regla
-// caída del cielo.
+// hace evidente el tope.
+//
+// La geometría viene de geometriaGrilla, compartida con la grilla de conteo: la
+// primera y la última columna son las mismas en los dos bloques, así las
+// etiquetas y los subtotales quedan alineados entre uno y otro.
 //
 // No existe una fila de "billetes que se retiran": lo que sale es lo contado
 // menos lo que queda, y eso lo calcula la página.
-//
-// Las denominaciones vienen de lib/caja/conteoBilletes. Dispersarlas es la forma
-// segura de que dejen de coincidir con las del conteo.
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import {
@@ -22,6 +22,15 @@ import {
   ajustarCantidad,
   totalDesglose,
 } from "@/lib/caja/conteoBilletes";
+import {
+  GRID_CAMBIO,
+  CELDA_SUBTOTAL,
+  CELDA_ETIQUETA,
+  CELDA_CONTROL,
+  BOTON_PASO,
+  HUECO_BOTON,
+  importeGrilla,
+} from "@/components/caja/geometriaGrilla";
 
 const money = (n) =>
   `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -43,7 +52,7 @@ export default function GrillaCambio({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-[3.6rem_2.6rem_1fr_auto] sm:grid-cols-[5rem_3.5rem_1fr_6.5rem] items-center gap-1.5 text-[10px] sunmi-text-muted uppercase tracking-wide">
+      <div className={`${GRID_CAMBIO} text-[10px] sunmi-text-muted uppercase tracking-wide`}>
         <span>Billete</span>
         <span className="text-center">Contadas</span>
         <span className="text-center">Quedan</span>
@@ -52,15 +61,10 @@ export default function GrillaCambio({
 
       <div className="space-y-1.5">
         {filas.map(({ valor, etiqueta, contadas, quedan, subtotalQueda, excede }) => (
-          <div
-            key={valor}
-            className="grid grid-cols-[3.6rem_2.6rem_1fr_auto] sm:grid-cols-[5rem_3.5rem_1fr_6.5rem] items-center gap-1.5"
-          >
+          <div key={valor} className={GRID_CAMBIO}>
             <label
               htmlFor={`cambio-${valor}`}
-              className={`text-[13px] font-semibold tabular-nums ${
-                excede ? "sunmi-text-danger" : "sunmi-text-strong"
-              }`}
+              className={`${CELDA_ETIQUETA} ${excede ? "sunmi-text-danger" : "sunmi-text-strong"}`}
             >
               {etiqueta}
             </label>
@@ -69,7 +73,7 @@ export default function GrillaCambio({
               {contadas === null ? "—" : contadas}
             </span>
 
-            <div className="flex items-center gap-1 min-w-0">
+            <div className={CELDA_CONTROL}>
               <BotonPaso
                 signo="−"
                 etiqueta={`Dejar un billete menos de ${etiqueta}`}
@@ -97,45 +101,54 @@ export default function GrillaCambio({
             </div>
 
             <div
-              className={`text-[13px] text-right tabular-nums font-mono ${
+              className={`${CELDA_SUBTOTAL} ${
                 excede ? "sunmi-text-danger" : quedan ? "sunmi-text-strong" : "sunmi-text-muted"
               }`}
             >
-              {money(subtotalQueda)}
+              {importeGrilla(subtotalQueda)}
             </div>
           </div>
         ))}
 
-        {/* Monedas y billetes chicos: se deja un IMPORTE, no una cantidad. */}
-        <div className="grid grid-cols-[3.6rem_2.6rem_1fr_auto] sm:grid-cols-[5rem_3.5rem_1fr_6.5rem] items-center gap-1.5 pt-1">
+        {/* Monedas: se deja un IMPORTE, no una cantidad. Misma grilla y huecos
+            del tamaño de un botón, para que el input arranque en la misma x. */}
+        <div className={GRID_CAMBIO}>
           <label
             htmlFor="cambio-monedas"
-            className={`text-[12px] font-semibold leading-tight ${
+            className={`${CELDA_ETIQUETA} ${
               monedasExceden ? "sunmi-text-danger" : "sunmi-text-strong"
             }`}
           >
             Monedas / otros
           </label>
-          <span className="text-[12px] text-center tabular-nums sunmi-text-muted">
-            {hayConteoDetallado ? money(monedasContadas) : "—"}
+          {/* El tope de monedas se muestra en pesos enteros: con centavos no
+              entra en la columna y partía en dos renglones. Se redondea HACIA
+              ABAJO para no anunciar un tope mayor que el real — la validación
+              sigue comparando al centavo. */}
+          <span className="text-[11px] text-center tabular-nums sunmi-text-muted leading-tight min-w-0">
+            {hayConteoDetallado ? Math.floor(monedasContadas).toLocaleString("es-AR") : "—"}
           </span>
-          <SunmiInput
-            id="cambio-monedas"
-            type="number"
-            min="0"
-            step="0.01"
-            inputMode="decimal"
-            value={desgloseCambio[CLAVE_MONEDAS] ?? ""}
-            onChange={(e) => set(CLAVE_MONEDAS, e.target.value)}
-            placeholder="0.00"
-            className="text-center tabular-nums min-w-0 !px-1"
-          />
+          <div className={CELDA_CONTROL}>
+            <button type="button" tabIndex={-1} aria-hidden="true" className={HUECO_BOTON} />
+            <SunmiInput
+              id="cambio-monedas"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={desgloseCambio[CLAVE_MONEDAS] ?? ""}
+              onChange={(e) => set(CLAVE_MONEDAS, e.target.value)}
+              placeholder="0.00"
+              className="text-center tabular-nums min-w-0 !px-1"
+            />
+            <button type="button" tabIndex={-1} aria-hidden="true" className={HUECO_BOTON} />
+          </div>
           <div
-            className={`text-[13px] text-right tabular-nums font-mono ${
+            className={`${CELDA_SUBTOTAL} ${
               monedasExceden ? "sunmi-text-danger" : monedasQuedan ? "sunmi-text-strong" : "sunmi-text-muted"
             }`}
           >
-            {money(monedasQuedan)}
+            {importeGrilla(monedasQuedan)}
           </div>
         </div>
       </div>
@@ -150,7 +163,7 @@ export default function GrillaCambio({
   );
 }
 
-/** Botón táctil de ±1. Área grande: se usa con el dedo en un mostrador. */
+/** Botón táctil de ±1. Mismo tamaño que en la grilla de conteo. */
 function BotonPaso({ signo, etiqueta, onClick, deshabilitado = false }) {
   return (
     <button
@@ -158,7 +171,7 @@ function BotonPaso({ signo, etiqueta, onClick, deshabilitado = false }) {
       onClick={onClick}
       disabled={deshabilitado}
       aria-label={etiqueta}
-      className="shrink-0 w-8 h-8 rounded-md sunmi-btn-base sunmi-btn-slate text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+      className={BOTON_PASO}
     >
       {signo}
     </button>

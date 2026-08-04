@@ -40,6 +40,7 @@ import {
   PanelConteo,
   PanelCambio,
   PanelResumen,
+  PanelMovimientos,
   ResumenCabecera,
 } from "@/components/caja/PanelesRetiro";
 
@@ -91,6 +92,7 @@ export default function NuevoRetiroPage() {
   const [huellaInicial, setHuellaInicial] = useState(null);
   const [esperado, setEsperado] = useState(null);
   const [fondoConfigurado, setFondoConfigurado] = useState(null);
+  const [movimientosManuales, setMovimientosManuales] = useState(null);
   const [errorFatal, setErrorFatal] = useState("");
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
@@ -135,6 +137,7 @@ export default function NuevoRetiroPage() {
       turno: t,
       esperado: res?.ok ? Number(res.efectivoEsperado) : null,
       fondo: cfg?.ok ? cfg.fondoObjetivoCaja : null,
+      movimientosManuales: res?.ok ? res.movimientosManuales ?? null : null,
       // Huella completa: el esperado solo no distingue una venta de un retiro.
       huella: huellaDelTurno({
         turnoId: t.id,
@@ -160,6 +163,7 @@ export default function NuevoRetiroPage() {
         setTurno(d.turno);
         setEsperado(d.esperado);
         setFondoConfigurado(d.fondo);
+        setMovimientosManuales(d.movimientosManuales);
         setHuellaInicial(d.huella);
         claveRef.current = nuevaClave(d.turno.id);
 
@@ -306,6 +310,7 @@ export default function NuevoRetiroPage() {
         // Solo se actualiza el ESPERADO. Lo contado lo contó una persona y no se
         // toca por detrás.
         setEsperado(fresco.esperado);
+        setMovimientosManuales(fresco.movimientosManuales);
         setHuellaInicial(fresco.huella);
         setCambios(c);
         return;
@@ -446,6 +451,14 @@ export default function NuevoRetiroPage() {
         totalRetiro={evaluacion.totalRetiro}
       />
 
+      {/* Movimientos de caja. En MÓVIL va acá, justo después del resumen y antes
+          de contar: es el contexto que explica por qué el esperado no es lo que
+          se vendió. En escritorio se muestra en la columna del resumen, para no
+          empujar hacia abajo el conteo. */}
+      <div className="xl:hidden">
+        <PanelMovimientos movimientos={movimientosManuales} />
+      </div>
+
       {/* Una sola pantalla: tres columnas en escritorio, una sobre otra en móvil.
           Sin pasos, sin Anterior ni Siguiente. */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
@@ -485,6 +498,14 @@ export default function NuevoRetiroPage() {
           onGuardar={guardarSolo}
           onVolver={volverAlPos}
           onConfirmar={confirmar}
+        />
+
+        {/* En escritorio, debajo de las cifras de la columna de resumen. En
+            móvil ya se mostró arriba, así que acá se oculta: nunca aparece dos
+            veces. Ocupa la tercera columna. */}
+        <PanelMovimientos
+          movimientos={movimientosManuales}
+          className="hidden xl:block xl:col-start-3"
         />
       </div>
 

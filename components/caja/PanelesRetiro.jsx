@@ -79,7 +79,7 @@ export function PanelConteo({ modo, onModo, monto, onMonto, desglose, onDesglose
   return (
     <Bloque
       titulo="Contar todo el efectivo del cajón"
-      ayuda="Incluí el fondo. No cuentes Mercado Pago, débito ni crédito."
+      ayuda="Incluí el cambio que hay en el cajón. No cuentes Mercado Pago, débito ni crédito."
     >
       <SelectorModo
         valor={modo}
@@ -124,6 +124,45 @@ export function PanelConteo({ modo, onModo, monto, onMonto, desglose, onDesglose
       {horaConteo && (
         <p className="text-[11px] sunmi-text-muted">Conteo iniciado a las {horaConteo}</p>
       )}
+    </Bloque>
+  );
+}
+
+// ── Movimientos manuales de caja ────────────────────────────────────────────
+
+/**
+ * Lo que entró o salió por "Caja +/−" en este turno.
+ *
+ * Informativo y nada más: sin botones para crear movimientos, porque esa función
+ * ya vive en el POS y duplicarla acá invitaría a registrar un gasto en medio de
+ * un conteo. Sirve para responder "¿por qué el esperado no es lo que vendí?".
+ *
+ * NO incluye los retiros de recaudación: esos tienen su propia pantalla y su
+ * propio historial. Mezclarlos haría leer un retiro de $103.400 como si alguien
+ * hubiera sacado plata a mano.
+ */
+export function PanelMovimientos({ movimientos = null, className = "" }) {
+  const ingresos = Number(movimientos?.ingresos) || 0;
+  const retiros = Number(movimientos?.retiros) || 0;
+  const neto = Number(movimientos?.neto) || 0;
+  const hay = Math.round((ingresos + retiros) * 100) !== 0;
+
+  return (
+    <Bloque titulo="Movimientos de caja" className={className}>
+      {hay ? (
+        <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
+          <Fila label="Ingresos manuales" valor={ingresos} clase="sunmi-text-strong" />
+          <Fila label="Retiros manuales" valor={-retiros} clase={retiros ? "sunmi-text-warning" : "sunmi-text-strong"} />
+          <Fila label="Neto movimientos" valor={neto} clase={tonoDiferencia(neto)} fuerte />
+        </div>
+      ) : (
+        <p className="text-[12px] sunmi-text-muted leading-snug">
+          No hay ingresos ni retiros manuales en este turno.
+        </p>
+      )}
+      <p className="text-[11px] sunmi-text-muted leading-snug">
+        No incluye los retiros de recaudación.
+      </p>
     </Bloque>
   );
 }
