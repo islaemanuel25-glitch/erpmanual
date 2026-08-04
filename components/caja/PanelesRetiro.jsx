@@ -253,7 +253,7 @@ export function PanelResumen({
               Guardar borrador
             </SunmiButton>
             <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="py-2 !text-xs">
-              Cerrar y volver al POS
+              Cerrar esta pestaña
             </SunmiButton>
           </div>
         ) : (
@@ -285,7 +285,7 @@ export function ResumenCabecera({
         valor={hayContado ? diferencia : "—"}
         clase={hayContado ? tonoDiferencia(diferencia) : "sunmi-text-muted"}
       />
-      <Cifra label="Cambio que quedará" valor={totalCambio} />
+      <Cifra label="Cambio que queda" valor={totalCambio} />
       <Cifra label="Total a retirar" valor={totalRetiro} clase="sunmi-text-accent" destacado />
     </div>
   );

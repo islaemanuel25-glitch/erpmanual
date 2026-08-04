@@ -398,7 +398,7 @@ export default function NuevoRetiroPage() {
             />
           </div>
           <SunmiButton color="amber" onClick={volverAlPos} className="w-full py-3 font-bold">
-            {enPestanaNueva ? "Cerrar y volver al POS" : "Volver al POS"}
+            {enPestanaNueva ? "Cerrar esta pestaña" : "Volver al POS"}
           </SunmiButton>
         </SunmiCard>
       </Marco>
@@ -489,7 +489,7 @@ export default function NuevoRetiroPage() {
       </div>
 
       <p className="text-[10px] sunmi-text-muted text-center pb-1">
-        Fondo de referencia del local: {money(fondoObjetivo)}. No hace falta dejar ese importe exacto.
+        Cambio de referencia del local: {money(fondoObjetivo)}. No hace falta dejar ese importe exacto.
       </p>
     </Marco>
   );
