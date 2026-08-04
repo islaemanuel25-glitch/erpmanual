@@ -113,7 +113,7 @@ export default function CircuitoDelDinero({ turno, resumen = null }) {
         <SunmiCard>
           <h3 className="text-sm font-bold mb-2">Al abrir</h3>
 
-          <Dato etiqueta="Monto inicial" ayuda="Lo que el operador contó de verdad">
+          <Dato etiqueta="Cambio inicial" ayuda="Con lo que abrió: lo que el operador contó de verdad">
             <Monto valor={c.apertura.montoInicial} clase="sunmi-text-strong" />
           </Dato>
 
@@ -160,10 +160,10 @@ export default function CircuitoDelDinero({ turno, resumen = null }) {
             <>
               {/* Cadena vieja de fondo: se muestra tal cual para que un turno
                   histórico se siga leyendo como siempre. */}
-              <Dato etiqueta="Fondo que dejó el cierre anterior" ayuda="Cadena anterior, hoy desactivada">
+              <Dato etiqueta="Cambio que dejó el cierre anterior" ayuda="Cadena anterior, hoy desactivada">
                 <Monto valor={t.fondoSugeridoApertura} />
               </Dato>
-              <Dato etiqueta="Fondo realmente recibido">
+              <Dato etiqueta="Cambio realmente recibido">
                 <Monto valor={t.fondoRecibidoApertura} />
               </Dato>
               <Dato etiqueta="Diferencia de recepción">

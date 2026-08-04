@@ -14,6 +14,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import { estadoDelTurno, ESTADO_TURNO } from "@/lib/caja/cierreRelevo";
 
 const fmt = (n) =>
   n != null
@@ -37,24 +38,33 @@ const fmtFecha = (iso) => {
 
 const ESTADO_INICIAL = "abiertas";
 
-// Un turno tiene TRES estados posibles, no dos: además de abierta y cerrada
-// existe la anulada, que técnicamente está cerrada pero no fue una operación
-// comercial. Mezclarlas es lo que hacía ilegible el listado.
-function estadoDe(t) {
-  if (t.anuladoEn) return "anulada";
-  if (t.cierre) return "cerrada";
-  return "abierta";
-}
-
+/**
+ * Un turno tiene CUATRO estados, no tres.
+ *
+ * Además de abierta, cerrada y anulada existe la que ya tomó su corte de cierre:
+ * sigue con `cierre` en null y no vende. Con la función local de tres casos
+ * salía como "Abierta", que era mentir sobre una caja que no admite ni una venta
+ * más. Se usa la fuente única del proyecto —la misma que aplica el backend— en
+ * vez de comparar campos acá.
+ */
 function EtiquetaEstado({ turno }) {
-  const e = estadoDe(turno);
-  if (e === "abierta")
+  const e = turno.estado ?? estadoDelTurno(turno);
+  if (e === ESTADO_TURNO.ABIERTO)
     return (
       <span className="sunmi-text-success font-semibold whitespace-nowrap">
         ● Abierta
       </span>
     );
-  if (e === "anulada")
+  if (e === ESTADO_TURNO.CIERRE_EN_PREPARACION)
+    return (
+      <span
+        className="sunmi-text-warning font-semibold whitespace-nowrap"
+        title="Ya tomó el corte de cierre: no admite ventas y espera el conteo"
+      >
+        ◐ Cierre en preparación
+      </span>
+    );
+  if (e === ESTADO_TURNO.ANULADO)
     return (
       <span
         className="sunmi-text-warning font-semibold whitespace-nowrap"
@@ -185,7 +195,7 @@ export default function TurnosPage() {
     "Real",
     "Diferencia",
     "Se retiró",
-    "Fondo dejado",
+    "Cambio dejado",
     "Ventas",
     "Efectivo",
     "Digital",
@@ -194,7 +204,8 @@ export default function TurnosPage() {
 
   // Las anuladas se atenúan para que no compitan visualmente con las cajas
   // reales, pero siguen visibles y auditables.
-  const claseFila = (t) => (estadoDe(t) === "anulada" ? "opacity-60" : "");
+  const claseFila = (t) =>
+    (t.estado ?? estadoDelTurno(t)) === ESTADO_TURNO.ANULADO ? "opacity-60" : "";
 
   // Franja compacta: encabezado + filtros. En escritorio entra todo en una fila;
   // en móvil las fechas van a la par y el resto a ancho completo. Sin separador
@@ -479,7 +490,7 @@ export default function TurnosPage() {
                         v={t.efectivoRetiradoCierre != null ? fmt(t.efectivoRetiradoCierre) : "—"}
                       />
                       <Dato
-                        k="Fondo dejado"
+                        k="Cambio dejado"
                         v={t.fondoDejadoCierre != null ? fmt(t.fondoDejadoCierre) : "—"}
                         clase="sunmi-text-link"
                       />

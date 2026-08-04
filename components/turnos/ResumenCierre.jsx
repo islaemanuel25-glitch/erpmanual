@@ -131,7 +131,7 @@ export function ComoSeCalculo({ turno, resumen, ingresos = 0, retiros = 0 }) {
   return (
     <SunmiCard>
       <h2 className="text-base font-bold mb-2">Cómo se calculó</h2>
-      <FilaCuenta etiqueta="Fondo inicial" valor={inicial} />
+      <FilaCuenta etiqueta="Cambio inicial" valor={inicial} />
       <FilaCuenta signo="+" etiqueta="Ventas en efectivo" valor={ventasEfectivo} clase="sunmi-text-success" />
       <FilaCuenta signo="+" etiqueta="Ingresos" valor={ingresos} clase={ingresos > 0 ? "sunmi-text-success" : ""} />
       <FilaCuenta signo="−" etiqueta="Retiros" valor={retiros} clase={retiros > 0 ? "sunmi-text-danger" : ""} />

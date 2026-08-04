@@ -92,10 +92,10 @@ function imprimirZReport(turno, resumen, movimientos) {
 <div class="line"></div>
 <div class="center bold">ENTREGA DEL EFECTIVO</div>
 <div class="row"><span>Se retira:</span><span>$${fmt(turno.efectivoRetiradoCierre)}</span></div>
-<div class="row bold"><span>Queda de fondo:</span><span>$${fmt(turno.fondoDejadoCierre)}</span></div>
+<div class="row bold"><span>Queda de cambio:</span><span>${fmt(turno.fondoDejadoCierre)}</span></div>
 ${turno.destinoRetiroCierre ? `<div class="row"><span>Destino:</span><span>${turno.destinoRetiroCierre}</span></div>` : ""}
 ${turno.recibidoPorCierre ? `<div class="row"><span>Recibe:</span><span>${turno.recibidoPorCierre}</span></div>` : ""}
-<div class="center" style="font-size:10px;margin-top:4px;">El fondo que queda abre el proximo turno</div>`
+<div class="center" style="font-size:10px;margin-top:4px;">El cambio que queda abre el proximo turno</div>`
     : "";
 
   const obsHtml = turno.observaciones
@@ -139,7 +139,7 @@ ${turno.recibidoPorCierre ? `<div class="row"><span>Recibe:</span><span>${turno.
 ${movHtml}
 <div class="line"></div>
 <div class="center bold">ARQUEO EFECTIVO</div>
-<div class="row"><span>Monto inicial:</span><span>$${fmt(turno.montoInicial)}</span></div>
+<div class="row"><span>Cambio inicial:</span><span>${fmt(turno.montoInicial)}</span></div>
 <div class="row"><span>+ Ventas efectivo:</span><span>$${fmt(resumen.totalEfectivo)}</span></div>
 ${totalIngresos > 0 ? `<div class="row"><span>+ Ingresos:</span><span>$${fmt(totalIngresos)}</span></div>` : ""}
 ${totalRetiros > 0 ? `<div class="row"><span>- Retiros:</span><span>$${fmt(totalRetiros)}</span></div>` : ""}
@@ -375,20 +375,32 @@ export default function TurnoDetallePage() {
             <span className="sunmi-text-muted text-xs">Apertura</span>
             <p className="font-semibold text-sm">{fmtFecha(turno.apertura)}</p>
           </div>
+          {/* ESTADO, no "Cierre".
+              La etiqueta decía "Cierre" y el valor "Abierto", así que la caja
+              abierta se leía "Cierre: Abierto" — un rótulo que nombra algo que
+              todavía no existe. La fecha del cierre pasa a ser un renglón
+              secundario, y solo cuando hay cierre. */}
           <div>
-            <span className="sunmi-text-muted text-xs">Cierre</span>
+            <span className="sunmi-text-muted text-xs">Estado</span>
             <p className="font-semibold text-sm">
-              {estaCerrado ? (
-                fmtFecha(turno.cierre)
+              {estado === ESTADO_TURNO.ANULADO ? (
+                <span className="sunmi-text-warning">Anulado</span>
+              ) : estado === ESTADO_TURNO.CERRADO ? (
+                <span className="sunmi-text-muted">Cerrado</span>
               ) : enPreparacion ? (
                 <span className="sunmi-text-warning">Cierre en preparación</span>
               ) : (
                 <span className="sunmi-text-success">Abierto</span>
               )}
             </p>
+            {turno.cierre && (
+              <p className="text-[11px] sunmi-text-muted leading-tight">
+                {fmtFecha(turno.cierre)}
+              </p>
+            )}
           </div>
           <div>
-            <span className="sunmi-text-muted text-xs">Monto Inicial</span>
+            <span className="sunmi-text-muted text-xs">Cambio inicial</span>
             <p className="font-semibold text-sm">${fmt(turno.montoInicial)}</p>
           </div>
           <div>
