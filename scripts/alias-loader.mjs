@@ -22,6 +22,11 @@ const EXTENSIONES = ["", ".js", ".mjs", ".jsx", path.join("", "index.js")];
 // desde una ruta de app/ en una prueba, Node busca el directorio y falla.
 const SUBPATHS_NEXT = ["next/server", "next/headers", "next/navigation"];
 
+// `next/link` se sustituye por un stub que renderiza un <a>: el Link real
+// arrastra el router del cliente y no se puede montar fuera de Next. Ver
+// scripts/stub-next-link.mjs.
+const STUB_LINK = path.join(ROOT, "scripts", "stub-next-link.mjs");
+
 export async function resolve(specifier, context, next) {
   if (specifier.startsWith("@/")) {
     const base = path.join(ROOT, specifier.slice(2));
@@ -31,6 +36,9 @@ export async function resolve(specifier, context, next) {
         return next(pathToFileURL(candidato).href, context);
       }
     }
+  }
+  if (specifier === "next/link") {
+    return next(pathToFileURL(STUB_LINK).href, context);
   }
   if (SUBPATHS_NEXT.includes(specifier)) {
     const archivo = path.join(ROOT, "node_modules", `${specifier}.js`);
