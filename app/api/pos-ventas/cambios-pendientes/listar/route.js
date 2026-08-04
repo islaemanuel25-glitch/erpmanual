@@ -17,9 +17,6 @@ import {
   serializarCambio,
 } from "@/lib/caja/cierreRelevoServer";
 
-/** Estados que se listan por defecto: los que todavía esperan a alguien. */
-const ABIERTOS = [ESTADO_CAMBIO.DISPONIBLE, ESTADO_CAMBIO.RESERVADO, ESTADO_CAMBIO.VENCIDO];
-
 export async function GET(req) {
   try {
     const ctx = await contextoRelevo(req);
@@ -41,10 +38,27 @@ export async function GET(req) {
 
     const incluirCerrados = req.nextUrl.searchParams.get("incluirCerrados") === "1";
 
+    // ── QUÉ SE MUESTRA ─────────────────────────────────────────────────────
+    //
+    // Los DISPONIBLES, más la reserva PROPIA si la hay. Las reservas ajenas
+    // vigentes se ocultan: mostrarlas solo serviría para que alguien intente
+    // tomar un sobre que otro está contando y se lleve un 409, o peor, para que
+    // dos personas crean que están contando lo mismo.
+    //
+    // Los RECIBIDOS y CANCELADOS tampoco: ya no esperan a nadie.
+    const dondeAbiertos = {
+      OR: [
+        { estado: { in: [ESTADO_CAMBIO.DISPONIBLE, ESTADO_CAMBIO.VENCIDO] } },
+        // La propia, sea cual sea su vencimiento: si volvió dentro del plazo la
+        // recupera, y si venció ya la liberó el barrido de arriba.
+        { estado: ESTADO_CAMBIO.RESERVADO, reservadoPorUsuarioId: ctx.session.id },
+      ],
+    };
+
     const filas = await prisma.cambioPendiente.findMany({
       where: {
         localId,
-        ...(incluirCerrados ? {} : { estado: { in: ABIERTOS } }),
+        ...(incluirCerrados ? {} : dondeAbiertos),
       },
       orderBy: { dejadoEn: "desc" },
       take: 50,
@@ -59,18 +73,26 @@ export async function GET(req) {
       },
     });
 
+    const items = filas.map((f) => ({
+      ...serializarCambio(f),
+      // La pantalla necesita saber cuál es "el mío" para ofrecer continuar en vez
+      // de tomar. Se resuelve en el servidor y no comparando ids en el cliente.
+      esMio: f.estado === ESTADO_CAMBIO.RESERVADO && f.reservadoPorUsuarioId === ctx.session.id,
+      turnoOrigen: {
+        id: f.turnoOrigen.id,
+        apertura: f.turnoOrigen.apertura,
+        cierre: f.turnoOrigen.cierre,
+      },
+    }));
+
     return NextResponse.json({
       ok: true,
       reservasLiberadas: liberadas,
       cortesMarcadosVencidos: atrasados,
-      items: filas.map((f) => ({
-        ...serializarCambio(f),
-        turnoOrigen: {
-          id: f.turnoOrigen.id,
-          apertura: f.turnoOrigen.apertura,
-          cierre: f.turnoOrigen.cierre,
-        },
-      })),
+      // La reserva propia se devuelve aparte para que la pantalla la ponga
+      // primero sin tener que buscarla.
+      miReserva: items.find((i) => i.esMio) ?? null,
+      items,
     });
   } catch (error) {
     console.error("Error listando cambios pendientes:", error);

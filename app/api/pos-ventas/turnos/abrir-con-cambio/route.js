@@ -20,6 +20,7 @@ import {
   ESTADO_CAMBIO,
   WHERE_TURNO_OPERATIVO,
   evaluarRecepcionCambio,
+  avisoApertura,
 } from "@/lib/caja/cierreRelevo";
 import { contextoRelevo, serializarCambio, OPCIONES_TX } from "@/lib/caja/cierreRelevoServer";
 
@@ -91,16 +92,26 @@ export async function POST(req) {
         throw e;
       }
 
+      // La comparación es DOBLE: por total y por denominación.
+      //
+      // Diez billetes de $1.000 y cinco de $2.000 suman lo mismo, pero con los
+      // de $2.000 no se puede dar vuelto de $1.000. Comparar solo totales diría
+      // "todo bien" sobre un cajón que no sirve para trabajar.
       const recepcion = evaluarRecepcionCambio({
         totalEsperado: Number(sobre.total),
         totalRecibido: recibido.total,
         motivo: body?.motivoDiferencia,
+        desgloseEsperado: sobre.desglose ?? {},
+        desgloseRecibido: recibido.desglose,
+        confirmaComposicion: body?.confirmaComposicion === true,
       });
       if (!recepcion.valido) {
         const e = new Error(recepcion.error);
         e.codigo = "recepcion_invalida";
         e.clase = recepcion.clase;
         e.diferencia = recepcion.diferencia;
+        e.composicion = recepcion.composicion ?? null;
+        e.necesitaConfirmarComposicion = recepcion.necesitaConfirmarComposicion === true;
         e.totalEsperado = Number(sobre.total);
         e.totalRecibido = recibido.total;
         throw e;
@@ -156,7 +167,33 @@ export async function POST(req) {
         },
       });
 
-      return { turno, consumido, recepcion };
+      // Quién dejó este cambio, para el aviso que ve el operador al entrar al
+      // POS. Se resuelve acá, con el sobre ya consumido, y no en la pantalla:
+      // los ids de operario son Int planos y la pantalla no tiene cómo
+      // traducirlos sola.
+      const origen = sobre.operadorOrigenId
+        ? await tx.operadorLocal.findUnique({
+            where: { id: sobre.operadorOrigenId },
+            select: { nombre: true },
+          })
+        : null;
+      const turnoOrigen = await tx.turno.findUnique({
+        where: { id: sobre.turnoOrigenId },
+        select: { vendedor: { select: { nombre: true } } },
+      });
+      const quien = origen?.nombre || turnoOrigen?.vendedor?.nombre || "el turno anterior";
+
+      return {
+        turno,
+        consumido,
+        recepcion,
+        aviso: avisoApertura({
+          clase: recepcion.clase,
+          montoInicial: recepcion.montoInicial,
+          diferencia: recepcion.diferencia,
+          quien,
+        }),
+      };
     }, OPCIONES_TX);
 
     return NextResponse.json({
@@ -167,7 +204,14 @@ export async function POST(req) {
         clase: resultado.recepcion.clase,
         diferencia: resultado.recepcion.diferencia,
         montoInicial: resultado.recepcion.montoInicial,
+        // La composición queda REGISTRADA sin columna nueva: el desglose que
+        // declaró el cierre y el que contó quien abre están los dos guardados en
+        // la fila, así que la comparación se deriva y no puede quedar
+        // desincronizada de los datos. `compararComposicion` es la única fuente.
+        composicionCoincide: resultado.recepcion.composicion?.coincide ?? null,
+        diferenciasComposicion: resultado.recepcion.composicion?.filas ?? [],
       },
+      aviso: resultado.aviso,
     });
   } catch (error) {
     if (error?.codigo === "no_encontrado") {
@@ -181,9 +225,14 @@ export async function POST(req) {
         {
           ok: false,
           error: error.message,
-          necesitaMotivo: true,
+          // Se distinguen los dos motivos por los que se frena: falta explicar
+          // una diferencia de plata, o falta aceptar que los billetes son otros.
+          // La pantalla muestra cosas distintas en cada caso.
+          necesitaMotivo: !error.necesitaConfirmarComposicion,
+          necesitaConfirmarComposicion: error.necesitaConfirmarComposicion === true,
           clase: error.clase,
           diferencia: error.diferencia,
+          composicion: error.composicion,
           totalEsperado: error.totalEsperado,
           totalRecibido: error.totalRecibido,
         },

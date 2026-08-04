@@ -58,6 +58,57 @@ export async function POST(req) {
     // abajo lo encuentra libre.
     await liberarReservasVencidas(localId, ahora);
 
+    // ── UNA RESERVA VIVA POR PERSONA ───────────────────────────────────────
+    //
+    // Sin esto, alguien podría tomar tres sobres "para ver cuál le conviene" y
+    // dejar dos bloqueados hasta que venzan, con el resto del local esperando.
+    // Tampoco tendría sentido: se abre UN turno con UN cajón.
+    //
+    // Se busca después de liberar las vencidas, así una reserva abandonada del
+    // propio usuario no lo bloquea a sí mismo.
+    const propia = await prisma.cambioPendiente.findFirst({
+      where: {
+        localId,
+        estado: ESTADO_CAMBIO.RESERVADO,
+        reservadoPorUsuarioId: session.id,
+        turnoDestinoId: null,
+        id: { not: cambioId },
+      },
+      select: { id: true, total: true, reservaVenceEn: true },
+    });
+    if (propia) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Ya tenés otro cambio reservado. Terminá esa apertura o liberá la reserva antes de tomar este.",
+          reservaPropia: {
+            cambioPendienteId: propia.id,
+            total: Number(propia.total),
+            reservaVenceEn: propia.reservaVenceEn,
+          },
+        },
+        { status: 409 }
+      );
+    }
+
+    // Volver a tomar el sobre que ya tengo reservado es idempotente: renueva el
+    // plazo y devuelve lo mismo, en vez de rebotar a quien vuelve a la pantalla.
+    const yaMio = await prisma.cambioPendiente.findFirst({
+      where: {
+        id: cambioId, localId, estado: ESTADO_CAMBIO.RESERVADO,
+        reservadoPorUsuarioId: session.id, turnoDestinoId: null,
+      },
+      select: { id: true },
+    });
+    if (yaMio) {
+      const renovado = await prisma.cambioPendiente.update({
+        where: { id: cambioId },
+        data: { reservaVenceEn: vencimientoReserva(ahora) },
+      });
+      return NextResponse.json({ ok: true, repetido: true, cambio: serializarCambio(renovado) });
+    }
+
     const { count } = await prisma.cambioPendiente.updateMany({
       // `estado: DISPONIBLE` y `turnoDestinoId: null` en el WHERE son el candado.
       // El segundo es redundante hoy —RECIBIDO siempre tiene destino— y está a
