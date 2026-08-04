@@ -25,7 +25,6 @@ import ModalTicketOffline from "@/components/pos-ventas/ModalTicketOffline";
 import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
 import ModalCanjePuntos from "@/components/pos-ventas/ModalCanjePuntos";
 import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullscreen";
-import ModalAperturaTurno from "@/components/pos-ventas/ModalAperturaTurno";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
 import AvisoArqueo from "@/components/pos-ventas/AvisoArqueo";
 import useArqueoEstado from "@/hooks/useArqueoEstado";
@@ -1524,16 +1523,20 @@ export default function PosVentasPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Sin turno abierto: modal apertura de caja
+  // Sin turno abierto: apertura por CAMBIOS PENDIENTES.
+  //
+  // Ya no es un modal con un importe escrito a mano. El operador elige de qué
+  // cierre recibe el cambio, lo cuenta por denominación y abre con lo que contó
+  // de verdad. Es una pantalla propia porque contar lleva su tiempo y porque la
+  // elección del sobre es un acto con consecuencias contables.
+  //
+  // `ModalAperturaTurno` y /api/pos-ventas/turnos/abrir siguen en el repositorio
+  // como vía administrativa acotada. El clásico NO puede consumir un
+  // CambioPendiente: ni lo lee ni lo marca, así que no hay forma de que un sobre
+  // se pierda por ahí.
   // ---------------------------------------------------------------------------
   if (localActual && me && turnoActual === null) {
-    return (
-      <ModalAperturaTurno
-        localId={localActual}
-        vendedorNombre={me?.nombre || "-"}
-        onApertura={(turno) => setTurnoActual(turno)}
-      />
-    );
+    return <RedirigirAApertura router={router} />;
   }
 
   // ---------------------------------------------------------------------------
@@ -2096,6 +2099,30 @@ export default function PosVentasPage() {
           onCancelar={state.modalConfirmacion.onCancelar}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Manda a la apertura nueva.
+ *
+ * Se navega en vez de renderizar la pantalla acá adentro porque el POS ya tiene
+ * mucho estado propio —carrito, cola offline, arqueo— y montar la apertura
+ * dentro de este componente la ataría a todo eso. Con una ruta propia, la
+ * apertura se puede abrir directo, recargar y volver, y el POS no tiene que
+ * saber nada de cambios pendientes.
+ *
+ * El `replace` es deliberado: si fuera `push`, el botón Atrás devolvería a un POS
+ * sin turno que volvería a redirigir, y el usuario quedaría preso del rebote.
+ */
+function RedirigirAApertura({ router }) {
+  useEffect(() => {
+    router.replace("/modulos/pos-ventas/aperturas");
+  }, [router]);
+
+  return (
+    <div className="sunmi-bg w-full min-h-full flex items-center justify-center p-4">
+      <p className="text-sm sunmi-text-muted">Abriendo caja…</p>
     </div>
   );
 }
