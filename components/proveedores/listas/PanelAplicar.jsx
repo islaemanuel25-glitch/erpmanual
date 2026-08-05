@@ -27,6 +27,9 @@ import {
 export default function PanelAplicar({
   importacion,
   resumenSeleccion,
+  previo,
+  cargandoPrevio,
+  onPedirPrevio,
   trabajando,
   onSeleccionarTodos,
   onDeseleccionar,
@@ -36,6 +39,7 @@ export default function PanelAplicar({
 }) {
   const [modo, setModo] = useState(MODO_PRECIO_VENTA_DEFAULT);
   const [confirmando, setConfirmando] = useState(false);
+  const [confirmadoLeido, setConfirmadoLeido] = useState(false);
 
   const yaAplicada = importacion?.estado === "APLICADA";
   const seleccionadas = resumenSeleccion?.seleccionadas ?? 0;
@@ -105,7 +109,11 @@ export default function PanelAplicar({
         </div>
         <SunmiButton
           color="cyan"
-          onClick={() => setConfirmando(true)}
+          onClick={() => {
+            setConfirmadoLeido(false);
+            setConfirmando(true);
+            onPedirPrevio?.();
+          }}
           disabled={!puedeAplicar}
           className="py-3 px-4 font-bold !text-xs inline-flex items-center justify-center gap-1"
         >
@@ -135,10 +143,83 @@ export default function PanelAplicar({
               Precio de venta: <span className="sunmi-text-strong">{TEXTO_MODO_PRECIO_VENTA[modo]}</span>
             </li>
           </ul>
+
+          {/* ── El resumen final ─────────────────────────────────────────
+              Los totales los calcula el SERVIDOR sobre todas las
+              seleccionadas. Sumarlos en la pantalla daría el total de la
+              página que se está mirando, que con 25 filas por página sería
+              un número equivocado presentado como si fuera el definitivo. */}
+          {cargandoPrevio && (
+            <p className="text-[11.5px] sunmi-text-muted">Calculando el total…</p>
+          )}
+          {previo && !cargandoPrevio && (
+            <div className="sunmi-border border rounded-lg p-2.5 space-y-1">
+              <div className="text-[11px] font-bold uppercase tracking-wide sunmi-text-muted">
+                Resumen final
+              </div>
+              <div className="flex justify-between gap-2 text-[12px]">
+                <span className="sunmi-text-muted">Productos a actualizar</span>
+                <span className="font-semibold sunmi-text-strong tabular-nums">{previo.cantidad}</span>
+              </div>
+              <div className="flex justify-between gap-2 text-[12px]">
+                <span className="sunmi-text-muted">Costo total actual</span>
+                <span className="tabular-nums sunmi-text-strong">{money(previo.costoTotalAnterior)}</span>
+              </div>
+              <div className="flex justify-between gap-2 text-[12px]">
+                <span className="sunmi-text-muted">Costo total nuevo</span>
+                <span className="tabular-nums font-semibold sunmi-text-strong">{money(previo.costoTotalNuevo)}</span>
+              </div>
+              <div className="flex justify-between gap-2 text-[12px]">
+                <span className="sunmi-text-muted">Variación</span>
+                <span
+                  className={`tabular-nums font-semibold ${
+                    previo.variacionPct > 0 ? "sunmi-text-danger" : "sunmi-text-success"
+                  }`}
+                >
+                  {previo.variacionPct > 0 ? "+" : ""}
+                  {previo.variacionPct?.toFixed(1)} %
+                </span>
+              </div>
+              <div className="flex justify-between gap-2 text-[12px]">
+                <span className="sunmi-text-muted">Filas con alerta</span>
+                <span
+                  className={`tabular-nums font-semibold ${
+                    previo.conAlerta > 0 ? "sunmi-text-warning" : "sunmi-text-muted"
+                  }`}
+                >
+                  {previo.conAlerta}
+                </span>
+              </div>
+              {previo.conAlerta > 0 && (
+                <p className="text-[11px] sunmi-text-warning leading-snug">
+                  Hay {previo.conAlerta} {previo.conAlerta === 1 ? "fila" : "filas"} con alerta de
+                  gramaje, factor o variación alta. Podés revisarlas con el filtro &quot;Con alerta&quot;
+                  antes de seguir.
+                </p>
+              )}
+            </div>
+          )}
+
           <p className="text-[11.5px] sunmi-text-warning leading-snug">
             Se van a modificar costos reales de productos. Los precios de venta que dependen
             del margen se recalculan. Esto no se deshace desde esta pantalla.
           </p>
+
+          {/* Confirmación explícita: hay que tildar antes de poder aplicar. Un
+              botón solo se aprieta sin leer; una casilla obliga a un acto
+              deliberado sobre la frase que dice qué va a pasar. */}
+          <label className="flex items-start gap-2 text-[11.5px] sunmi-text-strong cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmadoLeido}
+              onChange={(e) => setConfirmadoLeido(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+            />
+            <span>
+              Revisé la lista y confirmo que se actualicen los costos de{" "}
+              <span className="font-semibold">{previo?.cantidad ?? seleccionadas}</span> productos.
+            </span>
+          </label>
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
             <SunmiButton
               color="slate"
@@ -153,6 +234,7 @@ export default function PanelAplicar({
                 setConfirmando(false);
                 onAplicar?.(modo);
               }}
+              disabled={!confirmadoLeido || cargandoPrevio}
               className="py-2 font-bold !text-xs order-1 sm:order-2"
             >
               Sí, aplicar {seleccionadas} {seleccionadas === 1 ? "fila" : "filas"}

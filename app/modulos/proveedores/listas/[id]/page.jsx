@@ -27,12 +27,11 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 
 import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
+import FilaRevision from "@/components/proveedores/listas/FilaRevision";
 import {
   BadgeEstado,
   Dato,
   ErrorRecuperable,
-  FilaCard,
-  FilaTabla,
   Paginacion,
   ResumenMetricas,
   Vacio,
@@ -45,7 +44,27 @@ import {
   porcentaje,
 } from "@/lib/proveedores/listas/presentacion";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
+
+/**
+ * Las vistas de la revisión. El valor viaja al servidor, que es quien filtra:
+ * la pantalla no puede filtrar por "con alerta" porque las alertas se calculan
+ * comparando cada fila con el producto vivo, y para eso habría que traerse las
+ * 917 filas en cada clic.
+ */
+const VISTAS = [
+  { id: "todas", texto: "Todas" },
+  { id: "seleccionadas", texto: "Seleccionadas" },
+  { id: "listas", texto: "Listas" },
+  { id: "alerta", texto: "Con alerta" },
+  { id: "exactas", texto: "Exactas" },
+  { id: "sufijo5", texto: "Sufijo 5" },
+  { id: "sufijo4", texto: "Sufijo 4" },
+  { id: "factorDudoso", texto: "Factor dudoso" },
+  { id: "sinVincular", texto: "Sin vincular" },
+  { id: "ambiguas", texto: "Ambiguas" },
+  { id: "excluidas", texto: "Excluidas" },
+];
 
 /**
  * ¿Esta fila admite vincularse?
@@ -103,6 +122,7 @@ export default function ConciliacionPage() {
   // se la pasó.
   const [page, setPage] = useState(1);
   const [estado, setEstado] = useState(() => busqueda?.get("estado") ?? "");
+  const [vista, setVista] = useState(() => busqueda?.get("vista") ?? "todas");
   const [q, setQ] = useState(() => busqueda?.get("q") ?? "");
   // El texto tipeado se separa del que se consulta: buscar en cada tecla sobre
   // 917 filas dispararía una consulta por letra.
@@ -122,6 +142,8 @@ export default function ConciliacionPage() {
   const [trabajando, setTrabajando] = useState(false);
   const [errorAplicar, setErrorAplicar] = useState("");
   const [resultado, setResultado] = useState(null);
+  const [previo, setPrevio] = useState(null);
+  const [cargandoPrevio, setCargandoPrevio] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -135,6 +157,7 @@ export default function ConciliacionPage() {
       url.searchParams.set("page", String(page));
       url.searchParams.set("pageSize", String(PAGE_SIZE));
       if (estado) url.searchParams.set("estado", estado);
+      if (vista && vista !== "todas") url.searchParams.set("vista", vista);
       if (qAplicado) url.searchParams.set("q", qAplicado);
 
       const r = await fetch(url.toString(), { credentials: "include", cache: "no-store" });
@@ -153,7 +176,7 @@ export default function ConciliacionPage() {
     } finally {
       setCargando(false);
     }
-  }, [id, page, estado, qAplicado]);
+  }, [id, page, estado, vista, qAplicado]);
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
@@ -208,6 +231,35 @@ export default function ConciliacionPage() {
   const alMarcarFila = (fila, marcada) =>
     mandarSeleccion({ accion: marcada ? "MARCAR" : "DESMARCAR", ids: [fila.id] });
 
+  /**
+   * Excluir e incluir recargan la página de datos en vez de parchear la fila:
+   * excluir cambia el contador de seleccionables y, en la vista "excluidas",
+   * hace que la fila entre o salga del listado. Parchear en memoria dejaría la
+   * pantalla diciendo algo distinto de la base.
+   */
+  const cambiarExclusion = async (fila, excluir) => {
+    const r = await mandarSeleccion({ accion: excluir ? "EXCLUIR" : "INCLUIR", ids: [fila.id] });
+    if (r) await cargar();
+  };
+
+  /** El resumen final lo calcula el servidor sobre TODAS las seleccionadas. */
+  const pedirPrevio = async () => {
+    setCargandoPrevio(true);
+    setPrevio(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/aplicar`, {
+        credentials: "include", cache: "no-store",
+      });
+      const json = await r.json();
+      if (r.ok && json?.ok) setPrevio(json);
+      else setErrorAplicar(json?.error || "No se pudo calcular el resumen.");
+    } catch {
+      setErrorAplicar("Error de conexión.");
+    } finally {
+      setCargandoPrevio(false);
+    }
+  };
+
   const aplicar = async (modoPrecioVenta) => {
     setTrabajando(true);
     setErrorAplicar("");
@@ -244,9 +296,10 @@ export default function ConciliacionPage() {
     setQ("");
     setQAplicado("");
     setEstado("");
+    setVista("todas");
     setPage(1);
   };
-  const hayFiltros = !!estado || !!qAplicado;
+  const hayFiltros = !!estado || !!qAplicado || vista !== "todas";
 
   if (cargandoUser || cargandoCtx) return null;
   if (!esAdmin) return <SinPermisos />;
@@ -298,6 +351,9 @@ export default function ConciliacionPage() {
             <PanelAplicar
               importacion={cab}
               resumenSeleccion={resumenSeleccion}
+              previo={previo}
+              cargandoPrevio={cargandoPrevio}
+              onPedirPrevio={pedirPrevio}
               trabajando={trabajando}
               onSeleccionarTodos={() => mandarSeleccion({ accion: "TODOS" })}
               onDeseleccionar={() => mandarSeleccion({ accion: "NINGUNO" })}
@@ -400,66 +456,48 @@ export default function ConciliacionPage() {
             />
           )}
 
+          {/* ── Vistas ─────────────────────────────────────────────────── */}
+          {!error && cab && (
+            <div className="flex flex-wrap gap-1.5">
+              {VISTAS.map((v) => {
+                const activa = vista === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => {
+                      setVista(v.id);
+                      setPage(1);
+                    }}
+                    aria-pressed={activa}
+                    className={`px-2.5 py-1.5 rounded-full text-[11.5px] font-semibold border transition-colors ${
+                      activa
+                        ? "sunmi-btn-base sunmi-btn-cyan border-transparent"
+                        : "sunmi-border sunmi-text-muted"
+                    }`}
+                  >
+                    {v.texto}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {!cargando && !error && filas.length > 0 && (
             <>
-              {/* ESCRITORIO: tabla. */}
-              <SunmiCard className="hidden lg:block p-0 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="sunmi-border border-b">
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold w-8">
-                          <span className="sr-only">Seleccionar</span>
-                        </th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">#</th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">Código</th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">Descripción</th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">Producto ERP</th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Proveedor</th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Costo actual</th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Propuesto</th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Diferencia</th>
-                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filas.map((f) => (
-                        <Fragment key={f.id}>
-                          <FilaTabla
-                            fila={f}
-                            onVincular={puedeVincular(f) ? setVinculando : null}
-                            seleccion={seleccionDe(f)}
-                          />
-                          {/* El panel se despliega DEBAJO de su fila, en la misma
-                              tabla: así se ve al mismo tiempo el dato del
-                              proveedor y el producto que se está por elegir. */}
-                          {vinculando?.id === f.id && (
-                            <tr className="sunmi-border border-b">
-                              <td colSpan={10} className="px-2 py-2">
-                                <PanelVincular
-                                  importacionId={id}
-                                  fila={f}
-                                  onVinculada={alVincular}
-                                  onCerrar={() => setVinculando(null)}
-                                />
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </SunmiCard>
-
-              {/* MÓVIL: cards. */}
-              <div className="lg:hidden space-y-2">
+              {/* Una sola lista para escritorio y móvil. La tarjeta pone los dos
+                  lados enfrentados en pantalla ancha y los apila en el teléfono:
+                  quince columnas en una tabla no se leen en ningún tamaño. */}
+              <div className="space-y-2">
                 {filas.map((f) => (
                   <Fragment key={f.id}>
-                    <FilaCard
+                    <FilaRevision
                       fila={f}
-                      onVincular={puedeVincular(f) ? setVinculando : null}
                       seleccion={seleccionDe(f)}
+                      onVincular={setVinculando}
+                      onExcluir={(x) => cambiarExclusion(x, true)}
+                      onIncluir={(x) => cambiarExclusion(x, false)}
+                      trabajando={trabajando}
                     />
                     {vinculando?.id === f.id && (
                       <PanelVincular

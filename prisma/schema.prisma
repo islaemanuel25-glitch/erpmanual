@@ -2344,6 +2344,10 @@ model ImportacionListaFila {
 
   seleccionable Boolean  @default(false)
   seleccionada  Boolean  @default(false)
+  /// Excluida A MANO desde la pantalla de revisión. No pisa el estado que
+  /// calculó el motor —que sigue explicando por qué la fila está como está—
+  /// sino que la saca de lo aplicable y la deselecciona. Es reversible.
+  excluidaManual Boolean @default(false)
   /// ── VINCULACIÓN MANUAL (Etapa 6A) ─────────────────────────────────────
   ///
   /// Quién resolvió a mano una fila que no macheaba, cuándo y de dónde salió la

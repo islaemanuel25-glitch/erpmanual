@@ -38,6 +38,7 @@ import { requireAdmin } from "@/lib/authorize";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { ESTADO_IMPORTACION } from "@/lib/proveedores/listas/persistencia";
 import { CONFIG_ARCOR } from "@/lib/proveedores/listas/configuraciones/arcor";
+import { alertasDeFila, presentacionDe } from "@/lib/proveedores/listas/alertas";
 import {
   MODO_PRECIO_VENTA,
   modoPrecioVentaValido,
@@ -82,6 +83,116 @@ async function resultadoPrevio(importacionId) {
     ventaAnterior: f.ventaAnterior === null ? null : Number(f.ventaAnterior),
     ventaNueva: f.ventaNueva === null ? null : Number(f.ventaNueva),
   }));
+}
+
+/**
+ * GET /api/proveedores/listas/[id]/aplicar
+ *
+ * El RESUMEN FINAL, antes de confirmar. No escribe nada.
+ *
+ * Los totales se calculan acá y no en la pantalla porque la pantalla ve una
+ * página de 25 filas: sumar ahí daría el total de lo que se está mirando y lo
+ * mostraría como si fuera el definitivo, que es la peor clase de número
+ * equivocado —el que parece correcto—.
+ *
+ * Revalida cada fila igual que la aplicación real, así que la cantidad que
+ * informa es la que se va a aplicar de verdad, no la que está marcada.
+ */
+export async function GET(req, context) {
+  try {
+    const admin = requireAdmin(req);
+    if (!admin.ok) {
+      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    }
+    const scope = await resolveScope(req);
+    if (scope.error) {
+      return NextResponse.json(
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
+      );
+    }
+    const { grupoId, localId } = scope;
+
+    const { id } = await context.params;
+    const importacionId = Number(id);
+    if (!Number.isInteger(importacionId)) {
+      return NextResponse.json({ ok: false, error: "Id inválido." }, { status: 400 });
+    }
+
+    const importacion = await prisma.importacionListaProveedor.findFirst({
+      where: { id: importacionId, grupoId },
+      select: { id: true, estado: true, recargoPct: true, localOperativoId: true },
+    });
+    if (!importacion) {
+      return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
+    }
+
+    const filas = await prisma.importacionListaFila.findMany({
+      where: { importacionId, seleccionada: true, aplicada: false },
+      orderBy: { filaExcel: "asc" },
+    });
+
+    const baseIds = [...new Set(filas.map((f) => f.productoBaseId).filter((x) => x !== null))];
+    const productos = baseIds.length
+      ? await prisma.productoBase.findMany({
+          where: { id: { in: baseIds }, grupoId },
+          select: {
+            id: true, nombre: true, precio_costo: true, precio_venta: true, margen: true,
+            redondeo_100: true, es_combo: true, creadoEnLocalId: true,
+            unidad_medida: true, factor_pack: true, modoCompraProveedor: true,
+            pesoReferenciaKg: true,
+          },
+        })
+      : [];
+    const porId = new Map(productos.map((p) => [p.id, p]));
+
+    const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
+    const contexto = { operandoEnLocalId: Number(localId), depositoLocalId };
+    const recargoPct = Number(importacion.recargoPct);
+
+    let cantidad = 0;
+    let costoTotalAnterior = 0;
+    let costoTotalNuevo = 0;
+    let conAlerta = 0;
+    let noAplicables = 0;
+
+    for (const f of filas) {
+      const base = f.productoBaseId === null ? null : porId.get(f.productoBaseId) ?? null;
+      const v = revalidarFila({ fila: f, base, contexto, config: CONFIG_ARCOR, recargoPct });
+      if (!v.aplicable) {
+        noAplicables++;
+        continue;
+      }
+      cantidad++;
+      costoTotalAnterior += Number(v.costoActual ?? 0);
+      costoTotalNuevo += Number(v.costoNuevo ?? 0);
+
+      const presentacionConciliada = presentacionDe({
+        unidadMedida: base.unidad_medida,
+        factorPack: f.factorErp,
+      });
+      if (alertasDeFila({ ...f, presentacionConciliada }, base).length > 0) conAlerta++;
+    }
+
+    const variacionPct =
+      costoTotalAnterior > 0 ? (costoTotalNuevo / costoTotalAnterior - 1) * 100 : 0;
+
+    return NextResponse.json({
+      ok: true,
+      cantidad,
+      seleccionadas: filas.length,
+      // Seleccionadas que la revalidación descartaría. Si es > 0, el usuario
+      // marcó filas que ya no se pueden aplicar y conviene que lo sepa antes.
+      noAplicables,
+      costoTotalAnterior: Math.round(costoTotalAnterior * 100) / 100,
+      costoTotalNuevo: Math.round(costoTotalNuevo * 100) / 100,
+      variacionPct,
+      conAlerta,
+    });
+  } catch (e) {
+    console.error("[listas/aplicar/previo] error:", e);
+    return NextResponse.json({ ok: false, error: "No se pudo calcular el resumen." }, { status: 500 });
+  }
 }
 
 export async function POST(req, context) {

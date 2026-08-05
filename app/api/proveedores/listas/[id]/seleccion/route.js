@@ -28,7 +28,7 @@ import {
   TEXTO_NO_SELECCIONABLE,
 } from "@/lib/proveedores/listas/seleccion";
 
-const ACCIONES = new Set(["MARCAR", "DESMARCAR", "TODOS", "NINGUNO"]);
+const ACCIONES = new Set(["MARCAR", "DESMARCAR", "TODOS", "NINGUNO", "EXCLUIR", "INCLUIR"]);
 
 export async function POST(req, context) {
   try {
@@ -72,7 +72,7 @@ export async function POST(req, context) {
       where: { importacionId },
       select: {
         id: true, estado: true, aplicada: true, seleccionada: true,
-        productoBaseId: true, costoMaestroPropuesto: true,
+        productoBaseId: true, costoMaestroPropuesto: true, excluidaManual: true,
       },
     });
 
@@ -84,6 +84,47 @@ export async function POST(req, context) {
       aMarcar = idsSeleccionables(filas, importacion);
     } else if (accion === "NINGUNO") {
       aDesmarcar = filas.filter((f) => f.seleccionada).map((f) => f.id);
+    } else if (accion === "EXCLUIR" || accion === "INCLUIR") {
+      // Excluir es una decisión de una persona que miró la fila. No se valida
+      // contra el estado: se puede excluir cualquier fila, incluso una que el
+      // motor considera perfecta, porque el que sabe si el producto es el que
+      // parece no es el motor.
+      const ids = normalizarIds(body?.ids);
+      if (ids.length === 0) {
+        return NextResponse.json({ ok: false, error: "No llegó ninguna fila." }, { status: 400 });
+      }
+      const existentes = new Set(filas.map((f) => f.id));
+      const objetivo = ids.filter((x) => existentes.has(x));
+      if (objetivo.length === 0) {
+        return NextResponse.json({ ok: false, error: "Ninguna fila pertenece a esta importación." }, { status: 404 });
+      }
+      const excluir = accion === "EXCLUIR";
+      await prisma.$transaction(async (tx) => {
+        await tx.importacionListaFila.updateMany({
+          where: { id: { in: objetivo }, importacionId },
+          // Excluir DESELECCIONA en el mismo movimiento: dejar marcada una fila
+          // excluida sería una contradicción que después hay que explicar.
+          data: excluir
+            ? { excluidaManual: true, seleccionada: false }
+            : { excluidaManual: false },
+        });
+      }, OPCIONES_TX);
+
+      const frescasEx = await prisma.importacionListaFila.findMany({
+        where: { importacionId },
+        select: {
+          id: true, estado: true, aplicada: true, seleccionada: true,
+          productoBaseId: true, costoMaestroPropuesto: true, excluidaManual: true,
+        },
+      });
+      return NextResponse.json({
+        ok: true,
+        accion,
+        afectadas: objetivo.length,
+        resumen: resumirSeleccion(frescasEx, importacion),
+        seleccionadas: frescasEx.filter((f) => f.seleccionada).map((f) => f.id),
+        excluidas: frescasEx.filter((f) => f.excluidaManual).map((f) => f.id),
+      });
     } else {
       const ids = normalizarIds(body?.ids);
       if (ids.length === 0) {
@@ -135,7 +176,7 @@ export async function POST(req, context) {
       where: { importacionId },
       select: {
         id: true, estado: true, aplicada: true, seleccionada: true,
-        productoBaseId: true, costoMaestroPropuesto: true,
+        productoBaseId: true, costoMaestroPropuesto: true, excluidaManual: true,
       },
     });
 
@@ -147,6 +188,7 @@ export async function POST(req, context) {
       rechazadas,
       resumen: resumirSeleccion(frescas, importacion),
       seleccionadas: frescas.filter((f) => f.seleccionada).map((f) => f.id),
+      excluidas: frescas.filter((f) => f.excluidaManual).map((f) => f.id),
     });
   } catch (e) {
     console.error("[listas/seleccion] error:", e);
