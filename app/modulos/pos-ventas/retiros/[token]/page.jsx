@@ -39,7 +39,7 @@ import {
   PanelMovimientos,
   ResumenCabeceraCorte,
 } from "@/components/caja/PanelesRetiro";
-import { AvisoCorteHecho, hora } from "@/components/caja/PanelesCierre";
+import { AvisoCorteHecho, AVISO_POSTERIORES_RETIRO, hora } from "@/components/caja/PanelesCierre";
 
 import { totalDesglose, desgloseVacio } from "@/lib/caja/conteoBilletes";
 import { calcularDiferencia } from "@/lib/caja/efectivoEsperado";
@@ -322,7 +322,12 @@ export default function RetiroPorTokenPage() {
         </div>
       </SunmiCard>
 
-      <AvisoCorteHecho corteEn={retiro?.corteEn} />
+      {/* "este retiro", no "este cierre": la caja no se cerró y sigue vendiendo. */}
+      <AvisoCorteHecho
+        corteEn={retiro?.corteEn}
+        sustantivo="retiro"
+        posteriores={AVISO_POSTERIORES_RETIRO}
+      />
 
       {aviso && <Aviso tono="info">{aviso}</Aviso>}
 

@@ -59,9 +59,26 @@ export const AVISO_CAMBIO_SUPERA_ESPERADO =
 export const AVISO_POSTERIORES =
   "Las operaciones posteriores pertenecen al siguiente turno.";
 
-/** "Corte realizado a las HH:mm. Este cierre incluye operaciones hasta ese momento." */
-export function avisoDespuesDelCorte(hora) {
-  return `Corte realizado a las ${hora}. Este cierre incluye operaciones hasta ese momento.`;
+/**
+ * El equivalente para el retiro, que NO cierra el turno.
+ *
+ * En un cierre lo que viene después es de otro turno; en un retiro es del MISMO
+ * turno, que sigue vendiendo. Reusar el texto del cierre le diría al cajero que
+ * su caja se acabó, que es justo lo contrario de lo que pasa.
+ */
+export const AVISO_POSTERIORES_RETIRO =
+  "Las operaciones posteriores siguen en esta caja, fuera de este retiro.";
+
+/**
+ * "Corte realizado a las HH:mm. Este cierre incluye operaciones hasta ese momento."
+ *
+ * El sustantivo es un parámetro porque el bloque lo comparten las DOS pantallas.
+ * Decirle "cierre" a un retiro —que no cierra nada y deja la caja vendiendo— es
+ * exactamente el tipo de detalle que hace dudar al cajero de si entendió bien
+ * qué está por pasar. Detectado mirando la captura de la pantalla de retiro.
+ */
+export function avisoDespuesDelCorte(hora, sustantivo = "cierre") {
+  return `Corte realizado a las ${hora}. Este ${sustantivo} incluye operaciones hasta ese momento.`;
 }
 
 /**
@@ -205,13 +222,13 @@ export function PanelAntesDelCorte({
  * esto la pregunta obvia —"¿el número que veo incluye lo que están cobrando
  * ahora?"— no tiene respuesta en pantalla.
  */
-export function AvisoCorteHecho({ corteEn, atrasado = false }) {
+export function AvisoCorteHecho({ corteEn, atrasado = false, sustantivo = "cierre", posteriores = AVISO_POSTERIORES }) {
   return (
     <div className="sunmi-surface-soft sunmi-border rounded-lg p-2 text-[11px] leading-snug flex items-start gap-2">
       <Clock size={14} className="shrink-0 mt-0.5 sunmi-text-accent" />
       <div className="min-w-0 space-y-0.5">
-        <div className="sunmi-text-strong">{avisoDespuesDelCorte(hora(corteEn))}</div>
-        <div className="sunmi-text-muted">{AVISO_POSTERIORES}</div>
+        <div className="sunmi-text-strong">{avisoDespuesDelCorte(hora(corteEn), sustantivo)}</div>
+        <div className="sunmi-text-muted">{posteriores}</div>
         {atrasado && (
           <div className="sunmi-text-warning font-semibold">
             Este cierre está atrasado: se cortó hace varias horas y todavía no se confirmó.

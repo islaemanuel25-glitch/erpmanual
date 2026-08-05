@@ -31,9 +31,19 @@
 // PARCIAL y se leen exactamente igual que siempre.
 import { NextResponse } from "next/server";
 
+/**
+ * El texto que ve el cajero en la pestaña vieja.
+ *
+ * Es lo único que va a leer: el bundle anterior muestra `json.error` tal cual en
+ * su renglón de error, sin más contexto. Por eso dice las tres cosas que hacen
+ * falta —qué cambió, que ESTE conteo no se puede confirmar, y qué hacer— en vez
+ * de un "operación no permitida" que dejaría a la persona mirando un cajón
+ * contado sin saber si la plata salió o no.
+ */
 export const MENSAJE_FLUJO_NUEVO =
-  "El retiro cambió: ahora se separa el cambio y se toma un corte antes de contar. " +
-  "Volvé a abrir la pantalla de retiro para empezar de nuevo.";
+  "El retiro de recaudación ahora comienza separando el cambio. " +
+  "Este conteo no puede confirmarse con el proceso anterior. " +
+  "Volvé al POS e iniciá un retiro nuevo.";
 
 export async function POST() {
   return NextResponse.json(
