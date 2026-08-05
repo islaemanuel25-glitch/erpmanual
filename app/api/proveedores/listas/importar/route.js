@@ -151,22 +151,17 @@ export async function POST(req) {
     // choca contra la base y se resuelve más abajo. El nombre del archivo no se
     // usa como criterio: el mismo Excel se baja dos veces con nombres distintos.
     //
-    // EL BLOQUEO ES GLOBAL Y PARA SIEMPRE, INCLUSO SI LA ANTERIOR SE DESCARTÓ.
+    // UNA IMPORTACIÓN CANCELADA NO BLOQUEA EL ARCHIVO.
     //
-    // El índice único no mira el estado, así que una importación DESCARTADA
-    // sigue ocupando el hash: el mismo archivo no se puede volver a subir. Es
-    // deliberado en esta versión y conviene saberlo, porque el flujo natural de
-    // "me equivoqué, la descarto y la vuelvo a subir" NO funciona todavía.
+    // El índice único es PARCIAL —excluye las canceladas— así que el mismo Excel
+    // se puede volver a subir después de cancelar. La garantía contra carreras
+    // se conserva: sigue siendo imposible que existan dos importaciones VIVAS
+    // del mismo archivo, que es lo que el índice tiene que impedir.
     //
-    // Se conserva así a propósito. Las alternativas —un índice parcial que
-    // excluya DESCARTADA, o sumar el estado a la clave— cambian la garantía de
-    // idempotencia contra carreras, que es lo que hoy impide que dos pedidos
-    // simultáneos creen dos importaciones del mismo archivo. Rediseñar eso es
-    // una decisión de otra etapa; agregar una excepción a medias sería peor que
-    // el problema. Mientras tanto, la salida es reimportar desde un archivo
-    // distinto o rehabilitar la importación existente.
+    // Antes el bloqueo era para siempre y el flujo natural —"me equivoqué, la
+    // cancelo y la vuelvo a subir"— era imposible.
     const previa = await prisma.importacionListaProveedor.findFirst({
-      where: { grupoId, proveedorId, archivoHash },
+      where: { grupoId, proveedorId, archivoHash, estado: { not: "CANCELADA" } },
       select: { id: true, createdAt: true, estado: true, archivoNombre: true },
     });
     if (previa) {

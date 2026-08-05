@@ -2191,6 +2191,9 @@ enum EstadoImportacionLista {
   CONCILIADA
   APLICADA
   DESCARTADA
+  /// Cancelada a mano. Queda como historial y LIBERA el archivo para poder
+  /// volver a importarlo.
+  CANCELADA
 }
 
 /// Cómo se encontró el producto de una fila. Espeja TIPO_COINCIDENCIA del motor.
@@ -2268,6 +2271,8 @@ model ImportacionListaProveedor {
   createdAt    DateTime  @default(now())
   conciliadaEn DateTime?
   aplicadaEn   DateTime?
+  canceladaEn  DateTime?
+  canceladaPorUsuarioId Int?
   /// Quién apretó "Aplicar". Se guarda acá y no solo en la bitácora porque
   /// esta pantalla tiene que poder explicar una corrida vieja sin depender
   /// de que el interceptor haya estado activo.
@@ -2286,7 +2291,11 @@ model ImportacionListaProveedor {
   /// IDEMPOTENCIA REAL, a nivel base. Dos pedidos simultáneos con el mismo
   /// archivo no pueden crear dos importaciones: el segundo choca contra este
   /// índice. Un `findFirst` previo solo cubre el caso secuencial.
-  @@unique([grupoId, proveedorId, archivoHash], name: "importacion_archivo_unica")
+  /// El índice de archivo único es PARCIAL y vive en SQL: excluye las canceladas
+  /// para que el mismo Excel se pueda volver a subir después de cancelar. Prisma
+  /// no puede expresar un WHERE en @@unique, así que acá queda solo el índice de
+  /// búsqueda y la unicidad la garantiza la migración.
+  @@index([grupoId, proveedorId, archivoHash])
   @@index([grupoId, proveedorId, createdAt])
   @@index([grupoId, estado])
   @@index([usuarioId])

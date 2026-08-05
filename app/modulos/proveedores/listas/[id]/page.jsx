@@ -144,6 +144,8 @@ export default function ConciliacionPage() {
   const [resultado, setResultado] = useState(null);
   const [previo, setPrevio] = useState(null);
   const [cargandoPrevio, setCargandoPrevio] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
+  const [trabajandoCancelar, setTrabajandoCancelar] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -260,6 +262,32 @@ export default function ConciliacionPage() {
     }
   };
 
+  /**
+   * Cancelar deja el registro como historial y libera el archivo. No toca
+   * costos, precios ni productos: es una decisión sobre el proceso.
+   */
+  const cancelarImportacion = async () => {
+    setTrabajandoCancelar(true);
+    setErrorAplicar("");
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/cancelar`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await r.json();
+      if (!r.ok || !json?.ok) {
+        setErrorAplicar(json?.error || "No se pudo cancelar la importación.");
+        return;
+      }
+      setCancelando(false);
+      await cargar();
+    } catch {
+      setErrorAplicar("Error de conexión.");
+    } finally {
+      setTrabajandoCancelar(false);
+    }
+  };
+
   const aplicar = async (modoPrecioVenta) => {
     setTrabajando(true);
     setErrorAplicar("");
@@ -341,6 +369,63 @@ export default function ConciliacionPage() {
 
             <ResumenMetricas metricas={metricasDeImportacion(cab)} />
 
+            {/* ── Cancelar ─────────────────────────────────────────────
+                Una importación que no sirve tiene que poder sacarse del medio.
+                Antes no se podía, y además su archivo quedaba bloqueado para
+                siempre: no había forma de subir el Excel corregido. */}
+            {cab.estado === "CANCELADA" ? (
+              <div className="sunmi-surface-soft sunmi-border border rounded-lg px-3 py-2">
+                <span className="text-[12.5px] font-semibold sunmi-text-danger">
+                  Importación cancelada
+                </span>
+                <p className="text-[11.5px] sunmi-text-muted leading-snug mt-0.5">
+                  Queda solo como historial. No se puede aplicar y el archivo quedó liberado:
+                  ya se puede volver a importar.
+                </p>
+              </div>
+            ) : cab.estado !== "APLICADA" ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setCancelando(true)}
+                  disabled={trabajandoCancelar}
+                  className="py-2 px-3 !text-[11.5px]"
+                >
+                  Cancelar importación
+                </SunmiButton>
+                {cancelando && (
+                  <div className="w-full sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-2">
+                    <p className="text-[12px] sunmi-text-strong leading-snug">
+                      ¿Cancelar esta importación? Queda como historial, se desmarcan todas las
+                      filas y no se va a poder aplicar.
+                    </p>
+                    <p className="text-[11.5px] sunmi-text-muted leading-snug">
+                      No se modifica ningún costo, precio ni producto. El archivo queda liberado
+                      para volver a importarlo.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
+                      <SunmiButton
+                        color="slate"
+                        onClick={() => setCancelando(false)}
+                        disabled={trabajandoCancelar}
+                        className="py-2 !text-xs order-2 sm:order-1"
+                      >
+                        No, volver
+                      </SunmiButton>
+                      <SunmiButton
+                        color="red"
+                        onClick={cancelarImportacion}
+                        disabled={trabajandoCancelar}
+                        className="py-2 font-bold !text-xs order-1 sm:order-2"
+                      >
+                        {trabajandoCancelar ? "Cancelando…" : "Sí, cancelar la importación"}
+                      </SunmiButton>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
             {avisoVinculo && (
               <p className="text-[11.5px] sunmi-text-success leading-snug">{avisoVinculo}</p>
             )}
@@ -348,6 +433,7 @@ export default function ConciliacionPage() {
             {/* La barra de aplicación va ARRIBA de la tabla y fuera de ella: es
                 una acción sobre el conjunto, no sobre una fila, y esconderla al
                 final de 917 filas la volvería invisible. */}
+            {cab.estado !== "CANCELADA" && (
             <PanelAplicar
               importacion={cab}
               resumenSeleccion={resumenSeleccion}
@@ -361,6 +447,10 @@ export default function ConciliacionPage() {
               resultado={resultado}
               error={errorAplicar}
             />
+            )}
+            {cab.estado === "CANCELADA" && errorAplicar && (
+              <p className="text-[12px] sunmi-text-danger">{errorAplicar}</p>
+            )}
 
             {/* Productos del proveedor que no vinieron en el archivo. Por ahora
                 solo el contador: el endpoint no entrega el detalle todavía. */}

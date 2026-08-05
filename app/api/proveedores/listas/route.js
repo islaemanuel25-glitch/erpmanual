@@ -37,8 +37,14 @@ export async function GET(req) {
     const where = { grupoId };
     const proveedorId = Number(url.searchParams.get("proveedorId"));
     if (Number.isInteger(proveedorId) && proveedorId > 0) where.proveedorId = proveedorId;
+    // Las CANCELADAS no son procesos activos: se esconden salvo que se pidan.
+    // Sin esto una importación cancelada seguiría ocupando la pantalla como si
+    // hubiera algo que hacer con ella.
     const estado = url.searchParams.get("estado");
     if (estado) where.estado = estado;
+    else if (url.searchParams.get("incluirCanceladas") !== "1") {
+      where.estado = { not: "CANCELADA" };
+    }
 
     const [total, items] = await Promise.all([
       prisma.importacionListaProveedor.count({ where }),

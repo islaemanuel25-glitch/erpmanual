@@ -41,8 +41,38 @@ export default function HistorialListasPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
+  // Las canceladas no son procesos activos: se esconden salvo que se pidan.
+  const [verCanceladas, setVerCanceladas] = useState(false);
+  const [cancelando, setCancelando] = useState(null);
+  const [trabajandoCancelar, setTrabajandoCancelar] = useState(false);
   const [pag, setPag] = useState({ page: 1, paginas: 1, total: 0 });
   const [page, setPage] = useState(1);
+
+  /**
+   * Cancelar una importación desde el historial. No toca costos ni productos:
+   * la saca del flujo y libera su archivo para poder volver a importarlo.
+   */
+  const cancelar = async (importacionId) => {
+    setTrabajandoCancelar(true);
+    setError("");
+    try {
+      const r = await fetch(`/api/proveedores/listas/${importacionId}/cancelar`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await r.json();
+      if (!r.ok || !json?.ok) {
+        setError(json?.error || "No se pudo cancelar la importación.");
+        return;
+      }
+      setCancelando(null);
+      await cargar();
+    } catch {
+      setError("Error de conexión.");
+    } finally {
+      setTrabajandoCancelar(false);
+    }
+  };
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -51,7 +81,9 @@ export default function HistorialListasPage() {
     setCargando(true);
     setError("");
     try {
-      const r = await fetch(`/api/proveedores/listas?page=${page}&pageSize=${PAGE_SIZE}`, {
+      const r = await fetch(
+        `/api/proveedores/listas?page=${page}&pageSize=${PAGE_SIZE}${verCanceladas ? "&incluirCanceladas=1" : ""}`,
+        {
         credentials: "include",
         cache: "no-store",
       });
@@ -67,7 +99,7 @@ export default function HistorialListasPage() {
     } finally {
       setCargando(false);
     }
-  }, [page]);
+  }, [page, verCanceladas]);
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
@@ -139,6 +171,51 @@ export default function HistorialListasPage() {
         />
       )}
 
+      {cancelando !== null && (
+        <SunmiCard className="p-3 space-y-2">
+          <p className="text-[12.5px] font-semibold sunmi-text-strong">
+            ¿Cancelar esta importación?
+          </p>
+          <p className="text-[11.5px] sunmi-text-muted leading-snug">
+            Queda solo como historial y no se va a poder aplicar. No se modifica ningún costo,
+            precio ni producto, y el archivo queda liberado para volver a importarlo.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
+            <SunmiButton
+              color="slate"
+              onClick={() => setCancelando(null)}
+              disabled={trabajandoCancelar}
+              className="py-2 !text-xs order-2 sm:order-1"
+            >
+              No, volver
+            </SunmiButton>
+            <SunmiButton
+              color="red"
+              onClick={() => cancelar(cancelando)}
+              disabled={trabajandoCancelar}
+              className="py-2 font-bold !text-xs order-1 sm:order-2"
+            >
+              {trabajandoCancelar ? "Cancelando…" : "Sí, cancelar la importación"}
+            </SunmiButton>
+          </div>
+        </SunmiCard>
+      )}
+
+      {!cargando && !error && (
+        <label className="flex items-center gap-2 text-[12px] sunmi-text-muted cursor-pointer">
+          <input
+            type="checkbox"
+            checked={verCanceladas}
+            onChange={(e) => {
+              setVerCanceladas(e.target.checked);
+              setPage(1);
+            }}
+            className="h-4 w-4"
+          />
+          Ver también las canceladas
+        </label>
+      )}
+
       {!cargando && !error && items.length > 0 && (
         <>
           {/* ESCRITORIO: tabla. */}
@@ -180,7 +257,7 @@ export default function HistorialListasPage() {
                       <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-danger">{i.bloqueadas}</td>
                       <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-warning">{i.factorDudoso}</td>
                       <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-danger">{i.errores}</td>
-                      <td className="px-2 py-2 text-right">
+                      <td className="px-2 py-2 text-right whitespace-nowrap">
                         <SunmiButton
                           color="cyan"
                           onClick={() => router.push(`/modulos/proveedores/listas/${i.id}`)}
@@ -188,6 +265,15 @@ export default function HistorialListasPage() {
                         >
                           Ver
                         </SunmiButton>
+                        {i.estado !== "CANCELADA" && i.estado !== "APLICADA" && (
+                          <SunmiButton
+                            color="slate"
+                            onClick={() => setCancelando(i.id)}
+                            className="py-1.5 px-3 !text-xs ml-1"
+                          >
+                            Cancelar
+                          </SunmiButton>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -225,6 +311,15 @@ export default function HistorialListasPage() {
                 >
                   Ver conciliación
                 </SunmiButton>
+                {i.estado !== "CANCELADA" && i.estado !== "APLICADA" && (
+                  <SunmiButton
+                    color="slate"
+                    onClick={() => setCancelando(i.id)}
+                    className="w-full py-2 !text-xs"
+                  >
+                    Cancelar importación
+                  </SunmiButton>
+                )}
               </SunmiCard>
             ))}
           </div>
