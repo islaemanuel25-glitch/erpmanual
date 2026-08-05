@@ -37,9 +37,19 @@ import {
   calcularCorteRetiro,
   serializarRetiroPreparacion,
 } from "@/lib/caja/retiroRelevoServer";
+import { procesoPendienteDeRetiro } from "@/lib/caja/procesoPendiente";
+import {
+  cierrePendienteDeTurno,
+  retiroPendienteDeTurno,
+  nombreDeOperador,
+} from "@/lib/caja/procesoPendienteServer";
 import { bloquearTurno, OPCIONES_TX } from "@/lib/caja/cierreRelevoServer";
 
 export async function POST(req) {
+  // Fuera del `try` a propósito: el manejo del choque contra el índice parcial
+  // necesita saber sobre qué turno se estaba cortando, y una `const` adentro del
+  // bloque no llega al `catch`.
+  let turnoDelPedido = null;
   try {
     const body = await req.json().catch(() => ({}));
     const { turnoId } = body;
@@ -53,17 +63,25 @@ export async function POST(req) {
     // vería nunca.
     const ctx = await contextoArqueo(req, { turnoId, exigirAbierto: true });
     if (ctx.error) {
+      // Si lo que bloquea es un CIERRE ya tomado sobre este mismo turno, el
+      // rechazo viaja con ese proceso. Antes solo llevaba un texto, y la pantalla
+      // no tenía cómo llevar al cajero hasta el conteo que quedó abierto.
+      const bloqueante = ctx.enPreparacionDeCierre
+        ? await cierrePendienteDeTurno(ctx.turnoId ?? (Number(turnoId) || null))
+        : null;
       return NextResponse.json(
         {
           ok: false,
           error: ctx.error,
           needsContexto: ctx.needsContexto,
           enPreparacionDeCierre: ctx.enPreparacionDeCierre ?? false,
+          procesoPendiente: bloqueante,
         },
         { status: ctx.status }
       );
     }
     const { session, localId, turno } = ctx;
+    turnoDelPedido = turno?.id ?? null;
 
     if (!turno) {
       return NextResponse.json(
@@ -178,6 +196,14 @@ export async function POST(req) {
     return NextResponse.json({
       ok: true,
       repetido: resultado.repetido,
+      // Un corte que YA EXISTÍA no es un alta: es un proceso pendiente. Se
+      // informa con la misma forma que los rechazos para que la pantalla muestre
+      // el cartel en vez de navegar sola a un conteo que el cajero no pidió.
+      procesoPendiente: resultado.repetido
+        ? procesoPendienteDeRetiro(resultado.retiro, {
+            operadorNombre: await nombreDeOperador(resultado.retiro.iniciadoPorOperadorId),
+          })
+        : null,
       retiro: serializarRetiroPreparacion(resultado.retiro),
       desglose: resultado.desglose
         ? {
@@ -196,8 +222,17 @@ export async function POST(req) {
     // pedido tomó el corte mientras este estaba en vuelo. La base es la garantía
     // dura.
     if (error?.code === "P2002") {
+      // Se busca el corte que ganó la carrera para poder ofrecerlo. Es una
+      // lectura más en un camino excepcional, y evita dejar al cajero con un
+      // aviso sin salida.
+      const pendiente = await retiroPendienteDeTurno(turnoDelPedido);
       return NextResponse.json(
-        { ok: false, error: ERROR_RETIRO_YA_EN_PREPARACION, duplicado: true },
+        {
+          ok: false,
+          error: ERROR_RETIRO_YA_EN_PREPARACION,
+          duplicado: true,
+          procesoPendiente: pendiente,
+        },
         { status: 409 }
       );
     }

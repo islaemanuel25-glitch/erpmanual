@@ -6,6 +6,10 @@ import { resolveScope } from "@/lib/grupos";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { WHERE_TURNO_OPERATIVO, ESTADO_CIERRE } from "@/lib/caja/cierreRelevo";
 import { ESTADO_RETIRO } from "@/lib/caja/retiroRelevo";
+import {
+  retiroPendienteDeTurno,
+  cierrePendienteDeTurno,
+} from "@/lib/caja/procesoPendienteServer";
 
 export async function GET(req) {
   try {
@@ -71,6 +75,17 @@ export async function GET(req) {
         })
       : null;
 
+    // ── EL PROCESO PENDIENTE, CON FORMA DE AVISO ──────────────────────────
+    //
+    // Las pantallas de inicio necesitan poder MOSTRAR el proceso abierto, no
+    // solo saber que existe: hora del corte, cambio separado, retiro esperado,
+    // quién lo inició, y si todavía se puede deshacer. Se arma acá, con la misma
+    // forma que viaja en los 409, para que el cartel sea uno solo.
+    const [procesoRetiro, procesoCierre] = await Promise.all([
+      retiroEnCurso ? retiroPendienteDeTurno(turno.id) : null,
+      enPreparacion ? cierrePendienteDeTurno(enPreparacion.id) : null,
+    ]);
+
     // Marcar como vencido si la apertura no cae en el día calendario AR de hoy.
     // El front bloquea la venta y obliga a cerrar caja antes de seguir.
     let requiereCierre = false;
@@ -101,6 +116,7 @@ export async function GET(req) {
             token: enPreparacion.cierresPreparacion[0]?.token ?? null,
             estado: enPreparacion.cierresPreparacion[0]?.estado ?? null,
             venceEn: enPreparacion.cierresPreparacion[0]?.venceEn ?? null,
+            proceso: procesoCierre,
           }
         : null,
       // Mismo criterio para el retiro: el token viaja para poder ofrecer
@@ -113,6 +129,7 @@ export async function GET(req) {
             token: retiroEnCurso.token,
             corteEn: retiroEnCurso.corteEn,
             efectivoRetiradoEsperado: Number(retiroEnCurso.efectivoRetiradoEsperado),
+            proceso: procesoRetiro,
           }
         : null,
     });

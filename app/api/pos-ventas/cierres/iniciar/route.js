@@ -45,6 +45,14 @@ import {
 } from "@/lib/caja/cierreRelevo";
 import { ESTADO_RETIRO } from "@/lib/caja/retiroRelevo";
 import {
+  procesoPendienteDeRetiro,
+  procesoPendienteDeCierre,
+} from "@/lib/caja/procesoPendiente";
+import {
+  cierrePendienteDeTurno,
+  nombreDeOperador,
+} from "@/lib/caja/procesoPendienteServer";
+import {
   contextoRelevo,
   calcularCorte,
   bloquearTurno,
@@ -54,6 +62,10 @@ import {
 } from "@/lib/caja/cierreRelevoServer";
 
 export async function POST(req) {
+  // Fuera del `try` a propósito: el manejo del choque contra el índice único
+  // necesita saber sobre qué turno se estaba cortando para poder ofrecer el
+  // corte que ganó la carrera, y una `const` adentro del bloque no llega ahí.
+  let turnoDelPedido = null;
   try {
     const ctx = await contextoRelevo(req);
     if (ctx.error) {
@@ -69,6 +81,7 @@ export async function POST(req) {
     if (!Number.isInteger(turnoId) || turnoId <= 0) {
       return NextResponse.json({ ok: false, error: "turnoId requerido" }, { status: 400 });
     }
+    turnoDelPedido = turnoId;
 
     // ── EL CAMBIO SE VALIDA ACÁ, NO SE CONFÍA ──────────────────────────────
     // El cliente manda cuántos billetes de cada uno. El total lo calcula el
@@ -154,12 +167,21 @@ export async function POST(req) {
       // retiro iniciado un milisegundo antes tiene que verse.
       const retiroEnCurso = await tx.retiroPreparacion.findFirst({
         where: { turnoId, estado: ESTADO_RETIRO.PREPARANDO },
-        select: { id: true, token: true },
+        select: {
+          id: true, token: true, estado: true, corteEn: true,
+          totalCambio: true, efectivoRetiradoEsperado: true,
+          iniciadoPorOperadorId: true,
+        },
       });
       if (retiroEnCurso) {
         const e = new Error(ERROR_RETIRO_EN_PREPARACION_PARA_CIERRE);
         e.codigo = "conflicto";
         e.retiroToken = retiroEnCurso.token;
+        // El proceso que bloquea viaja con el rechazo. Sin esto la pantalla solo
+        // tenía un texto: no podía ofrecer "continuar" ni "cancelar", y el botón
+        // parecía muerto. El nombre del operario se resuelve afuera de la
+        // transacción, en el catch, para no alargarla con una lectura de adorno.
+        e.retiroBloqueante = retiroEnCurso;
         throw e;
       }
 
@@ -244,6 +266,13 @@ export async function POST(req) {
     return NextResponse.json({
       ok: true,
       repetido: resultado.repetido,
+      // Un corte que YA EXISTÍA no es un alta: es un proceso pendiente. Viaja con
+      // la misma forma que los rechazos para que la pantalla muestre el mismo
+      // cartel en los dos casos, en vez de navegar en silencio a una pantalla que
+      // el cajero no pidió.
+      procesoPendiente: resultado.repetido
+        ? procesoPendienteDeCierre(resultado.cierre, resultado.sobre)
+        : null,
       cierre: serializarCierre(resultado.cierre),
       cambioPendiente: serializarCambio(resultado.sobre),
       desglose: resultado.desglose
@@ -261,15 +290,33 @@ export async function POST(req) {
     }
     if (error?.codigo === "conflicto") {
       return NextResponse.json(
-        { ok: false, error: error.message, retiroToken: error.retiroToken ?? null },
+        {
+          ok: false,
+          error: error.message,
+          retiroToken: error.retiroToken ?? null,
+          procesoPendiente: error.retiroBloqueante
+            ? procesoPendienteDeRetiro(error.retiroBloqueante, {
+                operadorNombre: await nombreDeOperador(error.retiroBloqueante.iniciadoPorOperadorId),
+              })
+            : null,
+        },
         { status: 409 }
       );
     }
     // Choque contra el UNIQUE de turnoId: otro pedido tomó el corte mientras este
     // estaba en vuelo. La base es la garantía dura de "un corte por turno".
     if (error?.code === "P2002") {
+      // Se busca el corte que ganó la carrera para poder ofrecerlo. Es una
+      // lectura más en un camino que ya es excepcional, y evita que el cajero
+      // quede con un aviso sin salida.
+      const pendiente = await cierrePendienteDeTurno(turnoDelPedido);
       return NextResponse.json(
-        { ok: false, error: "Esta caja ya tiene un cierre en preparación.", duplicado: true },
+        {
+          ok: false,
+          error: "Esta caja ya tiene un cierre en preparación.",
+          duplicado: true,
+          procesoPendiente: pendiente,
+        },
         { status: 409 }
       );
     }

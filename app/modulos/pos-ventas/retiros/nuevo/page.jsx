@@ -22,7 +22,7 @@
 // Nada se registra hasta confirmar el modal. Hasta ahí no hay fila, no hay
 // movimiento y no salió plata.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, X } from "lucide-react";
 
@@ -36,6 +36,8 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import ModalCambioPrevio from "@/components/caja/ModalCambioPrevio";
+import ModalProcesoPendiente from "@/components/caja/ModalProcesoPendiente";
+import useProcesoPendiente from "@/hooks/useProcesoPendiente";
 import { Aviso, PanelMovimientos } from "@/components/caja/PanelesRetiro";
 import { PanelAntesDelCorte } from "@/components/caja/PanelesCierre";
 import { totalDesglose } from "@/lib/caja/conteoBilletes";
@@ -101,11 +103,16 @@ export default function PrepararRetiroPage() {
       cache: "no-store",
     }).then((x) => x.json());
 
-    // Si esta caja ya tiene un retiro a medio contar, no hay nada que preparar:
-    // se va derecho a terminarlo. Es el caso de quien vuelve a tocar el botón.
-    if (r?.retiroEnPreparacion?.token) {
-      return { yaCortado: r.retiroEnPreparacion };
-    }
+    // ── PROCESOS PENDIENTES, ANTES QUE NADA ────────────────────────────────
+    //
+    // Antes esta pantalla redirigía sola al retiro que ya existía, y no miraba el
+    // cierre. Con un cierre ya tomado, el cajero llegaba hasta el modal, apretaba
+    // el botón, el servidor devolvía 409 y no se veía nada. Ahora los dos casos
+    // se detectan acá y se muestran, con salidas.
+    const pendiente =
+      r?.retiroEnPreparacion?.proceso || r?.cierreEnPreparacion?.proceso || null;
+    if (pendiente?.token) return { pendiente };
+
     const t = r?.ok ? r.turno : null;
     if (!t?.id) return { turno: null };
 
@@ -121,38 +128,47 @@ export default function PrepararRetiroPage() {
     };
   }, []);
 
+  // El hook va primero y la relectura después, unidas por una ref: la
+  // cancelación tiene que releer, y la relectura tiene que poder mostrar un
+  // proceso. Con una ref no hay que declarar una antes que la otra.
+  const releerRef = useRef(null);
+  const proc = useProcesoPendiente({
+    enPestanaNueva,
+    alCancelar: () => releerRef.current?.(),
+  });
+  const { setProceso } = proc;
+
+  const releer = useCallback(async () => {
+    try {
+      const d = await cargar();
+      if (d.pendiente) {
+        setProceso(d.pendiente);
+        return;
+      }
+      if (!d.turno) {
+        setErrorFatal("No hay una caja abierta a tu nombre en este local.");
+        return;
+      }
+      setTurno(d.turno);
+      setEsperado(d.esperado);
+      setMovimientos(d.movimientos);
+
+      // Un conteo del flujo anterior no se traduce: se descarta y se avisa.
+      // Ver el comentario de versiones en borradorRetiro.js.
+      if (purgarBorradoresViejos(storage) > 0) setAviso(AVISO_FLUJO_CAMBIADO);
+    } catch {
+      setErrorFatal("No se pudo leer el estado de la caja.");
+    } finally {
+      setCargando(false);
+    }
+  }, [cargar, storage, setProceso]);
+
+  releerRef.current = releer;
+
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !puedeUsar || needsContexto) return;
-    let vivo = true;
-    (async () => {
-      try {
-        const d = await cargar();
-        if (!vivo) return;
-        if (d.yaCortado?.token) {
-          router.replace(rutaRetiro(d.yaCortado.token, enPestanaNueva));
-          return;
-        }
-        if (!d.turno) {
-          setErrorFatal("No hay una caja abierta a tu nombre en este local.");
-          return;
-        }
-        setTurno(d.turno);
-        setEsperado(d.esperado);
-        setMovimientos(d.movimientos);
-
-        // Un conteo del flujo anterior no se traduce: se descarta y se avisa.
-        // Ver el comentario de versiones en borradorRetiro.js.
-        if (purgarBorradoresViejos(storage) > 0) setAviso(AVISO_FLUJO_CAMBIADO);
-      } catch {
-        if (vivo) setErrorFatal("No se pudo leer el estado de la caja.");
-      } finally {
-        if (vivo) setCargando(false);
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, [cargar, cargandoUser, cargandoCtx, puedeUsar, needsContexto, storage, router, enPestanaNueva]);
+    releer();
+  }, [releer, cargandoUser, cargandoCtx, puedeUsar, needsContexto]);
 
   const volverAlPos = () => {
     // Abierta en pestaña propia: cerrarla devuelve al POS, que nunca se fue.
@@ -210,6 +226,16 @@ export default function PrepararRetiroPage() {
         body: JSON.stringify({ turnoId: turno.id, desgloseCambio }),
       });
       const json = await res.json();
+
+      // Un proceso pendiente no es un error en letra chica adentro del modal: es
+      // un cartel con salidas. Llega tanto en el 409 de exclusión mutua —un
+      // cierre ya tomado— como en el 200 con `repetido`, cuando el retiro ya
+      // existía. Los dos casos terminan en la misma pantalla.
+      if (proc.tomarDeRespuesta(json)) {
+        setModalAbierto(false);
+        return;
+      }
+
       if (!res.ok || !json?.ok || !json.retiro?.token) {
         setError(json?.error || "No se pudo iniciar el retiro.");
         return;
@@ -234,6 +260,23 @@ export default function PrepararRetiroPage() {
             Seleccioná un local para retirar la recaudación.
           </p>
         </SunmiCard>
+      </Marco>
+    );
+  }
+
+  // El aviso de proceso pendiente se muestra SOLO: mientras exista no hay nada
+  // que preparar, y dejar el botón a la vista invitaría a apretarlo otra vez.
+  if (proc.proceso) {
+    return (
+      <Marco>
+        <ModalProcesoPendiente
+          proceso={proc.proceso}
+          cancelando={proc.cancelando}
+          error={proc.error}
+          onContinuar={() => router.replace(proc.rutaContinuar())}
+          onCancelar={proc.cancelar}
+          onVolver={volverAlPos}
+        />
       </Marco>
     );
   }
@@ -284,6 +327,10 @@ export default function PrepararRetiroPage() {
       </SunmiCard>
 
       {aviso && <Aviso tono="info">{aviso}</Aviso>}
+
+      {/* Lo que quedó del proceso que se acaba de deshacer. Se dice explícito
+          que la caja sigue viva: es la duda inmediata del cajero. */}
+      {proc.exito && <Aviso tono="info">{proc.exito}</Aviso>}
 
       {/* MISMA SECUENCIA QUE EL CIERRE: tarjeta simple, botón, modal. Que las
           dos pantallas se vean igual no es prolijidad: es lo que evita que el
