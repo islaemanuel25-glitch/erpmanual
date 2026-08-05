@@ -2194,6 +2194,11 @@ enum EstadoImportacionLista {
   /// Cancelada a mano. Queda como historial y LIBERA el archivo para poder
   /// volver a importarlo.
   CANCELADA
+  /// Se aplicó una tanda pero quedan filas pendientes de decisión. La
+  /// importación SIGUE ABIERTA: se puede vincular, seleccionar y aplicar de
+  /// nuevo. Las filas ya aplicadas quedan cerradas una por una, no por el
+  /// estado de la cabecera.
+  PARCIALMENTE_APLICADA
 }
 
 /// Cómo se encontró el producto de una fila. Espeja TIPO_COINCIDENCIA del motor.

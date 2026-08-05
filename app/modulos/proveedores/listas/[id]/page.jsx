@@ -28,6 +28,7 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
 import FilaRevision from "@/components/proveedores/listas/FilaRevision";
+import PanelMacheo from "@/components/proveedores/listas/PanelMacheo";
 import {
   BadgeEstado,
   Dato,
@@ -58,8 +59,14 @@ const VISTAS = [
   { id: "listas", texto: "Listas" },
   { id: "alerta", texto: "Con alerta" },
   { id: "exactas", texto: "Exactas" },
+  { id: "manuales", texto: "Manuales" },
+  { id: "sinCeros", texto: "Sin ceros" },
+  { id: "sufijo8", texto: "Sufijo 8" },
+  { id: "sufijo7", texto: "Sufijo 7" },
+  { id: "sufijo6", texto: "Sufijo 6" },
   { id: "sufijo5", texto: "Sufijo 5" },
   { id: "sufijo4", texto: "Sufijo 4" },
+  { id: "codigoBarra", texto: "Código de barras" },
   { id: "factorDudoso", texto: "Factor dudoso" },
   { id: "sinVincular", texto: "Sin vincular" },
   { id: "ambiguas", texto: "Ambiguas" },
@@ -84,8 +91,10 @@ function puedeVincular(fila) {
  * aplica: la pantalla no vuelve a decidirlo por su cuenta. Cuando la fila no se
  * puede marcar se pasa el motivo, para que el checkbox gris tenga explicación.
  */
+const ESTADOS_ABIERTOS = ["CONCILIADA", "PARCIALMENTE_APLICADA"];
+
 function seleccionDeFila(fila, importacion, onCambiar) {
-  if (!importacion || importacion.estado !== "CONCILIADA") return null;
+  if (!importacion || !ESTADOS_ABIERTOS.includes(importacion.estado)) return null;
   const puede = fila?.seleccionable === true && fila?.aplicada !== true;
   return {
     puede,
@@ -115,6 +124,7 @@ export default function ConciliacionPage() {
   const [cab, setCab] = useState(null);
   const [filas, setFilas] = useState([]);
   const [pag, setPag] = useState({ page: 1, paginas: 1, total: 0 });
+  const [macheo, setMacheo] = useState(null);
 
   // Los filtros arrancan de la URL: así una conciliación filtrada se puede
   // compartir por link y volver a abrir igual. Sin esto, pegar la URL con
@@ -146,6 +156,9 @@ export default function ConciliacionPage() {
   const [cargandoPrevio, setCargandoPrevio] = useState(false);
   const [cancelando, setCancelando] = useState(false);
   const [trabajandoCancelar, setTrabajandoCancelar] = useState(false);
+  const [progreso, setProgreso] = useState(null);
+  const [finalizando, setFinalizando] = useState(false);
+  const [trabajandoFinalizar, setTrabajandoFinalizar] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -173,6 +186,8 @@ export default function ConciliacionPage() {
       setFilas(json.filas ?? []);
       setPag(json.paginacion ?? { page: 1, paginas: 1, total: 0 });
       if (json.seleccion) setResumenSeleccion(json.seleccion);
+      if (json.macheo) setMacheo(json.macheo);
+      if (json.progreso) setProgreso(json.progreso);
     } catch {
       setError("Error de conexión.");
     } finally {
@@ -285,6 +300,29 @@ export default function ConciliacionPage() {
       setErrorAplicar("Error de conexión.");
     } finally {
       setTrabajandoCancelar(false);
+    }
+  };
+
+  /** Cierra la importación por decisión del usuario. No aplica nada. */
+  const finalizarImportacion = async () => {
+    setTrabajandoFinalizar(true);
+    setErrorAplicar("");
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/finalizar`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await r.json();
+      if (!r.ok || !json?.ok) {
+        setErrorAplicar(json?.error || "No se pudo finalizar la importación.");
+        return;
+      }
+      setFinalizando(false);
+      await cargar();
+    } catch {
+      setErrorAplicar("Error de conexión.");
+    } finally {
+      setTrabajandoFinalizar(false);
     }
   };
 
@@ -433,7 +471,7 @@ export default function ConciliacionPage() {
             {/* La barra de aplicación va ARRIBA de la tabla y fuera de ella: es
                 una acción sobre el conjunto, no sobre una fila, y esconderla al
                 final de 917 filas la volvería invisible. */}
-            {cab.estado !== "CANCELADA" && (
+            {cab.estado !== "CANCELADA" && cab.estado !== "APLICADA" && (
             <PanelAplicar
               importacion={cab}
               resumenSeleccion={resumenSeleccion}
@@ -543,6 +581,106 @@ export default function ConciliacionPage() {
                   </SunmiButton>
                 ) : null
               }
+            />
+          )}
+
+          {/* ── Progreso de la importación ────────────────────────────────
+              Aplicar una tanda no termina el trabajo. Estos cinco números son
+              lo que dice si queda algo por hacer, y antes no existían: la
+              pantalla seguía mostrando "101 listos" después de aplicar esas
+              mismas 101, como si nada hubiera pasado. */}
+          {!error && cab && progreso && (
+            <SunmiCard className="p-3 space-y-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-[13.5px] font-bold sunmi-text-strong">Progreso</h2>
+                {progreso.pendientes > 0 ? (
+                  <span className="text-[11.5px] sunmi-text-warning">
+                    Quedan {progreso.pendientes} filas por resolver
+                  </span>
+                ) : (
+                  <span className="text-[11.5px] sunmi-text-success">No quedan filas pendientes</span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {[
+                  { k: "aplicadas", t: "Aplicadas", v: progreso.aplicadas, tono: "sunmi-text-success", d: "Ya escribieron su costo. No se pueden volver a aplicar." },
+                  { k: "listasPendientes", t: "Listas pendientes", v: progreso.listasPendientes, tono: "sunmi-text-accent", d: "Se pueden aplicar en la próxima tanda." },
+                  { k: "requierenRevision", t: "Requieren revisión", v: progreso.requierenRevision, tono: "sunmi-text-warning", d: "Falta corregir el armado del producto." },
+                  { k: "excluidas", t: "Excluidas", v: progreso.excluidas, tono: "sunmi-text-muted", d: "Se sacaron a mano de la aplicación." },
+                  { k: "sinVincular", t: "Sin vincular", v: progreso.sinVincular, tono: "sunmi-text-muted", d: "No tienen producto del ERP asociado." },
+                ].map((x) => (
+                  <div key={x.k} className="sunmi-surface-soft rounded-lg p-2.5" title={x.d}>
+                    <div className={`text-[19px] font-bold tabular-nums leading-none ${x.tono}`}>{x.v}</div>
+                    <div className="text-[11.5px] sunmi-text-strong mt-1">{x.t}</div>
+                    <div className="text-[10.5px] sunmi-text-muted leading-snug">{x.d}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Cierre explícito: mientras haya pendientes, terminar es una
+                  decisión, no una consecuencia de haber aplicado algo. */}
+              {cab.estado !== "APLICADA" && cab.estado !== "CANCELADA" && (
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <SunmiButton
+                    color="slate"
+                    onClick={() => setFinalizando(true)}
+                    disabled={trabajandoFinalizar}
+                    className="py-2 px-3 !text-[11.5px]"
+                  >
+                    Finalizar importación
+                  </SunmiButton>
+                  <span className="text-[10.5px] sunmi-text-muted">
+                    Cierra la lista sin aplicar lo que queda pendiente.
+                  </span>
+                  {finalizando && (
+                    <div className="w-full sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-2">
+                      <p className="text-[12px] sunmi-text-strong leading-snug">
+                        ¿Dar por terminada esta importación?
+                        {progreso.pendientes > 0 && (
+                          <> Quedan <span className="font-semibold">{progreso.pendientes}</span> filas
+                          sin resolver y no se van a poder aplicar después.</>
+                        )}
+                      </p>
+                      <p className="text-[11.5px] sunmi-text-muted leading-snug">
+                        Las {progreso.aplicadas} ya aplicadas conservan su historial. No se modifica
+                        ningún costo ni precio.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
+                        <SunmiButton
+                          color="slate"
+                          onClick={() => setFinalizando(false)}
+                          disabled={trabajandoFinalizar}
+                          className="py-2 !text-xs order-2 sm:order-1"
+                        >
+                          No, seguir trabajando
+                        </SunmiButton>
+                        <SunmiButton
+                          color="cyan"
+                          onClick={finalizarImportacion}
+                          disabled={trabajandoFinalizar}
+                          className="py-2 font-bold !text-xs order-1 sm:order-2"
+                        >
+                          {trabajandoFinalizar ? "Finalizando…" : "Sí, finalizar la importación"}
+                        </SunmiButton>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </SunmiCard>
+          )}
+
+          {/* La sección de macheo va ARRIBA de todo el listado: responde la
+              pregunta previa —cómo se encontró cada producto— antes de que el
+              usuario empiece a revisar fila por fila. */}
+          {!error && cab && (
+            <PanelMacheo
+              macheo={macheo}
+              vista={vista}
+              onVista={(v) => {
+                setVista(v);
+                setPage(1);
+              }}
             />
           )}
 

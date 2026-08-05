@@ -36,7 +36,7 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
-import { ESTADO_IMPORTACION } from "@/lib/proveedores/listas/persistencia";
+import { ESTADO_IMPORTACION, esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 import { CONFIG_ARCOR } from "@/lib/proveedores/listas/configuraciones/arcor";
 import { alertasDeFila, presentacionDe } from "@/lib/proveedores/listas/alertas";
 import {
@@ -252,9 +252,9 @@ export async function POST(req, context) {
       });
     }
 
-    if (importacion.estado !== ESTADO_IMPORTACION.CONCILIADA) {
+    if (!esImportacionAbierta(importacion.estado)) {
       return NextResponse.json(
-        { ok: false, error: "Solo se puede aplicar una importación conciliada." },
+        { ok: false, error: "La importación está cerrada: no se pueden aplicar más filas." },
         { status: 409 }
       );
     }
@@ -287,7 +287,7 @@ export async function POST(req, context) {
         where: { id: importacionId },
         select: { estado: true },
       });
-      if (cab.estado !== ESTADO_IMPORTACION.CONCILIADA) {
+      if (!esImportacionAbierta(cab.estado)) {
         return { carrera: true };
       }
 
@@ -433,19 +433,49 @@ export async function POST(req, context) {
 
       const resumen = resumirAplicacion(detalle);
 
-      await tx.importacionListaProveedor.update({
-        where: { id: importacionId },
-        data: {
-          estado: ESTADO_IMPORTACION.APLICADA,
-          aplicadaEn: ahora,
-          aplicadaPorUsuarioId: usuarioId,
-          modoPrecioVenta,
-          aplicadas: resumen.aplicadas,
-          omitidas: resumen.omitidas,
+      // ── El estado final depende de lo que QUEDE ────────────────────────
+      //
+      // Antes se ponía APLICADA siempre, y eso cerraba la importación entera
+      // aunque quedaran ochocientas filas por revisar: no se podía vincular,
+      // ni seleccionar, ni aplicar una segunda tanda. Aplicar una tanda no es
+      // terminar el trabajo.
+      //
+      // Pendiente = fila no aplicada, no excluida a mano y en un estado que
+      // todavía admite una decisión. Una fila SIN_CAMBIOS o con ERROR no está
+      // pendiente: no hay nada que decidir sobre ella.
+      const pendientes = await tx.importacionListaFila.count({
+        where: {
+          importacionId,
+          aplicada: false,
+          excluidaManual: false,
+          estado: { in: ["LISTO_PARA_ACTUALIZAR", "NO_MACHEADO", "FACTOR_DUDOSO", "CODIGO_DUPLICADO"] },
         },
       });
 
-      return { resumen, detalle };
+      // Los contadores ACUMULAN entre tandas: son el total de la importación,
+      // no el de la última corrida.
+      const yaAplicadas = await tx.importacionListaFila.count({
+        where: { importacionId, aplicada: true },
+      });
+      const yaOmitidas = await tx.importacionListaFila.count({
+        where: { importacionId, resultadoAplicacion: "OMITIDA" },
+      });
+
+      await tx.importacionListaProveedor.update({
+        where: { id: importacionId },
+        data: {
+          estado: pendientes > 0
+            ? ESTADO_IMPORTACION.PARCIALMENTE_APLICADA
+            : ESTADO_IMPORTACION.APLICADA,
+          aplicadaEn: ahora,
+          aplicadaPorUsuarioId: usuarioId,
+          modoPrecioVenta,
+          aplicadas: yaAplicadas,
+          omitidas: yaOmitidas,
+        },
+      });
+
+      return { resumen, detalle, pendientes };
     }, TX_APLICAR);
 
     if (salida.carrera) {
@@ -471,6 +501,10 @@ export async function POST(req, context) {
       archivo: importacion.archivoNombre,
       resumen: salida.resumen,
       detalle: salida.detalle,
+      pendientes: salida.pendientes,
+      // Si quedan pendientes, la importación NO terminó. La pantalla lo usa
+      // para no decir "listo" cuando falta trabajo.
+      finalizada: salida.pendientes === 0,
     });
   } catch (e) {
     console.error("[listas/aplicar] error:", e);

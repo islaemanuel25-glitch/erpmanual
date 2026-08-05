@@ -243,6 +243,33 @@ export default function FilaRevision({
         </div>
       )}
 
+      {/* ── Candidatos de una fila ambigua ──────────────────────────────
+          Se muestran TODOS. Una fila queda ambigua justamente porque más de un
+          producto podía ser; enseñar uno solo daría a entender que el sistema
+          eligió, que es lo contrario de lo que pasó. */}
+      {Array.isArray(fila.candidatos) && fila.candidatos.length > 0 && (
+        <div className="sunmi-surface-soft rounded-lg p-2.5 space-y-1">
+          <div className="text-[11px] font-semibold sunmi-text-danger">
+            {fila.candidatos.length} productos podían ser
+            {fila.candidatosSufijoDigitos ? ` (coinciden ${fila.candidatosSufijoDigitos} dígitos)` : ""}
+          </div>
+          <p className="text-[10.5px] sunmi-text-muted leading-snug">
+            No se eligió ninguno. Resolvelo con &quot;Vincular&quot; para decidir cuál es.
+          </p>
+          <ul className="space-y-0.5">
+            {fila.candidatos.map((c) => (
+              <li key={c.productoBaseId} className="text-[11.5px] sunmi-text-strong">
+                {c.nombre ?? `Producto #${c.productoBaseId}`}
+                <span className="sunmi-text-muted">
+                  {" · código "}{c.codigoInterno}
+                  {c.costoActual !== null && c.costoActual !== undefined ? ` · costo ${money(c.costoActual)}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <Alertas alertas={fila.alertas} />
       <Motivo motivo={fila.motivo} />
 

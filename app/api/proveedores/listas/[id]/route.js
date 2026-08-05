@@ -29,7 +29,13 @@ import {
   MODO_PRECIO_VENTA,
 } from "@/lib/proveedores/listas/aplicacion";
 import { alertasDeFila, presentacionDe } from "@/lib/proveedores/listas/alertas";
-import { TIPO_COINCIDENCIA } from "@/lib/proveedores/listas/conciliarLista";
+import {
+  TIPO_COINCIDENCIA,
+  indexarCodigosProveedor,
+  macheePorCodigo,
+} from "@/lib/proveedores/listas/conciliarLista";
+import { resumirMacheo, resumirProgreso } from "@/lib/proveedores/listas/macheo";
+import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { paginacion, LIMITES } from "@/lib/proveedores/listas/persistencia";
@@ -49,8 +55,13 @@ const VISTAS = {
   seleccionadas: { seleccionada: true },
   listas: { estado: "LISTO_PARA_ACTUALIZAR" },
   exactas: { tipoCoincidencia: "CODIGO_INTERNO" },
+  sinCeros: { tipoCoincidencia: "CODIGO_INTERNO_SIN_CEROS" },
+  sufijo8: { tipoCoincidencia: "SUFIJO_8" },
+  sufijo7: { tipoCoincidencia: "SUFIJO_7" },
+  sufijo6: { tipoCoincidencia: "SUFIJO_6" },
   sufijo5: { tipoCoincidencia: "SUFIJO_5" },
   sufijo4: { tipoCoincidencia: "SUFIJO_4" },
+  manuales: { vinculadoPorUsuarioId: { not: null } },
   codigoBarra: { tipoCoincidencia: "CODIGO_BARRA" },
   factorDudoso: { estado: "FACTOR_DUDOSO" },
   sinVincular: { estado: "NO_MACHEADO" },
@@ -152,7 +163,7 @@ export async function GET(req, context) {
           descripcionProveedor: true, categoriaCruda: true,
           unidadProveedor: true, unidadesPorBulto: true,
           precioConIva: true, precioSinIva: true,
-          productoBaseId: true, tipoCoincidencia: true,
+          productoBaseId: true, tipoCoincidencia: true, sufijoDigitos: true,
           sugerenciaProductoBaseId: true, sugerenciaCodigoBarra: true,
           costoAnterior: true, recargoPct: true, montoRecargo: true, precioConRecargo: true,
           factorErp: true, costoUnitarioCalculado: true, costoMaestroPropuesto: true,
@@ -186,6 +197,30 @@ export async function GET(req, context) {
     });
     const resumenSeleccion = resumirSeleccion(filasParaResumen, cabecera);
 
+    // ── El macheo, contado sobre TODA la importación ─────────────────────
+    //
+    // Sobre todas las filas y no sobre la página: el punto de esta sección es
+    // decir cómo se macheó el archivo entero. Se piden solo las tres columnas
+    // que deciden el grupo, no la fila completa.
+    const filasParaMacheo = await prisma.importacionListaFila.findMany({
+      where: { importacionId },
+      select: { tipoCoincidencia: true, productoBaseId: true, vinculadoPorUsuarioId: true },
+    });
+
+    // El universo del ERP: productos con este proveedor asociado en alguna de
+    // sus tres relaciones. Es un número del CATÁLOGO, no del archivo, y por eso
+    // se informa aparte.
+    const productosDelProveedor = await prisma.productoBase.count({
+      where: { grupoId, ...productoDelProveedorWhere(cabecera.proveedor.id) },
+    });
+
+    const macheo = resumirMacheo(filasParaMacheo, { productosDelProveedor });
+
+    // Progreso por tandas: cuántas ya se aplicaron y cuántas siguen pendientes
+    // de decisión. Es lo que permite aplicar en varias veces sin que la pantalla
+    // diga que terminó cuando falta trabajo.
+    const progreso = resumirProgreso(filasParaResumen);
+
     // ── Códigos internos del proveedor, para mostrarlos al lado del producto ──
     const baseIds = [...new Set(filas.map((f) => f.productoBaseId).filter((x) => x !== null))];
     const vinculos = baseIds.length
@@ -211,6 +246,53 @@ export async function GET(req, context) {
         })
       : [];
     const propiosPorBase = new Map(propios.map((p) => [p.baseId, p.codigo_barra_propio]));
+
+    // ── Candidatos de las filas AMBIGUAS ─────────────────────────────────
+    //
+    // Se calculan en vivo y no se guardan: son pocas filas y la alternativa era
+    // una columna nueva para un dato derivable. Mostrarlos todos es el punto:
+    // una fila ambigua es ambigua justamente porque hay más de un producto
+    // posible, y esconderlos daría la impresión de que el sistema eligió.
+    const hayAmbiguas = filas.some((f) => f.tipoCoincidencia === TIPO_COINCIDENCIA.AMBIGUA);
+    let candidatosPorFila = new Map();
+    if (hayAmbiguas) {
+      const vinculosTodos = await prisma.productoCodigoProveedor.findMany({
+        where: { grupoId, proveedorId: cabecera.proveedor.id, activo: true },
+        select: { id: true, productoBaseId: true, codigoInterno: true, activo: true },
+      });
+      const indice = indexarCodigosProveedor(vinculosTodos);
+      const idsCandidatos = new Set();
+      const porFila = new Map();
+      for (const f of filas) {
+        if (f.tipoCoincidencia !== TIPO_COINCIDENCIA.AMBIGUA) continue;
+        const r = macheePorCodigo(indice, f);
+        const cands = (r.candidatos ?? []).map((c) => ({
+          productoBaseId: c.productoBaseId,
+          codigoInterno: c.codigoInterno,
+        }));
+        porFila.set(f.id, { candidatos: cands, sufijoDigitos: r.sufijoDigitos ?? null });
+        for (const c of cands) idsCandidatos.add(c.productoBaseId);
+      }
+      const nombres = idsCandidatos.size
+        ? await prisma.productoBase.findMany({
+            where: { id: { in: [...idsCandidatos] } },
+            select: { id: true, nombre: true, precio_costo: true },
+          })
+        : [];
+      const nombrePorId = new Map(nombres.map((x) => [x.id, x]));
+      for (const [filaId, v] of porFila) {
+        candidatosPorFila.set(filaId, {
+          sufijoDigitos: v.sufijoDigitos,
+          candidatos: v.candidatos.map((c) => ({
+            ...c,
+            nombre: nombrePorId.get(c.productoBaseId)?.nombre ?? null,
+            costoActual: nombrePorId.get(c.productoBaseId)?.precio_costo == null
+              ? null
+              : Number(nombrePorId.get(c.productoBaseId).precio_costo),
+          })),
+        });
+      }
+    }
 
     const modoVenta = MODO_PRECIO_VENTA.RECALCULAR_POR_MARGEN;
 
@@ -284,6 +366,10 @@ export async function GET(req, context) {
         ventaSeRecalcula: proyeccion.aplica,
         alertas,
         tieneAlerta: alertas.length > 0,
+        // Solo en las ambiguas. Se muestran TODOS: elegir uno en silencio es
+        // exactamente lo que el motor se niega a hacer.
+        candidatos: candidatosPorFila.get(f.id)?.candidatos ?? null,
+        candidatosSufijoDigitos: candidatosPorFila.get(f.id)?.sufijoDigitos ?? null,
       };
     };
 
@@ -306,10 +392,12 @@ export async function GET(req, context) {
       },
       filas: filasSalida,
       vista,
+      macheo,
       // El contador tiene que hablar de la importación entera: el usuario
       // selecciona en varias páginas y necesita saber cuántas lleva en total,
       // no cuántas hay marcadas en las 50 que está mirando.
       seleccion: resumenSeleccion,
+      progreso,
       paginacion: {
         page,
         pageSize,

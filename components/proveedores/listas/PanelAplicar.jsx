@@ -41,6 +41,7 @@ export default function PanelAplicar({
   const [confirmando, setConfirmando] = useState(false);
   const [confirmadoLeido, setConfirmadoLeido] = useState(false);
 
+  // Solo APLICADA cierra. PARCIALMENTE_APLICADA sigue aceptando tandas.
   const yaAplicada = importacion?.estado === "APLICADA";
   const seleccionadas = resumenSeleccion?.seleccionadas ?? 0;
   const seleccionables = resumenSeleccion?.seleccionables ?? 0;

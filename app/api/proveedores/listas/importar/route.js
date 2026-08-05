@@ -151,17 +151,22 @@ export async function POST(req) {
     // choca contra la base y se resuelve más abajo. El nombre del archivo no se
     // usa como criterio: el mismo Excel se baja dos veces con nombres distintos.
     //
-    // UNA IMPORTACIÓN CANCELADA NO BLOQUEA EL ARCHIVO.
+    // SOLO BLOQUEAN LAS IMPORTACIONES ABIERTAS.
     //
-    // El índice único es PARCIAL —excluye las canceladas— así que el mismo Excel
-    // se puede volver a subir después de cancelar. La garantía contra carreras
-    // se conserva: sigue siendo imposible que existan dos importaciones VIVAS
-    // del mismo archivo, que es lo que el índice tiene que impedir.
+    // El índice único es PARCIAL: ocupan el archivo únicamente las que están en
+    // borrador, conciliadas o parcialmente aplicadas. Una cancelada o una ya
+    // terminada son historial, no un conflicto, y no impiden volver a importar
+    // la misma lista del proveedor.
     //
-    // Antes el bloqueo era para siempre y el flujo natural —"me equivoqué, la
-    // cancelo y la vuelvo a subir"— era imposible.
+    // La garantía real se conserva: sigue siendo imposible tener dos procesos
+    // ABIERTOS del mismo archivo, que es el duplicado que hace daño. Antes el
+    // bloqueo era para siempre y dejaba al proveedor sin poder mandar una lista
+    // nueva nunca más.
     const previa = await prisma.importacionListaProveedor.findFirst({
-      where: { grupoId, proveedorId, archivoHash, estado: { not: "CANCELADA" } },
+      where: {
+        grupoId, proveedorId, archivoHash,
+        estado: { in: ["BORRADOR", "CONCILIADA", "PARCIALMENTE_APLICADA"] },
+      },
       select: { id: true, createdAt: true, estado: true, archivoNombre: true },
     });
     if (previa) {
