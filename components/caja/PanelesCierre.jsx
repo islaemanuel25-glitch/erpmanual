@@ -17,7 +17,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import { Lock, TriangleAlert, Clock } from "lucide-react";
+import { TriangleAlert, Clock } from "lucide-react";
 
 import { Cifra, Fila, money } from "@/components/caja/CifrasRetiro";
 
@@ -27,19 +27,15 @@ export const AVISO_ANTES_DEL_CORTE =
   "Al iniciar el cierre se hará un corte de este turno. El POS quedará disponible para el siguiente operador y las operaciones posteriores no formarán parte de este cierre.";
 
 /**
- * La instrucción del orden físico, en la pantalla previa.
+ * El botón de la pantalla previa. NO corta: abre el modal del cambio.
  *
- * Es lo primero que se lee porque es lo primero que hay que hacer con las manos,
- * y porque invierte lo que el cajero venía haciendo hasta ayer: antes contaba
- * todo el cajón y elegía el cambio al final.
+ * Dice lo que va a pasar al final de la secuencia, no lo que hace el clic. El
+ * texto largo —"Separar cambio, iniciar cierre y liberar POS"— vive en el botón
+ * de confirmación del modal, que sí es el que corta.
  */
-export const AYUDA_CAMBIO_PREVIO_CIERRE =
-  "Separá primero el cambio que quedará disponible para seguir vendiendo. Después del corte contarás únicamente el dinero retirado.";
+export const ACCION_ABRIR_CAMBIO_CIERRE = "Iniciar cierre y liberar POS";
 
-/** El cambio que se deja queda para OTRO operador: eso cambia lo que conviene dejar. */
-export const AYUDA_GRILLA_CAMBIO_CIERRE =
-  "Contá los billetes y monedas que dejás en la caja para el siguiente operador.";
-
+/** El botón que SÍ corta, dentro del modal. */
 export const ACCION_INICIAR_CIERRE = "Separar cambio, iniciar cierre y liberar POS";
 
 export const AVISO_CONTAR_SOLO_RETIRO_CIERRE =
@@ -117,28 +113,24 @@ export function PanelAntesDelCorte({
   operadorNombre,
   localNombre,
   esperado,
-  /** Total del cambio que se está separando, ya contado en el otro bloque. */
-  totalCambio = 0,
-  /** `esperado − cambio`. Es lo que se va a tener que contar después del corte. */
-  retiroEstimado = null,
-  confirmando = false,
   iniciando = false,
   error = "",
-  onPedirConfirmacion,
-  onCancelar,
+  /** Abre el modal donde se separa el cambio. NO corta nada por sí solo. */
   onIniciar,
+  // Lo único que difiere entre el cierre y el retiro es el texto. La secuencia
+  // —tarjeta simple, botón, modal— tiene que ser idéntica en los dos: si una
+  // pantalla pidiera la grilla de entrada y la otra no, el cajero tendría que
+  // acordarse de cuál es cuál.
+  titulo = "Antes de cerrar",
+  ayuda = "Revisá que esta sea la caja que querés cerrar.",
+  aviso = AVISO_ANTES_DEL_CORTE,
+  textoBoton = ACCION_ABRIR_CAMBIO_CIERRE,
 }) {
-  const superaEsperado = retiroEstimado != null && retiroEstimado < 0;
-
   return (
     <SunmiCard className="p-3 space-y-3">
       <div>
-        <h2 className="text-sm font-bold sunmi-text-strong leading-tight">
-          Antes de cerrar
-        </h2>
-        <p className="text-[11px] sunmi-text-muted leading-snug mt-0.5">
-          Revisá que esta sea la caja que querés cerrar.
-        </p>
+        <h2 className="text-sm font-bold sunmi-text-strong leading-tight">{titulo}</h2>
+        <p className="text-[11px] sunmi-text-muted leading-snug mt-0.5">{ayuda}</p>
       </div>
 
       <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
@@ -150,65 +142,25 @@ export function PanelAntesDelCorte({
 
       <Cifra label="Efectivo esperado ahora" valor={esperado ?? "—"} destacado />
 
-      {/* Las dos cifras que resultan de separar el cambio. Se muestran ANTES de
-          cortar porque son la decisión que se está tomando: cuánto queda para
-          seguir vendiendo y cuánto habrá que contar después. */}
-      <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
-        <Fila label="Cambio que queda" valor={totalCambio} />
-        <Fila
-          label="Retiro estimado"
-          valor={retiroEstimado ?? "—"}
-          clase={superaEsperado ? "sunmi-text-warning" : "sunmi-text-accent"}
-          fuerte
-        />
-      </div>
-
-      {superaEsperado && (
-        <div className="sunmi-state-warning sunmi-text-warning sunmi-border rounded-lg p-2 text-[11px] leading-snug flex items-start gap-2">
-          <TriangleAlert size={14} className="shrink-0 mt-0.5" />
-          <div className="min-w-0">{AVISO_CAMBIO_SUPERA_ESPERADO}</div>
-        </div>
-      )}
-
       <div className="sunmi-state-warning sunmi-text-warning sunmi-border rounded-lg p-2 text-[11px] leading-snug flex items-start gap-2">
         <TriangleAlert size={14} className="shrink-0 mt-0.5" />
-        <div className="min-w-0">{AVISO_ANTES_DEL_CORTE}</div>
+        <div className="min-w-0">{aviso}</div>
       </div>
 
       {error && <div className="text-[12px] sunmi-text-danger text-center">{error}</div>}
 
-      {/* Confirmación en DOS TIEMPOS. El botón no corta: pide confirmar. Es la
-          misma razón por la que abrir la pantalla no corta — la acción no se
-          deshace sin dejar rastro y deja al local sin cobrar mientras tanto. */}
-      {!confirmando ? (
-        <SunmiButton
-          color="amber"
-          onClick={onPedirConfirmacion}
-          disabled={iniciando || !turno?.id}
-          className="w-full py-3 font-bold"
-        >
-          {ACCION_INICIAR_CIERRE}
-        </SunmiButton>
-      ) : (
-        <div className="sunmi-surface sunmi-border rounded-lg p-3 space-y-2">
-          <div className="flex items-start gap-2">
-            <Lock size={16} className="shrink-0 mt-0.5 sunmi-text-warning" />
-            <p className="text-[12px] sunmi-text-strong leading-snug">
-              Después de esto el turno #{turno?.id} no admite más ventas ni movimientos, y el
-              cambio de {money(totalCambio)} queda publicado para el siguiente operador: no vas a
-              poder cambiarlo. Vas a contar con calma solo el dinero retirado.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <SunmiButton color="slate" onClick={onCancelar} disabled={iniciando} className="py-2 !text-xs">
-              Volver
-            </SunmiButton>
-            <SunmiButton color="amber" onClick={onIniciar} disabled={iniciando} className="py-2 !text-xs font-bold">
-              {iniciando ? "Cortando…" : "Sí, separar cambio y cortar"}
-            </SunmiButton>
-          </div>
-        </div>
-      )}
+      {/* El botón NO corta: abre el modal donde se separa el cambio. Esa es la
+          confirmación en dos tiempos — y existe por lo mismo por lo que abrir la
+          pantalla tampoco corta: la acción no se deshace sin dejar rastro y deja
+          al local sin cobrar mientras alguien cuenta. */}
+      <SunmiButton
+        color="amber"
+        onClick={onIniciar}
+        disabled={iniciando || !turno?.id}
+        className="w-full py-3 font-bold"
+      >
+        {textoBoton}
+      </SunmiButton>
     </SunmiCard>
   );
 }

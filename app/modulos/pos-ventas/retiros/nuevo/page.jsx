@@ -1,6 +1,6 @@
 "use client";
 
-// RETIRO DE RECAUDACIÓN — paso previo: SEPARAR EL CAMBIO y tomar el corte.
+// RETIRO DE RECAUDACIÓN — paso previo: revisar la caja y separar el cambio.
 //
 // CÓMO SE HACE UN RETIRO DE VERDAD
 //
@@ -18,8 +18,9 @@
 // entró después de que cerrara la pila. Separando el cambio antes, el corte
 // congela los dos números y nada de lo que pase después los mueve.
 //
-// Nada se registra hasta "Separar cambio e iniciar retiro". Hasta ahí no hay
-// fila, no hay movimiento y no salió plata.
+// MISMA SECUENCIA QUE EL CIERRE: tarjeta simple, botón, modal con la grilla.
+// Nada se registra hasta confirmar el modal. Hasta ahí no hay fila, no hay
+// movimiento y no salió plata.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -34,19 +35,18 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
-import { Cifra, Fila } from "@/components/caja/CifrasRetiro";
-import { Aviso, PanelCambioPrevio, PanelMovimientos } from "@/components/caja/PanelesRetiro";
+import ModalCambioPrevio from "@/components/caja/ModalCambioPrevio";
+import { Aviso, PanelMovimientos } from "@/components/caja/PanelesRetiro";
+import { PanelAntesDelCorte } from "@/components/caja/PanelesCierre";
 import { totalDesglose } from "@/lib/caja/conteoBilletes";
 import { calcularRetiroEsperado } from "@/lib/caja/cierreRelevo";
 import {
   TITULO_PREPARAR_RETIRO,
-  AYUDA_CAMBIO_RETIRO,
+  AVISO_ANTES_DEL_RETIRO,
+  ACCION_ABRIR_CAMBIO_RETIRO,
   ACCION_INICIAR_RETIRO,
 } from "@/lib/caja/retiroRelevo";
 import { purgarBorradoresViejos, AVISO_FLUJO_CAMBIADO } from "@/lib/caja/borradorRetiro";
-
-const AYUDA_GRILLA =
-  "Contá los billetes y monedas que dejás en la caja para seguir vendiendo.";
 
 export default function PrepararRetiroPage() {
   const router = useRouter();
@@ -69,7 +69,10 @@ export default function PrepararRetiroPage() {
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
   const [iniciando, setIniciando] = useState(false);
-  const [confirmando, setConfirmando] = useState(false);
+
+  // El modal donde se separa el cambio. Abrirlo NO crea nada.
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [revalidado, setRevalidado] = useState(false);
 
   // El cambio que se separa. Vive solo en memoria hasta el corte: guardarlo a
   // medias invitaría a retomarlo horas después contra un esperado que ya cambió.
@@ -87,7 +90,6 @@ export default function PrepararRetiroPage() {
         : calcularRetiroEsperado({ efectivoEsperadoCorte: esperado, totalCambio }),
     [esperado, totalCambio]
   );
-  const superaEsperado = retiroEstimado != null && retiroEstimado < 0;
 
   // ── Estado de la caja, ANTES del corte ───────────────────────────────────
   // Acá sí se lee el resumen vivo: todavía no hay nada congelado y el número que
@@ -161,12 +163,45 @@ export default function PrepararRetiroPage() {
     router.push("/modulos/pos-ventas");
   };
 
+  // ── El modal ─────────────────────────────────────────────────────────────
+  //
+  // Abrirlo y cerrarlo no toca nada: no hay pedido al servidor, no se crea la
+  // preparación y no se congela ninguna cifra.
+  const abrirModal = () => {
+    setError("");
+    setRevalidado(false);
+    setModalAbierto(true);
+  };
+
+  const cerrarModal = () => {
+    if (iniciando) return;
+    setModalAbierto(false);
+    setRevalidado(false);
+    setError("");
+  };
+
   // ── El corte ─────────────────────────────────────────────────────────────
   const iniciar = async () => {
     if (iniciando || !turno?.id) return;
     setIniciando(true);
     setError("");
     try {
+      // EL ESPERADO SE REVALIDA ANTES DE CORTAR. Mientras el modal estaba
+      // abierto la caja pudo cobrar —acá más todavía que en el cierre, porque el
+      // turno nunca se congela—. No se manda ese número: el servidor calcula el
+      // suyo igual. Se avisa para que nadie confirme mirando una cifra vieja.
+      const fresco = await fetch(`/api/pos-ventas/turnos/resumen?turnoId=${turno.id}`, {
+        credentials: "include",
+        cache: "no-store",
+      }).then((x) => x.json()).catch(() => null);
+      const esperadoAhora = fresco?.ok ? Number(fresco.efectivoEsperado) : null;
+
+      if (esperadoAhora != null && esperado != null && esperadoAhora !== esperado && !revalidado) {
+        setEsperado(esperadoAhora);
+        setRevalidado(true);
+        return;
+      }
+
       const res = await fetch("/api/pos-ventas/retiros/iniciar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,13 +212,11 @@ export default function PrepararRetiroPage() {
       const json = await res.json();
       if (!res.ok || !json?.ok || !json.retiro?.token) {
         setError(json?.error || "No se pudo iniciar el retiro.");
-        setConfirmando(false);
         return;
       }
       router.replace(rutaRetiro(json.retiro.token, enPestanaNueva));
     } catch {
       setError("Error de conexión.");
-      setConfirmando(false);
     } finally {
       setIniciando(false);
     }
@@ -238,9 +271,6 @@ export default function PrepararRetiroPage() {
               Turno #{turno?.id} · <span className="sunmi-text-success font-semibold">abierto</span> ·{" "}
               {contexto?.nombre || "—"}
             </p>
-            <p className="text-[11px] sunmi-text-accent leading-snug mt-0.5">
-              {AYUDA_CAMBIO_RETIRO}
-            </p>
           </div>
           <button
             type="button"
@@ -255,93 +285,39 @@ export default function PrepararRetiroPage() {
 
       {aviso && <Aviso tono="info">{aviso}</Aviso>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-        <PanelCambioPrevio
-          desglose={desgloseCambio}
-          onDesglose={setDesgloseCambio}
-          ayuda={AYUDA_GRILLA}
-        />
+      {/* MISMA SECUENCIA QUE EL CIERRE: tarjeta simple, botón, modal. Que las
+          dos pantallas se vean igual no es prolijidad: es lo que evita que el
+          cajero tenga que acordarse de cuál le pide la grilla de entrada. */}
+      <PanelAntesDelCorte
+        turno={turno}
+        operadorNombre={operador?.nombre}
+        localNombre={contexto?.nombre}
+        esperado={esperado}
+        iniciando={iniciando}
+        error={modalAbierto ? "" : error}
+        onIniciar={abrirModal}
+        titulo="Antes de retirar"
+        ayuda="La caja va a seguir vendiendo con el cambio que dejes."
+        aviso={AVISO_ANTES_DEL_RETIRO}
+        textoBoton={ACCION_ABRIR_CAMBIO_RETIRO}
+      />
 
-        <div className="space-y-3">
-          <SunmiCard className="p-3 space-y-3">
-            <div>
-              <h2 className="text-sm font-bold sunmi-text-strong leading-tight">
-                Antes de retirar
-              </h2>
-              <p className="text-[11px] sunmi-text-muted leading-snug mt-0.5">
-                La caja va a seguir vendiendo con el cambio que dejes.
-              </p>
-            </div>
+      <PanelMovimientos movimientos={movimientos} />
 
-            <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
-              <Fila label="Turno" valor={turno?.id ? `#${turno.id}` : "—"} />
-              <Fila label="Operador" valor={operador?.nombre || "Sin operario"} />
-              <Fila label="Local" valor={contexto?.nombre || "—"} />
-            </div>
-
-            <Cifra label="Efectivo esperado ahora" valor={esperado ?? "—"} destacado />
-
-            <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">
-              <Fila label="Cambio que queda" valor={totalCambio} />
-              <Fila
-                label="Retiro estimado"
-                valor={retiroEstimado ?? "—"}
-                clase={superaEsperado ? "sunmi-text-warning" : "sunmi-text-accent"}
-                fuerte
-              />
-            </div>
-
-            {superaEsperado && (
-              <Aviso>
-                El cambio que estás dejando supera el efectivo esperado. Si es correcto, la
-                diferencia va a aparecer como sobrante al confirmar.
-              </Aviso>
-            )}
-
-            {error && <div className="text-[12px] sunmi-text-danger text-center">{error}</div>}
-
-            {/* Confirmación en DOS TIEMPOS: después del corte el cambio queda
-                congelado y no se puede volver a elegir. */}
-            {!confirmando ? (
-              <SunmiButton
-                color="amber"
-                onClick={() => setConfirmando(true)}
-                disabled={iniciando || !turno?.id}
-                className="w-full py-3 font-bold"
-              >
-                {ACCION_INICIAR_RETIRO}
-              </SunmiButton>
-            ) : (
-              <div className="sunmi-surface sunmi-border rounded-lg p-3 space-y-2">
-                <p className="text-[12px] sunmi-text-strong leading-snug">
-                  Después del corte no vas a poder cambiar el cambio separado. La caja sigue
-                  vendiendo y lo que entre después no forma parte de este retiro.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <SunmiButton
-                    color="slate"
-                    onClick={() => setConfirmando(false)}
-                    disabled={iniciando}
-                    className="py-2 !text-xs"
-                  >
-                    Volver
-                  </SunmiButton>
-                  <SunmiButton
-                    color="amber"
-                    onClick={iniciar}
-                    disabled={iniciando}
-                    className="py-2 !text-xs font-bold"
-                  >
-                    {iniciando ? "Cortando…" : "Sí, separar cambio y cortar"}
-                  </SunmiButton>
-                </div>
-              </div>
-            )}
-          </SunmiCard>
-
-          <PanelMovimientos movimientos={movimientos} />
-        </div>
-      </div>
+      <ModalCambioPrevio
+        abierto={modalAbierto}
+        esperado={esperado}
+        desglose={desgloseCambio}
+        onDesglose={setDesgloseCambio}
+        totalCambio={totalCambio}
+        retiroEstimado={retiroEstimado}
+        textoConfirmar={ACCION_INICIAR_RETIRO}
+        confirmando={iniciando}
+        revalidado={revalidado}
+        error={error}
+        onCancelar={cerrarModal}
+        onConfirmar={iniciar}
+      />
     </Marco>
   );
 }
@@ -353,5 +329,7 @@ function rutaRetiro(token, enPestanaNueva) {
 }
 
 function Marco({ children }) {
-  return <div className="p-2 lg:p-3 space-y-3 max-w-[1000px] mx-auto">{children}</div>;
+  // Angosta: la página es una tarjeta con los datos de la caja y un botón. La
+  // grilla del cambio vive en el modal.
+  return <div className="p-2 lg:p-3 space-y-3 max-w-[560px] mx-auto">{children}</div>;
 }

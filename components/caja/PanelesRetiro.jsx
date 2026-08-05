@@ -256,29 +256,9 @@ export function PanelCambio({
 // sirviendo a los cortes que se tomaron con el orden anterior, que eligen el
 // cambio recién al final y ya no se pueden rehacer.
 
-/**
- * Contar el cambio que se SEPARA, antes de cortar.
- *
- * Usa la grilla de conteo y no la del cambio, y la diferencia no es estética: la
- * grilla del cambio tiene una columna "Contadas" y un tope por denominación,
- * porque nació para elegir qué parte de una pila ya contada se queda. Acá no hay
- * ninguna pila contada todavía —el cambio es lo PRIMERO que se cuenta— así que
- * no hay contra qué topear, y mostrar una columna vacía sería inventar una
- * restricción que no existe.
- */
-export function PanelCambioPrevio({ desglose, onDesglose, ayuda, error = null }) {
-  return (
-    <Bloque titulo="Cambio que queda en la caja" ayuda={ayuda} alineado>
-      <TablaDenominaciones
-        desglose={desglose}
-        onCambiar={onDesglose}
-        idPrefijo="cambio-previo"
-        titulo="Cantidad que se deja"
-      />
-      {error && <Aviso tono="danger">{error}</Aviso>}
-    </Bloque>
-  );
-}
+// El bloque que contaba el cambio antes del corte vivía acá. Se fue a
+// components/caja/ModalCambioPrevio.jsx: esa grilla aparece ahora dentro de un
+// modal, no como una columna de la página. Ver el comentario de ese archivo.
 
 /**
  * El cambio ya separado, SOLO LECTURA.

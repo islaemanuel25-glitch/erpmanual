@@ -38,12 +38,11 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
-import { PanelCambioPrevio } from "@/components/caja/PanelesRetiro";
+import ModalCambioPrevio from "@/components/caja/ModalCambioPrevio";
 import {
   PanelAntesDelCorte,
   TITULO_CIERRE,
-  AYUDA_GRILLA_CAMBIO_CIERRE,
-  AYUDA_CAMBIO_PREVIO_CIERRE,
+  ACCION_INICIAR_CIERRE,
 } from "@/components/caja/PanelesCierre";
 import { totalDesglose } from "@/lib/caja/conteoBilletes";
 import { calcularRetiroEsperado } from "@/lib/caja/cierreRelevo";
@@ -66,8 +65,13 @@ export default function IniciarCierrePage() {
   const [cierreExistente, setCierreExistente] = useState(null);
   const [errorFatal, setErrorFatal] = useState("");
   const [error, setError] = useState("");
-  const [confirmando, setConfirmando] = useState(false);
   const [iniciando, setIniciando] = useState(false);
+
+  // El modal donde se separa el cambio. Abrirlo NO crea nada.
+  const [modalAbierto, setModalAbierto] = useState(false);
+  // El esperado se movió mientras el modal estaba abierto: hace falta una
+  // segunda confirmación con el número nuevo a la vista.
+  const [revalidado, setRevalidado] = useState(false);
 
   // El cambio que se separa. Vive solo en memoria hasta el corte: no hay
   // borrador acá a propósito, porque esta pantalla se completa en un minuto y
@@ -155,24 +159,57 @@ export default function IniciarCierrePage() {
     router.push("/modulos/pos-ventas");
   };
 
+  // ── El modal ─────────────────────────────────────────────────────────────
+  //
+  // Abrirlo y cerrarlo no toca nada: no hay pedido al servidor, no se crea la
+  // preparación y no se congela ninguna cifra. Lo único que hace es mostrar la
+  // grilla.
+  const abrirModal = () => {
+    setError("");
+    setRevalidado(false);
+    setModalAbierto(true);
+  };
+
+  const cerrarModal = () => {
+    if (iniciando) return;
+    setModalAbierto(false);
+    setRevalidado(false);
+    setError("");
+  };
+
   // ── El corte ─────────────────────────────────────────────────────────────
   const iniciar = async () => {
     if (iniciando || !turno?.id) return;
     setIniciando(true);
     setError("");
     try {
+      // EL ESPERADO SE REVALIDA ANTES DE CORTAR. Mientras el modal estaba
+      // abierto el local pudo cobrar, y el retiro estimado que se muestra sería
+      // otro. No se manda ese número —el servidor calcula el suyo igual— pero sí
+      // se avisa, para que nadie confirme mirando una cifra vieja.
+      const fresco = await fetch(`/api/pos-ventas/turnos/resumen?turnoId=${turno.id}`, {
+        credentials: "include",
+        cache: "no-store",
+      }).then((x) => x.json()).catch(() => null);
+      const esperadoAhora = fresco?.ok ? Number(fresco.efectivoEsperado) : null;
+
+      if (esperadoAhora != null && esperado != null && esperadoAhora !== esperado && !revalidado) {
+        setEsperado(esperadoAhora);
+        setRevalidado(true);
+        return;
+      }
+
       const res = await fetch("/api/pos-ventas/cierres/iniciar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        // Solo el desglose. El total lo calcula el servidor: mandarlo sería
-        // ofrecerle un número que no tiene por qué creer.
+        // Solo el desglose. Los totales los calcula el servidor: mandarlos sería
+        // ofrecerle números que no tiene por qué creer.
         body: JSON.stringify({ turnoId: turno.id, desgloseCambio }),
       });
       const json = await res.json();
       if (!res.ok || !json?.ok || !json.cierre?.token) {
         setError(json?.error || "No se pudo iniciar el cierre.");
-        setConfirmando(false);
         return;
       }
 
@@ -187,7 +224,6 @@ export default function IniciarCierrePage() {
       router.replace(rutaCierre(json.cierre.token, enPestanaNueva));
     } catch {
       setError("Error de conexión.");
-      setConfirmando(false);
     } finally {
       setIniciando(false);
     }
@@ -253,9 +289,6 @@ export default function IniciarCierrePage() {
             <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
               Todavía no se cortó nada. La caja sigue operativa.
             </p>
-            <p className="text-[11px] sunmi-text-accent leading-snug mt-0.5">
-              {AYUDA_CAMBIO_PREVIO_CIERRE}
-            </p>
           </div>
           <button
             type="button"
@@ -268,30 +301,32 @@ export default function IniciarCierrePage() {
         </div>
       </SunmiCard>
 
-      {/* Dos columnas en escritorio: se cuenta el cambio a la izquierda y se ven
-          las consecuencias a la derecha, sin scroll entre una cosa y la otra. */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
-        <PanelCambioPrevio
-          desglose={desgloseCambio}
-          onDesglose={setDesgloseCambio}
-          ayuda={AYUDA_GRILLA_CAMBIO_CIERRE}
-        />
+      <PanelAntesDelCorte
+        turno={turno}
+        operadorNombre={operador?.nombre}
+        localNombre={contexto?.nombre}
+        esperado={esperado}
+        iniciando={iniciando}
+        error={modalAbierto ? "" : error}
+        onIniciar={abrirModal}
+      />
 
-        <PanelAntesDelCorte
-          turno={turno}
-          operadorNombre={operador?.nombre}
-          localNombre={contexto?.nombre}
-          esperado={esperado}
-          totalCambio={totalCambio}
-          retiroEstimado={retiroEstimado}
-          confirmando={confirmando}
-          iniciando={iniciando}
-          error={error}
-          onPedirConfirmacion={() => setConfirmando(true)}
-          onCancelar={() => setConfirmando(false)}
-          onIniciar={iniciar}
-        />
-      </div>
+      {/* La grilla vive acá: aparece al apretar el botón y desaparece al
+          cancelar. Hasta que se confirme, no hay nada creado ni congelado. */}
+      <ModalCambioPrevio
+        abierto={modalAbierto}
+        esperado={esperado}
+        desglose={desgloseCambio}
+        onDesglose={setDesgloseCambio}
+        totalCambio={totalCambio}
+        retiroEstimado={retiroEstimado}
+        textoConfirmar={ACCION_INICIAR_CIERRE}
+        confirmando={iniciando}
+        revalidado={revalidado}
+        error={error}
+        onCancelar={cerrarModal}
+        onConfirmar={iniciar}
+      />
     </Marco>
   );
 }
@@ -303,7 +338,7 @@ function rutaCierre(token, enPestanaNueva) {
 }
 
 function Marco({ children }) {
-  // Más ancha que antes: ahora hay una grilla de conteo al lado del resumen. En
-  // móvil siguen quedando uno debajo del otro.
-  return <div className="p-2 lg:p-3 space-y-3 max-w-[1000px] mx-auto">{children}</div>;
+  // Angosta otra vez: la página volvió a ser una tarjeta con cuatro datos y un
+  // botón. La grilla ya no está acá, está en el modal.
+  return <div className="p-2 lg:p-3 space-y-3 max-w-[560px] mx-auto">{children}</div>;
 }
