@@ -20,7 +20,11 @@
 
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
-import XLSX from "xlsx";
+// Namespace import, NO default: el build ESM de `xlsx` (xlsx.mjs) no exporta
+// default, y Turbopack falla al compilar la ruta. Es la forma que ya usa el
+// resto del ERP. Con `node --test` el default funcionaba por interop de CJS, así
+// que el problema solo aparecía al servir la aplicación.
+import * as XLSX from "xlsx";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";

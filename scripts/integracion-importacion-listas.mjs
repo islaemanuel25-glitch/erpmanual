@@ -22,6 +22,12 @@ import fs from "node:fs";
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
+// Import DEFAULT y no namespace, al revés que en el código de la aplicación.
+// `xlsx` publica dos builds: el CJS (xlsx.js), que tiene todo incluido readFile,
+// y el ESM (xlsx.mjs), que es FS-free y NO expone readFile. Un `import *` en un
+// .mjs resuelve al ESM y se queda sin readFile; el default resuelve al CJS. En
+// las rutas de Next pasa lo contrario: Turbopack toma el ESM y el default no
+// existe. Por eso cada contexto usa la forma que le sirve.
 import XLSX from "xlsx";
 
 const prisma = new PrismaClient();
