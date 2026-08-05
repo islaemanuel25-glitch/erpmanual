@@ -392,6 +392,10 @@ export async function POST(req, context) {
           where: { id: fila.id },
           data: {
             aplicada: true,
+            // Deja de estar seleccionada: una fila cerrada marcada para aplicar
+            // es una contradicción, y ensucia los contadores de la tanda
+            // siguiente.
+            seleccionada: false,
             costoAplicado: costoNuevo,
             costoPrevioAplicacion: costoAnterior,
             ventaAnterior: ventaAnteriorMaestra,

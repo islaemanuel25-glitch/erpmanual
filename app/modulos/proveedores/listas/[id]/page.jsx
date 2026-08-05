@@ -56,7 +56,8 @@ const PAGE_SIZE = 25;
 const VISTAS = [
   { id: "todas", texto: "Todas" },
   { id: "seleccionadas", texto: "Seleccionadas" },
-  { id: "listas", texto: "Listas" },
+  { id: "listas", texto: "Listas pendientes" },
+  { id: "aplicadas", texto: "Aplicadas" },
   { id: "alerta", texto: "Con alerta" },
   { id: "exactas", texto: "Exactas" },
   { id: "manuales", texto: "Manuales" },

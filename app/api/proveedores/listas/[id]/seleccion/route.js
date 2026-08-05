@@ -122,7 +122,10 @@ export async function POST(req, context) {
         accion,
         afectadas: objetivo.length,
         resumen: resumirSeleccion(frescasEx, importacion),
-        seleccionadas: frescasEx.filter((f) => f.seleccionada).map((f) => f.id),
+        // Las aplicadas conservan la marca de cuando se aplicaron. No se limpia
+        // —tocar una fila cerrada sería peor— pero no se informa como selección
+        // viva: la pantalla dibujaría un tilde en una fila que no se puede tocar.
+        seleccionadas: frescasEx.filter((f) => f.seleccionada && !f.aplicada).map((f) => f.id),
         excluidas: frescasEx.filter((f) => f.excluidaManual).map((f) => f.id),
       });
     } else {
@@ -187,7 +190,7 @@ export async function POST(req, context) {
       desmarcadas: aDesmarcar.length,
       rechazadas,
       resumen: resumirSeleccion(frescas, importacion),
-      seleccionadas: frescas.filter((f) => f.seleccionada).map((f) => f.id),
+      seleccionadas: frescas.filter((f) => f.seleccionada && !f.aplicada).map((f) => f.id),
       excluidas: frescas.filter((f) => f.excluidaManual).map((f) => f.id),
     });
   } catch (e) {

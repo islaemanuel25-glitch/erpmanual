@@ -52,8 +52,14 @@ const numero = (v) => (v === null || v === undefined ? null : Number(v));
  */
 const VISTAS = {
   todas: {},
-  seleccionadas: { seleccionada: true },
-  listas: { estado: "LISTO_PARA_ACTUALIZAR" },
+  // Las vistas de TRABAJO excluyen lo ya aplicado. Sin esto, "Listas" mostraba
+  // las 101 filas que ya se habían aplicado —su estado sigue siendo
+  // LISTO_PARA_ACTUALIZAR— todas con la casilla deshabilitada, y la pantalla
+  // parecía de solo lectura aunque la importación estuviera abierta.
+  seleccionadas: { seleccionada: true, aplicada: false },
+  listas: { estado: "LISTO_PARA_ACTUALIZAR", aplicada: false },
+  // Para poder ver las aplicadas cuando se las busca a propósito.
+  aplicadas: { aplicada: true },
   exactas: { tipoCoincidencia: "CODIGO_INTERNO" },
   sinCeros: { tipoCoincidencia: "CODIGO_INTERNO_SIN_CEROS" },
   sufijo8: { tipoCoincidencia: "SUFIJO_8" },
