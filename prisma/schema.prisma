@@ -33,6 +33,7 @@ model Grupo {
   configuracion   ConfiguracionGrupo?
   listasPrecio    ListaPrecio[]
   codigosProveedor ProductoCodigoProveedor[]
+  importacionesLista ImportacionListaProveedor[]
 }
 
 model GrupoDeposito {
@@ -200,6 +201,7 @@ model Usuario {
   movimientosPuntos ClientePuntoMovimiento[]
   movimientosCC     MovimientoCuenta[]
   auditoriaStock    AuditoriaStock[]
+  importacionesLista ImportacionListaProveedor[]
 
   @@map("Usuario")
 }
@@ -228,6 +230,17 @@ model Proveedor {
 
   dias_pedido DiaPedido[] @default([])
 
+  /// Qué parser de lista de precios usa este proveedor.
+  ///
+  /// Es un identificador EXPLÍCITO que carga el administrador, no un nombre que
+  /// se adivina. Reconocer al proveedor por el texto de su nombre sería frágil y
+  /// peligroso: dos proveedores pueden llamarse parecido, y un parser equivocado
+  /// leería un código de barras como si fuera un precio. Sin este campo cargado,
+  /// el proveedor simplemente no admite importación de listas.
+  ///
+  /// Los valores válidos viven en lib/proveedores/listas/registro.js
+  parserListaId String?
+
   activo    Boolean        @default(true)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
@@ -237,6 +250,7 @@ model Proveedor {
   productos3        ProductoBase[]    @relation("productoProveedor3")
   pedidosProveedor  PedidoProveedor[]
   codigosProveedor  ProductoCodigoProveedor[]
+  importacionesLista ImportacionListaProveedor[]
 
   @@index([creadoEnLocalId])
 }
@@ -315,6 +329,8 @@ model ProductoBase {
   ventaDetalles   VentaDetalle[]
   codigosProveedor ProductoCodigoProveedor[]
   componenteEnVentas VentaDetalleComponente[]
+
+  filasImportacionLista ImportacionListaFila[]
 
   @@unique([grupoId, codigo_barra])
   @@index([grupoId])
@@ -2148,4 +2164,181 @@ model PushSubscription {
   @@index([localId])
   @@index([endpoint])
   @@index([grupoId, activo])
+}
+
+// ---------------------------------------------------------------------------
+// IMPORTACIÓN DE LISTAS DE PRECIOS DE PROVEEDOR
+//
+// Un administrador sube el Excel del proveedor, el sistema lo parsea, lo concilia
+// contra el catálogo y GUARDA el resultado. En esta etapa no se toca ningún
+// costo: la importación es una propuesta revisable, y la cabecera + las filas SON
+// la auditoría de esa propuesta.
+//
+// POR QUÉ SE GUARDAN TODAS LAS FILAS, INCLUSO LAS QUE NO SE PUEDEN APLICAR
+//
+// Una lista de Arcor trae 917 productos y solo una parte queda lista para
+// actualizar. Guardar únicamente esa parte dejaría sin explicación las otras: por
+// qué un producto no macheó, por qué un display quedó dudoso, por qué un kg quedó
+// bloqueado. Esa explicación es lo que permite corregir el catálogo, y se pierde
+// si no se persiste.
+//
+// ES ADITIVO. Dos tablas nuevas, tres enums nuevos y un campo nullable en
+// Proveedor. No toca ninguna tabla existente ni requiere backfill.
+// ---------------------------------------------------------------------------
+
+enum EstadoImportacionLista {
+  BORRADOR
+  CONCILIADA
+  APLICADA
+  DESCARTADA
+}
+
+/// Cómo se encontró el producto de una fila. Espeja TIPO_COINCIDENCIA del motor.
+enum TipoCoincidenciaLista {
+  CODIGO_INTERNO
+  CODIGO_INTERNO_SIN_CEROS
+  AMBIGUA
+  NINGUNA
+}
+
+/// Los ocho estados de `lib/proveedores/listas/estados.js`, sin inventar ninguno.
+enum EstadoFilaLista {
+  LISTO_PARA_ACTUALIZAR
+  SIN_CAMBIOS
+  NO_MACHEADO
+  CODIGO_DUPLICADO
+  FACTOR_DUDOSO
+  EXCLUIDO
+  BLOQUEADO
+  ERROR
+}
+
+model ImportacionListaProveedor {
+  id               Int @id @default(autoincrement())
+  grupoId          Int
+  proveedorId      Int
+  usuarioId        Int
+  /// Ubicación desde la que se operó. Define la regla de propiedad del costo.
+  localOperativoId Int
+
+  archivoNombre    String
+  archivoTamano    Int
+  /// SHA-256 del contenido. Es la identidad del archivo: el nombre no alcanza,
+  /// porque el mismo Excel se baja dos veces con nombres distintos.
+  archivoHash      String
+  /// Dónde quedó el binario. NULLABLE A PROPÓSITO: el proyecto todavía no tiene
+  /// almacenamiento permanente de archivos, y escribirlo en el disco del
+  /// contenedor lo perdería al recrearlo. La conciliación se guarda completa sin
+  /// el binario; cuando exista un almacenamiento real, este campo lo apunta.
+  archivoUbicacion String?
+
+  /// Qué parser lo leyó y con qué versión, para poder explicar un resultado viejo.
+  parser        String
+  parserVersion String
+
+  recargoPct         Decimal @db.Decimal(6, 3)
+  umbralVariacionPct Decimal @db.Decimal(6, 3)
+  /// Qué se hará con el precio de venta al aplicar. Se guarda desde ahora para
+  /// que la decisión quede registrada junto a la propuesta; todavía no se usa.
+  modoPrecioVenta    String  @default("NO_TOCAR")
+
+  estado EstadoImportacionLista @default(BORRADOR)
+
+  totalFilas              Int @default(0)
+  listoParaActualizar     Int @default(0)
+  sinCambios              Int @default(0)
+  noMacheadas             Int @default(0)
+  codigoDuplicado         Int @default(0)
+  factorDudoso            Int @default(0)
+  excluidas               Int @default(0)
+  bloqueadas              Int @default(0)
+  errores                 Int @default(0)
+  sugerenciasCodigoBarras Int @default(0)
+  variacionAlta           Int @default(0)
+  faltantes               Int @default(0)
+
+  createdAt    DateTime  @default(now())
+  conciliadaEn DateTime?
+  aplicadaEn   DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  grupo     Grupo                  @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  proveedor Proveedor              @relation(fields: [proveedorId], references: [id])
+  usuario   Usuario                @relation(fields: [usuarioId], references: [id])
+  filas     ImportacionListaFila[]
+
+  /// IDEMPOTENCIA REAL, a nivel base. Dos pedidos simultáneos con el mismo
+  /// archivo no pueden crear dos importaciones: el segundo choca contra este
+  /// índice. Un `findFirst` previo solo cubre el caso secuencial.
+  @@unique([grupoId, proveedorId, archivoHash], name: "importacion_archivo_unica")
+  @@index([grupoId, proveedorId, createdAt])
+  @@index([grupoId, estado])
+  @@index([usuarioId])
+}
+
+model ImportacionListaFila {
+  id            Int @id @default(autoincrement())
+  importacionId Int
+
+  filaExcel  Int
+  hojaNombre String
+
+  codigoCrudo              String
+  codigoNormalizado        String
+  codigoComparableSinCeros String?
+  codigoBarraProveedor     String?
+  descripcionProveedor     String
+  categoriaCruda           String?
+
+  unidadProveedor  String
+  unidadesPorBulto Int?
+  /// Precio TAL COMO LO INFORMÓ el proveedor. Seis decimales: el archivo real
+  /// trae valores como 1404.602001 y truncarlos falsearía la propuesta.
+  precioConIva     Decimal  @db.Decimal(18, 6)
+  precioSinIva     Decimal? @db.Decimal(18, 6)
+
+  productoBaseId           Int?
+  codigoProveedorId        Int?
+  tipoCoincidencia         TipoCoincidenciaLista @default(NINGUNA)
+  /// Producto sugerido por código de barras. NO es un vínculo: hay que confirmarlo.
+  sugerenciaProductoBaseId Int?
+  sugerenciaCodigoBarra    String?
+
+  costoAnterior          Decimal? @db.Decimal(12, 2)
+  recargoPct             Decimal  @db.Decimal(6, 3)
+  montoRecargo           Decimal? @db.Decimal(18, 6)
+  precioConRecargo       Decimal? @db.Decimal(18, 6)
+  factorErp              Int?
+  costoUnitarioCalculado Decimal? @db.Decimal(18, 6)
+  costoMaestroPropuesto  Decimal? @db.Decimal(12, 2)
+  diferencia             Decimal? @db.Decimal(12, 2)
+  diferenciaPct          Decimal? @db.Decimal(12, 4)
+  variacionAlta          Boolean  @default(false)
+
+  /// El enum lo garantiza la base: una fila no puede quedar con un estado que el
+  /// motor no produce.
+  estado EstadoFilaLista
+  /// Motivo textual, tal como lo devuelve el motor o la configuración del
+  /// proveedor. NO es enum a propósito: cada proveedor puede aportar motivos
+  /// propios y no queremos una migración por cada uno.
+  motivo String?
+
+  seleccionable Boolean  @default(false)
+  seleccionada  Boolean  @default(false)
+  /// Se llenan en la etapa de aplicación. Acá nacen en false/null.
+  aplicada      Boolean  @default(false)
+  costoAplicado Decimal? @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  importacion  ImportacionListaProveedor @relation(fields: [importacionId], references: [id], onDelete: Cascade)
+  productoBase ProductoBase?             @relation(fields: [productoBaseId], references: [id], onDelete: SetNull)
+
+  /// Una fila física del Excel no puede entrar dos veces en la misma importación.
+  @@unique([importacionId, hojaNombre, filaExcel], name: "fila_unica_por_importacion")
+  @@index([importacionId, estado])
+  @@index([importacionId, codigoNormalizado])
+  @@index([productoBaseId])
+  @@index([importacionId, filaExcel])
 }
