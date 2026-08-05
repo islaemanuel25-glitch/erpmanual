@@ -27,7 +27,6 @@
 import { PrismaClient } from "@prisma/client";
 
 import { cargarDatosDeConciliacion } from "../lib/proveedores/listas/cargaErp.js";
-import { getDepositoIdDeGrupo } from "../lib/visibilidad.js";
 import { conciliarLista, TIPO_COINCIDENCIA, digitosDeSufijo } from "../lib/proveedores/listas/conciliarLista.js";
 import { CONFIG_ARCOR } from "../lib/proveedores/listas/configuraciones/arcor.js";
 import { filaAPersistir, contadoresDeCabecera, OPCIONES_TX } from "../lib/proveedores/listas/persistencia.js";
@@ -124,7 +123,11 @@ async function main() {
     { grupoId: cab.grupoId, proveedorId: cab.proveedorId, localId: cab.localOperativoId },
     prisma
   );
-  const depositoLocalId = await getDepositoIdDeGrupo(cab.grupoId, prisma);
+  // Consulta directa en vez de lib/visibilidad: ese módulo importa el cliente
+  // compartido y con él el interceptor de auditoría, que no resuelve fuera del
+  // bundle de Next. Es un findFirst de una línea, no hay lógica que duplicar.
+  const gd = await prisma.grupoDeposito.findFirst({ where: { grupoId: cab.grupoId }, select: { localId: true } });
+  const depositoLocalId = gd?.localId ?? null;
 
   // El recargo que vale es el GUARDADO en la importación, no el default de la
   // configuración: la propuesta que el usuario vio se calculó con ese.
