@@ -6,10 +6,13 @@
 // calma, se filtran y se comparten por URL. Un modal con esto adentro sería
 // inservible.
 //
-// Todavía no hay ningún botón para aplicar: esta pantalla explica QUÉ pasaría.
+// Desde acá se selecciona y se aplica. Es la única pantalla del módulo que
+// escribe costos reales, así que la acción está separada de la revisión: primero
+// se mira, después se marca, y recién al final se confirma en un panel aparte
+// que dice proveedor, archivo, cantidad y qué pasa con el precio de venta.
 
-import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Fragment, useCallback, useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Search, X } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
@@ -20,8 +23,10 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
+import PanelVincular from "@/components/proveedores/listas/PanelVincular";
+import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
 import {
   BadgeEstado,
   Dato,
@@ -42,9 +47,43 @@ import {
 
 const PAGE_SIZE = 50;
 
+/**
+ * ¿Esta fila admite vincularse?
+ *
+ * Solo las que no machearon, sin producto y sin aplicar. El backend vuelve a
+ * validarlo —es la autoridad—; acá se decide si el botón se muestra, para no
+ * ofrecer una acción que va a rebotar.
+ */
+function puedeVincular(fila) {
+  return fila?.estado === "NO_MACHEADO" && fila?.productoBaseId == null && fila?.aplicada !== true;
+}
+
+/**
+ * Qué mostrarle a la casilla de una fila.
+ *
+ * `seleccionable` lo calcula el backend con el mismo predicado que después
+ * aplica: la pantalla no vuelve a decidirlo por su cuenta. Cuando la fila no se
+ * puede marcar se pasa el motivo, para que el checkbox gris tenga explicación.
+ */
+function seleccionDeFila(fila, importacion, onCambiar) {
+  if (!importacion || importacion.estado !== "CONCILIADA") return null;
+  const puede = fila?.seleccionable === true && fila?.aplicada !== true;
+  return {
+    puede,
+    marcada: fila?.seleccionada === true,
+    motivo: puede
+      ? ""
+      : fila?.aplicada === true
+        ? "Esta fila ya se aplicó."
+        : "Solo se pueden aplicar las filas listas para actualizar.",
+    onCambiar,
+  };
+}
+
 export default function ConciliacionPage() {
   const router = useRouter();
   const params = useParams();
+  const busqueda = useSearchParams();
   const id = params?.id;
 
   const sesion = useUser() || {};
@@ -58,12 +97,31 @@ export default function ConciliacionPage() {
   const [filas, setFilas] = useState([]);
   const [pag, setPag] = useState({ page: 1, paginas: 1, total: 0 });
 
+  // Los filtros arrancan de la URL: así una conciliación filtrada se puede
+  // compartir por link y volver a abrir igual. Sin esto, pegar la URL con
+  // ?estado=... mostraba la lista entera y el usuario veía otra cosa que quien
+  // se la pasó.
   const [page, setPage] = useState(1);
-  const [estado, setEstado] = useState("");
-  const [q, setQ] = useState("");
+  const [estado, setEstado] = useState(() => busqueda?.get("estado") ?? "");
+  const [q, setQ] = useState(() => busqueda?.get("q") ?? "");
   // El texto tipeado se separa del que se consulta: buscar en cada tecla sobre
   // 917 filas dispararía una consulta por letra.
-  const [qAplicado, setQAplicado] = useState("");
+  const [qAplicado, setQAplicado] = useState(() => busqueda?.get("q") ?? "");
+
+  // Qué fila tiene el panel de vinculación abierto. Una sola por vez: dos
+  // paneles abiertos invitan a confirmar el equivocado.
+  const [vinculando, setVinculando] = useState(null);
+  const [avisoVinculo, setAvisoVinculo] = useState("");
+
+  // ── Aplicación ──────────────────────────────────────────────────────────
+  //
+  // La selección vive en la BASE, no acá: la lista tiene miles de filas y se
+  // navega paginada y filtrada. Un estado local se perdería al cambiar de
+  // página, que es justo cuando el usuario está armando la selección.
+  const [resumenSeleccion, setResumenSeleccion] = useState({ seleccionables: 0, seleccionadas: 0, aplicadas: 0 });
+  const [trabajando, setTrabajando] = useState(false);
+  const [errorAplicar, setErrorAplicar] = useState("");
+  const [resultado, setResultado] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -89,6 +147,7 @@ export default function ConciliacionPage() {
       setCab(json.importacion);
       setFilas(json.filas ?? []);
       setPag(json.paginacion ?? { page: 1, paginas: 1, total: 0 });
+      if (json.seleccion) setResumenSeleccion(json.seleccion);
     } catch {
       setError("Error de conexión.");
     } finally {
@@ -100,6 +159,82 @@ export default function ConciliacionPage() {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
     cargar();
   }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto]);
+
+  /**
+   * La fila vinculada vuelve del servidor ya recalculada, y el resumen con los
+   * contadores nuevos. Se reemplaza en su lugar en vez de recargar todo: el
+   * usuario no pierde el filtro ni la página en la que estaba.
+   */
+  const alVincular = (json) => {
+    setFilas((prev) => prev.map((f) => (f.id === json.fila.id ? { ...f, ...json.fila } : f)));
+    setCab((prev) => (prev ? { ...prev, ...json.resumen } : prev));
+    setVinculando(null);
+    setAvisoVinculo(
+      `Fila ${json.fila.filaExcel} vinculada con ${json.fila.productoBase?.nombre ?? "el producto elegido"}. Nuevo estado: ${json.fila.estado}.`
+    );
+  };
+
+  // ── Selección ───────────────────────────────────────────────────────────
+  //
+  // Cada cambio va al servidor, que es quien valida. La pantalla no decide si
+  // una fila puede marcarse: dibuja lo que el backend ya declaró seleccionable.
+  const mandarSeleccion = useCallback(
+    async (cuerpo) => {
+      setErrorAplicar("");
+      try {
+        const r = await fetch(`/api/proveedores/listas/${id}/seleccion`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(cuerpo),
+        });
+        const json = await r.json();
+        if (!r.ok || !json?.ok) {
+          setErrorAplicar(json?.error || "No se pudo cambiar la selección.");
+          return null;
+        }
+        setResumenSeleccion(json.resumen);
+        const marcadas = new Set(json.seleccionadas ?? []);
+        setFilas((prev) => prev.map((f) => ({ ...f, seleccionada: marcadas.has(f.id) })));
+        return json;
+      } catch {
+        setErrorAplicar("Error de conexión.");
+        return null;
+      }
+    },
+    [id]
+  );
+
+  const alMarcarFila = (fila, marcada) =>
+    mandarSeleccion({ accion: marcada ? "MARCAR" : "DESMARCAR", ids: [fila.id] });
+
+  const aplicar = async (modoPrecioVenta) => {
+    setTrabajando(true);
+    setErrorAplicar("");
+    setResultado(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/aplicar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ modoPrecioVenta }),
+      });
+      const json = await r.json();
+      if (!r.ok || !json?.ok) {
+        setErrorAplicar(json?.error || "No se pudo aplicar la lista.");
+        return;
+      }
+      setResultado(json);
+      // Se recarga: la cabecera pasó a APLICADA y las filas traen su resultado.
+      await cargar();
+    } catch {
+      setErrorAplicar("Error de conexión. No se aplicó nada.");
+    } finally {
+      setTrabajando(false);
+    }
+  };
+
+  const seleccionDe = (f) => seleccionDeFila(f, cab, alMarcarFila);
 
   const buscar = () => {
     setPage(1);
@@ -153,6 +288,24 @@ export default function ConciliacionPage() {
 
             <ResumenMetricas metricas={metricasDeImportacion(cab)} />
 
+            {avisoVinculo && (
+              <p className="text-[11.5px] sunmi-text-success leading-snug">{avisoVinculo}</p>
+            )}
+
+            {/* La barra de aplicación va ARRIBA de la tabla y fuera de ella: es
+                una acción sobre el conjunto, no sobre una fila, y esconderla al
+                final de 917 filas la volvería invisible. */}
+            <PanelAplicar
+              importacion={cab}
+              resumenSeleccion={resumenSeleccion}
+              trabajando={trabajando}
+              onSeleccionarTodos={() => mandarSeleccion({ accion: "TODOS" })}
+              onDeseleccionar={() => mandarSeleccion({ accion: "NINGUNO" })}
+              onAplicar={aplicar}
+              resultado={resultado}
+              error={errorAplicar}
+            />
+
             {/* Productos del proveedor que no vinieron en el archivo. Por ahora
                 solo el contador: el endpoint no entrega el detalle todavía. */}
             <div className="sunmi-surface-soft sunmi-border border rounded-lg px-3 py-2">
@@ -181,12 +334,15 @@ export default function ConciliacionPage() {
                     setEstado(v);
                     setPage(1);
                   }}
-                  options={[
-                    { value: "", label: "Todos los estados" },
-                    ...ESTADOS_FILTRABLES.map((e) => ({ value: e.valor, label: e.etiqueta })),
-                  ]}
                   placeholder="Todos los estados"
-                />
+                >
+                  <SunmiSelectOption value="">Todos los estados</SunmiSelectOption>
+                  {ESTADOS_FILTRABLES.map((e) => (
+                    <SunmiSelectOption key={e.valor} value={e.valor}>
+                      {e.etiqueta}
+                    </SunmiSelectOption>
+                  ))}
+                </SunmiSelectAdv>
               </div>
 
               <div className="space-y-1">
@@ -252,6 +408,9 @@ export default function ConciliacionPage() {
                   <table className="w-full text-left">
                     <thead>
                       <tr className="sunmi-border border-b">
+                        <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold w-8">
+                          <span className="sr-only">Seleccionar</span>
+                        </th>
                         <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">#</th>
                         <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">Código</th>
                         <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">Descripción</th>
@@ -265,7 +424,28 @@ export default function ConciliacionPage() {
                     </thead>
                     <tbody>
                       {filas.map((f) => (
-                        <FilaTabla key={f.id} fila={f} />
+                        <Fragment key={f.id}>
+                          <FilaTabla
+                            fila={f}
+                            onVincular={puedeVincular(f) ? setVinculando : null}
+                            seleccion={seleccionDe(f)}
+                          />
+                          {/* El panel se despliega DEBAJO de su fila, en la misma
+                              tabla: así se ve al mismo tiempo el dato del
+                              proveedor y el producto que se está por elegir. */}
+                          {vinculando?.id === f.id && (
+                            <tr className="sunmi-border border-b">
+                              <td colSpan={10} className="px-2 py-2">
+                                <PanelVincular
+                                  importacionId={id}
+                                  fila={f}
+                                  onVinculada={alVincular}
+                                  onCerrar={() => setVinculando(null)}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -275,7 +455,21 @@ export default function ConciliacionPage() {
               {/* MÓVIL: cards. */}
               <div className="lg:hidden space-y-2">
                 {filas.map((f) => (
-                  <FilaCard key={f.id} fila={f} />
+                  <Fragment key={f.id}>
+                    <FilaCard
+                      fila={f}
+                      onVincular={puedeVincular(f) ? setVinculando : null}
+                      seleccion={seleccionDe(f)}
+                    />
+                    {vinculando?.id === f.id && (
+                      <PanelVincular
+                        importacionId={id}
+                        fila={f}
+                        onVinculada={alVincular}
+                        onCerrar={() => setVinculando(null)}
+                      />
+                    )}
+                  </Fragment>
                 ))}
               </div>
 

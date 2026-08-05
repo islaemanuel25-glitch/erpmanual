@@ -9,6 +9,8 @@
 import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
+import { resumirSeleccion } from "@/lib/proveedores/listas/seleccion";
+import { textoOmision } from "@/lib/proveedores/listas/aplicacion";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { paginacion, LIMITES } from "@/lib/proveedores/listas/persistencia";
@@ -49,6 +51,7 @@ export async function GET(req, context) {
         totalFilas: true, listoParaActualizar: true, sinCambios: true, noMacheadas: true,
         codigoDuplicado: true, factorDudoso: true, excluidas: true, bloqueadas: true,
         errores: true, sugerenciasCodigoBarras: true, variacionAlta: true, faltantes: true,
+        aplicadas: true, omitidas: true, aplicadaPorUsuarioId: true,
         proveedor: { select: { id: true, nombre: true } },
         usuario: { select: { id: true, nombre: true } },
       },
@@ -105,10 +108,21 @@ export async function GET(req, context) {
           diferencia: true, diferenciaPct: true, variacionAlta: true,
           estado: true, motivo: true, seleccionable: true, seleccionada: true,
           aplicada: true, costoAplicado: true,
+          resultadoAplicacion: true, motivoAplicacion: true,
+          costoPrevioAplicacion: true, ventaAnterior: true, ventaNueva: true,
           productoBase: { select: { id: true, nombre: true } },
         },
       }),
     ]);
+
+    const filasParaResumen = await prisma.importacionListaFila.findMany({
+      where: { importacionId },
+      select: {
+        id: true, estado: true, aplicada: true, seleccionada: true,
+        productoBaseId: true, costoMaestroPropuesto: true,
+      },
+    });
+    const resumenSeleccion = resumirSeleccion(filasParaResumen, cabecera);
 
     return NextResponse.json({
       ok: true,
@@ -130,7 +144,18 @@ export async function GET(req, context) {
         diferencia: numero(f.diferencia),
         diferenciaPct: numero(f.diferenciaPct),
         costoAplicado: numero(f.costoAplicado),
+        costoPrevioAplicacion: numero(f.costoPrevioAplicacion),
+        ventaAnterior: numero(f.ventaAnterior),
+        ventaNueva: numero(f.ventaNueva),
+        // El texto se resuelve en el servidor: es el mismo diccionario que usa
+        // el endpoint que aplica, así que la pantalla no puede quedar diciendo
+        // otra cosa que el motivo real.
+        textoMotivoAplicacion: f.motivoAplicacion ? textoOmision(f.motivoAplicacion) : null,
       })),
+      // El contador tiene que hablar de la importación entera: el usuario
+      // selecciona en varias páginas y necesita saber cuántas lleva en total,
+      // no cuántas hay marcadas en las 50 que está mirando.
+      seleccion: resumenSeleccion,
       paginacion: {
         page,
         pageSize,

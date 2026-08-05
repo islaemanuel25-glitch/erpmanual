@@ -2260,6 +2260,14 @@ model ImportacionListaProveedor {
   createdAt    DateTime  @default(now())
   conciliadaEn DateTime?
   aplicadaEn   DateTime?
+  /// Quién apretó "Aplicar". Se guarda acá y no solo en la bitácora porque
+  /// esta pantalla tiene que poder explicar una corrida vieja sin depender
+  /// de que el interceptor haya estado activo.
+  aplicadaPorUsuarioId Int?
+  /// Contadores del resultado. Se recalculan desde las filas, nunca se suman
+  /// a mano.
+  aplicadas Int @default(0)
+  omitidas  Int @default(0)
   updatedAt    DateTime  @updatedAt
 
   grupo     Grupo                  @relation(fields: [grupoId], references: [id], onDelete: Cascade)
@@ -2339,6 +2347,25 @@ model ImportacionListaFila {
   /// Se llenan en la etapa de aplicación. Acá nacen en false/null.
   aplicada      Boolean  @default(false)
   costoAplicado Decimal? @db.Decimal(12, 2)
+
+  /// ── HISTORIAL DE LA APLICACIÓN ────────────────────────────────────────
+  ///
+  /// Vive en la fila y NO en AuditoriaBitacora a propósito. La bitácora
+  /// registra que un producto cambió de costo, pero no por qué una fila
+  /// NO se aplicó, y ese motivo es la mitad de la información que necesita
+  /// quien revisa una corrida. Además el interceptor puede estar apagado.
+  aplicadaEn           DateTime?
+  aplicadaPorUsuarioId Int?
+  /// APLICADA | OMITIDA. Texto y no enum: los motivos de omisión los aporta
+  /// la configuración de cada proveedor y no queremos una migración por cada uno.
+  resultadoAplicacion  String?
+  motivoAplicacion     String?
+  /// Costo que tenía el producto JUSTO ANTES de escribir. Puede diferir de
+  /// `costoAnterior`, que es el que había al conciliar; la diferencia entre
+  /// los dos es lo que delata que alguien movió el costo en el medio.
+  costoPrevioAplicacion Decimal? @db.Decimal(12, 2)
+  ventaAnterior         Decimal? @db.Decimal(12, 2)
+  ventaNueva            Decimal? @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

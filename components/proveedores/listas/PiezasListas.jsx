@@ -7,6 +7,7 @@
 // puede ser ilegible en otro.
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiButton from "@/components/sunmi/SunmiButton";
 import {
   presentarEstado,
   textoDeMotivo,
@@ -184,9 +185,67 @@ export function Paginacion({ page, paginas, total, onPage, cargando = false }) {
  * motivo, sugerencia— va en una segunda línea dentro de la celda que le
  * corresponde, en vez de estirar la tabla hasta obligar a scrollear de costado.
  */
-export function FilaTabla({ fila }) {
+/**
+ * Casilla de selección de una fila.
+ *
+ * Cuando la fila NO se puede seleccionar no se dibuja un checkbox deshabilitado
+ * sin más: se pone el motivo en el `title`. Un cuadrito gris sin explicación
+ * deja al usuario probando clicks sin entender por qué no pasa nada.
+ */
+export function CasillaFila({ seleccion, fila }) {
+  if (!seleccion) return null;
+  const { puede, marcada, motivo, onCambiar } = seleccion;
+  return (
+    <input
+      type="checkbox"
+      checked={puede ? marcada === true : false}
+      disabled={!puede}
+      onChange={(e) => onCambiar?.(fila, e.target.checked)}
+      aria-label={
+        puede
+          ? `Seleccionar la fila ${fila.filaExcel} para aplicar`
+          : `La fila ${fila.filaExcel} no se puede aplicar`
+      }
+      title={puede ? "" : motivo || "No se puede aplicar."}
+      className="mt-0.5 h-4 w-4 accent-current cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+    />
+  );
+}
+
+/** Lo que pasó con la fila al aplicar. Solo aparece después de una corrida. */
+export function ResultadoFila({ fila }) {
+  if (!fila?.resultadoAplicacion) return null;
+  const aplicada = fila.resultadoAplicacion === "APLICADA";
+  return (
+    <div className="mt-1 space-y-0.5">
+      <span
+        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+          aplicada ? "sunmi-text-success" : "sunmi-text-warning"
+        }`}
+      >
+        {aplicada ? "Aplicada" : "Omitida"}
+      </span>
+      {!aplicada && fila.motivoAplicacion && (
+        <div className="text-[10px] sunmi-text-muted leading-snug">{fila.textoMotivoAplicacion}</div>
+      )}
+      {aplicada && (
+        <div className="text-[10px] tabular-nums sunmi-text-muted">
+          {money(fila.costoPrevioAplicacion)} → {money(fila.costoAplicado)}
+          {fila.ventaNueva !== null && fila.ventaNueva !== undefined && (
+            <> · venta {money(fila.ventaAnterior)} → {money(fila.ventaNueva)}</>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function FilaTabla({ fila, onVincular = null, seleccion = null }) {
   return (
     <tr className="sunmi-border border-b align-top">
+      <td className="px-2 py-2">
+        <CasillaFila seleccion={seleccion} fila={fila} />
+      </td>
       <td className="px-2 py-2 text-[11px] tabular-nums sunmi-text-muted">{fila.filaExcel}</td>
       <td className="px-2 py-2">
         <div className="text-[12px] font-semibold sunmi-text-strong break-all">{fila.codigoCrudo}</div>
@@ -245,6 +304,16 @@ export function FilaTabla({ fila }) {
           </div>
         )}
         <Motivo motivo={fila.motivo} />
+        <ResultadoFila fila={fila} />
+        {onVincular && (
+          <button
+            type="button"
+            onClick={() => onVincular(fila)}
+            className="mt-1 sunmi-btn-base sunmi-btn-cyan px-2 py-1 !text-[10.5px]"
+          >
+            {fila.sugerenciaProductoBaseId ? "Vincular sugerido" : "Vincular"}
+          </button>
+        )}
       </td>
     </tr>
   );
@@ -257,16 +326,19 @@ export function FilaTabla({ fila }) {
  * esconder el motivo o el producto en móvil dejaría la pantalla inservible justo
  * donde más se usa.
  */
-export function FilaCard({ fila }) {
+export function FilaCard({ fila, onVincular = null, seleccion = null }) {
   return (
     <SunmiCard className="p-3 space-y-2">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex items-start gap-2">
+          <CasillaFila seleccion={seleccion} fila={fila} />
+          <div className="min-w-0">
           <div className="text-[13px] font-semibold sunmi-text-strong break-words">
             {fila.descripcionProveedor}
           </div>
           <div className="text-[11px] sunmi-text-muted break-all">
             {fila.codigoCrudo} · fila {fila.filaExcel}
+          </div>
           </div>
         </div>
         <BadgeEstado estado={fila.estado} className="shrink-0" />
@@ -317,7 +389,18 @@ export function FilaCard({ fila }) {
 
       {fila.variacionAlta && <AvisoVariacion diferenciaPct={fila.diferenciaPct} />}
       <Motivo motivo={fila.motivo} />
+      <ResultadoFila fila={fila} />
       {!fila.productoBase && <Sugerencia fila={fila} />}
+
+      {onVincular && (
+        <SunmiButton
+          color="cyan"
+          onClick={() => onVincular(fila)}
+          className="w-full py-2 !text-xs"
+        >
+          {fila.sugerenciaProductoBaseId ? "Vincular sugerido" : "Vincular producto"}
+        </SunmiButton>
+      )}
     </SunmiCard>
   );
 }
