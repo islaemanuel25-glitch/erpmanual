@@ -2325,6 +2325,17 @@ model ImportacionListaFila {
 
   seleccionable Boolean  @default(false)
   seleccionada  Boolean  @default(false)
+  /// ── VINCULACIÓN MANUAL (Etapa 6A) ─────────────────────────────────────
+  ///
+  /// Quién resolvió a mano una fila que no macheaba, cuándo y de dónde salió la
+  /// decisión. Vive acá y no en AuditoriaBitacora porque el interceptor no
+  /// audita ProductoCodigoProveedor: sin estos campos, crear un vínculo desde
+  /// esta pantalla no dejaría rastro de quién lo hizo.
+  vinculadoPorUsuarioId Int?
+  vinculadoEn           DateTime?
+  /// SUGERENCIA_CODIGO_BARRAS | BUSQUEDA_MANUAL
+  origenVinculo         String?
+
   /// Se llenan en la etapa de aplicación. Acá nacen en false/null.
   aplicada      Boolean  @default(false)
   costoAplicado Decimal? @db.Decimal(12, 2)

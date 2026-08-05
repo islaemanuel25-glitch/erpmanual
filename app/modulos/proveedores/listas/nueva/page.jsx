@@ -24,7 +24,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import { ErrorRecuperable, Dato } from "@/components/proveedores/listas/PiezasListas";
 import {
@@ -195,15 +195,20 @@ export default function NuevaImportacionPage() {
                 setProveedorId(v);
                 setErrorEnvio(null);
               }}
-              options={proveedores.map((p) => ({
-                value: String(p.id),
-                // Los que no admiten importación se ven igual, con la marca. No
-                // se esconden: el usuario tiene que poder ver que existen y qué
-                // les falta.
-                label: p.admiteImportacion ? p.nombre : `${p.nombre} — sin formato configurado`,
-              }))}
               placeholder="Elegí un proveedor"
-            />
+              searchable
+            >
+              {/* Los que no admiten importación se listan igual, con la marca.
+                  Esconderlos dejaría al usuario buscando un proveedor que está
+                  ahí y que solo necesita que le configuren el formato. */}
+              {proveedores.map((prov) => (
+                <SunmiSelectOption key={prov.id} value={String(prov.id)}>
+                  {prov.admiteImportacion
+                    ? prov.nombre
+                    : `${prov.nombre} — sin formato configurado`}
+                </SunmiSelectOption>
+              ))}
+            </SunmiSelectAdv>
             {proveedor && !compat.admite && (
               <p className="text-[11.5px] sunmi-text-danger leading-snug">{compat.motivo}</p>
             )}
