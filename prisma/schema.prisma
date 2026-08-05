@@ -2203,6 +2203,8 @@ enum TipoCoincidenciaLista {
   SUFIJO_6
   SUFIJO_5
   SUFIJO_4
+  /// Último camino que machea, dentro del universo del proveedor.
+  CODIGO_BARRA
   AMBIGUA
   NINGUNA
 }

@@ -47,18 +47,23 @@ function contarCoincidencias(filas) {
   const c = {
     exactas: 0, sinCeros: 0,
     sufijo8: 0, sufijo7: 0, sufijo6: 0, sufijo5: 0, sufijo4: 0,
-    ambiguas: 0, sinVincular: 0,
+    codigoBarra: 0, ambiguas: 0, sinVincular: 0,
+    sugerenciasNombre: 0,
   };
   for (const f of filas) {
     const t = f.tipoCoincidencia;
     if (t === TIPO_COINCIDENCIA.CODIGO_INTERNO) c.exactas++;
     else if (t === TIPO_COINCIDENCIA.CODIGO_INTERNO_SIN_CEROS) c.sinCeros++;
+    else if (t === TIPO_COINCIDENCIA.CODIGO_BARRA) c.codigoBarra++;
     else if (t === TIPO_COINCIDENCIA.AMBIGUA) c.ambiguas++;
     else if (t === TIPO_COINCIDENCIA.NINGUNA) c.sinVincular++;
     else {
       const d = digitosDeSufijo(t);
       if (d) c[`sufijo${d}`]++;
     }
+    // Una sugerencia sin código de barras es la de NOMBRE: el código de barras
+    // ya no sugiere, machea.
+    if (f.sugerenciaProductoBaseId && !f.sugerenciaCodigoBarra) c.sugerenciasNombre++;
   }
   return c;
 }
@@ -133,6 +138,14 @@ async function main() {
   // configuración: la propuesta que el usuario vio se calculó con ese.
   const config = { ...CONFIG_ARCOR, recargoPct: Number(cab.recargoPct), umbralVariacionPct: Number(cab.umbralVariacionPct) };
 
+  console.log(`
+UNIVERSO: ${datos.diagnostico.productosDelProveedor} productos del ERP asociados a este proveedor`);
+  console.log(`  por relación → principal ${datos.diagnostico.productosPorRelacion.principal}` +
+    ` · secundario ${datos.diagnostico.productosPorRelacion.secundario}` +
+    ` · terciario ${datos.diagnostico.productosPorRelacion.terciario}`);
+  console.log(`  vínculos de código: ${datos.diagnostico.vinculosEnUniverso} dentro del universo, ` +
+    `${datos.diagnostico.vinculosFueraDelUniverso} descartados por apuntar afuera`);
+
   const conciliacion = conciliarLista({
     filas: filasMotor,
     productos: datos.productos,
@@ -159,7 +172,7 @@ async function main() {
   };
 
   console.log("\n── COINCIDENCIAS ──");
-  for (const k of ["exactas", "sinCeros", "sufijo8", "sufijo7", "sufijo6", "sufijo5", "sufijo4", "ambiguas", "sinVincular"]) {
+  for (const k of ["exactas", "sinCeros", "sufijo8", "sufijo7", "sufijo6", "sufijo5", "sufijo4", "codigoBarra", "sugerenciasNombre", "ambiguas", "sinVincular"]) {
     linea(k, antes.coincidencias[k], despues.coincidencias[k]);
   }
 
