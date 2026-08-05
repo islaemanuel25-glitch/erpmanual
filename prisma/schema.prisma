@@ -2197,6 +2197,12 @@ enum EstadoImportacionLista {
 enum TipoCoincidenciaLista {
   CODIGO_INTERNO
   CODIGO_INTERNO_SIN_CEROS
+  /// Fallback por terminación numérica. El número son los dígitos usados.
+  SUFIJO_8
+  SUFIJO_7
+  SUFIJO_6
+  SUFIJO_5
+  SUFIJO_4
   AMBIGUA
   NINGUNA
 }
@@ -2308,6 +2314,9 @@ model ImportacionListaFila {
   productoBaseId           Int?
   codigoProveedorId        Int?
   tipoCoincidencia         TipoCoincidenciaLista @default(NINGUNA)
+  /// Con cuántos dígitos resolvió el fallback por sufijo. null si el vínculo no
+  /// vino por ahí. Aparte del enum para poder contar sin parsear su nombre.
+  sufijoDigitos            Int?
   /// Producto sugerido por código de barras. NO es un vínculo: hay que confirmarlo.
   sugerenciaProductoBaseId Int?
   sugerenciaCodigoBarra    String?
