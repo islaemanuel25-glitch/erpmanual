@@ -35,6 +35,7 @@ import {
   macheePorCodigo,
 } from "@/lib/proveedores/listas/conciliarLista";
 import { resumirMacheo, resumirProgreso } from "@/lib/proveedores/listas/macheo";
+import { RANGO_POR_DEFECTO } from "@/lib/proveedores/listas/rangoAumento";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
@@ -105,6 +106,7 @@ export async function GET(req, context) {
         id: true, estado: true, archivoNombre: true, archivoTamano: true,
         archivoHash: true, archivoUbicacion: true, parser: true, parserVersion: true,
         recargoPct: true, umbralVariacionPct: true, modoPrecioVenta: true,
+        aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
         localOperativoId: true, createdAt: true, conciliadaEn: true, aplicadaEn: true,
         totalFilas: true, listoParaActualizar: true, sinCambios: true, noMacheadas: true,
         codigoDuplicado: true, factorDudoso: true, excluidas: true, bloqueadas: true,
@@ -179,7 +181,8 @@ export async function GET(req, context) {
           resultadoAplicacion: true, motivoAplicacion: true,
           costoPrevioAplicacion: true, ventaAnterior: true, ventaNueva: true,
           excluidaManual: true,
-          factorConfirmado: true, confirmadoEn: true,
+          multiplicadorConfirmado: true, cantidadPresentacion: true, confirmadoEn: true,
+          aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
           // El producto VIVO. Es la mitad de la comparación que el usuario
           // necesita para decidir, y tiene que salir de la base ahora, no de lo
           // que se congeló al conciliar.
@@ -399,6 +402,12 @@ export async function GET(req, context) {
         ...cabecera,
         recargoPct: numero(cabecera.recargoPct),
         umbralVariacionPct: numero(cabecera.umbralVariacionPct),
+        // El rango vigente. Si la importación no lo tiene, vale el de Arcor:
+        // así una importación vieja se sigue mostrando con un criterio.
+        aumentoEsperadoMinPct:
+          cabecera.aumentoEsperadoMinPct === null ? RANGO_POR_DEFECTO.minPct : numero(cabecera.aumentoEsperadoMinPct),
+        aumentoEsperadoMaxPct:
+          cabecera.aumentoEsperadoMaxPct === null ? RANGO_POR_DEFECTO.maxPct : numero(cabecera.aumentoEsperadoMaxPct),
       },
       filas: filasSalida,
       vista,

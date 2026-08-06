@@ -1,103 +1,107 @@
 "use client";
 
-// CONFIRMAR LA PRESENTACIÓN de una fila que quedó por revisar.
+// CONFIRMAR LA INTERPRETACIÓN de una fila que quedó por revisar.
 //
-// ── LO QUE ESTA PANTALLA TIENE QUE DEJAR CLARO ──────────────────────────────
+// ── POR QUÉ TRES BLOQUES SEPARADOS ──────────────────────────────────────────
 //
-// Que la CANTIDAD y el PRECIO son dos cosas distintas. El proveedor cotiza una
-// presentación —una unidad, un display, un bulto— y ese precio es el total de
-// esa presentación. Cuántas unidades trae adentro es un dato del producto y no
-// cambia ese total: un display de $5.678 cuesta $5.962 con recargo, traiga 12 o
-// traiga 18 sobres.
+// Porque son tres preguntas distintas y mezclarlas fue lo que rompió el cálculo.
 //
-// Por eso el panel muestra el precio informado arriba de todo, con la
-// presentación que está cotizando al lado, y el costo propuesto ES ese precio
-// salvo que el archivo diga que el precio es por unidad suelta. El costo
-// unitario aparece dividido, gris y marcado como informativo, para que nunca se
-// confunda con lo que se va a guardar.
+//   PRESENTACIÓN  cuántas unidades trae el envase. Dato del producto.
+//   PRECIO        de qué es el precio informado, y cuánto costaría cada lectura.
+//   AUMENTO       cómo se compara el costo propuesto contra el que ya existe.
 //
-// La pregunta que se hace no es "por cuánto multiplico" sino "qué es tu
-// producto": el display que te cotizan, o una unidad de las que ese producto
-// agrupa. Son dos respuestas posibles, no un número libre.
+// El UxBU vive en el primer bloque, apagado y con su leyenda: es un nivel
+// logístico del proveedor que ERP Azul no maneja. No entra en ningún cálculo.
+//
+// ── LO QUE LA PANTALLA NO HACE ──────────────────────────────────────────────
+//
+// No preselecciona. La hipótesis recomendada se marca y se explica, pero hay que
+// elegirla. Estar dentro del rango no confirma nada: lo único que cambia es que
+// no lleva advertencia. Las hipótesis absurdas se muestran con su costo y su
+// motivo, y no se pueden elegir.
 
 import { useState } from "react";
-import { CheckCircle2, Link2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Link2, X } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { money, porcentaje } from "@/lib/proveedores/listas/presentacion";
 import {
-  RELACION,
-  BASE_PRECIO,
   TEXTO_BASE_PRECIO,
-  UNIDADES_MAX,
+  LEYENDA_UXBU,
+  CANTIDAD_MAX,
   basePrecioDeFila,
-  relacionesPosibles,
-  relacionImplicita,
-  costoDeRelacion,
-  costoUnitarioInformativo,
-  unidadesValidas,
-  respaldoDeRelacion,
+  analizarFila,
+  cantidadValida,
 } from "@/lib/proveedores/listas/confirmarPresentacion";
+import {
+  TEXTO_ESTADO_VARIACION,
+  TONO_ESTADO_VARIACION,
+  esAlertaFuerte,
+  exigeConfirmacionExplicita,
+  textoRecomendacion,
+} from "@/lib/proveedores/listas/rangoAumento";
 
-const TITULO_RELACION = {
-  MISMA_PRESENTACION: "Mi producto es lo que me están cotizando",
-  POR_UNIDAD_SUELTA: "Mi producto agrupa varias de esas unidades",
+const pct = (n) => (n === null || n === undefined ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(1)} %`);
+
+const TEXTO_COMPATIBILIDAD = {
+  COINCIDEN: "La cantidad del archivo coincide con la del producto.",
+  DIFIEREN: "La cantidad del archivo no coincide con la del producto. Se guarda en esta importación; la ficha del producto no se toca.",
+  SIN_DATO: "No se pudo leer una cantidad de la descripción.",
 };
 
-/** Por qué quedó por revisar, en criollo. */
-const TEXTO_MOTIVO = {
-  FACTOR_DIFIERE:
-    "El archivo declara un armado distinto del que tiene el producto. Decidí qué es tu producto: el precio no cambia por eso.",
-  FACTOR_AUSENTE:
-    "El producto no tiene cargado cuántas unidades agrupa. Decidí qué es tu producto respecto de lo que te cotizan.",
-  DISPLAY_SIN_EQUIVALENCIA:
-    "El proveedor cotiza por display. El precio informado es el del display entero, no el de cada unidad.",
-  BULTO_SOBRE_UNIDAD_SUELTA:
-    "El proveedor cotiza por bulto y el producto guarda por unidad suelta. Decidí cuál de los dos es tu producto.",
-};
+function Bloque({ titulo, children }) {
+  return (
+    <div className="sunmi-border border rounded-lg p-2.5 space-y-1">
+      <div className="text-[10px] font-bold uppercase tracking-wide sunmi-text-muted">{titulo}</div>
+      {children}
+    </div>
+  );
+}
 
-export default function PanelConfirmarArmado({ fila, onConfirmada, onCerrar, onVincularOtro }) {
+function Dato({ label, children, tono }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
+      <span className="sunmi-text-muted">{label}</span>
+      <span className={`tabular-nums font-semibold ${tono ?? "sunmi-text-strong"}`}>{children}</span>
+    </div>
+  );
+}
+
+export default function PanelConfirmarArmado({ fila, importacion, onConfirmada, onCerrar, onVincularOtro }) {
   const erp = fila.erp;
   const baseParaCalculo = erp
     ? {
         unidad_medida: erp.unidadMedida,
         factor_pack: erp.factorPack,
         modoCompraProveedor: erp.modoCompraProveedor ?? null,
+        precio_costo: erp.costoActual,
       }
     : null;
 
+  const rango = {
+    minPct: importacion?.aumentoEsperadoMinPct ?? 10,
+    maxPct: importacion?.aumentoEsperadoMaxPct ?? 20,
+  };
   const basePrecio = basePrecioDeFila(fila);
-  const opciones = relacionesPosibles(fila, baseParaCalculo);
-  const implicita = relacionImplicita({
-    costoActual: erp?.costoActual,
-    precioConIva: fila.precioConIva,
-    recargoPct: fila.recargoPct,
+  const analisis = analizarFila({
+    fila, base: baseParaCalculo, recargoPct: fila.recargoPct, rango,
   });
+  const { presentacion, evaluadas, recomendada, resultado } = analisis;
 
-  // La cantidad arranca con la del producto: es lo que el ERP cree hoy, y la
-  // persona la corrige si el archivo la contradice.
-  const [relacion, setRelacion] = useState("");
-  const [unidades, setUnidades] = useState(erp?.factorPack ? String(erp.factorPack) : "");
+  const [clave, setClave] = useState("");
+  const [cantidad, setCantidad] = useState(
+    presentacion.cantidadDescripcion ? String(presentacion.cantidadDescripcion) : ""
+  );
+  const [aceptoAlerta, setAceptoAlerta] = useState(false);
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState("");
 
-  const cantidad = unidades === "" ? null : Number(unidades);
-  const cantidadOk = unidadesValidas(cantidad);
-  const multiplica = relacion === RELACION.POR_UNIDAD_SUELTA;
-  const listo = relacion !== "" && (!multiplica || cantidadOk);
-
-  const costoDe = (rel) =>
-    costoDeRelacion({
-      precioConIva: fila.precioConIva,
-      recargoPct: fila.recargoPct,
-      relacion: rel,
-      unidades: cantidad,
-    });
-
-  const costoElegido = listo ? costoDe(relacion) : null;
-  const costoActual = erp?.costoActual ?? null;
-  const unitario = costoUnitarioInformativo({ costoTotal: costoElegido, unidades: cantidad });
+  const elegida = evaluadas.find((h) => h.clave === clave) ?? null;
+  const cantidadNum = cantidad === "" ? null : Number(cantidad);
+  const cantidadOk = cantidad === "" || cantidadValida(cantidadNum);
+  const necesitaAceptar = elegida ? exigeConfirmacionExplicita(elegida.estado) : false;
+  const listo = elegida !== null && !elegida.absurda && cantidadOk && (!necesitaAceptar || aceptoAlerta);
 
   const confirmar = async () => {
     if (!listo || trabajando) return;
@@ -110,12 +114,12 @@ export default function PanelConfirmarArmado({ fila, onConfirmada, onCerrar, onV
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ relacion, unidades: cantidadOk ? cantidad : null }),
+          body: JSON.stringify({ clave, cantidadPresentacion: cantidadValida(cantidadNum) ? cantidadNum : null }),
         }
       );
       const json = await r.json();
       if (!r.ok || !json?.ok) {
-        setError(json?.error || "No se pudo confirmar la presentación.");
+        setError(json?.error || "No se pudo confirmar.");
         return;
       }
       onConfirmada?.(json);
@@ -126,206 +130,175 @@ export default function PanelConfirmarArmado({ fila, onConfirmada, onCerrar, onV
     }
   };
 
-  // Sin base no hay nada que decidir: el archivo no dice de qué es el precio.
   if (basePrecio === null) {
     return (
-      <div
-        data-panel="confirmar-armado"
-        data-fila={fila.id}
-        className="sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-2"
-      >
+      <div data-panel="confirmar-armado" data-fila={fila.id} className="sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-2">
         <div className="text-[13px] font-semibold sunmi-text-strong">No se puede confirmar</div>
         <p className="text-[11.5px] sunmi-text-muted leading-snug">
-          El archivo no dice de qué presentación es este precio, así que no hay forma de saber a
-          qué corresponde. Sin ese dato no se propone ningún costo.
+          El archivo no dice de qué presentación es este precio, así que no hay forma de saber a qué
+          corresponde. Sin ese dato no se propone ningún costo.
         </p>
-        <SunmiButton color="slate" onClick={onCerrar} className="py-2 !text-xs">
-          Cerrar
-        </SunmiButton>
+        <SunmiButton color="slate" onClick={onCerrar} className="py-2 !text-xs">Cerrar</SunmiButton>
       </div>
     );
   }
 
   return (
-    <div
-      data-panel="confirmar-armado"
-      data-fila={fila.id}
-      className="sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-3"
-    >
+    <div data-panel="confirmar-armado" data-fila={fila.id} className="sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="text-[13px] font-semibold sunmi-text-strong inline-flex items-center gap-1">
-            <CheckCircle2 size={14} aria-hidden="true" />
-            Confirmar producto y presentación
-          </h3>
-          <p className="text-[11px] sunmi-text-muted leading-snug">
-            {TEXTO_MOTIVO[fila.motivo] ??
-              "Decidí qué es tu producto respecto de lo que cotiza el proveedor."}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onCerrar}
-          aria-label="Cerrar la confirmación de presentación"
-          className="shrink-0 sunmi-text-muted"
-        >
+        <h3 className="text-[13px] font-semibold sunmi-text-strong inline-flex items-center gap-1">
+          <CheckCircle2 size={14} aria-hidden="true" />
+          Confirmar producto e interpretación
+        </h3>
+        <button type="button" onClick={onCerrar} aria-label="Cerrar la confirmación" className="shrink-0 sunmi-text-muted">
           <X size={16} aria-hidden="true" />
         </button>
       </div>
 
-      {/* ── Lo que informa el proveedor ──────────────────────────────────── */}
-      <div className="sunmi-border border rounded-lg p-2.5 space-y-1">
-        <div className="text-[10px] font-bold uppercase tracking-wide sunmi-text-muted">
-          Lo que informa el proveedor
-        </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[12px] sunmi-text-strong break-words">
-            {fila.descripcionProveedor}
-          </span>
-          <span className="text-[15px] font-bold tabular-nums sunmi-text-strong shrink-0">
-            {money(fila.precioConIva)}
-          </span>
-        </div>
-        <div className="text-[11px] sunmi-text-muted">
-          Ese precio es el de{" "}
-          <span className="sunmi-text-strong">{TEXTO_BASE_PRECIO[basePrecio]}</span>, más{" "}
-          {porcentaje(fila.recargoPct)} de recargo.
-          {basePrecio !== BASE_PRECIO.UNIDAD && " No es el precio de cada unidad."}
-        </div>
-      </div>
+      {/* ── La recomendación, explicada ──────────────────────────────────── */}
+      <p data-rol="recomendacion" className="text-[11.5px] sunmi-text-strong leading-snug">
+        {textoRecomendacion({
+          evaluadas, recomendada, resultado,
+          baseTexto: TEXTO_BASE_PRECIO[basePrecio],
+          money, pct,
+        })}
+      </p>
 
-      {/* ── El producto que se conserva ──────────────────────────────────── */}
-      <div className="sunmi-border border rounded-lg p-2.5 space-y-0.5">
-        <div className="text-[10px] font-bold uppercase tracking-wide sunmi-text-muted">
-          Producto que se va a conservar
-        </div>
-        <div className="text-[12.5px] font-semibold sunmi-text-strong break-words">
-          {erp?.nombre ?? "—"}
-        </div>
-        <div className="text-[11px] sunmi-text-muted">
-          {erp?.presentacion ?? "—"}
-          {erp?.codigosArcor?.length ? ` · código ${erp.codigosArcor.join(" / ")}` : ""}
-          {costoActual !== null ? ` · costo actual ${money(costoActual)}` : ""}
-        </div>
-        {implicita !== null && (
-          <div className="text-[10.5px] sunmi-text-muted leading-snug">
-            Como referencia: el costo que tenés hoy equivale a{" "}
-            <span className="sunmi-text-strong">
-              {implicita < 1.6 ? "una" : implicita.toFixed(1)}
-            </span>{" "}
-            {implicita < 1.6
-              ? `sola ${TEXTO_BASE_PRECIO[basePrecio].replace("una ", "").replace("un ", "")}`
-              : `de esas presentaciones`}
-            . Es lo que valía la última vez que el costo estuvo bien.
-          </div>
+      {/* ── 1. PRESENTACIÓN DEL PRODUCTO ─────────────────────────────────── */}
+      <Bloque titulo="1 · Presentación del producto">
+        <div className="text-[12px] sunmi-text-strong break-words">{fila.descripcionProveedor}</div>
+        <Dato label="Cantidad que dice la descripción">
+          {presentacion.cantidadDescripcion ?? "—"}
+        </Dato>
+        <Dato label="Cantidad cargada en el producto (factor_pack)">
+          {presentacion.factorPackErp ?? "—"}
+        </Dato>
+        {presentacion.pesoTexto && <Dato label="Peso o volumen">{presentacion.pesoTexto}</Dato>}
+        {presentacion.contenidoInterno !== null && (
+          <Dato label="Contenido interno del envase">{presentacion.contenidoInterno} piezas</Dato>
         )}
-      </div>
-
-      {/* ── Cantidad contenida: un dato, no un factor ────────────────────── */}
-      <div className="space-y-1">
-        <label htmlFor={`unidades-${fila.id}`} className="text-[11.5px] font-semibold sunmi-text-strong block">
-          ¿Cuántas unidades contiene?
-        </label>
-        <div className="flex items-center gap-2">
-          <div className="w-28">
+        <p className={`text-[10.5px] leading-snug ${presentacion.compatibilidad === "DIFIEREN" ? "sunmi-text-warning" : "sunmi-text-muted"}`}>
+          {TEXTO_COMPATIBILIDAD[presentacion.compatibilidad]}
+        </p>
+        <div className="flex items-end gap-2 pt-1">
+          <div className="w-24">
+            <label htmlFor={`cant-${fila.id}`} className="text-[10.5px] sunmi-text-muted block">
+              Cantidad conciliada
+            </label>
             <SunmiInput
-              id={`unidades-${fila.id}`}
-              value={unidades}
-              onChange={(e) => {
-                setUnidades(e.target.value.replace(/[^\d]/g, ""));
-                setError("");
-              }}
+              id={`cant-${fila.id}`}
+              value={cantidad}
+              onChange={(e) => { setCantidad(e.target.value.replace(/[^\d]/g, "")); setError(""); }}
               inputMode="numeric"
-              placeholder={`1 a ${UNIDADES_MAX}`}
+              placeholder={`1 a ${CANTIDAD_MAX}`}
               autoComplete="off"
             />
           </div>
-          <p className="text-[10.5px] sunmi-text-muted leading-snug flex-1">
-            {fila.unidadesPorBulto
-              ? `El archivo trae ${fila.unidadesPorBulto} como unidades por bulto. `
-              : ""}
-            {multiplica
-              ? "Con la opción de abajo, esta cantidad multiplica el precio."
-              : "Es un dato de la presentación: no cambia el costo."}
+          <p className="text-[10.5px] sunmi-text-muted leading-snug flex-1 pb-1.5">
+            Se guarda en esta importación. No modifica la ficha del producto ni el costo.
           </p>
         </div>
-      </div>
-
-      {/* ── Qué es el producto ───────────────────────────────────────────── */}
-      <div className="space-y-1.5">
-        <div className="text-[11.5px] font-semibold sunmi-text-strong">
-          ¿Qué es tu producto respecto de lo que te cotizan?
+        <div className="pt-1 border-t sunmi-border">
+          <Dato label={`UxBU del archivo`} tono="sunmi-text-muted">
+            {presentacion.unidadesPorBultoArchivo ?? "—"}
+          </Dato>
+          <p className="text-[10px] sunmi-text-muted leading-snug">{LEYENDA_UXBU}</p>
         </div>
-        {opciones.map((o) => {
-          const c = costoDe(o.relacion);
-          const activa = relacion === o.relacion;
-          const respaldo = respaldoDeRelacion({
-            relacion: o.relacion,
-            implicita,
-            unidades: cantidad,
-          });
-          return (
-            <button
-              key={o.relacion}
-              type="button"
-              onClick={() => {
-                setRelacion(o.relacion);
-                setError("");
-              }}
-              className={`w-full text-left rounded-lg border p-2.5 ${
-                activa ? "sunmi-border-accent border-2" : "sunmi-border"
-              }`}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[12.5px] font-semibold sunmi-text-strong">
-                  {TITULO_RELACION[o.relacion]}
-                </span>
-                <span className="text-[13px] font-bold tabular-nums sunmi-text-strong shrink-0">
-                  {c === null ? "—" : money(c)}
-                </span>
-              </div>
-              <div className="text-[10.5px] sunmi-text-muted leading-snug">{o.detalle}</div>
-              {respaldo === "NO_RESPALDA" && (
-                <div className="text-[10.5px] sunmi-text-warning leading-snug mt-0.5">
-                  Ojo: el costo que tenés hoy no se parece a este. Puede ser que el producto sea
-                  otra presentación, o que el costo viejo esté mal. Revisalo antes de confirmar.
+      </Bloque>
+
+      {/* ── 2. PRECIO ────────────────────────────────────────────────────── */}
+      <Bloque titulo="2 · Precio">
+        <Dato label="U.M. del archivo">{fila.unidadProveedor}</Dato>
+        <Dato label="Qué está cotizando">{TEXTO_BASE_PRECIO[basePrecio]}</Dato>
+        <Dato label="Precio informado">{money(fila.precioConIva)}</Dato>
+        <Dato label="Recargo aplicado">{porcentaje(fila.recargoPct)}</Dato>
+
+        <div className="space-y-1.5 pt-1.5">
+          {evaluadas.map((h) => {
+            const activa = clave === h.clave;
+            const esRec = h.clave === recomendada;
+            return (
+              <button
+                key={h.clave}
+                type="button"
+                disabled={h.absurda}
+                onClick={() => { setClave(h.clave); setAceptoAlerta(false); setError(""); }}
+                className={`w-full text-left rounded-lg border p-2 ${
+                  activa ? "sunmi-border-accent border-2" : "sunmi-border"
+                } ${h.absurda ? "opacity-60" : ""}`}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[12px] font-semibold sunmi-text-strong">
+                    {h.multiplicador === 1 ? "Sin multiplicar" : `Por ${h.multiplicador}`}
+                    {h.origenCantidad ? <span className="font-normal sunmi-text-muted"> · {h.origenCantidad}</span> : null}
+                    {esRec && <span className="sunmi-text-success font-normal"> · recomendada</span>}
+                  </span>
+                  <span className="text-[13px] font-bold tabular-nums sunmi-text-strong shrink-0">
+                    {money(h.costoNuevo)}
+                  </span>
                 </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── El efecto ────────────────────────────────────────────────────── */}
-      {listo && costoElegido !== null && (
-        <div className="sunmi-border border rounded-lg p-2.5 space-y-0.5">
-          <div className="text-[11px] sunmi-text-muted">Costo total de la presentación</div>
-          <div className="text-[13px] tabular-nums sunmi-text-strong">
-            {money(costoActual)} <span className="sunmi-text-muted">→</span>{" "}
-            <span className="font-bold">{money(costoElegido)}</span>
-          </div>
-          {unitario !== null && (
-            <div className="text-[10.5px] sunmi-text-muted">
-              Costo por unidad, solo como referencia: {money(unitario)} ({cantidad} unidades). No se
-              guarda.
-            </div>
-          )}
-          <p className="text-[10.5px] sunmi-text-muted leading-snug">
-            Confirmar no aplica el costo: deja la fila lista para que la apliques con el resto. La
-            cantidad no modifica la ficha del producto.
-          </p>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[10.5px] sunmi-text-muted leading-snug">{h.detalle}</span>
+                  <span className={`text-[11px] tabular-nums shrink-0 ${TONO_ESTADO_VARIACION[h.estado]}`}>
+                    {pct(h.variacionPct)}
+                  </span>
+                </div>
+                {h.absurda && (
+                  <div className="text-[10.5px] sunmi-text-danger leading-snug">
+                    Cambia el costo de orden de magnitud: no puede ser esta. Queda a la vista para
+                    que se entienda por qué se descartó.
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </Bloque>
+
+      {/* ── 3. CONTROL DE AUMENTO ────────────────────────────────────────── */}
+      <Bloque titulo="3 · Control de aumento">
+        <Dato label="Costo actual">{money(analisis.costoActual)}</Dato>
+        <Dato label="Costo propuesto">{elegida ? money(elegida.costoNuevo) : "—"}</Dato>
+        <Dato label="Variación" tono={elegida ? TONO_ESTADO_VARIACION[elegida.estado] : undefined}>
+          {elegida ? pct(elegida.variacionPct) : "—"}
+        </Dato>
+        <Dato label="Rango esperado configurado">{rango.minPct} % a {rango.maxPct} %</Dato>
+        <Dato label="Estado" tono={elegida ? TONO_ESTADO_VARIACION[elegida.estado] : undefined}>
+          {elegida ? TEXTO_ESTADO_VARIACION[elegida.estado] : "—"}
+        </Dato>
+
+        {elegida && esAlertaFuerte(elegida.estado) && (
+          <div data-rol="alerta-fuerte" className="sunmi-text-danger text-[11.5px] leading-snug inline-flex items-start gap-1 pt-1">
+            <AlertTriangle size={14} aria-hidden="true" className="shrink-0 mt-0.5" />
+            <span>
+              {elegida.estado === "DISMINUCION"
+                ? "Con esta interpretación el costo BAJA. Una lista nueva que baja el costo casi siempre significa que la interpretación o el producto vinculado están mal."
+                : "Con esta interpretación el costo queda igual que hoy. Revisá que sea lo que corresponde antes de confirmar."}
+            </span>
+          </div>
+        )}
+
+        {elegida && necesitaAceptar && (
+          <label className="flex items-start gap-2 text-[11.5px] sunmi-text-strong cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={aceptoAlerta}
+              onChange={(e) => setAceptoAlerta(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+              aria-label="Confirmar una variación fuera del rango esperado"
+            />
+            <span>
+              Revisé esta fila: la variación es {TEXTO_ESTADO_VARIACION[elegida.estado].toLowerCase()} y
+              aun así corresponde.
+            </span>
+          </label>
+        )}
+      </Bloque>
 
       {error && <p className="text-[12px] sunmi-text-danger leading-snug">{error}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-        <SunmiButton
-          color="cyan"
-          onClick={confirmar}
-          disabled={!listo || trabajando}
-          className="py-2 font-bold !text-xs"
-        >
+        <SunmiButton color="cyan" onClick={confirmar} disabled={!listo || trabajando} className="py-2 font-bold !text-xs">
           {trabajando ? "Confirmando…" : "Confirmar producto"}
         </SunmiButton>
         <SunmiButton

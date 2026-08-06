@@ -2254,6 +2254,16 @@ model ImportacionListaProveedor {
 
   recargoPct         Decimal @db.Decimal(6, 3)
   umbralVariacionPct Decimal @db.Decimal(6, 3)
+  /// ── RANGO DE AUMENTO ESPERADO ─────────────────────────────────────────
+  ///
+  /// Control de coherencia, SEPARADO del recargo. El recargo construye el costo
+  /// propuesto; el rango compara ese costo contra el que el producto ya tiene.
+  /// No se suman: un rango de 10 a 20 % sigue siendo 10 a 20 % con recargo 5.
+  ///
+  /// Configurable por importación. Cambiarlo solo recalcula la previsualización:
+  /// no toca productos ni filas ya confirmadas.
+  aumentoEsperadoMinPct Decimal? @db.Decimal(6, 3)
+  aumentoEsperadoMaxPct Decimal? @db.Decimal(6, 3)
   /// Qué se hará con el precio de venta al aplicar. Se guarda desde ahora para
   /// que la decisión quede registrada junto a la propuesta; todavía no se usa.
   modoPrecioVenta    String  @default("NO_TOCAR")
@@ -2388,10 +2398,21 @@ model ImportacionListaFila {
   /// Mezclarlos fue el error que esto corrige: un display de $5.678 terminaba
   /// valuado en $71.545 por multiplicarlo por lo que trae adentro.
   baseConfirmada         String?
+  /// Por cuánto se multiplicó el precio informado. Vale 1 salvo que el archivo
+  /// demuestre que cotiza por unidad suelta y el producto agrupe varias. NUNCA
+  /// sale de UxBU, que es un nivel logístico del proveedor.
+  multiplicadorConfirmado Int?
+  /// Cuántas unidades trae el envase. Es un DATO de la presentación: no
+  /// multiplica el precio y NO reescribe ProductoBase.factor_pack, que se
+  /// corrige por su propio flujo.
+  cantidadPresentacion   Int?
+  /// El rango con el que se evaluó esta fila, copiado de la cabecera. Cambiar el
+  /// rango después no puede reescribir con qué criterio se decidió.
+  aumentoEsperadoMinPct  Decimal? @db.Decimal(6, 3)
+  aumentoEsperadoMaxPct  Decimal? @db.Decimal(6, 3)
+  /// Columnas de diseños anteriores, sin uso y sin datos. Se eliminan en una
+  /// migración de limpieza, cuando ninguna versión en ejecución las lea.
   unidadesConfirmadas    Int?
-  /// Del diseño anterior, que trataba la cantidad como multiplicador. Sin uso y
-  /// sin datos; se elimina en una migración de limpieza posterior, cuando
-  /// ninguna versión en ejecución la lea.
   factorConfirmado       Int?
   confirmadoPorUsuarioId Int?
   confirmadoEn           DateTime?

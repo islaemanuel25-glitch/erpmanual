@@ -1,21 +1,27 @@
 // POST /api/proveedores/listas/[id]/filas/[filaId]/confirmar
 //
-// Confirma la PRESENTACIÓN de una fila que quedó por revisar.
+// Confirma la interpretación de una fila que quedó por revisar.
 //
-// ── QUÉ SE CONFIRMA, Y QUÉ NO ───────────────────────────────────────────────
+// ── QUÉ SE CONFIRMA ─────────────────────────────────────────────────────────
 //
-// Se confirma qué es el producto del ERP respecto de lo que cotiza el proveedor:
-// la misma presentación —el costo es el precio informado— o la unidad suelta que
-// el producto agrupa —el costo es el precio por la cantidad que agrupa—.
+// Una HIPÓTESIS: qué es el producto del ERP respecto de lo que cotiza el
+// proveedor. Con display o bulto hay una sola, sin multiplicar. Con precio por
+// unidad puede haber más, y el multiplicador sale del `factor_pack` del ERP o de
+// la descripción del proveedor. Nunca de UxBU, que es un nivel logístico que el
+// ERP no maneja.
 //
-// NO se confirma un multiplicador. La cantidad contenida se guarda como dato de
-// la presentación y solo entra en la cuenta con POR_UNIDAD_SUELTA, que el
-// servidor únicamente admite cuando el archivo dice que el precio es por unidad.
-// Con display o bulto la cantidad no toca el precio: un display de $5.678 cuesta
-// $5.962 con recargo, traiga 12 o traiga 18 adentro.
+// Y un DATO: la cantidad que trae la presentación. Se guarda en la fila, sirve
+// para el costo unitario y para una futura corrección de la ficha, y NO
+// multiplica el precio ni toca `ProductoBase.factor_pack`.
 //
-// Tampoco se toca `ProductoBase.factor_pack`: corregir la ficha del producto es
-// otro flujo, con otras consecuencias sobre compras, stock y transferencias.
+// ── LO QUE EL SERVIDOR NO ACEPTA ────────────────────────────────────────────
+//
+// Una hipótesis que el archivo no habilita, y una hipótesis absurda —de las que
+// cambian el costo de orden de magnitud—. Esas se muestran explicadas en la
+// pantalla pero no se pueden confirmar.
+//
+// El porcentaje NO confirma nada por sí solo: una fila dentro del rango exige la
+// misma acción de la persona que una fuera de rango. La diferencia es la alerta.
 //
 // NO TOCA COSTOS NI PRECIOS. Deja la fila lista; aplicar es un paso aparte.
 
@@ -29,15 +35,25 @@ import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
 import { esComboBase } from "@/lib/combos/guards";
 import { OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
+import { RANGO_POR_DEFECTO, rangoValido } from "@/lib/proveedores/listas/rangoAumento";
 import {
-  RELACION,
   puedeConfirmarse,
-  relacionesPosibles,
-  unidadesValidas,
+  analizarFila,
+  cantidadValida,
   resultadoConfirmacion,
   TEXTO_NO_CONFIRMABLE,
-  UNIDADES_MAX,
+  CANTIDAD_MAX,
 } from "@/lib/proveedores/listas/confirmarPresentacion";
+
+/** El rango vigente de una importación, con el de Arcor como respaldo. */
+function rangoDe(importacion) {
+  const minPct = importacion.aumentoEsperadoMinPct;
+  const maxPct = importacion.aumentoEsperadoMaxPct;
+  if (minPct !== null && maxPct !== null && rangoValido({ minPct: Number(minPct), maxPct: Number(maxPct) })) {
+    return { minPct: Number(minPct), maxPct: Number(maxPct) };
+  }
+  return RANGO_POR_DEFECTO;
+}
 
 export async function POST(req, context) {
   try {
@@ -63,12 +79,18 @@ export async function POST(req, context) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const relacion = String(body?.relacion ?? "");
-    const unidades = body?.unidades === null || body?.unidades === undefined ? null : Number(body.unidades);
+    const clave = String(body?.clave ?? "");
+    const cantidadPresentacion =
+      body?.cantidadPresentacion === null || body?.cantidadPresentacion === undefined
+        ? null
+        : Number(body.cantidadPresentacion);
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId },
-      select: { id: true, estado: true, recargoPct: true, umbralVariacionPct: true, localOperativoId: true },
+      select: {
+        id: true, estado: true, recargoPct: true, umbralVariacionPct: true, localOperativoId: true,
+        aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
+      },
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
@@ -113,49 +135,26 @@ export async function POST(req, context) {
       );
     }
 
-    // La relación tiene que ser una de las que el ARCHIVO habilita. Es acá donde
-    // se impide multiplicar un display: POR_UNIDAD_SUELTA solo aparece cuando la
-    // columna U.M. dice que el precio es por unidad.
-    const posibles = relacionesPosibles(fila, base);
-    if (!posibles.some((o) => o.relacion === relacion)) {
+    if (cantidadPresentacion !== null && !cantidadValida(cantidadPresentacion)) {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            relacion === RELACION.POR_UNIDAD_SUELTA
-              ? "El proveedor no está cotizando por unidad suelta, así que el precio no se multiplica por la cantidad."
-              : "Elegí qué es el producto respecto de lo que cotiza el proveedor.",
-          opciones: posibles,
-        },
+        { ok: false, error: `La cantidad de la presentación tiene que ser un entero de 1 a ${CANTIDAD_MAX}.` },
         { status: 400 }
       );
     }
 
-    // La cantidad es obligatoria SOLO cuando multiplica. En el resto es un dato
-    // opcional de la presentación.
-    if (relacion === RELACION.POR_UNIDAD_SUELTA && !unidadesValidas(unidades)) {
-      return NextResponse.json(
-        { ok: false, error: `Indicá cuántas unidades agrupa el producto: un entero de 1 a ${UNIDADES_MAX}.` },
-        { status: 400 }
-      );
-    }
-    if (unidades !== null && !unidadesValidas(unidades)) {
-      return NextResponse.json(
-        { ok: false, error: `La cantidad contenida tiene que ser un entero de 1 a ${UNIDADES_MAX}.` },
-        { status: 400 }
-      );
-    }
+    const recargoPct = Number(importacion.recargoPct);
+    const rango = rangoDe(importacion);
 
     const r = resultadoConfirmacion({
-      fila,
-      base,
-      relacion,
-      unidades,
-      recargoPct: Number(importacion.recargoPct),
+      fila, base, clave, cantidadPresentacion, recargoPct, rango,
       umbralVariacionPct: Number(importacion.umbralVariacionPct),
     });
     if (!r.ok) {
-      return NextResponse.json({ ok: false, error: r.motivo }, { status: 409 });
+      const analisis = analizarFila({ fila, base, recargoPct, rango });
+      return NextResponse.json(
+        { ok: false, error: r.motivo, hipotesis: analisis.evaluadas },
+        { status: 400 }
+      );
     }
 
     const listo = r.estado === "LISTO_PARA_ACTUALIZAR";
@@ -172,13 +171,17 @@ export async function POST(req, context) {
       await tx.importacionListaFila.update({
         where: { id: filaIdNum },
         data: {
-          baseConfirmada: r.relacion,
-          unidadesConfirmadas: r.unidades,
+          multiplicadorConfirmado: r.multiplicador,
+          cantidadPresentacion: r.cantidadPresentacion,
+          // El rango se congela con la fila: cambiarlo después no puede
+          // reescribir con qué criterio se decidió esto.
+          aumentoEsperadoMinPct: r.rango.minPct,
+          aumentoEsperadoMaxPct: r.rango.maxPct,
           confirmadoPorUsuarioId: Number(session?.id ?? session?.userId) || null,
           confirmadoEn: new Date(),
-          // `factorErp` sigue siendo el factor DEL PRODUCTO, no una decisión:
-          // es la foto contra la que la aplicación detecta que la ficha cambió
-          // entre confirmar y aplicar.
+          // `factorErp` sigue siendo el factor DEL PRODUCTO: es la foto contra la
+          // que la aplicación detecta que la ficha cambió entre confirmar y
+          // aplicar. No se escribe nada en ProductoBase.
           factorErp: base.factor_pack ?? null,
           precioConRecargo: r.precioConRecargo,
           montoRecargo: r.montoRecargo,
@@ -224,9 +227,10 @@ export async function POST(req, context) {
     return NextResponse.json({
       ok: true,
       quedoLista: listo,
-      relacion: r.relacion,
-      unidades: r.unidades,
-      multiplico: r.relacion === RELACION.POR_UNIDAD_SUELTA,
+      multiplicador: r.multiplicador,
+      cantidadPresentacion: r.cantidadPresentacion,
+      estadoVariacion: r.estadoVariacion,
+      variacionPct: r.variacionPct,
       fila: {
         ...f,
         precioConIva: Number(f.precioConIva),
@@ -240,7 +244,7 @@ export async function POST(req, context) {
   } catch (e) {
     console.error("[listas/confirmar] error:", e);
     return NextResponse.json(
-      { ok: false, error: "No se pudo confirmar la presentación." },
+      { ok: false, error: "No se pudo confirmar la interpretación." },
       { status: 500 }
     );
   }
