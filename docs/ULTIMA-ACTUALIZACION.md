@@ -1,33 +1,14 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-06 06:24
+**Fecha:** 2026-08-06 08:54
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat(listas): conciliar presentación y precio por separado, con rango esperado, fix(listas): separar la cantidad contenida de la base del precio, fix(listas): dar salida operativa a las filas por revisar
-- Archivos: 14 nuevos (14 total)
-
-### pos-ventas
-- fix(caja): ningún proceso de caja pendiente queda oculto
-- Archivos: 5 modificados (5 total)
+- feat(listas): grilla operativa para conciliar 190 productos, feat(listas): conciliar presentación y precio por separado, con rango esperado
+- Archivos: 3 modificados (3 total)
 
 
-## Archivos nuevos desde última sincronización
-- app/api/proveedores/listas/[id]/filas/[filaId]/confirmar/route.js
-- app/api/proveedores/listas/[id]/route.js
-- app/modulos/proveedores/listas/[id]/page.jsx
-- app/api/proveedores/listas/[id]/aplicar/route.js
-- app/api/proveedores/listas/[id]/seleccion/route.js
-- app/api/proveedores/listas/[id]/finalizar/route.js
-- app/api/proveedores/listas/importar/route.js
-- app/api/proveedores/listas/[id]/cancelar/route.js
-- app/api/proveedores/listas/route.js
-- app/modulos/proveedores/listas/page.jsx
-- app/api/proveedores/listas/[id]/filas/[filaId]/vincular/route.js
-- app/api/proveedores/listas/[id]/productos/route.js
-- app/modulos/proveedores/listas/nueva/page.jsx
-- app/api/proveedores/listas/proveedores/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

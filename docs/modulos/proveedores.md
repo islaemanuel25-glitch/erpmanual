@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-06 06:24
+**Última actualización:** 2026-08-06 08:54
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,8 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-06: feat(listas): grilla operativa para conciliar 190 productos
+- 2026-08-06: feat(listas): conciliar presentación y precio por separado, con rango esperado
 - 2026-08-06: feat(listas): conciliar presentación y precio por separado, con rango esperado
 - 2026-08-05: fix(listas): separar la cantidad contenida de la base del precio
 - 2026-08-05: fix(listas): dar salida operativa a las filas por revisar
