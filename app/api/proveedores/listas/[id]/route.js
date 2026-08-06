@@ -189,6 +189,7 @@ export async function GET(req, context) {
           productoBase: {
             select: {
               id: true, nombre: true, codigo_barra: true, codigo_barra_secundario: true,
+              updatedAt: true,
               unidad_medida: true, factor_pack: true, precio_costo: true,
               precio_venta: true, margen: true, redondeo_100: true,
               modoCompraProveedor: true, es_combo: true,
@@ -360,6 +361,9 @@ export async function GET(req, context) {
               codigoBarra: b.codigo_barra,
               codigoBarraSecundario: b.codigo_barra_secundario,
               codigoBarraPropio: propiosPorBase.get(b.id) ?? null,
+              // Cuándo se tocó el costo por última vez. La grilla lo muestra
+              // debajo del costo actual, para saber contra qué se compara.
+              actualizadoEn: b.updatedAt,
               presentacion: presentacionActual,
               unidadMedida: b.unidad_medida,
               factorPack: b.factor_pack,

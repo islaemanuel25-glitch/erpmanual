@@ -11,7 +11,7 @@
 // se mira, después se marca, y recién al final se confirma en un panel aparte
 // que dice proveedor, archivo, cantidad y qué pasa con el precio de venta.
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Search, X } from "lucide-react";
 
@@ -27,9 +27,8 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 
 import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
-import FilaRevision from "@/components/proveedores/listas/FilaRevision";
+import GrillaConciliacion from "@/components/proveedores/listas/GrillaConciliacion";
 import PanelMacheo from "@/components/proveedores/listas/PanelMacheo";
-import PanelConfirmarArmado from "@/components/proveedores/listas/PanelConfirmarArmado";
 import {
   BadgeEstado,
   Dato,
@@ -46,7 +45,6 @@ import {
   porcentaje,
 } from "@/lib/proveedores/listas/presentacion";
 
-const PAGE_SIZE = 25;
 
 /**
  * Las vistas de la revisión. El valor viaja al servidor, que es quien filtra:
@@ -135,6 +133,9 @@ export default function ConciliacionPage() {
   // ?estado=... mostraba la lista entera y el usuario veía otra cosa que quien
   // se la pasó.
   const [page, setPage] = useState(1);
+  // Cuántas filas por página. Quien revisa 190 productos quiere elegir cuánto
+  // barre de una: 25 para mirar con calma, 100 para pasar rápido.
+  const [pageSize, setPageSize] = useState(25);
   const [estado, setEstado] = useState(() => busqueda?.get("estado") ?? "");
   const [vista, setVista] = useState(() => busqueda?.get("vista") ?? "todas");
   const [q, setQ] = useState(() => busqueda?.get("q") ?? "");
@@ -145,7 +146,6 @@ export default function ConciliacionPage() {
   // Qué fila tiene el panel de vinculación abierto. Una sola por vez: dos
   // paneles abiertos invitan a confirmar el equivocado.
   const [vinculando, setVinculando] = useState(null);
-  const [confirmando, setConfirmando] = useState(null);
   const [avisoVinculo, setAvisoVinculo] = useState("");
 
   // ── Aplicación ──────────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ export default function ConciliacionPage() {
     try {
       const url = new URL(`/api/proveedores/listas/${id}`, window.location.origin);
       url.searchParams.set("page", String(page));
-      url.searchParams.set("pageSize", String(PAGE_SIZE));
+      url.searchParams.set("pageSize", String(pageSize));
       if (estado) url.searchParams.set("estado", estado);
       if (vista && vista !== "todas") url.searchParams.set("vista", vista);
       if (qAplicado) url.searchParams.set("q", qAplicado);
@@ -198,7 +198,7 @@ export default function ConciliacionPage() {
     } finally {
       setCargando(false);
     }
-  }, [id, page, estado, vista, qAplicado]);
+  }, [id, page, pageSize, estado, vista, qAplicado]);
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
@@ -226,7 +226,6 @@ export default function ConciliacionPage() {
    * diciendo cosas distintas.
    */
   const alConfirmar = async (json) => {
-    setConfirmando(null);
     const comoQuedo =
       json.multiplicador > 1
         ? `el precio informado por ${json.multiplicador}`
@@ -738,49 +737,54 @@ export default function ConciliacionPage() {
 
           {!cargando && !error && filas.length > 0 && (
             <>
-              {/* Una sola lista para escritorio y móvil. La tarjeta pone los dos
-                  lados enfrentados en pantalla ancha y los apila en el teléfono:
-                  quince columnas en una tabla no se leen en ningún tamaño. */}
-              <div className="space-y-2">
-                {filas.map((f) => (
-                  <Fragment key={f.id}>
-                    <FilaRevision
-                      fila={f}
-                      seleccion={seleccionDe(f)}
-                      onVincular={(x) => { setConfirmando(null); setVinculando(x); }}
-                      onConfirmar={(x) => { setVinculando(null); setConfirmando(x); }}
-                      onExcluir={(x) => cambiarExclusion(x, true)}
-                      onIncluir={(x) => cambiarExclusion(x, false)}
-                      trabajando={trabajando}
-                    />
-                    {confirmando?.id === f.id && (
-                      <PanelConfirmarArmado
-                        fila={f}
-                        importacion={cab}
-                        onConfirmada={alConfirmar}
-                        onCerrar={() => setConfirmando(null)}
-                        onVincularOtro={() => { setConfirmando(null); setVinculando(f); }}
-                      />
-                    )}
-                    {vinculando?.id === f.id && (
-                      <PanelVincular
-                        importacionId={id}
-                        fila={f}
-                        onVinculada={alVincular}
-                        onCerrar={() => setVinculando(null)}
-                      />
-                    )}
-                  </Fragment>
-                ))}
-              </div>
-
-              <Paginacion
-                page={pag.page}
-                paginas={pag.paginas}
-                total={pag.total}
-                cargando={cargando}
-                onPage={setPage}
+              {/* La grilla decide sola cómo mostrarse: tabla densa en pantalla
+                  ancha, tarjetas compactas en el teléfono. El detalle se abre
+                  debajo de la propia fila, nunca en un modal ni en un panel. */}
+              <GrillaConciliacion
+                filas={filas}
+                importacion={cab}
+                seleccionDe={seleccionDe}
+                onMarcar={alMarcarFila}
+                onVincular={(x) => setVinculando(x)}
+                onConfirmada={alConfirmar}
+                editable={ESTADOS_ABIERTOS.includes(cab?.estado) && !trabajando}
               />
+
+              {/* Vincular sigue siendo un buscador aparte: es la única acción
+                  que necesita escribir y comparar candidatos. */}
+              {vinculando && (
+                <PanelVincular
+                  importacionId={id}
+                  fila={vinculando}
+                  onVinculada={alVincular}
+                  onCerrar={() => setVinculando(null)}
+                />
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="filas-por-pagina" className="text-[11px] sunmi-text-muted">
+                  Mostrar
+                </label>
+                <SunmiSelectAdv
+                  id="filas-por-pagina"
+                  value={String(pageSize)}
+                  onChange={(v) => { setPageSize(Number(v)); setPage(1); }}
+                  className="w-24"
+                >
+                  <SunmiSelectOption value="25">25</SunmiSelectOption>
+                  <SunmiSelectOption value="50">50</SunmiSelectOption>
+                  <SunmiSelectOption value="100">100</SunmiSelectOption>
+                </SunmiSelectAdv>
+                <div className="flex-1 min-w-[12rem]">
+                  <Paginacion
+                    page={pag.page}
+                    paginas={pag.paginas}
+                    total={pag.total}
+                    cargando={cargando}
+                    onPage={setPage}
+                  />
+                </div>
+              </div>
             </>
           )}
         </>
