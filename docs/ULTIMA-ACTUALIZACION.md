@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-05 23:13
+**Fecha:** 2026-08-06 06:24
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix(listas): separar la cantidad contenida de la base del precio, fix(listas): dar salida operativa a las filas por revisar, fix(precios): la vista "Listas" mostraba solo las filas ya aplicadas
+- feat(listas): conciliar presentación y precio por separado, con rango esperado, fix(listas): separar la cantidad contenida de la base del precio, fix(listas): dar salida operativa a las filas por revisar
 - Archivos: 14 nuevos (14 total)
 
 ### pos-ventas
@@ -15,8 +15,8 @@
 
 ## Archivos nuevos desde última sincronización
 - app/api/proveedores/listas/[id]/filas/[filaId]/confirmar/route.js
-- app/modulos/proveedores/listas/[id]/page.jsx
 - app/api/proveedores/listas/[id]/route.js
+- app/modulos/proveedores/listas/[id]/page.jsx
 - app/api/proveedores/listas/[id]/aplicar/route.js
 - app/api/proveedores/listas/[id]/seleccion/route.js
 - app/api/proveedores/listas/[id]/finalizar/route.js

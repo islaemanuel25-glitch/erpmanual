@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-08-06] - Actualización: proveedores, pos-ventas
+
+### Modificado
+- **proveedores**: feat(listas): conciliar presentación y precio por separado, con rango esperado
+- **proveedores**: fix(listas): separar la cantidad contenida de la base del precio
+- **proveedores**: fix(listas): dar salida operativa a las filas por revisar
+- **proveedores**: fix(precios): la vista "Listas" mostraba solo las filas ya aplicadas
+- **proveedores**: fix(precios): aplicar listas por tandas sin cerrar la importación
+- **proveedores**: fix(precios): permitir cancelar una importación y liberar su archivo
+- **proveedores**: feat(precios): pantalla de revisión producto por producto antes de aplicar
+- **proveedores**: feat(precios): aplicar los costos de una lista de proveedor
+- **proveedores**: feat(precios): vincular a mano las filas no macheadas de una lista
+- **proveedores**: feat(precios): agregar interfaz de listas de proveedores
+- **proveedores**: feat(precios): persistir conciliaciones de proveedores
+- **pos-ventas**: fix(caja): ningún proceso de caja pendiente queda oculto
+
+
 ## [2026-08-05] - Actualización: proveedores, pos-ventas
 
 ### Modificado
