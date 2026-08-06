@@ -29,6 +29,7 @@ import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
 import GrillaConciliacion from "@/components/proveedores/listas/GrillaConciliacion";
 import PanelMacheo from "@/components/proveedores/listas/PanelMacheo";
+import VistaProductosSistema from "@/components/proveedores/listas/VistaProductosSistema";
 import ResumenConciliacion from "@/components/proveedores/listas/ResumenConciliacion";
 import {
   BadgeEstado,
@@ -134,6 +135,22 @@ export default function ConciliacionPage() {
   // Cuántas filas por página. Quien revisa 190 productos quiere elegir cuánto
   // barre de una: 25 para mirar con calma, 100 para pasar rápido.
   const [pageSize, setPageSize] = useState(25);
+  /**
+   * Qué muestra el área principal.
+   *
+   *   CONCILIACION  la grilla de filas del archivo. Es el modo normal.
+   *   PENDIENTES    la MISMA grilla, acotada a los productos que faltan. No es
+   *                 otra pantalla: son las filas de esos productos, con sus
+   *                 acciones reales.
+   *   AUSENTES      productos del ERP que la lista no informó.
+   *   SIN_CODIGO    productos sin el código del proveedor guardado.
+   *
+   * Los dos últimos no tienen filas ni precio nuevo, así que se muestran como
+   * productos y ofrecen abrir la ficha, no confirmar nada.
+   */
+  const [modo, setModo] = useState("CONCILIACION");
+  // Los productos a los que se acota la grilla en el modo PENDIENTES.
+  const [productosFiltro, setProductosFiltro] = useState(null);
   const [estado, setEstado] = useState(() => busqueda?.get("estado") ?? "");
   const [vista, setVista] = useState(() => busqueda?.get("vista") ?? "todas");
   const [q, setQ] = useState(() => busqueda?.get("q") ?? "");
@@ -178,6 +195,7 @@ export default function ConciliacionPage() {
       const url = new URL(`/api/proveedores/listas/${id}`, window.location.origin);
       url.searchParams.set("page", String(page));
       url.searchParams.set("pageSize", String(pageSize));
+      if (productosFiltro?.length) url.searchParams.set("productos", productosFiltro.join(","));
       if (estado) url.searchParams.set("estado", estado);
       if (vista && vista !== "todas") url.searchParams.set("vista", vista);
       if (qAplicado) url.searchParams.set("q", qAplicado);
@@ -202,7 +220,7 @@ export default function ConciliacionPage() {
     } finally {
       setCargando(false);
     }
-  }, [id, page, pageSize, estado, vista, qAplicado]);
+  }, [id, page, pageSize, estado, vista, qAplicado, productosFiltro]);
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
@@ -242,24 +260,50 @@ export default function ConciliacionPage() {
     await cargar();
   };
 
+
+
   /**
-   * Una acción disparada desde el detalle de una métrica.
+   * Cambiar el modo del área principal.
    *
-   * "Cambiar producto" abre el buscador con esa fila. "Confirmar" y "Ver
-   * opciones" mandan a la grilla filtrada por lo que falta revisar: la decisión
-   * se toma ahí, con las hipótesis y el control de aumento a la vista, y no en
-   * una lista de resumen.
+   * Pendientes vuelve a la grilla acotada a esos productos: los ids se piden al
+   * mismo endpoint del resumen, que ya los sabe, y se limpian los filtros para
+   * que no se crucen con el recorte.
    */
-  const alAccionDesdeDetalle = (accion, fila) => {
-    if (accion === "CAMBIAR") {
-      setVinculando(fila);
-      return;
+  const cambiarModo = async (nuevo) => {
+    setVinculando(null);
+    if (nuevo !== "PENDIENTES") setProductosFiltro(null);
+
+    if (nuevo === "PENDIENTES") {
+      setEstado("");
+      setQ("");
+      setQAplicado("");
+      setVista("todas");
+      setPage(1);
+      try {
+        const r = await fetch(
+          `/api/proveedores/listas/${id}/sistema?situacion=PENDIENTES&page=1`,
+          { credentials: "include" }
+        );
+        const json = await r.json();
+        if (json?.ok) {
+          setProductosFiltro(json.items.map((x) => x.id));
+          setAvisoVinculo(
+            `Mostrando los ${json.paginacion.total} productos que faltan actualizar.`
+          );
+        }
+      } catch {
+        setErrorAplicar("No se pudieron cargar los productos pendientes.");
+        return;
+      }
     }
-    setVista("factorDudoso");
+    setModo(nuevo);
+  };
+
+  const volverAConciliacion = () => {
+    setModo("CONCILIACION");
+    setProductosFiltro(null);
     setPage(1);
-    setAvisoVinculo(
-      `Fila ${fila.filaExcel} en la lista de abajo: elegí la interpretación y confirmá.`
-    );
+    setAvisoVinculo("");
   };
 
   // ── Selección ───────────────────────────────────────────────────────────
@@ -441,7 +485,8 @@ export default function ConciliacionPage() {
               sistema={sistema}
               archivo={archivo}
               proveedor={cab.proveedor}
-              onAccionPendiente={alAccionDesdeDetalle}
+              modo={modo}
+              onModo={cambiarModo}
             />
 
             {/* ── Cancelar ─────────────────────────────────────────────
@@ -529,6 +574,20 @@ export default function ConciliacionPage() {
 
           </SunmiCard>
 
+          {/* ── Modos de PRODUCTOS ─────────────────────────────────────
+              Ausentes y sin código no tienen filas ni precio nuevo: se muestran
+              como productos, en el mismo lugar que la grilla, con su título y
+              su vuelta atrás. */}
+          {(modo === "AUSENTES" || modo === "SIN_CODIGO") && (
+            <VistaProductosSistema
+              importacionId={id}
+              situacion={modo}
+              onVolver={volverAConciliacion}
+            />
+          )}
+
+          {modo !== "AUSENTES" && modo !== "SIN_CODIGO" && (
+            <>
           {/* ── Filtros ───────────────────────────────────────────────── */}
           <SunmiCard className="p-3">
             <div className="grid grid-cols-1 sm:grid-cols-[220px_1fr_auto] gap-2 items-end">
@@ -708,6 +767,27 @@ export default function ConciliacionPage() {
             </div>
           )}
 
+          {modo === "PENDIENTES" && (
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div className="min-w-0">
+                <h2 className="text-[14px] font-bold sunmi-text-strong">
+                  Productos pendientes de actualizar
+                </h2>
+                <p className="text-[11px] sunmi-text-muted leading-tight">
+                  La misma grilla, acotada a los productos del ERP que faltan. Las acciones son las
+                  de siempre: confirmar, ver opciones o cambiar el producto.
+                </p>
+              </div>
+              <SunmiButton
+                color="slate"
+                onClick={volverAConciliacion}
+                className="py-1.5 px-3 !text-[11.5px] shrink-0"
+              >
+                Volver a la conciliación
+              </SunmiButton>
+            </div>
+          )}
+
           {!cargando && !error && filas.length > 0 && (
             <>
               {/* La grilla decide sola cómo mostrarse: tabla densa en pantalla
@@ -758,6 +838,8 @@ export default function ConciliacionPage() {
                   />
                 </div>
               </div>
+            </>
+          )}
             </>
           )}
         </>

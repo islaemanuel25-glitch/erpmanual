@@ -845,13 +845,17 @@ export default function FormProducto({
         {/* CÓDIGOS INTERNOS POR PROVEEDOR — identificación del producto por proveedor,
             junto al resto de datos principales. Solo en producto existente. */}
         {initialData?.id && (
-          <MaestroLock locked={soloLocal}>
-          <SeccionCodigosProveedor
-            productoBaseId={initialData.id}
-            proveedores={catalogos?.PROVEEDORES || []}
-            proveedoresSugeridos={[form.proveedor_id, form.proveedor2_id, form.proveedor3_id]}
-          />
-          </MaestroLock>
+          // El ancla la usa la conciliación de listas para traer directo acá a
+          // quien necesita cargarle el código del proveedor a un producto.
+          <div id="codigos-proveedor" className="scroll-mt-20">
+            <MaestroLock locked={soloLocal}>
+              <SeccionCodigosProveedor
+                productoBaseId={initialData.id}
+                proveedores={catalogos?.PROVEEDORES || []}
+                proveedoresSugeridos={[form.proveedor_id, form.proveedor2_id, form.proveedor3_id]}
+              />
+            </MaestroLock>
+          </div>
         )}
 
         {/* VENTA EN LOCAL + PRECIOS — ocultos para servicios de importe variable */}

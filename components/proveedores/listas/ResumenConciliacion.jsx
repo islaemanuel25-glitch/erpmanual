@@ -26,8 +26,8 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { TONO_SITUACION } from "@/lib/proveedores/listas/resumenSistema";
-import DetalleMetrica from "@/components/proveedores/listas/DetalleMetrica";
 import { PRESENTACION_ESTADO_IMPORTACION } from "@/lib/proveedores/listas/presentacion";
+import BotonReporte from "@/components/proveedores/listas/BotonReporte";
 
 /**
  * Una métrica del resumen. Es un BOTÓN: el número solo no sirve para trabajar,
@@ -70,12 +70,13 @@ function Dato({ etiqueta, children }) {
   );
 }
 
-export default function ResumenConciliacion({ cabecera, sistema, archivo, proveedor, onAccionPendiente }) {
+export default function ResumenConciliacion({ cabecera, sistema, archivo, proveedor, modo, onModo }) {
   const [verArchivo, setVerArchivo] = useState(false);
-  // Qué métrica está abierta. Una sola a la vez: dos listas largas abiertas
-  // empujan la grilla fuera de la pantalla, que es lo que veníamos de arreglar.
-  const [abierta, setAbierta] = useState(null);
-  const alternar = (clave) => setAbierta((x) => (x === clave ? null : clave));
+  // El encabezado no muestra listas: pide un MODO y el área principal cambia.
+  // Meter una lista larga acá adentro empujaba la grilla fuera de la pantalla,
+  // que es lo que veníamos de arreglar.
+  const abierta = modo;
+  const alternar = (clave) => onModo?.(modo === clave ? "CONCILIACION" : clave);
   if (!sistema) return null;
 
   // Los valores por clave, para poder escribir la frase principal sin repetir
@@ -108,6 +109,15 @@ export default function ResumenConciliacion({ cabecera, sistema, archivo, provee
         )}
         <Dato etiqueta="Recargo">{Number(cabecera?.recargoPct ?? 0)} %</Dato>
         {rango && <Dato etiqueta="Aumento esperado">{rango}</Dato>}
+        <div className="ml-auto">
+          <BotonReporte
+            importacionId={cabecera?.id}
+            cabecera={cabecera}
+            sistema={sistema}
+            proveedor={proveedor}
+            usuario={cabecera?.usuario?.nombre}
+          />
+        </div>
       </div>
 
       {/* ── EL SISTEMA: el bloque principal ───────────────────────────────── */}
@@ -187,19 +197,6 @@ export default function ResumenConciliacion({ cabecera, sistema, archivo, provee
           )}
         </div>
       </div>
-
-      {/* ── El detalle de la métrica abierta ──────────────────────────────
-          Debajo del resumen y encima de la grilla: es donde la vista estaba
-          mirando cuando tocó el número. */}
-      {abierta && (
-        <DetalleMetrica
-          key={abierta}
-          importacionId={cabecera?.id}
-          situacion={abierta}
-          onCerrar={() => setAbierta(null)}
-          onAccion={onAccionPendiente}
-        />
-      )}
 
       {/* ── EL ARCHIVO: secundario, plegado ───────────────────────────────── */}
       {archivo && (

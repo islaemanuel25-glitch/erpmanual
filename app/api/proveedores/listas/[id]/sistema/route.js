@@ -24,6 +24,8 @@ import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { SITUACION_DETALLE } from "@/lib/proveedores/listas/detalleSistema";
 
 const PAGE_SIZE = 50;
+/** Tope del modo reporte. Muy por encima de cualquier universo real. */
+const TOPE_REPORTE = 5000;
 
 /** Los campos del producto que el detalle necesita, y ninguno más. */
 const CAMPOS_PRODUCTO = {
@@ -83,6 +85,10 @@ export async function GET(req, context) {
       );
     }
     const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+    // El reporte necesita TODO de una: paginado en 50 tardaría ocho viajes para
+    // los 279 actualizados y podría mostrar un estado inconsistente si alguien
+    // aplica algo en el medio. El tope existe igual, por las dudas.
+    const todo = url.searchParams.get("todo") === "1";
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId },
@@ -115,8 +121,8 @@ export async function GET(req, context) {
         where,
         select: CAMPOS_PRODUCTO,
         orderBy: { nombre: "asc" },
-        skip: (page - 1) * PAGE_SIZE,
-        take: PAGE_SIZE,
+        skip: todo ? 0 : (page - 1) * PAGE_SIZE,
+        take: todo ? TOPE_REPORTE : PAGE_SIZE,
       }),
     ]);
 
@@ -201,10 +207,10 @@ export async function GET(req, context) {
       },
       recargoPct: numero(importacion.recargoPct),
       paginacion: {
-        page,
-        pageSize: PAGE_SIZE,
+        page: todo ? 1 : page,
+        pageSize: todo ? TOPE_REPORTE : PAGE_SIZE,
         total,
-        paginas: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+        paginas: todo ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE)),
       },
     });
   } catch (e) {

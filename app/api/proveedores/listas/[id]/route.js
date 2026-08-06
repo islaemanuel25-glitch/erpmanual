@@ -147,6 +147,22 @@ export async function GET(req, context) {
     const enMemoria = vista === "alerta";
     if (!enMemoria) Object.assign(where, VISTAS[vista]);
 
+    // Filtro por PRODUCTOS del ERP. Es lo que permite que tocar "7 pendientes"
+    // lleve a la grilla operativa mostrando exactamente esos 7 y no una vista
+    // aproximada: los ids salen del endpoint del resumen, que ya los sabe.
+    const productosParam = url.searchParams.get("productos");
+    if (productosParam) {
+      const ids = productosParam
+        .split(",")
+        .map((x) => Number(x.trim()))
+        .filter((x) => Number.isInteger(x) && x > 0)
+        .slice(0, 500);
+      if (ids.length === 0) {
+        return NextResponse.json({ ok: false, error: "Lista de productos inválida." }, { status: 400 });
+      }
+      where.productoBaseId = { in: ids };
+    }
+
     // Búsqueda por código o por descripción. `insensitive` para que el cajero no
     // tenga que acordarse de cómo lo escribió el proveedor.
     const q = (url.searchParams.get("q") ?? "").trim();
