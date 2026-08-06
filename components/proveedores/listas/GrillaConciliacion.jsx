@@ -2,74 +2,45 @@
 
 // LA GRILLA DE CONCILIACIÓN.
 //
-// ── QUÉ PROBLEMA RESUELVE ───────────────────────────────────────────────────
+// ── CÓMO SE COMPARA ─────────────────────────────────────────────────────────
 //
-// Antes cada producto era una ficha de 350 px en desktop y 605 px en móvil: dos
-// filas y media por pantalla, con el botón principal abajo de todo. Revisar 190
-// productos así son 190 scrolls. Esto es una herramienta de operación masiva, no
-// un formulario de alta.
+// La fila principal es el PRODUCTO DEL ERP. Al tocarla se abre debajo UNA fila
+// más, la del archivo del proveedor, usando LAS MISMAS COLUMNAS. Así el nombre
+// queda arriba del nombre, el código arriba del código y el costo arriba del
+// precio: la comparación la hace la tabla y el ojo la lee de corrido.
 //
-// Ahora cada producto es UNA LÍNEA con todo lo que hace falta para decidir sin
-// abrirla: qué dice el archivo, contra qué producto quedó, cómo se comparan las
-// presentaciones, cuánto costaba, cuánto costaría, cuánto varía, en qué estado
-// queda y qué se recomienda. El detalle se expande DEBAJO de la propia fila y
-// solo cuando hace falta.
+// Debajo de esa fila van las interpretaciones y el cierre de la decisión, que
+// es lo único que la tabla no puede mostrar.
+//
+// ── POR QUÉ SE ABRE TOCANDO LA FILA ─────────────────────────────────────────
+//
+// Ver el detalle de una fila no es una acción con consecuencias: es mirar. Un
+// botón "Ver opciones" en la columna de acciones lo disfrazaba de decisión,
+// competía con la única acción que sí decide y obligaba a apuntar a un blanco
+// de dos centímetros. Ahora el blanco es la fila entera y el galón indica que
+// hay algo abajo. Las acciones quedan para lo que cambia datos.
 //
 // ── LO QUE SE DECIDE SIN ABRIR NADA ─────────────────────────────────────────
 //
-// Cuando hay una única interpretación coherente, la fila trae el botón
-// Confirmar habilitado y resuelve de un clic. Cuando hay más de una, el botón
-// dice "Ver opciones" y obliga a mirar. Cuando ninguna cierra, no hay confirmar:
-// hay que cambiar el producto.
+// La columna Recomendación adelanta qué propone el motor y el chip de estado
+// dice si esa propuesta es sana. Con eso se decide si vale la pena abrir.
 //
 // No calcula nada propio: `analizarFila` es el mismo módulo que valida el
 // servidor.
 
-import { useState } from "react";
-import { AlertTriangle, Check, Link2, MoreVertical, Lock } from "lucide-react";
+import { Fragment, useState } from "react";
+import { ChevronRight, Info } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import DetalleConciliacion from "@/components/proveedores/listas/DetalleConciliacion";
+import InterpretacionesFila from "@/components/proveedores/listas/InterpretacionesFila";
 import { money, presentarEstado } from "@/lib/proveedores/listas/presentacion";
-import { basePrecioDeFila, analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
-import { TONO_ESTADO_VARIACION, TEXTO_ESTADO_VARIACION, esAlertaFuerte } from "@/lib/proveedores/listas/rangoAumento";
+import { LEYENDA_UXBU, analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
+import { TONO_ESTADO_VARIACION, TEXTO_ESTADO_VARIACION } from "@/lib/proveedores/listas/rangoAumento";
+
+/** El acento del tema, para marcar lo que cuelga de la fila abierta. */
+const BARRA_ACENTO = { boxShadow: "inset 3px 0 0 var(--pos-accent)" };
 
 const pct = (n) => (n === null || n === undefined ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(1)} %`);
-
-/**
- * El código que el proveedor le asigna al producto, guardado en
- * `ProductoCodigoProveedor.codigoInterno`.
- *
- * Es lo que permite comparar de un vistazo contra el código que vino en el
- * archivo. Cuando el producto no lo tiene cargado se dice así, con todas las
- * letras: NO se reemplaza por el sku ni por el id, que son otra cosa y darían a
- * entender que hay un código de Arcor donde no lo hay.
- */
-const codigoArcorGuardado = (erp) => {
-  if (!erp) return null;
-  return erp.codigosArcor?.length ? erp.codigosArcor.join(" / ") : null;
-};
-
-/**
- * Cómo se relacionan el código del archivo y el guardado en el ERP.
- *
- * Puestos uno al lado del otro delatan por qué macheó cada fila, que es
- * información que antes había que ir a buscar al panel de macheo: 11905 contra
- * 11905 es una coincidencia exacta y no admite discusión; 14429 contra 1014429
- * es una coincidencia por terminación, que es un fallback tolerante y conviene
- * mirar con más cuidado.
- */
-function relacionDeCodigos(codigoArchivo, guardado) {
-  const a = String(codigoArchivo ?? "").trim();
-  const b = String(guardado ?? "").trim();
-  if (!b) return { clave: "SIN_CODIGO", texto: null, tono: "sunmi-text-warning" };
-  if (!a) return { clave: "SIN_ARCHIVO", texto: null, tono: "sunmi-text-muted" };
-  if (a === b) return { clave: "IGUAL", texto: "coincide exacto", tono: "sunmi-text-success" };
-  if (b.endsWith(a) || a.endsWith(b)) {
-    return { clave: "SUFIJO", texto: "coincide por terminación", tono: "sunmi-text-warning" };
-  }
-  return { clave: "DISTINTO", texto: "no se parecen", tono: "sunmi-text-muted" };
-}
 const fechaCorta = (iso) => {
   if (!iso) return null;
   const d = new Date(iso);
@@ -77,11 +48,35 @@ const fechaCorta = (iso) => {
 };
 
 /**
+ * El código que el proveedor le asigna al producto, guardado en
+ * `ProductoCodigoProveedor.codigoInterno`. Cuando no lo tiene se dice así: NO se
+ * reemplaza por el sku ni por el id, que son otra cosa.
+ */
+const codigoArcorGuardado = (erp) =>
+  erp && erp.codigosArcor?.length ? erp.codigosArcor.join(" / ") : null;
+
+/**
+ * Cómo se relacionan el código del archivo y el guardado en el ERP.
+ *
+ * Puestos uno debajo del otro delatan por qué macheó cada fila: 11905 contra
+ * 11905 es exacta; 14429 contra 1014429 es por terminación, que es un fallback
+ * tolerante y conviene mirar con más cuidado.
+ */
+function relacionDeCodigos(codigoArchivo, guardado) {
+  const a = String(codigoArchivo ?? "").trim();
+  const b = String(guardado ?? "").trim();
+  if (!a || !b) return null;
+  if (a === b) return { texto: "coincide exacto", tono: "sunmi-text-success" };
+  if (b.endsWith(a) || a.endsWith(b)) return { texto: "coincide por terminación", tono: "sunmi-text-warning" };
+  return { texto: "no se parecen", tono: "sunmi-text-muted" };
+}
+
+/**
  * Todo lo que la fila necesita mostrar, resuelto una sola vez.
  *
- * Las filas que el motor ya resolvió —listas, sin cambios, aplicadas— muestran
- * lo que el motor calculó. Las que quedaron por revisar se analizan acá con el
- * módulo puro, que es lo que permite recomendar sin abrir el detalle.
+ * Las filas que el motor ya resolvió muestran lo que el motor calculó. Las que
+ * quedaron por revisar se analizan con el módulo puro, que es lo que permite
+ * adelantar la recomendación sin abrir nada.
  */
 function resumirFila(fila, importacion) {
   const erp = fila.erp;
@@ -92,23 +87,22 @@ function resumirFila(fila, importacion) {
       porRevisar: false,
       costoPropuesto: fila.costoNuevo ?? fila.costoMaestroPropuesto ?? null,
       variacionPct: fila.diferenciaPct === null || fila.diferenciaPct === undefined ? null : Number(fila.diferenciaPct),
+      multiplicador: fila.multiplicadorConfirmado ?? null,
       recomendacion: null,
       resultado: null,
-      multiplicador: fila.multiplicadorConfirmado ?? null,
       presentacion: null,
       estadoVariacion: null,
     };
   }
 
-  const base = {
-    unidad_medida: erp.unidadMedida,
-    factor_pack: erp.factorPack,
-    modoCompraProveedor: erp.modoCompraProveedor ?? null,
-    precio_costo: erp.costoActual,
-  };
   const a = analizarFila({
     fila,
-    base,
+    base: {
+      unidad_medida: erp.unidadMedida,
+      factor_pack: erp.factorPack,
+      modoCompraProveedor: erp.modoCompraProveedor ?? null,
+      precio_costo: erp.costoActual,
+    },
     recargoPct: fila.recargoPct,
     rango: {
       minPct: importacion?.aumentoEsperadoMinPct ?? 10,
@@ -125,7 +119,6 @@ function resumirFila(fila, importacion) {
     multiplicador: elegida?.multiplicador ?? null,
     resultado: a.resultado,
     presentacion: a.presentacion,
-    cantidadHipotesis: a.evaluadas.length,
     recomendacion:
       a.resultado === "RECOMENDADA"
         ? {
@@ -133,27 +126,9 @@ function resumirFila(fila, importacion) {
             detalle: elegida?.origenCantidad ?? `U.M. = ${fila.unidadProveedor}`,
           }
         : a.resultado === "AMBIGUA"
-          ? { titulo: `Ambiguo (${a.evaluadas.filter((h) => !h.absurda).length} opciones)`, detalle: "Ver detalle" }
+          ? { titulo: `Ambiguo (${a.evaluadas.filter((h) => !h.absurda).length} opciones)`, detalle: "Tocá la fila para elegir" }
           : { titulo: "Sin opción válida", detalle: "Revisar el producto" },
   };
-}
-
-/** La comparación de presentaciones, en una celda: "30u / 30u ✓". */
-function Presentacion({ resumen, fila }) {
-  if (!resumen.presentacion) {
-    return <span className="sunmi-text-muted">{fila.erp?.presentacion ?? "—"}</span>;
-  }
-  const { cantidadDescripcion, factorPackErp, compatibilidad } = resumen.presentacion;
-  const tono =
-    compatibilidad === "COINCIDEN" ? "sunmi-text-success" : compatibilidad === "DIFIEREN" ? "sunmi-text-warning" : "sunmi-text-muted";
-  return (
-    <span className="tabular-nums whitespace-nowrap">
-      {cantidadDescripcion ?? "—"} <span className="sunmi-text-muted">/</span> {factorPackErp ?? "—"}{" "}
-      <span className={tono} aria-hidden="true">
-        {compatibilidad === "COINCIDEN" ? "✓" : compatibilidad === "DIFIEREN" ? "!" : "·"}
-      </span>
-    </span>
-  );
 }
 
 function ChipEstado({ fila, resumen }) {
@@ -174,38 +149,15 @@ function ChipEstado({ fila, resumen }) {
   return <span className={`text-[10px] px-1.5 py-0.5 rounded sunmi-border border ${p.tono}`}>{p.etiqueta}</span>;
 }
 
-/** Las acciones de la fila. La principal siempre a la vista, nunca abajo. */
-function Acciones({ fila, resumen, abierto, onAbrir, onVincular, compacto }) {
-  const puedeConfirmarDirecto = resumen.porRevisar && resumen.resultado === "RECOMENDADA";
-  const riesgoso = resumen.estadoVariacion ? esAlertaFuerte(resumen.estadoVariacion) : false;
-  const clase = compacto ? "py-1.5 px-2.5 !text-[11px]" : "py-1 px-2 !text-[10.5px]";
-
+/** Una celda con su valor y una nota chica debajo. */
+function Celda({ children, nota, notaTono, alineado, titulo, estilo }) {
   return (
-    <div className={`flex items-center gap-1 ${compacto ? "" : "justify-end"}`}>
-      {resumen.porRevisar && resumen.resultado !== "REVISAR" && (
-        <SunmiButton
-          color="cyan"
-          onClick={onAbrir}
-          disabled={riesgoso && !abierto ? false : false}
-          className={`${clase} inline-flex items-center gap-1`}
-        >
-          {riesgoso && <Lock size={11} aria-hidden="true" />}
-          {puedeConfirmarDirecto && !riesgoso ? "Confirmar" : "Ver opciones"}
-        </SunmiButton>
-      )}
-      <SunmiButton color="slate" onClick={onVincular} className={clase}>
-        Cambiar
-      </SunmiButton>
-      <button
-        type="button"
-        onClick={onAbrir}
-        aria-label={`Ver detalle de la fila ${fila.filaExcel}`}
-        aria-expanded={abierto}
-        className="sunmi-text-muted p-1"
-      >
-        <MoreVertical size={14} aria-hidden="true" />
-      </button>
-    </div>
+    <td className={`px-1.5 py-1 ${alineado === "der" ? "text-right" : ""}`} title={titulo} style={estilo}>
+      <div className="sunmi-text-strong">{children}</div>
+      {nota ? (
+        <div className={`text-[9.5px] leading-tight ${notaTono ?? "sunmi-text-muted"}`}>{nota}</div>
+      ) : null}
+    </td>
   );
 }
 
@@ -221,26 +173,37 @@ export default function GrillaConciliacion({
   const [abierta, setAbierta] = useState(null);
   const alternar = (id) => setAbierta((x) => (x === id ? null : id));
 
-  const filasConResumen = filas.map((f) => ({ f, r: resumirFila(f, importacion) }));
+  const filasConResumen = filas.map((f) => ({
+    f,
+    r: resumirFila(f, importacion),
+    // Solo se abre lo que tiene algo abajo: sin producto vinculado no hay nada
+    // que comparar ni que interpretar.
+    expandible: f.estado === "FACTOR_DUDOSO" && !!f.erp && !f.aplicada,
+  }));
+
+  /** Teclado: la fila se comporta como el botón que ahora es. */
+  const teclaAbre = (e, id) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    alternar(id);
+  };
 
   return (
     <div className="space-y-1">
-      {/* ── DESKTOP: tabla densa ──────────────────────────────────────────
-          Una línea por producto. El scroll horizontal vive en este contenedor
-          y nunca en el body de la página. */}
+      {/* ── DESKTOP: tabla comparable ─────────────────────────────────────
+          Las columnas son las mismas para el ERP y para el archivo. El scroll
+          horizontal vive en este contenedor, nunca en el body. */}
       <div className="hidden lg:block overflow-x-auto sunmi-border border rounded-lg">
         <table className="w-full text-[11px] border-collapse">
           <thead className="sunmi-surface-soft">
             <tr className="sunmi-text-muted text-left">
               <th className="font-medium px-1.5 py-1.5 w-8" />
-              <th className="font-medium px-1.5 py-1.5 w-12">Fila</th>
-              <th className="font-medium px-1.5 py-1.5">Producto archivo</th>
-              <th className="font-medium px-1.5 py-1.5">Código archivo</th>
-              <th className="font-medium px-1.5 py-1.5">Producto ERP</th>
-              <th className="font-medium px-1.5 py-1.5">Código Arcor guardado</th>
-              <th className="font-medium px-1.5 py-1.5">U.M.</th>
-              <th className="font-medium px-1.5 py-1.5">Present.</th>
-              <th className="font-medium px-1.5 py-1.5 text-right">Costo actual</th>
+              <th className="font-medium px-1.5 py-1.5 w-16">Origen</th>
+              <th className="font-medium px-1.5 py-1.5">Nombre</th>
+              <th className="font-medium px-1.5 py-1.5">Código</th>
+              <th className="font-medium px-1.5 py-1.5 w-14">U.M.</th>
+              <th className="font-medium px-1.5 py-1.5">Presentación</th>
+              <th className="font-medium px-1.5 py-1.5 text-right">Costo / Precio</th>
               <th className="font-medium px-1.5 py-1.5 text-right">Costo propuesto</th>
               <th className="font-medium px-1.5 py-1.5 text-right">Var.</th>
               <th className="font-medium px-1.5 py-1.5">Estado</th>
@@ -249,71 +212,89 @@ export default function GrillaConciliacion({
             </tr>
           </thead>
           <tbody>
-            {filasConResumen.map(({ f, r }) => {
-              const sel = seleccionDe?.(f) ?? { marcada: false, habilitada: false };
+            {filasConResumen.map(({ f, r, expandible }) => {
+              const sel = seleccionDe?.(f) ?? null;
+              const puedeMarcar = sel?.puede === true && editable;
               const abierto = abierta === f.id;
               const tono = r.estadoVariacion ? TONO_ESTADO_VARIACION[r.estadoVariacion] : "sunmi-text-muted";
+              const guardado = codigoArcorGuardado(f.erp);
+              const rel = relacionDeCodigos(f.codigoCrudo, guardado);
+              const abre = expandible && editable;
               return (
-                <>
+                <Fragment key={f.id}>
+                  {/* ── EL PRODUCTO DEL ERP. La fila entera abre. ───────── */}
                   <tr
-                    key={f.id}
                     data-fila={f.filaExcel}
-                    className={`border-t sunmi-border align-middle ${abierto ? "sunmi-surface-soft" : ""}`}
+                    data-origen="erp"
+                    data-expandible={abre ? "si" : "no"}
+                    role={abre ? "button" : undefined}
+                    tabIndex={abre ? 0 : undefined}
+                    aria-expanded={abre ? abierto : undefined}
+                    onClick={abre ? () => alternar(f.id) : undefined}
+                    onKeyDown={abre ? (e) => teclaAbre(e, f.id) : undefined}
+                    className={`border-t sunmi-border align-middle ${abre ? "cursor-pointer" : ""} ${
+                      abierto ? "sunmi-surface-soft" : ""
+                    }`}
                   >
+                    {/* La misma barra de acento que llevan la fila del archivo y
+                        las interpretaciones: abierta, la fila y lo que cuelga de
+                        ella se leen como un solo bloque. */}
+                    <td
+                      className="px-1.5 py-1.5"
+                      style={abierto ? BARRA_ACENTO : undefined}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {puedeMarcar ? (
+                        <input
+                          type="checkbox"
+                          checked={sel.marcada}
+                          onChange={(e) => onMarcar?.(f, e.target.checked)}
+                          aria-label={`Seleccionar la fila ${f.filaExcel} para aplicar`}
+                          className="h-3.5 w-3.5"
+                        />
+                      ) : null}
+                    </td>
                     <td className="px-1.5 py-1.5">
-                      <input
-                        type="checkbox"
-                        checked={sel.marcada}
-                        disabled={!sel.habilitada || !editable}
-                        onChange={(e) => onMarcar?.(f, e.target.checked)}
-                        aria-label={
-                          sel.habilitada ? `Seleccionar la fila ${f.filaExcel}` : `La fila ${f.filaExcel} no se puede aplicar`
-                        }
-                        className="h-3.5 w-3.5"
-                      />
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold sunmi-text-muted uppercase">
+                        {abre && (
+                          <ChevronRight
+                            size={12}
+                            aria-hidden="true"
+                            className={`transition-transform ${abierto ? "rotate-90 sunmi-text-accent" : ""}`}
+                          />
+                        )}
+                        ERP
+                      </span>
                     </td>
-                    <td className="px-1.5 py-1.5 tabular-nums sunmi-text-muted">{f.filaExcel}</td>
-                    <td className="px-1.5 py-1.5 max-w-[15rem]">
-                      <div className="truncate sunmi-text-strong font-medium" title={f.descripcionProveedor}>
-                        {f.descripcionProveedor}
-                      </div>
-                    </td>
-                    <td className="px-1.5 py-1.5 tabular-nums sunmi-text-muted">{f.codigoCrudo ?? "—"}</td>
-                    <td className="px-1.5 py-1.5 max-w-[14rem]">
+                    <td className="px-1.5 py-1.5 max-w-[18rem]">
                       {f.erp ? (
-                        <div className="truncate sunmi-text-strong" title={f.erp.nombre}>{f.erp.nombre}</div>
+                        <div className="truncate sunmi-text-strong font-medium" title={f.erp.nombre}>
+                          {f.erp.nombre}
+                        </div>
                       ) : (
                         <span className="sunmi-text-warning">Sin vincular</span>
                       )}
                     </td>
                     <td className="px-1.5 py-1.5 tabular-nums">
-                      {codigoArcorGuardado(f.erp) ? (
-                        <>
-                          <div className="sunmi-text-strong">{codigoArcorGuardado(f.erp)}</div>
-                          {relacionDeCodigos(f.codigoCrudo, codigoArcorGuardado(f.erp)).texto && (
-                            <div className={`text-[9.5px] ${relacionDeCodigos(f.codigoCrudo, codigoArcorGuardado(f.erp)).tono}`}>
-                              {relacionDeCodigos(f.codigoCrudo, codigoArcorGuardado(f.erp)).texto}
-                            </div>
-                          )}
-                        </>
+                      {guardado ? (
+                        <span className="sunmi-text-strong">{guardado}</span>
                       ) : (
                         <span className="text-[10px] sunmi-text-warning">Sin código Arcor</span>
                       )}
                     </td>
-                    <td className="px-1.5 py-1.5">{f.unidadProveedor}</td>
-                    <td className="px-1.5 py-1.5"><Presentacion resumen={r} fila={f} /></td>
-                    <td className="px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap">
-                      <div className="sunmi-text-strong">{money(f.erp?.costoActual)}</div>
-                      {fechaCorta(f.erp?.actualizadoEn) && (
-                        <div className="text-[9.5px] sunmi-text-muted">act. {fechaCorta(f.erp.actualizadoEn)}</div>
-                      )}
+                    <td className="px-1.5 py-1.5 sunmi-text-strong">{f.erp?.unidadMedida ?? "—"}</td>
+                    <td className="px-1.5 py-1.5 tabular-nums sunmi-text-strong">
+                      {f.erp?.factorPack ? `${f.erp.factorPack} u.` : (f.erp?.presentacion ?? "—")}
                     </td>
-                    <td className="px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap">
-                      <div className="font-semibold sunmi-text-strong">{money(r.costoPropuesto)}</div>
-                      {r.multiplicador ? (
-                        <div className="text-[9.5px] sunmi-text-muted">× {r.multiplicador}</div>
-                      ) : null}
-                    </td>
+                    <Celda
+                      alineado="der"
+                      nota={fechaCorta(f.erp?.actualizadoEn) ? `act. ${fechaCorta(f.erp.actualizadoEn)}` : null}
+                    >
+                      <span className="tabular-nums">{money(f.erp?.costoActual)}</span>
+                    </Celda>
+                    <Celda alineado="der" nota={r.multiplicador ? `× ${r.multiplicador}` : null}>
+                      <span className="tabular-nums font-semibold">{money(r.costoPropuesto)}</span>
+                    </Celda>
                     <td className={`px-1.5 py-1.5 text-right tabular-nums whitespace-nowrap ${tono}`}>
                       {pct(r.variacionPct)}
                     </td>
@@ -328,34 +309,77 @@ export default function GrillaConciliacion({
                         <span className="sunmi-text-muted">—</span>
                       )}
                     </td>
-                    <td className="px-1.5 py-1.5">
+                    <td className="px-1.5 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
                       {editable ? (
-                        <Acciones
-                          fila={f}
-                          resumen={r}
-                          abierto={abierto}
-                          onAbrir={() => alternar(f.id)}
-                          onVincular={() => onVincular?.(f)}
-                        />
+                        <SunmiButton
+                          color="slate"
+                          onClick={() => onVincular?.(f)}
+                          className="py-1 px-2 !text-[10.5px]"
+                        >
+                          Cambiar
+                        </SunmiButton>
                       ) : (
                         <span className="text-[10px] sunmi-text-muted">solo lectura</span>
                       )}
                     </td>
                   </tr>
+
+                  {/* ── EL PRODUCTO DEL ARCHIVO, en las mismas columnas ─── */}
                   {abierto && (
-                    <tr key={`${f.id}-detalle`} className="sunmi-border border-t">
-                      <td colSpan={14} className="p-0">
-                        <DetalleConciliacion
+                    <tr data-fila={f.filaExcel} data-origen="archivo" className="sunmi-surface-soft align-middle">
+                      <td className="px-1.5 py-1" style={BARRA_ACENTO} />
+                      <td className="px-1.5 py-1 text-[10px] font-semibold sunmi-text-accent uppercase whitespace-nowrap">
+                        Fila {f.filaExcel}
+                      </td>
+                      <td className="px-1.5 py-1 max-w-[18rem]">
+                        <div className="truncate sunmi-text-strong" title={f.descripcionProveedor}>
+                          {f.descripcionProveedor}
+                        </div>
+                      </td>
+                      <Celda nota={rel?.texto} notaTono={rel?.tono}>
+                        <span className="tabular-nums">{f.codigoCrudo ?? "—"}</span>
+                      </Celda>
+                      <td className="px-1.5 py-1 sunmi-text-strong">{f.unidadProveedor ?? "—"}</td>
+                      <Celda
+                        nota={f.unidadesPorBulto ? `UxBU ${f.unidadesPorBulto} · dato logístico` : null}
+                        titulo={f.unidadesPorBulto ? LEYENDA_UXBU : undefined}
+                      >
+                        <span className="tabular-nums">
+                          {r.presentacion?.cantidadDescripcion ? `${r.presentacion.cantidadDescripcion} u.` : "—"}
+                          {r.presentacion?.pesoTexto ? ` · ${r.presentacion.pesoTexto}` : ""}
+                        </span>
+                      </Celda>
+                      <Celda alineado="der" nota={`+${Number(f.recargoPct ?? 0)} % de recargo`}>
+                        <span className="tabular-nums">{money(f.precioConIva)}</span>
+                      </Celda>
+                      <td className="px-1.5 py-1 text-right sunmi-text-muted">—</td>
+                      <td className="px-1.5 py-1 text-right sunmi-text-muted">—</td>
+                      <td className="px-1.5 py-1 text-[10px] sunmi-text-muted">informado</td>
+                      <td className="px-1.5 py-1 text-[10px] sunmi-text-muted">
+                        {r.presentacion?.compatibilidad === "COINCIDEN"
+                          ? "Presentación coincide"
+                          : r.presentacion?.compatibilidad === "DIFIEREN"
+                            ? "Presentación distinta"
+                            : "—"}
+                      </td>
+                      <td className="px-1.5 py-1" />
+                    </tr>
+                  )}
+
+                  {/* ── Las interpretaciones y el cierre ────────────────── */}
+                  {abierto && (
+                    <tr className="sunmi-surface-soft">
+                      <td colSpan={12} className="pl-3 pr-2 pt-0.5 pb-1.5" style={BARRA_ACENTO}>
+                        <InterpretacionesFila
                           fila={f}
                           importacion={importacion}
                           onConfirmada={(json) => { setAbierta(null); onConfirmada?.(json); }}
                           onVincularOtro={() => { setAbierta(null); onVincular?.(f); }}
-                          onCerrar={() => setAbierta(null)}
                         />
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>
@@ -364,33 +388,54 @@ export default function GrillaConciliacion({
 
       {/* ── MÓVIL: tarjetas compactas, sin scroll horizontal ─────────────── */}
       <div className="lg:hidden space-y-1.5">
-        {filasConResumen.map(({ f, r }) => {
-          const sel = seleccionDe?.(f) ?? { marcada: false, habilitada: false };
+        {filasConResumen.map(({ f, r, expandible }) => {
+          const sel = seleccionDe?.(f) ?? null;
+          const puedeMarcar = sel?.puede === true && editable;
           const abierto = abierta === f.id;
           const tono = r.estadoVariacion ? TONO_ESTADO_VARIACION[r.estadoVariacion] : "sunmi-text-muted";
+          const guardado = codigoArcorGuardado(f.erp);
+          const rel = relacionDeCodigos(f.codigoCrudo, guardado);
+          const abre = expandible && editable;
           return (
             <div key={f.id} data-fila={f.filaExcel} className="sunmi-border border rounded-lg overflow-hidden">
-              <div className="p-2 space-y-1.5">
+              <div
+                data-origen="erp"
+                data-expandible={abre ? "si" : "no"}
+                role={abre ? "button" : undefined}
+                tabIndex={abre ? 0 : undefined}
+                aria-expanded={abre ? abierto : undefined}
+                onClick={abre ? () => alternar(f.id) : undefined}
+                onKeyDown={abre ? (e) => teclaAbre(e, f.id) : undefined}
+                className="p-2 space-y-1.5"
+              >
                 <div className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={sel.marcada}
-                    disabled={!sel.habilitada || !editable}
-                    onChange={(e) => onMarcar?.(f, e.target.checked)}
-                    aria-label={
-                      sel.habilitada ? `Seleccionar la fila ${f.filaExcel}` : `La fila ${f.filaExcel} no se puede aplicar`
-                    }
-                    className="h-4 w-4 mt-0.5 shrink-0"
-                  />
+                  {puedeMarcar && (
+                    <input
+                      type="checkbox"
+                      checked={sel.marcada}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => onMarcar?.(f, e.target.checked)}
+                      aria-label={`Seleccionar la fila ${f.filaExcel} para aplicar`}
+                      className="h-4 w-4 mt-0.5 shrink-0"
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
+                    <span className="inline-flex items-center gap-0.5 text-[9.5px] font-semibold sunmi-text-muted uppercase">
+                      {abre && (
+                        <ChevronRight
+                          size={11}
+                          aria-hidden="true"
+                          className={`transition-transform ${abierto ? "rotate-90 sunmi-text-accent" : ""}`}
+                        />
+                      )}
+                      ERP
+                    </span>
                     <div className="text-[12px] font-semibold sunmi-text-strong leading-tight break-words">
-                      <span className="sunmi-text-muted tabular-nums">{f.filaExcel}</span>{" "}
-                      {f.descripcionProveedor}
+                      {f.erp?.nombre ?? <span className="sunmi-text-warning">Sin vincular</span>}
                     </div>
-                    <div className="text-[10px] sunmi-text-muted tabular-nums truncate">
-                      {f.unidadProveedor} · archivo {f.codigoCrudo ?? "—"} · Arcor{" "}
-                      {codigoArcorGuardado(f.erp) ?? "sin código"}
-                      {f.erp ? ` · ${f.erp.nombre}` : " · sin vincular"}
+                    <div className="text-[10px] sunmi-text-muted tabular-nums">
+                      {guardado ?? "sin código Arcor"} · {f.erp?.unidadMedida ?? "—"}
+                      {f.erp?.factorPack ? ` · ${f.erp.factorPack} u.` : ""}
                     </div>
                   </div>
                   <ChipEstado fila={f} resumen={r} />
@@ -398,7 +443,7 @@ export default function GrillaConciliacion({
 
                 <div className="grid grid-cols-3 gap-1 text-[11px] tabular-nums">
                   <div>
-                    <div className="text-[9.5px] sunmi-text-muted">Actual</div>
+                    <div className="text-[9.5px] sunmi-text-muted">Costo actual</div>
                     <div className="sunmi-text-strong">{money(f.erp?.costoActual)}</div>
                   </div>
                   <div>
@@ -412,24 +457,60 @@ export default function GrillaConciliacion({
                 </div>
 
                 {editable && (
-                  <Acciones
-                    fila={f}
-                    resumen={r}
-                    abierto={abierto}
-                    onAbrir={() => alternar(f.id)}
-                    onVincular={() => onVincular?.(f)}
-                    compacto
-                  />
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <SunmiButton
+                      color="slate"
+                      onClick={() => onVincular?.(f)}
+                      className="py-1.5 px-2.5 !text-[11px]"
+                    >
+                      Cambiar
+                    </SunmiButton>
+                  </div>
                 )}
               </div>
+
+              {/* La misma comparación, apilada: el archivo con las mismas
+                  etiquetas que el ERP de arriba, y después la decisión. */}
               {abierto && (
-                <DetalleConciliacion
-                  fila={f}
-                  importacion={importacion}
-                  onConfirmada={(json) => { setAbierta(null); onConfirmada?.(json); }}
-                  onVincularOtro={() => { setAbierta(null); onVincular?.(f); }}
-                  onCerrar={() => setAbierta(null)}
-                />
+                <div className="sunmi-surface-soft border-t sunmi-border p-2 space-y-2" style={BARRA_ACENTO}>
+                  <div data-origen="archivo" className="space-y-1">
+                    <div className="text-[9.5px] font-semibold sunmi-text-accent uppercase">
+                      Archivo · fila {f.filaExcel}
+                    </div>
+                    <div className="text-[12px] font-semibold sunmi-text-strong leading-tight break-words">
+                      {f.descripcionProveedor}
+                    </div>
+                    <div className="text-[10px] sunmi-text-muted tabular-nums">
+                      {f.codigoCrudo ?? "—"}
+                      {rel ? ` · ${rel.texto}` : ""} · {f.unidadProveedor}
+                      {r.presentacion?.cantidadDescripcion ? ` · ${r.presentacion.cantidadDescripcion} u.` : ""}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-[11px] tabular-nums">
+                      <div>
+                        <div className="text-[9.5px] sunmi-text-muted">Precio informado</div>
+                        <div className="sunmi-text-strong">{money(f.precioConIva)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[9.5px] sunmi-text-muted">Recargo</div>
+                        <div className="sunmi-text-strong">+{Number(f.recargoPct ?? 0)} %</div>
+                      </div>
+                      <div>
+                        <div className="text-[9.5px] sunmi-text-muted">UxBU</div>
+                        <div className="sunmi-text-muted inline-flex items-center gap-0.5" title={LEYENDA_UXBU}>
+                          {f.unidadesPorBulto ?? "—"}
+                          <Info size={9} aria-hidden="true" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <InterpretacionesFila
+                    fila={f}
+                    importacion={importacion}
+                    onConfirmada={(json) => { setAbierta(null); onConfirmada?.(json); }}
+                    onVincularOtro={() => { setAbierta(null); onVincular?.(f); }}
+                  />
+                </div>
               )}
             </div>
           );
