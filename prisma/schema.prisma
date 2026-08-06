@@ -2371,6 +2371,27 @@ model ImportacionListaFila {
   /// Vive en la FILA y no en el producto a propósito: cambiar factor_pack
   /// reescribiría la ficha del producto para todo el ERP —compras, stock,
   /// transferencias— a partir de una lista de precios.
+  /// ── PRESENTACIÓN CONFIRMADA A MANO ────────────────────────────────────
+  ///
+  /// Dos datos que NO se mezclan:
+  ///
+  ///   baseConfirmada       qué es el producto del ERP respecto de lo que cotiza
+  ///                        el proveedor. MISMA_PRESENTACION no multiplica nada;
+  ///                        POR_UNIDAD_SUELTA multiplica por la cantidad, y solo
+  ///                        se admite cuando el archivo dice que el precio es
+  ///                        por unidad suelta.
+  ///   unidadesConfirmadas  cuántas unidades contiene esa presentación. Es un
+  ///                        DATO del producto —sirve para el costo unitario y
+  ///                        para corregir la ficha por su propio flujo—, no un
+  ///                        multiplicador del precio.
+  ///
+  /// Mezclarlos fue el error que esto corrige: un display de $5.678 terminaba
+  /// valuado en $71.545 por multiplicarlo por lo que trae adentro.
+  baseConfirmada         String?
+  unidadesConfirmadas    Int?
+  /// Del diseño anterior, que trataba la cantidad como multiplicador. Sin uso y
+  /// sin datos; se elimina en una migración de limpieza posterior, cuando
+  /// ninguna versión en ejecución la lea.
   factorConfirmado       Int?
   confirmadoPorUsuarioId Int?
   confirmadoEn           DateTime?

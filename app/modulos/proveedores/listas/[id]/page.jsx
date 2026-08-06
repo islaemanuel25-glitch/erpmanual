@@ -227,10 +227,13 @@ export default function ConciliacionPage() {
    */
   const alConfirmar = async (json) => {
     setConfirmando(null);
+    const comoQuedo = json.multiplico
+      ? `${json.unidades} unidades × el precio informado`
+      : "el precio informado, sin multiplicar";
     setAvisoVinculo(
       json.quedoLista
-        ? `Fila ${json.fila.filaExcel} confirmada con armado de ${json.factorConfirmado}. Ya está lista para aplicar.`
-        : `Fila ${json.fila.filaExcel} confirmada: con ese armado el costo no cambia, así que no queda para aplicar.`
+        ? `Fila ${json.fila.filaExcel} confirmada: el costo es ${comoQuedo}. Ya está lista para aplicar.`
+        : `Fila ${json.fila.filaExcel} confirmada: con esa presentación el costo no cambia, así que no queda para aplicar.`
     );
     await cargar();
   };
