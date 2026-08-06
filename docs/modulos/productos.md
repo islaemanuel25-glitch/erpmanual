@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-07-29 08:16
+**Última actualización:** 2026-08-06 13:28
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-06: feat(listas): vistas por producto en el área principal y reportes PDF
 - 2026-07-28: feat(productos): codigo de barras propio por ubicacion
 - 2026-07-28: fix(productos): permitir editar la ficha al local propietario
 - 2026-07-27: feat(pos): agregar servicios de importe variable

@@ -1,12 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-06 11:58
+**Fecha:** 2026-08-06 13:28
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat(listas): resumen orientado al ERP, con detalle por producto, feat(listas): grilla operativa para conciliar 190 productos, feat(listas): conciliar presentación y precio por separado, con rango esperado
+- feat(listas): vistas por producto en el área principal y reportes PDF, feat(listas): resumen orientado al ERP, con detalle por producto, feat(listas): grilla operativa para conciliar 190 productos
 - Archivos: 1 nuevos, 3 modificados (4 total)
+
+### productos
+- feat(listas): vistas por producto en el área principal y reportes PDF
+- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización
