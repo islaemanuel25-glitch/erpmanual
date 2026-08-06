@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-06 08:54
+**Última actualización:** 2026-08-06 11:58
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,9 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-06: feat(listas): resumen orientado al ERP, con detalle por producto
+- 2026-08-06: feat(listas): grilla operativa para conciliar 190 productos
+- 2026-08-06: feat(listas): conciliar presentación y precio por separado, con rango esperado
 - 2026-08-06: feat(listas): grilla operativa para conciliar 190 productos
 - 2026-08-06: feat(listas): conciliar presentación y precio por separado, con rango esperado
 - 2026-08-06: feat(listas): conciliar presentación y precio por separado, con rango esperado
