@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-07-30 08:09
+**Última actualización:** 2026-08-05 21:21
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,24 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-08-05: fix(caja): ningún proceso de caja pendiente queda oculto
+- 2026-08-04: refactor(caja): la grilla del cambio vuelve a un modal
+- 2026-08-04: fix(caja): textos que la validación por navegador destapó
+- 2026-08-04: feat(caja): el retiro de recaudación toma un corte congelado
+- 2026-08-04: feat(caja): el cierre separa el cambio antes del corte
+- 2026-08-04: fix(caja): el tercer estado del turno llega a listados, detalle y auditoría
+- 2026-08-04: fix(caja): la reserva de un cambio pertenece a la PERSONA, no al dispositivo
+- 2026-08-04: feat(caja): la apertura de caja pasa a ser física, por denominaciones y con relevo
+- 2026-08-04: feat(caja): comparar el cambio recibido por denominación, no solo por total
+- 2026-08-04: feat(caja): el cierre pasa a ser una pantalla propia y libera el POS al cortar
+- 2026-08-04: feat(caja): piezas compartidas del cierre — paneles, borrador por token y aviso entre pestañas
+- 2026-08-04: fix(caja): un turno cortado deja de ser "abierto" para todos los consumidores
+- 2026-08-04: feat(caja): motor del cierre con relevo — corte, confirmación y cambio pendiente
+- 2026-08-04: feat(caja): el efectivo contado sale solo del conteo por denominación
+- 2026-08-04: fix(caja): alinear las grillas del retiro y mostrar los movimientos de caja
+- 2026-08-04: fix(caja): serializar los retiros de una misma caja con lock de fila
+- 2026-08-04: fix(caja): unificar la terminología del cambio y separar cerrar de guardar
+- 2026-08-04: feat(pos-ventas): el retiro pasa a ser una sola pantalla, sin pasos
 - 2026-07-30: fix(reportes): mejorar resumen y unidades del comprobante
 - 2026-07-29: fix(reportes): paginar comprobantes y ampliar corrección de ventas
 - 2026-07-28: feat(productos): codigo de barras propio por ubicacion

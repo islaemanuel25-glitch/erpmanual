@@ -1,5 +1,37 @@
 # Changelog
 
+## [2026-08-05] - Actualización: proveedores, pos-ventas
+
+### Modificado
+- **proveedores**: fix(listas): dar salida operativa a las filas por revisar
+- **proveedores**: fix(precios): la vista "Listas" mostraba solo las filas ya aplicadas
+- **proveedores**: fix(precios): aplicar listas por tandas sin cerrar la importación
+- **proveedores**: fix(precios): permitir cancelar una importación y liberar su archivo
+- **proveedores**: feat(precios): pantalla de revisión producto por producto antes de aplicar
+- **proveedores**: feat(precios): aplicar los costos de una lista de proveedor
+- **proveedores**: feat(precios): vincular a mano las filas no macheadas de una lista
+- **proveedores**: feat(precios): agregar interfaz de listas de proveedores
+- **proveedores**: feat(precios): persistir conciliaciones de proveedores
+- **pos-ventas**: fix(caja): ningún proceso de caja pendiente queda oculto
+- **pos-ventas**: refactor(caja): la grilla del cambio vuelve a un modal
+- **pos-ventas**: fix(caja): textos que la validación por navegador destapó
+- **pos-ventas**: feat(caja): el retiro de recaudación toma un corte congelado
+- **pos-ventas**: feat(caja): el cierre separa el cambio antes del corte
+- **pos-ventas**: fix(caja): el tercer estado del turno llega a listados, detalle y auditoría
+- **pos-ventas**: fix(caja): la reserva de un cambio pertenece a la PERSONA, no al dispositivo
+- **pos-ventas**: feat(caja): la apertura de caja pasa a ser física, por denominaciones y con relevo
+- **pos-ventas**: feat(caja): comparar el cambio recibido por denominación, no solo por total
+- **pos-ventas**: feat(caja): el cierre pasa a ser una pantalla propia y libera el POS al cortar
+- **pos-ventas**: feat(caja): piezas compartidas del cierre — paneles, borrador por token y aviso entre pestañas
+- **pos-ventas**: fix(caja): un turno cortado deja de ser "abierto" para todos los consumidores
+- **pos-ventas**: feat(caja): motor del cierre con relevo — corte, confirmación y cambio pendiente
+- **pos-ventas**: feat(caja): el efectivo contado sale solo del conteo por denominación
+- **pos-ventas**: fix(caja): alinear las grillas del retiro y mostrar los movimientos de caja
+- **pos-ventas**: fix(caja): serializar los retiros de una misma caja con lock de fila
+- **pos-ventas**: fix(caja): unificar la terminología del cambio y separar cerrar de guardar
+- **pos-ventas**: feat(pos-ventas): el retiro pasa a ser una sola pantalla, sin pasos
+
+
 ## [2026-07-30] - Actualización: reportes-ventas
 
 ### Modificado

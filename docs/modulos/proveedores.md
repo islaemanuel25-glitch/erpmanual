@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-07-29 08:16
+**Última actualización:** 2026-08-05 21:21
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,15 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-05: fix(listas): dar salida operativa a las filas por revisar
+- 2026-08-05: fix(precios): la vista "Listas" mostraba solo las filas ya aplicadas
+- 2026-08-05: fix(precios): aplicar listas por tandas sin cerrar la importación
+- 2026-08-05: fix(precios): permitir cancelar una importación y liberar su archivo
+- 2026-08-05: feat(precios): pantalla de revisión producto por producto antes de aplicar
+- 2026-08-05: feat(precios): aplicar los costos de una lista de proveedor
+- 2026-08-05: feat(precios): vincular a mano las filas no macheadas de una lista
+- 2026-08-05: feat(precios): agregar interfaz de listas de proveedores
+- 2026-08-05: feat(precios): persistir conciliaciones de proveedores
 - 2026-07-26: fix(security): completar aislamiento y permisos por local
 - 2026-07-26: fix(security): endurecer permisos y aislamiento entre grupos y locales
 - 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores
