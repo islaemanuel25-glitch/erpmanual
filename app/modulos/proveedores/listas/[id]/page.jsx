@@ -29,6 +29,7 @@ import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
 import FilaRevision from "@/components/proveedores/listas/FilaRevision";
 import PanelMacheo from "@/components/proveedores/listas/PanelMacheo";
+import PanelConfirmarArmado from "@/components/proveedores/listas/PanelConfirmarArmado";
 import {
   BadgeEstado,
   Dato,
@@ -68,7 +69,9 @@ const VISTAS = [
   { id: "sufijo5", texto: "Sufijo 5" },
   { id: "sufijo4", texto: "Sufijo 4" },
   { id: "codigoBarra", texto: "Código de barras" },
-  { id: "factorDudoso", texto: "Factor dudoso" },
+  // Mismo nombre que la tarjeta de progreso: el usuario busca "Revisar armado"
+  // y el filtro se llamaba distinto.
+  { id: "factorDudoso", texto: "Revisar armado" },
   { id: "sinVincular", texto: "Sin vincular" },
   { id: "ambiguas", texto: "Ambiguas" },
   { id: "excluidas", texto: "Excluidas" },
@@ -142,6 +145,7 @@ export default function ConciliacionPage() {
   // Qué fila tiene el panel de vinculación abierto. Una sola por vez: dos
   // paneles abiertos invitan a confirmar el equivocado.
   const [vinculando, setVinculando] = useState(null);
+  const [confirmando, setConfirmando] = useState(null);
   const [avisoVinculo, setAvisoVinculo] = useState("");
 
   // ── Aplicación ──────────────────────────────────────────────────────────
@@ -213,6 +217,22 @@ export default function ConciliacionPage() {
     setAvisoVinculo(
       `Fila ${json.fila.filaExcel} vinculada con ${json.fila.productoBase?.nombre ?? "el producto elegido"}. Nuevo estado: ${json.fila.estado}.`
     );
+  };
+
+  /**
+   * La fila confirmada vuelve recalculada del servidor. Se recarga la página de
+   * datos en vez de parchearla: al pasar a "lista" cambia de vista, cambian los
+   * contadores y cambia el progreso, y parchear en memoria dejaría tres números
+   * diciendo cosas distintas.
+   */
+  const alConfirmar = async (json) => {
+    setConfirmando(null);
+    setAvisoVinculo(
+      json.quedoLista
+        ? `Fila ${json.fila.filaExcel} confirmada con armado de ${json.factorConfirmado}. Ya está lista para aplicar.`
+        : `Fila ${json.fila.filaExcel} confirmada: con ese armado el costo no cambia, así que no queda para aplicar.`
+    );
+    await cargar();
   };
 
   // ── Selección ───────────────────────────────────────────────────────────
@@ -723,11 +743,20 @@ export default function ConciliacionPage() {
                     <FilaRevision
                       fila={f}
                       seleccion={seleccionDe(f)}
-                      onVincular={setVinculando}
+                      onVincular={(x) => { setConfirmando(null); setVinculando(x); }}
+                      onConfirmar={(x) => { setVinculando(null); setConfirmando(x); }}
                       onExcluir={(x) => cambiarExclusion(x, true)}
                       onIncluir={(x) => cambiarExclusion(x, false)}
                       trabajando={trabajando}
                     />
+                    {confirmando?.id === f.id && (
+                      <PanelConfirmarArmado
+                        fila={f}
+                        onConfirmada={alConfirmar}
+                        onCerrar={() => setConfirmando(null)}
+                        onVincularOtro={() => { setConfirmando(null); setVinculando(f); }}
+                      />
+                    )}
                     {vinculando?.id === f.id && (
                       <PanelVincular
                         importacionId={id}

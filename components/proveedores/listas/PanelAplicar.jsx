@@ -218,7 +218,8 @@ export default function PanelAplicar({
             />
             <span>
               Revisé la lista y confirmo que se actualicen los costos de{" "}
-              <span className="font-semibold">{previo?.cantidad ?? seleccionadas}</span> productos.
+              <span className="font-semibold">{previo?.cantidad ?? seleccionadas}</span>{" "}
+              {(previo?.cantidad ?? seleccionadas) === 1 ? "producto" : "productos"}.
             </span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">

@@ -2362,6 +2362,18 @@ model ImportacionListaFila {
   /// calculó el motor —que sigue explicando por qué la fila está como está—
   /// sino que la saca de lo aplicable y la deselecciona. Es reversible.
   excluidaManual Boolean @default(false)
+  /// ── ARMADO CONFIRMADO A MANO ──────────────────────────────────────────
+  ///
+  /// Cuántas unidades del ERP cubre el precio del proveedor, cuando el motor
+  /// no pudo deducirlo: el archivo y el producto declaran armados distintos, o
+  /// el proveedor cotiza por display y el ERP no tiene ese concepto.
+  ///
+  /// Vive en la FILA y no en el producto a propósito: cambiar factor_pack
+  /// reescribiría la ficha del producto para todo el ERP —compras, stock,
+  /// transferencias— a partir de una lista de precios.
+  factorConfirmado       Int?
+  confirmadoPorUsuarioId Int?
+  confirmadoEn           DateTime?
   /// ── VINCULACIÓN MANUAL (Etapa 6A) ─────────────────────────────────────
   ///
   /// Quién resolvió a mano una fila que no macheaba, cuándo y de dónde salió la

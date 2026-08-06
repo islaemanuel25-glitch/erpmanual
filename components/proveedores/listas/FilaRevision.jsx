@@ -15,7 +15,7 @@
 // leen, y no en columnas separadas que hay que ir cruzando con la vista.
 
 import { useState } from "react";
-import { AlertTriangle, Ban, ChevronDown, ChevronUp, Link2, RotateCcw } from "lucide-react";
+import { AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp, Link2, RotateCcw } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -115,6 +115,7 @@ export default function FilaRevision({
   fila,
   seleccion,
   onVincular,
+  onConfirmar,
   onExcluir,
   onIncluir,
   trabajando,
@@ -275,6 +276,19 @@ export default function FilaRevision({
 
       {/* ── Acciones ────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-1.5 pt-0.5">
+        {/* La salida de una fila por revisar: conservar el producto y decidir el
+            armado. Sin esto esas filas no tenían forma de llegar a "lista". */}
+        {onConfirmar && fila.estado === "FACTOR_DUDOSO" && !excluida && fila.aplicada !== true && (
+          <SunmiButton
+            color="cyan"
+            onClick={() => onConfirmar(fila)}
+            disabled={trabajando}
+            className="py-1.5 px-2.5 !text-[11px] inline-flex items-center gap-1"
+          >
+            <CheckCircle2 size={12} aria-hidden="true" />
+            Confirmar producto
+          </SunmiButton>
+        )}
         {onVincular && (
           <SunmiButton
             color="slate"

@@ -164,7 +164,7 @@ export async function GET(req, context) {
         orderBy: { filaExcel: "asc" },
         ...paginado,
         select: {
-          id: true, filaExcel: true, hojaNombre: true,
+          id: true, importacionId: true, filaExcel: true, hojaNombre: true,
           codigoCrudo: true, codigoNormalizado: true, codigoBarraProveedor: true,
           descripcionProveedor: true, categoriaCruda: true,
           unidadProveedor: true, unidadesPorBulto: true,
@@ -179,6 +179,7 @@ export async function GET(req, context) {
           resultadoAplicacion: true, motivoAplicacion: true,
           costoPrevioAplicacion: true, ventaAnterior: true, ventaNueva: true,
           excluidaManual: true,
+          factorConfirmado: true, confirmadoEn: true,
           // El producto VIVO. Es la mitad de la comparación que el usuario
           // necesita para decidir, y tiene que salir de la base ahora, no de lo
           // que se congeló al conciliar.
@@ -359,6 +360,9 @@ export async function GET(req, context) {
               presentacion: presentacionActual,
               unidadMedida: b.unidad_medida,
               factorPack: b.factor_pack,
+              // Lo necesita el panel de confirmación para calcular el costo de
+              // cada armado sin volver a preguntarle al servidor.
+              modoCompraProveedor: b.modoCompraProveedor,
               costoActual: numero(b.precio_costo),
               ventaActual: numero(b.precio_venta),
               margen: numero(b.margen),
