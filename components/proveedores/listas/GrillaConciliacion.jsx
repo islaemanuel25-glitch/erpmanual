@@ -49,6 +49,27 @@ const codigoArcorGuardado = (erp) => {
   if (!erp) return null;
   return erp.codigosArcor?.length ? erp.codigosArcor.join(" / ") : null;
 };
+
+/**
+ * Cómo se relacionan el código del archivo y el guardado en el ERP.
+ *
+ * Puestos uno al lado del otro delatan por qué macheó cada fila, que es
+ * información que antes había que ir a buscar al panel de macheo: 11905 contra
+ * 11905 es una coincidencia exacta y no admite discusión; 14429 contra 1014429
+ * es una coincidencia por terminación, que es un fallback tolerante y conviene
+ * mirar con más cuidado.
+ */
+function relacionDeCodigos(codigoArchivo, guardado) {
+  const a = String(codigoArchivo ?? "").trim();
+  const b = String(guardado ?? "").trim();
+  if (!b) return { clave: "SIN_CODIGO", texto: null, tono: "sunmi-text-warning" };
+  if (!a) return { clave: "SIN_ARCHIVO", texto: null, tono: "sunmi-text-muted" };
+  if (a === b) return { clave: "IGUAL", texto: "coincide exacto", tono: "sunmi-text-success" };
+  if (b.endsWith(a) || a.endsWith(b)) {
+    return { clave: "SUFIJO", texto: "coincide por terminación", tono: "sunmi-text-warning" };
+  }
+  return { clave: "DISTINTO", texto: "no se parecen", tono: "sunmi-text-muted" };
+}
 const fechaCorta = (iso) => {
   if (!iso) return null;
   const d = new Date(iso);
@@ -267,7 +288,14 @@ export default function GrillaConciliacion({
                     </td>
                     <td className="px-1.5 py-1.5 tabular-nums">
                       {codigoArcorGuardado(f.erp) ? (
-                        <span className="sunmi-text-strong">{codigoArcorGuardado(f.erp)}</span>
+                        <>
+                          <div className="sunmi-text-strong">{codigoArcorGuardado(f.erp)}</div>
+                          {relacionDeCodigos(f.codigoCrudo, codigoArcorGuardado(f.erp)).texto && (
+                            <div className={`text-[9.5px] ${relacionDeCodigos(f.codigoCrudo, codigoArcorGuardado(f.erp)).tono}`}>
+                              {relacionDeCodigos(f.codigoCrudo, codigoArcorGuardado(f.erp)).texto}
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <span className="text-[10px] sunmi-text-warning">Sin código Arcor</span>
                       )}

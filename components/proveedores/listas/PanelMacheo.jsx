@@ -71,17 +71,10 @@ export default function PanelMacheo({ macheo, vista, onVista }) {
         </p>
       </div>
 
-      {/* ── Los dos universos, separados ─────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div className="sunmi-surface-soft rounded-lg p-2.5">
-          <div className="text-[19px] font-bold tabular-nums sunmi-text-strong leading-none">
-            {productosDelProveedor ?? "—"}
-          </div>
-          <div className="text-[11.5px] sunmi-text-strong mt-1">Productos de este proveedor en el ERP</div>
-          <div className="text-[10.5px] sunmi-text-muted leading-snug">
-            Productos del catálogo que tienen a este proveedor asociado. No depende del archivo.
-          </div>
-        </div>
+      {/* ── Lo que trajo el archivo ──────────────────────────────────────
+          El universo del ERP ya lo cuenta el encabezado, que es donde se mide
+          el trabajo. Acá quedan los dos números del archivo. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="sunmi-surface-soft rounded-lg p-2.5">
           <div className="text-[19px] font-bold tabular-nums sunmi-text-strong leading-none">
             {totalFilas}

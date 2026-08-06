@@ -36,6 +36,9 @@ import {
 } from "@/lib/proveedores/listas/conciliarLista";
 import { resumirMacheo, resumirProgreso } from "@/lib/proveedores/listas/macheo";
 import { RANGO_POR_DEFECTO } from "@/lib/proveedores/listas/rangoAumento";
+import { resumenDelSistema, resumenDelArchivo } from "@/lib/proveedores/listas/resumenSistema";
+import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
+import { motivoDePendiente, pendienteEnAlerta } from "@/lib/proveedores/listas/detalleSistema";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
@@ -227,6 +230,108 @@ export async function GET(req, context) {
 
     const macheo = resumirMacheo(filasParaMacheo, { productosDelProveedor });
 
+    // ── EL RESUMEN DESDE EL SISTEMA ──────────────────────────────────────────
+    //
+    // Las tres situaciones del universo, excluyentes entre sí. Se cuentan sobre
+    // el CATÁLOGO y no sobre el archivo: 625 de las 917 filas son productos que
+    // este negocio no compra, y medir el avance contra ellas dice que falta el
+    // 68 % cuando el trabajo está casi terminado.
+    //
+    // Son tres `count` con EXISTS sobre un índice ya existente
+    // `(importacionId, productoBaseId)`; no recorren filas en memoria.
+    const universoWhere = { grupoId, ...productoDelProveedorWhere(cabecera.proveedor.id) };
+    const conFilaAplicada = {
+      filasImportacionLista: { some: { importacionId, aplicada: true } },
+    };
+    const conFilaSinAplicar = {
+      filasImportacionLista: { some: { importacionId, aplicada: false } },
+    };
+
+    const [actualizados, pendientes, ausentes, sinCodigoArcor, filasAplicadas] = await Promise.all([
+      prisma.productoBase.count({ where: { ...universoWhere, ...conFilaAplicada } }),
+      prisma.productoBase.count({
+        where: { ...universoWhere, NOT: conFilaAplicada, ...conFilaSinAplicar },
+      }),
+      prisma.productoBase.count({
+        where: { ...universoWhere, filasImportacionLista: { none: { importacionId } } },
+      }),
+      prisma.productoBase.count({
+        where: {
+          ...universoWhere,
+          codigosProveedor: { none: { proveedorId: cabecera.proveedor.id, activo: true } },
+        },
+      }),
+      // Las FILAS aplicadas. Se informa junto a los productos porque no son el
+      // mismo número: 281 filas sobre 279 productos significa que el proveedor
+      // informó dos veces el mismo producto, y eso hay que poder verlo.
+      prisma.importacionListaFila.count({ where: { importacionId, aplicada: true } }),
+    ]);
+
+    // ── Cuántos pendientes están en alerta ───────────────────────────────────
+    //
+    // Se cuenta sobre el MOTIVO real de cada producto, con los mismos módulos
+    // que usa el detalle. El contador anterior miraba `variacionAlta`, un flag
+    // que se fija al conciliar y que en una fila por revisar siempre vale false:
+    // decía "0 fuera de lo esperado" mientras el detalle mostraba disminuciones.
+    //
+    // Son pocas filas —las pendientes de una importación—, así que se resuelven
+    // en una consulta y en memoria.
+    const rangoVigente = {
+      minPct: cabecera.aumentoEsperadoMinPct === null ? RANGO_POR_DEFECTO.minPct : numero(cabecera.aumentoEsperadoMinPct),
+      maxPct: cabecera.aumentoEsperadoMaxPct === null ? RANGO_POR_DEFECTO.maxPct : numero(cabecera.aumentoEsperadoMaxPct),
+    };
+    const filasPendientes = await prisma.importacionListaFila.findMany({
+      // Acotado a los PRODUCTOS PENDIENTES, exactamente los mismos que cuenta
+      // la métrica: del universo y sin ninguna fila aplicada. Sin la segunda
+      // condición entraban 3 productos que ya se actualizaron pero conservan
+      // una fila sin aplicar, y la alerta decía 10 sobre 7 pendientes.
+      where: {
+        importacionId,
+        aplicada: false,
+        productoBase: {
+          is: { grupoId, ...productoDelProveedorWhere(cabecera.proveedor.id), NOT: conFilaAplicada },
+        },
+      },
+      include: {
+        productoBase: {
+          select: {
+            precio_costo: true, unidad_medida: true, factor_pack: true, modoCompraProveedor: true,
+          },
+        },
+      },
+    });
+    const productosEnAlerta = new Set();
+    for (const f of filasPendientes) {
+      const b = f.productoBase;
+      const analisis =
+        b && f.estado === "FACTOR_DUDOSO"
+          ? analizarFila({
+              fila: { ...f, precioConIva: numero(f.precioConIva) },
+              base: b,
+              recargoPct: numero(f.recargoPct),
+              rango: rangoVigente,
+            })
+          : null;
+      const { motivo } = motivoDePendiente({ fila: f, analisis });
+      if (pendienteEnAlerta(motivo)) productosEnAlerta.add(f.productoBaseId);
+    }
+    const conAlerta = productosEnAlerta.size;
+
+    const sistema = resumenDelSistema({
+      universo: productosDelProveedor,
+      actualizados, pendientes, ausentes,
+      sinCodigo: sinCodigoArcor,
+      conAlerta,
+      filasAplicadas,
+    });
+
+    const archivo = resumenDelArchivo({
+      totalFilas: cabecera.totalFilas,
+      sinVincular: cabecera.noMacheadas,
+      ambiguas: filasParaMacheo.filter((f) => f.tipoCoincidencia === "AMBIGUA").length,
+      duplicadas: cabecera.codigoDuplicado,
+    });
+
     // Progreso por tandas: cuántas ya se aplicaron y cuántas siguen pendientes
     // de decisión. Es lo que permite aplicar en varias veces sin que la pantalla
     // diga que terminó cuando falta trabajo.
@@ -416,6 +521,10 @@ export async function GET(req, context) {
       filas: filasSalida,
       vista,
       macheo,
+      // El resumen principal: qué pasó con los productos que YA existen en el
+      // ERP. El del archivo queda como bloque secundario.
+      sistema,
+      archivo,
       // El contador tiene que hablar de la importación entera: el usuario
       // selecciona en varias páginas y necesita saber cuántas lleva en total,
       // no cuántas hay marcadas en las 50 que está mirando.

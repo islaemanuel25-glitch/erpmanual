@@ -29,6 +29,7 @@ import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
 import GrillaConciliacion from "@/components/proveedores/listas/GrillaConciliacion";
 import PanelMacheo from "@/components/proveedores/listas/PanelMacheo";
+import ResumenConciliacion from "@/components/proveedores/listas/ResumenConciliacion";
 import {
   BadgeEstado,
   Dato,
@@ -39,9 +40,6 @@ import {
 } from "@/components/proveedores/listas/PiezasListas";
 import {
   ESTADOS_FILTRABLES,
-  metricasDeImportacion,
-  fechaHora,
-  tamanoArchivo,
   porcentaje,
 } from "@/lib/proveedores/listas/presentacion";
 
@@ -162,6 +160,10 @@ export default function ConciliacionPage() {
   const [cancelando, setCancelando] = useState(false);
   const [trabajandoCancelar, setTrabajandoCancelar] = useState(false);
   const [progreso, setProgreso] = useState(null);
+  // El resumen visto desde el sistema —qué pasó con los productos del ERP— y el
+  // del archivo, que pasa a ser secundario.
+  const [sistema, setSistema] = useState(null);
+  const [archivo, setArchivo] = useState(null);
   const [finalizando, setFinalizando] = useState(false);
   const [trabajandoFinalizar, setTrabajandoFinalizar] = useState(false);
 
@@ -193,6 +195,8 @@ export default function ConciliacionPage() {
       if (json.seleccion) setResumenSeleccion(json.seleccion);
       if (json.macheo) setMacheo(json.macheo);
       if (json.progreso) setProgreso(json.progreso);
+      if (json.sistema) setSistema(json.sistema);
+      if (json.archivo) setArchivo(json.archivo);
     } catch {
       setError("Error de conexión.");
     } finally {
@@ -236,6 +240,26 @@ export default function ConciliacionPage() {
         : `Fila ${json.fila.filaExcel} confirmada: con esa interpretación el costo no cambia, así que no queda para aplicar.`
     );
     await cargar();
+  };
+
+  /**
+   * Una acción disparada desde el detalle de una métrica.
+   *
+   * "Cambiar producto" abre el buscador con esa fila. "Confirmar" y "Ver
+   * opciones" mandan a la grilla filtrada por lo que falta revisar: la decisión
+   * se toma ahí, con las hipótesis y el control de aumento a la vista, y no en
+   * una lista de resumen.
+   */
+  const alAccionDesdeDetalle = (accion, fila) => {
+    if (accion === "CAMBIAR") {
+      setVinculando(fila);
+      return;
+    }
+    setVista("factorDudoso");
+    setPage(1);
+    setAvisoVinculo(
+      `Fila ${fila.filaExcel} en la lista de abajo: elegí la interpretación y confirmá.`
+    );
   };
 
   // ── Selección ───────────────────────────────────────────────────────────
@@ -408,28 +432,17 @@ export default function ConciliacionPage() {
         <>
           {/* ── Cabecera ──────────────────────────────────────────────── */}
           <SunmiCard className="p-3 space-y-3">
-            <div className="flex items-start justify-between gap-2 flex-wrap">
-              <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
-                  {cab.proveedor?.nombre ?? "Proveedor"}
-                </h1>
-                <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight break-all">
-                  {cab.archivoNombre} · {tamanoArchivo(cab.archivoTamano)}
-                </p>
-              </div>
-              <BadgeEstado estado={cab.estado} className="shrink-0" />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-              <Dato label="Fecha">{fechaHora(cab.createdAt)}</Dato>
-              <Dato label="Usuario">{cab.usuario?.nombre ?? "—"}</Dato>
-              <Dato label="Recargo">{porcentaje(cab.recargoPct)}</Dato>
-              <Dato label="Umbral de variación">{porcentaje(cab.umbralVariacionPct)}</Dato>
-              <Dato label="Sugerencias por código de barras">{cab.sugerenciasCodigoBarras}</Dato>
-              <Dato label="Formato">{cab.parser} v{cab.parserVersion}</Dato>
-            </div>
-
-            <ResumenMetricas metricas={metricasDeImportacion(cab)} />
+            {/* El resumen manda: primero qué pasó con los productos del ERP,
+                después qué trajo el archivo. Los datos de la importación
+                —fecha, usuario, parser— viven adentro del encabezado nuevo o
+                dejan de mostrarse: no ayudan a decidir nada. */}
+            <ResumenConciliacion
+              cabecera={cab}
+              sistema={sistema}
+              archivo={archivo}
+              proveedor={cab.proveedor}
+              onAccionPendiente={alAccionDesdeDetalle}
+            />
 
             {/* ── Cancelar ─────────────────────────────────────────────
                 Una importación que no sirve tiene que poder sacarse del medio.
@@ -514,18 +527,6 @@ export default function ConciliacionPage() {
               <p className="text-[12px] sunmi-text-danger">{errorAplicar}</p>
             )}
 
-            {/* Productos del proveedor que no vinieron en el archivo. Por ahora
-                solo el contador: el endpoint no entrega el detalle todavía. */}
-            <div className="sunmi-surface-soft sunmi-border border rounded-lg px-3 py-2">
-              <span className="text-[12px] sunmi-text-strong font-semibold">
-                {cab.faltantes} {cab.faltantes === 1 ? "producto vinculado" : "productos vinculados"} a este
-                proveedor no {cab.faltantes === 1 ? "apareció" : "aparecieron"} en el archivo
-              </span>
-              <p className="text-[10.5px] sunmi-text-muted leading-snug mt-0.5">
-                Pueden ser productos discontinuados o códigos que el proveedor dejó de informar.
-                El listado detallado queda para una etapa posterior.
-              </p>
-            </div>
           </SunmiCard>
 
           {/* ── Filtros ───────────────────────────────────────────────── */}
@@ -608,39 +609,11 @@ export default function ConciliacionPage() {
             />
           )}
 
-          {/* ── Progreso de la importación ────────────────────────────────
-              Aplicar una tanda no termina el trabajo. Estos cinco números son
-              lo que dice si queda algo por hacer, y antes no existían: la
-              pantalla seguía mostrando "101 listos" después de aplicar esas
-              mismas 101, como si nada hubiera pasado. */}
+          {/* ── Cierre de la importación ───────────────────────────────────
+              Los conteos se fueron al encabezado, que ahora los cuenta desde el
+              sistema. Acá queda solo la decisión de terminar. */}
           {!error && cab && progreso && (
             <SunmiCard className="p-3 space-y-2">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-[13.5px] font-bold sunmi-text-strong">Progreso</h2>
-                {progreso.pendientes > 0 ? (
-                  <span className="text-[11.5px] sunmi-text-warning">
-                    Quedan {progreso.pendientes} filas por resolver
-                  </span>
-                ) : (
-                  <span className="text-[11.5px] sunmi-text-success">No quedan filas pendientes</span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                {[
-                  { k: "aplicadas", t: "Aplicadas", v: progreso.aplicadas, tono: "sunmi-text-success", d: "Ya escribieron su costo. No se pueden volver a aplicar." },
-                  { k: "listasPendientes", t: "Listas pendientes", v: progreso.listasPendientes, tono: "sunmi-text-accent", d: "Se pueden aplicar en la próxima tanda." },
-                  { k: "requierenRevision", t: "Requieren revisión", v: progreso.requierenRevision, tono: "sunmi-text-warning", d: "Falta corregir el armado del producto." },
-                  { k: "excluidas", t: "Excluidas", v: progreso.excluidas, tono: "sunmi-text-muted", d: "Se sacaron a mano de la aplicación." },
-                  { k: "sinVincular", t: "Sin vincular", v: progreso.sinVincular, tono: "sunmi-text-muted", d: "No tienen producto del ERP asociado." },
-                ].map((x) => (
-                  <div key={x.k} className="sunmi-surface-soft rounded-lg p-2.5" title={x.d}>
-                    <div className={`text-[19px] font-bold tabular-nums leading-none ${x.tono}`}>{x.v}</div>
-                    <div className="text-[11.5px] sunmi-text-strong mt-1">{x.t}</div>
-                    <div className="text-[10.5px] sunmi-text-muted leading-snug">{x.d}</div>
-                  </div>
-                ))}
-              </div>
-
               {/* Cierre explícito: mientras haya pendientes, terminar es una
                   decisión, no una consecuencia de haber aplicado algo. */}
               {cab.estado !== "APLICADA" && cab.estado !== "CANCELADA" && (
