@@ -1018,14 +1018,31 @@ export default function FormProducto({
               )}
             </Field>
 
-            {puedeEditarCosto && showPreciosRef && (
+            {/* El costo unitario depende del PACK, no de quién mira la ficha.
+                Estaba condicionado además a `puedeEditarCosto`, así que en un local
+                sobre un producto del depósito desaparecía: se veía el costo del bulto
+                en solo lectura pero no su costo por unidad, y había que dividir a mano.
+                No se ocultaba nada sensible —es una división del número que ya está a
+                la vista— y la venta unitaria de acá abajo nunca tuvo esa condición.
+                Ahora se muestra siempre que haya pack, y cuando el costo no es editable
+                se presenta en solo lectura igual que el campo de costo de arriba. */}
+            {showPreciosRef && (
               <Field label="Costo unitario ref." fieldKey="precio_costo_unitario_ref">
-                <SunmiInput
-                  type="number"
-                  value={toPrecioUnitarioRef(form.precio_costo)}
-                  onWheel={(e) => e.target.blur()}
-                  onChange={(e) => onChangeCostoUnitarioRef(e.target.value)}
-                />
+                {puedeEditarCosto ? (
+                  <SunmiInput
+                    type="number"
+                    value={toPrecioUnitarioRef(form.precio_costo)}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => onChangeCostoUnitarioRef(e.target.value)}
+                  />
+                ) : (
+                  <SunmiInput
+                    type="number"
+                    value={toPrecioUnitarioRef(form.precio_costo)}
+                    readOnly
+                    disabled
+                  />
+                )}
                 <p className="text-xs text-slate-500 mt-1">
                   Referencia: costo del bulto ÷ {factorPackPrecios} uds.
                 </p>
