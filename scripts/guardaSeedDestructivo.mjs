@@ -63,11 +63,15 @@ function abortar(motivo, detalle = "") {
 }
 
 /**
- * Verifica que se pueda vaciar la base de DATABASE_URL. Aborta el proceso si no.
+ * Verifica que se pueda vaciar la base indicada. Aborta el proceso si no.
+ *
+ * @param {string} [urlCruda] URL a validar. Se pasa explícitamente desde
+ *   scripts/lib/clientePrisma.mjs, que la captura ANTES de que Prisma cargue el
+ *   .env. Si se omite cae a process.env, que es como la usan los seeds.
  * @returns {string} el nombre de la base, ya validado.
  */
-export function exigirBaseDescartable() {
-  const crudo = process.env.DATABASE_URL;
+export function exigirBaseDescartable(urlCruda = process.env.DATABASE_URL) {
+  const crudo = urlCruda;
   if (!crudo) abortar("falta DATABASE_URL.");
 
   let url;

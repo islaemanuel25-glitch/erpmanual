@@ -1,8 +1,8 @@
-const bcrypt = require("bcrypt");
-const { PrismaClient } = require("@prisma/client");
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+import bcrypt from "bcrypt";
 
 async function main() {
-  const prisma = new PrismaClient();
+  const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
   const ops = [
     { localId: 1, nombre: "Juan", pin: "1234" },

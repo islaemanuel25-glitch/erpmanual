@@ -1,10 +1,28 @@
-import { PrismaClient } from "@prisma/client";
+// Da de baja (soft delete: activo = false) al usuario del mail indicado.
+//
+// El mail era una constante en el código —"maira@admin.com"— y ahora es un
+// argumento obligatorio. Si falta, el script aborta sin conectarse.
+//
+// Uso: DATABASE_URL=... node scripts/eliminar-usuario-por-email.js <mail>
+//
+// La búsqueda es por mail EXACTO. Antes, si no encontraba coincidencia exacta,
+// buscaba cualquier usuario cuyo mail contuviera "maira" y daba de baja al
+// PRIMERO de la lista sin preguntar. Con el mail como argumento eso quedaba
+// incoherente —se nombra a uno y se da de baja a otro—, así que ahora lista los
+// parecidos y aborta: hay que pasar el mail exacto.
 
-const prisma = new PrismaClient();
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+
+const email = process.argv[2];
+if (!email || !email.includes("@")) {
+  console.error("ABORTADO: falta el mail del usuario a dar de baja.");
+  console.error("  Uso: DATABASE_URL=... node scripts/eliminar-usuario-por-email.js <mail>");
+  process.exit(2);
+}
+
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 async function main() {
-  const email = "maira@admin.com";
-
   console.log(`🔍 Buscando usuario con email: ${email}...`);
 
   try {
@@ -13,25 +31,20 @@ async function main() {
       where: { email: email.toLowerCase() },
     });
 
-    // Si no se encuentra, buscar por contains (case insensitive)
+    // Sin coincidencia exacta no se elige por parecido: se informa y se corta.
     if (!usuarioBase) {
-      console.log("⚠️  No se encontró con búsqueda exacta, buscando variaciones...");
-      const todosUsuarios = await prisma.usuario.findMany({
-        where: {
-          email: {
-            contains: "maira",
-            mode: "insensitive",
-          },
-        },
+      const parecidos = await prisma.usuario.findMany({
+        where: { email: { contains: email.split("@")[0], mode: "insensitive" } },
+        select: { id: true, email: true, nombre: true, activo: true },
       });
-
-      if (todosUsuarios.length > 0) {
-        console.log(`\n📋 Se encontraron ${todosUsuarios.length} usuario(s) con "maira" en el email:`);
-        todosUsuarios.forEach((u, i) => {
-          console.log(`   ${i + 1}. ID: ${u.id}, Email: "${u.email}", Nombre: "${u.nombre}"`);
+      if (parecidos.length > 0) {
+        console.log(`\n📋 No hay coincidencia exacta, pero sí ${parecidos.length} parecido(s):`);
+        parecidos.forEach((u, i) => {
+          console.log(`   ${i + 1}. ID: ${u.id}, Email: "${u.email}", Nombre: "${u.nombre}", Activo: ${u.activo}`);
         });
-        usuarioBase = todosUsuarios[0]; // Usar el primero
-        console.log(`\n✅ Usando el primer resultado (ID: ${usuarioBase.id})`);
+        console.log("\nABORTADO: volvé a correrlo con el mail exacto del que quieras dar de baja.");
+        await prisma.$disconnect();
+        process.exit(2);
       }
     }
 

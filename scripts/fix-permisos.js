@@ -1,7 +1,7 @@
 // scripts/fix-permisos.js
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 async function main() {
   console.log("🔧 Reparando permisos corruptos...");

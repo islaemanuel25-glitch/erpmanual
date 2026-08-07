@@ -27,7 +27,7 @@
 //   DATABASE_URL=... node --import ./scripts/alias-loader.mjs \
 //     scripts/preparar-aplicacion-lista.mjs --id 1 [--escribir]
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 
 import { TIPO_COINCIDENCIA } from "../lib/proveedores/listas/conciliarLista.js";
 import { CONFIG_ARCOR } from "../lib/proveedores/listas/configuraciones/arcor.js";
@@ -39,7 +39,7 @@ import {
 } from "../lib/proveedores/listas/aplicacion.js";
 import { ESTADO_LINEA } from "../lib/proveedores/listas/estados.js";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 const args = process.argv.slice(2);
 const ID = Number(args[args.indexOf("--id") + 1]);

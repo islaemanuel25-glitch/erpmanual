@@ -25,11 +25,11 @@
 //   DATABASE_URL=... node --import ./scripts/alias-loader.mjs \
 //     scripts/reabrir-importacion-lista.mjs --id 3 [--escribir]
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 
 import { resumirProgreso } from "../lib/proveedores/listas/macheo.js";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 const args = process.argv.slice(2);
 const ID = Number(args[args.indexOf("--id") + 1]);

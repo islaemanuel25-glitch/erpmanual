@@ -5,10 +5,10 @@
 //
 // Uso: node scripts/seed-lista-default.js
 
-const { PrismaClient } = require("@prisma/client");
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 
 async function main() {
-  const prisma = new PrismaClient();
+  const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
   let creadas = 0;
   let saltadas = 0;

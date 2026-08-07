@@ -14,9 +14,9 @@
 // Uso (prod):  DATABASE_URL=... node scripts/otorgar-reportes-ver.mjs
 //              (o en un container one-off durante el deploy, como las migraciones)
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 const ROLES_OBJETIVO = ["Deposito", "Mini"];
 const PERMISO = "reportes.ver";

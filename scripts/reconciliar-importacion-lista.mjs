@@ -24,14 +24,14 @@
 //   DATABASE_URL=... node --import ./scripts/alias-loader.mjs \
 //     scripts/reconciliar-importacion-lista.mjs --id 1 [--escribir]
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 
 import { cargarDatosDeConciliacion } from "../lib/proveedores/listas/cargaErp.js";
 import { conciliarLista, TIPO_COINCIDENCIA, digitosDeSufijo } from "../lib/proveedores/listas/conciliarLista.js";
 import { CONFIG_ARCOR } from "../lib/proveedores/listas/configuraciones/arcor.js";
 import { filaAPersistir, contadoresDeCabecera, OPCIONES_TX } from "../lib/proveedores/listas/persistencia.js";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 const args = process.argv.slice(2);
 const ID = Number(args[args.indexOf("--id") + 1]);
