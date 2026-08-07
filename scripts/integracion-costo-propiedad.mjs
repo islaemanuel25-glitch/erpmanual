@@ -66,6 +66,14 @@ async function costoLocal(baseId, localId) {
   const pl = await prisma.productoLocal.findFirst({ where: { baseId, localId }, select: { precio_costo: true } });
   return pl?.precio_costo == null ? null : Number(pl.precio_costo);
 }
+async function ventaBase(baseId) {
+  const b = await prisma.productoBase.findUnique({ where: { id: baseId }, select: { precio_venta: true } });
+  return b?.precio_venta == null ? null : Number(b.precio_venta);
+}
+async function ventaLocal(baseId, localId) {
+  const pl = await prisma.productoLocal.findFirst({ where: { baseId, localId }, select: { precio_venta: true } });
+  return pl?.precio_venta == null ? null : Number(pl.precio_venta);
+}
 
 async function seed() {
   const hash = await bcrypt.hash("secret123", 8);
@@ -174,14 +182,22 @@ async function run() {
     req("PUT", ed(S.baseDepo, S.depo), { cookie: cookieFor(S.duenoDepo), body: bodySinCosto }), 200);
   assertOk("costo maestro preservado (sigue 120, no null)", (await costoBase(S.baseDepo)) === 120);
 
-  // 9a. Edición masiva desde un local sobre producto de depósito → saltea costo + reporta.
-  await check("Masiva (admin en contexto Local A) sobre producto de depósito → 200 con salteo",
+  // 9a. Edición masiva desde un local sobre producto de depósito: el costo maestro
+  // queda protegido, pero el PRECIO DE VENTA del local sí se aplica y no se derrama.
+  // Antes acá se salteaba la fila entera y el local quedaba sin poder actualizar su
+  // precio de venta: ese salteo era el bug, no la regla.
+  const ventaBaseAntes9a = await ventaBase(S.baseDepo);
+  const ventaBAntes9a = await ventaLocal(S.baseDepo, S.localB);
+  await check("Masiva (admin en contexto Local A) sobre producto de depósito → 200, venta local aplicada",
     req("POST", "/api/productos/precios/apply", {
       cookie: cookieFor(S.admin, { grupoActivo: S.g, contextoLocalId: S.localA }),
       body: { localId: S.localA, metodo: "MARGEN_MASIVO", pricingMode: "RECALC_BY_MARGIN",
         items: [{ productoBaseId: S.baseDepo, costoAnterior: 120, costoNuevo: 555, ventaAnterior: 150, ventaNueva: 999 }] },
-    }), 200, (r) => Array.isArray(r.json?.saltados) && r.json.saltados.length === 1);
+    }), 200, (r) => r.json?.soloVenta === 1 && Array.isArray(r.json?.saltados) && r.json.saltados.length === 0);
   assertOk("masiva NO cambió el costo maestro del depósito (120)", (await costoBase(S.baseDepo)) === 120);
+  assertOk("masiva aplicó la venta en el local A (999)", (await ventaLocal(S.baseDepo, S.localA)) === 999);
+  assertOk("masiva NO cambió la venta maestra del depósito", (await ventaBase(S.baseDepo)) === ventaBaseAntes9a);
+  assertOk("masiva NO cambió la venta del local B", (await ventaLocal(S.baseDepo, S.localB)) === ventaBAntes9a);
 
   // 9b. Masiva desde el DEPÓSITO sobre su producto → aplica.
   await check("Masiva (admin en contexto Depósito) sobre producto de depósito → 200 aplicado",

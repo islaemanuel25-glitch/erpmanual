@@ -7,7 +7,7 @@ import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { getContextoActivo } from "@/lib/contexto";
 import { validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
 import { esComboBase } from "@/lib/combos/guards";
-import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
+import { puedeEditarCosto, puedeEditarBaseProducto } from "@/lib/productos/propiedadCosto";
 
 const CHUNK_SIZE = 50;
 
@@ -212,6 +212,12 @@ export async function POST(req) {
             // importa un producto del DEPÓSITO, se saltea el costo (base y override) y
             // se reporta; el resto de la fila (venta, margen, stock, etc.) se aplica.
             const puedeCosto = puedeEditarCosto(localId, baseActual.creadoEnLocalId, depositoLocalId);
+            // La ficha maestra sigue la MISMA propiedad que el costo. Sin esto, un
+            // local que importaba un producto del depósito reescribía la base
+            // —nombre, unidad, precio de venta, estado, códigos— y el cambio se
+            // derramaba al depósito y a todos los demás locales. Su override local
+            // (más abajo) sí se aplica: el precio de venta del local es suyo.
+            const puedeBase = puedeEditarBaseProducto(localId, baseActual.creadoEnLocalId, depositoLocalId);
 
             // Defensa: el estado pudo cambiar entre preview y apply.
             const v = await validarUnicidadCodigos({
@@ -241,10 +247,12 @@ export async function POST(req) {
             if (p.modo_envio) updateData.modo_envio = p.modo_envio;
             if (p.modo_compra_proveedor) updateData.modoCompraProveedor = p.modo_compra_proveedor;
 
-            await tx.productoBase.update({
-              where: { id: p.productoBaseId },
-              data: updateData,
-            });
+            if (puedeBase) {
+              await tx.productoBase.update({
+                where: { id: p.productoBaseId },
+                data: updateData,
+              });
+            }
 
             const existingLocal = await tx.productoLocal.findFirst({
               where: { baseId: p.productoBaseId, localId },

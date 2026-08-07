@@ -22,7 +22,7 @@ import {
   mensajeColisionCodigoPropio,
 } from "@/lib/productos/codigoBarraPropio";
 import { validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
-import { precioDesdeMargen, hayReglaAutomatica } from "@/lib/precios/precioDesdeMargen";
+import { propagarCostoALocales } from "@/lib/precios/propagarCostoALocales";
 
 // ── Detección de "guardado engañoso" ────────────────────────────────────────
 // Cuando la ruta es 'override' (un local edita un producto de depósito), SOLO se
@@ -103,49 +103,34 @@ async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
 
   if (!base) return;
 
-  const locales = await prisma.productoLocal.findMany({
-    where: { baseId },
-  });
-
-  for (const local of locales) {
-    const data = {};
-
-    if (precioCosto !== undefined && precioCosto !== null) {
-      const costo = Number(precioCosto);
-      data.precio_costo = costo;
-
-      // Margen CONFIGURADO: override del local, o el de la base. Ya NO cae a 0
-      // cuando no hay ninguno: ese fallback calculaba venta = costo × 1 y
-      // convertía el precio de venta en el precio de costo, borrando precios
-      // cargados a mano. Sin margen no hay regla automática y el precio no se
-      // toca — misma semántica que lib/compras-proveedor/costoMaestro.js.
-      const margenConfigurado =
-        local.margen !== null && local.margen !== undefined ? local.margen : base.margen;
-
-      if (hayReglaAutomatica(margenConfigurado)) {
-        // Única fórmula del ERP. Antes acá había un Math.round que podía
-        // redondear HACIA ABAJO y dejar el precio por debajo de costo+margen,
-        // justo lo contrario de lo que promete el margen configurado.
-        const { aplica, precioFinal } = precioDesdeMargen({
-          costo,
-          margenConfigurado,
-          redondeo100: base.redondeo_100 === true,
-        });
-        if (aplica) data.precio_venta = precioFinal;
-      }
-    }
-
-    if (activo !== undefined) {
-      data.activo = Boolean(activo);
-    }
-
-    if (Object.keys(data).length === 0) continue;
-
-    await prisma.productoLocal.update({
-      where: { id: local.id },
-      data,
+  // El recálculo por costo vive en un único lugar (lib/precios/propagarCostoALocales),
+  // compartido con el flujo de compras. Tenerlo duplicado era lo que permitía que los
+  // dos caminos se comportaran distinto: por edición se propagaba a todos los locales
+  // y por compra solo al que compraba.
+  let propagacion = null;
+  if (precioCosto !== undefined && precioCosto !== null) {
+    propagacion = await propagarCostoALocales(prisma, {
+      baseId,
+      costo: precioCosto,
+      margenBase: base.margen,
+      redondeo100: base.redondeo_100 === true,
     });
+
+    const enRiesgo = propagacion.sinMargen.filter((x) => x.bajoCosto);
+    if (enRiesgo.length > 0) {
+      console.warn(
+        `[productos/editar] producto ${baseId}: costo nuevo ${precioCosto} y ${enRiesgo.length} ubicación(es) ` +
+          `sin margen configurado quedaron por debajo del costo: ` +
+          enRiesgo.map((x) => `local ${x.localId} ($${x.precioVenta})`).join(", ")
+      );
+    }
   }
+
+  if (activo !== undefined) {
+    await prisma.productoLocal.updateMany({ where: { baseId }, data: { activo: Boolean(activo) } });
+  }
+
+  return propagacion;
 }
 
 export async function PUT(req, context) {
@@ -335,7 +320,7 @@ export async function PUT(req, context) {
     // código propio en la MISMA ubicación operante, cualquiera sea la ruta).
     let resp;
     if (ruta === "base") {
-      resp = await editarBase(baseId, baseData);
+      resp = await editarBase(baseId, baseData, operandoEnLocalId);
     } else {
       // ruta === "override": producto de depósito editado desde un local. Solo se
       // persiste el override. Si el payload intenta cambiar la ficha maestra (que este
@@ -398,7 +383,7 @@ function validarModoPedido(modoPedido, unidadMedida, factorPack) {
   return "BULTO";
 }
 
-async function editarBase(baseId, baseData) {
+async function editarBase(baseId, baseData, operandoEnLocalId = null) {
   const dataFinal = {
     nombre: baseData.nombre,
     descripcion: baseData.descripcion,
@@ -528,9 +513,28 @@ async function editarBase(baseId, baseData) {
     activo: baseData.activo,
   });
 
-  // Sincronizar ProductoLocal del depósito con los valores exactos de la base
+  // Alinear el precio EFECTIVO de la ubicación que acaba de guardar la ficha.
+  //
+  // El precio efectivo de cualquier ubicación es su ProductoLocal.precio_venta y,
+  // sólo si está en null, el de la ficha maestra. Es la misma regla en el editor,
+  // en el listado y en el POS. Entonces, si el dueño guarda un precio en la ficha
+  // pero su propio override conserva el anterior, el override sigue ganando y la
+  // pantalla vuelve a mostrar el precio viejo apenas se recarga: el usuario guarda
+  // 250 y ve 200.
+  //
+  // Esto ya se resolvía para el depósito, pero mirando `es_deposito` en vez de la
+  // PROPIEDAD del producto. Por eso el local que creó un producto exclusivo suyo
+  // quedaba afuera y sufría el guardado engañoso. Se agrega la ubicación que opera,
+  // que en esta rama es siempre la dueña (o el admin en contexto depósito).
+  //
+  // Alcance deliberadamente acotado a esas filas: los demás locales conservan el
+  // precio y el margen que hayan definido para sí sobre productos del depósito.
+  const ubicacionesAAlinear = [{ local: { es_deposito: true } }];
+  const opId = Number(operandoEnLocalId);
+  if (Number.isInteger(opId) && opId > 0) ubicacionesAAlinear.push({ localId: opId });
+
   await prisma.productoLocal.updateMany({
-    where: { baseId, local: { es_deposito: true } },
+    where: { baseId, OR: ubicacionesAAlinear },
     data: {
       precio_costo: dataFinal.precio_costo,
       precio_venta: dataFinal.precio_venta,

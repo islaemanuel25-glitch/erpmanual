@@ -145,8 +145,13 @@ export default function FormProducto({
     precio_costo: toNum(o.precio_costo ?? o.precioCosto ?? ""),
     precio_venta: toNum(o.precio_venta ?? o.precioVenta ?? ""),
     margen: toNum(o.margen ?? ""),
-    precio_sugerido: toNum(o.precio_sugerido ?? ""),
-    iva_porcentaje: toNum(o.iva_porcentaje ?? ""),
+    // Estos dos llegan en camelCase desde /api/productos/obtener (precioSugerido,
+    // ivaPorcentaje). Sin el fallback se leían como vacíos y el form los reenviaba
+    // en null: al dueño le BORRABA el valor cargado, y a un local sobre un producto
+    // del depósito le hacía rebotar el guardado con "no podés modificar la ficha
+    // maestra" —bloqueando de hecho su propio precio de venta.
+    precio_sugerido: toNum(o.precio_sugerido ?? o.precioSugerido ?? ""),
+    iva_porcentaje: toNum(o.iva_porcentaje ?? o.ivaPorcentaje ?? ""),
     fecha_vencimiento:
       o.fecha_vencimiento
         ? String(o.fecha_vencimiento).split("T")[0]

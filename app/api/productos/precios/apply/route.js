@@ -4,7 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
-import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
+import { alcanceEdicionProducto } from "@/lib/productos/propiedadCosto";
 
 function toNumber(value) {
   const n = Number(value);
@@ -81,6 +81,7 @@ export async function POST(req) {
       });
 
       let applied = 0;
+      let soloVenta = 0;
       const saltados = [];
       for (const item of items) {
         const productoBaseId = toNumber(item?.productoBaseId);
@@ -99,18 +100,62 @@ export async function POST(req) {
           throw new Error("Item inválido");
         }
 
-        // Propiedad del costo: si la ubicación que opera NO es dueña del producto
-        // (p. ej. un local sobre un producto del depósito), se SALTEA su costo y se
-        // reporta; el resto del lote sigue. No se toca el maestro ajeno.
+        // Propiedad: se autoriza POR CAMPO, no por fila. El costo maestro es del
+        // dueño (el depósito para sus productos; el local creador para los
+        // exclusivos), pero el PRECIO DE VENTA de un local es suyo y no depende de
+        // esa propiedad. Antes acá se salteaba la fila entera cuando la ubicación no
+        // era dueña del costo, y eso dejaba a un local sin poder actualizar el precio
+        // de venta de los productos que toma del depósito.
         const baseInfo = await tx.productoBase.findUnique({
           where: { id: productoBaseId },
-          select: { creadoEnLocalId: true, grupoId: true },
+          select: { creadoEnLocalId: true, grupoId: true, proveedor_id: true },
         });
         if (!baseInfo || baseInfo.grupoId !== grupoId) {
           throw new Error(`Producto ${productoBaseId} fuera de alcance`);
         }
-        if (!puedeEditarCosto(operatingLocalId, baseInfo.creadoEnLocalId, depositoLocalId)) {
-          saltados.push({ productoBaseId, motivo: "costo administrado por otra ubicación (depósito)" });
+
+        const alcance = alcanceEdicionProducto(
+          operatingLocalId,
+          baseInfo.creadoEnLocalId,
+          depositoLocalId
+        );
+
+        if (alcance === "deny") {
+          // Producto exclusivo de OTRO local: no se toca nada.
+          saltados.push({ productoBaseId, motivo: "el producto pertenece a otro local" });
+          continue;
+        }
+
+        if (alcance === "override") {
+          // Producto del depósito operado desde un local: se aplica SOLO el precio de
+          // venta y SOLO sobre el ProductoLocal de la ubicación que opera. Ni la ficha
+          // maestra ni los otros locales se tocan, así que el costo maestro queda
+          // intacto y el precio de un local no se propaga a nadie.
+          if (!esMargenMasivo && Number(baseInfo.proveedor_id) !== proveedorId) {
+            throw new Error(`Producto ${productoBaseId} fuera de alcance`);
+          }
+          const localUpd = await tx.productoLocal.updateMany({
+            where: { baseId: productoBaseId, localId: operatingLocalId },
+            data: { precio_venta: ventaNueva },
+          });
+          if (localUpd.count === 0) {
+            saltados.push({ productoBaseId, motivo: "el producto no está habilitado en tu local" });
+            continue;
+          }
+          // El costo no cambió: se registra igual a sí mismo para que el historial no
+          // declare una actualización de costo que nunca ocurrió.
+          await tx.precioUpdateItem.create({
+            data: {
+              precioUpdateId: update.id,
+              productoBaseId,
+              costoAnterior,
+              costoNuevo: costoAnterior,
+              ventaAnterior,
+              ventaNueva,
+            },
+          });
+          soloVenta += 1;
+          applied += 1;
           continue;
         }
 
@@ -173,21 +218,24 @@ export async function POST(req) {
         applied += 1;
       }
 
-      return { updateId: update.id, applied, saltados };
+      return { updateId: update.id, applied, soloVenta, saltados };
     }, {
       maxWait: 10000,
       timeout: 120000,
     });
 
-    const saltadosMsg =
-      result.saltados.length > 0
-        ? ` ${result.saltados.length} salteado(s): el costo lo administra el depósito.`
+    const soloVentaMsg =
+      result.soloVenta > 0
+        ? ` En ${result.soloVenta} se actualizó solo el precio de venta de tu local: el costo lo administra el depósito.`
         : "";
+    const saltadosMsg =
+      result.saltados.length > 0 ? ` ${result.saltados.length} salteado(s).` : "";
     return NextResponse.json({
       ok: true,
-      message: `Actualización aplicada: ${result.applied} productos.${saltadosMsg}`,
+      message: `Actualización aplicada: ${result.applied} productos.${soloVentaMsg}${saltadosMsg}`,
       updateId: result.updateId,
       applied: result.applied,
+      soloVenta: result.soloVenta,
       saltados: result.saltados,
     });
   } catch (e) {
