@@ -13,29 +13,19 @@
  *   node scripts/backfill-deposito-pl.cjs --apply    -> aplica (createMany skipDuplicates)
  *
  * Sale con exit code != 0 si, tras aplicar, quedan faltantes.
- * Carga DATABASE_URL desde .env sin volcar el archivo.
+ *
+ * LA BASE SE DICE, NO SE HEREDA. Antes este script leía el .env por su cuenta,
+ * así que sin DATABASE_URL escribía en la base de desarrollo creyendo que estaba
+ * bien. Ahora la pide por scripts/lib/clientePrisma.mjs, que aborta si falta.
+ * El nivel depende del modo: en dry-run solo lee, con --apply escribe y entonces
+ * además exige servidor local.
+ *
+ *   DATABASE_URL=... node scripts/backfill-deposito-pl.cjs [--apply]
  */
-const fs = require("fs");
-const path = require("path");
-
-const envPath = path.join(__dirname, "..", ".env");
-try {
-  const envTxt = fs.readFileSync(envPath, "utf8");
-  for (const line of envTxt.split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i);
-    if (m) {
-      let v = m[2];
-      if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
-      if (!process.env[m[1]]) process.env[m[1]] = v;
-    }
-  }
-} catch {
-  // si no hay .env, se asume DATABASE_URL en el entorno
-}
-
 const APPLY = process.argv.includes("--apply");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+
+// Se crea dentro del IIFE: el cliente no existe hasta que la fábrica validó.
+let prisma;
 
 // Regla A: para un depósito, "sus" bases son las creadas por él o sin creador;
 // se excluyen las creadas por cualquier local no-depósito.
@@ -53,6 +43,9 @@ async function counts(dep, grupoIds) {
 }
 
 (async () => {
+  const { crearClientePrisma, LECTURA, ESCRITURA } = await import("./lib/clientePrisma.mjs");
+  prisma = await crearClientePrisma({ nivel: APPLY ? ESCRITURA : LECTURA });
+
   console.log(APPLY ? "MODO: APPLY (escribe con skipDuplicates)" : "MODO: DRY-RUN (no escribe)");
   const deps = await prisma.local.findMany({ where: { es_deposito: true }, select: { id: true, nombre: true } });
   console.log(`Depósitos encontrados: ${deps.length}`);

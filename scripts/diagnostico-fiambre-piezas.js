@@ -26,12 +26,18 @@
  *     irreversible sin backup. Hacé backup de la base antes de --apply.
  */
 
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+// LA BASE SE DICE, NO SE HEREDA: la pide scripts/lib/clientePrisma.mjs, que
+// aborta si falta DATABASE_URL. El diagnóstico solo lee; --apply escribe y
+// entonces además exige servidor local.
+//
+//   DATABASE_URL=... node scripts/diagnostico-fiambre-piezas.js [--migrar [--apply]]
+import { crearClientePrisma, LECTURA, ESCRITURA } from "./lib/clientePrisma.mjs";
 
 const args = process.argv.slice(2);
 const MIGRAR = args.includes("--migrar");
 const APPLY = args.includes("--apply");
+
+const prisma = await crearClientePrisma({ nivel: APPLY ? ESCRITURA : LECTURA });
 
 function esFiambreFijo(b) {
   const um = (b.unidad_medida || "").toLowerCase();

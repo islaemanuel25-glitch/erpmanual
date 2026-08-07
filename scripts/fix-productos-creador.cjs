@@ -17,26 +17,19 @@
  *   node scripts/fix-productos-creador.cjs --apply    -> aplica
  *
  * NO se corre contra producción hasta autorización explícita.
+ *
+ * LA BASE SE DICE, NO SE HEREDA. Antes este script leía el .env por su cuenta,
+ * así que sin DATABASE_URL trabajaba sobre la base de desarrollo sin avisar.
+ * Ahora la pide por scripts/lib/clientePrisma.mjs, que aborta si falta. El nivel
+ * depende del modo: en dry-run solo lee, con --apply escribe y entonces además
+ * exige servidor local.
+ *
+ *   DATABASE_URL=... node scripts/fix-productos-creador.cjs [--apply]
  */
-const fs = require("fs");
-const path = require("path");
-
-const envPath = path.join(__dirname, "..", ".env");
-try {
-  const envTxt = fs.readFileSync(envPath, "utf8");
-  for (const line of envTxt.split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/i);
-    if (m) {
-      let v = m[2];
-      if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
-      if (!process.env[m[1]]) process.env[m[1]] = v;
-    }
-  }
-} catch {}
-
 const APPLY = process.argv.includes("--apply");
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+
+// Se crea dentro del IIFE: el cliente no existe hasta que la fábrica validó.
+let prisma;
 
 // ── CONFIG (por nombre de local, no-depósito) ──────────────────────────────
 const RECLASIFICAR_A_DEPOSITO = ["mini el 7"];   // eran de depósito, creados por error
@@ -63,6 +56,9 @@ async function enUsoEnDeposito(plId) {
 }
 
 (async () => {
+  const { crearClientePrisma, LECTURA, ESCRITURA } = await import("./lib/clientePrisma.mjs");
+  prisma = await crearClientePrisma({ nivel: APPLY ? ESCRITURA : LECTURA });
+
   console.log(APPLY ? "MODO: APPLY (escribe)" : "MODO: DRY-RUN (no escribe)");
   let reclasificados = 0, materializados = 0, quitados = 0, salteados = 0;
 

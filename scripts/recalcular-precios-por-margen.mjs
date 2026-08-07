@@ -26,7 +26,11 @@
 //   --aplicar          escribe. Exige además --confirmo.
 //   --limite N         corta después de N filas (para probar de a poco).
 
-import { PrismaClient } from "@prisma/client";
+// LA BASE SE DICE, NO SE HEREDA: la valida scripts/lib/clientePrisma.mjs. La
+// simulación es de solo lectura y por eso puede correrse contra cualquier base,
+// que es como se usa para auditar producción; --aplicar sube a nivel escritura y
+// entonces exige servidor local, además del --confirmo que ya pedía.
+import { crearClientePrisma, LECTURA, ESCRITURA } from "./lib/clientePrisma.mjs";
 import { precioDesdeMargen, hayReglaAutomatica } from "../lib/precios/precioDesdeMargen.js";
 
 const arg = (n) => process.argv.includes(`--${n}`);
@@ -40,15 +44,16 @@ const CONFIRMO = arg("confirmo");
 const SOLO_BAJO_COSTO = arg("solo-bajo-costo");
 const LIMITE = valor("limite") ? Number(valor("limite")) : null;
 
-const url = process.env.DATABASE_URL || "";
-if (!url) { console.error("Falta DATABASE_URL."); process.exit(2); }
 if (APLICAR && !CONFIRMO) {
   console.error("--aplicar exige --confirmo. Corré primero sin banderas para ver la simulación.");
   process.exit(2);
 }
 
-const nombreBase = (() => { try { return new URL(url).pathname.replace(/^\//, ""); } catch { return "(?)"; } })();
-const prisma = new PrismaClient({ datasources: { db: { url } } });
+const prisma = await crearClientePrisma({ nivel: APLICAR ? ESCRITURA : LECTURA });
+// Seguro después de la fábrica: si el operador no puso la variable, ya abortó.
+const nombreBase = (() => {
+  try { return new URL(process.env.DATABASE_URL).pathname.replace(/^\//, ""); } catch { return "(?)"; }
+})();
 
 const n = (v) => (v == null ? null : Number(v));
 

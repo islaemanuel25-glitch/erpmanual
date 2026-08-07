@@ -1,14 +1,24 @@
-import { PrismaClient } from "@prisma/client";
+// Borra TODOS los productos y sus datos relacionados. Es el script de mayor radio
+// de destrucción del repo, así que va a nivel DESTRUCTIVO: además de
+// CONFIRM_RESET_PRODUCTOS —que se conserva— la fábrica exige servidor local,
+// nombre de base en la lista blanca y SEED_DESTRUCTIVO igual a ese nombre.
+//
+//   CONFIRM_RESET_PRODUCTOS=true SEED_DESTRUCTIVO=<base> DATABASE_URL=…/<base> \
+//     node scripts/reset-productos.js
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 
-const prisma = new PrismaClient();
+// La confirmación propia se evalúa ANTES de pedir el cliente: sin ella no se
+// abre conexión ni se valida nada más.
+if (process.env.CONFIRM_RESET_PRODUCTOS !== "true") {
+  console.error(
+    "Abortado. Ejecutar con:\n  CONFIRM_RESET_PRODUCTOS=true node scripts/reset-productos.js"
+  );
+  process.exit(1);
+}
+
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 
 async function main() {
-  if (process.env.CONFIRM_RESET_PRODUCTOS !== "true") {
-    console.error(
-      "Abortado. Ejecutar con:\n  CONFIRM_RESET_PRODUCTOS=true node scripts/reset-productos.js"
-    );
-    process.exit(1);
-  }
 
   console.log("=== RESET PRODUCTOS ===");
   console.log("Esto eliminara TODOS los productos y datos relacionados.");
