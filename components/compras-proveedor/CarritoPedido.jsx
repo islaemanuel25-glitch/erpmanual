@@ -44,6 +44,10 @@ export default function CarritoPedido({
     if (!Number.isFinite(v)) return "";
     return String(Math.round(v * 10000) / 10000);
   };
+
+  // Moneda es-AR (punto de miles, sin centavos) para subtotales y total.
+  const NF_ARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+  const fmtPesos = (n) => `$${NF_ARS.format(Math.round(Number(n) || 0))}`;
   const esDrawer = variant === "drawer";
   const listMax = esDrawer
     ? "max-h-[calc(100dvh-300px)]"
@@ -127,7 +131,7 @@ export default function CarritoPedido({
           />
           <span className="ml-auto text-[12.5px] font-semibold tabular-nums sunmi-text-strong shrink-0">
             {r.subtotal != null ? (
-              `$${r.subtotal.toFixed(2)}`
+              fmtPesos(r.subtotal)
             ) : (
               <span className="sunmi-text-accent" title={r.advertencia || ""}>
                 ⚠
@@ -195,7 +199,7 @@ export default function CarritoPedido({
       {/* Total */}
       <div className="flex items-center justify-between mt-3">
         <span className="text-[12px] sunmi-text-muted">Total estimado</span>
-        <b className="text-[16px] sunmi-text-accent tabular-nums">${total.toFixed(2)}</b>
+        <b className="text-[16px] sunmi-text-accent tabular-nums">{fmtPesos(total)}</b>
       </div>
 
       {/* Notas */}

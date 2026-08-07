@@ -32,13 +32,17 @@ import {
   diaActualEnum,
 } from "@/lib/proveedores/diasPedido";
 
-// Filtros de vista del catálogo. "Con cantidad" se reemplazó por el filtro
-// "Pedido (N)" (toggle aparte) que muestra solo lo que está en el pedido.
+// Trío de vistas del catálogo. El tercer pill "Cargados (N)" es el filtro del
+// pedido (soloPedido), que se renderiza aparte con su contador.
 const FILTROS_VISTA = [
   ["sugeridos", "Sugeridos"],
   ["todos", "Todos"],
-  ["bajoStock", "Bajo stock"],
 ];
+
+// Moneda es-AR: punto de miles, SIN centavos. Para subtotales y totales (montos
+// agregados). El costo unitario editable conserva sus decimales aparte.
+const NF_ARS = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+const fmtPesos = (n) => `$${NF_ARS.format(Math.round(Number(n) || 0))}`;
 
 export default function NuevaCompraProveedorPage() {
   const router = useRouter();
@@ -1009,8 +1013,6 @@ export default function NuevaCompraProveedorPage() {
       const v = modoManual ? "todos" : vista;
       if (v === "sugeridos") {
         lista = lista.filter((p) => p.sugerido > 0 || itemsMap.has(p.productoLocalId));
-      } else if (v === "bajoStock") {
-        lista = lista.filter((p) => p.bajoMin || itemsMap.has(p.productoLocalId));
       }
     }
 
@@ -1062,8 +1064,6 @@ export default function NuevaCompraProveedorPage() {
     ? "Catálogo de productos"
     : vista === "sugeridos"
     ? "Sugeridos por faltante"
-    : vista === "bajoStock"
-    ? "Bajo stock mínimo"
     : "Todos los productos";
 
   // ── Fragmentos compartidos ───────────────────────────────────────────────
@@ -1109,7 +1109,7 @@ export default function NuevaCompraProveedorPage() {
           soloPedido ? "sunmi-btn sunmi-btn-primary" : "sunmi-control"
         } ${lineasCount === 0 ? "opacity-50 cursor-default" : ""}`}
       >
-        Pedido ({lineasCount})
+        Cargados ({lineasCount})
       </button>
       {categorias.length > 0 && (
         <div className="w-[148px] shrink-0">
@@ -1228,24 +1228,31 @@ export default function NuevaCompraProveedorPage() {
     const parts = [];
     if (!esAuto) return parts;
     if (p.stockActual != null) {
+      // Rojo (danger) SOLO en alerta real: stock bajo el mínimo.
       parts.push({
         txt: `Stock ${rv.esFiambre ? Number(p.stockActual).toFixed(1) : p.stockActual}`,
         danger: p.bajoMin,
       });
     }
     if (!p.sinParametros) {
-      if (p.faltante > 0)
-        parts.push({ txt: `Faltan ${rv.esFiambre ? Number(p.faltante).toFixed(1) : p.faltante}`, danger: true });
-      else if (p.sugerido > 0) parts.push({ txt: `Sug. ${p.sugerido}`, accent: true });
-      else parts.push({ txt: "OK", ok: true });
+      // Faltan y Sug. casi siempre coinciden → una sola cifra "Sug.". En fiambre
+      // difieren (piezas vs kg): se muestra el sugerido con el faltante en kg.
+      const sug = p.sugerido || 0;
+      if (sug > 0) {
+        const hint = rv.esFiambre && p.faltante > 0 ? ` · faltan ${Number(p.faltante).toFixed(1)} kg` : "";
+        // Sin rojo por defecto: se resalta (ámbar) solo si está bajo el mínimo.
+        parts.push({ txt: `Sug. ${sug}${hint}`, accent: p.bajoMin });
+      } else parts.push({ txt: "OK", ok: true });
     }
     return parts;
   };
 
+  // Badges: fiambre es informativo → neutro (rojo reservado a alertas reales).
+  // Bajo mínimo es la ÚNICA alerta que se resalta (ámbar).
   const badges = (rv, p, short = false) => (
     <>
       {rv.esFiambre && (
-        <span className="px-1 py-0.5 text-[8.5px] font-bold uppercase rounded bg-red-600 text-white leading-none shrink-0">
+        <span className="px-1 py-0.5 text-[8.5px] font-bold uppercase rounded sunmi-control sunmi-text-muted leading-none shrink-0">
           {short ? "F" : "Fiambre"}
         </span>
       )}
@@ -1376,7 +1383,7 @@ export default function NuevaCompraProveedorPage() {
           <span className="truncate whitespace-nowrap">
             <b>{lineasCount}</b> {lineasCount === 1 ? "producto" : "productos"}{" "}
             <span className="sunmi-text-muted">· Total</span>{" "}
-            <b className="sunmi-text-accent tabular-nums">${total.toFixed(2)}</b>
+            <b className="sunmi-text-accent tabular-nums">{fmtPesos(total)}</b>
           </span>
           {lineasCount > 0 && (
             <span className="ml-auto flex items-center gap-1 text-[11px] shrink-0" style={{ color: "var(--pos-link)" }}>
@@ -1414,7 +1421,7 @@ export default function NuevaCompraProveedorPage() {
             <span className="sunmi-text-muted">·</span>
             <span className="whitespace-nowrap">
               <span className="sunmi-text-muted text-[12px]">Total estimado </span>
-              <b className="sunmi-text-accent tabular-nums text-[15px]">${total.toFixed(2)}</b>
+              <b className="sunmi-text-accent tabular-nums text-[15px]">{fmtPesos(total)}</b>
             </span>
           </div>
           <div className="flex gap-2 shrink-0 ml-auto">
@@ -1512,83 +1519,126 @@ export default function NuevaCompraProveedorPage() {
     </div>
   );
 
-  // ── Fila del catálogo (desktop) ──
+  // Celda "Sugerido" (fusión de Faltan + Sug.): una sola cifra cuando coinciden;
+  // en fiambre, sugerido en piezas + hint chico del faltante en kg. Sin rojo por
+  // defecto: se resalta (ámbar) solo si está bajo el mínimo (alerta real).
+  const celdaSugerido = (p, rv) => {
+    if (p.sinParametros) return <span className="sunmi-text-muted">—</span>;
+    const sug = p.sugerido || 0;
+    if (sug <= 0) return <span className="sunmi-text-muted text-[11px]">OK</span>;
+    return (
+      <div className="leading-tight">
+        <span className={p.bajoMin ? "sunmi-text-accent font-semibold" : "sunmi-text-strong"}>
+          {sug}
+        </span>
+        {rv.esFiambre && p.faltante > 0 && (
+          <div className="text-[9.5px] sunmi-text-muted leading-none mt-0.5">
+            faltan {Number(p.faltante).toFixed(1)} kg
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Tacho neutro (gris) que se vuelve rojo al hover. Nada de tachos rojos
+  // encendidos por defecto en cientos de filas.
+  const botonQuitar = (p, size = 14) => (
+    <button
+      type="button"
+      onClick={() => quitarItem(p.productoLocalId)}
+      aria-label="Quitar del pedido"
+      title="Quitar del pedido"
+      className="w-[26px] h-[26px] inline-flex items-center justify-center rounded-md sunmi-text-muted hover:bg-red-600 hover:text-white transition"
+    >
+      <Trash2 size={size} />
+    </button>
+  );
+
+  // ── Fila del catálogo (desktop, densa estilo módulo Productos) ──
   const filaDesktop = (p) => {
     const rv = rowVars(p);
     const seg = costoSecundario(rv);
-    const meta = metaEstado(p, rv);
     return (
       <div
         key={p.productoLocalId}
-        className="flex items-center gap-3 px-3 py-2 border-b sunmi-divide"
-        style={{ borderLeft: rv.enPedido ? "3px solid var(--pos-accent, #f59e0b)" : "3px solid transparent" }}
+        className="flex items-center gap-2 px-3 py-1.5 border-b sunmi-divide text-[12px]"
+        style={{
+          borderLeft: rv.enPedido ? "3px solid var(--pos-accent, #f59e0b)" : "3px solid transparent",
+          // Tinte SOLO en alerta real (bajo mínimo), muy sutil.
+          backgroundColor: p.bajoMin
+            ? "color-mix(in srgb, var(--pos-warning, #f59e0b) 7%, transparent)"
+            : undefined,
+        }}
       >
         {/* Producto */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-[200px]">
           <div className="flex items-center gap-1.5 leading-tight">
             <span className="text-[12.5px] sunmi-text-strong truncate" title={p.nombre}>
               {p.nombre}
             </span>
             {badges(rv, p)}
           </div>
-          <div className="text-[10.5px] sunmi-text-muted leading-tight mt-0.5 truncate">
-            {meta.map((m, idx) => (
-              <span key={idx}>
-                {idx > 0 && " · "}
-                <span
-                  className={
-                    m.danger
-                      ? "sunmi-text-danger"
-                      : m.accent
-                      ? "sunmi-text-accent"
-                      : m.ok
-                      ? "sunmi-text-success"
-                      : ""
-                  }
-                >
-                  {m.txt}
-                </span>
+          {p.stockActual != null && esAuto && (
+            <div className="text-[10px] leading-none mt-0.5">
+              <span className={p.bajoMin ? "sunmi-text-danger" : "sunmi-text-muted"}>
+                Stock {rv.esFiambre ? Number(p.stockActual).toFixed(1) : p.stockActual}
               </span>
-            ))}
-            {rv.codigo !== "—" && <span> · {rv.codigo}</span>}
-          </div>
+            </div>
+          )}
         </div>
 
-        {/* Unidad · Costo */}
-        <div className="w-[210px] shrink-0">
-          <div className="flex items-center gap-1.5">
-            {toggleUnidad(p, rv)}
-            {costoInput(p, rv, "w-[82px] ml-auto")}
-          </div>
-          <div className="h-[13px] flex items-center justify-between gap-2 text-[10px] sunmi-text-muted leading-none mt-0.5">
-            <span className="truncate">
-              {rv.esPack ? `1 pack = ${rv.factor} un` : ""}
-            </span>
-            <span className="shrink-0">{rv.activa && seg ? seg : ""}</span>
-          </div>
+        {/* Código */}
+        <div className="w-[112px] shrink-0 text-[10.5px] sunmi-text-muted truncate" title={rv.codigo}>
+          {rv.codigo}
+        </div>
+
+        {/* Cód. interno */}
+        <div className="w-[96px] shrink-0 text-[10.5px] sunmi-text-muted truncate" title={p.codigoInterno || ""}>
+          {p.codigoInterno || "—"}
+        </div>
+
+        {/* Unidad */}
+        <div className="w-[104px] shrink-0">{toggleUnidad(p, rv)}</div>
+
+        {/* Pack (equivale a "1 pack = N un") */}
+        <div className="w-[48px] shrink-0 text-center text-[11px] sunmi-text-muted tabular-nums">
+          {rv.esPack ? rv.factor : "—"}
+        </div>
+
+        {/* Sugerido (fusión Faltan/Sug.) */}
+        <div className="w-[64px] shrink-0 text-right text-[12px] tabular-nums">
+          {esAuto ? celdaSugerido(p, rv) : <span className="sunmi-text-muted">—</span>}
         </div>
 
         {/* Cantidad */}
-        <div className="w-[108px] shrink-0">
+        <div className="w-[104px] shrink-0">
           {stepper(p, rv)}
-          {rv.esFiambre && rv.pesoRef > 0 && (Number(rv.cantidadVal) || 0) > 0 && (
-            <div className="text-[10px] sunmi-text-muted text-center mt-0.5">
-              ~{((Number(rv.cantidadVal) || 0) * rv.pesoRef).toFixed(1)} kg
+          {rv.esFiambre && rv.pesoRef > 0 && rv.cantNum > 0 && (
+            <div className="text-[9.5px] sunmi-text-muted text-center mt-0.5 leading-none">
+              ~{(rv.cantNum * rv.pesoRef).toFixed(1)} kg
             </div>
           )}
           {rv.esPack && rv.disp === "BULTO" && rv.cantNum > 0 && (
-            <div className="text-[10px] sunmi-text-accent text-center mt-0.5">
-              Equivale a {rv.cantNum * rv.factor} un
+            <div className="text-[9.5px] sunmi-text-accent text-center mt-0.5 leading-none">
+              = {rv.cantNum * rv.factor} un
             </div>
+          )}
+        </div>
+
+        {/* Costo */}
+        <div className="w-[112px] shrink-0">
+          {costoInput(p, rv, "w-[104px] ml-auto")}
+          {rv.activa && seg && (
+            <div className="text-[9.5px] sunmi-text-muted text-right leading-none mt-0.5">{seg}</div>
           )}
         </div>
 
         {/* Subtotal */}
-        <div className="w-[86px] shrink-0 text-right text-[12.5px] font-medium tabular-nums">
+        <div className="w-[100px] shrink-0 text-right text-[12.5px] font-medium tabular-nums">
           {!rv.activa ? (
             <span className="sunmi-text-muted">—</span>
           ) : rv.r.subtotal != null ? (
-            `$${rv.r.subtotal.toFixed(2)}`
+            fmtPesos(rv.r.subtotal)
           ) : (
             <span className="sunmi-text-accent" title={rv.r.advertencia || ""}>
               ⚠
@@ -1597,18 +1647,8 @@ export default function NuevaCompraProveedorPage() {
         </div>
 
         {/* Acción */}
-        <div className="w-[30px] shrink-0 flex justify-end">
-          {rv.enPedido && (
-            <button
-              type="button"
-              onClick={() => quitarItem(p.productoLocalId)}
-              aria-label="Quitar del pedido"
-              title="Quitar del pedido"
-              className="w-[26px] h-[26px] inline-flex items-center justify-center rounded-md sunmi-btn-red transition"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
+        <div className="w-[34px] shrink-0 flex justify-end">
+          {rv.enPedido && botonQuitar(p)}
         </div>
       </div>
     );
@@ -1666,20 +1706,11 @@ export default function NuevaCompraProveedorPage() {
 
         <div className="shrink-0 flex flex-col items-end justify-between gap-1">
           <div className="h-[26px] flex items-start">
-            {rv.enPedido && (
-              <button
-                type="button"
-                onClick={() => quitarItem(p.productoLocalId)}
-                aria-label="Quitar del pedido"
-                className="w-[26px] h-[26px] inline-flex items-center justify-center rounded-md sunmi-btn-red"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
+            {rv.enPedido && botonQuitar(p, 13)}
           </div>
           {stepper(p, rv, true)}
           <div className="text-[11.5px] font-semibold tabular-nums sunmi-text-strong h-[15px]">
-            {rv.activa && rv.r.subtotal != null ? `$${rv.r.subtotal.toFixed(2)}` : ""}
+            {rv.activa && rv.r.subtotal != null ? fmtPesos(rv.r.subtotal) : ""}
           </div>
         </div>
       </div>
@@ -1759,25 +1790,27 @@ export default function NuevaCompraProveedorPage() {
             {/* ── Zona principal: catálogo a todo el ancho ── */}
             <div className="min-w-0">
               <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
-                {/* Barra: buscador + filtros de vista + categoría + tamaño */}
-                <div className="flex flex-col gap-2 lg:flex-row lg:items-center mb-2">
-                  <div className="relative flex-1">
-                    <Search
-                      size={15}
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-10 sunmi-text-muted"
-                    />
-                    <SunmiInput
-                      placeholder="Buscar producto o código..."
-                      value={search}
-                      onChange={(e) => {
-                        setSearch(e.target.value);
-                        setPostVinculoMsg("");
-                      }}
-                      className="!pl-8 !py-1.5"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {chipsFiltros("md")}
+                {/* Buscador protagonista: fila propia, ancho completo, borde visible */}
+                <div className="relative mb-2">
+                  <Search
+                    size={17}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
+                    style={{ color: "var(--pos-link)" }}
+                  />
+                  <SunmiInput
+                    placeholder="Buscar por código interno, nombre, SKU o código de barra..."
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPostVinculoMsg("");
+                    }}
+                    className="!pl-10 !py-2.5 text-[13px] ring-1 ring-inset sunmi-ring"
+                  />
+                </div>
+                {/* Pills (trío) + categoría + tamaño de página */}
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  {chipsFiltros("md")}
+                  <div className="ml-auto">
                     <SunmiPageSizer value={pageSize} onChange={setPageSize} />
                   </div>
                 </div>
@@ -1835,20 +1868,25 @@ export default function NuevaCompraProveedorPage() {
                   </span>
                 </div>
 
-                {/* Cabecera de columnas */}
-                <div
-                  className="flex items-center gap-3 px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-wide sunmi-text-muted border-b sunmi-divider"
-                  style={{ borderLeft: "3px solid transparent" }}
-                >
-                  <div className="flex-1 min-w-0">Producto</div>
-                  <div className="w-[210px] shrink-0">Unidad · Costo</div>
-                  <div className="w-[108px] shrink-0 text-center">Cantidad</div>
-                  <div className="w-[86px] shrink-0 text-right">Subtotal</div>
-                  <div className="w-[30px] shrink-0" />
-                </div>
-
-                {/* Lista del catálogo */}
-                <div className="max-h-[60dvh] overflow-y-auto" id="nueva-compra-scroll">
+                {/* Lista del catálogo (cabecera sticky + filas densas) */}
+                <div className="max-h-[62dvh] overflow-auto" id="nueva-compra-scroll">
+                  {/* Cabecera de columnas — sobria (muted sobre superficie), sticky */}
+                  <div
+                    className="sticky top-0 z-10 flex items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide sunmi-text-muted border-b sunmi-divider sunmi-surface min-w-[860px]"
+                    style={{ borderLeft: "3px solid transparent" }}
+                  >
+                    <div className="flex-1 min-w-[200px]">Producto</div>
+                    <div className="w-[112px] shrink-0">Código</div>
+                    <div className="w-[96px] shrink-0">Cód. interno</div>
+                    <div className="w-[104px] shrink-0">Unidad</div>
+                    <div className="w-[48px] shrink-0 text-center">Pack</div>
+                    <div className="w-[64px] shrink-0 text-right">Sug.</div>
+                    <div className="w-[104px] shrink-0 text-center">Cantidad</div>
+                    <div className="w-[112px] shrink-0 text-right">Costo</div>
+                    <div className="w-[100px] shrink-0 text-right">Subtotal</div>
+                    <div className="w-[34px] shrink-0" />
+                  </div>
+                  <div className="min-w-[860px]">
                   {loadingProds && productos.length === 0 ? (
                     <div className="px-3 py-8 text-center text-xs sunmi-text-muted">Buscando...</div>
                   ) : listaRender.length === 0 ? (
@@ -1862,6 +1900,7 @@ export default function NuevaCompraProveedorPage() {
                   ) : (
                     pageRows.map(filaDesktop)
                   )}
+                  </div>
                 </div>
 
                 {/* Paginación del listado */}
