@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-08-07] - Actualización: productos, proveedores
+
+### Modificado
+- **productos**: SunmiTable: densidad, align, render, ordenable, filaExpandible y tono de fila
+- **productos**: feat(listas): vistas por producto en el área principal y reportes PDF
+- **proveedores**: feat(listas): vistas por producto en el área principal y reportes PDF
+- **proveedores**: feat(listas): resumen orientado al ERP, con detalle por producto
+- **proveedores**: feat(listas): grilla operativa para conciliar 190 productos
+- **proveedores**: feat(listas): conciliar presentación y precio por separado, con rango esperado
+
+
 ## [2026-08-06] - Actualización: proveedores, pos-ventas
 
 ### Modificado
