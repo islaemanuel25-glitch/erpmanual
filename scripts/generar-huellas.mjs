@@ -1,0 +1,278 @@
+// Generador de huellas de tablas: navega las pantallas con tabla del ERP en un
+// Edge headless, guarda una captura PNG por pantalla y una huella estructural
+// de cada <table> en huellas.json.
+//
+// La huella no mira píxeles: mira columnas, alineaciones, padding, fondo, alto
+// de fila, opacidad, tipografía, ancho de tabla y overflow del contenedor. Es lo
+// que permite comparar dos corridas (antes/después de un refactor) sin que un
+// antialias o un dato distinto genere ruido.
+//
+// Login: real, contra /api/login, con las credenciales que se le pasan. No firma
+// tokens ni inyecta cookies a mano; la cookie la emite el servidor.
+//
+// Uso:
+//   node scripts/generar-huellas.mjs --salida /tmp/despues \
+//     --usuario admin@admin.com --clave <clave> [--tanda 1] [--base http://localhost:3111]
+//
+// Sin --tanda captura las 16 pantallas de una. Con --tanda N captura el bloque
+// N de 5 (1..4) y acumula sobre el huellas.json que ya exista en --salida.
+
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+const arg = (n, def = null) => {
+  const i = process.argv.indexOf(`--${n}`);
+  return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : def;
+};
+
+const BASE = arg("base", "http://localhost:3111");
+const SALIDA = arg("salida");
+const USUARIO = arg("usuario");
+const CLAVE = arg("clave");
+const TANDA = arg("tanda") ? Number(arg("tanda")) : null;
+const TAM_TANDA = Number(arg("tam-tanda", "5"));
+const PUERTO_CDP = Number(arg("puerto-cdp", "9223"));
+const EDGE =
+  arg("edge") || "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+
+if (!SALIDA || !USUARIO || !CLAVE) {
+  console.error("Faltan --salida, --usuario o --clave.");
+  process.exit(1);
+}
+
+// Las 16 pantallas con tabla. Las 5 de la baseline que quedaron sin tabla
+// (clientes-detalle, reportes-ventas, transferencias, turnos-detalle y
+// edicion-rapida-fila-editada) no entran: su huella es vacía y no compara nada.
+const PANTALLAS = [
+  { nombre: "01-categorias", url: "/modulos/categorias" },
+  { nombre: "02-clientes", url: "/modulos/clientes" },
+  { nombre: "04-clientes-analytics", url: "/modulos/clientes/analytics" },
+  { nombre: "05-compras-proveedor-detalle", url: "/modulos/compras-proveedor/216" },
+  { nombre: "06-compras-proveedor-ganancia", url: "/modulos/compras-proveedor/ganancia" },
+  { nombre: "07-listas-precios", url: "/modulos/configuracion/listas-precios" },
+  { nombre: "08-locales", url: "/modulos/locales" },
+  { nombre: "09-operadores", url: "/modulos/operadores" },
+  { nombre: "10-productos", url: "/modulos/productos" },
+  { nombre: "11-proveedores", url: "/modulos/proveedores" },
+  { nombre: "12-reportes-stock", url: "/modulos/reportes-stock" },
+  { nombre: "14-roles", url: "/modulos/roles" },
+  { nombre: "16-turnos", url: "/modulos/turnos" },
+  { nombre: "18-usuarios", url: "/modulos/usuarios" },
+  { nombre: "19-productos-fila-seleccionada", url: "/modulos/productos", clicPrimeraFila: true },
+  { nombre: "20-edicion-rapida", url: "/modulos/productos/edicion-rapida" },
+];
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const log = (m) => console.log(m);
+
+// --- Extracción de la huella (se evalúa dentro de la página) ----------------
+const EXTRAER = `(() => {
+  const cs = (el) => getComputedStyle(el);
+  const tablas = [...document.querySelectorAll("table")].map((tabla, indice) => {
+    const ths = [...tabla.querySelectorAll("thead th")];
+    const th0 = ths[0];
+    const filasEl = [...tabla.querySelectorAll("tbody tr")];
+    const muestra = filasEl.slice(0, 3).map((tr) => {
+      const td = tr.querySelector("td");
+      const sTr = cs(tr), sTd = td ? cs(td) : null;
+      return {
+        alto: Math.round(tr.getBoundingClientRect().height),
+        fondo: sTr.backgroundColor,
+        opacidad: sTr.opacity,
+        tdPad: sTd ? sTd.padding : null,
+        tdFuente: sTd ? sTd.fontSize : null,
+        tdAlign: sTd ? sTd.textAlign : null,
+      };
+    });
+    const cont = tabla.parentElement, sCont = cont ? cs(cont) : null;
+    return {
+      indice,
+      columnas: ths.map((th) => (th.innerText || "").trim()),
+      thAlign: ths.map((th) => cs(th).textAlign),
+      thPad: th0 ? cs(th0).padding : null,
+      thFondo: th0 ? cs(th0).backgroundColor : null,
+      filas: filasEl.length,
+      muestra,
+      anchoTabla: Math.round(tabla.getBoundingClientRect().width),
+      contenedor: sCont ? {
+        overflowX: sCont.overflowX, overflowY: sCont.overflowY,
+        maxHeight: sCont.maxHeight, id: cont.id || null,
+      } : null,
+    };
+  });
+  const t0 = document.querySelector("table");
+  return JSON.stringify({ url: location.pathname, tablas, textoTabla: t0 ? t0.innerText : "" });
+})()`;
+
+// --- Cliente CDP mínimo -----------------------------------------------------
+let ws, msgId = 0, sessionId = null;
+const pending = new Map();
+
+function send(method, params = {}, useSession = true) {
+  return new Promise((resolve, reject) => {
+    const id = ++msgId;
+    pending.set(id, { resolve, reject });
+    const msg = { id, method, params };
+    if (useSession && sessionId) msg.sessionId = sessionId;
+    ws.send(JSON.stringify(msg));
+  });
+}
+
+async function urlDepurador() {
+  for (let i = 0; i < 60; i++) {
+    try {
+      const r = await fetch(`http://127.0.0.1:${PUERTO_CDP}/json/version`);
+      const j = await r.json();
+      if (j.webSocketDebuggerUrl) return j.webSocketDebuggerUrl;
+    } catch {}
+    await sleep(250);
+  }
+  throw new Error("Edge no respondió al puerto de depuración");
+}
+
+async function conectar() {
+  ws = new WebSocket(await urlDepurador());
+  await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
+  ws.onmessage = (ev) => {
+    const m = JSON.parse(ev.data);
+    if (m.id && pending.has(m.id)) {
+      const p = pending.get(m.id);
+      pending.delete(m.id);
+      m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result);
+    }
+  };
+  const { targetId } = await send("Target.createTarget", { url: "about:blank" }, false);
+  const { sessionId: sid } = await send("Target.attachToTarget", { targetId, flatten: true }, false);
+  sessionId = sid;
+  await send("Page.enable");
+  await send("Runtime.enable");
+  await send("Network.enable");
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 1280, height: 800, deviceScaleFactor: 1, mobile: false,
+  });
+}
+
+async function evaluar(expresion, esperaPromesa = false) {
+  const r = await send("Runtime.evaluate", {
+    expression: expresion,
+    returnByValue: true,
+    awaitPromise: esperaPromesa,
+  });
+  if (r.exceptionDetails) {
+    throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
+  }
+  return r.result.value;
+}
+
+async function navegar(url) {
+  await send("Page.navigate", { url });
+  for (let i = 0; i < 80; i++) {
+    await sleep(150);
+    const listo = await evaluar(`document.readyState === "complete" && location.pathname !== "about:blank"`);
+    if (listo) return;
+  }
+}
+
+// Espera a que la tabla deje de moverse: mismo conteo de filas en dos lecturas
+// separadas. Es lo que evita capturar una pantalla a medio cargar (el caso de
+// 10-productos en la baseline vieja: 1 fila en vez de 25).
+async function esperarTablaEstable(intentos = 40, intervalo = 400) {
+  let previo = -1, estables = 0;
+  for (let i = 0; i < intentos; i++) {
+    await sleep(intervalo);
+    const n = await evaluar(`document.querySelectorAll("tbody tr").length`);
+    const cargando = await evaluar(
+      `!!document.querySelector("[aria-busy='true'], .animate-pulse, [data-cargando='true']")`
+    );
+    if (n === previo && n > 0 && !cargando) {
+      if (++estables >= 2) return n;
+    } else {
+      estables = 0;
+    }
+    previo = n;
+  }
+  return previo;
+}
+
+async function iniciarSesion() {
+  await navegar(`${BASE}/login`);
+  const res = await evaluar(
+    `fetch("/api/login", {
+       method: "POST",
+       headers: { "Content-Type": "application/json" },
+       credentials: "same-origin",
+       body: JSON.stringify({ email: ${JSON.stringify(USUARIO)}, password: ${JSON.stringify(CLAVE)} }),
+     }).then(r => r.status + "")`,
+    true
+  );
+  if (res !== "200") throw new Error(`Login real falló con status ${res}`);
+  log(`  login real OK como ${USUARIO}`);
+}
+
+// --- Corrida ----------------------------------------------------------------
+const edge = spawn(
+  EDGE,
+  [
+    "--headless=new",
+    `--remote-debugging-port=${PUERTO_CDP}`,
+    `--user-data-dir=${path.join(SALIDA, "edge-profile")}`,
+    "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--hide-scrollbars",
+    "about:blank",
+  ],
+  { stdio: "ignore" }
+);
+
+const cerrar = () => { try { edge.kill(); } catch {} };
+process.on("exit", cerrar);
+process.on("SIGINT", () => { cerrar(); process.exit(130); });
+
+try {
+  fs.mkdirSync(SALIDA, { recursive: true });
+  await conectar();
+  await iniciarSesion();
+
+  const seleccion = TANDA
+    ? PANTALLAS.slice((TANDA - 1) * TAM_TANDA, TANDA * TAM_TANDA)
+    : PANTALLAS;
+  if (!seleccion.length) {
+    console.error(`La tanda ${TANDA} está vacía (hay ${PANTALLAS.length} pantallas).`);
+    process.exit(1);
+  }
+
+  const archivo = path.join(SALIDA, "huellas.json");
+  const huellas = fs.existsSync(archivo)
+    ? JSON.parse(fs.readFileSync(archivo, "utf8"))
+    : {};
+
+  log(`Tanda ${TANDA ?? "única"}: ${seleccion.length} pantallas → ${SALIDA}`);
+  for (const p of seleccion) {
+    await navegar(BASE + p.url);
+    const filas = await esperarTablaEstable();
+
+    if (p.clicPrimeraFila) {
+      await evaluar(`(() => {
+        const tr = document.querySelector("tbody tr");
+        if (tr) tr.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        return true;
+      })()`);
+      await sleep(700);
+    }
+
+    const huella = JSON.parse(await evaluar(EXTRAER));
+    huellas[p.nombre] = huella;
+
+    const { data } = await send("Page.captureScreenshot", { format: "png" });
+    fs.writeFileSync(path.join(SALIDA, `${p.nombre}.png`), Buffer.from(data, "base64"));
+
+    log(`  ${p.nombre}: ${huella.tablas.length} tabla(s), ${filas} fila(s)`);
+  }
+
+  fs.writeFileSync(archivo, JSON.stringify(huellas, null, 1));
+  log(`Listo. ${Object.keys(huellas).length} pantallas en ${archivo}`);
+} catch (e) {
+  console.error("Error:", e.message);
+  process.exitCode = 1;
+} finally {
+  cerrar();
+}
