@@ -168,9 +168,11 @@ async function conectar() {
   // El ancho del viewport determina el ancho de las tablas: dos corridas con
   // anchos distintos dan diferencias en anchoTabla que no son del código.
   await send("Emulation.setDeviceMetricsOverride", {
-    // 1366x800 es el ancho con el que se tomó la línea de base de referencia.
+    // 1366x900 es la ventana con la que se tomó la línea de base de referencia.
+    // El alto importa tanto como el ancho: el contenedor de scroll usa
+    // max-h-[70dvh], así que a 900 mide 630px y a 800 mide 560px.
     width: Number(arg("ancho", "1366")),
-    height: Number(arg("alto", "800")),
+    height: Number(arg("alto", "900")),
     deviceScaleFactor: 1,
     mobile: false,
   });
@@ -317,9 +319,16 @@ try {
   }
   await fijarContexto();
 
-  const seleccion = TANDA
-    ? PANTALLAS.slice((TANDA - 1) * TAM_TANDA, TANDA * TAM_TANDA)
-    : PANTALLAS;
+  // --solo permite recapturar pantallas sueltas, que es lo que hace falta cuando
+  // una línea de base salió mal y hay que rehacer sólo esa.
+  const soloArg = arg("solo");
+  const solo = soloArg ? soloArg.split(",").map((s) => s.trim()) : null;
+
+  const seleccion = solo
+    ? PANTALLAS.filter((p) => solo.includes(p.nombre))
+    : TANDA
+      ? PANTALLAS.slice((TANDA - 1) * TAM_TANDA, TANDA * TAM_TANDA)
+      : PANTALLAS;
   if (!seleccion.length) {
     console.error(`La tanda ${TANDA} está vacía (hay ${PANTALLAS.length} pantallas).`);
     process.exit(1);
