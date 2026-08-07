@@ -126,5 +126,8 @@ if (!informe.length) {
   }
 }
 
-console.log(`Resumen: ${conDiferencias} pantalla(s) con diferencias estructurales, ` +
-  `${noComparables} con datos distintos, ${pantallas.length - conDiferencias - noComparables} idénticas.`);
+// Una pantalla puede tener a la vez datos distintos y diferencias estructurales,
+// así que las categorías se solapan: las idénticas se cuentan aparte, no restando.
+const identicas = pantallas.length - informe.length;
+console.log(`Resumen: ${pantallas.length} pantalla(s) comparadas, ${identicas} idénticas, ` +
+  `${conDiferencias} con diferencias estructurales, ${noComparables} con datos distintos.`);

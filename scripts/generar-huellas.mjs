@@ -57,7 +57,10 @@ const PANTALLAS = [
   { nombre: "11-proveedores", url: "/modulos/proveedores" },
   { nombre: "12-reportes-stock", url: "/modulos/reportes-stock" },
   { nombre: "14-roles", url: "/modulos/roles" },
-  { nombre: "16-turnos", url: "/modulos/turnos" },
+  // Turnos arranca filtrado por "hoy" y "abiertas", así que su huella depende del
+  // día en que se corre. Para poder compararla contra una línea de base tomada
+  // otro día, se reponen las fechas de esa corrida y se vuelve a buscar.
+  { nombre: "16-turnos", url: "/modulos/turnos", fecha: arg("fecha-turnos", "2026-08-06") },
   { nombre: "18-usuarios", url: "/modulos/usuarios" },
   { nombre: "19-productos-fila-seleccionada", url: "/modulos/productos", clicPrimeraFila: true },
   { nombre: "20-edicion-rapida", url: "/modulos/productos/edicion-rapida" },
@@ -72,6 +75,20 @@ const EXTRAER = `(() => {
   const tablas = [...document.querySelectorAll("table")].map((tabla, indice) => {
     const ths = [...tabla.querySelectorAll("thead th")];
     const th0 = ths[0];
+    // El fondo del encabezado no lo pinta el <th>: lo pinta el <thead>
+    // (.sunmi-thead). Medir sólo el th da transparente siempre y hace aparecer
+    // una diferencia falsa en todas las pantallas. Tomamos el primer fondo
+    // opaco subiendo th → tr → thead, que es lo que se ve.
+    const fondoEfectivo = (el) => {
+      let n = el;
+      while (n && n !== document.documentElement) {
+        const c = cs(n).backgroundColor;
+        if (c && c !== "rgba(0, 0, 0, 0)" && c !== "transparent") return c;
+        if (n.tagName === "THEAD") break;
+        n = n.parentElement;
+      }
+      return el ? cs(el).backgroundColor : null;
+    };
     const filasEl = [...tabla.querySelectorAll("tbody tr")];
     const muestra = filasEl.slice(0, 3).map((tr) => {
       const td = tr.querySelector("td");
@@ -91,7 +108,7 @@ const EXTRAER = `(() => {
       columnas: ths.map((th) => (th.innerText || "").trim()),
       thAlign: ths.map((th) => cs(th).textAlign),
       thPad: th0 ? cs(th0).padding : null,
-      thFondo: th0 ? cs(th0).backgroundColor : null,
+      thFondo: th0 ? fondoEfectivo(th0) : null,
       filas: filasEl.length,
       muestra,
       anchoTabla: Math.round(tabla.getBoundingClientRect().width),
@@ -148,8 +165,14 @@ async function conectar() {
   await send("Page.enable");
   await send("Runtime.enable");
   await send("Network.enable");
+  // El ancho del viewport determina el ancho de las tablas: dos corridas con
+  // anchos distintos dan diferencias en anchoTabla que no son del código.
   await send("Emulation.setDeviceMetricsOverride", {
-    width: 1280, height: 800, deviceScaleFactor: 1, mobile: false,
+    // 1366x800 es el ancho con el que se tomó la línea de base de referencia.
+    width: Number(arg("ancho", "1366")),
+    height: Number(arg("alto", "800")),
+    deviceScaleFactor: 1,
+    mobile: false,
   });
 }
 
@@ -195,6 +218,19 @@ async function esperarTablaEstable(intentos = 40, intervalo = 400) {
   return previo;
 }
 
+// El perfil de Edge se reusa entre tandas, así que la cookie de sesión sobrevive.
+// Conviene aprovecharla: /api/login limita a 10 intentos cada 15 minutos por IP y
+// una corrida por tandas los consume enseguida.
+async function sesionVigente() {
+  await navegar(`${BASE}/login`);
+  const r = await evaluar(
+    `fetch("/api/contexto-activo/get", { credentials: "same-origin" })
+       .then((r) => r.status + "").catch(() => "err")`,
+    true
+  );
+  return r === "200";
+}
+
 async function iniciarSesion() {
   await navegar(`${BASE}/login`);
   const res = await evaluar(
@@ -208,6 +244,50 @@ async function iniciarSesion() {
   );
   if (res !== "200") throw new Error(`Login real falló con status ${res}`);
   log(`  login real OK como ${USUARIO}`);
+}
+
+// Un admin sin local fijo entra sin contexto operativo y el ERP lo desvía a
+// /inicio. Hay que fijar grupo activo y ubicación como haría el selector de la
+// interfaz, si no todas las pantallas de módulo redirigen y no hay tabla que medir.
+async function fijarContexto() {
+  const contexto = await evaluar(
+    `(async () => {
+       const j = (r) => r.json();
+       const grupos = await fetch("/api/grupos/listar", { credentials: "same-origin" }).then(j).catch(() => null);
+       const g = (grupos?.items || grupos?.grupos || [])[0];
+       if (g) {
+         await fetch("/api/grupo-activo/set", {
+           method: "POST", headers: { "Content-Type": "application/json" },
+           credentials: "same-origin", body: JSON.stringify({ grupoId: g.id }),
+         });
+       }
+       const locales = await fetch("/api/locales/listar", { credentials: "same-origin" }).then(j).catch(() => null);
+       const items = locales?.items || [];
+       // /api/locales/listar devuelve esDeposito (camelCase); toleramos ambas grafías.
+       const esDep = (l) => l.esDeposito === true || l.es_deposito === true;
+       const elegido = items.find(esDep) || items[0];
+       if (!elegido) return JSON.stringify({ error: "sin locales" });
+       const r = await fetch("/api/contexto-activo/set", {
+         method: "POST", headers: { "Content-Type": "application/json" },
+         credentials: "same-origin",
+         body: JSON.stringify({ localId: elegido.id, esDeposito: esDep(elegido) }),
+       });
+       return JSON.stringify({
+         grupo: g ? g.nombre : null,
+         local: elegido.nombre,
+         deposito: esDep(elegido),
+         disponibles: items.map((l) => l.nombre + (esDep(l) ? " (depósito)" : "")),
+         status: r.status,
+       });
+     })()`,
+    true
+  );
+  const c = JSON.parse(contexto);
+  if (c.error || c.status !== 200) {
+    throw new Error(`No se pudo fijar el contexto: ${contexto}`);
+  }
+  log(`  contexto: grupo ${c.grupo ?? "(ninguno)"}, local ${c.local}${c.deposito ? " (depósito)" : ""}`);
+  log(`  ubicaciones visibles: ${(c.disponibles || []).join(", ")}`);
 }
 
 // --- Corrida ----------------------------------------------------------------
@@ -230,7 +310,12 @@ process.on("SIGINT", () => { cerrar(); process.exit(130); });
 try {
   fs.mkdirSync(SALIDA, { recursive: true });
   await conectar();
-  await iniciarSesion();
+  if (await sesionVigente()) {
+    log("  sesión del perfil todavía vigente: no se repite el login");
+  } else {
+    await iniciarSesion();
+  }
+  await fijarContexto();
 
   const seleccion = TANDA
     ? PANTALLAS.slice((TANDA - 1) * TAM_TANDA, TANDA * TAM_TANDA)
@@ -248,6 +333,38 @@ try {
   log(`Tanda ${TANDA ?? "única"}: ${seleccion.length} pantallas → ${SALIDA}`);
   for (const p of seleccion) {
     await navegar(BASE + p.url);
+
+    if (p.fecha) {
+      // El formulario se monta después del readyState: hay que esperarlo.
+      let montado = false;
+      for (let i = 0; i < 40 && !montado; i++) {
+        await sleep(250);
+        montado = await evaluar(`!!document.getElementById("f-desde")`);
+      }
+      if (!montado) log(`  ${p.nombre}: el filtro de fechas nunca se montó`);
+
+      // React ignora una asignación directa a .value: hay que usar el setter
+      // nativo y disparar el evento para que el estado del componente se entere.
+      const ok = await evaluar(`(() => {
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        const poner = (id) => {
+          const el = document.getElementById(id);
+          if (!el) return false;
+          setter.call(el, ${JSON.stringify(p.fecha)});
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        };
+        const a = poner("f-desde"), b = poner("f-hasta");
+        const boton = [...document.querySelectorAll("button")]
+          .find((x) => (x.innerText || "").trim().toLowerCase() === "buscar");
+        if (boton) boton.click();
+        return a && b && !!boton;
+      })()`);
+      if (!ok) log(`  ${p.nombre}: no se pudieron reponer los filtros de fecha`);
+      await sleep(1200);
+    }
+
     const filas = await esperarTablaEstable();
 
     if (p.clicPrimeraFila) {
@@ -265,7 +382,8 @@ try {
     const { data } = await send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(path.join(SALIDA, `${p.nombre}.png`), Buffer.from(data, "base64"));
 
-    log(`  ${p.nombre}: ${huella.tablas.length} tabla(s), ${filas} fila(s)`);
+    const desvio = huella.url !== p.url ? `  ⚠ redirigido a ${huella.url}` : "";
+    log(`  ${p.nombre}: ${huella.tablas.length} tabla(s), ${filas} fila(s)${desvio}`);
   }
 
   fs.writeFileSync(archivo, JSON.stringify(huellas, null, 1));
