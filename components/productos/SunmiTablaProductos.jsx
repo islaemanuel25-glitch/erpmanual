@@ -10,7 +10,7 @@ import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
 
-import { Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Warehouse, Eye, Power, PowerOff } from "lucide-react";
+import { Pencil, Trash2, Warehouse, Eye, Power, PowerOff } from "lucide-react";
 
 // Campos que se pueden ordenar desde el backend
 const SORTABLE_KEYS = [
@@ -239,39 +239,33 @@ export default function SunmiTablaProductos({
     })
     .filter(Boolean);
 
-  const headers = [
-    ...columnas.map((c) => {
-      const isSortable = SORTABLE_KEYS.includes(c.key);
-      const isActive = sortKey === c.key;
-
-      const sortIcon = isSortable
-        ? isActive
-          ? sortDir === "asc"
-            ? <ArrowUp size={11} className="inline ml-0.5" />
-            : <ArrowDown size={11} className="inline ml-0.5" />
-          : <ArrowUpDown size={11} className="inline ml-0.5 opacity-30" />
-        : null;
-
-      const label = (
-        <span
-          className={isSortable ? "cursor-pointer select-none hover:text-[var(--pos-accent)] transition-colors" : ""}
-          onClick={isSortable ? () => onSort?.(c.key) : undefined}
-        >
-          {c.titulo}
-          {sortIcon}
-        </span>
-      );
-
-      // Siempre devolver { label, className } para que SunmiTable renderice el encabezado (si no hay thClass, h.label era undefined)
-      return { label, className: c.thClass || "" };
-    }),
-    { label: "Acciones", className: "w-[80px]" },
+  // El ordenamiento ya no se contrabandea dentro de `headers[].label`: se
+  // declara. `ordenable` le dice a SunmiTable que dibuje el control y avise por
+  // `onSort`; la flecha, el estado activo y el hover los pone la tabla.
+  //
+  // `onSort` sigue recibiendo la clave como primer argumento, que es lo único
+  // que mira la pantalla de productos: la dirección la decide ella al alternar.
+  const columnasTabla = [
+    ...columnas.map((c) => ({
+      clave: c.key,
+      titulo: c.titulo,
+      ordenable: SORTABLE_KEYS.includes(c.key),
+      thClassName: c.thClass || "",
+    })),
+    { clave: "__acciones", titulo: "Acciones", thClassName: "w-[80px]" },
   ];
-  const colSpan = headers.length;
+  const colSpan = columnasTabla.length;
 
   return (
     <div className="rounded-xl border sunmi-border overflow-hidden">
-      <SunmiTable headers={headers} stickyHeader scrollId="productos-scroll">
+      <SunmiTable
+        columnas={columnasTabla}
+        ordenClave={sortKey}
+        ordenDir={sortDir}
+        onSort={(clave) => onSort?.(clave)}
+        stickyHeader
+        scrollId="productos-scroll"
+      >
         {rows.length === 0 ? (
           <SunmiTableEmpty message="No hay productos disponibles" colSpan={colSpan} />
         ) : (
@@ -282,9 +276,12 @@ export default function SunmiTablaProductos({
             <SunmiTableRow
               key={row.id}
               onClick={onSelectProducto ? () => onSelectProducto(row.id) : undefined}
-              // Seleccionado: amarillo suave persistente (!important para que gane
-              // al hover). No seleccionado: hover normal de SunmiTableRow.
-              className={`transition-colors ${isSelected ? "!bg-amber-400/30" : ""}`}
+              // El tinte de la fila elegida sale del acento del theme y el hover
+              // se compone encima. Antes era `!bg-amber-400/30`: un color fijo
+              // fuera del sistema de themes y un `!important` que además le
+              // apagaba el hover a la fila seleccionada.
+              tono={isSelected ? "atencion-fuerte" : null}
+              className="transition-colors"
             >
               {columnas.map((c) => (
                 <td

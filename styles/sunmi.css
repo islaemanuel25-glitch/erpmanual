@@ -349,6 +349,31 @@
   border: 1px solid color-mix(in srgb, var(--pos-success) 30%, transparent);
 }
 
+/* --- Tono de fila de tabla ---------------------------------------------
+   El tono ocupa `background-color` y el hover ocupa `background-image`. Al ser
+   propiedades distintas, el hover se PINTA ENCIMA del tono en vez de
+   reemplazarlo: la fila teñida sigue respondiendo al mouse y ninguna pantalla
+   necesita `!important` para que su color sobreviva.
+
+   Sin la clase `sunmi-fila` nada de esto se activa, así que las filas que ya
+   existen quedan exactamente como estaban. */
+.sunmi-fila { background-color: var(--fila-tono, transparent); }
+.sunmi-fila:hover,
+.sunmi-fila-seleccionada {
+  background-image: linear-gradient(var(--table-row-hover), var(--table-row-hover));
+}
+.sunmi-fila-ok       { --fila-tono: color-mix(in srgb, var(--pos-success) 8%, transparent); }
+.sunmi-fila-alerta   { --fila-tono: color-mix(in srgb, var(--pos-danger) 8%, transparent); }
+.sunmi-fila-atencion { --fila-tono: color-mix(in srgb, var(--pos-accent) 8%, transparent); }
+/* La variante fuerte existe porque el código real usa dos intensidades: un tinte
+   de fondo para un estado ambiente —guardada, con error, editada— y uno mucho
+   más marcado para la fila que el usuario tiene elegida en este momento. Con una
+   sola intensidad, o la selección no se ve o el estado ambiente grita. */
+.sunmi-fila-atencion-fuerte { --fila-tono: color-mix(in srgb, var(--pos-accent) 30%, transparent); }
+/* "Apagado" no pinta: atenúa. Es lo que se quiere para una fila anulada, que
+   tiene que seguir legible y auditable sin competir con las vigentes. */
+.sunmi-fila-apagado  { opacity: 0.6; }
+
 /* --- Control (stepper ±, placeholder img) --- */
 .sunmi-control       { background: var(--pos-control-bg); color: var(--pos-control-text); }
 .sunmi-control:hover { background: var(--pos-control-hover); }

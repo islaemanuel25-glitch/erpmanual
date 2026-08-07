@@ -203,9 +203,13 @@ export default function TurnosPage() {
   ];
 
   // Las anuladas se atenúan para que no compitan visualmente con las cajas
-  // reales, pero siguen visibles y auditables.
-  const claseFila = (t) =>
-    (t.estado ?? estadoDelTurno(t)) === ESTADO_TURNO.ANULADO ? "opacity-60" : "";
+  // reales, pero siguen visibles y auditables. Va como tono de fila: atenuar
+  // con una clase suelta dejaba a la fila sin hover, y una caja anulada se
+  // sigue queriendo poder señalar con el mouse.
+  const esAnulada = (t) => (t.estado ?? estadoDelTurno(t)) === ESTADO_TURNO.ANULADO;
+  const tonoFila = (t) => (esAnulada(t) ? "apagado" : null);
+  /** En móvil la caja es una tarjeta, no una fila: ahí la atenuación va directa. */
+  const claseFila = (t) => (esAnulada(t) ? "opacity-60" : "");
 
   // Franja compacta: encabezado + filtros. En escritorio entra todo en una fila;
   // en móvil las fechas van a la par y el resto a ancho completo. Sin separador
@@ -377,7 +381,7 @@ export default function TurnosPage() {
             <div className="hidden xl:block">
               <SunmiTable headers={headers}>
                 {turnos.map((t) => (
-                    <SunmiTableRow key={t.id} className={claseFila(t)}>
+                    <SunmiTableRow key={t.id} tono={tonoFila(t)}>
                       <td className="px-3 py-2 text-sm">
                         <EtiquetaEstado turno={t} />
                       </td>

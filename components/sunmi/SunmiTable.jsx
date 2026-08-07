@@ -1,6 +1,85 @@
 "use client";
 
+// LA TABLA DE SUNMI.
+//
+// ── DOS MODOS, Y EL VIEJO NO SE TOCA ────────────────────────────────────────
+//
+// MODO CLÁSICO: `headers` + los `<tr>` como hijos. Es como funcionó siempre y
+// es lo que usan las pantallas que ya existen. Ninguna cambia.
+//
+// MODO POR COLUMNAS: `columnas` + `filas`. La tabla arma las celdas ella misma
+// y con eso puede hacer lo que antes cada pantalla resolvía a mano: alinear
+// números a la derecha, ordenar por encabezado, teñir una fila según su estado,
+// colgarle un detalle debajo, y mostrar el cargando y el vacío.
+//
+// El modo se elige solo: si viene `columnas`, manda el modo por columnas.
+//
+// ── TODO LO NUEVO ENTRA APAGADO ─────────────────────────────────────────────
+//
+// Cada agregado tiene un default que reproduce el comportamiento actual:
+// `densidad="normal"` da el mismo padding de siempre, `align` por defecto es
+// izquierda, y sin `ordenable`, `tonoFila` ni `filaExpandible` no se dibuja
+// nada extra. Es la misma regla con la que se sumó `stickyHeader` sin que se
+// moviera una sola pantalla.
+//
+// ── LO QUE A PROPÓSITO NO ESTÁ ──────────────────────────────────────────────
+//
+// No hay prop `className`. Tres pantallas se lo pasan hoy y se ignora en
+// silencio; implementarlo les cambiaría el aspecto solo por existir.
+// `headers[].label` sigue aceptando cualquier nodo React: hay pantallas que
+// meten ahí su propio control y romperlas no aporta nada.
+
+import { Fragment } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import SunmiTableRow from "./SunmiTableRow";
+import SunmiTableEmpty from "./SunmiTableEmpty";
+
+/** El padding de cada densidad. "normal" es exactamente el de siempre. */
+const DENSIDAD = {
+  compacta: { th: "px-2 py-1", td: "px-2 py-1" },
+  normal: { th: "px-2 py-1.5", td: "px-2 py-1.5" },
+  comoda: { th: "px-3 py-2.5", td: "px-3 py-2.5" },
+};
+
+const ALINEACION = { izq: "text-left", der: "text-right", centro: "text-center" };
+
+/**
+ * El encabezado de una columna ordenable.
+ *
+ * La flecha dice tres cosas distintas: hacia arriba que se está ordenando
+ * ascendente por acá, hacia abajo que descendente, y la doble apagada que esta
+ * columna se puede ordenar pero no es la que manda. Sin ese tercer estado no se
+ * sabe qué columnas son clickeables hasta probarlas.
+ */
+function TituloOrdenable({ columna, ordenClave, ordenDir, onSort }) {
+  const activa = ordenClave === columna.clave;
+  const siguiente = activa && ordenDir === "asc" ? "desc" : "asc";
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={() => onSort?.(columna.clave, siguiente)}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onSort?.(columna.clave, siguiente);
+      }}
+      aria-label={`Ordenar por ${columna.titulo}`}
+      className="cursor-pointer select-none hover:text-[var(--pos-accent)] transition-colors"
+    >
+      {columna.titulo}
+      {activa ? (
+        ordenDir === "asc"
+          ? <ArrowUp size={11} className="inline ml-0.5" />
+          : <ArrowDown size={11} className="inline ml-0.5" />
+      ) : (
+        <ArrowUpDown size={11} className="inline ml-0.5 opacity-30" />
+      )}
+    </span>
+  );
+}
 
 export default function SunmiTable({
   headers = [],
@@ -10,9 +89,104 @@ export default function SunmiTable({
   stickyHeader = false,
   maxHeightClass = "max-h-[70dvh]",
   scrollId,
+
+  // ── Modo por columnas. Todo opcional. ────────────────────────────────────
+  /** [{ clave, titulo, align, render, ordenable, thClassName, tdClassName, title }] */
+  columnas,
+  filas,
+  claveFila,
+  densidad = "normal",
+  cargando = false,
+  vacio,
+  onSort,
+  ordenClave,
+  ordenDir,
+  /** (fila) => "ok" | "alerta" | "atencion" | "apagado" | null */
+  tonoFila,
+  /** (fila) => ReactNode | null. Devolver null es "esta fila no está abierta". */
+  filaExpandible,
+  onClickFila,
+  filaSeleccionada,
 }) {
   const { theme } = useSunmiTheme();
   const theadBase = theme.table?.headerClass || "sunmi-thead";
+  const d = DENSIDAD[densidad] ?? DENSIDAD.normal;
+
+  // `columnas` declara los ENCABEZADOS. Quién dibuja el CUERPO lo decide
+  // `filas`: con filas lo dibuja la tabla, sin filas siguen mandando los hijos.
+  //
+  // Esa separación es la que permite migrar de a poco. Una pantalla con una
+  // columna de acciones complicada puede declarar sus columnas —y con eso
+  // ganar el ordenamiento y la alineación— sin tener que reescribir sus celdas
+  // el mismo día.
+  const porColumnas = Array.isArray(columnas) && columnas.length > 0;
+  const cuerpoPropio = porColumnas && Array.isArray(filas);
+
+  // Los encabezados. En modo clásico se respeta la firma vieja al pie de la
+  // letra, incluido que `label` pueda ser JSX.
+  const encabezados = porColumnas
+    ? columnas.map((c) => ({
+        label: c.ordenable ? (
+          <TituloOrdenable columna={c} ordenClave={ordenClave} ordenDir={ordenDir} onSort={onSort} />
+        ) : (
+          c.titulo
+        ),
+        className: `${ALINEACION[c.align] ?? ALINEACION.izq} ${c.thClassName || ""}`.trim(),
+      }))
+    : headers;
+
+  const columnasTotales = porColumnas ? columnas.length : headers.length || 50;
+
+  const cuerpo = () => {
+    if (!cuerpoPropio) return children;
+    if (cargando) return <SunmiTableEmpty message="Cargando…" colSpan={columnasTotales} />;
+    if (!filas || filas.length === 0) {
+      return vacio !== undefined && typeof vacio !== "string" ? (
+        <tr>
+          <td colSpan={columnasTotales} className="text-center py-3 sunmi-text-muted text-[12px] italic">
+            {vacio}
+          </td>
+        </tr>
+      ) : (
+        <SunmiTableEmpty message={vacio ?? undefined} colSpan={columnasTotales} />
+      );
+    }
+
+    return filas.map((fila, i) => {
+      const clave = claveFila ? claveFila(fila, i) : (fila?.id ?? i);
+      const detalle = filaExpandible ? filaExpandible(fila) : null;
+      return (
+        <Fragment key={clave}>
+          <SunmiTableRow
+            tono={tonoFila ? tonoFila(fila) : null}
+            selected={filaSeleccionada ? filaSeleccionada(fila) : false}
+            onClick={onClickFila ? () => onClickFila(fila) : undefined}
+          >
+            {columnas.map((c) => (
+              <td
+                key={c.clave}
+                className={`${d.td} ${ALINEACION[c.align] ?? ALINEACION.izq} ${c.tdClassName || ""}`.trim()}
+                title={c.title ? c.title(fila) : undefined}
+              >
+                {c.render ? c.render(fila) : (fila?.[c.clave] ?? "—")}
+              </td>
+            ))}
+          </SunmiTableRow>
+
+          {/* El detalle cuelga de la fila y ocupa el ancho entero. Que la
+              pantalla devuelva null es lo que dice "esta fila está cerrada":
+              así el estado de apertura vive donde vive el dato, no acá. */}
+          {detalle ? (
+            <tr>
+              <td colSpan={columnasTotales} className="p-0">
+                {detalle}
+              </td>
+            </tr>
+          ) : null}
+        </Fragment>
+      );
+    });
+  };
 
   return (
     <div
@@ -27,16 +201,18 @@ export default function SunmiTable({
         "
       >
         {/* ===== HEADER ===== */}
-        {headers.length > 0 && (
+        {encabezados.length > 0 && (
           <thead className={stickyHeader ? `${theadBase} sticky top-0 z-20` : theadBase}>
             <tr>
-              {headers.map((h, i) => {
+              {encabezados.map((h, i) => {
                 const label = typeof h === "string" ? h : h.label;
                 const extra = typeof h === "string" ? "" : (h.className || "");
+                // `text-left` va primero para que un `text-right` de la columna
+                // lo pise; si fuera al revés ninguna alineación funcionaría.
                 return (
                   <th
                     key={i}
-                    className={`px-2 py-1.5 text-left font-semibold whitespace-nowrap ${extra}`}
+                    className={`${d.th} text-left font-semibold whitespace-nowrap ${extra}`}
                   >
                     {label}
                   </th>
@@ -50,9 +226,10 @@ export default function SunmiTable({
         <tbody
           className="divide-y sunmi-divide"
         >
-          {children}
+          {cuerpo()}
         </tbody>
       </table>
     </div>
   );
 }
+

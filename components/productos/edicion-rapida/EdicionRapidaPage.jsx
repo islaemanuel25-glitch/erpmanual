@@ -457,14 +457,27 @@ export default function EdicionRapidaPage() {
   // =========================================================
   // Row style por estado
   // =========================================================
-  const getRowClassName = (id) => {
+  // El estado de la fila se dice con el tono de SunmiTableRow, no con una clase
+  // que le gane al hover. Antes hacían falta tres `!important` y la fila teñida
+  // dejaba de responder al mouse; ahora el hover se compone encima del tono y
+  // los colores salen del theme en vez de estar escritos a mano.
+  const getRowTono = (id) => {
     const s = rowStatus[id];
     const hasE = edits[id] && Object.keys(edits[id]).length > 0;
-    if (s === "saving") return "opacity-70";
-    if (s === "saved") return "!bg-emerald-500/5";
-    if (s === "error") return "!bg-red-500/5";
-    if (hasE) return "!bg-amber-500/5 border-l-2 border-l-amber-400";
-    return "";
+    if (s === "saving") return "apagado";
+    if (s === "saved") return "ok";
+    if (s === "error") return "alerta";
+    if (hasE) return "atencion";
+    return null;
+  };
+
+  /** Lo que no es tono: la barra lateral de la fila con cambios sin guardar. */
+  const getRowClassName = (id) => {
+    const hasE = edits[id] && Object.keys(edits[id]).length > 0;
+    const s = rowStatus[id];
+    return hasE && s !== "saving" && s !== "saved" && s !== "error"
+      ? "border-l-2 border-l-[var(--pos-accent)]"
+      : "";
   };
 
   // =========================================================
@@ -945,7 +958,11 @@ export default function EdicionRapidaPage() {
                     rows.map((row, rowIdx) => {
                       const hasEdits = edits[row.id] && Object.keys(edits[row.id]).length > 0;
                       return (
-                        <SunmiTableRow key={row.id} className={getRowClassName(row.id)}>
+                        <SunmiTableRow
+                          key={row.id}
+                          tono={getRowTono(row.id)}
+                          className={getRowClassName(row.id)}
+                        >
                           {puedeEditar && (
                             <td className="px-2 py-1 align-middle w-8">
                               <input
