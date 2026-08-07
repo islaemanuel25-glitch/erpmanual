@@ -15,6 +15,15 @@
 // reemplazarlo. Nadie necesita `!important` y la fila teñida sigue reaccionando
 // al mouse. Los colores salen de `--pos-*`, así que acompañan al theme.
 //
+// ── QUÉ COLOR Y CUÁNTO SON DOS PREGUNTAS ────────────────────────────────────
+//
+// `tono` dice qué estado tiene la fila y `intensidad` cuánto se nota. Están
+// separados porque son decisiones independientes: la misma fila "con cambios sin
+// guardar" se pinta suave en una pantalla que muestra veinte a la vez y fuerte
+// en la que el usuario acaba de elegir. Con un solo eje habría que inventar un
+// valor por combinación —"atencion-fuerte", "ok-fuerte", …— y cada pantalla
+// nueva agregaría el suyo.
+//
 // ── COMPATIBILIDAD ──────────────────────────────────────────────────────────
 //
 // Sin `tono` la fila produce exactamente las mismas clases que antes. Las
@@ -27,9 +36,11 @@ export default function SunmiTableRow({
   className = "",
   /** "ok" | "alerta" | "atencion" | "apagado" | null */
   tono = null,
+  /** "ambiente" | "fuerte". Ambiente es lo de siempre. */
+  intensidad = "ambiente",
 }) {
   const fondo = tono
-    ? `sunmi-fila sunmi-fila-${tono}${selected ? " sunmi-fila-seleccionada" : ""}`
+    ? `sunmi-fila sunmi-fila-${tono} sunmi-fila-${intensidad}${selected ? " sunmi-fila-seleccionada" : ""}`
     : selected
       ? "bg-[var(--table-row-hover)]"
       : "hover:bg-[var(--table-row-hover)]";

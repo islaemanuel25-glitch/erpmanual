@@ -280,7 +280,8 @@ export default function SunmiTablaProductos({
               // se compone encima. Antes era `!bg-amber-400/30`: un color fijo
               // fuera del sistema de themes y un `!important` que además le
               // apagaba el hover a la fila seleccionada.
-              tono={isSelected ? "atencion-fuerte" : null}
+              tono={isSelected ? "atencion" : null}
+              intensidad="fuerte"
               className="transition-colors"
             >
               {columnas.map((c) => (
