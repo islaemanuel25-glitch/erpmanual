@@ -2,13 +2,17 @@
 // local con turno ABIERTO, ventas corregibles + casos de bloqueo, y un local
 // AJENO con su propia venta (para verificar que el buscador NO cruza locales).
 // Imprime IDs + cookies (JWT admin + contexto) para el driver CDP.
-// Uso: DATABASE_URL=<test> AUTH_SECRET=<.env> node scripts/manual-seed.mjs
+// GUARDA: hace TRUNCATE de todas las tablas. Ver scripts/guardaSeedDestructivo.mjs;
+// exige servidor local, base en la lista blanca y SEED_DESTRUCTIVO igual al nombre.
+// Uso: SEED_DESTRUCTIVO=erpazul_correccion_test AUTH_SECRET=<.env> \
+//      DATABASE_URL=postgresql://…/erpazul_correccion_test node scripts/manual-seed.mjs
 
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
+import { exigirBaseDescartable } from "./guardaSeedDestructivo.mjs";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) { console.error("ABORT: no test DB"); process.exit(2); }
+exigirBaseDescartable();
+const url = process.env.DATABASE_URL;
 const AUTH_SECRET = process.env.AUTH_SECRET;
 const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
 

@@ -1,14 +1,17 @@
 // Seed de la PRUEBA MANUAL en TELÉFONO REAL (solo DB aislada). Crea 2 usuarios
 // con login real (bcrypt), un local de prueba + local ajeno, y los escenarios
 // MOBILE-01..12. Imprime el mapeo (ventaId/numero) para el checklist.
-// GUARDA: solo escribe en la DB cuyo nombre contenga "test" (guard).
-// Uso: DATABASE_URL=<...test...> node scripts/mobile-seed.mjs
+// GUARDA: hace TRUNCATE de todas las tablas. Ver scripts/guardaSeedDestructivo.mjs;
+// exige servidor local, base en la lista blanca y SEED_DESTRUCTIVO igual al nombre.
+// Uso: SEED_DESTRUCTIVO=erpazul_correccion_test \
+//      DATABASE_URL=postgresql://…/erpazul_correccion_test node scripts/mobile-seed.mjs
 
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
+import { exigirBaseDescartable } from "./guardaSeedDestructivo.mjs";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) { console.error("ABORT: DATABASE_URL no es la DB aislada (guard /test/)."); process.exit(2); }
+exigirBaseDescartable();
+const url = process.env.DATABASE_URL;
 const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
 
 const PERMS_TESTER = ["reportes.ver", "ventas.corregir_simple", "ventas.corregir_completa", "pos.usar"];
