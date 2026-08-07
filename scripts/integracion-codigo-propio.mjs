@@ -5,20 +5,18 @@
 // Contra dev server + DB test (mismo setup que integracion-editar-propiedad.mjs).
 //
 // Uso:
-//   DATABASE_URL="postgresql://.../erpazul_cbpropio_test?schema=public" \
+//   DATABASE_URL="postgresql://.../erpazul_term_test?schema=public" \
 //   AUTH_SECRET="<.env>" RBAC_BASE_URL="http://localhost:3041" \
 //   node scripts/integracion-codigo-propio.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) { console.error("ABORT: DATABASE_URL no apunta a *test*."); process.exit(2); }
 const AUTH_SECRET = process.env.AUTH_SECRET;
 if (!AUTH_SECRET) { console.error("ABORT: falta AUTH_SECRET."); process.exit(2); }
 const BASE = process.env.RBAC_BASE_URL || "http://localhost:3041";
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 
 let pass = 0, fail = 0;
 const S = {};

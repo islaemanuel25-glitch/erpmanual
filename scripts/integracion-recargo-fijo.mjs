@@ -11,12 +11,10 @@
 //   DATABASE_URL="postgresql://.../erpazul_term_test?schema=public" \
 //   node scripts/integracion-recargo-fijo.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 import { actualizarCostoRealProducto } from "../lib/compras-proveedor/costoMaestro.js";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) { console.error("ABORT: DATABASE_URL no apunta a *test*."); process.exit(2); }
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 
 let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { if (c) { console.log(`✔ ${n}`); pass++; } else { console.log(`✖ ${n} ${d}`); fail++; } };

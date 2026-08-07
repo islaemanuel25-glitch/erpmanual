@@ -5,18 +5,16 @@
 //  - No hay DUPLICACIÓN: un producto vendido suelto Y dentro de un combo queda
 //    partido entre VentaDetalle (suelto) y VentaDetalleComponente (combo), y la
 //    suma == el descuento real de StockLocal.
-// Uso: DATABASE_URL=<test> AUTH_SECRET=<.env> RBAC_BASE_URL=http://localhost:3011 node scripts/evidencia-consumo-congelado.mjs
+// Uso: DATABASE_URL=...erpazul_term_test AUTH_SECRET=<.env> RBAC_BASE_URL=http://localhost:3011 node scripts/evidencia-consumo-congelado.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { planConsumoVenta } from "../lib/combos/planConsumoVenta.js";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) { console.error("ABORT: no test DB"); process.exit(2); }
 const AUTH_SECRET = process.env.AUTH_SECRET;
 const BASE = process.env.RBAC_BASE_URL || "http://localhost:3011";
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 let pass = 0, fail = 0;
 const ok = (n, c, d = "") => { if (c) { console.log(`✔ ${n}`); pass++; } else { console.log(`✖ ${n} ${d}`); fail++; } };
 const S = {};

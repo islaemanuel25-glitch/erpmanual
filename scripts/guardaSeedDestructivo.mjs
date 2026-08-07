@@ -48,12 +48,21 @@ const HOSTS_LOCALES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
  * "test".
  */
 const BASES_DESCARTABLES = new Set([
-  // Base de trabajo de los arneses de integración, que ya la truncan ellos.
+  // Base de trabajo de los 23 arneses de integración, que la truncan y la
+  // reconstruyen en cada corrida. Es la única que usan: antes cada arnés
+  // nombraba la suya y cuatro de esos nombres ni siquiera existían.
   "erpazul_term_test",
   // Dedicada a la prueba manual de corrección de ventas. Si no existe, crearla:
   //   createdb erpazul_correccion_test && prisma migrate deploy
   "erpazul_correccion_test",
+  // Destino de setup-db-test.js, que la recrea entera con `prisma db push`.
+  // Ya era de usar y tirar antes de estar en esta lista.
+  "erpazul_migration_test",
 ]);
+
+// NO ENTRAN, aunque el nombre tenga "test": erpazul_combos_manual_test y
+// erpazul_migrate_test guardan escenarios armados a mano. La guarda vieja
+// —"test" como subcadena— las dejaba vaciar; por eso se cambió.
 
 function abortar(motivo, detalle = "") {
   console.error(`ABORTADO: ${motivo}`);

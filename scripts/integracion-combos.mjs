@@ -1,21 +1,17 @@
 // Harness de integración de COMBOS contra PostgreSQL REAL (base de test aislada).
-// Uso: DATABASE_URL="postgresql://.../erpazul_combos_test?schema=public" node scripts/integracion-combos.mjs
-// NUNCA producción: aborta si el nombre de base no contiene "test".
+// Uso: DATABASE_URL="postgresql://.../erpazul_term_test?schema=public" node scripts/integracion-combos.mjs
+// NUNCA producción: la base tiene que estar en la lista blanca de
+// scripts/guardaSeedDestructivo.mjs y el servidor tiene que ser local.
 //
 // Verifica: constraints reales de E1 (CHECK mismo-local, FK Cascade/Restrict/SetNull),
 // venta real de combos (consolidación, VentaDetalle/VentaDetalleComponente, costo),
 // rollback total, concurrencia real (FOR UPDATE + advisory) y no-regresión normal.
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import { crearCombo, getCombo, cambiarEstadoCombo } from "../lib/combos/service.js";
 import { construirLineasComerciales, aplicarConsumoStock } from "../lib/combos/ventaConsumo.js";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) {
-  console.error("ABORT: DATABASE_URL no apunta a una base de *test*. url=", url.replace(/:\/\/[^@]*@/, "://***@"));
-  process.exit(2);
-}
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 let pass = 0, fail = 0;
 async function run(name, fn) {

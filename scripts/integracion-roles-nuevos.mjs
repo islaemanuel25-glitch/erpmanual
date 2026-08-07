@@ -3,27 +3,22 @@
 // estricto por local, los guards de rol de sistema (esSistema) y localId obligatorio.
 //
 // Uso:
-//   DATABASE_URL="postgresql://.../erpazul_roles_test?schema=public" \
+//   DATABASE_URL="postgresql://.../erpazul_term_test?schema=public" \
 //   AUTH_SECRET="<el del .env>" RBAC_BASE_URL="http://localhost:3011" \
 //   node scripts/integracion-roles-nuevos.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { DEFAULT_PERMISOS_SISTEMA, CAJERO, ENCARGADO, DUENO_LOCAL } from "../lib/rbac/systemRoles.js";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) {
-  console.error("ABORT: DATABASE_URL no apunta a una base de *test*.");
-  process.exit(2);
-}
 const AUTH_SECRET = process.env.AUTH_SECRET;
 if (!AUTH_SECRET) {
   console.error("ABORT: falta AUTH_SECRET.");
   process.exit(2);
 }
 const BASE = process.env.RBAC_BASE_URL || "http://localhost:3011";
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 let pass = 0, fail = 0;
 const S = {};

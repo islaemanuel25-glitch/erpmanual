@@ -1,17 +1,15 @@
 // Harness de integración: PAGOS MÚLTIPLES (pago dividido) end-to-end.
 // crear con pagos[] → tenders persistidos + agregación de cierre por tender.
-// Uso: DATABASE_URL=<test> AUTH_SECRET=<.env> RBAC_BASE_URL=http://localhost:3011 node scripts/integracion-pagos-multiples.mjs
+// Uso: DATABASE_URL=...erpazul_term_test AUTH_SECRET=<.env> RBAC_BASE_URL=http://localhost:3011 node scripts/integracion-pagos-multiples.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { DEFAULT_PERMISOS_SISTEMA, DUENO_LOCAL } from "../lib/rbac/systemRoles.js";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) { console.error("ABORT: no test DB"); process.exit(2); }
 const AUTH_SECRET = process.env.AUTH_SECRET;
 const BASE = process.env.RBAC_BASE_URL || "http://localhost:3011";
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 let pass = 0, fail = 0;
 const S = {};
 const ok = (n, c, d = "") => { if (c) { console.log(`✔ ${n}`); pass++; } else { console.log(`✖ ${n} ${d}`); fail++; } };

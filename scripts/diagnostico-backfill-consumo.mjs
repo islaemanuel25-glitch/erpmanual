@@ -20,13 +20,11 @@
 //
 // SEED=1 crea fixtures sintéticas (una por categoría) para ejercitar el
 // clasificador en la DB aislada. Sin SEED, clasifica lo que ya exista.
-// Uso: DATABASE_URL=<...test...> [SEED=1] node scripts/diagnostico-backfill-consumo.mjs
+// Uso: DATABASE_URL=...erpazul_term_test [SEED=1] node scripts/diagnostico-backfill-consumo.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) { console.error("ABORT: DATABASE_URL no es una DB de test (guard /test/)."); process.exit(2); }
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 
 const SEED = process.env.SEED === "1";
 

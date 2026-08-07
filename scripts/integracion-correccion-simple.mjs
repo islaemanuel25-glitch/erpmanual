@@ -10,16 +10,14 @@
 //   · Venta FIADA: cambiar cliente → 409 requiere_correccion_completa; observaciones OK.
 //   · Sin permiso → 403; venta ajena (no-admin) → 404; fuera de ventana 30d → 409.
 //   · Detalle: puedeCorregirSimple=true dentro de ventana; puedeCorregirCompleta=false.
-// Uso: DATABASE_URL=<test> AUTH_SECRET=<.env> RBAC_BASE_URL=http://localhost:3011 node scripts/integracion-correccion-simple.mjs
+// Uso: DATABASE_URL=...erpazul_term_test AUTH_SECRET=<.env> RBAC_BASE_URL=http://localhost:3011 node scripts/integracion-correccion-simple.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) { console.error("ABORT: no test DB"); process.exit(2); }
 const AUTH_SECRET = process.env.AUTH_SECRET;
 const BASE = process.env.RBAC_BASE_URL || "http://localhost:3011";
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 let pass = 0, fail = 0;
 const S = {};
 const ok = (n, c, d = "") => { if (c) { console.log(`✔ ${n}`); pass++; } else { console.log(`✖ ${n} ${d}`); fail++; } };

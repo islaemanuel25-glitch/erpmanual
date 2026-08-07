@@ -5,29 +5,24 @@
 //   1) Base aislada de test (el nombre DEBE contener "test"). Aborta si no.
 //   2) Un dev server de Next corriendo en BASE_URL apuntando a ESA misma base.
 // Uso:
-//   DATABASE_URL="postgresql://.../erpazul_rbac_test?schema=public" \
+//   DATABASE_URL="postgresql://.../erpazul_term_test?schema=public" \
 //   AUTH_SECRET="<el del .env>" RBAC_BASE_URL="http://localhost:3000" \
 //   node scripts/integracion-rbac.mjs
 //
 // Firma cookies JWT como el login real (jsonwebtoken + AUTH_SECRET), sin importar
 // código con alias @/ (que node no resuelve).
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
-const url = process.env.DATABASE_URL || "";
-if (!/test/i.test(url)) {
-  console.error("ABORT: DATABASE_URL no apunta a una base de *test*.");
-  process.exit(2);
-}
 const AUTH_SECRET = process.env.AUTH_SECRET;
 if (!AUTH_SECRET) {
   console.error("ABORT: falta AUTH_SECRET (usá el mismo que el dev server).");
   process.exit(2);
 }
 const BASE = process.env.RBAC_BASE_URL || "http://localhost:3000";
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 let pass = 0, fail = 0;
 const S = {};
