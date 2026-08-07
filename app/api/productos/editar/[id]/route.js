@@ -98,7 +98,8 @@ async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
 
   const base = await prisma.productoBase.findUnique({
     where: { id: baseId },
-    select: { margen: true, redondeo_100: true },
+    // unidad y factor los necesita la regla de recargo fijo por unidad.
+    select: { margen: true, redondeo_100: true, unidad_medida: true, factor_pack: true },
   });
 
   if (!base) return;
@@ -114,6 +115,8 @@ async function syncFromBaseToLocales(baseId, { precioCosto, activo }) {
       costo: precioCosto,
       margenBase: base.margen,
       redondeo100: base.redondeo_100 === true,
+      unidadMedida: base.unidad_medida,
+      factorPack: base.factor_pack,
     });
 
     const enRiesgo = propagacion.sinMargen.filter((x) => x.bajoCosto);
@@ -320,7 +323,7 @@ export async function PUT(req, context) {
     // código propio en la MISMA ubicación operante, cualquiera sea la ruta).
     let resp;
     if (ruta === "base") {
-      resp = await editarBase(baseId, baseData, operandoEnLocalId);
+      resp = await editarBase(baseId, baseData, operandoEnLocalId, localData);
     } else {
       // ruta === "override": producto de depósito editado desde un local. Solo se
       // persiste el override. Si el payload intenta cambiar la ficha maestra (que este
@@ -383,7 +386,7 @@ function validarModoPedido(modoPedido, unidadMedida, factorPack) {
   return "BULTO";
 }
 
-async function editarBase(baseId, baseData, operandoEnLocalId = null) {
+async function editarBase(baseId, baseData, operandoEnLocalId = null, localData = null) {
   const dataFinal = {
     nombre: baseData.nombre,
     descripcion: baseData.descripcion,
@@ -543,6 +546,22 @@ async function editarBase(baseId, baseData, operandoEnLocalId = null) {
     },
   });
 
+  // La regla de precio es POR UBICACIÓN, así que se guarda solo en la del dueño que
+  // está editando, nunca en las demás. Va aparte del updateMany de arriba —que
+  // alcanza también al depósito— justamente para no imponerle una regla a nadie.
+  if (Number.isInteger(opId) && opId > 0 && localData?.reglaPrecio !== undefined) {
+    await prisma.productoLocal.updateMany({
+      where: { baseId, localId: opId },
+      data: {
+        reglaPrecio: localData.reglaPrecio,
+        recargoFijoUnidad:
+          localData.reglaPrecio === "MARGEN_PORCENTUAL"
+            ? null
+            : localData.recargoFijoUnidad ?? undefined,
+      },
+    });
+  }
+
   return NextResponse.json({
     ok: true,
     item: mergeBaseLocalToUi(updated, null),
@@ -567,6 +586,14 @@ async function editarOverride(baseId, localId, localData) {
         precio_venta: localData.precio_venta ?? undefined,
         margen: localData.margen ?? undefined,
         activo: localData.activo ?? undefined,
+        // Regla de precio de ESTA ubicación. Editable también cuando el producto es
+        // del depósito: el costo sigue bloqueado, pero cómo el local arma su precio
+        // es decisión del local.
+        reglaPrecio: localData.reglaPrecio ?? undefined,
+        recargoFijoUnidad:
+          localData.reglaPrecio === "MARGEN_PORCENTUAL"
+            ? null
+            : localData.recargoFijoUnidad ?? undefined,
         // Override por local del recargo del servicio: null = heredar base.
         recargoServicioPct: validarRecargoServicioPct(localData.recargoServicioPct).valido
           ? validarRecargoServicioPct(localData.recargoServicioPct).pct

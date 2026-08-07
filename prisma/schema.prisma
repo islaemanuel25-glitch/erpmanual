@@ -373,6 +373,17 @@ model ProductoLocal {
   precio_costo Decimal? @db.Decimal(12, 2)
   precio_venta Decimal? @db.Decimal(12, 2)
   margen       Decimal? @db.Decimal(6, 2)
+  // Cómo se calcula el precio de venta EN ESTA UBICACIÓN. Es por ubicación igual
+  // que el precio: dos locales pueden usar reglas distintas para el mismo producto.
+  //   MARGEN_PORCENTUAL   → costo × (1 + margen/100). Es lo de siempre y el default,
+  //                         así que ningún registro existente cambia de comportamiento.
+  //   RECARGO_FIJO_UNIDAD → costo UNITARIO + recargoFijoUnidad, en pesos. No usa
+  //                         `margen` ni el de la ficha.
+  reglaPrecio       ReglaPrecio @default(MARGEN_PORCENTUAL)
+  // Pesos que se suman al costo UNITARIO cuando la regla es RECARGO_FIJO_UNIDAD.
+  // null en modo margen. El valor guardado NO se reconstruye desde el precio: solo
+  // una edición manual del precio de venta puede cambiarlo (ver lib/precios).
+  recargoFijoUnidad Decimal? @db.Decimal(12, 2)
   // Override por local del recargo del servicio de importe variable (0..100).
   // null → hereda ProductoBase.recargoServicioDefaultPct (y este, si null, → 0).
   recargoServicioPct Decimal? @db.Decimal(5, 2)
@@ -692,6 +703,13 @@ enum PrecioUpdatePricingMode {
   KEEP_VENTA
   RECALC_BY_MARGIN
   SET_VENTA
+}
+
+/// Cómo se deriva el precio de venta de una ubicación a partir del costo.
+/// MARGEN_PORCENTUAL es el default y el comportamiento histórico.
+enum ReglaPrecio {
+  MARGEN_PORCENTUAL
+  RECARGO_FIJO_UNIDAD
 }
 
 model PrecioUpdate {

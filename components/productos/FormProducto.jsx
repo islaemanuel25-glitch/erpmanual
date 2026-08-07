@@ -15,6 +15,13 @@ import {
   redondearA100Arriba,
   margenEfectivoDe,
 } from "@/lib/precios/precioDesdeMargen";
+import {
+  REGLA_MARGEN,
+  REGLA_RECARGO,
+  precioDesdeRecargoUnidad,
+  recargoDesdePrecio,
+  costoUnitarioDesde,
+} from "@/lib/precios/recargoFijoUnidad";
 import useVersionGuard from "@/hooks/useVersionGuard";
 import AvisoVersionNueva from "@/components/version/AvisoVersionNueva";
 import { useUser } from "@/app/context/UserContext";
@@ -152,6 +159,9 @@ export default function FormProducto({
     // maestra" —bloqueando de hecho su propio precio de venta.
     precio_sugerido: toNum(o.precio_sugerido ?? o.precioSugerido ?? ""),
     iva_porcentaje: toNum(o.iva_porcentaje ?? o.ivaPorcentaje ?? ""),
+    // Regla de precio de esta ubicación. Sin dato → la de siempre.
+    reglaPrecio: o.reglaPrecio ?? o.regla_precio ?? "MARGEN_PORCENTUAL",
+    recargoFijoUnidad: toNum(o.recargoFijoUnidad ?? o.recargo_fijo_unidad ?? ""),
     fecha_vencimiento:
       o.fecha_vencimiento
         ? String(o.fecha_vencimiento).split("T")[0]
@@ -358,6 +368,74 @@ export default function FormProducto({
     onChangeVenta(bulto);
   };
 
+  // ── REGLA DE PRECIO ────────────────────────────────────────────────────────
+  // Dos formas de llegar al precio de venta. La de siempre es el margen; la nueva
+  // suma pesos fijos al costo UNITARIO. La elección es de ESTA ubicación.
+  const porRecargo = form.reglaPrecio === REGLA_RECARGO;
+
+  /** Recalcula la venta desde el recargo. El recargo guardado NO se toca acá. */
+  const recalcularVentaPorRecargo = (recargo, costo = form.precio_costo) => {
+    const r = precioDesdeRecargoUnidad({
+      costo,
+      recargoFijoUnidad: recargo,
+      unidadMedida: form.unidad_medida,
+      factorPack: form.factor_pack,
+      redondeo100: form.redondeo_100,
+    });
+    return r.aplica ? r.precioVenta : "";
+  };
+
+  const onChangeRecargo = (val) => {
+    setForm((p) => ({
+      ...p,
+      recargoFijoUnidad: val === "" ? "" : Number(val),
+      precio_venta: val === "" ? p.precio_venta : recalcularVentaPorRecargo(val, p.precio_costo),
+    }));
+  };
+
+  /** El usuario escribió un precio a mano: de ahí se deduce el recargo. Es el ÚNICO
+      camino por el que el recargo guardado cambia. */
+  const onChangeVentaConRecargo = (val) => {
+    setForm((p) => {
+      const nuevoRecargo =
+        val === ""
+          ? p.recargoFijoUnidad
+          : recargoDesdePrecio({
+              precioVenta: val,
+              costo: p.precio_costo,
+              unidadMedida: p.unidad_medida,
+              factorPack: p.factor_pack,
+            });
+      return { ...p, precio_venta: val === "" ? "" : Number(val), recargoFijoUnidad: nuevoRecargo ?? p.recargoFijoUnidad };
+    });
+  };
+
+  const onChangeRegla = (val) => {
+    setForm((p) => {
+      if (val === REGLA_RECARGO) {
+        // Al entrar en modo recargo se propone el recargo que ya tiene el precio
+        // actual, para no cambiarle el precio al usuario solo por cambiar de modo.
+        const propuesto =
+          p.recargoFijoUnidad !== "" && p.recargoFijoUnidad !== null && p.recargoFijoUnidad !== undefined
+            ? p.recargoFijoUnidad
+            : recargoDesdePrecio({
+                precioVenta: p.precio_venta,
+                costo: p.precio_costo,
+                unidadMedida: p.unidad_medida,
+                factorPack: p.factor_pack,
+              });
+        return { ...p, reglaPrecio: REGLA_RECARGO, recargoFijoUnidad: propuesto ?? "" };
+      }
+      return { ...p, reglaPrecio: REGLA_MARGEN };
+    });
+  };
+
+  const costoUnitarioMostrado = costoUnitarioDesde(
+    form.precio_costo,
+    form.unidad_medida,
+    form.factor_pack
+  );
+
   const labelEscalaPrecio =
     form.unidad_medida === "kg"
       ? "(por kg)"
@@ -470,6 +548,13 @@ export default function FormProducto({
       recargoServicioPct: esServicio
         ? (p.recargoServicioPct === "" ? null : Number(p.recargoServicioPct))
         : null,
+      // Regla de precio de esta ubicación. El recargo viaja solo en su modo; en modo
+      // margen va null para que el backend lo limpie.
+      reglaPrecio: p.reglaPrecio || "MARGEN_PORCENTUAL",
+      recargoFijoUnidad:
+        p.reglaPrecio === "RECARGO_FIJO_UNIDAD"
+          ? (p.recargoFijoUnidad === "" ? null : Number(p.recargoFijoUnidad))
+          : null,
       modo_pedido: p.modo_pedido || "BULTO",
       modo_envio: p.modo_envio || defaultModoEnvio(p.unidad_medida),
       modo_stock: p.modo_stock || "BULTO",
@@ -1049,7 +1134,48 @@ export default function FormProducto({
               </Field>
             )}
 
+            {/* Regla de precio de ESTA ubicación. Margen es el default y deja todo
+                como estaba; recargo fijo suma pesos al costo unitario. */}
+            <Field label="Regla de precio" fieldKey="reglaPrecio" colSpan>
+              <SunmiSelectAdv value={form.reglaPrecio} onChange={onChangeRegla}>
+                <option value="MARGEN_PORCENTUAL">Margen porcentual</option>
+                <option value="RECARGO_FIJO_UNIDAD">Recargo fijo por unidad</option>
+              </SunmiSelectAdv>
+              <p className="text-xs sunmi-text-muted mt-1">
+                {porRecargo
+                  ? "El precio sale del costo por unidad más un monto fijo en pesos. No se usa el margen."
+                  : "El precio sale del costo más un porcentaje. Es el comportamiento de siempre."}
+              </p>
+            </Field>
+
+            {porRecargo && (
+              <>
+                <Field label="Costo unitario ref." fieldKey="recargo_costo_unitario">
+                  <SunmiInput type="number" value={costoUnitarioMostrado ?? ""} readOnly disabled />
+                  <p className="text-xs text-slate-500 mt-1">
+                    {showPreciosRef
+                      ? `Costo del bulto ÷ ${factorPackPrecios} uds.`
+                      : "El producto se vende por unidad: el costo unitario es el costo."}
+                  </p>
+                </Field>
+
+                <Field label="Recargo por unidad $" fieldKey="recargoFijoUnidad">
+                  <SunmiInput
+                    type="number"
+                    value={form.recargoFijoUnidad}
+                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => onChangeRecargo(e.target.value)}
+                  />
+                  <p className="text-xs sunmi-text-muted mt-1">
+                    Se suma a cada unidad. El monto guardado no cambia cuando sube el costo:
+                    solo lo modifica una edición manual del precio.
+                  </p>
+                </Field>
+              </>
+            )}
+
             {/* Fila 2: Margen % (fila propia cuando hay refs) */}
+            {!porRecargo && (
             <Field label="Margen %" fieldKey="margen" colSpan={showPreciosRef}>
               <SunmiInput
                 type="number"
@@ -1073,6 +1199,7 @@ export default function FormProducto({
                 </span>
               </p>
             </Field>
+            )}
 
             {/* Fila 3: Venta (+ venta unitario ref. en pack/cajón) */}
             <Field label={`Venta * ${labelEscalaPrecio}`} fieldKey="precio_venta">
@@ -1082,8 +1209,12 @@ export default function FormProducto({
                     type="number"
                     value={form.precio_venta}
                     onWheel={(e) => e.target.blur()}
-                    onChange={(e) => onChangeVenta(e.target.value)}
-                    onBlur={aplicarRedondeoVenta}
+                    // En modo recargo, escribir el precio a mano recalcula el recargo;
+                    // es el único camino por el que ese monto cambia.
+                    onChange={(e) =>
+                      porRecargo ? onChangeVentaConRecargo(e.target.value) : onChangeVenta(e.target.value)
+                    }
+                    onBlur={porRecargo ? undefined : aplicarRedondeoVenta}
                   />
                 </div>
                 {enableVoiceInputs && (
