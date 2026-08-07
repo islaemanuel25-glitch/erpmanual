@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-07 00:43
+**Última actualización:** 2026-08-07 01:21
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,8 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-07: refactor(sunmi): separar el tono de la fila de su intensidad
+- 2026-08-07: SunmiTable: densidad, align, render, ordenable, filaExpandible y tono de fila
 - 2026-08-07: SunmiTable: densidad, align, render, ordenable, filaExpandible y tono de fila
 - 2026-08-06: feat(listas): vistas por producto en el área principal y reportes PDF
 - 2026-08-06: feat(listas): vistas por producto en el área principal y reportes PDF
