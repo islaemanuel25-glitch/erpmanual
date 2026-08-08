@@ -74,9 +74,28 @@ VPS**, usá la notebook; y si tampoco la tenés, el repo de GitHub.
     cd erpazul-backups
     dir
 
-Descifrar. Te va a pedir la frase del PASO 0:
+Descifrar, con la frase del PASO 0. Se hace en dos comandos: primero la frase va
+a un archivo temporal, después se descifra leyéndola de ahí.
 
-    gpg --output semanal-20260808_010805.sql.gz --decrypt semanal-20260808_010805.sql.gz.gpg
+    # 1. Escribí la frase en un archivo. Reemplazá por la tuya, entre comillas simples.
+    printf '%s' 'ocho-palabras-y-cuatro-digitos-aca' > /tmp/frase.txt
+
+    # 2. Descifrar
+    gpg --batch --pinentry-mode loopback --passphrase-file /tmp/frase.txt \
+        --output semanal-20260808_010805.sql.gz \
+        --decrypt semanal-20260808_010805.sql.gz.gpg
+
+    # 3. Borrá la frase en cuanto termines
+    rm -f /tmp/frase.txt
+
+**Por qué no se escribe `gpg --decrypt` a secas.** Sin `--pinentry-mode loopback`,
+gpg intenta abrir un programa de contraseña gráfico que en Git Bash para Windows
+no existe, y **se queda colgado sin decir nada** — no da error, no pide la frase,
+no termina. Está probado. Si te pasó, cortá con Ctrl+C y usá los comandos de
+arriba.
+
+Si al descifrar dice `decryption failed: Bad session key`, la frase está mal.
+Fijate en los guiones y en que no haya espacios de más al copiarla.
 
 ---
 

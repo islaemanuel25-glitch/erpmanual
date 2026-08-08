@@ -44,6 +44,30 @@ $ETIQUETA_DISCO = "BACKUP-ERP"
 
 New-Item -ItemType Directory -Path $DIR_LOCAL, $DIR_ESTADO -Force | Out-Null
 
+# ── Ejecutables externos ────────────────────────────────────────────────────
+# gpg NO está en el PATH de PowerShell: viene con Git para Windows y su carpeta
+# (Git\usr\bin) no se agrega al PATH del sistema. Buscarlo con `gpg` a secas
+# funciona en la terminal de Git Bash y falla en la tarea programada, que corre
+# con el PATH de Windows. Se resuelve por ruta y se verifica al ARRANCAR, para
+# que la falta se vea en la primera línea del log y no recién al ir a cifrar.
+function ResolverEjecutable {
+  param([string]$Nombre, [string[]]$Candidatos = @())
+  $enPath = (Get-Command $Nombre -ErrorAction SilentlyContinue).Source
+  if ($enPath) { return $enPath }
+  foreach ($c in $Candidatos) { if (Test-Path $c) { return $c } }
+  return $null
+}
+
+$GPG = ResolverEjecutable "gpg" @(
+  "$env:ProgramFiles\Git\usr\bin\gpg.exe",
+  "${env:ProgramFiles(x86)}\Git\usr\bin\gpg.exe",
+  "$env:ProgramFiles\GnuPG\bin\gpg.exe",
+  "$env:LOCALAPPDATA\Programs\Git\usr\bin\gpg.exe"
+)
+$SSH = ResolverEjecutable "ssh" @("$env:WINDIR\System32\OpenSSH\ssh.exe")
+$SCP = ResolverEjecutable "scp" @("$env:WINDIR\System32\OpenSSH\scp.exe")
+$GIT = ResolverEjecutable "git" @("$env:ProgramFiles\Git\cmd\git.exe")
+
 # ── Log ─────────────────────────────────────────────────────────────────────
 $script:lineas = @()
 function Registrar {
@@ -77,12 +101,26 @@ function ActualizarEstado {
 
 function EjecutarSsh {
   param([string]$Comando)
-  $r = & ssh -o ConnectTimeout=20 -o BatchMode=yes $VPS $Comando 2>&1
+  $r = & $SSH -o ConnectTimeout=20 -o BatchMode=yes $VPS $Comando 2>&1
   if ($LASTEXITCODE -ne 0) { throw "ssh falló ($LASTEXITCODE): $r" }
   return ($r | Out-String).Trim()
 }
 
 Registrar "corrida" "INICIO" ("simular={0} forzarRepo={1}" -f $Simular, $ForzarRepo)
+
+# Si falta un ejecutable se dice ACÁ, no cuando se lo va a usar. gpg sobre todo:
+# su ausencia solo se notaría los domingos, y como una línea de error perdida
+# entre corridas exitosas de los otros destinos.
+$faltan = @()
+if (-not $SSH) { $faltan += "ssh" }
+if (-not $SCP) { $faltan += "scp" }
+if (-not $GIT) { $faltan += "git" }
+if (-not $GPG) { $faltan += "gpg (viene con Git para Windows, en Git\usr\bin)" }
+if ($faltan.Count -gt 0) {
+  Registrar "corrida" "FALTAN PROGRAMAS" ($faltan -join ", ")
+  throw ("No se puede continuar, faltan: {0}" -f ($faltan -join ", "))
+}
+Registrar "corrida" "PROGRAMAS OK" ("gpg={0}" -f $GPG)
 
 # ── 1. Notebook: el diario ──────────────────────────────────────────────────
 $nombreDiario = $null
@@ -94,7 +132,7 @@ try {
   if (Test-Path $destino) {
     Registrar "notebook" "YA ESTABA" $nombreDiario
   } else {
-    & scp -o ConnectTimeout=20 "${VPS}:$DIR_REMOTO/$nombreDiario" $destino
+    & $SCP -o ConnectTimeout=20 "${VPS}:$DIR_REMOTO/$nombreDiario" $destino
     if ($LASTEXITCODE -ne 0) { throw "scp falló ($LASTEXITCODE)" }
   }
 
@@ -156,16 +194,32 @@ try {
     if (-not (Test-Path (Join-Path $REPO_LOCAL ".git"))) {
       Registrar "repo_git" "CLONANDO" $REPO_REMOTO
       if (-not $Simular) {
-        & git clone $REPO_REMOTO $REPO_LOCAL 2>&1 | Out-Null
+        & $GIT clone $REPO_REMOTO $REPO_LOCAL 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "git clone falló: ¿existe el repo y tenés acceso?" }
       }
     }
 
-    # La frase sale del archivo DPAPI y se pasa a gpg por un descriptor, NUNCA
-    # como argumento: los argumentos son visibles para cualquier proceso.
+    # La frase sale del archivo DPAPI y se le pasa a gpg por --passphrase-file.
+    #
+    # NO se usa --passphrase-fd 0: canalizar una cadena de PowerShell a la
+    # entrada estándar de un ejecutable nativo no cierra el descriptor, y gpg
+    # queda esperando para siempre. Probado: cuelga sin timeout ni mensaje.
+    #
+    # Tampoco --passphrase a secas: los argumentos de un proceso los puede leer
+    # cualquier otro proceso de la máquina.
+    #
+    # El archivo temporal vive en el perfil del usuario, con permisos solo para
+    # él, y se borra en el finally aunque gpg falle.
     $sec   = Import-Clixml $ARCHIVO_FRASE
     $frase = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec))
+    $fraseTmp = Join-Path $DIR_ESTADO ".frase.tmp"
+    [System.IO.File]::WriteAllText($fraseTmp, $frase, [System.Text.UTF8Encoding]::new($false))
+    $aclF = Get-Acl $fraseTmp
+    $aclF.SetAccessRuleProtection($true, $false)
+    $aclF.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+      $env:USERNAME, "FullControl", "Allow")))
+    Set-Acl $fraseTmp $aclF
 
     $subidos = @()
     foreach ($serie in @("semanal", "mensual")) {
@@ -177,7 +231,7 @@ try {
       if (-not $nombre) { Registrar "repo_git" "SIN $serie" "el VPS todavía no generó ninguno"; continue }
 
       $tmp = Join-Path $env:TEMP $nombre
-      & scp -o ConnectTimeout=20 "${VPS}:$DIR_REMOTO/$nombre" $tmp
+      & $SCP -o ConnectTimeout=20 "${VPS}:$DIR_REMOTO/$nombre" $tmp
       if ($LASTEXITCODE -ne 0) { throw "scp del $serie falló" }
 
       $shaRem = (EjecutarSsh "sha256sum $DIR_REMOTO/$nombre").Split(" ")[0]
@@ -189,25 +243,23 @@ try {
         Registrar "repo_git" "SIMULADO" "$nombre.gpg"
       } else {
         New-Item -ItemType Directory -Path $REPO_LOCAL -Force | Out-Null
-        # --batch --passphrase-fd 0: sin pedir nada por pantalla y sin exponer la
-        # frase en la línea de comandos.
-        $frase | & gpg --batch --yes --quiet --symmetric --cipher-algo AES256 `
-                       --passphrase-fd 0 --pinentry-mode loopback `
-                       --output $cifrado $tmp
+        & $GPG --batch --yes --quiet --symmetric --cipher-algo AES256 `
+               --passphrase-file $fraseTmp --pinentry-mode loopback `
+               --output $cifrado $tmp
         if ($LASTEXITCODE -ne 0) { throw "gpg falló al cifrar $nombre" }
         $subidos += "$nombre.gpg"
       }
-      Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+      Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
     }
 
     if ($subidos.Count -gt 0 -and -not $Simular) {
       Push-Location $REPO_LOCAL
       try {
-        & git add -- *.gpg 2>&1 | Out-Null
-        $hay = & git status --porcelain
+        & $GIT add -- *.gpg 2>&1 | Out-Null
+        $hay = & $GIT status --porcelain
         if ($hay) {
-          & git commit -m ("backup cifrado {0}: {1}" -f (Get-Date -Format "yyyy-MM-dd"), ($subidos -join ", ")) 2>&1 | Out-Null
-          & git push 2>&1 | Out-Null
+          & $GIT commit -m ("backup cifrado {0}: {1}" -f (Get-Date -Format "yyyy-MM-dd"), ($subidos -join ", ")) 2>&1 | Out-Null
+          & $GIT push 2>&1 | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "git push falló" }
           Registrar "repo_git" "OK" ($subidos -join ", ")
           ActualizarEstado "repo_git" ($subidos -join ", ")
@@ -219,6 +271,13 @@ try {
   }
 } catch {
   Registrar "repo_git" "ERROR" $_.Exception.Message
+} finally {
+  # La frase temporal se borra pase lo que pase: si gpg falló, si scp falló, o si
+  # alguien cortó la corrida. Nunca debe quedar en disco entre corridas.
+  if ($fraseTmp -and (Test-Path $fraseTmp)) {
+    Remove-Item -LiteralPath $fraseTmp -Force -ErrorAction SilentlyContinue
+  }
+  if (Test-Path $fraseTmp) { Registrar "repo_git" "AVISO" "no se pudo borrar la frase temporal" }
 }
 
 Registrar "corrida" "FIN" ""
