@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-08 17:46
+**Fecha:** 2026-08-08 18:06
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat(listas): el macheo se guarda cuando la fila se aplica, fix(listas): el reporte no podía ver una confirmación al resolver el rango, refactor(listas): el rango sale de rangoDeLaFila en los cinco lectores
+- feat(listas): queda registrado si el vínculo lo decidió una persona o el motor, feat(listas): el macheo se guarda cuando la fila se aplica, fix(listas): el reporte no podía ver una confirmación al resolver el rango
 - Archivos: 1 nuevos, 8 modificados (9 total)
 
 

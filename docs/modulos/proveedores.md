@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-08 17:46
+**Última actualización:** 2026-08-08 18:06
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,15 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-08: feat(listas): queda registrado si el vínculo lo decidió una persona o el motor
+- 2026-08-08: feat(listas): el macheo se guarda cuando la fila se aplica
+- 2026-08-08: fix(listas): el reporte no podía ver una confirmación al resolver el rango
+- 2026-08-08: refactor(listas): el rango sale de rangoDeLaFila en los cinco lectores
+- 2026-08-08: feat(listas): la cola de pendientes se filtra en el servidor por la columna
+- 2026-08-08: feat(listas): el rango esperado se asienta en la cabecera, no se deja implícito
+- 2026-08-08: feat(listas): el motor calcula la interpretación y la confirmación vencida deja de contar — rutas SIN VERIFICAR
+- 2026-08-08: feat(listas): candidatos por parecido de nombre, calculados en el servidor
+- 2026-08-08: wip(listas): panel de decisión con SunmiTable — SIN VERIFICAR
 - 2026-08-08: feat(listas): el macheo se guarda cuando la fila se aplica
 - 2026-08-08: fix(listas): el reporte no podía ver una confirmación al resolver el rango
 - 2026-08-08: refactor(listas): el rango sale de rangoDeLaFila en los cinco lectores
