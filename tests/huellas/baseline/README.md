@@ -54,3 +54,23 @@ Cinco pantallas del relevamiento original no tienen `<table>` y por lo tanto no
 producen huella comparable: `03-clientes-detalle`, `13-reportes-ventas`,
 `15-transferencias`, `17-turnos-detalle` y `21-edicion-rapida-fila-editada`.
 Se revisan a ojo.
+
+## Pantallas que no están acá
+
+La conciliación de listas de proveedor tiene tabla y no entró en el relevamiento
+original. Sus huellas viven en `tests/huellas/conciliacion`, con su propio README:
+son posteriores a este momento y meterlas acá haría que este directorio dejara de
+referirse a un árbol identificable.
+
+## Sobre las cinco que hubo que recapturar
+
+El motivo real apareció después: el generador esperaba a que la tabla dejara de
+moverse contando `tbody tr`, y `SunmiTable` dibuja "Cargando…" como UNA fila con
+UNA celda que ocupa todas las columnas. Esa fila contaba como dato y se quedaba
+quieta en 1, así que la espera daba la tabla por asentada y capturaba la pantalla
+a medio cargar. No era lentitud de la base.
+
+Está arreglado: la espera ahora separa las filas de datos de la fila de relleno.
+Con eso, `12-reportes-stock` volvió a dar sus 2033 filas y `16-turnos` volvió a
+tener tabla, las dos coincidiendo con esta línea de base. Dos corridas seguidas
+dan huellas idénticas.

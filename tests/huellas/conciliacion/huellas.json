@@ -1,0 +1,140 @@
+{
+ "22-listas-conciliacion": {
+  "url": "/modulos/proveedores/listas/3",
+  "tablas": [
+   {
+    "indice": 0,
+    "columnas": [
+     "",
+     "",
+     "Fila",
+     "Producto",
+     "Código",
+     "Costo actual",
+     "Propuesto",
+     "Var.",
+     "Estado",
+     "Decisión"
+    ],
+    "thAlign": [
+     "left",
+     "left",
+     "right",
+     "left",
+     "left",
+     "right",
+     "right",
+     "right",
+     "left",
+     "left"
+    ],
+    "thPad": "3.5px 7px",
+    "thFondo": "rgb(22, 27, 34)",
+    "filas": 25,
+    "muestra": [
+     {
+      "alto": 40,
+      "fondo": "color(srgb 0.972549 0.443137 0.443137 / 0.08)",
+      "opacidad": "1",
+      "tdPad": "3.5px 7px",
+      "tdFuente": "12px",
+      "tdAlign": "left"
+     },
+     {
+      "alto": 40,
+      "fondo": "color(srgb 0.972549 0.443137 0.443137 / 0.08)",
+      "opacidad": "1",
+      "tdPad": "3.5px 7px",
+      "tdFuente": "12px",
+      "tdAlign": "left"
+     },
+     {
+      "alto": 40,
+      "fondo": "color(srgb 0.972549 0.443137 0.443137 / 0.08)",
+      "opacidad": "1",
+      "tdPad": "3.5px 7px",
+      "tdFuente": "12px",
+      "tdAlign": "left"
+     }
+    ],
+    "anchoTabla": 1258,
+    "contenedor": {
+     "overflowX": "auto",
+     "overflowY": "auto",
+     "maxHeight": "630px",
+     "id": null
+    }
+   }
+  ],
+  "textoTabla": "\t\tFila\tProducto\tCódigo\tCosto actual\tPropuesto\tVar.\tEstado\tDecisión\n\t\n\t3\t\nSin vincular\nAZUCAR ARCOR x 1kg\n\t\n12753\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t5\t\nSin vincular\nKETCHUP DOYP. LC X250G\n\t\n10301\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t6\t\nSin vincular\nKETCHUP PICANTE DP. LC X250\n\t\n10302\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t8\t\nSin vincular\nMAYO. BC x 1 Kg\n\t\n13543\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t9\t\nSin vincular\nMAYO. BC x 500 grs\n\t\n13545\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t10\t\nSin vincular\nMAYO. BC x 250 grs\n\t\n13546\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t11\t\nSin vincular\nMAYO. BC x 125 grs\n\t\n13787\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t12\t\nSin vincular\nKETCHUP AMERICANO LC X250\n\t\n15045\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t14\t\nSin vincular\nBEBIDA BC NARANJA 1L\n\t\n15421\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t15\t\nSin vincular\nBEBIDA BC MANZANA 1L\n\t\n15422\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t16\t\nSin vincular\nBEBIDA BC MULTIFRUTA 1L\n\t\n15423\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t17\t\nSin vincular\nBC. NARANJA X 200ML\n\t\n15424\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t18\t\nSin vincular\nBC. MANZANA X 200ML\n\t\n15425\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t19\t\nSin vincular\nBC. MULTIFRUTAS X 200ML\n\t\n15426\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t21\t\nSin vincular\nATUN ACEITE LC x 170g\n\t\n13135\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t22\t\nSin vincular\nATUN NATURAL(100% lomo) LC x 170g\n\t\n13136\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t23\t\nSin vincular\nATUN EN ACEITE LC X300G\n\t\n13876\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t24\t\nSin vincular\nATUN AL NATURAL LC X300GS\n\t\n13877\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t25\t\nSin vincular\nATUN AHUMADO LC x 170g\n\t\n14460\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t26\t\nSin vincular\nATUN ENSALADA VERDE x285g\n\t\n14464\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t27\t\nSin vincular\nATUN ENS.ROJA LC x285g\n\t\n14465\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t28\t\nSin vincular\nATUN ENS. VERDE LC x180g\n\t\n14466\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t29\t\nSin vincular\nATUN DESMEN.AL NATURAL LC X170\n\t\n14891\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t30\t\nSin vincular\nATUN DESMEN.ACE/AG.LC X 170g\n\t\n14983\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es\n\n\t\n\t32\t\nSin vincular\nATUN EN ACEITE LC X300G\n\t\n15269\n\t—\t—\t—\tSin vincular\t\nElegir producto\nno se sabe cuál es"
+ },
+ "23-listas-armado-dudoso": {
+  "url": "/modulos/proveedores/listas/3",
+  "tablas": [
+   {
+    "indice": 0,
+    "columnas": [
+     "",
+     "",
+     "Fila",
+     "Producto",
+     "Código",
+     "Costo actual",
+     "Propuesto",
+     "Var.",
+     "Estado",
+     "Decisión"
+    ],
+    "thAlign": [
+     "left",
+     "left",
+     "right",
+     "left",
+     "left",
+     "right",
+     "right",
+     "right",
+     "left",
+     "left"
+    ],
+    "thPad": "3.5px 7px",
+    "thFondo": "rgb(22, 27, 34)",
+    "filas": 10,
+    "muestra": [
+     {
+      "alto": 40,
+      "fondo": "color(srgb 0.984314 0.74902 0.141176 / 0.08)",
+      "opacidad": "1",
+      "tdPad": "3.5px 7px",
+      "tdFuente": "12px",
+      "tdAlign": "left"
+     },
+     {
+      "alto": 40,
+      "fondo": "color(srgb 0.984314 0.74902 0.141176 / 0.08)",
+      "opacidad": "1",
+      "tdPad": "3.5px 7px",
+      "tdFuente": "12px",
+      "tdAlign": "left"
+     },
+     {
+      "alto": 40,
+      "fondo": "color(srgb 0.984314 0.74902 0.141176 / 0.08)",
+      "opacidad": "1",
+      "tdPad": "3.5px 7px",
+      "tdFuente": "12px",
+      "tdAlign": "left"
+     }
+    ],
+    "anchoTabla": 1258,
+    "contenedor": {
+     "overflowX": "auto",
+     "overflowY": "auto",
+     "maxHeight": "630px",
+     "id": null
+    }
+   }
+  ],
+  "textoTabla": "\t\tFila\tProducto\tCódigo\tCosto actual\tPropuesto\tVar.\tEstado\tDecisión\n\t\n\t202\t\nMOGUL DIENTES 500G\nPRESTO. ESPINA/CREMA x 250g\n\t\n12631\nERP 1002631\n\t$ 7.316,96\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t355\t\nMOGUL CONITOS\nNV AGUILA TENTA. x 160g MOUSSE\n\t\n13113\nERP 1003113\n\t$ 11.601,86\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t482\t\nRocklets mini 10g\nHEL. PALITO MOGUL 18u X51g\n\t\n14266\nERP 1004266\n\t$ 19.886,80\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t625\t\nBUTTER TOFFEES AVELLANAS\nB. TOFFEES x648g AVELLANAS (108u)\n\t\n13409\nERP 13409\n\t$ 9.370,00\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t738\t\nARCOR MASTICABLES 800g\nMASTICABLES x 800g FRUTA (242u)\n\t\n1782\nERP 1001782\n\t$ 8.035,00\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t747\t\nTOPLINE7 VIBRANT STRAWBERRY 14gr\nROLL MASTI. MANZANA x24u\n\t\n15111\nERP 1005111\n\t$ 10.651,00\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t826\t\nSERRANITAS 105g\nSERRANITAS OFERTA X315G\n\t\n14361\nERP 1014361\n\t$ 19.250,00\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t829\t\nSERRANAS SANDWICH 112G\nSERRANAS SANDWICH 3 X 112 GRS\n\t\n7049\nERP 1007049\n\t$ 25.439,96\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t925\t\nCRIOLLITA x3 100G\nCRIOLLITAS ORIGINAL X 3\n\t\n10204\nERP 1010204\n\t$ 35.200,00\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio\n\n\t\n\t936\t\nTRAVIATA x3 324G\nTRAVIATA 3x108g\n\t\n14408\nERP 1014408\n\t$ 26.640,00\t—\t—\tRevisar armado\t\nRevisar armado\nno se pudo convertir el precio"
+ }
+}

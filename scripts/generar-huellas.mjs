@@ -217,25 +217,84 @@ async function navegar(url) {
   }
 }
 
-// Espera a que la tabla deje de moverse: mismo conteo de filas en dos lecturas
-// separadas. Es lo que evita capturar una pantalla a medio cargar (el caso de
-// 10-productos en la baseline vieja: 1 fila en vez de 25).
-async function esperarTablaEstable(intentos = 40, intervalo = 400) {
-  let previo = -1, estables = 0;
+// Cuenta FILAS DE DATOS y detecta la fila de relleno.
+//
+// `SunmiTable` dibuja tanto "Cargando…" como el mensaje de vacío igual: UNA fila
+// con UNA celda que ocupa todas las columnas. Contar `tbody tr` a secas la toma
+// por una fila de datos, y ahí estaba el problema: la tabla parecía tener 1 fila
+// y quedarse quieta en 1, así que la espera la daba por asentada y capturaba la
+// pantalla mientras todavía decía "Cargando…".
+//
+// Es lo que dejó `12-reportes-stock` con 1 fila contra 2033 reales dos corridas
+// seguidas, y las otras cuatro de la línea de base que hubo que recapturar.
+//
+// La forma —una sola celda con colspan— se reconoce sin depender del texto, que
+// cambia por pantalla. El texto se usa solo para lo otro que hay que distinguir:
+// si el relleno dice "cargando" hay que seguir esperando, y si dice cualquier
+// otra cosa la tabla está vacía DE VERDAD y esperar más no la va a llenar.
+const CONTEO = `(() => {
+  const tbody = document.querySelector("tbody");
+  if (!tbody) return JSON.stringify({ filas: 0, relleno: null, hayTabla: false });
+  const esRelleno = (tr) => {
+    const tds = tr.querySelectorAll("td");
+    return tds.length === 1 && Number(tds[0].getAttribute("colspan") || 1) > 1;
+  };
+  const trs = [...tbody.querySelectorAll("tr")];
+  const rellenos = trs.filter(esRelleno);
+  return JSON.stringify({
+    filas: trs.length - rellenos.length,
+    relleno: rellenos.length ? (rellenos[0].innerText || "").trim() : null,
+    hayTabla: true,
+  });
+})()`;
+
+/**
+ * Espera a que la tabla tenga datos asentados, no a que pase un tiempo.
+ *
+ * Corta cuando dos lecturas seguidas coinciden y no hay nada cargando. Una tabla
+ * legítimamente vacía también corta: su relleno no dice "cargando", así que ya
+ * está asentada y seguir esperando solo agrega dieciocho segundos por pantalla.
+ *
+ * Devuelve las filas de DATOS. La huella sigue contando `tbody tr` como siempre,
+ * relleno incluido, a propósito: cambiar eso movería el número de las pantallas
+ * de la línea de base y aparecerían diferencias que no son de estilo.
+ */
+async function esperarTablaEstable(intentos = 80, intervalo = 300) {
+  let previo = -1, estables = 0, ultimo = 0;
   for (let i = 0; i < intentos; i++) {
     await sleep(intervalo);
-    const n = await evaluar(`document.querySelectorAll("tbody tr").length`);
-    const cargando = await evaluar(
-      `!!document.querySelector("[aria-busy='true'], .animate-pulse, [data-cargando='true']")`
-    );
-    if (n === previo && n > 0 && !cargando) {
-      if (++estables >= 2) return n;
+    const { filas, relleno, hayTabla } = JSON.parse(await evaluar(CONTEO));
+    ultimo = filas;
+
+    const cargando =
+      (relleno !== null && /cargando/i.test(relleno)) ||
+      (await evaluar(
+        `!!document.querySelector("[aria-busy='true'], .animate-pulse, [data-cargando='true']")`
+      ));
+    if (cargando || !hayTabla) {
+      // Se reinicia el conteo: lo que se leyó recién no era la tabla final.
+      estables = 0;
+      previo = -1;
+      continue;
+    }
+
+    // Que HAYA filas es una condición y se confirma enseguida. Que NO las haya es
+    // una negación y no se puede confirmar leyendo una vez: hay pantallas que
+    // dibujan el mensaje de vacío mientras la consulta viaja, sin marcar que
+    // están cargando. Por eso el vacío necesita quedarse quieto bastante más
+    // tiempo antes de darlo por bueno. Es la única espera por reloj que queda, y
+    // está acá porque no hay ninguna señal en el DOM que diga "ya no va a llegar
+    // nada": `12-reportes-stock` capturó 0 filas contra 2033 reales por esto.
+    const necesarias = filas > 0 ? 2 : 12;
+
+    if (filas === previo && (filas > 0 || relleno !== null)) {
+      if (++estables >= necesarias) return filas;
     } else {
       estables = 0;
     }
-    previo = n;
+    previo = filas;
   }
-  return previo;
+  return ultimo;
 }
 
 // El perfil de Edge se reusa entre tandas, así que la cookie de sesión sobrevive.
@@ -361,12 +420,24 @@ try {
   for (const p of seleccion) {
     await navegar(BASE + p.url);
 
+    // La pantalla tiene que estar asentada ANTES de tocarle nada. Escribirle la
+    // fecha mientras todavía carga hacía que el botón "Buscar" no existiera
+    // todavía: la reposición fallaba, la pantalla quedaba con el filtro de hoy y
+    // la huella salía vacía. Es lo que dejaba a `16-turnos` sin tabla.
+    if (p.fecha || p.clicPrimeraFila) await esperarTablaEstable();
+
     if (p.fecha) {
-      // El formulario se monta después del readyState: hay que esperarlo.
+      // El formulario se monta después del readyState, y el botón puede tardar
+      // más que los campos: se esperan los TRES, que son los que hacen falta.
       let montado = false;
       for (let i = 0; i < 40 && !montado; i++) {
         await sleep(250);
-        montado = await evaluar(`!!document.getElementById("f-desde")`);
+        montado = await evaluar(`(() => {
+          const campos = !!document.getElementById("f-desde") && !!document.getElementById("f-hasta");
+          const boton = [...document.querySelectorAll("button")]
+            .some((x) => (x.innerText || "").trim().toLowerCase() === "buscar");
+          return campos && boton;
+        })()`);
       }
       if (!montado) log(`  ${p.nombre}: el filtro de fechas nunca se montó`);
 
