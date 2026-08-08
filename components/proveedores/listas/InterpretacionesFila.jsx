@@ -26,6 +26,7 @@ import {
   TONO_ESTADO_VARIACION,
   esAlertaFuerte,
 } from "@/lib/proveedores/listas/rangoAumento";
+import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
 const pct = (n) => (n === null || n === undefined ? "—" : `${n >= 0 ? "+" : ""}${n.toFixed(1)} %`);
 
@@ -89,10 +90,10 @@ export default function InterpretacionesFila({ fila, importacion, onConfirmada, 
       }
     : null;
 
-  const rango = {
-    minPct: importacion?.aumentoEsperadoMinPct ?? 10,
-    maxPct: importacion?.aumentoEsperadoMaxPct ?? 20,
-  };
+  // El rango DE ESTA FILA: el congelado si su confirmación sigue vigente, si no
+  // el de la cabecera, si no el default. Antes había un `?? 10` y un `?? 20`
+  // escritos acá, que ignoraban el congelado.
+  const rango = rangoDeLaFila(fila, importacion);
   const analisis = analizarFila({ fila, base, recargoPct: fila.recargoPct, rango });
   const { evaluadas, recomendada, presentacion } = analisis;
 

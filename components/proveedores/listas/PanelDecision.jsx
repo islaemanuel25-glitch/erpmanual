@@ -35,9 +35,24 @@ import {
   textoRecomendacion,
 } from "@/lib/proveedores/listas/rangoAumento";
 import { PREGUNTA } from "@/lib/proveedores/listas/panelDecision";
+import {
+  rangoDeLaFila,
+  confirmacionDeInterpretacionVigente,
+} from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
 const pct = (n) =>
   n === null || n === undefined ? "—" : `${n >= 0 ? "+" : ""}${Number(n).toFixed(1)} %`;
+
+/**
+ * Lo que pasa con la confirmación si se vincula otro producto.
+ *
+ * Dice VENCE y no "se borra" porque eso es lo que ocurre: la fila conserva quién
+ * confirmó y qué confirmó, y esa decisión deja de contar porque fue tomada sobre
+ * un producto que ya no es el suyo. La diferencia importa para decidir: nadie
+ * evita revincular por miedo a perder un dato que no se pierde.
+ */
+const AVISO_REVINCULAR =
+  "Vincular otro producto deja sin efecto la interpretación confirmada: la fila vuelve a pedir que se elija cómo leer el precio. Queda registrado quién la confirmó y cuándo.";
 
 /** La base que `analizarFila` espera, armada desde el producto del ERP. */
 export function baseDesdeErp(erp) {
@@ -58,10 +73,11 @@ export function analisisDeFila(fila, erp, importacion) {
     fila,
     base,
     recargoPct: fila.recargoPct,
-    rango: {
-      minPct: importacion?.aumentoEsperadoMinPct ?? 10,
-      maxPct: importacion?.aumentoEsperadoMaxPct ?? 20,
-    },
+    // El rango DE ESTA FILA. Antes era el de la cabecera con un `?? 10` y un
+    // `?? 20` escritos acá: una fila confirmada se evaluaba con el criterio de la
+    // cabecera y no con el que quedó congelado cuando alguien la decidió, que es
+    // exactamente lo que ese congelado existe para impedir.
+    rango: rangoDeLaFila(fila, importacion),
   });
 }
 
@@ -334,6 +350,10 @@ export default function PanelDecision({
   const erp = productoElegido ?? fila.erp ?? null;
   const analisis = useMemo(() => analisisDeFila(fila, erp, importacion), [fila, erp, importacion]);
 
+  // ¿Hay una decisión de una persona que esta fila todavía está usando? Es lo
+  // que decide si vincular otro producto tiene una consecuencia que avisar.
+  const confirmadaVigente = confirmacionDeInterpretacionVigente(fila);
+
   const esPreguntaProducto = forma.pregunta === PREGUNTA.PRODUCTO && !productoElegido;
 
   const tarjetas = useMemo(() => {
@@ -443,9 +463,22 @@ export default function PanelDecision({
       <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
         <div className="flex items-center gap-3 text-[10.5px]">
           {onVincularOtro ? (
-            <button type="button" onClick={onVincularOtro} className="sunmi-text-accent hover:underline">
+            <button
+              type="button"
+              onClick={onVincularOtro}
+              className="sunmi-text-accent hover:underline"
+              // La advertencia solo aparece cuando hay algo que perder. Y dice
+              // VENCER, no borrar, porque es lo que pasa: la confirmación queda
+              // guardada con quién la hizo y cuándo, y deja de contar porque fue
+              // sobre un producto que ya no es el de la fila. Decir "se borra"
+              // haría dudar de deshacer algo que en realidad no se pierde.
+              title={confirmadaVigente ? AVISO_REVINCULAR : undefined}
+            >
               Buscar otro producto
             </button>
+          ) : null}
+          {onVincularOtro && confirmadaVigente ? (
+            <span className="sunmi-text-warning">{AVISO_REVINCULAR}</span>
           ) : null}
           {forma.error && onCorregirOrigen ? (
             <button type="button" onClick={onCorregirOrigen} className="sunmi-text-accent hover:underline">

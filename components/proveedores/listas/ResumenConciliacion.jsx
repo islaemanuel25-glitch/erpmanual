@@ -70,6 +70,10 @@ function Dato({ etiqueta, children }) {
   );
 }
 
+/** Por qué el recargo y el rango no se pueden tocar desde acá. */
+const LEYENDA_INMUTABLE =
+  "Queda fijado al crear la importación: todas sus filas se conciliaron con este valor. Para usar otro, importá la lista de nuevo.";
+
 export default function ResumenConciliacion({ cabecera, sistema, archivo, proveedor, modo, onModo }) {
   const [verArchivo, setVerArchivo] = useState(false);
   // El encabezado no muestra listas: pide un MODO y el área principal cambia.
@@ -107,8 +111,21 @@ export default function ResumenConciliacion({ cabecera, sistema, archivo, provee
             <Dato etiqueta="Archivo">{cabecera.archivoNombre}</Dato>
           </span>
         )}
-        <Dato etiqueta="Recargo">{Number(cabecera?.recargoPct ?? 0)} %</Dato>
-        {rango && <Dato etiqueta="Aumento esperado">{rango}</Dato>}
+        {/* Los dos parámetros comerciales de la importación. Se MUESTRAN y no se
+            editan: quedan fijados al crearla y todas sus filas se conciliaron con
+            estos. No hay endpoint que los cambie, y no es un olvido — cambiarlos
+            después reescribiría el criterio con el que ya se decidieron filas,
+            incluidas las que alguien confirmó. Para usar otros se importa de
+            nuevo. El título lo dice al pasar el mouse, para que no haya que
+            averiguarlo probando. */}
+        <span title={LEYENDA_INMUTABLE}>
+          <Dato etiqueta="Recargo">{Number(cabecera?.recargoPct ?? 0)} %</Dato>
+        </span>
+        {rango && (
+          <span title={LEYENDA_INMUTABLE}>
+            <Dato etiqueta="Aumento esperado">{rango}</Dato>
+          </span>
+        )}
         <div className="ml-auto">
           <BotonReporte
             importacionId={cabecera?.id}

@@ -20,6 +20,7 @@ import { Download, FileText, Share2 } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { TIPO_REPORTE, TITULO_REPORTE } from "@/lib/proveedores/listas/reporteImportacion";
+import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
 const OPCIONES = [
   {
@@ -97,11 +98,6 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
       const partes = {};
       for (const s of opcion.situaciones) partes[s] = await traer(s);
 
-      const rango = {
-        minPct: cabecera?.aumentoEsperadoMinPct ?? 10,
-        maxPct: cabecera?.aumentoEsperadoMaxPct ?? 20,
-      };
-
       // El generador se carga recién ahora: jsPDF pesa y no tiene por qué estar
       // en el bundle de una pantalla que casi siempre se usa sin exportar nada.
       const [{ generarReportePDF }, { analizarFila }] = await Promise.all([
@@ -120,7 +116,11 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
             precio_costo: item.costoActual,
           },
           recargoPct: filaPrincipal.recargoPct,
-          rango,
+          // El rango DE ESA FILA, resuelto adentro del bucle. Antes se calculaba
+          // uno solo para toda la importación, con un `?? 10` y un `?? 20`
+          // escritos a mano: el reporte evaluaba las filas confirmadas con un
+          // criterio distinto del que se ve en pantalla al abrirlas.
+          rango: rangoDeLaFila(filaPrincipal, cabecera),
         });
       };
 

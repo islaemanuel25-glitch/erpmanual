@@ -22,6 +22,7 @@ import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { SITUACION_DETALLE } from "@/lib/proveedores/listas/detalleSistema";
+import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
 const PAGE_SIZE = 50;
 /** Tope del modo reporte. Muy por encima de cualquier universo real. */
@@ -201,10 +202,13 @@ export async function GET(req, context) {
       ok: true,
       situacion,
       items,
-      rango: {
-        minPct: numero(importacion.aumentoEsperadoMinPct) ?? 10,
-        maxPct: numero(importacion.aumentoEsperadoMaxPct) ?? 20,
-      },
+      // El rango de la IMPORTACIÓN, resuelto por el único lugar que sabe de
+      // dónde sale: cabecera, y si no la tiene, el default del sistema. El `{}`
+      // es porque acá no hay una fila que pueda aportar un congelado; cuando la
+      // hay —cada fila de `items`— quien la muestra la resuelve con su propia
+      // fila. Antes eran dos `?? 10` y `?? 20` escritos a mano, que además
+      // ignoraban el congelado.
+      rango: rangoDeLaFila({}, importacion),
       recargoPct: numero(importacion.recargoPct),
       paginacion: {
         page: todo ? 1 : page,

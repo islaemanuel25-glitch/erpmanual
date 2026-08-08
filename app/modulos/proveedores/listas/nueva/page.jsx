@@ -36,6 +36,10 @@ import {
 } from "@/lib/proveedores/listas/presentacion";
 import { LIMITES } from "@/lib/proveedores/listas/persistencia";
 import { CONFIG_ARCOR } from "@/lib/proveedores/listas/configuraciones/arcor";
+// El mismo rango con el que va a nacer la importación. Se muestra desde la
+// constante y no con un 10 y un 20 escritos acá: si el default cambia, la
+// pantalla que lo anuncia tiene que cambiar con él.
+import { RANGO_POR_DEFECTO } from "@/lib/proveedores/listas/rangoAumento";
 
 export default function NuevaImportacionPage() {
   const router = useRouter();
@@ -223,9 +227,13 @@ export default function NuevaImportacionPage() {
           <div className="sunmi-surface-soft sunmi-border border rounded-lg p-3 grid grid-cols-2 gap-3">
             <Dato label="Recargo que se aplica">{porcentaje(recargoPct)}</Dato>
             <Dato label="Umbral de variación alta">{porcentaje(umbralPct)}</Dato>
+            <Dato label="Aumento esperado">
+              {porcentaje(RANGO_POR_DEFECTO.minPct)} a {porcentaje(RANGO_POR_DEFECTO.maxPct)}
+            </Dato>
             <p className="col-span-2 text-[10.5px] sunmi-text-muted leading-snug">
-              Son los valores configurados para el proveedor. El servidor los vuelve a
-              validar al importar.
+              Son los valores configurados para el proveedor y no se pueden cambiar
+              después: quedan guardados en la importación al crearla, y todas sus filas
+              se evalúan con estos. Para usar otros hay que importar de nuevo.
             </p>
           </div>
 
