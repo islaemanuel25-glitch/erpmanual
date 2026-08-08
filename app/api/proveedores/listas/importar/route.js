@@ -44,6 +44,7 @@ import {
   enLotes,
   OPCIONES_TX,
 } from "@/lib/proveedores/listas/persistencia";
+import { RANGO_POR_DEFECTO } from "@/lib/proveedores/listas/rangoAumento";
 
 /** Un porcentaje del formulario, o el default de la configuración. */
 function porcentaje(valor, porDefecto) {
@@ -246,11 +247,21 @@ export async function POST(req) {
     const config = { ...reg.config, recargoPct, umbralVariacionPct };
 
     // La cabecera todavía no existe —se crea en el paso 9— así que al motor se le
-    // pasa el rango con el que va a nacer. Hoy la importación no recibe rango por
-    // el formulario y estas dos columnas quedan nulas: `rangoDeLaFila` cae
-    // entonces al default del sistema, que es el único lugar donde ese 10-20 está
-    // escrito. Se pasa explícito para que se vea, no por omisión.
-    const cabecera = { aumentoEsperadoMinPct: null, aumentoEsperadoMaxPct: null };
+    // pasa el rango con el que va a nacer, y ES EL MISMO OBJETO que se persiste
+    // unas líneas más abajo. No hay forma de que la cabecera diga un criterio y el
+    // motor haya usado otro.
+    //
+    // El rango se ASIENTA, no se deja implícito. Antes estas dos columnas nacían
+    // nulas y todo caía al default del sistema: funcionaba, pero la importación no
+    // guardaba con qué criterio se la evaluó, así que cambiar el default mañana
+    // reescribiría en silencio el criterio de todas las viejas. Es la misma razón
+    // por la que el rango se congela en la fila al confirmar.
+    //
+    // El formulario todavía no ofrece elegirlo. Cuando lo ofrezca, entra por acá.
+    const cabecera = {
+      aumentoEsperadoMinPct: RANGO_POR_DEFECTO.minPct,
+      aumentoEsperadoMaxPct: RANGO_POR_DEFECTO.maxPct,
+    };
 
     const conciliacion = conciliarLista({
       filas: salidaParser.productos,
@@ -286,6 +297,8 @@ export async function POST(req) {
             parserVersion: reg.parserVersion,
             recargoPct,
             umbralVariacionPct,
+            // El mismo objeto que se le pasó al motor. Ver la nota del paso 8.
+            ...cabecera,
             modoPrecioVenta: MODO_PRECIO_VENTA.NO_TOCAR,
             estado: ESTADO_IMPORTACION.BORRADOR,
             ...contadores,
