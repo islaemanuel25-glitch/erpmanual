@@ -1,0 +1,16 @@
+[Unit]
+Description=Backup diario de la base de producción del ERP
+Documentation=file:///srv/produccion/erpazul/docs/RESTAURACION-BACKUP.md
+
+[Service]
+Type=oneshot
+ExecStart=%h/bin/vps-backup-erpazul.sh
+# La salida va a journald: `journalctl --user -u vps-backup-erpazul` muestra el
+# historial completo, incluidos los fallos. Es la razón principal de usar un
+# timer en vez de cron, que se pierde la salida salvo que uno la redirija.
+StandardOutput=journal
+StandardError=journal
+# El dump comprime con gzip -9 y comparte los núcleos con producción: se le baja
+# la prioridad para no competir con la app ni con PostgreSQL.
+Nice=10
+IOSchedulingClass=idle

@@ -1,0 +1,16 @@
+[Unit]
+Description=Disparo diario del backup de la base de producción
+
+[Timer]
+# 03:20 hora del server (UTC). Fuera del horario comercial y separado de los
+# otros timers del host: logrotate y dpkg-db-backup corren a las 00:00, y
+# docker-image-prune a las 00:35.
+OnCalendar=*-*-* 03:20:00
+# Si el server estuvo apagado a esa hora, la corrida se ejecuta al arrancar en
+# vez de perderse. Es la diferencia concreta con cron y la razón de pedirlo.
+Persistent=true
+# Hasta 5 minutos de dispersión, para no arrancar siempre en el mismo segundo.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
