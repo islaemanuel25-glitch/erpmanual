@@ -2242,7 +2242,24 @@ enum EstadoFilaLista {
   NO_MACHEADO
   CODIGO_DUPLICADO
   FACTOR_DUDOSO
+
+  /// OBSOLETO — NO CABLEAR. Nada escribe este valor y ninguna fila lo tiene:
+  /// verificado en 2026-08-08, 0 de 2.751 filas en erpazul_al.
+  ///
+  /// La exclusión NO es un estado: vive en `ImportacionListaFila.excluidaManual`.
+  /// Son dos cosas distintas y por eso son dos columnas. El estado explica POR QUÉ
+  /// la fila está como está —lo que calculó el motor— y la marca dice QUÉ SE
+  /// DECIDIÓ hacer con ella. Si excluir pisara el estado se perdería el motivo, y
+  /// desexcluir —que es reversible— no podría restaurarlo.
+  ///
+  /// Sigue acá SOLO porque PostgreSQL no permite quitar valores de un enum: haría
+  /// falta recrear el tipo entero y convertir la columna, una migración cara sobre
+  /// una tabla grande para borrar algo que nadie usa. Del lado JS ya se sacó.
+  ///
+  /// Si estás por volver a usarlo porque "estaba en el enum": no. Usá
+  /// `excluidaManual`.
   EXCLUIDO
+
   BLOQUEADO
   ERROR
 }
