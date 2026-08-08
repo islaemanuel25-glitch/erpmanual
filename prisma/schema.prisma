@@ -351,6 +351,20 @@ model ProductoCodigoProveedor {
   codigoInterno        String
   descripcionProveedor String?
   activo               Boolean  @default(true)
+  /// QUIÉN decidió este vínculo:
+  ///   VINCULACION_MANUAL     una persona lo eligió en la pantalla de revisión.
+  ///   APLICACION_AUTOMATICA  lo dedujo el motor y quedó guardado al APLICARSE la
+  ///                          fila — o sea, se escribió un costo con él.
+  ///
+  /// Son dos hechos distintos y hasta ahora no se distinguían porque todos los
+  /// vínculos eran humanos. Desde que el macheo se guarda al aplicar conviven los
+  /// dos, y el día que uno salga mal hay que poder revocar los deducidos sin
+  /// tocar los que eligió alguien.
+  ///
+  /// NULO en los vínculos anteriores a esta columna. No se rellenan: no consta de
+  /// dónde salieron, y suponer que todos fueron manuales sería inventar el dato
+  /// que la columna existe para registrar. Un nulo se deja en paz.
+  origenAlta           String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

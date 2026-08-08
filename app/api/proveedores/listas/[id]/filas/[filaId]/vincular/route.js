@@ -36,6 +36,7 @@ import {
   resolverOrigen,
   MOTIVO_RECHAZO,
   TEXTO_RECHAZO,
+  ORIGEN_ALTA_VINCULO,
 } from "@/lib/proveedores/listas/vinculacion";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
 
@@ -180,6 +181,9 @@ export async function POST(req, context) {
             // permite reconocer después con qué nombre lo llama él.
             descripcionProveedor: fila.descripcionProveedor ?? null,
             activo: true,
+            // Lo eligió una persona en esta pantalla. Queda distinguido del que
+            // deduce el motor al aplicar una fila.
+            origenAlta: ORIGEN_ALTA_VINCULO.VINCULACION_MANUAL,
           },
           select: { id: true },
         });
@@ -192,6 +196,9 @@ export async function POST(req, context) {
             activo: true,
             productoBaseId,
             descripcionProveedor: fila.descripcionProveedor ?? null,
+            // Reactivar y reapuntar es una decisión de una persona: el vínculo
+            // pasa a ser suyo aunque antes lo hubiera deducido el motor.
+            origenAlta: ORIGEN_ALTA_VINCULO.VINCULACION_MANUAL,
           },
         });
       }

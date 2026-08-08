@@ -54,7 +54,7 @@ import {
 } from "@/lib/proveedores/listas/aplicacion";
 // El macheo que deja una fila aplicada. Vive con las demás decisiones de
 // vínculo, no acá: es la misma pregunta que resuelve la vinculación a mano.
-import { vinculoAPersistirAlAplicar } from "@/lib/proveedores/listas/vinculacion";
+import { vinculoAPersistirAlAplicar, ORIGEN_ALTA_VINCULO } from "@/lib/proveedores/listas/vinculacion";
 
 // Una corrida grande escribe miles de filas. El default de 5 s de Prisma no
 // alcanza ni de lejos; el de la persistencia (60 s) tampoco para una lista
@@ -433,6 +433,9 @@ export async function POST(req, context) {
             codigoInterno: aprendido.codigoInterno,
             descripcionProveedor: fila.descripcionProveedor ?? null,
             activo: true,
+            // Queda escrito que lo dedujo el motor y no una persona: es lo que
+            // permite revocar los deducidos sin tocar los humanos.
+            origenAlta: ORIGEN_ALTA_VINCULO.APLICACION_AUTOMATICA,
           });
         }
 
