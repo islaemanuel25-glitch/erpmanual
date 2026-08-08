@@ -52,6 +52,14 @@ import {
  * 917 filas en cada clic.
  */
 const VISTAS = [
+  // PRIMERA Y POR DEFECTO. La pantalla se llama "Pendientes de decisión" y esto
+  // es lo que hay que decidir: abrirla en "Todas" dejaba las veinte filas que
+  // importan enterradas entre novecientas que no piden nada.
+  //
+  // El servidor la resuelve en el WHERE con `filtroDeLaCola`, paginada. Es para
+  // lo que se persistió el veredicto de interpretación: calcularlo al leer
+  // obligaría a traer las 917 filas para saber cuáles entran.
+  { id: "cola", texto: "Pendientes de decisión" },
   { id: "todas", texto: "Todas" },
   { id: "seleccionadas", texto: "Seleccionadas" },
   { id: "listas", texto: "Listas pendientes" },
@@ -73,6 +81,16 @@ const VISTAS = [
   { id: "ambiguas", texto: "Ambiguas" },
   { id: "excluidas", texto: "Excluidas" },
 ];
+
+/**
+ * Con qué vista se abre la pantalla, y contra cuál se mide "hay filtros puestos".
+ *
+ * Está en una constante y no escrita en los tres lugares que la usan —el estado
+ * inicial, el botón de limpiar y el cartel de filtros activos— porque si uno solo
+ * quedara en "todas", limpiar los filtros llevaría a una vista distinta de la que
+ * abre sola y el cartel diría que hay un filtro puesto sin que nadie lo pusiera.
+ */
+const VISTA_POR_DEFECTO = "cola";
 
 /**
  * ¿Esta fila admite vincularse?
@@ -152,7 +170,7 @@ export default function ConciliacionPage() {
   // Los productos a los que se acota la grilla en el modo PENDIENTES.
   const [productosFiltro, setProductosFiltro] = useState(null);
   const [estado, setEstado] = useState(() => busqueda?.get("estado") ?? "");
-  const [vista, setVista] = useState(() => busqueda?.get("vista") ?? "todas");
+  const [vista, setVista] = useState(() => busqueda?.get("vista") ?? VISTA_POR_DEFECTO);
   const [q, setQ] = useState(() => busqueda?.get("q") ?? "");
   // El texto tipeado se separa del que se consulta: buscar en cada tecla sobre
   // 917 filas dispararía una consulta por letra.
@@ -338,6 +356,9 @@ export default function ConciliacionPage() {
       setEstado("");
       setQ("");
       setQAplicado("");
+      // "Todas" a propósito, no la cola: entrar por "pendientes del sistema" es
+      // pedir las filas DE ESOS PRODUCTOS, incluidas las que ya están listas.
+      // Acotarlas además a la cola escondería justo las que se pueden aplicar.
       setVista("todas");
       setPage(1);
       try {
@@ -515,10 +536,10 @@ export default function ConciliacionPage() {
     setQ("");
     setQAplicado("");
     setEstado("");
-    setVista("todas");
+    setVista(VISTA_POR_DEFECTO);
     setPage(1);
   };
-  const hayFiltros = !!estado || !!qAplicado || vista !== "todas";
+  const hayFiltros = !!estado || !!qAplicado || vista !== VISTA_POR_DEFECTO;
 
   if (cargandoUser || cargandoCtx) return null;
   if (!esAdmin) return <SinPermisos />;

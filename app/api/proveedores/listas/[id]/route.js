@@ -35,10 +35,11 @@ import {
   macheePorCodigo,
 } from "@/lib/proveedores/listas/conciliarLista";
 import { resumirMacheo, resumirProgreso } from "@/lib/proveedores/listas/macheo";
-import { RANGO_POR_DEFECTO } from "@/lib/proveedores/listas/rangoAumento";
 import { resumenDelSistema, resumenDelArchivo } from "@/lib/proveedores/listas/resumenSistema";
 import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { motivoDePendiente, pendienteEnAlerta } from "@/lib/proveedores/listas/detalleSistema";
+import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
+import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
@@ -56,6 +57,11 @@ const numero = (v) => (v === null || v === undefined ? null : Number(v));
  */
 const VISTAS = {
   todas: {},
+  // PENDIENTES DE DECISIÓN. El filtro sale de `filtroDeLaCola`, que vive pegado
+  // a `esDeLaCola` para que la regla no se separe entre el servidor y la
+  // pantalla. Se arma abajo porque necesita una referencia de campo de Prisma
+  // —la vigencia compara dos columnas de la misma fila— y el módulo es puro.
+  cola: null,
   // Las vistas de TRABAJO excluyen lo ya aplicado. Sin esto, "Listas" mostraba
   // las 101 filas que ya se habían aplicado —su estado sigue siendo
   // LISTO_PARA_ACTUALIZAR— todas con la casilla deshabilitada, y la pantalla
@@ -145,7 +151,18 @@ export async function GET(req, context) {
       return NextResponse.json({ ok: false, error: "Vista inválida." }, { status: 400 });
     }
     const enMemoria = vista === "alerta";
-    if (!enMemoria) Object.assign(where, VISTAS[vista]);
+    if (vista === "cola") {
+      // Paginado en SQL, que es el punto de haber persistido el veredicto: sin
+      // esto habría que traer las 917 filas para saber cuáles entran.
+      //
+      // Va en `AND` y no con un `Object.assign`: el filtro trae su propio `OR` y
+      // la búsqueda por texto de más abajo trae otro. Puestos los dos como
+      // `where.OR`, el segundo pisaba al primero y la cola devolvía cualquier
+      // cosa apenas alguien escribía en el buscador.
+      (where.AND ??= []).push(filtroDeLaCola(prisma.importacionListaFila.fields.vinculadoEn));
+    } else if (!enMemoria) {
+      Object.assign(where, VISTAS[vista]);
+    }
 
     // Filtro por PRODUCTOS del ERP. Es lo que permite que tocar "7 pendientes"
     // lleve a la grilla operativa mostrando exactamente esos 7 y no una vista
@@ -167,11 +184,16 @@ export async function GET(req, context) {
     // tenga que acordarse de cómo lo escribió el proveedor.
     const q = (url.searchParams.get("q") ?? "").trim();
     if (q) {
-      where.OR = [
-        { codigoNormalizado: { contains: q.toUpperCase() } },
-        { codigoCrudo: { contains: q, mode: "insensitive" } },
-        { descripcionProveedor: { contains: q, mode: "insensitive" } },
-      ];
+      // Dentro de `AND` para poder convivir con el `OR` de la vista "cola". Como
+      // Prisma ANDea las claves del `where` igual, el resultado es el mismo que
+      // antes cuando no hay otra vista con `OR`.
+      (where.AND ??= []).push({
+        OR: [
+          { codigoNormalizado: { contains: q.toUpperCase() } },
+          { codigoCrudo: { contains: q, mode: "insensitive" } },
+          { descripcionProveedor: { contains: q, mode: "insensitive" } },
+        ],
+      });
     }
 
     // Con la vista "alerta" no se puede paginar en SQL: hay que calcular primero.
@@ -292,10 +314,6 @@ export async function GET(req, context) {
     //
     // Son pocas filas —las pendientes de una importación—, así que se resuelven
     // en una consulta y en memoria.
-    const rangoVigente = {
-      minPct: cabecera.aumentoEsperadoMinPct === null ? RANGO_POR_DEFECTO.minPct : numero(cabecera.aumentoEsperadoMinPct),
-      maxPct: cabecera.aumentoEsperadoMaxPct === null ? RANGO_POR_DEFECTO.maxPct : numero(cabecera.aumentoEsperadoMaxPct),
-    };
     const filasPendientes = await prisma.importacionListaFila.findMany({
       // Acotado a los PRODUCTOS PENDIENTES, exactamente los mismos que cuenta
       // la métrica: del universo y sin ninguna fila aplicada. Sin la segunda
@@ -325,7 +343,12 @@ export async function GET(req, context) {
               fila: { ...f, precioConIva: numero(f.precioConIva) },
               base: b,
               recargoPct: numero(f.recargoPct),
-              rango: rangoVigente,
+              // El rango DE ESTA FILA, no el de la cabecera a secas: si alguien
+              // la confirmó, manda el que quedó congelado con esa decisión. Antes
+              // acá iba el de la cabecera para todas, así que la alerta de una
+              // fila confirmada se medía con un criterio distinto del que se ve
+              // al abrirla.
+              rango: rangoDeLaFila(f, cabecera),
             })
           : null;
       const { motivo } = motivoDePendiente({ fila: f, analisis });
@@ -527,12 +550,12 @@ export async function GET(req, context) {
         ...cabecera,
         recargoPct: numero(cabecera.recargoPct),
         umbralVariacionPct: numero(cabecera.umbralVariacionPct),
-        // El rango vigente. Si la importación no lo tiene, vale el de Arcor:
-        // así una importación vieja se sigue mostrando con un criterio.
-        aumentoEsperadoMinPct:
-          cabecera.aumentoEsperadoMinPct === null ? RANGO_POR_DEFECTO.minPct : numero(cabecera.aumentoEsperadoMinPct),
-        aumentoEsperadoMaxPct:
-          cabecera.aumentoEsperadoMaxPct === null ? RANGO_POR_DEFECTO.maxPct : numero(cabecera.aumentoEsperadoMaxPct),
+        // El rango DE LA CABECERA, resuelto con el mismo orden que el de una
+        // fila: sin fila que aporte un congelado, `rangoDeLaFila` devuelve el de
+        // la importación y, si no lo tiene, el default del sistema. Se pasa `{}`
+        // a propósito: acá no hay fila, hay cabecera.
+        aumentoEsperadoMinPct: rangoDeLaFila({}, cabecera).minPct,
+        aumentoEsperadoMaxPct: rangoDeLaFila({}, cabecera).maxPct,
       },
       filas: filasSalida,
       vista,

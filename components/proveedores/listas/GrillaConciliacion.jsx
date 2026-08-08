@@ -32,8 +32,12 @@ import { ChevronRight } from "lucide-react";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import PanelDecision, { analisisDeFila } from "@/components/proveedores/listas/PanelDecision";
 import { money, presentarEstado } from "@/lib/proveedores/listas/presentacion";
-import { TONO_ESTADO_VARIACION } from "@/lib/proveedores/listas/rangoAumento";
+import { TONO_ESTADO_VARIACION, clasificarVariacion } from "@/lib/proveedores/listas/rangoAumento";
 import { formaDelPanel, tonoDeFila, PREGUNTA } from "@/lib/proveedores/listas/panelDecision";
+import {
+  rangoDeLaFila,
+  confirmacionDeInterpretacionVigente,
+} from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
 const pct = (n) =>
   n === null || n === undefined ? "—" : `${n >= 0 ? "+" : ""}${Number(n).toFixed(1)} %`;
@@ -44,37 +48,73 @@ const codigoGuardado = (erp) => (erp?.codigosArcor?.length ? erp.codigosArcor.jo
 /**
  * Lo que la fila necesita mostrar, resuelto una vez por render.
  *
- * `analizarFila` es el mismo módulo que valida el servidor: la pantalla no
- * recalcula, solo muestra.
+ * ── LA GRILLA NO ANALIZA, LEE ───────────────────────────────────────────────
+ *
+ * Antes cada fila corría `analizarFila` en el navegador para saber si el motor
+ * había podido elegir una lectura del precio. Ahora ese veredicto viene en
+ * `resultadoInterpretacion`, calculado al conciliar y guardado en la fila.
+ *
+ * No es por velocidad: es porque el servidor filtra la cola POR ESA COLUMNA. Si
+ * la grilla se lo recalculara por su cuenta, alcanzaba con que las dos cuentas
+ * difirieran una vez —un producto que cambió de costo desde que se concilió— para
+ * que una fila apareciera en "Pendientes de decisión" y la grilla la dibujara
+ * como sana. Dos verdades sobre la misma fila, y ninguna forma de saber cuál.
+ *
+ * El análisis completo sigue existiendo, pero en el PANEL: se calcula para la
+ * fila que se abre, una por vez, y ahí sí muestra las hipótesis con sus números.
  */
 function resumir(fila, importacion) {
-  const analisis = fila.erp ? analisisDeFila(fila, fila.erp, importacion) : null;
   const forma = formaDelPanel({
     estado: fila.estado,
     tieneProducto: !!fila.erp,
-    resultado: analisis?.resultado ?? null,
+    resultado: fila.resultadoInterpretacion ?? null,
     aplicada: !!fila.aplicada,
+    excluida: fila.excluidaManual === true,
+    confirmada: confirmacionDeInterpretacionVigente(fila),
   });
-  const elegida = analisis?.evaluadas?.find((h) => h.clave === analisis.recomendada) ?? null;
 
   return {
     forma,
-    analisis,
-    costoPropuesto: elegida?.costoNuevo ?? fila.costoMaestroPropuesto ?? null,
+    // Los números que el motor PROPUSO, no los de una hipótesis que nadie eligió.
+    // Una fila con el armado dudoso no tiene costo propuesto —de eso se trata— y
+    // muestra una raya: el número aparece al abrirla, con las lecturas posibles
+    // al lado. Ponerle acá el de la lectura sugerida daba a entender que el
+    // sistema ya había propuesto ese costo.
+    costoPropuesto: fila.costoMaestroPropuesto ?? null,
     variacionPct:
-      elegida?.variacionPct ??
-      (fila.diferenciaPct === null || fila.diferenciaPct === undefined ? null : Number(fila.diferenciaPct)),
-    estadoVariacion: elegida?.estado ?? null,
+      fila.diferenciaPct === null || fila.diferenciaPct === undefined ? null : Number(fila.diferenciaPct),
+    // El tono de la variación sí se calcula acá, y no es lo mismo que analizar la
+    // fila: es comparar dos números que la fila ya trae contra el rango que le
+    // corresponde. No elige ninguna lectura ni recomienda nada.
+    estadoVariacion: clasificarVariacion({
+      costoActual: fila.costoAnterior,
+      costoNuevo: fila.costoMaestroPropuesto,
+      ...rangoDeLaFila(fila, importacion),
+    }).estado,
   };
 }
 
-/** Qué decisión pide la fila, en dos palabras. */
-function textoDecision(forma, analisis) {
+/**
+ * Qué decisión pide la fila, en dos palabras.
+ *
+ * Sale de los mismos dos hechos guardados que la forma del panel. FACTOR_DUDOSO
+ * se nombra por su estado y no por el veredicto: en esas filas el motor no llegó
+ * a evaluar las lecturas —el veredicto es nulo— y decir "hay una sugerida" sería
+ * inventar una recomendación que nadie hizo.
+ */
+function textoDecision(forma, fila) {
   if (forma.pregunta === PREGUNTA.PRODUCTO) return { titulo: "Elegir producto", detalle: "no se sabe cuál es" };
   if (forma.pregunta === PREGUNTA.INTERPRETACION) {
     if (forma.error) return { titulo: "Revisar el dato", detalle: "el cálculo no cierra" };
-    if (analisis?.resultado === "AMBIGUA") return { titulo: "Elegir lectura", detalle: "más de una posible" };
-    if (analisis?.resultado === "REVISAR") return { titulo: "Revisar", detalle: "ninguna da un costo creíble" };
+    if (fila.estado === "FACTOR_DUDOSO") {
+      return { titulo: "Revisar armado", detalle: "no se pudo convertir el precio" };
+    }
+    if (fila.resultadoInterpretacion === "AMBIGUA") {
+      return { titulo: "Elegir lectura", detalle: "más de una posible" };
+    }
+    if (fila.resultadoInterpretacion === "REVISAR") {
+      return { titulo: "Revisar", detalle: "ninguna da un costo creíble" };
+    }
     return { titulo: "Confirmar lectura", detalle: "hay una sugerida" };
   }
   return { titulo: "Sin acción", detalle: null };
@@ -266,7 +306,7 @@ export default function GrillaConciliacion({
         titulo: "Decisión",
         render: (f) => {
           const r = resumenes.get(f.id);
-          const d = textoDecision(r.forma, r.analisis);
+          const d = textoDecision(r.forma, f);
           return (
             <>
               <div className="sunmi-text-strong truncate max-w-[10rem]">{d.titulo}</div>
@@ -306,7 +346,9 @@ export default function GrillaConciliacion({
         ordenClave="fila"
         ordenDir="asc"
         vacio="No quedan decisiones pendientes en esta vista."
-        tonoFila={(f) => tonoDeFila({ estado: f.estado, aplicada: f.aplicada })}
+        tonoFila={(f) =>
+          tonoDeFila({ estado: f.estado, aplicada: f.aplicada, excluida: f.excluidaManual === true })
+        }
         onClickFila={editable ? alternar : undefined}
         filaSeleccionada={(f) => abierta === f.id}
         // Devolver null es "esta fila está cerrada": el estado de apertura vive
