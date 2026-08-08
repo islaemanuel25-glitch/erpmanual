@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-08 13:08
+**Última actualización:** 2026-08-08 13:44
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,12 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-08: refactor(listas): el rango sale de rangoDeLaFila en los cinco lectores
+- 2026-08-08: feat(listas): la cola de pendientes se filtra en el servidor por la columna
+- 2026-08-08: feat(listas): el rango esperado se asienta en la cabecera, no se deja implícito
+- 2026-08-08: feat(listas): el motor calcula la interpretación y la confirmación vencida deja de contar — rutas SIN VERIFICAR
+- 2026-08-08: feat(listas): candidatos por parecido de nombre, calculados en el servidor
+- 2026-08-08: wip(listas): panel de decisión con SunmiTable — SIN VERIFICAR
 - 2026-08-08: feat(listas): el rango esperado se asienta en la cabecera, no se deja implícito
 - 2026-08-08: feat(listas): el motor calcula la interpretación y la confirmación vencida deja de contar — rutas SIN VERIFICAR
 - 2026-08-08: feat(listas): candidatos por parecido de nombre, calculados en el servidor

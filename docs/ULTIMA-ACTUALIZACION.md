@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-08 13:08
+**Fecha:** 2026-08-08 13:44
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat(listas): el rango esperado se asienta en la cabecera, no se deja implícito, feat(listas): el motor calcula la interpretación y la confirmación vencida deja de contar — rutas SIN VERIFICAR, feat(listas): candidatos por parecido de nombre, calculados en el servidor
-- Archivos: 1 nuevos, 4 modificados (5 total)
+- refactor(listas): el rango sale de rangoDeLaFila en los cinco lectores, feat(listas): la cola de pendientes se filtra en el servidor por la columna, feat(listas): el rango esperado se asienta en la cabecera, no se deja implícito
+- Archivos: 1 nuevos, 7 modificados (8 total)
 
 
 ## Archivos nuevos desde última sincronización
