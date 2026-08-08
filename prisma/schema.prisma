@@ -2401,6 +2401,22 @@ model ImportacionListaFila {
   /// propios y no queremos una migración por cada uno.
   motivo String?
 
+  /// Si el motor pudo ELEGIR una interpretación del precio: RECOMENDADA (una
+  /// sola creíble), AMBIGUA (varias) o REVISAR (ninguna). Sale de
+  /// `recomendarHipotesis`, igual que `estado` sale de `clasificarLinea`.
+  ///
+  /// Se persiste por la misma razón que el estado: la pantalla necesita FILTRAR
+  /// por él —la cola de "pendientes de decisión" son las filas que necesitan que
+  /// alguien decida— y calcularlo al leer obligaría a traer las 917 filas para
+  /// saber cuáles entran, rompiendo la paginación del servidor.
+  ///
+  /// No queda viejo: depende del recargo y del rango esperado, que son
+  /// inmutables una vez creada la importación, y de la vinculación y el costo,
+  /// que sí reconcilian cuando cambian.
+  ///
+  /// Nulo en filas conciliadas antes de que existiera la columna.
+  resultadoInterpretacion String?
+
   seleccionable Boolean  @default(false)
   seleccionada  Boolean  @default(false)
   /// Excluida A MANO desde la pantalla de revisión. No pisa el estado que
