@@ -71,7 +71,12 @@ export async function POST(req, context) {
     // ── 1. La importación, anclada al grupo ──────────────────────────────
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId },
-      select: { id: true, estado: true, proveedorId: true, recargoPct: true, umbralVariacionPct: true },
+      select: {
+        id: true, estado: true, proveedorId: true, recargoPct: true, umbralVariacionPct: true,
+        // El rango esperado va al motor: sin él no se puede decidir si alguna
+        // lectura del precio es creíble.
+        aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
+      },
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
@@ -230,6 +235,16 @@ export async function POST(req, context) {
           precioConIva: Number(fila.precioConIva),
           precioSinIva: fila.precioSinIva === null ? null : Number(fila.precioSinIva),
           categoriaCruda: fila.categoriaCruda,
+          // La confirmación y el rango congelado, COMO VAN A QUEDAR después de
+          // esta vinculación. `vinculadoEn` es el `ahora` que se está por
+          // escribir, no el que tiene la fila: si se pasara el viejo, una
+          // confirmación anterior seguiría pareciendo vigente y el motor
+          // evaluaría con un rango congelado para el producto que la fila ya no
+          // tiene. La autoría no se toca; simplemente deja de contar.
+          confirmadoEn: fila.confirmadoEn,
+          vinculadoEn: ahora,
+          aumentoEsperadoMinPct: fila.aumentoEsperadoMinPct,
+          aumentoEsperadoMaxPct: fila.aumentoEsperadoMaxPct,
         },
         indice,
         indiceBarra: indexarCodigosBarra([]),
@@ -239,6 +254,8 @@ export async function POST(req, context) {
           proveedorId: importacion.proveedorId,
           operandoEnLocalId: localId,
           depositoLocalId,
+          // De acá sale el rango cuando la fila no tiene uno congelado vigente.
+          cabecera: importacion,
         },
         config,
       });
@@ -262,6 +279,11 @@ export async function POST(req, context) {
           variacionAlta: datos.variacionAlta,
           estado: datos.estado,
           motivo: datos.motivo,
+          // Los dos veredictos del motor se escriben juntos. Es la ruta donde
+          // más importa: vincular es la acción que más probablemente saca una
+          // fila de la cola, y dejar este valor viejo la dejaría ahí para
+          // siempre —o la sacaría sin que nadie haya decidido nada—.
+          resultadoInterpretacion: datos.resultadoInterpretacion,
           seleccionable: datos.seleccionable,
           seleccionada: datos.seleccionada,
           // La sugerencia deja de estar pendiente: ya se resolvió.

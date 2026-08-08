@@ -245,11 +245,18 @@ export async function POST(req) {
     );
     const config = { ...reg.config, recargoPct, umbralVariacionPct };
 
+    // La cabecera todavía no existe —se crea en el paso 9— así que al motor se le
+    // pasa el rango con el que va a nacer. Hoy la importación no recibe rango por
+    // el formulario y estas dos columnas quedan nulas: `rangoDeLaFila` cae
+    // entonces al default del sistema, que es el único lugar donde ese 10-20 está
+    // escrito. Se pasa explícito para que se vea, no por omisión.
+    const cabecera = { aumentoEsperadoMinPct: null, aumentoEsperadoMaxPct: null };
+
     const conciliacion = conciliarLista({
       filas: salidaParser.productos,
       productos,
       codigosProveedor,
-      contexto: { grupoId, proveedorId, operandoEnLocalId: localId, depositoLocalId },
+      contexto: { grupoId, proveedorId, operandoEnLocalId: localId, depositoLocalId, cabecera },
       config,
     });
 
