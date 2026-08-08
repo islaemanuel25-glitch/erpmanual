@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-07 01:21
+**Última actualización:** 2026-08-08 12:46
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,11 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-07: refactor(sunmi): separar el tono de la fila de su intensidad
+- 2026-08-07: SunmiTable: densidad, align, render, ordenable, filaExpandible y tono de fila
+- 2026-08-07: feat(precios): regla de recargo fijo por unidad, por ubicación
+- 2026-08-07: fix(productos): mostrar el costo unitario también en los locales
+- 2026-08-07: fix(precios): que una suba de costo arrastre el precio de venta de cada local
 - 2026-08-07: refactor(sunmi): separar el tono de la fila de su intensidad
 - 2026-08-07: SunmiTable: densidad, align, render, ordenable, filaExpandible y tono de fila
 - 2026-08-07: SunmiTable: densidad, align, render, ordenable, filaExpandible y tono de fila

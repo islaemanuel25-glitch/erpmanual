@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-08-08] - Actualización: proveedores, productos
+
+### Modificado
+- **proveedores**: feat(listas): el motor calcula la interpretación y la confirmación vencida deja de contar — rutas SIN VERIFICAR
+- **proveedores**: feat(listas): candidatos por parecido de nombre, calculados en el servidor
+- **proveedores**: wip(listas): panel de decisión con SunmiTable — SIN VERIFICAR
+- **productos**: refactor(sunmi): separar el tono de la fila de su intensidad
+- **productos**: SunmiTable: densidad, align, render, ordenable, filaExpandible y tono de fila
+- **productos**: feat(precios): regla de recargo fijo por unidad, por ubicación
+- **productos**: fix(productos): mostrar el costo unitario también en los locales
+- **productos**: fix(precios): que una suba de costo arrastre el precio de venta de cada local
+
+
 ## [2026-08-07] - Actualización: productos, proveedores
 
 ### Modificado

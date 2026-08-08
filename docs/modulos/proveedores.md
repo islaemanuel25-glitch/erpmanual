@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-07 00:43
+**Última actualización:** 2026-08-08 12:46
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,9 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-08: feat(listas): el motor calcula la interpretación y la confirmación vencida deja de contar — rutas SIN VERIFICAR
+- 2026-08-08: feat(listas): candidatos por parecido de nombre, calculados en el servidor
+- 2026-08-08: wip(listas): panel de decisión con SunmiTable — SIN VERIFICAR
 - 2026-08-06: feat(listas): vistas por producto en el área principal y reportes PDF
 - 2026-08-06: feat(listas): resumen orientado al ERP, con detalle por producto
 - 2026-08-06: feat(listas): grilla operativa para conciliar 190 productos
