@@ -51,6 +51,17 @@ const CAMPOS_FILA = {
   costoAnterior: true, costoMaestroPropuesto: true, montoRecargo: true, precioConRecargo: true,
   costoPrevioAplicacion: true, costoAplicado: true, aplicadaEn: true,
   multiplicadorConfirmado: true, cantidadPresentacion: true,
+  // Lo que `rangoDeLaFila` necesita para saber si manda el rango congelado de la
+  // fila o el de la cabecera. Sin estos cuatro campos la función no puede ver una
+  // confirmación y cae SIEMPRE a la cabecera, en silencio.
+  //
+  // Hoy no cambia ningún número —el reporte solo analiza filas FACTOR_DUDOSO, y
+  // una fila confirmada deja de estar en ese estado— pero el llamador dice que
+  // resuelve el rango de la fila y tiene que poder hacerlo. Si no, el día que
+  // alguien analice otro estado desde acá, la respuesta va a estar mal sin que
+  // nada lo delate.
+  confirmadoEn: true, vinculadoEn: true,
+  aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
 };
 
 const numero = (v) => (v === null || v === undefined ? null : Number(v));
