@@ -52,9 +52,16 @@ Se regeneran con:
 que apuntarlo a este directorio informa estas dos y lista el resto como "sólo en
 la corrida nueva".
 
-## Lo que la captura NO muestra
+## Qué muestra la captura
 
-El PNG es del alto de la ventana y la tabla queda abajo del pliegue: lo que se ve
-es la cabecera de la importación. La evidencia de las columnas y de las filas está
-en `huellas.json`, que es lo que compara el script. Para mirar la tabla a ojo hay
-que abrir la pantalla.
+La tabla, con el chip de la vista activa arriba. El generador desplaza la pantalla
+hasta el contenedor de la grilla antes de fotografiar y deja un poco de contexto
+por encima; antes fotografiaba el alto de la ventana sin moverse y la tabla —lo
+único que se está midiendo— quedaba abajo del pliegue.
+
+En `22-listas-conciliacion` se lee al pie "Página 1 de 26 · 636 registros", que es
+la cola paginada por el servidor. En `23-listas-armado-dudoso` se ven las diez
+filas con Propuesto y Var. en raya.
+
+La comparación, igual, la hace `huellas.json`: el PNG es para mirar a ojo lo que
+la huella no captura, como el texto de la columna Decisión.

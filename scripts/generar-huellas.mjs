@@ -84,6 +84,16 @@ const PANTALLAS = [
   },
 ];
 
+/**
+ * Cuánto se retrocede después de traer la tabla arriba, para dejar contexto.
+ *
+ * 180 y no menos porque la barra superior de la aplicación es fija y tapa los
+ * primeros ~56 px: con 120 el chip de la vista activa quedaba cortado por la
+ * mitad, que es justo lo que hay que poder leer para saber con qué filtro se
+ * sacó la foto.
+ */
+const DESPLAZAMIENTO_CONTEXTO = Number(arg("contexto-px", "180"));
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (m) => console.log(m);
 
@@ -476,6 +486,42 @@ try {
 
     const huella = JSON.parse(await evaluar(EXTRAER));
     huellas[p.nombre] = huella;
+
+    // La captura se lleva LA TABLA, no lo primero que se ve al cargar.
+    //
+    // Hasta acá fotografiaba el alto de la ventana sin moverse, así que en toda
+    // pantalla con encabezado alto la tabla quedaba abajo del pliegue y la imagen
+    // mostraba cualquier cosa menos lo que se estaba midiendo. Justo lo que había
+    // que mirar a ojo —la columna Decisión de la conciliación— no salía nunca.
+    //
+    // Se desplaza el contenedor de la tabla hasta arriba y se retrocede un poco,
+    // para que entren también los filtros y los chips: sin ese contexto no se
+    // entiende con qué vista se sacó la foto.
+    const ubicada = await evaluar(`(() => {
+      const t = document.querySelector("table");
+      if (!t) return false;
+      const cont = t.parentElement || t;
+      cont.scrollIntoView({ block: "start" });
+
+      // El retroceso va sobre el elemento que REALMENTE scrollea, que en esta
+      // aplicación no es la ventana: con \`window.scrollBy\` no se movía nada y la
+      // foto salía igual que sin retroceder. Se arranca DESDE EL PADRE del
+      // contenedor de la tabla a propósito: ese contenedor también scrollea —usa
+      // max-h— y moverlo desplazaría las filas en vez de la página.
+      let s = cont.parentElement;
+      while (s && s !== document.body) {
+        const o = getComputedStyle(s).overflowY;
+        if ((o === "auto" || o === "scroll") && s.scrollHeight > s.clientHeight) break;
+        s = s.parentElement;
+      }
+      const objetivo =
+        s && s !== document.body ? s : document.scrollingElement || document.documentElement;
+      objetivo.scrollTop = Math.max(0, objetivo.scrollTop - ${DESPLAZAMIENTO_CONTEXTO});
+      return true;
+    })()`);
+    // El desplazamiento no es instantáneo aunque no sea suave: hay que darle un
+    // cuadro antes de fotografiar, o sale la posición anterior.
+    if (ubicada) await sleep(400);
 
     const { data } = await send("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(path.join(SALIDA, `${p.nombre}.png`), Buffer.from(data, "base64"));
