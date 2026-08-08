@@ -52,6 +52,9 @@ import {
   RESULTADO_FILA,
   MOTIVO_OMISION,
 } from "@/lib/proveedores/listas/aplicacion";
+// El macheo que deja una fila aplicada. Vive con las demás decisiones de
+// vínculo, no acá: es la misma pregunta que resuelve la vinculación a mano.
+import { vinculoAPersistirAlAplicar } from "@/lib/proveedores/listas/vinculacion";
 
 // Una corrida grande escribe miles de filas. El default de 5 s de Prisma no
 // alcanza ni de lejos; el de la persistencia (60 s) tampoco para una lista
@@ -326,6 +329,12 @@ export async function POST(req, context) {
       const omitidasPorMotivo = new Map();
       const ahora = new Date();
 
+      // ── Los vínculos que deja esta tanda ──────────────────────────────
+      //
+      // Se juntan acá y se insertan de una sola vez al final de la transacción.
+      // Ver la nota larga más abajo, en el insert.
+      const vinculosNuevos = new Map();
+
       for (const fila of filas) {
         const base = fila.productoBaseId === null ? null : porId.get(fila.productoBaseId) ?? null;
         const v = revalidarFila({ fila, base, contexto, config, recargoPct });
@@ -407,6 +416,26 @@ export async function POST(req, context) {
           },
         });
 
+        // ── El macheo aprendido ────────────────────────────────────────
+        //
+        // Recién acá, con el costo ya escrito en ESTE producto desde ESTA fila.
+        // Es la evidencia de que el vínculo sirvió para actuar; un macheo por
+        // sufijo que nadie aplicó sigue siendo una suposición y no se guarda.
+        const aprendido = vinculoAPersistirAlAplicar(fila);
+        if (aprendido.persistir) {
+          // La clave del índice único. Si dos filas de la misma tanda traen el
+          // mismo código, queda una sola: insertar las dos haría que el propio
+          // INSERT chocara consigo mismo.
+          vinculosNuevos.set(aprendido.codigoInterno, {
+            grupoId,
+            proveedorId: importacion.proveedorId,
+            productoBaseId: base.id,
+            codigoInterno: aprendido.codigoInterno,
+            descripcionProveedor: fila.descripcionProveedor ?? null,
+            activo: true,
+          });
+        }
+
         detalle.push({
           filaId: fila.id,
           codigo: fila.codigoCrudo,
@@ -433,6 +462,31 @@ export async function POST(req, context) {
             aplicadaPorUsuarioId: usuarioId,
           },
         });
+      }
+
+      // ── Los vínculos aprendidos, en un solo insert ─────────────────────
+      //
+      // `skipDuplicates` es lo que hace esto SEGURO, y no solo idempotente. Se
+      // traduce a un ON CONFLICT DO NOTHING sobre el índice único
+      // (grupoId, proveedorId, codigoInterno), así que:
+      //
+      //   · si el vínculo ya existe igual, no pasa nada;
+      //   · si el código ya está vinculado a OTRO producto, NO se repunta. Ese
+      //     conflicto es una decisión de una persona —la ruta de vincular a mano
+      //     lo devuelve para que alguien lo mire— y aplicar una tanda no puede
+      //     resolverlo en silencio;
+      //   · si el vínculo existe pero está INACTIVO, no se resucita. Alguien lo
+      //     dio de baja a propósito y un lote no revierte esa decisión.
+      //
+      // Un `create` con try/catch no serviría: en Postgres el error de unicidad
+      // aborta la transacción entera, y se caerían los costos ya escritos.
+      let vinculosGuardados = 0;
+      if (vinculosNuevos.size > 0) {
+        const r = await tx.productoCodigoProveedor.createMany({
+          data: [...vinculosNuevos.values()],
+          skipDuplicates: true,
+        });
+        vinculosGuardados = r.count;
       }
 
       const resumen = resumirAplicacion(detalle);
@@ -479,7 +533,7 @@ export async function POST(req, context) {
         },
       });
 
-      return { resumen, detalle, pendientes };
+      return { resumen, detalle, pendientes, vinculosGuardados };
     }, TX_APLICAR);
 
     if (salida.carrera) {
@@ -504,6 +558,8 @@ export async function POST(req, context) {
       proveedor: importacion.proveedor?.nombre ?? null,
       archivo: importacion.archivoNombre,
       resumen: salida.resumen,
+      // Cuántos macheos quedaron aprendidos para la próxima lista del proveedor.
+      vinculosGuardados: salida.vinculosGuardados ?? 0,
       detalle: salida.detalle,
       pendientes: salida.pendientes,
       // Si quedan pendientes, la importación NO terminó. La pantalla lo usa
