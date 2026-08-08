@@ -287,34 +287,25 @@ export default function ConciliacionPage() {
   /**
    * Los candidatos de la pregunta de producto.
    *
-   * No están persistidos en la fila —se guarda el tipo de coincidencia y la
-   * sugerencia, no la lista— así que hay que pedirlos. Es el mismo endpoint que
-   * usa el buscador de vinculación.
+   * El parecido lo calcula el SERVIDOR, con la misma `sugerirPorNombre` que usa
+   * la conciliación y sobre el mismo universo. Acá no se compara nada: sin el
+   * universo de productos —que sale de una consulta— el navegador no podría, y
+   * mandárselo entero sería mover mucho para traer poco.
+   *
+   * Como cada apertura relee, la sugerencia siempre está fresca: un producto
+   * creado hace diez segundos ya aparece. No hay copia en memoria que invalidar.
    */
   const buscarCandidatos = async (fila) => {
-    // Con código duplicado se busca POR EL CÓDIGO: el endpoint machea contra
-    // `codigosProveedor.codigoInterno`, así que devuelve justo los productos que
-    // comparten ese código, que son los candidatos del empate. Sin código se
-    // busca por la descripción del proveedor.
-    const termino =
-      fila.estado === "CODIGO_DUPLICADO" && fila.codigoCrudo
-        ? String(fila.codigoCrudo)
-        : String(fila.descripcionProveedor ?? "").slice(0, 40);
-    if (termino.trim().length < 2) return [];
-
-    const url = new URL(`/api/proveedores/listas/${id}/productos`, window.location.origin);
-    url.searchParams.set("q", termino);
-    const r = await fetch(url.toString(), { credentials: "include", cache: "no-store" });
+    // Se manda el ID de la fila, no su descripción: el servidor lee la fila y usa
+    // exactamente el texto que ya clasificó el motor. Un string armado acá podría
+    // llegar recortado o normalizado distinto y compararía otra cosa.
+    const url = `/api/proveedores/listas/${id}/filas/${fila.id}/candidatos`;
+    const r = await fetch(url, {
+      credentials: "include", cache: "no-store",
+    });
     if (!r.ok) return [];
     const json = await r.json().catch(() => null);
-    return (json?.items ?? []).map((it) => ({
-      productoBaseId: it.productoBaseId ?? it.id,
-      nombre: it.nombre,
-      unidadMedida: it.unidad_medida ?? it.unidadMedida,
-      factorPack: it.factor_pack ?? it.factorPack,
-      costoActual: it.precio_costo ?? it.costoActual ?? null,
-      codigoProveedor: it.codigoInterno ?? it.codigosProveedor?.[0]?.codigoInterno ?? null,
-    }));
+    return Array.isArray(json?.candidatos) ? json.candidatos : [];
   };
 
   const alConfirmar = async (json) => {
