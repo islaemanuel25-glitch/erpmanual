@@ -64,6 +64,24 @@ const PANTALLAS = [
   { nombre: "18-usuarios", url: "/modulos/usuarios" },
   { nombre: "19-productos-fila-seleccionada", url: "/modulos/productos", clicPrimeraFila: true },
   { nombre: "20-edicion-rapida", url: "/modulos/productos/edicion-rapida" },
+  // Pendientes de decisión de una importación de lista. NO tiene línea de base:
+  // el relevamiento original no la incluyó, así que la primera corrida la
+  // informa como "sólo en la corrida nueva" y a partir de ahí sirve de
+  // referencia. Se agrega porque es la pantalla con tabla que más se movió —la
+  // vista arranca en la cola y la columna Propuesto cambió de contenido— y no
+  // tenerla dejaba ese cambio sin ninguna medición.
+  //
+  // El id 3 es la importación abierta de `erpazul_al`. Con otra base hay que
+  // cambiarlo o la pantalla da 404 y la huella sale vacía.
+  { nombre: "22-listas-conciliacion", url: `/modulos/proveedores/listas/${arg("importacion", "3")}` },
+  // La misma pantalla acotada al armado dudoso. Va aparte porque esas filas son
+  // las únicas donde la columna Propuesto queda en raya —el motor no propuso
+  // ningún costo para ellas— y en la vista general no entran en la primera
+  // página: quedan detrás de seiscientas sin vincular.
+  {
+    nombre: "23-listas-armado-dudoso",
+    url: `/modulos/proveedores/listas/${arg("importacion", "3")}?estado=FACTOR_DUDOSO`,
+  },
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

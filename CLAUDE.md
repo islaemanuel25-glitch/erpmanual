@@ -37,6 +37,17 @@ falla. Un clon nuevo no podía commitear por falta de identidad de git.
 Corolario: la comparación tiene que medir lo mismo de los dos lados. Dos capturas
 tomadas con ventanas de distinto alto informan diferencias que no existen.
 
+Corolario: **después de tocar `schema.prisma`, correr `prisma generate` antes de
+probar nada.** Esto no lo ve ni el build ni los candados. El proyecto es
+JavaScript, así que Next compila sin mirar los argumentos de Prisma, y los
+candados son funciones puras que no tocan la base: los dos pasan en verde con un
+cliente viejo. La consulta falla recién contra Postgres, con un mensaje que
+además apunta a otro lado —`Unknown argument`, o un P2022 nombrando una columna
+que no existe—. La migración aplicada no alcanza: el cliente se genera aparte.
+En la imagen esto ya está resuelto —el Dockerfile corre `prisma generate` antes
+de `npm run build`, con el CLI fijado en `dependencies`— y el que falta es
+siempre el de la máquina de quien está probando.
+
 ### 3. Un hecho, una columna
 
 El veredicto del motor y la decisión de una persona son datos distintos y no se
