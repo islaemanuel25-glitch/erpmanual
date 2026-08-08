@@ -20,7 +20,7 @@
 
 import fs from "node:fs";
 import { createHash } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 // Import DEFAULT y no namespace, al revés que en el código de la aplicación.
 // `xlsx` publica dos builds: el CJS (xlsx.js), que tiene todo incluido readFile,
@@ -30,7 +30,7 @@ import jwt from "jsonwebtoken";
 // existe. Por eso cada contexto usa la forma que le sirve.
 import XLSX from "xlsx";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const SUFIJO = `imp-listas-${Date.now().toString(36)}`;
 
 let ok = 0;

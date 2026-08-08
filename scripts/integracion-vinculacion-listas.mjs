@@ -13,12 +13,12 @@
 //   DATABASE_URL=<base descartable> AUTH_SECRET=<secreto> \
 //   node --import ./scripts/alias-loader.mjs scripts/integracion-vinculacion-listas.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 // Default y no namespace: ver la nota en scripts/integracion-importacion-listas.mjs.
 import XLSX from "xlsx";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const SUFIJO = `vinc-${Date.now().toString(36)}`;
 
 let ok = 0;

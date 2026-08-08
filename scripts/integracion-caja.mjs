@@ -13,10 +13,10 @@
 // Crea su propio local y usuarios de prueba, y los borra al terminar. NO toca
 // datos existentes: todo lo que escribe cuelga del local de prueba.
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const SUFIJO = `caja-test-${Date.now().toString(36)}`;
 
 let ok = 0;

@@ -9,10 +9,10 @@
 //
 // Crea su propio local y usuarios de prueba y los borra al terminar.
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const SUF = `multi-${Date.now().toString(36)}`;
 let ok = 0;
 let fallos = 0;

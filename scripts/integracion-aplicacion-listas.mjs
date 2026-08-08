@@ -13,11 +13,11 @@
 //   DATABASE_URL=<base descartable> AUTH_SECRET=<secreto> \
 //   node --import ./scripts/alias-loader.mjs scripts/integracion-aplicacion-listas.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 import XLSX from "xlsx";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const SUFIJO = `apl-${Date.now().toString(36)}`;
 
 let ok = 0;

@@ -21,10 +21,10 @@
 //
 // Crea su propio grupo, local y usuarios de prueba. NO toca datos existentes.
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const SUFIJO = `cambio-previo-${Date.now().toString(36)}`;
 
 let ok = 0;
