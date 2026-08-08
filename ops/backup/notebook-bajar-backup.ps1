@@ -99,11 +99,35 @@ function ActualizarEstado {
   Set-Content -Path $ESTADO -Value $salida -Encoding UTF8
 }
 
+# Ejecuta un programa externo y decide por su CÓDIGO DE SALIDA, no por si escribió
+# en stderr.
+#
+# Windows PowerShell 5.1 convierte cada línea que un .exe manda a stderr en un
+# registro de error, y con $ErrorActionPreference='Stop' eso aborta el script
+# aunque el programa haya terminado bien. `git clone` informa su progreso por
+# stderr, así que un clon exitoso se veía como una falla. Acá se baja la
+# preferencia mientras corre el programa y se mira el código de salida, que es lo
+# único que dice de verdad si funcionó.
+function EjecutarNativo {
+  param([string]$Programa, [string[]]$Argumentos, [string]$Descripcion)
+  $previo = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $salida = & $Programa @Argumentos 2>&1
+    $codigo = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previo
+  }
+  if ($codigo -ne 0) {
+    $texto = ($salida | Out-String).Trim()
+    throw ("{0} falló (código {1}): {2}" -f $Descripcion, $codigo, $texto)
+  }
+  return ($salida | Out-String).Trim()
+}
+
 function EjecutarSsh {
   param([string]$Comando)
-  $r = & $SSH -o ConnectTimeout=20 -o BatchMode=yes $VPS $Comando 2>&1
-  if ($LASTEXITCODE -ne 0) { throw "ssh falló ($LASTEXITCODE): $r" }
-  return ($r | Out-String).Trim()
+  return EjecutarNativo $SSH @("-o", "ConnectTimeout=20", "-o", "BatchMode=yes", $VPS, $Comando) "ssh"
 }
 
 Registrar "corrida" "INICIO" ("simular={0} forzarRepo={1}" -f $Simular, $ForzarRepo)
@@ -132,8 +156,7 @@ try {
   if (Test-Path $destino) {
     Registrar "notebook" "YA ESTABA" $nombreDiario
   } else {
-    & $SCP -o ConnectTimeout=20 "${VPS}:$DIR_REMOTO/$nombreDiario" $destino
-    if ($LASTEXITCODE -ne 0) { throw "scp falló ($LASTEXITCODE)" }
+    EjecutarNativo $SCP @("-o", "ConnectTimeout=20", "${VPS}:$DIR_REMOTO/$nombreDiario", $destino) "scp del diario" | Out-Null
   }
 
   # La verificación es el punto: sin esto solo sabemos que hay un archivo, no
@@ -178,6 +201,8 @@ try {
   Registrar "disco_externo" "ERROR" $_.Exception.Message
 }
 
+$fraseTmp = $null   # se usa en el finally; puede fallar antes de asignarla
+$fraseTmp = $null   # se usa en el finally: puede fallar antes de asignarla
 # ── 3. Repo git privado: semanal y mensual, CIFRADOS ────────────────────────
 # El diario NO va al repo: git guarda todas las versiones para siempre y un .gz
 # no comprime más, así que subir 365 por año lo haría crecer sin freno.
@@ -194,9 +219,21 @@ try {
     if (-not (Test-Path (Join-Path $REPO_LOCAL ".git"))) {
       Registrar "repo_git" "CLONANDO" $REPO_REMOTO
       if (-not $Simular) {
-        & $GIT clone $REPO_REMOTO $REPO_LOCAL 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "git clone falló: ¿existe el repo y tenés acceso?" }
+        EjecutarNativo $GIT @("clone", $REPO_REMOTO, $REPO_LOCAL) "git clone (revisa que el repo exista y tengas acceso)" | Out-Null
       }
+    }
+
+    # Identidad del commit, LOCAL a este clon. Esta máquina no tiene identidad
+    # global de git —el repo del ERP usa la suya propia—, así que un clon recién
+    # hecho no puede commitear: git corta con "Author identity unknown". Se
+    # configura acá y no a mano para que después de un formateo el primer intento
+    # funcione, en vez de fallar una vez y obligar a averiguar por qué.
+    if (-not $Simular -and (Test-Path (Join-Path $REPO_LOCAL ".git"))) {
+      Push-Location $REPO_LOCAL
+      try {
+        EjecutarNativo $GIT @("config", "user.name", "emanuel") "git config user.name" | Out-Null
+        EjecutarNativo $GIT @("config", "user.email", "emanuel@erpmanual.local") "git config user.email" | Out-Null
+      } finally { Pop-Location }
     }
 
     # La frase sale del archivo DPAPI y se le pasa a gpg por --passphrase-file.
@@ -231,8 +268,7 @@ try {
       if (-not $nombre) { Registrar "repo_git" "SIN $serie" "el VPS todavía no generó ninguno"; continue }
 
       $tmp = Join-Path $env:TEMP $nombre
-      & $SCP -o ConnectTimeout=20 "${VPS}:$DIR_REMOTO/$nombre" $tmp
-      if ($LASTEXITCODE -ne 0) { throw "scp del $serie falló" }
+      EjecutarNativo $SCP @("-o", "ConnectTimeout=20", "${VPS}:$DIR_REMOTO/$nombre", $tmp) "scp del $serie" | Out-Null
 
       $shaRem = (EjecutarSsh "sha256sum $DIR_REMOTO/$nombre").Split(" ")[0]
       $shaLoc = (Get-FileHash -Path $tmp -Algorithm SHA256).Hash.ToLower()
@@ -243,10 +279,7 @@ try {
         Registrar "repo_git" "SIMULADO" "$nombre.gpg"
       } else {
         New-Item -ItemType Directory -Path $REPO_LOCAL -Force | Out-Null
-        & $GPG --batch --yes --quiet --symmetric --cipher-algo AES256 `
-               --passphrase-file $fraseTmp --pinentry-mode loopback `
-               --output $cifrado $tmp
-        if ($LASTEXITCODE -ne 0) { throw "gpg falló al cifrar $nombre" }
+        EjecutarNativo $GPG @("--batch", "--yes", "--quiet", "--symmetric", "--cipher-algo", "AES256", "--passphrase-file", $fraseTmp, "--pinentry-mode", "loopback", "--output", $cifrado, $tmp) "gpg al cifrar $nombre" | Out-Null
         $subidos += "$nombre.gpg"
       }
       Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
@@ -255,12 +288,11 @@ try {
     if ($subidos.Count -gt 0 -and -not $Simular) {
       Push-Location $REPO_LOCAL
       try {
-        & $GIT add -- *.gpg 2>&1 | Out-Null
-        $hay = & $GIT status --porcelain
+        EjecutarNativo $GIT @("add", "--", "*.gpg") "git add" | Out-Null
+        $hay = EjecutarNativo $GIT @("status", "--porcelain") "git status"
         if ($hay) {
-          & $GIT commit -m ("backup cifrado {0}: {1}" -f (Get-Date -Format "yyyy-MM-dd"), ($subidos -join ", ")) 2>&1 | Out-Null
-          & $GIT push 2>&1 | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "git push falló" }
+          EjecutarNativo $GIT @("commit", "-m", ("backup cifrado {0}: {1}" -f (Get-Date -Format "yyyy-MM-dd"), ($subidos -join ", "))) "git commit" | Out-Null
+          EjecutarNativo $GIT @("push", "--set-upstream", "origin", "HEAD") "git push" | Out-Null
           Registrar "repo_git" "OK" ($subidos -join ", ")
           ActualizarEstado "repo_git" ($subidos -join ", ")
         } else {
@@ -277,7 +309,7 @@ try {
   if ($fraseTmp -and (Test-Path $fraseTmp)) {
     Remove-Item -LiteralPath $fraseTmp -Force -ErrorAction SilentlyContinue
   }
-  if (Test-Path $fraseTmp) { Registrar "repo_git" "AVISO" "no se pudo borrar la frase temporal" }
+  if ($fraseTmp -and (Test-Path $fraseTmp)) { Registrar "repo_git" "AVISO" "no se pudo borrar la frase temporal" }
 }
 
 Registrar "corrida" "FIN" ""
