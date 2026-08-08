@@ -1,17 +1,34 @@
 "use client";
 
-// CONCILIACIÓN de una importación.
+// LA PANTALLA DE UNA IMPORTACIÓN, DADA VUELTA.
 //
-// Página propia y a ancho completo, no modal: son 917 filas que se revisan con
-// calma, se filtran y se comparten por URL. Un modal con esto adentro sería
-// inservible.
+// La unidad es el PRODUCTO del sistema, no la fila del archivo. El archivo de
+// Arcor trae 917 filas y 625 de ellas son productos que este negocio no tiene:
+// medir contra ellas decía que faltaba el 68 % cuando el trabajo real estaba casi
+// terminado. El número que manda ahora es 376, los productos de Arcor que hay en
+// el sistema.
 //
-// Desde acá se selecciona y se aplica. Es la única pantalla del módulo que
-// escribe costos reales, así que la acción está separada de la revisión: primero
-// se mira, después se marca, y recién al final se confirma en un panel aparte
-// que dice proveedor, archivo, cantidad y qué pasa con el precio de venta.
+// ── LA CABECERA DICE QUÉ HACER HOY ──────────────────────────────────────────
+//
+// Un titular en criollo que cambia con el estado —recién importada habla de lo
+// que hay para actualizar, ya aplicada de lo que quedó con el precio viejo— y
+// cinco cards sobre esos 376. La de "listos para aplicar" lleva el botón adentro
+// y se apaga sola cuando el número da cero.
+//
+// ── UN SOLO SISTEMA DE FILTRO ───────────────────────────────────────────────
+//
+// Cinco filtros, uno por card, con las mismas palabras. Antes había diecinueve
+// chips Y un desplegable de estado: dos sistemas que se pisaban y que obligaban a
+// entender el vocabulario del motor —FACTOR_DUDOSO, CODIGO_DUPLICADO— para poder
+// filtrar. La búsqueda por texto va aparte y se combina, no reemplaza.
+//
+// ── EL ARCHIVO ES DIAGNÓSTICO ───────────────────────────────────────────────
+//
+// Las 917 filas y los criterios de macheo viven plegados abajo. Se abren cuando
+// algo no cierra; en un día normal nadie necesita saber cuántas machearon por
+// sufijo de cinco dígitos.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Search, X } from "lucide-react";
 
@@ -23,111 +40,23 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
-import GrillaConciliacion from "@/components/proveedores/listas/GrillaConciliacion";
-import PanelMacheo from "@/components/proveedores/listas/PanelMacheo";
-import VistaProductosSistema from "@/components/proveedores/listas/VistaProductosSistema";
-import ResumenConciliacion from "@/components/proveedores/listas/ResumenConciliacion";
-import {
-  BadgeEstado,
-  Dato,
-  ErrorRecuperable,
-  Paginacion,
-  ResumenMetricas,
-  Vacio,
-} from "@/components/proveedores/listas/PiezasListas";
-import {
-  ESTADOS_FILTRABLES,
-  porcentaje,
-} from "@/lib/proveedores/listas/presentacion";
+import PanelDecision from "@/components/proveedores/listas/PanelDecision";
+import PanelProducto from "@/components/proveedores/listas/PanelProducto";
+import CabeceraCatalogo, { ORDEN_CARDS } from "@/components/proveedores/listas/CabeceraCatalogo";
+import TablaCatalogo from "@/components/proveedores/listas/TablaCatalogo";
+import DiagnosticoArchivo from "@/components/proveedores/listas/DiagnosticoArchivo";
+import BotonReporte from "@/components/proveedores/listas/BotonReporte";
+import { ErrorRecuperable, Paginacion } from "@/components/proveedores/listas/PiezasListas";
+import { formaDelPanel, PREGUNTA } from "@/lib/proveedores/listas/panelDecision";
+import { GRUPO_PRODUCTO, TEXTO_GRUPO, titularDeCatalogo } from "@/lib/proveedores/listas/gruposProducto";
 
+/** Los cinco filtros, en el mismo orden y con las mismas palabras que las cards. */
+const FILTROS = ORDEN_CARDS;
 
-/**
- * Las vistas de la revisión. El valor viaja al servidor, que es quien filtra:
- * la pantalla no puede filtrar por "con alerta" porque las alertas se calculan
- * comparando cada fila con el producto vivo, y para eso habría que traerse las
- * 917 filas en cada clic.
- */
-const VISTAS = [
-  // PRIMERA Y POR DEFECTO. La pantalla se llama "Pendientes de decisión" y esto
-  // es lo que hay que decidir: abrirla en "Todas" dejaba las veinte filas que
-  // importan enterradas entre novecientas que no piden nada.
-  //
-  // El servidor la resuelve en el WHERE con `filtroDeLaCola`, paginada. Es para
-  // lo que se persistió el veredicto de interpretación: calcularlo al leer
-  // obligaría a traer las 917 filas para saber cuáles entran.
-  { id: "cola", texto: "Pendientes de decisión" },
-  { id: "todas", texto: "Todas" },
-  { id: "seleccionadas", texto: "Seleccionadas" },
-  { id: "listas", texto: "Listas pendientes" },
-  { id: "aplicadas", texto: "Aplicadas" },
-  { id: "alerta", texto: "Con alerta" },
-  { id: "exactas", texto: "Exactas" },
-  { id: "manuales", texto: "Manuales" },
-  { id: "sinCeros", texto: "Sin ceros" },
-  { id: "sufijo8", texto: "Sufijo 8" },
-  { id: "sufijo7", texto: "Sufijo 7" },
-  { id: "sufijo6", texto: "Sufijo 6" },
-  { id: "sufijo5", texto: "Sufijo 5" },
-  { id: "sufijo4", texto: "Sufijo 4" },
-  { id: "codigoBarra", texto: "Código de barras" },
-  // Mismo nombre que la tarjeta de progreso: el usuario busca "Revisar armado"
-  // y el filtro se llamaba distinto.
-  { id: "factorDudoso", texto: "Revisar armado" },
-  { id: "sinVincular", texto: "Sin vincular" },
-  { id: "ambiguas", texto: "Ambiguas" },
-  { id: "excluidas", texto: "Excluidas" },
-];
-
-/**
- * Con qué vista se abre la pantalla, y contra cuál se mide "hay filtros puestos".
- *
- * Está en una constante y no escrita en los tres lugares que la usan —el estado
- * inicial, el botón de limpiar y el cartel de filtros activos— porque si uno solo
- * quedara en "todas", limpiar los filtros llevaría a una vista distinta de la que
- * abre sola y el cartel diría que hay un filtro puesto sin que nadie lo pusiera.
- */
-const VISTA_POR_DEFECTO = "cola";
-
-/**
- * ¿Esta fila admite vincularse?
- *
- * Solo las que no machearon, sin producto y sin aplicar. El backend vuelve a
- * validarlo —es la autoridad—; acá se decide si el botón se muestra, para no
- * ofrecer una acción que va a rebotar.
- */
-function puedeVincular(fila) {
-  return fila?.estado === "NO_MACHEADO" && fila?.productoBaseId == null && fila?.aplicada !== true;
-}
-
-/**
- * Qué mostrarle a la casilla de una fila.
- *
- * `seleccionable` lo calcula el backend con el mismo predicado que después
- * aplica: la pantalla no vuelve a decidirlo por su cuenta. Cuando la fila no se
- * puede marcar se pasa el motivo, para que el checkbox gris tenga explicación.
- */
-const ESTADOS_ABIERTOS = ["CONCILIADA", "PARCIALMENTE_APLICADA"];
-
-function seleccionDeFila(fila, importacion, onCambiar) {
-  if (!importacion || !ESTADOS_ABIERTOS.includes(importacion.estado)) return null;
-  const puede = fila?.seleccionable === true && fila?.aplicada !== true;
-  return {
-    puede,
-    marcada: fila?.seleccionada === true,
-    motivo: puede
-      ? ""
-      : fila?.aplicada === true
-        ? "Esta fila ya se aplicó."
-        : "Solo se pueden aplicar las filas listas para actualizar.",
-    onCambiar,
-  };
-}
-
-export default function ConciliacionPage() {
+export default function CatalogoImportacionPage() {
   const router = useRouter();
   const params = useParams();
   const busqueda = useSearchParams();
@@ -141,66 +70,35 @@ export default function ConciliacionPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [cab, setCab] = useState(null);
-  const [filas, setFilas] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [porGrupo, setPorGrupo] = useState({});
+  const [universo, setUniverso] = useState(0);
+  const [cobertura, setCobertura] = useState(null);
   const [pag, setPag] = useState({ page: 1, paginas: 1, total: 0 });
+  const [archivo, setArchivo] = useState(null);
   const [macheo, setMacheo] = useState(null);
+  const [resumenSeleccion, setResumenSeleccion] = useState(null);
 
-  // Los filtros arrancan de la URL: así una conciliación filtrada se puede
-  // compartir por link y volver a abrir igual. Sin esto, pegar la URL con
-  // ?estado=... mostraba la lista entera y el usuario veía otra cosa que quien
-  // se la pasó.
+  const [grupo, setGrupo] = useState(() => busqueda?.get("grupo") ?? null);
   const [page, setPage] = useState(1);
-  // Cuántas filas por página. Quien revisa 190 productos quiere elegir cuánto
-  // barre de una: 25 para mirar con calma, 100 para pasar rápido.
-  const [pageSize, setPageSize] = useState(25);
-  /**
-   * Qué muestra el área principal.
-   *
-   *   CONCILIACION  la grilla de filas del archivo. Es el modo normal.
-   *   PENDIENTES    la MISMA grilla, acotada a los productos que faltan. No es
-   *                 otra pantalla: son las filas de esos productos, con sus
-   *                 acciones reales.
-   *   AUSENTES      productos del ERP que la lista no informó.
-   *   SIN_CODIGO    productos sin el código del proveedor guardado.
-   *
-   * Los dos últimos no tienen filas ni precio nuevo, así que se muestran como
-   * productos y ofrecen abrir la ficha, no confirmar nada.
-   */
-  const [modo, setModo] = useState("CONCILIACION");
-  // Los productos a los que se acota la grilla en el modo PENDIENTES.
-  const [productosFiltro, setProductosFiltro] = useState(null);
-  const [estado, setEstado] = useState(() => busqueda?.get("estado") ?? "");
-  const [vista, setVista] = useState(() => busqueda?.get("vista") ?? VISTA_POR_DEFECTO);
+  const [pageSize] = useState(25);
   const [q, setQ] = useState(() => busqueda?.get("q") ?? "");
-  // El texto tipeado se separa del que se consulta: buscar en cada tecla sobre
-  // 917 filas dispararía una consulta por letra.
   const [qAplicado, setQAplicado] = useState(() => busqueda?.get("q") ?? "");
 
-  // Qué fila tiene el panel de vinculación abierto. Una sola por vez: dos
-  // paneles abiertos invitan a confirmar el equivocado.
+  const [abierta, setAbierta] = useState(null);
   const [vinculando, setVinculando] = useState(null);
-  const [avisoVinculo, setAvisoVinculo] = useState("");
+  const [aviso, setAviso] = useState("");
+  const [trabajandoProducto, setTrabajandoProducto] = useState(false);
 
-  // ── Aplicación ──────────────────────────────────────────────────────────
-  //
-  // La selección vive en la BASE, no acá: la lista tiene miles de filas y se
-  // navega paginada y filtrada. Un estado local se perdería al cambiar de
-  // página, que es justo cuando el usuario está armando la selección.
-  const [resumenSeleccion, setResumenSeleccion] = useState({ seleccionables: 0, seleccionadas: 0, aplicadas: 0 });
-  const [trabajando, setTrabajando] = useState(false);
-  const [errorAplicar, setErrorAplicar] = useState("");
-  const [resultado, setResultado] = useState(null);
+  // La aplicación: el botón vive en la card y el panel se revela debajo.
+  const [mostrarAplicar, setMostrarAplicar] = useState(false);
   const [previo, setPrevio] = useState(null);
   const [cargandoPrevio, setCargandoPrevio] = useState(false);
+  const [trabajando, setTrabajando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [errorAplicar, setErrorAplicar] = useState("");
   const [cancelando, setCancelando] = useState(false);
   const [trabajandoCancelar, setTrabajandoCancelar] = useState(false);
-  const [progreso, setProgreso] = useState(null);
-  // El resumen visto desde el sistema —qué pasó con los productos del ERP— y el
-  // del archivo, que pasa a ser secundario.
-  const [sistema, setSistema] = useState(null);
-  const [archivo, setArchivo] = useState(null);
-  const [finalizando, setFinalizando] = useState(false);
-  const [trabajandoFinalizar, setTrabajandoFinalizar] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -210,188 +108,62 @@ export default function ConciliacionPage() {
     setCargando(true);
     setError("");
     try {
-      const url = new URL(`/api/proveedores/listas/${id}`, window.location.origin);
+      const url = new URL(`/api/proveedores/listas/${id}/catalogo`, window.location.origin);
+      if (grupo) url.searchParams.set("grupo", grupo);
       url.searchParams.set("page", String(page));
       url.searchParams.set("pageSize", String(pageSize));
-      if (productosFiltro?.length) url.searchParams.set("productos", productosFiltro.join(","));
-      if (estado) url.searchParams.set("estado", estado);
-      if (vista && vista !== "todas") url.searchParams.set("vista", vista);
       if (qAplicado) url.searchParams.set("q", qAplicado);
 
-      const r = await fetch(url.toString(), { credentials: "include", cache: "no-store" });
-      const json = await r.json();
-      if (!r.ok || !json?.ok) {
-        // Una importación de otro grupo da 404: no se revela que existe.
-        setError(json?.error || "No se pudo cargar la conciliación.");
+      // El catálogo trae los productos y los contadores. El endpoint viejo sigue
+      // dando lo que describe al ARCHIVO —macheo, filas, selección—, que ahora es
+      // el bloque de diagnóstico. Se piden en paralelo.
+      const [rCat, rArch] = await Promise.all([
+        fetch(url.toString(), { credentials: "include", cache: "no-store" }),
+        fetch(`/api/proveedores/listas/${id}?pageSize=1`, { credentials: "include", cache: "no-store" }),
+      ]);
+      const jCat = await rCat.json();
+      if (!rCat.ok || !jCat?.ok) {
+        setError(jCat?.error || "No se pudo cargar el catálogo.");
         return;
       }
-      setCab(json.importacion);
-      setFilas(json.filas ?? []);
-      setPag(json.paginacion ?? { page: 1, paginas: 1, total: 0 });
-      if (json.seleccion) setResumenSeleccion(json.seleccion);
-      if (json.macheo) setMacheo(json.macheo);
-      if (json.progreso) setProgreso(json.progreso);
-      if (json.sistema) setSistema(json.sistema);
-      if (json.archivo) setArchivo(json.archivo);
+      setProductos(jCat.productos ?? []);
+      setPorGrupo(Object.fromEntries((jCat.grupos ?? []).map((g) => [g.clave, g.valor])));
+      setUniverso(jCat.cobertura?.universo ?? 0);
+      setCobertura(jCat.cobertura ?? null);
+      setPag(jCat.paginacion ?? { page: 1, paginas: 1, total: 0 });
+
+      const jArch = await rArch.json().catch(() => null);
+      if (jArch?.ok) {
+        setCab(jArch.importacion);
+        setArchivo(jArch.archivo ?? null);
+        setMacheo(jArch.macheo ?? null);
+        setResumenSeleccion(jArch.seleccion ?? null);
+      }
     } catch {
       setError("Error de conexión.");
     } finally {
       setCargando(false);
     }
-  }, [id, page, pageSize, estado, vista, qAplicado, productosFiltro]);
+  }, [id, grupo, page, pageSize, qAplicado]);
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
     cargar();
   }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto]);
 
-  /**
-   * La fila vinculada vuelve del servidor ya recalculada, y el resumen con los
-   * contadores nuevos. Se reemplaza en su lugar en vez de recargar todo: el
-   * usuario no pierde el filtro ni la página en la que estaba.
-   */
-  const alVincular = (json) => {
-    setFilas((prev) => prev.map((f) => (f.id === json.fila.id ? { ...f, ...json.fila } : f)));
-    setCab((prev) => (prev ? { ...prev, ...json.resumen } : prev));
-    setVinculando(null);
-    setAvisoVinculo(
-      `Fila ${json.fila.filaExcel} vinculada con ${json.fila.productoBase?.nombre ?? "el producto elegido"}. Nuevo estado: ${json.fila.estado}.`
-    );
-  };
+  // El filtro arranca en la primera card que tenga trabajo. Se decide UNA vez:
+  // re-derivarlo en cada carga pelearía con los clics del usuario.
+  useEffect(() => {
+    if (grupo !== null || !Object.keys(porGrupo).length) return;
+    const conTrabajo = FILTROS.find((g) => Number(porGrupo[g] ?? 0) > 0);
+    setGrupo(conTrabajo ?? GRUPO_PRODUCTO.ACTUALIZADO);
+  }, [porGrupo, grupo]);
 
-  /**
-   * La fila confirmada vuelve recalculada del servidor. Se recarga la página de
-   * datos en vez de parchearla: al pasar a "lista" cambia de vista, cambian los
-   * contadores y cambia el progreso, y parchear en memoria dejaría tres números
-   * diciendo cosas distintas.
-   */
-  /**
-   * El panel elige; la escritura la hace la página.
-   *
-   * La grilla no conoce endpoints a propósito: devuelve QUÉ se eligió y quién
-   * sabe a dónde mandarlo es esta pantalla. Así el mismo panel sirve para la
-   * pregunta de producto y la de interpretación sin cablearle dos rutas.
-   */
-  const confirmarDecision = async ({ fila, clave, producto }) => {
-    // Si el paso 1 eligió otro producto, primero se vincula: la interpretación
-    // se confirma contra el producto que quedó, no contra el que estaba.
-    if (producto?.productoBaseId && producto.productoBaseId !== fila.erp?.productoBaseId) {
-      const rv = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/vincular`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ productoBaseId: producto.productoBaseId }),
-      });
-      if (!rv.ok) {
-        setAvisoVinculo("No se pudo vincular el producto elegido.");
-        return;
-      }
-    }
+  const titular = useMemo(() => titularDeCatalogo({ porGrupo, universo }), [porGrupo, universo]);
+  const abierto = cab?.estado !== "CANCELADA" && cab?.estado !== "APLICADA";
 
-    const r = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/confirmar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ clave, cantidadPresentacion: null }),
-    });
-    const json = await r.json().catch(() => null);
-    if (!r.ok || !json?.ok) {
-      setAvisoVinculo(json?.error || "No se pudo confirmar la decisión.");
-      return;
-    }
-    await alConfirmar(json);
-  };
+  // ── Acciones ────────────────────────────────────────────────────────────
 
-  /**
-   * Los candidatos de la pregunta de producto.
-   *
-   * El parecido lo calcula el SERVIDOR, con la misma `sugerirPorNombre` que usa
-   * la conciliación y sobre el mismo universo. Acá no se compara nada: sin el
-   * universo de productos —que sale de una consulta— el navegador no podría, y
-   * mandárselo entero sería mover mucho para traer poco.
-   *
-   * Como cada apertura relee, la sugerencia siempre está fresca: un producto
-   * creado hace diez segundos ya aparece. No hay copia en memoria que invalidar.
-   */
-  const buscarCandidatos = async (fila) => {
-    // Se manda el ID de la fila, no su descripción: el servidor lee la fila y usa
-    // exactamente el texto que ya clasificó el motor. Un string armado acá podría
-    // llegar recortado o normalizado distinto y compararía otra cosa.
-    const url = `/api/proveedores/listas/${id}/filas/${fila.id}/candidatos`;
-    const r = await fetch(url, {
-      credentials: "include", cache: "no-store",
-    });
-    if (!r.ok) return [];
-    const json = await r.json().catch(() => null);
-    return Array.isArray(json?.candidatos) ? json.candidatos : [];
-  };
-
-  const alConfirmar = async (json) => {
-    const comoQuedo =
-      json.multiplicador > 1
-        ? `el precio informado por ${json.multiplicador}`
-        : "el precio informado, sin multiplicar";
-    setAvisoVinculo(
-      json.quedoLista
-        ? `Fila ${json.fila.filaExcel} confirmada: el costo es ${comoQuedo}. Ya está lista para aplicar.`
-        : `Fila ${json.fila.filaExcel} confirmada: con esa interpretación el costo no cambia, así que no queda para aplicar.`
-    );
-    await cargar();
-  };
-
-
-
-  /**
-   * Cambiar el modo del área principal.
-   *
-   * Pendientes vuelve a la grilla acotada a esos productos: los ids se piden al
-   * mismo endpoint del resumen, que ya los sabe, y se limpian los filtros para
-   * que no se crucen con el recorte.
-   */
-  const cambiarModo = async (nuevo) => {
-    setVinculando(null);
-    if (nuevo !== "PENDIENTES") setProductosFiltro(null);
-
-    if (nuevo === "PENDIENTES") {
-      setEstado("");
-      setQ("");
-      setQAplicado("");
-      // "Todas" a propósito, no la cola: entrar por "pendientes del sistema" es
-      // pedir las filas DE ESOS PRODUCTOS, incluidas las que ya están listas.
-      // Acotarlas además a la cola escondería justo las que se pueden aplicar.
-      setVista("todas");
-      setPage(1);
-      try {
-        const r = await fetch(
-          `/api/proveedores/listas/${id}/sistema?situacion=PENDIENTES&page=1`,
-          { credentials: "include" }
-        );
-        const json = await r.json();
-        if (json?.ok) {
-          setProductosFiltro(json.items.map((x) => x.id));
-          setAvisoVinculo(
-            `Mostrando los ${json.paginacion.total} productos que faltan actualizar.`
-          );
-        }
-      } catch {
-        setErrorAplicar("No se pudieron cargar los productos pendientes.");
-        return;
-      }
-    }
-    setModo(nuevo);
-  };
-
-  const volverAConciliacion = () => {
-    setModo("CONCILIACION");
-    setProductosFiltro(null);
-    setPage(1);
-    setAvisoVinculo("");
-  };
-
-  // ── Selección ───────────────────────────────────────────────────────────
-  //
-  // Cada cambio va al servidor, que es quien valida. La pantalla no decide si
-  // una fila puede marcarse: dibuja lo que el backend ya declaró seleccionable.
   const mandarSeleccion = useCallback(
     async (cuerpo) => {
       setErrorAplicar("");
@@ -408,8 +180,6 @@ export default function ConciliacionPage() {
           return null;
         }
         setResumenSeleccion(json.resumen);
-        const marcadas = new Set(json.seleccionadas ?? []);
-        setFilas((prev) => prev.map((f) => ({ ...f, seleccionada: marcadas.has(f.id) })));
         return json;
       } catch {
         setErrorAplicar("Error de conexión.");
@@ -419,21 +189,13 @@ export default function ConciliacionPage() {
     [id]
   );
 
-  const alMarcarFila = (fila, marcada) =>
-    mandarSeleccion({ accion: marcada ? "MARCAR" : "DESMARCAR", ids: [fila.id] });
-
-  /**
-   * Excluir e incluir recargan la página de datos en vez de parchear la fila:
-   * excluir cambia el contador de seleccionables y, en la vista "excluidas",
-   * hace que la fila entre o salga del listado. Parchear en memoria dejaría la
-   * pantalla diciendo algo distinto de la base.
-   */
-  const cambiarExclusion = async (fila, excluir) => {
-    const r = await mandarSeleccion({ accion: excluir ? "EXCLUIR" : "INCLUIR", ids: [fila.id] });
-    if (r) await cargar();
+  /** Abrir el panel de aplicar: se marcan todas las listas y se pide el previo. */
+  const abrirAplicar = async () => {
+    setMostrarAplicar(true);
+    await mandarSeleccion({ accion: "TODOS" });
+    await pedirPrevio();
   };
 
-  /** El resumen final lo calcula el servidor sobre TODAS las seleccionadas. */
   const pedirPrevio = async () => {
     setCargandoPrevio(true);
     setPrevio(null);
@@ -448,55 +210,6 @@ export default function ConciliacionPage() {
       setErrorAplicar("Error de conexión.");
     } finally {
       setCargandoPrevio(false);
-    }
-  };
-
-  /**
-   * Cancelar deja el registro como historial y libera el archivo. No toca
-   * costos, precios ni productos: es una decisión sobre el proceso.
-   */
-  const cancelarImportacion = async () => {
-    setTrabajandoCancelar(true);
-    setErrorAplicar("");
-    try {
-      const r = await fetch(`/api/proveedores/listas/${id}/cancelar`, {
-        method: "POST",
-        credentials: "include",
-      });
-      const json = await r.json();
-      if (!r.ok || !json?.ok) {
-        setErrorAplicar(json?.error || "No se pudo cancelar la importación.");
-        return;
-      }
-      setCancelando(false);
-      await cargar();
-    } catch {
-      setErrorAplicar("Error de conexión.");
-    } finally {
-      setTrabajandoCancelar(false);
-    }
-  };
-
-  /** Cierra la importación por decisión del usuario. No aplica nada. */
-  const finalizarImportacion = async () => {
-    setTrabajandoFinalizar(true);
-    setErrorAplicar("");
-    try {
-      const r = await fetch(`/api/proveedores/listas/${id}/finalizar`, {
-        method: "POST",
-        credentials: "include",
-      });
-      const json = await r.json();
-      if (!r.ok || !json?.ok) {
-        setErrorAplicar(json?.error || "No se pudo finalizar la importación.");
-        return;
-      }
-      setFinalizando(false);
-      await cargar();
-    } catch {
-      setErrorAplicar("Error de conexión.");
-    } finally {
-      setTrabajandoFinalizar(false);
     }
   };
 
@@ -517,7 +230,7 @@ export default function ConciliacionPage() {
         return;
       }
       setResultado(json);
-      // Se recarga: la cabecera pasó a APLICADA y las filas traen su resultado.
+      setMostrarAplicar(false);
       await cargar();
     } catch {
       setErrorAplicar("Error de conexión. No se aplicó nada.");
@@ -526,20 +239,182 @@ export default function ConciliacionPage() {
     }
   };
 
-  const seleccionDe = (f) => seleccionDeFila(f, cab, alMarcarFila);
+  const cancelarImportacion = async () => {
+    setTrabajandoCancelar(true);
+    setErrorAplicar("");
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/cancelar`, {
+        method: "POST", credentials: "include",
+      });
+      const json = await r.json();
+      if (!r.ok || !json?.ok) {
+        setErrorAplicar(json?.error || "No se pudo cancelar la importación.");
+        return;
+      }
+      setCancelando(false);
+      await cargar();
+    } catch {
+      setErrorAplicar("Error de conexión.");
+    } finally {
+      setTrabajandoCancelar(false);
+    }
+  };
 
-  const buscar = () => {
-    setPage(1);
-    setQAplicado(q.trim());
+  /** La decisión del panel de una FILA. El panel elige; la página escribe. */
+  const confirmarDecision = async ({ fila, clave, producto }) => {
+    if (producto?.productoBaseId && producto.productoBaseId !== fila.erp?.id) {
+      const rv = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/vincular`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ productoBaseId: producto.productoBaseId }),
+      });
+      if (!rv.ok) {
+        setAviso("No se pudo vincular el producto elegido.");
+        return;
+      }
+    }
+    const r = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/confirmar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ clave, cantidadPresentacion: null }),
+    });
+    const json = await r.json().catch(() => null);
+    if (!r.ok || !json?.ok) {
+      setAviso(json?.error || "No se pudo confirmar la decisión.");
+      return;
+    }
+    setAviso(`Fila ${json.fila.filaExcel} confirmada.`);
+    setAbierta(null);
+    await cargar();
   };
-  const limpiar = () => {
-    setQ("");
-    setQAplicado("");
-    setEstado("");
-    setVista(VISTA_POR_DEFECTO);
-    setPage(1);
+
+  const buscarCandidatos = async (fila) => {
+    const r = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/candidatos`, {
+      credentials: "include", cache: "no-store",
+    });
+    if (!r.ok) return [];
+    const json = await r.json().catch(() => null);
+    return Array.isArray(json?.candidatos) ? json.candidatos : [];
   };
-  const hayFiltros = !!estado || !!qAplicado || vista !== VISTA_POR_DEFECTO;
+
+  /** CASO A: el producto sin código es esta fila del archivo. */
+  const vincularFilaAProducto = async (producto, filaId) => {
+    setTrabajandoProducto(true);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/filas/${filaId}/vincular`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ productoBaseId: producto.id }),
+      });
+      const json = await r.json().catch(() => null);
+      if (!r.ok || !json?.ok) {
+        setAviso(json?.error || "No se pudo vincular la fila.");
+        return;
+      }
+      setAviso(`${producto.nombre} quedó vinculado con la fila ${json.fila?.filaExcel ?? filaId}.`);
+      setAbierta(null);
+      await cargar();
+    } finally {
+      setTrabajandoProducto(false);
+    }
+  };
+
+  /** CASO B: qué hacer con un producto que la lista no trajo. */
+  const resolverDestino = async (producto, destino) => {
+    if (destino === "DEJAR_COMO_ESTA") {
+      setAviso(`${producto.nombre} queda como está.`);
+      setAbierta(null);
+      return;
+    }
+    if (destino === "REVISAR_CODIGO") {
+      router.push(`/modulos/productos/${producto.id}/editar`);
+      return;
+    }
+    setTrabajandoProducto(true);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/vinculos/baja`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ productoBaseId: producto.id }),
+      });
+      const json = await r.json().catch(() => null);
+      if (!r.ok || !json?.ok) {
+        setAviso(json?.error || "No se pudo dar de baja el código.");
+        return;
+      }
+      setAviso(`${producto.nombre}: se dio de baja el código del proveedor. El producto no se tocó.`);
+      setAbierta(null);
+      await cargar();
+    } finally {
+      setTrabajandoProducto(false);
+    }
+  };
+
+  /**
+   * Qué panel le corresponde a un producto.
+   *
+   * Con filas del archivo, el de siempre: la comparación y sus dos preguntas. Sin
+   * filas, la tercera forma. La decisión no se toma acá — sale del grupo, que
+   * calculó el servidor con el mismo predicado que arma los contadores.
+   */
+  const renderPanel = (p) => {
+    if (!p.filas?.length) {
+      return (
+        <PanelProducto
+          producto={p}
+          importacion={cab}
+          onVincularFila={(filaId) => vincularFilaAProducto(p, filaId)}
+          onDestino={(d) => resolverDestino(p, d)}
+          trabajando={trabajandoProducto}
+        />
+      );
+    }
+    // La fila principal es la primera del archivo. El panel de siempre espera la
+    // fila con su lado del ERP adentro, así que se arma acá desde el producto.
+    const fila = {
+      ...p.filas[0],
+      importacionId: cab?.id,
+      erp: {
+        id: p.id,
+        nombre: p.nombre,
+        codigosArcor: (p.codigosProveedor ?? []).filter((c) => c.activo).map((c) => c.codigo),
+        codigoBarra: p.codigoBarra,
+        codigoBarraSecundario: p.codigoBarraSecundario,
+        actualizadoEn: p.actualizadoEn,
+        unidadMedida: p.unidadMedida,
+        factorPack: p.factorPack,
+        modoCompraProveedor: p.modoCompraProveedor,
+        costoActual: p.costoActual,
+        ventaActual: p.ventaActual,
+        esCombo: p.esCombo,
+      },
+    };
+    const forma = formaDelPanel({
+      estado: fila.estado,
+      tieneProducto: true,
+      resultado: fila.resultadoInterpretacion ?? null,
+      aplicada: !!fila.aplicada,
+      excluida: fila.excluidaManual === true,
+      confirmada: !!fila.confirmadoEn && (!fila.vinculadoEn || new Date(fila.confirmadoEn) > new Date(fila.vinculadoEn)),
+    });
+    return (
+      <PanelDecision
+        fila={fila}
+        importacion={cab}
+        forma={forma}
+        candidatos={[]}
+        productoElegido={null}
+        eleccion={null}
+        onElegir={() => {}}
+        onConfirmar={() => {}}
+        onVincularOtro={() => setVinculando(fila)}
+      />
+    );
+  };
 
   if (cargandoUser || cargandoCtx) return null;
   if (!esAdmin) return <SinPermisos />;
@@ -557,374 +432,206 @@ export default function ConciliacionPage() {
       {cab && (
         <>
           {/* ── Cabecera ──────────────────────────────────────────────── */}
-          <SunmiCard className="p-3 space-y-3">
-            {/* El resumen manda: primero qué pasó con los productos del ERP,
-                después qué trajo el archivo. Los datos de la importación
-                —fecha, usuario, parser— viven adentro del encabezado nuevo o
-                dejan de mostrarse: no ayudan a decidir nada. */}
-            <ResumenConciliacion
-              cabecera={cab}
-              sistema={sistema}
-              archivo={archivo}
-              proveedor={cab.proveedor}
-              modo={modo}
-              onModo={cambiarModo}
+          <SunmiCard className="p-3 space-y-2.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-[13px] font-bold sunmi-text-strong">
+                Importación #{cab.id}
+              </span>
+              <span className="text-[11px] sunmi-text-muted">{cab.proveedor?.nombre}</span>
+              <span className="text-[11px] sunmi-text-muted hidden sm:inline">
+                {cab.archivoNombre}
+              </span>
+              <div className="ml-auto">
+                <BotonReporte
+                  importacionId={cab.id}
+                  cabecera={cab}
+                  proveedor={cab.proveedor}
+                  usuario={cab.usuario?.nombre}
+                />
+              </div>
+            </div>
+
+            <CabeceraCatalogo
+              titular={titular}
+              porGrupo={porGrupo}
+              universo={universo}
+              grupoActivo={grupo}
+              onGrupo={(g) => {
+                setGrupo(g);
+                setPage(1);
+                setAbierta(null);
+              }}
+              onAplicar={abrirAplicar}
+              puedeAplicar={abierto}
+              onVerDiscontinuados={() => {
+                setGrupo(GRUPO_PRODUCTO.DISCONTINUADO);
+                setPage(1);
+              }}
             />
 
-            {/* ── Cancelar ─────────────────────────────────────────────
-                Una importación que no sirve tiene que poder sacarse del medio.
-                Antes no se podía, y además su archivo quedaba bloqueado para
-                siempre: no había forma de subir el Excel corregido. */}
+            {cobertura && !cobertura.cierra ? (
+              <p className="text-[11px] sunmi-text-danger">
+                Los grupos suman {cobertura.suma} y el catálogo tiene {cobertura.universo}: faltan{" "}
+                {cobertura.faltante} productos por clasificar. Avisá, es un error del sistema.
+              </p>
+            ) : null}
+
+            {aviso ? <p className="text-[11.5px] sunmi-text-success leading-snug">{aviso}</p> : null}
+
+            {mostrarAplicar && abierto ? (
+              <PanelAplicar
+                importacion={cab}
+                resumenSeleccion={resumenSeleccion}
+                previo={previo}
+                cargandoPrevio={cargandoPrevio}
+                onPedirPrevio={pedirPrevio}
+                trabajando={trabajando}
+                onSeleccionarTodos={() => mandarSeleccion({ accion: "TODOS" })}
+                onDeseleccionar={() => mandarSeleccion({ accion: "NINGUNO" })}
+                onAplicar={aplicar}
+                resultado={resultado}
+                error={errorAplicar}
+              />
+            ) : null}
+
             {cab.estado === "CANCELADA" ? (
               <div className="sunmi-surface-soft sunmi-border border rounded-lg px-3 py-2">
                 <span className="text-[12.5px] font-semibold sunmi-text-danger">
                   Importación cancelada
                 </span>
                 <p className="text-[11.5px] sunmi-text-muted leading-snug mt-0.5">
-                  Queda solo como historial. No se puede aplicar y el archivo quedó liberado:
-                  ya se puede volver a importar.
+                  Queda solo como historial. No se puede aplicar y el archivo quedó liberado.
                 </p>
               </div>
-            ) : cab.estado !== "APLICADA" ? (
+            ) : abierto ? (
               <div className="flex flex-wrap items-center gap-2">
                 <SunmiButton
                   color="slate"
                   onClick={() => setCancelando(true)}
                   disabled={trabajandoCancelar}
-                  className="py-2 px-3 !text-[11.5px]"
+                  className="py-1.5 px-2.5 !text-[11px]"
                 >
                   Cancelar importación
                 </SunmiButton>
                 {cancelando && (
                   <div className="w-full sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-2">
                     <p className="text-[12px] sunmi-text-strong leading-snug">
-                      ¿Cancelar esta importación? Queda como historial, se desmarcan todas las
-                      filas y no se va a poder aplicar.
-                    </p>
-                    <p className="text-[11.5px] sunmi-text-muted leading-snug">
-                      No se modifica ningún costo, precio ni producto. El archivo queda liberado
-                      para volver a importarlo.
+                      ¿Cancelar esta importación? Queda como historial y no se va a poder aplicar.
+                      No se modifica ningún costo ni producto.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
-                      <SunmiButton
-                        color="slate"
-                        onClick={() => setCancelando(false)}
-                        disabled={trabajandoCancelar}
-                        className="py-2 !text-xs order-2 sm:order-1"
-                      >
+                      <SunmiButton color="slate" onClick={() => setCancelando(false)} className="py-2 !text-xs">
                         No, volver
                       </SunmiButton>
                       <SunmiButton
                         color="red"
                         onClick={cancelarImportacion}
                         disabled={trabajandoCancelar}
-                        className="py-2 font-bold !text-xs order-1 sm:order-2"
+                        className="py-2 font-bold !text-xs"
                       >
-                        {trabajandoCancelar ? "Cancelando…" : "Sí, cancelar la importación"}
+                        {trabajandoCancelar ? "Cancelando…" : "Sí, cancelar"}
                       </SunmiButton>
                     </div>
                   </div>
                 )}
               </div>
             ) : null}
-
-            {avisoVinculo && (
-              <p className="text-[11.5px] sunmi-text-success leading-snug">{avisoVinculo}</p>
-            )}
-
-            {/* La barra de aplicación va ARRIBA de la tabla y fuera de ella: es
-                una acción sobre el conjunto, no sobre una fila, y esconderla al
-                final de 917 filas la volvería invisible. */}
-            {cab.estado !== "CANCELADA" && cab.estado !== "APLICADA" && (
-            <PanelAplicar
-              importacion={cab}
-              resumenSeleccion={resumenSeleccion}
-              previo={previo}
-              cargandoPrevio={cargandoPrevio}
-              onPedirPrevio={pedirPrevio}
-              trabajando={trabajando}
-              onSeleccionarTodos={() => mandarSeleccion({ accion: "TODOS" })}
-              onDeseleccionar={() => mandarSeleccion({ accion: "NINGUNO" })}
-              onAplicar={aplicar}
-              resultado={resultado}
-              error={errorAplicar}
-            />
-            )}
-            {cab.estado === "CANCELADA" && errorAplicar && (
-              <p className="text-[12px] sunmi-text-danger">{errorAplicar}</p>
-            )}
-
           </SunmiCard>
 
-          {/* ── Modos de PRODUCTOS ─────────────────────────────────────
-              Ausentes y sin código no tienen filas ni precio nuevo: se muestran
-              como productos, en el mismo lugar que la grilla, con su título y
-              su vuelta atrás. */}
-          {(modo === "AUSENTES" || modo === "SIN_CODIGO") && (
-            <VistaProductosSistema
-              importacionId={id}
-              situacion={modo}
-              onVolver={volverAConciliacion}
-            />
-          )}
-
-          {modo !== "AUSENTES" && modo !== "SIN_CODIGO" && (
-            <>
-          {/* ── Filtros ───────────────────────────────────────────────── */}
-          <SunmiCard className="p-3">
-            <div className="grid grid-cols-1 sm:grid-cols-[220px_1fr_auto] gap-2 items-end">
-              <div className="space-y-1">
-                <label htmlFor="filtro-estado" className="text-[11px] sunmi-text-muted block">
-                  Estado
-                </label>
-                <SunmiSelectAdv
-                  id="filtro-estado"
-                  value={estado}
-                  onChange={(v) => {
-                    setEstado(v);
+          {/* ── Filtros: cinco, con las palabras de las cards ─────────── */}
+          <SunmiCard className="p-2.5 space-y-2">
+            <div className="flex flex-wrap gap-1.5">
+              {FILTROS.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => {
+                    setGrupo(g);
                     setPage(1);
+                    setAbierta(null);
                   }}
-                  placeholder="Todos los estados"
+                  aria-pressed={grupo === g}
+                  className={`px-2.5 py-1.5 rounded-full text-[11.5px] font-semibold border transition-colors ${
+                    grupo === g ? "sunmi-btn-base sunmi-btn-cyan border-transparent" : "sunmi-border sunmi-text-muted"
+                  }`}
                 >
-                  <SunmiSelectOption value="">Todos los estados</SunmiSelectOption>
-                  {ESTADOS_FILTRABLES.map((e) => (
-                    <SunmiSelectOption key={e.valor} value={e.valor}>
-                      {e.etiqueta}
-                    </SunmiSelectOption>
-                  ))}
-                </SunmiSelectAdv>
-              </div>
+                  {TEXTO_GRUPO[g]} ({Number(porGrupo[g] ?? 0)})
+                </button>
+              ))}
+            </div>
 
-              <div className="space-y-1">
-                <label htmlFor="filtro-q" className="text-[11px] sunmi-text-muted block">
-                  Buscar por código o descripción
-                </label>
-                <div className="flex gap-2">
-                  <SunmiInput
-                    id="filtro-q"
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && buscar()}
-                    placeholder="Ej: 10301 o KETCHUP"
-                    autoComplete="off"
-                    className="flex-1"
-                  />
-                  <SunmiButton color="cyan" onClick={buscar} className="py-2 px-3 !text-xs">
-                    <Search size={14} aria-hidden="true" />
-                  </SunmiButton>
-                </div>
-              </div>
-
+            {/* La búsqueda se COMBINA con el filtro, no lo reemplaza. */}
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
+              <SunmiInput
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setPage(1);
+                    setQAplicado(q.trim());
+                  }
+                }}
+                placeholder="Buscar por nombre, SKU o código de barras"
+                className="!py-1.5 !text-[12px]"
+              />
+              <SunmiButton
+                color="cyan"
+                onClick={() => {
+                  setPage(1);
+                  setQAplicado(q.trim());
+                }}
+                className="py-1.5 px-3 !text-[11px] inline-flex items-center gap-1"
+              >
+                <Search size={13} aria-hidden="true" /> Buscar
+              </SunmiButton>
               <SunmiButton
                 color="slate"
-                onClick={limpiar}
-                disabled={!hayFiltros}
-                className="py-2 !text-xs inline-flex items-center gap-1 disabled:opacity-40"
+                onClick={() => {
+                  setQ("");
+                  setQAplicado("");
+                  setPage(1);
+                }}
+                disabled={!qAplicado}
+                className="py-1.5 px-3 !text-[11px] inline-flex items-center gap-1"
               >
-                <X size={14} aria-hidden="true" />
-                Limpiar
+                <X size={13} aria-hidden="true" /> Limpiar
               </SunmiButton>
             </div>
           </SunmiCard>
 
-          {/* ── Filas ─────────────────────────────────────────────────── */}
-          {cargando && (
-            <SunmiCard className="p-6">
-              <SunmiLoader />
-            </SunmiCard>
-          )}
+          {/* ── La tabla de PRODUCTOS ─────────────────────────────────── */}
+          <TablaCatalogo
+            productos={productos}
+            cargando={cargando}
+            abierta={abierta}
+            onAbrir={setAbierta}
+            renderPanel={renderPanel}
+          />
 
-          {!cargando && error && <ErrorRecuperable mensaje={error} onReintentar={cargar} />}
+          <Paginacion
+            page={pag.page}
+            paginas={pag.paginas}
+            total={pag.total}
+            onPage={(n) => {
+              setPage(n);
+              setAbierta(null);
+            }}
+          />
 
-          {!cargando && !error && filas.length === 0 && (
-            <Vacio
-              titulo={hayFiltros ? "Ninguna fila coincide con el filtro" : "Esta importación no tiene filas"}
-              detalle={hayFiltros ? "Probá con otro estado o limpiá la búsqueda." : null}
-              accion={
-                hayFiltros ? (
-                  <SunmiButton color="slate" onClick={limpiar} className="py-2 !text-xs">
-                    Limpiar filtros
-                  </SunmiButton>
-                ) : null
-              }
-            />
-          )}
-
-          {/* ── Cierre de la importación ───────────────────────────────────
-              Los conteos se fueron al encabezado, que ahora los cuenta desde el
-              sistema. Acá queda solo la decisión de terminar. */}
-          {!error && cab && progreso && (
-            <SunmiCard className="p-3 space-y-2">
-              {/* Cierre explícito: mientras haya pendientes, terminar es una
-                  decisión, no una consecuencia de haber aplicado algo. */}
-              {cab.estado !== "APLICADA" && cab.estado !== "CANCELADA" && (
-                <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  <SunmiButton
-                    color="slate"
-                    onClick={() => setFinalizando(true)}
-                    disabled={trabajandoFinalizar}
-                    className="py-2 px-3 !text-[11.5px]"
-                  >
-                    Finalizar importación
-                  </SunmiButton>
-                  <span className="text-[10.5px] sunmi-text-muted">
-                    Cierra la lista sin aplicar lo que queda pendiente.
-                  </span>
-                  {finalizando && (
-                    <div className="w-full sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-2">
-                      <p className="text-[12px] sunmi-text-strong leading-snug">
-                        ¿Dar por terminada esta importación?
-                        {progreso.pendientes > 0 && (
-                          <> Quedan <span className="font-semibold">{progreso.pendientes}</span> filas
-                          sin resolver y no se van a poder aplicar después.</>
-                        )}
-                      </p>
-                      <p className="text-[11.5px] sunmi-text-muted leading-snug">
-                        Las {progreso.aplicadas} ya aplicadas conservan su historial. No se modifica
-                        ningún costo ni precio.
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
-                        <SunmiButton
-                          color="slate"
-                          onClick={() => setFinalizando(false)}
-                          disabled={trabajandoFinalizar}
-                          className="py-2 !text-xs order-2 sm:order-1"
-                        >
-                          No, seguir trabajando
-                        </SunmiButton>
-                        <SunmiButton
-                          color="cyan"
-                          onClick={finalizarImportacion}
-                          disabled={trabajandoFinalizar}
-                          className="py-2 font-bold !text-xs order-1 sm:order-2"
-                        >
-                          {trabajandoFinalizar ? "Finalizando…" : "Sí, finalizar la importación"}
-                        </SunmiButton>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </SunmiCard>
-          )}
-
-          {/* La sección de macheo va ARRIBA de todo el listado: responde la
-              pregunta previa —cómo se encontró cada producto— antes de que el
-              usuario empiece a revisar fila por fila. */}
-          {!error && cab && (
-            <PanelMacheo
-              macheo={macheo}
-              vista={vista}
-              onVista={(v) => {
-                setVista(v);
-                setPage(1);
+          {vinculando ? (
+            <PanelVincular
+              importacionId={id}
+              fila={vinculando}
+              onCerrar={() => setVinculando(null)}
+              onVinculada={async () => {
+                setVinculando(null);
+                await cargar();
               }}
             />
-          )}
+          ) : null}
 
-          {/* ── Vistas ─────────────────────────────────────────────────── */}
-          {!error && cab && (
-            <div className="flex flex-wrap gap-1.5">
-              {VISTAS.map((v) => {
-                const activa = vista === v.id;
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => {
-                      setVista(v.id);
-                      setPage(1);
-                    }}
-                    aria-pressed={activa}
-                    className={`px-2.5 py-1.5 rounded-full text-[11.5px] font-semibold border transition-colors ${
-                      activa
-                        ? "sunmi-btn-base sunmi-btn-cyan border-transparent"
-                        : "sunmi-border sunmi-text-muted"
-                    }`}
-                  >
-                    {v.texto}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {modo === "PENDIENTES" && (
-            <div className="flex items-start justify-between gap-2 flex-wrap">
-              <div className="min-w-0">
-                <h2 className="text-[14px] font-bold sunmi-text-strong">
-                  Productos pendientes de actualizar
-                </h2>
-                <p className="text-[11px] sunmi-text-muted leading-tight">
-                  La misma grilla, acotada a los productos del ERP que faltan. Las acciones son las
-                  de siempre: confirmar, ver opciones o cambiar el producto.
-                </p>
-              </div>
-              <SunmiButton
-                color="slate"
-                onClick={volverAConciliacion}
-                className="py-1.5 px-3 !text-[11.5px] shrink-0"
-              >
-                Volver a la conciliación
-              </SunmiButton>
-            </div>
-          )}
-
-          {!cargando && !error && filas.length > 0 && (
-            <>
-              {/* La grilla decide sola cómo mostrarse: tabla densa en pantalla
-                  ancha, tarjetas compactas en el teléfono. El detalle se abre
-                  debajo de la propia fila, nunca en un modal ni en un panel. */}
-              <GrillaConciliacion
-                filas={filas}
-                importacion={cab}
-                seleccionDe={seleccionDe}
-                onMarcar={alMarcarFila}
-                onVincular={(x) => setVinculando(x)}
-                onConfirmada={confirmarDecision}
-                buscarCandidatos={buscarCandidatos}
-                editable={ESTADOS_ABIERTOS.includes(cab?.estado) && !trabajando}
-              />
-
-              {/* Vincular sigue siendo un buscador aparte: es la única acción
-                  que necesita escribir y comparar candidatos. */}
-              {vinculando && (
-                <PanelVincular
-                  importacionId={id}
-                  fila={vinculando}
-                  onVinculada={alVincular}
-                  onCerrar={() => setVinculando(null)}
-                />
-              )}
-
-              <div className="flex flex-wrap items-center gap-2">
-                <label htmlFor="filas-por-pagina" className="text-[11px] sunmi-text-muted">
-                  Mostrar
-                </label>
-                <SunmiSelectAdv
-                  id="filas-por-pagina"
-                  value={String(pageSize)}
-                  onChange={(v) => { setPageSize(Number(v)); setPage(1); }}
-                  className="w-24"
-                >
-                  <SunmiSelectOption value="25">25</SunmiSelectOption>
-                  <SunmiSelectOption value="50">50</SunmiSelectOption>
-                  <SunmiSelectOption value="100">100</SunmiSelectOption>
-                </SunmiSelectAdv>
-                <div className="flex-1 min-w-[12rem]">
-                  <Paginacion
-                    page={pag.page}
-                    paginas={pag.paginas}
-                    total={pag.total}
-                    cargando={cargando}
-                    onPage={setPage}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-            </>
-          )}
+          {/* ── El archivo, como diagnóstico ──────────────────────────── */}
+          <DiagnosticoArchivo archivo={archivo} macheo={macheo} cabecera={cab} />
         </>
       )}
     </Marco>
@@ -932,17 +639,17 @@ export default function ConciliacionPage() {
 }
 
 function Marco({ children, router }) {
-  // Ancho completo: la conciliación necesita el espacio, y no es un modal.
   return (
-    <div className="p-2 lg:p-3 space-y-3 w-full max-w-[1600px] mx-auto">
-      <button
-        type="button"
-        onClick={() => router.push("/modulos/proveedores/listas")}
-        className="text-[11px] sunmi-text-muted inline-flex items-center gap-1"
-      >
-        <ArrowLeft size={14} aria-hidden="true" />
-        Volver al historial
-      </button>
+    <div className="min-h-screen sunmi-bg p-3 space-y-2.5">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => router.push("/modulos/proveedores/listas")}
+          className="inline-flex items-center gap-1 text-[12px] sunmi-text-muted hover:underline"
+        >
+          <ArrowLeft size={14} aria-hidden="true" /> Volver al historial
+        </button>
+      </div>
       {children}
     </div>
   );

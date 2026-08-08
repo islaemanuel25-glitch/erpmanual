@@ -34,6 +34,8 @@ import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { paginacion, LIMITES } from "@/lib/proveedores/listas/persistencia";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import { candidatosParaProducto } from "@/lib/proveedores/listas/candidatosSinCodigo";
+import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 import { filtroDeLaCola, esDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import {
   GRUPO_PRODUCTO,
@@ -174,6 +176,16 @@ export async function GET(req, context) {
         : [],
     ]);
 
+    // ── Candidatos de los productos SIN CÓDIGO ───────────────────────────
+    //
+    // Se calculan ACÁ y no en el navegador. Las señales se miden contra las 626
+    // filas que no machearon con nada, y mandarlas al cliente para que las
+    // recorra sería un megabyte por página para terminar mostrando cinco
+    // tarjetas. El módulo es el mismo que prueban los candados.
+    const rango = rangoDeLaFila({}, importacion);
+    const recargoPct = numero(importacion.recargoPct);
+    const candidatosPorProducto = new Map();
+
     const filasPorProducto = new Map();
     for (const f of filas) {
       if (!filasPorProducto.has(f.productoBaseId)) filasPorProducto.set(f.productoBaseId, []);
@@ -188,18 +200,60 @@ export async function GET(req, context) {
     // El grupo de cada producto se recalcula con el MISMO predicado que armó los
     // contadores, sobre los hechos de esta página. Si difiriera del `where` que
     // lo trajo, el candado de equivalencia estaría roto y hay que verlo.
-    const salida = productos.map((p) => {
+    const conGrupo = productos.map((p) => {
       const suyas = filasPorProducto.get(p.id) ?? [];
       const suyosCodigos = codigosPorProducto.get(p.id) ?? [];
-      const grupo = grupoDeProducto({
-        tieneFilaAplicada: suyas.some((f) => f.aplicada === true),
-        // La cola se decide con el mismo predicado puro que usa la pantalla.
-        tieneFilaEnCola: suyas.some((f) => esDeLaCola(f)),
-        tieneFila: suyas.length > 0,
-        tieneCodigoActivo: suyosCodigos.some((c) => c.activo === true),
-        tieneCodigoDadoDeBaja: suyosCodigos.some((c) => c.activo === false),
-      });
+      return {
+        p,
+        suyas,
+        suyosCodigos,
+        grupo: grupoDeProducto({
+          tieneFilaAplicada: suyas.some((f) => f.aplicada === true),
+          tieneFilaEnCola: suyas.some((f) => esDeLaCola(f)),
+          tieneFila: suyas.length > 0,
+          tieneCodigoActivo: suyosCodigos.some((c) => c.activo === true),
+          tieneCodigoDadoDeBaja: suyosCodigos.some((c) => c.activo === false),
+        }),
+      };
+    });
 
+    // Las filas sin machear se traen UNA vez, y solo si hay algún producto que
+    // las necesite. En una página de actualizados no se consulta nada.
+    const necesitanCandidatos = conGrupo.filter((x) => x.grupo === GRUPO_PRODUCTO.SIN_CODIGO);
+    if (necesitanCandidatos.length > 0) {
+      const filasSinMachear = await prisma.importacionListaFila.findMany({
+        where: { importacionId, productoBaseId: null },
+        select: {
+          id: true, filaExcel: true, codigoCrudo: true, codigoNormalizado: true,
+          descripcionProveedor: true, unidadProveedor: true, unidadesPorBulto: true,
+          precioConIva: true, recargoPct: true,
+        },
+      });
+      const normalizadas = filasSinMachear.map((f) => ({
+        ...f,
+        precioConIva: numero(f.precioConIva),
+        recargoPct: numero(f.recargoPct),
+      }));
+      for (const x of necesitanCandidatos) {
+        candidatosPorProducto.set(
+          x.p.id,
+          candidatosParaProducto({
+            producto: {
+              nombre: x.p.nombre,
+              precio_costo: numero(x.p.precio_costo),
+              unidad_medida: x.p.unidad_medida,
+              factor_pack: x.p.factor_pack,
+              modoCompraProveedor: x.p.modoCompraProveedor,
+            },
+            filas: normalizadas,
+            recargoPct,
+            rango,
+          })
+        );
+      }
+    }
+
+    const salida = conGrupo.map(({ p, suyas, suyosCodigos, grupo }) => {
       return {
         id: p.id,
         nombre: p.nombre,
@@ -214,6 +268,8 @@ export async function GET(req, context) {
         modoCompraProveedor: p.modoCompraProveedor,
         esCombo: p.es_combo === true,
         grupo,
+        // Solo en los sin código: las tarjetas de la tercera forma del panel.
+        candidatos: candidatosPorProducto.get(p.id) ?? null,
         codigosProveedor: suyosCodigos.map((c) => ({
           codigo: c.codigoInterno,
           activo: c.activo,
