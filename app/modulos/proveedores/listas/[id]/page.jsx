@@ -247,6 +247,76 @@ export default function ConciliacionPage() {
    * contadores y cambia el progreso, y parchear en memoria dejaría tres números
    * diciendo cosas distintas.
    */
+  /**
+   * El panel elige; la escritura la hace la página.
+   *
+   * La grilla no conoce endpoints a propósito: devuelve QUÉ se eligió y quién
+   * sabe a dónde mandarlo es esta pantalla. Así el mismo panel sirve para la
+   * pregunta de producto y la de interpretación sin cablearle dos rutas.
+   */
+  const confirmarDecision = async ({ fila, clave, producto }) => {
+    // Si el paso 1 eligió otro producto, primero se vincula: la interpretación
+    // se confirma contra el producto que quedó, no contra el que estaba.
+    if (producto?.productoBaseId && producto.productoBaseId !== fila.erp?.productoBaseId) {
+      const rv = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/vincular`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ productoBaseId: producto.productoBaseId }),
+      });
+      if (!rv.ok) {
+        setAvisoVinculo("No se pudo vincular el producto elegido.");
+        return;
+      }
+    }
+
+    const r = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/confirmar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ clave, cantidadPresentacion: null }),
+    });
+    const json = await r.json().catch(() => null);
+    if (!r.ok || !json?.ok) {
+      setAvisoVinculo(json?.error || "No se pudo confirmar la decisión.");
+      return;
+    }
+    await alConfirmar(json);
+  };
+
+  /**
+   * Los candidatos de la pregunta de producto.
+   *
+   * No están persistidos en la fila —se guarda el tipo de coincidencia y la
+   * sugerencia, no la lista— así que hay que pedirlos. Es el mismo endpoint que
+   * usa el buscador de vinculación.
+   */
+  const buscarCandidatos = async (fila) => {
+    // Con código duplicado se busca POR EL CÓDIGO: el endpoint machea contra
+    // `codigosProveedor.codigoInterno`, así que devuelve justo los productos que
+    // comparten ese código, que son los candidatos del empate. Sin código se
+    // busca por la descripción del proveedor.
+    const termino =
+      fila.estado === "CODIGO_DUPLICADO" && fila.codigoCrudo
+        ? String(fila.codigoCrudo)
+        : String(fila.descripcionProveedor ?? "").slice(0, 40);
+    if (termino.trim().length < 2) return [];
+
+    const url = new URL(`/api/proveedores/listas/${id}/productos`, window.location.origin);
+    url.searchParams.set("q", termino);
+    const r = await fetch(url.toString(), { credentials: "include", cache: "no-store" });
+    if (!r.ok) return [];
+    const json = await r.json().catch(() => null);
+    return (json?.items ?? []).map((it) => ({
+      productoBaseId: it.productoBaseId ?? it.id,
+      nombre: it.nombre,
+      unidadMedida: it.unidad_medida ?? it.unidadMedida,
+      factorPack: it.factor_pack ?? it.factorPack,
+      costoActual: it.precio_costo ?? it.costoActual ?? null,
+      codigoProveedor: it.codigoInterno ?? it.codigosProveedor?.[0]?.codigoInterno ?? null,
+    }));
+  };
+
   const alConfirmar = async (json) => {
     const comoQuedo =
       json.multiplicador > 1
@@ -799,7 +869,8 @@ export default function ConciliacionPage() {
                 seleccionDe={seleccionDe}
                 onMarcar={alMarcarFila}
                 onVincular={(x) => setVinculando(x)}
-                onConfirmada={alConfirmar}
+                onConfirmada={confirmarDecision}
+                buscarCandidatos={buscarCandidatos}
                 editable={ESTADOS_ABIERTOS.includes(cab?.estado) && !trabajando}
               />
 

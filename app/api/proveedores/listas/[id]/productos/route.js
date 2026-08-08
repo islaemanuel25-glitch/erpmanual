@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requireAdmin, checkPerm } from "@/lib/authorize";
 import { productoVisibleWhere, getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
 import {
@@ -93,6 +93,9 @@ export async function GET(req, context) {
         nombre: true,
         unidad_medida: true,
         factor_pack: true,
+        // Habilita mostrar la variación de cada candidato, que es la evidencia
+        // que delata cuál es el correcto. Solo se emite con costos.ver.
+        precio_costo: true,
         codigo_barra: true,
         codigo_barra_secundario: true,
         creadoEnLocalId: true,
@@ -110,6 +113,11 @@ export async function GET(req, context) {
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
 
+    // Hoy la guarda de arriba ya exige administrador, así que esto siempre da
+    // true. Se consulta igual para que el costo dependa del permiso y no de esa
+    // guarda: si mañana se afloja, el costo no viaja de arriba sin decidirlo.
+    const puedeVerCosto = checkPerm(admin.session, "costos.ver").ok;
+
     const items = bases.map((b) =>
       presentarCandidato(
         {
@@ -123,10 +131,12 @@ export async function GET(req, context) {
           codigosProveedor: b.codigosProveedor.map((x) => x.codigoInterno),
           creadoEnLocalId: b.creadoEnLocalId,
           esCombo: b.es_combo,
+          costoActual: b.precio_costo,
         },
         {
           // Se calcula ahora para poder ADVERTIR antes de vincular, no después.
           puedeEditarCosto: puedeEditarCosto(localId, b.creadoEnLocalId, depositoLocalId),
+          puedeVerCosto,
         }
       )
     );
