@@ -19,9 +19,28 @@
 // ── POR QUÉ TAMBIÉN LAS CANCELADAS ──────────────────────────────────────────
 //
 // No se abren y nadie las trabaja, así que su resultado no se usa. Se rellenan
-// igual para que la columna no quede con valores en unas filas y NULL en otras:
-// dentro de seis meses, ese NULL obligaría a averiguar si significa "no se
+// igual para que la columna no quede con valores en unas importaciones y NULL en
+// otras: dentro de seis meses, ese NULL obligaría a averiguar si significa "no se
 // calculó nunca" o "el motor no pudo decidir".
+//
+// ── QUÉ FILAS SE RELLENAN, Y POR QUÉ NO TODAS ───────────────────────────────
+//
+// Exactamente las que el motor rellenaría, ni una más. El motor le calcula el
+// veredicto a las filas que llegan al final de `conciliarFila`, que son las
+// mismas que llegan a tener un costo propuesto: una fila sin vincular, bloqueada
+// o con el armado dudoso nunca llega ahí y su veredicto queda NULO.
+//
+// Este script NO vuelve a correr el motor —eso recalcularía el estado con
+// productos que cambiaron desde entonces, que es justo el dato inventado que
+// queremos evitar— así que lee ese mismo hecho de la fila guardada:
+// `costoMaestroPropuesto` no nulo. Es un solo hecho, no una segunda copia de la
+// regla, y el candado 65 de conciliarLista ata las dos cosas: si algún día el
+// motor moviera el cálculo de lugar, ese candado se pone rojo antes de que este
+// script escriba valores que el motor volvería a dejar en nulo.
+//
+// Un NULL en la columna significa entonces lo mismo acá que en el motor: "no se
+// llegó a evaluar". Distinto de REVISAR, que es "se miraron las hipótesis y
+// ninguna cierra".
 //
 // Uso:
 //   DATABASE_URL=... node --import ./scripts/alias-loader.mjs \
@@ -31,6 +50,11 @@
 
 import { crearClientePrisma, LECTURA, ESCRITURA } from "./lib/clientePrisma.mjs";
 import { analizarFila } from "../lib/proveedores/listas/confirmarPresentacion.js";
+// El mismo resolvedor de rango que usa el motor: congelado de la fila si la
+// confirmación está vigente, después la cabecera, después el default. Escribir
+// acá "el rango de la importación" a secas ignoraría el congelado de las filas
+// confirmadas, que es exactamente lo que ese congelado existe para proteger.
+import { rangoDeLaFila } from "../lib/proveedores/listas/vigenciaConfirmacion.js";
 
 const APLICAR = process.argv.includes("--aplicar");
 const prisma = await crearClientePrisma({ nivel: APLICAR ? ESCRITURA : LECTURA });
@@ -55,15 +79,16 @@ async function main() {
   for (const imp of importaciones) {
     // Se aborta en vez de completar con un default: una importación sin rango es
     // un dato que hay que mirar, no uno que se pueda suponer.
+    //
+    // Después de la migración 20260808150000 no debería quedar ninguna: esa
+    // migración asentó 10 a 20 en las que nacían nulas, que es el criterio con el
+    // que efectivamente se las evaluó. Si esto salta, la migración no corrió en
+    // esta base y hay que aplicarla antes, no completar el número acá.
     if (imp.aumentoEsperadoMinPct === null || imp.aumentoEsperadoMaxPct === null) {
       throw new Error(`La importación ${imp.id} no tiene rango esperado. Revisar antes de rellenar.`);
     }
 
-    const rango = {
-      minPct: Number(imp.aumentoEsperadoMinPct),
-      maxPct: Number(imp.aumentoEsperadoMaxPct),
-    };
-    log(`\n── importación ${imp.id} (${imp.estado}) · recargo ${imp.recargoPct} % · rango ${rango.minPct}–${rango.maxPct} %`);
+    log(`\n── importación ${imp.id} (${imp.estado}) · recargo ${imp.recargoPct} % · rango ${imp.aumentoEsperadoMinPct}–${imp.aumentoEsperadoMaxPct} %`);
 
     const filas = await prisma.importacionListaFila.findMany({
       where: { importacionId: imp.id },
@@ -71,6 +96,11 @@ async function main() {
         id: true, descripcionProveedor: true, unidadProveedor: true,
         unidadesPorBulto: true, precioConIva: true, recargoPct: true,
         productoBaseId: true,
+        // El hecho que dice si el motor llegó a evaluar esta fila.
+        costoMaestroPropuesto: true,
+        // Lo que necesita `rangoDeLaFila` para saber si manda el congelado.
+        confirmadoEn: true, vinculadoEn: true,
+        aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
       },
     });
 
@@ -89,26 +119,34 @@ async function main() {
     const porId = new Map(bases.map((b) => [b.id, b]));
 
     const cambios = new Map();
+    let sinEvaluar = 0;
     for (const f of filas) {
       const base = f.productoBaseId ? porId.get(f.productoBaseId) : null;
-      // Sin producto no hay nada que interpretar: el resultado queda nulo, que es
-      // distinto de "no se calculó".
+      // Sin producto no hay nada que interpretar.
       if (!base) continue;
 
-      // El recargo de LA FILA, que es el que el motor le aplicó, y el rango de
-      // ESTA importación. Nunca los de otra.
+      // Y sin costo propuesto, el motor nunca llegó a evaluar esta fila: su
+      // veredicto es NULO, y rellenarlo diría algo que el motor no dijo.
+      if (f.costoMaestroPropuesto === null || f.costoMaestroPropuesto === undefined) {
+        sinEvaluar++;
+        continue;
+      }
+
+      // El recargo de LA FILA, que es el que el motor le aplicó, y el rango que
+      // le corresponde A ESTA FILA: el congelado si su confirmación sigue
+      // vigente, si no el de ESTA importación. Nunca el de otra.
       const a = analizarFila({
         fila: f,
         base,
         recargoPct: f.recargoPct,
-        rango,
+        rango: rangoDeLaFila(f, imp),
       });
       if (!a?.resultado) continue;
       cambios.set(f.id, a.resultado);
       porResultado[a.resultado] = (porResultado[a.resultado] ?? 0) + 1;
     }
 
-    log(`   filas: ${filas.length} · con producto: ${filas.filter((f) => f.productoBaseId).length} · a escribir: ${cambios.size}`);
+    log(`   filas: ${filas.length} · con producto: ${filas.filter((f) => f.productoBaseId).length} · sin evaluar por el motor: ${sinEvaluar} · a escribir: ${cambios.size}`);
     total += cambios.size;
 
     if (APLICAR && cambios.size) {
