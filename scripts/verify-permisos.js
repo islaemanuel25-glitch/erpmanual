@@ -1,7 +1,7 @@
 // scripts/verify-permisos.js
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, LECTURA } from "./lib/clientePrisma.mjs";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: LECTURA });
 
 async function main() {
   console.log("🔍 Verificando permisos y roles...");

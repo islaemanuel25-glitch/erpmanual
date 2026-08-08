@@ -9,11 +9,11 @@
 //   node scripts/auditoria-pagos-integridad.mjs
 //   (opcional) FECHA_DESDE=2026-01-01 FECHA_HASTA=2026-12-31
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, LECTURA } from "./lib/clientePrisma.mjs";
 
-const url = process.env.DATABASE_URL || "";
-if (!url) { console.error("ABORT: falta DATABASE_URL"); process.exit(2); }
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+// Solo lee, así que puede apuntar a cualquier base —incluida producción— pero la
+// URL tiene que venir del operador: la fábrica no la hereda del .env.
+const prisma = await crearClientePrisma({ nivel: LECTURA });
 
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 let problemas = 0;

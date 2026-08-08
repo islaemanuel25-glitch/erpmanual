@@ -9,7 +9,7 @@
 //
 //   node scripts/auditar-presentacion-lista.mjs <importacionId>
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, LECTURA } from "./lib/clientePrisma.mjs";
 
 import {
   RELACION,
@@ -20,7 +20,7 @@ import {
   costoDeRelacion,
 } from "../lib/proveedores/listas/confirmarPresentacion.js";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: LECTURA });
 const importacionId = Number(process.argv[2] ?? 3);
 
 /** ¿La relación implícita respalda esta opción? Cerca de 1 o cerca de la cantidad. */

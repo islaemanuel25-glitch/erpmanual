@@ -1,5 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 async function main() {
   await prisma.rol.update({

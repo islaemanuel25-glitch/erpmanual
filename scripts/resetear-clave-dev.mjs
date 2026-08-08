@@ -13,45 +13,21 @@
 //
 // Guarda de seguridad: se niega a correr si la base no está en localhost.
 
+// La guarda que este script tenía propia —host local y NODE_ENV— es exactamente
+// el nivel ESCRITURA de la fábrica, así que se delega y no se duplica.
+import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 import bcrypt from "bcrypt";
-import { PrismaClient } from "@prisma/client";
 
 const COSTE_BCRYPT = 10; // igual que prisma/seed.js
-const HOSTS_LOCALES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 function arg(nombre) {
   const i = process.argv.indexOf(`--${nombre}`);
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : null;
 }
 
-function exigirBaseLocal() {
-  const crudo = process.env.DATABASE_URL;
-  if (!crudo) {
-    console.error("Falta DATABASE_URL.");
-    process.exit(1);
-  }
-  let url;
-  try {
-    url = new URL(crudo);
-  } catch {
-    console.error("DATABASE_URL no es una URL válida.");
-    process.exit(1);
-  }
-  if (!HOSTS_LOCALES.has(url.hostname)) {
-    console.error(
-      `Este script sólo corre contra bases locales. Host recibido: ${url.hostname}. Abortado.`
-    );
-    process.exit(1);
-  }
-  if (process.env.NODE_ENV === "production") {
-    console.error("NODE_ENV=production. Abortado.");
-    process.exit(1);
-  }
-  return url.pathname.replace(/^\//, "") || "(sin nombre)";
-}
-
-const base = exigirBaseLocal();
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
+// Seguro después de la fábrica: si el operador no puso la variable, ya abortó.
+const base = new URL(process.env.DATABASE_URL).pathname.replace(/^\//, "") || "(sin nombre)";
 
 // Admin = rol cuyo array de permisos contiene "*" (misma regla que el login).
 function esAdmin(rol) {

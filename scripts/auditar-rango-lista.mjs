@@ -5,13 +5,13 @@
 //
 //   node scripts/auditar-rango-lista.mjs <importacionId> [minPct] [maxPct]
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, LECTURA } from "./lib/clientePrisma.mjs";
 
 import { aplicarRecargo, round2, requiereConversionABulto } from "../lib/proveedores/listas/calculoCosto.js";
 import { presentacionDeDescripcion, compatibilidadDePresentacion } from "../lib/proveedores/listas/presentacionDescripcion.js";
 import { clasificarVariacion, recomendarHipotesis, ESTADO_VARIACION } from "../lib/proveedores/listas/rangoAumento.js";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: LECTURA });
 const importacionId = Number(process.argv[2] ?? 3);
 const minPct = Number(process.argv[3] ?? 8);
 const maxPct = Number(process.argv[4] ?? 15);

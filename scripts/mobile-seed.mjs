@@ -6,13 +6,10 @@
 // Uso: SEED_DESTRUCTIVO=erpazul_correccion_test \
 //      DATABASE_URL=postgresql://…/erpazul_correccion_test node scripts/mobile-seed.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 import bcrypt from "bcrypt";
-import { exigirBaseDescartable } from "./guardaSeedDestructivo.mjs";
 
-exigirBaseDescartable();
-const url = process.env.DATABASE_URL;
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 
 const PERMS_TESTER = ["reportes.ver", "ventas.corregir_simple", "ventas.corregir_completa", "pos.usar"];
 const PERMS_SINCORR = ["reportes.ver", "pos.usar"]; // ve el ticket pero NO puede corregir

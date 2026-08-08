@@ -17,7 +17,7 @@
 //   DATABASE_URL=... node --import ./scripts/alias-loader.mjs \
 //     scripts/auditar-macheo-lista.mjs --id 1
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, LECTURA } from "./lib/clientePrisma.mjs";
 
 import { cargarDatosDeConciliacion } from "../lib/proveedores/listas/cargaErp.js";
 import {
@@ -32,7 +32,7 @@ import {
   LONGITUDES_SUFIJO,
 } from "../lib/proveedores/listas/normalizarCodigo.js";
 
-const prisma = new PrismaClient();
+const prisma = await crearClientePrisma({ nivel: LECTURA });
 
 const args = process.argv.slice(2);
 const ID = Number(args[args.indexOf("--id") + 1]);

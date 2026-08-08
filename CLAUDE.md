@@ -51,3 +51,29 @@ negocian:
 - Commits en español con prefijo: feat:, fix:, docs:, refactor:
 - Componentes UI usar la librería Sunmi (SunmiCard, SunmiButton, SunmiInput, etc.)
 - No usar `<select>` ni `<input>` nativos — usar SunmiSelectAdv y SunmiInput
+
+## Scripts que tocan la base
+
+Reglas que no se negocian. Vienen de un caso real: `new PrismaClient()` sin
+argumentos no falla cuando falta `DATABASE_URL` — usa la del `.env`. Había 23
+scripts que escribían en `erpazul_dev` creyendo que trabajaban en otro lado, y 19
+que hacían `TRUNCATE` de todas las tablas protegidos solamente por que la palabra
+"test" no aparecía en el nombre de esa base.
+
+- **Ningún script de `scripts/` construye `PrismaClient` directo.** Todos piden el
+  cliente a `scripts/lib/clientePrisma.mjs`, que exige la URL de forma explícita y
+  aborta con código 2 si falta, en vez de heredarla. La única excepción es la
+  fábrica misma. Tres niveles: `LECTURA` (URL explícita), `ESCRITURA` (además host
+  local y `NODE_ENV` distinto de production) y `DESTRUCTIVO` (además nombre exacto
+  en lista blanca y `SEED_DESTRUCTIVO` igual a ese nombre). El nivel sigue al
+  **modo**, no al script: uno con dry-run pide `LECTURA` al simular y `ESCRITURA`
+  al aplicar, así la simulación puede auditar producción sin habilitar escrituras.
+- **La fábrica se importa ANTES que cualquier cosa que arrastre a Prisma.** En la
+  práctica, primero de todo. `@prisma/client` carga el `.env` al importarse, y la
+  fábrica distingue "la puso el operador" de "la puso el archivo" capturando la
+  variable antes de que eso ocurra. Si algo carga Prisma antes, esa distinción se
+  pierde en silencio.
+- **Un paso de datos que corre en producción va como migración de Prisma, nunca
+  como script.** Las migraciones ya tienen su lugar en el despliegue, quedan
+  registradas y se aplican una sola vez; un script suelto no. Corolario: si algo
+  necesita correr en el VPS, no es un script — es una migración.

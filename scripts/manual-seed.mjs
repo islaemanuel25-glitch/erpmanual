@@ -7,14 +7,11 @@
 // Uso: SEED_DESTRUCTIVO=erpazul_correccion_test AUTH_SECRET=<.env> \
 //      DATABASE_URL=postgresql://…/erpazul_correccion_test node scripts/manual-seed.mjs
 
-import { PrismaClient } from "@prisma/client";
+import { crearClientePrisma, DESTRUCTIVO } from "./lib/clientePrisma.mjs";
 import jwt from "jsonwebtoken";
-import { exigirBaseDescartable } from "./guardaSeedDestructivo.mjs";
 
-exigirBaseDescartable();
-const url = process.env.DATABASE_URL;
 const AUTH_SECRET = process.env.AUTH_SECRET;
-const prisma = new PrismaClient({ datasources: { db: { url } }, log: [] });
+const prisma = await crearClientePrisma({ nivel: DESTRUCTIVO });
 
 async function truncate() {
   const rows = await prisma.$queryRawUnsafe(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename <> '_prisma_migrations'`);
