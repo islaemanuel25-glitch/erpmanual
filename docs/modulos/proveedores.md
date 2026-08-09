@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-09 15:14
+**Última actualización:** 2026-08-09 16:33
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,9 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-09: fix(listas): la tapa cuenta lo mismo que adentro, y en productos
+- 2026-08-09: feat(listas): deshacer una aplicacion, con la previa a la vista antes de confirmar
+- 2026-08-09: feat(listas): una fila resuelta muestra qué se decidió y se puede corregir
 - 2026-08-09: feat(listas): deshacer una aplicacion, con la previa a la vista antes de confirmar
 - 2026-08-09: feat(listas): una fila resuelta muestra qué se decidió y se puede corregir
 - 2026-08-09: feat(listas): una fila resuelta muestra qué se decidió y se puede corregir
