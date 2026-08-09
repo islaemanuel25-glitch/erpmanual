@@ -9,6 +9,9 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { paginacion } from "@/lib/proveedores/listas/persistencia";
+import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
+import { whereDelGrupo, GRUPO_PRODUCTO } from "@/lib/proveedores/listas/gruposProducto";
 
 export async function GET(req) {
   try {
@@ -84,12 +87,38 @@ export async function GET(req) {
       }),
     ]);
 
+    // LOS MISMOS NÚMEROS QUE LA PANTALLA DE ADENTRO, Y EN PRODUCTOS.
+    //
+    // `listoParaActualizar` es un contador de FILAS congelado en la cabecera, y
+    // aplicar no cambia el estado de la fila —marca `aplicada`—, así que las ya
+    // aplicadas seguían contando: decía 287 cuando adentro quedaban 6. Dos
+    // números distintos para la misma pregunta, y el de la tapa era el que se
+    // veía primero.
+    //
+    // Se cuenta con `whereDelGrupo`, el mismo predicado que arma los grupos del
+    // catálogo, así que la tapa y el detalle no pueden separarse: si cambia la
+    // regla, cambian los dos.
+    const conteos = await Promise.all(
+      items.map(async (i) => {
+        const universoWhere = { grupoId, ...productoDelProveedorWhere(i.proveedor?.id) };
+        const base = { universoWhere, importacionId: i.id, proveedorId: i.proveedor?.id, filtroCola: filtroDeLaCola() };
+        const [listos, actualizados] = await Promise.all([
+          prisma.productoBase.count({ where: whereDelGrupo(GRUPO_PRODUCTO.LISTO_PARA_APLICAR, base) }),
+          prisma.productoBase.count({ where: whereDelGrupo(GRUPO_PRODUCTO.ACTUALIZADO, base) }),
+        ]);
+        return { id: i.id, listos, actualizados };
+      })
+    );
+    const porImportacion = new Map(conteos.map((c) => [c.id, c]));
+
     return NextResponse.json({
       ok: true,
       items: items.map((i) => ({
         ...i,
         recargoPct: Number(i.recargoPct),
         umbralVariacionPct: Number(i.umbralVariacionPct),
+        productosListos: porImportacion.get(i.id)?.listos ?? 0,
+        productosActualizados: porImportacion.get(i.id)?.actualizados ?? 0,
       })),
       paginacion: { page, pageSize, total, paginas: Math.ceil(total / pageSize) },
     });

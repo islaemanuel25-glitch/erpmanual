@@ -41,6 +41,11 @@ export default function HistorialListasPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
+
+  // Cuántos costos escribieron estas listas, para que la tapa no diga que no se
+  // aplicó nada cuando sí se aplicó.
+  const totalActualizados = items.reduce((n, i) => n + Number(i.productosActualizados ?? 0), 0);
+  const yaSeAplicoAlgo = totalActualizados > 0;
   // Las canceladas no son procesos activos: se esconden salvo que se pidan.
   const [verCanceladas, setVerCanceladas] = useState(false);
   const [cancelando, setCancelando] = useState(null);
@@ -132,8 +137,16 @@ export default function HistorialListasPage() {
               <FileSpreadsheet size={18} aria-hidden="true" />
               Listas de proveedores
             </h1>
+            {/* El texto decía SIEMPRE "todavía no se aplica ningún costo", incluso
+                con 279 productos ya actualizados. Ahora dice lo que pasó: cuántos
+                costos escribieron estas listas, o la advertencia cuando todavía
+                no escribieron ninguno. */}
             <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
-              Importaciones de listas de precios. Todavía no se aplica ningún costo.
+              {yaSeAplicoAlgo
+                ? `Importaciones de listas de precios. Ya se actualizaron ${totalActualizados} ${
+                    totalActualizados === 1 ? "producto" : "productos"
+                  }.`
+                : "Importaciones de listas de precios. Todavía no se aplica ningún costo."}
             </p>
           </div>
           <SunmiButton
@@ -230,7 +243,8 @@ export default function HistorialListasPage() {
                     <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">Usuario</th>
                     <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold">Estado</th>
                     <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Filas</th>
-                    <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Listas</th>
+                    <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Para aplicar</th>
+                    <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Actualizados</th>
                     <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Sin cambios</th>
                     <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Sin vincular</th>
                     <th className="px-2 py-2 text-[11px] sunmi-text-muted font-semibold text-right">Bloqueadas</th>
@@ -251,7 +265,8 @@ export default function HistorialListasPage() {
                       <td className="px-2 py-2 text-[12px] sunmi-text-muted">{i.usuario?.nombre ?? "—"}</td>
                       <td className="px-2 py-2"><BadgeEstado estado={i.estado} /></td>
                       <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-strong">{i.totalFilas}</td>
-                      <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-success">{i.listoParaActualizar}</td>
+                      <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-success">{i.productosListos}</td>
+                      <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-muted">{i.productosActualizados}</td>
                       <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-muted">{i.sinCambios}</td>
                       <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-muted">{i.noMacheadas}</td>
                       <td className="px-2 py-2 text-[12px] tabular-nums text-right sunmi-text-danger">{i.bloqueadas}</td>
@@ -298,7 +313,8 @@ export default function HistorialListasPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-1.5 text-[11.5px]">
                   <Cifra etiqueta="Filas" valor={i.totalFilas} tono="sunmi-text-strong" />
-                  <Cifra etiqueta="Listas" valor={i.listoParaActualizar} tono="sunmi-text-success" />
+                  <Cifra etiqueta="Para aplicar" valor={i.productosListos} tono="sunmi-text-success" />
+                  <Cifra etiqueta="Actualizados" valor={i.productosActualizados} tono="sunmi-text-muted" />
                   <Cifra etiqueta="Sin cambios" valor={i.sinCambios} tono="sunmi-text-muted" />
                   <Cifra etiqueta="Sin vincular" valor={i.noMacheadas} tono="sunmi-text-muted" />
                   <Cifra etiqueta="Armado" valor={i.factorDudoso} tono="sunmi-text-warning" />
