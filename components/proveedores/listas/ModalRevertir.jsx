@@ -108,6 +108,8 @@ export default function ModalRevertir({ abierto, importacionId, onCerrar, onReve
       color="amber"
       onClose={trabajando ? undefined : onCerrar}
       maxWidth="max-w-2xl"
+      // Escribe cientos de costos: tocar el velo por error no puede cerrarlo.
+      destructivo
       footer={
         <div className="flex items-center justify-end gap-2 flex-wrap">
           <SunmiButton color="slate" onClick={onCerrar} disabled={trabajando} className="py-2 !text-xs">
