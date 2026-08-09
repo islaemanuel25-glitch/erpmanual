@@ -27,7 +27,11 @@ import { AlertTriangle, Check } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { money } from "@/lib/proveedores/listas/presentacion";
-import { analizarFila, LEYENDA_UXBU } from "@/lib/proveedores/listas/confirmarPresentacion";
+import {
+  analizarFila,
+  basePrecioDeFila,
+  LEYENDA_UXBU,
+} from "@/lib/proveedores/listas/confirmarPresentacion";
 import {
   TONO_ESTADO_VARIACION,
   TEXTO_ESTADO_VARIACION,
@@ -41,6 +45,13 @@ import {
 
 const pct = (n) =>
   n === null || n === undefined ? "—" : `${n >= 0 ? "+" : ""}${Number(n).toFixed(1)} %`;
+
+/** Cómo se nombra el precio que se multiplica, según de qué es. */
+const TITULO_BASE = {
+  UNIDAD: "Precio unitario",
+  DISPLAY: "Precio del display",
+  BULTO: "Precio del bulto",
+};
 
 /**
  * Lo que pasa con la confirmación si se vincula otro producto.
@@ -299,7 +310,14 @@ function tarjetasDeInterpretacion(analisis, fila) {
           }`;
     return {
       clave: h.clave,
-      titulo: h.multiplicador === 1 ? "Sin multiplicar" : `Precio unitario × ${h.multiplicador}`,
+      // El título dice de QUÉ es el precio que se multiplica, y eso sale del
+      // archivo. En una fila de display decir "precio unitario" era mentir en
+      // chico: el proveedor no cotiza una unidad suelta, cotiza el envase que
+      // arma. Sale de `basePrecioDeFila`, que es quien lo sabe.
+      titulo:
+        h.multiplicador === 1
+          ? "Sin multiplicar"
+          : `${TITULO_BASE[basePrecioDeFila(fila)] ?? "Precio"} × ${h.multiplicador}`,
       cuenta,
       detalle: h.origenCantidad ? `Cantidad tomada de ${h.origenCantidad}.` : h.detalle,
       costoNuevo: h.costoNuevo,
@@ -396,6 +414,10 @@ export default function PanelDecision({
   );
 
   const sugerida = esPreguntaProducto ? null : analisis?.recomendada ?? null;
+
+  /** ¿Queda alguna lectura que no sea imposible? Decide si las improbables se
+   *  pueden tocar: el mismo criterio que aplica el servidor al confirmar. */
+  const hayAlgunaCreible = tarjetas.some((t) => !t.absurda);
 
   // UNA SOLA HIPÓTESIS NO ES UNA ELECCIÓN.
   //
@@ -516,7 +538,11 @@ export default function PanelDecision({
               tarjeta={t}
               elegida={eleccion === t.clave}
               sugerida={sugerida === t.clave}
-              deshabilitada={t.absurda}
+              // Una improbable no se puede elegir MIENTRAS haya algo creíble al
+              // lado. Si no hay nada creíble, se puede elegir igual —marcada
+              // como imposible— porque si no la fila queda sin salida: el botón
+              // apagado y ninguna otra tarjeta que tocar.
+              deshabilitada={t.absurda && hayAlgunaCreible}
               onElegir={onElegir}
             />
           ))}
