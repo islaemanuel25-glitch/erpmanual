@@ -36,7 +36,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Search, Undo2, X } from "lucide-react";
+import { ArrowLeft, CheckCheck, Search, Undo2, X } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -48,6 +48,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
+import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
 import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
 import PanelDecision from "@/components/proveedores/listas/PanelDecision";
@@ -111,6 +112,8 @@ export default function CatalogoImportacionPage() {
   const [errorAplicar, setErrorAplicar] = useState("");
   const [cancelando, setCancelando] = useState(false);
   const [revirtiendo, setRevirtiendo] = useState(false);
+  const [terminando, setTerminando] = useState(false);
+  const [trabajandoTerminar, setTrabajandoTerminar] = useState(false);
   const [trabajandoCancelar, setTrabajandoCancelar] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
@@ -173,7 +176,8 @@ export default function CatalogoImportacionPage() {
   }, [porGrupo, grupo]);
 
   const titular = useMemo(() => titularDeCatalogo({ porGrupo, universo }), [porGrupo, universo]);
-  const abierto = cab?.estado !== "CANCELADA" && cab?.estado !== "APLICADA";
+  const abierto =
+    cab?.estado !== "CANCELADA" && cab?.estado !== "APLICADA" && cab?.estado !== "TERMINADA";
 
   // ¿Hay algo escrito que se pueda deshacer? Sale del contador de productos
   // actualizados, que es el mismo número que muestra la card: si hay
@@ -522,7 +526,31 @@ export default function CatalogoImportacionPage() {
               />
             ) : null}
 
-            {cab.estado === "CANCELADA" ? (
+            {/* UNA TERMINADA NO ACEPTA TRABAJO, PERO SÍ DESHACER. Por eso este
+                bloque va antes que el de cancelada y no comparte su camino: si
+                cayera en el `else`, el botón de deshacer desaparecería justo en
+                la lista donde más falta hace, que es la que ya escribió costos. */}
+            {cab.estado === "TERMINADA" ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="sunmi-surface-soft sunmi-border border rounded-lg px-3 py-2 min-w-0 flex-1">
+                  <span className="text-[12.5px] font-semibold sunmi-text-strong">
+                    Importación terminada
+                  </span>
+                  <p className="text-[11.5px] sunmi-text-muted leading-snug mt-0.5">
+                    No se puede confirmar ni aplicar nada más. Lo que ya se aplicó se puede deshacer.
+                  </p>
+                </div>
+                {hayAplicadas ? (
+                  <SunmiButton
+                    color="slate"
+                    onClick={() => setRevirtiendo(true)}
+                    className="py-1.5 px-2.5 !text-[11px] inline-flex items-center gap-1"
+                  >
+                    <Undo2 size={13} aria-hidden="true" /> Deshacer la aplicación
+                  </SunmiButton>
+                ) : null}
+              </div>
+            ) : cab.estado === "CANCELADA" ? (
               <div className="sunmi-surface-soft sunmi-border border rounded-lg px-3 py-2">
                 <span className="text-[12.5px] font-semibold sunmi-text-danger">
                   Importación cancelada
@@ -545,6 +573,16 @@ export default function CatalogoImportacionPage() {
                     <Undo2 size={13} aria-hidden="true" /> Deshacer la aplicación
                   </SunmiButton>
                 ) : null}
+                {/* Terminar cierra el trabajo. Va acá, con cancelar y deshacer:
+                    las tres son decisiones sobre la importación entera. */}
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setTerminando(true)}
+                  disabled={trabajandoTerminar}
+                  className="py-1.5 px-2.5 !text-[11px] inline-flex items-center gap-1"
+                >
+                  <CheckCheck size={13} aria-hidden="true" /> Terminar importación
+                </SunmiButton>
                 <SunmiButton
                   color="slate"
                   onClick={() => setCancelando(true)}
@@ -652,6 +690,43 @@ export default function CatalogoImportacionPage() {
               }}
             />
           ) : null}
+
+          <ModalTerminar
+            abierto={terminando}
+            // Los pendientes SON los productos que quedan sin aplicar: los que
+            // esperan decisión más los ya decididos que nadie aplicó. Sale de los
+            // mismos contadores que muestran las cards.
+            sinAplicar={
+              Number(porGrupo[GRUPO_PRODUCTO.NECESITA_DECISION] ?? 0) +
+              Number(porGrupo[GRUPO_PRODUCTO.LISTO_PARA_APLICAR] ?? 0)
+            }
+            actualizados={Number(porGrupo[GRUPO_PRODUCTO.ACTUALIZADO] ?? 0)}
+            trabajando={trabajandoTerminar}
+            onCerrar={() => setTerminando(false)}
+            onTerminar={async () => {
+              setTrabajandoTerminar(true);
+              try {
+                const r = await fetch(`/api/proveedores/listas/${id}/finalizar`, {
+                  method: "POST",
+                  credentials: "include",
+                });
+                const j = await r.json();
+                if (!r.ok || !j?.ok) {
+                  setAviso(j?.error || "No se pudo terminar la importación.");
+                  return;
+                }
+                setTerminando(false);
+                await cargar();
+                setAviso(
+                  `Importación terminada. ${j.pendientesSinResolver ?? 0} filas quedaron sin aplicar.`
+                );
+              } catch {
+                setAviso("Error de conexión.");
+              } finally {
+                setTrabajandoTerminar(false);
+              }
+            }}
+          />
 
           <ModalRevertir
             abierto={revirtiendo}

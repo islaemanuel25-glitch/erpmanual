@@ -97,9 +97,13 @@ export async function POST(req, context) {
       await tx.importacionListaProveedor.update({
         where: { id: importacionId },
         data: {
-          estado: ESTADO_IMPORTACION.APLICADA,
-          aplicadaEn: new Date(),
-          aplicadaPorUsuarioId: usuarioId,
+          // TERMINADA, no APLICADA. Son cosas distintas: aplicada la escribió el
+          // motor cuando no quedaba nada pendiente; terminada la cerró una
+          // persona diciendo "con esto alcanza". Y sobre todo, una TERMINADA se
+          // puede revertir — que es la razón de que el estado exista.
+          estado: ESTADO_IMPORTACION.TERMINADA,
+          terminadaEn: new Date(),
+          terminadaPorUsuarioId: usuarioId,
         },
       });
 

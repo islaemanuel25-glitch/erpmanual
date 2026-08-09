@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Upload } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -33,6 +33,7 @@ import {
   mensajeDeError,
   tamanoArchivo,
   porcentaje,
+  fechaHora,
 } from "@/lib/proveedores/listas/presentacion";
 import { LIMITES } from "@/lib/proveedores/listas/persistencia";
 import { CONFIG_ARCOR } from "@/lib/proveedores/listas/configuraciones/arcor";
@@ -54,6 +55,9 @@ export default function NuevaImportacionPage() {
   const [errorCarga, setErrorCarga] = useState("");
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState("");
+  // La importación sin terminar de este proveedor, si la hay. Se avisa, no se
+  // bloquea: ver el cartel más abajo.
+  const [abierta, setAbierta] = useState(null);
   const [archivo, setArchivo] = useState(null);
   const [errorArchivo, setErrorArchivo] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -93,6 +97,36 @@ export default function NuevaImportacionPage() {
     [proveedores, proveedorId]
   );
   const compat = proveedorAdmiteImportacion(proveedor);
+
+  // ¿Este proveedor ya tiene una lista sin terminar? Se pregunta al mismo
+  // endpoint del historial —que ya filtra por proveedor y esconde las
+  // canceladas— en vez de inventar uno nuevo para la misma pregunta.
+  useEffect(() => {
+    if (!proveedorId) {
+      setAbierta(null);
+      return;
+    }
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await fetch(
+          `/api/proveedores/listas?proveedorId=${proveedorId}&pageSize=10`,
+          { credentials: "include", cache: "no-store" }
+        );
+        const j = await r.json();
+        if (!vivo || !j?.ok) return;
+        const viva = (j.items ?? []).find(
+          (i) => i.estado === "CONCILIADA" || i.estado === "PARCIALMENTE_APLICADA"
+        );
+        setAbierta(viva ?? null);
+      } catch {
+        // El aviso es de cortesía: si no se puede consultar, no se traba nada.
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [proveedorId]);
 
   // Los valores comerciales que se van a usar. Se muestran para que nadie
   // importe sin saber con qué recargo, pero el servidor decide.
@@ -215,6 +249,33 @@ export default function NuevaImportacionPage() {
             </SunmiSelectAdv>
             {proveedor && !compat.admite && (
               <p className="text-[11.5px] sunmi-text-danger leading-snug">{compat.motivo}</p>
+            )}
+
+            {/* AVISA, NO BLOQUEA. Importar una lista nueva teniendo otra abierta
+                del mismo proveedor es legítimo —una lista corregida, una de otro
+                mes— pero casi siempre es que quedó una sin terminar. Se dice, con
+                el enlace para ir a verla, y se deja seguir: bloquear obligaría a
+                cerrar algo sin haberlo mirado. */}
+            {abierta && (
+              <div className="rounded-lg border sunmi-border p-2 flex items-start gap-2">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0 sunmi-text-warning" aria-hidden="true" />
+                <div className="min-w-0 text-[11.5px] leading-snug">
+                  <span className="sunmi-text-warning font-semibold">
+                    Este proveedor ya tiene una importación sin terminar.
+                  </span>{" "}
+                  <span className="sunmi-text-muted">
+                    {abierta.archivoNombre} · {fechaHora(abierta.createdAt)}. Podés importar igual;
+                    las dos van a quedar abiertas.
+                  </span>{" "}
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/modulos/proveedores/listas/${abierta.id}`)}
+                    className="sunmi-text-accent hover:underline"
+                  >
+                    Ver la que está abierta
+                  </button>
+                </div>
+              </div>
             )}
             {proveedores.length === 0 && (
               <p className="text-[11.5px] sunmi-text-muted">

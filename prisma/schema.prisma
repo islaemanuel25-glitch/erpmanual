@@ -2231,6 +2231,14 @@ enum EstadoImportacionLista {
   /// nuevo. Las filas ya aplicadas quedan cerradas una por una, no por el
   /// estado de la cabecera.
   PARCIALMENTE_APLICADA
+  /// Cerrada a mano: "con esto alcanza". No acepta confirmar ni aplicar, y
+  /// libera el archivo para la lista siguiente.
+  ///
+  /// SE DIFERENCIA DE CANCELADA EN UNA SOLA COSA, Y ES LA RAZÓN DE QUE EXISTA:
+  /// una TERMINADA sí se puede REVERTIR. Cancelada nunca escribió un costo, así
+  /// que no hay nada que deshacer; terminada suele haber escrito cientos, y el
+  /// día que uno salga mal tiene que haber vuelta atrás.
+  TERMINADA
 }
 
 /// Cómo se encontró el producto de una fila. Espeja TIPO_COINCIDENCIA del motor.
@@ -2337,6 +2345,10 @@ model ImportacionListaProveedor {
   aplicadaEn   DateTime?
   canceladaEn  DateTime?
   canceladaPorUsuarioId Int?
+  /// Cuándo y quién cerró la importación por decisión propia. Misma convención
+  /// que `canceladaEn`. Nulo significa que nunca se terminó.
+  terminadaEn  DateTime?
+  terminadaPorUsuarioId Int?
   /// Quién apretó "Aplicar". Se guarda acá y no solo en la bitácora porque
   /// esta pantalla tiene que poder explicar una corrida vieja sin depender
   /// de que el interceptor haya estado activo.

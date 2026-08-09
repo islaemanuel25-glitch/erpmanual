@@ -34,7 +34,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
-import { OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
+import { OPCIONES_TX, esImportacionRevertible } from "@/lib/proveedores/listas/persistencia";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { planDeReversion, TEXTO_OMISION } from "@/lib/proveedores/listas/reversion";
 
@@ -176,6 +176,24 @@ async function contexto(req, context) {
   const importacion = await cargarImportacion(prisma, { importacionId, grupoId: scope.grupoId });
   if (!importacion) {
     return { error: NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 }) };
+  }
+
+  // QUÉ IMPORTACIONES SE PUEDEN DESHACER. Las abiertas y las TERMINADAS: una
+  // lista terminada es justo la que ya escribió cientos de costos, y cerrarla no
+  // puede cerrar también la salida de emergencia. Una CANCELADA no entra —nunca
+  // escribió un costo, el endpoint de cancelar la rechaza si estaba aplicada—,
+  // así que ahí no hay nada que deshacer.
+  if (!esImportacionRevertible(importacion.estado)) {
+    return {
+      error: NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Esta importación no se puede deshacer: solo se deshacen las que están en curso o terminadas.",
+        },
+        { status: 409 }
+      ),
+    };
   }
 
   return { scope, importacionId, importacion };
