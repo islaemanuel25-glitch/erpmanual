@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-09 16:33
+**Fecha:** 2026-08-09 17:07
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix(listas): la tapa cuenta lo mismo que adentro, y en productos, feat(listas): deshacer una aplicacion, con la previa a la vista antes de confirmar, feat(listas): una fila resuelta muestra qué se decidió y se puede corregir
-- Archivos: 1 nuevos, 4 modificados (5 total)
+- feat(listas): TERMINADA cierra el trabajo sin cerrar la vuelta atrás, fix(listas): la tapa cuenta lo mismo que adentro, y en productos, feat(listas): deshacer una aplicacion, con la previa a la vista antes de confirmar
+- Archivos: 1 nuevos, 6 modificados (7 total)
 
 ### auditoria
 - fix(auditoria): la referencia al cliente base va anclada en globalThis
