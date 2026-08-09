@@ -188,7 +188,7 @@ export async function GET(req, context) {
       unidadMedida: p.unidad_medida,
       factorPack: p.factor_pack,
       modoCompraProveedor: p.modoCompraProveedor,
-      codigosArcor: codigosPorProducto.get(p.id) ?? [],
+      codigosProveedor: codigosPorProducto.get(p.id) ?? [],
       proveedores:
         situacion === "SIN_CODIGO"
           ? [p.proveedor_id, p.proveedor2_id, p.proveedor3_id]

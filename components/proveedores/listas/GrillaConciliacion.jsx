@@ -43,7 +43,7 @@ const pct = (n) =>
   n === null || n === undefined ? "—" : `${n >= 0 ? "+" : ""}${Number(n).toFixed(1)} %`;
 
 /** El código que el proveedor le asigna al producto, si el ERP lo tiene guardado. */
-const codigoGuardado = (erp) => (erp?.codigosArcor?.length ? erp.codigosArcor.join(" / ") : null);
+const codigoGuardado = (erp) => (erp?.codigosProveedor?.length ? erp.codigosProveedor.join(" / ") : null);
 
 /**
  * Lo que la fila necesita mostrar, resuelto una vez por render.
@@ -321,19 +321,23 @@ export default function GrillaConciliacion({
     [abierta, resumenes, seleccionDe, onMarcar, editable]
   );
 
-  const confirmar = useCallback(async () => {
+  // La clave la manda el panel, no el estado de acá: cuando la fila tiene una
+  // sola lectura no hubo nada que tocar, así que `eleccion` es null y el panel
+  // resuelve solo. Con dos o más tarjetas la clave que llega ES la que se eligió
+  // acá, porque el panel la recibe por prop.
+  const confirmar = useCallback(async (clave) => {
     const fila = filas.find((f) => f.id === abierta);
-    if (!fila || !eleccion) return;
+    if (!fila || !clave) return;
     setConfirmando(true);
     try {
-      await onConfirmada?.({ fila, clave: eleccion, producto: productoElegido });
+      await onConfirmada?.({ fila, clave, producto: productoElegido });
       setAbierta(null);
       setEleccion(null);
       setProductoElegido(null);
     } finally {
       setConfirmando(false);
     }
-  }, [filas, abierta, eleccion, productoElegido, onConfirmada]);
+  }, [filas, abierta, productoElegido, onConfirmada]);
 
   return (
     <div className="sunmi-border border rounded-lg overflow-hidden">

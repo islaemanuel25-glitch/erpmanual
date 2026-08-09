@@ -17,10 +17,16 @@
 //
 // ── UN SOLO SISTEMA DE FILTRO ───────────────────────────────────────────────
 //
-// Cinco filtros, uno por card, con las mismas palabras. Antes había diecinueve
-// chips Y un desplegable de estado: dos sistemas que se pisaban y que obligaban a
-// entender el vocabulario del motor —FACTOR_DUDOSO, CODIGO_DUPLICADO— para poder
-// filtrar. La búsqueda por texto va aparte y se combina, no reemplaza.
+// LAS CARDS SON EL FILTRO. Tocar una la marca y filtra la tabla. No hay chips.
+//
+// Antes había diecinueve chips Y un desplegable de estado: dos sistemas que se
+// pisaban y que obligaban a entender el vocabulario del motor —FACTOR_DUDOSO,
+// CODIGO_DUPLICADO— para poder filtrar. Después quedaron cinco chips, que era
+// mejor pero seguía siendo un segundo sistema: decían las mismas cinco palabras
+// y los mismos cinco números que las cards de arriba, y se comían una banda de
+// alto que en la Sunmi dejaba la tabla abajo del pliegue.
+//
+// La búsqueda por texto va aparte y se combina, no reemplaza.
 //
 // ── EL ARCHIVO ES DIAGNÓSTICO ───────────────────────────────────────────────
 //
@@ -51,9 +57,10 @@ import DiagnosticoArchivo from "@/components/proveedores/listas/DiagnosticoArchi
 import BotonReporte from "@/components/proveedores/listas/BotonReporte";
 import { ErrorRecuperable, Paginacion } from "@/components/proveedores/listas/PiezasListas";
 import { formaDelPanel, PREGUNTA } from "@/lib/proveedores/listas/panelDecision";
-import { GRUPO_PRODUCTO, TEXTO_GRUPO, titularDeCatalogo } from "@/lib/proveedores/listas/gruposProducto";
+import { GRUPO_PRODUCTO, titularDeCatalogo } from "@/lib/proveedores/listas/gruposProducto";
 
-/** Los cinco filtros, en el mismo orden y con las mismas palabras que las cards. */
+/** Los cinco filtros SON las cards, en su orden. Acá solo se usa para elegir en
+ *  cuál arranca la pantalla. */
 const FILTROS = ORDEN_CARDS;
 
 export default function CatalogoImportacionPage() {
@@ -86,6 +93,10 @@ export default function CatalogoImportacionPage() {
   const [qAplicado, setQAplicado] = useState(() => busqueda?.get("q") ?? "");
 
   const [abierta, setAbierta] = useState(null);
+  // La elección del panel vive acá y se limpia al cambiar de producto abierto:
+  // una tarjeta elegida en una fila no puede quedar marcada en la siguiente.
+  const [eleccionPanel, setEleccionPanel] = useState(null);
+  const [confirmandoPanel, setConfirmandoPanel] = useState(false);
   const [vinculando, setVinculando] = useState(null);
   const [aviso, setAviso] = useState("");
   const [trabajandoProducto, setTrabajandoProducto] = useState(false);
@@ -381,7 +392,7 @@ export default function CatalogoImportacionPage() {
       erp: {
         id: p.id,
         nombre: p.nombre,
-        codigosArcor: (p.codigosProveedor ?? []).filter((c) => c.activo).map((c) => c.codigo),
+        codigosProveedor: (p.codigosProveedor ?? []).filter((c) => c.activo).map((c) => c.codigo),
         codigoBarra: p.codigoBarra,
         codigoBarraSecundario: p.codigoBarraSecundario,
         actualizadoEn: p.actualizadoEn,
@@ -408,9 +419,19 @@ export default function CatalogoImportacionPage() {
         forma={forma}
         candidatos={[]}
         productoElegido={null}
-        eleccion={null}
-        onElegir={() => {}}
-        onConfirmar={() => {}}
+        eleccion={eleccionPanel}
+        onElegir={setEleccionPanel}
+        confirmando={confirmandoPanel}
+        // La clave la manda el panel: con una sola lectura no hay elección
+        // guardada acá porque no hubo nada que tocar.
+        onConfirmar={async (clave) => {
+          setConfirmandoPanel(true);
+          try {
+            await confirmarDecision({ fila, clave, producto: null });
+          } finally {
+            setConfirmandoPanel(false);
+          }
+        }}
         onVincularOtro={() => setVinculando(fila)}
       />
     );
@@ -538,28 +559,8 @@ export default function CatalogoImportacionPage() {
             ) : null}
           </SunmiCard>
 
-          {/* ── Filtros: cinco, con las palabras de las cards ─────────── */}
+          {/* ── La búsqueda. El filtro son las cards, no hay chips ────── */}
           <SunmiCard className="p-2.5 space-y-2">
-            <div className="flex flex-wrap gap-1.5">
-              {FILTROS.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => {
-                    setGrupo(g);
-                    setPage(1);
-                    setAbierta(null);
-                  }}
-                  aria-pressed={grupo === g}
-                  className={`px-2.5 py-1.5 rounded-full text-[11.5px] font-semibold border transition-colors ${
-                    grupo === g ? "sunmi-btn-base sunmi-btn-cyan border-transparent" : "sunmi-border sunmi-text-muted"
-                  }`}
-                >
-                  {TEXTO_GRUPO[g]} ({Number(porGrupo[g] ?? 0)})
-                </button>
-              ))}
-            </div>
-
             {/* La búsqueda se COMBINA con el filtro, no lo reemplaza. */}
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
               <SunmiInput
@@ -604,7 +605,10 @@ export default function CatalogoImportacionPage() {
             productos={productos}
             cargando={cargando}
             abierta={abierta}
-            onAbrir={setAbierta}
+            onAbrir={(x) => {
+              setAbierta(x);
+              setEleccionPanel(null);
+            }}
             renderPanel={renderPanel}
           />
 

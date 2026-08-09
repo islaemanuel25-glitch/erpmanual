@@ -53,7 +53,7 @@ const MOTIVO = {
 
 function Acciones({ item, situacion, compacto }) {
   const clase = compacto ? "py-1.5 px-2.5 !text-[11px]" : "py-1 px-2 !text-[10.5px]";
-  const sinCodigo = !item.codigosArcor?.length;
+  const sinCodigo = !item.codigosProveedor?.length;
   return (
     <div className={`flex flex-wrap items-center gap-1 ${compacto ? "" : "justify-end"}`}>
       <SunmiButton
@@ -163,8 +163,8 @@ export default function VistaProductosSistema({ importacionId, situacion, onVolv
                       </div>
                     </td>
                     <td className="px-1.5 py-1.5 tabular-nums">
-                      {item.codigosArcor?.length ? (
-                        <span className="sunmi-text-strong">{item.codigosArcor.join(" / ")}</span>
+                      {item.codigosProveedor?.length ? (
+                        <span className="sunmi-text-strong">{item.codigosProveedor.join(" / ")}</span>
                       ) : (
                         <span className="text-[10px] sunmi-text-warning">Sin código Arcor</span>
                       )}
@@ -201,8 +201,8 @@ export default function VistaProductosSistema({ importacionId, situacion, onVolv
                     {item.nombre}
                   </div>
                   <div className="text-[10px] sunmi-text-muted tabular-nums">
-                    {item.codigosArcor?.length ? (
-                      <>Arcor {item.codigosArcor.join(" / ")}</>
+                    {item.codigosProveedor?.length ? (
+                      <>Arcor {item.codigosProveedor.join(" / ")}</>
                     ) : (
                       <span className="sunmi-text-warning">Sin código Arcor</span>
                     )}

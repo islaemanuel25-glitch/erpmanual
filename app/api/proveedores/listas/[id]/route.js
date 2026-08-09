@@ -501,7 +501,7 @@ export async function GET(req, context) {
           ? {
               id: b.id,
               nombre: b.nombre,
-              codigosArcor: codigosPorBase.get(b.id) ?? [],
+              codigosProveedor: codigosPorBase.get(b.id) ?? [],
               codigoBarra: b.codigo_barra,
               codigoBarraSecundario: b.codigo_barra_secundario,
               codigoBarraPropio: propiosPorBase.get(b.id) ?? null,

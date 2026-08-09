@@ -14,6 +14,13 @@
 // condición propia para encenderse es una card que algún día va a estar
 // encendida con cero adentro.
 //
+// ── LAS CARDS SON EL FILTRO ─────────────────────────────────────────────────
+//
+// No hay una fila de chips escritos debajo. La había, decía exactamente lo mismo
+// que las cards —las mismas cinco palabras y los mismos cinco números— y se
+// comía una banda de alto que en la Sunmi empujaba la tabla abajo del pliegue.
+// Un solo sistema de filtro, y es este. La búsqueda por texto se combina.
+//
 // ── LOS DISCONTINUADOS NO SON UNA CARD ──────────────────────────────────────
 //
 // Van como una línea chica adentro de "sin código de Arcor", debajo del número y
@@ -37,33 +44,63 @@ export const ORDEN_CARDS = [
   GRUPO_PRODUCTO.NO_TRAIDO,
 ];
 
+// ── LA CARD ES EL FILTRO, Y POR ESO NO ES UN <button> ───────────────────────
+//
+// El contenedor es un div y el filtro es un botón absoluto que lo tapa entero,
+// por debajo de lo que sí es interactivo. Envolver todo en un <button> ponía
+// adentro otro <button> —"Aplicar los N"— y un role="link" —los discontinuados—:
+// eso es HTML inválido, y el navegador reacomoda el DOM por su cuenta cuando lo
+// encuentra. Con la capa de abajo, tocar el número o el texto filtra, y tocar el
+// botón o la línea de discontinuados hace lo suyo sin frenar ninguna burbuja.
 function Card({ grupo, valor, activa, destacada, apagada, onClick, children }) {
-  const borde = destacada && !apagada ? "sunmi-border-accent" : "sunmi-border";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={activa}
-      className={`text-left rounded-lg border p-2.5 transition-colors min-w-0 ${borde} ${
-        activa ? "sunmi-surface-soft" : ""
+    <div
+      className={`relative rounded-lg border p-2.5 transition-colors min-w-0 ${
+        destacada && !apagada ? "sunmi-border-accent" : "sunmi-border"
       }`}
-      style={destacada && !apagada ? { borderColor: "var(--pos-accent)" } : undefined}
+      style={
+        activa
+          ? { background: "var(--pos-accent)", borderColor: "var(--pos-accent)", color: "var(--app-bg)" }
+          : destacada && !apagada
+            ? { borderColor: "var(--pos-accent)" }
+            : undefined
+      }
     >
+      {/* La capa que filtra. Va primera y absoluta: queda debajo de todo lo que
+          se dibuje después con `relative`. */}
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={activa}
+        aria-label={`Filtrar: ${TEXTO_GRUPO[grupo]}`}
+        className="absolute inset-0 w-full h-full rounded-lg"
+      />
+
+      {/* Los textos NO llevan clase de color cuando la card está marcada: heredan
+          el del fondo naranja. `sunmi-text-muted` sobre naranja no se lee. */}
       <div
-        className={`text-[22px] leading-none font-bold tabular-nums ${
-          apagada ? "sunmi-text-muted" : destacada ? "sunmi-text-accent" : "sunmi-text-strong"
+        className={`relative pointer-events-none text-[22px] leading-none font-bold tabular-nums ${
+          activa ? "" : apagada ? "sunmi-text-muted" : destacada ? "sunmi-text-accent" : "sunmi-text-strong"
         }`}
       >
         {valor}
       </div>
-      <div className="text-[11px] font-semibold sunmi-text-strong mt-1 leading-tight">
+      <div
+        className={`relative pointer-events-none text-[11px] font-semibold mt-1 leading-tight ${
+          activa ? "" : "sunmi-text-strong"
+        }`}
+      >
         {TEXTO_GRUPO[grupo]}
       </div>
-      <div className="text-[9.5px] sunmi-text-muted leading-tight mt-0.5 hidden sm:block">
+      <div
+        className={`relative pointer-events-none text-[9.5px] leading-tight mt-0.5 hidden sm:block ${
+          activa ? "opacity-80" : "sunmi-text-muted"
+        }`}
+      >
         {DETALLE_GRUPO[grupo]}
       </div>
-      {children}
-    </button>
+      <div className="relative">{children}</div>
+    </div>
   );
 }
 
@@ -106,11 +143,10 @@ export default function CabeceraCatalogo({
             >
               {esAplicar && n > 0 && puedeAplicar ? (
                 <SunmiButton
-                  color="amber"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAplicar?.();
-                  }}
+                  // Ámbar sobre ámbar no se ve: con la card marcada el botón se
+                  // pasa a oscuro para seguir existiendo.
+                  color={grupoActivo === g ? "slate" : "amber"}
+                  onClick={onAplicar}
                   className="mt-2 w-full py-1.5 !text-[11px] font-bold"
                 >
                   Aplicar los {n}
@@ -118,23 +154,20 @@ export default function CabeceraCatalogo({
               ) : null}
 
               {esSinCodigo && discontinuados > 0 ? (
-                <span
-                  role="link"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onVerDiscontinuados?.();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.stopPropagation();
-                      onVerDiscontinuados?.();
-                    }
-                  }}
-                  className="mt-2 pt-1.5 border-t sunmi-border block text-[9.5px] sunmi-text-muted hover:underline cursor-pointer"
+                // Un botón de verdad, no un span con role. Está por encima de la
+                // capa que filtra, así que tocarlo NO selecciona la card.
+                <button
+                  type="button"
+                  onClick={onVerDiscontinuados}
+                  // La raya de arriba es un separador, no un recuadro:
+                  // `sunmi-border` pone los cuatro lados y dibujaba una cajita.
+                  style={{ borderTopColor: "var(--app-border)" }}
+                  className={`mt-2 pt-1.5 border-t block w-full text-left text-[9.5px] hover:underline ${
+                    grupoActivo === g ? "" : "sunmi-text-muted"
+                  }`}
                 >
                   + {discontinuados} discontinuados · ver
-                </span>
+                </button>
               ) : null}
             </Card>
           );

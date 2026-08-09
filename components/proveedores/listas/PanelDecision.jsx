@@ -114,9 +114,7 @@ const COLUMNAS_COMPARACION = [
       <>
         <div className="sunmi-text-strong">{o.codigo ?? "—"}</div>
         {o.notaCodigo ? (
-          <div className={`text-[9.5px] leading-tight ${o.tonoNotaCodigo ?? "sunmi-text-muted"}`}>
-            {o.notaCodigo}
-          </div>
+          <div className="text-[9.5px] leading-tight sunmi-text-muted">{o.notaCodigo}</div>
         ) : null}
       </>
     ),
@@ -171,7 +169,7 @@ const COLUMNAS_COMPARACION = [
  * comparando son productos entre sí. En la de INTERPRETACIÓN hay una sola fila
  * ERP: el producto ya está decidido y lo que se compara es contra el archivo.
  */
-function origenesDeComparacion({ fila, candidatos, analisis, presentacionArchivo }) {
+function origenesDeComparacion({ fila, candidatos, analisis, presentacionArchivo, presentacionErp }) {
   const filas = [];
 
   for (const c of candidatos) {
@@ -180,9 +178,19 @@ function origenesDeComparacion({ fila, candidatos, analisis, presentacionArchivo
       origen: c.etiqueta ?? "ERP",
       destacado: false,
       producto: c.nombre,
-      codigo: c.codigoProveedor ?? null,
-      notaCodigo: c.notaCodigo ?? null,
-      tonoNotaCodigo: c.tonoNotaCodigo ?? null,
+      // PLURAL: acá hay una LISTA, no un valor. Cuando la persistencia del
+      // macheo guarde el código del archivo, un producto va a tener el viejo con
+      // prefijo —1006139— y el del proveedor —6139—, y los dos tienen que verse.
+      //
+      // Antes decía `codigoProveedor`, singular, y NADIE en el repo escribía ese
+      // campo: los tres productores mandaban una lista con otro nombre. La celda
+      // mostraba una raya en los 317 productos que sí tienen código guardado.
+      codigo: c.codigosProveedor?.length ? c.codigosProveedor.join(" / ") : null,
+      // `notaCodigo` y `tonoNotaCodigo` se leían de `c` y ningún productor los
+      // escribía: la celda de nota estaba siempre vacía. El código de barras SÍ
+      // lo escriben los tres, y es lo que sirve para distinguir dos candidatos
+      // de nombre parecido.
+      notaCodigo: c.codigoBarra ? `CB ${c.codigoBarra}` : null,
       precio: c.costoActual,
       notaPrecio: "costo actual",
       presentacion: c.factorPack ? `${c.factorPack} u.` : (c.presentacion ?? "—"),
@@ -203,7 +211,17 @@ function origenesDeComparacion({ fila, candidatos, analisis, presentacionArchivo
     presentacion: presentacionArchivo?.cantidadDescripcion
       ? `${presentacionArchivo.cantidadDescripcion} u.`
       : (fila.unidadProveedor ?? "—"),
-    notaPresentacion: fila.unidadesPorBulto ? `UxBU ${fila.unidadesPorBulto} · dato logístico` : null,
+    // La presentación DEL ERP viaja como nota de esta celda y no como una fila
+    // propia. Es el único dato del producto que no está en la grilla, y su lugar
+    // natural es al lado de la presentación contra la que se compara: repetir el
+    // producto entero en una fila aparte lo mostraba dos veces, porque la fila de
+    // la grilla justo arriba YA es el producto del sistema.
+    notaPresentacion: [
+      presentacionErp ? `el ERP lo guarda como ${presentacionErp}` : null,
+      fila.unidadesPorBulto ? `UxBU ${fila.unidadesPorBulto} · dato logístico` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null,
     tituloPresentacion: fila.unidadesPorBulto ? LEYENDA_UXBU : null,
     // La variación que daría el precio tomado tal cual, sin multiplicar.
     variacionPct: analisis?.evaluadas?.find((h) => h.multiplicador === 1)?.variacionPct ?? null,
@@ -316,11 +334,14 @@ function tarjetasDeProducto(candidatos, fila, importacion) {
     return {
       clave: `PRODUCTO_${c.productoBaseId}`,
       titulo: c.nombre,
-      cuenta: c.codigoProveedor ? `Código ${c.codigoProveedor}` : null,
+      cuenta: c.codigosProveedor?.length ? `Código ${c.codigosProveedor.join(" / ")}` : null,
+      // `parecido`, que es como lo escribe quien arma los candidatos. Antes decía
+      // `c.puntaje` —y `c.detalle` de respaldo—: dos campos que nadie escribía,
+      // así que la tarjeta nunca mostró el parecido por nombre.
       detalle:
-        c.puntaje !== undefined && c.puntaje !== null
-          ? `Parecido por nombre: ${Math.round(Number(c.puntaje) * 100)} %`
-          : c.detalle ?? null,
+        c.parecido !== undefined && c.parecido !== null
+          ? `Parecido por nombre: ${Math.round(Number(c.parecido) * 100)} %`
+          : null,
       costoNuevo: elegida?.costoNuevo ?? null,
       variacionPct: elegida?.variacionPct ?? null,
       estadoVariacion: elegida?.estado ?? null,
@@ -368,22 +389,51 @@ export default function PanelDecision({
     () =>
       origenesDeComparacion({
         fila,
+        // EN LA PREGUNTA DE PRODUCTO hay una fila por candidato: lo que se compara
+        // son productos entre sí y hay que verlos.
+        //
+        // EN LA DE INTERPRETACIÓN, NINGUNA. El producto ya está decidido, y la
+        // fila de la grilla que se acaba de abrir ES ese producto: volver a
+        // dibujarlo acá lo mostraba dos veces, una arriba de la otra. Al abrir
+        // solo se despliega lo nuevo — la fila del archivo y las opciones.
         candidatos: esPreguntaProducto
           ? candidatos.map((c, i) => ({ ...c, etiqueta: `Candidato ${String.fromCharCode(65 + i)}` }))
-          : erp
-            ? [{ ...erp, etiqueta: "ERP" }]
-            : [],
+          : [],
         analisis,
         presentacionArchivo: analisis?.presentacion,
+        // Lo único del ERP que no está en la grilla. Viaja como nota, no como fila.
+        presentacionErp: esPreguntaProducto
+          ? null
+          : erp?.factorPack
+            ? `${erp.factorPack} u.`
+            : (erp?.unidadMedida ?? null),
       }),
     [fila, candidatos, esPreguntaProducto, erp, analisis]
   );
 
   const sugerida = esPreguntaProducto ? null : analisis?.recomendada ?? null;
-  const puedeConfirmar = !!eleccion && !confirmando;
+
+  // UNA SOLA HIPÓTESIS NO ES UNA ELECCIÓN.
+  //
+  // Cuando el archivo habilita una única forma de leer el precio no hay nada que
+  // decidir: hay un resultado. Dibujarlo como tarjeta sin marcar, con el botón
+  // apagado hasta tocarla, aparentaba una elección que no existe y además
+  // trababa el avance.
+  //
+  // La regla de no preseleccionar sigue viva para dos o más tarjetas, que es
+  // para lo que se puso: ahí sí hay caminos distintos y el sistema no elige por
+  // la persona.
+  const unica =
+    !esPreguntaProducto && tarjetas.length === 1 && !tarjetas[0].absurda ? tarjetas[0] : null;
+  const eleccionEfectiva = eleccion ?? unica?.clave ?? null;
+  const puedeConfirmar = !!eleccionEfectiva && !confirmando;
 
   return (
-    <div className="p-2.5 space-y-2.5 sunmi-surface-soft">
+    // El ancho se ata al de la PANTALLA y no al de la tabla. El panel vive en una
+    // celda con `colspan` adentro de un contenedor que scrollea de costado: sin
+    // esto hereda el ancho de las seis columnas, y en la Sunmi el veredicto y su
+    // explicación quedaban cortados a la derecha, ilegibles sin scrollear.
+    <div className="p-2.5 space-y-2.5 sunmi-surface-soft max-w-[calc(100vw-4rem)] sticky left-0">
       {/* ── Paso, cuando la decisión encadena ─────────────────────────────── */}
       {forma.paso ? (
         <div className="text-[10px] font-semibold sunmi-text-accent uppercase tracking-wide">
@@ -437,6 +487,40 @@ export default function PanelDecision({
           <div className="text-[12px] font-semibold sunmi-text-strong">Nada que elegir</div>
           <div className="text-[10.5px] sunmi-text-muted mt-0.5">{fila.motivo || textoSinPregunta(fila)}</div>
         </div>
+      ) : unica ? (
+        /* ── Una sola lectura: el RESULTADO, no una elección ──────────────── */
+        <div className="rounded-lg border sunmi-border p-2.5 sunmi-surface-soft">
+          <div className="text-[10px] font-semibold sunmi-text-muted uppercase tracking-wide">
+            Costo que resulta
+          </div>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <span className="text-[20px] font-semibold sunmi-text-strong tabular-nums">
+              {money(unica.costoNuevo)}
+            </span>
+            {unica.variacionPct !== undefined && unica.variacionPct !== null ? (
+              <span
+                className={`text-[11px] tabular-nums ${
+                  unica.estadoVariacion ? TONO_ESTADO_VARIACION[unica.estadoVariacion] : "sunmi-text-muted"
+                }`}
+              >
+                {pct(unica.variacionPct)}
+                {unica.estadoVariacion ? ` · ${TEXTO_ESTADO_VARIACION[unica.estadoVariacion]}` : ""}
+              </span>
+            ) : null}
+          </div>
+          {/* El porqué: el título de la lectura y la cuenta en una línea, que es
+              lo que permite verificar el número sin calculadora. */}
+          <div className="text-[10.5px] sunmi-text-muted tabular-nums mt-1">
+            {unica.titulo}
+            {unica.cuenta ? ` · ${unica.cuenta}` : ""}
+          </div>
+          {unica.detalle ? (
+            <div className="text-[10.5px] sunmi-text-muted mt-0.5">{unica.detalle}</div>
+          ) : null}
+          <div className="text-[10.5px] sunmi-text-muted mt-1">
+            Es la única forma de leer el precio de esta fila: no hay nada que elegir.
+          </div>
+        </div>
       ) : (
         <div className="space-y-1.5">
           {tarjetas.map((t) => (
@@ -489,7 +573,10 @@ export default function PanelDecision({
         {forma.pregunta !== null ? (
           <SunmiButton
             color="amber"
-            onClick={onConfirmar}
+            // La clave viaja en el click. Cuando hay una sola lectura, quien
+            // monta el panel no tiene ninguna elección guardada —no hubo nada
+            // que tocar— y sin esto confirmaría con `null`.
+            onClick={() => onConfirmar?.(eleccionEfectiva)}
             disabled={!puedeConfirmar}
             className="py-1.5 px-3 !text-[11px]"
           >
