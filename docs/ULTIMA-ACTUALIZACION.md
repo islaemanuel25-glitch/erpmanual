@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-08 19:43
+**Fecha:** 2026-08-08 21:07
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat(listas): la pantalla dada vuelta — el producto como unidad, feat(listas): el catálogo del proveedor, paginado por PRODUCTO — endpoint nuevo, feat(listas): queda registrado si el vínculo lo decidió una persona o el motor
+- feat(listas): las cards son el filtro y el panel no repite el producto, feat(listas): la pantalla dada vuelta — el producto como unidad, feat(listas): el catálogo del proveedor, paginado por PRODUCTO — endpoint nuevo
 - Archivos: 3 nuevos, 8 modificados (11 total)
 
 
