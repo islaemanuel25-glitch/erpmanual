@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-09 09:09
+**Última actualización:** 2026-08-09 15:14
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,8 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-09: feat(listas): deshacer una aplicacion, con la previa a la vista antes de confirmar
+- 2026-08-09: feat(listas): una fila resuelta muestra qué se decidió y se puede corregir
 - 2026-08-09: feat(listas): una fila resuelta muestra qué se decidió y se puede corregir
 - 2026-08-09: feat(listas): una fila resuelta muestra qué se decidió y se puede corregir
 - 2026-08-08: feat(listas): las cards son el filtro y el panel no repite el producto

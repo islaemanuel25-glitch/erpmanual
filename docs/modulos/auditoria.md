@@ -1,6 +1,6 @@
 # Modulo: Bitácora de auditoría
 
-**Última actualización:** 2026-08-09 09:09
+**Última actualización:** 2026-08-09 15:14
 
 ## Ubicacion
 - UI: `app/modulos/auditoria/page.jsx`
@@ -38,6 +38,7 @@ paralelo a las islas existentes (AuditoriaStock, PrecioUpdate), que no reemplaza
 - `lib/authorize.js` (`requirePerm`)
 
 ## Cambios recientes
+- 2026-08-09: fix(auditoria): la referencia al cliente base va anclada en globalThis
 - 2026-08-09: fix(auditoria): la referencia al cliente base va anclada en globalThis
 - 2026-07-24: fix(auditoria): una fila por acción, diff correcto y contexto completo
 - 2026-07-24: feat(auditoria): bitácora de auditoría central por interceptor de Prisma
