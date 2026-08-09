@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-08 22:38
+**Fecha:** 2026-08-09 01:35
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat(listas): las cards son el filtro y el panel no repite el producto, feat(listas): la pantalla dada vuelta — el producto como unidad, feat(listas): el catálogo del proveedor, paginado por PRODUCTO — endpoint nuevo
+- feat(listas): una fila resuelta muestra qué se decidió y se puede corregir, feat(listas): las cards son el filtro y el panel no repite el producto, feat(listas): la pantalla dada vuelta — el producto como unidad
 - Archivos: 3 nuevos, 8 modificados (11 total)
 
 
