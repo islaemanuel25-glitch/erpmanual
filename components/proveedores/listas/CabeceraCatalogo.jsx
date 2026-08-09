@@ -8,7 +8,7 @@
 //
 // ── LA CARD DE APLICAR SE APAGA SOLA ────────────────────────────────────────
 //
-// "Listos para aplicar" va destacada en el naranja de marca y lleva el botón
+// "Listos para aplicar" va destacada en el acento del tema y lleva el botón
 // adentro. Cuando el número da cero se apaga a gris y el botón desaparece, y eso
 // NO tiene lógica aparte: sale del mismo número que muestra. Una card con una
 // condición propia para encenderse es una card que algún día va a estar
@@ -58,6 +58,16 @@ function Card({ grupo, valor, activa, destacada, apagada, onClick, children }) {
       className={`relative rounded-lg border p-2.5 transition-colors min-w-0 ${
         destacada && !apagada ? "sunmi-border-accent" : "sunmi-border"
       }`}
+      // EL MARCADO SALE DEL TEMA, NO DE UN COLOR. `--pos-accent` es la variable
+      // CSS que define cada tema en globals.css: acá se ve naranja porque este
+      // tema es naranja, y en violetaSaas sale violeta y en verdeComercio verde
+      // sin tocar una línea. Nunca un hex ni una clase de Tailwind con número:
+      // hay un segundo juego de temas en lib/sunmiThemes.js con los mismos
+      // catorce nombres y valores propios, y clavar un color acá es empezar a
+      // seguir el que no manda.
+      //
+      // El texto va en `--app-bg` —el fondo del tema— porque sobre el acento lo
+      // que se lee es el color del fondo, no el de la letra.
       style={
         activa
           ? { background: "var(--pos-accent)", borderColor: "var(--pos-accent)", color: "var(--app-bg)" }
@@ -77,7 +87,7 @@ function Card({ grupo, valor, activa, destacada, apagada, onClick, children }) {
       />
 
       {/* Los textos NO llevan clase de color cuando la card está marcada: heredan
-          el del fondo naranja. `sunmi-text-muted` sobre naranja no se lee. */}
+          el del acento. `sunmi-text-muted` sobre el acento no se lee. */}
       <div
         className={`relative pointer-events-none text-[22px] leading-none font-bold tabular-nums ${
           activa ? "" : apagada ? "sunmi-text-muted" : destacada ? "sunmi-text-accent" : "sunmi-text-strong"
