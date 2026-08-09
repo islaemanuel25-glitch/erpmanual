@@ -168,31 +168,56 @@ export default function ModalRevertir({ abierto, importacionId, onCerrar, onReve
               <div className="text-[10.5px] sunmi-text-muted mt-0.5">
                 No se tocan porque su costo de hoy ya no es el que escribió esta lista.
               </div>
+              {/* Mismo criterio que la muestra de abajo: renglones enteros y una
+                  línea de cierre con el número real de cada ancho. Acá cada
+                  omitido trae su motivo explicado, así que ocupa más y entran
+                  menos. */}
               <ul className="mt-1.5 space-y-1">
-                {previa.omitidos.slice(0, 8).map((o) => (
-                  <li key={o.productoBaseId} className="text-[10.5px] leading-snug">
+                {previa.omitidos.slice(0, 6).map((o, n) => (
+                  <li
+                    key={o.productoBaseId}
+                    className={`text-[10.5px] leading-snug ${n >= 2 ? "hidden sm:list-item" : ""}`}
+                  >
                     <span className="sunmi-text-strong">{o.nombre ?? `Producto #${o.productoBaseId}`}</span>
                     <span className="sunmi-text-muted"> · {o.texto}</span>
                   </li>
                 ))}
-                {previa.omitidos.length > 8 ? (
-                  <li className="text-[10.5px] sunmi-text-muted">
-                    y {previa.omitidos.length - 8} más.
+                {previa.omitidos.length > 2 ? (
+                  <li className="text-[10.5px] sunmi-text-muted sm:hidden">
+                    y {previa.omitidos.length - 2} más.
+                  </li>
+                ) : null}
+                {previa.omitidos.length > 6 ? (
+                  <li className="text-[10.5px] sunmi-text-muted hidden sm:list-item">
+                    y {previa.omitidos.length - 6} más.
                   </li>
                 ) : null}
               </ul>
             </div>
           ) : null}
 
-          {/* Una muestra de lo que se va a escribir. */}
+          {/* Una muestra de lo que se va a escribir.
+             *
+             * SE CORTA POR RENGLONES ENTEROS, nunca a mitad de un producto. Antes
+             * eran cinco fijos y en la Sunmi el último quedaba partido al ras del
+             * alto del modal: un renglón cortado sin indicio de scroll no se lee
+             * como "hay más", se lee como que la pantalla se rompió.
+             *
+             * En 360 px cada producto ocupa dos o tres líneas, así que entran
+             * tres; en escritorio entran cinco. El corte lo decide el ancho y la
+             * línea de cierre dice cuántos quedaron afuera EN CADA CASO — por eso
+             * son dos líneas y no una: el número real cambia con el ancho. */}
           {previa.items.length > 0 ? (
             <div className="rounded-lg border sunmi-border p-2.5">
               <div className="text-[10px] uppercase tracking-wide sunmi-text-muted">
                 Algunos de los que vuelven
               </div>
               <ul className="mt-1 space-y-0.5">
-                {previa.items.slice(0, 5).map((i) => (
-                  <li key={i.productoBaseId} className="text-[10.5px] leading-snug tabular-nums">
+                {previa.items.slice(0, 5).map((i, n) => (
+                  <li
+                    key={i.productoBaseId}
+                    className={`text-[10.5px] leading-snug tabular-nums ${n >= 3 ? "hidden sm:list-item" : ""}`}
+                  >
                     <span className="sunmi-text-strong">{i.nombre}</span>
                     <span className="sunmi-text-muted">
                       {" "}
@@ -203,6 +228,16 @@ export default function ModalRevertir({ abierto, importacionId, onCerrar, onReve
                     </span>
                   </li>
                 ))}
+                {previa.items.length > 3 ? (
+                  <li className="text-[10.5px] sunmi-text-muted sm:hidden">
+                    y {previa.items.length - 3} más.
+                  </li>
+                ) : null}
+                {previa.items.length > 5 ? (
+                  <li className="text-[10.5px] sunmi-text-muted hidden sm:list-item">
+                    y {previa.items.length - 5} más.
+                  </li>
+                ) : null}
               </ul>
             </div>
           ) : null}
