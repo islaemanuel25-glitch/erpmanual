@@ -25,7 +25,6 @@
 import { useMemo } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 
-import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { money } from "@/lib/proveedores/listas/presentacion";
 import { analizarFila, LEYENDA_UXBU } from "@/lib/proveedores/listas/confirmarPresentacion";
@@ -82,85 +81,70 @@ export function analisisDeFila(fila, erp, importacion) {
 }
 
 // ── ARRIBA: la comparación ──────────────────────────────────────────────────
+//
+// SIN BARRA DE COLUMNAS PROPIA. Antes esto era una tabla con su `<thead>`
+// —Origen, Producto, Código, Precio, Presentación, Variación— que se dibujaba
+// justo debajo de la barra de la grilla: dos barras de títulos pegadas, la
+// segunda para una sola fila.
+//
+// Ahora cada origen es un bloque y cada dato lleva su rótulo pegado arriba, en
+// chico. Un rótulo por dato ocupa menos que una barra entera y encima sobrevive
+// al ancho de la Sunmi, donde una tabla de seis columnas obliga a scrollear de
+// costado para saber qué es cada número.
 
-const COLUMNAS_COMPARACION = [
-  {
-    clave: "origen",
-    titulo: "Origen",
-    render: (o) => (
-      <span
-        className={`text-[10px] font-semibold uppercase whitespace-nowrap ${
-          o.destacado ? "sunmi-text-accent" : "sunmi-text-muted"
-        }`}
-      >
-        {o.origen}
-      </span>
-    ),
-  },
-  {
-    clave: "producto",
-    titulo: "Producto",
-    render: (o) => (
-      <div className="truncate max-w-[20rem] sunmi-text-strong" title={o.producto ?? ""}>
+/** Un dato con su rótulo encima. El rótulo es lo que reemplaza a la barra. */
+function Dato({ rotulo, children, nota, titulo, className = "" }) {
+  return (
+    <div className={`min-w-0 ${className}`} title={titulo}>
+      <div className="text-[9px] uppercase tracking-wide sunmi-text-muted leading-none">{rotulo}</div>
+      <div className="text-[11.5px] sunmi-text-strong leading-tight mt-0.5">{children}</div>
+      {nota ? <div className="text-[9.5px] leading-tight sunmi-text-muted mt-0.5">{nota}</div> : null}
+    </div>
+  );
+}
+
+/** Un origen de la comparación: el archivo, o un producto candidato. */
+function Origen({ o }) {
+  return (
+    <div className="rounded-lg border sunmi-border p-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span
+          className={`text-[10px] font-semibold uppercase ${
+            o.destacado ? "sunmi-text-accent" : "sunmi-text-muted"
+          }`}
+        >
+          {o.origen}
+        </span>
+        {o.variacionPct === undefined ? null : (
+          <span
+            className={`text-[11px] tabular-nums whitespace-nowrap ${
+              o.estadoVariacion ? TONO_ESTADO_VARIACION[o.estadoVariacion] : "sunmi-text-muted"
+            }`}
+          >
+            {pct(o.variacionPct)} <span className="text-[9px] sunmi-text-muted">variación</span>
+          </span>
+        )}
+      </div>
+
+      <div className="text-[12px] font-semibold sunmi-text-strong leading-snug mt-0.5">
         {o.producto ?? <span className="sunmi-text-warning">Sin vincular</span>}
       </div>
-    ),
-  },
-  {
-    clave: "codigo",
-    titulo: "Código",
-    tdClassName: "tabular-nums",
-    render: (o) => (
-      <>
-        <div className="sunmi-text-strong">{o.codigo ?? "—"}</div>
-        {o.notaCodigo ? (
-          <div className="text-[9.5px] leading-tight sunmi-text-muted">{o.notaCodigo}</div>
-        ) : null}
-      </>
-    ),
-  },
-  {
-    clave: "precio",
-    titulo: "Precio",
-    align: "der",
-    tdClassName: "tabular-nums",
-    render: (o) => (
-      <>
-        <div className="sunmi-text-strong">{money(o.precio)}</div>
-        {o.notaPrecio ? (
-          <div className="text-[9.5px] leading-tight sunmi-text-muted">{o.notaPrecio}</div>
-        ) : null}
-      </>
-    ),
-  },
-  {
-    clave: "presentacion",
-    titulo: "Presentación",
-    title: (o) => (o.tituloPresentacion ? o.tituloPresentacion : undefined),
-    render: (o) => (
-      <>
-        <div className="sunmi-text-strong">{o.presentacion ?? "—"}</div>
-        {o.notaPresentacion ? (
-          <div className="text-[9.5px] leading-tight sunmi-text-muted">{o.notaPresentacion}</div>
-        ) : null}
-      </>
-    ),
-  },
-  {
-    clave: "variacion",
-    titulo: "Variación",
-    align: "der",
-    tdClassName: "tabular-nums whitespace-nowrap",
-    render: (o) =>
-      o.variacionPct === undefined ? (
-        <span className="sunmi-text-muted">—</span>
-      ) : (
-        <span className={o.estadoVariacion ? TONO_ESTADO_VARIACION[o.estadoVariacion] : "sunmi-text-muted"}>
-          {pct(o.variacionPct)}
-        </span>
-      ),
-  },
-];
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1.5">
+        <Dato rotulo="Código" nota={o.notaCodigo} className="tabular-nums">
+          {o.codigo ?? "—"}
+        </Dato>
+        <Dato rotulo="Precio" nota={o.notaPrecio} className="tabular-nums">
+          {money(o.precio)}
+        </Dato>
+        <Dato rotulo="Presentación" nota={o.notaPresentacion} titulo={o.tituloPresentacion ?? undefined}>
+          {o.presentacion ?? "—"}
+        </Dato>
+      </div>
+    </div>
+  );
+}
+
 
 /**
  * Las filas de la comparación.
@@ -442,16 +426,19 @@ export default function PanelDecision({
         </div>
       ) : null}
 
-      {/* ── ARRIBA: la comparación ────────────────────────────────────────── */}
-      <div className="sunmi-border border rounded-lg overflow-hidden">
-        <SunmiTable
-          densidad="compacta"
-          columnas={COLUMNAS_COMPARACION}
-          filas={origenes}
-          claveFila={(o) => o.id}
-          cargando={cargandoCandidatos && esPreguntaProducto}
-          vacio="Sin orígenes que comparar."
-        />
+      {/* ── ARRIBA: la comparación, en bloques y sin barra de columnas ─────── */}
+      <div className="space-y-1.5">
+        {cargandoCandidatos && esPreguntaProducto ? (
+          <div className="rounded-lg border sunmi-border p-2.5 text-[10.5px] sunmi-text-muted">
+            Buscando productos parecidos…
+          </div>
+        ) : origenes.length === 0 ? (
+          <div className="rounded-lg border sunmi-border p-2.5 text-[10.5px] sunmi-text-muted">
+            Sin orígenes que comparar.
+          </div>
+        ) : (
+          origenes.map((o) => <Origen key={o.id} o={o} />)
+        )}
       </div>
 
       {/* ── El cartel de error, encima de las tarjetas ────────────────────── */}
