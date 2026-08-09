@@ -137,7 +137,12 @@ function Origen({ o }) {
         )}
       </div>
 
-      <div className="text-[12px] font-semibold sunmi-text-strong leading-snug mt-0.5">
+      {/* El nombre del producto del archivo se dibuja EXACTAMENTE como el del
+          producto del sistema en la grilla: 12 px y peso medio. El de la grilla
+          es el que manda —es el producto que se está por tocar— y el del archivo
+          es contra qué se lo compara. Estaba en semibold y se leía más grande
+          que el que manda. */}
+      <div className="text-[12px] font-medium sunmi-text-strong leading-snug mt-0.5">
         {o.producto ?? <span className="sunmi-text-warning">Sin vincular</span>}
       </div>
 
@@ -275,7 +280,9 @@ function Tarjeta({ tarjeta, elegida, sugerida, onElegir, deshabilitada }) {
             <div className="text-[10.5px] sunmi-text-muted mt-0.5">{tarjeta.detalle}</div>
           ) : null}
 
-          <div className="flex items-baseline gap-2 mt-1">
+          {/* El costo y su variación bajan a dos líneas cuando la columna es
+              angosta: en la Sunmi cada tarjeta mide unos 160 px. */}
+          <div className="flex items-baseline gap-2 mt-1 flex-wrap">
             <span className="text-[16px] font-semibold sunmi-text-strong tabular-nums">
               {money(tarjeta.costoNuevo)}
             </span>
@@ -531,7 +538,17 @@ export default function PanelDecision({
           </div>
         </div>
       ) : (
-        <div className="space-y-1.5">
+        /* LAS OPCIONES VAN UNA AL LADO DE LA OTRA, no apiladas.
+         *
+         * Elegir entre dos lecturas es comparar dos números; apiladas obligaba a
+         * scrollear para ver la segunda y a acordarse de la primera. En dos
+         * columnas se comparan mirando.
+         *
+         * Dos columnas SIEMPRE, también en la Sunmi de 360 px: ahí es donde más
+         * cuesta scrollear y donde la comparación se pierde. Con tres tarjetas
+         * —el máximo que devuelven las dos preguntas— la tercera baja a la fila
+         * siguiente en la Sunmi y en escritorio entran las tres en una. */
+        <div className={`grid gap-1.5 grid-cols-2 ${tarjetas.length >= 3 ? "md:grid-cols-3" : ""}`}>
           {tarjetas.map((t) => (
             <Tarjeta
               key={t.clave}
@@ -547,7 +564,8 @@ export default function PanelDecision({
             />
           ))}
           {tarjetas.length === 0 && !cargandoCandidatos ? (
-            <div className="rounded-lg border sunmi-border p-2.5 text-[10.5px] sunmi-text-muted">
+            /* Ocupa el ancho entero: un cartel no es una opción más. */
+            <div className="col-span-full rounded-lg border sunmi-border p-2.5 text-[10.5px] sunmi-text-muted">
               {esPreguntaProducto
                 ? "No se encontró ningún producto candidato. Buscá uno a mano."
                 : "El archivo no habilita ninguna interpretación para esta fila."}
