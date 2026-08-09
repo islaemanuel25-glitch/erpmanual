@@ -2515,6 +2515,19 @@ model ImportacionListaFila {
   ventaAnterior         Decimal? @db.Decimal(12, 2)
   ventaNueva            Decimal? @db.Decimal(12, 2)
 
+  /// ── LA REVERSIÓN ──────────────────────────────────────────────────────
+  ///
+  /// NULO SIGNIFICA QUE NUNCA SE REVIRTIÓ. No hay un booleano al lado: la
+  /// fecha ya lo dice, y dos hechos para lo mismo se contradicen el día que
+  /// uno se escribe y el otro no.
+  ///
+  /// El historial de arriba NO se borra al revertir: costo previo, costo
+  /// aplicado, venta anterior, venta escrita y fecha quedan como estaban.
+  /// Son la prueba de qué se escribió, y borrarlos dejaría una reversión sin
+  /// nada que explicar. La fila sí vuelve a contar como no aplicada.
+  revertidaEn           DateTime?
+  revertidaPorUsuarioId Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

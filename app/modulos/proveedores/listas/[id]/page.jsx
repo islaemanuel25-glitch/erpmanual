@@ -36,7 +36,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Search, X } from "lucide-react";
+import { ArrowLeft, Search, Undo2, X } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -47,6 +47,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
+import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
 import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
 import PanelDecision from "@/components/proveedores/listas/PanelDecision";
@@ -109,6 +110,7 @@ export default function CatalogoImportacionPage() {
   const [resultado, setResultado] = useState(null);
   const [errorAplicar, setErrorAplicar] = useState("");
   const [cancelando, setCancelando] = useState(false);
+  const [revirtiendo, setRevirtiendo] = useState(false);
   const [trabajandoCancelar, setTrabajandoCancelar] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
@@ -172,6 +174,11 @@ export default function CatalogoImportacionPage() {
 
   const titular = useMemo(() => titularDeCatalogo({ porGrupo, universo }), [porGrupo, universo]);
   const abierto = cab?.estado !== "CANCELADA" && cab?.estado !== "APLICADA";
+
+  // ¿Hay algo escrito que se pueda deshacer? Sale del contador de productos
+  // actualizados, que es el mismo número que muestra la card: si hay
+  // actualizados es porque hubo filas aplicadas.
+  const hayAplicadas = Number(porGrupo[GRUPO_PRODUCTO.ACTUALIZADO] ?? 0) > 0;
 
   // ── Acciones ────────────────────────────────────────────────────────────
 
@@ -526,6 +533,18 @@ export default function CatalogoImportacionPage() {
               </div>
             ) : abierto ? (
               <div className="flex flex-wrap items-center gap-2">
+                {/* Deshacer vive al lado de cancelar porque son la misma
+                    familia: lo que se hace con la importación entera. Aparece
+                    solo si hay algo escrito que deshacer. */}
+                {hayAplicadas ? (
+                  <SunmiButton
+                    color="slate"
+                    onClick={() => setRevirtiendo(true)}
+                    className="py-1.5 px-2.5 !text-[11px] inline-flex items-center gap-1"
+                  >
+                    <Undo2 size={13} aria-hidden="true" /> Deshacer la aplicación
+                  </SunmiButton>
+                ) : null}
                 <SunmiButton
                   color="slate"
                   onClick={() => setCancelando(true)}
@@ -633,6 +652,22 @@ export default function CatalogoImportacionPage() {
               }}
             />
           ) : null}
+
+          <ModalRevertir
+            abierto={revirtiendo}
+            importacionId={id}
+            onCerrar={() => setRevirtiendo(false)}
+            onRevertido={async (r) => {
+              setRevirtiendo(false);
+              // Recargar entero: las cards recuentan, los productos vuelven a
+              // "listos para aplicar" y el botón de aplicar reaparece solo.
+              await cargar();
+              setAviso(
+                `Se deshizo la aplicación: ${r?.escrito?.productos ?? 0} productos volvieron al costo anterior` +
+                  `${r?.escrito?.ventas ? ` y ${r.escrito.ventas} precios de venta se recalcularon` : ""}.`
+              );
+            }}
+          />
 
           {/* ── El archivo, como diagnóstico ──────────────────────────── */}
           <DiagnosticoArchivo archivo={archivo} macheo={macheo} cabecera={cab} />
