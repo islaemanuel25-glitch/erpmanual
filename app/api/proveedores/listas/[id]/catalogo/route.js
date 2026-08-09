@@ -164,6 +164,10 @@ export async function GET(req, context) {
               aplicada: true, excluidaManual: true, seleccionada: true,
               costoAnterior: true, costoMaestroPropuesto: true, costoAplicado: true,
               aplicadaEn: true, confirmadoEn: true, vinculadoEn: true,
+              // QUÉ lectura se confirmó, no solo que se confirmó. Sin esto el
+              // panel abre una fila ya resuelta con las tarjetas en blanco, y
+              // una fila resuelta se ve igual que una sin resolver.
+              multiplicadorConfirmado: true,
               aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
             },
           })

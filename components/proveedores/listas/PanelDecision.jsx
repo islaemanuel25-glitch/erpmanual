@@ -41,6 +41,7 @@ import { PREGUNTA } from "@/lib/proveedores/listas/panelDecision";
 import {
   rangoDeLaFila,
   confirmacionDeInterpretacionVigente,
+  claveDeLaConfirmacion,
 } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
 const pct = (n) =>
@@ -233,7 +234,7 @@ function origenesDeComparacion({ fila, candidatos, analisis, presentacionArchivo
 
 // ── ABAJO: las tarjetas ─────────────────────────────────────────────────────
 
-function Tarjeta({ tarjeta, elegida, sugerida, onElegir, deshabilitada }) {
+function Tarjeta({ tarjeta, elegida, sugerida, confirmada, onElegir, deshabilitada }) {
   const seleccionable = !deshabilitada && !!onElegir;
   return (
     <label
@@ -258,7 +259,18 @@ function Tarjeta({ tarjeta, elegida, sugerida, onElegir, deshabilitada }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[12px] font-semibold sunmi-text-strong">{tarjeta.titulo}</span>
-            {sugerida ? (
+            {/* CONFIRMADA le gana a SUGERIDA: lo que decidió una persona manda
+                sobre lo que propone el motor, y ver las dos marcas juntas haría
+                dudar de cuál está vigente. */}
+            {confirmada ? (
+              <span
+                className="text-[9.5px] px-1.5 py-0.5 rounded border inline-flex items-center gap-0.5 sunmi-text-accent"
+                style={{ borderColor: "var(--pos-accent)" }}
+              >
+                <Check size={9} aria-hidden="true" />
+                Confirmada
+              </span>
+            ) : sugerida ? (
               <span className="text-[9.5px] px-1.5 py-0.5 rounded border sunmi-border sunmi-text-success inline-flex items-center gap-0.5">
                 <Check size={9} aria-hidden="true" />
                 Sugerida
@@ -438,8 +450,30 @@ export default function PanelDecision({
   // la persona.
   const unica =
     !esPreguntaProducto && tarjetas.length === 1 && !tarjetas[0].absurda ? tarjetas[0] : null;
-  const eleccionEfectiva = eleccion ?? unica?.clave ?? null;
-  const puedeConfirmar = !!eleccionEfectiva && !confirmando;
+
+  // UNA FILA YA RESUELTA MUESTRA QUÉ SE DECIDIÓ.
+  //
+  // La tarjeta que se confirmó viene marcada y elegida. Antes la fila abría con
+  // todo en blanco —el multiplicador guardado ni siquiera viajaba al cliente— y
+  // se veía idéntica a una sin resolver, con el botón apagado: de ahí la
+  // sensación de pantalla rota.
+  // Se traduce contra las hipótesis DEL MOTOR y no contra las tarjetas: las
+  // tarjetas son la presentación y no llevan el multiplicador, así que buscar
+  // ahí no encontraba nunca nada y la marca no aparecía. Las claves son las
+  // mismas de los dos lados, que es lo que permite comparar después.
+  const claveConfirmada = esPreguntaProducto
+    ? null
+    : claveDeLaConfirmacion(fila, analisis?.evaluadas ?? []);
+  const eleccionEfectiva = eleccion ?? unica?.clave ?? claveConfirmada;
+
+  // Con la fila ya resuelta el botón no confirma: CAMBIA. Y solo hay algo que
+  // cambiar si se eligió una lectura distinta de la que ya está guardada.
+  const yaResuelta = !!claveConfirmada;
+  const puedeConfirmar = confirmando
+    ? false
+    : yaResuelta
+      ? !!eleccion && eleccion !== claveConfirmada
+      : !!eleccionEfectiva;
 
   return (
     // El ancho se ata al de la PANTALLA y no al de la tabla. El panel vive en una
@@ -553,8 +587,9 @@ export default function PanelDecision({
             <Tarjeta
               key={t.clave}
               tarjeta={t}
-              elegida={eleccion === t.clave}
+              elegida={eleccionEfectiva === t.clave}
               sugerida={sugerida === t.clave}
+              confirmada={claveConfirmada === t.clave}
               // Una improbable no se puede elegir MIENTRAS haya algo creíble al
               // lado. Si no hay nada creíble, se puede elegir igual —marcada
               // como imposible— porque si no la fila queda sin salida: el botón
@@ -601,7 +636,14 @@ export default function PanelDecision({
             </button>
           ) : null}
         </div>
-        {forma.pregunta !== null ? (
+        {/* EL BOTÓN APARECE SOLO SI HAY ALGO QUE HACER.
+         *
+         *   · La fila está en la cola  → hay una pregunta abierta: "Confirmar".
+         *   · La resolvió una persona  → se puede cambiar: "Cambiar la lectura".
+         *   · La resolvió el motor     → no hay nada que decidir ni que cambiar,
+         *     y el servidor rechaza confirmarla. Mostrar el botón habilitado era
+         *     prometer una acción que terminaba en un cartel de error. */}
+        {forma.pregunta !== null && (forma.enCola || yaResuelta) ? (
           <SunmiButton
             color="amber"
             // La clave viaja en el click. Cuando hay una sola lectura, quien
@@ -611,7 +653,11 @@ export default function PanelDecision({
             disabled={!puedeConfirmar}
             className="py-1.5 px-3 !text-[11px]"
           >
-            {confirmando ? "Confirmando…" : "Confirmar y seguir"}
+            {confirmando
+              ? "Guardando…"
+              : yaResuelta
+                ? "Cambiar la lectura"
+                : "Confirmar y seguir"}
           </SunmiButton>
         ) : null}
       </div>
