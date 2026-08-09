@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-08-09] - Actualización: proveedores
+
+### Modificado
+- **proveedores**: feat(listas): una fila resuelta muestra qué se decidió y se puede corregir
+- **proveedores**: feat(listas): las cards son el filtro y el panel no repite el producto
+- **proveedores**: feat(listas): la pantalla dada vuelta — el producto como unidad
+- **proveedores**: feat(listas): el catálogo del proveedor, paginado por PRODUCTO — endpoint nuevo
+- **proveedores**: feat(listas): queda registrado si el vínculo lo decidió una persona o el motor
+- **proveedores**: feat(listas): el macheo se guarda cuando la fila se aplica
+- **proveedores**: fix(listas): el reporte no podía ver una confirmación al resolver el rango
+- **proveedores**: refactor(listas): el rango sale de rangoDeLaFila en los cinco lectores
+- **proveedores**: feat(listas): la cola de pendientes se filtra en el servidor por la columna
+- **proveedores**: feat(listas): el rango esperado se asienta en la cabecera, no se deja implícito
+- **proveedores**: feat(listas): el motor calcula la interpretación y la confirmación vencida deja de contar — rutas SIN VERIFICAR
+- **proveedores**: feat(listas): candidatos por parecido de nombre, calculados en el servidor
+- **proveedores**: wip(listas): panel de decisión con SunmiTable — SIN VERIFICAR
+
+
 ## [2026-08-08] - Actualización: proveedores, productos
 
 ### Modificado
