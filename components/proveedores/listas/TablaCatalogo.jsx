@@ -157,7 +157,22 @@ export default function TablaCatalogo({
     <div className="sunmi-border border rounded-lg overflow-hidden">
       <SunmiTable
         densidad="compacta"
-        stickyHeader
+        // EL ENCABEZADO PEGADO SE APAGA CUANDO HAY UN PANEL ABIERTO.
+        //
+        // `stickyHeader` envuelve la tabla en un contenedor con `max-h-[70dvh]`
+        // y scroll propio. Con el panel abierto eso recorta la zona de acción: en
+        // la Sunmi de 360 el contenedor mide 448 px, el contenido 461, y el botón
+        // de confirmar quedaba en y=871 con la ventana en 640 — fuera de la
+        // pantalla y sin forma de tocarlo. Medido, no deducido.
+        //
+        // Además el encabezado, que es `sticky` con z-index 20, se montaba encima
+        // del texto de la fila al scrollear adentro de ese contenedor.
+        //
+        // Sin panel abierto sigue pegado, que es donde sirve: 25 filas de
+        // catálogo se recorren mejor viendo los títulos. Con panel abierto manda
+        // poder decidir, y para eso el alto no puede recortar nada: scrollea la
+        // página entera.
+        stickyHeader={!abierta}
         columnas={columnas}
         filas={productos}
         claveFila={(p) => p.id}
