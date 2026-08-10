@@ -16,6 +16,8 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import { Pencil } from "lucide-react";
+import { ORIGENES, linkEditarProducto } from "@/lib/compras-proveedor/retornoPedido";
 import SinPermisos from "@/components/auth/SinPermisos";
 import useAccionesEnvioPedido from "@/hooks/useAccionesEnvioPedido";
 import {
@@ -48,7 +50,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   const router = useRouter();
 
   const { perfil } = useUser();
-  const { loading: loadingCtx, needsContexto } = useContextoActivo();
+  // `contexto` hace falta para el link a editar producto: la edición se hace
+  // parado en la ubicación activa.
+  const { loading: loadingCtx, needsContexto, contexto } = useContextoActivo();
 
   const [pedido, setPedido] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -328,6 +332,22 @@ export default function DetallePedidoProveedorPage({ params }) {
   const permisosP = perfil?.permisos || [];
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("compras.ver")) return <SinPermisos />;
+
+  // Editar producto es OTRO permiso, separable de ver o cargar compras.
+  const puedeEditarProductoP = esAdminP || permisosP.includes("productos.editar");
+
+  // Ir a editar el producto de esta línea, y volver a ESTE pedido. El pedido ya
+  // está guardado en el servidor, así que no hace falta preservar nada del lado
+  // del navegador: la vuelta lo recarga.
+  const irAEditarProducto = (base) => {
+    const url = linkEditarProducto({
+      baseId: base?.id,
+      localId: contexto?.localId,
+      origen: ORIGENES.PEDIDO_DETALLE,
+      pedidoId: pedido?.id,
+    });
+    if (url) router.push(url);
+  };
 
   if (loading) {
     return (
@@ -619,7 +639,23 @@ export default function DetallePedidoProveedorPage({ params }) {
                   return (
                     <SunmiTableRow key={det.id}>
                       <td className="px-3 py-1.5 text-sm">
-                        {base?.nombre || "-"}
+                        <span className="inline-flex items-center gap-1.5">
+                          {/* Editar el PRODUCTO. Mismo criterio que en el pedido
+                              nuevo: los datos del producto se cambian en editar
+                              producto, y se vuelve acá. */}
+                          {puedeEditarProductoP && base?.id ? (
+                            <button
+                              type="button"
+                              onClick={() => irAEditarProducto(base)}
+                              aria-label={`Editar ${base?.nombre || "producto"}`}
+                              title="Editar el producto (precio, códigos, datos)"
+                              className="w-[22px] h-[22px] inline-flex items-center justify-center rounded sunmi-control shrink-0"
+                            >
+                              <Pencil size={11} />
+                            </button>
+                          ) : null}
+                          <span>{base?.nombre || "-"}</span>
+                        </span>
                         {esFiambre && (
                           <span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>
                         )}

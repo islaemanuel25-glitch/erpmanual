@@ -2,8 +2,9 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import { Trash2, X, Pencil } from "lucide-react";
+import { Trash2, X, Pencil, TriangleAlert } from "lucide-react";
 import { subtotalLinea, unidadDisplay, naturalezaLinea } from "@/lib/compras-proveedor/calculoPedido";
+import { compararCostoLinea, textoAvisoCosto } from "@/lib/compras-proveedor/avisoCostoLinea";
 
 /**
  * Carrito del pedido a proveedor (rediseño "cart-first").
@@ -68,6 +69,16 @@ export default function CarritoPedido({
   const linea = (i) => {
     const base = baseDe(i);
     const r = subtotalLinea({ base, cantidad: i.cantidad, costo: i.precioCosto });
+    // ¿Lo que estoy pagando difiere del costo que tiene el producto en el
+    // catálogo? El pedido ya no arrastra el costo, así que esta señal es lo
+    // único que evita que el catálogo se quede viejo sin que nadie se entere.
+    // No escribe nada: invita a abrir el lápiz.
+    const cmp = compararCostoLinea({
+      precioLinea: i.precioCosto,
+      unidad: i.unidadPedido,
+      costoCatalogo: i.costoCatalogo,
+      base,
+    });
     const disp = unidadDisplay(base, i.unidadPedido);
     const unidadTxt = disp === "PIEZA / por kg" ? "pieza" : disp.toLowerCase();
     const esPack = naturalezaLinea(base) === "PACK";
@@ -164,6 +175,19 @@ export default function CarritoPedido({
             )}
           </span>
         </div>
+        {cmp.hayDiferencia && (
+          <div
+            className="flex items-center gap-1 mt-1 text-[10px] sunmi-text-warning"
+            title={textoAvisoCosto(cmp)}
+            data-aviso-costo={cmp.sentido}
+          >
+            <TriangleAlert size={11} className="shrink-0" aria-hidden="true" />
+            <span className="min-w-0">
+              {cmp.sentido === "sube" ? "Más caro" : "Más barato"} que el catálogo
+              {" "}({fmtPesos(cmp.costoCatalogo)})
+            </span>
+          </div>
+        )}
         {esPack && (
           <div className="text-[10px] sunmi-text-muted mt-1">
             1 pack = {factor} un

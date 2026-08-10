@@ -85,6 +85,9 @@ export default function NuevaCompraProveedorPage() {
   // Vincular al vuelo (Etapa 5)
   const [vincularOpen, setVincularOpen] = useState(false);
   const [postVinculoMsg, setPostVinculoMsg] = useState("");
+  // Líneas que NO se pudieron restaurar al volver de editar un producto. Aparte
+  // de postVinculoMsg: eso confirma una acción, esto avisa una pérdida.
+  const [avisoRestauracion, setAvisoRestauracion] = useState("");
   const justLinkedRef = useRef(null);
   // Proveedor para el que ya se sembraron los sugeridos (evita re-sembrar y que
   // un sugerido quitado vuelva solo en la misma sesión).
@@ -211,6 +214,7 @@ export default function NuevaCompraProveedorPage() {
             detalleId: d.id,
             productoLocalId: d.productoLocalId,
             baseId: base.id ?? null,
+            costoCatalogo: Number(base.precio_costo) || 0,
             nombre: base.nombre || "",
             sku: base.sku || "",
             modoCompra,
@@ -309,6 +313,7 @@ export default function NuevaCompraProveedorPage() {
             .map((pr) => ({
               productoLocalId: pr.productoLocalId,
               baseId: pr.baseId ?? null,
+              costoCatalogo: Number(pr.precio_costo) || 0,
               nombre: pr.nombre,
               sku: pr.sku,
               codigo_barra: pr.codigo_barra,
@@ -343,13 +348,24 @@ export default function NuevaCompraProveedorPage() {
           }
           if (guardado && String(guardado.proveedorId) === String(proveedorId)) {
             const porId = new Map((data.items || []).map((pr) => [pr.productoLocalId, pr]));
+            // Las que no se pudieron restaurar se AVISAN. Restaurar el resto está
+            // bien; hacerlo callado no: alguien confirmaría el pedido creyendo
+            // que está completo.
+            const perdidas = [];
             const restaurado = guardado.lineas
               .map((l) => {
                 const pr = porId.get(l.productoLocalId);
-                if (!pr) return null; // el producto ya no está en el universo del proveedor
+                if (!pr) {
+                  // Ya no está en el universo del proveedor: le sacaron el
+                  // proveedor, lo desactivaron o lo borraron mientras se editaba
+                  // el producto.
+                  perdidas.push(l.productoLocalId);
+                  return null;
+                }
                 return {
                   productoLocalId: pr.productoLocalId,
                   baseId: pr.baseId ?? null,
+                  costoCatalogo: Number(pr.precio_costo) || 0,
                   nombre: pr.nombre,
                   sku: pr.sku,
                   codigo_barra: pr.codigo_barra,
@@ -371,6 +387,16 @@ export default function NuevaCompraProveedorPage() {
               autofillRef.current = String(proveedorId); // no re-sembrar encima
               setItems(restaurado);
               setNotas(guardado.notas || "");
+            }
+            if (perdidas.length > 0) {
+              // Se nombra CUÁL se perdió y POR QUÉ, no "hubo un problema". Sin el
+              // dato, la persona no puede volver a agregarlo ni saber qué le falta.
+              const cuales = perdidas.join(", ");
+              setAvisoRestauracion(
+                perdidas.length === 1
+                  ? `Se recuperó el pedido, pero una línea quedó afuera (producto ${cuales}): ya no aparece entre los de este proveedor. Puede que le hayan sacado el proveedor, lo hayan desactivado o lo hayan borrado. Si lo necesitás, agregalo de nuevo.`
+                  : `Se recuperó el pedido, pero ${perdidas.length} líneas quedaron afuera (productos ${cuales}): ya no aparecen entre los de este proveedor. Si las necesitás, agregalas de nuevo.`
+              );
             }
           }
         }
@@ -417,6 +443,7 @@ export default function NuevaCompraProveedorPage() {
     const nuevoItemBase = {
       productoLocalId: prod.productoLocalId,
       baseId: prod.baseId ?? null,
+      costoCatalogo: Number(prod.precio_costo) || 0,
       nombre: prod.nombre,
       sku: prod.sku,
       modoCompra: prod.modoCompra || "BULTO",
@@ -1918,6 +1945,20 @@ export default function NuevaCompraProveedorPage() {
                     <SunmiPageSizer value={pageSize} onChange={setPageSize} />
                   </div>
                 </div>
+
+                {avisoRestauracion ? (
+                  <div className="mb-2 rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring text-xs sunmi-text-warning flex items-start gap-2">
+                    <span className="flex-1">{avisoRestauracion}</span>
+                    <button
+                      type="button"
+                      onClick={() => setAvisoRestauracion("")}
+                      className="shrink-0 sunmi-text-muted"
+                      aria-label="Cerrar aviso"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : null}
 
                 {postVinculoMsg ? (
                   <div className="mb-2 rounded-md px-3 py-2 sunmi-surface ring-1 ring-inset sunmi-ring text-xs sunmi-text-accent">
