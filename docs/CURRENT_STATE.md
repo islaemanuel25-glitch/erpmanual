@@ -8,6 +8,24 @@
 > contradicciones y cinco puntos de deuda, marcados abajo como RESUELTO. El resto
 > del documento sigue describiendo el commit del encabezado.
 >
+> ## En producción
+>
+> **Commit desplegado:** `933294e2ce5b498f108103cb01d6fb3f75f5f44a`
+> **Desplegado el:** 2026-08-10 12:20 (hora del VPS, UTC)
+>
+> Los cinco valores coinciden: `origin/main`, HEAD del VPS, tag de la imagen,
+> `APP_BUILD_ID` y `/api/version`. Sin migraciones —el clasificador informó cero
+> sobre el HEAD desplegado— y con corte de **10,8 segundos** hasta que el endpoint
+> volvió a responder.
+>
+> **Referencia de rollback de esta versión** (la imagen que corría ANTES):
+> `ghcr.io/islaemanuel25-glitch/erpmanual:218fe0f3201e4f94c18a5cb5a3d4337a6dd1b6ca`,
+> image ID `sha256:1ae3955f7990eb6ad6c1017bbf1b478a0f6f19205a7961c64d6abeee3fd8d8d8`.
+>
+> **Ojo:** el commit desplegado es POSTERIOR al del relevamiento. Lo que dice este
+> documento sobre deuda y contradicciones vale para el commit del encabezado, con
+> las correcciones marcadas como RESUELTO ya en producción.
+>
 > **ANTES DE CONFIAR EN ESTE DOCUMENTO, CORRÉ:**
 >
 > ```
