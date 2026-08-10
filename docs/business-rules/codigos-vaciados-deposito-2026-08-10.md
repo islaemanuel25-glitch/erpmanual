@@ -1,53 +1,45 @@
-# Códigos de barra del depósito vaciados el 2026-08-10 — respaldo para reponer
+# Códigos del depósito vaciados el 2026-08-10 — respaldo para reponer
 
-> **Estado ANTERIOR** de los 60 productos que la migración
+> **Estado ANTERIOR** de los 45 productos que la migración
 > `20260810230000_vaciar_codigos_barra_del_deposito` pasa a `NULL`.
 
-## Por qué estos 60
+## Por qué estos 45
 
-El criterio es **quién creó el producto**, no la forma del código ni las ventas.
-El único local que crea y toca productos es Casiano Casas y lo suyo no se toca;
-el resto es del depósito. La decisión está en
-[../decisions/DEC-0006-codigos-de-casiano-intocables.md](../decisions/DEC-0006-codigos-de-casiano-intocables.md).
+Dos condiciones, y cada una cubre un riesgo distinto.
 
-El creador no se deduce: está guardado en `ProductoBase.creadoEnLocalId`.
+**Los creó el depósito.** Es la decisión de negocio de
+[../decisions/DEC-0006](../decisions/DEC-0006-codigos-de-casiano-intocables.md):
+el único local que crea y toca productos es Casiano Casas y lo suyo no se toca.
+El creador está guardado en `ProductoBase.creadoEnLocalId`, no se deduce.
 
-⚠ **Este criterio reemplaza al de la migración anterior y no son compatibles.**
-La de las 21:00 vació solo los que no tenían ninguna venta. Esta vacía por
-creador, y la oposición es total: **los 60 tienen ventas**. Tiene que ser así,
-porque los que nunca vendieron ya los vació la anterior — lo que queda es
-exactamente lo que se usa. Entre ellos `xl` con 172 ventas y `BARRATREMBLAY` con
-201, las dos del mismo día de la medición.
+**Y tienen 50 ventas o menos.** Este corte no es de propiedad sino de riesgo.
+Quién creó un producto no dice nada sobre quién teclea su código en la caja: el
+depósito creó "Hamburguesa Casera XL" y sus 172 ventas pasaron por un mostrador,
+y el buscador del POS mira este campo.
 
-Queda afuera `pollo trozado` (id 2387, 34 ventas), el único de Casiano Casas.
+Nadie tiene exactamente 50 ventas, así que el corte no tiene borde ambiguo.
 
 ## Cómo reponer
 
 Uno solo, por id:
 
 ```sql
-UPDATE "ProductoBase" SET codigo_barra = 'xl' WHERE id = 694 AND codigo_barra IS NULL;
+UPDATE "ProductoBase" SET codigo_barra = 'picadofino' WHERE id = 552 AND codigo_barra IS NULL;
 ```
 
 Todos de una vez:
 
 ```sql
 UPDATE "ProductoBase" SET codigo_barra = 'BENGALA' WHERE id = 68 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'BARRATREMBLAY' WHERE id = 79 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'bica' WHERE id = 92 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'PAÑO AMARRILLO' WHERE id = 430 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'pancho12' WHERE id = 448 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'PETACACAFE' WHERE id = 455 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'picadofino' WHERE id = 552 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'TARRITOORINA' WHERE id = 586 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'maple' WHERE id = 691 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'xl' WHERE id = 694 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'chori' WHERE id = 763 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'SURTIDO PRIME' WHERE id = 822 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'albondiga' WHERE id = 857 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = '7790O36048260' WHERE id = 967 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'torpedo' WHERE id = 1416 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'pancho24' WHERE id = 1417 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'LOMO PAN' WHERE id = 1437 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'QUITAESMALTENEPTUS' WHERE id = 1473 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'picadogrueso' WHERE id = 1541 AND codigo_barra IS NULL;
@@ -56,25 +48,16 @@ UPDATE "ProductoBase" SET codigo_barra = 'LIVRA CITRUS 1.5 GAS' WHERE id = 1883 
 UPDATE "ProductoBase" SET codigo_barra = 'fanta 237' WHERE id = 1885 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'sprite237' WHERE id = 1886 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'solcabello' WHERE id = 1951 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = '361LATA' WHERE id = 2023 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'paletasadia' WHERE id = 2083 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'cremosocremac' WHERE id = 2086 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'salamefox' WHERE id = 2088 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'pachamama' WHERE id = 2091 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'panlomo' WHERE id = 2092 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'paletafela' WHERE id = 2098 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'mortadela' WHERE id = 2099 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'salamefela' WHERE id = 2100 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'cremosoverona' WHERE id = 2101 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'papas' WHERE id = 2105 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'cascarablanca' WHERE id = 2117 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'cascaranegra' WHERE id = 2119 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'paletapala' WHERE id = 2120 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'mozzacremac' WHERE id = 2124 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'casera' WHERE id = 2125 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'salametro' WHERE id = 2126 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'pancholargo' WHERE id = 2130 AND codigo_barra IS NULL;
-UPDATE "ProductoBase" SET codigo_barra = 'doververde' WHERE id = 2134 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'PRITTY' WHERE id = 2185 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'CARBONCHICO' WHERE id = 2190 AND codigo_barra IS NULL;
 UPDATE "ProductoBase" SET codigo_barra = 'CARBONGRANDE' WHERE id = 2191 AND codigo_barra IS NULL;
@@ -94,26 +77,8 @@ UPDATE "ProductoBase" SET codigo_barra = 'caja bon o bon' WHERE id = 2397 AND co
 UPDATE "ProductoBase" SET codigo_barra = 'bocadito fantoche' WHERE id = 2398 AND codigo_barra IS NULL;
 ```
 
-## La lista, ordenada por ventas
+## Los 45, ordenados por ventas
 
-Los de arriba son los que más se usan: si alguno era un atajo de tecleo en uso,
-es el primero que se va a notar.
-
-- **2086** · `cremosocremac` (13 car.) · Queso Cremoso Cremac · **204 ventas**, última 2026-08-10
-- **79** · `BARRATREMBLAY` (13 car.) · BARRA TREMBLAY · **203 ventas**, última 2026-08-10
-- **694** · `xl` (2 car.) · Hamburguesa Casera XL · **172 ventas**, última 2026-08-10
-- **1417** · `pancho24` (8 car.) · Pancho 24 Als · **164 ventas**, última 2026-08-10
-- **2083** · `paletasadia` (11 car.) · Paleta sadia · **115 ventas**, última 2026-08-10
-- **455** · `PETACACAFE` (10 car.) · DERNA PETACA CAFE AL COGNAC XCAJA · **86 ventas**, última 2026-08-10
-- **2099** · `mortadela` (9 car.) · Mortadela Paladini · **82 ventas**, última 2026-08-10
-- **691** · `maple` (5 car.) · Maple Huevos x30 · **81 ventas**, última 2026-08-10
-- **2098** · `paletafela` (10 car.) · Paleta Fela · **80 ventas**, última 2026-08-10
-- **2105** · `papas` (5 car.) · Papas Congeladas · **77 ventas**, última 2026-08-10
-- **1416** · `torpedo` (7 car.) · PAN TORPEDO  · **74 ventas**, última 2026-08-10
-- **2100** · `salamefela` (10 car.) · Salame Fela · **61 ventas**, última 2026-08-10
-- **2134** · `doververde` (10 car.) · Dover Verde · **60 ventas**, última 2026-08-10
-- **2023** · `361LATA` (7 car.) · 361 LATA X24 · **56 ventas**, última 2026-08-10
-- **2130** · `pancholargo` (11 car.) · Pan Super Pancho · **56 ventas**, última 2026-08-10
 - **552** · `picadofino` (10 car.) · Salamin Fox Picado Fino · **48 ventas**, última 2026-08-10
 - **1541** · `picadogrueso` (12 car.) · Salamin Fox Picado Grueso · **42 ventas**, última 2026-08-10
 - **2117** · `cascarablanca` (13 car.) · Queso Cascara Blanca CLP · **41 ventas**, última 2026-08-10
@@ -159,3 +124,28 @@ es el primero que se va a notar.
 - **2315** · `arrolladovaca` (13 car.) · Arrollado de Vaca · **1 ventas**, última 2026-06-08
 - **2397** · `caja bon o bon` (14 car.) · caja bon o bon · **1 ventas**, última 2026-07-10
 - **2398** · `bocadito fantoche` (17 car.) · bocadito fantoche · **1 ventas**, última 2026-07-10
+
+## Los 15 que quedaron AFUERA por pasar de 50 ventas
+
+**No se tocan.** Son la lista que hay que llevar al mostrador para preguntar
+cuáles se tipean de verdad. La respuesta no está en la base: no hay registro de
+búsquedas, así que qué se escribe para encontrar un producto solo lo sabe quien
+atiende.
+
+- **2086** · `cremosocremac` (13 car.) · Queso Cremoso Cremac · **204 ventas**, última 2026-08-10
+- **79** · `BARRATREMBLAY` (13 car.) · BARRA TREMBLAY · **203 ventas**, última 2026-08-10
+- **694** · `xl` (2 car.) · Hamburguesa Casera XL · **172 ventas**, última 2026-08-10
+- **1417** · `pancho24` (8 car.) · Pancho 24 Als · **164 ventas**, última 2026-08-10
+- **2083** · `paletasadia` (11 car.) · Paleta sadia · **115 ventas**, última 2026-08-10
+- **455** · `PETACACAFE` (10 car.) · DERNA PETACA CAFE AL COGNAC XCAJA · **86 ventas**, última 2026-08-10
+- **2099** · `mortadela` (9 car.) · Mortadela Paladini · **82 ventas**, última 2026-08-10
+- **691** · `maple` (5 car.) · Maple Huevos x30 · **81 ventas**, última 2026-08-10
+- **2098** · `paletafela` (10 car.) · Paleta Fela · **80 ventas**, última 2026-08-10
+- **2105** · `papas` (5 car.) · Papas Congeladas · **77 ventas**, última 2026-08-10
+- **1416** · `torpedo` (7 car.) · PAN TORPEDO  · **74 ventas**, última 2026-08-10
+- **2100** · `salamefela` (10 car.) · Salame Fela · **61 ventas**, última 2026-08-10
+- **2134** · `doververde` (10 car.) · Dover Verde · **60 ventas**, última 2026-08-10
+- **2023** · `361LATA` (7 car.) · 361 LATA X24 · **56 ventas**, última 2026-08-10
+- **2130** · `pancholargo` (11 car.) · Pan Super Pancho · **56 ventas**, última 2026-08-10
+
+Mientras tanto conservan su código y nada cambia para ellos.

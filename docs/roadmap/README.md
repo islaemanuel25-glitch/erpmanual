@@ -18,6 +18,16 @@ Relevado sobre `d20afa98e9edece663fb3dda694d3c99783ab788` — 2026-08-10.
 
 ## PENDIENTE CONFIRMADO
 
+- **Preguntar en el mostrador cuáles de estos 15 códigos se tipean de verdad.**
+  Son códigos de texto en productos del depósito con más de 50 ventas, que por eso
+  quedaron afuera de la migración
+  `20260810230000_vaciar_codigos_barra_del_deposito`. **La respuesta no está en la
+  base** —no hay registro de búsquedas— así que la trae Emanuel del mostrador.
+  La lista, con id, código, nombre y ventas, está al final de
+  [../business-rules/codigos-vaciados-deposito-2026-08-10.md](../business-rules/codigos-vaciados-deposito-2026-08-10.md).
+  Los que nadie tipee se vacían en una migración siguiente; los que sí, se quedan.
+  Mientras tanto conservan su código y no cambia nada para ellos.
+
 - **Limpiar las columnas muertas de `ImportacionListaFila`.** El propio schema
   dice que `unidadesConfirmadas` y `factorConfirmado` "se eliminan en una
   migración de limpieza" (`prisma/schema.prisma:2490-2493`).

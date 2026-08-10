@@ -34,24 +34,46 @@ El creador no se deduce de nada: está guardado en `ProductoBase.creadoEnLocalId
 
 ## Por qué
 
-Porque el riesgo no está repartido parejo. Un código de texto en el depósito es
-basura heredada de la carga inicial; nadie del depósito lo tipea para buscar,
-porque ahí se trabaja con lector. Un código de texto en un local que carga sus
-propios productos puede ser el atajo con el que atienden todos los días.
+**El motivo no está escrito porque Emanuel no lo dio, y no se completa acá.** La
+regla que dio es la de arriba: Casiano crea y toca productos, y lo suyo no se
+toca.
 
-Emanuel conoce esa diferencia y ninguna medición la alcanza: no hay registro de
-búsquedas, así que qué se tipea y qué no es conocimiento del negocio, no del
-sistema.
+Lo que sí se puede afirmar es lo que la medición sostiene: el creador está
+guardado y es un hecho verificable, mientras que "quién tipea este código" no
+está en ninguna tabla. Cualquier explicación sobre los hábitos de una ubicación
+sería una suposición, y una suposición metida en una hoja de decisión se lee
+después como si hubiera sido parte de la decisión.
 
-## Lo que esta decisión cuesta, y se acepta
+Si el motivo hace falta para revisar esto más adelante, hay que preguntárselo,
+no reconstruirlo.
 
-**Los 60 del depósito que se vacían tienen ventas. Los 60.** Entre ellos `xl` con
-172 ventas y `BARRATREMBLAY` con 201, las dos del mismo día en que se midió.
+## El recorte por ventas: 15 quedan afuera
 
-Es la contracara de la decisión anterior, que vació solo los de cero ventas
-justamente para no romper un atajo en uso. Acá se acepta ese costo a cambio de
-limpiar la columna de una vez, y con el respaldo listo para reponer cualquiera:
-[../business-rules/codigos-vaciados-deposito-2026-08-10.md](../business-rules/codigos-vaciados-deposito-2026-08-10.md).
+La decisión de propiedad —lo de Casiano no se toca— **no cubre el riesgo del
+mostrador**, y eso apareció al mirar los números.
+
+Quién creó un producto no dice nada sobre quién teclea su código en la caja. El
+depósito creó "Hamburguesa Casera XL", y sus 172 ventas pasaron por un mostrador.
+El buscador del POS mira este campo, así que si alguien escribe `xl` para
+encontrarlo, vaciarlo le rompe el trabajo — sin importar quién dio de alta el
+producto.
+
+Por eso la migración lleva **una segunda condición que no es de propiedad sino de
+riesgo**: se vacían los que tienen **50 ventas o menos**. Los 15 que pasan de 50
+quedan afuera.
+
+**No es que sean intocables.** Es que ahí está concentrado el riesgo, y la
+respuesta no está en la base: no hay registro de búsquedas, así que qué se tipea
+para encontrar un producto solo lo sabe quien atiende. La lista de los 15 va al
+mostrador y la respuesta la trae Emanuel. Está anotada como pendiente en el
+roadmap.
+
+Nadie tiene exactamente 50 ventas, así que el corte no tiene borde ambiguo. El
+que más vende de los que sí se vacían tiene 48.
+
+El corte se evaluó **una vez**, con los números del 2026-08-10, y quedó
+congelado en la lista de ids de la migración. Si a alguno le suben las ventas
+entre hoy y el despliegue, igual se vacía: la lista es el contrato.
 
 ## Esto NO es un invariante del sistema
 
@@ -65,18 +87,24 @@ la siguiente. Lo único que existe es esta hoja y la lista explícita de ids den
 de una migración.
 
 Un invariante en el código diría "esto es así siempre"; lo que hay que decir es
-"esto lo decidimos el 2026-08-10 por este motivo".
+"esto lo decidimos el 2026-08-10". Y si el motivo no está, que se note que no
+está, en vez de rellenarlo.
 
 ## Alcance real, medido
 
 - **61** productos con código de texto quedaban al momento de decidir.
-- **60** los creó el depósito → se vacían.
+- **60** los creó el depósito.
+  - **45** tienen 50 ventas o menos → **se vacían**.
+  - **15** pasan de 50 → **quedan afuera**, esperando la consulta al mostrador.
 - **1** lo creó Casiano Casas: `pollo trozado` (id 2387, 34 ventas) → **no se
   toca**.
 - **0** sin creador. El campo está siempre cargado en los 2.578 productos del
-  catálogo.
+  catálogo, así que el grupo que preveíamos no existe.
 - Casiano creó **305 productos** en total: 247 sin ningún código, 57 con código
-  de dígitos y ese 1 con texto.
+  de dígitos y ese 1 con texto. Cuando carga algo, lo normal es dejar el campo
+  vacío.
+- Al terminar quedan **16** códigos de texto en la columna: los 15 en consulta
+  más el de Casiano.
 
 ## Lo que esta decisión NO alcanza
 
