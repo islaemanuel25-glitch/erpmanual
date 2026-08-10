@@ -111,6 +111,40 @@ Sin esto solo sabemos que hay un archivo, no que sea el mismo ni que sirva.
 **Al copiar al disco externo**, el SHA-256 se vuelve a comparar entre origen y
 destino.
 
+### El quinto chequeo: solo cuando el deploy lleva una migración de DATOS
+
+Los cuatro de arriba prueban que **el archivo está bien formado**: que el dump
+terminó, que el gzip no está corrupto, que hay estructura adentro. Ninguno prueba
+que contenga **lo que se está por borrar**.
+
+Cuando el despliegue trae una migración que modifica o borra datos, el dump deja
+de ser una red genérica y pasa a ser la única copia de esos valores. Así que se
+verifica que estén:
+
+```bash
+ssh vps-erp 'zcat <DUMP> | grep -c "<UN_VALOR_QUE_LA_MIGRACION_VA_A_BORRAR>"'
+```
+
+Tiene que dar 1 o más. Se elige un valor concreto y reconocible de los que la
+migración toca —no un nombre de tabla ni una palabra común—: en el vaciado de
+códigos de barra del 2026-08-10 se usó `BOCADITO CHOC BLANCO`, uno de los códigos
+que iban a pasar a NULL.
+
+**Por qué importa la diferencia.** Un dump tomado sobre la base equivocada, o de
+un momento en que esos valores ya no estaban, pasa los cuatro chequeos con las
+mejores notas. Este es el único que responde la pregunta que de verdad importa el
+día que haya que reponer: *¿esto que tengo acá tiene los valores viejos?*
+
+Corolario: el chequeo también sirve como **prueba de que se sabe qué se está por
+borrar**. Si no se puede nombrar un valor concreto para buscar, la migración no
+está lo bastante entendida como para aplicarla.
+
+Y la reposición fina —volver un valor sin restaurar la base entera— no sale de
+acá: sale del SQL con los valores anteriores que tiene que traer la propia tanda.
+El dump es el último recurso, porque restaurarlo se lleva puesto todo lo que pasó
+desde que se sacó. Está desarrollado en el skill `/deploy`, en "Un rollback de
+imagen NO deshace una migración".
+
 ## Las cinco fallas que solo aparecieron ejecutando
 
 Ninguna era visible leyendo el código. Están todas resueltas en el script; están
