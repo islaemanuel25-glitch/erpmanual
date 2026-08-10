@@ -16,9 +16,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
-import { esComboBase } from "@/lib/combos/guards";
-import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
+import { pedidoEnAlcance } from "@/lib/compras/scope";
 
 export async function POST(req, { params }) {
   try {
@@ -142,34 +140,16 @@ export async function POST(req, { params }) {
       data,
     });
 
-    // Si se editó el costo, propagarlo al costo real/maestro del producto (solo costo).
-    if (data.precioCosto != null && data.precioCosto > 0) {
-      const pl = await prisma.productoLocal.findUnique({
-        where: { id: updated.productoLocalId },
-        select: {
-          base: {
-            select: { factor_pack: true, modoCompraProveedor: true, unidad_medida: true, es_combo: true },
-          },
-        },
-      });
-      // Los combos no propagan costo: no tienen stock físico ni se compran.
-      if (pl?.base && !esComboBase(pl.base)) {
-        const costoMaestro = costoLineaAMaestro({
-          precioCosto: data.precioCosto,
-          unidad: updated.unidad,
-          factorPack: pl.base.factor_pack,
-          modoCompraProveedor: pl.base.modoCompraProveedor,
-          unidadMedida: pl.base.unidad_medida,
-        });
-        await actualizarCostoRealProducto(prisma, {
-          productoLocalId: updated.productoLocalId,
-          costoMaestro,
-          // Propiedad del costo: solo el dueño del producto mueve el costo.
-          operadoDesdeLocalId: ownerLocalIdDePedido(pedido),
-          depositoLocalId: pedido.depositoId,
-        });
-      }
-    }
+    // Acá se propagaba el costo editado al costo maestro del producto.
+    //
+    // YA NO. Editar la línea de un pedido cambia lo que se le va a pagar al
+    // proveedor por ESE pedido, y nada más. El costo del producto en el catálogo
+    // se edita desde editar producto, que es el único lugar donde se escriben
+    // datos del producto — hay un botón en la línea que lleva ahí y vuelve.
+    //
+    // Antes esto era una asimetría además: agregar una línea NO propagaba y
+    // editarla SÍ, así que el mismo hecho económico movía el costo maestro o no
+    // según con qué botón se hubiera cargado. Ahora ninguna de las dos propaga.
 
     return NextResponse.json({ ok: true, detalle: updated });
   } catch (err) {

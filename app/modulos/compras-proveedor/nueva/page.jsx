@@ -20,6 +20,14 @@ import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCod
 import ModalEnviarPedido from "@/components/compras-proveedor/ModalEnviarPedido";
 import CarritoPedido from "@/components/compras-proveedor/CarritoPedido";
 import {
+  ORIGENES,
+  CLAVE_PEDIDO_EN_CURSO,
+  linkEditarProducto,
+  debeReabrirPedido,
+  serializarPedidoEnCurso,
+  deserializarPedidoEnCurso,
+} from "@/lib/compras-proveedor/retornoPedido";
+import {
   subtotalLinea,
   unidadDisplay,
   naturalezaLinea,
@@ -49,7 +57,10 @@ export default function NuevaCompraProveedorPage() {
   const searchParams = useSearchParams();
 
   const { perfil } = useUser();
-  const { loading: loadingCtx, needsContexto } = useContextoActivo();
+  // `contexto` hace falta para el link a editar producto: la edición se hace
+  // parado en la ubicación activa, y el backend rechaza con 403 si esa ubicación
+  // no es dueña del producto.
+  const { loading: loadingCtx, needsContexto, contexto } = useContextoActivo();
 
   const proveedorIdParam = searchParams.get("proveedorId") || "";
   const pedidoIdParam = searchParams.get("pedidoId") || "";
@@ -78,6 +89,9 @@ export default function NuevaCompraProveedorPage() {
   // Proveedor para el que ya se sembraron los sugeridos (evita re-sembrar y que
   // un sugerido quitado vuelva solo en la misma sesión).
   const autofillRef = useRef(null);
+  // Se arma en el primer render: si venimos de editar un producto, la carga del
+  // catálogo tiene que restaurar el pedido en vez de arrancar vacía.
+  const restaurarRef = useRef(debeReabrirPedido(searchParams));
 
   // Items del pedido (sugeridos precargados + los agregados manualmente).
   const [items, setItems] = useState([]);
@@ -196,6 +210,7 @@ export default function NuevaCompraProveedorPage() {
           return {
             detalleId: d.id,
             productoLocalId: d.productoLocalId,
+            baseId: base.id ?? null,
             nombre: base.nombre || "",
             sku: base.sku || "",
             modoCompra,
@@ -293,6 +308,7 @@ export default function NuevaCompraProveedorPage() {
             .filter((pr) => pr.sugerido > 0)
             .map((pr) => ({
               productoLocalId: pr.productoLocalId,
+              baseId: pr.baseId ?? null,
               nombre: pr.nombre,
               sku: pr.sku,
               codigo_barra: pr.codigo_barra,
@@ -308,6 +324,55 @@ export default function NuevaCompraProveedorPage() {
               pesoRefKg: pr.pesoRefKg,
             }));
           setItems(sembrado);
+        }
+
+        // VOLVIENDO DE EDITAR UN PRODUCTO: restaurar el pedido que estaba en curso.
+        //
+        // Se restauran las CANTIDADES guardadas, y el costo y los datos del
+        // producto salen del catálogo recién traído. Por eso esto va acá dentro
+        // y no en un efecto aparte: si se restaurara antes de la carga, la línea
+        // mostraría el costo viejo, que es justo lo que se fue a cambiar.
+        if (restaurarRef.current) {
+          restaurarRef.current = false;
+          let guardado = null;
+          try {
+            guardado = deserializarPedidoEnCurso(sessionStorage.getItem(CLAVE_PEDIDO_EN_CURSO));
+            sessionStorage.removeItem(CLAVE_PEDIDO_EN_CURSO);
+          } catch {
+            guardado = null;
+          }
+          if (guardado && String(guardado.proveedorId) === String(proveedorId)) {
+            const porId = new Map((data.items || []).map((pr) => [pr.productoLocalId, pr]));
+            const restaurado = guardado.lineas
+              .map((l) => {
+                const pr = porId.get(l.productoLocalId);
+                if (!pr) return null; // el producto ya no está en el universo del proveedor
+                return {
+                  productoLocalId: pr.productoLocalId,
+                  baseId: pr.baseId ?? null,
+                  nombre: pr.nombre,
+                  sku: pr.sku,
+                  codigo_barra: pr.codigo_barra,
+                  codigoInterno: pr.codigoInterno || null,
+                  modoCompra: pr.modoCompra || "BULTO",
+                  unidadPedido: l.unidadPedido || (pr.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO"),
+                  unidad_medida: pr.unidad_medida,
+                  cantidad: l.cantidad,
+                  // Del catálogo, NO del guardado: es el costo nuevo.
+                  precioCosto: Number(pr.precio_costo || 0),
+                  factorPack: Number(pr.factor_pack) || 1,
+                  sugerido: pr.sugerido,
+                  sinParametros: pr.sinParametros,
+                  pesoRefKg: pr.pesoRefKg,
+                };
+              })
+              .filter(Boolean);
+            if (restaurado.length > 0) {
+              autofillRef.current = String(proveedorId); // no re-sembrar encima
+              setItems(restaurado);
+              setNotas(guardado.notas || "");
+            }
+          }
         }
 
         // Mensaje específico tras vincular al vuelo (Etapa 5)
@@ -351,6 +416,7 @@ export default function NuevaCompraProveedorPage() {
       unidadParam || (prod.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO");
     const nuevoItemBase = {
       productoLocalId: prod.productoLocalId,
+      baseId: prod.baseId ?? null,
       nombre: prod.nombre,
       sku: prod.sku,
       modoCompra: prod.modoCompra || "BULTO",
@@ -1053,6 +1119,44 @@ export default function NuevaCompraProveedorPage() {
   const permisosP = perfil?.permisos || [];
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("compras.crear")) return <SinPermisos />;
+
+  // Editar un producto y cargar un pedido son permisos DISTINTOS y separables:
+  // hoy los cuatro roles que pueden pedir también pueden editar, pero el registro
+  // los declara aparte, así que un rol nuevo podría tener uno y no el otro. Si no
+  // tiene el permiso, el botón no aparece — en vez de aparecer y devolver 403 en
+  // la cara de quien lo aprieta.
+  const puedeEditarProductoP = esAdminP || permisosP.includes("productos.editar");
+
+  // Ir a editar el producto de una línea, y volver acá con el pedido intacto.
+  //
+  // El pedido en curso se guarda en la pestaña ANTES de navegar. No se crea un
+  // borrador en el servidor: eso haría aparecer un pedido en la lista de
+  // pendientes que nadie pidió crear y habría que salir a limpiarlo.
+  //
+  // Al volver se restauran las CANTIDADES, no los costos: el costo se vuelve a
+  // pedir al catálogo, porque el motivo de haber ido a editar el producto es
+  // justamente que cambió. Restaurar el costo guardado mostraría el viejo.
+  const irAEditarProducto = (item) => {
+    if (!item?.baseId) return;
+    const enCurso = serializarPedidoEnCurso({ proveedorId, items, notas });
+    try {
+      if (enCurso) {
+        sessionStorage.setItem(CLAVE_PEDIDO_EN_CURSO, JSON.stringify(enCurso));
+      } else {
+        sessionStorage.removeItem(CLAVE_PEDIDO_EN_CURSO);
+      }
+    } catch {
+      // Sin sessionStorage se pierde el carrito al volver, pero no se rompe la
+      // navegación: es preferible a quedarse sin poder editar el producto.
+    }
+    const url = linkEditarProducto({
+      baseId: item.baseId,
+      localId: contexto?.localId,
+      origen: ORIGENES.PEDIDO_NUEVO,
+      proveedorId,
+    });
+    if (url) router.push(url);
+  };
 
   const accionesDeshabilitadas = saving || lineasCount === 0 || !proveedorId;
 
@@ -2136,6 +2240,8 @@ export default function NuevaCompraProveedorPage() {
             onCosto: updateItemCosto,
             onBlurCosto: handleBlurCosto,
             onQuitar: quitarItem,
+            onEditarProducto: irAEditarProducto,
+            puedeEditarProducto: puedeEditarProductoP,
             onClose: () => setResumenOpen(false),
             onGuardar: () => {
               setResumenOpen(false);

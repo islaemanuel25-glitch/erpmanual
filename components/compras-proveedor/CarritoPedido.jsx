@@ -2,7 +2,7 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import { Trash2, X } from "lucide-react";
+import { Trash2, X, Pencil } from "lucide-react";
 import { subtotalLinea, unidadDisplay, naturalezaLinea } from "@/lib/compras-proveedor/calculoPedido";
 
 /**
@@ -27,6 +27,9 @@ export default function CarritoPedido({
   onCosto,
   onBlurCosto,
   onQuitar,
+  // Ir a editar el PRODUCTO de esta línea. Opcional: sin handler no hay botón.
+  onEditarProducto,
+  puedeEditarProducto = false,
   onGuardar,
   onConfirmar,
   saving = false,
@@ -79,15 +82,37 @@ export default function CarritoPedido({
           >
             {i.nombre}
           </span>
-          <button
-            type="button"
-            onClick={() => onQuitar(i.productoLocalId)}
-            aria-label={`Quitar ${i.nombre}`}
-            title="Quitar del pedido"
-            className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-md sunmi-btn-red shrink-0"
-          >
-            <Trash2 size={12} />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Editar el PRODUCTO, no la línea.
+                El costo de la línea es lo que se le paga al proveedor por este
+                pedido; el costo del catálogo se cambia en editar producto y en
+                ningún otro lado. Este botón lleva ahí y vuelve acá con el pedido
+                intacto.
+                Solo aparece si quien está cargando el pedido tiene permiso de
+                editar productos: son dos permisos distintos y separables, así
+                que un botón incondicional se rompería en la cara de quien no lo
+                tiene. */}
+            {puedeEditarProducto && onEditarProducto && i.baseId ? (
+              <button
+                type="button"
+                onClick={() => onEditarProducto(i)}
+                aria-label={`Editar ${i.nombre}`}
+                title="Editar el producto (precio, códigos, datos)"
+                className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-md sunmi-control shrink-0"
+              >
+                <Pencil size={12} />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => onQuitar(i.productoLocalId)}
+              aria-label={`Quitar ${i.nombre}`}
+              title="Quitar del pedido"
+              className="w-[24px] h-[24px] inline-flex items-center justify-center rounded-md sunmi-btn-red shrink-0"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-1.5 mt-1.5">
           {/* Stepper cantidad */}

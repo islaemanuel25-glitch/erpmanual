@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 import { esComboBase } from "@/lib/combos/guards";
 
 export async function POST(req) {
@@ -128,28 +127,39 @@ export async function POST(req) {
       },
     });
 
-    // Propagar el costo de cada línea al costo real/maestro del producto (solo costo).
-    for (const det of pedido.detalles) {
-      const costo = det.precioCosto != null ? Number(det.precioCosto) : null;
-      if (!costo || costo <= 0) continue;
-      const base = det.producto?.base;
-      const costoMaestro = costoLineaAMaestro({
-        precioCosto: costo,
-        unidad: det.unidad,
-        factorPack: base?.factor_pack,
-        modoCompraProveedor: base?.modoCompraProveedor,
-        unidadMedida: base?.unidad_medida,
-      });
-      await actualizarCostoRealProducto(prisma, {
-        productoLocalId: det.productoLocalId,
-        costoMaestro,
-        // Propiedad del costo: la ubicación dueña del pedido (creadoEnLocalId=localId)
-        // solo mueve el costo si es dueña del producto. Un local comprando un
-        // producto del depósito NO toca el costo.
-        operadoDesdeLocalId: localId,
-        depositoLocalId: depId,
-      });
-    }
+    // Acá se propagaba el costo de cada línea al costo maestro del producto.
+    //
+    // YA NO. Un pedido registra lo que se le está por pagar al proveedor; no es
+    // el lugar donde se decide cuánto vale el producto en el catálogo. Toda
+    // edición de un dato del producto —precio, código, lo que sea— se hace desde
+    // editar producto, y desde la línea del pedido hay un botón que lleva ahí y
+    // vuelve.
+    //
+    // El caso que motivaba la propagación —el proveedor canta un aumento
+    // mientras se arma el pedido— se resuelve ahora abriendo el producto,
+    // cambiándole el costo y volviendo: la línea toma el costo nuevo y el
+    // catálogo queda actualizado de forma explícita, no como efecto lateral de
+    // haber cargado un pedido.
+    //
+    // `PedidoProveedorDetalle.precioCosto` SIGUE guardándose: es lo que se pidió
+    // y a qué precio. Lo que desapareció es que eso reescriba `ProductoBase` y
+    // los overrides de todas las ubicaciones.
+    //
+    // ── O ENTRA TODO O NO ENTRA NADA ──────────────────────────────────────────
+    //
+    // Al sacar la propagación, esta ruta quedó con UNA sola escritura: el create
+    // del pedido con sus detalles anidados, que Prisma ejecuta en su propia
+    // transacción. No hay ningún `await` después, así que el mensaje de error del
+    // catch dice la verdad: si falla, no quedó un pedido existiendo.
+    //
+    // Antes NO era así. El pedido se creaba acá y después un bucle propagaba el
+    // costo línea por línea, sin transacción: si fallaba en la tercera de cinco,
+    // el pedido existía, dos productos ya tenían el costo nuevo, y la respuesta
+    // decía "Error interno al crear pedido". Quien lo veía asumía que no había
+    // pasado nada.
+    //
+    // Si alguna vez se agrega otra escritura después de este create, hay que
+    // envolver las dos en `prisma.$transaction` o el mensaje vuelve a mentir.
 
     return NextResponse.json({ ok: true, item: pedido });
   } catch (err) {

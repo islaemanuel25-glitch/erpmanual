@@ -8,6 +8,7 @@ import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import FormProducto from "@/components/productos/FormProducto";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import { urlRetornoPedido } from "@/lib/compras-proveedor/retornoPedido";
 
 export default function EditarProductoPage({ params }) {
   const router = useRouter();
@@ -16,8 +17,17 @@ export default function EditarProductoPage({ params }) {
 
   const localId = contexto?.localId || 0;
 
-  // URL de retorno al listado preservando contexto (page, sort, filtros)
+  // URL de retorno al listado preservando contexto (page, sort, filtros).
+  //
+  // Si se llegó acá desde una línea de pedido a proveedor, se vuelve AL PEDIDO y
+  // no al listado. El destino sale de una lista blanca (lib/compras-proveedor/
+  // retornoPedido.js): nunca de una URL que venga en la query, que sería un
+  // redirect abierto. Si no hay origen válido, se conserva el comportamiento de
+  // siempre.
   const returnUrl = useMemo(() => {
+    const alPedido = urlRetornoPedido(searchParams);
+    if (alPedido) return alPedido;
+
     const listing = new URLSearchParams();
     for (const [k, v] of searchParams.entries()) {
       listing.set(k, v);
