@@ -1199,8 +1199,16 @@ export default function NuevaCompraProveedorPage() {
 
   // ── Fragmentos compartidos ───────────────────────────────────────────────
 
+  // `flex-wrap` en vez de `overflow-x-auto`: la fila no desbordaba, CORTABA. El
+  // último chip quedaba partido contra el borde derecho —"Categorías" a medias—
+  // sin ninguna señal de que había más a la derecha, así que se leía como algo
+  // roto y no como algo desplazable.
+  //
+  // Bajar de línea solo ocurre cuando no entra: a 412 px sigue en una sola línea
+  // y no cambia nada; a 360 el chip de categorías pasa al segundo renglón y se
+  // lee completo.
   const chipsFiltros = (size = "md") => (
-    <div className="flex items-center gap-1 overflow-x-auto">
+    <div className="flex items-center gap-1 flex-wrap">
       {/* En manual no se mezclan filtros de sugeridos/bajo stock: solo categoría. */}
       {esAuto &&
         FILTROS_VISTA.map(([v, label]) => (
@@ -1260,37 +1268,45 @@ export default function NuevaCompraProveedorPage() {
   // Decisión inicial: si hay un borrador abierto para el proveedor, se muestra una
   // sola vez. Al elegir una opción la tarjeta desaparece (no ocupa espacio durante
   // toda la carga).
+  // `compact` = va DENTRO del encabezado pegajoso de mobile, que ya mide 190 px.
+  // Ahí el cartel entra en UNA sola línea —sin `flex-wrap`, con el texto
+  // truncable y los botones abreviados— para no llevarse un tercio de la
+  // pantalla. Sin `compact` es el de escritorio, que tiene lugar de sobra.
   const bannerBorrador = (compact = false) =>
     borradorExistente && (
       <div
-        className={`rounded-lg border px-3 py-2 ${compact ? "mb-2" : "mb-3"} flex items-center justify-between gap-2 flex-wrap`}
+        className={
+          compact
+            ? "rounded-lg border px-2 py-1 mb-1.5 flex items-center justify-between gap-1.5"
+            : "rounded-lg border px-3 py-2 mb-3 flex items-center justify-between gap-2 flex-wrap"
+        }
         style={{ borderColor: "var(--pos-warning, #f59e0b)" }}
       >
-        <span className="text-[12px] min-w-0">
+        <span className={compact ? "text-[11px] min-w-0 truncate" : "text-[12px] min-w-0"}>
           <b style={{ color: "var(--pos-warning, #f59e0b)" }}>
-            Tenés un pedido en curso
+            {compact ? "Pedido en curso" : "Tenés un pedido en curso"}
           </b>{" "}
           <span className="sunmi-text-muted">
             #{borradorExistente.id} · {borradorExistente.cantItems}{" "}
             {borradorExistente.cantItems === 1 ? "ítem" : "ítems"}
           </span>
         </span>
-        <div className="flex gap-1.5 shrink-0">
+        <div className={compact ? "flex gap-1 shrink-0" : "flex gap-1.5 shrink-0"}>
           <SunmiButton
             color="cyan"
-            className="!px-2.5 !py-1 text-[12px]"
+            className={compact ? "!px-2 !py-0.5 text-[11px]" : "!px-2.5 !py-1 text-[12px]"}
             onClick={() =>
               router.push(`/modulos/compras-proveedor/nueva?pedidoId=${borradorExistente.id}`)
             }
           >
-            Continuar pedido
+            {compact ? "Continuar" : "Continuar pedido"}
           </SunmiButton>
           <SunmiButton
             color="slate"
-            className="!px-2.5 !py-1 text-[12px]"
+            className={compact ? "!px-2 !py-0.5 text-[11px]" : "!px-2.5 !py-1 text-[12px]"}
             onClick={() => setBorradorExistente(null)}
           >
-            Crear pedido nuevo
+            {compact ? "Nuevo" : "Crear pedido nuevo"}
           </SunmiButton>
         </div>
       </div>
@@ -1458,7 +1474,18 @@ export default function NuevaCompraProveedorPage() {
   // Stepper de cantidad (agrega/ajusta; bajar a 0 quita la línea).
   const stepper = (p, rv, big = false) => {
     const btn = big ? "w-[30px] h-[30px] text-[16px]" : "w-[22px] h-[22px] text-[14px]";
-    const inp = big ? "w-[44px] text-[13px]" : "w-[42px] text-[12px]";
+    // El ancho va al CONTENEDOR y el tamaño de letra al INPUT: son dos cosas
+    // distintas y se separan a propósito. Un `text-[12px]` puesto en el div no
+    // llega al input —los controles de formulario no heredan la tipografía— así
+    // que juntarlos le cambiaba el cuerpo de letra sin que se notara.
+    //
+    // Los anchos NO son los de antes. El original pedía 42/44 px, que nunca se
+    // aplicaron porque `w-full` los tapaba; al empezar a aplicarse quedaban 26 px
+    // útiles, y ahí "1870" ya no entra (mide 31). Cuatro y cinco cifras son
+    // corrientes: la misma línea que sugiere 49 packs sugiere 2450 unidades si se
+    // la pasa a "Un". Con `!px-1` y estos anchos entran cinco cifras holgadas.
+    const anchoInp = big ? "w-[54px]" : "w-[50px]";
+    const letraInp = big ? "text-[13px]" : "text-[12px]";
     return (
       <div className="flex items-center justify-center gap-0.5">
         <button
@@ -1471,19 +1498,29 @@ export default function NuevaCompraProveedorPage() {
         >
           −
         </button>
-        <SunmiInput
-          type="text"
-          inputMode="numeric"
-          value={rv.cantidadVal}
-          placeholder="0"
-          onChange={(e) =>
-            rv.enPedido
-              ? updateItemCantidad(p.productoLocalId, e.target.value)
-              : setDraftField(p, "cant", e.target.value.replace(/[^\d]/g, ""))
-          }
-          onBlur={() => (rv.enPedido ? handleBlurCantidad(p.productoLocalId) : handleBlurDraftCant(p))}
-          className={`${inp} !py-0.5 text-center tabular-nums`}
-        />
+        {/* BOCETO — el ancho lo pone el CONTENEDOR, no el input.
+            `SunmiInput` aplica `w-full` y esa clase le gana a cualquier
+            `w-[Npx]` que se le pase por className: medido, el width computado de
+            estos inputs es 100 %. Por eso el stepper se comía la fila entera en
+            360 px y tapaba el precio unitario.
+            Acá se envuelve en un div con ancho fijo, que es local a esta
+            pantalla. El arreglo de fondo es en SunmiInput y afecta a toda la
+            aplicación: va aparte. */}
+        <div className={anchoInp}>
+          <SunmiInput
+            type="text"
+            inputMode="numeric"
+            value={rv.cantidadVal}
+            placeholder="0"
+            onChange={(e) =>
+              rv.enPedido
+                ? updateItemCantidad(p.productoLocalId, e.target.value)
+                : setDraftField(p, "cant", e.target.value.replace(/[^\d]/g, ""))
+            }
+            onBlur={() => (rv.enPedido ? handleBlurCantidad(p.productoLocalId) : handleBlurDraftCant(p))}
+            className={`${letraInp} !py-0.5 !px-1 text-center tabular-nums`}
+          />
+        </div>
         <button
           type="button"
           onClick={() =>
@@ -1792,58 +1829,86 @@ export default function NuevaCompraProveedorPage() {
     const meta = metaEstado(p, rv);
     const costoNum = Number(rv.costoActual) || 0;
     return (
+      // BOCETO 2026-08-10 — fila mobile reorganizada.
+      //
+      // El problema: en 360 px el nombre quedaba en UNA letra ("C.", "B.") y el
+      // precio unitario aparecía debajo del botón de restar. La fila era de dos
+      // columnas —datos a la izquierda, controles a la derecha— y la columna de
+      // controles se quedaba con casi todo el ancho.
+      //
+      // El criterio decidido: GANA EL NOMBRE. Así que deja de ser una fila de
+      // dos columnas y pasa a ser un bloque apilado, donde el nombre ocupa el
+      // ancho completo y los controles bajan a su propio renglón.
       <div
         key={p.productoLocalId}
-        className="flex gap-2 px-2.5 py-2"
+        className="px-2.5 py-2"
         style={{ borderLeft: rv.enPedido ? "3px solid var(--pos-accent, #f59e0b)" : "3px solid transparent" }}
       >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1 leading-tight">
-            <span className="text-[12.5px] font-medium sunmi-text-strong truncate" title={p.nombre}>
-              {p.nombre}
-            </span>
+        {/* 1) El nombre, con TODO el ancho. Hasta dos renglones: con uno solo,
+               los nombres largos de verdad seguían cortándose. */}
+        <div className="flex items-start gap-1 leading-tight">
+          <span
+            className="text-[12.5px] font-medium sunmi-text-strong flex-1 min-w-0 break-words"
+            style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+            title={p.nombre}
+          >
+            {p.nombre}
+          </span>
+          <div className="shrink-0 flex items-center gap-1">
             {badges(rv, p, true)}
+            {rv.enPedido && botonQuitar(p, 13)}
           </div>
-          <div className="text-[10.5px] sunmi-text-muted leading-tight mt-0.5">
-            {meta.map((m, idx) => (
-              <span key={idx}>
-                {idx > 0 && " · "}
-                <span
-                  className={
-                    m.danger ? "sunmi-text-danger" : m.accent ? "sunmi-text-accent" : m.ok ? "sunmi-text-success" : ""
-                  }
-                >
-                  {m.txt}
-                </span>
+        </div>
+
+        {/* 2) Estado del producto: stock, sugerido. */}
+        <div className="text-[10.5px] sunmi-text-muted leading-tight mt-0.5">
+          {meta.map((m, idx) => (
+            <span key={idx}>
+              {idx > 0 && " · "}
+              <span
+                className={
+                  m.danger ? "sunmi-text-danger" : m.accent ? "sunmi-text-accent" : m.ok ? "sunmi-text-success" : ""
+                }
+              >
+                {m.txt}
               </span>
-            ))}
-          </div>
-          <div className="flex items-center gap-1.5 mt-1">
+            </span>
+          ))}
+        </div>
+
+        {/* 3) Unidad + precio unitario a la izquierda, stepper a la derecha.
+               El precio ya no queda debajo de ningún botón: comparten renglón
+               pero cada uno tiene su lugar, y el precio puede achicarse. */}
+        <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {toggleUnidad(p, rv)}
-            <span className="text-[10.5px] sunmi-text-muted">
+            <span className="text-[10.5px] sunmi-text-muted truncate">
               ${costoNum.toFixed(2)}/{rv.costoUnidad}
               {rv.activa && seg && <span> · {seg.replace("≈ ", "")}</span>}
             </span>
           </div>
-          {rv.esPack && (
-            <div className="text-[10px] sunmi-text-muted mt-0.5">
-              1 pack = {rv.factor} un
-              {rv.disp === "BULTO" && rv.cantNum > 0 && (
-                <span className="sunmi-text-accent"> · equivale a {rv.cantNum * rv.factor} un</span>
-              )}
-            </div>
-          )}
+          <div className="shrink-0">{stepper(p, rv, true)}</div>
         </div>
 
-        <div className="shrink-0 flex flex-col items-end justify-between gap-1">
-          <div className="h-[26px] flex items-start">
-            {rv.enPedido && botonQuitar(p, 13)}
+        {/* 4) Equivalencia del pack y subtotal, en el mismo renglón: los dos son
+               consecuencia de la cantidad y se leen juntos. */}
+        {(rv.esPack || (rv.activa && rv.r.subtotal != null)) && (
+          <div className="flex items-baseline justify-between gap-2 mt-1">
+            <span className="text-[10px] sunmi-text-muted min-w-0 truncate">
+              {rv.esPack && (
+                <>
+                  1 pack = {rv.factor} un
+                  {rv.disp === "BULTO" && rv.cantNum > 0 && (
+                    <span className="sunmi-text-accent"> · equivale a {rv.cantNum * rv.factor} un</span>
+                  )}
+                </>
+              )}
+            </span>
+            <span className="text-[12px] font-semibold tabular-nums sunmi-text-strong shrink-0">
+              {rv.activa && rv.r.subtotal != null ? fmtPesos(rv.r.subtotal) : ""}
+            </span>
           </div>
-          {stepper(p, rv, true)}
-          <div className="text-[11.5px] font-semibold tabular-nums sunmi-text-strong h-[15px]">
-            {rv.activa && rv.r.subtotal != null ? fmtPesos(rv.r.subtotal) : ""}
-          </div>
-        </div>
+        )}
       </div>
     );
   };
@@ -2137,12 +2202,21 @@ export default function NuevaCompraProveedorPage() {
                 />
               </div>
               {chipsFiltros("sm")}
+              {/* El cartel del pedido en curso vive ACÁ, dentro del encabezado
+                  pegajoso, y no debajo en el contenido.
+                  Antes se desplazaba con la lista y se metía por debajo del
+                  encabezado: en reposo se veía entero y al bajar quedaba tapado,
+                  primero por el buscador y después por el título. Un aviso que se
+                  esconde justo cuando la persona está trabajando no sirve.
+                  Va en su variante de UNA LÍNEA para no comerse media pantalla:
+                  el encabezado ya mide 190 px y el cartel completo lo llevaba a
+                  ~250 sobre un alto de 800. */}
+              {bannerBorrador(true)}
             </>
           )}
         </div>
 
         <div className="px-2 pt-2 pb-[96px]">
-          {bannerBorrador(true)}
 
           {mostrarWarningDia && (
             <div

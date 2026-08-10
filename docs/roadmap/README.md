@@ -81,6 +81,34 @@ Ordenada por lo que puede doler. La evidencia completa está en
 17. ~~**La auditoría del ajuste de stock es best-effort.**~~ **RESUELTO
     2026-08-10** — stock y auditoría van en la misma transacción, con el criterio
     escrito en el encabezado del archivo.
+18. **`SunmiInput` ignora en silencio el ancho que le pasan.** El componente aplica
+    `w-full` sobre el `className` recibido (`components/sunmi/SunmiInput.jsx:10`),
+    así que cualquier `w-[Npx]` que llegue por ahí no tiene ningún efecto: el input
+    se estira al ancho del contenedor. **Medido:** 75 de 77 inputs de la pantalla
+    de nuevo pedido tenían `width: 100%`.
+
+    Nadie lo nota en escritorio, porque la celda de la tabla ya acota el ancho.
+    Aparece en mobile, donde el input se come la fila y empuja el resto fuera de la
+    vista — así se rompieron la fila del listado y las dos del carrito.
+
+    **Parches locales puestos hasta hoy: 3**, todos del 2026-08-10 y todos de la
+    misma forma —envolver el input en un `div` con el ancho— en
+    `app/modulos/compras-proveedor/nueva/page.jsx` (stepper de cantidad) y
+    `components/compras-proveedor/CarritoPedido.jsx` (cantidad y costo).
+
+    **Sitios que siguen pidiendo un ancho que no se aplica: 15, en 5 archivos**
+    —`compras-proveedor/[id]` (6), `pos-transferencias/nueva/TablaSugeridos` (3),
+    `reportes-ventas/EditorVentaCorreccion` (3), `reportes-ventas/LineaEditableCard`
+    (2), `pos-transferencias/nueva/PreparadosTable` (1)—. Enumerado recorriendo los
+    298 `.jsx` de `git ls-files "*.jsx"` y buscando `w-[Npx]` dentro de cada
+    elemento `<SunmiInput …/>`. **El conteo es un piso, no un total:** solo cuenta
+    los anchos escritos como literal. `costoInput` en `nueva/page.jsx:1446` pasa el
+    suyo por variable (`w = "w-[80px]"`) y ninguna búsqueda por literal lo
+    encuentra.
+
+    El arreglo de fondo es hacer que `w-full` ceda ante un ancho explícito, y toca
+    **toda** la aplicación de una sola vez: por eso va como tanda propia y con
+    capturas, no colgado de un cambio de pantalla.
 
 ---
 
