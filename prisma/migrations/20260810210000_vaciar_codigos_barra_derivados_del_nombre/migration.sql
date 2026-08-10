@@ -1,5 +1,5 @@
--- Vaciar el código de barra de 33 productos cuyo código era el nombre del
--- producto volcado en la columna equivocada.
+-- Vaciar el código de barra de 29 productos que tienen basura en esa columna y
+-- NINGUNA VENTA.
 --
 -- ── POR QUÉ ES UNA MIGRACIÓN Y NO UN SCRIPT ─────────────────────────────────
 --
@@ -8,28 +8,35 @@
 -- migración se aplica una sola vez, queda anotada en _prisma_migrations y llega
 -- con la versión que la trajo.
 --
--- ── EL CRITERIO ES EL LARGO ─────────────────────────────────────────────────
+-- ── EL CRITERIO ES CERO VENTAS ──────────────────────────────────────────────
 --
--- Entran los códigos de MÁS DE 8 CARACTERES. Un nombre volcado tiene 12 o 15
--- caracteres; un atajo de tecleo tiene cuatro o cinco. Nadie escribe
--- "medialunassaladas" para buscar un producto.
+-- Se probaron dos criterios de forma antes y los dos fallaron:
 --
--- El criterio anterior —"el código es el nombre o su comienzo"— estaba mal y se
--- reemplazó: dejaba adentro 14 abreviaturas cortas como `bica`, `chori` o
--- `camel10`, que son exactamente lo que alguien teclea todos los días. Esas
--- pasaron a la lista que se revisa una por una.
+--   1. "El código es el nombre del producto o su comienzo". Dejaba adentro
+--      bica, chori y camel10, que son atajos de tecleo: un atajo TAMBIÉN
+--      empieza igual que el nombre.
+--   2. "Más de 8 caracteres". La fiambrería tiene nombres cortos, así que
+--      mortadela (9 caracteres, 82 ventas) y paletafela (10, 80) caían del lado
+--      del vaciado mientras picadofino (10, 48) quedaba afuera. A 13 caracteres
+--      convivían BARRATREMBLAY con 201 ventas y cascarablanca con 41.
+--
+-- No hay regla de forma que separe un atajo en uso de una basura heredada. La
+-- que sí separa es el uso: si el producto nunca se vendió, nadie tipeó su
+-- código para venderlo.
+--
+-- El motivo es la ASIMETRÍA, no la elegancia. Vaciar un atajo en uso le rompe
+-- el trabajo a quien está atendiendo; dejar basura en un campo no le cuesta
+-- nada a nadie. Y lo que de verdad importaba —que no entren códigos nuevos— ya
+-- está resuelto con el tope de 16 caracteres.
 --
 -- ── QUÉ SE VACÍA, Y QUÉ NO ──────────────────────────────────────────────────
 --
--- Solo estos 33 ids, con su código exacto escrito al lado. NO se recalcula el
--- criterio al aplicar: si alguien le cambia el código a alguno entre la medición
--- y el despliegue, esa fila NO se toca. La lista es el contrato.
+-- Solo estos 29 ids, con su código exacto escrito al lado. NO se recalcula el
+-- criterio al aplicar: la lista es el contrato, para que el conjunto no cambie
+-- solo entre que se revisa y que se aplica. Si a alguno le cambiaron el código
+-- en el medio, esa fila no se toca.
 --
--- Quedan afuera a propósito:
---   * Los 57 restantes con letras: los 43 que no se parecen al nombre más las 14
---     abreviaturas de 8 caracteres o menos.
---   * Los 16 de más de 14 caracteres que no están en esta lista, incluidos los
---     tres GS1 legítimos.
+-- Quedan afuera los 61 restantes con letras: todos tienen al menos una venta.
 --
 -- ── SE VACÍA A NULL, NO A CADENA VACÍA ──────────────────────────────────────
 --
@@ -52,42 +59,37 @@
 --
 -- El estado anterior está en docs/business-rules/codigos-vaciados-2026-08-10.md,
 -- con el UPDATE listo para copiar, uno por uno o todos juntos.
-
 WITH objetivo (id, codigo_viejo, nombre) AS (
   VALUES
-  (857, 'albondiga', 'Albondigas Caseras x Caja'),
+  (139, 'CORDONES', 'CORDON EL MOÑO X12U'),
   (292, 'HILO ATAR', 'HILO ATAR'),
-  (2099, 'mortadela', 'Mortadela Paladini'),
-  (2088, 'salamefox', 'Salame Fox '),
-  (2126, 'salametro', 'Salametro'),
-  (2272, 'aceiteseda', 'Aceite Seda 10L'),
-  (2134, 'doververde', 'Dover Verde'),
-  (2331, 'fantalimon', 'Fanta Limon 2l'),
-  (2098, 'paletafela', 'Paleta Fela'),
-  (2120, 'paletapala', 'Paleta Paladini'),
-  (2100, 'salamefela', 'Salame Fela'),
-  (2271, 'verduleria', 'verduleria'),
-  (2190, 'CARBONCHICO', 'CARBON CHICO'),
-  (2083, 'paletasadia', 'Paleta sadia'),
+  (316, 'JAIMITOS', 'Jaimitos X 10u'),
   (427, 'PALO MADERA', 'PALO MADERA'),
-  (2191, 'CARBONGRANDE', 'CARBON  GRANDE'),
+  (658, 'PERRO', 'BALANCIN ALIMENTO PERRO 15KG'),
   (665, 'IODOPOVIDONA', 'IODOPOVIDONA'),
-  (1780, 'LOMO DEL RIO', 'LOMO DEL RIO X2'),
-  (1393, 'PULVERIZADOR', 'PULVERIZADOR1L'),
-  (586, 'TARRITOORINA', 'TARRITO ORINA'),
-  (79, 'BARRATREMBLAY', 'BARRA TREMBLAY'),
-  (1721, 'pan congelADO', 'pan congelado xkg'),
-  (2387, 'pollo trozado', 'pollo trozado'),
-  (2397, 'caja bon o bon', 'caja bon o bon'),
-  (1647, 'cremoso ramolac', 'CREMOSO RAMOLAC X KG'),
-  (1577, 'ESCOBILLON CURVO', 'ESCOBILLON CURVO'),
-  (2296, 'Medialunasdulces', 'Medialunas Dulces Congeladas x75'),
-  (2295, 'bizcochocongelado', 'Bizcocho Congelado'),
-  (2398, 'bocadito fantoche', 'bocadito fantoche'),
-  (2297, 'medialunassaladas', 'Medialunas Saladas Congeladas x75'),
   (1296, 'TOALLITAS PAMPERS', 'TOALLITAS PAMPERS X48'),
-  (1585, 'ARGENTINA BOMBILLA', 'ARGENTINA BOMBILLA'),
-  (1473, 'QUITAESMALTENEPTUS', 'QUITAESMALTE NEPTUS 60CM')
+  (1322, 'cordones', 'cordones negros'),
+  (1393, 'PULVERIZADOR', 'PULVERIZADOR1L'),
+  (1406, 'BOLSA 50x70', 'BOLSA CONSORCIO YO RECICLO 50x70'),
+  (1407, 'BOLSA 60x90', 'BOLSA  CONSORCIO YO RECICLO 60x90'),
+  (1457, 'prepizza', 'prepizza cebolla'),
+  (1539, 'mixta', 'prepizza mixta'),
+  (1577, 'ESCOBILLON CURVO', 'ESCOBILLON CURVO'),
+  (1647, 'cremoso ramolac', 'CREMOSO RAMOLAC X KG'),
+  (1721, 'pan congelADO', 'pan congelado xkg'),
+  (1775, 'pategras', 'pategras por kg'),
+  (1779, 'bagetines', 'BAGUETINES DEL RIO x2'),
+  (1780, 'LOMO DEL RIO', 'LOMO DEL RIO X2'),
+  (1789, '7790895641749-', 'cepita anana 1.5l'),
+  (1800, 'BOCADITO CHOC BLANCO', 'GRANIX BOCADITO CHOC. BLANCO 2KG'),
+  (1882, 'LIVRA POMELO 1.5 GAS', 'LIVRA POMELO 1.5 CON GAS'),
+  (2294, 'skyclasico', 'Skyy Clasico'),
+  (2295, 'bizcochocongelado', 'Bizcocho Congelado'),
+  (2296, 'Medialunasdulces', 'Medialunas Dulces Congeladas x75'),
+  (2297, 'medialunassaladas', 'Medialunas Saladas Congeladas x75'),
+  (2318, 'petacagin', 'Petaca Derna Gin'),
+  (2329, 'secadortango', 'Secador De Pïso Tango'),
+  (2331, 'fantalimon', 'Fanta Limon 2l')
 ),
 -- Solo las que TODAVÍA tienen exactamente ese código. Si cambió, se saltea.
 vigentes AS (
@@ -104,13 +106,13 @@ rastro AS (
          'Producto', v.id::text, v.nombre,
          jsonb_build_object(
            'autor', 'migracion 20260810210000_vaciar_codigos_barra_derivados_del_nombre',
-           'motivo', 'el codigo era el nombre del producto volcado; mas de 8 caracteres, nadie lo tipea para buscar',
+           'motivo', 'basura en la columna del codigo y ninguna venta: nadie tipeo ese codigo para vender',
            'codigo_barra', jsonb_build_object('antes', v.codigo_viejo, 'despues', NULL)
          )
   FROM vigentes v JOIN "ProductoBase" pb ON pb.id = v.id
   RETURNING "entidadId"
 )
--- No hace falta referenciar `rastro` para que corra: PostgreSQL ejecuta los CTE
+-- No hace falta referenciar rastro para que corra: PostgreSQL ejecuta los CTE
 -- que modifican datos exactamente una vez y siempre hasta el final, lea o no la
 -- consulta principal su salida.
 UPDATE "ProductoBase" pb
