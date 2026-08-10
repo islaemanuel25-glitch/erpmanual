@@ -4,28 +4,35 @@ Lugares donde el repo se contradice a sí mismo. **Ninguna se resolvió eligiend
 una versión en silencio**: acá se registra que hay dos y quién dice qué.
 
 Relevado sobre `d20afa98e9edece663fb3dda694d3c99783ab788`.
+**Actualizado el 2026-08-10:** de las doce, **cinco están cerradas** (C-01, C-10 y
+las tres del bloque de precios y `esDefault`). Las cerradas quedan escritas con lo
+que se hizo, no se borran: el historial de por qué algo es como es vale tanto
+como el estado actual.
 
 ---
 
-## C-01 — El código contradice al código: `/api/me` se abre donde el resto se cierra
+## C-01 — `/api/me` se abría donde el resto se cerraba · **CERRADA (2026-08-10)**
 
-La más grave, porque las dos versiones son código y una declara la regla por
-escrito.
+Era la más grave, porque las dos versiones eran código y una declaraba la regla
+por escrito.
 
-- `app/api/login/route.js:111` — `Array.isArray(user.rol?.permisos) ? ... : []`,
-  con el comentario textual: *"Seguridad: si permisos no es un array válido…
-  **NO otorgar admin. Fail-closed → sin permisos**."*
-- `lib/auth.js:76` — hace lo mismo: array vacío.
-- **`app/api/me/route.js:23-25`** — `Array.isArray(payload.permisos) ? payload.permisos : ["*"]`.
-  Un token con permisos corruptos recibe **admin total**.
+- `app/api/login/route.js` — caía a `[]`, con el comentario textual: *"Seguridad:
+  si permisos no es un array válido… **NO otorgar admin. Fail-closed → sin
+  permisos**."*
+- `lib/auth.js` — lo mismo.
+- **`app/api/me/route.js`** — caía a `["*"]`. Un token con permisos corruptos
+  recibía **admin total**.
 
-**Alcance real:** el backend sigue rechazando cada operación porque valida contra
-`getUsuarioSession`, así que no es un agujero de escritura. Pero el frontend arma
-menú y botones con lo que devuelve `/api/me`, así que mostraría la aplicación
-entera.
+El backend rechazaba igual cada operación porque valida contra
+`getUsuarioSession`, así que no era un agujero de escritura; pero el frontend
+arma menú y botones con esa respuesta.
 
-**Sin resolver.** Cambiar `["*"]` por `[]` es una línea, pero es un cambio de
-comportamiento y va al roadmap, no a esta tanda.
+**Cómo se cerró:** no se arregló solo el archivo roto. La decisión estaba escrita
+a mano en los tres lugares, y ese era el bug de fondo. Ahora vive una sola vez en
+`lib/rbac/permisosSesion.js` —módulo puro— y los tres la importan. Dos candados
+estructurales recorren los tres archivos: uno falla si vuelve un fallback a
+`["*"]`, el otro si alguien reimplementa la regla en vez de importarla. Commit
+`32e0d51`.
 
 ---
 
@@ -158,16 +165,24 @@ que envolver algo. Pero el texto no lo aclara y se lee como contradicción.
 
 ---
 
-## C-10 — Dos criterios opuestos para el mismo hecho: auditar antes de mover
+## C-10 — Dos criterios opuestos para auditar antes de mover · **CERRADA (2026-08-10)**
 
-- **Transferencias**: si no se puede auditar, **no se hace la devolución**. La
-  ruta corta explícitamente (`confirmar-recepcion/route.js:171-187`).
-- **Ajuste de stock**: el stock se mueve **aunque la auditoría falle**; el error
-  se traga con `.catch(console.error)`
-  (`stock_locales/ajustar/route.js:210` y `:256`).
+- **Transferencias**: si no se puede auditar, **no se hace la devolución**.
+- **Ajuste de stock**: el stock se movía **aunque la auditoría fallara**; el error
+  se tragaba con `.catch(console.error)`, y además la escritura corría fuera de
+  transacción, así que sacar el `.catch` no habría alcanzado.
 
-Los dos son movimientos de stock que dejan `AuditoriaStock`. Uno es bloqueante y
-el otro best-effort, sin que ningún comentario explique la diferencia.
+**Cómo se cerró:** el ajuste se alineó con transferencias. La escritura de stock y
+su fila de `AuditoriaStock` van ahora en la **misma transacción**, en los dos
+modos —ajuste y límites—, y sin `grupoId` la operación se rechaza con 409 en vez
+de escribir a ciegas.
+
+**El criterio quedó escrito en el encabezado del archivo**, que era la mitad del
+problema: la divergencia duró meses porque nada la explicaba. El razonamiento es
+que todos los demás movimientos de stock tienen un documento atrás —remito,
+ticket, pedido— y el ajuste manual **no tiene ninguno**: la fila de auditoría es
+la única evidencia de que ocurrió. Y el costo también quedó escrito: si la tabla
+de auditoría falla, el ajuste deja de funcionar. Es deliberado.
 
 ---
 
@@ -193,3 +208,50 @@ Quien tenga esa capability tiene el permiso y **no puede llegar a la pantalla**.
 
 Son dos de los ~63 informes sueltos de la raíz. No se mantienen y no son
 documentación vigente; ver [../PROJECT.md](../PROJECT.md).
+
+---
+
+## C-13 — El historial del cliente estaba clasificado como técnico · **CERRADA (2026-08-10)**
+
+Apareció al arreglar la mezcla de ventas internas: **la ruta estaba en la lista de
+TÉCNICOS a propósito**, con su justificación en
+`lib/ventas/filtroVentaComercial.js` ("historial" entre las superficies que no
+filtran) y un candado que lo afirmaba. El relevamiento la había marcado como
+posible accidente porque la justificación no estaba en la ruta, sino en la
+clasificación.
+
+O sea que no era un descuido: era una decisión, tomada en otro momento y con otro
+criterio.
+
+**Cómo se cerró:** se movió de TÉCNICO a COMERCIAL, y el candado de clasificación
+se reescribió sabiendo qué se cambiaba —nunca se aflojó—. El argumento es que es
+una pantalla que mira una persona para saber qué le compró un cliente, no una
+vista de inspección. La necesidad técnica no se perdió: las internas se piden con
+`?incluirInternas=1`, que es explícito y se prende.
+
+Verificado ejecutando contra `erpazul_al`: el cliente 1 tiene 333 ventas, 287
+comerciales y 46 internas. La venta interna 4033 **no aparece** por defecto y **sí
+aparece** con el parámetro.
+
+---
+
+## C-14 — Un candado puede pasar en verde con el código roto · **lección, no contradicción**
+
+No es una contradicción del repo: es algo que pasó al cerrar C-13 y conviene que
+quede escrito.
+
+El candado que verificaba que las seis rutas de clientes pidieran permiso buscaba
+la constante `PERMISOS_LEER_CLIENTES` en el archivo. Pasó en verde mientras cinco
+de esas rutas estaban **rotas**: se le pasaba a `checkPerm` el scope entero en vez
+de `scope.session` —los resolvedores devuelven la sesión anidada—, así que
+`session.permisos` era `undefined`, reventaba con TypeError, lo atrapaba el catch
+y la ruta respondía **500 en vez de 403**. La pantalla quedaba rota para todos,
+incluido quien sí tenía el permiso.
+
+Lo encontró una captura, no el candado. Ahora hay dos candados más: uno prohíbe
+`checkPerm(scope,` en las seis rutas y otro recorre **todo** `app/api/clientes/`
+buscando esa forma.
+
+**La lección:** un candado que verifica que algo *esté* no verifica que *funcione*.
+Cuando lo que se afirma es "esta ruta valida permisos", la forma de la llamada es
+parte de la afirmación.

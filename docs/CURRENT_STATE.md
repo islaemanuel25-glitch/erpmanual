@@ -4,6 +4,10 @@
 > **Fecha y hora:** 2026-08-10 00:18
 > **Rama:** `main`
 >
+> **Revisado el 2026-08-10** tras la tanda de correcciones: se cerraron cinco
+> contradicciones y cinco puntos de deuda, marcados abajo como RESUELTO. El resto
+> del documento sigue describiendo el commit del encabezado.
+>
 > **ANTES DE CONFIAR EN ESTE DOCUMENTO, CORRÉ:**
 >
 > ```
@@ -38,7 +42,7 @@ Decir con qué se enumeró es parte del número.
 | Migraciones | 81 | `ls -d prisma/migrations/*/` |
 | Componentes Sunmi | 40 archivos | `git ls-files "components/sunmi/*.jsx"` |
 | Archivos de candados | 92 | `git ls-files "*.test.mjs"` |
-| Tests que corren | 2407 (0 fallando) | `node --import ./scripts/alias-loader.mjs --test $(git ls-files "*.test.mjs")` |
+| Tests que corren | **2470** (0 fallando) | `node --import ./scripts/alias-loader.mjs --test $(git ls-files "*.test.mjs")` |
 | Permisos declarados | 59, en 15 grupos, 0 deprecados | `grep -oE 'code: "[^"]+"' lib/rbac/registry.js \| sort -u` |
 | Scripts en `scripts/` | 85 `.js`/`.mjs` | `git ls-files "scripts/*.mjs" "scripts/*.js"` |
 | Archivos `.md` trackeados | 113 | `git ls-files "*.md"` |
@@ -121,18 +125,13 @@ Quieto desde julio o antes: `areas-fisicas`, `categorias`, `grupos`, `locales`,
 
 Solo lo que se puede señalar en un archivo. Ordenado por lo que puede doler.
 
-### 1. `/api/me` se abre donde el resto se cierra — **[VERIFICADO]**
+### 1. `/api/me` se abría donde el resto se cerraba — **RESUELTO 2026-08-10**
 
-`app/api/me/route.js:23-25` hace `Array.isArray(payload.permisos) ? payload.permisos : ["*"]`.
-Un token con permisos corruptos recibe **admin total**.
+Devolvía `["*"]` ante un token con permisos corruptos, mientras `login` y
+`getUsuarioSession` caían a `[]` y lo declaraban por escrito.
 
-`app/api/login/route.js:111` hace lo contrario y lo dice por escrito: *"Seguridad:
-si permisos no es un array válido… NO otorgar admin. Fail-closed → sin permisos."*
-`lib/auth.js:76` también devuelve array vacío.
-
-O sea: el propio repo declara la regla y un archivo la incumple. El backend sigue
-rechazando cada operación porque valida contra `getUsuarioSession`, así que no es
-un agujero de escritura, pero el frontend mostraría la aplicación entera.
+La regla vive ahora una sola vez en `lib/rbac/permisosSesion.js` y la importan los
+tres. Commit `32e0d51`. Ver contradicción C-01.
 
 ### 2. `lib/compras-proveedor/` escribe costos y no tiene candados — **[VERIFICADO]**
 
@@ -191,6 +190,25 @@ con `precio_costo` en el bloque `data`, más los que se encontraron leyendo:
 **Ese número es un piso, no un techo.** El patrón no ve las escrituras donde el
 objeto `data` se arma en una variable aparte. Cualquier cambio en la regla de
 propiedad del costo tiene que revisar todos, no los tres que primero aparecen.
+
+### 6.bis El redondeo a 100 estaba duplicado — **RESUELTO 2026-08-10**
+
+Había dos funciones hacia arriba que diferían con centavos, y **el POS usaba la
+defectuosa**: un valor con residuo binario saltaba de múltiplo y cobraba cien
+pesos de más. Quedó una sola, `redondear100` en `lib/precios/redondeo.js`, con
+diez llamadores y candado sobre el caso de los centavos.
+
+### 6.ter El descuento por puntos entraba crudo del cliente — **RESUELTO 2026-08-10**
+
+Era el único importe del cobro que el servidor aceptaba sin recalcular. Ahora lee
+`pesoPorPunto` de la configuración y rechaza el cobro si no coincide.
+
+### 6.quater La agenda de clientes era pública — **RESUELTO 2026-08-10**
+
+**Seis** rutas de lectura de clientes no pedían ningún permiso —no dos, como decía
+el relevamiento: además de `listar` y `buscar` estaban `[id]`, `[id]/ventas`,
+`analytics/ranking` y `analytics/inactivos`—. Ahora exigen `clientes.ver` **o**
+`pos.usar`, para no romper la búsqueda desde el POS.
 
 ### 7. Tres registries de menú conviviendo — **[VERIFICADO]**
 

@@ -149,21 +149,28 @@ tocarlos: la base elegible es el subtotal sin servicios (`:479-495`).
 
 ---
 
-## RN-42 — El descuento por puntos NO se recalcula en el servidor · **[ACCIDENTE POSIBLE]**
+## RN-42 — El descuento por puntos LO RECALCULA EL SERVIDOR · **[CÓDIGO]** · *desde 2026-08-10*
 
-Es el único importe del cobro que no es server-authoritative.
+Era el único importe del cobro que **no** era server-authoritative: el servidor
+validaba que `puntosCanje` no excediera el saldo —dos veces— pero tomaba el peso
+del descuento crudo del body. Se controlaba cuántos puntos se gastaban y no cuánta
+plata valían, así que un canje de 1 punto podía descontar el subtotal entero.
 
-`app/api/pos-ventas/crear/route.js:482` toma `descuentoPorPuntos` crudo del body
-(`Number(descuentoPorPuntosBody) || 0`). El servidor **sí** valida que
-`puntosCanje` no exceda el saldo (`:574-596`, y otra vez dentro de la transacción
-en `:971-1006`), pero **nunca verifica que el descuento sea
-`puntosCanje × pesoPorPunto`**. El único tope es no exceder la mercadería elegible
-(`:487`).
+Ahora el servidor **lee `pesoPorPunto` de `PuntosConfigLocal` y recalcula**. Si el
+importe recibido no coincide, **rechaza el cobro** con un mensaje que dice los dos
+números y qué hacer. La fórmula vive una sola vez en `lib/pos-ventas/puntos.js` y
+la comparten el POS y el servidor.
 
-El cálculo lo hace el cliente: `app/modulos/pos-ventas/page.jsx:1946-1954`.
+**Qué valor manda:** el del servidor al momento del cobro, no el que el navegador
+tenía cargado. `pesoPorPunto` se puede editar en cualquier momento desde la
+pantalla de fidelidad, así que entre que el cajero abre el canje y aprieta cobrar
+puede haber cambiado. Se rechaza en vez de corregir en silencio: corregir
+cambiaría el total que el cajero ya leyó en pantalla, con una persona enfrente.
 
-**No se pudo verificar si es intencional.** Se registra como posible accidente, no
-como regla. Va al roadmap como **requiere decisión humana**.
+La comparación lleva **un centavo de tolerancia**, porque `pts × pesoPorPunto` en
+coma flotante da residuos y rechazar una venta legítima por ruido binario sería
+peor que el problema. Candado: `lib/pos-ventas/puntos.test.mjs`, con el caso
+manipulado.
 
 ---
 
@@ -203,6 +210,12 @@ Lo aplican reportes de ventas, analytics de clientes y los totales de turno. **N
 lo aplica `auditoria-pos-ventas`, a propósito**: es la vista técnica, y está
 declarado en `filtroVentaComercial.js:35-37`.
 
-**[ACCIDENTE POSIBLE]** — `app/api/clientes/[id]/ventas/route.js:60` tampoco lo
-aplica, y no hay comentario que lo justifique. Si un cliente está vinculado a un
-local interno, su historial mezcla ventas internas con comerciales.
+**Corregido el 2026-08-10:** `app/api/clientes/[id]/ventas` tampoco lo aplicaba,
+y el historial de un cliente vinculado a un local interno mezclaba sus
+transferencias con sus compras. Resultó que la ruta estaba clasificada como
+TÉCNICA a propósito —ver C-13—, así que se movió de categoría de forma deliberada
+y el candado de clasificación se reescribió. Ahora filtra por defecto y las
+internas se piden con `?incluirInternas=1`.
+
+Verificado contra `erpazul_al`: el cliente 1 tiene 333 ventas, 287 comerciales y
+46 internas; la interna 4033 no aparece por defecto y sí con el parámetro.

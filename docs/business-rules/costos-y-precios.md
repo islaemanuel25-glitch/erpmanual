@@ -96,23 +96,27 @@ rojo**. Es el caso textual de la regla 1 de `CLAUDE.md`.
 
 ---
 
-## RN-15 — El redondeo a 100 es siempre hacia arriba, pero hay dos funciones · **[CÓDIGO]**
+## RN-15 — El redondeo a 100: una sola función · **[CÓDIGO]** · *unificada 2026-08-10*
 
 **No conviven `ceil` y `round`.** Buscado el patrón `/ 100) * 100` en todo el
 repo: las dos apariciones vivas son `Math.ceil`, y la tercera es un comentario de
 test que advierte justamente contra `Math.round`
 (`lib/precios/margenNoSeDeforma.test.mjs:113-114`).
 
-Lo que sí hay son **dos funciones distintas, ambas hacia arriba**:
+Hoy hay **una sola**: `redondear100` en `lib/precios/redondeo.js`, con **diez
+llamadores** que la importan de ese archivo. Normaliza a centavos antes de subir y
+devuelve 0 ante un valor ≤ 0 o inválido.
 
-- `redondear100` (`lib/precios/redondeo.js:9`) — devuelve 0 si el valor es ≤ 0 o
-  inválido. La usan stock, reportes, POS buscar-producto, listas y combos.
-- `redondearA100Arriba` (`lib/precios/precioDesdeMargen.js:55`) — normaliza a
-  centavos antes de subir, **para no empujar 1400 a 1500 por ruido binario**;
-  devuelve el valor tal cual si es ≤ 0. La usan precios, recargo fijo, preview y
-  `FormProducto`.
+**Hasta el 2026-08-10 eran dos**, ambas hacia arriba pero distintas:
+`redondear100` no normalizaba a centavos —así que un 1400,0000000001 salido de un
+cálculo lo empujaba a **1500: cien pesos de más**— y `redondearA100Arriba` sí. La
+que usaba el POS era la defectuosa, o sea que el precio impreso en el ticket salía
+de ella.
 
-Para valores con centavos **las dos pueden dar resultados distintos**.
+Se unificó en el nombre y el archivo que usa el POS, pero con el comportamiento
+correcto de las dos. Candado en `lib/precios/redondeo.test.mjs`, con el caso de
+los centavos, que es donde diferían, y uno estructural que recorre `lib/` y `app/`
+buscando redondeos a 100 escritos a mano.
 
 ---
 
@@ -175,7 +179,7 @@ el servidor.
 
 ---
 
-## RN-20 — `ListaPrecio.esDefault` no lo lee ningún camino de venta · **[ACCIDENTE POSIBLE]**
+## RN-20 — `ListaPrecio.esDefault` no lo lee ningún camino de venta · **[CÓDIGO]** · *el control salió de la UI el 2026-08-10*
 
 El campo se escribe desde la UI y dos endpoints (`crear`, `marcar-default`) lo
 mantienen, desmarcando el anterior en transacción. Pero
@@ -183,5 +187,13 @@ mantienen, desmarcando el anterior en transacción. Pero
 del grupo NUNCA se consulta en runtime."* Verificado: no aparece en la resolución
 de precio ni en `pos-ventas/crear`.
 
-Es un botón que no cambia nada funcional. **Requiere decisión humana**: sacarlo de
-la UI o volver a conectarlo. Ver [../roadmap/README.md](../roadmap/README.md).
+Era un botón que no cambiaba nada funcional: alguien lo marcaba, veía una pill
+ámbar y se iba creyendo que había configurado los precios de la ubicación.
+
+**El control se sacó de la pantalla el 2026-08-10** —la columna "Default", la pill,
+el botón de la estrella y el toggle del modal—. **La columna NO se borró y no hubo
+migración**: el dato queda por si algún día se conecta. La lista que sí se aplica
+se elige en la tarjeta "Lista predeterminada del depósito", que escribe
+`GrupoDeposito.listaPrecioDefaultId`.
+
+Reconectarlo toca la resolución de precio y sigue siendo una tanda propia.

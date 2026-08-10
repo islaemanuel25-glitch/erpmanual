@@ -41,8 +41,7 @@ Relevado sobre `d20afa98e9edece663fb3dda694d3c99783ab788` — 2026-08-10.
 Ordenada por lo que puede doler. La evidencia completa está en
 [../CURRENT_STATE.md](../CURRENT_STATE.md).
 
-1. **`/api/me` es fail-open donde el resto es fail-closed.** Un token con permisos
-   corruptos recibe `["*"]`. Es una línea. `app/api/me/route.js:23-25`.
+1. ~~**`/api/me` es fail-open.**~~ **RESUELTO 2026-08-10** — commit `32e0d51`.
 2. **`lib/compras-proveedor/` escribe costos en producción sin un solo candado
    propio.** Tres rutas dependen de él.
 3. **Cero candados sobre `lib/auth.js`, `lib/authorize.js`, `lib/grupos.js` y
@@ -52,7 +51,8 @@ Ordenada por lo que puede doler. La evidencia completa está en
 5. **La fórmula de precio por margen está triplicada** (canónica + dos copias en
    combos). El día que cambie, los combos quedan atrás y nada se pone rojo.
 6. **`||` contra `??` al leer el override de costo.** Stock Locales y Reporte
-   Valorizado pueden mostrar el mismo producto con costo distinto.
+   Valorizado pueden mostrar el mismo producto con costo distinto. **Sigue
+   abierta:** se unificó el redondeo, no esto.
 7. **La vista global rompe `/api/contexto-activo/get` con un 500.**
 8. **`grupo-activo/set` no valida que el grupo exista.**
 9. **`productos/eliminar` no chequea todas las referencias.** Un producto vendido
@@ -78,8 +78,9 @@ Ordenada por lo que puede doler. La evidencia completa está en
     [../business-rules/contradicciones.md](../business-rules/contradicciones.md).
 16. **`SOLO_TRANSITO` está implementada y no la llama nadie**
     (`lib/transferencias/politicasStock.js:14`).
-17. **La auditoría del ajuste de stock es best-effort**, mientras la de
-    transferencias es bloqueante. Dos criterios opuestos para el mismo hecho.
+17. ~~**La auditoría del ajuste de stock es best-effort.**~~ **RESUELTO
+    2026-08-10** — stock y auditoría van en la misma transacción, con el criterio
+    escrito en el encabezado del archivo.
 
 ---
 
@@ -116,25 +117,20 @@ Ordenada por lo que puede doler. La evidencia completa está en
 
 Lo que no se puede resolver leyendo el código.
 
-1. **`ListaPrecio.esDefault`: ¿se saca de la UI o se vuelve a conectar?** Hoy la
-   pantalla deja marcar una lista como predeterminada del grupo y **ningún camino
-   de venta la lee**. Es un botón que no hace nada.
-2. **¿El descuento por puntos debe recalcularse en el servidor?** Hoy es el único
-   importe del cobro que se acepta tal como lo manda el cliente. El saldo sí se
-   valida; la aritmética `puntos × pesoPorPunto`, no. No se pudo determinar si es
-   intencional.
-3. **¿La auditoría del ajuste de stock debe ser bloqueante**, como la de
-   transferencias, o está bien que el stock se mueva sin rastro si la auditoría
-   falla?
-4. **¿El historial de ventas de un cliente debe excluir las ventas internas?**
-   `app/api/clientes/[id]/ventas/route.js:60` no aplica `whereVentaComercial`, sin
-   comentario que lo justifique.
-5. **¿`clientes/listar` y `clientes/buscar` deberían exigir permiso?** Hoy solo
-   piden sesión: cualquier usuario autenticado lista la agenda de su grupo.
-   Podría ser deliberado, porque el POS necesita buscar clientes con `pos.usar` y
-   no con `clientes.ver`.
-6. **¿Se unifican las dos funciones de redondeo a 100?** Las dos redondean hacia
-   arriba pero difieren con centavos.
+**Cuatro de las seis se resolvieron el 2026-08-10** con las decisiones que tomó
+Emanuel en la orden de trabajo: `esDefault` salió de la UI, el descuento por
+puntos lo recalcula el servidor, la auditoría del ajuste pasó a bloqueante, el
+historial del cliente excluye las internas por defecto y las dos funciones de
+redondeo se unificaron en una.
+
+Quedan estas dos:
+
+1. **¿`clientes/listar` y `clientes/buscar` deberían exigir permiso?** — **YA SE
+   RESOLVIÓ**: exigen `clientes.ver` **o** `pos.usar`. Se deja anotado porque la
+   pregunta era si el POS necesitaba el acceso, y la respuesta fue que sí.
+2. **¿Se reconecta `ListaPrecio.esDefault` alguna vez?** El control salió de la
+   pantalla y el dato quedó en la base. Reconectarlo toca la resolución de precio
+   y es una tanda propia. Mientras tanto, la columna guarda valores que nadie lee.
 
 ---
 
