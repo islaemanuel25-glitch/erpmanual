@@ -6,8 +6,8 @@ import { resolveScope } from "@/lib/grupos";
 import {
   precioDesdeMargen,
   hayReglaAutomatica,
-  redondearA100Arriba,
 } from "@/lib/precios/precioDesdeMargen";
+import { redondear100 } from "@/lib/precios/redondeo";
 
 function toNumber(value) {
   const n = Number(value);
@@ -259,7 +259,7 @@ export async function POST(req) {
       } else if (p.redondeo_100) {
         // Los otros modos (KEEP_VENTA / SET_VENTA) siguen redondeando el precio
         // que traen; RECALC ya salió redondeado del helper.
-        ventaNueva = redondearA100Arriba(ventaNueva);
+        ventaNueva = redondear100(ventaNueva);
       }
 
       const alertas = buildAlerts({ costoAnterior, costoNuevo, ventaAnterior, ventaNueva });

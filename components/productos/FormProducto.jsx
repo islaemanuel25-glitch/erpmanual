@@ -12,9 +12,9 @@ import SeccionCodigosProveedor from "@/components/productos/SeccionCodigosProvee
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
 import {
   precioDesdeMargen,
-  redondearA100Arriba,
   margenEfectivoDe,
 } from "@/lib/precios/precioDesdeMargen";
+import { redondear100 } from "@/lib/precios/redondeo";
 import {
   REGLA_MARGEN,
   REGLA_RECARGO,
@@ -128,7 +128,7 @@ export default function FormProducto({
     return Number.isFinite(n) ? n : "";
   };
 
-  // El redondeo a 100 vive en lib/precios/precioDesdeMargen.js (redondearA100Arriba):
+  // El redondeo a 100 vive en lib/precios/redondeo.js (redondear100):
   // una sola regla para el form, las compras y la propagación depósito→locales.
   // Acá solo queda el redondeo a centavos, que es de PERSISTENCIA (Decimal(12,2)).
   const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
@@ -324,7 +324,7 @@ export default function FormProducto({
       if (!p.redondeo_100) return p;
       const pv = Number(p.precio_venta);
       if (!Number.isFinite(pv) || pv <= 0) return p;
-      const pvR = redondearA100Arriba(pv);
+      const pvR = redondear100(pv);
       if (pvR === pv) return p;
       return { ...p, precio_venta: pvR };
     });
@@ -336,7 +336,7 @@ export default function FormProducto({
     const pc = Number(form.precio_costo);
     let pv = Number(form.precio_venta);
     if (!Number.isFinite(pv)) return null;
-    if (form.redondeo_100 && pv > 0) pv = redondearA100Arriba(pv);
+    if (form.redondeo_100 && pv > 0) pv = redondear100(pv);
     return margenEfectivoDe(pc, pv);
   })();
 
@@ -502,7 +502,7 @@ export default function FormProducto({
 
     let precioVentaOut = Number(p.precio_venta);
     if (p.redondeo_100 && precioVentaOut > 0)
-      precioVentaOut = redondearA100Arriba(precioVentaOut);
+      precioVentaOut = redondear100(precioVentaOut);
 
     const payload = {
       nombre: p.nombre,
@@ -1308,7 +1308,7 @@ export default function FormProducto({
                   setForm((p) => {
                     const next = { ...p, redondeo_100: v };
                     if (v && Number(p.precio_venta) > 0) {
-                      next.precio_venta = redondearA100Arriba(Number(p.precio_venta));
+                      next.precio_venta = redondear100(Number(p.precio_venta));
                     }
                     return next;
                   });
