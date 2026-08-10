@@ -24,35 +24,97 @@ De **2.559 productos**, **2.239 tienen algún código** cargado. De esos:
 Por largo: 1.928 productos tienen exactamente 13 caracteres —un EAN-13— y 79
 tienen 14. Ese es el grueso y está bien.
 
-## ⚠️ EL TOPE NO SE PUSO, Y POR QUÉ
+## EL TOPE ESTÁ PUESTO, EN 16
 
-Se iba a poner un tope duro de 14 caracteres que frenara al escribir. **No se
-puso**, porque la medición encontró tres códigos de **16 dígitos, todos números,
-que parecen legítimos**:
+**Decidido y aplicado el 2026-08-10.** El tope frena a los 16 caracteres, no a
+los 14.
 
-- `0117798091030524` (16) — CERVEZA ANTARES LAGER LATA
-- `0147798397440011` (16) — Rasta Blanco X18
-- `0147798397444200` (16) — Rasta Negro X18
+El motivo es que tres productos tienen un código de 16 dígitos que es legítimo:
 
-Los tres empiezan con `01`. En GS1-128, `01` es el identificador de aplicación
-de GTIN, y lo que sigue es un **GTIN-14**. Sacándole el `01`:
+- `0117798091030524` — CERVEZA ANTARES LAGER LATA
+- `0147798397440011` — Rasta Blanco X18
+- `0147798397444200` — Rasta Negro X18
 
-- `0117798091030524` → GTIN-14 `17798091030524`
-- `0147798397440011` → GTIN-14 `47798397440011`
-- `0147798397444200` → GTIN-14 `47798397444200`
+Los tres empiezan con `01`, que en GS1 es el identificador de aplicación de
+GTIN, seguido de un GTIN-14. Es lo que emite un lector al escanear el código de
+un bulto. Con 14 rechazaríamos un escaneo real de caja; con 16 siguen frenados
+los de 17, 18 y 20, que son los que de verdad son basura.
 
-Es exactamente lo que emite un lector al escanear el código de una **caja**. No
-es basura tipeada: es un formato de código de barras real, más largo que 14
-porque incluye el identificador.
+Dos de esos productos se venden: Rasta Blanco X18 tenía 31 líneas de venta y la
+última el mismo día de la medición.
 
-**Y se usan:** Rasta Blanco X18 tiene 31 líneas de venta, la última el
-2026-08-10. Rasta Negro X18 tiene 24, la última el 2026-08-05. Cerveza Antares
-Lager Lata todavía no se vendió.
+### Cómo frena
 
-Un tope de 14 impediría volver a cargar esos códigos, y haría que un escaneo de
-caja no se pueda guardar. **La decisión de negocio es de Emanuel**: si el lector
-del local emite GS1-128 con el identificador adelante, el tope tiene que ser 16 y
-no 14.
+**Al escribir, no al guardar.** No hay validación en el servidor: agregarla
+rechazaría al guardar los 16 productos que hoy tienen más de 14 y son válidos.
+
+El tope vive en `lib/productos/codigoBarra.js` y lo aplican los **cinco campos**
+donde se carga un código: el principal, el secundario y el propio de la ubicación
+en la ficha de producto; los dos del formulario de combo; y la columna de la
+grilla de edición rápida. Cada uno lleva `maxLength` —que frena el tecleo y
+recorta el pegado en el navegador— más `alEscribirCodigoBarra`, que es la misma
+regla en JavaScript y cubre los caminos que `maxLength` no ve, como el dictado
+por voz.
+
+### Lo guardado no se toca
+
+Los 16 códigos de más de 14 caracteres **se quedan como están**. Verificado en
+la pantalla real, no solo en los candados:
+
+- Un producto con `LIVRA CITRUS 1.5 GAS` guardado —20 caracteres— abre el campo
+  con los 20 a la vista, pese al `maxLength` de 16.
+- Teclear encima de ese valor no lo mueve: sigue en 20.
+- Borrar sí funciona: un backspace lo deja en 19.
+- En un código normal de 13, teclear 10 caracteres más lo detiene exactamente
+  en 16.
+
+## De dónde salieron los 90 con letras
+
+Medido el 2026-08-10 contra producción. **Se agrupan a medias**: hay un pico
+grande el día de la carga inicial y después un goteo que se apaga solo.
+
+- **47 de los 90 se crearon el 2026-05-07**, el día en que entraron 1.834
+  productos de una vez. Ese día el 97 % de los códigos cargados fueron dígitos
+  correctos y el 2,6 % salieron con letras, así que **no fue una importación que
+  puso el nombre en la columna equivocada**: fue una importación que funcionó
+  bien y dejó un resto sin resolver.
+- Los otros 43 gotean entre mayo y julio, de a uno o dos por día. La excepción es
+  el **2026-06-02**, donde se crearon 6 productos y **los 6** salieron con letras:
+  ahí sí parece una tanda cargada a mano de un tirón.
+- **Desde el 2026-07-11 no entró ninguno más.** El último es del 2026-07-10.
+  Sea lo que fuere que los generaba, dejó de pasar hace un mes.
+
+### Qué son
+
+De los 90:
+
+- **21 tienen el código exactamente igual al nombre** del producto, comparando
+  sin espacios ni mayúsculas.
+- **48 tienen un código con el que empieza el nombre** —`BENGALA` en
+  `BENGALA X4`—.
+- **60 comparten los primeros 5 caracteres** con el nombre.
+
+O sea: dos tercios son el nombre del producto, entero o abreviado, escrito en la
+columna del código.
+
+### Ninguno tiene otro código en otro lado
+
+**Los 90 tienen el campo secundario vacío**, y ninguno tiene un SKU que parezca
+un código de barras. Vaciar el campo los dejaría **sin ningún código**.
+
+### Se venden como cualquier otro producto
+
+61 de los 90 tienen ventas, con 2.249 líneas y la última el mismo día de la
+medición. Es el 68 %, contra el 65 % de los productos con código de dígitos: **la
+misma proporción**. No son productos muertos con un código viejo; son productos
+normales cuyo código es basura.
+
+Lo que no se puede medir es si alguien **usa** ese texto para buscar. El campo lo
+lee el buscador del POS, así que tipear `cascarablanca` encontraría el producto;
+pero no hay registro de búsquedas, así que si eso pasa alguna vez o nunca no se
+puede saber leyendo la base. Lo que sí se puede afirmar: como en 48 de los 90 el
+nombre empieza con el mismo texto, buscar por nombre ya los encuentra, y el
+código no agrega nada.
 
 ## Lo que sí es basura, para decidir qué hacer
 

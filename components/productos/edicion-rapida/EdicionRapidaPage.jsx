@@ -17,6 +17,11 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import FiltrosProductos from "@/components/productos/FiltrosProductos";
 import ColumnManager from "@/components/productos/ColumnManager";
+import {
+  MAX_CODIGO_BARRA,
+  alEscribirCodigoBarra,
+  paraMostrarCodigoBarra,
+} from "@/lib/productos/codigoBarra";
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -615,18 +620,25 @@ export default function EdicionRapidaPage() {
         return (
           <SunmiInput
             type="text"
-            value={val ?? ""}
-            onChange={(e) => setFieldEdit(row.id, "codigoBarra", e.target.value)}
+            value={paraMostrarCodigoBarra(val)}
+            maxLength={MAX_CODIGO_BARRA}
+            onChange={(e) => setFieldEdit(row.id, "codigoBarra", alEscribirCodigoBarra(e.target.value, val ?? ""))}
             onKeyDown={handleCellKeyDown}
             data-row={rowIdx}
             data-col="codigoBarra"
-            // `w-32` son 112 px en esta escala y no alcanzan ni para un EAN-13,
-            // que pide 120. Nunca se notó porque el ancho no se aplicaba: el
-            // input se estiraba a la celda. El valor más largo que hay hoy en
-            // producción es "LIVRA POMELO 1.5 GAS" —alguien escribió un nombre en
-            // el campo del código— y necesita 176 px. Se dimensiona para el peor
-            // valor real, no para el que debería haber.
-            className="w-[176px]"
+            // 160 px, no 176. Los 176 estaban dimensionados para "LIVRA POMELO
+            // 1.5 GAS", 20 caracteres, que era el peor valor real cuando no había
+            // tope. Con el tope en 16 ya no puede entrar nada así.
+            //
+            // Medido con la sonda sobre el ancho de 16 caracteres: 16 dígitos
+            // piden 144 px, y el valor de 16 caracteres más ancho que existe hoy
+            // en producción —"ESCOBILLON CURVO", mayúsculas con espacio— pide
+            // 160. Se toma ese.
+            //
+            // Los 16 códigos viejos de más de 16 caracteres siguen guardados y se
+            // siguen viendo: los de 17 y 18 se leen enteros, y los tres de 20 se
+            // cortan en pantalla pero NO se tocan ni se pierden al guardar.
+            className="w-[160px]"
           />
         );
 

@@ -16,6 +16,11 @@ import {
 } from "@/lib/precios/precioDesdeMargen";
 import { redondear100 } from "@/lib/precios/redondeo";
 import {
+  MAX_CODIGO_BARRA,
+  alEscribirCodigoBarra,
+  paraMostrarCodigoBarra,
+} from "@/lib/productos/codigoBarra";
+import {
   REGLA_MARGEN,
   REGLA_RECARGO,
   precioDesdeRecargoUnidad,
@@ -656,7 +661,19 @@ export default function FormProducto({
             <Field label="Código barras" fieldKey="codigo_barra">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <SunmiInput value={form.codigo_barra} onChange={(e) => setField("codigo_barra", e.target.value)} />
+                  {/* `maxLength` frena el tecleo y recorta el pegado en el
+                      navegador. `alEscribirCodigoBarra` es la misma regla en
+                      JavaScript, y cubre lo que maxLength no ve: el dictado por
+                      voz y cualquier camino que escriba el estado sin pasar por
+                      el teclado. El valor se muestra SIN recortar, para no
+                      mutilar los códigos largos que ya están guardados. */}
+                  <SunmiInput
+                    value={paraMostrarCodigoBarra(form.codigo_barra)}
+                    maxLength={MAX_CODIGO_BARRA}
+                    onChange={(e) =>
+                      setField("codigo_barra", alEscribirCodigoBarra(e.target.value, form.codigo_barra))
+                    }
+                  />
                 </div>
                 {enableVoiceInputs && (
                   <VoiceFieldButton
@@ -664,7 +681,7 @@ export default function FormProducto({
                     label="Dictar código de barras"
                     onResult={(t) => {
                       const v = parseVoiceCodigoBarra(t);
-                      if (v) setField("codigo_barra", v);
+                      if (v) setField("codigo_barra", alEscribirCodigoBarra(v, form.codigo_barra));
                     }}
                   />
                 )}
@@ -673,8 +690,14 @@ export default function FormProducto({
 
             <Field label="Código barras secundario" fieldKey="codigo_barra_secundario">
               <SunmiInput
-                value={form.codigo_barra_secundario}
-                onChange={(e) => setField("codigo_barra_secundario", e.target.value)}
+                value={paraMostrarCodigoBarra(form.codigo_barra_secundario)}
+                maxLength={MAX_CODIGO_BARRA}
+                onChange={(e) =>
+                  setField(
+                    "codigo_barra_secundario",
+                    alEscribirCodigoBarra(e.target.value, form.codigo_barra_secundario)
+                  )
+                }
               />
               <p className="text-xs text-slate-500 mt-1">
                 Opcional. Identifica al mismo producto que el principal.
@@ -730,9 +753,15 @@ export default function FormProducto({
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
                     <SunmiInput
-                      value={form.codigo_barra_propio}
+                      value={paraMostrarCodigoBarra(form.codigo_barra_propio)}
                       placeholder="Agregar código propio"
-                      onChange={(e) => setField("codigo_barra_propio", e.target.value)}
+                      maxLength={MAX_CODIGO_BARRA}
+                      onChange={(e) =>
+                        setField(
+                          "codigo_barra_propio",
+                          alEscribirCodigoBarra(e.target.value, form.codigo_barra_propio)
+                        )
+                      }
                     />
                   </div>
                   {String(form.codigo_barra_propio || "").trim() !== "" && (

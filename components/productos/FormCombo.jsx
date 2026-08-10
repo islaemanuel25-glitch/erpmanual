@@ -9,6 +9,11 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import EditorComponentesCombo from "@/components/productos/EditorComponentesCombo";
 import { costoCombo, gananciaYMargen, round2 } from "@/lib/combos/costo";
 import {
+  MAX_CODIGO_BARRA,
+  alEscribirCodigoBarra,
+  paraMostrarCodigoBarra,
+} from "@/lib/productos/codigoBarra";
+import {
   precioPorMargen,
   disponibilidadPreview,
   validarComposicionUI,
@@ -143,11 +148,23 @@ export default function FormCombo({ mode = "crear", initial = null, localId, loc
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[11px] sunmi-label mb-1 block">Código (opcional)</label>
-              <SunmiInput value={codigoBarra} onChange={(e) => setCodigoBarra(e.target.value)} placeholder="—" />
+              <SunmiInput
+                value={paraMostrarCodigoBarra(codigoBarra)}
+                maxLength={MAX_CODIGO_BARRA}
+                onChange={(e) => setCodigoBarra(alEscribirCodigoBarra(e.target.value, codigoBarra))}
+                placeholder="—"
+              />
             </div>
             <div>
               <label className="text-[11px] sunmi-label mb-1 block">Cód. secundario</label>
-              <SunmiInput value={codigoBarraSecundario} onChange={(e) => setCodigoBarraSecundario(e.target.value)} placeholder="—" />
+              <SunmiInput
+                value={paraMostrarCodigoBarra(codigoBarraSecundario)}
+                maxLength={MAX_CODIGO_BARRA}
+                onChange={(e) =>
+                  setCodigoBarraSecundario(alEscribirCodigoBarra(e.target.value, codigoBarraSecundario))
+                }
+                placeholder="—"
+              />
             </div>
           </div>
         </div>

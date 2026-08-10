@@ -189,17 +189,19 @@ Quedan estas tres:
    pantalla y el dato quedó en la base. Reconectarlo toca la resolución de precio
    y es una tanda propia. Mientras tanto, la columna guarda valores que nadie lee.
 
-3. **¿El tope del código de barra es 14 o 16?** — **BLOQUEA UN CAMBIO YA
-   PREPARADO.** Se iba a poner un tope duro de 14 caracteres que frenara al
-   escribir, para que no vuelva a entrar un "LIVRA POMELO 1.5 GAS" en el campo del
-   código. Al medir contra producción aparecieron **tres códigos de 16 dígitos que
-   son GS1-128 legítimos** —el identificador `01` seguido de un GTIN-14, que es lo
-   que emite un lector al escanear una caja— y **dos de esos productos se venden**,
-   uno el mismo día de la medición. Un tope de 14 impediría volver a cargarlos.
+3. ~~**¿El tope del código de barra es 14 o 16?**~~ **RESUELTO 2026-08-10: 16.**
+   Los tres códigos de 16 dígitos son etiquetas de bulto GS1 —identificador `01`
+   más GTIN-14— y dos de esos productos se venden, así que 14 habría rechazado un
+   escaneo real. El tope frena al escribir y no al guardar, en los cinco campos
+   donde se carga un código, y **lo guardado no se toca**: verificado en la
+   pantalla real que un código de 20 caracteres se muestra entero, no crece al
+   teclearle encima y sí se puede acortar.
 
-   La pregunta es de negocio, no técnica: si el lector del local emite el código
-   con el identificador adelante, el tope tiene que ser 16. La medición completa,
-   los tres códigos y los 93 productos fuera de norma están en
+   Queda pendiente **una decisión distinta**, sobre los datos: qué hacer con los
+   93 productos fuera de norma que ya están. La medición del origen —47 nacieron
+   el día de la carga inicial, el goteo se apagó el 2026-07-10, dos tercios tienen
+   el nombre del producto en la columna del código, y **ninguno tiene otro código
+   en el campo secundario**— está en
    [../business-rules/codigos-de-barra.md](../business-rules/codigos-de-barra.md).
    **Ningún dato se tocó.**
 ---
