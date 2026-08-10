@@ -125,9 +125,9 @@ export default function ModalListaPrecio({
         if (margenOriginal !== margenNum) {
           diff.margenPorcentaje = margenNum;
         }
-        if (Boolean(lista?.esDefault) !== form.esDefault) {
-          diff.esDefault = form.esDefault;
-        }
+        // esDefault ya no se manda: el control se sacó de la pantalla y el valor
+        // que tenga la lista se conserva como está. Ver el comentario del bloque
+        // que estaba abajo del separador.
         if (Boolean(lista?.redondeo_100) !== form.redondeo_100) {
           diff.redondeo_100 = form.redondeo_100;
         }
@@ -153,7 +153,9 @@ export default function ModalListaPrecio({
           nombre: form.nombre.trim(),
           tipoBase: form.tipoBase,
           margenPorcentaje: margenNum,
-          esDefault: form.esDefault,
+          // Una lista nueva nace sin la marca: el control se sacó de la pantalla
+          // porque ningún camino de venta la lee. El endpoint sigue aceptando el
+          // campo, pero ya nadie se lo manda desde acá.
           redondeo_100: form.redondeo_100,
           notas: form.notas.trim() || null,
           localId: localIdFinal,
@@ -267,20 +269,17 @@ export default function ModalListaPrecio({
 
           <SunmiSeparator />
 
-          {/* TOGGLE DEFAULT */}
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] sunmi-label">Default del grupo</span>
-              <SunmiToggle
-                value={form.esDefault}
-                onChange={(v) => setForm((f) => ({ ...f, esDefault: v }))}
-              />
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Marca de referencia del grupo. No define la lista automática del depósito: eso se
-              configura en “Lista predeterminada del depósito”.
-            </p>
-          </div>
+          {/* El toggle "Default del grupo" se sacó de acá.
+              Escribía ListaPrecio.esDefault, que NINGÚN camino de venta lee: lo
+              dice el propio motor en lib/precios/resolverListaCliente.js:10.
+              Alguien lo marcaba, creía haber cambiado los precios de la
+              ubicación, y no había cambiado nada.
+              La lista que sí se aplica se elige en la tarjeta "Lista
+              predeterminada del depósito", que escribe
+              GrupoDeposito.listaPrecioDefaultId.
+              La columna NO se borró ni se migró: el dato queda por si algún día
+              se conecta. Reconectarlo toca la resolución de precio y es una
+              tanda propia — ver docs/roadmap/README.md. */}
 
           {/* TOGGLE REDONDEO */}
           <div className="flex items-center justify-between">

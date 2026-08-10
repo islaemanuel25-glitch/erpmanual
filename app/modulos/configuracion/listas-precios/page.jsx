@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Star, Eye, Power } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, Power } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
@@ -12,7 +12,6 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
-import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -137,38 +136,20 @@ export default function ListasPreciosPage() {
     setModalPreview({ open: false, lista: null });
   };
 
-  const marcarDefault = async (lista) => {
-    if (
-      !confirm(
-        `Marcar "${lista.nombre}" como default del grupo? La actual default perderá ese estado.`
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await fetch(
-        `/api/listas-precios/marcar-default/${lista.id}?localId=${localIdFinal}`,
-        {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      const data = await res.json();
-      if (!res.ok || !data?.ok) {
-        alert(data?.error || "Error al marcar como default");
-        return;
-      }
-      cargar();
-    } catch (e) {
-      console.error("Error marcar default:", e);
-      alert("Error al marcar como default");
-    }
-  };
+  // Acá vivía `marcarDefault`, que llamaba a /api/listas-precios/marcar-default.
+  //
+  // Escribía ListaPrecio.esDefault, un campo que NINGÚN camino de venta lee: lo
+  // declara el propio motor en lib/precios/resolverListaCliente.js:10. O sea que
+  // el botón desmarcaba la lista anterior, marcaba esta, mostraba una pill
+  // ámbar… y no cambiaba un solo precio. Quien lo apretaba se iba creyendo que
+  // había configurado algo.
+  //
+  // La lista que SÍ se aplica se elige en la tarjeta "Lista predeterminada del
+  // depósito" (arriba de esta tabla), que escribe GrupoDeposito.listaPrecioDefaultId.
+  //
+  // El endpoint y la columna quedan donde están, sin migración: el dato se
+  // conserva por si algún día se conecta. Reconectarlo toca la resolución de
+  // precio y es una tanda propia — ver docs/roadmap/README.md.
 
   const toggleActivo = async (lista) => {
     const accion = lista.activo ? "desactivar" : "activar";
@@ -268,13 +249,12 @@ export default function ListasPreciosPage() {
               "Tipo",
               "Margen",
               "Redondeo",
-              "Default",
               "Estado",
               "Acciones",
             ]}
           >
             {listas.length === 0 ? (
-              <SunmiTableEmpty message="No hay listas de precios" colSpan={7} />
+              <SunmiTableEmpty message="No hay listas de precios" colSpan={6} />
             ) : (
               listas.map((l) => {
                 const margenTxt =
@@ -286,18 +266,12 @@ export default function ListasPreciosPage() {
 
                 const redondeoTxt = l.redondeo_100 ? "✓ a 100" : "—";
 
-                const puedeMarcarDefault =
-                  puedeEditar && l.activo && !l.esDefault;
-
                 return (
                   <SunmiTableRow key={l.id}>
                     <td className="px-3 py-2">{l.nombre}</td>
                     <td className="px-3 py-2">{tipoLabel(l.tipoBase)}</td>
                     <td className="px-3 py-2">{margenTxt}</td>
                     <td className="px-3 py-2">{redondeoTxt}</td>
-                    <td className="px-3 py-2">
-                      {l.esDefault ? <SunmiPill color="amber">Default</SunmiPill> : "—"}
-                    </td>
                     <td className="px-3 py-2">
                       <SunmiBadgeEstado value={l.activo} />
                     </td>
@@ -316,15 +290,6 @@ export default function ListasPreciosPage() {
                             icon={Pencil}
                             color="amber"
                             onClick={() => abrirEditar(l)}
-                          />
-                        )}
-
-                        {/* Marcar default */}
-                        {puedeMarcarDefault && (
-                          <SunmiButtonIcon
-                            icon={Star}
-                            color="amber"
-                            onClick={() => marcarDefault(l)}
                           />
                         )}
 

@@ -1,9 +1,42 @@
 // app/api/stock_locales/ajustar/route.js
+//
+// ── EL AJUSTE MANUAL NO SE MUEVE SIN RASTRO ─────────────────────────────────
+//
+// EL CRITERIO, escrito para que no se vuelva a decidir al revés:
+//
+//   Si la fila de `AuditoriaStock` no se puede escribir, EL STOCK NO SE MUEVE.
+//   La escritura y su rastro van en la MISMA transacción, y sin `grupoId` la
+//   operación se rechaza con 409 en vez de escribir a ciegas.
+//
+// POR QUÉ ACÁ Y NO EN OTRO LADO. Todos los demás movimientos de stock tienen un
+// documento atrás que los explica: una transferencia tiene su remito, una venta
+// tiene su ticket, una recepción tiene su pedido. Si se pierde el rastro, el
+// movimiento igual se puede reconstruir desde el documento.
+//
+// El ajuste manual NO TIENE NINGUNO. Alguien entra, escribe un número y el stock
+// cambia. La fila de auditoría —quién, cuándo, de cuánto a cuánto y con qué
+// motivo— es la ÚNICA evidencia que queda de que eso pasó. Un ajuste sin rastro
+// es indistinguible de un faltante.
+//
+// QUÉ HABÍA ANTES. Las dos escrituras corrían fuera de transacción y con
+// `.catch(console.error)`: el stock cambiaba igual y el error se iba a un log
+// que nadie mira. En transferencias se había decidido lo contrario —sin poder
+// auditar, no hay devolución (`confirmar-recepcion/route.js:171-187`)— y nada
+// explicaba la diferencia. Eran dos criterios opuestos para el mismo hecho.
+//
+// EL COSTO DE ESTA DECISIÓN, para que esté a la vista: si la tabla de auditoría
+// falla, el ajuste de stock deja de funcionar. Es deliberado. Preferimos que se
+// note y se arregle antes que acumular movimientos sin autor.
+
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+
+const TEXTO_SIN_AUDITORIA =
+  "No se puede registrar el ajuste porque no se pudo determinar el grupo de la " +
+  "ubicación, y sin eso no queda rastro de quién lo hizo. El stock no se tocó.";
 
 export async function POST(req) {
   try {
@@ -184,14 +217,20 @@ export async function POST(req) {
 
       if (nuevoStock < 0 && !allowNegativeStock) nuevoStock = 0;
 
-      const actualizado = await prisma.stockLocal.update({
-        where: { localId_productoId: { localId, productoId: productoLocalId } },
-        data: { cantidad: nuevoStock },
-      });
+      // EL AJUSTE NO SE MUEVE SIN RASTRO. Ver el criterio al pie del archivo.
+      if (!grupoId) {
+        return NextResponse.json(
+          { ok: false, error: TEXTO_SIN_AUDITORIA },
+          { status: 409 }
+        );
+      }
 
-      // Auditoría
-      if (grupoId) {
-        await prisma.auditoriaStock.create({
+      const actualizado = await prisma.$transaction(async (tx) => {
+        const upd = await tx.stockLocal.update({
+          where: { localId_productoId: { localId, productoId: productoLocalId } },
+          data: { cantidad: nuevoStock },
+        });
+        await tx.auditoriaStock.create({
           data: {
             grupoId,
             localId,
@@ -207,8 +246,9 @@ export async function POST(req) {
             cantidadNueva: nuevoStock,
             motivo: motivo || null,
           },
-        }).catch((e) => console.error("Error auditoría stock:", e.message));
-      }
+        });
+        return upd;
+      });
 
       return NextResponse.json({
         ok: true,
@@ -230,17 +270,23 @@ export async function POST(req) {
       const minAnterior = Number(stock.stockMin || 0);
       const maxAnterior = Number(stock.stockMax || 0);
 
-      const actualizado = await prisma.stockLocal.update({
-        where: { localId_productoId: { localId, productoId: productoLocalId } },
-        data: {
-          stockMin: nuevoMin ?? stock.stockMin ?? 0,
-          stockMax: nuevoMax ?? stock.stockMax ?? 0,
-        },
-      });
+      // Mismo criterio que el ajuste: sin rastro no se escribe.
+      if (!grupoId) {
+        return NextResponse.json(
+          { ok: false, error: TEXTO_SIN_AUDITORIA },
+          { status: 409 }
+        );
+      }
 
-      // Auditoría
-      if (grupoId) {
-        await prisma.auditoriaStock.create({
+      const actualizado = await prisma.$transaction(async (tx) => {
+        const upd = await tx.stockLocal.update({
+          where: { localId_productoId: { localId, productoId: productoLocalId } },
+          data: {
+            stockMin: nuevoMin ?? stock.stockMin ?? 0,
+            stockMax: nuevoMax ?? stock.stockMax ?? 0,
+          },
+        });
+        await tx.auditoriaStock.create({
           data: {
             grupoId,
             localId,
@@ -248,13 +294,14 @@ export async function POST(req) {
             userId: session.id,
             accion: "LIMITES",
             stockMinAnterior: minAnterior,
-            stockMinNuevo: Number(actualizado.stockMin || 0),
+            stockMinNuevo: Number(upd.stockMin || 0),
             stockMaxAnterior: maxAnterior,
-            stockMaxNuevo: Number(actualizado.stockMax || 0),
+            stockMaxNuevo: Number(upd.stockMax || 0),
             motivo: motivo || null,
           },
-        }).catch((e) => console.error("Error auditoría stock:", e.message));
-      }
+        });
+        return upd;
+      });
 
       return NextResponse.json({
         ok: true,
