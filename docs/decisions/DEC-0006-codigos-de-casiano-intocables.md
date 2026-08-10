@@ -47,33 +47,21 @@ después como si hubiera sido parte de la decisión.
 Si el motivo hace falta para revisar esto más adelante, hay que preguntárselo,
 no reconstruirlo.
 
-## El recorte por ventas: 15 quedan afuera
+## Lo que esta decisión cuesta, y se acepta
 
-La decisión de propiedad —lo de Casiano no se toca— **no cubre el riesgo del
-mostrador**, y eso apareció al mirar los números.
+**Los 60 del depósito que se vacían tienen ventas. Los 60.** Tiene que ser así:
+los que nunca vendieron ya los vació la migración anterior, así que lo que queda
+es exactamente lo que se usa. Entre ellos `cremosocremac` con 204 ventas,
+`BARRATREMBLAY` con 203 y `xl` con 172, las tres del mismo día de la medición.
 
-Quién creó un producto no dice nada sobre quién teclea su código en la caja. El
-depósito creó "Hamburguesa Casera XL", y sus 172 ventas pasaron por un mostrador.
-El buscador del POS mira este campo, así que si alguien escribe `xl` para
-encontrarlo, vaciarlo le rompe el trabajo — sin importar quién dio de alta el
-producto.
+Se probó un recorte por ventas —dejar afuera los de más de 50— y **se descartó**:
+el criterio quedó siendo uno solo, quién creó el producto. No hay condición ni
+excepción por ventas.
 
-Por eso la migración lleva **una segunda condición que no es de propiedad sino de
-riesgo**: se vacían los que tienen **50 ventas o menos**. Los 15 que pasan de 50
-quedan afuera.
-
-**No es que sean intocables.** Es que ahí está concentrado el riesgo, y la
-respuesta no está en la base: no hay registro de búsquedas, así que qué se tipea
-para encontrar un producto solo lo sabe quien atiende. La lista de los 15 va al
-mostrador y la respuesta la trae Emanuel. Está anotada como pendiente en el
-roadmap.
-
-Nadie tiene exactamente 50 ventas, así que el corte no tiene borde ambiguo. El
-que más vende de los que sí se vacían tiene 48.
-
-El corte se evaluó **una vez**, con los números del 2026-08-10, y quedó
-congelado en la lista de ids de la migración. Si a alguno le suben las ventas
-entre hoy y el despliegue, igual se vacía: la lista es el contrato.
+Lo que sí queda es una ayuda operativa, no una regla: en el respaldo, los 15 que
+más venden están señalados arriba de todo con su `UPDATE` listo. Si alguien avisa
+que le falta un atajo, lo más probable es que sea uno de esos y se repone sin leer
+las sesenta líneas.
 
 ## Esto NO es un invariante del sistema
 
@@ -93,9 +81,7 @@ está, en vez de rellenarlo.
 ## Alcance real, medido
 
 - **61** productos con código de texto quedaban al momento de decidir.
-- **60** los creó el depósito.
-  - **45** tienen 50 ventas o menos → **se vacían**.
-  - **15** pasan de 50 → **quedan afuera**, esperando la consulta al mostrador.
+- **60** los creó el depósito → **se vacían**, sin mirar ventas.
 - **1** lo creó Casiano Casas: `pollo trozado` (id 2387, 34 ventas) → **no se
   toca**.
 - **0** sin creador. El campo está siempre cargado en los 2.578 productos del
@@ -103,8 +89,7 @@ está, en vez de rellenarlo.
 - Casiano creó **305 productos** en total: 247 sin ningún código, 57 con código
   de dígitos y ese 1 con texto. Cuando carga algo, lo normal es dejar el campo
   vacío.
-- Al terminar quedan **16** códigos de texto en la columna: los 15 en consulta
-  más el de Casiano.
+- Al terminar queda **1** solo código de texto en la columna: el de Casiano.
 
 ## Lo que esta decisión NO alcanza
 

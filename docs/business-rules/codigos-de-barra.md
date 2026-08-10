@@ -122,18 +122,17 @@ código no agrega nada.
 **ya aplicada en producción**. Criterio: cero ventas.
 [Respaldo](codigos-vaciados-2026-08-10.md).
 
-**45 por vaciar** con `20260810230000_vaciar_codigos_barra_del_deposito`, escrita
-y **sin aplicar**. Dos condiciones: los creó el depósito **y** tienen 50 ventas o
-menos. [Respaldo](codigos-vaciados-deposito-2026-08-10.md).
+**60 por vaciar** con `20260810230000_vaciar_codigos_barra_del_deposito`, escrita
+y **sin aplicar**. Criterio: los creó el depósito.
+[Respaldo](codigos-vaciados-deposito-2026-08-10.md), con los 15 más vendidos
+señalados arriba de todo para reponer uno rápido.
 
-**16 quedan con su código:**
+**1 queda con su código:** `pollo trozado` (id 2387, 34 ventas), el único creado
+por Casiano Casas, por
+[DEC-0006](../decisions/DEC-0006-codigos-de-casiano-intocables.md). Cuando la
+segunda migración se aplique va a ser el **único** producto con código de texto.
 
-- **15** del depósito con más de 50 ventas. **No se tocan hasta preguntar en el
-  mostrador** cuáles se tipean de verdad. Anotado como pendiente en el roadmap.
-- **1** de Casiano Casas: `pollo trozado` (id 2387), por
-  [DEC-0006](../decisions/DEC-0006-codigos-de-casiano-intocables.md).
-
-### Los cuatro criterios que se probaron, y el recorte que hizo falta
+### Los criterios que se probaron
 
 1. **"El código es el nombre o su comienzo."** Dejaba adentro `bica`, `chori`,
    `camel10`. Un atajo de tecleo también empieza igual que el nombre.
@@ -141,17 +140,37 @@ menos. [Respaldo](codigos-vaciados-deposito-2026-08-10.md).
    son cortos.
 3. **"Cero ventas."** Vació 29, pero por construcción dejó afuera todo lo que se
    usa.
-4. **"Quién creó el producto."** Resolvió la propiedad —lo de Casiano no se
-   toca— pero **no el riesgo**: quién dio de alta un producto no dice nada sobre
-   quién teclea su código en la caja. El depósito creó "Hamburguesa Casera XL" y
-   sus 172 ventas pasaron por un mostrador.
+4. **"Quién creó el producto."** El que quedó.
 
-Por eso la migración lleva **una segunda condición, de riesgo y no de**
-**propiedad**: 50 ventas o menos. Nadie tiene exactamente 50, así que el corte no
-tiene borde ambiguo; el que más vende de los que se vacían tiene 48.
+Se probó además un recorte por ventas sobre el cuarto —dejar afuera los de más
+de 50— y **se descartó**. El criterio es uno solo.
 
-## Los 45 que se vacían, ordenados por ventas
+### Lo que el criterio cuesta
 
+**Los 60 que se vacían tienen ventas. Los 60.** Tiene que ser así: los que nunca
+vendieron ya los vació la migración anterior, así que lo que queda es exactamente
+lo que se usa. Entre ellos `cremosocremac` con 204, `BARRATREMBLAY` con 203 y
+`xl` con 172, las tres del mismo día de la medición.
+
+Está aceptado en DEC-0006, y el respaldo permite reponer cualquiera.
+
+## Los 60 que se vacían, ordenados por ventas
+
+- **2086** · `cremosocremac` (13 car.) · Queso Cremoso Cremac · **204 ventas**, última 2026-08-10
+- **79** · `BARRATREMBLAY` (13 car.) · BARRA TREMBLAY · **203 ventas**, última 2026-08-10
+- **694** · `xl` (2 car.) · Hamburguesa Casera XL · **172 ventas**, última 2026-08-10
+- **1417** · `pancho24` (8 car.) · Pancho 24 Als · **164 ventas**, última 2026-08-10
+- **2083** · `paletasadia` (11 car.) · Paleta sadia · **115 ventas**, última 2026-08-10
+- **455** · `PETACACAFE` (10 car.) · DERNA PETACA CAFE AL COGNAC XCAJA · **86 ventas**, última 2026-08-10
+- **2099** · `mortadela` (9 car.) · Mortadela Paladini · **82 ventas**, última 2026-08-10
+- **691** · `maple` (5 car.) · Maple Huevos x30 · **81 ventas**, última 2026-08-10
+- **2098** · `paletafela` (10 car.) · Paleta Fela · **80 ventas**, última 2026-08-10
+- **2105** · `papas` (5 car.) · Papas Congeladas · **77 ventas**, última 2026-08-10
+- **1416** · `torpedo` (7 car.) · PAN TORPEDO  · **74 ventas**, última 2026-08-10
+- **2100** · `salamefela` (10 car.) · Salame Fela · **61 ventas**, última 2026-08-10
+- **2134** · `doververde` (10 car.) · Dover Verde · **60 ventas**, última 2026-08-10
+- **2023** · `361LATA` (7 car.) · 361 LATA X24 · **56 ventas**, última 2026-08-10
+- **2130** · `pancholargo` (11 car.) · Pan Super Pancho · **56 ventas**, última 2026-08-10
 - **552** · `picadofino` (10 car.) · Salamin Fox Picado Fino · **48 ventas**, última 2026-08-10
 - **1541** · `picadogrueso` (12 car.) · Salamin Fox Picado Grueso · **42 ventas**, última 2026-08-10
 - **2117** · `cascarablanca` (13 car.) · Queso Cascara Blanca CLP · **41 ventas**, última 2026-08-10
@@ -197,27 +216,6 @@ tiene borde ambiguo; el que más vende de los que se vacían tiene 48.
 - **2315** · `arrolladovaca` (13 car.) · Arrollado de Vaca · **1 ventas**, última 2026-06-08
 - **2397** · `caja bon o bon` (14 car.) · caja bon o bon · **1 ventas**, última 2026-07-10
 - **2398** · `bocadito fantoche` (17 car.) · bocadito fantoche · **1 ventas**, última 2026-07-10
-
-## Los 15 que esperan la consulta al mostrador
-
-Conservan su código. La pregunta —cuáles se tipean de verdad— no se responde con
-la base: no hay registro de búsquedas.
-
-- **2086** · `cremosocremac` (13 car.) · Queso Cremoso Cremac · **204 ventas**, última 2026-08-10
-- **79** · `BARRATREMBLAY` (13 car.) · BARRA TREMBLAY · **203 ventas**, última 2026-08-10
-- **694** · `xl` (2 car.) · Hamburguesa Casera XL · **172 ventas**, última 2026-08-10
-- **1417** · `pancho24` (8 car.) · Pancho 24 Als · **164 ventas**, última 2026-08-10
-- **2083** · `paletasadia` (11 car.) · Paleta sadia · **115 ventas**, última 2026-08-10
-- **455** · `PETACACAFE` (10 car.) · DERNA PETACA CAFE AL COGNAC XCAJA · **86 ventas**, última 2026-08-10
-- **2099** · `mortadela` (9 car.) · Mortadela Paladini · **82 ventas**, última 2026-08-10
-- **691** · `maple` (5 car.) · Maple Huevos x30 · **81 ventas**, última 2026-08-10
-- **2098** · `paletafela` (10 car.) · Paleta Fela · **80 ventas**, última 2026-08-10
-- **2105** · `papas` (5 car.) · Papas Congeladas · **77 ventas**, última 2026-08-10
-- **1416** · `torpedo` (7 car.) · PAN TORPEDO  · **74 ventas**, última 2026-08-10
-- **2100** · `salamefela` (10 car.) · Salame Fela · **61 ventas**, última 2026-08-10
-- **2134** · `doververde` (10 car.) · Dover Verde · **60 ventas**, última 2026-08-10
-- **2023** · `361LATA` (7 car.) · 361 LATA X24 · **56 ventas**, última 2026-08-10
-- **2130** · `pancholargo` (11 car.) · Pan Super Pancho · **56 ventas**, última 2026-08-10
 ## El tercer campo: el código de nivel ubicación
 
 `ProductoLocal.codigo_barra_propio` es un campo **distinto** de los dos del
@@ -238,4 +236,4 @@ El buscador del POS sí lo lee, junto con el primario y el secundario, pero
 ## Un caso aparte: `%` (id 2337)
 
 En "azucar impalpable velez 250gr". Lo creó el depósito y tiene 3 ventas, así
-que entra en los 45 que se vacían.
+que entra en los 60 que se vacían.

@@ -1,4 +1,4 @@
--- Vaciar el código de barra de 45 productos creados en el depósito cuyo código
+-- Vaciar el código de barra de 60 productos creados en el depósito cuyo código
 -- es texto y no un código de barras.
 --
 -- ── POR QUÉ ES OTRA MIGRACIÓN Y NO UNA EDICIÓN DE LA ANTERIOR ───────────────
@@ -7,36 +7,38 @@
 -- _prisma_migrations con su checksum. Editarla haría que `migrate deploy`
 -- falle. Una migración aplicada es historia: no se toca, se agrega otra.
 --
--- ── DOS CONDICIONES, Y CADA UNA CUBRE UN RIESGO DISTINTO ────────────────────
+-- ── EL CRITERIO ES QUIÉN CREÓ EL PRODUCTO, Y NADA MÁS ───────────────────────
 --
--- 1. Lo creó el DEPÓSITO. Decisión de negocio del 2026-08-10, en
---    docs/decisions/DEC-0006: el único local que crea y toca productos es
---    Casiano Casas y lo suyo no se toca. El creador no se deduce: está en
---    ProductoBase.creadoEnLocalId.
+-- Decisión de negocio del 2026-08-10, en docs/decisions/DEC-0006: el único
+-- local que crea y toca productos es Casiano Casas y lo suyo no se toca; el
+-- resto es del depósito y se vacía.
 --
--- 2. Tiene 50 ventas o menos. Este corte NO está en DEC-0006 como criterio de
---    propiedad: es un recorte por riesgo. Quién creó un producto no dice nada
---    sobre quién teclea su código en la caja — el depósito creó 'Hamburguesa
---    Casera XL' y sus 172 ventas pasaron por un mostrador, y el buscador del
---    POS mira este campo. Los 15 que pasan de 50 quedan afuera hasta que
---    alguien pregunte en el mostrador cuáles se tipean de verdad.
+-- El creador no se deduce: está guardado en ProductoBase.creadoEnLocalId.
+-- Medido sobre los 61 que quedaban con letras: 60 del depósito, 1 de Casiano
+-- Casas ('pollo trozado'), y NINGUNO sin creador.
 --
--- Nadie tiene exactamente 50 ventas, así que el corte no tiene borde ambiguo.
+-- Hubo un recorte por ventas —dejar afuera los de más de 50— que se probó y se
+-- descartó. No queda ni como condición ni como excepción: el criterio es uno
+-- solo. Los 15 que más venden están señalados aparte en el respaldo, para
+-- poder reponer uno rápido si alguien nota que le falta un atajo.
+--
+-- ⚠ ESTO NO MIRA LAS VENTAS, Y LOS 60 TIENEN. Los que nunca vendieron ya los
+-- vació 20260810210000, así que lo que queda es exactamente lo que se usa:
+-- 'xl' con 172 ventas, BARRATREMBLAY con 203, cremosocremac con 204, las tres
+-- del mismo día de la medición. Es una decisión tomada a sabiendas.
 --
 -- ── QUÉ QUEDA AFUERA ────────────────────────────────────────────────────────
 --
---   * Los 15 de más de 50 ventas, listados en el respaldo.
---   * 'pollo trozado' (id 2387), el único creado por Casiano Casas.
---   * Los tres códigos GS1 de 16 dígitos, que son legítimos.
+--   * 'pollo trozado' (id 2387), el único creado por Casiano Casas. Cuando esta
+--     migración se aplique va a ser el ÚNICO producto con código de texto.
+--   * Los tres códigos GS1 de 16 dígitos, que son etiquetas de bulto legítimas.
 --   * El código de nivel ubicación (ProductoLocal.codigo_barra_propio), que es
 --     otro campo, de otra tabla, y está VACÍO en las 11.651 filas de producción.
 --
 -- ── QUÉ SE VACÍA ───────────────────────────────────────────────────────────
 --
--- Solo estos 45 ids, con su código exacto escrito al lado. NO se recalcula el
--- criterio al aplicar: la lista es el contrato. Si a alguno de estos le suben
--- las ventas por encima de 50 entre hoy y el despliegue, igual se vacía; el
--- corte se evaluó una vez, con los números del 2026-08-10.
+-- Solo estos 60 ids, con su código exacto escrito al lado. NO se recalcula el
+-- criterio al aplicar: la lista es el contrato.
 --
 -- ── SE VACÍA A NULL, NO A CADENA VACÍA ──────────────────────────────────────
 --
@@ -52,19 +54,26 @@
 --
 -- ── REPONER ─────────────────────────────────────────────────────────────────
 --
--- docs/business-rules/codigos-vaciados-deposito-2026-08-10.md
+-- docs/business-rules/codigos-vaciados-deposito-2026-08-10.md, con los 15 más
+-- vendidos señalados arriba de todo.
 WITH objetivo (id, codigo_viejo, nombre) AS (
   VALUES
   (68, 'BENGALA', 'BENGALA X4'),
+  (79, 'BARRATREMBLAY', 'BARRA TREMBLAY'),
   (92, 'bica', 'Bicarbonato Paez'),
   (430, 'PAÑO AMARRILLO', 'PAÑO AMARILLO'),
   (448, 'pancho12', 'Pan Pancho Fucci'),
+  (455, 'PETACACAFE', 'DERNA PETACA CAFE AL COGNAC XCAJA'),
   (552, 'picadofino', 'Salamin Fox Picado Fino'),
   (586, 'TARRITOORINA', 'TARRITO ORINA'),
+  (691, 'maple', 'Maple Huevos x30'),
+  (694, 'xl', 'Hamburguesa Casera XL'),
   (763, 'chori', 'Chorigol Casero x Caja 30u'),
   (822, 'SURTIDO PRIME', 'PRIME PRESERVATIVO'),
   (857, 'albondiga', 'Albondigas Caseras x Caja'),
   (967, '7790O36048260', 'VINO UVITA BLANCO DULCE X12'),
+  (1416, 'torpedo', 'PAN TORPEDO '),
+  (1417, 'pancho24', 'Pancho 24 Als'),
   (1437, 'LOMO PAN', 'PAN ALS LOMO'),
   (1473, 'QUITAESMALTENEPTUS', 'QUITAESMALTE NEPTUS 60CM'),
   (1541, 'picadogrueso', 'Salamin Fox Picado Grueso'),
@@ -73,16 +82,25 @@ WITH objetivo (id, codigo_viejo, nombre) AS (
   (1885, 'fanta 237', 'fanta vidrio 237'),
   (1886, 'sprite237', 'Sprite Vidrio 237 '),
   (1951, 'solcabello', 'SOL PAMPEANO CABELLITO'),
+  (2023, '361LATA', '361 LATA X24'),
+  (2083, 'paletasadia', 'Paleta sadia'),
+  (2086, 'cremosocremac', 'Queso Cremoso Cremac'),
   (2088, 'salamefox', 'Salame Fox '),
   (2091, 'pachamama', 'Tabaco Pacha Mama'),
   (2092, 'panlomo', 'Pan Lomito'),
+  (2098, 'paletafela', 'Paleta Fela'),
+  (2099, 'mortadela', 'Mortadela Paladini'),
+  (2100, 'salamefela', 'Salame Fela'),
   (2101, 'cremosoverona', 'Queso Cremoso Verona'),
+  (2105, 'papas', 'Papas Congeladas'),
   (2117, 'cascarablanca', 'Queso Cascara Blanca CLP'),
   (2119, 'cascaranegra', 'Queso Cascara Negra CLP'),
   (2120, 'paletapala', 'Paleta Paladini'),
   (2124, 'mozzacremac', 'Mozzarella Cremac'),
   (2125, 'casera', 'Hamburguesa Casera'),
   (2126, 'salametro', 'Salametro'),
+  (2130, 'pancholargo', 'Pan Super Pancho'),
+  (2134, 'doververde', 'Dover Verde'),
   (2185, 'PRITTY', 'PRITTY 1L'),
   (2190, 'CARBONCHICO', 'CARBON CHICO'),
   (2191, 'CARBONGRANDE', 'CARBON  GRANDE'),
@@ -116,7 +134,7 @@ rastro AS (
          'Producto', v.id::text, v.nombre,
          jsonb_build_object(
            'autor', 'migracion 20260810230000_vaciar_codigos_barra_del_deposito',
-           'motivo', 'codigo de texto en producto del deposito, con 50 ventas o menos; los de mas ventas esperan la consulta al mostrador',
+           'motivo', 'codigo de texto en un producto creado en el deposito; los de Casiano Casas no se tocan',
            'codigo_barra', jsonb_build_object('antes', v.codigo_viejo, 'despues', NULL)
          )
   FROM vigentes v JOIN "ProductoBase" pb ON pb.id = v.id
