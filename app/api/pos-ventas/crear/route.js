@@ -17,6 +17,7 @@ import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
 import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta } from "@/lib/pos-ventas/pagos";
+import { verificarDescuentoPuntos, textoDescuentoPuntosInvalido } from "@/lib/pos-ventas/puntos";
 import {
   esModalidadServicio,
   validarImporteServicio,
@@ -479,7 +480,35 @@ export async function POST(req) {
     const baseElegibleDescuento = Math.round((subtotal - subtotalServicios + Number.EPSILON) * 100) / 100;
     const descuentoManual = Number(descuento) || 0;
     const descuentoAutomatico = baseElegibleDescuento * (descuentoAplicadoPct / 100);
-    const descuentoPorPuntosVal = Number(descuentoPorPuntosBody) || 0;
+
+    // El descuento por puntos LO CALCULA EL SERVIDOR. Era el único importe del
+    // cobro que entraba crudo del body: se validaba cuántos puntos se gastaban
+    // pero no cuánta plata valían, así que un canje de 1 punto podía descontar
+    // el subtotal entero. Manda el `pesoPorPunto` vigente ahora, no el que el
+    // navegador tenía cargado. Ver lib/pos-ventas/puntos.js.
+    let descuentoPorPuntosVal = 0;
+    if (puntosCanje > 0) {
+      const cfgPuntos = await prisma.puntosConfigLocal.findFirst({
+        where: { localId, activo: true },
+        select: { redencionJson: true },
+      });
+      const pesoPorPunto = cfgPuntos?.redencionJson?.pesoPorPunto || 0;
+
+      const chequeo = verificarDescuentoPuntos({
+        puntosCanje,
+        pesoPorPunto,
+        descuentoRecibido: descuentoPorPuntosBody,
+      });
+      if (!chequeo.ok) {
+        return NextResponse.json(
+          { ok: false, error: textoDescuentoPuntosInvalido(chequeo) },
+          { status: 400 }
+        );
+      }
+      // Se usa el del servidor, no el recibido, aunque hayan coincidido dentro
+      // de la tolerancia: el que vale es el calculado acá.
+      descuentoPorPuntosVal = chequeo.esperado;
+    }
     const descuentoTotal = descuentoAutomatico + descuentoManual + descuentoPorPuntosVal;
 
     // Ningún descuento (manual/automático/puntos) puede exceder la mercadería elegible:

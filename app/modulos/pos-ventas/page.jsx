@@ -41,6 +41,7 @@ import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
 import HistorialDia from "@/components/pos-ventas/HistorialDia";
 import AvisoVentaInterna from "@/components/pos-ventas/AvisoVentaInterna";
 import { ClipboardList, Printer, Undo2 } from "lucide-react";
+import { descuentoPorPuntos } from "@/lib/pos-ventas/puntos";
 
 export default function PosVentasPage() {
   const router = useRouter();
@@ -1942,9 +1943,11 @@ export default function PosVentasPage() {
           pesoPorPunto={puntosConfig?.redencionJson?.pesoPorPunto || 0}
           canjeActual={state.puntosCanje}
           onCanjear={(pts) => {
-            // Solo actualizar estado local, el canje se hará dentro de la transacción de venta
+            // Solo actualizar estado local, el canje se hará dentro de la transacción de venta.
+            // La fórmula es la MISMA que usa el servidor para verificar: si acá se
+            // calculara distinto, el cobro se rechazaría. Ver lib/pos-ventas/puntos.js.
             const pesoPorPunto = puntosConfig?.redencionJson?.pesoPorPunto || 0;
-            const descuentoCalc = pts * pesoPorPunto;
+            const descuentoCalc = descuentoPorPuntos(pts, pesoPorPunto);
             // Estimar saldo nuevo (sin confirmar, se validará en backend)
             const nuevoSaldo = Math.max(0, state.saldoPuntos - pts);
             dispatch({
