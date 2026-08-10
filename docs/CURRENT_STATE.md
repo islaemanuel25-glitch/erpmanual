@@ -10,22 +10,39 @@
 >
 > ## En producción
 >
-> **Commit desplegado:** `0f0bac616eee76281c6e0026337b94230fb294e5`
-> **Desplegado el:** 2026-08-10 15:33 (hora del VPS, UTC)
+> **Commit desplegado:** `a9b2e68b73b8634846f576c9bc9faaf46b035e10`
+> **Desplegado el:** 2026-08-10 18:05 (hora del VPS, UTC)
 >
 > Los cinco valores coinciden: `origin/main`, HEAD del VPS, tag de la imagen,
 > `APP_BUILD_ID` y `/api/version`. Sin migraciones —el clasificador informó cero
-> sobre el HEAD desplegado— y con corte de **8,7 segundos** hasta que el endpoint
-> volvió a responder.
+> sobre el HEAD desplegado, y `migrate deploy` confirmó "No pending migrations"
+> sobre las 81 existentes—. El contenedor arrancó en 497 ms y el primer sondeo,
+> a los 5 segundos de recrear, ya respondía; **el corte no se midió con la
+> precisión de la vez anterior**, solo se acotó por debajo de esos 5 segundos.
 >
-> Este despliegue llevó las cuatro tandas de compras-proveedor —los candados del
-> costo y del dinero, el principio de que los datos del producto se editan en
-> editar producto, el aviso de costo distinto y su contador— más el registro del
-> despliegue anterior.
+> Este despliegue llevó un solo cambio: la pantalla de nuevo pedido de
+> compras-proveedor se puede usar en el teléfono. Es frontend puro —dos archivos
+> de pantalla y dos de documentación—, sin tocar cálculos, permisos ni rutas.
 >
 > **Referencia de rollback de esta versión** (la imagen que corría ANTES):
-> `ghcr.io/islaemanuel25-glitch/erpmanual:933294e2ce5b498f108103cb01d6fb3f75f5f44a`,
-> image ID `sha256:40c287c68ba755281e9a69125beadc0c38faae931148ca0d65e57b324a7703e5`.
+> `ghcr.io/islaemanuel25-glitch/erpmanual:0f0bac616eee76281c6e0026337b94230fb294e5`,
+> digest `sha256:0ff93c8306773912dd7ba6ec9c4784f91611486625840df65721b0364bd2b951`,
+> image ID `sha256:59c7a24ef18e07ae93a76a4e49675a7ccb39d15a8f81fa198298d652dfbb88d4`.
+>
+> Backup previo validado con los cuatro chequeos:
+> `/srv/produccion/backups/pre-a9b2e68_20260810_175929.sql.gz` (1.928.633 bytes,
+> 56 tablas).
+>
+> **Lo que no cerró:** el árbol del VPS tiene **21 archivos sin trackear**
+> —`.env.bak-*` y `.env.rollback-*` que dejaron despliegues anteriores, uno de
+> ellos el de hoy—. Los archivos trackeados están limpios. La verificación de
+> cierre pide `git status --porcelain` vacío y no lo está; es previo y acumulado,
+> no lo introdujo este despliegue.
+>
+> **Lo que no se pudo verificar:** que la pantalla se vea bien en producción. Sin
+> sesión, `/modulos/compras-proveedor/nueva` devuelve 200 y sirve el armazón, pero
+> el contenido lo dibuja el cliente después de autenticarse. Las capturas que
+> respaldan el cambio son de la máquina de desarrollo, no de producción.
 >
 > **Ojo:** el commit desplegado es POSTERIOR al del relevamiento. Lo que dice este
 > documento sobre deuda y contradicciones vale para el commit del encabezado, con
