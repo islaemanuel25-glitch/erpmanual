@@ -123,6 +123,16 @@ Ordenada por lo que puede doler. La evidencia completa está en
     poder revertir uno sin el otro. El arreglo es el mismo y `componerClaseInput`
     ya está escrito y probado.
 
+21. **Una cantidad sugerida de transferencia se muestra como flotante crudo.**
+    En `/modulos/pos-transferencias/nueva` hay una fila cuyo input de cantidad
+    trae `0.16000000000000014` —19 caracteres— en vez de `0.16`. Es el residuo
+    clásico de una resta en punto flotante, no un dato cargado por nadie.
+
+    Se vio al capturar la pantalla con datos reales el 2026-08-10. **A 360 px ya
+    se cortaba antes del arreglo de anchos**; en escritorio no, porque el input
+    estirado medía unos 150 px y ahora mide 76. Ningún ancho razonable entra 19
+    caracteres: lo que hay que arreglar es el redondeo del sugerido, no la caja.
+
 20. **Dos importaciones muertas de `SunmiInput`**, sin consecuencia:
     `app/modulos/auditoria-pos-ventas/turnos/page.jsx` y
     `app/modulos/proveedores/listas/nueva/page.jsx` lo importan y no lo usan.
@@ -170,7 +180,7 @@ puntos lo recalcula el servidor, la auditoría del ajuste pasó a bloqueante, el
 historial del cliente excluye las internas por defecto y las dos funciones de
 redondeo se unificaron en una.
 
-Quedan estas dos:
+Quedan estas tres:
 
 1. **¿`clientes/listar` y `clientes/buscar` deberían exigir permiso?** — **YA SE
    RESOLVIÓ**: exigen `clientes.ver` **o** `pos.usar`. Se deja anotado porque la
@@ -179,6 +189,19 @@ Quedan estas dos:
    pantalla y el dato quedó en la base. Reconectarlo toca la resolución de precio
    y es una tanda propia. Mientras tanto, la columna guarda valores que nadie lee.
 
+3. **¿El tope del código de barra es 14 o 16?** — **BLOQUEA UN CAMBIO YA
+   PREPARADO.** Se iba a poner un tope duro de 14 caracteres que frenara al
+   escribir, para que no vuelva a entrar un "LIVRA POMELO 1.5 GAS" en el campo del
+   código. Al medir contra producción aparecieron **tres códigos de 16 dígitos que
+   son GS1-128 legítimos** —el identificador `01` seguido de un GTIN-14, que es lo
+   que emite un lector al escanear una caja— y **dos de esos productos se venden**,
+   uno el mismo día de la medición. Un tope de 14 impediría volver a cargarlos.
+
+   La pregunta es de negocio, no técnica: si el lector del local emite el código
+   con el identificador adelante, el tope tiene que ser 16. La medición completa,
+   los tres códigos y los 93 productos fuera de norma están en
+   [../business-rules/codigos-de-barra.md](../business-rules/codigos-de-barra.md).
+   **Ningún dato se tocó.**
 ---
 
 ## Qué documentar en la próxima tanda
