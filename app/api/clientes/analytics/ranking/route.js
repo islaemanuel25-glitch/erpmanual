@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { checkPerm, PERMISOS_LEER_CLIENTES } from "@/lib/authorize";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 
@@ -11,6 +12,14 @@ export async function GET(req) {
         { ok: false, error: scope.error },
         { status: scope.status }
       );
+    }
+
+    // La agenda de clientes NO es pública: hasta acá alcanzaba con estar
+    // autenticado y cualquier usuario veía los clientes del grupo entero.
+    // Alcanza con UNO de los dos permisos, porque son dos caminos legítimos.
+    const permiso = checkPerm(scope.session, PERMISOS_LEER_CLIENTES);
+    if (!permiso.ok) {
+      return NextResponse.json({ ok: false, error: permiso.error }, { status: permiso.status });
     }
 
     const { grupoId, localId } = scope;

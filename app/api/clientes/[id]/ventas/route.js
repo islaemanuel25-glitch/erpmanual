@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm, PERMISOS_LEER_CLIENTES } from "@/lib/authorize";
+import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 
 export async function GET(req, context) {
   try {
@@ -11,6 +13,12 @@ export async function GET(req, context) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    // La agenda de clientes NO es pública. Alcanza con UNO de los dos permisos.
+    const permiso = checkPerm(session, PERMISOS_LEER_CLIENTES);
+    if (!permiso.ok) {
+      return NextResponse.json({ ok: false, error: permiso.error }, { status: permiso.status });
     }
 
     const { id } = await context.params;
@@ -56,8 +64,23 @@ export async function GET(req, context) {
       );
     }
 
-    // Ventas paginadas
-    const where = { clienteId, localId };
+    // Ventas paginadas.
+    //
+    // LAS VENTAS INTERNAS QUEDAN AFUERA POR DEFECTO. Un cliente puede estar
+    // vinculado a un local interno (`Cliente.localVinculadoId`), y entonces las
+    // transferencias que se registraron como venta aparecían mezcladas con sus
+    // compras reales, inflando su historial con movimientos que no compró nadie.
+    //
+    // El mismo criterio que ya usaban reportes de ventas, analytics y los totales
+    // de turno: `whereVentaComercial` se traduce en `transferencia: { is: null }`.
+    // La excepción declarada es `auditoria-pos-ventas`, que es la vista técnica.
+    //
+    // Verlas es una decisión explícita, nunca la mezcla por defecto: se prende
+    // con `?incluirInternas=1`.
+    const incluirInternas = searchParams.get("incluirInternas") === "1";
+    const where = incluirInternas
+      ? { clienteId, localId }
+      : whereVentaComercial({ clienteId, localId });
     if (cursor) where.id = { lt: cursor };
 
     const rows = await prisma.venta.findMany({
