@@ -154,10 +154,12 @@ backups/
 # Windows NUL artifact
 nul
 
-# Claude Code locales (versionamos .claude/agents/ y .claude/skills/)
+# Claude Code locales (versionamos agents/, skills/ y settings.json — NO
+# settings.local.json, que es la lista de permisos de cada máquina)
 .claude/*
 !.claude/agents/
 !.claude/skills/
+!.claude/settings.json
 
 # Instalador de impresion (binario grande, se genera con build-installer.bat)
 public/downloads/*.exe

@@ -14,16 +14,32 @@ la conclusión que se apoya en él viaja como si estuviera verificada.
 **Con qué se enumeró es parte de la afirmación.** "Son 54 scripts" sin decir cómo
 se contaron no es un dato: es una impresión con formato de dato.
 
-## Estado de Git de este repo, ahora
+## Estado de Git de este repo
 
 Esto se calcula **antes** del fork y llega ya resuelto. Adentro no hay Bash: no
 se puede correr `git`, ni `git ls-files`, ni `git grep`. Estos números son la
-única foto de Git disponible, y son de este instante.
+única foto de Git disponible.
+
+**Medido el !`date +"%Y-%m-%d %H:%M"`** (hora local de la máquina).
+
+La marca de tiempo no es decoración: es una foto, no un valor vivo. Si el
+relevamiento se extiende, o si en el medio se crean o borran archivos, estos
+números envejecen y hay que volver a invocar la skill. **Al citar cualquiera de
+estos conteos en un informe, va con su fecha y hora.**
 
 - Archivos **trackeados**: !`git ls-files | wc -l`
 - **Untracked no ignorados** (los que `git status` muestra con `??`): !`git status --porcelain | grep -c "^??"`
-- Entradas **ignoradas** presentes en disco, con los directorios colapsados: !`git status --porcelain --ignored | grep -c "^!!"`
-- Lo mismo contado archivo por archivo dentro de esas entradas: !`git status --porcelain --ignored=matching | grep -c "^!!"`
+- **Entradas ignoradas** presentes en disco, con los directorios colapsados
+  (`--ignored`, modo `traditional`): !`git status --porcelain --ignored | grep -c "^!!"`
+- **Archivos ignorados expandidos** dentro de esas entradas
+  (`--ignored=matching`): !`git status --porcelain --ignored=matching | grep -c "^!!"`
+
+Los dos últimos son **dos números distintos que contestan dos preguntas
+distintas**, y ninguno es "el" número de ignorados. El primero cuenta entradas
+—`node_modules/` vale 1—; el segundo expande dentro de ellas. **Nunca fusionarlos
+en uno solo:** al citarlos hay que decir cuál se usó. Y ojo, ninguno de los dos
+recorre en profundidad los directorios untracked: para eso haría falta `-uall`,
+que acá no se corre porque tardaría muchísimo en `node_modules`.
 
 Las entradas ignoradas, una por línea:
 
@@ -86,11 +102,9 @@ ignorado. Que dos métodos coincidan una vez no los vuelve intercambiables.
 
 ## Contar ignorados: el modo cambia el número
 
-`git status --ignored` **colapsa directorios enteros en una sola entrada**
-(`node_modules/` cuenta como 1). Con `--ignored=matching` los expande. En este
-repo eso es la diferencia entre los dos números de arriba, y **ninguno de los
-dos está mal**: contestan preguntas distintas. Decir cuál se usó es parte del
-número.
+Los dos modos están arriba, contados y nombrados por separado a propósito.
+**Ninguno de los dos está mal y ninguno reemplaza al otro.** Decir cuál se usó es
+parte del número, igual que decir con qué herramienta se enumeró.
 
 ## El caso que originó la regla
 

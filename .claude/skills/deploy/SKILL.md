@@ -2,7 +2,7 @@
 name: deploy
 description: Despliegue a producción por GHCR — backup validado, referencia de rollback, pull, migración en contenedor descartable, recrear solo app y verificación de cierre.
 disable-model-invocation: true
-allowed-tools: Bash, Read, Grep
+allowed-tools: Bash, Read, Grep, Glob
 ---
 
 # Desplegar a producción
@@ -88,9 +88,10 @@ digest, `linux/amd64`, `APP_BUILD_ID` y el label
 Cuatro comandos, en este orden. Cada uno con `-T` o `</dev/null` si viaja por
 heredoc de ssh (ver trampas).
 
-**Entre el segundo y el tercero va el chequeo de migraciones**, que está más
-abajo y puede frenar el deploy. No se saltea aunque el despliegue "no traiga
-migraciones": eso es justamente lo que el chequeo comprueba.
+**Entre el segundo y el tercero va `node scripts/clasificar-migraciones.mjs
+--vps`**, que puede frenar el deploy. No se saltea aunque el despliegue "no
+traiga migraciones": eso es justamente lo que el chequeo comprueba. Si igual se
+lo saltea, la guardia lo intercepta en el tercer comando.
 
 ```bash
 ssh vps-erp 'cd /srv/produccion/erpazul && git merge --ff-only origin/main'
@@ -132,34 +133,81 @@ justamente porque la costumbre **no** era la que se creía.
 
 ### El chequeo que frena el deploy — antes de migrar
 
-Una regla que solo vive en un documento se viola en silencio la primera vez.
-Antes del `migrate deploy`, clasificar lo que este despliegue introduce:
+Una regla que solo vive en un documento se viola en silencio la primera vez. Es
+un script versionado, con sus candados:
 
 ```bash
-SHA_VPS="$(ssh vps-erp 'cd /srv/produccion/erpazul && git rev-parse HEAD')"
-git diff --name-only "$SHA_VPS"..HEAD -- prisma/migrations | grep 'migration.sql$' | while read -r f; do
-  if grep -q -iE 'DROP (COLUMN|TABLE|CONSTRAINT|INDEX|TYPE)|RENAME (COLUMN|TO)|SET NOT NULL|ALTER COLUMN .* TYPE|TRUNCATE|DELETE FROM|^UPDATE ' "$f"; then
-    echo "NO ADITIVA: $f"; else echo "aditiva:    $f"; fi
-done
+node scripts/clasificar-migraciones.mjs --vps
 ```
 
-El rango se saca del HEAD del VPS, no de `migrate status`: son exactamente las
-migraciones que este despliegue introduce sobre lo que hoy corre.
+Pide el HEAD desplegado al VPS por ssh y clasifica exactamente lo que este árbol
+introduce por encima. El rango sale del HEAD del VPS y no de `migrate status`:
+son las migraciones que este despliegue mete sobre lo que hoy corre.
 
-**Si aparece una sola línea `NO ADITIVA`, el deploy se frena acá.** No se
-continúa por criterio propio: se le informa a Emanuel qué migración es, qué
-sentencia la marcó y por qué rompería a la versión que está atendiendo, y se
-espera confirmación explícita. Puede ser un falso positivo —un `DROP INDEX IF
-EXISTS` sobre un índice que ya no usa nadie lo es— y confirmarlo es de él, no del
-que está desplegando.
+Códigos de salida: **0** no encontró nada, **1** marcó al menos una y el
+despliegue se frena, **2** no pudo determinar el rango. Falla cerrado: si el ssh
+no llega, si el SHA no existe o si el directorio de migraciones no está donde lo
+espera, sale con 2. **Nunca pasa por no haber podido mirar.**
 
-**El clasificador es por patrón de texto y no es confiable.** No entiende
-contexto: no distingue un `DROP COLUMN` de una columna muerta de uno de una
-columna en uso, no lee `UPDATE` dentro de un bloque `DO $$`, y no ve una
-migración incompatible que no use ninguna de estas palabras —un `CREATE UNIQUE
-INDEX` sobre datos con duplicados, por ejemplo, falla y no aparece acá—. Sirve
-para frenar, no para autorizar. **Que dé todo "aditiva" no es un permiso**: si
-hay cualquier duda sobre una migración, se frena igual y se pregunta.
+**Un 0 no es una autorización.** El propio script lo imprime al salir bien, para
+que no haya que venir a leer esto para enterarse. El análisis es textual: busca
+palabras conocidas y nada más.
+
+Si sale con 1: **no se continúa por criterio propio.** Se le informa a Emanuel
+qué migración es, qué sentencia la marcó y por qué rompería a la versión que está
+atendiendo, y se espera confirmación explícita. Puede ser un falso positivo —un
+`DROP INDEX IF EXISTS` sobre un índice muerto lo es, y una migración de datos
+idempotente que rellena nulos también— y confirmarlo es de él, no del que está
+desplegando.
+
+### La guardia automática, y por dónde se saltea
+
+El chequeo no depende de que alguien se acuerde de correrlo. Hay un hook
+`PreToolUse` registrado en `.claude/settings.json` que intercepta cualquier
+comando Bash con `migrate deploy`, corre el clasificador y **deniega** si no sale
+con 0. Autorizar a mano es explícito y visible en la línea:
+`DEPLOY_MIGRACION_AUTORIZADA=1` adelante del comando, misma idea que
+`SEED_DESTRUCTIVO`.
+
+**Esa guardia NO hace obligatorio el chequeo.** Cubre un solo camino. Estos
+llegan a producción sin pasar por ella:
+
+1. **Una terminal cualquiera fuera de Claude Code.** `ssh vps-erp` y el comando a
+   mano desde PowerShell, Git Bash o el editor: el hook ni se entera.
+2. **Un `docker compose` tipeado dentro del VPS.** Es otra máquina; nada de esto
+   existe ahí.
+3. **`DEPLOY_MIGRACION_AUTORIZADA=1`**, que es la puerta prevista y por eso deja
+   rastro en la línea de comandos.
+4. **Otra sesión de Claude Code fuera de este repo**, o con `--settings` propio:
+   el hook es de proyecto y se resuelve por directorio.
+5. **`prisma migrate deploy` escrito de otra forma** — un script intermedio, un
+   alias, un `Makefile` que lo envuelva. La guardia hace match sobre el texto del
+   comando, así que un envoltorio la esquiva sin querer.
+6. **GitHub Actions.** Hoy solo construye la imagen y no migra, pero si algún día
+   migrara, el hook no corre ahí. Ese es el único lugar que obligaría de verdad,
+   y está fuera del alcance de lo local.
+7. **La consola del proveedor o cualquier cliente SQL** contra la base.
+
+En resumen: la guardia atrapa el camino que se usa todos los días —desplegar
+desde una sesión de Claude Code en este repo— y **ninguno de los otros**. Es el
+mecanismo local más fuerte disponible, no una garantía. Lo que hace obligatorio
+un chequeo es que corra del lado del servidor, y eso todavía no existe.
+
+### Los límites del clasificador
+
+- **Es análisis de texto, no un parser SQL**, y no lo va a ser. No distingue un
+  `DROP COLUMN` de una columna muerta de uno de una columna en uso.
+- **No lee adentro de bloques dinámicos.** Un `DO $$ ... $$` o un `EXECUTE` con
+  la sentencia armada como string le pasan por al lado.
+- **No detecta incompatibilidades semánticas sin palabras conocidas.** Un
+  `CREATE UNIQUE INDEX` sobre datos que ya tienen duplicados falla al aplicarse y
+  no aparece acá. Una migración que agrega una columna que el código viejo no
+  espera pero que cambia el comportamiento de un trigger, tampoco.
+- **Marca de más.** Todo `UPDATE` queda marcado, incluidos los backfills
+  idempotentes que rellenan nulos. Es a propósito: preferimos frenar de más.
+- Los candados están en `scripts/clasificar-migraciones.test.mjs`, con dos
+  fixtures en `tests/migraciones/` —una aditiva y una destructiva— que no se
+  aplican nunca y existen para que el clasificador se pueda romper solo.
 
 ## Paso 5 — Verificación de cierre
 
