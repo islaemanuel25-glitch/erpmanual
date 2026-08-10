@@ -81,34 +81,53 @@ Ordenada por lo que puede doler. La evidencia completa está en
 17. ~~**La auditoría del ajuste de stock es best-effort.**~~ **RESUELTO
     2026-08-10** — stock y auditoría van en la misma transacción, con el criterio
     escrito en el encabezado del archivo.
-18. **`SunmiInput` ignora en silencio el ancho que le pasan.** El componente aplica
-    `w-full` sobre el `className` recibido (`components/sunmi/SunmiInput.jsx:10`),
-    así que cualquier `w-[Npx]` que llegue por ahí no tiene ningún efecto: el input
-    se estira al ancho del contenedor. **Medido:** 75 de 77 inputs de la pantalla
-    de nuevo pedido tenían `width: 100%`.
+18. ~~**`SunmiInput` ignora en silencio el ancho que le pasan.**~~ **RESUELTO
+    2026-08-10.** El componente aplicaba `w-full` siempre; `w-full` y `w-[46px]`
+    empatan en especificidad, así que decidía el orden de la hoja de estilos y
+    ganaba `w-full`. Medido antes del arreglo: 75 de 77 inputs de una pantalla
+    tenían `width: 100%`.
 
-    Nadie lo nota en escritorio, porque la celda de la tabla ya acota el ancho.
-    Aparece en mobile, donde el input se come la fila y empuja el resto fuera de la
-    vista — así se rompieron la fila del listado y las dos del carrito.
+    Ahora `w-full` lo pone `componerClaseInput` (`lib/sunmi/claseAncho.js`) SOLO
+    cuando quien usa el componente no declaró un ancho propio, con dos exclusiones
+    deliberadas: `min-w-`/`max-w-` no son un ancho, y un ancho con variante
+    —`sm:w-40`— tampoco alcanza, porque dejaría al input sin ancho por debajo del
+    breakpoint. Nueve candados en `lib/sunmi/claseAncho.test.mjs`, verificados
+    rompiendo el arreglo de cinco formas distintas.
 
-    **Parches locales puestos hasta hoy: 3**, todos del 2026-08-10 y todos de la
-    misma forma —envolver el input en un `div` con el ancho— en
-    `app/modulos/compras-proveedor/nueva/page.jsx` (stepper de cantidad) y
-    `components/compras-proveedor/CarritoPedido.jsx` (cantidad y costo).
+    **Los tres parches locales se retiraron** en el mismo commit, ahora que la
+    causa está resuelta: el stepper de `compras-proveedor/nueva` y los dos inputs
+    de `CarritoPedido` vuelven a llevar el ancho en su propio `className`. Las
+    capturas del carrito quedaron byte a byte idénticas.
 
-    **Sitios que siguen pidiendo un ancho que no se aplica: 15, en 5 archivos**
-    —`compras-proveedor/[id]` (6), `pos-transferencias/nueva/TablaSugeridos` (3),
-    `reportes-ventas/EditorVentaCorreccion` (3), `reportes-ventas/LineaEditableCard`
-    (2), `pos-transferencias/nueva/PreparadosTable` (1)—. Enumerado recorriendo los
-    298 `.jsx` de `git ls-files "*.jsx"` y buscando `w-[Npx]` dentro de cada
-    elemento `<SunmiInput …/>`. **El conteo es un piso, no un total:** solo cuenta
-    los anchos escritos como literal. `costoInput` en `nueva/page.jsx:1446` pasa el
-    suyo por variable (`w = "w-[80px]"`) y ninguna búsqueda por literal lo
-    encuentra.
+    **Alcance real: 28 sitios que cambian, sobre 225 usos de `SunmiInput`** —los
+    otros 193 no piden ancho y conservan `w-full` sin cambio—. Enumerado dos
+    veces por métodos distintos: recortando cada elemento `<SunmiInput …/>` de los
+    298 `.jsx` de `git ls-files` y extrayendo su `className`, y una pasada
+    independiente del auditor. Los dos dieron 225 usos, 32 con clase de ancho, 28
+    reales y 4 que ya pedían `w-full`.
 
-    El arreglo de fondo es hacer que `w-full` ceda ante un ancho explícito, y toca
-    **toda** la aplicación de una sola vez: por eso va como tanda propia y con
-    capturas, no colgado de un cambio de pantalla.
+    Nueve de esos 28 no entraban con el ancho que pedían, medido contra el peor
+    valor real de **producción**: los seis de transferencias (46 px para
+    `"4380.005"`, el stock más largo), el código de barra y el SKU de edición
+    rápida, y la cantidad del carrito del POS en modo compacto.
+
+19. **`SunmiSelectAdv` tiene exactamente el mismo bug.**
+    `components/sunmi/SunmiSelectAdv.jsx:195` aplica `w-full` sobre el `className`
+    recibido, igual que hacía `SunmiInput`. Hay **3 sitios** pidiendo un ancho que
+    hoy no se aplica, los tres en `components/pos-transferencias/nueva/TablaSugeridos.jsx`:
+    línea 55 (`w-[85px]`, cuántas filas mostrar), 118 (`w-[140px]`, filtro de
+    categoría) y 140 (`w-[140px]`, filtro de área).
+
+    Lo encontró el auditor relevando el arreglo de `SunmiInput`; **no se tocó**, a
+    propósito: es otro componente y merece su propia tanda con sus capturas, para
+    poder revertir uno sin el otro. El arreglo es el mismo y `componerClaseInput`
+    ya está escrito y probado.
+
+20. **Dos importaciones muertas de `SunmiInput`**, sin consecuencia:
+    `app/modulos/auditoria-pos-ventas/turnos/page.jsx` y
+    `app/modulos/proveedores/listas/nueva/page.jsx` lo importan y no lo usan.
+    Sale de comparar los 89 archivos que importan contra los 87 que tienen
+    `<SunmiInput`.
 
 ---
 

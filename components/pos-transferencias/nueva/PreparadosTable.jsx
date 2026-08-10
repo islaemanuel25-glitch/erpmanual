@@ -310,7 +310,16 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
     : Number(p.sugerido || 0);
   const roturaUds = Math.max(0, pedidoUds - totalUdsDisplay);
 
-  const inputCls = "w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+  // 76 px, no 46. Los 46 estaban escritos desde siempre pero no se aplicaban:
+  // SunmiInput los tapaba con `w-full` y el input se estiraba a la celda. Desde
+  // que el ancho pedido se respeta, 46 px dejan 30 útiles y ahí no entra una
+  // cantidad de cuatro cifras con decimales.
+  //
+  // Medido contra producción: el techo de lo que se puede transferir es el stock,
+  // y el stock más largo es "4380.005" —9 caracteres—, que necesita 76 px. Con 46
+  // se habría cortado sin avisar, en el campo donde se decide cuánta mercadería
+  // sale del depósito.
+  const inputCls = "w-[76px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
   return (
     <tr
@@ -434,7 +443,13 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
                     onFocus={() => setIsEditing(true)}
                     onBlur={flush}
                     onChange={(e) => handleChange(e.target.value)}
-                    className={"w-[52px] " + inputCls}
+                    // Antes decía `"w-[52px] " + inputCls`, y como inputCls ya
+                    // traía su propio ancho quedaban DOS clases de ancho en el
+                    // mismo input. Empatan en especificidad, así que ganaba la
+                    // que Tailwind hubiera puesto última en la hoja: una moneda
+                    // al aire. Daba igual mientras ningún ancho se aplicaba;
+                    // ahora que se aplican, se deja uno solo.
+                    className={inputCls}
                     disabled={bloqueado}
                   />
                   {!bloqueado && (

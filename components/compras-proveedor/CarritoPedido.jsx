@@ -154,25 +154,21 @@ export default function CarritoPedido({
             >
               −
             </button>
-            {/* El ancho lo pone el CONTENEDOR: SunmiInput aplica `w-full` y esa
-                clase le gana a cualquier `w-[Npx]` del className. Sin esto el
-                input se estiraba y empujaba el subtotal fuera de la vista.
-                Es un parche local; el arreglo de fondo está anotado en el
-                roadmap. */}
             {/* 50 px con `!px-1` deja 42 útiles: entran cinco cifras. Con el
                 padding de fábrica quedaban 32 y "18700" ya se cortaba, y una
-                cantidad en unidades llega ahí sin esfuerzo. */}
-            <div className="w-[50px] shrink-0">
-              <SunmiInput
-                type="text"
-                inputMode="numeric"
-                value={i.cantidad}
-                onChange={(e) => onCantidad(i.productoLocalId, e.target.value)}
-                onBlur={() => onBlurCantidad(i.productoLocalId)}
-                className="!py-0.5 !px-1 text-center text-[12px] tabular-nums"
-                aria-label="Cantidad"
-              />
-            </div>
+                cantidad en unidades llega ahí sin esfuerzo.
+                `shrink-0` es imprescindible: esto vive en una fila flex y sin él
+                el input cede ancho cuando el renglón aprieta, que es justo lo
+                que había que evitar. */}
+            <SunmiInput
+              type="text"
+              inputMode="numeric"
+              value={i.cantidad}
+              onChange={(e) => onCantidad(i.productoLocalId, e.target.value)}
+              onBlur={() => onBlurCantidad(i.productoLocalId)}
+              className="w-[50px] shrink-0 !py-0.5 !px-1 text-center text-[12px] tabular-nums"
+              aria-label="Cantidad"
+            />
             <button
               type="button"
               onClick={() => onSetCantidad(i.productoLocalId, (Number(i.cantidad) || 0) + 1)}
@@ -184,17 +180,15 @@ export default function CarritoPedido({
           </div>
           <span className="text-[10px] sunmi-text-muted shrink-0">{unidadTxt}</span>
           <span className="text-[10px] sunmi-text-muted shrink-0">×</span>
-          <div className="w-[74px] shrink-0">
-            <SunmiInput
-              type="text"
-              inputMode="decimal"
-              value={fmtCosto(i.precioCosto)}
-              onChange={(e) => onCosto(i.productoLocalId, e.target.value)}
-              onBlur={() => onBlurCosto(i.productoLocalId)}
-              className="!py-0.5 !px-1 text-right text-[12px] tabular-nums"
-              aria-label="Costo"
-            />
-          </div>
+          <SunmiInput
+            type="text"
+            inputMode="decimal"
+            value={fmtCosto(i.precioCosto)}
+            onChange={(e) => onCosto(i.productoLocalId, e.target.value)}
+            onBlur={() => onBlurCosto(i.productoLocalId)}
+            className="w-[74px] shrink-0 !py-0.5 !px-1 text-right text-[12px] tabular-nums"
+            aria-label="Costo"
+          />
         </div>
         {/* El subtotal baja a su propio renglón, alineado a la derecha.
             Compartía fila con el stepper, la unidad y el costo, y en 360 px no

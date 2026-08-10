@@ -620,7 +620,13 @@ export default function EdicionRapidaPage() {
             onKeyDown={handleCellKeyDown}
             data-row={rowIdx}
             data-col="codigoBarra"
-            className="w-32"
+            // `w-32` son 112 px en esta escala y no alcanzan ni para un EAN-13,
+            // que pide 120. Nunca se notó porque el ancho no se aplicaba: el
+            // input se estiraba a la celda. El valor más largo que hay hoy en
+            // producción es "LIVRA POMELO 1.5 GAS" —alguien escribió un nombre en
+            // el campo del código— y necesita 176 px. Se dimensiona para el peor
+            // valor real, no para el que debería haber.
+            className="w-[176px]"
           />
         );
 
@@ -634,7 +640,9 @@ export default function EdicionRapidaPage() {
             onKeyDown={handleCellKeyDown}
             data-row={rowIdx}
             data-col="sku"
-            className="w-28"
+            // `w-28` son 98 px y el SKU más largo de producción es un EAN-13
+            // —"7790639003536"—, que necesita 120.
+            className="w-[120px]"
           />
         );
 

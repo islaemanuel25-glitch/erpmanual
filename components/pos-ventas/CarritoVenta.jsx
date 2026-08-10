@@ -135,7 +135,11 @@ function CantidadStepper({ item, idx, onCantidadChange, compact }) {
         value={item.cantidad}
         onChange={handleChange}
         onBlur={handleBlur}
-        className={compact ? "w-14 !text-center !py-1 text-sm" : "w-16 !text-center !py-1"}
+        // El compacto era `w-14` —49 px— y la cantidad de línea más larga de
+        // producción es "26.412", que necesita 56. Es una venta por kilo: seis
+        // caracteres es lo normal, no un caso raro. El ancho no se aplicaba, así
+        // que nunca se vio cortado; ahora sí se aplicaría.
+        className={compact ? "w-[56px] !text-center !py-1 text-sm" : "w-16 !text-center !py-1"}
       />
       <button type="button" className={btnStepClass} onClick={() => handleStep(1)}>
         +

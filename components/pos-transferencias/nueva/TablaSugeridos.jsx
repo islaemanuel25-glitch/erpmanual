@@ -383,6 +383,12 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
       </td>
 
       {/* SUGERIDO EDITABLE + ROTURA */}
+      {/* Los tres inputs de cantidad de esta celda pasaron de 46 a 76 px. Los 46
+          estaban escritos y no se aplicaban —SunmiInput los tapaba con `w-full`—,
+          así que el input se estiraba y todo entraba. Con el ancho respetado, 46
+          dejan 30 px útiles y una cantidad de cuatro cifras con decimales se
+          corta. El techo real es el stock: el más largo de producción es
+          "4380.005" y necesita 76 px. */}
       <td className="px-2 py-2 min-w-[140px] md:min-w-[200px] align-middle">
         <div className="ml-auto">
           <div className="flex items-center justify-end gap-3">
@@ -398,7 +404,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
                     onFocus={handleFocus}
                     onBlur={flush}
                     onChange={(e) => handleBultos(e.target.value)}
-                    className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-[76px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button type="button" onClick={() => handleBultos(bultos + 1)} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
                   <span className="text-[10px] sunmi-text-muted">{labelBulto}</span>
@@ -414,7 +420,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
                       onFocus={handleFocus}
                       onBlur={flush}
                       onChange={(e) => handleUds(e.target.value)}
-                      className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-[76px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
                     <span className="text-[10px] sunmi-text-muted">uds</span>
@@ -431,7 +437,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
                   onFocus={handleFocus}
                   onBlur={flush}
                   onChange={(e) => handleUds(e.target.value)}
-                  className="w-[46px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-[76px] text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <button type="button" onClick={() => handleUds(uds + 1)} className="w-6 h-6 rounded-md sunmi-control text-[13px] font-bold active:scale-95 transition flex items-center justify-center">+</button>
                 <span className="text-[10px] sunmi-text-muted">{esFiambre && inputEnPiezas ? "pzs" : (esFiambre ? "kg" : "uds")}</span>

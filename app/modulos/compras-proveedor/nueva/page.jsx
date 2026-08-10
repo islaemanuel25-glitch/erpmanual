@@ -1474,18 +1474,12 @@ export default function NuevaCompraProveedorPage() {
   // Stepper de cantidad (agrega/ajusta; bajar a 0 quita la línea).
   const stepper = (p, rv, big = false) => {
     const btn = big ? "w-[30px] h-[30px] text-[16px]" : "w-[22px] h-[22px] text-[14px]";
-    // El ancho va al CONTENEDOR y el tamaño de letra al INPUT: son dos cosas
-    // distintas y se separan a propósito. Un `text-[12px]` puesto en el div no
-    // llega al input —los controles de formulario no heredan la tipografía— así
-    // que juntarlos le cambiaba el cuerpo de letra sin que se notara.
-    //
-    // Los anchos NO son los de antes. El original pedía 42/44 px, que nunca se
+    // Los anchos NO son los originales. El código pedía 42/44 px, que nunca se
     // aplicaron porque `w-full` los tapaba; al empezar a aplicarse quedaban 26 px
     // útiles, y ahí "1870" ya no entra (mide 31). Cuatro y cinco cifras son
     // corrientes: la misma línea que sugiere 49 packs sugiere 2450 unidades si se
     // la pasa a "Un". Con `!px-1` y estos anchos entran cinco cifras holgadas.
-    const anchoInp = big ? "w-[54px]" : "w-[50px]";
-    const letraInp = big ? "text-[13px]" : "text-[12px]";
+    const inp = big ? "w-[54px] text-[13px]" : "w-[50px] text-[12px]";
     return (
       <div className="flex items-center justify-center gap-0.5">
         <button
@@ -1498,29 +1492,19 @@ export default function NuevaCompraProveedorPage() {
         >
           −
         </button>
-        {/* BOCETO — el ancho lo pone el CONTENEDOR, no el input.
-            `SunmiInput` aplica `w-full` y esa clase le gana a cualquier
-            `w-[Npx]` que se le pase por className: medido, el width computado de
-            estos inputs es 100 %. Por eso el stepper se comía la fila entera en
-            360 px y tapaba el precio unitario.
-            Acá se envuelve en un div con ancho fijo, que es local a esta
-            pantalla. El arreglo de fondo es en SunmiInput y afecta a toda la
-            aplicación: va aparte. */}
-        <div className={anchoInp}>
-          <SunmiInput
-            type="text"
-            inputMode="numeric"
-            value={rv.cantidadVal}
-            placeholder="0"
-            onChange={(e) =>
-              rv.enPedido
-                ? updateItemCantidad(p.productoLocalId, e.target.value)
-                : setDraftField(p, "cant", e.target.value.replace(/[^\d]/g, ""))
-            }
-            onBlur={() => (rv.enPedido ? handleBlurCantidad(p.productoLocalId) : handleBlurDraftCant(p))}
-            className={`${letraInp} !py-0.5 !px-1 text-center tabular-nums`}
-          />
-        </div>
+        <SunmiInput
+          type="text"
+          inputMode="numeric"
+          value={rv.cantidadVal}
+          placeholder="0"
+          onChange={(e) =>
+            rv.enPedido
+              ? updateItemCantidad(p.productoLocalId, e.target.value)
+              : setDraftField(p, "cant", e.target.value.replace(/[^\d]/g, ""))
+          }
+          onBlur={() => (rv.enPedido ? handleBlurCantidad(p.productoLocalId) : handleBlurDraftCant(p))}
+          className={`${inp} !py-0.5 !px-1 text-center tabular-nums`}
+        />
         <button
           type="button"
           onClick={() =>
