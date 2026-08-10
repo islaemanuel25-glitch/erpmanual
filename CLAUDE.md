@@ -188,6 +188,29 @@ Al finalizar CADA sesión donde se hayan modificado archivos del proyecto, ejecu
 - **APIs:** app/api/[nombre]/[accion]/route.js
 - **Componentes:** components/[nombre]/
 
+## Dónde está la memoria del proyecto
+
+`CLAUDE.md` enseña a **orientarse**, no contiene la enciclopedia. Antes de
+trabajar:
+
+1. **`docs/PROJECT.md`** — qué es ERP Azul, cómo está armado, quiénes son los
+   actores, y el concepto de depósito y local, del que cuelga casi todo lo demás.
+   Es breve y estable.
+2. **`docs/CURRENT_STATE.md`** — el estado real, con el commit del relevamiento en
+   el encabezado. **Comparar ese hash contra `git rev-parse HEAD` antes de
+   confiar**: si difieren, es histórico.
+
+Y después, según lo que busques: `docs/business-rules/` para una regla y dónde
+está implementada —empezando por `contradicciones.md`, que es lo que hay que
+mirar antes de tocar algo—, `docs/architecture/` para cómo está construida un
+área transversal, `docs/decisions/` para por qué se decidió algo,
+`docs/incidents/` para qué salió mal, `docs/roadmap/` para qué falta, y
+`docs/modulos/` para un módulo concreto.
+
+Cada afirmación de esos documentos va etiquetada como verificada en código,
+documentada, inferida o dudosa. **Si no tiene etiqueta ni evidencia, no es un
+hecho del proyecto.**
+
 ## Procedimientos que viven en skills
 
 Son recetas de varios pasos, con sus trampas y su verificación de cierre. No se
