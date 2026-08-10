@@ -10,76 +10,75 @@
 >
 > ## En producción
 >
-> **Commit desplegado:** `17a014dd3739cbaf005f56d2c075d44fef5bd636`
-> **Desplegado el:** 2026-08-10 21:31 (hora del VPS, UTC)
+> **Commit desplegado:** `05834aa3a518115017f012e6473898c3cf7c1448`
+> **Desplegado el:** 2026-08-10 23:48 (hora del VPS, UTC)
 >
 > Los cinco valores coinciden: `origin/main`, HEAD del VPS, tag de la imagen,
 > `APP_BUILD_ID` y `/api/version`. El corte quedó **por debajo de 5 segundos**:
-> `up -d` arrancó 21:31:07 y volvió 21:31:10, y el primer sondeo posterior
-> encontró el endpoint en 200 de inmediato. Next informó "Ready in 499ms".
+> `up -d` arrancó 23:48:43 y volvió 23:48:47, y el primer sondeo posterior
+> encontró el endpoint en 200 al segundo. Next informó "Ready in 405ms".
 >
-> **ESTE FUE EL PRIMER DESPLIEGUE CON MIGRACIÓN DE DATOS.** Llevó tres cosas: el
-> tope de 16 caracteres en el código de barra (`6a4821a`), la migración que vacía
-> 29 códigos basura (`17a014d`) y su documentación.
+> Llevó cuatro commits: la corrección de las skills `deploy` y `backup` con lo que
+> salió del despliegue anterior (`68f0e2a`), y las tres tandas del vaciado de
+> códigos de barra, que terminaron en `05834aa`.
 >
-> ### La migración
+> ### La migración, y el procedimiento corregido funcionando
 >
-> `20260810210000_vaciar_codigos_barra_derivados_del_nombre` pone en NULL el
-> `codigo_barra` de 29 productos que tenían el nombre del producto en esa columna
-> y **ninguna venta**. El clasificador la marcó como NO ADITIVA por el UPDATE de
-> datos y frenó el despliegue con código 1, que es lo correcto. Se autorizó con
-> `DEPLOY_MIGRACION_AUTORIZADA=1` adelante del comando, que es la puerta prevista
-> y deja rastro en la línea.
+> `20260810230000_vaciar_codigos_barra_del_deposito` puso en NULL el
+> `codigo_barra` de 60 productos creados en el depósito cuyo código era texto. El
+> criterio es quién creó el producto, por DEC-0006. El clasificador la marcó NO
+> ADITIVA y frenó con código 1; se autorizó con `DEPLOY_MIGRACION_AUTORIZADA=1`.
 >
-> **Compatibilidad hacia atrás, verificada y no asumida.** Durante la ventana
-> entre migrar y recrear, el esquema es nuevo y el código es el viejo. Se
-> comprobó: en producción **ya había 323 productos con el código en NULL** que la
-> versión anterior atendía todos los días; ningún lector de `codigo_barra` de esa
-> versión accede al valor sin guarda —el único `.trim()` directo, en
-> `productos/import/preview`, está dentro de un `if (p.codigo_barra)`—; y la
-> migración solo escribe NULL, una forma de dato que ya convivía con el unique
-> `(grupoId, codigo_barra)` porque PostgreSQL trata los NULL como distintos.
+> **Este fue el primer despliegue con el orden corregido, y se notó.** Con
+> `APP_IMAGE` actualizado ANTES de bajar la imagen y de migrar, `compose pull app`
+> descargó capas de verdad —la vez anterior informaba "Skipped - Image is already
+> present locally" porque miraba la imagen vieja— y `migrate deploy` informó **83
+> migraciones** contra las 82 que informaba el contenedor antes de empezar. Ese
+> conteo, y no el código de salida, es lo que prueba que se aplicó algo.
 >
 > **Verificado después de aplicar, contra producción y solo lectura:** los
-> productos con letras en el código bajaron de 90 a 61; los que tienen NULL
-> subieron de 323 a 352, exactamente +29; aparecieron las 29 filas de bitácora con
-> acción `producto.codigo_barra.vaciar`, su autor y el valor anterior. Y el
-> conjunto vaciado es **exactamente** el de la lista: cero ids de la migración sin
-> vaciar, cero productos vaciados que no estuvieran en ella, cero cadenas vacías.
+> productos con letras en el código bajaron a **1**; aparecieron **60** filas de
+> bitácora de esta migración —89 sumando la anterior—; cero cadenas vacías; y el
+> conjunto vaciado es **exactamente** el de la lista: cero ids sin vaciar, cero
+> vaciados fuera de ella.
 >
-> **Trampa encontrada en el camino, para que no se repita:** el primer intento de
-> `migrate deploy` informó "81 migrations found / No pending migrations", porque
-> `docker compose run` toma la imagen de `APP_IMAGE`, que todavía apuntaba al SHA
-> anterior — o sea, corrió el contenedor descartable de la imagen VIEJA, que no
-> contiene la migración nueva. **Con migraciones, `APP_IMAGE` se actualiza ANTES
-> de migrar, no antes de recrear.** Al repetirlo con la imagen nueva informó 82 y
-> la aplicó. El chequeo que lo detectó fue mirar el número de migraciones, no el
-> código de salida: el comando había salido con éxito.
+> El único que queda con código de texto es `pollo trozado` (id 2387), creado en
+> Casiano Casas. La columna `codigo_barra` queda con 89 productos menos de basura
+> y un solo caso pendiente de decisión.
+>
+> ### El tope de 16 caracteres ya está en producción
+>
+> Vino en `6a4821a`, dentro de este mismo despliegue: los cinco campos donde se
+> carga un código frenan a los 16 caracteres al escribir y al pegar, y lo guardado
+> largo se sigue mostrando entero. Así que la columna no solo quedó limpia: no
+> puede volver a ensuciarse igual.
 >
 > **Referencia de rollback de esta versión** (la imagen que corría ANTES):
-> `ghcr.io/islaemanuel25-glitch/erpmanual:84793e18c8d0b49d3e2d4c505c9e8e5b900de5be`,
-> digest `sha256:2eedf9651e40b086336c3e22c81762b66c1d027e716c56d0f971e52408d99282`,
-> image ID `sha256:d7840a8832e7bca29adea4c08c6ba7c431ff344e14447b779a91b849ab1386b1`.
+> `ghcr.io/islaemanuel25-glitch/erpmanual:17a014dd3739cbaf005f56d2c075d44fef5bd636`,
+> digest `sha256:d6f86f157f49b24e542fac5ab02dc35a2947deb058bbdf9e1685b8a5bbe5378e`,
+> image ID `sha256:83686d7b959e535e2f45373bf2bc5ad08c56ae37fcce1e12d2bf073fb7108815`.
 >
-> **Ojo con el rollback de esta versión:** volver la imagen atrás NO deshace la
-> migración. El rollback de código deja los 29 códigos en NULL, y la versión
-> anterior los maneja sin problema. Para reponer los datos está el SQL en
-> `docs/business-rules/codigos-vaciados-2026-08-10.md`, y el dump previo en
-> `/srv/produccion/backups/pre-migracion-codigos-17a014d_20260810_212412.sql.gz`
-> (1.938.673 bytes, 56 tablas, validado con los cuatro chequeos y con la
-> comprobación extra de que uno de los códigos a vaciar aparece dentro del dump).
+> **Volver la imagen atrás NO deshace la migración.** Los 60 códigos quedan en
+> NULL y la versión anterior los maneja —ya convivía con 323 productos sin
+> código—. Para reponer datos: el SQL en
+> `docs/business-rules/codigos-vaciados-deposito-2026-08-10.md`, que tiene los 15
+> más vendidos señalados arriba de todo, y el dump previo en
+> `/srv/produccion/backups/pre-migracion-deposito-05834aa_20260810_234139.sql.gz`
+> (1.952.470 bytes, 56 tablas). Ese backup pasó los **cinco** chequeos, incluido
+> el quinto: contiene `BARRATREMBLAY` y `cremosocremac`, dos de los códigos que la
+> migración iba a borrar.
 >
-> **Lo que no cerró:** el árbol del VPS tiene **23 archivos sin trackear**
+> **Lo que no cerró:** el árbol del VPS tiene **24 archivos sin trackear**
 > —`.env.bak-*` y `.env.rollback-*` acumulados por despliegues anteriores—. Los
-> trackeados están limpios. La verificación de cierre pide ese listado vacío y no
-> lo está; es previo y acumulado.
+> trackeados están limpios. La verificación de cierre pide ese listado vacío.
 >
 > **Lo que no se pudo verificar:** que las pantallas se vean bien EN PRODUCCIÓN.
-> Sin sesión las rutas devuelven 200 y sirven el armazón, pero el contenido lo
-> dibuja el cliente después de autenticarse. Los logs de Next no registran por
-> pedido: sus 6 líneas prueban que la aplicación arrancó, no que las pantallas
-> funcionen. El tope de 16 caracteres se verificó en la máquina de desarrollo,
-> contra una copia de la base, no de producción.
+> Sin sesión las rutas devuelven 200 y sirven el armazón; el contenido lo dibuja el
+> cliente después de autenticarse. Los logs de Next no registran por pedido: sus 6
+> líneas prueban que arrancó, no que las pantallas funcionen. Y **no se comprobó
+> con una venta real** que los 60 productos sin código se sigan encontrando por
+> nombre en el POS: eso lo cubren los candados de `lib/productos/codigoVaciado.test.mjs`
+> y la medición, no una prueba en producción.
 >
 > **Ojo:** el commit desplegado es POSTERIOR al del relevamiento. Lo que dice este
 > documento sobre deuda y contradicciones vale para el commit del encabezado, con
