@@ -154,9 +154,10 @@ backups/
 # Windows NUL artifact
 nul
 
-# Claude Code locales (versionamos solo .claude/agents/)
+# Claude Code locales (versionamos .claude/agents/ y .claude/skills/)
 .claude/*
 !.claude/agents/
+!.claude/skills/
 
 # Instalador de impresion (binario grande, se genera con build-installer.bat)
 public/downloads/*.exe

@@ -2,7 +2,7 @@
 
 ## Cómo trabajar en este proyecto
 
-Estas nueve reglas salieron de errores concretos, y cada una tiene abajo el suyo.
+Estas diez reglas salieron de errores concretos, y cada una tiene abajo el suyo.
 No son preferencias de estilo: son las cosas que ya salieron mal.
 
 ### 1. Reusar, no reescribir al lado
@@ -26,16 +26,14 @@ a mano. Cambiar la constante no los habría tocado.
 
 Nada se da por bueno porque compile o porque el código se lea bien.
 
-*Por qué:* de las fallas encontradas esta semana, **ninguna era visible leyendo**.
-`gpg` no estaba en el PATH de PowerShell y la tarea habría fallado todos los
-domingos como una línea de error perdida. `--passphrase-fd 0` colgaba el proceso
-sin timeout, sin mensaje y sin terminar. El comando de descifrado del propio
-documento de restauración se colgaba igual. `git clone` escribe su progreso en
-stderr y PowerShell lo tomaba por error, así que un clon perfecto se veía como
-falla. Un clon nuevo no podía commitear por falta de identidad de git.
+*Por qué:* las cinco fallas de la cadena de backup —`gpg` fuera del PATH,
+`--passphrase-fd 0` colgando el proceso, el descifrado colgado, `git clone`
+escribiendo en stderr, el clon sin identidad de git— **ninguna era visible
+leyendo**. Están todas resueltas y anotadas con su detalle en el skill `/backup`.
 
 Corolario: la comparación tiene que medir lo mismo de los dos lados. Dos capturas
-tomadas con ventanas de distinto alto informan diferencias que no existen.
+tomadas con ventanas de distinto alto informan diferencias que no existen. Cómo
+se saca una captura comparable: `/capturas`.
 
 Corolario: **después de tocar `schema.prisma`, correr `prisma generate` antes de
 probar nada.** Esto no lo ve ni el build ni los candados. El proyecto es
@@ -165,6 +163,9 @@ repo, no solo donde se lo está por cambiar. Buscar `aumentoEsperadoMinPct` dio
 **cinco lectores en cuatro archivos**, tres de ellos componentes que no estaban
 en el plan.
 
+El procedimiento —qué herramienta recorre qué, cómo enumerar por envoltorios y
+cómo se informa un conteo— está en el skill `/relevar`.
+
 ## Auto-documentación
 
 Al finalizar CADA sesión donde se hayan modificado archivos del proyecto, ejecutar:
@@ -187,27 +188,22 @@ Al finalizar CADA sesión donde se hayan modificado archivos del proyecto, ejecu
 - **APIs:** app/api/[nombre]/[accion]/route.js
 - **Componentes:** components/[nombre]/
 
-## Despliegue a producción
+## Procedimientos que viven en skills
 
-El procedimiento completo está en `docs/RELEASE-CHECKLIST.md` §3.bis. Reglas que no se
-negocian:
+Son recetas de varios pasos, con sus trampas y su verificación de cierre. No se
+repiten acá: se invocan.
 
-- **El VPS no construye la imagen.** La construye GitHub Actions y la publica en
-  `ghcr.io/islaemanuel25-glitch/erpmanual:<SHA_COMPLETO>`. El VPS solo descarga.
-- **Nunca `latest`** ni SHA corto. Producción despliega siempre por SHA completo.
-- Deben coincidir: SHA de `origin/main`, HEAD del VPS, tag de la imagen, `APP_BUILD_ID`
-  y `/api/version`. Si alguno difiere, parar.
-- Nada de `docker build`, `docker compose up --build` ni `docker compose down` en el VPS.
-  Nunca recrear PostgreSQL: siempre `--no-deps app`.
-- `APP_IMAGE` va en el `.env` de Compose del VPS, **nunca en `.env.prod`**.
-- Migraciones con `prisma migrate deploy` (**sin `npx`**) en un container one-off de la
-  imagen nueva, *antes* de recrear la app.
-- Backup validado antes de cualquier despliegue. Registrar el RepoTag fijo o el image ID
-  exacto de la imagen anterior y conservarlo: es la referencia de rollback. Nunca usar
-  `latest` para volver atrás.
+- **Desplegar a producción** — `/deploy`. Referencia larga en
+  `docs/RELEASE-CHECKLIST.md` §3.bis.
+- **La cadena de backup** — `/backup`. Restaurar es otro procedimiento y está en
+  `docs/RESTAURACION-BACKUP.md`.
+- **Sacar capturas comparables** — `/capturas`.
+- **Relevar el repo sin dejar niveles afuera** — `/relevar`.
 
-⚠️ **Nunca imprimir secretos**: `docker compose config` sin filtrar vuelca
-`POSTGRES_PASSWORD` en claro. Tampoco `DATABASE_URL` ni el contenido de `.env.prod`.
+⚠️ **Nunca imprimir secretos**, en ningún contexto y no solo desplegando:
+`docker compose config` sin filtrar vuelca `POSTGRES_PASSWORD` en claro. Tampoco
+`DATABASE_URL`, ni el contenido de `.env.prod`, ni la frase de cifrado de los
+backups.
 
 ## Convenciones
 
