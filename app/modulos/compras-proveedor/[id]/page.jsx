@@ -16,8 +16,14 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import { Pencil } from "lucide-react";
+import { Pencil, TriangleAlert } from "lucide-react";
 import { ORIGENES, linkEditarProducto } from "@/lib/compras-proveedor/retornoPedido";
+import {
+  compararCostoLinea,
+  contarLineasConAviso,
+  textoAvisoCosto,
+  textoContadorAvisos,
+} from "@/lib/compras-proveedor/avisoCostoLinea";
 import SinPermisos from "@/components/auth/SinPermisos";
 import useAccionesEnvioPedido from "@/hooks/useAccionesEnvioPedido";
 import {
@@ -405,6 +411,18 @@ export default function DetallePedidoProveedorPage({ params }) {
     return subtotalLinea({ base, cantidad: cant, costo, kg });
   };
 
+  // Cuántas líneas tienen precio distinto del catálogo. Se cuenta con el módulo,
+  // no acá: si cada pantalla contara por su cuenta, el día que una cambie el
+  // umbral las dos mostrarían números distintos para el mismo pedido.
+  const lineasConAvisoCosto = contarLineasConAviso(
+    (pedido?.detalles || []).map((d) => ({
+      precioLinea: (esRecepcion || esBorrador) ? (costos[d.id] ?? d.precioCosto) : d.precioCosto,
+      unidad: unidadesEdit[d.id] || d.unidad,
+      costoCatalogo: d.producto?.base?.precio_costo,
+      base: d.producto?.base,
+    }))
+  );
+
   // Total estimado/factura reactivo = suma de subtotales económicos.
   const computedTotalFactura = (pedido?.detalles || []).reduce(
     (acc, d) => acc + (calcLineaDetalle(d).subtotal || 0),
@@ -605,10 +623,21 @@ export default function DetallePedidoProveedorPage({ params }) {
 
         {/* Detalle de productos */}
         <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-          <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+          <div className="flex items-center gap-2 flex-wrap pb-2 mb-3 border-b sunmi-divider">
             <h3 className="text-[13px] font-semibold sunmi-text-strong">
               Detalle ({pedido.detalles?.length || 0} items)
             </h3>
+            {/* Arriba y no solo en la línea: en un pedido de 26 ítems, un aviso
+                que hay que ir a buscar bajando no sirve. */}
+            {lineasConAvisoCosto > 0 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] sunmi-text-warning ring-1 ring-inset sunmi-ring"
+                data-contador-avisos={lineasConAvisoCosto}
+              >
+                <TriangleAlert size={11} aria-hidden="true" />
+                {textoContadorAvisos(lineasConAvisoCosto)}
+              </span>
+            )}
           </div>
 
           {/* DESKTOP: tabla */}
@@ -636,6 +665,17 @@ export default function DetallePedidoProveedorPage({ params }) {
                   const esFiambre = base?.modoCompraProveedor === "UNIDAD";
                   const r = calcLineaDetalle(det);
                   const puedeToggle = esBorrador && permiteToggleUnidad(base);
+                  // El MISMO módulo y el MISMO umbral que el carrito del pedido
+                  // nuevo. El precio que se compara es el que está editándose si
+                  // la pantalla lo deja editar, y el guardado si no.
+                  const cmpCosto = compararCostoLinea({
+                    precioLinea: (esRecepcion || esBorrador)
+                      ? (costos[det.id] ?? det.precioCosto)
+                      : det.precioCosto,
+                    unidad: unidadesEdit[det.id] || det.unidad,
+                    costoCatalogo: base?.precio_costo,
+                    base,
+                  });
                   return (
                     <SunmiTableRow key={det.id}>
                       <td className="px-3 py-1.5 text-sm">
@@ -724,7 +764,24 @@ export default function DetallePedidoProveedorPage({ params }) {
                             />
                           </div>
                         ) : (
-                          det.precioCosto ? `$${Number(det.precioCosto).toFixed(2)}` : "-"
+                          det.precioCosto ? `${Number(det.precioCosto).toFixed(2)}` : "-"
+                        )}
+                        {/* El aviso va DENTRO de esta celda, debajo del número
+                            que cuestiona. No agrega columna: la grilla tiene
+                            columnas variables según el estado y una nueva
+                            obligaría a recalcular todos los colSpan. */}
+                        {cmpCosto.hayDiferencia && (
+                          <div
+                            className="flex items-center gap-1 mt-0.5 text-[10px] sunmi-text-warning"
+                            title={textoAvisoCosto(cmpCosto)}
+                            data-aviso-costo={cmpCosto.sentido}
+                          >
+                            <TriangleAlert size={10} className="shrink-0" aria-hidden="true" />
+                            <span>
+                              {cmpCosto.sentido === "sube" ? "más caro" : "más barato"} · catálogo $
+                              {Number(cmpCosto.costoCatalogo).toFixed(2)}
+                            </span>
+                          </div>
                         )}
                       </td>
 

@@ -4,7 +4,12 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { Trash2, X, Pencil, TriangleAlert } from "lucide-react";
 import { subtotalLinea, unidadDisplay, naturalezaLinea } from "@/lib/compras-proveedor/calculoPedido";
-import { compararCostoLinea, textoAvisoCosto } from "@/lib/compras-proveedor/avisoCostoLinea";
+import {
+  compararCostoLinea,
+  contarLineasConAviso,
+  textoAvisoCosto,
+  textoContadorAvisos,
+} from "@/lib/compras-proveedor/avisoCostoLinea";
 
 /**
  * Carrito del pedido a proveedor (rediseño "cart-first").
@@ -38,6 +43,7 @@ export default function CarritoPedido({
   onClose,
 }) {
   const lineas = items.filter((i) => Number(i.cantidad) > 0);
+
   const esSheet = variant === "sheet";
 
   // El costo se guarda a full precisión (fuente de verdad del subtotal); acá se
@@ -65,6 +71,18 @@ export default function CarritoPedido({
     factor_pack: i.factorPack,
     pesoReferenciaKg: i.pesoRefKg,
   });
+
+  // Cuántas líneas tienen precio distinto del catálogo. Se cuenta con el módulo
+  // compartido y NO acá: el detalle del pedido cuenta lo mismo con la misma
+  // función, así que el umbral no se puede despegar entre las dos pantallas.
+  const lineasConAvisoCosto = contarLineasConAviso(
+    lineas.map((i) => ({
+      precioLinea: i.precioCosto,
+      unidad: i.unidadPedido,
+      costoCatalogo: i.costoCatalogo,
+      base: baseDe(i),
+    }))
+  );
 
   const linea = (i) => {
     const base = baseDe(i);
@@ -211,6 +229,17 @@ export default function CarritoPedido({
           {proveedorNombre && (
             <p className="text-[11px] sunmi-text-muted truncate" title={proveedorNombre}>
               {proveedorNombre}
+            </p>
+          )}
+          {/* Arriba de la lista: en un pedido de 50 líneas, un aviso que hay que
+              ir a buscar bajando no sirve. */}
+          {lineasConAvisoCosto > 0 && (
+            <p
+              className="mt-1 inline-flex items-center gap-1 text-[10.5px] sunmi-text-warning"
+              data-contador-avisos={lineasConAvisoCosto}
+            >
+              <TriangleAlert size={11} className="shrink-0" aria-hidden="true" />
+              {textoContadorAvisos(lineasConAvisoCosto)}
             </p>
           )}
         </div>
