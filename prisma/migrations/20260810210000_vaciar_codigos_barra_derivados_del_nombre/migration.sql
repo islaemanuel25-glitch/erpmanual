@@ -1,5 +1,5 @@
--- Vaciar el código de barra de 47 productos cuyo código era el nombre del
--- producto, entero o abreviado.
+-- Vaciar el código de barra de 33 productos cuyo código era el nombre del
+-- producto volcado en la columna equivocada.
 --
 -- ── POR QUÉ ES UNA MIGRACIÓN Y NO UN SCRIPT ─────────────────────────────────
 --
@@ -8,18 +8,28 @@
 -- migración se aplica una sola vez, queda anotada en _prisma_migrations y llega
 -- con la versión que la trajo.
 --
+-- ── EL CRITERIO ES EL LARGO ─────────────────────────────────────────────────
+--
+-- Entran los códigos de MÁS DE 8 CARACTERES. Un nombre volcado tiene 12 o 15
+-- caracteres; un atajo de tecleo tiene cuatro o cinco. Nadie escribe
+-- "medialunassaladas" para buscar un producto.
+--
+-- El criterio anterior —"el código es el nombre o su comienzo"— estaba mal y se
+-- reemplazó: dejaba adentro 14 abreviaturas cortas como `bica`, `chori` o
+-- `camel10`, que son exactamente lo que alguien teclea todos los días. Esas
+-- pasaron a la lista que se revisa una por una.
+--
 -- ── QUÉ SE VACÍA, Y QUÉ NO ──────────────────────────────────────────────────
 --
--- Solo estos 47 ids, con su código exacto escrito al lado. NO se recalcula el
--- criterio al aplicar: si alguien le cambió el código a alguno entre la medición
+-- Solo estos 33 ids, con su código exacto escrito al lado. NO se recalcula el
+-- criterio al aplicar: si alguien le cambia el código a alguno entre la medición
 -- y el despliegue, esa fila NO se toca. La lista es el contrato.
 --
 -- Quedan afuera a propósito:
---   * Los 43 códigos con letras que NO son el nombre del producto.
---   * Los 16 de más de 14 caracteres, incluidos los tres GS1 legítimos.
---   * '%' (id 2337), que entró en el conteo original por un artefacto: al
---     sacarle los caracteres no alfanuméricos queda vacío, y "el nombre empieza
---     con la cadena vacía" es verdadero para todos.
+--   * Los 57 restantes con letras: los 43 que no se parecen al nombre más las 14
+--     abreviaturas de 8 caracteres o menos.
+--   * Los 16 de más de 14 caracteres que no están en esta lista, incluidos los
+--     tres GS1 legítimos.
 --
 -- ── SE VACÍA A NULL, NO A CADENA VACÍA ──────────────────────────────────────
 --
@@ -45,20 +55,6 @@
 
 WITH objetivo (id, codigo_viejo, nombre) AS (
   VALUES
-  (92, 'bica', 'Bicarbonato Paez'),
-  (763, 'chori', 'Chorigol Casero x Caja 30u'),
-  (691, 'maple', 'Maple Huevos x30'),
-  (2105, 'papas', 'Papas Congeladas'),
-  (2185, 'PRITTY', 'PRITTY 1L'),
-  (2023, '361LATA', '361 LATA X24'),
-  (68, 'BENGALA', 'BENGALA X4'),
-  (2225, 'camel10', 'Camel 10'),
-  (2301, 'bondiola', 'Bondiola Piamontesa'),
-  (1322, 'cordones', 'cordones negros'),
-  (316, 'JAIMITOS', 'Jaimitos X 10u'),
-  (1417, 'pancho24', 'Pancho 24 Als'),
-  (1775, 'pategras', 'pategras por kg'),
-  (1457, 'prepizza', 'prepizza cebolla'),
   (857, 'albondiga', 'Albondigas Caseras x Caja'),
   (292, 'HILO ATAR', 'HILO ATAR'),
   (2099, 'mortadela', 'Mortadela Paladini'),
@@ -108,7 +104,7 @@ rastro AS (
          'Producto', v.id::text, v.nombre,
          jsonb_build_object(
            'autor', 'migracion 20260810210000_vaciar_codigos_barra_derivados_del_nombre',
-           'motivo', 'el codigo era el nombre del producto, entero o abreviado; la busqueda por nombre ya lo encuentra',
+           'motivo', 'el codigo era el nombre del producto volcado; mas de 8 caracteres, nadie lo tipea para buscar',
            'codigo_barra', jsonb_build_object('antes', v.codigo_viejo, 'despues', NULL)
          )
   FROM vigentes v JOIN "ProductoBase" pb ON pb.id = v.id
