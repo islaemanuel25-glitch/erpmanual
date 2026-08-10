@@ -10,39 +10,51 @@
 >
 > ## En producción
 >
-> **Commit desplegado:** `a9b2e68b73b8634846f576c9bc9faaf46b035e10`
-> **Desplegado el:** 2026-08-10 18:05 (hora del VPS, UTC)
+> **Commit desplegado:** `84793e18c8d0b49d3e2d4c505c9e8e5b900de5be`
+> **Desplegado el:** 2026-08-10 20:01 (hora del VPS, UTC)
 >
 > Los cinco valores coinciden: `origin/main`, HEAD del VPS, tag de la imagen,
 > `APP_BUILD_ID` y `/api/version`. Sin migraciones —el clasificador informó cero
-> sobre el HEAD desplegado, y `migrate deploy` confirmó "No pending migrations"
-> sobre las 81 existentes—. El contenedor arrancó en 497 ms y el primer sondeo,
-> a los 5 segundos de recrear, ya respondía; **el corte no se midió con la
-> precisión de la vez anterior**, solo se acotó por debajo de esos 5 segundos.
+> archivos sobre el HEAD desplegado, y `migrate deploy` confirmó "No pending
+> migrations" sobre las 81 existentes—. El corte quedó **por debajo de 5
+> segundos**, medido de punta a punta: `up -d` arrancó 20:01:55 y volvió 20:01:59,
+> y el primer sondeo posterior encontró el endpoint en 200 al segundo. Next
+> informó "Ready in 504ms".
 >
-> Este despliegue llevó un solo cambio: la pantalla de nuevo pedido de
-> compras-proveedor se puede usar en el teléfono. Es frontend puro —dos archivos
-> de pantalla y dos de documentación—, sin tocar cálculos, permisos ni rutas.
+> Este despliegue llevó dos commits. El de fondo es `506bc08`: **el ancho que se
+> le pide a `SunmiInput` ahora se aplica**. El componente ponía `w-full` siempre y,
+> como empata en especificidad con el ancho pedido, ganaba por orden de hoja de
+> estilos; medido antes del arreglo, 75 de 77 inputs de una pantalla tenían
+> `width: 100%`. Ahora `w-full` lo pone `componerClaseInput` solo cuando nadie
+> declaró ancho, así que los 193 usos sin ancho no cambian y los 28 que sí piden
+> uno empiezan a recibirlo. Nueve de esos 28 no entraban con el ancho escrito y se
+> ensancharon, medidos contra el peor valor real de producción. El segundo commit,
+> `84793e1`, es solo documentación.
+>
+> **Sin migraciones y sin tocar la base.** `erpazul_db` sigue con 9 días de
+> `Up (healthy)`: se recreó únicamente `app`, con `--no-deps`.
 >
 > **Referencia de rollback de esta versión** (la imagen que corría ANTES):
-> `ghcr.io/islaemanuel25-glitch/erpmanual:0f0bac616eee76281c6e0026337b94230fb294e5`,
-> digest `sha256:0ff93c8306773912dd7ba6ec9c4784f91611486625840df65721b0364bd2b951`,
-> image ID `sha256:59c7a24ef18e07ae93a76a4e49675a7ccb39d15a8f81fa198298d652dfbb88d4`.
+> `ghcr.io/islaemanuel25-glitch/erpmanual:a9b2e68b73b8634846f576c9bc9faaf46b035e10`,
+> digest `sha256:679209db13acd1ae535ce749fd3b0a270d6c05d9035d1d03d738d10d494cc843`,
+> image ID `sha256:806abc7ce3a560d220a47e0ae21218af199a0ee0a40152c68e306e5578e53a2c`.
 >
 > Backup previo validado con los cuatro chequeos:
-> `/srv/produccion/backups/pre-a9b2e68_20260810_175929.sql.gz` (1.928.633 bytes,
+> `/srv/produccion/backups/pre-84793e1_20260810_195518.sql.gz` (1.935.366 bytes,
 > 56 tablas).
 >
-> **Lo que no cerró:** el árbol del VPS tiene **21 archivos sin trackear**
-> —`.env.bak-*` y `.env.rollback-*` que dejaron despliegues anteriores, uno de
-> ellos el de hoy—. Los archivos trackeados están limpios. La verificación de
-> cierre pide `git status --porcelain` vacío y no lo está; es previo y acumulado,
-> no lo introdujo este despliegue.
+> **Lo que no cerró:** el árbol del VPS tiene **22 archivos sin trackear**
+> —`.env.bak-*` y `.env.rollback-*` acumulados por despliegues anteriores, uno de
+> ellos el de hoy—. Los trackeados están limpios. La verificación de cierre pide
+> `git status --porcelain` vacío y no lo está; es previo y acumulado, no lo
+> introdujo este despliegue.
 >
-> **Lo que no se pudo verificar:** que la pantalla se vea bien en producción. Sin
-> sesión, `/modulos/compras-proveedor/nueva` devuelve 200 y sirve el armazón, pero
-> el contenido lo dibuja el cliente después de autenticarse. Las capturas que
-> respaldan el cambio son de la máquina de desarrollo, no de producción.
+> **Lo que no se pudo verificar:** que las pantallas se vean bien EN PRODUCCIÓN.
+> Sin sesión, las rutas devuelven 200 y sirven el armazón, pero el contenido lo
+> dibuja el cliente después de autenticarse. Y los logs de Next en producción no
+> registran por pedido: sus 6 líneas prueban que la aplicación arrancó, no que las
+> pantallas funcionen. Las capturas que respaldan el cambio son de la máquina de
+> desarrollo, contra una copia de la base, no de producción.
 >
 > **Ojo:** el commit desplegado es POSTERIOR al del relevamiento. Lo que dice este
 > documento sobre deuda y contradicciones vale para el commit del encabezado, con
