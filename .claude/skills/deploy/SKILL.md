@@ -88,6 +88,10 @@ digest, `linux/amd64`, `APP_BUILD_ID` y el label
 Cuatro comandos, en este orden. Cada uno con `-T` o `</dev/null` si viaja por
 heredoc de ssh (ver trampas).
 
+**Entre el segundo y el tercero va el chequeo de migraciones**, que está más
+abajo y puede frenar el deploy. No se saltea aunque el despliegue "no traiga
+migraciones": eso es justamente lo que el chequeo comprueba.
+
 ```bash
 ssh vps-erp 'cd /srv/produccion/erpazul && git merge --ff-only origin/main'
 ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod.yml pull app'
@@ -108,15 +112,54 @@ el contenedor viejo, que tiene el cliente Prisma anterior.
 ### La ventana entre migrar y recrear
 
 Entre el paso de migrar y el de recrear, **el esquema es nuevo y el código que
-corre es el viejo**. Son segundos, pero existen y hay tráfico real.
+corre es el viejo**. Son segundos, pero existen y hay tráfico real: la app vieja
+sigue atendiendo pedidos contra el esquema nuevo.
 
-Por eso las migraciones son aditivas en la práctica de este repo: columnas
-nullable, `ALTER TYPE ... ADD VALUE IF NOT EXISTS`, índices nuevos. Una columna
-borrada o un `NOT NULL` sin default rompen al código viejo durante esa ventana.
+**LA REGLA (decidida el 2026-08-09, obligatoria desde acá):** toda migración que
+se despliegue mientras la versión anterior sigue atendiendo tráfico tiene que ser
+**compatible hacia atrás con esa versión** durante toda la ventana. Las
+migraciones destructivas o incompatibles **no pasan por este flujo**: necesitan
+estrategia por fases —agregar, desplegar el código que usa lo nuevo, y recién en
+un despliegue posterior borrar lo viejo— y se planean aparte.
 
-Si una migración **no** es aditiva, esta secuencia no alcanza y hay que
-planearla aparte. No está escrito como regla en ningún lado del repo: es lo que
-hacen todas las migraciones existentes.
+**LO OBSERVADO, que es distinto y no la respalda:** el repo tiene 81 migraciones
+y **14 contienen sentencias destructivas** —`DROP COLUMN` sobre `Proveedor` y
+sobre `AuditoriaBitacora`, `DROP INDEX`, cambios de tipo de columna—, enumeradas
+con `grep -l -iE 'DROP (COLUMN|TABLE|CONSTRAINT|INDEX|TYPE)|RENAME (COLUMN|TO)|SET NOT NULL|ALTER COLUMN .* TYPE|TRUNCATE|DELETE FROM' prisma/migrations/*/migration.sql`.
+Todas se desplegaron por este mismo flujo como si fueran aditivas. No rompió
+nada visible, pero eso es suerte y poco tráfico, no una garantía. La regla existe
+justamente porque la costumbre **no** era la que se creía.
+
+### El chequeo que frena el deploy — antes de migrar
+
+Una regla que solo vive en un documento se viola en silencio la primera vez.
+Antes del `migrate deploy`, clasificar lo que este despliegue introduce:
+
+```bash
+SHA_VPS="$(ssh vps-erp 'cd /srv/produccion/erpazul && git rev-parse HEAD')"
+git diff --name-only "$SHA_VPS"..HEAD -- prisma/migrations | grep 'migration.sql$' | while read -r f; do
+  if grep -q -iE 'DROP (COLUMN|TABLE|CONSTRAINT|INDEX|TYPE)|RENAME (COLUMN|TO)|SET NOT NULL|ALTER COLUMN .* TYPE|TRUNCATE|DELETE FROM|^UPDATE ' "$f"; then
+    echo "NO ADITIVA: $f"; else echo "aditiva:    $f"; fi
+done
+```
+
+El rango se saca del HEAD del VPS, no de `migrate status`: son exactamente las
+migraciones que este despliegue introduce sobre lo que hoy corre.
+
+**Si aparece una sola línea `NO ADITIVA`, el deploy se frena acá.** No se
+continúa por criterio propio: se le informa a Emanuel qué migración es, qué
+sentencia la marcó y por qué rompería a la versión que está atendiendo, y se
+espera confirmación explícita. Puede ser un falso positivo —un `DROP INDEX IF
+EXISTS` sobre un índice que ya no usa nadie lo es— y confirmarlo es de él, no del
+que está desplegando.
+
+**El clasificador es por patrón de texto y no es confiable.** No entiende
+contexto: no distingue un `DROP COLUMN` de una columna muerta de uno de una
+columna en uso, no lee `UPDATE` dentro de un bloque `DO $$`, y no ve una
+migración incompatible que no use ninguna de estas palabras —un `CREATE UNIQUE
+INDEX` sobre datos con duplicados, por ejemplo, falla y no aparece acá—. Sirve
+para frenar, no para autorizar. **Que dé todo "aditiva" no es un permiso**: si
+hay cualquier duda sobre una migración, se frena igual y se pregunta.
 
 ## Paso 5 — Verificación de cierre
 
@@ -170,11 +213,25 @@ maquilla.
 ## Rollback sin compilar
 
 Apuntar `APP_IMAGE` a la referencia fija registrada en el paso 2 y repetir el
-paso de recrear. Sin compilar, sin `build`.
+paso de recrear. Sin compilar, sin `build`. Este camino sí se usó.
 
-Si hubo migración aplicada, el rollback de Prisma es **manual**: escribir el SQL
-inverso, ejecutarlo, borrar la entrada de `_prisma_migrations` y recién ahí
-revertir el código.
+### Rollback de una migración: NUNCA SE EJECUTÓ
+
+El procedimiento existe y está en `docs/RELEASE-CHECKLIST.md` §3: identificar el
+`migration.sql` aplicado, escribir el SQL inverso, ejecutarlo contra la base,
+borrar la entrada de `_prisma_migrations` y recién ahí revertir el código.
+
+**No es un mecanismo probado.** Nunca se ejecutó ni se verificó de punta a punta,
+ni en producción ni en una copia. Está escrito, no está validado, y la diferencia
+importa el día que haga falta: los cuatro pasos tienen orden y un error en
+`_prisma_migrations` deja la base en un estado que `migrate deploy` no sabe
+resolver.
+
+Antes de considerarlo confiable necesita una prueba segura: restaurar un dump en
+una base descartable, aplicar la migración, revertirla siguiendo los cuatro pasos
+y comprobar que `migrate status` queda coherente y que la versión anterior
+levanta. **Esa prueba no se hace en producción**, y hasta que se haga, el
+rollback de código es la única vuelta atrás con evidencia.
 
 ## Referencia larga
 

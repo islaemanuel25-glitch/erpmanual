@@ -1,6 +1,6 @@
 ---
 name: relevar
-description: Relevamiento recursivo del repo — enumerar diciendo siempre con qué se enumeró, y desconfiar de todo conteo que no recorra todos los niveles.
+description: Relevamiento recursivo del repo — enumerar diciendo siempre con qué se enumeró, distinguiendo trackeado, untracked e ignorado, y sabiendo qué universo cubre cada herramienta.
 context: fork
 agent: auditor
 allowed-tools: Glob, Grep, Read
@@ -14,25 +14,83 @@ la conclusión que se apoya en él viaja como si estuviera verificada.
 **Con qué se enumeró es parte de la afirmación.** "Son 54 scripts" sin decir cómo
 se contaron no es un dato: es una impresión con formato de dato.
 
-## Herramientas y su alcance real
+## Estado de Git de este repo, ahora
 
-Verificado en este repo, sobre `*.test.mjs`:
+Esto se calcula **antes** del fork y llega ya resuelto. Adentro no hay Bash: no
+se puede correr `git`, ni `git ls-files`, ni `git grep`. Estos números son la
+única foto de Git disponible, y son de este instante.
 
-- `Glob` con patrón `*.test.mjs` → **91 archivos, recursivo**. El Glob de las
-  herramientas recorre todo el árbol sin necesidad de `**/`.
-- `git ls-files "*.test.mjs"` → **91**. Recorre el repo entero. Ve solo lo
-  trackeado.
-- `Grep` (ripgrep) → recursivo por default, respeta `.gitignore`.
-- `ls *.test.mjs` en la raíz → **0 archivos**. El glob del shell mira un solo
-  nivel.
-- `fs.readdirSync` → un solo nivel. `find -maxdepth N` → lo que se le diga.
+- Archivos **trackeados**: !`git ls-files | wc -l`
+- **Untracked no ignorados** (los que `git status` muestra con `??`): !`git status --porcelain | grep -c "^??"`
+- Entradas **ignoradas** presentes en disco, con los directorios colapsados: !`git status --porcelain --ignored | grep -c "^!!"`
+- Lo mismo contado archivo por archivo dentro de esas entradas: !`git status --porcelain --ignored=matching | grep -c "^!!"`
 
-Los dos primeros coinciden y son los que sirven para afirmar un número. Los tres
-últimos son los que ya mintieron.
+Las entradas ignoradas, una por línea:
 
-**Ojo con lo no trackeado:** `git ls-files` no ve archivos sin agregar ni
-ignorados. Si la pregunta es "qué hay en el disco" y no "qué hay en el repo",
-`git ls-files` es la herramienta equivocada y hay que decirlo.
+!`git status --porcelain --ignored | grep "^!!" | sed "s/^!! //"`
+
+## Los cuatro universos
+
+No son tres. El tercero es el que deja ciegos a los relevamientos.
+
+1. **Trackeado** — está en el índice de Git. Lo ve `git ls-files`.
+2. **Untracked no ignorado** — está en disco, Git lo ve y lo reporta con `??`.
+3. **En disco pero ignorado por `.gitignore`** — está ahí, funciona, se ejecuta,
+   y **no aparece ni en `git ls-files` ni en `git status` a secas**. Hay que
+   pedirlo con `--ignored`.
+4. **Qué universo cubre cada herramienta** — abajo, medido.
+
+El caso 3 no es teórico. Las cuatro skills de este mismo directorio eran
+exactamente eso hasta hace un commit: existían en disco, cargaban y funcionaban,
+no estaban trackeadas, y `git status` **tampoco las mostraba como untracked**
+porque `.gitignore` tenía `.claude/*`. Un relevamiento que solo mira los dos
+primeros universos habría informado que no existían.
+
+Mirando la lista de arriba: ahí adentro hay archivos que importan y que un
+relevamiento normal no ve.
+
+## Alcance real de cada herramienta, medido en este repo
+
+Medido con `*.sql`, que es donde se separan:
+
+- **`Glob`** — recursivo sin necesidad de `**/`, y **NO respeta `.gitignore`**.
+  Con `*.sql` devolvió **85** archivos: los 82 trackeados **más** tres ignorados
+  (`backup_erpazul.sql`, `diff.sql`, `fix_column.sql`).
+  Es la única herramienta del fork que alcanza el universo 3.
+- **`Grep`** (ripgrep) — recursivo, y **SÍ respeta `.gitignore`**. Buscar una
+  frase que está en un archivo ignorado devolvió **nada**; pasándole ese archivo
+  como `path` explícito, lo encontró. O sea: el archivo estaba, el filtro lo
+  escondía.
+- **`Read`** — no enumera. Abre lo que se le pida, ignorado o no.
+
+Fuera del fork, en el hilo principal:
+
+- **`git ls-files`** — repo entero, solo universo 1.
+- **`git grep`** — repo entero, solo universo 1. **No está disponible dentro de
+  esta skill**: el auditor no tiene Bash. Si hace falta una búsqueda de Git
+  puntual, se pide en el hilo principal.
+- **`ls *.sql`** en la raíz → 3 archivos. El glob del shell mira **un solo
+  nivel**.
+- **`fs.readdirSync`** → un solo nivel. **`find -maxdepth N`** → lo que se le
+  diga.
+
+**La consecuencia práctica:** un conteo hecho solo con `Grep` está ciego a lo
+ignorado. Uno hecho solo con `git ls-files` también. **Glob es el que ve el
+disco.** Cuando la pregunta es "qué hay realmente acá", la respuesta sale de
+Glob; cuando es "qué hay en el repo", de la lista de trackeados de arriba. Son
+preguntas distintas y hay que decir cuál se contestó.
+
+Y ojo con las coincidencias: con `*.test.mjs`, Glob y `git ls-files` dan los dos
+**91**. No porque sean equivalentes, sino porque no hay ningún `.test.mjs`
+ignorado. Que dos métodos coincidan una vez no los vuelve intercambiables.
+
+## Contar ignorados: el modo cambia el número
+
+`git status --ignored` **colapsa directorios enteros en una sola entrada**
+(`node_modules/` cuenta como 1). Con `--ignored=matching` los expande. En este
+repo eso es la diferencia entre los dos números de arriba, y **ninguno de los
+dos está mal**: contestan preguntas distintas. Decir cuál se usó es parte del
+número.
 
 ## El caso que originó la regla
 
@@ -82,13 +140,12 @@ literal. Un `?? 10` no aparece en ningún grep del nombre de la constante.
 Siempre con las tres cosas juntas:
 
 1. **El número.**
-2. **Con qué se enumeró**, textual: el comando o la herramienta y el patrón.
-3. **Qué queda afuera de esa enumeración**: lo no trackeado, lo ignorado, los
-   caminos alternativos que el patrón no cubre.
+2. **Con qué se enumeró**, textual: la herramienta y el patrón.
+3. **Qué universo cubre y qué queda afuera**: si incluye lo ignorado, si incluye
+   lo untracked, qué caminos alternativos no cubre el patrón.
 
-Ejemplo de la forma correcta: *"91 candados, enumerados con
-`git ls-files '*.test.mjs'`; no incluye archivos sin trackear ni los ignorados
-por `.gitignore`."*
+Ejemplo de la forma correcta: *"85 archivos `.sql`, enumerados con Glob `*.sql`,
+que ve el disco entero incluidos los ignorados; de esos, 82 están trackeados."*
 
 Y si un número cambió entre dos informes, **explicar el cambio antes de dar el
 nuevo**: 2344 contra 2329 no fue una regresión, fue que un conteo enumeró todo el
@@ -97,6 +154,7 @@ repo y el otro solo `lib/`.
 ## Antes de cerrar el relevamiento
 
 - ¿La enumeración recorre todos los niveles, o solo el primero?
+- ¿Cubre lo ignorado, o la herramienta lo filtró sin avisar?
 - ¿El patrón cubre a los que hacen lo mismo por otro camino?
 - ¿Hay envoltorios entre el llamador y lo que estoy buscando?
 - ¿Qué queda afuera y lo dije?

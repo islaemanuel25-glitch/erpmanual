@@ -16,7 +16,9 @@ hacia afuera. Si alguien lo compromete se lleva la base pero **no** los backups:
 no tiene con qué llegar a ellos. El sentido del tráfico es parte del diseño y no
 se invierte por comodidad.
 
-## Los tres destinos
+## Los tres destinos que existen
+
+Son **tres**, no cuatro. Los tres se ejecutan y se validan en cada corrida:
 
 1. **VPS** `/srv/produccion/backups/` — 30 diarios, 12 semanales, 12 mensuales.
    Sin cifrar: está bajo control propio.
@@ -27,10 +29,21 @@ se invierte por comodidad.
    todas las versiones para siempre y un `.gz` no comprime más, así que subir
    365 por año lo haría crecer sin freno.
 
-Hay un cuarto destino previsto y todavía vacío: disco externo con etiqueta
-`BACKUP-ERP`. Se busca **por etiqueta y no por letra**, porque la letra cambia
-según qué haya enchufado antes. Mientras no exista, cada corrida deja
-`disco_externo | NO CONECTADO` en el log y sigue.
+### El cuarto destino no existe
+
+El disco externo con etiqueta `BACKUP-ERP` está **previsto en el código y
+condicional**: el script lo busca **por etiqueta y no por letra** —la letra
+cambia según qué haya enchufado antes— y hoy no hay ningún volumen con esa
+etiqueta. Cada corrida deja `disco_externo | NO CONECTADO` en el log y sigue de
+largo, que es lo correcto.
+
+**No se cuenta como copia** mientras no exista y no se haya validado una copia
+real ahí. Al informar la cobertura de backup se dice tres, y el disco se
+menciona aparte como previsto. Contarlo como cuarto destino es exactamente el
+tipo de cuenta que hace creer que hay una copia de más.
+
+Sumarlo no requiere tocar ningún script: formatear el disco, ponerle la etiqueta,
+correr la tarea y comprobar que `ESTADO.txt` registre el destino con fecha.
 
 ## Eslabón 1 — El dump en el VPS
 
