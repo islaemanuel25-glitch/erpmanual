@@ -116,112 +116,86 @@ puede saber leyendo la base. Lo que sí se puede afirmar: como en 48 de los 90 e
 nombre empieza con el mismo texto, buscar por nombre ya los encuentra, y el
 código no agrega nada.
 
-## Lo que sí es basura, para decidir qué hacer
+## Estado de la limpieza
 
-**No se borró ni se corrigió nada.** Van con el nombre del producto al lado.
+**47 vaciados** el 2026-08-10 por la migración
+`20260810210000_vaciar_codigos_barra_derivados_del_nombre`: los que tenían el
+nombre del producto, entero o abreviado. El estado anterior y el SQL para
+reponerlos están en
+[codigos-vaciados-2026-08-10.md](codigos-vaciados-2026-08-10.md).
 
-### Más de 14 caracteres, con letras o espacios (13 productos)
+**43 sin tocar**, esperando decisión uno por uno. Son los de abajo.
 
-- `BOCADITO CHOC BLANCO` (20) — GRANIX BOCADITO CHOC. BLANCO 2KG
-- `LIVRA CITRUS 1.5 GAS` (20) — LIVRA CITRUS 1.5 CON GAS
-- `LIVRA POMELO 1.5 GAS` (20) — LIVRA POMELO 1.5 CON GAS
-- `ARGENTINA BOMBILLA` (18) — ARGENTINA BOMBILLA
-- `QUITAESMALTENEPTUS` (18) — QUITAESMALTE NEPTUS 60CM
-- `bizcochocongelado` (17) — Bizcocho Congelado
-- `bocadito fantoche` (17) — bocadito fantoche
-- `medialunassaladas` (17) — Medialunas Saladas Congeladas x75
-- `Solmayorhigienico` (17) — Sol Mayor Papel Higienico
-- `TOALLITAS PAMPERS` (17) — TOALLITAS PAMPERS X48
-- `ESCOBILLON CURVO` (16) — ESCOBILLON CURVO
-- `Medialunasdulces` (16) — Medialunas Dulces Congeladas x75
-- `cremoso ramolac` (15) — CREMOSO RAMOLAC X KG
+**16 largos sin tocar** —los tres GS1 son legítimos—, listados más abajo.
 
-### 14 caracteres o menos, pero con letras o espacios (77 productos)
+## Los 43 que quedan, para decidir uno por uno
 
-Entran dentro del tope de largo, así que **un tope por largo no los habría
-frenado**. La mayoría son nombres abreviados usados como código interno, y varios
-parecen deliberados: el producto no tiene código de fábrica y alguien le puso uno
-a mano para poder buscarlo.
+No se parecen al nombre del producto, así que vaciarlos no es obvio: alguno
+podría ser un atajo de tecleo que alguien usa a diario. Van con las ventas al
+lado, que es el único indicio medible de que el producto está vivo.
 
-- `caja bon o bon` (14) — caja bon o bon
-- `7790895641749-` (14) — cepita anana 1.5l
-- `PAÑO AMARRILLO` (14) — PAÑO AMARILLO
-- `arrolladovaca` (13) — Arrollado de Vaca
-- `BARRATREMBLAY` (13) — BARRA TREMBLAY
-- `pan congelADO` (13) — pan congelado xkg
-- `pollo trozado` (13) — pollo trozado
-- `SURTIDO PRIME` (13) — PRIME PRESERVATIVO
-- `cascarablanca` (13) — Queso Cascara Blanca CLP
-- `cremosocremac` (13) — Queso Cremoso Cremac
-- `cremosoverona` (13) — Queso Cremoso Verona
-- `holandaverona` (13) — Queso Holanda La Verona
-- `7790O36048260` (13) — VINO UVITA BLANCO DULCE X12
-- `CARBONGRANDE` (12) — CARBON  GRANDE
-- `IODOPOVIDONA` (12) — IODOPOVIDONA
-- `LOMO DEL RIO` (12) — LOMO DEL RIO X2
-- `PULVERIZADOR` (12) — PULVERIZADOR1L
-- `cascaranegra` (12) — Queso Cascara Negra CLP
-- `picadogrueso` (12) — Salamin Fox Picado Grueso
-- `secadortango` (12) — Secador De Pïso Tango
-- `TARRITOORINA` (12) — TARRITO ORINA
-- `BOLSA 50x70` (11) — BOLSA CONSORCIO YO RECICLO 50x70
-- `BOLSA 60x90` (11) — BOLSA  CONSORCIO YO RECICLO 60x90
-- `CARBONCHICO` (11) — CARBON CHICO
-- `mozzacremac` (11) — Mozzarella Cremac
-- `paletasadia` (11) — Paleta sadia
-- `PALO MADERA` (11) — PALO MADERA
-- `pancholargo` (11) — Pan Super Pancho
-- `sardoverona` (11) — Queso Sardo La Verona
-- `aceiteseda` (10) — Aceite Seda 10L
-- `PETACACAFE` (10) — DERNA PETACA CAFE AL COGNAC XCAJA
-- `doververde` (10) — Dover Verde
-- `fantalimon` (10) — Fanta Limon 2l
-- `paletafela` (10) — Paleta Fela
-- `paletapala` (10) — Paleta Paladini
-- `salamefela` (10) — Salame Fela
-- `picadofino` (10) — Salamin Fox Picado Fino
-- `skyclasico` (10) — Skyy Clasico
-- `solcabello` (10) — SOL PAMPEANO CABELLITO
-- `verduleria` (10) — verduleria
-- `albondiga` (9) — Albondigas Caseras x Caja
-- `bagetines` (9) — BAGUETINES DEL RIO x2
-- `fanta 237` (9) — fanta vidrio 237
-- `HILO ATAR` (9) — HILO ATAR
-- `mortadela` (9) — Mortadela Paladini
-- `petacagin` (9) — Petaca Derna Gin
-- `salamefox` (9) — Salame Fox 
-- `salametro` (9) — Salametro
-- `solforati` (9) — Sol Pampeano Forati
-- `sprite237` (9) — Sprite Vidrio 237 
-- `pachamama` (9) — Tabaco Pacha Mama
-- `bondiola` (8) — Bondiola Piamontesa
-- `CORDONES` (8) — CORDON EL MOÑO X12U
-- `cordones` (8) — cordones negros
-- `JAIMITOS` (8) — Jaimitos X 10u
-- `LOMO PAN` (8) — PAN ALS LOMO
-- `pancho24` (8) — Pancho 24 Als
-- `pancho12` (8) — Pan Pancho Fucci
-- `pategras` (8) — pategras por kg
-- `prepizza` (8) — prepizza cebolla
-- `361LATA` (7) — 361 LATA X24
-- `BENGALA` (7) — BENGALA X4
-- `camel10` (7) — Camel 10
-- `panlomo` (7) — Pan Lomito
-- `torpedo` (7) — PAN TORPEDO 
-- `casera` (6) — Hamburguesa Casera
-- `PRITTY` (6) — PRITTY 1L
-- `lahoja` (6) — Tabaco La Hoja
-- `PERRO` (5) — BALANCIN ALIMENTO PERRO 15KG
-- `chori` (5) — Chorigol Casero x Caja 30u
-- `maple` (5) — Maple Huevos x30
-- `papas` (5) — Papas Congeladas
-- `mixta` (5) — prepizza mixta
-- `roque` (5) — Queso Azukl Vanguard
-- `bica` (4) — Bicarbonato Paez
-- `xl` (2) — Hamburguesa Casera XL
-- `%` (1) — azucar impalpable velez 250gr
+Ojo: que el producto se venda **no prueba** que alguien use este código para
+encontrarlo. No hay registro de búsquedas. Lo que sí se sabe es que el buscador
+del POS lee este campo, así que tipear el texto exacto encontraría el producto.
 
-## Un caso aparte: `7790895641749-`
+### Con ventas (31)
+
+- **2086** · `cremosocremac` (13) · Queso Cremoso Cremac · 204 ventas, última 2026-08-10
+- **694** · `xl` (2) · Hamburguesa Casera XL · 172 ventas, última 2026-08-10
+- **455** · `PETACACAFE` (10) · DERNA PETACA CAFE AL COGNAC XCAJA · 86 ventas, última 2026-08-10
+- **1416** · `torpedo` (7) · PAN TORPEDO  · 74 ventas, última 2026-08-10
+- **2130** · `pancholargo` (11) · Pan Super Pancho · 56 ventas, última 2026-08-10
+- **552** · `picadofino` (10) · Salamin Fox Picado Fino · 48 ventas, última 2026-08-10
+- **1541** · `picadogrueso` (12) · Salamin Fox Picado Grueso · 42 ventas, última 2026-08-10
+- **2117** · `cascarablanca` (13) · Queso Cascara Blanca CLP · 41 ventas, última 2026-08-10
+- **2091** · `pachamama` (9) · Tabaco Pacha Mama · 40 ventas, última 2026-08-09
+- **2299** · `sardoverona` (11) · Queso Sardo La Verona · 30 ventas, última 2026-08-06
+- **2101** · `cremosoverona` (13) · Queso Cremoso Verona · 28 ventas, última 2026-08-08
+- **2213** · `lahoja` (6) · Tabaco La Hoja · 28 ventas, última 2026-08-08
+- **448** · `pancho12` (8) · Pan Pancho Fucci · 20 ventas, última 2026-08-08
+- **2092** · `panlomo` (7) · Pan Lomito · 14 ventas, última 2026-07-08
+- **967** · `7790O36048260` (13) · VINO UVITA BLANCO DULCE X12 · 14 ventas, última 2026-08-09
+- **2124** · `mozzacremac` (11) · Mozzarella Cremac · 9 ventas, última 2026-08-04
+- **2119** · `cascaranegra` (12) · Queso Cascara Negra CLP · 9 ventas, última 2026-08-07
+- **822** · `SURTIDO PRIME` (13) · PRIME PRESERVATIVO · 8 ventas, última 2026-08-06
+- **2125** · `casera` (6) · Hamburguesa Casera · 5 ventas, última 2026-07-28
+- **2300** · `roque` (5) · Queso Azukl Vanguard · 5 ventas, última 2026-08-07
+- **2336** · `solforati` (9) · Sol Pampeano Forati · 5 ventas, última 2026-08-05
+- **2337** · `%` (1) · azucar impalpable velez 250gr · 4 ventas, última 2026-07-22
+- **2298** · `holandaverona` (13) · Queso Holanda La Verona · 4 ventas, última 2026-07-02
+- **2241** · `Solmayorhigienico` (17) · Sol Mayor Papel Higienico · 4 ventas, última 2026-07-27
+- **1951** · `solcabello` (10) · SOL PAMPEANO CABELLITO · 2 ventas, última 2026-08-06
+- **1886** · `sprite237` (9) · Sprite Vidrio 237  · 2 ventas, última 2026-08-05
+- **2315** · `arrolladovaca` (13) · Arrollado de Vaca · 1 ventas, última 2026-06-08
+- **1885** · `fanta 237` (9) · fanta vidrio 237 · 1 ventas, última 2026-08-05
+- **1883** · `LIVRA CITRUS 1.5 GAS` (20) · LIVRA CITRUS 1.5 CON GAS · 1 ventas, última 2026-05-27
+- **1437** · `LOMO PAN` (8) · PAN ALS LOMO · 1 ventas, última 2026-05-23
+- **430** · `PAÑO AMARRILLO` (14) · PAÑO AMARILLO · 1 ventas, última 2026-07-03
+
+### Sin ventas (12)
+
+- **1779** · `bagetines` (9) · BAGUETINES DEL RIO x2 · sin ventas
+- **658** · `PERRO` (5) · BALANCIN ALIMENTO PERRO 15KG · sin ventas
+- **1406** · `BOLSA 50x70` (11) · BOLSA CONSORCIO YO RECICLO 50x70 · sin ventas
+- **1407** · `BOLSA 60x90` (11) · BOLSA  CONSORCIO YO RECICLO 60x90 · sin ventas
+- **1789** · `7790895641749-` (14) · cepita anana 1.5l · sin ventas
+- **139** · `CORDONES` (8) · CORDON EL MOÑO X12U · sin ventas
+- **1800** · `BOCADITO CHOC BLANCO` (20) · GRANIX BOCADITO CHOC. BLANCO 2KG · sin ventas
+- **1882** · `LIVRA POMELO 1.5 GAS` (20) · LIVRA POMELO 1.5 CON GAS · sin ventas
+- **2318** · `petacagin` (9) · Petaca Derna Gin · sin ventas
+- **1539** · `mixta` (5) · prepizza mixta · sin ventas
+- **2329** · `secadortango` (12) · Secador De Pïso Tango · sin ventas
+- **2294** · `skyclasico` (10) · Skyy Clasico · sin ventas
+
+## Un caso aparte: `%` (id 2337)
+
+En "azucar impalpable velez 250gr". Entró en el conteo original de "48 a vaciar"
+por un artefacto de la comparación: al sacarle los caracteres no alfanuméricos
+queda la cadena vacía, y "el nombre empieza con la cadena vacía" es verdadero
+para cualquier nombre. **No es el comienzo de ningún nombre**, así que quedó
+afuera del vaciado y entra en la lista de arriba.
+
+## Otro caso aparte: `7790895641749-`
 
 Trece dígitos correctos y un guion al final, en "cepita anana 1.5l". Es el único
 que parece un error de tipeo sobre un código válido y no una decisión.
