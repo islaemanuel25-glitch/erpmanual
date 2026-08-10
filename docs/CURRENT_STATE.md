@@ -10,51 +10,76 @@
 >
 > ## En producción
 >
-> **Commit desplegado:** `84793e18c8d0b49d3e2d4c505c9e8e5b900de5be`
-> **Desplegado el:** 2026-08-10 20:01 (hora del VPS, UTC)
+> **Commit desplegado:** `17a014dd3739cbaf005f56d2c075d44fef5bd636`
+> **Desplegado el:** 2026-08-10 21:31 (hora del VPS, UTC)
 >
 > Los cinco valores coinciden: `origin/main`, HEAD del VPS, tag de la imagen,
-> `APP_BUILD_ID` y `/api/version`. Sin migraciones —el clasificador informó cero
-> archivos sobre el HEAD desplegado, y `migrate deploy` confirmó "No pending
-> migrations" sobre las 81 existentes—. El corte quedó **por debajo de 5
-> segundos**, medido de punta a punta: `up -d` arrancó 20:01:55 y volvió 20:01:59,
-> y el primer sondeo posterior encontró el endpoint en 200 al segundo. Next
-> informó "Ready in 504ms".
+> `APP_BUILD_ID` y `/api/version`. El corte quedó **por debajo de 5 segundos**:
+> `up -d` arrancó 21:31:07 y volvió 21:31:10, y el primer sondeo posterior
+> encontró el endpoint en 200 de inmediato. Next informó "Ready in 499ms".
 >
-> Este despliegue llevó dos commits. El de fondo es `506bc08`: **el ancho que se
-> le pide a `SunmiInput` ahora se aplica**. El componente ponía `w-full` siempre y,
-> como empata en especificidad con el ancho pedido, ganaba por orden de hoja de
-> estilos; medido antes del arreglo, 75 de 77 inputs de una pantalla tenían
-> `width: 100%`. Ahora `w-full` lo pone `componerClaseInput` solo cuando nadie
-> declaró ancho, así que los 193 usos sin ancho no cambian y los 28 que sí piden
-> uno empiezan a recibirlo. Nueve de esos 28 no entraban con el ancho escrito y se
-> ensancharon, medidos contra el peor valor real de producción. El segundo commit,
-> `84793e1`, es solo documentación.
+> **ESTE FUE EL PRIMER DESPLIEGUE CON MIGRACIÓN DE DATOS.** Llevó tres cosas: el
+> tope de 16 caracteres en el código de barra (`6a4821a`), la migración que vacía
+> 29 códigos basura (`17a014d`) y su documentación.
 >
-> **Sin migraciones y sin tocar la base.** `erpazul_db` sigue con 9 días de
-> `Up (healthy)`: se recreó únicamente `app`, con `--no-deps`.
+> ### La migración
+>
+> `20260810210000_vaciar_codigos_barra_derivados_del_nombre` pone en NULL el
+> `codigo_barra` de 29 productos que tenían el nombre del producto en esa columna
+> y **ninguna venta**. El clasificador la marcó como NO ADITIVA por el UPDATE de
+> datos y frenó el despliegue con código 1, que es lo correcto. Se autorizó con
+> `DEPLOY_MIGRACION_AUTORIZADA=1` adelante del comando, que es la puerta prevista
+> y deja rastro en la línea.
+>
+> **Compatibilidad hacia atrás, verificada y no asumida.** Durante la ventana
+> entre migrar y recrear, el esquema es nuevo y el código es el viejo. Se
+> comprobó: en producción **ya había 323 productos con el código en NULL** que la
+> versión anterior atendía todos los días; ningún lector de `codigo_barra` de esa
+> versión accede al valor sin guarda —el único `.trim()` directo, en
+> `productos/import/preview`, está dentro de un `if (p.codigo_barra)`—; y la
+> migración solo escribe NULL, una forma de dato que ya convivía con el unique
+> `(grupoId, codigo_barra)` porque PostgreSQL trata los NULL como distintos.
+>
+> **Verificado después de aplicar, contra producción y solo lectura:** los
+> productos con letras en el código bajaron de 90 a 61; los que tienen NULL
+> subieron de 323 a 352, exactamente +29; aparecieron las 29 filas de bitácora con
+> acción `producto.codigo_barra.vaciar`, su autor y el valor anterior. Y el
+> conjunto vaciado es **exactamente** el de la lista: cero ids de la migración sin
+> vaciar, cero productos vaciados que no estuvieran en ella, cero cadenas vacías.
+>
+> **Trampa encontrada en el camino, para que no se repita:** el primer intento de
+> `migrate deploy` informó "81 migrations found / No pending migrations", porque
+> `docker compose run` toma la imagen de `APP_IMAGE`, que todavía apuntaba al SHA
+> anterior — o sea, corrió el contenedor descartable de la imagen VIEJA, que no
+> contiene la migración nueva. **Con migraciones, `APP_IMAGE` se actualiza ANTES
+> de migrar, no antes de recrear.** Al repetirlo con la imagen nueva informó 82 y
+> la aplicó. El chequeo que lo detectó fue mirar el número de migraciones, no el
+> código de salida: el comando había salido con éxito.
 >
 > **Referencia de rollback de esta versión** (la imagen que corría ANTES):
-> `ghcr.io/islaemanuel25-glitch/erpmanual:a9b2e68b73b8634846f576c9bc9faaf46b035e10`,
-> digest `sha256:679209db13acd1ae535ce749fd3b0a270d6c05d9035d1d03d738d10d494cc843`,
-> image ID `sha256:806abc7ce3a560d220a47e0ae21218af199a0ee0a40152c68e306e5578e53a2c`.
+> `ghcr.io/islaemanuel25-glitch/erpmanual:84793e18c8d0b49d3e2d4c505c9e8e5b900de5be`,
+> digest `sha256:2eedf9651e40b086336c3e22c81762b66c1d027e716c56d0f971e52408d99282`,
+> image ID `sha256:d7840a8832e7bca29adea4c08c6ba7c431ff344e14447b779a91b849ab1386b1`.
 >
-> Backup previo validado con los cuatro chequeos:
-> `/srv/produccion/backups/pre-84793e1_20260810_195518.sql.gz` (1.935.366 bytes,
-> 56 tablas).
+> **Ojo con el rollback de esta versión:** volver la imagen atrás NO deshace la
+> migración. El rollback de código deja los 29 códigos en NULL, y la versión
+> anterior los maneja sin problema. Para reponer los datos está el SQL en
+> `docs/business-rules/codigos-vaciados-2026-08-10.md`, y el dump previo en
+> `/srv/produccion/backups/pre-migracion-codigos-17a014d_20260810_212412.sql.gz`
+> (1.938.673 bytes, 56 tablas, validado con los cuatro chequeos y con la
+> comprobación extra de que uno de los códigos a vaciar aparece dentro del dump).
 >
-> **Lo que no cerró:** el árbol del VPS tiene **22 archivos sin trackear**
-> —`.env.bak-*` y `.env.rollback-*` acumulados por despliegues anteriores, uno de
-> ellos el de hoy—. Los trackeados están limpios. La verificación de cierre pide
-> `git status --porcelain` vacío y no lo está; es previo y acumulado, no lo
-> introdujo este despliegue.
+> **Lo que no cerró:** el árbol del VPS tiene **23 archivos sin trackear**
+> —`.env.bak-*` y `.env.rollback-*` acumulados por despliegues anteriores—. Los
+> trackeados están limpios. La verificación de cierre pide ese listado vacío y no
+> lo está; es previo y acumulado.
 >
 > **Lo que no se pudo verificar:** que las pantallas se vean bien EN PRODUCCIÓN.
-> Sin sesión, las rutas devuelven 200 y sirven el armazón, pero el contenido lo
-> dibuja el cliente después de autenticarse. Y los logs de Next en producción no
-> registran por pedido: sus 6 líneas prueban que la aplicación arrancó, no que las
-> pantallas funcionen. Las capturas que respaldan el cambio son de la máquina de
-> desarrollo, contra una copia de la base, no de producción.
+> Sin sesión las rutas devuelven 200 y sirven el armazón, pero el contenido lo
+> dibuja el cliente después de autenticarse. Los logs de Next no registran por
+> pedido: sus 6 líneas prueban que la aplicación arrancó, no que las pantallas
+> funcionen. El tope de 16 caracteres se verificó en la máquina de desarrollo,
+> contra una copia de la base, no de producción.
 >
 > **Ojo:** el commit desplegado es POSTERIOR al del relevamiento. Lo que dice este
 > documento sobre deuda y contradicciones vale para el commit del encabezado, con
