@@ -118,50 +118,52 @@ código no agrega nada.
 
 ## Estado de la limpieza
 
-**29 se vacían** con la migración
-`20260810210000_vaciar_codigos_barra_derivados_del_nombre`. El criterio final es
-**cero ventas**: ninguno de los 29 tiene una sola línea de venta. El estado
-anterior y el SQL para reponerlos están en
+Dos migraciones, con criterios sucesivos y distintos.
+
+**29 vaciados** por `20260810210000_vaciar_codigos_barra_derivados_del_nombre`,
+**ya aplicada en producción**. Criterio: cero ventas. Respaldo en
 [codigos-vaciados-2026-08-10.md](codigos-vaciados-2026-08-10.md).
 
-**61 quedan sin tocar**, para decidir uno por uno. Todos tienen al menos una
-venta.
+**60 por vaciar** con `20260810230000_vaciar_codigos_barra_del_deposito`, escrita
+y **sin aplicar**. Criterio: los creó el depósito. Respaldo en
+[codigos-vaciados-deposito-2026-08-10.md](codigos-vaciados-deposito-2026-08-10.md).
 
-### Por qué el criterio terminó siendo el uso y no la forma
+**1 intocable:** `pollo trozado` (id 2387, 34 ventas), el único creado por
+Casiano Casas. Por [../decisions/DEC-0006](../decisions/DEC-0006-codigos-de-casiano-intocables.md).
 
-Se probaron dos criterios de forma y los dos fallaron, cada uno por su lado:
+Cuando la segunda se aplique, la columna queda con **un solo** código de texto.
 
-1. **"El código es el nombre del producto o su comienzo."** Dejaba adentro
-   `bica`, `chori`, `camel10` y once más. Un atajo de tecleo TAMBIÉN empieza
-   igual que el nombre: por eso es un buen atajo.
-2. **"Más de 8 caracteres."** La fiambrería tiene nombres cortos, así que partía
-   el rubro al medio: `mortadela` (9 caracteres, 82 ventas) caía del lado del
-   vaciado y `picadofino` (10, 48) quedaba afuera. Y a 13 caracteres convivían
-   `BARRATREMBLAY` con 201 ventas y `cascarablanca` con 41.
+### Los cuatro criterios, y por qué los tres primeros no alcanzaron
 
-No hay regla sobre la forma del texto que separe un atajo en uso de una basura
-heredada. La que sí separa es el uso: **si el producto nunca se vendió, nadie
-tipeó su código para venderlo**.
+1. **"El código es el nombre o su comienzo."** Dejaba adentro `bica`, `chori`,
+   `camel10`. Un atajo de tecleo también empieza igual que el nombre: por eso es
+   un buen atajo.
+2. **"Más de 8 caracteres."** Partía la fiambrería al medio, porque sus nombres
+   son cortos: `mortadela` (9, 82 ventas) caía adentro y `picadofino` (10, 48)
+   quedaba afuera.
+3. **"Cero ventas."** Funcionó y vació 29, pero por construcción dejó afuera
+   todo lo que se usa — que era justamente lo que había que decidir.
+4. **"Quién creó el producto."** El que decidió. Ninguna regla de forma podía
+   saber de quién es un código; el creador está guardado y el negocio sabe qué
+   ubicación tipea y cuál usa lector.
 
-La decisión se toma por la asimetría de los errores, no por elegancia. Vaciar un
-atajo en uso le rompe el trabajo a quien está atendiendo; dejar basura en un
-campo no le cuesta nada a nadie. Y lo que de verdad importaba —que no entren
-códigos nuevos— ya está resuelto con el tope de 16 caracteres.
+### Lo que el cuarto criterio cuesta
 
-## Los 61 que quedan, ordenados por ventas
+**Los 60 que se vacían tienen ventas. Los 60.** Tiene que ser así: los que nunca
+vendieron ya los vació la migración anterior, así que lo que queda es exactamente
+lo que se usa. Entre ellos `xl` con 172 ventas y `BARRATREMBLAY` con 201, las dos
+del mismo día de la medición.
 
-De más a menos. Todos tienen al menos una venta, así que ninguno se puede
-descartar por inactividad. Los de arriba son casi seguro atajos vivos.
+Es la contracara declarada de la decisión anterior. Está aceptado en DEC-0006 y
+el respaldo permite reponer cualquiera.
 
-Que el producto se venda **no prueba** que alguien use este código para
-encontrarlo — no hay registro de búsquedas. Lo que sí se sabe es que el buscador
-del POS lee este campo, así que tipear el texto exacto encuentra el producto.
+## Los 60 del depósito, ordenados por ventas
 
 - **2086** · `cremosocremac` (13 car.) · Queso Cremoso Cremac · **204 ventas**, última 2026-08-10
-- **79** · `BARRATREMBLAY` (13 car.) · BARRA TREMBLAY · **201 ventas**, última 2026-08-10
+- **79** · `BARRATREMBLAY` (13 car.) · BARRA TREMBLAY · **203 ventas**, última 2026-08-10
 - **694** · `xl` (2 car.) · Hamburguesa Casera XL · **172 ventas**, última 2026-08-10
 - **1417** · `pancho24` (8 car.) · Pancho 24 Als · **164 ventas**, última 2026-08-10
-- **2083** · `paletasadia` (11 car.) · Paleta sadia · **114 ventas**, última 2026-08-10
+- **2083** · `paletasadia` (11 car.) · Paleta sadia · **115 ventas**, última 2026-08-10
 - **455** · `PETACACAFE` (10 car.) · DERNA PETACA CAFE AL COGNAC XCAJA · **86 ventas**, última 2026-08-10
 - **2099** · `mortadela` (9 car.) · Mortadela Paladini · **82 ventas**, última 2026-08-10
 - **691** · `maple` (5 car.) · Maple Huevos x30 · **81 ventas**, última 2026-08-10
@@ -170,8 +172,8 @@ del POS lee este campo, así que tipear el texto exacto encuentra el producto.
 - **1416** · `torpedo` (7 car.) · PAN TORPEDO  · **74 ventas**, última 2026-08-10
 - **2100** · `salamefela` (10 car.) · Salame Fela · **61 ventas**, última 2026-08-10
 - **2134** · `doververde` (10 car.) · Dover Verde · **60 ventas**, última 2026-08-10
+- **2023** · `361LATA` (7 car.) · 361 LATA X24 · **56 ventas**, última 2026-08-10
 - **2130** · `pancholargo` (11 car.) · Pan Super Pancho · **56 ventas**, última 2026-08-10
-- **2023** · `361LATA` (7 car.) · 361 LATA X24 · **55 ventas**, última 2026-08-10
 - **552** · `picadofino` (10 car.) · Salamin Fox Picado Fino · **48 ventas**, última 2026-08-10
 - **1541** · `picadogrueso` (12 car.) · Salamin Fox Picado Grueso · **42 ventas**, última 2026-08-10
 - **2117** · `cascarablanca` (13 car.) · Queso Cascara Blanca CLP · **41 ventas**, última 2026-08-10
@@ -180,7 +182,6 @@ del POS lee este campo, así que tipear el texto exacto encuentra el producto.
 - **92** · `bica` (4 car.) · Bicarbonato Paez · **36 ventas**, última 2026-08-10
 - **2191** · `CARBONGRANDE` (12 car.) · CARBON  GRANDE · **35 ventas**, última 2026-08-09
 - **2120** · `paletapala` (10 car.) · Paleta Paladini · **34 ventas**, última 2026-08-10
-- **2387** · `pollo trozado` (13 car.) · pollo trozado · **33 ventas**, última 2026-08-10
 - **2299** · `sardoverona` (11 car.) · Queso Sardo La Verona · **30 ventas**, última 2026-08-06
 - **2101** · `cremosoverona` (13 car.) · Queso Cremoso Verona · **28 ventas**, última 2026-08-08
 - **2213** · `lahoja` (6 car.) · Tabaco La Hoja · **28 ventas**, última 2026-08-08
@@ -189,45 +190,54 @@ del POS lee este campo, así que tipear el texto exacto encuentra el producto.
 - **857** · `albondiga` (9 car.) · Albondigas Caseras x Caja · **25 ventas**, última 2026-08-07
 - **2185** · `PRITTY` (6 car.) · PRITTY 1L · **25 ventas**, última 2026-08-07
 - **448** · `pancho12` (8 car.) · Pan Pancho Fucci · **20 ventas**, última 2026-08-08
-- **2092** · `panlomo` (7 car.) · Pan Lomito · **14 ventas**, última 2026-07-08
 - **967** · `7790O36048260` (13 car.) · VINO UVITA BLANCO DULCE X12 · **14 ventas**, última 2026-08-09
-- **2124** · `mozzacremac` (11 car.) · Mozzarella Cremac · **9 ventas**, última 2026-08-04
+- **2092** · `panlomo` (7 car.) · Pan Lomito · **14 ventas**, última 2026-07-08
 - **2119** · `cascaranegra` (12 car.) · Queso Cascara Negra CLP · **9 ventas**, última 2026-08-07
+- **2124** · `mozzacremac` (11 car.) · Mozzarella Cremac · **9 ventas**, última 2026-08-04
 - **763** · `chori` (5 car.) · Chorigol Casero x Caja 30u · **8 ventas**, última 2026-06-21
 - **822** · `SURTIDO PRIME` (13 car.) · PRIME PRESERVATIVO · **8 ventas**, última 2026-08-06
 - **1585** · `ARGENTINA BOMBILLA` (18 car.) · ARGENTINA BOMBILLA · **5 ventas**, última 2026-08-10
-- **2301** · `bondiola` (8 car.) · Bondiola Piamontesa · **5 ventas**, última 2026-08-05
 - **2125** · `casera` (6 car.) · Hamburguesa Casera · **5 ventas**, última 2026-07-28
 - **2300** · `roque` (5 car.) · Queso Azukl Vanguard · **5 ventas**, última 2026-08-07
+- **2301** · `bondiola` (8 car.) · Bondiola Piamontesa · **5 ventas**, última 2026-08-05
 - **2336** · `solforati` (9 car.) · Sol Pampeano Forati · **5 ventas**, última 2026-08-05
-- **2337** · `%` (1 car.) · azucar impalpable velez 250gr · **4 ventas**, última 2026-07-22
 - **68** · `BENGALA` (7 car.) · BENGALA X4 · **4 ventas**, última 2026-08-06
-- **2298** · `holandaverona` (13 car.) · Queso Holanda La Verona · **4 ventas**, última 2026-07-02
 - **2241** · `Solmayorhigienico` (17 car.) · Sol Mayor Papel Higienico · **4 ventas**, última 2026-07-27
 - **2271** · `verduleria` (10 car.) · verduleria · **4 ventas**, última 2026-06-22
-- **2272** · `aceiteseda` (10 car.) · Aceite Seda 10L · **3 ventas**, última 2026-07-27
+- **2298** · `holandaverona` (13 car.) · Queso Holanda La Verona · **4 ventas**, última 2026-07-02
+- **2337** · `%` (1 car.) · azucar impalpable velez 250gr · **4 ventas**, última 2026-07-22
 - **586** · `TARRITOORINA` (12 car.) · TARRITO ORINA · **3 ventas**, última 2026-08-04
-- **1951** · `solcabello` (10 car.) · SOL PAMPEANO CABELLITO · **2 ventas**, última 2026-08-06
+- **2272** · `aceiteseda` (10 car.) · Aceite Seda 10L · **3 ventas**, última 2026-07-27
 - **1886** · `sprite237` (9 car.) · Sprite Vidrio 237  · **2 ventas**, última 2026-08-05
-- **2315** · `arrolladovaca` (13 car.) · Arrollado de Vaca · **1 ventas**, última 2026-06-08
-- **2398** · `bocadito fantoche` (17 car.) · bocadito fantoche · **1 ventas**, última 2026-07-10
-- **2397** · `caja bon o bon` (14 car.) · caja bon o bon · **1 ventas**, última 2026-07-10
-- **2225** · `camel10` (7 car.) · Camel 10 · **1 ventas**, última 2026-05-26
-- **1885** · `fanta 237` (9 car.) · fanta vidrio 237 · **1 ventas**, última 2026-08-05
-- **1883** · `LIVRA CITRUS 1.5 GAS` (20 car.) · LIVRA CITRUS 1.5 CON GAS · **1 ventas**, última 2026-05-27
-- **1437** · `LOMO PAN` (8 car.) · PAN ALS LOMO · **1 ventas**, última 2026-05-23
+- **1951** · `solcabello` (10 car.) · SOL PAMPEANO CABELLITO · **2 ventas**, última 2026-08-06
 - **430** · `PAÑO AMARRILLO` (14 car.) · PAÑO AMARILLO · **1 ventas**, última 2026-07-03
+- **1437** · `LOMO PAN` (8 car.) · PAN ALS LOMO · **1 ventas**, última 2026-05-23
 - **1473** · `QUITAESMALTENEPTUS` (18 car.) · QUITAESMALTE NEPTUS 60CM · **1 ventas**, última 2026-07-31
+- **1883** · `LIVRA CITRUS 1.5 GAS` (20 car.) · LIVRA CITRUS 1.5 CON GAS · **1 ventas**, última 2026-05-27
+- **1885** · `fanta 237` (9 car.) · fanta vidrio 237 · **1 ventas**, última 2026-08-05
+- **2225** · `camel10` (7 car.) · Camel 10 · **1 ventas**, última 2026-05-26
+- **2315** · `arrolladovaca` (13 car.) · Arrollado de Vaca · **1 ventas**, última 2026-06-08
+- **2397** · `caja bon o bon` (14 car.) · caja bon o bon · **1 ventas**, última 2026-07-10
+- **2398** · `bocadito fantoche` (17 car.) · bocadito fantoche · **1 ventas**, última 2026-07-10
+
+## El tercer campo: el código de nivel ubicación
+
+`ProductoLocal.codigo_barra_propio` es un campo **distinto** de los dos del
+producto: vive en la fila de la ubicación, con un unique por
+`(localId, codigo_barra_propio)`, y no lo ven las otras ubicaciones.
+
+**Está vacío: 0 de 11.651 filas en producción.** La capacidad existe en la ficha
+desde el 2026-07-28 y nadie la usó nunca, ni el depósito ni Casiano.
+
+Las 90 mediciones de este documento **nunca lo incluyeron**: salieron todas de
+`ProductoBase.codigo_barra`, el primario del producto.
+
+El buscador del POS sí lo lee, junto con el primario y el secundario, pero
+**solo el de la ubicación donde uno está parado**: la consulta filtra por
+`localId`, así que un código propio de otro local no matchea nunca
+(`app/api/pos-ventas/buscar-producto/route.js:106-116`).
 
 ## Un caso aparte: `%` (id 2337)
 
-En "azucar impalpable velez 250gr". Tiene 3 ventas, así que queda en la lista de
-arriba. Entró en el conteo original de "48 a vaciar" por un artefacto: al sacarle
-los caracteres no alfanuméricos queda la cadena vacía, y "el nombre empieza con
-la cadena vacía" es verdadero para cualquier nombre.
-
-## Otro caso aparte: `7790895641749-`
-
-Trece dígitos correctos y un guion al final, en "cepita anana 1.5l". Es el único
-que parece un error de tipeo sobre un código válido y no una decisión. Tiene cero
-ventas, así que se vacía.
+En "azucar impalpable velez 250gr". Lo creó el depósito y tiene 3 ventas, así
+que entra en los 60.
