@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import bcrypt from "bcrypt";
 import { firmarToken, SesionCookie } from "@/lib/auth";
 import { DUENO_LOCAL } from "@/lib/rbac/systemRoles";
+import { normalizarPermisos } from "@/lib/rbac/permisosSesion";
 
 // Rate limit en memoria por IP: máx 10 intentos por 15 min
 const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
@@ -108,7 +109,11 @@ export async function POST(req) {
     // Seguridad: si permisos no es un array válido (null/objeto/string/JSON inválido),
     // NO otorgar admin. Fail-closed → sin permisos. El rol Admin real guarda ["*"]
     // (array) y se conserva tal cual.
-    const permisos = Array.isArray(user.rol?.permisos) ? user.rol.permisos : [];
+    //
+    // La regla vive en lib/rbac/permisosSesion.js y la comparten los tres lugares
+    // que la necesitan. Estaba escrita a mano en cada uno, y /api/me la tenía al
+    // revés.
+    const permisos = normalizarPermisos(user.rol?.permisos);
 
     // Identidad de rol para el bypass de operario de DUEÑO_LOCAL. Se calcula acá
     // (donde tenemos el rol completo desde la DB) y se snapshotea en el JWT.

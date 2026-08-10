@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getTokenFromRequest, verificarToken } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { operarioObligatorio } from "@/lib/config/acceso";
+import { normalizarPermisos, esAdminPorPermisos } from "@/lib/rbac/permisosSesion";
 
 export async function GET(req) {
   try {
@@ -20,11 +21,12 @@ export async function GET(req) {
     // -------------------------------------------
     // Normalización de permisos
     // -------------------------------------------
-    const permisos = Array.isArray(payload.permisos)
-      ? payload.permisos
-      : ["*"];
-
-    const esAdmin = permisos.includes("*");
+    // FAIL-CLOSED, igual que login y que getUsuarioSession. Esto devolvía
+    // ["*"] ante un payload con permisos corruptos: el backend rechazaba igual
+    // cada operación, pero el frontend arma menú y botones con esta respuesta y
+    // le mostraba la aplicación entera a quien no debía verla.
+    const permisos = normalizarPermisos(payload.permisos);
+    const esAdmin = esAdminPorPermisos(permisos);
 
     // -------------------------------------------
     // Saber si es depósito (solo si tiene localId)
