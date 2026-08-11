@@ -6,6 +6,16 @@
  *
  * Uso:  node scripts/check-theme-tokens.js
  *       npm run check:theme
+ *
+ * ── ADEMÁS ES LA FUENTE DE LOS PATRONES DE COLOR ────────────────────────────
+ *
+ * `scripts/hardcodeo.mjs` cuenta colores fijos y los lee DE ACÁ, no de una copia
+ * propia. Dos listas de colores prohibidos empiezan iguales y se separan el día
+ * que alguien agrega un patrón en una sola; entonces el mismo archivo pasa un
+ * chequeo y falla el otro, y nadie sabe cuál tiene razón.
+ *
+ * Por eso el archivo exporta FORBIDDEN y WHITELIST, y solo corre el chequeo
+ * cuando se lo invoca directo. Requerirlo desde otro script no ejecuta nada.
  */
 
 const fs = require("fs");
@@ -73,6 +83,11 @@ function walk(dir) {
   }
   return results;
 }
+
+module.exports = { FORBIDDEN, WHITELIST, ROOTS, walk };
+
+// Requerido desde otro script: solo se exportan los patrones, no se corre nada.
+if (require.main !== module) return;
 
 const files = ROOTS.filter((r) => fs.existsSync(r)).flatMap((r) => walk(r));
 const violations = [];

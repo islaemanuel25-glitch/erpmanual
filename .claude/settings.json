@@ -12,6 +12,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hook-trinquete-hardcodeo.mjs",
+            "timeout": 90
+          }
+        ]
+      }
     ]
   }
 }

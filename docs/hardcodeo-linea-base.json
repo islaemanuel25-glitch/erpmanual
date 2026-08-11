@@ -1,0 +1,303 @@
+{
+  "_lea_esto": "Línea de base del hardcodeo. La genera scripts/hardcodeo.mjs --linea-base. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
+  "generada": "2026-08-11 00:42",
+  "commit": "4b51b41c342b91ad11f43835b19d379a5a1bf65f",
+  "total": {
+    "color": 297,
+    "medida": 1853,
+    "modal": 54,
+    "crudo": 324,
+    "kit-pisado": 6,
+    "tema-paralelo": 129
+  },
+  "porPantalla": {
+    "(kit)": {
+      "color": 32,
+      "medida": 30,
+      "modal": 1,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "(suelto)": {
+      "color": 5,
+      "medida": 10,
+      "modal": 0,
+      "crudo": 2,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "auditoria": {
+      "color": 1,
+      "medida": 3,
+      "modal": 0,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 1
+    },
+    "auditoria-pos-ventas": {
+      "color": 43,
+      "medida": 187,
+      "modal": 0,
+      "crudo": 13,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "auth": {
+      "color": 2,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "caja": {
+      "color": 0,
+      "medida": 59,
+      "modal": 2,
+      "crudo": 9,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "categorias": {
+      "color": 1,
+      "medida": 2,
+      "modal": 1,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "clientes": {
+      "color": 28,
+      "medida": 64,
+      "modal": 4,
+      "crudo": 33,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "compras": {
+      "color": 0,
+      "medida": 2,
+      "modal": 0,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "compras-proveedor": {
+      "color": 23,
+      "medida": 188,
+      "modal": 6,
+      "crudo": 21,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "configuracion": {
+      "color": 9,
+      "medida": 18,
+      "modal": 1,
+      "crudo": 1,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "dashboard": {
+      "color": 8,
+      "medida": 23,
+      "modal": 1,
+      "crudo": 5,
+      "kit-pisado": 0,
+      "tema-paralelo": 2
+    },
+    "fidelidad": {
+      "color": 0,
+      "medida": 14,
+      "modal": 0,
+      "crudo": 3,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "grupos": {
+      "color": 10,
+      "medida": 21,
+      "modal": 1,
+      "crudo": 4,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "inicio": {
+      "color": 0,
+      "medida": 3,
+      "modal": 0,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "layout": {
+      "color": 10,
+      "medida": 27,
+      "modal": 2,
+      "crudo": 5,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "listas-precios": {
+      "color": 7,
+      "medida": 20,
+      "modal": 2,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "locales": {
+      "color": 3,
+      "medida": 3,
+      "modal": 1,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "notificaciones": {
+      "color": 1,
+      "medida": 21,
+      "modal": 1,
+      "crudo": 9,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "operador": {
+      "color": 0,
+      "medida": 10,
+      "modal": 1,
+      "crudo": 3,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "operadores": {
+      "color": 2,
+      "medida": 4,
+      "modal": 1,
+      "crudo": 1,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "pedidos": {
+      "color": 2,
+      "medida": 68,
+      "modal": 0,
+      "crudo": 16,
+      "kit-pisado": 0,
+      "tema-paralelo": 1
+    },
+    "pos-transferencias": {
+      "color": 2,
+      "medida": 119,
+      "modal": 0,
+      "crudo": 29,
+      "kit-pisado": 3,
+      "tema-paralelo": 1
+    },
+    "pos-ventas": {
+      "color": 37,
+      "medida": 140,
+      "modal": 18,
+      "crudo": 65,
+      "kit-pisado": 0,
+      "tema-paralelo": 119
+    },
+    "productos": {
+      "color": 45,
+      "medida": 192,
+      "modal": 2,
+      "crudo": 30,
+      "kit-pisado": 3,
+      "tema-paralelo": 5
+    },
+    "proveedores": {
+      "color": 3,
+      "medida": 310,
+      "modal": 2,
+      "crudo": 35,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "reportes-stock": {
+      "color": 0,
+      "medida": 4,
+      "modal": 0,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "reportes-ventas": {
+      "color": 0,
+      "medida": 142,
+      "modal": 0,
+      "crudo": 12,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "roles": {
+      "color": 0,
+      "medida": 0,
+      "modal": 1,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "sidebar": {
+      "color": 11,
+      "medida": 3,
+      "modal": 2,
+      "crudo": 3,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "stock_locales": {
+      "color": 5,
+      "medida": 33,
+      "modal": 2,
+      "crudo": 14,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "transferencias": {
+      "color": 0,
+      "medida": 67,
+      "modal": 0,
+      "crudo": 7,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "turnos": {
+      "color": 1,
+      "medida": 60,
+      "modal": 1,
+      "crudo": 4,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "usuarios": {
+      "color": 6,
+      "medida": 5,
+      "modal": 1,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "ventas": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "version": {
+      "color": 0,
+      "medida": 1,
+      "modal": 0,
+      "crudo": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    }
+  }
+}
