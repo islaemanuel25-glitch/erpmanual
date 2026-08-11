@@ -40,11 +40,12 @@ dominio `https://operix.cloud`, backups en `/srv/produccion/backups/`.
    compara el CONTEO de migraciones que informa el contenedor contra el del
    árbol, y tiene que coincidir. Ver "El código de salida de `migrate deploy` NO
    alcanza" en el paso 4.
-8. **`prisma db push` está bloqueado siempre y no tiene autorización posible.**
-   No es un olvido ni una regla que se afloje cuando aprieta: cambia el esquema
-   sin dejar archivo de migración, así que no hay nada que revisar antes ni nada
-   que leer después. Ver "`prisma db push` está BLOQUEADO SIEMPRE" en el paso 4
-   antes de tocarlo.
+8. **Cuatro comandos de Prisma están bloqueados siempre y no tienen
+   autorización posible**: `db push`, `migrate reset`, `db execute` y
+   `migrate resolve`. No es un olvido ni una regla que se afloje cuando aprieta.
+   La lista, el criterio por el que es esa y no otra, y lo que se miró y NO se
+   tapó están en `lib/deploy/guardiaMigraciones.js`. Ver "Los cuatro comandos
+   bloqueados" en el paso 4 antes de tocarlos.
 
 ## Antes de empezar
 
@@ -343,45 +344,75 @@ desde una sesión de Claude Code en este repo— y **ninguno de los otros**. Es 
 mecanismo local más fuerte disponible, no una garantía. Lo que hace obligatorio
 un chequeo es que corra del lado del servidor, y eso todavía no existe.
 
-### `prisma db push` está BLOQUEADO SIEMPRE — no lo desbloquees sin leer esto
+### Los cuatro comandos bloqueados — no los desbloquees sin leer esto
 
-La guardia rechaza cualquier comando Bash que nombre `prisma` y `db push`, y
-**no tiene variable que lo habilite**. `DEPLOY_MIGRACION_AUTORIZADA=1` no sirve
-acá: se probó y sigue rechazando. Es a propósito y no es un olvido.
+La guardia rechaza cuatro comandos de Prisma, **siempre y sin variable que los
+habilite**. `DEPLOY_MIGRACION_AUTORIZADA=1` no sirve para ninguno: se probó con
+los cuatro y siguen rechazando. Es a propósito.
 
-**Por qué no es como `migrate deploy`.** Los dos tocan el esquema de producción,
-pero no se parecen en lo que dejan atrás. `migrate deploy` aplica archivos que
-están escritos, versionados y revisables, se aplican una sola vez y quedan
-registrados en `_prisma_migrations`; se puede mirar antes qué entra, y después
-queda dicho qué entró. `db push` no hace nada de eso: compara `schema.prisma`
-contra la base, calcula la diferencia y la ejecuta, sin generar archivo. Si esa
-diferencia incluye tirar una columna, la tira con los datos adentro y **no queda
-ni la sentencia que lo hizo**. No hay qué revisar antes ni qué leer después.
+1. **`db push`** — compara `schema.prisma` contra la base y aplica la diferencia
+   sin generar archivo de migración. Si esa diferencia incluye tirar una columna,
+   la tira con los datos adentro y no queda ni la sentencia que lo hizo.
+2. **`migrate reset`** — borra la base entera y la reconstruye. Lo dice su propia
+   ayuda: *all data will be lost*. No tiene versión suave.
+3. **`db execute`** — manda SQL crudo desde un archivo o desde la entrada
+   estándar. Además acepta `--url`, o sea que la base destino se escribe en la
+   misma línea y no depende del `.env`: puede apuntar a producción sin que nada
+   del entorno lo delate.
+4. **`migrate resolve`** — marca una migración como aplicada o revertida **sin
+   ejecutarla**. No toca los datos: falsea `_prisma_migrations`, que es la tabla
+   contra la que este mismo documento verifica en el paso 4. Un estado mentido
+   hace que la verificación dé bien con el esquema mal.
 
-Por eso tampoco lo cubre el clasificador: el clasificador lee archivos de
-migración, y acá no hay archivo que leer. No es que se lo dejó pasar — es que no
-existe la superficie sobre la que trabaja.
+**El criterio, que es lo que hay que entender antes de tocar la lista.** Un
+comando entra si cumple las dos condiciones: puede destruir o falsear, Y no hace
+falta para el trabajo de todos los días. La segunda es la que explica las
+ausencias. Lo que sí hace falta no se tapa aunque sea peligroso —se informa y
+decide Emanuel—, porque una guardia que estorba todos los días se termina
+apagando, y ahí deja de proteger de todo.
 
-**Qué estaba tapando cuando se puso.** Hasta el 2026-08-10 lo frenaba el cartel
-de permiso. Ese día los carteles se apagaron, y `db push` quedó siendo el único
-comando capaz de tirar una columna de producción sin dejar rastro y sin que nada
-lo mirara. Se tapó en la misma tanda en que se descubrió.
+**Lo que se miró y NO se tapó**, con el motivo, está en la constante
+`NO_TAPADOS` de `lib/deploy/guardiaMigraciones.js`: `migrate dev` (puede resetear
+la base, pero es el comando del trabajo diario), `studio` (edita cualquier fila,
+pero el daño lo hace una persona haciendo clic y eso no lo distingue un match de
+texto), `db seed` (ya está protegido mejor por `scripts/lib/clientePrisma.mjs`) y
+`db pull` (pisa `schema.prisma`, pero eso está en git). **No son olvidos.**
 
-**La regla de Emanuel, textual:** *"db push no lo quiero nunca, en ningún caso.
-Si algún día hace falta, lo hablamos."* Es una decisión suya, no una propiedad
-del sistema: si algún día se necesita, se habla con él y **se cambia la función a
-propósito**, diciendo en el commit qué caso lo justificó. Lo que no se hace es
-agregarle un flag de escape — que ese trámite cueste es el punto.
+**Por qué no los cubre el clasificador.** El clasificador lee archivos de
+migración. Estos cuatro o no generan archivo, o no lo ejecutan. No es que se los
+dejó pasar: no existe la superficie sobre la que trabaja.
 
-Los candados están en `lib/deploy/guardiaMigraciones.test.mjs`. El central se
-llama "EL DB PUSH NO SE AUTORIZA CON NADA" y se pone rojo si alguien unifica los
-dos caminos.
+**Qué estaban tapando.** Hasta el 2026-08-10 los frenaba el cartel de permiso.
+Ese día los carteles se apagaron por decisión de Emanuel, y los cuatro quedaron
+pudiendo tocar producción sin que nada los mirara.
+
+**La regla, textual:** *"db push no lo quiero nunca, en ningún caso. Si algún día
+hace falta, lo hablamos."* Y sobre la lista: *"no lo hagas solo, porque si vamos
+de a uno siempre va a faltar la próxima."* Son decisiones suyas, no propiedades
+del sistema.
+
+**Si aparece un comando nuevo, se agrega a la lista. No se hace una excepción**,
+no se le pone un `if` al lado, y no se le agrega una variable de escape a
+ninguno. Mientras haya un solo lugar, agregar el próximo cuesta una línea y un
+candado; en cuanto haya dos mecanismos, el que revise va a mirar uno y creer que
+vio los dos. Y si uno hace falta de verdad, se saca de la lista **a propósito**,
+diciendo en el commit qué caso lo justificó.
+
+Los candados están en `lib/deploy/guardiaMigraciones.test.mjs`: uno por comando
+llamado "NO SE AUTORIZA CON NADA", más "LA LISTA DE RECHAZO NO SE RECORTA", que
+se pone rojo si alguien saca una entrada. Verificados por mutación con siete
+formas distintas de aflojar la guardia; las siete se detectan.
+
+**De dónde salió la lista:** de enumerar el CLI instalado, no de acordarse.
+`prisma --help` de la 6.19.3 más los sub-help de `db` y de `migrate`. Si se
+actualiza Prisma, se vuelve a enumerar así.
 
 **El costo, que es real y conocido:** la guardia hace match sobre el TEXTO del
-comando, así que frena también un `echo` o un `grep` que mencionen la frase.
-Pasó al probarla: la prueba se frenó a sí misma. Si hace falta escribir sobre
-`db push`, se hace con las herramientas de edición, no con un `cat` en la shell.
-Frena de más y esa es la dirección correcta.
+comando, así que frena también un `echo`, un `grep` o un `cat` que mencionen una
+de las frases. Pasó dos veces al construirla: la prueba se frenó a sí misma, y
+después se frenó la edición de este documento. Si hace falta escribir sobre
+estos comandos, se hace con las herramientas de edición, no con la shell. Frena
+de más y esa es la dirección correcta.
 
 ### Los límites del clasificador
 
