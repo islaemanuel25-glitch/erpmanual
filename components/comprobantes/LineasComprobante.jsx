@@ -18,6 +18,29 @@
 // palabra ("Vinculado" contra "¿Es este?"), la forma (el sugerido viene con
 // botones y el vinculado no) y el tono. Quien mira apurado lee la palabra.
 //
+// ── SOLO SE MUESTRA LO QUE PIDE DECISIÓN ───────────────────────────────────
+//
+// Lo que el sistema ya resolvió no se dibuja. Ocupaba lo mismo que lo que pide
+// atención, y una factura de siete líneas no entraba en una pantalla: lo que
+// sobraba era justamente lo que no había que mirar.
+//
+// Se pueden ver con el interruptor de arriba, cerrado por defecto.
+//
+// EL CONTEO DE ARRIBA ES SIEMPRE EL TOTAL REAL, no el de lo visible. Si dijera
+// "6 líneas" porque hay seis a la vista, alguien creería que la factura tiene
+// seis y tiene siete — y esa es la clase de error que después nadie encuentra,
+// porque el número que lo delataría es el que está mal.
+//
+// ── UNA LÍNEA RESUELTA NO SE VA DE ABAJO DEL DEDO ──────────────────────────
+//
+// Al vincular, la línea deja de pedir decisión y le tocaría desaparecer. Si se
+// fuera en el acto, todo lo de abajo sube un renglón justo cuando la persona
+// está yendo a tocar la siguiente, y toca otra cosa.
+//
+// Por eso las que se resuelven ACÁ se quedan a la vista, ya en verde, hasta que
+// se cierre la lista. El movimiento ocurre cuando la persona decide, no en el
+// medio de su gesto.
+//
 // ── VINCULAR A MANO SIN SALIR DE ACÁ ───────────────────────────────────────
 //
 // Va a pasar seguido las primeras veces, hasta que los alias se acumulen. Si
@@ -126,6 +149,10 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState(null);
   const [buscandoEn, setBuscandoEn] = useState(null); // lineaId
+  const [verResueltas, setVerResueltas] = useState(false);
+  // Las que se resolvieron en ESTA apertura de la lista. Se quedan a la vista
+  // para que nada se mueva abajo del dedo; se van al cerrar y volver a abrir.
+  const [recienResueltas, setRecienResueltas] = useState(() => new Set());
 
   async function recargar() {
     setCargando(true);
@@ -149,6 +176,7 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
       });
       const d = await r.json();
       setMensaje({ tipo: d.ok ? "ok" : "error", texto: d.ok ? d.queHacer : d.queHacer || d.error });
+      if (d.ok) setRecienResueltas((s) => new Set(s).add(lineaId));
       setBuscandoEn(null);
       await recargar();
       onCambio?.();
@@ -162,14 +190,36 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
 
   const { lineas, resumen } = datos;
 
+  // Lo que se dibuja: lo que pide decisión, más lo que se acaba de resolver acá
+  // —para que no se mueva nada abajo del dedo— más todo si el interruptor está
+  // abierto.
+  const pideDecision = (l) => l.requiereDecision || recienResueltas.has(l.id);
+  const visibles = verResueltas ? lineas : lineas.filter(pideDecision);
+  const resueltasOcultas = lineas.length - visibles.length;
+
   return (
     <div className="mt-2">
-      <p className="text-sm2 sunmi-text-muted mb-2">
-        {resumen.total} líneas · {resumen.vinculadasSolas} vinculadas solas ·{" "}
-        <span className={resumen.esperandoDecision ? "sunmi-text-warning font-bold" : ""}>
-          {resumen.esperandoDecision} esperan que las mires
-        </span>
-      </p>
+      {/* EL CONTEO ES EL TOTAL REAL, no el de lo visible. */}
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <p className="text-sm2 sunmi-text-muted">
+          {resumen.total} {resumen.total === 1 ? "línea" : "líneas"} ·{" "}
+          {resumen.vinculadasSolas} {resumen.vinculadasSolas === 1 ? "vinculada sola" : "vinculadas solas"} ·{" "}
+          <span className={resumen.esperandoDecision ? "sunmi-text-warning font-bold" : ""}>
+            {resumen.esperandoDecision}{" "}
+            {resumen.esperandoDecision === 1 ? "espera que la mires" : "esperan que las mires"}
+          </span>
+        </p>
+        {resueltasOcultas > 0 && !verResueltas && (
+          <SunmiButton color="slate" type="button" onClick={() => setVerResueltas(true)}>
+            Ver las {resueltasOcultas} ya resueltas
+          </SunmiButton>
+        )}
+        {verResueltas && (
+          <SunmiButton color="slate" type="button" onClick={() => setVerResueltas(false)}>
+            Ocultar las resueltas
+          </SunmiButton>
+        )}
+      </div>
 
       {mensaje && (
         <p className={`text-xs mb-2 ${mensaje.tipo === "error" ? "sunmi-text-danger" : "sunmi-text-success"}`}>
@@ -180,10 +230,16 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
       {/* ── Escritorio: tabla, con Revisar entre Producto y SKU ─────────── */}
       <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
         <SunmiTable headers={["Producto", "Revisar", "Cant.", "Precio unit.", "Subtotal", "En el pedido"]}>
-          {lineas.length === 0 ? (
-            <SunmiTableEmpty label="El comprobante no tiene líneas leídas" />
+          {visibles.length === 0 ? (
+            <SunmiTableEmpty
+              label={
+                lineas.length === 0
+                  ? "El comprobante no tiene líneas leídas"
+                  : "Nada pendiente: todas las líneas están resueltas"
+              }
+            />
           ) : (
-            lineas.map((l) => {
+            visibles.map((l) => {
               const e = estadoDeVinculo(l);
               // EL NOMBRE SOLO SI ESTÁ VINCULADO. Pintar el primer candidato acá hacía
               // que una línea sin vincular pareciera vinculada: la columna decía
@@ -242,7 +298,12 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
 
       {/* ── Móvil: tarjetas ──────────────────────────────────────────────── */}
       <div className="md:hidden flex flex-col gap-2">
-        {lineas.map((l) => {
+        {visibles.length === 0 && lineas.length > 0 && (
+          <p className="text-xs sunmi-text-success py-3 text-center">
+            Nada pendiente: todas las líneas están resueltas
+          </p>
+        )}
+        {visibles.map((l) => {
           const e = estadoDeVinculo(l);
           // EL NOMBRE SOLO SI ESTÁ VINCULADO. Pintar el primer candidato acá hacía
               // que una línea sin vincular pareciera vinculada: la columna decía
