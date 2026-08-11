@@ -1,8 +1,9 @@
 # Runbook — crear el volumen de fotos de comprobantes
 
-**Estado:** ESCRITO, NO EJECUTADO. Nadie lo corrió todavía, y **no se corre hasta
-que Emanuel autorice tocar producción** (dicho el 2026-08-11). No es una espera
-formal: es la misma regla de siempre para infraestructura productiva.
+**Estado:** EN EJECUCIÓN el 2026-08-11, con autorización explícita de Emanuel.
+El paso 1 quedó hecho antes; los pasos 2 a 5 van en esta tanda, después del
+despliegue del código (que es lo que pone el chequeo del arranque adentro de la
+imagen, sin lo cual el paso 4 no verificaría nada real).
 
 Es una tanda **propia**, de infraestructura, y **no se mezcla con un despliegue
 de código**. El motivo está medido, no es preferencia: el 2026-08-10 un
@@ -54,7 +55,7 @@ el directorio está vacío.
 El criterio vive en `lib/compras-proveedor/comprobante/almacenImagenes.js`, que es
 puro y tiene sus candados; el que mira el disco es
 `lib/compras-proveedor/comprobante/almacenDisco.js`. Comprueba **dos veces**: al
-arrancar, para que el problema se vea al levantar y no cuando alguien sube una
+arrancar, para que el problema se vea al levantar y no cuando alguien sube un
 comprobante un sábado; y **antes de cada escritura**, porque un montaje se puede caer
 después de arrancar y ahí el chequeo del arranque ya pasó y no protege nada.
 
@@ -83,14 +84,29 @@ centinela la aplicación no va a escribir, y es mejor descubrirlo ahora.
 ### 2. Declararlo en el compose
 
 En `docker-compose.prod.yml`, montarlo en el servicio `app` y declararlo abajo.
-La ruta de adentro va también en `.env` como `COMPROBANTES_VOLUMEN_PATH`, junto a
+La ruta de adentro sale de `COMPROBANTES_VOLUMEN_PATH`, que gobierna el montaje
+Y la variable del contenedor a la vez —misma variable, mismo default, no pueden
+desfasarse—. Si se le quiere dar un valor distinto al default, va en `.env` junto a
 `APP_IMAGE` —el `.env` de Compose, permisos 600— y **nunca en `.env.prod`**, por
 la misma razón de siempre: ese es el `env_file` del contenedor y sus variables no
 interpolan el compose.
 
+⚠️ **`external: true` no es opcional**, y es la trampa de este paso. Sin eso,
+Compose crea un volumen propio y le antepone el nombre del proyecto: quedaría
+`erpazul_erpazul_comprobantes`, vacío, y el que se aprovisionó en el paso 1 —con
+su centinela adentro— no se montaría nunca. La aplicación se negaría a escribir
+por falta de centinela, que es el final bueno, pero por un motivo que costaría
+entender. El nombre del proyecto se confirma con
+`docker inspect erpazul_app --format '{{index .Config.Labels "com.docker.compose.project"}}'`.
+
 ⚠️ **No recrear `db` ni usar `docker compose down`.** Es la regla 4 del skill
 `/deploy` y sigue valiendo acá: el servicio `db` fue creado fuera de Compose y
 recrearlo lo levantaría sin contraseña.
+
+⚠️ **El compose está versionado.** Editarlo a mano en el VPS deja el árbol sucio
+y el próximo `git merge --ff-only` del despliegue se niega a correr. El cambio va
+por el repo, y el VPS lo recibe con el merge — con su imagen, para que los cinco
+valores del skill `/deploy` sigan coincidiendo.
 
 ### 3. Recrear solo la app
 

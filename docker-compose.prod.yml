@@ -64,8 +64,28 @@ services:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
+      # La ruta del volumen de comprobantes. Sale de la MISMA variable que el
+      # montaje de abajo, con el mismo default, para que no puedan desfasarse:
+      # si la aplicación mirara una ruta y Docker montara otra, el chequeo del
+      # arranque diría "no existe el directorio" y nadie sabría por qué.
+      COMPROBANTES_VOLUMEN_PATH: "${COMPROBANTES_VOLUMEN_PATH:-/vol/comprobantes}"
     volumes:
       - ./backups:/app/backups
+      - erpazul_comprobantes:${COMPROBANTES_VOLUMEN_PATH:-/vol/comprobantes}
     depends_on:
       db:
         condition: service_healthy
+
+# ── EL VOLUMEN DE FOTOS DE COMPROBANTES ─────────────────────────────────────
+#
+# `external: true` NO es opcional. Sin eso, Compose crea un volumen propio y le
+# antepone el nombre del proyecto: quedaría `erpazul_erpazul_comprobantes`,
+# vacío, y el que aprovisionamos a mano —con su centinela adentro— no se
+# montaría nunca. La aplicación se negaría a escribir por falta de centinela, que
+# es el final bueno, pero por un motivo que costaría entender.
+#
+# Se crea con el runbook, no con Compose: docs/RUNBOOK-VOLUMEN-COMPROBANTES.md.
+# NO va al backup, a propósito: docs/decisions/DEC-0008.
+volumes:
+  erpazul_comprobantes:
+    external: true
