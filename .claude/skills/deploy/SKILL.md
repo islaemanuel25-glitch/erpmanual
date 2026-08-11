@@ -15,7 +15,7 @@ Datos del entorno: alias ssh `vps-erp`, directorio `/srv/produccion/erpazul`,
 compose `docker-compose.prod.yml`, contenedores `erpazul_app` y `erpazul_db`,
 dominio `https://operix.cloud`, backups en `/srv/produccion/backups/`.
 
-## Las siete reglas duras
+## Las ocho reglas duras
 
 1. **Nunca `latest`, nunca SHA corto.** Solo el SHA completo de 40 caracteres.
    Una etiqueta móvil impide saber qué versión corre y volver a una anterior.
@@ -40,6 +40,11 @@ dominio `https://operix.cloud`, backups en `/srv/produccion/backups/`.
    compara el CONTEO de migraciones que informa el contenedor contra el del
    árbol, y tiene que coincidir. Ver "El código de salida de `migrate deploy` NO
    alcanza" en el paso 4.
+8. **`prisma db push` está bloqueado siempre y no tiene autorización posible.**
+   No es un olvido ni una regla que se afloje cuando aprieta: cambia el esquema
+   sin dejar archivo de migración, así que no hay nada que revisar antes ni nada
+   que leer después. Ver "`prisma db push` está BLOQUEADO SIEMPRE" en el paso 4
+   antes de tocarlo.
 
 ## Antes de empezar
 
@@ -302,6 +307,16 @@ con 0. Autorizar a mano es explícito y visible en la línea:
 `DEPLOY_MIGRACION_AUTORIZADA=1` adelante del comando, misma idea que
 `SEED_DESTRUCTIVO`.
 
+La decisión vive en `lib/deploy/guardiaMigraciones.js`, que es una función pura
+con sus candados al lado; el hook solo lee la entrada, corre el clasificador
+cuando hace falta y escribe la respuesta.
+
+**Desde el 2026-08-10 esta guardia importa más que antes.** Ese día Emanuel sacó
+los pedidos de permiso —`defaultMode` en `dontAsk`— porque un cartel que siempre
+se acepta no protege y solo frena. El cartel era el segundo control de todo lo de
+acá. Al desaparecer, este hook pasó a ser el único que queda del lado de la
+máquina, y por eso se le agregaron las dos cosas de abajo.
+
 **Esa guardia NO hace obligatorio el chequeo.** Cubre un solo camino. Estos
 llegan a producción sin pasar por ella:
 
@@ -309,8 +324,10 @@ llegan a producción sin pasar por ella:
    mano desde PowerShell, Git Bash o el editor: el hook ni se entera.
 2. **Un `docker compose` tipeado dentro del VPS.** Es otra máquina; nada de esto
    existe ahí.
-3. **`DEPLOY_MIGRACION_AUTORIZADA=1`**, que es la puerta prevista y por eso deja
-   rastro en la línea de comandos.
+3. **`DEPLOY_MIGRACION_AUTORIZADA=1`**, que es la puerta prevista. Deja rastro en
+   la línea de comandos, avisa en pantalla, y desde el 2026-08-10 además escribe
+   una línea en `.claude/migraciones-autorizadas.log`. Ver más abajo por qué no
+   alcanzaba con las dos primeras.
 4. **Otra sesión de Claude Code fuera de este repo**, o con `--settings` propio:
    el hook es de proyecto y se resuelve por directorio.
 5. **`prisma migrate deploy` escrito de otra forma** — un script intermedio, un
@@ -325,6 +342,46 @@ En resumen: la guardia atrapa el camino que se usa todos los días —desplegar
 desde una sesión de Claude Code en este repo— y **ninguno de los otros**. Es el
 mecanismo local más fuerte disponible, no una garantía. Lo que hace obligatorio
 un chequeo es que corra del lado del servidor, y eso todavía no existe.
+
+### `prisma db push` está BLOQUEADO SIEMPRE — no lo desbloquees sin leer esto
+
+La guardia rechaza cualquier comando Bash que nombre `prisma` y `db push`, y
+**no tiene variable que lo habilite**. `DEPLOY_MIGRACION_AUTORIZADA=1` no sirve
+acá: se probó y sigue rechazando. Es a propósito y no es un olvido.
+
+**Por qué no es como `migrate deploy`.** Los dos tocan el esquema de producción,
+pero no se parecen en lo que dejan atrás. `migrate deploy` aplica archivos que
+están escritos, versionados y revisables, se aplican una sola vez y quedan
+registrados en `_prisma_migrations`; se puede mirar antes qué entra, y después
+queda dicho qué entró. `db push` no hace nada de eso: compara `schema.prisma`
+contra la base, calcula la diferencia y la ejecuta, sin generar archivo. Si esa
+diferencia incluye tirar una columna, la tira con los datos adentro y **no queda
+ni la sentencia que lo hizo**. No hay qué revisar antes ni qué leer después.
+
+Por eso tampoco lo cubre el clasificador: el clasificador lee archivos de
+migración, y acá no hay archivo que leer. No es que se lo dejó pasar — es que no
+existe la superficie sobre la que trabaja.
+
+**Qué estaba tapando cuando se puso.** Hasta el 2026-08-10 lo frenaba el cartel
+de permiso. Ese día los carteles se apagaron, y `db push` quedó siendo el único
+comando capaz de tirar una columna de producción sin dejar rastro y sin que nada
+lo mirara. Se tapó en la misma tanda en que se descubrió.
+
+**La regla de Emanuel, textual:** *"db push no lo quiero nunca, en ningún caso.
+Si algún día hace falta, lo hablamos."* Es una decisión suya, no una propiedad
+del sistema: si algún día se necesita, se habla con él y **se cambia la función a
+propósito**, diciendo en el commit qué caso lo justificó. Lo que no se hace es
+agregarle un flag de escape — que ese trámite cueste es el punto.
+
+Los candados están en `lib/deploy/guardiaMigraciones.test.mjs`. El central se
+llama "EL DB PUSH NO SE AUTORIZA CON NADA" y se pone rojo si alguien unifica los
+dos caminos.
+
+**El costo, que es real y conocido:** la guardia hace match sobre el TEXTO del
+comando, así que frena también un `echo` o un `grep` que mencionen la frase.
+Pasó al probarla: la prueba se frenó a sí misma. Si hace falta escribir sobre
+`db push`, se hace con las herramientas de edición, no con un `cat` en la shell.
+Frena de más y esa es la dirección correcta.
 
 ### Los límites del clasificador
 
@@ -369,6 +426,27 @@ ssh vps-erp 'cd /srv/produccion/erpazul && git status --porcelain'    # vacío
 PostgreSQL healthy, 0 reinicios, logs sin errores, migraciones al día, `/login`
 en 200 y el árbol del VPS limpio. Si algo de esto no da, se informa — no se
 maquilla.
+
+### Y antes de escribir el reporte: la bitácora de autorizaciones
+
+```bash
+cat .claude/migraciones-autorizadas.log
+```
+
+Si aparece una línea con la fecha de hoy, **se dice en el reporte**: que se usó
+la autorización manual, sobre qué comando, y que por eso el clasificador no miró
+las migraciones que entraron. No es un detalle técnico — es el único control que
+quedó de ese caso.
+
+Este paso existe porque **el aviso de pantalla no alcanza, y eso se comprobó**:
+en la ruta de "permitir", ni el `systemMessage` ni la razón del hook vuelven al
+contexto de quien está trabajando. El cartel se le muestra a Emanuel en el
+momento y a nadie más; si él está mirando otra cosa, no queda nada. El archivo sí
+queda.
+
+Está en `.gitignore` a propósito: es el rastro de lo que pasó en esta máquina, no
+del repo. Si algún día el despliegue se hace desde otro lado, ese lado necesita
+su propia bitácora.
 
 ### Los cinco valores no ven la base
 
