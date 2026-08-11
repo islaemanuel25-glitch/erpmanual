@@ -228,6 +228,23 @@ model Proveedor {
   // quien lo creó. Con productos, la visibilidad se deriva de ellos.
   creadoEnLocalId Int?
 
+  /// ── UMBRALES DE COSTO DEL MÓDULO DE COMPROBANTES ──────────────────────
+  ///
+  /// Desde qué diferencia porcentual una línea se marca para revisión, y desde
+  /// qué BAJA se trata como sospecha de mala lectura en vez de precio nuevo.
+  ///
+  /// NULL = este proveedor no tiene el suyo y cae al default global
+  /// (UMBRALES_COSTO_DEFAULT en lib/compras-proveedor/fronteraCosto.js: 5 y 15).
+  /// Son nullables A PROPÓSITO: null y "igual al default" son cosas distintas.
+  /// Si se copiara el default en cada fila, cambiarlo después no movería a
+  /// nadie, que es exactamente el problema que el CLAUDE.md describe con el
+  /// rango de aumento esperado escrito a mano en cinco lugares.
+  ///
+  /// Van por proveedor porque cada uno se mueve distinto y ese es el nivel
+  /// donde se nota.
+  umbralRevisarPct      Decimal? @db.Decimal(6, 3)
+  umbralSospechaBajaPct Decimal? @db.Decimal(6, 3)
+
   dias_pedido DiaPedido[] @default([])
 
   /// Qué parser de lista de precios usa este proveedor.
