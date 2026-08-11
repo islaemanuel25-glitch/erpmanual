@@ -269,6 +269,15 @@ function trinquete() {
 
 // ── Entrada ────────────────────────────────────────────────────────────────
 
+/** Qué contestar cuando llega el modo pero no el nombre de la pantalla. */
+function faltaNombre(modo) {
+  return (
+    `Falta el nombre de la pantalla: ${modo} <pantalla>\n\n` +
+    `Si esto llegó desde la skill /revisar-pantalla, el marcador de argumento no ` +
+    `se sustituyó: la invocación tiene que ser  /revisar-pantalla productos.`
+  );
+}
+
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(n);
 const valor = (n) => {
@@ -281,11 +290,15 @@ if (flag("--linea-base")) salida = escribirLineaBase();
 else if (flag("--trinquete")) salida = trinquete();
 else if (flag("--ranking")) {
   const nombre = valor("--ranking");
-  if (!nombre) { console.error("Falta el nombre: --ranking <pantalla>"); salida = 2; }
+  // Sin nombre se explica y se sale con 0, NO con error. Esto lo llama un
+  // bloque inyectado de la skill `/revisar-pantalla`, y ahí un código de salida
+  // distinto de cero no muestra el mensaje: tumba la carga entera de la skill.
+  // Pasó al probarla por primera vez, con el marcador de argumento equivocado.
+  if (!nombre) { console.log(faltaNombre("--ranking")); salida = 0; }
   else salida = ranking(nombre);
 } else if (flag("--ficha")) {
   const nombre = valor("--ficha");
-  if (!nombre) { console.error("Falta el nombre: --ficha <pantalla>"); salida = 2; }
+  if (!nombre) { console.log(faltaNombre("--ficha")); salida = 0; }
   else salida = ficha(nombre, flag("--json"));
 } else {
   console.error("Uso:");

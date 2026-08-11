@@ -6,18 +6,18 @@ agent: auditor
 allowed-tools: Read, Glob, Grep
 ---
 
-# Ficha de hardcodeo — $1
+# Ficha de hardcodeo — $ARGUMENTS
 
 La ficha ya está corrida. Abajo está la salida cruda del contador, con archivo y
 línea de cada hallazgo. **No hay que volver a contar nada.**
 
 ## La ficha
 
-!`node --no-warnings scripts/hardcodeo.mjs --ficha "$1" 2>&1`
+!`node --no-warnings scripts/hardcodeo.mjs --ficha "$ARGUMENTS" 2>&1`
 
 ## Cuánto es esto comparado con el resto
 
-!`node --no-warnings scripts/hardcodeo.mjs --ranking "$1" 2>&1`
+!`node --no-warnings scripts/hardcodeo.mjs --ranking "$ARGUMENTS" 2>&1`
 
 ## Qué hacer con esto
 
