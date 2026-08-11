@@ -34,6 +34,16 @@ import {
   lineaDelPedido,
   TEXTO_MOTIVO_PEDIDO,
 } from "@/lib/compras-proveedor/comprobante/vinculo";
+import {
+  deducirUnidad,
+  explicarVeredicto,
+  lecturasPosibles,
+} from "@/lib/compras-proveedor/comprobante/unidadPorPrecio";
+import {
+  finalUnitarioSinPercepcionesCentavos,
+  aPesos,
+  RECETA_POR_DEFECTO,
+} from "@/lib/compras-proveedor/comprobante/impuestos";
 
 export async function GET(req, { params }) {
   try {
@@ -55,6 +65,9 @@ export async function GET(req, { params }) {
       where: { id: comprobanteId, grupoId },
       select: {
         id: true, proveedorId: true, pedidoId: true, estado: true,
+        // La receta con la que se leyó: es la que convierte neto a final, y
+        // tiene que ser la MISMA que usó la lectura, no la de hoy.
+        recetaUsada: true,
         proveedor: { select: { id: true, nombre: true } },
         lineas: {
           orderBy: { orden: "asc" },
@@ -79,9 +92,12 @@ export async function GET(req, { params }) {
 
     // El catálogo completo es la última red de la cascada. Se trae acotado a lo
     // visible en esta ubicación, que es lo que la persona puede elegir.
+    // Se traen `factor_pack` y `precio_costo` porque la deducción de unidad los
+    // necesita: sin cuántas trae el bulto y cuánto costaba antes, no hay dos
+    // hipótesis que comparar.
     const catalogo = await prisma.productoBase.findMany({
       where: { grupoId, activo: true },
-      select: { id: true, nombre: true },
+      select: { id: true, nombre: true, factor_pack: true, precio_costo: true },
       take: 5000,
     });
     const catalogoNormalizado = catalogo.map((p) => ({ productoBaseId: p.id, nombre: p.nombre }));
@@ -107,6 +123,11 @@ export async function GET(req, { params }) {
     // El nombre de cada producto, para poder mostrar el candidato sin otra
     // consulta desde la pantalla.
     const nombrePorBase = new Map(catalogo.map((p) => [p.id, p.nombre]));
+    const datosPorBase = new Map(catalogo.map((p) => [p.id, p]));
+
+    // La receta con la que se leyó. Si el comprobante no la guardó —lecturas
+    // viejas— se usa la genérica, y se dice.
+    const receta = comprobante.recetaUsada ?? { ...RECETA_POR_DEFECTO };
 
     const lineas = comprobante.lineas.map((l) => {
       const yaVinculada = l.productoLocalId != null;
@@ -125,6 +146,48 @@ export async function GET(req, { params }) {
       const productoBaseId = busqueda?.vinculoAutomatico?.productoBaseId ?? null;
       const delPedido = lineaDelPedido({ productoBaseId, detalles: detallesPlanos });
 
+      // ── LA UNIDAD ─────────────────────────────────────────────────────
+      //
+      // Solo tiene sentido cuando ya se sabe QUÉ producto es: sin producto no
+      // hay costo anterior ni factor de pack con qué comparar.
+      //
+      // EL ORDEN: neto a final ANTES de comparar. El costo del ERP está en
+      // escala final y el precio de la factura viene neto; comparar sin
+      // convertir mete la alícuota entera en el cociente.
+      const prod = productoBaseId ? datosPorBase.get(productoBaseId) : null;
+      let unidadInfo = null;
+      if (prod) {
+        const precioFinal = aPesos(
+          finalUnitarioSinPercepcionesCentavos({
+            netoUnitario: Number(l.netoUnitario),
+            internoUnitario: Number(l.internoUnitario ?? 0),
+            receta,
+          })
+        );
+        const veredicto = deducirUnidad({
+          costoAnteriorFinal: Number(prod.precio_costo ?? 0),
+          precioFacturaFinal: precioFinal,
+          factorPack: prod.factor_pack,
+        });
+        unidadInfo = {
+          ...veredicto,
+          precioFinal,
+          // Las dos lecturas CON SUS NÚMEROS. Elegir entre dos resultados es
+          // fácil; entre dos etiquetas abstractas, no.
+          lecturas: lecturasPosibles({
+            cantidad: Number(l.cantidad),
+            precioFinal,
+            factorPack: prod.factor_pack,
+          }),
+          explicacion: explicarVeredicto({
+            veredicto,
+            cantidad: Number(l.cantidad),
+            precioFinal,
+            factorPack: prod.factor_pack,
+          }),
+        };
+      }
+
       return {
         ...l,
         // Lo que vinculó solo se distingue de lo sugerido POR DATO, no por
@@ -139,6 +202,7 @@ export async function GET(req, { params }) {
           nombre: c.nombre ?? nombrePorBase.get(c.productoBaseId) ?? null,
         })),
         sugerido: busqueda?.vinculoAutomatico ?? null,
+        unidad: unidadInfo,
         pedidoDetalle: delPedido.detalle,
         motivoPedido: delPedido.motivo,
         textoMotivoPedido: delPedido.motivo ? TEXTO_MOTIVO_PEDIDO[delPedido.motivo] : null,
@@ -159,6 +223,7 @@ export async function GET(req, { params }) {
         vinculadasSolas: lineas.filter((l) => l.vinculadaSola).length,
         esperandoDecision: lineas.filter((l) => l.requiereDecision).length,
         sinCandidatos: lineas.filter((l) => l.origen === "SIN_CANDIDATOS").length,
+        unidadSinResolver: lineas.filter((l) => l.unidad?.requiereDecision).length,
       },
     });
   } catch (err) {

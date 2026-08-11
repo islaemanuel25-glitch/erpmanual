@@ -71,6 +71,60 @@ function estadoDeVinculo(l) {
   return { etiqueta: "¿Es este?", tono: "sunmi-text-warning", pideAccion: true };
 }
 
+/**
+ * La unidad, EN CRIOLLO.
+ *
+ * El cociente no le dice nada a nadie: "3,08" no es una respuesta. La respuesta
+ * es "36 ÷ 12 = 3 bultos, y el bulto sale 37.464".
+ *
+ * Y cuando no se puede decidir, la pregunta va entre DOS RESULTADOS CONCRETOS
+ * con su cantidad y su costo, no entre dos etiquetas abstractas. Elegir entre
+ * "3 bultos a 37.464" y "36 bultos a 3.122" es fácil; elegir entre "¿por unidad
+ * o por bulto?" obliga a rehacer la cuenta en la cabeza.
+ */
+function Unidad({ u, onElegir, puedeElegir }) {
+  if (!u) return null;
+
+  if (u.requiereDecision && u.lecturas) {
+    return (
+      <div className="mt-1">
+        <p className="text-sm2 sunmi-text-warning font-bold">¿Por unidad o por bulto?</p>
+        <p className="text-sm2 sunmi-text-muted leading-snug">{u.porque}</p>
+        <div className="mt-1 flex flex-col gap-1">
+          {[u.lecturas.porUnidad, u.lecturas.porBulto].map((op) => (
+            <SunmiButton
+              key={op.unidad}
+              color="cyan"
+              type="button"
+              className="justify-start text-left"
+              disabled={!puedeElegir}
+              onClick={() => onElegir?.(op.unidad)}
+            >
+              {op.texto}
+            </SunmiButton>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (u.explicacion) {
+    return (
+      <div className="mt-1">
+        <p className="text-sm2 sunmi-text-strong">{u.explicacion.frase}</p>
+        <p className="text-sm2 sunmi-text-muted">{u.explicacion.detalle}</p>
+        {u.explicacion.avisoDivision && (
+          <p className="text-sm2 sunmi-text-warning leading-snug">{u.explicacion.avisoDivision}</p>
+        )}
+      </div>
+    );
+  }
+
+  // Sin producto todavía no hay nada que deducir, y decirlo es mejor que el
+  // silencio: aclara que falta vincular primero.
+  return <p className="text-sm2 sunmi-text-muted mt-1">{u.texto}</p>;
+}
+
 /** La tira de aviso de la columna Revisar: barra, palabra corta, detalle chico. */
 function Revisar({ linea, children }) {
   const e = estadoDeVinculo(linea);
@@ -193,7 +247,9 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
   // Lo que se dibuja: lo que pide decisión, más lo que se acaba de resolver acá
   // —para que no se mueva nada abajo del dedo— más todo si el interruptor está
   // abierto.
-  const pideDecision = (l) => l.requiereDecision || recienResueltas.has(l.id);
+  // Una línea con la unidad sin resolver también pide decisión: si no, quedaría
+  // escondida detrás del filtro y nadie la miraría nunca.
+  const pideDecision = (l) => l.requiereDecision || l.unidad?.requiereDecision || recienResueltas.has(l.id);
   const visibles = verResueltas ? lineas : lineas.filter(pideDecision);
   const resueltasOcultas = lineas.length - visibles.length;
 
@@ -208,6 +264,11 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
             {resumen.esperandoDecision}{" "}
             {resumen.esperandoDecision === 1 ? "espera que la mires" : "esperan que las mires"}
           </span>
+          {resumen.unidadSinResolver > 0 && (
+            <span className="sunmi-text-warning">
+              {" "}· {resumen.unidadSinResolver} sin saber si es por unidad o por bulto
+            </span>
+          )}
         </p>
         {resueltasOcultas > 0 && !verResueltas && (
           <SunmiButton color="slate" type="button" onClick={() => setVerResueltas(true)}>
@@ -257,6 +318,7 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
                   </td>
                   <td className="px-3 py-1.5 align-top max-w-[24rem]">
                     <Revisar linea={l}>
+                      <Unidad u={l.unidad} puedeElegir={puedeVincular} />
                       {puedeVincular && e.pideAccion && (
                         <div className="mt-1 flex flex-col gap-1">
                           {(l.candidatos || []).slice(0, 3).map((c) => (
@@ -321,6 +383,7 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
               </p>
               <div className="mt-2">
                 <Revisar linea={l}>
+                  <Unidad u={l.unidad} puedeElegir={puedeVincular} />
                   {puedeVincular && e.pideAccion && (
                     <div className="mt-1 flex flex-col gap-1">
                       {(l.candidatos || []).slice(0, 3).map((c) => (
