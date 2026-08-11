@@ -35,6 +35,34 @@ Corolario: la comparación tiene que medir lo mismo de los dos lados. Dos captur
 tomadas con ventanas de distinto alto informan diferencias que no existen. Cómo
 se saca una captura comparable: `/capturas`.
 
+Corolario, y es el que más veces se cobró: **los candados prueban piezas, la
+pantalla prueba el camino, y los defectos viven entre las piezas.** Suite en
+verde y build limpio no dicen nada sobre si el camino completo funciona.
+
+Cinco veces en el módulo de comprobante, todas con la misma forma —algo
+compilaba, sus candados estaban en verde, y el defecto vivía en el espacio entre
+dos piezas que cada candado probaba por separado—:
+
+1. El panel **nunca se montó**: el script que insertaba el JSX comprobaba que el
+   archivo hubiera cambiado de largo, y el cambio del import ya lo alteraba.
+2. `SunmiInput` sin importar. Es JSX: compila, y explota en el navegador.
+3. La cadena de lectores pasaba `archivo` y los lectores esperaban `archivos`.
+   La lectura **no anduvo ni una vez**, y el motivo falso —ARCHIVO_NO_SOPORTADO—
+   además impedía el pase al respaldo, así que el síntoma señalaba a la pieza
+   equivocada.
+4. `gemini-2.5-flash` estaba dado de baja. El nombre se escribió de memoria tres
+   líneas debajo del comentario que advierte que Google los da de baja sin avisar.
+5. El **código del proveedor se leía y se tiraba al guardar**, así que el único
+   escalón de la cascada de vínculo que no interpreta nada no podía funcionar
+   nunca. Apareció buscando un caso para una captura.
+
+Ninguno lo encontró un candado. A los cinco los encontró abrir la pantalla.
+
+En la práctica: **una tanda que toca una pantalla no está terminada hasta que se
+abrió con datos reales.** Y cuando se verifica que un cambio se aplicó, se
+comprueba el cambio —que el JSX está, que el texto salió— y no un efecto lateral
+como que el archivo pesa distinto.
+
 Corolario: **después de tocar `schema.prisma`, correr `prisma generate` antes de
 probar nada.** Esto no lo ve ni el build ni los candados. El proyecto es
 JavaScript, así que Next compila sin mirar los argumentos de Prisma, y los
