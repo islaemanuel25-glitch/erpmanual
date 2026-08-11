@@ -20,11 +20,13 @@
 --
 -- ── A QUIÉN SE LE DAN ──────────────────────────────────────────────────────
 --
--- A DUEÑO_LOCAL. `Admin` no hace falta: tiene el comodín `*`.
+-- A DUEÑO_LOCAL y a ENCARGADO. Admin no hace falta: tiene el comodín.
 --
--- A ENCARGADO NO, y es la parte deliberada: ENCARGADO tiene `compras.recibir`,
--- o sea que es quien carga. Dárselos recrearía exactamente el problema que
--- motivó separarlos.
+-- La separación entre quien recibe y quien revisa la hace el TILDE del permiso,
+-- no una lista escrita en el código: si mañana hay que sacárselo a alguien, se
+-- destilda. Una versión anterior de esta migración excluía a ENCARGADO para
+-- forzar que fueran personas distintas; se sacó porque en el depósito hoy
+-- trabaja una sola persona y esa regla no protegía a nadie.
 --
 -- ── ES IDEMPOTENTE ─────────────────────────────────────────────────────────
 --
@@ -33,10 +35,10 @@
 
 UPDATE "Rol"
    SET "permisos" = "permisos" || '["compras.revisar"]'::jsonb
- WHERE "nombre" = 'DUEÑO_LOCAL'
+ WHERE "nombre" IN ('DUEÑO_LOCAL', 'ENCARGADO')
    AND NOT ("permisos" @> '["compras.revisar"]'::jsonb);
 
 UPDATE "Rol"
    SET "permisos" = "permisos" || '["comprobantes.ver"]'::jsonb
- WHERE "nombre" = 'DUEÑO_LOCAL'
+ WHERE "nombre" IN ('DUEÑO_LOCAL', 'ENCARGADO')
    AND NOT ("permisos" @> '["comprobantes.ver"]'::jsonb);
