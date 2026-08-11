@@ -111,8 +111,20 @@ function ficha(nombre, json) {
   const porArchivo = escanear();
   const grupos = agruparPorPantalla(porArchivo);
   if (!grupos.has(nombre)) {
-    console.error(`No hay ninguna pantalla que se llame "${nombre}".`);
-    console.error("Las que hay: " + [...grupos.keys()].sort().join(", "));
+    // Va a stdout, no a stderr. Equivocarse de nombre no es un error del
+    // programa: es una pregunta con respuesta, y la respuesta es la lista. Si
+    // saliera por stderr, la skill —que lo descarta— dejaría al que preguntó con
+    // un "no encontré" pelado y sin los nombres que sí existen.
+    const cerca = [...grupos.keys()]
+      .filter((k) => k.includes(nombre) || nombre.includes(k))
+      .sort();
+    console.log(`No hay ninguna pantalla que se llame "${nombre}".`);
+    if (cerca.length) console.log(`\n¿Quisiste decir?  ${cerca.join("  ·  ")}`);
+    console.log("\nLas que hay:\n");
+    const todas = [...grupos.keys()].sort();
+    for (let i = 0; i < todas.length; i += 4) {
+      console.log("  " + todas.slice(i, i + 4).map((s) => s.padEnd(24)).join("").trimEnd());
+    }
     process.exit(2);
   }
   const g = grupos.get(nombre);
@@ -151,6 +163,37 @@ function ficha(nombre, json) {
   console.log("Lo que esta ficha NO cuenta:");
   for (const f of FUERA_DE_ALCANCE) console.log(`   · ${f.que}`);
   console.log("   (el motivo de cada uno está en lib/hardcodeo/contador.js)");
+  return 0;
+}
+
+// ── Modo ranking ───────────────────────────────────────────────────────────
+//
+// Dónde está parada una pantalla respecto de las demás. Es un modo del script y
+// no un `node -e` escrito dentro de la skill: una expresión de trescientos
+// caracteres metida en un archivo de texto no se puede probar, no se puede leer
+// y se rompe con cualquier comilla.
+
+function ranking(nombre) {
+  const base = leerLineaBase();
+  if (!base) {
+    console.log("(no hay línea de base todavía)");
+    return 0;
+  }
+  const todas = Object.entries(base.porPantalla)
+    .map(([k, v]) => [k, Object.values(v).reduce((a, c) => a + c, 0)])
+    .sort((a, b) => b[1] - a[1]);
+  const i = todas.findIndex((x) => x[0] === nombre);
+  if (i < 0) {
+    console.log(`"${nombre}" no está en la línea de base.`);
+    return 0;
+  }
+  console.log(`Total de la pantalla: ${todas[i][1]} hallazgos.`);
+  console.log(`Puesto ${i + 1} de ${todas.length} pantallas, de peor a mejor.`);
+  console.log("");
+  console.log("Las cinco peores del repo:");
+  for (const [k, v] of todas.slice(0, 5)) {
+    console.log(`  ${String(v).padStart(4)}  ${k}${k === nombre ? "   ← esta" : ""}`);
+  }
   return 0;
 }
 
@@ -236,13 +279,18 @@ const valor = (n) => {
 let salida = 0;
 if (flag("--linea-base")) salida = escribirLineaBase();
 else if (flag("--trinquete")) salida = trinquete();
-else if (flag("--ficha")) {
+else if (flag("--ranking")) {
+  const nombre = valor("--ranking");
+  if (!nombre) { console.error("Falta el nombre: --ranking <pantalla>"); salida = 2; }
+  else salida = ranking(nombre);
+} else if (flag("--ficha")) {
   const nombre = valor("--ficha");
   if (!nombre) { console.error("Falta el nombre: --ficha <pantalla>"); salida = 2; }
   else salida = ficha(nombre, flag("--json"));
 } else {
   console.error("Uso:");
   console.error("  node scripts/hardcodeo.mjs --ficha <pantalla> [--json]");
+  console.error("  node scripts/hardcodeo.mjs --ranking <pantalla>");
   console.error("  node scripts/hardcodeo.mjs --trinquete");
   console.error("  node scripts/hardcodeo.mjs --linea-base");
   salida = 2;

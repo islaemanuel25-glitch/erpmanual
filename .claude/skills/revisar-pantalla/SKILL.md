@@ -13,19 +13,48 @@ línea de cada hallazgo. **No hay que volver a contar nada.**
 
 ## La ficha
 
-!`node scripts/hardcodeo.mjs --ficha "$1" 2>/dev/null || echo "SIN FICHA: revisar el nombre de la pantalla."`
+!`node --no-warnings scripts/hardcodeo.mjs --ficha "$1" 2>&1`
 
 ## Cuánto es esto comparado con el resto
 
-!`node -e "const b=require('./docs/hardcodeo-linea-base.json');const p=b.porPantalla['$1'];if(!p){console.log('(esa pantalla no está en la línea de base)');process.exit(0)}const t=Object.values(p).reduce((a,c)=>a+c,0);const todas=Object.entries(b.porPantalla).map(([k,v])=>[k,Object.values(v).reduce((a,c)=>a+c,0)]).sort((a,b)=>b[1]-a[1]);const pos=todas.findIndex(x=>x[0]==='$1')+1;console.log('Total de la pantalla: '+t+' hallazgos.');console.log('Puesto '+pos+' de '+todas.length+' pantallas, de peor a mejor.');console.log('');console.log('Las cinco peores del repo:');for(const [k,v] of todas.slice(0,5))console.log('  '+String(v).padStart(4)+'  '+k);" 2>/dev/null`
+!`node --no-warnings scripts/hardcodeo.mjs --ranking "$1" 2>&1`
 
 ## Qué hacer con esto
 
 Sos el auditor: **mirás y explicás, no arreglás**. La tanda que corrige es otra.
 
-Devolvé la ficha ordenada por lo que más conviene arreglar primero. El contador
-ya viene ordenado por prioridad, pero el orden de la lista no es el informe: hay
-que leer los hallazgos y decir cuáles valen la pena.
+### La forma del informe, que no se negocia
+
+**La ficha de arriba NO se copia.** Emanuel ya la tiene si la quiere; lo que
+espera de vos es lo que la ficha no dice. Un informe que repite doscientas líneas
+no se lee, y entonces no sirvió de nada haberlo pedido.
+
+Cuatro bloques, en este orden, y nada más:
+
+1. **Una línea de encabezado**: cuántos hallazgos, en cuántos archivos, y el
+   puesto en el ranking.
+2. **LO PRIMERO QUE CONVIENE ARREGLAR — como mucho cinco entradas.** Cada una con
+   qué es, **archivo y línea** —los que de verdad hay que abrir, no todos—,
+   cuántas veces se repite, y el reemplazo concreto. Si son treinta ocurrencias
+   del mismo caso en el mismo archivo, es UNA entrada que dice "treinta veces en
+   tal archivo", no treinta.
+3. **EL RESTO, RESUMIDO**: dos o tres líneas por categoría con el total y dónde
+   se concentra. Sin listar ubicaciones.
+4. **LO QUE LA FICHA NO DICE**: falsos positivos que detectaste, patrones detrás
+   de los números, y qué no se puede arreglar todavía porque falta el componente
+   o el token.
+
+Como referencia de largo: **cuarenta líneas está bien, ochenta ya es demasiado.**
+Si no entra, es que se está copiando la ficha en vez de leerla.
+
+### Si no hay ficha porque el nombre no existe
+
+No inventes un informe ni salgas a buscar la pantalla por tu cuenta. Decilo en
+dos líneas, ofrecé los nombres que más se parecen al que se pidió —el contador ya
+los imprime— y terminá. Quien preguntó necesita el nombre correcto para repetir
+la consulta, no un análisis de otra cosa.
+
+### Cómo elegir esas cinco
 
 Tres criterios para ordenar, en este orden:
 
@@ -46,6 +75,17 @@ Y decí lo que la ficha NO dice:
 - **Si hay un patrón detrás de los números.** "Los 30 colores fijos son todos del
   mismo archivo" es información; "hay 30 colores fijos" no.
 - **Qué no se puede arreglar todavía** porque falta el componente o el token.
+
+## Cómo se cierra el informe
+
+Terminá **siempre** con una línea que diga exactamente:
+
+    Ficha leída con el criterio ARRANQUE-2026-08-11.
+
+Es la marca de que este cuerpo se cargó y no solo su descripción. Si esa línea no
+aparece en el informe, la skill no se abrió: lo que se leyó fue el resumen de una
+línea del frontmatter, y el informe se armó sin ninguna de las instrucciones de
+acá.
 
 ## Los límites del contador
 
