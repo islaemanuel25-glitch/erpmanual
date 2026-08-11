@@ -62,9 +62,14 @@ export async function POST(req, { params }) {
         id: true,
         proveedorId: true,
         estado: true,
-        archivoUbicacion: true,
-        archivoMime: true,
         imagenBorradaEn: true,
+        estado: true,
+        cerroEnIntento: true,
+        // TODAS las fotos, en orden: se leen juntas como el papel que son.
+        archivos: {
+          orderBy: { orden: "asc" },
+          select: { orden: true, ubicacion: true, mime: true, nombre: true },
+        },
         intentosLectura: true,
         proveedor: { select: { nombre: true } },
       },
@@ -83,7 +88,8 @@ export async function POST(req, { params }) {
       );
     }
 
-    if (comprobante.imagenBorradaEn || !comprobante.archivoUbicacion) {
+    const fotos = (comprobante.archivos || []).filter((a) => a.ubicacion);
+    if (comprobante.imagenBorradaEn || !fotos.length) {
       // No es un error del sistema: es la ventana de siete días funcionando.
       return NextResponse.json(
         {
@@ -120,9 +126,14 @@ export async function POST(req, { params }) {
     });
     const { receta, version: recetaVersion, esGenerica } = recetaDelProveedor(recetaFila);
 
-    let bytes;
+    // Se leen TODAS antes de mandar: si falta una, no se manda media factura.
+    // Media factura leída daría una cuenta que no cierra por el motivo
+    // equivocado, y la puerta la marcaría como mal leída culpando al modelo.
+    let archivosLeidos;
     try {
-      bytes = await readFile(comprobante.archivoUbicacion);
+      archivosLeidos = await Promise.all(
+        fotos.map(async (f) => ({ bytes: await readFile(f.ubicacion), mime: f.mime, orden: f.orden }))
+      );
     } catch {
       return NextResponse.json(
         {
@@ -137,7 +148,7 @@ export async function POST(req, { params }) {
     // ── La lectura ───────────────────────────────────────────────────────
     const resultado = await leerConCadena({
       cadena,
-      archivo: { bytes, mime: comprobante.archivoMime },
+      archivos: archivosLeidos,
       receta,
       proveedorNombre: comprobante.proveedor?.nombre ?? null,
     });
@@ -149,7 +160,12 @@ export async function POST(req, { params }) {
         where: { id: comprobante.id },
         // Se guarda QUIÉN intentó último: si se pasó al respaldo, es el
         // respaldo el que falló, y anotar el titular contaría otra historia.
-        data: { intentosLectura: { increment: 1 }, modeloLectura: resultado.lector ?? eleccion.lector.nombre },
+        data: {
+          intentosLectura: { increment: 1 },
+          modeloLectura: resultado.lector ?? eleccion.lector.nombre,
+          usoRespaldo: resultado.usoRespaldo === true,
+          motivoPaseRespaldo: resultado.porQuePaso ?? null,
+        },
       });
       return NextResponse.json(
         {
@@ -181,6 +197,15 @@ export async function POST(req, { params }) {
           ...puerta.aGuardar,
           leidoEn: new Date(),
           intentosLectura: { increment: 1 },
+          usoRespaldo: resultado.usoRespaldo === true,
+          motivoPaseRespaldo: resultado.porQuePaso ?? null,
+          // EN QUÉ INTENTO CERRÓ POR PRIMERA VEZ. Solo se escribe la primera
+          // vez que cierra: releer uno que ya había cerrado no puede reescribir
+          // su historia, o el número de "cerró a la primera" se iría inflando
+          // solo. Sin esto, después de veinte facturas reales no habría número.
+          ...(puerta.cierra && comprobante.cerroEnIntento == null
+            ? { cerroEnIntento: comprobante.intentosLectura + 1 }
+            : {}),
           // La fecha viene del papel como texto: se convierte acá, y si no se
           // entiende queda en null en vez de en una fecha inventada.
           fecha: fechaLeidaONull(puerta.aGuardar.fecha),
@@ -219,6 +244,7 @@ export async function POST(req, { params }) {
       diferenciaCentavos: puerta.diferenciaCentavos,
       lineasIncoherentes: puerta.lineasIncoherentes ?? [],
       lineas: guardado.cuantasLineas,
+      fotos: fotos.length,
       modelo: resultado.lectura.modelo,
       recetaGenerica: esGenerica,
       // Cuál leyó y si hubo que ir al respaldo. El nombre del modelo ya los

@@ -2725,6 +2725,25 @@ model ComprobanteProveedor {
   /// suma, para que se vea que hubo que insistir.
   intentosLectura Int       @default(0)
 
+  /// ── PARA QUE EL NÚMERO DE ACIERTO SALGA SOLO ─────────────────────────
+  ///
+  /// La medición del acierto se hace con las facturas REALES que entren por la
+  /// pantalla, no con una prueba armada. Para que después de veinte facturas el
+  /// número esté sin que nadie prepare nada, hace falta guardar esto ahora.
+  ///
+  /// En qué intento cerró por primera vez. 1 = cerró a la primera. Null = nunca
+  /// cerró. Se guarda el NÚMERO y no un booleano porque "cerró" y "cerró a la
+  /// primera" son preguntas distintas, y `intentosLectura` no alcanza: releer un
+  /// comprobante que ya había cerrado lo sube igual.
+  cerroEnIntento Int?
+  /// Si la lectura la hizo el respaldo. `modeloLectura` ya dice cuál fue, pero
+  /// contar cuántas veces el titular se quedó sin cuota no tiene que depender de
+  /// deducirlo del nombre del modelo.
+  usoRespaldo       Boolean @default(false)
+  /// Por qué se pasó al respaldo: sin cuota y servicio caído se arreglan
+  /// distinto.
+  motivoPaseRespaldo String?
+
   /// El consumo, para que el costo sea un dato y no una sorpresa a fin de mes.
   /// En micro-dólares ENTEROS —millonésimas— y no en Decimal de centavos: una
   /// lectura sale fracciones de centavo, y redondear a centavos daría cero en
@@ -2734,9 +2753,6 @@ model ComprobanteProveedor {
   tokensSalida  Int?
   costoMicroUsd Int?
 
-  /// MIME informado al subir. Es un dato del archivo, no una autorización:
-  /// quien decide si se puede leer es el contenido.
-  archivoMime String?
 
   /// ── LA IMAGEN VIVE SIETE DÍAS ────────────────────────────────────────
   ///
@@ -2751,12 +2767,17 @@ model ComprobanteProveedor {
   /// Confirmar la recepción NO adelanta el borrado. La segunda revisión del
   /// dueño ocurre después de que el personal recibe, así que borrar al
   /// confirmar le sacaría el papel justo antes de que lo mire.
-  archivoNombre String?
-  archivoTamano Int?
-  /// SHA-256 del contenido. Segunda red contra el duplicado: la identidad de
-  /// negocio atrapa la misma factura recargada, el hash atrapa el mismo archivo.
-  archivoHash      String?
-  archivoUbicacion String?
+  /// ── UN COMPROBANTE, VARIAS IMÁGENES ──────────────────────────────────
+  ///
+  /// Los datos del archivo viven en `ComprobanteArchivo`, uno por foto, porque
+  /// UNA FACTURA LARGA VIENE EN VARIAS FOTOS. La de DAS son dos: el encabezado
+  /// con las líneas y el pie con los totales. Con un archivo por comprobante,
+  /// el total a verificar quedaba en una imagen y las líneas que tiene que
+  /// sumar en la otra, así que leyendo una sola NUNCA iba a cerrar — y la
+  /// puerta la habría marcado como mal leída para siempre, sin que el problema
+  /// estuviera en la lectura.
+  ///
+  /// Las fotos se leen JUNTAS, en un solo pedido, como el papel que son.
   /// Cuándo se recibió con el okey del personal. Queda como dato, no dispara
   /// el borrado.
   confirmadoEn DateTime?
@@ -2768,8 +2789,9 @@ model ComprobanteProveedor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  proveedor Proveedor          @relation(fields: [proveedorId], references: [id])
+  proveedor Proveedor            @relation(fields: [proveedorId], references: [id])
   lineas    ComprobanteLinea[]
+  archivos  ComprobanteArchivo[]
 
   /// El índice único de identidad es PARCIAL y vive en la migración —excluye
   /// los ANULADO, para que un número anulado se pueda volver a subir—, así que
@@ -2778,9 +2800,43 @@ model ComprobanteProveedor {
   @@index([grupoId, proveedorId, puntoVenta, numero])
   @@index([grupoId, pedidoId])
   @@index([grupoId, estado])
-  @@index([grupoId, proveedorId, archivoHash])
   /// Para el barrido diario: las que vencieron y todavía tienen imagen.
   @@index([venceEn, imagenBorradaEn])
+}
+
+/// UNA FOTO DE UN COMPROBANTE. Varias por comprobante, en orden.
+///
+/// Existe porque una factura larga viene en varias fotos: la de DAS son dos,
+/// el encabezado con las líneas y el pie con los totales. Leyendo una sola,
+/// el total a verificar está en una imagen y las líneas que tiene que sumar en
+/// la otra, así que NUNCA cerraría — y la puerta la marcaría como mal leída
+/// para siempre, con la lectura perfecta.
+model ComprobanteArchivo {
+  id            Int @id @default(autoincrement())
+  comprobanteId Int
+
+  /// En qué orden se mandan al lector. Importa: el modelo lee las imágenes
+  /// como páginas de un mismo papel, y el pie después del encabezado se
+  /// entiende distinto que al revés.
+  orden Int
+
+  nombre String
+  tamano Int
+  mime   String?
+  /// SHA-256 del contenido. Es la red contra subir dos veces la misma foto:
+  /// la identidad de negocio atrapa la misma factura recargada, el hash atrapa
+  /// el mismo ARCHIVO — y con varias fotos por comprobante, el hash tiene que
+  /// vivir por foto o dos páginas distintas se leerían como duplicado.
+  hash      String
+  ubicacion String?
+
+  createdAt DateTime @default(now())
+
+  comprobante ComprobanteProveedor @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+
+  @@unique([comprobanteId, orden])
+  @@index([comprobanteId])
+  @@index([hash])
 }
 
 model ComprobanteLinea {

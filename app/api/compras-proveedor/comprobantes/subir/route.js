@@ -1,8 +1,9 @@
 // POST /api/compras-proveedor/comprobantes/subir
 //
-// Sube uno o varios comprobantes: fotos, PDF o Excel. Cada archivo crea SU
-// comprobante, en PENDIENTE_LECTURA. Esta ruta NO lee el papel y no propone
-// ningún costo: deja el archivo guardado y la fila creada.
+// Sube fotos, PDF o Excel. Por defecto cada archivo crea SU comprobante, en
+// PENDIENTE_LECTURA; con `agruparEnUno` o `comprobanteId` varias fotos se
+// cuelgan de un mismo comprobante, porque una factura larga viene en varias.
+// Esta ruta NO lee el papel y no propone ningún costo.
 //
 // ── EL ORDEN, QUE NO ES CASUAL ─────────────────────────────────────────────
 //
@@ -14,15 +15,15 @@
 //
 // ── LA UBICACIÓN SE ESCRIBE ÚLTIMA, Y ESA ES LA CLAVE ──────────────────────
 //
-// La fila se crea antes que el archivo por un motivo concreto: el nombre del
-// archivo lleva el id del comprobante, y ese id lo da la base. Pero se crea SIN
-// `archivoUbicacion`, y ese campo se completa recién cuando el archivo ya está
-// escrito en el volumen.
+// La fila de la foto se crea antes que el archivo por un motivo concreto: el
+// nombre del archivo lleva el id del comprobante y el orden de la página, y ese
+// id lo da la base. Pero se crea SIN `ubicacion`, y ese campo se completa recién
+// cuando el archivo ya está escrito en el volumen.
 //
-// Así, si la escritura falla, lo que queda es una fila sin ubicación —que todo
+// Así, si la escritura falla, lo que queda es una foto sin ubicación —que todo
 // el resto del sistema trata como "sin imagen", que es la verdad— y nunca una
-// fila que promete una imagen inexistente. Es la asimetría correcta: mejor una
-// fila que admite no tener foto que una que miente.
+// que promete un archivo inexistente. Es la asimetría correcta: mejor una fila
+// que admite no tener foto que una que miente.
 //
 // El otro extremo posible es un archivo escrito cuya fila no llegó a
 // actualizarse: un huérfano en el volumen. Molesta menos, porque no le miente a
@@ -99,6 +100,25 @@ export async function POST(req) {
     const pedidoIdCrudo = form.get("pedidoId");
     const pedidoId = Number(pedidoIdCrudo) > 0 ? Number(pedidoIdCrudo) : null;
 
+    // ── QUÉ FOTOS SON EL MISMO PAPEL ─────────────────────────────────────
+    //
+    // Una factura larga viene en varias fotos: la de DAS son dos, encabezado y
+    // pie. Leyendo una sola, el total a verificar queda en una imagen y las
+    // líneas que tiene que sumar en la otra, así que NUNCA cerraría.
+    //
+    // Quién lo decide es quien sube, no el sistema: no hay forma de saber si
+    // tres fotos son tres facturas o tres páginas de una sin mirarlas.
+    //
+    //   · `comprobanteId` — estas fotos son páginas MÁS de ese comprobante. Es
+    //     el caso de sacar el pie después de haber subido el encabezado.
+    //   · `agruparEnUno` — todas las de ESTA tanda son un solo comprobante.
+    //   · sin ninguno de los dos — una foto, un comprobante, que es el caso
+    //     común y el comportamiento de siempre.
+    const comprobanteExistenteId = Number(form.get("comprobanteId")) > 0
+      ? Number(form.get("comprobanteId"))
+      : null;
+    const agruparEnUno = form.get("agruparEnUno") === "true";
+
     const archivos = form.getAll("archivos").filter((f) => f && typeof f.arrayBuffer === "function");
 
     // Se leen los bytes y se hashea ANTES de evaluar la tanda, porque el
@@ -136,19 +156,40 @@ export async function POST(req) {
     // todavía no se leyó el número.
     const hashes = leidos.filter((_, i) => tanda.resultados[i]?.ok).map((a) => a.hash);
     const yaEstaban = hashes.length
-      ? await prisma.comprobanteProveedor.findMany({
+      ? await prisma.comprobanteArchivo.findMany({
           where: {
-            grupoId,
-            proveedorId,
-            archivoHash: { in: hashes },
-            estado: { not: "ANULADO" },
+            hash: { in: hashes },
+            comprobante: { grupoId, proveedorId, estado: { not: "ANULADO" } },
           },
-          select: { id: true, archivoHash: true },
+          select: { hash: true, comprobanteId: true },
         })
       : [];
-    const hashRepetido = new Map(yaEstaban.map((c) => [c.archivoHash, c.id]));
+    const hashRepetido = new Map(yaEstaban.map((c) => [c.hash, c.comprobanteId]));
 
-    // ── 5. Archivo primero, fila después, uno por uno ────────────────────
+    // ── 5. Un comprobante para todas, o uno por foto ─────────────────────
+    //
+    // Si se agrupan, el comprobante se crea UNA vez y las fotos se le cuelgan
+    // en orden. El orden importa: el lector las manda como páginas de un mismo
+    // papel, y el pie después del encabezado se entiende distinto que al revés.
+    let comprobanteAgrupado = null;
+    if (comprobanteExistenteId) {
+      const existente = await prisma.comprobanteProveedor.findFirst({
+        where: { id: comprobanteExistenteId, grupoId },
+        select: { id: true, estado: true, _count: { select: { archivos: true } } },
+      });
+      if (!existente) {
+        return NextResponse.json({ ok: false, error: "No existe ese comprobante." }, { status: 404 });
+      }
+      if (existente.estado === "ANULADO") {
+        return NextResponse.json(
+          { ok: false, error: "El comprobante está anulado.", queHacer: "Subí las fotos como uno nuevo." },
+          { status: 409 }
+        );
+      }
+      comprobanteAgrupado = existente;
+    }
+
+    let ordenSiguiente = (comprobanteAgrupado?._count?.archivos ?? 0) + 1;
     const resultados = [];
     for (let i = 0; i < leidos.length; i++) {
       const a = leidos[i];
@@ -172,25 +213,39 @@ export async function POST(req) {
         continue;
       }
 
-      // La fila se crea primero SOLO para tener el id que va en el nombre del
-      // archivo, y se completa con la ubicación recién cuando el archivo está
-      // escrito. Si la escritura falla, la fila queda sin `archivoUbicacion` y
-      // el resto del sistema la trata como "sin imagen", que es la verdad.
-      const creado = await prisma.comprobanteProveedor.create({
+      // El comprobante se crea una sola vez si se agrupan; si no, uno por foto.
+      if (!comprobanteAgrupado || (!agruparEnUno && !comprobanteExistenteId)) {
+        comprobanteAgrupado = await prisma.comprobanteProveedor.create({
+          data: {
+            grupoId,
+            proveedorId,
+            pedidoId,
+            localOperativoId: localId,
+            usuarioId: session?.id ?? session?.usuarioId ?? null,
+            estado: "PENDIENTE_LECTURA",
+            // Los siete días corren desde la SUBIDA, no desde la lectura ni
+            // desde la confirmación: es lo que se le prometió a quien sube.
+            venceEn: calcularVencimiento(new Date()),
+          },
+          select: { id: true },
+        });
+        if (!agruparEnUno && !comprobanteExistenteId) ordenSiguiente = 1;
+      }
+      const creado = comprobanteAgrupado;
+      const ordenDeEsta = ordenSiguiente;
+      ordenSiguiente += 1;
+
+      // La foto se crea SIN ubicación, y se completa recién cuando el archivo
+      // está escrito. Si la escritura falla queda una foto que admite no tener
+      // archivo, nunca una que promete uno inexistente.
+      const foto = await prisma.comprobanteArchivo.create({
         data: {
-          grupoId,
-          proveedorId,
-          pedidoId,
-          localOperativoId: localId,
-          usuarioId: session?.id ?? session?.usuarioId ?? null,
-          estado: "PENDIENTE_LECTURA",
-          archivoNombre: a.nombre,
-          archivoTamano: a.tamano,
-          archivoMime: a.mime || null,
-          archivoHash: a.hash,
-          // Los siete días corren desde la SUBIDA, no desde la lectura ni desde
-          // la confirmación: es lo que se le prometió a quien sube.
-          venceEn: calcularVencimiento(new Date()),
+          comprobanteId: creado.id,
+          orden: ordenDeEsta,
+          nombre: a.nombre,
+          tamano: a.tamano,
+          mime: a.mime || null,
+          hash: a.hash,
         },
         select: { id: true },
       });
@@ -206,18 +261,20 @@ export async function POST(req) {
         const destino = await exigirAlmacen({
           comprobanteId: creado.id,
           proveedorNombre: proveedor?.nombre,
+          orden: ordenDeEsta,
           extension: (a.nombre.split(".").pop() || "jpg"),
         });
         await writeFile(destino.rutaAbsoluta, a.bytes);
-        await prisma.comprobanteProveedor.update({
-          where: { id: creado.id },
-          data: { archivoUbicacion: destino.rutaAbsoluta },
+        await prisma.comprobanteArchivo.update({
+          where: { id: foto.id },
+          data: { ubicacion: destino.rutaAbsoluta },
         });
         resultados.push({
           indice: i,
           nombre: a.nombre,
           ok: true,
           comprobanteId: creado.id,
+          orden: ordenDeEsta,
           tamano: a.tamano,
         });
       } catch (e) {
