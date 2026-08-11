@@ -53,9 +53,7 @@ CREATE TABLE "ComprobanteProveedor" (
     "archivoHash" TEXT,
     "archivoUbicacion" TEXT,
     "confirmadoEn" TIMESTAMP(3),
-    "borradoProgramadoEn" TIMESTAMP(3),
-    "avisoBorradoDesde" TIMESTAMP(3),
-    "avisoBorradoRespondidoEn" TIMESTAMP(3),
+    "venceEn" TIMESTAMP(3),
     "imagenBorradaEn" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -93,6 +91,8 @@ CREATE INDEX "ComprobanteProveedor_grupoId_proveedorId_puntoVenta_numero_idx" ON
 CREATE INDEX "ComprobanteProveedor_grupoId_pedidoId_idx" ON "ComprobanteProveedor"("grupoId", "pedidoId");
 CREATE INDEX "ComprobanteProveedor_grupoId_estado_idx" ON "ComprobanteProveedor"("grupoId", "estado");
 CREATE INDEX "ComprobanteProveedor_grupoId_proveedorId_archivoHash_idx" ON "ComprobanteProveedor"("grupoId", "proveedorId", "archivoHash");
+-- El barrido diario pide las vencidas con imagen todavía puesta.
+CREATE INDEX "ComprobanteProveedor_venceEn_imagenBorradaEn_idx" ON "ComprobanteProveedor"("venceEn", "imagenBorradaEn");
 
 -- ── LA IDENTIDAD DEL COMPROBANTE, Y POR QUÉ EL ÍNDICE ES PARCIAL ──────────
 --

@@ -36,6 +36,7 @@ haya sido deliberado.
 | [DEC-0006](DEC-0006-fabrica-de-cliente-prisma.md) | Ningún script construye `PrismaClient` directo | Vigente |
 | [DEC-0006](DEC-0006-codigos-de-casiano-intocables.md) | Los códigos de CASIANO CASAS no se tocan | Vigente |
 | [DEC-0007](DEC-0007-prisma-mcp-sin-decidir.md) | `prisma mcp` daría la vuelta alrededor de la guardia | **SIN DECIDIR** |
+| [DEC-0008](DEC-0008-imagenes-de-facturas-no-se-respaldan.md) | Las imágenes de facturas viven siete días y NO se respaldan | Vigente |
 
 ⚠️ **El número 0006 está usado dos veces.** No se renumeró acá porque los dos
 archivos ya están referenciados desde otros documentos y desde commits; queda

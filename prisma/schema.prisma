@@ -2697,27 +2697,32 @@ model ComprobanteProveedor {
   recetaVersion Int?
   recetaUsada   Json?
 
-  /// ── LA IMAGEN, QUE ES TEMPORAL ───────────────────────────────────────
+  /// ── LA IMAGEN VIVE SIETE DÍAS ────────────────────────────────────────
   ///
   /// Vive en un VOLUMEN del VPS, no en el disco del contenedor: ahí se perdería
   /// al recrearlo, que es el motivo por el que el campo equivalente de
   /// ImportacionListaProveedor quedó en null todo este tiempo.
   ///
-  /// Se borra cuando el dueño confirma, y de todas formas ninguna pasa del mes.
-  /// Una semana antes sale un aviso ofreciendo descargar el paquete; lo ven solo
-  /// dueño y administrador y queda hasta que alguien conteste. Si nadie
-  /// contesta, se borra igual.
+  /// CADA FOTO VENCE A LOS SIETE DÍAS DE SUBIDA, por su cuenta. Un proceso
+  /// diario borra las vencidas. NO hay borrado mensual en bloque: una foto de
+  /// ayer no se va junto con una de la semana pasada.
+  ///
+  /// Confirmar la recepción NO adelanta el borrado. La segunda revisión del
+  /// dueño ocurre después de que el personal recibe, así que borrar al
+  /// confirmar le sacaría el papel justo antes de que lo mire.
   archivoNombre String?
   archivoTamano Int?
   /// SHA-256 del contenido. Segunda red contra el duplicado: la identidad de
   /// negocio atrapa la misma factura recargada, el hash atrapa el mismo archivo.
-  archivoHash              String?
-  archivoUbicacion         String?
-  confirmadoEn             DateTime?
-  borradoProgramadoEn      DateTime?
-  avisoBorradoDesde        DateTime?
-  avisoBorradoRespondidoEn DateTime?
-  imagenBorradaEn          DateTime?
+  archivoHash      String?
+  archivoUbicacion String?
+  /// Cuándo se recibió con el okey del personal. Queda como dato, no dispara
+  /// el borrado.
+  confirmadoEn DateTime?
+  /// createdAt + 7 días. Se guarda en vez de calcularse para que el barrido
+  /// diario pueda pedirlas por índice en lugar de recorrer la tabla entera.
+  venceEn         DateTime?
+  imagenBorradaEn DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2733,6 +2738,8 @@ model ComprobanteProveedor {
   @@index([grupoId, pedidoId])
   @@index([grupoId, estado])
   @@index([grupoId, proveedorId, archivoHash])
+  /// Para el barrido diario: las que vencieron y todavía tienen imagen.
+  @@index([venceEn, imagenBorradaEn])
 }
 
 model ComprobanteLinea {
