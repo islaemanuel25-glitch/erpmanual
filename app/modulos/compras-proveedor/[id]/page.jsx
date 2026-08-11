@@ -12,6 +12,7 @@ import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
+import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import { useUser } from "@/app/context/UserContext";
