@@ -223,6 +223,10 @@ export async function POST(req, { params }) {
             comprobanteId: comprobante.id,
             orden: i + 1,
             textoCrudo: l.descripcion ?? "(sin descripción)",
+            // El código del proveedor es el primer escalón de la cascada de
+            // vínculo, y el único que no interpreta nada. Se guardaba nada:
+            // el lector lo leía y esta ruta lo tiraba.
+            codigoProveedor: l.codigoProveedor ?? null,
             cantidad: l.cantidad,
             netoUnitario: l.netoUnitario,
             subtotalImpreso: l.subtotalImpreso ?? l.netoUnitario * l.cantidad,

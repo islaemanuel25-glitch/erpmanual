@@ -2848,6 +2848,21 @@ model ComprobanteLinea {
   /// muestra debajo del nombre del producto y lo que alimenta el alias.
   textoCrudo String
 
+  /// EL CÓDIGO DE ARTÍCULO DEL PROVEEDOR, tal como viene impreso.
+  ///
+  /// La factura de DYSSA trae "Cód Art" —010027, 010193…— y es el ÚNICO dato de
+  /// vínculo que no interpreta nada: el proveedor y nosotros estamos hablando
+  /// del mismo número. Es el primer escalón de la cascada de
+  /// `lib/compras-proveedor/comprobante/vinculo.js` y machea directo contra
+  /// `ProductoCodigoProveedor.codigoInterno`.
+  ///
+  /// Faltaba. El lector lo leía —está en el contrato desde el principio— y la
+  /// ruta lo tiraba al guardar, así que el escalón más fuerte de la cascada no
+  /// podía funcionar NUNCA: toda línea caía a sugerencia por texto. Se descubrió
+  /// al armar la captura, buscando un caso que vinculara solo y no encontrando
+  /// ninguno posible.
+  codigoProveedor String?
+
   cantidad     Decimal @db.Decimal(12, 3)
   /// Unitario NETO, sin impuestos. Alta precisión como el resto de los
   /// unitarios del proyecto (PedidoProveedorDetalle.precioCosto es 18,6).

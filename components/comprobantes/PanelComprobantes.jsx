@@ -24,6 +24,7 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import LineasComprobante from "@/components/comprobantes/LineasComprobante";
 
 import {
   debePreguntarPorAgrupar,
@@ -103,6 +104,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
   const [mensaje, setMensaje] = useState(null);
   const [pregunta, setPregunta] = useState(null); // { archivos, opciones, candidatos }
   const [seleccion, setSeleccion] = useState([]);
+  const [abierto, setAbierto] = useState(null); // qué comprobante muestra sus líneas
   const inputRef = useRef(null);
 
   const resumen = useMemo(() => resumenDeLista(items), [items]);
@@ -308,7 +310,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
         <>
           {/* ── Escritorio: tabla ────────────────────────────────────── */}
           <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
-            <SunmiTable headers={["", "Comprobante", "Estado", "Fotos", "Líneas", "Leyó", ""]}>
+            <SunmiTable headers={["", "Comprobante", "Estado", "Fotos", "Líneas", "Último intento", ""]}>
               {items.length === 0 ? (
                 <SunmiTableEmpty label="Todavía no hay comprobantes" />
               ) : (
@@ -346,13 +348,29 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                     </td>
                     <td className="px-3 py-1.5 align-top text-xs">{c._count?.lineas ?? 0}</td>
                     <td className="px-3 py-1.5 align-top text-sm2 sunmi-text-muted">
+                      {/* El campo guarda el ÚLTIMO QUE INTENTÓ, no el que leyó:
+                          la ruta lo escribe también cuando la lectura falla. El
+                          encabezado decía "Leyó" y afirmaba algo que no pasó. */}
                       {c.modeloLectura || "—"}
+                      {c.modeloLectura && !c.leidoEn && (
+                        <span className="block sunmi-text-warning">intentó, no leyó</span>
+                      )}
                       {c.usoRespaldo && <span className="block">(respaldo)</span>}
                       {c.intentosLectura > 1 && (
                         <span className="block">{c.intentosLectura} intentos</span>
                       )}
                     </td>
-                    <td className="px-3 py-1.5 align-top text-right">
+                    <td className="px-3 py-1.5 align-top text-right whitespace-nowrap">
+                      {c._count?.lineas > 0 && (
+                        <SunmiButton
+                          color="slate"
+                          type="button"
+                          className="mr-1"
+                          onClick={() => setAbierto(abierto === c.id ? null : c.id)}
+                        >
+                          {abierto === c.id ? "Ocultar líneas" : "Ver líneas"}
+                        </SunmiButton>
+                      )}
                       {puedeRecibir && c.fotos > 0 && (
                         <SunmiButton
                           color="accent"
@@ -368,6 +386,15 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                 ))
               )}
             </SunmiTable>
+            {abierto && (
+              <div className="border-t sunmi-divider p-3">
+                <LineasComprobante
+                  comprobanteId={abierto}
+                  puedeVincular={puedeRecibir}
+                  onCambio={recargar}
+                />
+              </div>
+            )}
           </div>
 
           {/* ── Móvil: tarjetas ──────────────────────────────────────── */}
@@ -401,17 +428,27 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                     {c._count?.lineas ? ` · ${c._count.lineas} líneas` : ""}
                     {c.modeloLectura ? ` · ${c.modeloLectura}` : ""}
                   </p>
-                  {puedeRecibir && c.fotos > 0 && (
-                    <SunmiButton
-                      color="accent"
-                      type="button"
-                      disabled={leyendo === c.id}
-                      onClick={() => leer(c.id)}
-                    >
-                      {leyendo === c.id ? "Leyendo…" : c.leidoEn ? "Releer" : "Leer"}
-                    </SunmiButton>
-                  )}
+                  <div className="flex gap-1">
+                    {c._count?.lineas > 0 && (
+                      <SunmiButton color="slate" type="button" onClick={() => setAbierto(abierto === c.id ? null : c.id)}>
+                        {abierto === c.id ? "Ocultar" : "Líneas"}
+                      </SunmiButton>
+                    )}
+                    {puedeRecibir && c.fotos > 0 && (
+                      <SunmiButton
+                        color="accent"
+                        type="button"
+                        disabled={leyendo === c.id}
+                        onClick={() => leer(c.id)}
+                      >
+                        {leyendo === c.id ? "Leyendo…" : c.leidoEn ? "Releer" : "Leer"}
+                      </SunmiButton>
+                    )}
+                  </div>
                 </div>
+                {abierto === c.id && (
+                  <LineasComprobante comprobanteId={c.id} puedeVincular={puedeRecibir} onCambio={recargar} />
+                )}
               </div>
             ))}
           </div>
