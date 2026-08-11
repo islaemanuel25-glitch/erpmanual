@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
@@ -38,13 +39,6 @@ const TONOS = {
   peligro: "sunmi-text-danger",
   neutro: "sunmi-text-muted",
 };
-const BARRAS = {
-  ok: "bg-emerald-500",
-  info: "bg-sky-500",
-  aviso: "bg-amber-500",
-  peligro: "bg-rose-500",
-  neutro: "bg-slate-400",
-};
 
 function tamano(bytes) {
   const n = Number(bytes);
@@ -62,11 +56,13 @@ function identidad(c) {
 function Aviso({ estado }) {
   const v = comoSeDice(estado);
   return (
-    <div className="flex gap-2">
-      <div className={`w-1 rounded shrink-0 ${BARRAS[v.tono] || BARRAS.neutro}`} aria-hidden />
+    // La barra usa `bg-current`, o sea el MISMO color que el texto del título.
+    // No hay una segunda tabla de colores que pueda quedar desfasada del tono.
+    <div className={`flex gap-2 ${TONOS[v.tono] || TONOS.neutro}`}>
+      <div className="w-1 rounded shrink-0 bg-current" aria-hidden />
       <div className="min-w-0">
-        <p className={`text-xs font-bold ${TONOS[v.tono] || TONOS.neutro}`}>{v.titulo}</p>
-        <p className="text-[11px] sunmi-text-muted leading-snug">{v.detalle}</p>
+        <p className="text-xs font-bold">{v.titulo}</p>
+        <p className="text-sm2 sunmi-text-muted leading-snug">{v.detalle}</p>
       </div>
     </div>
   );
@@ -212,7 +208,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <h3 className="text-sm font-bold sunmi-text-strong">Comprobantes</h3>
-          <p className="text-[11px] sunmi-text-muted">
+          <p className="text-sm2 sunmi-text-muted">
             {resumen.total === 0
               ? "Sacá una foto de la factura. Si es larga, sacá una por hoja."
               : `${resumen.total} en total · ${resumen.sinLeer} sin leer` +
@@ -236,7 +232,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
             </SunmiButton>
           </div>
         )}
-        <input
+        <SunmiInput
           ref={inputRef}
           type="file"
           multiple
@@ -278,8 +274,9 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                 items.map((c) => (
                   <SunmiTableRow key={c.id}>
                     <td className="px-2 py-1.5 align-top">
-                      <input
+                      <SunmiInput
                         type="checkbox"
+                        className="w-4"
                         checked={seleccion.includes(c.id)}
                         onChange={() => alternar(c.id)}
                         aria-label={`Elegir comprobante ${c.id}`}
@@ -287,7 +284,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                     </td>
                     <td className="px-3 py-1.5 align-top">
                       <p className="text-xs font-bold sunmi-text-strong">{identidad(c)}</p>
-                      <p className="text-[11px] sunmi-text-muted">
+                      <p className="text-sm2 sunmi-text-muted">
                         {c.proveedor?.nombre} · {new Date(c.createdAt).toLocaleString("es-AR")}
                       </p>
                     </td>
@@ -307,7 +304,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                       )}
                     </td>
                     <td className="px-3 py-1.5 align-top text-xs">{c._count?.lineas ?? 0}</td>
-                    <td className="px-3 py-1.5 align-top text-[11px] sunmi-text-muted">
+                    <td className="px-3 py-1.5 align-top text-sm2 sunmi-text-muted">
                       {c.modeloLectura || "—"}
                       {c.usoRespaldo && <span className="block">(respaldo)</span>}
                       {c.intentosLectura > 1 && (
@@ -344,10 +341,11 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-xs font-bold sunmi-text-strong truncate">{identidad(c)}</p>
-                    <p className="text-[11px] sunmi-text-muted truncate">{c.proveedor?.nombre}</p>
+                    <p className="text-sm2 sunmi-text-muted truncate">{c.proveedor?.nombre}</p>
                   </div>
-                  <input
+                  <SunmiInput
                     type="checkbox"
+                    className="w-4"
                     checked={seleccion.includes(c.id)}
                     onChange={() => alternar(c.id)}
                     aria-label={`Elegir comprobante ${c.id}`}
@@ -357,7 +355,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                   <Aviso estado={c.estado} />
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="text-[11px] sunmi-text-muted">
+                  <p className="text-sm2 sunmi-text-muted">
                     {c.fotos === 0 ? "fotos vencidas" : `${c.fotos} foto(s)`}
                     {c._count?.lineas ? ` · ${c._count.lineas} líneas` : ""}
                     {c.modeloLectura ? ` · ${c.modeloLectura}` : ""}
@@ -431,7 +429,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
               ))}
           </div>
 
-          <p className="text-[11px] sunmi-text-muted mt-3">
+          <p className="text-sm2 sunmi-text-muted mt-3">
             Si te equivocás, después se pueden unir con el botón «Unir».
           </p>
         </SunmiModalLayout>

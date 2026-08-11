@@ -512,6 +512,16 @@ export default function DetallePedidoProveedorPage({ params }) {
           </div>
         )}
 
+        {/* Los comprobantes del pedido: subir, ver, agrupar y leer. La
+            conciliación línea por línea contra el pedido viene después. */}
+        {(pedido.proveedor?.id ?? pedido.proveedorId) && (
+          <PanelComprobantes
+            pedidoId={pedido.id}
+            proveedorId={pedido.proveedor?.id ?? pedido.proveedorId}
+            puedeRecibir={esRecepcion}
+          />
+        )}
+
         {/* Panel factura — editable en ENVIADO, readonly en RECIBIDO */}
         {(esRecepcion || pedido.estado === "RECIBIDO") && (
           <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
