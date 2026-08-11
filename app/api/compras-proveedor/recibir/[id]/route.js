@@ -5,7 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
-import { esFiambreFijo } from "@/lib/conversiones/stock";
+import { esFiambreFijoEnUbicacion } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 
@@ -193,6 +193,20 @@ export async function POST(req, { params }) {
     // Para el depósito coincide con depositoId (caso normal).
     const ownerLocalId = ownerLocalIdDePedido(pedido);
 
+    // La ubicación decide la UNIDAD en la que entra el fiambre de pieza fija:
+    // piezas en el depósito, kilos en un local. El pedido no trae este dato —su
+    // include no tiene ninguna relación a Local, solo ids— así que se consulta
+    // acá, antes de abrir la transacción.
+    //
+    // Sin esto, la recepción sumaba PIEZAS a la fila de un local mientras el POS
+    // de ese local descontaba KILOS del mismo número. Es la forma canónica de
+    // preguntarlo, la misma que ya usan el POS y stock_locales.
+    const ubicacionDestino = await prisma.local.findUnique({
+      where: { id: ownerLocalId },
+      select: { es_deposito: true },
+    });
+    const destinoEsDeposito = ubicacionDestino?.es_deposito === true;
+
     // Transacción: incrementar stock + marcar recibido
     await prisma.$transaction(async (tx) => {
       let totalFacturaComputed = 0;
@@ -225,11 +239,15 @@ export async function POST(req, { params }) {
             kgReales = cantRecibida * pesoRef;
           }
 
-          // Stock operativo del depósito:
-          // - Fiambre fijo (entra por pieza/barra, peso fijo): se cuenta en PIEZAS.
-          //   Recibir 10 piezas suma +10 (NO +60). Los kg son solo equivalencia.
-          // - Fiambre variable (por peso): se cuenta en kg (kgReales).
-          incremento = esFiambreFijo(base) ? cantRecibida : kgReales;
+          // La unidad depende de DÓNDE entra el stock, no solo del producto:
+          // - Fiambre fijo EN EL DEPÓSITO: se cuenta en PIEZAS. Recibir 10
+          //   piezas suma +10 (NO +60). Los kg son solo equivalencia.
+          // - Fiambre fijo EN UN LOCAL: se cuenta en KILOS, igual que lo lee el
+          //   POS de ese local y que lo escribe una transferencia.
+          // - Fiambre variable, en cualquier lado: se cuenta en kg (kgReales).
+          incremento = esFiambreFijoEnUbicacion(base, destinoEsDeposito)
+            ? cantRecibida
+            : kgReales;
 
           // Actualizar pesoPromedioKg si está habilitado
           if (base.actualizaPromedioPorRecepcion && cantRecibida > 0 && kgReales > 0) {

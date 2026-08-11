@@ -82,6 +82,19 @@ const PANTALLAS = [
     nombre: "23-listas-armado-dudoso",
     url: `/modulos/proveedores/listas/${arg("importacion", "3")}?estado=FACTOR_DUDOSO`,
   },
+  // Stock por ubicación. NO tiene línea de base, igual que 22 y 23: la primera
+  // corrida la informa como "sólo en la corrida nueva" y a partir de ahí sirve
+  // de referencia.
+  //
+  // Se agrega porque es la única pantalla que traduce el número guardado a
+  // bultos + sueltas, y esa traducción tuvo dos defectos que sólo se ven acá y
+  // nunca en el dato: la parte de sueltas salía con basura de coma flotante, y
+  // el stock negativo no se traducía. Sin esta entrada, arreglar eso no tenía
+  // ninguna medición.
+  //
+  // La búsqueda de esta pantalla es del lado del cliente y no lee la URL, así
+  // que la huella es la vista por defecto de la ubicación del contexto.
+  { nombre: "24-stock-locales", url: "/modulos/stock_locales" },
 ];
 
 /**

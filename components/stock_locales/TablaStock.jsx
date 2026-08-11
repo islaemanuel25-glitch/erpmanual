@@ -45,12 +45,20 @@ export default function TablaStock({
         unidades: Number(p.stock || 0),
         factorPack: p.factorPack,
       });
-      if (bultos > 0 || sueltas > 0) {
+      // Un stock NEGATIVO se lee igual que uno positivo, con el signo adelante.
+      //
+      // Antes la condición era `bultos > 0 || sueltas > 0`, así que con un
+      // negativo los dos daban ≤ 0, caía al formato de sueltas y decía
+      // "-551.5 uds" donde tenía que decir "-2 bultos + -181.5 uds". El
+      // desglose se perdía justo en las filas que más hay que mirar. Estaba
+      // protegido por accidente, no por diseño: sin esa condición habría
+      // mostrado el par roto que devolvía fromUnidades con negativos.
+      if (bultos !== 0 || sueltas !== 0) {
         return (
           <span>
-            {bultos > 0 && <strong>{bultos} bultos</strong>}
-            {bultos > 0 && sueltas > 0 && " + "}
-            {sueltas > 0 && `${sueltas} uds`}
+            {bultos !== 0 && <strong>{bultos} bultos</strong>}
+            {bultos !== 0 && sueltas !== 0 && " + "}
+            {sueltas !== 0 && `${sueltas} uds`}
           </span>
         );
       }
