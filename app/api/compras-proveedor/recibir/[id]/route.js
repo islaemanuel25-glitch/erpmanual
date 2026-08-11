@@ -6,6 +6,11 @@ import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 import { esFiambreFijoEnUbicacion } from "@/lib/conversiones/stock";
+import {
+  clasificarDiferenciaCosto,
+  decidirEscrituraDeCosto,
+  cantidadesNegativas,
+} from "@/lib/compras-proveedor/fronteraCosto";
 import { esComboBase } from "@/lib/combos/guards";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 
@@ -118,6 +123,67 @@ export async function POST(req, { params }) {
     const body = await req.json().catch(() => ({}));
     const recibidos = body.recibidos || {}; // { detalleId: cantidadRecibida }
     const kgRecibidosMap = body.kgRecibidos || {}; // { detalleId: kgReales }
+
+    // ── LA FRONTERA ENTRE RECIBIR Y ESCRIBIR EL COSTO ────────────────────
+    //
+    // Hasta el 2026-08-11 recibir escribía el costo maestro de TODAS las
+    // líneas, sin excepción. Estas dos listas permiten separar las decisiones:
+    // la mercadería entra igual, el costo se toca o no.
+    //
+    // AMBAS SON OPCIONALES Y VACÍAS POR DEFECTO, así que un cliente que no las
+    // mande —la pantalla de compras de hoy— se comporta exactamente como antes.
+    // Es a propósito: este cambio no puede alterar lo que ya funciona.
+    const costosExcluidos = new Set(
+      (Array.isArray(body.costosExcluidos) ? body.costosExcluidos : []).map(Number).filter(Number.isFinite)
+    );
+    const costosAceptados = new Set(
+      (Array.isArray(body.costosAceptados) ? body.costosAceptados : []).map(Number).filter(Number.isFinite)
+    );
+    const decisionesDeCosto = []; // para informar qué se escribió y qué no
+
+    // ── LOS UMBRALES, Y QUIÉN GOBIERNA A QUIÉN ───────────────────────────
+    //
+    // Los dos números entran por el cuerpo del pedido y tienen su default en
+    // UNA sola constante (lib/compras-proveedor/fronteraCosto.js). Dónde se
+    // guardan —por proveedor, global o por comprobante— todavía no está
+    // decidido; cuando se decida, el que los lea se los pasa acá.
+    const umbralesDeCosto = {
+      revisarPct: body.umbralRevisarPct,
+      sospechaBajaPct: body.umbralSospechaBajaPct,
+    };
+
+    // La regla de umbrales SOLO gobierna si el cliente la pide. Es deliberado:
+    // la pantalla de compras de hoy no tiene forma de aceptar una línea marcada,
+    // así que si los umbrales rigieran de entrada, esa pantalla dejaría de
+    // escribir costos por encima del 5 % y nadie tendría cómo autorizarlos.
+    //
+    // La exclusión explícita, en cambio, SIEMPRE se respeta: si alguien se tomó
+    // el trabajo de listar una línea, es una intención, no un default.
+    const fronteraCostoActiva = body.fronteraCostoActiva === true;
+
+    // ── NEGATIVOS: se frena, no se convierte en cero ─────────────────────
+    //
+    // `toUnidades` devuelve 0 ante una cantidad negativa, sin error y sin aviso
+    // (lib/conversiones/stock.js:23). Con un remito interno eso no pasaba; con
+    // una factura sí, en cuanto aparezca una nota de crédito o una devolución.
+    // NO se toca `toUnidades` en esta tanda: todavía no está decidido si las
+    // notas de crédito entran por acá, y cambiarla toca transferencias y stock.
+    // Hasta que se decida, frenar es la respuesta honesta.
+    const negativos = cantidadesNegativas(
+      Object.entries(recibidos).map(([id, cantidad]) => ({ id: Number(id), cantidad }))
+    );
+    if (negativos.hay) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Hay líneas con cantidad negativa. Este módulo todavía no acepta notas de crédito ni devoluciones: " +
+            "convertirlas en cero perdería el dato sin avisar, así que se frena.",
+          detallesConNegativo: negativos.ids,
+        },
+        { status: 400 }
+      );
+    }
 
     // --- Factura / ganancia (opcionales) ---
     // totalFactura se computa en la transacción desde cantRecibida * precioCosto
@@ -329,14 +395,55 @@ export async function POST(req, { params }) {
           modoCompraProveedor: base?.modoCompraProveedor,
           unidadMedida: base?.unidad_medida,
         });
-        await actualizarCostoRealProducto(tx, {
-          productoLocalId: plDestino,
-          costoMaestro,
-          // Propiedad del costo: solo el dueño del producto mueve el costo. Un local
-          // que recibe una compra de un producto del depósito NO toca el costo.
-          operadoDesdeLocalId: ownerLocalId,
-          depositoLocalId: pedido.depositoId,
+
+        // ── LA FRONTERA ─────────────────────────────────────────────────
+        //
+        // Todo lo de arriba —el stock, el detalle del pedido, el total de la
+        // factura— ya ocurrió y NO depende de esta decisión. Lo único que
+        // cuelga de acá es la propagación del costo al producto y a sus
+        // ubicaciones. Si no se escribe, la mercadería entró igual.
+        //
+        // El costo del catálogo se compara contra el maestro, que es la misma
+        // escala en la que se escribiría: comparar contra el precio de línea
+        // daría porcentajes falsos en cuanto haya un pack de por medio.
+        const clasificacion = clasificarDiferenciaCosto({
+          costoAnterior: Number(base?.precio_costo ?? 0),
+          costoNuevo: costoMaestro,
+          umbrales: umbralesDeCosto,
         });
+        const decision = decidirEscrituraDeCosto({
+          clasificacion,
+          excluidaAMano: costosExcluidos.has(det.id),
+          aceptada: costosAceptados.has(det.id),
+          hayCosto: Number.isFinite(costoMaestro) && costoMaestro > 0,
+        });
+        // Con la frontera apagada se conserva el comportamiento de siempre
+        // —escribir— salvo que la línea esté excluida a mano. La clasificación
+        // se calcula igual y viaja en la respuesta: es información gratis y sin
+        // efecto, útil para ver qué pasaría antes de encender la regla.
+        const escribeCosto = fronteraCostoActiva
+          ? decision.escribe
+          : !costosExcluidos.has(det.id);
+
+        decisionesDeCosto.push({
+          detalleId: det.id,
+          escribio: escribeCosto,
+          motivo: escribeCosto ? null : decision.motivo,
+          clase: clasificacion.clase,
+          diferenciaPct: clasificacion.diferenciaPct,
+          gobernadaPorUmbrales: fronteraCostoActiva,
+        });
+
+        if (escribeCosto) {
+          await actualizarCostoRealProducto(tx, {
+            productoLocalId: plDestino,
+            costoMaestro,
+            // Propiedad del costo: solo el dueño del producto mueve el costo. Un local
+            // que recibe una compra de un producto del depósito NO toca el costo.
+            operadoDesdeLocalId: ownerLocalId,
+            depositoLocalId: pedido.depositoId,
+          });
+        }
       }
 
       // Marcar pedido como RECIBIDO + guardar factura/ganancia
@@ -371,7 +478,11 @@ export async function POST(req, { params }) {
       },
     });
 
-    return NextResponse.json({ ok: true, item: updated });
+    // `decisionesDeCosto` viaja siempre, esté la frontera encendida o no: quien
+    // recibe tiene derecho a saber qué costos se escribieron y cuáles no, y con
+    // qué diferencia porcentual. Sin esto, no escribir un costo sería tan
+    // silencioso como escribirlo mal.
+    return NextResponse.json({ ok: true, item: updated, decisionesDeCosto });
   } catch (err) {
     console.error("Error compras-proveedor/recibir:", err);
     return NextResponse.json(
