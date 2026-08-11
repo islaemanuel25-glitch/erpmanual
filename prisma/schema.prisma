@@ -245,6 +245,13 @@ model Proveedor {
   umbralRevisarPct      Decimal? @db.Decimal(6, 3)
   umbralSospechaBajaPct Decimal? @db.Decimal(6, 3)
 
+  /// Una receta POR GRUPO. `Proveedor` no tiene `grupoId` —es compartido entre
+  /// grupos, y las tablas que cuelgan de él llevan el suyo—, así que desde acá
+  /// se ven varias aunque cada grupo tenga una sola. La unicidad real la
+  /// garantiza @@unique([grupoId, proveedorId]) en RecetaProveedor.
+  recetas      RecetaProveedor[]
+  comprobantes ComprobanteProveedor[]
+
   dias_pedido DiaPedido[] @default([])
 
   /// Qué parser de lista de precios usa este proveedor.
@@ -2569,4 +2576,212 @@ model ImportacionListaFila {
   @@index([importacionId, codigoNormalizado])
   @@index([productoBaseId])
   @@index([importacionId, filaExcel])
+}
+
+// ===========================================================================
+// RECEPCIÓN POR COMPROBANTE
+// ===========================================================================
+//
+// Leer la factura del proveedor, conciliarla contra el pedido y mostrarla.
+// La aritmética de impuestos vive en lib/compras-proveedor/comprobante/, con su
+// candado sobre dos facturas reales; acá está solo lo que se guarda.
+//
+// El precedente estructural es ImportacionListaProveedor: archivo con hash,
+// parser versionado, filas con estado y motivo. Lo que aquel NO tiene y este sí
+// es la CANTIDAD — una lista informa precios, una factura informa precio Y
+// cantidad, y por eso no se pudo reusar su modelo.
+
+enum EstadoComprobante {
+  /// Subido y leído, todavía sin conciliar contra el pedido.
+  CARGADO
+  /// La suma de sus líneas da el total del papel dentro de la tolerancia.
+  CIERRA
+  /// No cierra. Se muestra igual, con la diferencia a la vista.
+  DIFIERE
+  /// No vino como los de este proveedor: la receta no lo explica. NUNCA
+  /// reescribe la receta — el mismo proveedor puede mandar uno sin impuestos.
+  FUERA_DE_RECETA
+  /// Anulado a mano. Libera el número para volver a subirlo.
+  ANULADO
+}
+
+enum FacturaPor {
+  UNIDAD
+  BULTO
+}
+
+/// La receta de un proveedor: cómo viene armada su factura.
+///
+/// Se aprende una vez y se edita a mano. Los defaults de cada campo son los
+/// mismos de RECETA_POR_DEFECTO en lib/compras-proveedor/comprobante/impuestos.js.
+/// Si divergen, gana el código: ahí están los candados.
+model RecetaProveedor {
+  id          Int @id @default(autoincrement())
+  grupoId     Int
+  proveedorId Int
+
+  /// true = cada línea trae su IVA. false = el IVA viene solo al pie.
+  ivaPorLinea    Boolean @default(false)
+  alicuotaIvaPct Decimal @default(21) @db.Decimal(5, 2)
+
+  tieneImpuestoInterno Boolean @default(false)
+
+  /// MEDIDO sobre la factura de DYSSA: el IVA se calcula sobre el neto SOLO.
+  ivaIncluyeInternoEnLaBase Boolean @default(false)
+
+  /// [{ nombre, pct }] sobre el neto. Json y no una tabla porque son dos o tres
+  /// por proveedor, se editan juntas y nunca se consultan solas.
+  percepciones Json @default("[]")
+
+  /// Las percepciones van ADENTRO del costo. Decisión de negocio del
+  /// 2026-08-11, con lo que gana y lo que resigna escrito en impuestos.js.
+  percepcionesEnCosto Boolean @default(true)
+
+  facturaPor FacturaPor @default(UNIDAD)
+
+  /// Sube cada vez que alguien la edita. Se copia en el comprobante para poder
+  /// explicar un resultado viejo, igual que parserVersion en las listas.
+  version Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
+
+  /// Una receta por proveedor y grupo: es lo que hace que "la receta del
+  /// proveedor" sea una cosa y no un historial.
+  @@unique([grupoId, proveedorId])
+  @@index([proveedorId])
+}
+
+model ComprobanteProveedor {
+  id          Int @id @default(autoincrement())
+  grupoId     Int
+  proveedorId Int
+
+  /// El pedido contra el que se concilia. NULLABLE a propósito: se puede subir
+  /// un comprobante sin pedido, eligiendo el proveedor primero.
+  pedidoId Int?
+
+  localOperativoId Int
+  usuarioId        Int?
+
+  /// ── IDENTIDAD: proveedor + punto de venta + número ───────────────────
+  tipo       String
+  puntoVenta String
+  numero     String
+  fecha      DateTime
+
+  /// CUIT leído del papel. SOLO se compara contra Proveedor.cuit y se avisa si
+  /// difiere: NUNCA lo completa solo. Un CUIT mal leído que se autocompletara
+  /// dejaría al proveedor con un dato falso que nadie volvería a mirar.
+  cuitLeido String?
+
+  /// ── TOTALES LEÍDOS DEL PAPEL ─────────────────────────────────────────
+  /// Son lo que dice el comprobante, no lo que calculamos. La comparación entre
+  /// unos y otros es lo que decide si cierra.
+  netoLeido         Decimal? @db.Decimal(12, 2)
+  ivaLeido          Decimal? @db.Decimal(12, 2)
+  internoLeido      Decimal? @db.Decimal(12, 2)
+  percepcionesLeido Decimal? @db.Decimal(12, 2)
+  totalLeido        Decimal? @db.Decimal(12, 2)
+
+  /// Diferencia en CENTAVOS ENTEROS entre lo calculado y lo leído. Enteros
+  /// porque la tolerancia es de un centavo y la coma flotante no decide eso.
+  diferenciaCentavos Int?
+
+  estado EstadoComprobante @default(CARGADO)
+
+  /// Copia de la receta con la que se leyó, para poder explicar un resultado
+  /// viejo aunque la receta haya cambiado después.
+  recetaVersion Int?
+  recetaUsada   Json?
+
+  /// ── LA IMAGEN, QUE ES TEMPORAL ───────────────────────────────────────
+  ///
+  /// Vive en un VOLUMEN del VPS, no en el disco del contenedor: ahí se perdería
+  /// al recrearlo, que es el motivo por el que el campo equivalente de
+  /// ImportacionListaProveedor quedó en null todo este tiempo.
+  ///
+  /// Se borra cuando el dueño confirma, y de todas formas ninguna pasa del mes.
+  /// Una semana antes sale un aviso ofreciendo descargar el paquete; lo ven solo
+  /// dueño y administrador y queda hasta que alguien conteste. Si nadie
+  /// contesta, se borra igual.
+  archivoNombre String?
+  archivoTamano Int?
+  /// SHA-256 del contenido. Segunda red contra el duplicado: la identidad de
+  /// negocio atrapa la misma factura recargada, el hash atrapa el mismo archivo.
+  archivoHash              String?
+  archivoUbicacion         String?
+  confirmadoEn             DateTime?
+  borradoProgramadoEn      DateTime?
+  avisoBorradoDesde        DateTime?
+  avisoBorradoRespondidoEn DateTime?
+  imagenBorradaEn          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proveedor Proveedor          @relation(fields: [proveedorId], references: [id])
+  lineas    ComprobanteLinea[]
+
+  /// El índice único de identidad es PARCIAL y vive en la migración —excluye
+  /// los ANULADO, para que un número anulado se pueda volver a subir—, así que
+  /// acá queda solo el de búsqueda. Prisma no sabe expresar un WHERE en
+  /// @@unique; es la misma técnica que el índice de archivo de las listas.
+  @@index([grupoId, proveedorId, puntoVenta, numero])
+  @@index([grupoId, pedidoId])
+  @@index([grupoId, estado])
+  @@index([grupoId, proveedorId, archivoHash])
+}
+
+model ComprobanteLinea {
+  id            Int @id @default(autoincrement())
+  comprobanteId Int
+  orden         Int
+
+  /// El texto TAL CUAL lo trajo la factura, sin normalizar. Es lo que se
+  /// muestra debajo del nombre del producto y lo que alimenta el alias.
+  textoCrudo String
+
+  cantidad     Decimal @db.Decimal(12, 3)
+  /// Unitario NETO, sin impuestos. Alta precisión como el resto de los
+  /// unitarios del proyecto (PedidoProveedorDetalle.precioCosto es 18,6).
+  netoUnitario Decimal @db.Decimal(18, 6)
+  /// El subtotal COMO VIENE IMPRESO. No se recalcula desde cantidad × unitario:
+  /// medido en la factura de DAS, dos de tres líneas difieren un centavo y
+  /// recalcular desvía el comprobante tres centavos, fuera de la tolerancia.
+  subtotalImpreso Decimal  @db.Decimal(12, 2)
+  descuento       Decimal? @db.Decimal(12, 2)
+  internoUnitario Decimal? @db.Decimal(18, 6)
+  ivaPct          Decimal? @db.Decimal(5, 2)
+
+  /// El producto al que se vinculó, y contra qué línea del pedido.
+  productoLocalId Int?
+  pedidoDetalleId Int?
+
+  /// El costo FINAL unitario que resultó: neto + interno + IVA + la parte de
+  /// percepciones que le tocó. Es lo que se compara contra el catálogo.
+  costoFinalUnitario Decimal? @db.Decimal(18, 6)
+
+  /// ── PARA PODER DESHACER ──────────────────────────────────────────────
+  /// El costo que el producto TENÍA justo antes de que esta línea lo pisara.
+  /// Sin esto no hay reversión posible. Es el mismo patrón que
+  /// ImportacionListaFila.costoPrevioAplicacion, que existe por lo mismo.
+  costoPrevioAplicacion Decimal? @db.Decimal(12, 2)
+  costoEscrito          Boolean  @default(false)
+
+  /// Cómo quedó al comparar contra el catálogo. Los valores son los de
+  /// CLASE_DIFERENCIA en lib/compras-proveedor/fronteraCosto.js.
+  claseDiferencia String?
+  diferenciaPct   Decimal? @db.Decimal(6, 3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comprobante ComprobanteProveedor @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+
+  @@index([comprobanteId, orden])
+  @@index([productoLocalId])
+  @@index([pedidoDetalleId])
 }
