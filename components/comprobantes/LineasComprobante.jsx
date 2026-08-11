@@ -185,11 +185,17 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
           ) : (
             lineas.map((l) => {
               const e = estadoDeVinculo(l);
-              const nombre = l.sugerido?.nombre ?? l.candidatos?.[0]?.nombre ?? null;
+              // EL NOMBRE SOLO SI ESTÁ VINCULADO. Pintar el primer candidato acá hacía
+              // que una línea sin vincular pareciera vinculada: la columna decía
+              // "pan" y era apenas una sugerencia entre cinco. Es justo la
+              // confusión que la pantalla existe para evitar.
+              const nombre = l.productoLocalId || l.vinculadaSola ? l.sugerido?.nombre ?? null : null;
               return (
                 <SunmiTableRow key={l.id}>
                   <td className="px-3 py-1.5 align-top max-w-[18rem]">
-                    <p className="text-xs font-bold sunmi-text-strong">{nombre ?? "—"}</p>
+                    <p className={`text-xs font-bold ${nombre ? "sunmi-text-strong" : "sunmi-text-muted"}`}>
+                      {nombre ?? "Sin vincular"}
+                    </p>
                     {/* El texto crudo de la factura, debajo del nombre. */}
                     <p className="text-sm2 sunmi-text-muted break-words">{l.textoCrudo}</p>
                   </td>
@@ -197,7 +203,7 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
                     <Revisar linea={l}>
                       {puedeVincular && e.pideAccion && (
                         <div className="mt-1 flex flex-col gap-1">
-                          {(l.candidatos || []).map((c) => (
+                          {(l.candidatos || []).slice(0, 3).map((c) => (
                             <div key={c.productoBaseId} className="flex items-center gap-2">
                               <SunmiButton color="cyan" type="button" onClick={() => vincular(l.id, c.productoBaseId)}>
                                 Es este
@@ -238,10 +244,16 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
       <div className="md:hidden flex flex-col gap-2">
         {lineas.map((l) => {
           const e = estadoDeVinculo(l);
-          const nombre = l.sugerido?.nombre ?? l.candidatos?.[0]?.nombre ?? null;
+          // EL NOMBRE SOLO SI ESTÁ VINCULADO. Pintar el primer candidato acá hacía
+              // que una línea sin vincular pareciera vinculada: la columna decía
+              // "pan" y era apenas una sugerencia entre cinco. Es justo la
+              // confusión que la pantalla existe para evitar.
+              const nombre = l.productoLocalId || l.vinculadaSola ? l.sugerido?.nombre ?? null : null;
           return (
             <div key={l.id} className="rounded border sunmi-border p-2">
-              <p className="text-xs font-bold sunmi-text-strong">{nombre ?? "—"}</p>
+              <p className={`text-xs font-bold ${nombre ? "sunmi-text-strong" : "sunmi-text-muted"}`}>
+                      {nombre ?? "Sin vincular"}
+                    </p>
               <p className="text-sm2 sunmi-text-muted break-words">{l.textoCrudo}</p>
               <p className="text-sm2 sunmi-text-muted mt-1">
                 {Number(l.cantidad)} × {money(l.netoUnitario)} = {money(l.subtotalImpreso)}
@@ -250,7 +262,7 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
                 <Revisar linea={l}>
                   {puedeVincular && e.pideAccion && (
                     <div className="mt-1 flex flex-col gap-1">
-                      {(l.candidatos || []).map((c) => (
+                      {(l.candidatos || []).slice(0, 3).map((c) => (
                         <SunmiButton
                           key={c.productoBaseId}
                           color="cyan"
