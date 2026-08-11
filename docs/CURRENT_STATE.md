@@ -10,13 +10,43 @@
 >
 > ## En producción
 >
-> **Commit desplegado:** `05834aa3a518115017f012e6473898c3cf7c1448`
-> **Desplegado el:** 2026-08-10 23:48 (hora del VPS, UTC)
+> **Commit desplegado:** `f79cdafbabbf0a1e1865854ff27d5de6ff5f5cd8`
+> **Desplegado el:** 2026-08-11 10:27 (hora del VPS, UTC)
 >
 > Los cinco valores coinciden: `origin/main`, HEAD del VPS, tag de la imagen,
-> `APP_BUILD_ID` y `/api/version`. El corte quedó **por debajo de 5 segundos**:
-> `up -d` arrancó 23:48:43 y volvió 23:48:47, y el primer sondeo posterior
-> encontró el endpoint en 200 al segundo. Next informó "Ready in 405ms".
+> `APP_BUILD_ID` y `/api/version`. Los relojes del corte: la migración terminó de
+> aplicarse **10:27:43.712**, el contenedor nuevo se creó **10:27:54.308** y
+> arrancó **10:27:56.335**, o sea **un corte de unos 2 segundos** entre recrear y
+> estar arriba. Next informó "Ready in 685ms". Cero reinicios.
+>
+> La ventana entre migrar y recrear —esquema nuevo con código viejo atendiendo—
+> duró **13 segundos**, de 10:27:43 a 10:27:56. Se verificó antes de desplegar
+> que la migración era compatible hacia atrás con la versión anterior: nada que
+> escriba stock cambia, y el único efecto es que la etiqueta de "Albondigas
+> Caseras x Caja" pasa de "Pieza" a "Kg" trece segundos antes que el código que
+> la justifica.
+>
+> **Llevó migración de datos**, la primera que se despliega con el procedimiento
+> corregido: `20260811030000_albondigas_venta_por_peso`. El conteo subió de 83 a
+> **84**, verificado contra `_prisma_migrations` y con `migrate status` diciendo
+> "Database schema is up to date!". Tocó exactamente tres filas —857, 2085 y
+> 2211— y dejó intacta la 2210, que estaba excluida a propósito. Se cruzaron los
+> ids de los dos lados, no los totales.
+>
+> El clasificador la marcó como NO ADITIVA por el `UPDATE` de datos y frenó el
+> despliegue; Emanuel autorizó a mano con `DEPLOY_MIGRACION_AUTORIZADA=1`, y esa
+> autorización quedó registrada en `.claude/migraciones-autorizadas.log`.
+>
+> Referencia de rollback de la versión anterior, las tres fijas:
+> image ID `sha256:0078bf7f6bf653342babea8258cf7698809264f1d96d8baaba37027e99adde60`,
+> RepoTag `ghcr.io/islaemanuel25-glitch/erpmanual:05834aa3a518115017f012e6473898c3cf7c1448`,
+> digest `ghcr.io/islaemanuel25-glitch/erpmanual@sha256:c72db71fa10c637e9cc088c239226d89b42b9e29ae66404286b6f5ca731975f9`.
+> Backup previo en el VPS: `/srv/produccion/backups/pre-f79cdaf_20260811_102214.sql.gz`,
+> con los cinco chequeos, incluido el que confirma que el `620.000` que la
+> migración borró está guardado adentro del dump.
+>
+> ⚠️ **Un rollback de imagen NO deshace esta migración.** Los datos quedan como
+> los dejó; volver atrás el código no repone el `620.000` ni los `pesoEsFijo`.
 >
 > Llevó cuatro commits: la corrección de las skills `deploy` y `backup` con lo que
 > salió del despliegue anterior (`68f0e2a`), y las tres tandas del vaciado de
