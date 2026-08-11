@@ -30,18 +30,36 @@
 -- por la contradicción, así que si en producción ese producto no existe o ya
 -- está bien cargado, esta migración no toca ninguna fila. Es deliberado.
 --
+-- ── LOS OTROS DOS, AGREGADOS DESPUÉS ───────────────────────────────────────
+--
+-- "Crema de Leche Cremac" y "Mogul Tubito Mix Frutal" tenían la misma
+-- contradicción cargada. Los dos son `pack` comprados por BULTO: no son
+-- fiambre, y ahí `pesoEsFijo` es ruido que no decide nada.
+--
+-- Pasaron por la MISMA verificación de las diez decisiones, uno por uno, con la
+-- marca en verdadero y en falso: cambian CERO en los dos.
+--
+-- El sugerido de compra, que es el único lector aislado de `pesoEsFijo` y el
+-- que había que mirar con cuidado, ni siquiera los alcanza: ese cálculo vive
+-- dentro de `if (modoCompra === "UNIDAD")` en
+-- app/api/compras-proveedor/productos/route.js:184, y los dos se compran por
+-- BULTO. No es que los valores coincidan — es que la rama no se ejecuta.
+--
 -- ── LO QUE NO TOCA, A PROPÓSITO ────────────────────────────────────────────
 --
--- Hay otros DOS productos con la misma contradicción cargada —"Crema de Leche
--- Cremac" y "Mogul Tubito Mix Frutal"—, pero los dos son `pack` comprados por
--- BULTO: no son fiambre, y ahí `pesoEsFijo` es ruido que no decide nada. No se
--- limpian sin que Emanuel lo decida.
+-- El stock. "Albondigas" tiene -35,445 y "Mogul Tubito" -344,620 en el
+-- depósito; son parte de INC-0003 y se miran aparte.
 --
--- Tampoco toca el stock: este producto tiene -35,445 en el depósito, que es
--- parte del problema de negativos anotado en docs/incidents/ y se mira aparte.
+-- Tampoco toca `pesoReferenciaKg`, que en "Mogul Tubito" vale 620 —un valor sin
+-- sentido para un pack— pero que hoy no lo lee nadie para ese producto por la
+-- misma guarda de arriba. Limpiarlo es otra decisión.
 
 UPDATE "ProductoBase"
    SET "pesoEsFijo" = false
- WHERE nombre = 'Albondigas Caseras x Caja'
+ WHERE nombre IN (
+         'Albondigas Caseras x Caja',
+         'Crema de Leche Cremac',
+         'Mogul Tubito Mix Frutal'
+       )
    AND "modoVentaDeposito" = 'PESO'
    AND "pesoEsFijo" = true;
