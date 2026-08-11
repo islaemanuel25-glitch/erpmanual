@@ -45,14 +45,36 @@
 -- app/api/compras-proveedor/productos/route.js:184, y los dos se compran por
 -- BULTO. No es que los valores coincidan — es que la rama no se ejecuta.
 --
+-- ── Y EL pesoReferenciaKg DE "Mogul Tubito Mix Frutal" ─────────────────────
+--
+-- Vale 620, que para un pack no significa nada. Hoy no lo lee nadie porque el
+-- producto se compra por BULTO y todos sus lectores están detrás de una guarda
+-- de UNIDAD o de kg. Es basura inerte, pero esperando: el día que alguien pase
+-- ese producto a compra por unidad, el sugerido de compra va a leer 620 kg por
+-- pieza y nadie va a entender de dónde salió.
+--
+-- Se limpia ahora porque la migración ya estaba abierta y verificada.
+--
+-- Verificado EJECUTANDO, con catorce decisiones y no diez —este campo tiene
+-- lectores propios que `pesoEsFijo` no tenía: la ayuda de "≈ N piezas" de la
+-- tabla y las dos conversiones—. Cambian CERO, tanto con el código nuevo como
+-- con el que va a estar atendiendo durante la ventana del despliegue.
+--
+-- Una advertencia para el que repita esta verificación: `piezasToKg` y
+-- `kgToPiezas` dan distinto si se las llama sueltas, obviamente. Hay que
+-- modelarlas CON la guarda de su punto de uso —`esFiambreFijo` en
+-- confirmar-recepcion:227, la rama de kg en TablaStock:62 y :72— o dan un falso
+-- positivo. Pasó al escribir esto.
+--
 -- ── LO QUE NO TOCA, A PROPÓSITO ────────────────────────────────────────────
 --
 -- El stock. "Albondigas" tiene -35,445 y "Mogul Tubito" -344,620 en el
 -- depósito; son parte de INC-0003 y se miran aparte.
 --
--- Tampoco toca `pesoReferenciaKg`, que en "Mogul Tubito" vale 620 —un valor sin
--- sentido para un pack— pero que hoy no lo lee nadie para ese producto por la
--- misma guarda de arriba. Limpiarlo es otra decisión.
+-- "Mogul Gusanitos Extreme", el otro producto comprado por bulto con un peso de
+-- referencia cargado (0,5 kg, con pesoEsFijo en verdadero y venta por PIEZA).
+-- Es la misma clase de dato inerte, pero no estaba en el pedido y no se toca sin
+-- que Emanuel lo decida.
 
 UPDATE "ProductoBase"
    SET "pesoEsFijo" = false
@@ -63,3 +85,11 @@ UPDATE "ProductoBase"
        )
    AND "modoVentaDeposito" = 'PESO'
    AND "pesoEsFijo" = true;
+
+-- Filtra por el VALOR además del nombre, mismo criterio que arriba: si en
+-- producción ese producto no tiene 620 cargado, no se toca nada.
+UPDATE "ProductoBase"
+   SET "pesoReferenciaKg" = NULL
+ WHERE nombre = 'Mogul Tubito Mix Frutal'
+   AND "modoCompraProveedor" = 'BULTO'
+   AND "pesoReferenciaKg" = 620;
