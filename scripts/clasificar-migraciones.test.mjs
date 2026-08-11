@@ -15,7 +15,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { clasificarSql, sinComentarios, SALIDA, PATRONES } from "./clasificar-migraciones.mjs";
+import { clasificarSql, sinComentarios, SALIDA, PATRONES, esRangoDegenerado } from "./clasificar-migraciones.mjs";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
@@ -164,5 +164,35 @@ test("los patrones son los 13 esperados, cada uno con su motivo", () => {
     assert.ok(p.nombre, "un patrón sin nombre");
     assert.ok(p.motivo && p.motivo.length > 20, `el patrón ${p.nombre} no explica por qué rompe`);
     assert.ok(p.re instanceof RegExp);
+  }
+});
+
+// ── El rango degenerado, que es el tercer punto ciego ───────────────────────
+//
+// Salió del despliegue del 2026-08-11: el procedimiento hacía `git merge` en el
+// VPS antes de correr el clasificador, así que cuando el script preguntaba por
+// el HEAD del VPS ya era el mismo del árbol. Comparó contra sí mismo, informó
+// "Archivos a mirar: 0" y la guardia automática tampoco frenó — sobre un
+// despliegue que sí traía una migración de datos.
+
+test("un rango con la misma base y extremo ES degenerado", () => {
+  const sha = "f79cdafbabbf0a1e1865854ff27d5de6ff5f5cd8";
+  assert.equal(esRangoDegenerado(sha, sha), true);
+  assert.equal(esRangoDegenerado(sha, `${sha}\n`), true, "un salto de línea del rev-parse no lo cambia");
+  assert.equal(esRangoDegenerado(` ${sha} `, sha), true);
+});
+
+test("un rango con base distinta del extremo NO es degenerado", () => {
+  assert.equal(
+    esRangoDegenerado("05834aa3a518115017f012e6473898c3cf7c1448", "f79cdafbabbf0a1e1865854ff27d5de6ff5f5cd8"),
+    false
+  );
+});
+
+test("sin alguno de los dos extremos no se declara degenerado", () => {
+  // Que decida el que resuelve las referencias, no este predicado: si un
+  // rev-parse falló, el error correcto es el suyo y no "rango degenerado".
+  for (const [a, b] of [[null, "x"], ["x", null], [undefined, undefined], ["", ""]]) {
+    assert.equal(esRangoDegenerado(a, b), false, `${a} / ${b}`);
   }
 });

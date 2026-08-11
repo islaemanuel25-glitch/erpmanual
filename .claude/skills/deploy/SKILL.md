@@ -134,10 +134,27 @@ comandos trabajan sobre la imagen vieja, y eso incluye el contenedor descartable
 que corre las migraciones. El detalle de cómo se descubrió está abajo, en
 "La trampa del contenedor descartable".
 
-**Entre el tercero y el cuarto va `node scripts/clasificar-migraciones.mjs
---vps`**, que puede frenar el deploy. No se saltea aunque el despliegue "no
-traiga migraciones": eso es justamente lo que el chequeo comprueba. Si igual se
-lo saltea, la guardia lo intercepta en el cuarto comando.
+**El clasificador va ANTES del paso 1, no entre el tercero y el cuarto.** Se
+corre desde la máquina local, con el VPS todavía en el SHA viejo:
+
+```bash
+node scripts/clasificar-migraciones.mjs --vps
+```
+
+**Por qué antes y no después:** el rango sale del HEAD del VPS, y el paso 1
+—`git merge --ff-only`— mueve ese HEAD al SHA nuevo. Corrido después, el script
+compara el árbol contra sí mismo, informa `Archivos a mirar: 0` y no frena nada.
+Pasó el 2026-08-11, en un despliegue que sí traía una migración de datos: el
+clasificador dio cero y la guardia automática, que corre este mismo script,
+tampoco frenó. Hoy ese caso sale con 2 en vez de con 0 —ver "el rango
+degenerado" abajo—, pero el orden correcto sigue siendo este.
+
+Si por lo que sea ya se hizo el merge, se le pasa el SHA anterior a mano:
+`--desde <SHA_QUE_CORRÍA_ANTES>`.
+
+No se saltea aunque el despliegue "no traiga migraciones": eso es justamente lo
+que el chequeo comprueba. Si igual se lo saltea, la guardia lo intercepta en el
+cuarto comando.
 
 ```bash
 # 1. Traer el código
@@ -276,12 +293,27 @@ Pide el HEAD desplegado al VPS por ssh y clasifica exactamente lo que este árbo
 introduce por encima. El rango sale del HEAD del VPS y no de `migrate status`:
 son las migraciones que este despliegue mete sobre lo que hoy corre.
 
-**Solo ve migraciones COMMITEADAS.** El rango se calcula con
-`git diff --name-only <HEAD_VPS>..HEAD -- prisma/migrations`, y un archivo sin
-trackear no está en `HEAD`. Correr el clasificador con la migración recién
-escrita y todavía sin commitear informa `Archivos a mirar: 0` y **eso no
-significa nada**. Pasó el 2026-08-10: dio cero antes del commit y marcó la
-migración como no aditiva después. Se corre **después** de commitear, no antes.
+**«Archivos a mirar: 0» tiene TRES formas de mentir.** Las tres terminan en un
+cero tranquilizador sobre un despliegue que sí trae migraciones:
+
+1. **La migración no está commiteada.** El rango se calcula con
+   `git diff --name-only <HEAD_VPS>..HEAD -- prisma/migrations`, y un archivo sin
+   trackear no está en `HEAD`. Pasó el 2026-08-10: dio cero antes del commit y
+   marcó la migración como no aditiva después. Se corre **después** de
+   commitear, no antes. **Este caso todavía sale con 0 y hay que tenerlo
+   presente**: el script no puede distinguirlo.
+2. **El directorio de migraciones no está donde el script cree.** Cubierto: sale
+   con 2 por el `existsSync` de `principal()`.
+3. **El rango es degenerado** — la base y el extremo son el mismo commit.
+   Cubierto desde el 2026-08-11: sale con 2. Es lo que pasa si se corre el
+   clasificador después del `git merge` del paso 1, y es la razón por la que ese
+   chequeo se movió antes. Los candados están en
+   `scripts/clasificar-migraciones.test.mjs`, sobre `esRangoDegenerado`.
+
+De las tres, **la primera es la única que sigue sin cubrir**, y no se puede
+cubrir con este mecanismo: un archivo que no está en ningún commit no existe
+para `git diff`. Lo que la tapa es commitear antes, que es un hábito, no un
+candado.
 
 Códigos de salida: **0** no encontró nada, **1** marcó al menos una y el
 despliegue se frena, **2** no pudo determinar el rango. Falla cerrado: si el ssh

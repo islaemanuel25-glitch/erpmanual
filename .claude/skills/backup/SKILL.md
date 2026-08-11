@@ -139,6 +139,33 @@ Corolario: el chequeo también sirve como **prueba de que se sabe qué se está 
 borrar**. Si no se puede nombrar un valor concreto para buscar, la migración no
 está lo bastante entendida como para aplicarla.
 
+#### Se verifica sobre la fila de la TABLA correcta, no sobre la primera coincidencia
+
+El `grep -c` de arriba cuenta apariciones en todo el dump, y un nombre aparece en
+muchas tablas. **Que dé un número alto no prueba nada**: hay que confirmar que el
+valor está en la fila de la tabla que la migración toca.
+
+Pasó el 2026-08-11. Se buscó el peso de referencia `620.000` de un producto
+mirando la primera línea que nombraba el producto, y no estaba. El producto
+aparecía **diez veces** en el dump: tres eran filas de `AuditoriaBitacora` —de
+ediciones anteriores—, seis de detalles de pedidos, y **una sola** era la fila de
+`ProductoBase`, que es la que la migración iba a modificar. Buscar en la primera
+coincidencia daba un falso negativo; buscar sin mirar de qué tabla es cada una
+habría dado un falso positivo igual de malo.
+
+Cómo se hace bien: primero se ubican las apariciones con su número de línea, se
+identifica cuál es la fila de la tabla que importa —se reconoce por la forma del
+`COPY`: los primeros campos son el id y las claves foráneas del modelo—, y recién
+ahí se busca el valor **en esa línea**:
+
+```bash
+ssh vps-erp 'F=<DUMP>
+zcat "$F" | grep -n "<VALOR_O_NOMBRE>" | cut -c1-60          # ¿de qué tablas son?
+zcat "$F" | sed -n "<LINEA_DE_LA_FILA_BUENA>p" | grep -o "<VALOR>"'
+```
+
+Y si la migración toca varias filas, se comprueban todas, no una de muestra.
+
 Y la reposición fina —volver un valor sin restaurar la base entera— no sale de
 acá: sale del SQL con los valores anteriores que tiene que traer la propia tanda.
 El dump es el último recurso, porque restaurarlo se lleva puesto todo lo que pasó

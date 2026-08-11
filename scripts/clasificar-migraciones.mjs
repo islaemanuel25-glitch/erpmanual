@@ -257,6 +257,42 @@ const arg = (n) => {
 };
 const flag = (n) => process.argv.includes(`--${n}`);
 
+/**
+ * EL TERCER PUNTO CIEGO: el rango degenerado.
+ *
+ * Si la base y el extremo son el MISMO commit, `git diff base..hasta` no
+ * devuelve nada — y eso se imprime igual que "este despliegue no trae
+ * migraciones". Son cosas opuestas y se ven idénticas.
+ *
+ * Pasa de una forma concreta y no rebuscada: el procedimiento de despliegue
+ * hacía `git merge --ff-only` en el VPS ANTES de correr el clasificador, así
+ * que para cuando el script preguntaba "¿en qué SHA está el VPS?", el VPS ya
+ * estaba en el SHA nuevo. Comparaba el árbol contra sí mismo. Ocurrió el
+ * 2026-08-11, en un despliegue que sí traía una migración de datos: el
+ * clasificador informó "Archivos a mirar: 0" y la guardia automática, que corre
+ * este mismo script, tampoco frenó nada.
+ *
+ * Es el TERCER caso en que "0 archivos" no significa lo que parece:
+ *   1. La migración está escrita pero sin commitear — el rango se calcula con
+ *      `git diff`, y lo que no está en un commit no aparece.
+ *   2. El directorio de migraciones no está donde el script cree — cubierto
+ *      arriba con el `existsSync`.
+ *   3. El rango es degenerado — esto.
+ *
+ * Los tres terminan igual: un cero tranquilizador sobre un despliegue que sí
+ * trae migraciones. Por eso este caso NO sale con 0: sale con INDETERMINADO,
+ * que es como falla el resto del script cuando no pudo mirar.
+ */
+export function esRangoDegenerado(shaBase, shaHasta) {
+  if (!shaBase || !shaHasta) return false;
+  return String(shaBase).trim() === String(shaHasta).trim();
+}
+
+/** Resuelve una referencia de git a su SHA completo. */
+function resolverSha(ref) {
+  return correr("git", ["rev-parse", ref], `no se pudo resolver la referencia ${ref}`);
+}
+
 function principal() {
   const dir = arg("dir");
   const desde = arg("desde");
@@ -276,6 +312,21 @@ function principal() {
       throw new Indeterminado(`no existe ${path.relative(ROOT, DIR_MIGRACIONES)}: el repo no está donde el script cree`);
     }
     const base = desde || shaDelVps();
+
+    // Antes de mirar nada: que el rango no sea el vacío disfrazado de "limpio".
+    if (esRangoDegenerado(resolverSha(base), resolverSha(hasta))) {
+      throw new Indeterminado(
+        `el rango es degenerado: la base y el extremo son el mismo commit (${String(base).slice(0, 12)}).\n\n` +
+          (desde
+            ? "La base que se pasó con --desde ya es este árbol, así que no hay nada que comparar."
+            : "El HEAD del VPS ya está en este mismo commit. Si el despliegue ya hizo\n" +
+              "`git merge` en el VPS, el clasificador llega tarde: hay que correrlo ANTES\n" +
+              "de traer el código, o pasarle el SHA previo con --desde <SHA>.") +
+          "\n\nNo se sale con 0 a propósito: un rango vacío y un despliegue sin migraciones\n" +
+          "se imprimen igual, y este script existe para que esos dos no se confundan."
+      );
+    }
+
     archivos = migracionesDelRango(base, hasta);
     origen = `${base.slice(0, 12)}..${hasta}${desde ? "" : " (HEAD del VPS)"}`;
   } else {

@@ -48,6 +48,31 @@
 > ⚠️ **Un rollback de imagen NO deshace esta migración.** Los datos quedan como
 > los dejó; volver atrás el código no repone el `620.000` ni los `pesoEsFijo`.
 >
+> ### Una fila vieja sin terminar en `_prisma_migrations` — SIN EXPLICAR
+>
+> Apareció verificando el despliegue del 2026-08-11 y **no es de ese despliegue**:
+>
+> - `20241202000000_add_venta_campos`, empezada el **2026-03-21 04:13**,
+>   `finished_at` en NULL, `rolled_back_at` el **2026-04-27 20:54**,
+>   `applied_steps_count` en 0.
+>
+> Es de la ventana del incidente de React2Shell (ver `docs/incidents/INC-0001`).
+> **Su archivo sigue en el árbol** (`prisma/migrations/20241202000000_add_venta_campos`),
+> así que hay 84 archivos y 84 filas terminadas, más esta que quedó revertida.
+>
+> Prisma no la considera pendiente: `migrate status` informa 84 y "Database
+> schema is up to date!". Por eso no bloquea nada y por eso pasó desapercibida
+> hasta ahora.
+>
+> **Lo que no se sabe:** si el esquema que esa migración iba a introducir está
+> aplicado por otra vía o si falta; por qué se revirtió; y si alguien lo hizo a
+> mano. Nadie lo investigó. Se anota acá y no en un incidente porque no hay
+> síntoma: es una inconsistencia registrada entre el árbol y la tabla de control,
+> que conviene entender antes de que un día importe.
+>
+> Dónde mirar primero: comparar las columnas que esa migración declara contra las
+> que la base tiene hoy. Es lectura y no toca nada.
+>
 > Llevó cuatro commits: la corrección de las skills `deploy` y `backup` con lo que
 > salió del despliegue anterior (`68f0e2a`), y las tres tandas del vaciado de
 > códigos de barra, que terminaron en `05834aa`.
