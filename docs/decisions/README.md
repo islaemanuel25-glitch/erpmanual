@@ -34,6 +34,12 @@ haya sido deliberado.
 | [DEC-0004](DEC-0004-terminada-vs-cancelada.md) | TERMINADA se puede revertir; CANCELADA no | Vigente |
 | [DEC-0005](DEC-0005-el-vps-no-construye.md) | El VPS no construye la imagen | Vigente |
 | [DEC-0006](DEC-0006-fabrica-de-cliente-prisma.md) | Ningún script construye `PrismaClient` directo | Vigente |
+| [DEC-0006](DEC-0006-codigos-de-casiano-intocables.md) | Los códigos de CASIANO CASAS no se tocan | Vigente |
+| [DEC-0007](DEC-0007-prisma-mcp-sin-decidir.md) | `prisma mcp` daría la vuelta alrededor de la guardia | **SIN DECIDIR** |
+
+⚠️ **El número 0006 está usado dos veces.** No se renumeró acá porque los dos
+archivos ya están referenciados desde otros documentos y desde commits; queda
+señalado para que nadie lea la repetición como un error de esta tabla.
 
 ## Decisiones que se ven pero no se pudieron fechar
 

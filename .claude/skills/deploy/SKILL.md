@@ -338,6 +338,15 @@ llegan a producción sin pasar por ella:
    migrara, el hook no corre ahí. Ese es el único lugar que obligaría de verdad,
    y está fuera del alcance de lo local.
 7. **La consola del proveedor o cualquier cliente SQL** contra la base.
+8. **`prisma mcp`, si alguien alguna vez lo conecta.** Es un comando del propio
+   CLI que levanta un servidor MCP para herramientas de IA. Hoy no está
+   conectado y por eso no es un agujero abierto, pero si se conectara, las
+   operaciones sobre la base llegarían como llamadas de herramienta MCP y **no
+   como comandos de shell** — y toda esta guardia mira comandos de shell.
+   Enchufarlo daría la vuelta completa alrededor de los cuatro bloqueos, de la
+   autorización manual y de su bitácora, de una sola vez y sin que nada avise.
+   **Es una decisión pendiente, no un detalle:** está en
+   `docs/decisions/DEC-0007-prisma-mcp-sin-decidir.md`, sin resolver.
 
 En resumen: la guardia atrapa el camino que se usa todos los días —desplegar
 desde una sesión de Claude Code en este repo— y **ninguno de los otros**. Es el
@@ -560,7 +569,66 @@ ventas del día.
 Deshacer la migración en sí —el SQL inverso más la entrada de
 `_prisma_migrations`— es otra cosa, y está abajo.
 
+### Si una migración falla a mitad de camino — LEER ESTO ANTES DE TOCAR NADA
+
+Es el peor momento del despliegue y hay que leerlo con la cabeza fría, así que
+está escrito para leerlo justo ahí y no antes.
+
+**Primero: ¿el local puede seguir vendiendo?** Es la única pregunta urgente. El
+orden del despliegue migra ANTES de recrear, así que en ese momento la
+aplicación que atiende **sigue siendo la versión vieja**. Si la migración que
+falló no dejó el esquema roto para ese código, el mostrador sigue funcionando y
+no hay apuro. Establecer eso primero y decírselo a Emanuel primero. Todo lo
+demás puede esperar diez minutos; esto no.
+
+**Segundo: NO reintentar y NO marcar.** Prisma deja la migración anotada en
+`_prisma_migrations` como fallida, y a partir de ahí `migrate deploy` se niega a
+seguir hasta que alguien resuelva esa entrada. Eso no es un problema a esquivar:
+es el mecanismo funcionando. Reintentar a ciegas puede aplicar dos veces lo que
+sí entró.
+
+**Tercero: el comando que Prisma manda usar acá está BLOQUEADO a propósito.**
+`prisma migrate resolve` es exactamente lo que la documentación oficial indica
+para este caso, y es exactamente por eso que está en la lista de rechazo: es el
+comando que hace que el registro diga que algo pasó cuando no pasó. Usado bien
+es la salida; usado con apuro y sin entender qué quedó aplicado, deja la base en
+un estado que ningún control posterior detecta, porque el control lee el
+registro que se acaba de falsear.
+
+No está bloqueado por descuido ni porque nadie pensó en este día. **Está
+bloqueado pensando en este día.** Y `prisma db execute` también, así que el SQL
+inverso del rollback tampoco se ejecuta con Prisma.
+
+**Cuarto: juntar los hechos, que se puede sin desbloquear nada.** Todo esto pasa
+por la guardia sin problema:
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod.yml run --rm -T --no-deps app prisma migrate status'
+ssh vps-erp 'docker logs erpazul_app --since 30m 2>&1 | tail -50'
+```
+
+Y leer el `migration.sql` que falló, que está en el repo. Con eso se arma la
+única respuesta que importa: **qué sentencias entraron y cuáles no.**
+
+⚠️ Una advertencia honesta sobre eso: Prisma aplica cada archivo de migración
+dentro de una transacción, así que lo esperable es que un fallo no deje nada a
+medias. **Pero no todas las sentencias son transaccionables en PostgreSQL**, y
+este proyecto nunca vio el caso. Tratar "no quedó nada a medias" como una
+hipótesis a comprobar mirando la base, no como un hecho.
+
+**Quinto: informar y ESPERAR.** Decirle a Emanuel qué migración falló, con qué
+sentencia, qué quedó aplicado, si el local sigue operando, y cuáles son las
+opciones. **No decidir por criterio propio y no desbloquear nada.** Si la salida
+es marcar la migración, eso significa sacarla de la lista de rechazo de
+`lib/deploy/guardiaMigraciones.js` a propósito y con su confirmación — no
+inventarle un flag, no correrla por otro camino, no hacerla desde el VPS para
+esquivar la guardia. Ese trámite cuesta a propósito, y el día que cuesta es este.
+
 ### Rollback de una migración: NUNCA SE EJECUTÓ
+
+Esto es la continuación de la sección de arriba: si una migración falló y la
+decisión de Emanuel fue deshacerla, este es el camino — y hay que saber en qué
+estado está antes de empezarlo.
 
 El procedimiento existe y está en `docs/RELEASE-CHECKLIST.md` §3: identificar el
 `migration.sql` aplicado, escribir el SQL inverso, ejecutarlo contra la base,
@@ -571,6 +639,20 @@ ni en producción ni en una copia. Está escrito, no está validado, y la difere
 importa el día que haga falta: los cuatro pasos tienen orden y un error en
 `_prisma_migrations` deja la base en un estado que `migrate deploy` no sabe
 resolver.
+
+Decirlo así, con estas palabras, el día que se proponga: **no es "el
+procedimiento de rollback", es "un procedimiento escrito que nunca nadie
+corrió".** Proponerlo sin esa aclaración, en medio de un incidente, es hacer
+pasar por probado algo que no lo está.
+
+**Y dos de sus pasos chocan con la guardia, a propósito.** El paso 3 —ejecutar
+el SQL inverso— y el paso 4 —tocar `_prisma_migrations`— son justamente lo que
+hacen `prisma db execute` y `prisma migrate resolve`, los dos bloqueados. El
+documento largo dice "ejecutarlo directamente en la base" sin nombrar la
+herramienta, así que el que llegue ahí va a buscar la de Prisma y se va a chocar.
+Eso no es un obstáculo a esquivar: es el punto donde hay que frenar y confirmar
+con Emanuel, porque un rollback de migración nunca probado es exactamente la
+clase de cosa que no se ejecuta por criterio propio a las nueve de la mañana.
 
 Antes de considerarlo confiable necesita una prueba segura: restaurar un dump en
 una base descartable, aplicar la migración, revertirla siguiendo los cuatro pasos
