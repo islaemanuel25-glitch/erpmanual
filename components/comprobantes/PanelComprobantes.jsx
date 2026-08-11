@@ -68,6 +68,33 @@ function Aviso({ estado }) {
   );
 }
 
+/**
+ * De una respuesta del servidor a un mensaje que dice QUÉ PASÓ.
+ *
+ * NINGÚN texto se escribe a mano acá: todos salen del catálogo. El 2026-08-11
+ * los tres mensajes de esta pantalla estaban escritos inline —"No se pudo
+ * subir. Probá de nuevo."— y no decían nada; el candado no los atajó porque
+ * miraba el catálogo, que es donde no estaban.
+ *
+ * EL ESTADO SE MIRA ANTES DE LEER EL JSON. Un 413 lo contesta el proxy con una
+ * página HTML, así que `r.json()` revienta y todo el mensaje del servidor se
+ * pierde en un `catch` genérico. Eso fue justamente lo que pasó.
+ */
+async function mensajeDeRespuesta(r) {
+  if (!r.ok) {
+    const { texto } = queHacerHttp(r.status);
+    // Si el servidor mandó JSON con su propio motivo, ese gana: sabe más que la
+    // tabla por estado. Si no se puede leer —página de error del proxy—, queda
+    // el texto del estado, que igual dice qué pasó.
+    try {
+      const d = await r.json();
+      if (d?.queHacer || d?.error) return { tipo: "error", texto: d.queHacer || d.error };
+    } catch {}
+    return { tipo: "error", texto };
+  }
+  return null;
+}
+
 export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir = true }) {
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -134,6 +161,12 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
       for (const a of archivos) fd.append("archivos", a);
 
       const r = await fetch("/api/compras-proveedor/comprobantes/subir", { method: "POST", body: fd });
+      const fallo = await mensajeDeRespuesta(r);
+      if (fallo) {
+        setMensaje(fallo);
+        await recargar();
+        return;
+      }
       const d = await r.json();
 
       if (!d.ok && d.error) {
@@ -150,7 +183,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
       }
       await recargar();
     } catch {
-      setMensaje({ tipo: "error", texto: "No se pudo subir. Probá de nuevo." });
+      setMensaje({ tipo: "error", texto: SIN_RESPUESTA.texto });
     } finally {
       setSubiendo(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -162,6 +195,12 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
     setMensaje(null);
     try {
       const r = await fetch(`/api/compras-proveedor/comprobantes/leer/${id}`, { method: "POST" });
+      const fallo = await mensajeDeRespuesta(r);
+      if (fallo) {
+        setMensaje(fallo);
+        await recargar();
+        return;
+      }
       const d = await r.json();
       if (!d.ok) {
         setMensaje({ tipo: "error", texto: d.error || d.queHacer });
@@ -176,7 +215,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
       }
       await recargar();
     } catch {
-      setMensaje({ tipo: "error", texto: "No se pudo leer. Probá de nuevo." });
+      setMensaje({ tipo: "error", texto: SIN_RESPUESTA.texto });
     } finally {
       setLeyendo(null);
     }
@@ -191,12 +230,14 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: seleccion }),
       });
+      const fallo = await mensajeDeRespuesta(r);
+      if (fallo) { setMensaje(fallo); await recargar(); return; }
       const d = await r.json();
       setMensaje({ tipo: d.ok ? "ok" : "error", texto: d.ok ? d.queHacer : d.error });
       setSeleccion([]);
       await recargar();
     } catch {
-      setMensaje({ tipo: "error", texto: "No se pudo unir. Probá de nuevo." });
+      setMensaje({ tipo: "error", texto: SIN_RESPUESTA.texto });
     }
   }
 
