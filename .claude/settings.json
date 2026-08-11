@@ -37,15 +37,7 @@
       "Bash(node scripts/clasificar-migraciones.mjs:*)",
       "Bash(node --no-warnings scripts/clasificar-migraciones.mjs:*)",
       "PowerShell(node scripts/clasificar-migraciones.mjs:*)",
-      "PowerShell(node --no-warnings scripts/clasificar-migraciones.mjs:*)"
-    ],
-    "deny": [
-      "Read(.env)",
-      "Read(.env.*)",
-      "Read(**/.env)",
-      "Read(**/.env.*)"
-    ],
-    "ask": [
+      "PowerShell(node --no-warnings scripts/clasificar-migraciones.mjs:*)",
       "Bash(git push:*)",
       "PowerShell(git push:*)",
       "Bash(gh:*)",
@@ -67,7 +59,15 @@
       "PowerShell(Remove-Item:*)",
       "PowerShell(git rm:*)",
       "PowerShell(git clean:*)"
-    ]
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)"
+    ],
+    "ask": [],
+    "defaultMode": "dontAsk"
   },
   "hooks": {
     "PreToolUse": [
