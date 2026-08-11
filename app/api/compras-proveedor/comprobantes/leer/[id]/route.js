@@ -28,7 +28,8 @@ import { readFile } from "node:fs/promises";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { elegirLector, pasarPorLaPuerta, queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
+import { pasarPorLaPuerta, queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
+import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import {
   recetaDelProveedor,
   fechaLeidaONull,
@@ -96,8 +97,13 @@ export async function POST(req, { params }) {
       );
     }
 
-    // ── El lector, elegido por configuración ─────────────────────────────
-    const eleccion = elegirLector();
+    // ── La cadena: titular y respaldo ────────────────────────────────────
+    //
+    // El respaldo se usa SOLO si el titular falla por cuota o por servicio
+    // caído. Ver cadena.js: pasar por una respuesta ilegible convertiría "el
+    // modelo se equivocó" en "probemos hasta que alguno diga algo".
+    const cadena = armarCadena();
+    const eleccion = cadena.titular;
     if (!eleccion.ok) {
       // El intento NO se cuenta: no hubo lectura. Contar un intento que nunca
       // salió haría que el contador midiera problemas de configuración en vez de
@@ -129,7 +135,8 @@ export async function POST(req, { params }) {
     }
 
     // ── La lectura ───────────────────────────────────────────────────────
-    const resultado = await eleccion.lector.leer({
+    const resultado = await leerConCadena({
+      cadena,
       archivo: { bytes, mime: comprobante.archivoMime },
       receta,
       proveedorNombre: comprobante.proveedor?.nombre ?? null,
@@ -140,7 +147,9 @@ export async function POST(req, { params }) {
       // pisa, para que se vea que hubo que insistir.
       await prisma.comprobanteProveedor.update({
         where: { id: comprobante.id },
-        data: { intentosLectura: { increment: 1 }, modeloLectura: eleccion.lector.nombre },
+        // Se guarda QUIÉN intentó último: si se pasó al respaldo, es el
+        // respaldo el que falló, y anotar el titular contaría otra historia.
+        data: { intentosLectura: { increment: 1 }, modeloLectura: resultado.lector ?? eleccion.lector.nombre },
       });
       return NextResponse.json(
         {
@@ -150,6 +159,8 @@ export async function POST(req, { params }) {
           // Se dice explícitamente que no reintenta sola, para que nadie se quede
           // esperando que se resuelva.
           reintentaSola: false,
+          usoRespaldo: resultado.usoRespaldo === true,
+          porQuePaso: resultado.porQuePaso ?? null,
           intentos: comprobante.intentosLectura + 1,
         },
         { status: 502 }
@@ -210,6 +221,11 @@ export async function POST(req, { params }) {
       lineas: guardado.cuantasLineas,
       modelo: resultado.lectura.modelo,
       recetaGenerica: esGenerica,
+      // Cuál leyó y si hubo que ir al respaldo. El nombre del modelo ya los
+      // distingue, pero contar cuántas veces el titular se quedó sin cuota no
+      // tiene que depender de deducirlo.
+      usoRespaldo: resultado.usoRespaldo === true,
+      porQuePaso: resultado.porQuePaso ?? null,
       intentos: guardado.actualizado.intentosLectura,
       consumo: resultado.lectura.consumo,
     });
