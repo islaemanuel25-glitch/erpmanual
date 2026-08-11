@@ -28,6 +28,7 @@ un incidente y una anécdota.
 |---|---|---|
 | [INC-0001](INC-0001-react2shell.md) | React2Shell — RCE crítica en Next.js | Cerrado |
 | [INC-0002](INC-0002-bitacora-incompleta.md) | La bitácora anterior al 2026-08-09 está incompleta | Mitigado |
+| [INC-0003](INC-0003-stock-negativo.md) | Stock negativo grande y silencioso | **ABIERTO** |
 
 ## Incidentes que existen pero no se documentaron acá
 

@@ -93,8 +93,12 @@ const PANTALLAS = [
   // ninguna medición.
   //
   // La búsqueda de esta pantalla es del lado del cliente y no lee la URL, así
-  // que la huella es la vista por defecto de la ubicación del contexto.
-  { nombre: "24-stock-locales", url: "/modulos/stock_locales" },
+  // que se filtra escribiendo en su buscador (opción `buscar`).
+  //
+  // Se busca "Mogul" a propósito: son las filas con stock NEGATIVO grande del
+  // depósito (-551,5 con pack 185 y -344,62 con pack 70), que es donde se ven
+  // los dos defectos del desglose. En la vista por defecto quedan enterradas.
+  { nombre: "24-stock-locales", url: "/modulos/stock_locales", buscar: "Mogul" },
 ];
 
 /**
@@ -484,6 +488,38 @@ try {
       })()`);
       if (!ok) log(`  ${p.nombre}: no se pudieron reponer los filtros de fecha`);
       await sleep(1200);
+    }
+
+    if (p.buscar) {
+      // La tabla tiene que estar cargada ANTES de escribir: si se escribe
+      // mientras la pantalla todavía está montando, React vuelve a renderizar y
+      // se lleva puesto el valor. Pasó en la primera corrida — el campo quedaba
+      // enfocado y vacío, y la foto salía sin filtrar.
+      await esperarTablaEstable();
+      // Algunas pantallas filtran del lado del cliente y NO leen la URL, así que
+      // no hay forma de pedirles una vista puntual por querystring. Para poder
+      // fotografiar filas concretas —las que tienen el caso que se está
+      // arreglando y que de otro modo quedan enterradas en la página seis— se
+      // escribe en su buscador.
+      //
+      // Misma técnica que el filtro de fechas: React ignora una asignación
+      // directa a .value, hay que usar el setter nativo y disparar el evento.
+      const ok = await evaluar(`(() => {
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        const campos = [...document.querySelectorAll("input")].filter((el) => {
+          const t = (el.type || "text").toLowerCase();
+          if (t !== "text" && t !== "search") return false;
+          const pista = ((el.placeholder || "") + " " + (el.name || "") + " " + (el.id || "")).toLowerCase();
+          return pista.includes("busc") || pista.includes("search") || pista.includes("filtr");
+        });
+        if (!campos.length) return false;
+        setter.call(campos[0], ${JSON.stringify(p.buscar)});
+        campos[0].dispatchEvent(new Event("input", { bubbles: true }));
+        campos[0].dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+      })()`);
+      if (!ok) log(`  ${p.nombre}: no se encontró el buscador de la pantalla`);
+      await sleep(1500);
     }
 
     const filas = await esperarTablaEstable();
