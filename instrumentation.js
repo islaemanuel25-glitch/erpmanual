@@ -6,7 +6,7 @@
 // REGLA DE ESTE ARCHIVO: lo que va acá AVISA, no tumba. Si algo de acá tirara,
 // el servidor no levanta y se cae el POS de los cinco locales. Un chequeo que
 // puede voltear la aplicación entera tiene que ser algo sin lo cual la
-// aplicación no tiene sentido — y el volumen de fotos de facturas no lo es.
+// aplicación no tiene sentido — y el volumen de fotos de comprobantes no lo es.
 //
 // Lo que sí frena está en el punto de uso: `exigirAlmacen()` se pregunta antes
 // de CADA escritura y tira si el volumen no está. Ese es el que protege; este
@@ -27,6 +27,6 @@ export async function register() {
     // No debería pasar —`verificarAlArrancar` ya atrapa lo suyo— pero un
     // arranque no se cae por el chequeo de un volumen de fotos ni por
     // accidente.
-    console.error("[facturas] el chequeo de arranque falló inesperadamente:", e?.message ?? e);
+    console.error("[comprobantes] el chequeo de arranque falló inesperadamente:", e?.message ?? e);
   }
 }

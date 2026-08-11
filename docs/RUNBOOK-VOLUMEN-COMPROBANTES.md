@@ -1,6 +1,8 @@
-# Runbook — crear el volumen de fotos de facturas
+# Runbook — crear el volumen de fotos de comprobantes
 
-**Estado:** ESCRITO, NO EJECUTADO. Nadie lo corrió todavía.
+**Estado:** ESCRITO, NO EJECUTADO. Nadie lo corrió todavía, y **no se corre hasta
+que Emanuel autorice tocar producción** (dicho el 2026-08-11). No es una espera
+formal: es la misma regla de siempre para infraestructura productiva.
 
 Es una tanda **propia**, de infraestructura, y **no se mezcla con un despliegue
 de código**. El motivo está medido, no es preferencia: el 2026-08-10 un
@@ -15,9 +17,30 @@ Un volumen en el VPS para las fotos de comprobantes. **No entra al backup** —v
 `docs/decisions/DEC-0008`— porque las fotos se borran a los siete días por
 diseño.
 
+**Se llama `comprobantes` y no `facturas`, a propósito.** El módulo maneja A, B y
+recepciones sin factura; llamarle facturas al volumen confundiría al que lo lea
+en seis meses. Los tres nombres van juntos: volumen `erpazul_comprobantes`, ruta
+`/vol/comprobantes`, variable `COMPROBANTES_VOLUMEN_PATH`.
+
+## Sin tope de tamaño, pero medido
+
+No hay límite de tamaño y **hoy sería un número inventado**: con siete días de
+vida y fotos de celular esto no debería pasar de unos cientos de megas, pero eso
+es una estimación y no una medición. Lo que sí hay es que el ocupado **aparezca
+solo**: el aviso de la campana lo lleva adentro (`medirOcupacion()` en
+`almacenDisco.js`). Cuando haya varias semanas de uso, ese número es la medición
+y recién ahí tiene sentido discutir un tope.
+
+**Si algún día se llena, se rechaza la subida.** Nunca se borra lo más viejo para
+hacer lugar: la ventana promete siete días, y adelantarse la rompe en silencio —
+el que subió una foto ayer creería tener seis días y no los tendría, sin que nada
+se lo diga. Rechazar también molesta, pero molesta de frente y a tiempo. El
+mensaje está en `MOTIVO_ALMACEN.SIN_ESPACIO` y dice explícitamente que no se
+borró nada, para que nadie "resuelva" el problema borrando.
+
 ## El centinela, que es la pieza clave
 
-Dentro del volumen va un archivo `.volumen-facturas`. **Sin él, la aplicación se
+Dentro del volumen va un archivo `.volumen-comprobantes`. **Sin él, la aplicación se
 niega a escribir.**
 
 El motivo: si el volumen no está montado, Docker **igual crea el directorio del
@@ -32,7 +55,7 @@ El criterio vive en `lib/compras-proveedor/comprobante/almacenImagenes.js`, que 
 puro y tiene sus candados; el que mira el disco es
 `lib/compras-proveedor/comprobante/almacenDisco.js`. Comprueba **dos veces**: al
 arrancar, para que el problema se vea al levantar y no cuando alguien sube una
-factura un sábado; y **antes de cada escritura**, porque un montaje se puede caer
+comprobante un sábado; y **antes de cada escritura**, porque un montaje se puede caer
 después de arrancar y ahí el chequeo del arranque ya pasó y no protege nada.
 
 **Los dos fallan distinto, y es a propósito.** El del arranque —que corre desde
@@ -50,8 +73,8 @@ servidor llegó a `Ready`.
 ### 1. Crear el volumen y su centinela
 
 ```bash
-ssh vps-erp 'docker volume create erpazul_facturas'
-ssh vps-erp 'docker run --rm -v erpazul_facturas:/vol alpine sh -c "touch /vol/.volumen-facturas && ls -la /vol"'
+ssh vps-erp 'docker volume create erpazul_comprobantes'
+ssh vps-erp 'docker run --rm -v erpazul_comprobantes:/vol alpine sh -c "touch /vol/.volumen-comprobantes && ls -la /vol"'
 ```
 
 El `ls` tiene que mostrar el centinela. Si no aparece, **parar acá**: sin
@@ -60,7 +83,7 @@ centinela la aplicación no va a escribir, y es mejor descubrirlo ahora.
 ### 2. Declararlo en el compose
 
 En `docker-compose.prod.yml`, montarlo en el servicio `app` y declararlo abajo.
-La ruta de adentro va también en `.env` como `FACTURAS_VOLUMEN_PATH`, junto a
+La ruta de adentro va también en `.env` como `COMPROBANTES_VOLUMEN_PATH`, junto a
 `APP_IMAGE` —el `.env` de Compose, permisos 600— y **nunca en `.env.prod`**, por
 la misma razón de siempre: ese es el `env_file` del contenedor y sus variables no
 interpolan el compose.
@@ -78,7 +101,7 @@ ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod
 ### 4. Verificar que quedó montado DE VERDAD
 
 ```bash
-ssh vps-erp 'docker exec erpazul_app ls -la /vol/facturas'
+ssh vps-erp 'docker exec erpazul_app ls -la /vol/comprobantes'
 ssh vps-erp 'docker inspect erpazul_app --format "{{range .Mounts}}{{.Name}} -> {{.Destination}} ({{.Type}}){{println}}{{end}}"'
 ```
 
@@ -88,11 +111,11 @@ vacío es exactamente el fallo que esto previene: significa que no está montado
 Y el log de la aplicación tiene que decirlo con todas las letras:
 
 ```bash
-ssh vps-erp 'docker logs erpazul_app --since 5m 2>&1 | grep facturas'
+ssh vps-erp 'docker logs erpazul_app --since 5m 2>&1 | grep comprobantes'
 ```
 
-Con el volumen bien: `[facturas] almacén de imágenes verificado en /vol/facturas`.
-Cualquier otra cosa que empiece con `[facturas]` es el chequeo diciendo cuál de
+Con el volumen bien: `[comprobantes] almacén de imágenes verificado en /vol/comprobantes`.
+Cualquier otra cosa que empiece con `[comprobantes]` es el chequeo diciendo cuál de
 los cuatro casos es. **Que no aparezca ninguna línea también es un problema**:
 significa que `instrumentation.js` no corrió, y entonces esta verificación no
 verificó nada.
@@ -103,9 +126,9 @@ Escribir un archivo desde adentro del contenedor, **recrear la app**, y
 comprobar que el archivo sigue estando:
 
 ```bash
-ssh vps-erp 'docker exec erpazul_app sh -c "echo prueba > /vol/facturas/_prueba.txt"'
+ssh vps-erp 'docker exec erpazul_app sh -c "echo prueba > /vol/comprobantes/_prueba.txt"'
 ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps app'
-ssh vps-erp 'docker exec erpazul_app cat /vol/facturas/_prueba.txt && docker exec erpazul_app rm /vol/facturas/_prueba.txt'
+ssh vps-erp 'docker exec erpazul_app cat /vol/comprobantes/_prueba.txt && docker exec erpazul_app rm /vol/comprobantes/_prueba.txt'
 ```
 
 Si el archivo sobrevivió a la recreación, el volumen es real. **Este paso no se
