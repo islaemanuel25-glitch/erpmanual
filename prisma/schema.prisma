@@ -2592,6 +2592,15 @@ model ImportacionListaFila {
 // cantidad, y por eso no se pudo reusar su modelo.
 
 enum EstadoComprobante {
+  /// Subido, todavía SIN LEER. Es el estado con el que nace un comprobante: la
+  /// identidad —tipo, punto de venta, número, fecha— todavía no se conoce,
+  /// porque sale de leer el papel y eso ocurre después.
+  PENDIENTE_LECTURA
+  /// Se leyó, pero la aritmética NO cerró dentro del centavo. Desde acá no se
+  /// propone nada. Es distinto de DIFIERE: allá el PAPEL no cierra y se muestra
+  /// igual con la diferencia a la vista; acá lo que no cierra es la LECTURA, y
+  /// un número que puede estar inventado no puede proponer un costo.
+  MAL_LEIDO
   /// Subido y leído, todavía sin conciliar contra el pedido.
   CARGADO
   /// La suma de sus líneas da el total del papel dentro de la tolerancia.
@@ -2667,10 +2676,17 @@ model ComprobanteProveedor {
   usuarioId        Int?
 
   /// ── IDENTIDAD: proveedor + punto de venta + número ───────────────────
-  tipo       String
-  puntoVenta String
-  numero     String
-  fecha      DateTime
+  ///
+  /// NULLABLES hasta que se lea el papel. Un comprobante nace de una SUBIDA, y
+  /// en ese momento lo único que se tiene es el archivo. Poner "" o "SIN
+  /// NUMERO" mientras tanto sería inventar un dato y, peor, haría chocar entre
+  /// sí a dos comprobantes sin leer en el índice único de identidad. En
+  /// PostgreSQL los NULL son distintos entre sí, así que muchos pendientes
+  /// conviven sin problema y el único empieza a regir en cuanto hay número.
+  tipo       String?
+  puntoVenta String?
+  numero     String?
+  fecha      DateTime?
 
   /// CUIT leído del papel. SOLO se compara contra Proveedor.cuit y se avisa si
   /// difiere: NUNCA lo completa solo. Un CUIT mal leído que se autocompletara
@@ -2696,6 +2712,31 @@ model ComprobanteProveedor {
   /// viejo aunque la receta haya cambiado después.
   recetaVersion Int?
   recetaUsada   Json?
+
+  /// ── QUIÉN LEYÓ, Y CUÁNTO COSTÓ ───────────────────────────────────────
+  ///
+  /// El modelo se guarda por el mismo motivo que la receta copiada: dentro de
+  /// seis meses, mirando un comprobante viejo mal leído, la pregunta va a ser
+  /// "¿con qué se leyó esto?", y la respuesta no puede ser "con el que
+  /// estuviera configurado entonces".
+  modeloLectura   String?
+  leidoEn         DateTime?
+  /// Cuántos intentos de lectura lleva. Un reintento no borra el anterior:
+  /// suma, para que se vea que hubo que insistir.
+  intentosLectura Int       @default(0)
+
+  /// El consumo, para que el costo sea un dato y no una sorpresa a fin de mes.
+  /// En micro-dólares ENTEROS —millonésimas— y no en Decimal de centavos: una
+  /// lectura sale fracciones de centavo, y redondear a centavos daría cero en
+  /// cada fila y una suma mensual que no coincidiría con la factura del
+  /// servicio.
+  tokensEntrada Int?
+  tokensSalida  Int?
+  costoMicroUsd Int?
+
+  /// MIME informado al subir. Es un dato del archivo, no una autorización:
+  /// quien decide si se puede leer es el contenido.
+  archivoMime String?
 
   /// ── LA IMAGEN VIVE SIETE DÍAS ────────────────────────────────────────
   ///
