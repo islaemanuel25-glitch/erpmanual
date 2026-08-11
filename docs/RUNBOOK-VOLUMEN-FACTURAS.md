@@ -28,11 +28,22 @@ recrearlo. Comprobar que el directorio exista **no alcanza**: siempre existe.
 El centinela distingue las dos cosas: si el volumen está montado, está; si no,
 el directorio está vacío.
 
-La lógica vive en `lib/compras-proveedor/comprobante/almacenImagenes.js`, con sus
-candados. Comprueba **dos veces**: al arrancar, para que el problema se vea al
-levantar y no cuando alguien sube una factura un sábado; y **antes de cada
-escritura**, porque un montaje se puede caer después de arrancar y ahí el chequeo
-del arranque ya pasó y no protege nada.
+El criterio vive en `lib/compras-proveedor/comprobante/almacenImagenes.js`, que es
+puro y tiene sus candados; el que mira el disco es
+`lib/compras-proveedor/comprobante/almacenDisco.js`. Comprueba **dos veces**: al
+arrancar, para que el problema se vea al levantar y no cuando alguien sube una
+factura un sábado; y **antes de cada escritura**, porque un montaje se puede caer
+después de arrancar y ahí el chequeo del arranque ya pasó y no protege nada.
+
+**Los dos fallan distinto, y es a propósito.** El del arranque —que corre desde
+`instrumentation.js`, que Next llama solo— **avisa en el log y sigue**: si tumbara
+el proceso, un volumen de fotos sin montar dejaría sin POS a los cinco locales, y
+no vender es mucho peor que no poder subir una foto. El de la escritura —
+`exigirAlmacen()`— **sí frena**, y es el que protege de verdad.
+
+Probado con el servidor real, no leído: sin la variable, con el volumen montado y
+con el directorio vacío, las tres salidas son las de abajo y en los tres casos el
+servidor llegó a `Ready`.
 
 ## Los pasos
 
@@ -73,6 +84,18 @@ ssh vps-erp 'docker inspect erpazul_app --format "{{range .Mounts}}{{.Name}} -> 
 
 Tiene que verse el centinela **y** el montaje de tipo `volume`. Ver el directorio
 vacío es exactamente el fallo que esto previene: significa que no está montado.
+
+Y el log de la aplicación tiene que decirlo con todas las letras:
+
+```bash
+ssh vps-erp 'docker logs erpazul_app --since 5m 2>&1 | grep facturas'
+```
+
+Con el volumen bien: `[facturas] almacén de imágenes verificado en /vol/facturas`.
+Cualquier otra cosa que empiece con `[facturas]` es el chequeo diciendo cuál de
+los cuatro casos es. **Que no aparezca ninguna línea también es un problema**:
+significa que `instrumentation.js` no corrió, y entonces esta verificación no
+verificó nada.
 
 ### 5. La prueba que de verdad cierra
 
