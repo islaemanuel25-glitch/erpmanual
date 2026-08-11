@@ -1,9 +1,15 @@
 # Runbook — crear el volumen de fotos de comprobantes
 
-**Estado:** EN EJECUCIÓN el 2026-08-11, con autorización explícita de Emanuel.
-El paso 1 quedó hecho antes; los pasos 2 a 5 van en esta tanda, después del
-despliegue del código (que es lo que pone el chequeo del arranque adentro de la
-imagen, sin lo cual el paso 4 no verificaría nada real).
+**Estado:** EJECUTADO Y CERRADO el 2026-08-11, con autorización explícita de
+Emanuel. Los cinco pasos corrieron; el paso 5 confirmó que un archivo escrito por
+la aplicación sobrevive a recrear el contenedor.
+
+Se corrió **después** del despliegue del código, que es lo que pone el chequeo
+del arranque adentro de la imagen: sin eso el paso 4 no verificaría nada real.
+
+**Lo único que no estaba previsto fue el `chown` del paso 1**, y quedó agregado
+abajo con su motivo. Si se vuelve a correr este procedimiento —otro VPS, otro
+volumen—, ya viene contemplado.
 
 Es una tanda **propia**, de infraestructura, y **no se mezcla con un despliegue
 de código**. El motivo está medido, no es preferencia: el 2026-08-10 un
@@ -76,10 +82,33 @@ servidor llegó a `Ready`.
 ```bash
 ssh vps-erp 'docker volume create erpazul_comprobantes'
 ssh vps-erp 'docker run --rm -v erpazul_comprobantes:/vol alpine sh -c "touch /vol/.volumen-comprobantes && ls -la /vol"'
+ssh vps-erp 'docker run --rm -v erpazul_comprobantes:/vol alpine sh -c "chown -R 1000:1000 /vol && chmod 775 /vol"'
+ssh vps-erp 'docker run --rm -v erpazul_comprobantes:/vol alpine stat -c "%u:%g %a %n" /vol'
 ```
 
 El `ls` tiene que mostrar el centinela. Si no aparece, **parar acá**: sin
 centinela la aplicación no va a escribir, y es mejor descubrirlo ahora.
+
+⚠️ **EL `chown` NO ES OPCIONAL, Y ESTA ES LA TERCERA LÍNEA POR ESO.** El
+2026-08-11 este paso se corrió sin él y el volumen quedó inservible.
+
+El motivo: **el contenedor de Alpine que crea el centinela corre como root**, así
+que el volumen nace `root:root` con permisos 755. **La aplicación corre como
+`uid=1000(node)`** —confirmado con `docker exec erpazul_app id`—, y contra un
+directorio 755 de root, un uid 1000 no puede escribir. El montaje queda perfecto
+y la escritura no.
+
+El precedente que lo confirma está en el mismo contenedor: el bind de backups,
+que funciona hace meses, está **`node:node` con 775**. Es exactamente el dueño y
+los permisos a los que deja el `chown` de arriba, y por eso son esos números y no
+otros. Comprobarlo es una línea:
+`docker exec erpazul_app stat -c "%U:%G %a %n" /app/backups`.
+
+Lo que pasó sin el `chown`: el chequeo del arranque dijo **"El volumen está
+montado pero no se puede escribir en él"**, que es el motivo `NO_ESCRIBIBLE` y no
+el `SIN_CENTINELA`. Que sean cuatro motivos distintos y no un "error" genérico es
+lo que hizo que esto se viera en el paso 4 y no el día que alguien subiera la
+primera foto.
 
 ### 2. Declararlo en el compose
 
@@ -160,6 +189,13 @@ compose antes de tocar nada más.
 El mensaje dice cuál de los cuatro casos es: sin ruta, sin directorio, sin
 centinela o sin permiso de escritura. Los cuatro se arreglan distinto y por eso
 son cuatro mensajes distintos.
+
+**"Montado pero no se puede escribir"** → falta el `chown` del paso 1. Es el caso
+que ocurrió de verdad el 2026-08-11. Se arregla con la tercera línea del paso 1 y
+recreando la app; el volumen puede estar vacío o no, el `chown -R` no toca
+contenido. **No confundirlo con "no está montado"**: ahí el problema es el
+compose, acá son los permisos, y son arreglos opuestos. Que el chequeo los
+distinga es la razón por la que esto se vio en el paso 4 y no meses después.
 
 **El archivo de prueba no sobrevivió a la recreación** → se estaba escribiendo en
 el disco del contenedor. Es el fallo silencioso que motivó todo esto.
