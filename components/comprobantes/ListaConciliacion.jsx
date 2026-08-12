@@ -44,6 +44,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiPar from "@/components/sunmi/SunmiPar";
 import { comoSeDice } from "@/lib/compras-proveedor/comprobante/pantalla";
 import {
   estadoDeLaFila,
@@ -394,19 +395,17 @@ function GrupoComprobante({
       render: (f) => {
         const t = textoDelProducto(f);
         return (
-          <>
-            <div className="line-clamp-2 break-words font-medium leading-snug sunmi-text-strong" title={t.arriba}>
-              {t.arriba}
-            </div>
-            {t.abajo && (
-              <div
-                className={`text-xs2 truncate ${t.esPregunta ? "sunmi-text-accent" : "sunmi-text-muted"}`}
-                title={t.abajo}
-              >
-                {t.abajo}
-              </div>
-            )}
-          </>
+          <SunmiPar
+            className="line-clamp-2 break-words font-medium leading-snug sunmi-text-strong"
+            title={t.arriba}
+            arriba={t.arriba}
+            // El tamaño lo pone la pieza. El color solo cuando NO es el de por
+            // defecto: la pregunta va en acento porque espera que alguien la
+            // conteste, y ese es el único caso.
+            classNameAbajo={`truncate ${t.esPregunta ? "sunmi-text-accent" : ""}`}
+            titleAbajo={t.abajo ?? undefined}
+            abajo={t.abajo}
+          />
         );
       },
     },
@@ -428,12 +427,14 @@ function GrupoComprobante({
         const v = l[lado];
         const ambar = lado === "factura" && l.difiere;
         return (
-          <>
-            <div className="sunmi-text-strong">{v.cantidad ?? "—"}</div>
-            <div className={`text-xs2 ${ambar ? "sunmi-text-warning" : "sunmi-text-muted"}`}>
-              {v.precio ?? "—"}
-            </div>
-          </>
+          <SunmiPar
+            className="sunmi-text-strong"
+            arriba={v.cantidad ?? "—"}
+            // Igual que arriba: el tamaño lo pone la pieza y el color se declara
+            // solo cuando difiere del de por defecto.
+            classNameAbajo={ambar ? "sunmi-text-warning" : ""}
+            abajo={v.precio ?? "—"}
+          />
         );
       },
     })),
