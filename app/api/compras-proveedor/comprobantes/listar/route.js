@@ -90,10 +90,23 @@ export async function GET(req) {
     // `archivos` viene sin ubicación, así que para el resumen hay que decirle
     // cuáles siguen teniendo foto: eso lo dice `imagenBorradaEn`, que es del
     // comprobante entero porque la ventana es del PAPEL y no de cada foto.
+    // Cuántas líneas de cada comprobante ya están vinculadas a una del pedido.
+    // Es lo que hay que decir ANTES de borrar: es el único trabajo que volver a
+    // leer no recupera, porque lo hizo una persona a mano.
+    const vinculadasPorComprobante = items.length
+      ? await prisma.comprobanteLinea.groupBy({
+          by: ["comprobanteId"],
+          where: { comprobanteId: { in: items.map((c) => c.id) }, pedidoDetalleId: { not: null } },
+          _count: { _all: true },
+        })
+      : [];
+    const vinculadasDe = new Map(vinculadasPorComprobante.map((v) => [v.comprobanteId, v._count._all]));
+
     const conFotos = items.map((c) => ({
       ...c,
       fotos: c.imagenBorradaEn ? 0 : c.archivos.length,
       archivos: c.imagenBorradaEn ? [] : c.archivos,
+      lineasVinculadas: vinculadasDe.get(c.id) ?? 0,
     }));
 
     // ── LA COBERTURA DEL PEDIDO, CONTRA TODOS LOS COMPROBANTES ───────────

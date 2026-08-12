@@ -120,7 +120,7 @@ export default function TablaTicketsConflictivos({
             <div className="flex gap-2">
               <SunmiButton
                 type="button"
-                color="neutral"
+                color="slate"
                 disabled={page <= 1 || loadingTickets}
                 onClick={onPrevPage}
               >
@@ -128,7 +128,7 @@ export default function TablaTicketsConflictivos({
               </SunmiButton>
               <SunmiButton
                 type="button"
-                color="neutral"
+                color="slate"
                 disabled={page >= totalPages || loadingTickets || totalPages <= 1}
                 onClick={onNextPage}
               >

@@ -32,6 +32,7 @@ import {
   comoSeDice,
   resumenDeLista,
 } from "@/lib/compras-proveedor/comprobante/pantalla";
+import { sePuedeBorrar, textoDeBorrado } from "@/lib/compras-proveedor/comprobante/borrado";
 
 const TONOS = {
   ok: "sunmi-text-success",
@@ -107,6 +108,8 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
   const [pregunta, setPregunta] = useState(null); // { archivos, opciones, candidatos }
   const [seleccion, setSeleccion] = useState([]);
   const [abierto, setAbierto] = useState(null); // qué comprobante muestra sus líneas
+  const [borrando, setBorrando] = useState(null); // el comprobante que se está por borrar
+  const [trabajandoBorrar, setTrabajandoBorrar] = useState(false);
   const inputRef = useRef(null);
 
   const resumen = useMemo(() => resumenDeLista(items), [items]);
@@ -248,6 +251,28 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
     }
   }
 
+  async function borrar(c) {
+    setTrabajandoBorrar(true);
+    setMensaje(null);
+    try {
+      const r = await fetch(`/api/compras-proveedor/comprobantes/borrar/${c.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const d = await r.json().catch(() => ({}));
+      setMensaje({ tipo: d?.ok ? "ok" : "error", texto: d?.queHacer || d?.error });
+      setBorrando(null);
+      // Si estaba abierto mostrando sus líneas, se cierra: ya no existe.
+      if (abierto === c.id) setAbierto(null);
+      setSeleccion((s) => s.filter((x) => x !== c.id));
+      await recargar();
+    } catch {
+      setMensaje({ tipo: "error", texto: SIN_RESPUESTA.texto });
+    } finally {
+      setTrabajandoBorrar(false);
+    }
+  }
+
   const alternar = (id) =>
     setSeleccion((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
@@ -264,17 +289,24 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
           </p>
         </div>
         {puedeRecibir && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             {seleccion.length >= 2 && (
               <SunmiButton color="slate" type="button" onClick={unir}>
                 Unir {seleccion.length} en uno
               </SunmiButton>
             )}
+            {/* LA ACCIÓN PRINCIPAL DE LA PANTALLA, y se toca con el dedo en el
+                Sunmi. Los 36px del botón del kit alcanzan para el mouse y no
+                para el pulgar: `py-3` lo lleva a 44, que es la medida a la que
+                se apunta sin errarle. Y a lo ancho en el celular, donde no hay
+                nada que compita por ese espacio: el blanco alrededor de un
+                botón chico es lo que lo hacía parecer una etiqueta. */}
             <SunmiButton
-              color="accent"
+              color="primary"
               type="button"
               disabled={subiendo}
               onClick={() => inputRef.current?.click()}
+              className="py-3 px-5 text-sm font-bold w-full sm:w-auto justify-center"
             >
               {subiendo ? "Subiendo…" : "Subir fotos"}
             </SunmiButton>
@@ -415,12 +447,17 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                       )}
                       {puedeRecibir && c.fotos > 0 && (
                         <SunmiButton
-                          color="accent"
+                          color="primary"
                           type="button"
                           disabled={leyendo === c.id}
                           onClick={() => leer(c.id)}
                         >
                           {leyendo === c.id ? "Leyendo…" : c.leidoEn ? "Releer" : "Leer"}
+                        </SunmiButton>
+                      )}
+                      {puedeRecibir && sePuedeBorrar(c).ok && (
+                        <SunmiButton color="slate" type="button" onClick={() => setBorrando(c)}>
+                          Borrar
                         </SunmiButton>
                       )}
                     </td>
@@ -478,12 +515,17 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                     )}
                     {puedeRecibir && c.fotos > 0 && (
                       <SunmiButton
-                        color="accent"
+                        color="primary"
                         type="button"
                         disabled={leyendo === c.id}
                         onClick={() => leer(c.id)}
                       >
                         {leyendo === c.id ? "Leyendo…" : c.leidoEn ? "Releer" : "Leer"}
+                      </SunmiButton>
+                    )}
+                    {puedeRecibir && sePuedeBorrar(c).ok && (
+                      <SunmiButton color="slate" type="button" onClick={() => setBorrando(c)}>
+                        Borrar
                       </SunmiButton>
                     )}
                   </div>
@@ -495,6 +537,59 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
             ))}
           </div>
         </>
+      )}
+
+      {/* ── Confirmar el borrado ─────────────────────────────────────────
+          Un comprobante con veinte líneas leídas y ocho vinculadas a mano es
+          media hora de trabajo. Se dice CON NÚMEROS qué se lleva puesto: un
+          "esta acción no se puede deshacer" genérico no lo lee nadie.
+          El botón que borra va en rojo y NO es el primero: el que cancela está
+          antes, porque el dedo cae en el de arriba. */}
+      {borrando && (
+        <SunmiModalLayout
+          open
+          title="¿Borrar este comprobante?"
+          subtitle={identidad(borrando)}
+          color="red"
+          onClose={() => (trabajandoBorrar ? null : setBorrando(null))}
+        >
+          {(() => {
+            const d = textoDeBorrado({
+              lineas: borrando._count?.lineas ?? 0,
+              vinculadas: borrando.lineasVinculadas ?? 0,
+              fotos: borrando.fotos ?? 0,
+              identidad: borrando.numero ? identidad(borrando) : null,
+            });
+            return (
+              <>
+                <p className="text-xs sunmi-text-strong leading-snug">{d.texto}</p>
+                {d.aviso && (
+                  <p className="text-xs sunmi-text-warning leading-snug mt-2 font-bold">{d.aviso}</p>
+                )}
+                <div className="flex flex-col gap-2 mt-4">
+                  <SunmiButton
+                    color="slate"
+                    type="button"
+                    disabled={trabajandoBorrar}
+                    className="py-3 justify-center"
+                    onClick={() => setBorrando(null)}
+                  >
+                    No, dejarlo
+                  </SunmiButton>
+                  <SunmiButton
+                    color="red"
+                    type="button"
+                    disabled={trabajandoBorrar}
+                    className="py-3 justify-center"
+                    onClick={() => borrar(borrando)}
+                  >
+                    {trabajandoBorrar ? "Borrando…" : "Sí, borrarlo"}
+                  </SunmiButton>
+                </div>
+              </>
+            );
+          })()}
+        </SunmiModalLayout>
       )}
 
       {/* ── La pregunta al subir ──────────────────────────────────────── */}
@@ -520,7 +615,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
             )}
             {pregunta.opciones.includes("TODAS_UNA_SOLA") && (
               <SunmiButton
-                color="accent"
+                color="primary"
                 type="button"
                 onClick={() => subir(pregunta.archivos, { agruparEnUno: true })}
               >
@@ -540,7 +635,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
               (pregunta.candidatos || []).map((c) => (
                 <SunmiButton
                   key={c.id}
-                  color="accent"
+                  color="primary"
                   type="button"
                   onClick={() => subir(pregunta.archivos, { comprobanteId: c.id })}
                 >

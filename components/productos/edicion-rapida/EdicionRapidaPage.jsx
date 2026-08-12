@@ -859,7 +859,7 @@ export default function EdicionRapidaPage() {
                 ).length;
                 return count > 0 ? (
                   <SunmiButton
-                    color="emerald"
+                    color="primary"
                     className="!text-[11px] !px-3 !py-1 shrink-0 self-center"
                     disabled={bulkSaving}
                     onClick={handleSaveSelected}

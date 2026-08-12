@@ -453,7 +453,7 @@ export default function TurnoDetallePage() {
           <h2 className="text-base font-bold">Movimientos de caja</h2>
           {operativo && (
             <div className="flex gap-2">
-              <SunmiButton color="green" onClick={() => setModalMov("INGRESO")}>
+              <SunmiButton color="primary" onClick={() => setModalMov("INGRESO")}>
                 Ingreso
               </SunmiButton>
               <SunmiButton color="red" onClick={() => setModalMov("RETIRO")}>

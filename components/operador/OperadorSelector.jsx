@@ -118,7 +118,7 @@ export default function OperadorSelector({ operador, onLogin, onLogout, forzado 
           {loading ? "..." : "Ingresar"}
         </SunmiButton>
         {!forzado && (
-          <SunmiButton color="neutral" onClick={() => { setAbierto(false); setError(""); }} className="!py-1 text-xs">
+          <SunmiButton color="slate" onClick={() => { setAbierto(false); setError(""); }} className="!py-1 text-xs">
             Cancelar
           </SunmiButton>
         )}
