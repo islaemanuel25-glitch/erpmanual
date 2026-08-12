@@ -39,6 +39,7 @@ import {
   productoBaseDeLaLinea,
 } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
+import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 
 export async function GET(req, { params }) {
   try {
@@ -75,13 +76,10 @@ export async function GET(req, { params }) {
           select: {
             id: true, orden: true, textoCrudo: true, codigoProveedor: true, cantidad: true,
             netoUnitario: true, subtotalImpreso: true, internoUnitario: true,
+            // El vínculo ya hecho se lee del ESCALAR. `productoLocal` no es una
+            // relación del esquema: pedirla acá rompía la ruta entera contra
+            // Postgres. La traducción a su producto va aparte, más abajo.
             productoLocalId: true, pedidoDetalleId: true, precioPedidoPrevio: true,
-            // El producto del VÍNCULO ya hecho. Sin esto, una línea vinculada a
-            // mano se quedaba sin producto —y por lo tanto sin precio, sin
-            // unidad y sin línea de pedido— porque el producto salía solo de la
-            // sugerencia automática, que para una línea ya vinculada ni se
-            // calcula.
-            productoLocal: { select: { id: true, baseId: true } },
           },
         },
       },
@@ -136,6 +134,12 @@ export async function GET(req, { params }) {
     // viejas— se usa la genérica, y se dice.
     const receta = comprobante.recetaUsada ?? { ...RECETA_POR_DEFECTO };
 
+    // El producto de las líneas YA VINCULADAS, en una consulta aparte porque
+    // `productoLocal` no es una relación del esquema. Se arma un Map de
+    // productoLocalId → baseId, que es lo que `productoBaseDeLaLinea` espera.
+    const productosVinculados = await productosDeLasFilas(prisma, comprobante.lineas);
+    const baseDelLocal = new Map([...productosVinculados].map(([id, p]) => [id, p.baseId]));
+
     const lineas = comprobante.lineas.map((l) => {
       const yaVinculada = l.productoLocalId != null;
       const busqueda = yaVinculada
@@ -157,7 +161,7 @@ export async function GET(req, { params }) {
       // producto es" con el `productoLocalId` escrito en la fila.
       const { productoBaseId, desdeVinculo } = productoBaseDeLaLinea({
         linea: l,
-        baseDelLocal: new Map(l.productoLocal ? [[l.productoLocal.id, l.productoLocal.baseId]] : []),
+        baseDelLocal: baseDelLocal,
         sugeridoBaseId: busqueda?.vinculoAutomatico?.productoBaseId ?? null,
       });
 

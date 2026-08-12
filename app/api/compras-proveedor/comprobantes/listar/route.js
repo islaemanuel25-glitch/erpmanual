@@ -14,6 +14,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { resumenDeLista } from "@/lib/compras-proveedor/comprobante/pantalla";
 import { coberturaDelPedido, textoDeCobertura } from "@/lib/compras-proveedor/comprobante/cobertura";
+import { productosDeLasFilas, baseIdDeLaFila } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { armarCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { cuotaDelDia, horaLocalDeReposicion } from "@/lib/compras-proveedor/comprobante/lector/cuota";
 // El índice registra los lectores al importarse. Sin esto la cadena diría que no
@@ -106,10 +107,15 @@ export async function GET(req) {
         where: { pedidoId },
         select: { id: true, producto: { select: { baseId: true, base: { select: { nombre: true } } } } },
       });
+      // `productoLocal` NO es una relación del esquema: solo existe el escalar.
+      // Pedirla acá es lo que tumbaba esta ruta —y con ella la pantalla entera—
+      // con `Unknown field productoLocal`. La traducción va en una consulta
+      // aparte, en un solo lugar para las tres rutas que la necesitan.
       const vinculadas = await prisma.comprobanteLinea.findMany({
         where: { comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } }, productoLocalId: { not: null } },
-        select: { comprobanteId: true, productoLocal: { select: { baseId: true } } },
+        select: { comprobanteId: true, productoLocalId: true },
       });
+      const porProductoLocal = await productosDeLasFilas(prisma, vinculadas);
       const c = coberturaDelPedido({
         detalles: detalles.map((d) => ({
           id: d.id,
@@ -117,7 +123,7 @@ export async function GET(req) {
           nombre: d.producto?.base?.nombre ?? null,
         })),
         lineasDeComprobantes: vinculadas.map((v) => ({
-          productoBaseId: v.productoLocal?.baseId ?? null,
+          productoBaseId: baseIdDeLaFila(v, porProductoLocal),
           comprobanteId: v.comprobanteId,
         })),
       });

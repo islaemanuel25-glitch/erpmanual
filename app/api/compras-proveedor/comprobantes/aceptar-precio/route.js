@@ -28,6 +28,7 @@ import { checkPerm } from "@/lib/authorize";
 import { puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
+import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 
 export async function POST(req) {
   try {
@@ -48,10 +49,9 @@ export async function POST(req) {
       where: { id: lineaId, comprobante: { grupoId } },
       select: {
         id: true, cantidad: true, netoUnitario: true, internoUnitario: true,
+        // El escalar, no una relación: `productoLocal` no existe en el esquema y
+        // pedirla acá rompía la ruta contra Postgres. El producto se trae aparte.
         productoLocalId: true, pedidoDetalleId: true,
-        productoLocal: {
-          select: { id: true, base: { select: { id: true, nombre: true, factor_pack: true, precio_costo: true } } },
-        },
         comprobante: {
           select: {
             id: true, estado: true, confirmadoEn: true, recetaUsada: true,
@@ -63,7 +63,13 @@ export async function POST(req) {
     if (!linea) return NextResponse.json({ ok: false, error: "No existe esa línea." }, { status: 404 });
 
     const receta = linea.comprobante.recetaUsada ?? { ...RECETA_POR_DEFECTO };
-    const base = linea.productoLocal?.base;
+
+    // El producto vinculado, en una consulta aparte. Se piden los tres campos
+    // que el análisis usa y ninguno más.
+    const porProductoLocal = await productosDeLasFilas(prisma, [linea], {
+      id: true, nombre: true, factor_pack: true, precio_costo: true,
+    });
+    const base = porProductoLocal.get(Number(linea.productoLocalId))?.base ?? null;
 
     // LOS CINCO PASOS SALEN DEL MÓDULO COMPARTIDO, el mismo que alimenta la
     // pantalla. Se recalculan acá en vez de aceptar lo que llegó en el pedido:
