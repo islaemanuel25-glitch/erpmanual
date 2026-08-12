@@ -1,0 +1,25 @@
+-- El precio que la línea del pedido tenía ANTES de que el comprobante lo pisara.
+--
+-- ── POR QUÉ COLUMNA PROPIA Y NO `costoPrevioAplicacion` ────────────────────
+--
+-- Son dos hechos distintos y por eso van en dos columnas, que es la regla del
+-- proyecto:
+--
+--   · `costoPrevioAplicacion` guarda el costo que tenía el PRODUCTO antes de que
+--     esta línea lo pisara. Existe para poder revertir la segunda revisión.
+--
+--   · `precioPedidoPrevio` guarda el precio que tenía la LÍNEA DEL PEDIDO. Sirve
+--     para otra cosa: ver a qué se PIDIÓ y a qué terminó FACTURANDO, que es una
+--     pregunta comercial y no de reversión.
+--
+-- Meterlos en la misma columna haría que revertir un costo pisara el registro de
+-- lo que se había pedido, o al revés.
+--
+-- ── SE AGREGA AHORA PORQUE AHORA SE ESCRIBE ───────────────────────────────
+--
+-- Estaba anotado desde la tanda del vínculo y se dejó para cuando hubiera quién
+-- lo escribiera. Una columna que nadie escribe es la trampa que ya costó con
+-- DIFIERE: queda ahí, vacía, y alguien la llena con cualquier cosa por verla
+-- vacía.
+
+ALTER TABLE "ComprobanteLinea" ADD COLUMN "precioPedidoPrevio" DECIMAL(18,6);

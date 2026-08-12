@@ -35,15 +35,10 @@ import {
   TEXTO_MOTIVO_PEDIDO,
 } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
-  deducirUnidad,
-  explicarVeredicto,
-  lecturasPosibles,
-} from "@/lib/compras-proveedor/comprobante/unidadPorPrecio";
-import {
-  finalUnitarioSinPercepcionesCentavos,
-  aPesos,
-  RECETA_POR_DEFECTO,
-} from "@/lib/compras-proveedor/comprobante/impuestos";
+  analizarPrecioDeLinea,
+  productoBaseDeLaLinea,
+} from "@/lib/compras-proveedor/comprobante/precioDeLinea";
+import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
 
 export async function GET(req, { params }) {
   try {
@@ -69,13 +64,24 @@ export async function GET(req, { params }) {
         // La receta con la que se leyó: es la que convierte neto a final, y
         // tiene que ser la MISMA que usó la lectura, no la de hoy.
         recetaUsada: true,
-        proveedor: { select: { id: true, nombre: true } },
+        confirmadoEn: true,
+        // Los umbrales son del proveedor: la decisión de precio se toma con los
+        // suyos, no con una constante de esta ruta.
+        proveedor: {
+          select: { id: true, nombre: true, umbralRevisarPct: true, umbralSospechaBajaPct: true },
+        },
         lineas: {
           orderBy: { orden: "asc" },
           select: {
             id: true, orden: true, textoCrudo: true, codigoProveedor: true, cantidad: true,
             netoUnitario: true, subtotalImpreso: true, internoUnitario: true,
-            productoLocalId: true, pedidoDetalleId: true,
+            productoLocalId: true, pedidoDetalleId: true, precioPedidoPrevio: true,
+            // El producto del VÍNCULO ya hecho. Sin esto, una línea vinculada a
+            // mano se quedaba sin producto —y por lo tanto sin precio, sin
+            // unidad y sin línea de pedido— porque el producto salía solo de la
+            // sugerencia automática, que para una línea ya vinculada ni se
+            // calcula.
+            productoLocal: { select: { id: true, baseId: true } },
           },
         },
       },
@@ -144,53 +150,43 @@ export async function GET(req, { params }) {
             catalogo: catalogoNormalizado,
           });
 
-      const productoBaseId = busqueda?.vinculoAutomatico?.productoBaseId ?? null;
-      const delPedido = lineaDelPedido({ productoBaseId, detalles: detallesPlanos });
+      // QUÉ PRODUCTO ES. El vínculo ya hecho gana sobre la sugerencia: alguien
+      // ya decidió. Antes esto salía SOLO de `busqueda.vinculoAutomatico`, que
+      // para una línea vinculada ni se calcula — así que una línea vinculada a
+      // mano quedaba sin producto y la pantalla le decía "Todavía no se sabe qué
+      // producto es" con el `productoLocalId` escrito en la fila.
+      const { productoBaseId, desdeVinculo } = productoBaseDeLaLinea({
+        linea: l,
+        baseDelLocal: new Map(l.productoLocal ? [[l.productoLocal.id, l.productoLocal.baseId]] : []),
+        sugeridoBaseId: busqueda?.vinculoAutomatico?.productoBaseId ?? null,
+      });
 
-      // ── LA UNIDAD ─────────────────────────────────────────────────────
+      // La línea del pedido: si ya está guardada en la fila, esa manda. Volver a
+      // deducirla podría dar otra —el caso VARIAS_LINEAS— y pisar en silencio la
+      // que alguien eligió.
+      const delPedido = l.pedidoDetalleId
+        ? {
+            detalle: detallesPlanos.find((d) => d.id === l.pedidoDetalleId) ?? null,
+            motivo: null,
+          }
+        : lineaDelPedido({ productoBaseId, detalles: detallesPlanos });
+
+      // ── EL PRECIO, LA UNIDAD Y LA DECISIÓN ────────────────────────────
       //
-      // Solo tiene sentido cuando ya se sabe QUÉ producto es: sin producto no
-      // hay costo anterior ni factor de pack con qué comparar.
-      //
-      // EL ORDEN: neto a final ANTES de comparar. El costo del ERP está en
-      // escala final y el precio de la factura viene neto; comparar sin
-      // convertir mete la alícuota entera en el cociente.
+      // Los cinco pasos salen del módulo compartido, que es el MISMO que usa la
+      // ruta de aceptar. Tienen que dar el mismo número: esta muestra lo que
+      // aquella va a escribir.
       const prod = productoBaseId ? datosPorBase.get(productoBaseId) : null;
-      let unidadInfo = null;
-      if (prod) {
-        const precioFinal = aPesos(
-          finalUnitarioSinPercepcionesCentavos({
-            netoUnitario: Number(l.netoUnitario),
-            internoUnitario: Number(l.internoUnitario ?? 0),
-            receta,
-          })
-        );
-        const veredicto = deducirUnidad({
-          costoAnteriorFinal: Number(prod.precio_costo ?? 0),
-          precioFacturaFinal: precioFinal,
-          factorPack: prod.factor_pack,
-        });
-        unidadInfo = {
-          ...veredicto,
-          precioFinal,
-          // Las dos lecturas CON SUS NÚMEROS. Elegir entre dos resultados es
-          // fácil; entre dos etiquetas abstractas, no.
-          lecturas: lecturasPosibles({
-            cantidad: Number(l.cantidad),
-            precioFinal,
-            factorPack: prod.factor_pack,
-          }),
-          explicacion: explicarVeredicto({
-            veredicto,
-            cantidad: Number(l.cantidad),
-            precioFinal,
-            factorPack: prod.factor_pack,
-          }),
-        };
-      }
+      const analisis = analizarPrecioDeLinea({
+        linea: l,
+        producto: prod,
+        receta,
+        proveedor: comprobante.proveedor,
+      });
 
       return {
         ...l,
+        vinculoDesdeLaFila: desdeVinculo,
         // Lo que vinculó solo se distingue de lo sugerido POR DATO, no por
         // color: la pantalla no tiene que deducirlo del origen.
         vinculadaSola: !!busqueda?.vinculoAutomatico,
@@ -203,7 +199,18 @@ export async function GET(req, { params }) {
           nombre: c.nombre ?? nombrePorBase.get(c.productoBaseId) ?? null,
         })),
         sugerido: busqueda?.vinculoAutomatico ?? null,
-        unidad: unidadInfo,
+        unidad: analisis?.unidad ?? null,
+        // La decisión de precio viaja junto a la línea: es lo que dibuja el
+        // aviso y lo que habilita el botón. El servidor la vuelve a calcular
+        // al aceptar, así que esto es para mostrar, no para confiar.
+        precio: analisis
+          ? {
+              precioFinal: analisis.precioFinal,
+              costoAnterior: analisis.costoAnterior,
+              precioAEscribir: analisis.precioAEscribir,
+              decision: analisis.decision,
+            }
+          : null,
         pedidoDetalle: delPedido.detalle,
         motivoPedido: delPedido.motivo,
         textoMotivoPedido: delPedido.motivo ? TEXTO_MOTIVO_PEDIDO[delPedido.motivo] : null,
@@ -243,6 +250,9 @@ export async function GET(req, { params }) {
         esperandoDecision: lineas.filter((l) => l.requiereDecision).length,
         sinCandidatos: lineas.filter((l) => l.origen === "SIN_CANDIDATOS").length,
         unidadSinResolver: lineas.filter((l) => l.unidad?.requiereDecision).length,
+        // Precios que esperan un sí o un no. Los que solo se informan —las
+        // bajas— no entran: no hay nada que decidir ahí.
+        precioEsperando: lineas.filter((l) => l.precio?.decision?.ofreceAceptar).length,
       },
     });
   } catch (err) {
