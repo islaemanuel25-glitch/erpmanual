@@ -40,6 +40,7 @@ import { useSunmiTheme } from "./SunmiThemeProvider";
 import SunmiTableRow from "./SunmiTableRow";
 import SunmiTableEmpty from "./SunmiTableEmpty";
 import { celdasDelPie } from "@/lib/sunmi/pieDeTabla";
+import { paddingQueSobrevive } from "@/lib/sunmi/claseNegociada";
 
 /** El padding de cada densidad. "normal" es exactamente el de siempre. */
 const DENSIDAD = {
@@ -113,7 +114,7 @@ export default function SunmiTable({
   onClickFila,
   filaSeleccionada,
   /**
-   * La fila de totales al pie: `{ etiqueta, valores, alineacion }`.
+   * La fila de totales al pie: `{ etiqueta, valores, alineacion, padding }`.
    *
    * `valores` dice qué número va en qué columna, POR LA CLAVE DE LA COLUMNA, y
    * el span de la etiqueta se calcula solo. Nunca se pasa un `colSpan`: el
@@ -181,7 +182,11 @@ export default function SunmiTable({
             {columnas.map((c) => (
               <td
                 key={c.clave}
-                className={`${d.td} ${ALINEACION[c.align] ?? ALINEACION.izq} ${c.tdClassName || ""}`.trim()}
+                // LA DENSIDAD CEDE POR EJE. Si la columna declara su padding, el
+                // de la densidad NO se pone: nunca quedan los dos peleando. Sin
+                // esto, migrar una tabla cualquiera le cambia el padding a dos de
+                // cada tres celdas — está medido en `claseNegociada.js`.
+                className={`${paddingQueSobrevive(d.td, c.tdClassName)} ${ALINEACION[c.align] ?? ALINEACION.izq} ${c.tdClassName || ""}`.trim()}
                 title={c.title ? c.title(fila) : undefined}
               >
                 {c.render ? c.render(fila) : (fila?.[c.clave] ?? "—")}
@@ -217,19 +222,23 @@ export default function SunmiTable({
   const pieDibujado = () => {
     if (!cuerpoPropio || !pie) return null;
     const { span, celdas } = celdasDelPie(columnas, pie.valores);
+    // Las tres filas de totales que existen hoy tienen un padding propio, más
+    // alto que el de sus filas de datos —`px-3 py-2` en dos de ellas—. Se declara
+    // una vez para el pie entero, y la densidad cede por eje como en el cuerpo.
+    const padPie = paddingQueSobrevive(d.td, pie.padding);
     return (
       <tfoot>
         <tr className="border-t sunmi-divider">
           {span > 0 ? (
             <td
               colSpan={span}
-              className={`${d.td} ${ALINEACION[pie.alineacion] ?? ALINEACION.der} font-semibold sunmi-text-strong`}
+              className={`${padPie} ${pie.padding || ""} ${ALINEACION[pie.alineacion] ?? ALINEACION.der} font-semibold sunmi-text-strong`.trim()}
             >
               {pie.etiqueta}
             </td>
           ) : null}
           {celdas.map((c) => (
-            <td key={c.clave} className={`${d.td} ${ALINEACION[c.align] ?? ALINEACION.izq}`.trim()}>
+            <td key={c.clave} className={`${padPie} ${pie.padding || ""} ${ALINEACION[c.align] ?? ALINEACION.izq}`.trim()}>
               {c.valor}
             </td>
           ))}
