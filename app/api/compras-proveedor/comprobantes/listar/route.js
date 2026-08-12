@@ -14,6 +14,11 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { resumenDeLista } from "@/lib/compras-proveedor/comprobante/pantalla";
 import { coberturaDelPedido, textoDeCobertura } from "@/lib/compras-proveedor/comprobante/cobertura";
+import { armarCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
+import { cuotaDelDia, horaLocalDeReposicion } from "@/lib/compras-proveedor/comprobante/lector/cuota";
+// El índice registra los lectores al importarse. Sin esto la cadena diría que no
+// hay ninguno y el contador no sabría contra qué modelos contar.
+import "@/lib/compras-proveedor/comprobante/lector/index.js";
 
 export async function GET(req) {
   try {
@@ -120,11 +125,44 @@ export async function GET(req) {
       cobertura = { ...c, ...textoDeCobertura(c, { comprobantesSinLeer: sinLeer }) };
     }
 
+    // ── CUÁNTAS LECTURAS QUEDAN HOY ──────────────────────────────────────
+    //
+    // Se calcula sin llamar a nadie: sale de contar las llamadas registradas.
+    // Enterarse de que no quedan con el camión del proveedor en la puerta es el
+    // peor momento posible.
+    //
+    // La ventana se pide un poco más ancha que el día —48 horas— y el recorte
+    // fino lo hace `cuotaDelDia` con el huso del proveedor. Traer justo desde el
+    // corte obligaría a calcular el corte dos veces, acá y allá, y esas dos
+    // cuentas divergen el día que alguien toque una sola.
+    let cuota = null;
+    try {
+      const cadena = armarCadena();
+      const modelos = [cadena.titular?.lector?.nombre, cadena.respaldo?.lector?.nombre].filter(Boolean);
+      if (modelos.length) {
+        const llamadas = await prisma.llamadaLector.findMany({
+          where: { creadoEn: { gte: new Date(Date.now() - 48 * 3600 * 1000) } },
+          select: { modelo: true, creadoEn: true, ok: true, motivo: true },
+        });
+        const c = cuotaDelDia({ llamadas, modelos, huso: process.env.COMPROBANTE_CUOTA_HUSO || undefined });
+        cuota = {
+          ...c,
+          // La hora local del corte va SIEMPRE que se muestre el número: un
+          // "quedan 3" sin decir hasta cuándo obliga a adivinar.
+          reponeALas: horaLocalDeReposicion(new Date(), c.huso),
+        };
+      }
+    } catch (e) {
+      // Sin contador la pantalla funciona igual: es información, no operación.
+      console.error("No se pudo calcular la cuota:", e?.message);
+    }
+
     return NextResponse.json({
       ok: true,
       items: conFotos,
       resumen: resumenDeLista(items),
       cobertura,
+      cuota,
     });
   } catch (err) {
     console.error("Error compras-proveedor/comprobantes/listar:", err);

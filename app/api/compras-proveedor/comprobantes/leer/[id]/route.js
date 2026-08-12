@@ -153,6 +153,32 @@ export async function POST(req, { params }) {
       proveedorNombre: comprobante.proveedor?.nombre ?? null,
     });
 
+    // ── CADA LLAMADA QUEDA REGISTRADA, HAYA SALIDO BIEN O MAL ────────────
+    //
+    // La cadena informa cuántas hubo: pasar al respaldo son DOS, y la del
+    // titular gastó cuota aunque haya devuelto 429. De acá sale el número de
+    // lecturas que quedan en el día, y contar solo las que salieron bien lo
+    // mostraría más alto de lo que es.
+    //
+    // Best-effort: si esto falla, la lectura NO se pierde. Es un contador, no
+    // un dato del comprobante, y hacerlo bloqueante convertiría un problema de
+    // estadística en un problema de operación.
+    try {
+      const intentos = Array.isArray(resultado.intentos) ? resultado.intentos : [];
+      if (intentos.length) {
+        await prisma.llamadaLector.createMany({
+          data: intentos.map((i) => ({
+            modelo: i.lector,
+            ok: i.ok === true,
+            motivo: i.ok ? null : i.motivo ?? null,
+            comprobanteId: comprobante.id,
+          })),
+        });
+      }
+    } catch (e) {
+      console.error("No se pudo registrar la llamada al lector:", e?.message);
+    }
+
     if (!resultado.ok) {
       // Acá SÍ se cuenta el intento: hubo una lectura y salió mal. Se suma, no se
       // pisa, para que se vea que hubo que insistir.

@@ -2949,3 +2949,34 @@ model ComprobanteLinea {
   @@index([productoLocalId])
   @@index([pedidoDetalleId])
 }
+
+/// Una fila por LLAMADA al modelo de lectura, haya salido bien o mal.
+///
+/// Existe para poder decir cuántas lecturas quedan en el día sin llamar a nadie.
+/// No se puede deducir de `ComprobanteProveedor`: una lectura que falló gasta
+/// cuota igual —el 429 se cuenta contra el tope— y un comprobante releído gastó
+/// dos llamadas y tiene una sola fila. Contar comprobantes mostraría más
+/// disponibles de las que hay, que es justo el número que no se puede equivocar.
+///
+/// Y sirve para una segunda cosa: la hora exacta a la que el proveedor repone la
+/// cuota no se puede averiguar desde acá sin esperar a que ocurra. Con esta
+/// tabla sale sola — la primera llamada que sale bien después de una racha de
+/// CUOTA_AGOTADA marca el momento.
+model LlamadaLector {
+  id     Int     @id @default(autoincrement())
+  /// El nombre del modelo, tal como se guarda en `modeloLectura`. La cuota es
+  /// POR MODELO, así que sin esto no se puede contar.
+  modelo String
+  ok     Boolean
+  /// El código de MOTIVO_LECTURA cuando falló. Texto y no enum: los motivos los
+  /// define el contrato del lector y no queremos una migración por cada uno.
+  motivo String?
+  /// Contra qué comprobante fue, cuando lo hubo. Nullable porque la cuota es del
+  /// proyecto entero y una llamada vale igual sin comprobante detrás.
+  comprobanteId Int?
+
+  creadoEn DateTime @default(now())
+
+  /// Se consulta siempre igual: las de las últimas horas, por modelo.
+  @@index([creadoEn, modelo])
+}

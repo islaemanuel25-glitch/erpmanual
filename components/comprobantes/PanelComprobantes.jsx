@@ -99,6 +99,7 @@ async function mensajeDeRespuesta(r) {
 export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir = true }) {
   const [items, setItems] = useState([]);
   const [cobertura, setCobertura] = useState(null);
+  const [cuota, setCuota] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [subiendo, setSubiendo] = useState(false);
   const [leyendo, setLeyendo] = useState(null);
@@ -123,6 +124,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
       if (d.ok) {
         setItems(d.items || []);
         setCobertura(d.cobertura ?? null);
+        setCuota(d.cuota ?? null);
       } else setMensaje({ tipo: "error", texto: d.error });
     } finally {
       setCargando(false);
@@ -305,6 +307,23 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
               {" "}Además vinieron {cobertura.deMas} que no estaban pedidos.
             </span>
           )}
+        </p>
+      )}
+
+      {/* CUÁNTAS LECTURAS QUEDAN HOY.
+          Solo cuando quedan pocas: un aviso permanente deja de leerse, y el
+          umbral no se decide acá sino en cuota.js, que es donde está el motivo.
+          Va SIEMPRE con la hora del corte: un "quedan 3" sin decir hasta cuándo
+          obliga a adivinar, y la medianoche que importa no es la de acá. */}
+      {cuota?.mostrar && (
+        <p className={`mb-3 text-sm2 ${cuota.quedan === 0 ? "sunmi-text-danger" : "sunmi-text-warning"}`}>
+          {cuota.quedan === 0
+            ? "No quedan lecturas automáticas por hoy."
+            : `Quedan ${cuota.quedan} ${cuota.quedan === 1 ? "lectura automática" : "lecturas automáticas"} por hoy.`}{" "}
+          <span className="sunmi-text-muted">
+            Se reponen a las {cuota.reponeALas}. Los comprobantes se pueden subir igual y leerlos
+            después, o cargarlos a mano.
+          </span>
         </p>
       )}
 
