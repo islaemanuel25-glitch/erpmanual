@@ -18,6 +18,33 @@ lado: un vínculo viejo metía productos ajenos en la conciliación. Una búsque
 "parecida" en otra pantalla habría sugerido productos que el motor no considera
 del proveedor, y nadie se habría enterado hasta ver un costo mal aplicado.
 
+Corolario para el kit: **si una pantalla necesita algo que el kit no tiene, se
+agrega al kit, nunca a la pantalla.** Y la pieza que se agrega sale de una
+pantalla que HOY funciona, tal cual está — nunca escrita adivinando casos
+futuros.
+
+*Por qué:* las dos que se escribieron adivinando sirven para menos casos de los
+que hay. `SunmiModalLayout` solo sabe centrar, y hay dos pantallas que por eso no
+lo pueden usar. `SunmiButtonIcon` trae `text-amber-300`, `text-red-400` y
+`text-slate-400` fijos adentro y no acepta `title` ni `aria-label`: usarlo
+empeoraría productos. Una pieza que sirve para menos casos de los que hay no es
+media pieza, es una pieza que no se puede usar.
+
+Y la prueba de que salió bien no es que compile: **la pantalla de donde se sacó
+tiene que quedar IDÉNTICA**, comparada píxel a píxel y no a ojo. Si aparece una
+diferencia, la pieza está mal, no la pantalla. Sacar el par de dos renglones de
+`TablaCatalogo` movió 44 píxeles a 1366 por juntar dos hijos de JSX en una sola
+cadena: el navegador moldea cada nodo de texto por separado y el interletraje del
+límite se calcula distinto. Se vio comparando las capturas, después de comprobar
+que dos corridas de la misma versión dan cero y que por lo tanto no era ruido.
+
+Corolario de cómo nace una pieza: **negocia el `className`, no lo concatena.**
+Dos clases de Tailwind de la misma familia tienen la misma especificidad, así que
+no decide el orden dentro del atributo sino el de la hoja de estilos — poner las
+dos es dejar que gane cualquiera. Hoy 16 de los 19 componentes del kit concatenan
+y por eso un ancho escrito en la pantalla no se aplica; `SunmiInput` es el único
+que lo hace bien, y el porqué está en `lib/sunmi/claseAncho.js`.
+
 Corolario: el default de un valor se define UNA vez. Buscar el rango de aumento
 esperado dio cinco lugares distintos, tres de ellos con `?? 10` y `?? 20` escritos
 a mano. Cambiar la constante no los habría tocado.

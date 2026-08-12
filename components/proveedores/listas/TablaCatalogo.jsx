@@ -21,6 +21,7 @@ import { useCallback, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import SunmiPar from "@/components/sunmi/SunmiPar";
 import { money, fechaHora } from "@/lib/proveedores/listas/presentacion";
 import { GRUPO_PRODUCTO, TEXTO_GRUPO, TONO_GRUPO } from "@/lib/proveedores/listas/gruposProducto";
 
@@ -67,20 +68,23 @@ export default function TablaCatalogo({
       {
         clave: "producto",
         titulo: "Producto",
+        // Lo del archivo va en el renglón de abajo y no en una columna propia:
+        // solo tiene sentido al lado de a qué producto corresponde.
         render: (p) => (
-          <>
-            <div className="truncate max-w-[9rem] md:max-w-[22rem] sunmi-text-strong font-medium" title={p.nombre}>
-              {p.nombre}
-            </div>
-            {/* Lo del archivo va acá abajo y no en una columna propia: solo tiene
-                sentido al lado de a qué producto corresponde. */}
-            {p.filas?.[0]?.descripcionProveedor ? (
-              <div className="text-[9.5px] sunmi-text-muted truncate max-w-[9rem] md:max-w-[22rem]">
-                {p.filas[0].descripcionProveedor}
-                {p.filas.length > 1 ? ` · ${p.filas.length} filas` : ""}
-              </div>
-            ) : null}
-          </>
+          <SunmiPar
+            className="truncate max-w-[9rem] md:max-w-[22rem] sunmi-text-strong font-medium"
+            title={p.nombre}
+            arriba={p.nombre}
+            classNameAbajo="text-[9.5px] sunmi-text-muted truncate max-w-[9rem] md:max-w-[22rem]"
+            abajo={
+              p.filas?.[0]?.descripcionProveedor ? (
+                <>
+                  {p.filas[0].descripcionProveedor}
+                  {p.filas.length > 1 ? ` · ${p.filas.length} filas` : ""}
+                </>
+              ) : null
+            }
+          />
         ),
       },
       {
@@ -95,16 +99,20 @@ export default function TablaCatalogo({
           const activos = (p.codigosProveedor ?? []).filter((c) => c.activo);
           const bajas = (p.codigosProveedor ?? []).filter((c) => !c.activo);
           return (
-            <>
-              <div className="sunmi-text-strong">
-                {activos.length ? activos.map((c) => c.codigo).join(" / ") : "—"}
-              </div>
-              {bajas.length ? (
-                <div className="text-[9.5px] sunmi-text-muted">
-                  {bajas.map((c) => c.codigo).join(" / ")} dado de baja
-                </div>
-              ) : null}
-            </>
+            <SunmiPar
+              className="sunmi-text-strong"
+              arriba={activos.length ? activos.map((c) => c.codigo).join(" / ") : "—"}
+              classNameAbajo="text-[9.5px] sunmi-text-muted"
+              // LOS HIJOS QUEDAN COMO ESTABAN, no juntados en una cadena.
+              //
+              // Se midió: pasarlo como `${codigos} dado de baja` cambió 44
+              // píxeles de la captura a 1366. El navegador moldea CADA NODO DE
+              // TEXTO por separado, así que dos nodos pegados no dan lo mismo
+              // que uno solo — el interletraje del límite se calcula distinto.
+              // Dos corridas de la misma versión dan cero, o sea que no era
+              // ruido de la captura.
+              abajo={bajas.length ? <>{bajas.map((c) => c.codigo).join(" / ")} dado de baja</> : null}
+            />
           );
         },
       },
@@ -114,10 +122,11 @@ export default function TablaCatalogo({
         align: "der",
         tdClassName: "tabular-nums",
         render: (p) => (
-          <>
-            <div>{money(p.costoActual)}</div>
-            <div className="text-[9.5px] sunmi-text-muted">{fechaHora(p.actualizadoEn)}</div>
-          </>
+          <SunmiPar
+            arriba={money(p.costoActual)}
+            classNameAbajo="text-[9.5px] sunmi-text-muted"
+            abajo={fechaHora(p.actualizadoEn)}
+          />
         ),
       },
       {
@@ -128,10 +137,12 @@ export default function TablaCatalogo({
         render: (p) => {
           const e = estadoDe(p);
           return (
-            <>
-              <div className="font-semibold">{e.texto}</div>
-              {e.detalle ? <div className="text-[9.5px] sunmi-text-muted">{e.detalle}</div> : null}
-            </>
+            <SunmiPar
+              className="font-semibold"
+              arriba={e.texto}
+              classNameAbajo="text-[9.5px] sunmi-text-muted"
+              abajo={e.detalle}
+            />
           );
         },
       },
