@@ -63,7 +63,17 @@ export async function GET(req, { params }) {
       orderBy: { id: "asc" },
       select: {
         id: true, cantidad: true, precioCosto: true, cantidadRecibida: true, unidad: true,
-        producto: { select: { id: true, baseId: true, base: { select: { id: true, nombre: true } } } },
+        kgRecibidos: true,
+        // `modoCompraProveedor` es lo que decide si la línea es fiambre, y de eso
+        // depende que aparezca la columna de kilos. El fiambre entra por PIEZA en
+        // el depósito y se mide en KILOS en los locales: si esa columna
+        // desapareciera, alguien recibiría fiambre sin poder cargar el peso.
+        producto: {
+          select: {
+            id: true, baseId: true,
+            base: { select: { id: true, nombre: true, modoCompraProveedor: true } },
+          },
+        },
       },
     });
     const detallesPlanos = aplanarDetalles(detalles);
