@@ -49,7 +49,9 @@ import {
   estadoDeLaFila,
   origenDelCandidato,
   numerosDeLaFila,
+  importe,
   formaDeLaFila,
+  textoDePendiente,
 } from "@/lib/compras-proveedor/comprobante/textosDeFila";
 import {
   Unidad,
@@ -351,13 +353,15 @@ function GrupoComprobante({
   aceptando, decididas, setDecididas, onVincular, onAceptar,
   angosto,
 }) {
-  // Qué filas arrancan abiertas lo decide `formaDeLaFila`, no este componente:
-  // abiertas las que piden algo, cerradas las resueltas.
-  const [abiertas, setAbiertas] = useState(() => {
-    const s = new Set();
-    for (const f of g.filas) if (formaDeLaFila(f).abierta) s.add(f.lineaId);
-    return s;
-  });
+  // TODAS ARRANCAN CERRADAS.
+  //
+  // La regla anterior —abierta la que pide algo— parecía buena y en la primera
+  // factura real abrió las 21: con ninguna vinculada todavía, todas piden algo.
+  // Volvía el scroll infinito que la tabla vino a sacar.
+  //
+  // Lo que dice cuáles piden algo es la columna "Falta", que se lee de arriba
+  // abajo sin abrir nada. Abrir es elegir cuál resolver.
+  const [abiertas, setAbiertas] = useState(() => new Set());
   const alternar = (f) =>
     setAbiertas((prev) => {
       const s = new Set(prev);
@@ -388,45 +392,67 @@ function GrupoComprobante({
       // se va de ancho. Medido en 360 con los nombres reales: salía 376 y
       // aparecía scroll lateral, que es peor que una columna menos.
       tdClassName: "w-full max-w-0",
+      // DOS RENGLONES, como en la grilla de listas: arriba el producto del ERP,
+      // abajo lo que dice el papel. Con un solo renglón, seis Chesterfield
+      // distintos quedaban todos en "CHESTER…" y no se podían distinguir.
+      //
+      // El de abajo va en 9.5px, el mismo tamaño que usa listas para el texto
+      // del archivo: es contexto, no el dato principal.
+      //
+      // `title` en los dos: el nombre completo se puede ver sin abrir la fila.
       render: (f) => {
         const e = estadoDeLaFila(f);
         const vinculada = e.codigo !== "SIN_VINCULAR";
         return (
-          <span className={`block truncate ${vinculada ? "sunmi-text-strong" : "sunmi-text-muted"}`}>
-            {vinculada ? f.producto ?? "Sin nombre" : f.textoCrudo}
-          </span>
+          <>
+            <div
+              className={`truncate font-medium ${vinculada ? "sunmi-text-strong" : "sunmi-text-warning"}`}
+              title={vinculada ? f.producto ?? "" : "Sin vincular"}
+            >
+              {vinculada ? f.producto ?? "Sin nombre" : "Sin vincular"}
+            </div>
+            <div className="text-xs2 sunmi-text-muted truncate" title={f.textoCrudo ?? ""}>
+              {f.textoCrudo}
+            </div>
+          </>
         );
       },
     },
-    // A 360 el precio se cae y quedan producto, cantidad y estado: el precio se
+    // A 360 el precio se cae y quedan producto, cantidad y "Falta": el precio se
     // ve al desplegar. Medido, no supuesto — con las tres columnas y el precio
-    // adentro, la tabla no entra y aparece scroll lateral.
+    // adentro, el nombre del producto se corta y seis Chesterfield distintos
+    // quedan iguales, que es la única cosa que esta lista tiene que dejar ver.
     ...(angosto
       ? []
       : [{
-          clave: "factura",
-          titulo: "Factura",
+          clave: "precio",
+          titulo: "Precio",
           align: "der",
           tdClassName: "tabular-nums whitespace-nowrap",
-          render: (f) => {
-            const n = numerosDeLaFila(f).partes.find((x) => x.clave === "factura");
-            return n ? n.valor : "";
-          },
+          // SOLO EL PRECIO, no "cantidad × precio": la cantidad ya tiene su
+          // columna al lado y decirla dos veces en la misma fila es lo que este
+          // módulo vino a sacar. Vacío cuando todavía no hay producto, porque
+          // el precio a escribir depende de con qué se compare.
+          render: (f) => importe(f.costoFactura) ?? "",
         }]),
     {
       clave: "cantidad",
       titulo: "Cant.",
       align: "der",
+      thClassName: "w-12",
       tdClassName: "tabular-nums",
       render: (f) => cant(f.cantidad),
     },
     {
-      clave: "estado",
-      titulo: "Estado",
+      clave: "pendiente",
+      titulo: "Falta",
       align: "der",
+      thClassName: "w-16",
+      // QUÉ FALTA, no cómo está: la columna de producto ya dice "Sin vincular"
+      // cuando no hay producto. Es la misma división que en la grilla de listas.
       render: (f) => {
-        const e = estadoDeLaFila(f);
-        return <span className={`whitespace-nowrap ${e.tono}`}>{e.palabra}</span>;
+        const t = textoDePendiente(f);
+        return <span className={`whitespace-nowrap ${t.tono}`}>{t.texto}</span>;
       },
     },
   ];
@@ -443,7 +469,8 @@ function GrupoComprobante({
           vacio="Este comprobante no tiene líneas leídas."
           onClickFila={alternar}
           filaSeleccionada={(f) => abiertas.has(f.lineaId)}
-          tonoFila={(f) => (formaDeLaFila(f).abierta ? "atencion" : null)}
+          // El tono adelanta cuáles piden algo, sin abrir ninguna.
+          tonoFila={(f) => (formaDeLaFila(f).pide ? "atencion" : null)}
           // Devolver null es "esta fila está cerrada": el estado de apertura vive
           // acá, que es donde vive el dato.
           filaExpandible={(f) =>
@@ -498,7 +525,10 @@ function DetalleFila({
   const origen = origenDelCandidato(f.origen);
 
   return (
-    <div className="flex flex-col gap-1 py-1">
+    // El detalle cuelga en un `td` con `p-0`, así que sin esto queda pegado al
+    // borde y el último botón parece de la fila de abajo. La barra a la
+    // izquierda y el fondo lo atan visualmente a su fila.
+    <div className="flex flex-col gap-1 border-l-2 sunmi-border sunmi-surface px-2 py-1.5 ml-6">
       {/* EL TEXTO DEL PAPEL. En una fila vinculada es lo único que deja ver que
           el vínculo es correcto, así que no falta nunca. */}
       {f.textoCrudo && (
@@ -565,21 +595,29 @@ function DetalleFila({
         />
       )}
 
-      {/* LA SUGERENCIA, EN UN RENGLÓN, con el resto detrás de "Otro…". */}
+      {/* LA SUGERENCIA: la pregunta arriba, los botones juntos abajo.
+          En una línea sola con `flex-wrap`, "Sí" quedaba colgando del final de
+          la pregunta y "Otro…" caía solo al renglón siguiente, pegado al borde
+          izquierdo: se leía como un botón suelto de la pantalla y no como la
+          otra mitad de la misma decisión. */}
       {puedeRecibir && !vinculada && (
         <div>
           {primero ? (
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="text-sm2 sunmi-text-strong min-w-0 truncate">¿Es «{primero.nombre}»?</span>
-              {origen && <span className={`text-sm2 ${origen.tono}`}>{origen.texto}</span>}
-              <SunmiButton color="cyan" type="button" onClick={() => onVincular(f.lineaId, primero.productoBaseId)}>
-                Sí
-              </SunmiButton>
-              {candidatos.length > 1 && (
-                <SunmiButton color="slate" type="button" onClick={() => setVerOtros((v) => !v)}>
-                  {verOtros ? "Cerrar" : "Otro…"}
+            <div className="flex flex-col gap-1">
+              <p className="text-sm2 leading-snug">
+                <span className="sunmi-text-strong">¿Es «{primero.nombre}»?</span>
+                {origen && <span className={`ml-1 ${origen.tono}`}>{origen.texto}</span>}
+              </p>
+              <div className="flex items-center gap-1">
+                <SunmiButton color="cyan" type="button" onClick={() => onVincular(f.lineaId, primero.productoBaseId)}>
+                  Sí
                 </SunmiButton>
-              )}
+                {candidatos.length > 1 && (
+                  <SunmiButton color="slate" type="button" onClick={() => setVerOtros((v) => !v)}>
+                    {verOtros ? "Cerrar" : "Otro…"}
+                  </SunmiButton>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-1">
