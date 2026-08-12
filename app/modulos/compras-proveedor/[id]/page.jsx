@@ -13,6 +13,7 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
+import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import { useUser } from "@/app/context/UserContext";
@@ -651,6 +652,15 @@ export default function DetallePedidoProveedorPage({ params }) {
             )}
           </div>
 
+          {/* ── LA TABLA VIEJA QUEDA SOLO PARA EL BORRADOR ──────────────────
+              En borrador no hay nada que conciliar: hay un pedido que se está
+              armando, y esta tabla es donde se editan cantidades, unidad y costo,
+              y donde se borra una línea. Una lista de conciliación ahí mostraría
+              un cruce contra nada.
+
+              En recepción y en recibido va la lista única, abajo. */}
+          {esBorrador && (
+            <>
           {/* DESKTOP: tabla */}
           <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
             <SunmiTable
@@ -1001,6 +1011,38 @@ export default function DetallePedidoProveedorPage({ params }) {
               </div>
             )}
           </div>
+            </>
+          )}
+
+          {/* ── LA LISTA ÚNICA ────────────────────────────────────────────────
+              Cada línea de la factura con lo que le corresponde del pedido al
+              lado, agrupada por comprobante, y las del pedido que ningún
+              comprobante trajo aparte y al final. Reemplaza a las DOS listas que
+              había —las líneas de la factura arriba y el detalle del pedido
+              abajo— que obligaban a cruzarlas de memoria.
+
+              OJO CON EL NOMBRE: `esRecepcion` es el estado ENVIADO. Es
+              justamente el estado en el que se suben y se leen las facturas, así
+              que la conciliación SÍ está disponible ahí. El nombre engaña y ya
+              hizo dudar una vez si faltaba un estado; no falta.
+
+              El estado de lo recibido y su guardado siguen viviendo en esta
+              página: la lista solo dibuja los campos. Cambiar cómo se ve y cómo
+              se guarda en la misma tanda junta dos fuentes de error en la misma
+              ventana. */}
+          {(esRecepcion || pedido.estado === "RECIBIDO") && (
+            <ListaConciliacion
+              pedidoId={pedido.id}
+              estadoPedido={pedido.estado}
+              esRecepcion={esRecepcion}
+              puedeRecibir={esRecepcion}
+              recibidos={recibidos}
+              setRecibidos={setRecibidos}
+              kgRecibidos={kgRecibidos}
+              setKgRecibidos={setKgRecibidos}
+              onCambio={cargar}
+            />
+          )}
         </SunmiPanel>
 
         {/* Agregar productos al pedido — visible en BORRADOR y ENVIADO */}

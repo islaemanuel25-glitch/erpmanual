@@ -37,6 +37,32 @@ function recordLoginAttempt(ip) {
     return;
   }
   entry.count += 1;
+  // LA VENTANA CORRE DESDE EL ÚLTIMO INTENTO, no desde el primero.
+  //
+  // Arrancaba en el primero, así que quedar bloqueado en el intento 10
+  // significaba esperar lo que restara de esos 15 minutos — con la persona
+  // reintentando, que era lo único que podía hacer. Ahora cada intento corre el
+  // reloj: quien deja de insistir se destraba en 15 minutos exactos, y quien
+  // insiste no acorta su espera, que es justamente el desincentivo que un
+  // límite de intentos tiene que dar.
+  entry.resetAt = now + LOGIN_RATE_WINDOW_MS;
+}
+
+/**
+ * Un login que salió BIEN no gasta cupo.
+ *
+ * El contador se llevaba todos los intentos, aciertos incluidos, y se sumaba
+ * antes de validar nada. Diez entradas normales en 15 minutos —cambiar de
+ * ubicación, cerrar y volver, dos personas en el mismo local— dejaban a la IP
+ * bloqueada sin que nadie se hubiera equivocado nunca.
+ *
+ * Un límite de intentos existe para frenar a quien PRUEBA CONTRASEÑAS. El que
+ * entra bien no es ese.
+ */
+function perdonarIntento(ip) {
+  const entry = loginAttempts.get(ip);
+  if (!entry) return;
+  entry.count = Math.max(0, entry.count - 1);
 }
 
 export async function POST(req) {
@@ -145,6 +171,9 @@ export async function POST(req) {
     // ============================
     // 6) Respuesta + cookie
     // ============================
+    // Entró bien: el intento no cuenta contra el límite.
+    perdonarIntento(ip);
+
     const res = NextResponse.json({ ok: true, user: payload }, { status: 200 });
 
     res.cookies.set(SesionCookie.nombre, token, SesionCookie.opciones);

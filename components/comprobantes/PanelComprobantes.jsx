@@ -8,6 +8,15 @@
 // nueva. La conciliación contra el pedido —vincular cada línea a un producto—
 // viene después y va en la tabla de arriba.
 //
+// ── ACÁ YA NO SE VEN LAS LÍNEAS ────────────────────────────────────────────
+//
+// Este panel administra los comprobantes: subir, leer, unir y borrar. Las líneas
+// leídas y su conciliación contra el pedido viven en la LISTA ÚNICA de abajo,
+// que es una sola y agrupada por comprobante.
+//
+// Antes se desplegaban acá, y el detalle del pedido estaba en otra tabla más
+// abajo: había que ir de una a la otra y cruzarlas de memoria.
+//
 // ── LO QUE ESTA PANTALLA TIENE QUE DEJAR CLARO ─────────────────────────────
 //
 // Que "no se pudo leer bien" y "el papel no cierra" son cosas distintas, CON
@@ -24,7 +33,6 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import LineasComprobante from "@/components/comprobantes/LineasComprobante";
 
 import {
   debePreguntarPorAgrupar,
@@ -107,7 +115,6 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
   const [mensaje, setMensaje] = useState(null);
   const [pregunta, setPregunta] = useState(null); // { archivos, opciones, candidatos }
   const [seleccion, setSeleccion] = useState([]);
-  const [abierto, setAbierto] = useState(null); // qué comprobante muestra sus líneas
   const [borrando, setBorrando] = useState(null); // el comprobante que se está por borrar
   const [trabajandoBorrar, setTrabajandoBorrar] = useState(false);
   const inputRef = useRef(null);
@@ -262,8 +269,6 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
       const d = await r.json().catch(() => ({}));
       setMensaje({ tipo: d?.ok ? "ok" : "error", texto: d?.queHacer || d?.error });
       setBorrando(null);
-      // Si estaba abierto mostrando sus líneas, se cierra: ya no existe.
-      if (abierto === c.id) setAbierto(null);
       setSeleccion((s) => s.filter((x) => x !== c.id));
       await recargar();
     } catch {
@@ -327,20 +332,10 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
           con varias facturas. Y NO se dibuja como aviso mientras falten
           comprobantes por leer — un cartel que siempre dice que falta algo deja
           de significar que falta algo. */}
-      {cobertura?.texto && (
-        <p
-          className={`mb-3 text-sm2 ${
-            cobertura.esAviso ? "sunmi-text-warning" : "sunmi-text-muted"
-          }`}
-        >
-          {cobertura.texto}
-          {cobertura.deMas > 0 && (
-            <span className="sunmi-text-muted">
-              {" "}Además vinieron {cobertura.deMas} que no estaban pedidos.
-            </span>
-          )}
-        </p>
-      )}
+            {/* LA COBERTURA SE DICE UNA SOLA VEZ, y va en la lista única: es donde
+          están las líneas que faltan, así que el texto y lo que describe se leen
+          juntos. Acá quedaba repetida palabra por palabra, dos paneles más
+          arriba de lo que nombra. */}
 
       {/* CUÁNTAS LECTURAS QUEDAN HOY.
           Solo cuando quedan pocas: un aviso permanente deja de leerse, y el
@@ -435,16 +430,6 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                       )}
                     </td>
                     <td className="px-3 py-1.5 align-top text-right whitespace-nowrap">
-                      {c._count?.lineas > 0 && (
-                        <SunmiButton
-                          color="slate"
-                          type="button"
-                          className="mr-1"
-                          onClick={() => setAbierto(abierto === c.id ? null : c.id)}
-                        >
-                          {abierto === c.id ? "Ocultar líneas" : "Ver líneas"}
-                        </SunmiButton>
-                      )}
                       {puedeRecibir && c.fotos > 0 && (
                         <SunmiButton
                           color="primary"
@@ -465,15 +450,6 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                 ))
               )}
             </SunmiTable>
-            {abierto && (
-              <div className="border-t sunmi-divider p-3">
-                <LineasComprobante
-                  comprobanteId={abierto}
-                  puedeVincular={puedeRecibir}
-                  onCambio={recargar}
-                />
-              </div>
-            )}
           </div>
 
           {/* ── Móvil: tarjetas ──────────────────────────────────────── */}
@@ -508,11 +484,6 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                     {c.modeloLectura ? ` · ${c.modeloLectura}` : ""}
                   </p>
                   <div className="flex gap-1">
-                    {c._count?.lineas > 0 && (
-                      <SunmiButton color="slate" type="button" onClick={() => setAbierto(abierto === c.id ? null : c.id)}>
-                        {abierto === c.id ? "Ocultar" : "Líneas"}
-                      </SunmiButton>
-                    )}
                     {puedeRecibir && c.fotos > 0 && (
                       <SunmiButton
                         color="primary"
@@ -530,9 +501,6 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
                     )}
                   </div>
                 </div>
-                {abierto === c.id && (
-                  <LineasComprobante comprobanteId={c.id} puedeVincular={puedeRecibir} onCambio={recargar} />
-                )}
               </div>
             ))}
           </div>

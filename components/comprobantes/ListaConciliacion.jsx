@@ -279,7 +279,7 @@ function CamposRecepcion({ detalleId, esFiambre, tieneFiambre, recibidos, setRec
             const n = Number(recibidos?.[detalleId]);
             if (Number.isNaN(n) || n < 0) setRecibidos?.((p) => ({ ...p, [detalleId]: 0 }));
           }}
-          className="w-[56px] text-center"
+          className="w-14 text-center"
           aria-label="Cantidad recibida"
         />
         <SunmiButton color="slate" type="button" onClick={() => paso(1)}>+</SunmiButton>
