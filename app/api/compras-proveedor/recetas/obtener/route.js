@@ -19,7 +19,13 @@ export async function GET(req) {
     if (ctx.error) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
     const { grupoId, session } = ctx;
 
-    const perm = checkPerm(session, "compras.ver");
+    // LOS DOS PERMISOS, y no solo el de mirar. La pantalla y su entrada en el menú
+    // piden `compras.recibir`, que es el que hace falta para cargar una receta.
+    // Con solo "compras.ver" acá, un rol a medida con recibir y sin ver vería la
+    // pantalla en el menú y comería un 403 en cada carga. Hoy ningún rol del
+    // sistema está así —todos los que reciben también ven—, pero el desajuste ya
+    // estaba escrito y se arregla ahora que se ve, no cuando aparezca el rol.
+    const perm = checkPerm(session, ["compras.ver", "compras.recibir"]);
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const proveedorId = Number(new URL(req.url).searchParams.get("proveedorId"));
