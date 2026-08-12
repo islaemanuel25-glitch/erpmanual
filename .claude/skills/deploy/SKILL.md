@@ -47,6 +47,58 @@ dominio `https://operix.cloud`, backups en `/srv/produccion/backups/`.
    tapó están en `lib/deploy/guardiaMigraciones.js`. Ver "Los cuatro comandos
    bloqueados" en el paso 4 antes de tocarlos.
 
+## EL TOPE DE CORTE: 30 SEGUNDOS
+
+**Si el sitio no responde 30 segundos después de recrear la app, es un incidente
+y se revierte.** No se espera a ver si levanta.
+
+Producción son cinco locales vendiendo. Un corte de segundos es el precio normal
+de un despliegue; tres minutos no lo es, y a los tres minutos ya no importa por
+qué: importa volver.
+
+Cómo se mide, arrancando el reloj INMEDIATAMENTE después del `up -d`:
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod.yml up -d --no-deps app'
+# y sin pausa:
+for i in $(seq 1 30); do
+  curl -s -m 2 -o /dev/null -w "%{http_code}" https://operix.cloud/api/version | grep -q 200 && { echo "arriba a los ${i}s"; break; }
+  sleep 1
+done
+```
+
+Si el bucle termina sin un 200, **se revierte YA**: se pone `APP_IMAGE` en la
+imagen anterior —la que quedó anotada en el paso 2, que para eso se anota— y se
+recrea. Diagnosticar viene después, con el sitio arriba.
+
+El motivo por el que esto es una regla y no un criterio: el 2026-08-12 hubo dos
+caídas de más de tres minutos durante una jornada de quince despliegues, y nadie
+estaba mirando el reloj. Está en `docs/incidents/INC-0005-caidas-por-despliegue.md`.
+
+**Y no se encadenan despliegues.** Quince en un día son quince cortes. Si hay
+varios arreglos chicos, se juntan en uno.
+
+## Qué operaciones pueden dejar el sitio abajo
+
+Estas se hacen SABIENDO lo que cuestan, no de paso, y no mientras hay gente
+vendiendo:
+
+| Operación | Por qué corta |
+|---|---|
+| `docker compose up -d --no-deps app` | Recrea el contenedor que atiende. Es el corte normal del despliegue, de segundos — salvo que el arranque se demore (ver abajo). |
+| `docker compose up` **sin** `--no-deps` | Recrea también PostgreSQL. **Prohibido**: el servicio `db` fue creado fuera de Compose y volvería a levantar sin contraseña. |
+| `docker compose down` | Baja todo. **Prohibido.** |
+| `docker exec erpazul_app node …` con trabajo pesado | Corre DENTRO del proceso que sirve la aplicación. Una ráfaga de lecturas con una foto de 6,5 MB en memoria compite con los locales por CPU y memoria, y si se cruza el límite el kernel mata el contenedor. Si hay que medir con datos reales, va en un contenedor descartable de la misma imagen: `docker compose run --rm --no-deps app …`. |
+| `pg_dump` completo | Compite por E/S con la base que atiende las ventas. Es obligatorio antes de migrar; no se corre "para chequear algo". |
+| `prisma migrate deploy` | Entre migrar y recrear, el esquema es nuevo y el código viejo. Ver "La ventana entre migrar y recrear". |
+| `docker compose pull` | Descarga cientos de MB. No corta por sí solo, pero satura la red del servidor mientras baja. |
+
+**Y una causa de corte que no se ve en la tabla: lo que corre al arrancar.**
+`instrumentation.js` se ejecuta ANTES del primer pedido. Cualquier `await` de red
+ahí adentro es tiempo de sitio caído en cada recreación, multiplicado por cada
+despliegue del día. Lo que va en ese archivo tiene que ser instantáneo o correr
+en segundo plano.
+
 ## Antes de empezar
 
 - Árbol limpio y todo commiteado. `git status` de la máquina local.
