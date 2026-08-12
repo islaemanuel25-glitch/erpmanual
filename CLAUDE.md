@@ -63,6 +63,42 @@ abrió con datos reales.** Y cuando se verifica que un cambio se aplicó, se
 comprueba el cambio —que el JSX está, que el texto salió— y no un efecto lateral
 como que el archivo pesa distinto.
 
+Corolario, y es el que apagó el candado más importante del proyecto: **un campo
+obligatorio en una salida estructurada es una orden de inventar.** Lo que puede
+faltar se pregunta aparte, con un booleano que no se pueda derivar de los otros
+datos.
+
+`total` era obligatorio en el esquema del lector. Un remito o una planilla no
+traen total, pero el campo había que llenarlo igual, así que el modelo ponía el
+valor más plausible: **la suma de las líneas**. Y la verificación aritmética
+—todo el candado del módulo— compara justamente la suma de las líneas contra el
+total. Comparaba la suma contra sí misma: cerraba siempre, con cero de
+diferencia, y el comprobante quedaba habilitado para escribir costos. **La
+verificación se apagaba sola exactamente en los papeles donde más falta hace.**
+
+Lo peligroso no es que un campo sea obligatorio, es que su valor **se pueda
+derivar de los otros**. El contraste está medido sobre el mismo papel y el mismo
+modelo: los cuatro campos de identidad —tipo, punto de venta, número, fecha— son
+obligatorios y no se derivan de nada, y volvieron en `null` las cinco veces. El
+total se deriva, y volvió con la suma exacta las tres veces.
+
+Y el arreglo tiene la forma que hay que recordar: preguntar **aparte** si el
+papel trae un total impreso. Un sí o un no no se puede calcular sumando, y por
+eso sobrevive a que el modelo tenga ganas de completar el número. La respuesta
+manda sobre el dato.
+
+Corolario del corolario: **la defensa puede estar escrita y ser inalcanzable.**
+`verificarCoherenciaDeLineas` ya salteaba las líneas sin subtotal impreso, con el
+comentario correcto al lado explicando que comparar un número calculado contra sí
+mismo no prueba nada — y `subtotalImpreso` era obligatorio, así que nunca llegaba
+vacío y esa rama no corría jamás. Lo mismo le pasó al estado `SIN_TOTAL` recién
+creado: existía, y un `return` anterior lo hacía inalcanzable. Cuando se escribe
+una defensa, hay que ejercer el caso que la activa.
+
+Y un corolario sobre los candados: **la forma del dato de prueba tiene que ser la
+forma del dato real.** Un pie con `total: 0` y un pie sin el campo no son lo
+mismo, y el candado estaba probando el que nunca ocurre.
+
 Corolario: **después de tocar `schema.prisma`, correr `prisma generate` antes de
 probar nada.** Esto no lo ve ni el build ni los candados. El proyecto es
 JavaScript, así que Next compila sin mirar los argumentos de Prisma, y los
