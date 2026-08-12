@@ -32,11 +32,20 @@ media pieza, es una pieza que no se puede usar.
 
 Y la prueba de que salió bien no es que compile: **la pantalla de donde se sacó
 tiene que quedar IDÉNTICA**, comparada píxel a píxel y no a ojo. Si aparece una
-diferencia, la pieza está mal, no la pantalla. Sacar el par de dos renglones de
-`TablaCatalogo` movió 44 píxeles a 1366 por juntar dos hijos de JSX en una sola
-cadena: el navegador moldea cada nodo de texto por separado y el interletraje del
-límite se calcula distinto. Se vio comparando las capturas, después de comprobar
-que dos corridas de la misma versión dan cero y que por lo tanto no era ruido.
+diferencia, la pieza está mal, no la pantalla.
+
+Corolario, y es del tipo que no se deduce leyendo: **juntar dos hijos de JSX en
+una sola cadena mueve píxeles.** El navegador moldea cada nodo de texto por
+separado, así que el interletraje del límite entre dos nodos pegados no se
+calcula igual que dentro de uno solo. Sacar el par de dos renglones de
+`TablaCatalogo` movió 44 píxeles a 1366 por eso, sin cambiar una sola letra del
+texto. Cuando se saca una pieza, los hijos quedan como estaban.
+
+Corolario del método, que vale más que el caso: **antes de atribuirle un
+movimiento de píxeles a un cambio, correr dos veces la MISMA versión y comprobar
+que dan cero.** Si la captura tiene ruido, cualquier diagnóstico es inventado —
+se estaría explicando una diferencia que el cambio no produjo. Acá dieron cero, y
+recién por eso los 44 píxeles se pudieron atribuir.
 
 Corolario de cómo nace una pieza: **negocia el `className`, no lo concatena.**
 Dos clases de Tailwind de la misma familia tienen la misma especificidad, así que
