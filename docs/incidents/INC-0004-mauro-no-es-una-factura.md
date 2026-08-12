@@ -1,7 +1,7 @@
 # INC-0004 — El comprobante de Mauro no es una factura, y por eso no puede cerrar
 
 **Fecha:** 2026-08-12
-**Estado:** abierto, esperando decisión de Emanuel
+**Estado:** cerrado el 2026-08-12 (`7368fa3`), con un hallazgo grave adentro
 **Alcance:** módulo de recepción por comprobante, primer intento de cierre completo
 
 ## Qué pasó
@@ -68,11 +68,49 @@ La foto está **recortada**: en el borde se lee "ECONOMICOS // EXTR…", cortado
 Puede haber otra sección de la planilla fuera del cuadro. Las 31 filas son las
 que se ven; no se puede afirmar que sean todas las del papel.
 
-## Lo que hay que decidir
+## Lo que apareció al arreglarlo, y era peor
 
-1. **Qué hace el sistema con un documento sin pie.** Hoy queda `MAL_LEIDO` para
-   siempre, que dice algo falso: la lectura está bien, lo que falta es el total.
-   Merece un estado propio, o una regla explícita de que sin total no se propone
-   nada.
-2. **Si el conteo pasa a contar solo los renglones con cantidad.** Es cambiar la
-   pregunta del prompt y volver a medir.
+Al medir el arreglo del conteo contra el mismo papel, el modelo devolvió un
+total de **3.774.700 — exactamente la suma de las 21 líneas—** sobre un papel
+que no tiene renglón de total, comprobado recortando el borde de la foto. Tres
+corridas seguidas, las tres cerrando con diferencia cero y estado `CARGADO`.
+
+La causa estaba en el esquema de salida: `total` y `neto` eran **campos
+obligatorios**. Obligado a poner un número donde no hay ninguno, el modelo pone
+el más plausible, y el más plausible es la suma. Con eso la verificación compara
+la suma contra sí misma: **cierra siempre**. El candado central del módulo
+quedaba desactivado justo en los papeles donde más falta hace, y el comprobante
+salía habilitado para proponer costos.
+
+El arreglo tiene tres partes: el pie dejó de exigir `total` y `neto`; se
+pregunta aparte si el papel TIENE un renglón de total impreso —un booleano no se
+puede calcular sumando, que es la misma idea del conteo de renglones—; y el
+booleano manda sobre el número.
+
+Y hubo un segundo tropiezo, del mismo tipo: `lecturaUtilizable` exige un total y
+devolvía un solo texto sin código, así que el papel sin total salía por el
+return de "se leyó mal" **antes** de llegar a su estado nuevo. Los candados no lo
+vieron porque armaban el pie con `total: 0`, que sí pasa esa puerta; el modelo,
+sin la obligación, omite el campo entero. **La forma del dato de prueba tiene que
+ser la forma del dato real.**
+
+## Medición de cierre
+
+Tres corridas contra el mismo papel, con `7368fa3` en producción: renglones que
+dice ver **21**, transcriptas **21**, **ningún** aviso, estado **SIN_TOTAL**,
+propone costos **false**, total **omitido**, y el booleano en **false**.
+
+## Lo que se decidió y se hizo
+
+Las dos cosas, autorizadas por Emanuel el 2026-08-12:
+
+1. **Estado propio para el documento sin total** (`SIN_TOTAL`). Dice que no trae
+   total, que por eso no se puede verificar, y que no se propone ningún costo. No
+   acusa al lector, y deja abierta la otra posibilidad —que el total exista y no
+   se haya leído— porque desde los números no se distingue.
+2. **El conteo pasa a contar los renglones CON CANTIDAD.** Medido contra este
+   mismo papel: 21 contra 21, sin aviso.
+
+Queda sin resolver una sola cosa, y es de datos y no de código: **para probar el
+flujo de aceptar precios hace falta un comprobante con total impreso.** Con esta
+planilla no se puede, por diseño.
