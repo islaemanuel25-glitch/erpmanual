@@ -68,6 +68,12 @@ function estadoDeVinculo(l) {
   if (l.productoLocalId) return { etiqueta: "Vinculado", tono: "sunmi-text-success", pideAccion: false };
   if (l.vinculadaSola) return { etiqueta: "Vinculado solo", tono: "sunmi-text-success", pideAccion: false };
   if (l.origen === "SIN_CANDIDATOS") return { etiqueta: "Sin encontrar", tono: "sunmi-text-danger", pideAccion: true };
+  // DEL PEDIDO se dice distinto y no solo con otro tono: "está en tu pedido" es
+  // una afirmación mucho más fuerte que "existe en el catálogo", y quien mira
+  // apurado lee la palabra.
+  if (l.origen === "LINEA_DEL_PEDIDO") {
+    return { etiqueta: "Está en el pedido", tono: "sunmi-text-warning", pideAccion: true };
+  }
   return { etiqueta: "¿Es este?", tono: "sunmi-text-warning", pideAccion: true };
 }
 

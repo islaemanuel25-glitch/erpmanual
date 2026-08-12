@@ -151,6 +151,10 @@ export async function GET(req, { params }) {
               ...v,
               nombre: nombrePorBase.get(v.productoBaseId) ?? null,
             })),
+            // EL PEDIDO PRIMERO: es el universo chico —34 líneas contra 2.366
+            // fichas— y el que casi siempre tiene la respuesta, porque se está
+            // recibiendo lo que se encargó.
+            lineasDelPedido: detallesPlanos,
             universoProveedor: datos.productos.map((p) => ({ productoBaseId: p.id, nombre: p.nombre })),
             catalogo: catalogoNormalizado,
           });

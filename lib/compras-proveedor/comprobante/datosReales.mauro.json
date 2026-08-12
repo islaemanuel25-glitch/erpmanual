@@ -1,0 +1,163 @@
+{
+  "lineas": [
+    "PHILIPS MORRIS 10",
+    "PHILIPS SELECT RED KS",
+    "PHILIPS MORRIS 20 KS",
+    "PHILIPS MORRIS 20 CONV",
+    "PHILIPS MORRIS 20 BOX",
+    "CHESTERFIELD 10",
+    "CHESTERFIELD 10 CONV",
+    "CHESTERFIELD 20 KS",
+    "CHESTERFIELD 20 CONV KS",
+    "CHESTERFIELD 20 CONV BOX",
+    "MARLBORO 10",
+    "MARLBORO 10 FUSION UVA",
+    "MARLBORO 20 KS",
+    "MARLBORO 20 BOX",
+    "MARLBORO 20 XL FUSION UVA",
+    "M.CRAFTED 20 BOX CONV",
+    "M.CRAFTED 20 BOX RED",
+    "M.CRAFTED 20 BOX CORAL",
+    "M.CRAFTED 20 BOX UVA",
+    "M.CRAFTED 20 KS RED",
+    "M.CRAFTED 20 CONV KS"
+  ],
+  "pedido": [
+    {
+      "productoBaseId": 2044,
+      "nombre": "Chester 10"
+    },
+    {
+      "productoBaseId": 2045,
+      "nombre": "Chester 10 mentolado "
+    },
+    {
+      "productoBaseId": 2037,
+      "nombre": "Chester 20 común"
+    },
+    {
+      "productoBaseId": 2039,
+      "nombre": "Chester 20 mentolado box "
+    },
+    {
+      "productoBaseId": 2218,
+      "nombre": "chester 20 mentolado comun"
+    },
+    {
+      "productoBaseId": 2128,
+      "nombre": "Dover Rojo"
+    },
+    {
+      "productoBaseId": 2134,
+      "nombre": "Dover Verde"
+    },
+    {
+      "productoBaseId": 2032,
+      "nombre": "Liverpool rojo"
+    },
+    {
+      "productoBaseId": 2048,
+      "nombre": "Lucky 10 mentolado"
+    },
+    {
+      "productoBaseId": 2059,
+      "nombre": "Lucky 20 convertible xl "
+    },
+    {
+      "productoBaseId": 2183,
+      "nombre": "Lucky 20 Menta Comun"
+    },
+    {
+      "productoBaseId": 2129,
+      "nombre": "Lucky origen 20 comun"
+    },
+    {
+      "productoBaseId": 2062,
+      "nombre": "Lucky origen 20 común mentolado"
+    },
+    {
+      "productoBaseId": 2046,
+      "nombre": "Marlboro 10 Uva"
+    },
+    {
+      "productoBaseId": 2055,
+      "nombre": "Marlboro 20 Box "
+    },
+    {
+      "productoBaseId": 2216,
+      "nombre": "marlboro 20 comun "
+    },
+    {
+      "productoBaseId": 2132,
+      "nombre": "Marlboro 20 Crafted Box"
+    },
+    {
+      "productoBaseId": 2035,
+      "nombre": "Marlboro 20 crafted común"
+    },
+    {
+      "productoBaseId": 2036,
+      "nombre": "Marlboro 20 crafted coral box"
+    },
+    {
+      "productoBaseId": 2034,
+      "nombre": "Marlboro 20 crafted mentolado común"
+    },
+    {
+      "productoBaseId": 2131,
+      "nombre": "Marlboro 20 Crafted Uva Box"
+    },
+    {
+      "productoBaseId": 2031,
+      "nombre": "Marlboro 20 Crafter menta box"
+    },
+    {
+      "productoBaseId": 2058,
+      "nombre": "Marlboro 20 uva box"
+    },
+    {
+      "productoBaseId": 2049,
+      "nombre": "Milenio click mentolado"
+    },
+    {
+      "productoBaseId": 2050,
+      "nombre": "Milenio rojo"
+    },
+    {
+      "productoBaseId": 2052,
+      "nombre": "Milenio uva"
+    },
+    {
+      "productoBaseId": 2043,
+      "nombre": "Philips 10"
+    },
+    {
+      "productoBaseId": 2042,
+      "nombre": "Philips 10 mentolado"
+    },
+    {
+      "productoBaseId": 2040,
+      "nombre": "Philips 20 box"
+    },
+    {
+      "productoBaseId": 2041,
+      "nombre": "Philips 20 común"
+    },
+    {
+      "productoBaseId": 2219,
+      "nombre": "philips 20 mentolado box"
+    },
+    {
+      "productoBaseId": 2061,
+      "nombre": "Philips 20 red común"
+    },
+    {
+      "productoBaseId": 2054,
+      "nombre": "Pier rojo"
+    },
+    {
+      "productoBaseId": 2161,
+      "nombre": "Marlboro 10"
+    }
+  ]
+}
