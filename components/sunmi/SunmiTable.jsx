@@ -14,6 +14,10 @@
 //
 // El modo se elige solo: si viene `columnas`, manda el modo por columnas.
 //
+// Y el modo por columnas puede además cerrar la tabla con una FILA DE TOTALES,
+// que es lo último que le faltaba para que las tablas que hoy la escriben a mano
+// puedan migrar. Va en `pie`, en un `<tfoot>` de verdad, y sin `colSpan`.
+//
 // ── TODO LO NUEVO ENTRA APAGADO ─────────────────────────────────────────────
 //
 // Cada agregado tiene un default que reproduce el comportamiento actual:
@@ -35,6 +39,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import SunmiTableRow from "./SunmiTableRow";
 import SunmiTableEmpty from "./SunmiTableEmpty";
+import { celdasDelPie } from "@/lib/sunmi/pieDeTabla";
 
 /** El padding de cada densidad. "normal" es exactamente el de siempre. */
 const DENSIDAD = {
@@ -107,6 +112,17 @@ export default function SunmiTable({
   filaExpandible,
   onClickFila,
   filaSeleccionada,
+  /**
+   * La fila de totales al pie: `{ etiqueta, valores, alineacion }`.
+   *
+   * `valores` dice qué número va en qué columna, POR LA CLAVE DE LA COLUMNA, y
+   * el span de la etiqueta se calcula solo. Nunca se pasa un `colSpan`: el
+   * porqué está en `lib/sunmi/pieDeTabla.js`, y en una frase es que hoy ese
+   * número se escribe a mano y nada avisa cuando deja de seguir a las columnas.
+   *
+   * Sin `pie` no se dibuja nada, como todo lo nuevo de este archivo.
+   */
+  pie,
 }) {
   const { theme } = useSunmiTheme();
   const theadBase = theme.table?.headerClass || "sunmi-thead";
@@ -188,6 +204,40 @@ export default function SunmiTable({
     });
   };
 
+  // EL PIE VA EN UN `<tfoot>` DE VERDAD.
+  //
+  // No es adorno: el navegador lo mantiene abajo del cuerpo pase lo que pase, y
+  // los lectores de pantalla lo anuncian como el resumen de la tabla y no como
+  // una fila más de datos. Dos de las tres filas de totales que existen hoy son
+  // el último `<tr>` del cuerpo, así que se leen como un producto más llamado
+  // "TOTAL ESTIMADO".
+  //
+  // Solo en modo por columnas: en el clásico la tabla no sabe cuáles son las
+  // columnas, que es justamente lo que hace falta para calcular el span.
+  const pieDibujado = () => {
+    if (!cuerpoPropio || !pie) return null;
+    const { span, celdas } = celdasDelPie(columnas, pie.valores);
+    return (
+      <tfoot>
+        <tr className="border-t sunmi-divider">
+          {span > 0 ? (
+            <td
+              colSpan={span}
+              className={`${d.td} ${ALINEACION[pie.alineacion] ?? ALINEACION.der} font-semibold sunmi-text-strong`}
+            >
+              {pie.etiqueta}
+            </td>
+          ) : null}
+          {celdas.map((c) => (
+            <td key={c.clave} className={`${d.td} ${ALINEACION[c.align] ?? ALINEACION.izq}`.trim()}>
+              {c.valor}
+            </td>
+          ))}
+        </tr>
+      </tfoot>
+    );
+  };
+
   return (
     <div
       id={scrollId}
@@ -228,6 +278,7 @@ export default function SunmiTable({
         >
           {cuerpo()}
         </tbody>
+        {pieDibujado()}
       </table>
     </div>
   );
