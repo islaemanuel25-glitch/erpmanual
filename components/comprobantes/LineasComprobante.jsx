@@ -270,17 +270,11 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
             </span>
           )}
         </p>
-        {/* ── LOS DOS CONTEOS ──────────────────────────────────────────
-            Contra el PAPEL y contra el PEDIDO, y son preguntas distintas.
-            Que difieran del pedido NO es un error: puede faltar mercadería o
-            venir algo de más. Que difieran del papel sí lo es. */}
-        {datos.conteos?.enElPedido > 0 && (
-          <p className="text-sm2 sunmi-text-muted">
-            El pedido tiene {datos.conteos.enElPedido}{" "}
-            {datos.conteos.enElPedido === 1 ? "línea" : "líneas"}; la factura trajo{" "}
-            {datos.conteos.transcriptas}.
-          </p>
-        )}
+        {/* El conteo contra el PEDIDO no va acá: un pedido se cubre con
+            varias facturas, así que compararlo con UN comprobante haría que
+            toda entrega parcial pareciera incompleta. La cobertura vive en el
+            panel, contra todos los comprobantes juntos. Acá queda solo el
+            control de este comprobante contra su propio papel. */}
         {resueltasOcultas > 0 && !verResueltas && (
           <SunmiButton color="slate" type="button" onClick={() => setVerResueltas(true)}>
             Ver las {resueltasOcultas} ya resueltas

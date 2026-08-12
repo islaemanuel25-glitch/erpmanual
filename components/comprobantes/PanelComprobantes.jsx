@@ -98,6 +98,7 @@ async function mensajeDeRespuesta(r) {
 
 export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir = true }) {
   const [items, setItems] = useState([]);
+  const [cobertura, setCobertura] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [subiendo, setSubiendo] = useState(false);
   const [leyendo, setLeyendo] = useState(null);
@@ -119,8 +120,10 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
       const q = pedidoId ? `pedidoId=${pedidoId}` : `proveedorId=${proveedorId}`;
       const r = await fetch(`/api/compras-proveedor/comprobantes/listar?${q}`);
       const d = await r.json();
-      if (d.ok) setItems(d.items || []);
-      else setMensaje({ tipo: "error", texto: d.error });
+      if (d.ok) {
+        setItems(d.items || []);
+        setCobertura(d.cobertura ?? null);
+      } else setMensaje({ tipo: "error", texto: d.error });
     } finally {
       setCargando(false);
     }
@@ -284,6 +287,26 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
           onChange={alElegirArchivos}
         />
       </div>
+
+      {/* ── LA COBERTURA DEL PEDIDO ─────────────────────────────────────
+          Contra TODOS los comprobantes, no contra cada uno: un pedido se cubre
+          con varias facturas. Y NO se dibuja como aviso mientras falten
+          comprobantes por leer — un cartel que siempre dice que falta algo deja
+          de significar que falta algo. */}
+      {cobertura?.texto && (
+        <p
+          className={`mb-3 text-sm2 ${
+            cobertura.esAviso ? "sunmi-text-warning" : "sunmi-text-muted"
+          }`}
+        >
+          {cobertura.texto}
+          {cobertura.deMas > 0 && (
+            <span className="sunmi-text-muted">
+              {" "}Además vinieron {cobertura.deMas} que no estaban pedidos.
+            </span>
+          )}
+        </p>
+      )}
 
       {mensaje && (
         <div

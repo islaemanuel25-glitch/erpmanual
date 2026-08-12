@@ -13,6 +13,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { resumenDeLista } from "@/lib/compras-proveedor/comprobante/pantalla";
+import { coberturaDelPedido, textoDeCobertura } from "@/lib/compras-proveedor/comprobante/cobertura";
 
 export async function GET(req) {
   try {
@@ -88,10 +89,42 @@ export async function GET(req) {
       archivos: c.imagenBorradaEn ? [] : c.archivos,
     }));
 
+    // ── LA COBERTURA DEL PEDIDO, CONTRA TODOS LOS COMPROBANTES ───────────
+    //
+    // Un pedido se cubre con VARIAS facturas: el de Mauro tiene 34 líneas y el
+    // comprobante que llegó trajo 21. Contarlo por comprobante haría que toda
+    // entrega parcial pareciera incompleta, y un aviso que siempre dice que
+    // falta algo deja de significar que falta algo.
+    let cobertura = null;
+    if (pedidoId) {
+      const detalles = await prisma.pedidoProveedorDetalle.findMany({
+        where: { pedidoId },
+        select: { id: true, producto: { select: { baseId: true, base: { select: { nombre: true } } } } },
+      });
+      const vinculadas = await prisma.comprobanteLinea.findMany({
+        where: { comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } }, productoLocalId: { not: null } },
+        select: { comprobanteId: true, productoLocal: { select: { baseId: true } } },
+      });
+      const c = coberturaDelPedido({
+        detalles: detalles.map((d) => ({
+          id: d.id,
+          productoBaseId: d.producto?.baseId ?? null,
+          nombre: d.producto?.base?.nombre ?? null,
+        })),
+        lineasDeComprobantes: vinculadas.map((v) => ({
+          productoBaseId: v.productoLocal?.baseId ?? null,
+          comprobanteId: v.comprobanteId,
+        })),
+      });
+      const sinLeer = items.filter((x) => !x.leidoEn && x.estado !== "ANULADO").length;
+      cobertura = { ...c, ...textoDeCobertura(c, { comprobantesSinLeer: sinLeer }) };
+    }
+
     return NextResponse.json({
       ok: true,
       items: conFotos,
       resumen: resumenDeLista(items),
+      cobertura,
     });
   } catch (err) {
     console.error("Error compras-proveedor/comprobantes/listar:", err);
