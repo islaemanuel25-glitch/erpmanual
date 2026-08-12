@@ -78,6 +78,31 @@ estaba mirando el reloj. Está en `docs/incidents/INC-0005-caidas-por-despliegue
 **Y no se encadenan despliegues.** Quince en un día son quince cortes. Si hay
 varios arreglos chicos, se juntan en uno.
 
+## REGLA: NINGUNA MEDICIÓN CORRE DENTRO DEL CONTENEDOR QUE ATIENDE
+
+**Prohibido `docker exec erpazul_app …` para medir, probar o diagnosticar.** No es
+una recomendación: ese contenedor es el que atiende a los cinco locales, y todo
+lo que se ejecute ahí adentro compite con las ventas por CPU, memoria y
+conexiones a la base.
+
+Lo que sí se puede: un contenedor descartable de la MISMA imagen, que ve los
+mismos datos, el mismo volumen y las mismas variables, y muere al terminar.
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && \
+  docker compose -f docker-compose.prod.yml run --rm --no-deps app node -e "…"'
+```
+
+`--rm` para que no quede, `--no-deps` para que no levante nada más.
+
+Vale igual para lo que parece inofensivo: una consulta de un segundo abre su
+propio pool de conexiones a PostgreSQL, y una lectura de comprobante carga una
+foto de varios MB en memoria. Si hace falta medir con datos reales —y hace falta,
+es la regla 2 de CLAUDE.md— se mide **al lado**, no adentro.
+
+`docker exec` queda solo para MIRAR sin ejecutar trabajo: `printenv`, `ls`,
+`cat` de un log. Nada que abra una conexión ni cargue un archivo grande.
+
 ## Qué operaciones pueden dejar el sitio abajo
 
 Estas se hacen SABIENDO lo que cuestan, no de paso, y no mientras hay gente

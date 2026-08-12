@@ -79,6 +79,60 @@ producirlos, por orden de probabilidad:
 vienen armadas de GHCR—, y ningún `docker compose up` sin `--no-deps`, así que
 PostgreSQL nunca se recreó.
 
+## LO MEDIDO DESPUÉS, Y CORRIGE BUENA PARTE DE LO DE ARRIBA
+
+Con autorización para consultar el servidor, el 2026-08-12 a las 16:10 UTC:
+
+**El contenedor nunca murió.** `RestartCount=0`, `OOMKilled=false`, arrancado a
+las 15:41:14 UTC y con ese mismo proceso desde entonces. No hubo muerte por
+memoria ni reinicio en ningún momento del día.
+
+**El sitio no dejó de responder.** Doce pruebas seguidas contra `operix.cloud`
+dieron 200 entre 107 y 150 ms; `/login` sirvió la página completa. Y en la
+ventana del corte reportado —13:00 a 13:10, o sea 16:00 a 16:10 UTC— el log tiene
+**una sola línea y cero errores**: una venta del POS que pasó bien a las 13:11.
+
+**Lo que corrí en esa ventana era liviano.** Los eventos de Docker lo dicen: un
+`docker cp`, un exec que falló al instante por resolución de módulos, un exec con
+dos consultas de Prisma que vivió **un segundo** (16:03:26 → 16:03:27) y un
+`wget`. La ráfaga pesada de diez lecturas fue de madrugada, no acá.
+
+**Y el bloqueo del arranque no era tal.** El log del arranque dice
+`✓ Ready in 503ms`, y las líneas del chequeo de volumen y de modelo aparecen
+DESPUÉS. Medio segundo hasta atender. La afirmación de que `await
+verificarModelo()` demoraba el arranque hasta 10 segundos **no está respaldada**
+por lo que se ve; el `await` sigue ahí y conviene sacarlo por precaución, pero no
+fue la causa de nada.
+
+## LA CAUSA QUE SÍ ENCAJA: EL LÍMITE DE INTENTOS DE LOGIN
+
+`app/api/login/route.js` bloquea una IP tras **10 intentos en 15 minutos** y
+contesta 429 "Demasiados intentos. Intente más tarde.".
+
+Dos detalles que lo convierten en una trampa:
+
+1. **Cuenta TODOS los intentos, no solo los fallidos.** `recordLoginAttempt(ip)`
+   se llama antes de validar nada, así que un login exitoso gasta cupo igual.
+2. **La ventana arranca en el PRIMER intento**, no en el último. Quedar
+   bloqueado en el intento 10 significa esperar lo que reste de esos 15 minutos.
+
+nginx pasa la IP real —`X-Real-IP` y `X-Forwarded-For` están configurados—, así
+que el cupo es por usuario y no global. Alguien que no puede entrar reintenta, y
+cada reintento gasta cupo: el mecanismo se alimenta a sí mismo. Diez minutos sin
+poder entrar es exactamente lo que produce quedar bloqueado promediando la
+ventana.
+
+Encaja con todo lo observado: el sitio arriba, vendiendo, sin errores en el log
+—un 429 de login no loguea—, y UNA persona sin poder entrar.
+
+**Falta un dato para confirmarlo y lo tiene Emanuel:** si vio el cartel
+"Demasiados intentos. Intente más tarde.", está confirmado. Si vio otra cosa
+—pantalla en blanco, spinner, error de red— hay que seguir buscando.
+
+**Riesgo adicional a mirar:** varios equipos en dato móvil pueden salir por la
+misma IP del operador (CGNAT). Si los Sunmi de los cinco locales comparten IP,
+comparten cupo, y 10 logins entre todos en 15 minutos bloquean a todos.
+
 ## Lo que hay que mirar en el servidor para confirmarlo
 
 No lo hice. Cuando se autorice:
