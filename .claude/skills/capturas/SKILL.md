@@ -141,6 +141,27 @@ algo desborda.
 El `MSYS_NO_PATHCONV=1` no es adorno: sin él, Git Bash convierte `/modulos/...`
 en una ruta de Windows y el navegador no puede navegar ahí.
 
+### Si la captura va a usarse como PRUEBA, `--repeticiones 3`
+
+Comparar un antes contra un después solo prueba algo si dos corridas de la MISMA
+versión dan lo mismo. La de la recepción a 360 no lo daba: **27.639 píxeles de
+diferencia entre dos corridas idénticas**, repartidos por toda la página, con el
+mismo alto y sin corrimiento. No era layout, era tiempo — transiciones y
+animaciones fotografiadas a mitad de camino. Y los ceros que se habían informado
+con esa captura fueron suerte.
+
+    ... --repeticiones 3 --alto-captura 2400
+
+`--repeticiones` fotografía tres veces y compara los bytes: si no dan idénticas
+lo dice, guarda las tres para poder encontrar la causa, y sale con código 1.
+`--alto-captura` acota la foto a una banda fija, porque sin eso un píxel de más
+arriba de todo corre el resto de la página y contamina la comparación entera.
+
+El arnés apaga transiciones y animaciones, manda el scroll a cero y saca el foco
+antes de fotografiar. Aun así quedó una intermitencia de una corrida de cada seis
+más o menos, así que **el chequeo se corre igual**: un arnés que a veces acierta
+es peor que no tener, porque produce ceros que uno se cree.
+
 **Una pantalla con formulario largo no se da por revisada con una captura de
 viewport.** Se mide, y recién después se mira la imagen completa.
 

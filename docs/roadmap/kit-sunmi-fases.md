@@ -67,6 +67,26 @@ La de `rowSpan` **se queda como está**. Una sola celda suelta no justifica una
 familia, y una familia escrita para un caso es el error que ya se cometió dos
 veces.
 
+### EL PADDING: leer esto ANTES de migrar una sola celda
+
+En modo por columnas el padding de la celda lo pone `densidad`, y hay tres:
+`compacta` px-2 py-1, `normal` px-2 py-1.5 y `comoda` px-3 py-2.5.
+
+**De las 440 celdas crudas del repo que traen padding propio, esas tres cubren
+145. Las otras 295 usan otra cosa.** Las cuatro formas más comunes que ninguna
+densidad cubre son `px-3 py-1.5` en 67 celdas, `px-3 py-2` en 63, `px-2 py-2` en
+52 y `px-2.5 py-3` en 46.
+
+O sea: **migrar una tabla cualquiera sin saber esto le cambia el padding a dos de
+cada tres celdas.** Y hasta `db47914` tampoco se arreglaba escribiéndolo en
+`tdClassName`, porque la tabla lo concatenaba con el de la densidad y ganaba el
+que Tailwind hubiera puesto último en la hoja de estilos. `px-3` le gana a
+`px-2` por el orden numérico, así que a veces salía bien — que es la peor forma
+de salir bien, porque al revés sale mal en silencio.
+
+Desde `db47914` la densidad **cede, por eje**: si la columna declara `px-3`, la
+tabla no pone su `px` y sí conserva su `py`. No hacen falta densidades nuevas.
+
 ### Lo hecho
 
 - `SunmiPar` (`2cc15c1`): el par de dos renglones, sacado de `TablaCatalogo`,
@@ -84,7 +104,30 @@ veces.
 - **Los 9.5 px contra los 10 px del kit.** `SunmiPar` a propósito no lo decide:
   unificar hoy movería una pantalla viva. Se mira cuando las dos estén migradas
   y el cambio se pueda medir en las dos a la vez.
-- **16 de los 19 componentes del kit concatenan el `className` en vez de
-  negociarlo**, y por eso un ancho escrito en la pantalla no se aplica. Es el
-  trabajo de la fase 4. Ninguna pieza nueva nace con ese defecto:
-  `lib/sunmi/claseAncho.js` y `lib/sunmi/claseNegociada.js` tienen la forma.
+- **15 de los 19 componentes del kit concatenan el `className` en vez de
+  negociarlo**, y por eso un ancho escrito en la pantalla no se aplica. Eran 16:
+  `SunmiTable` ya está hecho en `db47914` —el primero—, así que **la fase 4 no lo
+  rehace**. Ninguna pieza nueva nace con ese defecto; `lib/sunmi/claseAncho.js` y
+  `lib/sunmi/claseNegociada.js` tienen la forma.
+
+## El arnés de captura, y por qué una captura sola no prueba nada
+
+`scripts/medir-desborde.mjs` toma la foto. Dos cosas que no son opcionales:
+
+- **`--repeticiones 3`.** Fotografía tres veces y compara los bytes. Si no dan
+  idénticas lo dice y sale con error, y guarda las tres para poder encontrar la
+  causa. Un arnés que a veces acierta es peor que no tener: produce ceros que uno
+  se cree. La captura de la recepción a 360 daba 27.639 píxeles de diferencia
+  entre dos corridas de la MISMA versión, y los ceros que se habían informado
+  antes con ella fueron suerte.
+- **`--alto-captura`**, que acota la foto a una banda fija —2400 px por defecto—.
+  Sin eso, un píxel de más arriba de todo corre el resto de la página y contamina
+  la comparación entera.
+
+La causa de aquel ruido era el tiempo: transiciones y animaciones fotografiadas
+a mitad de camino. Antes de la foto el arnés las apaga, manda el scroll a cero y
+saca el foco. Aun así el chequeo queda: quedó una intermitencia de
+aproximadamente una corrida de cada seis, y **el chequeo la agarra**.
+
+Rehecha con el arnés arreglado, la comparación de la recepción contra el commit
+anterior a `SunmiPar` da **idéntico byte a byte** a 360 y a 1366.

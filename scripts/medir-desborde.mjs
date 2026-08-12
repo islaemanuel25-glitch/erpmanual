@@ -40,6 +40,23 @@ const PERFIL = arg("perfil", path.join(SALIDA, "edge-profile"));
 const PUERTO = Number(arg("puerto-cdp", "9224"));
 const EDGE = arg("edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
 
+// ── PARA QUE LA CAPTURA SIRVA COMO PRUEBA ──────────────────────────────────
+//
+// Una captura solo prueba algo si dos corridas de la MISMA versión dan lo mismo.
+// La de la recepción a 360 no lo daba: dos corridas diferían en 27.639 píxeles,
+// repartidos por toda la página, con el mismo alto y sin corrimiento. Eso no es
+// layout: es tiempo. Transiciones y animaciones fotografiadas en distinto
+// momento, más la posición de scroll, que no tienen por qué coincidir.
+//
+// `--alto-captura` acota la foto a una banda fija. Sin eso, un píxel de más
+// arriba de todo corre el resto de la página y contamina la comparación entera.
+// Con `0` sale la página completa, que es como salía antes.
+const ALTO_CAPTURA = Number(arg("alto-captura", "2400"));
+// Cuántas veces se fotografía para comprobar que el arnés no tiene ruido. Las
+// fotos se comparan por sus bytes: mismo codificador y mismo tamaño, así que
+// bytes iguales es píxeles iguales. Con 1 no se comprueba nada.
+const REPETICIONES = Number(arg("repeticiones", "1"));
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(SALIDA, { recursive: true });
 
@@ -221,13 +238,70 @@ const alto = await evaluar(`(() => {
 await sleep(500);
 console.log(`\nPara la foto se abre el recorte: la pantalla completa mide ${alto}px.`);
 
-const { data } = await send("Page.captureScreenshot", {
-  format: "png",
-  captureBeyondViewport: true,
-});
+// ── SE LE SACA EL TIEMPO DE ENCIMA ─────────────────────────────────────────
+//
+// Sin esto la foto sale distinta cada vez, y de la peor manera: no se corre
+// nada, cambian miles de píxeles sueltos repartidos por toda la página. Son
+// transiciones a mitad de camino —el tema, el tono de la fila seleccionada, el
+// giro del chevron— fotografiadas en momentos distintos.
+//
+// Se apagan las transiciones y las animaciones, se manda el scroll a cero en
+// todos lados, y se saca el cursor de texto que parpadea. Todo en una pestaña
+// descartable: no cambia nada de la aplicación.
+await evaluar(`(() => {
+  const s = document.createElement("style");
+  s.textContent = "*,*::before,*::after{transition:none !important;animation:none !important;caret-color:transparent !important}";
+  document.head.appendChild(s);
+  window.scrollTo(0, 0);
+  for (const el of document.querySelectorAll("*")) { el.scrollTop = 0; el.scrollLeft = 0; }
+  if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  return true;
+})()`);
+await sleep(400);
+
+const recorte =
+  ALTO_CAPTURA > 0
+    ? { clip: { x: 0, y: 0, width: ANCHO, height: Math.min(ALTO_CAPTURA, alto), scale: 1 } }
+    : {};
+
+const fotos = [];
+for (let i = 0; i < Math.max(1, REPETICIONES); i++) {
+  const { data } = await send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: true,
+    ...recorte,
+  });
+  fotos.push(data);
+  if (i < REPETICIONES - 1) await sleep(400);
+}
+
 const archivo = path.join(SALIDA, `${arg("nombre", "captura")}-${ANCHO}-completa.png`);
-fs.writeFileSync(archivo, Buffer.from(data, "base64"));
-console.log(`\nCaptura completa: ${archivo}`);
+fs.writeFileSync(archivo, Buffer.from(fotos[0], "base64"));
+console.log(`\nCaptura: ${archivo}${ALTO_CAPTURA > 0 ? ` (banda fija de ${Math.min(ALTO_CAPTURA, alto)}px)` : " (página completa)"}`);
+
+// ── EL ARNÉS SE DECLARA APTO O NO ──────────────────────────────────────────
+//
+// Un arnés que a veces acierta es peor que no tener: produce ceros que uno se
+// cree. Si las repeticiones no dan idénticas, esta captura NO sirve como prueba
+// y el script lo dice y sale con error.
+let apto = null;
+if (REPETICIONES > 1) {
+  apto = fotos.every((f) => f === fotos[0]);
+  console.log(
+    apto
+      ? `ARNÉS DETERMINISTA: ${REPETICIONES} corridas idénticas. La captura sirve como prueba.`
+      : `ARNÉS CON RUIDO: ${REPETICIONES} corridas NO dieron idénticas. Esta captura NO prueba nada.`
+  );
+  // Con ruido se guardan TODAS, que es lo único que deja encontrar la causa.
+  // Sin esto queda "da distinto" y nada más, que no alcanza para arreglarlo.
+  if (!apto) {
+    fotos.forEach((f, i) => {
+      const p = path.join(SALIDA, `${arg("nombre", "captura")}-${ANCHO}-rep${i + 1}.png`);
+      fs.writeFileSync(p, Buffer.from(f, "base64"));
+      console.log(`  repetición ${i + 1}: ${p}`);
+    });
+  }
+}
 
 cerrar();
-process.exit(medida.desbordan.length ? 1 : 0);
+process.exit(medida.desbordan.length || apto === false ? 1 : 0);
