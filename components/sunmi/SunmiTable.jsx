@@ -40,7 +40,7 @@ import { useSunmiTheme } from "./SunmiThemeProvider";
 import SunmiTableRow from "./SunmiTableRow";
 import SunmiTableEmpty from "./SunmiTableEmpty";
 import { celdasDelPie } from "@/lib/sunmi/pieDeTabla";
-import { paddingQueSobrevive } from "@/lib/sunmi/claseNegociada";
+import { paddingQueSobrevive, declaraAlineacion } from "@/lib/sunmi/claseNegociada";
 
 /** El padding de cada densidad. "normal" es exactamente el de siempre. */
 const DENSIDAD = {
@@ -114,7 +114,7 @@ export default function SunmiTable({
   onClickFila,
   filaSeleccionada,
   /**
-   * La fila de totales al pie: `{ etiqueta, valores, alineacion, padding }`.
+   * La fila de totales al pie: `{ etiqueta, valores, alineacion, className }`.
    *
    * `valores` dice qué número va en qué columna, POR LA CLAVE DE LA COLUMNA, y
    * el span de la etiqueta se calcula solo. Nunca se pasa un `colSpan`: el
@@ -186,7 +186,15 @@ export default function SunmiTable({
                 // de la densidad NO se pone: nunca quedan los dos peleando. Sin
                 // esto, migrar una tabla cualquiera le cambia el padding a dos de
                 // cada tres celdas — está medido en `claseNegociada.js`.
-                className={`${paddingQueSobrevive(d.td, c.tdClassName)} ${ALINEACION[c.align] ?? ALINEACION.izq} ${c.tdClassName || ""}`.trim()}
+                // LA ALINEACIÓN TAMBIÉN CEDE. Si la columna trae la suya en
+                // `tdClassName`, la tabla no pone la propia. Antes quedaban las
+                // dos y ganaba una por el orden en que Tailwind escribe la hoja
+                // de estilos, no porque nadie lo hubiera decidido.
+                className={`${paddingQueSobrevive(d.td, c.tdClassName)} ${
+                  declaraAlineacion(c.tdClassName) ? "" : ALINEACION[c.align] ?? ALINEACION.izq
+                } ${c.tdClassName || ""}`
+                  .replace(/\s+/g, " ")
+                  .trim()}
                 title={c.title ? c.title(fila) : undefined}
               >
                 {c.render ? c.render(fila) : (fila?.[c.clave] ?? "—")}
@@ -225,20 +233,25 @@ export default function SunmiTable({
     // Las tres filas de totales que existen hoy tienen un padding propio, más
     // alto que el de sus filas de datos —`px-3 py-2` en dos de ellas—. Se declara
     // una vez para el pie entero, y la densidad cede por eje como en el cuerpo.
-    const padPie = paddingQueSobrevive(d.td, pie.padding);
+    const padPie = paddingQueSobrevive(d.td, pie.className);
     return (
       <tfoot>
         <tr className="border-t sunmi-divider">
           {span > 0 ? (
             <td
               colSpan={span}
-              className={`${padPie} ${pie.padding || ""} ${ALINEACION[pie.alineacion] ?? ALINEACION.der} font-semibold sunmi-text-strong`.trim()}
+              className={`${padPie} ${pie.className || ""} ${ALINEACION[pie.alineacion] ?? ALINEACION.der} font-semibold sunmi-text-strong`.trim()}
             >
               {pie.etiqueta}
             </td>
           ) : null}
           {celdas.map((c) => (
-            <td key={c.clave} className={`${padPie} ${pie.padding || ""} ${ALINEACION[c.align] ?? ALINEACION.izq}`.trim()}>
+            // A LA DERECHA POR DEFECTO, no a la izquierda como en el cuerpo. Las
+            // tres filas de totales que existen hoy alinean sus números a la
+            // derecha, y dos de ellas están en tablas cuyos ENCABEZADOS van a la
+            // izquierda: si el pie siguiera al encabezado, los números quedarían
+            // pegados al borde equivocado. Una columna que declara `align` gana.
+            <td key={c.clave} className={`${padPie} ${pie.className || ""} ${ALINEACION[c.align] ?? ALINEACION.der}`.trim()}>
               {c.valor}
             </td>
           ))}

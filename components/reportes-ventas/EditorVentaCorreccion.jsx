@@ -48,6 +48,13 @@ const MEDIOS = ["EFECTIVO", "DEBITO", "CREDITO", "MERCADOPAGO", "FIADO"];
 const MEDIO_LABEL = { EFECTIVO: "Efectivo", DEBITO: "Débito", CREDITO: "Crédito", MERCADOPAGO: "Mercado Pago", FIADO: "Fiado" };
 const ESTADO_BADGE = { cobrado: "sunmi-badge-success", fiado: "sunmi-badge-accent" };
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+/** El color de una diferencia: rojo si baja, acento si sube, apagado si no cambia. */
+function tonoDeDiferencia(dif) {
+  if (dif < 0) return "sunmi-text-danger";
+  if (dif > 0) return "sunmi-text-accent";
+  return "sunmi-text-muted";
+}
+
 function fmtFecha(iso) {
   if (!iso) return "—";
   const d = iso instanceof Date ? iso : new Date(iso);
@@ -140,6 +147,8 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
     // reloadKey permite "Recargar venta" ante conflicto de versión (re-fetch /editar).
   }, [ventaId, reloadKey]);
 
+
+
   const c = data?.correccion || {};
   const bloqueado = data && !c.puedeCorregirCompleta;
   const activas = lineas.filter((l) => !l.removed);
@@ -167,6 +176,149 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
   const puedeRevisar = activas.length > 0 && ambiguasSinResolver.length === 0 && pagosOk && agregadasSinCosto.length === 0;
 
   const setLinea = (key, patch) => setLineas((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
+  // ── LAS NUEVE COLUMNAS DEL DETALLE ────────────────────────────────────────
+  //
+  // Migradas a modo por columnas tal como estaban, celda por celda. Dos cosas
+  // que parecen detalles y no lo son:
+  //
+  // 1. NINGUNA declara `align`. En esta tabla los ENCABEZADOS van a la
+  //    izquierda y los valores centrados o a la derecha, y `align` mueve los
+  //    dos. La alineación va en `tdClassName`, que es solo la celda.
+  //
+  // 2. Todas declaran `px-3 py-1.5`, que no lo cubre ninguna densidad. La tabla
+  //    cede el suyo por eje —ver `lib/sunmi/claseNegociada.js`— así que no
+  //    quedan dos paddings peleando. Antes de que cediera, esto habría quedado
+  //    bien de casualidad: `px-3` le gana a `px-2` por el orden en que Tailwind
+  //    escribe la hoja de estilos, no porque alguien lo haya decidido.
+  const columnasDetalle = useMemo(
+    () => [
+      {
+        clave: "producto",
+        titulo: "Producto",
+        tdClassName: "px-3 py-1.5 text-sm",
+        render: (l) => {
+          const rec = l.reconstruccion || null;
+          const esNuevo = l.origenDetalleId == null;
+          return (
+            <>
+              <div className="font-medium sunmi-text-strong">
+                {l.nombre}
+                {l.esCombo && <span className="ml-2 text-[10px] sunmi-text-link font-medium">COMBO</span>}
+                {l.esServicio && <span className="ml-2 text-[10px] sunmi-text-link font-medium">SERVICIO</span>}
+                {esNuevo && <span className="ml-2 text-[10px] sunmi-text-success font-medium">NUEVO</span>}
+              </div>
+              {l.puedeToggle && (
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  <div className="inline-flex rounded-lg overflow-hidden border sunmi-border">
+                    <button type="button" onClick={() => setLinea(l.key, rescalarLinea(l, MODO_PACK))}
+                      className={`px-2 py-0.5 text-[11px] font-medium ${(l.modoVentaLinea || MODO_PACK) === MODO_PACK ? "sunmi-state-success sunmi-text-success" : "sunmi-text-muted"}`}>Pack</button>
+                    <button type="button" onClick={() => setLinea(l.key, rescalarLinea(l, MODO_UNIDAD))}
+                      className={`px-2 py-0.5 text-[11px] font-medium ${l.modoVentaLinea === MODO_UNIDAD ? "sunmi-state-success sunmi-text-success" : "sunmi-text-muted"}`}>Unidad</button>
+                  </div>
+                  <span className="text-[10px] sunmi-text-muted">1 pack = {Math.max(1, Number(l.factorPack) || 1)} u</span>
+                </div>
+              )}
+              {l.costoResoluble === false && (
+                <div className="text-[10px] sunmi-text-danger mt-0.5">⚠ Sin costo resoluble — no se puede revisar</div>
+              )}
+              {rec?.estado === "reconstruido" && (
+                <div className="text-[10px] sunmi-text-success mt-0.5">✓ Consumo reconstruido — {rec.modalidad} · {fmtCant(rec.cantidadFisica)} u</div>
+              )}
+              {rec?.estado === "ambiguo" && (
+                <div className="mt-1 max-w-[240px] space-y-1">
+                  <div className="text-[10px] sunmi-text-accent">⚠ Consumo original no registrado</div>
+                  <SunmiSelectAdv value={l.modalidadConfirmada || ""} onChange={(v) => setLinea(l.key, { modalidadConfirmada: v || null })}>
+                    <SunmiSelectOption value="">Elegí la modalidad…</SunmiSelectOption>
+                    {(rec.modalidadesPosibles || []).map((m) => (
+                      <SunmiSelectOption key={m.modalidad} value={m.modalidad}>{m.label}{rec.recomendada === m.modalidad ? " — recomendado" : ""}</SunmiSelectOption>
+                    ))}
+                  </SunmiSelectAdv>
+                </div>
+              )}
+            </>
+          );
+        },
+      },
+      {
+        clave: "cantOriginal",
+        titulo: "Cant. original",
+        tdClassName: "px-3 py-1.5 text-center sunmi-text-muted line-through tabular-nums",
+        render: (l) => (l.origenDetalleId == null ? "—" : fmtCant(l.cantidadOriginal)),
+      },
+      {
+        clave: "cantCorregida",
+        titulo: "Cant. corregida",
+        tdClassName: "px-3 py-1.5",
+        render: (l) => (
+          <div className="flex items-center gap-1 justify-center">
+            <SunmiButton color="slate" type="button" onClick={() => setLinea(l.key, { cantidad: Math.max(0, num(l.cantidad) - 1) })}>−</SunmiButton>
+            <SunmiInput
+              type="text" inputMode="decimal" value={l.cantidad}
+              onChange={(e) => { const raw = e.target.value; if (raw === "") { setLinea(l.key, { cantidad: "" }); return; } const v = Number(raw.replace(",", ".")); setLinea(l.key, { cantidad: Number.isFinite(v) ? Math.max(0, v) : 0 }); }}
+              onBlur={() => { const cur = Number(l.cantidad); if (!Number.isFinite(cur) || cur < 0) setLinea(l.key, { cantidad: 0 }); }}
+              className="w-[56px] text-center"
+            />
+            <SunmiButton color="slate" type="button" onClick={() => setLinea(l.key, { cantidad: num(l.cantidad) + 1 })}>+</SunmiButton>
+          </div>
+        ),
+      },
+      {
+        clave: "precioOriginal",
+        titulo: "Precio original",
+        tdClassName: "px-3 py-1.5 text-center sunmi-text-muted line-through tabular-nums",
+        render: (l) => (l.origenDetalleId == null ? "—" : money(l.precioOriginal)),
+      },
+      {
+        clave: "precioCorregido",
+        titulo: "Precio corregido",
+        tdClassName: "px-3 py-1.5",
+        render: (l) => (
+          <div className="flex items-center gap-0.5 justify-center">
+            <span className="sunmi-text-muted text-xs">$</span>
+            <SunmiInput
+              type="text" inputMode="decimal" value={l.precio}
+              disabled={l.esCombo || l.esServicio || !permiteEditarPrecio}
+              onChange={(e) => setLinea(l.key, { precio: e.target.value === "" ? 0 : Number(e.target.value.replace(",", ".")) })}
+              className="w-[90px] text-center"
+            />
+          </div>
+        ),
+      },
+      {
+        clave: "subOrig",
+        titulo: "Subtotal orig.",
+        tdClassName: "px-3 py-1.5 text-right tabular-nums sunmi-text-muted",
+        render: (l) => money(num(l.precioOriginal) * num(l.cantidadOriginal)),
+      },
+      {
+        clave: "subCorr",
+        titulo: "Subtotal corr.",
+        tdClassName: "px-3 py-1.5 text-right tabular-nums font-medium",
+        render: (l) => money(num(l.precio) * num(l.cantidad)),
+      },
+      {
+        clave: "diferencia",
+        titulo: "Diferencia",
+        tdClassName: "px-3 py-1.5 text-right tabular-nums font-medium",
+        // El tono depende de la fila, así que va en un `span` adentro: la clase
+        // de la columna es una sola para todas.
+        render: (l) => {
+          const dif = num(l.precio) * num(l.cantidad) - num(l.precioOriginal) * num(l.cantidadOriginal);
+          return <span className={tonoDeDiferencia(dif)}>{dif > 0 ? "+" : ""}{money(dif)}</span>;
+        },
+      },
+      {
+        clave: "acciones",
+        titulo: "",
+        tdClassName: "px-3 py-1.5 text-center",
+        render: (l) => (
+          <SunmiButton color="red" type="button" onClick={() => setLinea(l.key, { removed: true })}>Quitar</SunmiButton>
+        ),
+      },
+    ],
+    [permiteEditarPrecio]
+  );
 
   // --- Handlers de pagos (operan sobre la lista YA sincronizada) ---
   const onPagoMonto = (id, valueStr) => {
@@ -502,99 +654,34 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
 
                 {/* DESKTOP: tabla */}
                 <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
-                  <SunmiTable headers={["Producto", "Cant. original", "Cant. corregida", "Precio original", "Precio corregido", "Subtotal orig.", "Subtotal corr.", "Diferencia", ""]}>
-                    {activas.length === 0 ? (
-                      <SunmiTableEmpty message="Sin items" />
-                    ) : (
-                      activas.map((l) => {
-                        const subOrig = num(l.precioOriginal) * num(l.cantidadOriginal);
-                        const subCorr = num(l.precio) * num(l.cantidad);
-                        const dif = subCorr - subOrig;
-                        const rec = l.reconstruccion || null;
-                        const precioDeshab = l.esCombo || l.esServicio || !permiteEditarPrecio;
-                        const esNuevo = l.origenDetalleId == null;
-                        return (
-                          <SunmiTableRow key={l.key}>
-                            <td className="px-3 py-1.5 text-sm">
-                              <div className="font-medium sunmi-text-strong">
-                                {l.nombre}
-                                {l.esCombo && <span className="ml-2 text-[10px] sunmi-text-link font-medium">COMBO</span>}
-                                {l.esServicio && <span className="ml-2 text-[10px] sunmi-text-link font-medium">SERVICIO</span>}
-                                {esNuevo && <span className="ml-2 text-[10px] sunmi-text-success font-medium">NUEVO</span>}
-                              </div>
-                              {l.puedeToggle && (
-                                <div className="mt-1 flex items-center gap-2 flex-wrap">
-                                  <div className="inline-flex rounded-lg overflow-hidden border sunmi-border">
-                                    <button type="button" onClick={() => setLinea(l.key, rescalarLinea(l, MODO_PACK))}
-                                      className={`px-2 py-0.5 text-[11px] font-medium ${(l.modoVentaLinea || MODO_PACK) === MODO_PACK ? "sunmi-state-success sunmi-text-success" : "sunmi-text-muted"}`}>Pack</button>
-                                    <button type="button" onClick={() => setLinea(l.key, rescalarLinea(l, MODO_UNIDAD))}
-                                      className={`px-2 py-0.5 text-[11px] font-medium ${l.modoVentaLinea === MODO_UNIDAD ? "sunmi-state-success sunmi-text-success" : "sunmi-text-muted"}`}>Unidad</button>
-                                  </div>
-                                  <span className="text-[10px] sunmi-text-muted">1 pack = {Math.max(1, Number(l.factorPack) || 1)} u</span>
-                                </div>
-                              )}
-                              {l.costoResoluble === false && (
-                                <div className="text-[10px] sunmi-text-danger mt-0.5">⚠ Sin costo resoluble — no se puede revisar</div>
-                              )}
-                              {rec?.estado === "reconstruido" && (
-                                <div className="text-[10px] sunmi-text-success mt-0.5">✓ Consumo reconstruido — {rec.modalidad} · {fmtCant(rec.cantidadFisica)} u</div>
-                              )}
-                              {rec?.estado === "ambiguo" && (
-                                <div className="mt-1 max-w-[240px] space-y-1">
-                                  <div className="text-[10px] sunmi-text-accent">⚠ Consumo original no registrado</div>
-                                  <SunmiSelectAdv value={l.modalidadConfirmada || ""} onChange={(v) => setLinea(l.key, { modalidadConfirmada: v || null })}>
-                                    <SunmiSelectOption value="">Elegí la modalidad…</SunmiSelectOption>
-                                    {(rec.modalidadesPosibles || []).map((m) => (
-                                      <SunmiSelectOption key={m.modalidad} value={m.modalidad}>{m.label}{rec.recomendada === m.modalidad ? " — recomendado" : ""}</SunmiSelectOption>
-                                    ))}
-                                  </SunmiSelectAdv>
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-3 py-1.5 text-center sunmi-text-muted line-through tabular-nums">{esNuevo ? "—" : fmtCant(l.cantidadOriginal)}</td>
-                            <td className="px-3 py-1.5">
-                              <div className="flex items-center gap-1 justify-center">
-                                <SunmiButton color="slate" type="button" onClick={() => setLinea(l.key, { cantidad: Math.max(0, num(l.cantidad) - 1) })}>−</SunmiButton>
-                                <SunmiInput
-                                  type="text" inputMode="decimal" value={l.cantidad}
-                                  onChange={(e) => { const raw = e.target.value; if (raw === "") { setLinea(l.key, { cantidad: "" }); return; } const v = Number(raw.replace(",", ".")); setLinea(l.key, { cantidad: Number.isFinite(v) ? Math.max(0, v) : 0 }); }}
-                                  onBlur={() => { const cur = Number(l.cantidad); if (!Number.isFinite(cur) || cur < 0) setLinea(l.key, { cantidad: 0 }); }}
-                                  className="w-[56px] text-center"
-                                />
-                                <SunmiButton color="slate" type="button" onClick={() => setLinea(l.key, { cantidad: num(l.cantidad) + 1 })}>+</SunmiButton>
-                              </div>
-                            </td>
-                            <td className="px-3 py-1.5 text-center sunmi-text-muted line-through tabular-nums">{esNuevo ? "—" : money(l.precioOriginal)}</td>
-                            <td className="px-3 py-1.5">
-                              <div className="flex items-center gap-0.5 justify-center">
-                                <span className="sunmi-text-muted text-xs">$</span>
-                                <SunmiInput
-                                  type="text" inputMode="decimal" value={l.precio} disabled={precioDeshab}
-                                  onChange={(e) => setLinea(l.key, { precio: e.target.value === "" ? 0 : Number(e.target.value.replace(",", ".")) })}
-                                  className="w-[90px] text-center"
-                                />
-                              </div>
-                            </td>
-                            <td className="px-3 py-1.5 text-right tabular-nums sunmi-text-muted">{money(subOrig)}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums font-medium">{money(subCorr)}</td>
-                            <td className={`px-3 py-1.5 text-right tabular-nums font-medium ${dif < 0 ? "sunmi-text-danger" : dif > 0 ? "sunmi-text-accent" : "sunmi-text-muted"}`}>{dif > 0 ? "+" : ""}{money(dif)}</td>
-                            <td className="px-3 py-1.5 text-center">
-                              <SunmiButton color="red" type="button" onClick={() => setLinea(l.key, { removed: true })}>Quitar</SunmiButton>
-                            </td>
-                          </SunmiTableRow>
-                        );
-                      })
-                    )}
-                    {activas.length > 0 && (
-                      <tr className="border-t sunmi-divider">
-                        <td colSpan={5} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">TOTAL CORREGIDO</td>
-                        <td className="px-3 py-2 text-sm text-right tabular-nums sunmi-text-muted">{money(sumSubOrig)}</td>
-                        <td className="px-3 py-2 text-sm font-bold text-right sunmi-text-accent">{money(total)}</td>
-                        <td className={`px-3 py-2 text-sm font-bold text-right tabular-nums ${(total - sumSubOrig) < 0 ? "sunmi-text-danger" : (total - sumSubOrig) > 0 ? "sunmi-text-accent" : "sunmi-text-muted"}`}>{(total - sumSubOrig) > 0 ? "+" : ""}{money(total - sumSubOrig)}</td>
-                        <td />
-                      </tr>
-                    )}
-                  </SunmiTable>
+                  <SunmiTable
+                    columnas={columnasDetalle}
+                    filas={activas}
+                    claveFila={(l) => l.key}
+                    vacio="Sin items"
+                    // EL PIE LO ARMA LA TABLA, y por eso acá no hay ningún
+                    // colSpan. Era un 5 escrito a mano sobre nueve columnas: el
+                    // día que se agregue o se saque una, el pie queda corrido y
+                    // nada avisa. Ahora se dice qué número va en qué columna.
+                    pie={
+                      activas.length > 0
+                        ? {
+                            etiqueta: "TOTAL CORREGIDO",
+                            className: "px-3 py-2 text-sm",
+                            valores: {
+                              subOrig: <span className="tabular-nums sunmi-text-muted">{money(sumSubOrig)}</span>,
+                              subCorr: <span className="font-bold sunmi-text-accent">{money(total)}</span>,
+                              diferencia: (
+                                <span className={`font-bold tabular-nums ${tonoDeDiferencia(total - sumSubOrig)}`}>
+                                  {total - sumSubOrig > 0 ? "+" : ""}
+                                  {money(total - sumSubOrig)}
+                                </span>
+                              ),
+                            },
+                          }
+                        : undefined
+                    }
+                  />
                 </div>
 
                 {/* MÓVIL: cards */}
