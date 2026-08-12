@@ -1,0 +1,28 @@
+-- Un estado propio para el papel que no trae total.
+--
+-- ── POR QUÉ NO ALCANZABA CON MAL_LEIDO ─────────────────────────────────────
+--
+-- Un remito o una planilla de pedido trae producto, precio, cantidad e importe,
+-- y nada al pie: ni neto, ni IVA, ni total. La verificación aritmética compara
+-- la suma de las líneas contra ese total, así que sin total no puede correr.
+--
+-- Marcarlos MAL_LEIDO decía algo falso: que el modelo se equivocó, cuando la
+-- lectura puede haber sido perfecta. Es la misma distinción que ya existía entre
+-- MAL_LEIDO y DIFIERE —qué falló, la lectura o el papel—, y acá no falló
+-- ninguno de los dos: el papel es de otra clase.
+--
+-- Salió del único comprobante real que hay en producción, que resultó ser
+-- justamente una planilla. Emanuel maneja remitos y planillas además de
+-- facturas, así que es frecuente y no una excepción.
+--
+-- ── ES ADITIVA ─────────────────────────────────────────────────────────────
+--
+-- Solo agrega un valor al enum. Ninguna fila existente lo usa y ninguna cambia:
+-- la versión anterior de la aplicación sigue leyendo los estados de siempre sin
+-- enterarse de que hay uno más. `ALTER TYPE ... ADD VALUE` funciona dentro de la
+-- transacción de la migración en PostgreSQL 16; lo que no se puede es USAR el
+-- valor nuevo en esa misma transacción, y acá no se usa.
+--
+-- `IF NOT EXISTS` para que reaplicar no falle.
+
+ALTER TYPE "EstadoComprobante" ADD VALUE IF NOT EXISTS 'SIN_TOTAL';

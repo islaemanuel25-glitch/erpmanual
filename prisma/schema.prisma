@@ -2601,6 +2601,18 @@ enum EstadoComprobante {
   /// igual con la diferencia a la vista; acá lo que no cierra es la LECTURA, y
   /// un número que puede estar inventado no puede proponer un costo.
   MAL_LEIDO
+  /// EL PAPEL NO TRAE TOTAL, así que no hay contra qué verificar la suma. Es lo
+  /// normal en un remito o en una planilla de pedido, que Emanuel recibe además
+  /// de facturas: este caso es frecuente y no una excepción.
+  ///
+  /// No es MAL_LEIDO: allá el modelo se equivocó, acá la lectura puede haber
+  /// sido perfecta y lo que falta es el pie. Decir "no se pudo leer bien" sobre
+  /// una lectura correcta es afirmar algo falso, y es la misma clase de mentira
+  /// que ya separaba MAL_LEIDO de DIFIERE.
+  ///
+  /// No propone costos igual: sin la ecuación cerrada, un número puede estar
+  /// inventado y nadie lo sabría.
+  SIN_TOTAL
   /// Subido y leído, todavía sin conciliar contra el pedido.
   CARGADO
   /// La suma de sus líneas da el total del papel dentro de la tolerancia.
@@ -2719,10 +2731,16 @@ model ComprobanteProveedor {
   /// seis meses, mirando un comprobante viejo mal leído, la pregunta va a ser
   /// "¿con qué se leyó esto?", y la respuesta no puede ser "con el que
   /// estuviera configurado entonces".
-  /// Cuántos renglones dice VER el lector en el papel, aparte de los que
-  /// transcribió. Si se saltea una línea entera, la aritmética de esa línea
-  /// nunca se evalúa y las dos ecuaciones pueden cerrar igual: este es el
+  /// Cuántos renglones CON CANTIDAD dice VER el lector en el papel, aparte de
+  /// los que transcribió. Si se saltea una línea entera, la aritmética de esa
+  /// línea nunca se evalúa y las dos ecuaciones pueden cerrar igual: este es el
   /// tercer control, y el único que no sale de los mismos datos.
+  ///
+  /// "CON CANTIDAD" es la parte que costó: al principio contaba TODAS las filas
+  /// de la grilla, y en la primera planilla real —31 filas, 10 de ellas
+  /// ofrecidas sin pedir, con cantidad vacía e importe cero— avisó en rojo que
+  /// faltaban 10 renglones sobre una transcripción completa y correcta. Un aviso
+  /// que se equivoca la primera vez que alguien lo usa deja de mirarse.
   lineasEnElPapel Int?
   modeloLectura   String?
   leidoEn         DateTime?
