@@ -37,16 +37,19 @@
 // cargar el peso y nadie sabría por qué.
 
 import { useCallback, useEffect, useState } from "react";
+import { ChevronRight } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiTable from "@/components/sunmi/SunmiTable";
 import { comoSeDice } from "@/lib/compras-proveedor/comprobante/pantalla";
 import {
   estadoDeLaFila,
   origenDelCandidato,
   numerosDeLaFila,
+  formaDeLaFila,
 } from "@/lib/compras-proveedor/comprobante/textosDeFila";
 import {
   Unidad,
@@ -77,6 +80,27 @@ export default function ListaConciliacion({
   const [unidadElegida, setUnidadElegida] = useState({});
   const [aceptando, setAceptando] = useState(null);
   const [decididas, setDecididas] = useState({});
+
+  // ── A 360 SE CAE LA COLUMNA DEL PRECIO ────────────────────────────────
+  //
+  // `SunmiTable` en modo por columnas no tiene versión móvil aparte: es una
+  // tabla con scroll horizontal. Con cuatro columnas en 360 aparece scroll
+  // lateral, y una tabla que se corre a los costados es peor que una columna
+  // menos. Se cae el precio de la factura porque es el que se ve igual al
+  // desplegar; producto, cantidad y estado son los que se escanean contra el
+  // papel de arriba abajo.
+  //
+  // Arranca en false para que el servidor y el cliente dibujen lo mismo, y se
+  // corrige en cuanto el navegador puede medir.
+  const [angosto, setAngosto] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 480px)");
+    const aplicar = () => setAngosto(mq.matches);
+    aplicar();
+    mq.addEventListener?.("change", aplicar);
+    return () => mq.removeEventListener?.("change", aplicar);
+  }, []);
 
   const recargar = useCallback(async () => {
     setCargando(true);
@@ -167,34 +191,28 @@ export default function ListaConciliacion({
       )}
 
       {datos.grupos.map((g) => (
-        <SunmiCard key={g.comprobante.id} className="mb-2">
-          <EncabezadoGrupo comprobante={g.comprobante} cantidad={g.filas.length} />
-          <div className="mt-2 flex flex-col gap-2">
-            {g.filas.map((f) => (
-              <Fila
-                key={f.lineaId}
-                f={f}
-                esRecepcion={esRecepcion && !cerrado}
-                cerrado={cerrado}
-                tieneFiambre={tieneFiambre}
-                puedeRecibir={puedeRecibir}
-                recibidos={recibidos}
-                setRecibidos={setRecibidos}
-                kgRecibidos={kgRecibidos}
-                setKgRecibidos={setKgRecibidos}
-                buscandoEn={buscandoEn}
-                setBuscandoEn={setBuscandoEn}
-                unidadElegida={unidadElegida}
-                setUnidadElegida={setUnidadElegida}
-                aceptando={aceptando}
-                decididas={decididas}
-                setDecididas={setDecididas}
-                onVincular={vincular}
-                onAceptar={aceptarPrecio}
-              />
-            ))}
-          </div>
-        </SunmiCard>
+        <GrupoComprobante
+          key={g.comprobante.id}
+          g={g}
+          esRecepcion={esRecepcion && !cerrado}
+          cerrado={cerrado}
+          tieneFiambre={tieneFiambre}
+          puedeRecibir={puedeRecibir}
+          recibidos={recibidos}
+          setRecibidos={setRecibidos}
+          kgRecibidos={kgRecibidos}
+          setKgRecibidos={setKgRecibidos}
+          buscandoEn={buscandoEn}
+          setBuscandoEn={setBuscandoEn}
+          unidadElegida={unidadElegida}
+          setUnidadElegida={setUnidadElegida}
+          aceptando={aceptando}
+          decididas={decididas}
+          setDecididas={setDecididas}
+          onVincular={vincular}
+          onAceptar={aceptarPrecio}
+          angosto={angosto}
+        />
       ))}
 
       {/* EL GRUPO FINAL, SOLO SI HAY ALGO, con el conteo en el título.
@@ -307,34 +325,165 @@ function CamposRecepcion({ detalleId, esFiambre, tieneFiambre, recibidos, setRec
 }
 
 /**
- * Una fila.
+ * Un comprobante: su encabezado y su tabla.
  *
- * ── EL ORDEN, Y POR QUÉ ES ESE ─────────────────────────────────────────────
+ * ── UNA TABLA POR COMPROBANTE ──────────────────────────────────────────────
  *
- * 1. Identidad + ESTADO. El estado se dice UNA sola vez y acá: una palabra a la
- *    derecha. Antes lo insinuaban tres lugares distintos —la grilla con
- *    "Pedido —", el bloque de recepción con "vinculala primero" y la tira de
- *    aviso con "Está en el pedido"— y dos de los tres se contradecían.
+ * Y no una sola con filas separadoras: así el encabezado de columnas queda
+ * pegado a las filas que describe. Con separadores, líneas de facturas distintas
+ * quedan bajo un mismo encabezado y cuesta ver dónde empieza cada una.
  *
- *    Sin vincular, el título es el TEXTO DE LA FACTURA: cuando no hay producto,
- *    ese texto es la identidad de la línea.
+ * ── EL PATRÓN NO SE INVENTÓ ACÁ ────────────────────────────────────────────
  *
- * 2. El texto de la factura, siempre. En una fila vinculada va debajo del
- *    nombre, chico: ES LO ÚNICO QUE DEJA VER QUE EL VÍNCULO ES CORRECTO, así
- *    que no desaparece nunca.
+ * Es el mismo de la conciliación de listas de precios: fila colapsada con
+ * chevron, y al desplegar el detalle completo. Lo aporta `SunmiTable` en su modo
+ * por columnas —`columnas`, `filas`, `filaExpandible`— que ya existía. Escribir
+ * una tabla desplegable al lado habría sido rehacer un mecanismo probado.
  *
- * 3. Los números, cada uno con su etiqueta pegada. El que no existe no se
- *    dibuja: no hay forma de que quede un guion sin nombre.
- *
- * 4. Solo si hay algo que decir: el acumulado, la unidad, el precio.
- *
- * 5. Solo en recepción y con línea del pedido: los campos de carga.
- *
- * 6. Solo sin vincular: la sugerencia, en UN renglón, con el resto detrás de
- *    "Otro…". Antes eran tres botones a ancho completo apilados y se comían la
- *    pantalla: con 21 líneas, revisar la factura era imposible.
+ * Lo que sí se copió a propósito es la DECISIÓN de diseño que está escrita en
+ * `PanelDecision`: la forma siempre igual y el contenido cambiando. Es lo que
+ * permite mirar veintiuna filas sin volver a aprender dónde está cada cosa.
  */
-function Fila({
+function GrupoComprobante({
+  g, esRecepcion, cerrado, tieneFiambre, puedeRecibir,
+  recibidos, setRecibidos, kgRecibidos, setKgRecibidos,
+  buscandoEn, setBuscandoEn, unidadElegida, setUnidadElegida,
+  aceptando, decididas, setDecididas, onVincular, onAceptar,
+  angosto,
+}) {
+  // Qué filas arrancan abiertas lo decide `formaDeLaFila`, no este componente:
+  // abiertas las que piden algo, cerradas las resueltas.
+  const [abiertas, setAbiertas] = useState(() => {
+    const s = new Set();
+    for (const f of g.filas) if (formaDeLaFila(f).abierta) s.add(f.lineaId);
+    return s;
+  });
+  const alternar = (f) =>
+    setAbiertas((prev) => {
+      const s = new Set(prev);
+      s.has(f.lineaId) ? s.delete(f.lineaId) : s.add(f.lineaId);
+      return s;
+    });
+
+  const columnas = [
+    {
+      clave: "abrir",
+      titulo: "",
+      thClassName: "w-6",
+      render: (f) => (
+        <ChevronRight
+          size={12}
+          aria-hidden="true"
+          className={`transition-transform ${
+            abiertas.has(f.lineaId) ? "rotate-90 sunmi-text-accent" : "sunmi-text-muted"
+          }`}
+        />
+      ),
+    },
+    {
+      clave: "producto",
+      titulo: "Producto",
+      // `w-full max-w-0` es lo que hace que `truncate` funcione DENTRO de una
+      // tabla: sin acotar la celda, un nombre largo estira la columna y la tabla
+      // se va de ancho. Medido en 360 con los nombres reales: salía 376 y
+      // aparecía scroll lateral, que es peor que una columna menos.
+      tdClassName: "w-full max-w-0",
+      render: (f) => {
+        const e = estadoDeLaFila(f);
+        const vinculada = e.codigo !== "SIN_VINCULAR";
+        return (
+          <span className={`block truncate ${vinculada ? "sunmi-text-strong" : "sunmi-text-muted"}`}>
+            {vinculada ? f.producto ?? "Sin nombre" : f.textoCrudo}
+          </span>
+        );
+      },
+    },
+    // A 360 el precio se cae y quedan producto, cantidad y estado: el precio se
+    // ve al desplegar. Medido, no supuesto — con las tres columnas y el precio
+    // adentro, la tabla no entra y aparece scroll lateral.
+    ...(angosto
+      ? []
+      : [{
+          clave: "factura",
+          titulo: "Factura",
+          align: "der",
+          tdClassName: "tabular-nums whitespace-nowrap",
+          render: (f) => {
+            const n = numerosDeLaFila(f).partes.find((x) => x.clave === "factura");
+            return n ? n.valor : "";
+          },
+        }]),
+    {
+      clave: "cantidad",
+      titulo: "Cant.",
+      align: "der",
+      tdClassName: "tabular-nums",
+      render: (f) => cant(f.cantidad),
+    },
+    {
+      clave: "estado",
+      titulo: "Estado",
+      align: "der",
+      render: (f) => {
+        const e = estadoDeLaFila(f);
+        return <span className={`whitespace-nowrap ${e.tono}`}>{e.palabra}</span>;
+      },
+    },
+  ];
+
+  return (
+    <SunmiCard className="mb-2">
+      <EncabezadoGrupo comprobante={g.comprobante} cantidad={g.filas.length} />
+      <div className="mt-2">
+        <SunmiTable
+          densidad="compacta"
+          columnas={columnas}
+          filas={g.filas}
+          claveFila={(f) => f.lineaId}
+          vacio="Este comprobante no tiene líneas leídas."
+          onClickFila={alternar}
+          filaSeleccionada={(f) => abiertas.has(f.lineaId)}
+          tonoFila={(f) => (formaDeLaFila(f).abierta ? "atencion" : null)}
+          // Devolver null es "esta fila está cerrada": el estado de apertura vive
+          // acá, que es donde vive el dato.
+          filaExpandible={(f) =>
+            abiertas.has(f.lineaId) ? (
+              <DetalleFila
+                f={f}
+                esRecepcion={esRecepcion}
+                cerrado={cerrado}
+                tieneFiambre={tieneFiambre}
+                puedeRecibir={puedeRecibir}
+                recibidos={recibidos}
+                setRecibidos={setRecibidos}
+                kgRecibidos={kgRecibidos}
+                setKgRecibidos={setKgRecibidos}
+                buscandoEn={buscandoEn}
+                setBuscandoEn={setBuscandoEn}
+                unidadElegida={unidadElegida}
+                setUnidadElegida={setUnidadElegida}
+                aceptando={aceptando}
+                decididas={decididas}
+                setDecididas={setDecididas}
+                onVincular={onVincular}
+                onAceptar={onAceptar}
+              />
+            ) : null
+          }
+        />
+      </div>
+    </SunmiCard>
+  );
+}
+
+/**
+ * Lo que se ve al desplegar una fila.
+ *
+ * La forma es SIEMPRE la misma y en este orden: qué dice el papel, qué le
+ * corresponde del pedido, y las acciones. Lo que cambia es cuál de las acciones
+ * aparece, y eso lo decidió `formaDeLaFila` — acá no se vuelve a decidir.
+ */
+function DetalleFila({
   f, esRecepcion, cerrado, tieneFiambre, puedeRecibir,
   recibidos, setRecibidos, kgRecibidos, setKgRecibidos,
   buscandoEn, setBuscandoEn, unidadElegida, setUnidadElegida,
@@ -349,24 +498,17 @@ function Fila({
   const origen = origenDelCandidato(f.origen);
 
   return (
-    <div className="rounded border sunmi-border px-2 py-1.5">
-      {/* 1. IDENTIDAD Y ESTADO — el único lugar donde se dice cómo está. */}
-      <div className="flex items-baseline justify-between gap-2">
-        <p className={`text-xs font-bold min-w-0 truncate ${vinculada ? "sunmi-text-strong" : "sunmi-text-muted"}`}>
-          {vinculada ? f.producto ?? "Sin nombre" : f.textoCrudo}
-        </p>
-        <p className={`text-sm2 shrink-0 ${estado.tono}`}>{estado.palabra}</p>
-      </div>
-
-      {/* 2. El texto del papel. En una fila vinculada es lo único que deja
-             comprobar que el vínculo es correcto: no se va nunca. */}
-      {vinculada && f.textoCrudo && (
+    <div className="flex flex-col gap-1 py-1">
+      {/* EL TEXTO DEL PAPEL. En una fila vinculada es lo único que deja ver que
+          el vínculo es correcto, así que no falta nunca. */}
+      {f.textoCrudo && (
         <p className="text-sm2 sunmi-text-muted break-words leading-snug">{f.textoCrudo}</p>
       )}
 
-      {/* 3. Los números, con la etiqueta pegada al valor. */}
+      {/* Los números, con la etiqueta pegada al valor. El que no existe no se
+          dibuja: nunca un guion sin nombre. */}
       {(numeros.partes.length > 0 || numeros.noEstabaEnElPedido) && (
-        <p className="text-sm2 leading-snug mt-0.5">
+        <p className="text-sm2 leading-snug">
           {numeros.partes.map((x, i) => (
             <span key={x.clave}>
               {i > 0 && <span className="sunmi-text-muted"> · </span>}
@@ -382,7 +524,7 @@ function Fila({
         </p>
       )}
 
-      {/* 4. El acumulado entre TODOS los comprobantes: sin sumar de memoria. */}
+      {/* El acumulado entre TODOS los comprobantes: para no sumar de memoria. */}
       {f.textoAcumulado && (
         <p className="text-sm2 sunmi-text-warning leading-snug">{f.textoAcumulado}</p>
       )}
@@ -403,31 +545,29 @@ function Fila({
       />
 
       {cerrado && (
-        <p className="text-sm2 sunmi-text-muted mt-0.5">
+        <p className="text-sm2 sunmi-text-muted">
           Recibido: {cant(f.cantidadRecibida)}
           {f.esFiambre && f.kgRecibidos != null ? ` · ${Number(f.kgRecibidos).toFixed(2)} kg` : ""}
         </p>
       )}
 
-      {/* 5. Los campos de carga. Sin línea del pedido no hay dónde escribir, y
-             el aviso ámbar de arriba ya explica por qué. */}
+      {/* Los campos de carga. Sin línea del pedido no hay dónde escribir, y el
+          aviso ámbar de arriba ya explica por qué. */}
       {esRecepcion && f.pedidoDetalleId != null && (
-        <div className="mt-1">
-          <CamposRecepcion
-            detalleId={f.pedidoDetalleId}
-            esFiambre={f.esFiambre}
-            tieneFiambre={tieneFiambre}
-            recibidos={recibidos}
-            setRecibidos={setRecibidos}
-            kgRecibidos={kgRecibidos}
-            setKgRecibidos={setKgRecibidos}
-          />
-        </div>
+        <CamposRecepcion
+          detalleId={f.pedidoDetalleId}
+          esFiambre={f.esFiambre}
+          tieneFiambre={tieneFiambre}
+          recibidos={recibidos}
+          setRecibidos={setRecibidos}
+          kgRecibidos={kgRecibidos}
+          setKgRecibidos={setKgRecibidos}
+        />
       )}
 
-      {/* 6. LA SUGERENCIA, EN UN RENGLÓN. */}
+      {/* LA SUGERENCIA, EN UN RENGLÓN, con el resto detrás de "Otro…". */}
       {puedeRecibir && !vinculada && (
-        <div className="mt-1">
+        <div>
           {primero ? (
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-sm2 sunmi-text-strong min-w-0 truncate">¿Es «{primero.nombre}»?</span>
@@ -450,9 +590,6 @@ function Fila({
             </div>
           )}
 
-          {/* Los demás candidatos: renglones de texto, no botones a ancho
-              completo. Los tres apilados eran la mayor parte del alto de la
-              fila, y con 21 líneas hacían la factura imposible de revisar. */}
           {verOtros && (
             <div className="mt-1 flex flex-col gap-0.5">
               {candidatos.slice(1).map((c) => (
