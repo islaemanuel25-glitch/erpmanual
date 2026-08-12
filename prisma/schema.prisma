@@ -2742,6 +2742,19 @@ model ComprobanteProveedor {
   /// faltaban 10 renglones sobre una transcripción completa y correcta. Un aviso
   /// que se equivoca la primera vez que alguien lo usa deja de mirarse.
   lineasEnElPapel Int?
+
+  /// Cuántas transcribió EN ESA LECTURA. No se deduce contando las filas de
+  /// ComprobanteLinea: esas cambian después —vincular, excluir, corregir a
+  /// mano—, así que contarlas dentro de seis meses dice cuántas quedaron, no
+  /// cuántas leyó el modelo.
+  ///
+  /// Existe sobre todo para poder auditar el control de arriba. `lineasEnElPapel`
+  /// es obligatorio en el esquema de salida y DERIVABLE de la cantidad de líneas,
+  /// que es la forma exacta del agujero que apagó la verificación del total; lo
+  /// único que lo defiende es el prompt. Con los dos números guardados aparte,
+  /// dentro de veinte facturas se ve si alguna vez difirieron. Si nunca
+  /// difieren, el prompt no está funcionando y el control es decorativo.
+  lineasTranscriptas Int?
   modeloLectura   String?
   leidoEn         DateTime?
   /// Cuántos intentos de lectura lleva. Un reintento no borra el anterior:

@@ -95,6 +95,19 @@ vacío y esa rama no corría jamás. Lo mismo le pasó al estado `SIN_TOTAL` rec
 creado: existía, y un `return` anterior lo hacía inalcanzable. Cuando se escribe
 una defensa, hay que ejercer el caso que la activa.
 
+**Un caso quedó abierto a propósito, y conviene saber cuál.** El conteo de
+renglones —`lineasEnElPapel`— es obligatorio Y derivable de la cantidad de líneas
+transcriptas: tiene la forma exacta del agujero del total, y lo único que lo
+defiende es el prompt, que le pide expresamente al modelo que no lo saque de ahí.
+No se sacó porque el control sirve —antes del arreglo informó 31 sobre 21
+transcriptas, así que sí mira el papel—, pero no hay forma de comprobar desde
+adentro si en una lectura dada lo miró o lo copió.
+
+Lo que sí hay es cómo enterarse: **los dos números se guardan en columnas
+separadas**, `lineasEnElPapel` y `lineasTranscriptas`. Dentro de veinte facturas
+se mira si alguna vez difirieron. Si nunca difieren, el prompt no está
+funcionando y el control es decorativo — y se sabrá con datos, no discutiéndolo.
+
 Y un corolario sobre los candados: **la forma del dato de prueba tiene que ser la
 forma del dato real.** Un pie con `total: 0` y un pie sin el campo no son lo
 mismo, y el candado estaba probando el que nunca ocurre.

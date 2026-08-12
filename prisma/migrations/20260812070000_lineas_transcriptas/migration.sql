@@ -1,0 +1,29 @@
+-- Cuántas líneas transcribió el modelo EN ESA LECTURA.
+--
+-- ── NO ES REDUNDANTE CON CONTAR LAS FILAS ──────────────────────────────────
+--
+-- Las filas de `ComprobanteLinea` cambian después: vincular, excluir o corregir
+-- a mano las toca. Contarlas dentro de seis meses dice cuántas QUEDARON, no
+-- cuántas leyó el modelo. Son dos hechos distintos y por eso van separados.
+--
+-- ── PARA QUÉ SE AGREGA AHORA ───────────────────────────────────────────────
+--
+-- Para poder auditar con datos el único control que quedó con la forma del
+-- agujero que apagó la verificación del total: `lineasEnElPapel` es obligatorio
+-- en el esquema de salida y se puede derivar de la cantidad de líneas
+-- transcriptas. Lo único que lo defiende es el prompt, que le pide expresamente
+-- al modelo que no lo saque de ahí.
+--
+-- Guardando los dos números por separado, dentro de veinte facturas se puede
+-- mirar si alguna vez difirieron. Si NUNCA difieren, el prompt no está
+-- funcionando y el control es decorativo — y se sabrá mirando la tabla, no
+-- discutiéndolo.
+--
+-- Se agrega ahora porque ahora hay quién la escriba: `camposComunes` la completa
+-- en cada lectura. Una columna que nadie escribe es la trampa conocida.
+--
+-- Aditiva: columna nueva y nullable. Las lecturas viejas quedan en NULL, que es
+-- la verdad —no se registró— y no un cero que se confundiría con "no transcribió
+-- ninguna".
+
+ALTER TABLE "ComprobanteProveedor" ADD COLUMN "lineasTranscriptas" INTEGER;
