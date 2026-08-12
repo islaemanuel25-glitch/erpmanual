@@ -95,7 +95,31 @@
 
 /* Base para SunmiButton component */
 .sunmi-btn-base {
-  height: 36px;
+  /* ── MÍNIMO, NO FIJO ────────────────────────────────────────────────────
+   *
+   * Era `height: 36px`. Un botón cuyo contenido pasa de 36 píxeles no recorta
+   * ni scrollea: se DERRAMA sobre lo que tiene abajo. En la pantalla de recetas
+   * en 360 de ancho, la opción "Ya está adentro del precio" —título, detalle y
+   * ejemplo— medía 95px de contenido en una caja de 36 y tapaba la tarjeta
+   * siguiente y el título que venía después.
+   *
+   * Medido con `scripts/medir-desborde.mjs`: cuatro botones desbordaban, de
+   * +14px a +59px.
+   *
+   * El mínimo se conserva en 36 y el relleno vertical es menor que el sobrante
+   * de una línea suelta, así que un botón de una línea sigue midiendo
+   * exactamente 36px y ninguna pantalla se mueve. Lo que cambia es solo el que
+   * antes no entraba.
+   *
+   * `align-items: center` reemplaza al centrado que daba el alto fijo. No se
+   * fija `justify-content`: en flex el default es `flex-start`, que es el mismo
+   * alineado horizontal que tenía como inline-block, y así los botones que ya
+   * pasan `justify-start` o `text-left` siguen comportándose igual.
+   */
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding-block: 0.25rem;
   padding-inline: 1rem;
   border-radius: 0.375rem;
   font-size: 13px;

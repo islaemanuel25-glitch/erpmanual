@@ -101,6 +101,49 @@ que diga "ya no va a llegar nada".
 **Antes de dar por buena una captura, mirar el conteo de filas que informa el
 arnés.** Si dice 1 y la pantalla debería tener cientos, la captura no sirve.
 
+## La captura NO retrata la pantalla, y por eso una rota puede pasar el control
+
+Pasó el 2026-08-12 con la pantalla de recetas: se sacaron las capturas de 360, se
+miraron, y llegó rota al celular igual. **El problema no fue no mirar.**
+
+Son dos cosas, las dos medidas:
+
+1. **`Page.captureScreenshot` sin `captureBeyondViewport` fotografía solo el
+   viewport.** De un formulario largo quedan retratados 640 píxeles.
+
+2. **Y agregar esa opción NO alcanza en esta aplicación**, que es lo que menos se
+   ve venir. Acá el que scrollea NO es el documento: es un contenedor interno
+   —`MAIN.flex-1.min-h-0`— con overflow propio. Como el documento mide lo que el
+   viewport, una captura de "página completa" sale IDÉNTICA a una de viewport.
+
+   Medido en esa pantalla: el contenedor mostraba **539px de 6477px**, o sea que
+   el **92 %** del formulario no aparecía en ninguna imagen. Lo que estaba roto
+   estaba ahí.
+
+Y hay un tercer motivo, independiente de los dos anteriores: **un desborde de 14
+píxeles no se ve como un error.** Se ve como dos tarjetas un poco pegadas. El ojo
+no lo llama.
+
+### Qué hacer entonces
+
+**Medir, no mirar.** `scripts/medir-desborde.mjs` informa números:
+
+    MSYS_NO_PATHCONV=1 node scripts/medir-desborde.mjs --url /modulos/... \
+      --ancho 360 --alto 640 --salida /tmp/desborde --nombre pantalla [--abrir-primero]
+
+Devuelve qué contenedor scrollea de verdad y cuánto queda afuera; qué elementos
+tienen más contenido que su caja —`scrollHeight > clientHeight`, que es lo que
+delata un derrame antes de que se vea—; los altos de los botones de una línea,
+que tienen que seguir siendo 36 si se tocó el kit; y una captura con el recorte
+abierto, que es la única que muestra la pantalla entera. Sale con código 1 si
+algo desborda.
+
+El `MSYS_NO_PATHCONV=1` no es adorno: sin él, Git Bash convierte `/modulos/...`
+en una ruta de Windows y el navegador no puede navegar ahí.
+
+**Una pantalla con formulario largo no se da por revisada con una captura de
+viewport.** Se mide, y recién después se mira la imagen completa.
+
 ## Qué mide la huella y qué no
 
 Mide **estructura en reposo**: columnas, alineaciones, padding, fondo efectivo
