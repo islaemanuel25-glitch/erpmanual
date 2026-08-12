@@ -82,8 +82,25 @@ function estadoDeVinculo(l) {
  * "3 bultos a 37.464" y "36 bultos a 3.122" es fácil; elegir entre "¿por unidad
  * o por bulto?" obliga a rehacer la cuenta en la cabeza.
  */
-function Unidad({ u, onElegir, puedeElegir }) {
+function Unidad({ u, onElegir, puedeElegir, elegida }) {
   if (!u) return null;
+
+  // Ya eligió una persona: se muestra la lectura elegida con sus números, y se
+  // deja volver atrás. No se sigue preguntando lo que ya se contestó.
+  if (elegida && u.lecturas) {
+    const op = elegida === "POR_UNIDAD" ? u.lecturas.porUnidad : u.lecturas.porBulto;
+    return (
+      <div className="mt-1">
+        <p className="text-sm2 sunmi-text-strong">{op.texto}</p>
+        <p className="text-sm2 sunmi-text-muted">{op.cuenta}</p>
+        <div className="mt-1">
+          <SunmiButton color="slate" type="button" onClick={() => onElegir?.(null)}>
+            Cambiar
+          </SunmiButton>
+        </div>
+      </div>
+    );
+  }
 
   if (u.requiereDecision && u.lecturas) {
     return (
@@ -123,6 +140,60 @@ function Unidad({ u, onElegir, puedeElegir }) {
   // Sin producto todavía no hay nada que deducir, y decirlo es mejor que el
   // silencio: aclara que falta vincular primero.
   return <p className="text-sm2 sunmi-text-muted mt-1">{u.texto}</p>;
+}
+
+/**
+ * EL PRECIO: qué cambió y qué se puede hacer.
+ *
+ * Las tres reglas se ven distintas a propósito, porque son tres cosas
+ * distintas:
+ *
+ *   · Subió más del umbral → el porcentaje y los dos botones. Hay que decidir.
+ *   · Bajó → el porcentaje SIN botón. El costo no se baja solo, y el motivo
+ *     está escrito en `aceptarPrecio.js`: una baja aplicada sin querer sube el
+ *     margen en silencio y nadie la mira nunca.
+ *   · Salto brusco → en rojo y sin botón. No es un precio nuevo, es sospecha de
+ *     mala lectura.
+ *
+ * El texto viene armado del servidor. Acá no se recalcula ningún porcentaje: si
+ * la pantalla dijera un número y el servidor escribiera otro, sería peor que no
+ * mostrarlo.
+ */
+function Precio({ p, onAceptar, onNo, puede, aceptando, decidida }) {
+  const d = p?.decision;
+  if (!d || d.accion === "NINGUNA") return null;
+
+  const tono =
+    d.accion === "FRENA" ? "sunmi-text-danger"
+    : d.accion === "OFRECER" ? "sunmi-text-warning"
+    : "sunmi-text-muted";
+
+  return (
+    <div className={`mt-1 flex gap-2 ${tono}`}>
+      <div className="w-1 rounded shrink-0 bg-current" aria-hidden />
+      <div className="min-w-0 w-full">
+        <p className="text-xs font-bold">{d.titulo}</p>
+        <p className="text-sm2 sunmi-text-muted leading-snug">{d.detalle}</p>
+        {d.ofreceAceptar && puede && !decidida && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            <SunmiButton color="cyan" type="button" disabled={aceptando} onClick={onAceptar}>
+              {aceptando ? "Aceptando…" : "Aceptar"}
+            </SunmiButton>
+            <SunmiButton color="slate" type="button" disabled={aceptando} onClick={onNo}>
+              No
+            </SunmiButton>
+          </div>
+        )}
+        {/* Decir que no NO escribe nada: el estado de no aceptar es el que la
+            línea ya tiene. Por eso alcanza con dejar de ofrecerlo. */}
+        {decidida === "NO" && (
+          <p className="text-sm2 sunmi-text-muted mt-1">
+            Queda con el precio que tenía. No se escribió nada.
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** La tira de aviso de la columna Revisar: barra, palabra corta, detalle chico. */
@@ -207,6 +278,16 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
   // Las que se resolvieron en ESTA apertura de la lista. Se quedan a la vista
   // para que nada se mueva abajo del dedo; se van al cerrar y volver a abrir.
   const [recienResueltas, setRecienResueltas] = useState(() => new Set());
+  // La unidad que una persona eligió cuando el cociente no alcanzó.
+  //
+  // Vive en la pantalla y no en la base: NO SE GUARDA. Si se cierra sin
+  // aceptar, la próxima vez vuelve a preguntar. Es a propósito por ahora —
+  // guardarla es otra columna— y se dice acá para que nadie la suponga
+  // persistida. Al aceptar sí viaja al servidor, que la vuelve a usar para
+  // resolver qué precio escribe.
+  const [unidadElegida, setUnidadElegida] = useState({}); // lineaId → POR_UNIDAD | POR_BULTO
+  const [aceptando, setAceptando] = useState(null); // lineaId
+  const [decididas, setDecididas] = useState({}); // lineaId → "SI" | "NO"
 
   async function recargar() {
     setCargando(true);
@@ -239,6 +320,33 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
     }
   }
 
+  async function aceptarPrecio(lineaId) {
+    setMensaje(null);
+    setAceptando(lineaId);
+    try {
+      const r = await fetch("/api/compras-proveedor/comprobantes/aceptar-precio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineaId, unidad: unidadElegida[lineaId] ?? undefined }),
+      });
+      const d = await r.json();
+      setMensaje({ tipo: d.ok ? "ok" : "error", texto: d.ok ? d.queHacer : d.queHacer || d.error });
+      if (d.ok) {
+        setDecididas((s) => ({ ...s, [lineaId]: "SI" }));
+        setRecienResueltas((s) => new Set(s).add(lineaId));
+      }
+      await recargar();
+      onCambio?.();
+    } catch {
+      setMensaje({
+        tipo: "error",
+        texto: "Se cortó la conexión al aceptar el precio. No se escribió nada.",
+      });
+    } finally {
+      setAceptando(null);
+    }
+  }
+
   if (cargando) return <SunmiLoader />;
   if (!datos) return <p className="text-xs sunmi-text-muted">{mensaje?.texto ?? "Sin datos."}</p>;
 
@@ -249,7 +357,14 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
   // abierto.
   // Una línea con la unidad sin resolver también pide decisión: si no, quedaría
   // escondida detrás del filtro y nadie la miraría nunca.
-  const pideDecision = (l) => l.requiereDecision || l.unidad?.requiereDecision || recienResueltas.has(l.id);
+  // Un precio que espera un sí o un no también pide decisión: si no, quedaría
+  // escondido detrás del filtro y nadie lo miraría nunca. Es el mismo motivo por
+  // el que entró la unidad sin resolver.
+  const pideDecision = (l) =>
+    l.requiereDecision ||
+    l.unidad?.requiereDecision ||
+    (l.precio?.decision?.ofreceAceptar && !decididas[l.id]) ||
+    recienResueltas.has(l.id);
   const visibles = verResueltas ? lineas : lineas.filter(pideDecision);
   const resueltasOcultas = lineas.length - visibles.length;
 
@@ -267,6 +382,12 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
           {resumen.unidadSinResolver > 0 && (
             <span className="sunmi-text-warning">
               {" "}· {resumen.unidadSinResolver} sin saber si es por unidad o por bulto
+            </span>
+          )}
+          {resumen.precioEsperando > 0 && (
+            <span className="sunmi-text-warning">
+              {" "}· {resumen.precioEsperando}{" "}
+              {resumen.precioEsperando === 1 ? "precio que subió" : "precios que subieron"}
             </span>
           )}
         </p>
@@ -340,7 +461,20 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
                   </td>
                   <td className="px-3 py-1.5 align-top max-w-[24rem]">
                     <Revisar linea={l}>
-                      <Unidad u={l.unidad} puedeElegir={puedeVincular} />
+                      <Unidad
+                        u={l.unidad}
+                        puedeElegir={puedeVincular}
+                        elegida={unidadElegida[l.id] ?? null}
+                        onElegir={(v) => setUnidadElegida((s) => ({ ...s, [l.id]: v }))}
+                      />
+                      <Precio
+                        p={l.precio}
+                        puede={puedeVincular}
+                        aceptando={aceptando === l.id}
+                        decidida={decididas[l.id] === "NO" ? "NO" : null}
+                        onAceptar={() => aceptarPrecio(l.id)}
+                        onNo={() => setDecididas((s) => ({ ...s, [l.id]: "NO" }))}
+                      />
                       {puedeVincular && e.pideAccion && (
                         <div className="mt-1 flex flex-col gap-1">
                           {(l.candidatos || []).slice(0, 3).map((c) => (
@@ -405,7 +539,20 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
               </p>
               <div className="mt-2">
                 <Revisar linea={l}>
-                  <Unidad u={l.unidad} puedeElegir={puedeVincular} />
+                  <Unidad
+                    u={l.unidad}
+                    puedeElegir={puedeVincular}
+                    elegida={unidadElegida[l.id] ?? null}
+                    onElegir={(v) => setUnidadElegida((s) => ({ ...s, [l.id]: v }))}
+                  />
+                  <Precio
+                    p={l.precio}
+                    puede={puedeVincular}
+                    aceptando={aceptando === l.id}
+                    decidida={decididas[l.id] === "NO" ? "NO" : null}
+                    onAceptar={() => aceptarPrecio(l.id)}
+                    onNo={() => setDecididas((s) => ({ ...s, [l.id]: "NO" }))}
+                  />
                   {puedeVincular && e.pideAccion && (
                     <div className="mt-1 flex flex-col gap-1">
                       {(l.candidatos || []).slice(0, 3).map((c) => (
