@@ -108,9 +108,46 @@ separadas**, `lineasEnElPapel` y `lineasTranscriptas`. Dentro de veinte facturas
 se mira si alguna vez difirieron. Si nunca difieren, el prompt no está
 funcionando y el control es decorativo — y se sabrá con datos, no discutiéndolo.
 
+**Y un candado puede estar mirando el lugar equivocado.** Había dos exigiendo que
+los mensajes digan qué pasó: uno sobre el catálogo del servidor, otro sobre los
+textos de la pantalla. El día que producción se cayó, lo único que se vio fue
+"Error interno" — porque ese texto salía del `catch` de la ruta, un TERCER lugar
+donde ninguno de los dos miraba. Cuando un defecto que un candado debería haber
+atrapado igual pasa, la primera pregunta no es si el candado es débil: es si está
+mirando donde el problema ocurre.
+
+Deuda anotada de ese mismo episodio: **188 archivos bajo `app/api` contestan
+"Error interno"**. El candado nuevo cubre solo las rutas del módulo de
+comprobante. Cualquier error de cualquier otro módulo sigue llegando igual de
+mudo, y va a costar otra vuelta en otro lado.
+
 Y un corolario sobre los candados: **la forma del dato de prueba tiene que ser la
 forma del dato real.** Un pie con `total: 0` y un pie sin el campo no son lo
 mismo, y el candado estaba probando el que nunca ocurre.
+
+Corolario, y es de los que más caro salieron: **una consulta de Prisma no se
+prueba con candados ni con el build. Hay que ejercerla contra Postgres.**
+
+Y el detalle que lo hace fácil de saltear: **falla igual con cero filas.** Lo que
+Postgres valida son los ARGUMENTOS, no el resultado, así que "la base local está
+vacía" NO es motivo para no correrla. Es al revés: correrla contra una base vacía
+cuesta segundos y encuentra exactamente lo mismo.
+
+El 2026-08-12 tres rutas pedían `productoLocal` en un `select` de
+`ComprobanteLinea`. Esa relación no existe —el modelo tiene el escalar
+`productoLocalId` y nada más—. El build compiló, los 3.071 candados quedaron en
+verde, y la pantalla de comprobantes se cayó en producción. La subida se veía
+rota sin estarlo: subía bien y fallaba al recargar la lista, así que el error de
+la recarga tapaba el éxito de la subida.
+
+Nada podía atajarlo: Next no mira los argumentos de Prisma al compilar y los
+candados son funciones puras que no tocan la base. Es la misma familia que el
+cliente sin regenerar, y las dos terminan igual — **algo que no falla donde se
+rompe.**
+
+En la práctica, después de escribir o cambiar una consulta: correrla, con su
+forma exacta, contra la base. Y comprobar que esa corrida atrapa la versión mala,
+o no se sabe si prueba algo.
 
 Corolario: **después de tocar `schema.prisma`, correr `prisma generate` antes de
 probar nada.** Esto no lo ve ni el build ni los candados. El proyecto es

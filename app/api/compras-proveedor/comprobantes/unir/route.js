@@ -25,6 +25,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { puedenUnirse } from "@/lib/compras-proveedor/comprobante/pantalla";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function POST(req) {
   try {
@@ -134,6 +135,9 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error("Error compras-proveedor/comprobantes/unir:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "unir los comprobantes",
+        quedo: "Puede que la unión haya quedado hecha: mirá la lista antes de repetirla.",
+      }) }, { status: 500 });
   }
 }

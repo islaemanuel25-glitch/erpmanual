@@ -49,6 +49,7 @@ import {
   evaluarTanda,
   queHacer,
 } from "@/lib/compras-proveedor/comprobante/subida";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function POST(req) {
   try {
@@ -308,6 +309,9 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error("Error compras-proveedor/comprobantes/subir:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "subir los comprobantes",
+        quedo: "Puede que alguno haya entrado igual: mirá la lista antes de volver a subirlos, para no cargarlos dos veces.",
+      }) }, { status: 500 });
   }
 }

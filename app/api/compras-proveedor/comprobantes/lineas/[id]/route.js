@@ -40,6 +40,7 @@ import {
 } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function GET(req, { params }) {
   try {
@@ -261,6 +262,9 @@ export async function GET(req, { params }) {
     });
   } catch (err) {
     console.error("Error comprobantes/lineas:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "abrir el detalle del comprobante",
+        quedo: "No se tocó nada: esto solo muestra lo que ya estaba leído.",
+      }) }, { status: 500 });
   }
 }

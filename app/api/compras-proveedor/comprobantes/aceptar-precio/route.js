@@ -29,6 +29,7 @@ import { puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPreci
 import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
 import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function POST(req) {
   try {
@@ -155,6 +156,9 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error("Error comprobantes/aceptar-precio:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "aceptar el precio",
+        quedo: "Puede que el precio haya quedado escrito en la línea del pedido: fijate en el pedido antes de aceptarlo de nuevo.",
+      }) }, { status: 500 });
   }
 }

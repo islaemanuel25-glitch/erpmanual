@@ -12,6 +12,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { aPreguntas } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function GET(req) {
   try {
@@ -56,6 +57,9 @@ export async function GET(req) {
     });
   } catch (err) {
     console.error("Error recetas/obtener:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "abrir la receta",
+        quedo: "No se tocó nada: esto solo muestra lo que ya estaba guardado.",
+      }) }, { status: 500 });
   }
 }

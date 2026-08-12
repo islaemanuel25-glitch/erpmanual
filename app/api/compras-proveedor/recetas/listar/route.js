@@ -12,6 +12,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { resumenEnCriollo } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function GET(req) {
   try {
@@ -65,6 +66,9 @@ export async function GET(req) {
     });
   } catch (err) {
     console.error("Error recetas/listar:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "cargar las recetas",
+        quedo: "Las recetas guardadas están: esto es solo la pantalla.",
+      }) }, { status: 500 });
   }
 }

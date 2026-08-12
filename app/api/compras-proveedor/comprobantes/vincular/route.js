@@ -20,6 +20,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { aliasAEscribir } from "@/lib/compras-proveedor/comprobante/vinculo";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function POST(req) {
   try {
@@ -141,6 +142,9 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error("Error comprobantes/vincular:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "vincular la línea con el producto",
+        quedo: "Puede que el vínculo haya quedado hecho: volvé a abrir el detalle y fijate antes de repetirlo.",
+      }) }, { status: 500 });
   }
 }

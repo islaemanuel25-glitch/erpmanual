@@ -27,6 +27,7 @@ import { ofrecerRelectura } from "@/lib/compras-proveedor/comprobante/relecturaT
 import { cuotaDelDia } from "@/lib/compras-proveedor/comprobante/lector/cuota";
 import { armarCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import "@/lib/compras-proveedor/comprobante/lector/index.js";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function POST(req) {
   try {
@@ -106,6 +107,9 @@ export async function POST(req) {
     });
   } catch (err) {
     console.error("Error recetas/guardar:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "guardar la receta",
+        quedo: "Puede que haya quedado guardada: volvé a abrirla y fijate antes de cargarla de nuevo.",
+      }) }, { status: 500 });
   }
 }

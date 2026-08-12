@@ -34,6 +34,7 @@ import {
   recetaDelProveedor,
   fechaLeidaONull,
 } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function POST(req, { params }) {
   try {
@@ -287,7 +288,10 @@ export async function POST(req, { params }) {
     });
   } catch (err) {
     console.error("Error compras-proveedor/comprobantes/leer:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "leer el comprobante",
+        quedo: "El comprobante y su foto quedaron guardados, así que no hay que volver a subirlo.",
+      }) }, { status: 500 });
   }
 }
 

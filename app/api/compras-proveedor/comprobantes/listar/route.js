@@ -20,6 +20,7 @@ import { cuotaDelDia, horaLocalDeReposicion } from "@/lib/compras-proveedor/comp
 // El índice registra los lectores al importarse. Sin esto la cadena diría que no
 // hay ninguno y el contador no sabría contra qué modelos contar.
 import "@/lib/compras-proveedor/comprobante/lector/index.js";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function GET(req) {
   try {
@@ -172,6 +173,9 @@ export async function GET(req) {
     });
   } catch (err) {
     console.error("Error compras-proveedor/comprobantes/listar:", err);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: errorInesperado({
+        operacion: "cargar la lista de comprobantes",
+        quedo: "Los comprobantes que subiste están guardados: esto es solo la pantalla.",
+      }) }, { status: 500 });
   }
 }
