@@ -270,6 +270,17 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
             </span>
           )}
         </p>
+        {/* ── LOS DOS CONTEOS ──────────────────────────────────────────
+            Contra el PAPEL y contra el PEDIDO, y son preguntas distintas.
+            Que difieran del pedido NO es un error: puede faltar mercadería o
+            venir algo de más. Que difieran del papel sí lo es. */}
+        {datos.conteos?.enElPedido > 0 && (
+          <p className="text-sm2 sunmi-text-muted">
+            El pedido tiene {datos.conteos.enElPedido}{" "}
+            {datos.conteos.enElPedido === 1 ? "línea" : "líneas"}; la factura trajo{" "}
+            {datos.conteos.transcriptas}.
+          </p>
+        )}
         {resueltasOcultas > 0 && !verResueltas && (
           <SunmiButton color="slate" type="button" onClick={() => setVerResueltas(true)}>
             Ver las {resueltasOcultas} ya resueltas
@@ -281,6 +292,23 @@ export default function LineasComprobante({ comprobanteId, puedeVincular = true,
           </SunmiButton>
         )}
       </div>
+
+      {/* FALTAN RENGLONES: se avisa arriba de todo y aunque la cuenta cierre.
+          Una línea que el lector no transcribió nunca se evalúa, así que las
+          dos ecuaciones pueden dar bien con la factura incompleta. */}
+      {datos.conteos?.faltanDelPapel > 0 && (
+        <div className="mb-2 rounded border sunmi-border p-2">
+          <p className="text-xs font-bold sunmi-text-danger">
+            Faltan {datos.conteos.faltanDelPapel}{" "}
+            {datos.conteos.faltanDelPapel === 1 ? "renglón" : "renglones"} del comprobante
+          </p>
+          <p className="text-sm2 sunmi-text-muted leading-snug">
+            El lector dice ver {datos.conteos.enElPapel} en el papel y transcribió{" "}
+            {datos.conteos.transcriptas}. Revisá el detalle contra la foto antes de dar esta
+            lectura por buena, aunque la cuenta cierre.
+          </p>
+        </div>
+      )}
 
       {mensaje && (
         <p className={`text-xs mb-2 ${mensaje.tipo === "error" ? "sunmi-text-danger" : "sunmi-text-success"}`}>

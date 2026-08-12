@@ -65,6 +65,7 @@ export async function GET(req, { params }) {
       where: { id: comprobanteId, grupoId },
       select: {
         id: true, proveedorId: true, pedidoId: true, estado: true,
+        lineasEnElPapel: true,
         // La receta con la que se leyó: es la que convierte neto a final, y
         // tiene que ser la MISMA que usó la lectura, no la de hoy.
         recetaUsada: true,
@@ -218,6 +219,24 @@ export async function GET(req, { params }) {
         pedidoId: comprobante.pedidoId,
       },
       lineas,
+      // ── LOS DOS CONTEOS, ARRIBA Y A LA VISTA ─────────────────────────
+      //
+      // Contra el PAPEL: si el lector dice ver más renglones de los que trajo,
+      // falta uno y hay que decirlo aunque la cuenta cierre.
+      //
+      // Contra el PEDIDO: no se asume que difieran por error. Puede faltar
+      // mercadería o venir algo de más, y las dos cosas son información. Pero el
+      // número tiene que estar a la vista.
+      conteos: {
+        enElPapel: comprobante.lineasEnElPapel ?? null,
+        transcriptas: lineas.length,
+        faltanDelPapel:
+          Number.isFinite(comprobante.lineasEnElPapel) &&
+          comprobante.lineasEnElPapel > lineas.length
+            ? comprobante.lineasEnElPapel - lineas.length
+            : 0,
+        enElPedido: detallesPlanos.length,
+      },
       resumen: {
         total: lineas.length,
         vinculadasSolas: lineas.filter((l) => l.vinculadaSola).length,

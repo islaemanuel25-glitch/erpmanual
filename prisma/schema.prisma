@@ -2719,6 +2719,11 @@ model ComprobanteProveedor {
   /// seis meses, mirando un comprobante viejo mal leído, la pregunta va a ser
   /// "¿con qué se leyó esto?", y la respuesta no puede ser "con el que
   /// estuviera configurado entonces".
+  /// Cuántos renglones dice VER el lector en el papel, aparte de los que
+  /// transcribió. Si se saltea una línea entera, la aritmética de esa línea
+  /// nunca se evalúa y las dos ecuaciones pueden cerrar igual: este es el
+  /// tercer control, y el único que no sale de los mismos datos.
+  lineasEnElPapel Int?
   modeloLectura   String?
   leidoEn         DateTime?
   /// Cuántos intentos de lectura lleva. Un reintento no borra el anterior:
