@@ -51,7 +51,8 @@ import {
   numerosDeLaFila,
   importe,
   formaDeLaFila,
-  textoDePendiente,
+  textoDelProducto,
+  ladosDeLaFila,
 } from "@/lib/compras-proveedor/comprobante/textosDeFila";
 import {
   Unidad,
@@ -83,26 +84,15 @@ export default function ListaConciliacion({
   const [aceptando, setAceptando] = useState(null);
   const [decididas, setDecididas] = useState({});
 
-  // ── A 360 SE CAE LA COLUMNA DEL PRECIO ────────────────────────────────
+  // NO HAY COLUMNA QUE SE CAIGA A 360.
   //
-  // `SunmiTable` en modo por columnas no tiene versión móvil aparte: es una
-  // tabla con scroll horizontal. Con cuatro columnas en 360 aparece scroll
-  // lateral, y una tabla que se corre a los costados es peor que una columna
-  // menos. Se cae el precio de la factura porque es el que se ve igual al
-  // desplegar; producto, cantidad y estado son los que se escanean contra el
-  // papel de arriba abajo.
+  // Antes había una: con cuatro columnas la tabla se iba de ancho, así que se
+  // dejaba caer el precio por debajo de 480. Ya no hace falta —son tres, y las
+  // de números se miden por su contenido— y además el precio ahora no puede
+  // faltar: sin él, la fila muestra una cantidad sin nada contra qué
+  // compararla, que es el defecto que esta tanda vino a sacar.
   //
-  // Arranca en false para que el servidor y el cliente dibujen lo mismo, y se
-  // corrige en cuanto el navegador puede medir.
-  const [angosto, setAngosto] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(max-width: 480px)");
-    const aplicar = () => setAngosto(mq.matches);
-    aplicar();
-    mq.addEventListener?.("change", aplicar);
-    return () => mq.removeEventListener?.("change", aplicar);
-  }, []);
+  // Medido a 360 con las 21 líneas reales: nada desborda.
 
   const recargar = useCallback(async () => {
     setCargando(true);
@@ -213,7 +203,6 @@ export default function ListaConciliacion({
           setDecididas={setDecididas}
           onVincular={vincular}
           onAceptar={aceptarPrecio}
-          angosto={angosto}
         />
       ))}
 
@@ -351,7 +340,6 @@ function GrupoComprobante({
   recibidos, setRecibidos, kgRecibidos, setKgRecibidos,
   buscandoEn, setBuscandoEn, unidadElegida, setUnidadElegida,
   aceptando, decididas, setDecididas, onVincular, onAceptar,
-  angosto,
 }) {
   // TODAS ARRANCAN CERRADAS.
   //
@@ -392,69 +380,63 @@ function GrupoComprobante({
       // se va de ancho. Medido en 360 con los nombres reales: salía 376 y
       // aparecía scroll lateral, que es peor que una columna menos.
       tdClassName: "w-full max-w-0",
-      // DOS RENGLONES, como en la grilla de listas: arriba el producto del ERP,
-      // abajo lo que dice el papel. Con un solo renglón, seis Chesterfield
-      // distintos quedaban todos en "CHESTER…" y no se podían distinguir.
+      // Los dos renglones los decide `textoDelProducto`, fuera del componente,
+      // para que la regla se pueda ejercer sin dibujar nada. Acá solo se pinta.
       //
-      // El de abajo va en 9.5px, el mismo tamaño que usa listas para el texto
-      // del archivo: es contexto, no el dato principal.
+      // LA IDENTIDAD PUEDE OCUPAR DOS RENGLONES, y por eso va `line-clamp-2` y
+      // no `truncate`. Medido en 360 con la factura real: en un solo renglón
+      // "CHESTERFIELD 20 CONV KS" y "CHESTERFIELD 20 CONV BOX" se cortaban los
+      // dos en "CHESTERFIELD 20 C…" — justo donde difieren— y quedaban iguales.
+      // Distinguirlos es lo único que esta fila tiene que lograr cerrada.
       //
-      // `title` en los dos: el nombre completo se puede ver sin abrir la fila.
+      // Un nombre del ERP entra en un renglón, así que las filas vinculadas no
+      // crecen: el alto extra lo paga solo la que todavía no se resolvió.
       render: (f) => {
-        const e = estadoDeLaFila(f);
-        const vinculada = e.codigo !== "SIN_VINCULAR";
+        const t = textoDelProducto(f);
         return (
           <>
-            <div
-              className={`truncate font-medium ${vinculada ? "sunmi-text-strong" : "sunmi-text-warning"}`}
-              title={vinculada ? f.producto ?? "" : "Sin vincular"}
-            >
-              {vinculada ? f.producto ?? "Sin nombre" : "Sin vincular"}
+            <div className="line-clamp-2 break-words font-medium leading-snug sunmi-text-strong" title={t.arriba}>
+              {t.arriba}
             </div>
-            <div className="text-xs2 sunmi-text-muted truncate" title={f.textoCrudo ?? ""}>
-              {f.textoCrudo}
-            </div>
+            {t.abajo && (
+              <div
+                className={`text-xs2 truncate ${t.esPregunta ? "sunmi-text-accent" : "sunmi-text-muted"}`}
+                title={t.abajo}
+              >
+                {t.abajo}
+              </div>
+            )}
           </>
         );
       },
     },
-    // A 360 el precio se cae y quedan producto, cantidad y "Falta": el precio se
-    // ve al desplegar. Medido, no supuesto — con las tres columnas y el precio
-    // adentro, el nombre del producto se corta y seis Chesterfield distintos
-    // quedan iguales, que es la única cosa que esta lista tiene que dejar ver.
-    ...(angosto
-      ? []
-      : [{
-          clave: "precio",
-          titulo: "Precio",
-          align: "der",
-          tdClassName: "tabular-nums whitespace-nowrap",
-          // SOLO EL PRECIO, no "cantidad × precio": la cantidad ya tiene su
-          // columna al lado y decirla dos veces en la misma fila es lo que este
-          // módulo vino a sacar. Vacío cuando todavía no hay producto, porque
-          // el precio a escribir depende de con qué se compare.
-          render: (f) => importe(f.costoFactura) ?? "",
-        }]),
-    {
-      clave: "cantidad",
-      titulo: "Cant.",
+    // ── LO QUE SE COMPARA, AL LADO ────────────────────────────────────────
+    //
+    // Dos columnas con la misma forma: cantidad arriba, precio abajo. Es el
+    // equivalente exacto de "costo actual" contra "costo nuevo" en la grilla de
+    // listas. Antes había una sola cantidad, sin nada contra qué compararla, y
+    // esta lista existe para comparar.
+    //
+    // El ámbar es del precio de la factura y solo cuando hay los dos números.
+    ...["pedido", "factura"].map((lado) => ({
+      clave: lado,
+      titulo: lado === "pedido" ? "Pedido" : "Factura",
       align: "der",
-      thClassName: "w-12",
-      tdClassName: "tabular-nums",
-      render: (f) => cant(f.cantidad),
-    },
-    {
-      clave: "pendiente",
-      titulo: "Falta",
-      align: "der",
-      thClassName: "w-16",
-      // QUÉ FALTA, no cómo está: la columna de producto ya dice "Sin vincular"
-      // cuando no hay producto. Es la misma división que en la grilla de listas.
+      tdClassName: "tabular-nums whitespace-nowrap",
       render: (f) => {
-        const t = textoDePendiente(f);
-        return <span className={`whitespace-nowrap ${t.tono}`}>{t.texto}</span>;
+        const l = ladosDeLaFila(f);
+        const v = l[lado];
+        const ambar = lado === "factura" && l.difiere;
+        return (
+          <>
+            <div className="sunmi-text-strong">{v.cantidad ?? "—"}</div>
+            <div className={`text-xs2 ${ambar ? "sunmi-text-warning" : "sunmi-text-muted"}`}>
+              {v.precio ?? "—"}
+            </div>
+          </>
+        );
       },
-    },
+    })),
   ];
 
   return (
