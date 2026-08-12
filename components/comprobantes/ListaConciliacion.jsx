@@ -44,11 +44,14 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { comoSeDice } from "@/lib/compras-proveedor/comprobante/pantalla";
 import {
-  Revisar,
+  estadoDeLaFila,
+  origenDelCandidato,
+  numerosDeLaFila,
+} from "@/lib/compras-proveedor/comprobante/textosDeFila";
+import {
   Unidad,
   Precio,
   BuscadorProducto,
-  estadoDeVinculo,
 } from "@/components/comprobantes/PiezasConciliacion";
 
 const money = (v) => (v == null ? "—" : `$${Number(v).toFixed(2)}`);
@@ -303,52 +306,113 @@ function CamposRecepcion({ detalleId, esFiambre, tieneFiambre, recibidos, setRec
   );
 }
 
-/** Una fila: la línea de la factura con lo del pedido al lado. */
+/**
+ * Una fila.
+ *
+ * ── EL ORDEN, Y POR QUÉ ES ESE ─────────────────────────────────────────────
+ *
+ * 1. Identidad + ESTADO. El estado se dice UNA sola vez y acá: una palabra a la
+ *    derecha. Antes lo insinuaban tres lugares distintos —la grilla con
+ *    "Pedido —", el bloque de recepción con "vinculala primero" y la tira de
+ *    aviso con "Está en el pedido"— y dos de los tres se contradecían.
+ *
+ *    Sin vincular, el título es el TEXTO DE LA FACTURA: cuando no hay producto,
+ *    ese texto es la identidad de la línea.
+ *
+ * 2. El texto de la factura, siempre. En una fila vinculada va debajo del
+ *    nombre, chico: ES LO ÚNICO QUE DEJA VER QUE EL VÍNCULO ES CORRECTO, así
+ *    que no desaparece nunca.
+ *
+ * 3. Los números, cada uno con su etiqueta pegada. El que no existe no se
+ *    dibuja: no hay forma de que quede un guion sin nombre.
+ *
+ * 4. Solo si hay algo que decir: el acumulado, la unidad, el precio.
+ *
+ * 5. Solo en recepción y con línea del pedido: los campos de carga.
+ *
+ * 6. Solo sin vincular: la sugerencia, en UN renglón, con el resto detrás de
+ *    "Otro…". Antes eran tres botones a ancho completo apilados y se comían la
+ *    pantalla: con 21 líneas, revisar la factura era imposible.
+ */
 function Fila({
   f, esRecepcion, cerrado, tieneFiambre, puedeRecibir,
   recibidos, setRecibidos, kgRecibidos, setKgRecibidos,
   buscandoEn, setBuscandoEn, unidadElegida, setUnidadElegida,
   aceptando, decididas, setDecididas, onVincular, onAceptar,
 }) {
-  const e = estadoDeVinculo(f);
-  const nombre = f.productoLocalId || f.vinculadaSola ? f.producto : null;
+  const [verOtros, setVerOtros] = useState(false);
+  const estado = estadoDeLaFila(f);
+  const numeros = numerosDeLaFila(f);
+  const vinculada = estado.codigo !== "SIN_VINCULAR";
+  const candidatos = f.candidatos ?? [];
+  const primero = candidatos[0] ?? null;
+  const origen = origenDelCandidato(f.origen);
 
   return (
-    <div className="rounded border sunmi-border p-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className={`text-xs font-bold ${nombre ? "sunmi-text-strong" : "sunmi-text-muted"}`}>
-          {nombre ?? "Sin vincular"}
+    <div className="rounded border sunmi-border px-2 py-1.5">
+      {/* 1. IDENTIDAD Y ESTADO — el único lugar donde se dice cómo está. */}
+      <div className="flex items-baseline justify-between gap-2">
+        <p className={`text-xs font-bold min-w-0 truncate ${vinculada ? "sunmi-text-strong" : "sunmi-text-muted"}`}>
+          {vinculada ? f.producto ?? "Sin nombre" : f.textoCrudo}
         </p>
-        <p className="text-sm2 sunmi-text-muted">{f.subtotal != null ? money(f.subtotal) : ""}</p>
-      </div>
-      <p className="text-sm2 sunmi-text-muted break-words">{f.textoCrudo}</p>
-
-      {/* LO PEDIDO CONTRA LO RECIBIDO, y los dos costos, uno al lado del otro. */}
-      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-sm2">
-        <span className="sunmi-text-muted">Pedido</span>
-        <span className="sunmi-text-muted">Factura</span>
-        <span className="sunmi-text-strong">
-          {cant(f.cantidadPedida)} {f.unidadPedido ? f.unidadPedido.toLowerCase() : ""}
-        </span>
-        <span className="sunmi-text-strong">{cant(f.cantidad)}</span>
-        <span className="sunmi-text-strong">{money(f.costoCatalogo)}</span>
-        <span className="sunmi-text-strong">{money(f.costoFactura)}</span>
+        <p className={`text-sm2 shrink-0 ${estado.tono}`}>{estado.palabra}</p>
       </div>
 
-      {/* El acumulado entre TODOS los comprobantes: para no sumar de memoria. */}
-      {f.textoAcumulado && (
-        <p className="text-sm2 sunmi-text-warning mt-1 leading-snug">{f.textoAcumulado}</p>
+      {/* 2. El texto del papel. En una fila vinculada es lo único que deja
+             comprobar que el vínculo es correcto: no se va nunca. */}
+      {vinculada && f.textoCrudo && (
+        <p className="text-sm2 sunmi-text-muted break-words leading-snug">{f.textoCrudo}</p>
       )}
 
+      {/* 3. Los números, con la etiqueta pegada al valor. */}
+      {(numeros.partes.length > 0 || numeros.noEstabaEnElPedido) && (
+        <p className="text-sm2 leading-snug mt-0.5">
+          {numeros.partes.map((x, i) => (
+            <span key={x.clave}>
+              {i > 0 && <span className="sunmi-text-muted"> · </span>}
+              <span className="sunmi-text-muted">{x.etiqueta} </span>
+              <span className="sunmi-text-strong">{x.valor}</span>
+            </span>
+          ))}
+          {numeros.noEstabaEnElPedido && (
+            <span className="sunmi-text-warning">
+              {numeros.partes.length > 0 ? " · " : ""}No estaba en el pedido
+            </span>
+          )}
+        </p>
+      )}
+
+      {/* 4. El acumulado entre TODOS los comprobantes: sin sumar de memoria. */}
+      {f.textoAcumulado && (
+        <p className="text-sm2 sunmi-text-warning leading-snug">{f.textoAcumulado}</p>
+      )}
+
+      <Unidad
+        u={f.unidad}
+        puedeElegir={puedeRecibir}
+        elegida={unidadElegida[f.lineaId] ?? null}
+        onElegir={(v) => setUnidadElegida((s) => ({ ...s, [f.lineaId]: v }))}
+      />
+      <Precio
+        p={f.precio}
+        puede={puedeRecibir}
+        aceptando={aceptando === f.lineaId}
+        decidida={decididas[f.lineaId] === "NO" ? "NO" : null}
+        onAceptar={() => onAceptar(f.lineaId)}
+        onNo={() => setDecididas((s) => ({ ...s, [f.lineaId]: "NO" }))}
+      />
+
       {cerrado && (
-        <p className="text-sm2 sunmi-text-muted mt-1">
+        <p className="text-sm2 sunmi-text-muted mt-0.5">
           Recibido: {cant(f.cantidadRecibida)}
           {f.esFiambre && f.kgRecibidos != null ? ` · ${Number(f.kgRecibidos).toFixed(2)} kg` : ""}
         </p>
       )}
 
-      {esRecepcion && (
-        <div className="mt-2">
+      {/* 5. Los campos de carga. Sin línea del pedido no hay dónde escribir, y
+             el aviso ámbar de arriba ya explica por qué. */}
+      {esRecepcion && f.pedidoDetalleId != null && (
+        <div className="mt-1">
           <CamposRecepcion
             detalleId={f.pedidoDetalleId}
             esFiambre={f.esFiambre}
@@ -361,49 +425,61 @@ function Fila({
         </div>
       )}
 
-      <div className="mt-2">
-        <Revisar linea={f}>
-          <Unidad
-            u={f.unidad}
-            puedeElegir={puedeRecibir}
-            elegida={unidadElegida[f.lineaId] ?? null}
-            onElegir={(v) => setUnidadElegida((s) => ({ ...s, [f.lineaId]: v }))}
-          />
-          <Precio
-            p={f.precio}
-            puede={puedeRecibir}
-            aceptando={aceptando === f.lineaId}
-            decidida={decididas[f.lineaId] === "NO" ? "NO" : null}
-            onAceptar={() => onAceptar(f.lineaId)}
-            onNo={() => setDecididas((s) => ({ ...s, [f.lineaId]: "NO" }))}
-          />
-          {puedeRecibir && e.pideAccion && (
-            <div className="mt-1 flex flex-col gap-1">
-              {(f.candidatos || []).slice(0, 3).map((c) => (
-                <SunmiButton
-                  key={c.productoBaseId}
-                  color="cyan"
-                  type="button"
-                  className="justify-start text-left"
-                  onClick={() => onVincular(f.lineaId, c.productoBaseId)}
-                >
-                  Es este: {c.nombre}
-                </SunmiButton>
-              ))}
-              {buscandoEn === f.lineaId ? (
-                <BuscadorProducto
-                  onElegir={(p) => onVincular(f.lineaId, p.productoBaseId)}
-                  onCancelar={() => setBuscandoEn(null)}
-                />
-              ) : (
-                <SunmiButton color="slate" type="button" onClick={() => setBuscandoEn(f.lineaId)}>
-                  Buscar otro…
+      {/* 6. LA SUGERENCIA, EN UN RENGLÓN. */}
+      {puedeRecibir && !vinculada && (
+        <div className="mt-1">
+          {primero ? (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-sm2 sunmi-text-strong min-w-0 truncate">¿Es «{primero.nombre}»?</span>
+              {origen && <span className={`text-sm2 ${origen.tono}`}>{origen.texto}</span>}
+              <SunmiButton color="cyan" type="button" onClick={() => onVincular(f.lineaId, primero.productoBaseId)}>
+                Sí
+              </SunmiButton>
+              {candidatos.length > 1 && (
+                <SunmiButton color="slate" type="button" onClick={() => setVerOtros((v) => !v)}>
+                  {verOtros ? "Cerrar" : "Otro…"}
                 </SunmiButton>
               )}
             </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-sm2 sunmi-text-danger">No se encontró ninguno parecido.</span>
+              <SunmiButton color="slate" type="button" onClick={() => setBuscandoEn(f.lineaId)}>
+                Buscar
+              </SunmiButton>
+            </div>
           )}
-        </Revisar>
-      </div>
+
+          {/* Los demás candidatos: renglones de texto, no botones a ancho
+              completo. Los tres apilados eran la mayor parte del alto de la
+              fila, y con 21 líneas hacían la factura imposible de revisar. */}
+          {verOtros && (
+            <div className="mt-1 flex flex-col gap-0.5">
+              {candidatos.slice(1).map((c) => (
+                <SunmiButton
+                  key={c.productoBaseId}
+                  color="slate"
+                  type="button"
+                  className="justify-start text-left truncate"
+                  onClick={() => onVincular(f.lineaId, c.productoBaseId)}
+                >
+                  {c.nombre}
+                </SunmiButton>
+              ))}
+              <SunmiButton color="slate" type="button" onClick={() => setBuscandoEn(f.lineaId)}>
+                Buscar otro…
+              </SunmiButton>
+            </div>
+          )}
+
+          {buscandoEn === f.lineaId && (
+            <BuscadorProducto
+              onElegir={(p) => onVincular(f.lineaId, p.productoBaseId)}
+              onCancelar={() => setBuscandoEn(null)}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
