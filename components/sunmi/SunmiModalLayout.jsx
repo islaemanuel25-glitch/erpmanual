@@ -94,6 +94,26 @@ export default function SunmiModalLayout({
    */
   z = 9999,
   /**
+   * El espaciado del CUERPO y del PIE, con el del kit por defecto.
+   *
+   * ── POR QUÉ SON PARÁMETRO Y NO UNA OPINIÓN DEL KIT ─────────────────────
+   *
+   * Emparejar los modales es emparejar la CAPA y la ESTRUCTURA —el velo, el
+   * apilado, el botón de cerrar—, no repintar el interior de cada cuerpo. El
+   * `gap-3` del kit no es un borde: separa TODOS los bloques del formulario
+   * entre sí, así que imponerlo estira un modal de permisos con quince toggles.
+   * Migrar la capa de una pantalla no puede cambiar cómo se ve su formulario.
+   *
+   * Es la cuarta cosa de la misma familia —el alto del cuerpo, el apilado, el
+   * padding de la tarjeta y esto—: el kit tiene una opinión y las pantallas
+   * tienen otra. En todas se resolvió igual, y el criterio está escrito en el
+   * roadmap: el parámetro es una POSTERGACIÓN, no un perdón. Cada pantalla que
+   * declare uno queda anotada ahí con qué declaró y por qué, para que al final
+   * de la fase se pueda decidir qué se unifica y qué tiene razón de ser distinto.
+   */
+  espacioCuerpo = "mt-2 gap-3",
+  espacioPie = "mt-3",
+  /**
    * Clases del panel. NEGOCIA, no concatena: si acá viene un ancho o un ancho
    * máximo, la pieza retira el suyo. Dos clases de la misma familia tienen la
    * misma especificidad y ganaría la que Tailwind haya puesto última en la hoja
@@ -173,12 +193,14 @@ export default function SunmiModalLayout({
             )}
           </div>
 
-          <div className="mt-2 flex flex-col max-h-[65vh] overflow-y-auto gap-3">
+          <div
+            className={`flex flex-col max-h-[65vh] overflow-y-auto ${espacioCuerpo}`.trim()}
+          >
             {children}
           </div>
 
           {footer && (
-            <div className="mt-3 flex justify-end gap-2">
+            <div className={`flex justify-end gap-2 ${espacioPie}`.trim()}>
               {footer}
             </div>
           )}

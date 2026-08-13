@@ -367,6 +367,22 @@ porque no llama a `conciliarFila` —hace un `update` directo— así que el pat
 buscado no lo encontraba. Era el único de los tres que escribía la autoría de una
 decisión.
 
+**UNA FIRMA QUE AGRUPA SE COMPARA CONTRA LO QUE EXISTE, NO CONTRA UNA LISTA DE
+RASGOS ELEGIDA DE ANTEMANO.** Y antes de usar un agrupamiento para planificar, se
+abre UN CASO DE CADA GRUPO y se comprueba que la firma dijo la verdad.
+
+*Por qué:* es la quinta vez del mismo patrón y la más cara. Para planificar la
+migración de los modales se agrupó por cuatro rasgos elegidos a ojo —velo,
+encabezado, ancho de tarjeta y alto—. La firma decía que cuatro modales diferían
+solo en el velo. Al abrirlos, tres diferían en SIETE cosas y el cuarto ni
+siquiera era del mismo grupo. Comparada contra lo que el kit dibuja de verdad
+—capa, velo, panel, tarjeta, encabezado, botón y cuerpo—, la misma medición dio
+**23 grupos y no 12**.
+
+Lo que lo salvó fue abrir los cuatro antes de tocarlos. Sin eso, la tanda habría
+salido con una lista de diferencias esperadas de un renglón contra un cambio de
+siete, y todo lo que no estaba en la lista habría pasado como si estuviera bien.
+
 En la práctica: `git ls-files` y `git grep` recorren el repo entero;
 `fs.readdirSync` mira un nivel y `find -maxdepth` lo que se le diga. Cuando el
 conteo alimenta una afirmación —"son 54 scripts", "son tres rutas"— decir con qué

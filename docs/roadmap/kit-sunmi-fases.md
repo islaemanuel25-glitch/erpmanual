@@ -117,6 +117,37 @@ ya se escaparon las atajaría eso mismo:
 No se adelanta porque partir la fase 2 al medio cuesta más de lo que ahorra,
 pero queda fijado el momento: al cerrar la fase 2, antes de empezar la 3.
 
+## Fase 2 — qué declaró cada pantalla contra el default del kit
+
+**EL PARÁMETRO ES UNA POSTERGACIÓN, NO UN PERDÓN.** Sin esta cuenta, la fase 2
+termina con 36 modales parametrizados, ninguno igual a otro, y nadie sabe después
+qué se puede unificar y qué tiene razón de ser distinto. Una postergación sin
+registro es un olvido.
+
+Se anota cada pantalla que pase un parámetro distinto del default, con qué
+declaró y por qué. Al cerrar la fase se mira esta tabla entera y se decide qué se
+unifica.
+
+Los parámetros que existen, todos con el valor del kit por defecto y todos
+sacados de pantallas que hoy funcionan:
+
+- **`z`** — el apilado. El repo tiene un escalonado con intención: 40 el fondo del
+  cajón, 50 el modal, 60 el desplegable que se abre dentro del modal.
+- **`espacioCuerpo` / `espacioPie`** — el espaciado interior. Emparejar es la capa
+  y la estructura, no repintar el interior: el `gap-3` del kit separa todos los
+  bloques de un formulario, y migrar una capa no puede estirar un modal de
+  permisos con quince toggles.
+- **el alto del cuerpo** — decidido, todavía sin escribir: se agrega cuando migre
+  la primera pantalla que lo necesite. Hoy conviven 65, 70, 80, 90 y 92vh.
+- **el padding de la tarjeta** — decidido, todavía sin escribir, por lo mismo.
+  Tres modales tienen `p-0 overflow-hidden` y ponen su propio padding adentro.
+
+### Declaraciones
+
+| pantalla | parámetro | valor | por qué |
+| --- | --- | --- | --- |
+| _(ninguna todavía)_ | | | |
+
 ## Deuda anotada de esta fase
 
 - **Los 9.5 px contra los 10 px del kit.** `SunmiPar` a propósito no lo decide:

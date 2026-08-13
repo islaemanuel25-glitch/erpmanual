@@ -126,6 +126,31 @@ test("el cartel de identificarse sigue arriba de este default", () => {
   assert.ok(zCartel > zKit, `el cartel quedó en ${zCartel} y el kit en ${zKit}`);
 });
 
+// ── EL INTERIOR NO SE REPINTA ──────────────────────────────────────────────
+
+test("el espaciado del cuerpo y del pie es parámetro, con el valor de siempre", () => {
+  assert.match(SRC, /espacioCuerpo = "mt-2 gap-3"/, "cambió el default: eso mueve los cuatro usos actuales");
+  assert.match(SRC, /espacioPie = "mt-3"/);
+});
+
+test("EL `gap-3` NO ESTÁ CLAVADO en el cuerpo", () => {
+  // Si volviera a estarlo, migrar la capa de una pantalla le separaría todos los
+  // campos del formulario — que es exactamente lo que emparejar NO es.
+  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col max-h-"), SRC.indexOf("{children}"));
+  assert.doesNotMatch(cuerpo, /gap-3/, "el gap volvió a ser fijo");
+  assert.doesNotMatch(cuerpo, /mt-2/, "el margen volvió a ser fijo");
+  assert.match(cuerpo, /\$\{espacioCuerpo\}/);
+});
+
+test("lo que SÍ es del kit sigue clavado: el alto y el scroll", () => {
+  // El parámetro es del espaciado, no de la estructura. Si el alto o el scroll
+  // se volvieran negociables acá, la pieza dejaría de garantizar que un modal
+  // largo scrollea en vez de empujar la pantalla.
+  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col max-h-"), SRC.indexOf("{children}"));
+  assert.match(cuerpo, /max-h-\[65vh\]/);
+  assert.match(cuerpo, /overflow-y-auto/);
+});
+
 // ── ACCESIBILIDAD ──────────────────────────────────────────────────────────
 
 test("acepta las etiquetas y cae al título cuando no le pasan ninguna", () => {
