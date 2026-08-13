@@ -38,7 +38,6 @@ export default function TablaDetallePedido({
   pedido,
   esBorrador,
   esRecepcion,
-  tieneFiambre,
   // Lo que se está editando, con sus setters. Vive en la página: acá solo se
   // dibuja, igual que en la lista de conciliación.
   costos,
@@ -47,10 +46,6 @@ export default function TablaDetallePedido({
   setCantidadesEdit,
   unidadesEdit,
   setUnidadesEdit,
-  recibidos,
-  setRecibidos,
-  kgRecibidos,
-  setKgRecibidos,
   // Acciones y cálculos que siguen viviendo en la página.
   calcLineaDetalle,
   editarItemAPI,
@@ -69,10 +64,6 @@ export default function TablaDetallePedido({
           "Cant. pedida",
           "Unidad",
           "Costo",
-          ...(esRecepcion ? ["Cant. recibida"] : []),
-          ...(esRecepcion && tieneFiambre ? ["Kg recibidos"] : []),
-          ...(pedido.estado === "RECIBIDO" ? ["Recibido"] : []),
-          ...(pedido.estado === "RECIBIDO" && tieneFiambre ? ["Kg reales"] : []),
           "Subtotal",
           ...((esRecepcion || esBorrador) ? [""] : []),
         ]}
@@ -205,49 +196,6 @@ export default function TablaDetallePedido({
                   )}
                 </td>
 
-                {esRecepcion && (
-                  <td className="px-3 py-1.5">
-                    <div className="flex items-center gap-1">
-                      <SunmiButton color="slate" type="button" onClick={() => { const cur = Number(recibidos[det.id]) || 0; setRecibidos((prev) => ({ ...prev, [det.id]: Math.max(0, cur - 1) })); }}>−</SunmiButton>
-                      <SunmiInput
-                        type="text"
-                        inputMode="numeric"
-                        value={recibidos[det.id] ?? ""}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          if (raw === "") { setRecibidos((prev) => ({ ...prev, [det.id]: "" })); return; }
-                          const val = parseInt(raw, 10);
-                          setRecibidos((prev) => ({ ...prev, [det.id]: isNaN(val) ? "" : Math.max(0, val) }));
-                        }}
-                        onBlur={() => { const cur = Number(recibidos[det.id]); if (isNaN(cur) || cur < 0) setRecibidos((prev) => ({ ...prev, [det.id]: 0 })); }}
-                        className="w-[56px] text-center"
-                      />
-                      <SunmiButton color="slate" type="button" onClick={() => { const cur = Number(recibidos[det.id]) || 0; setRecibidos((prev) => ({ ...prev, [det.id]: cur + 1 })); }}>+</SunmiButton>
-                    </div>
-                  </td>
-                )}
-
-                {esRecepcion && tieneFiambre && (
-                  <td className="px-3 py-1.5 w-28">
-                    {esFiambre ? (
-                      <SunmiInput type="number" min="0" step="0.01" value={kgRecibidos[det.id] ?? ""}
-                        onChange={(e) => setKgRecibidos((prev) => ({ ...prev, [det.id]: e.target.value }))}
-                        className="w-24 text-center" placeholder="kg" />
-                    ) : (<span className="sunmi-text-muted text-xs">-</span>)}
-                  </td>
-                )}
-
-                {pedido.estado === "RECIBIDO" && (
-                  <td className="px-3 py-1.5 text-center sunmi-text-success">
-                    {det.cantidadRecibida != null ? Number(det.cantidadRecibida) : "-"}
-                  </td>
-                )}
-                {pedido.estado === "RECIBIDO" && tieneFiambre && (
-                  <td className="px-3 py-1.5 text-center sunmi-text-success">
-                    {esFiambre && det.kgRecibidos != null ? `${Number(det.kgRecibidos).toFixed(2)} kg` : "-"}
-                  </td>
-                )}
-
                 <td className="px-3 py-1.5 text-xs text-right font-medium">
                   {r.subtotal != null ? `$${r.subtotal.toFixed(2)}` : (
                     <span className="sunmi-text-accent" title={r.advertencia || ""}>⚠ {r.advertencia}</span>
@@ -267,15 +215,10 @@ export default function TablaDetallePedido({
         )}
         {(pedido.detalles || []).length > 0 && (() => {
           const baseCols = 5;
-          const extraCols =
-            (esRecepcion ? 1 : 0) +
-            (esRecepcion && tieneFiambre ? 1 : 0) +
-            (pedido.estado === "RECIBIDO" ? 1 : 0) +
-            (pedido.estado === "RECIBIDO" && tieneFiambre ? 1 : 0);
           const accionCol = (esRecepcion || esBorrador) ? 1 : 0;
           return (
             <tr className="border-t sunmi-divider">
-              <td colSpan={baseCols + extraCols} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">
+              <td colSpan={baseCols} className="px-3 py-2 text-sm font-semibold text-right sunmi-text-strong">
                 TOTAL ESTIMADO
               </td>
               <td className="px-3 py-2 text-sm font-bold text-right sunmi-text-accent">

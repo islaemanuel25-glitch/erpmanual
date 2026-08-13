@@ -663,17 +663,12 @@ export default function DetallePedidoProveedorPage({ params }) {
             pedido={pedido}
             esBorrador={esBorrador}
             esRecepcion={esRecepcion}
-            tieneFiambre={tieneFiambre}
             costos={costos}
             setCostos={setCostos}
             cantidadesEdit={cantidadesEdit}
             setCantidadesEdit={setCantidadesEdit}
             unidadesEdit={unidadesEdit}
             setUnidadesEdit={setUnidadesEdit}
-            recibidos={recibidos}
-            setRecibidos={setRecibidos}
-            kgRecibidos={kgRecibidos}
-            setKgRecibidos={setKgRecibidos}
             calcLineaDetalle={calcLineaDetalle}
             editarItemAPI={editarItemAPI}
             eliminarDetalle={eliminarDetalle}
