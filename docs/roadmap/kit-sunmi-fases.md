@@ -199,6 +199,10 @@ así por tres motivos, y no se rediscute:
 | `proveedores/ModalProveedor` | `espacioPie` | `"pt-2"` | tenía `pt-2`, no el `mt-3` del kit |
 | `compras-proveedor/ModalEnviarPedido` | `encabezado` | `"cinta"` | mismo caso que proveedor |
 | `compras-proveedor/ModalEnviarPedido` | `espacioCuerpo` / `espacioPie` | `""` | su cuerpo es contenido suelto con sus propios márgenes |
+| `compras-proveedor/ModalVincularCodigo` | `encabezado` | `"cinta"` | mismo caso |
+| `compras-proveedor/ModalVincularCodigo` | `espacioCuerpo` / `espacioPie` | `""` | el cuerpo trae sus propios márgenes |
+| `proveedores/ModalCodigosProveedor` | `encabezado` | `"cinta"` | mismo caso |
+| `proveedores/ModalCodigosProveedor` | `espacioCuerpo` / `espacioPie` | `""` | es de solo lectura y no tiene pie: el único botón es el de cerrar, que lo pone la pieza |
 
 ### Props muertos que se conservan a propósito
 

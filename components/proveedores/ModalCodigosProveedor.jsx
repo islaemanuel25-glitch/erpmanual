@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
 /**
@@ -54,15 +53,19 @@ export default function ModalCodigosProveedor({ open, onClose, proveedor }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-3">
-      <SunmiCard className="w-[95%] max-w-3xl">
-        <div className="flex items-center justify-between mb-3">
-          <SunmiHeader title={`Productos vinculados — ${proveedor?.nombre ?? ""}`} />
-          <SunmiButton color="cyan" onClick={onClose}>
-            Cerrar
-          </SunmiButton>
-        </div>
-
+    <SunmiModalLayout
+      open
+      title={`Productos vinculados — ${proveedor?.nombre ?? ""}`}
+      // Conserva su cinta de título: el kit por defecto dibuja texto normal.
+      encabezado="cinta"
+      onClose={onClose}
+      maxWidth="max-w-3xl"
+      // El cuerpo trae sus propios márgenes. Este modal es de solo lectura y no
+      // tiene pie: el único botón es el de cerrar, que lo pone la pieza.
+      espacioCuerpo=""
+      espacioPie=""
+    >
+      <>
         <p className="text-xs sunmi-text-muted mb-3">
           Productos del ERP identificados con un código interno de este proveedor. Solo lectura.
         </p>
@@ -112,7 +115,7 @@ export default function ModalCodigosProveedor({ open, onClose, proveedor }) {
             </div>
           )}
         </div>
-      </SunmiCard>
-    </div>
+      </>
+    </SunmiModalLayout>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
@@ -127,15 +126,29 @@ export default function ModalVincularCodigo({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-3">
-      <SunmiCard className="w-[95%] max-w-2xl">
-        <div className="flex items-center justify-between mb-3">
-          <SunmiHeader title="Vincular código interno a producto existente" />
-          <SunmiButton color="cyan" onClick={onClose}>
-            Cerrar
+    <SunmiModalLayout
+      open
+      title="Vincular código interno a producto existente"
+      // Conserva su cinta de título: el kit por defecto dibuja texto normal.
+      encabezado="cinta"
+      onClose={onClose}
+      maxWidth="max-w-2xl"
+      // El cuerpo trae sus propios márgenes y no tiene separación entre bloques
+      // que el kit deba poner.
+      espacioCuerpo=""
+      espacioPie=""
+      footer={
+        <>
+          <SunmiButton color="slate" type="button" onClick={onClose}>
+            Cancelar
           </SunmiButton>
-        </div>
-
+          <SunmiButton type="button" onClick={guardar} disabled={saving}>
+            {saving ? "Vinculando..." : "Vincular"}
+          </SunmiButton>
+        </>
+      }
+    >
+      <>
         <p className="text-xs sunmi-text-muted mb-3">
           Proveedor: <span className="sunmi-text-strong">{proveedorNombre || "—"}</span>.
           El código se asocia a un producto existente; no se crea ningún producto nuevo.
@@ -209,15 +222,7 @@ export default function ModalVincularCodigo({
 
         {error && <p className="text-xs sunmi-text-danger mb-2">{error}</p>}
 
-        <div className="flex justify-end gap-2">
-          <SunmiButton color="slate" type="button" onClick={onClose}>
-            Cancelar
-          </SunmiButton>
-          <SunmiButton type="button" onClick={guardar} disabled={saving}>
-            {saving ? "Vinculando..." : "Vincular"}
-          </SunmiButton>
-        </div>
-      </SunmiCard>
-    </div>
+      </>
+    </SunmiModalLayout>
   );
 }
