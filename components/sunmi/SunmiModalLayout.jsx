@@ -99,10 +99,18 @@ const FORMAS = {
   // contenido, el panel se vería pegado arriba y no como un cajón. Se midió
   // dibujándolo — sin esto la tarjeta terminaba a los 105 píxeles.
   //
-  // Su redondeo NO se deriva todavía: ninguna pantalla lo usa, y adivinar de qué
-  // lado se redondea un cajón es exactamente lo que este kit no hace. Se decide
-  // cuando migre CarritoPedido, que es de donde salió la forma.
-  cajon: { capa: "flex justify-end", panel: "h-full", tarjeta: "h-full flex flex-col", altoVa: "ninguno" },
+  // Su redondeo estaba pendiente a propósito, para no adivinarlo. CONTESTADO Y
+  // MEDIDO el 2026-08-13 mirando `CarritoPedido`, que es de donde salió la
+  // forma: su panel no tiene NINGUNA clase `rounded-*`. Es un panel de alto
+  // completo pegado al borde derecho con un borde a la izquierda, y las esquinas
+  // rectas son lo que lo hace parecer parte de la pantalla y no una tarjeta
+  // flotando. Verificado en la captura: 420x900 arrancando en x=946 sobre 1366.
+  cajon: {
+    capa: "flex justify-end",
+    panel: "h-full",
+    tarjeta: "h-full flex flex-col !rounded-none",
+    altoVa: "ninguno",
+  },
   // Hoja en el teléfono, centrada de `sm` para arriba: el redondeo acompaña.
   "hoja-o-centrado": {
     capa: "flex items-end sm:items-center justify-center",

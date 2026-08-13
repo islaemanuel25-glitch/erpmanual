@@ -358,8 +358,37 @@ Dos cosas que costaron una corrida cada una y conviene saber antes:
   el componente lee y los props son los del objeto `resumenProps` de la pantalla
   real. Es la regla que ya se cobró una tanda con los grupos del sidebar.
 
-**El andamio NO se commitea**: es una ruta de la aplicación y se desplegaría.
-Queda en el árbol sin trackear mientras dure la migración del carrito.
+**El andamio NO se commitea**: es una ruta de la aplicación y se desplegaría con
+datos de mentira. Eso ya NO lo sostiene acordarse: `scripts/andamiosNoSeCommitean.test.mjs`
+pone la suite en rojo si aparece trackeado cualquier `app/andamio-*`. Sirve para
+todos los que vengan, y van a venir. Comprobado que atrapa la versión mala:
+con el andamio del carrito stageado a la fuerza, el candado se pone rojo.
+
+### LO QUE FRENA LA MIGRACIÓN DE `CarritoPedido`: el encabezado del kit no se puede apagar
+
+Leído antes de escribir una línea, y por eso se frena acá y no después.
+
+El `cuerpo` de `CarritoPedido` **trae su propio encabezado**: título "Resumen del
+pedido", el nombre del proveedor, el contador de avisos de costo, el conteo de
+productos y una X para cerrar. Y ese cuerpo lo comparten **los tres caminos**,
+incluido el `aside`, que no se migra.
+
+`SunmiModalLayout` dibuja su fila de encabezado **siempre**: no hay forma de
+pedirle que no la ponga. Así que la migración deja dos salidas y las dos se ven:
+
+- pasarle `title` y sacar el encabezado propio del cuerpo → hay que duplicarlo
+  para que el `aside` lo conserve, o el `aside` lo pierde. Es tocar el contenido
+  de un camino que esta tanda no migra.
+- no pasarle `title` → la fila se dibuja igual, con un `<h2>` vacío y su `mb-3`.
+  Queda un hueco arriba de todo.
+
+**Esto está LEÍDO, no medido**: sale de la estructura del JSX, no de una captura.
+Medirlo pide escribir la migración, que es lo que se frenó.
+
+Lo que hace falta antes de retomar: que la pieza sepa **no dibujar encabezado**.
+Sería el primer caso de una pantalla que no quiere el encabezado del kit, así que
+sale de una necesidad real y no de adivinar — pero es una decisión de Emanuel,
+porque agrega superficie a la pieza justo cuando se está tratando de cerrarla.
 
 ### El `!` es el defecto de la fase 4 apareciendo adentro del kit mismo
 
