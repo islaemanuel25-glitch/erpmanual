@@ -1,6 +1,6 @@
 # Modulo: Usuarios
 
-**Última actualización:** 2026-07-29 08:16
+**Última actualización:** 2026-08-13 11:10
 
 ## Ubicacion
 - UI: `app/modulos/usuarios/page.jsx`
@@ -76,6 +76,7 @@ model Usuario {
 - Password se hashea con bcrypt antes de guardar
 
 ## Cambios recientes
+- 2026-08-13: refactor(kit): ModalOperador y ModalUsuario usan SunmiModalLayout
 - 2026-07-26: feat(ui): adaptar menu y pantallas a roles locales
 - 2026-07-26: feat(users): permitir gestion y costos por local
 - 2026-07-26: fix(security): endurecer permisos y aislamiento entre grupos y locales

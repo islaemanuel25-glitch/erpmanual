@@ -1,20 +1,22 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-09 17:07
+**Fecha:** 2026-08-13 11:10
 
 ## Módulos modificados recientemente
 
-### proveedores
-- feat(listas): TERMINADA cierra el trabajo sin cerrar la vuelta atrás, fix(listas): la tapa cuenta lo mismo que adentro, y en productos, feat(listas): deshacer una aplicacion, con la previa a la vista antes de confirmar
-- Archivos: 1 nuevos, 6 modificados (7 total)
+### configuracion
+- fix(configuracion): sacar los dos props muertos de arqueo-caja
+- Archivos: 1 modificados (1 total)
 
-### auditoria
-- fix(auditoria): la referencia al cliente base va anclada en globalThis
+### usuarios
+- refactor(kit): ModalOperador y ModalUsuario usan SunmiModalLayout
+- Archivos: 1 modificados (1 total)
+
+### locales
+- refactor(kit): ModalRol y ModalLocal usan SunmiModalLayout
 - Archivos: 1 modificados (1 total)
 
 
-## Archivos nuevos desde última sincronización
-- app/api/proveedores/listas/[id]/revertir/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

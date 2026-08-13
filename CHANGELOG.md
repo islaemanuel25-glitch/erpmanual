@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-13] - Actualización: configuracion, usuarios, locales
+
+### Modificado
+- **configuracion**: fix(configuracion): sacar los dos props muertos de arqueo-caja
+- **usuarios**: refactor(kit): ModalOperador y ModalUsuario usan SunmiModalLayout
+- **locales**: refactor(kit): ModalRol y ModalLocal usan SunmiModalLayout
+
+
 ## [2026-08-09] - Actualización: proveedores
 
 ### Modificado
