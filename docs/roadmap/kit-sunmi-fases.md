@@ -519,6 +519,58 @@ la expresión que buscaba superficie enumeraba paletas de Tailwind y
 que era el paso que la expresión pretendía ahorrar. Cuarta vez en esta fase que
 una firma dice una cosa y abrir los archivos dice otra.
 
+### EL VELO EN UN TEMA CLARO: la pregunta se contestó, y el defecto estaba en el otro eje
+
+**Medido el 2026-08-13**, sobre `SunmiModalLayout` montado en un andamio, a
+1366x900, con tres temas puestos por `localStorage` —que es por donde los pone el
+dispositivo de verdad— y contra el velo hecho a mano como término de comparación.
+
+La pregunta era si en un tema claro el velo del kit sigue diciendo "lo de atrás
+está bloqueado", ya que en vez de oscurecer, **aclara**. Se midieron dos
+contrastes, y la trampa era confundirlos:
+
+- **A) el texto de atrás contra su propio fondo**, los dos ya velados. Cuanto más
+  bajo, más apagado quedó lo de atrás. Dice "esto no se toca".
+- **B) la tarjeta contra el velo que tiene al lado.** Cuanto más alto, más se
+  despega el modal. Dice "esto sí".
+
+Velo del kit —`color-mix(in srgb, var(--app-bg) 78%, transparent)`—:
+
+- `sunmiDark`: A 1,70:1 · **B 1,00:1**
+- `sunmiLight`: A 1,41:1 · **B 1,10:1**
+- `ambarCaja`: A 1,39:1 · **B 1,04:1**
+
+Velo hecho a mano —`sunmi-overlay`, negro al 50 %, el que tienen las 23 que
+faltan—:
+
+- `sunmiDark`: A 3,41:1 · B 1,10:1
+- `sunmiLight`: A 3,49:1 · **B 4,31:1**
+- `ambarCaja`: A 3,43:1 · **B 4,12:1**
+
+**La respuesta a la pregunta que se hizo es que NO hay defecto ahí**: en un tema
+claro el velo del kit apaga lo de atrás MÁS que el viejo, no menos —1,41 contra
+3,49—. Aclarar en vez de oscurecer no importa; lo que apaga es que baje el
+contraste, y baja más.
+
+**El defecto está en el otro eje, y es real.** Con el velo del kit **la tarjeta
+deja de despegarse del fondo**: en claro cae de 4,31 a 1,10, y en oscuro da
+**1,00 exacto** — el corte horizontal muestra que el relleno de la tarjeta y el
+del velo son **el mismo color**, `rgb(15,23,42)`, y lo único que separa el modal
+de la pantalla es **un borde de un píxel** de `rgb(30,41,59)` y una sombra de una
+unidad de luminancia.
+
+El porqué es de una línea: el velo del kit no oscurece, **desvanece hacia el
+fondo de la app**. Todo lo de atrás se va hacia `--app-bg`… y en el tema oscuro
+la tarjeta YA ES `--app-bg`. El velo se come justo la diferencia que hacía que el
+modal fuera una figura sobre un fondo.
+
+**Esto lo arrastran las 13 migradas y desplegadas.** No lo vio nadie porque el
+borde alcanza para que la tarjeta se lea; lo que se perdió es el golpe de vista.
+Y va peor en `sunmiDark`, que es el default, no en los claros.
+
+**La decisión es de Emanuel** y no entra por una tanda técnica: cambiar el velo
+del kit mueve las 13 pantallas que ya están en producción.
+
 ### EL PRÓXIMO GRUPO: los siete gemelos del POS
 
 `ModalCanjePuntos`, `ModalCliente`, `ModalDescuento`, `ModalPesoKg`,

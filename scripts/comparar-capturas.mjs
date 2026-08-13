@@ -56,6 +56,7 @@ const fichaB = leerFicha(rutaB);
 // que salga no es del cambio, es del recorte.
 const debenCoincidir = [
   ["selector", (f) => f.selector ?? "(pantalla entera)"],
+  ["tema", (f) => f.tema ?? "(el del dispositivo)"],
   ["ancho de ventana", (f) => f.ancho],
   ["margen", (f) => f.margen ?? "(sin recorte al elemento)"],
   ["ancho del recorte", (f) => f.recorte?.width ?? "(sin recorte)"],

@@ -89,6 +89,18 @@ const ABRIR = arg("abrir", null);
 // preview de listas de precios se abre con un botón de ícono sin `aria-label`,
 // así que por texto no hay con qué encontrarlo. Toca el primero que matchee.
 const ABRIR_SELECTOR = arg("abrir-selector", null);
+// CON QUÉ TEMA SE MIDE. La clave va al `localStorage` ANTES de que cargue la
+// página, que es exactamente donde la deja el dispositivo cuando alguien elige
+// un tema en Apariencia.
+//
+// Por ese camino y no fijando `data-theme` a mano, que era lo primero que se
+// pensó: el tema mueve DOS cosas —las variables CSS del `:root` y el objeto que
+// `SunmiThemeProvider` reparte por React, del que salen las clases Tailwind de
+// cada pieza—. Escribir el atributo cambia una sola y deja la otra en el tema
+// anterior. Eso da una foto perfectamente determinista **de un render que no
+// existe**, que es la trampa que ya nos costó dos diagnósticos: reproducible y
+// correcto son preguntas distintas.
+const TEMA = arg("tema", null);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(SALIDA, { recursive: true });
@@ -159,6 +171,17 @@ await send("Runtime.enable");
 await send("Emulation.setDeviceMetricsOverride", {
   width: ANCHO, height: ALTO, deviceScaleFactor: 1, mobile: true,
 });
+
+// El tema se deja escrito antes de navegar, para que el provider lo hidrate en
+// su primer efecto igual que si el dispositivo ya lo tuviera elegido. Se corre
+// en CADA documento nuevo porque el login redirige y el segundo documento
+// también tiene que nacer con el tema puesto.
+if (TEMA) {
+  await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `try { window.localStorage.setItem("erp-sunmi-theme", ${JSON.stringify(TEMA)}); } catch (e) {}`,
+  });
+  console.log("tema personal fijado en localStorage:", TEMA);
+}
 
 const destino = String(BASE) + String(URL_REL);
 console.log("navegando a:", destino);
@@ -630,6 +653,10 @@ const ficha = {
   selector: ELEMENTO || null,
   margen: ELEMENTO ? MARGEN : null,
   abrir: ABRIR || ABRIR_SELECTOR || null,
+  // El tema cambia TODOS los colores de la foto. Comparar un antes en oscuro
+  // contra un después en claro daría una diferencia enorme que no es del cambio,
+  // y es el mismo error que el selector distinto, con otra cara.
+  tema: TEMA || null,
   altoCaptura: ELEMENTO ? null : ALTO_CAPTURA,
   recorte: cajaRecorte,
   repeticiones: REPETICIONES,
