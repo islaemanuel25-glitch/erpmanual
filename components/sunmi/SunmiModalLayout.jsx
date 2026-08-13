@@ -114,6 +114,25 @@ export default function SunmiModalLayout({
   espacioCuerpo = "mt-2 gap-3",
   espacioPie = "mt-3",
   /**
+   * Una referencia al div del CUERPO.
+   *
+   * ── POR QUÉ EXISTE, Y NO ES DE ASPECTO ─────────────────────────────────
+   *
+   * `ModalProveedor` la usa para mandar el scroll arriba cuando el modal se
+   * reabre. Sin eso, abrirlo para editar otro proveedor lo deja scrolleado donde
+   * quedó el anterior — y eso no es un detalle: es la clase de cosa que hace que
+   * alguien edite el campo equivocado.
+   *
+   * Hasta que la pieza se quedó con el div del cuerpo, esa pantalla no se podía
+   * migrar sin perder la función. Es la quinta cosa de la misma familia y se
+   * resuelve igual: sale de una pantalla que hoy funciona y queda anotada en el
+   * registro.
+   *
+   * Cuando estén las 36 se mira si esto debería hacerlo la pieza para todos —
+   * reabrir un modal arriba es razonable siempre— en vez de recibirlo de afuera.
+   */
+  refCuerpo,
+  /**
    * Clases del panel. NEGOCIA, no concatena: si acá viene un ancho o un ancho
    * máximo, la pieza retira el suyo. Dos clases de la misma familia tienen la
    * misma especificidad y ganaría la que Tailwind haya puesto última en la hoja
@@ -194,6 +213,7 @@ export default function SunmiModalLayout({
           </div>
 
           <div
+            ref={refCuerpo}
             className={`flex flex-col max-h-[65vh] overflow-y-auto ${espacioCuerpo}`.trim()}
           >
             {children}

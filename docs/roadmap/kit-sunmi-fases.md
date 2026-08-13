@@ -141,6 +141,15 @@ sacados de pantallas que hoy funcionan:
   la primera pantalla que lo necesite. Hoy conviven 65, 70, 80, 90 y 92vh.
 - **el padding de la tarjeta** — decidido, todavía sin escribir, por lo mismo.
   Tres modales tienen `p-0 overflow-hidden` y ponen su propio padding adentro.
+- **`refCuerpo`** — una referencia al div del cuerpo. **Lo usa UNO SOLO**:
+  `ModalProveedor`, para mandar el scroll arriba cuando el modal se reabre. Sin
+  eso, abrirlo para editar otro proveedor lo deja scrolleado donde quedó el
+  anterior, y alguien termina editando el campo equivocado. Es el único
+  parámetro de la familia que NO es de aspecto: sin él esa pantalla no se podía
+  migrar sin perder una función.
+
+  **Cuando estén las 36:** mirar si esto debería hacerlo la pieza para todos
+  —reabrir un modal arriba es razonable siempre— en vez de recibirlo de afuera.
 
 ### Declaraciones
 

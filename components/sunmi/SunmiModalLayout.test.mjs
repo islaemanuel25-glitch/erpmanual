@@ -142,6 +142,16 @@ test("EL `gap-3` NO ESTÁ CLAVADO en el cuerpo", () => {
   assert.match(cuerpo, /\$\{espacioCuerpo\}/);
 });
 
+test("EL CUERPO ACEPTA UNA REFERENCIA, y va en el div que scrollea", () => {
+  // `ModalProveedor` la usa para mandar el scroll arriba al reabrirse. Si la
+  // referencia terminara en otro div —la capa, el panel, la tarjeta— la pantalla
+  // seguiría compilando y el scroll no volvería nunca: `scrollTop = 0` sobre algo
+  // que no scrollea no hace nada y no avisa.
+  const cuerpo = SRC.slice(SRC.indexOf("ref={refCuerpo}"), SRC.indexOf("{children}"));
+  assert.match(cuerpo, /max-h-\[65vh\]/, "la referencia no está en el div que scrollea");
+  assert.match(cuerpo, /overflow-y-auto/);
+});
+
 test("lo que SÍ es del kit sigue clavado: el alto y el scroll", () => {
   // El parámetro es del espaciado, no de la estructura. Si el alto o el scroll
   // se volvieran negociables acá, la pieza dejaría de garantizar que un modal
