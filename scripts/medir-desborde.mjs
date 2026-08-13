@@ -264,6 +264,44 @@ const recorte =
     ? { clip: { x: 0, y: 0, width: ANCHO, height: Math.min(ALTO_CAPTURA, alto), scale: 1 } }
     : {};
 
+// ── ¿LA PÁGINA SE DIBUJÓ, O ES LA PANTALLA DE ERROR? ───────────────────────
+//
+// El chequeo de determinismo NO alcanza: una página de error es perfectamente
+// determinista y las tres fotos salen idénticas. Pasó dos veces en la misma
+// tarde — una con el build roto, que dejó a `next start` sin nada que servir, y
+// otra con un componente que explotaba por un fixture mal armado— y las dos
+// veces el arnés dijo que la captura servía como prueba.
+//
+// Determinista y VACÍA no es lo mismo que determinista y buena.
+const salud = await evaluar(`(() => {
+  const t = document.body ? document.body.innerText : "";
+  return {
+    error: /Application error|client-side exception|no se puede obtener acceso|ERR_CONNECTION/i.test(t),
+    largo: t.trim().length,
+  };
+})()`);
+if (salud.error || salud.largo < 10) {
+  console.log(
+    salud.error
+      ? "LA PÁGINA NO SE DIBUJÓ: es una pantalla de error. La captura NO prueba nada."
+      : `LA PÁGINA ESTÁ VACÍA (${salud.largo} caracteres de texto). La captura NO prueba nada.`
+  );
+}
+
+// UNA TOMA QUE SE DESCARTA, SIEMPRE.
+//
+// La primera foto después de forzar el recorte y apagar las transiciones no es
+// representativa: sale con píxeles sueltos de antialias repartidos, y la segunda
+// y la tercera dan idénticas entre sí. Se midió con la hoja inferior del carrito
+// —35 píxeles sueltos entre la primera y las otras dos, en filas salteadas, sin
+// ningún corrimiento—.
+//
+// No es "repetir hasta que dé": es sacar un fotograma que se sabe que no
+// representa el estado final. El chequeo de determinismo corre igual sobre las
+// que se conservan, y sigue siendo el que decide si la captura prueba algo.
+await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true, ...recorte });
+await sleep(300);
+
 const fotos = [];
 for (let i = 0; i < Math.max(1, REPETICIONES); i++) {
   const { data } = await send("Page.captureScreenshot", {
@@ -287,10 +325,16 @@ console.log(`\nCaptura: ${archivo}${ALTO_CAPTURA > 0 ? ` (banda fija de ${Math.m
 let apto = null;
 if (REPETICIONES > 1) {
   apto = fotos.every((f) => f === fotos[0]);
+  const sana = !salud.error && salud.largo >= 10;
   console.log(
-    apto
-      ? `ARNÉS DETERMINISTA: ${REPETICIONES} corridas idénticas. La captura sirve como prueba.`
-      : `ARNÉS CON RUIDO: ${REPETICIONES} corridas NO dieron idénticas. Esta captura NO prueba nada.`
+    !apto
+      ? `ARNÉS CON RUIDO: ${REPETICIONES} corridas NO dieron idénticas. Esta captura NO prueba nada.`
+      : sana
+        ? `ARNÉS DETERMINISTA: ${REPETICIONES} corridas idénticas. La captura sirve como prueba.`
+        // Una página de error es perfectamente determinista. Decir las dos cosas
+        // seguidas —"no prueba nada" y "sirve como prueba"— es peor que no decir
+        // ninguna: el que lee se queda con la que le conviene.
+        : `ARNÉS DETERMINISTA, pero la página no se dibujó: sigue sin probar nada.`
   );
   // Con ruido se guardan TODAS, que es lo único que deja encontrar la causa.
   // Sin esto queda "da distinto" y nada más, que no alcanza para arreglarlo.
@@ -304,4 +348,4 @@ if (REPETICIONES > 1) {
 }
 
 cerrar();
-process.exit(medida.desbordan.length || apto === false ? 1 : 0);
+process.exit(medida.desbordan.length || apto === false || salud.error || salud.largo < 10 ? 1 : 0);
