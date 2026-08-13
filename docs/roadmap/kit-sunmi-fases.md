@@ -364,6 +364,48 @@ pone la suite en rojo si aparece trackeado cualquier `app/andamio-*`. Sirve para
 todos los que vengan, y van a venir. Comprobado que atrapa la versión mala:
 con el andamio del carrito stageado a la fuerza, el candado se pone rojo.
 
+### EL BALDE NUEVO: cuántas capas traen SUPERFICIE PROPIA
+
+**Relevado el 2026-08-13**, después de que el carrito lo destapara. Superficie
+propia = el panel se pinta el fondo y el borde a mano en vez de usar `SunmiCard`.
+Migrarlas con el kit les cambia fondo y bordes, y eso no es una diferencia que se
+declare y se acepte.
+
+De las **43 capas a mano**:
+
+- **13 con superficie propia** — `compras-proveedor/nueva` (dos),
+  `configuracion/mantenimiento`, `ModalProcesoPendiente`, `CarritoPedido` (el
+  cajón), `CampanaNotificaciones`, `ModalArqueoCaja`, `ModalCajaMovimiento`,
+  `ModalConfirmacion`, `ActualizacionPreciosPage`, `ModalAjuste`, `ModalLimites`
+  y `SunmiSelectConCrearRapido`.
+- **24 con `SunmiCard`** — el grupo que sí se puede seguir migrando.
+- **6 sin decidir**, que hay que abrir a mano.
+
+Las tres superficies que aparecen son `sunmi-surface`, `sunmi-pos-panel` y
+`sunmi-card` —esta última es la CLASE del tema puesta en un div crudo, que no es
+lo mismo que el componente—.
+
+**Estas 13 quedan FUERA de la fase 2.** El problema no es del modal: es que el
+kit tiene una opinión sobre la superficie que media aplicación no comparte. Un
+prop de superficie sería el séptimo, y llegaríamos ahí por el mismo camino por el
+que llegamos a seis. Vuelven cuando `SunmiCard` se toque de verdad en la fase 4,
+**junto con las 104 del padding, que es la misma deuda con otra cara**.
+
+**EL CONTEO NECESITÓ TRES PASADAS Y LAS DOS PRIMERAS MINTIERON**, que es la parte
+que hay que llevarse:
+
+1. La primera dio **17**, contando el `bg-black/50` del VELO como si fuera la
+   tarjeta.
+2. La segunda dio **16**, contando el fondo de la CAPA cuando se lo pinta en su
+   propia línea —`fixed inset-0 bg-black/50`—.
+3. La tercera da **13**, y recién ahí se abrieron tres casos para comprobar que
+   la firma decía la verdad: `ModalAjuste` con `sunmi-card`, `ModalArqueoCaja`
+   con `sunmi-pos-panel`, y `ModalDescuento` con `<SunmiCard`. Los tres
+   coincidieron.
+
+Tercera vez en esta fase que una firma elegida a ojo dice una cosa y abrir los
+archivos dice otra.
+
 ### LA MIGRACIÓN DEL CARRITO SE ESCRIBIÓ, SE MIDIÓ Y SE REVIRTIÓ
 
 **2026-08-13.** Se escribió entera —los dos caminos, con `encabezado="ninguno"`—
