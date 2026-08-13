@@ -63,10 +63,38 @@ import { declaraAnchoMaximo } from "@/lib/sunmi/claseNegociada";
  * en la hoja de estilos. Está anotado como deuda en el roadmap; el día que la
  * tarjeta negocie, estos `!` se sacan.
  */
+//
+// ── Y LA FORMA DECIDE DÓNDE CAE EL ALTO ────────────────────────────────────
+//
+// Lo que una pantalla quiere declarar es "este modal no pasa de tanto". Que eso
+// se implemente topando el CUERPO o topando la TARJETA es una consecuencia de la
+// forma, no una decisión de la pantalla:
+//
+//   centrado  el tope va al cuerpo; la tarjeta crece con su contenido.
+//   hoja      el tope va a la TARJETA y el cuerpo crece contra él con
+//             `flex-1 min-h-0`. Si fuera al revés, la tarjeta mediría el tope
+//             MÁS el encabezado y el pie, y se pasaría de la pantalla.
+//   cajon     ninguno: su `h-full` ya fija el alto.
+//
+// Es el mismo patrón que el `z`: UN solo valor del que la pieza deriva los
+// destinos. Dos parámetros sueltos dejarían ponerlos incoherentes sin que nadie
+// se entere.
+//
+// ── LA COLUMNA TAMBIÉN ES DE LA FORMA ──────────────────────────────────────
+//
+// Una hoja cuyo pie se va con el scroll está rota: los botones de confirmar
+// tienen que quedar a la vista mientras el cuerpo se recorre. Por eso el
+// `flex flex-col` va acá y no en la pantalla, igual que ya lo lleva `cajon` por
+// exactamente la misma razón.
 const FORMAS = {
-  centrado: { capa: "flex items-center justify-center p-3", panel: "", tarjeta: "" },
+  centrado: { capa: "flex items-center justify-center p-3", panel: "", tarjeta: "", altoVa: "cuerpo" },
   // Pegada abajo: se redondea arriba y queda recta abajo.
-  hoja: { capa: "flex flex-col justify-end", panel: "", tarjeta: "!rounded-t-2xl !rounded-b-none" },
+  hoja: {
+    capa: "flex flex-col justify-end",
+    panel: "",
+    tarjeta: "!rounded-t-2xl !rounded-b-none flex flex-col",
+    altoVa: "tarjeta",
+  },
   // El cajón ocupa el alto entero: si la tarjeta quedara del alto de su
   // contenido, el panel se vería pegado arriba y no como un cajón. Se midió
   // dibujándolo — sin esto la tarjeta terminaba a los 105 píxeles.
@@ -74,12 +102,13 @@ const FORMAS = {
   // Su redondeo NO se deriva todavía: ninguna pantalla lo usa, y adivinar de qué
   // lado se redondea un cajón es exactamente lo que este kit no hace. Se decide
   // cuando migre CarritoPedido, que es de donde salió la forma.
-  cajon: { capa: "flex justify-end", panel: "h-full", tarjeta: "h-full flex flex-col" },
+  cajon: { capa: "flex justify-end", panel: "h-full", tarjeta: "h-full flex flex-col", altoVa: "ninguno" },
   // Hoja en el teléfono, centrada de `sm` para arriba: el redondeo acompaña.
   "hoja-o-centrado": {
     capa: "flex items-end sm:items-center justify-center",
     panel: "",
-    tarjeta: "!rounded-t-2xl !rounded-b-none sm:!rounded-t-xl sm:!rounded-b-xl",
+    tarjeta: "!rounded-t-2xl !rounded-b-none sm:!rounded-t-xl sm:!rounded-b-xl flex flex-col",
+    altoVa: "tarjeta",
   },
 };
 
@@ -165,12 +194,18 @@ export default function SunmiModalLayout({
   espacioCuerpo = "mt-2 gap-3",
   espacioPie = "mt-3",
   /**
-   * El ALTO del cuerpo. Estaba decidido en el roadmap desde el principio y sin
-   * escribir, esperando a la primera pantalla que lo necesitara: hoy conviven
-   * 65, 70, 80, 90 y 92vh en el repo. La primera fue `ModalCambioPrevio`, con su
-   * 92vh.
+   * HASTA DÓNDE CRECE EL MODAL. Uno solo, y la forma decide dónde lo aplica —
+   * ver el comentario de FORMAS.
+   *
+   * Estaba decidido en el roadmap desde el principio y sin escribir, esperando a
+   * la primera pantalla que lo necesitara: hoy conviven 65, 70, 80, 90 y 92vh en
+   * el repo. La primera fue `ModalCambioPrevio`.
+   *
+   * Recibe la clase TAL COMO LA ESCRIBE LA PANTALLA, así el par
+   * `max-h-[92vh] sm:max-h-[88vh]` pasa entero y ningún número de una sola
+   * pantalla entra al kit.
    */
-  altoCuerpo = "max-h-[65vh]",
+  alto = "max-h-[65vh]",
   /**
    * El PADDING y la SOMBRA de la tarjeta, por props explícitas.
    *
@@ -256,6 +291,13 @@ export default function SunmiModalLayout({
     .filter(Boolean)
     .join(" ");
 
+  // Dónde cae el alto, según la forma. Cuando va a la tarjeta, el cuerpo crece
+  // contra ella: `flex-1` para que ocupe lo que sobra y `min-h-0` para que
+  // pueda encogerse — sin eso un hijo flex no baja de su contenido y el scroll
+  // nunca aparece.
+  const altoEnLaTarjeta = f.altoVa === "tarjeta" ? alto : "";
+  const altoEnElCuerpo = f.altoVa === "cuerpo" ? alto : "flex-1 min-h-0";
+
   const cierraElVelo = !destructivo && typeof onClose === "function";
 
   return (
@@ -289,8 +331,15 @@ export default function SunmiModalLayout({
       )}
 
       <div className={clasesDelPanel}>
-        <SunmiCard className={[f.tarjeta, paddingTarjeta, sombraTarjeta].filter(Boolean).join(" ")}>
-          <div className="flex items-start justify-between gap-2">
+        <SunmiCard
+          className={[f.tarjeta, altoEnLaTarjeta, paddingTarjeta, sombraTarjeta]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {/* `shrink-0` en el encabezado y en el pie: cuando la forma hace de la
+              tarjeta una columna, lo único que tiene que ceder alto es el
+              cuerpo. En las formas que no son columna no hace nada. */}
+          <div className="shrink-0 flex items-start justify-between gap-2">
             {encabezado === "cinta" ? (
               <SunmiHeader title={title} color={color} />
             ) : (
@@ -316,13 +365,13 @@ export default function SunmiModalLayout({
 
           <div
             ref={refCuerpo}
-            className={`flex flex-col ${altoCuerpo} overflow-y-auto ${espacioCuerpo}`.trim()}
+            className={`flex flex-col ${altoEnElCuerpo} overflow-y-auto ${espacioCuerpo}`.trim()}
           >
             {children}
           </div>
 
           {footer && (
-            <div className={`flex justify-end gap-2 ${espacioPie}`.trim()}>
+            <div className={`shrink-0 flex justify-end gap-2 ${espacioPie}`.trim()}>
               {footer}
             </div>
           )}

@@ -297,6 +297,46 @@ anotar.
 | `listas-precios/ModalListaPrecio` | `espacioCuerpo` | `"p-4 space-y-4"` | ídem categorías |
 | `listas-precios/ModalPreviewPrecio` | `maxWidth` | `"max-w-2xl"` | su tarjeta es `max-w-2xl` |
 | `listas-precios/ModalPreviewPrecio` | `espacioCuerpo` | `"p-4 space-y-4"` | ídem |
+| `caja/ModalCambioPrevio` | `forma` | `"hoja-o-centrado"` | **es la pantalla de ORIGEN de esa forma**: hoja pegada abajo en el teléfono, centrada de `sm` para arriba |
+| `caja/ModalCambioPrevio` | `alto` | `"max-h-[92vh] sm:max-h-[88vh]"` | el par entero, tal como lo escribía. La forma lo aplica a la TARJETA |
+| `caja/ModalCambioPrevio` | `paddingTarjeta` | `"!p-0"` | su tarjeta no tiene padding: cada bloque pone su `px-4` |
+| `caja/ModalCambioPrevio` | `sombraTarjeta` | `"!shadow-2xl"` | más marcada que el `shadow-md` del kit |
+| `caja/ModalCambioPrevio` | `espacioCuerpo` / `espacioPie` | `"px-4 space-y-3"` / `"!grid …"` | el pie es una GRILLA, no el flex del kit: apilado en el teléfono, en fila de `sm` para arriba |
+| `caja/ModalCambioPrevio` | `className` | `"sm:mx-4"` | el margen lateral del panel de `sm` para arriba |
+
+### La primera vez que una forma del kit se dibuja desde el kit
+
+`hoja`, `cajon` y `hoja-o-centrado` se extrajeron de tres pantallas y **ninguna
+de las tres había vuelto al kit**: hasta acá las cuatro formas tenían un solo
+usuario real, `centrado`. O sea que tres de las cuatro nunca se habían dibujado
+desde la pieza, y su única prueba era que compilaban.
+
+`ModalCambioPrevio` es el primer caso, y por eso sus capturas van a los dos
+anchos **con intención y no por costumbre**: la forma cambia con el ancho, así
+que a 360 tiene que salir hoja pegada abajo y a 1366 centrada. **Si a un ancho
+sale la otra forma, la pieza está mal aunque los píxeles del panel coincidan.**
+
+Medido, y las dos dieron lo que tenían que dar: a 1366 el `align-items` calculado
+es `center` y la tarjeta queda a 448x673 centrada; a 360 es `flex-end`, la
+tarjeta mide 360x589 pegada al borde de abajo —**la misma caja exacta que antes
+de migrar**— con 14 px de radio arriba y 0 abajo.
+
+### El `!` es el defecto de la fase 4 apareciendo adentro del kit mismo
+
+Todo lo que la pieza le pasa a la tarjeta tiene que llevar `!`, y hay un candado
+que lo exige. El motivo es que `SunmiCard` **concatena su `className` en vez de
+negociarlo** — que es exactamente la deuda anotada para la fase 4, encontrada
+esta vez de adentro para afuera.
+
+Vale anotarlo con esas palabras porque cuando le toque a `SunmiCard` el trabajo
+va a estar medio hecho: ya están identificadas las familias que pelean —padding,
+redondeo, sombra y `display`— y ya está medido cuántos consumidores dependen de
+cada una.
+
+Y una trampa que costó una corrida: **`!p-0` es una clase que se llama `!p-0`**.
+El `!` es parte del nombre, así que un selector CSS `.p-0` no la encuentra y
+`.\!p-0` sí. Al buscar la tarjeta por `.shadow-2xl` el arnés no encontró nada,
+y el candado del selector lo dijo en vez de recortar cualquier cosa.
 
 ### El padding de la tarjeta NO se escribió, y este es el motivo
 

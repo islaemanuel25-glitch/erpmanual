@@ -140,7 +140,7 @@ test("el espaciado del cuerpo y del pie es parámetro, con el valor de siempre",
 test("EL `gap-3` NO ESTÁ CLAVADO en el cuerpo", () => {
   // Si volviera a estarlo, migrar la capa de una pantalla le separaría todos los
   // campos del formulario — que es exactamente lo que emparejar NO es.
-  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col ${altoCuerpo}"), SRC.indexOf("{children}"));
+  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col ${altoEnElCuerpo}"), SRC.indexOf("{children}"));
   assert.doesNotMatch(cuerpo, /gap-3/, "el gap volvió a ser fijo");
   assert.doesNotMatch(cuerpo, /mt-2/, "el margen volvió a ser fijo");
   assert.match(cuerpo, /\$\{espacioCuerpo\}/);
@@ -152,16 +152,38 @@ test("EL CUERPO ACEPTA UNA REFERENCIA, y va en el div que scrollea", () => {
   // seguiría compilando y el scroll no volvería nunca: `scrollTop = 0` sobre algo
   // que no scrollea no hace nada y no avisa.
   const cuerpo = SRC.slice(SRC.indexOf("ref={refCuerpo}"), SRC.indexOf("{children}"));
-  assert.match(cuerpo, /\$\{altoCuerpo\}/, "la referencia no está en el div que lleva el alto");
+  assert.match(cuerpo, /\$\{altoEnElCuerpo\}/, "la referencia no está en el div que lleva el alto");
   assert.match(cuerpo, /overflow-y-auto/, "la referencia no está en el div que scrollea");
 });
 
-test("el alto del cuerpo es parámetro, con el 65vh de siempre por default", () => {
-  // Estaba decidido en el roadmap y sin escribir, esperando a la primera
-  // pantalla que lo necesitara. El default no se toca: cambiarlo mueve los
-  // quince modales ya migrados.
-  assert.match(SRC, /altoCuerpo = "max-h-\[65vh\]"/, "cambió el default: eso mueve todos los migrados");
-  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col ${altoCuerpo}"), SRC.indexOf("{children}"));
+test("EL ALTO ES UNO SOLO Y LA FORMA DECIDE DÓNDE CAE", () => {
+  // Mismo patrón que el `z`: un valor del que la pieza deriva los destinos. Dos
+  // parámetros sueltos dejarían ponerlos incoherentes sin que nadie se entere.
+  const firma = SRC.slice(SRC.indexOf("export default function"), SRC.indexOf("}) {"));
+  const altos = [...firma.matchAll(/^\s*(alto[A-Za-z]*)\s*=/gm)].map((m) => m[1]);
+  assert.deepEqual(altos, ["alto"], altos.join(", "));
+
+  // Dónde cae cada forma, y que el cuerpo crezca contra la tarjeta cuando el
+  // tope está allá: sin `min-h-0` un hijo flex no baja de su contenido y el
+  // scroll no aparece nunca.
+  assert.match(SRC, /const altoEnLaTarjeta = f\.altoVa === "tarjeta" \? alto : ""/);
+  assert.match(SRC, /const altoEnElCuerpo = f\.altoVa === "cuerpo" \? alto : "flex-1 min-h-0"/);
+
+  const bloque = SRC.slice(SRC.indexOf("const FORMAS"), SRC.indexOf("export default"));
+  const destino = (nombre) => {
+    const i = bloque.indexOf(nombre);
+    return (bloque.slice(i, bloque.indexOf("}", i)).match(/altoVa:\s*"(\w+)"/) || [])[1];
+  };
+  assert.equal(destino("centrado:"), "cuerpo");
+  assert.equal(destino("hoja:"), "tarjeta");
+  assert.equal(destino('"hoja-o-centrado"'), "tarjeta");
+  // El cajón ya fija su alto con `h-full`: un tope encima sería contradictorio.
+  assert.equal(destino("cajon:"), "ninguno");
+});
+
+test("el alto conserva el 65vh de siempre por default", () => {
+  assert.match(SRC, /alto = "max-h-\[65vh\]"/, "cambió el default: eso mueve todos los migrados");
+  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col ${altoEnElCuerpo}"), SRC.indexOf("{children}"));
   assert.match(cuerpo, /overflow-y-auto/, "el scroll sí sigue clavado: sin él un modal largo empuja la pantalla");
 });
 
@@ -181,6 +203,9 @@ test("UNA HOJA SE REDONDEA ARRIBA Y QUEDA RECTA ABAJO", () => {
     const f = forma(nombre);
     assert.match(f, /!rounded-t-2xl/, `${nombre} no redondea arriba`);
     assert.match(f, /!rounded-b-none/, `${nombre} no queda recta abajo`);
+    // Y la columna, por la misma razón que el redondeo: una hoja cuyo pie se va
+    // con el scroll está rota. `cajon` ya lo llevaba desde antes.
+    assert.match(f, /flex flex-col/, `${nombre} no es columna: el pie se iría con el scroll`);
   }
   // Y la que se centra de `sm` para arriba recupera las cuatro esquinas ahí.
   assert.match(forma('"hoja-o-centrado"'), /sm:!rounded-t-xl sm:!rounded-b-xl/);
@@ -208,7 +233,7 @@ test("el padding y la sombra de la tarjeta son props, con el default del kit", (
   // aplicación por una pantalla.
   assert.match(SRC, /paddingTarjeta = ""/);
   assert.match(SRC, /sombraTarjeta = ""/);
-  assert.match(SRC, /\[f\.tarjeta, paddingTarjeta, sombraTarjeta\]/);
+  assert.match(SRC, /\[f\.tarjeta, altoEnLaTarjeta, paddingTarjeta, sombraTarjeta\]/);
 });
 
 // ── ACCESIBILIDAD ──────────────────────────────────────────────────────────
@@ -241,6 +266,7 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/categorias/ModalCategoria.jsx": true,
     "components/compras-proveedor/ModalVincularCodigo.jsx": true,
     "components/listas-precios/ModalListaPrecio.jsx": true,
+    "components/caja/ModalCambioPrevio.jsx": true,
     // Informativos, de confirmación y de selección: cerrarlos no pierde nada.
     // `ModalPreviewPrecio` tiene un campo y NO lleva destructivo a propósito: lo
     // único que se escribe ahí es el buscador, y perder un término de búsqueda
