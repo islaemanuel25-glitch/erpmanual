@@ -63,10 +63,48 @@ test("el velo QUE NO CIERRA vuelve a ser un div escondido", () => {
 
 test("NINGÚN COLOR FIJO adentro: el velo sale del token del tema", () => {
   // Es lo que arruinó a SunmiButtonIcon, que trae tres colores fijos y por eso
-  // no se puede usar. El velo del carrito es `bg-black/50`; acá se conserva el
-  // del kit, que ya sale del fondo del tema con transparencia.
+  // no se puede usar. El velo del carrito es `bg-black/50`; acá el color sigue
+  // saliendo del fondo del tema, aunque ahora se lo lleve hacia el negro.
   assert.doesNotMatch(SRC, /bg-(black|white|slate|gray|zinc|neutral|red|amber|green|blue)-?\d*\/?\d*/);
   assert.match(SRC, /var\(--app-bg\)/);
+});
+
+test("EL VELO NO SE DESVANECE HACIA EL FONDO DE LA APP", () => {
+  // ESTE ES EL CANDADO DEL DEFECTO, y por eso vale más que su tamaño.
+  //
+  // El velo decía `color-mix(in srgb, var(--app-bg) 78%, transparent)`. Apagaba
+  // muy bien lo de atrás, pero desvanece TODO hacia el fondo de la app — y la
+  // tarjeta de un modal ES el fondo de la app en casi todos los temas. Medido
+  // sobre `/modulos/categorias` en los catorce: en DIEZ el relleno de la tarjeta
+  // y el del velo daban exactamente el mismo color.
+  //
+  // Lo que este candado impide es volver a esa forma: que el color del velo sea
+  // `--app-bg` SIN llevarlo antes hacia el negro. Se mira la constante, que es
+  // donde vive el color, y no las dos ramas donde se usa.
+  // La constante se saca del TEXTO y no se importa: el archivo es JSX y la
+  // suite corre sin transformarlo.
+  const m = SRC.match(/export const COLOR_VELO = "([^"]+)"/);
+  assert.ok(m, "no está `export const COLOR_VELO`: el velo volvió a estar suelto");
+  const COLOR_VELO = m[1];
+  assert.match(COLOR_VELO, /color-mix/, "el velo dejó de mezclar: revisar este candado");
+  assert.match(
+    COLOR_VELO,
+    /black\s+\d+%/,
+    "el velo volvió a salir del fondo de la app sin oscurecer: eso hace que la tarjeta desaparezca contra él"
+  );
+  // Y el control negativo: la forma vieja tiene que fallar esta misma
+  // afirmación, o el candado no está mirando nada.
+  assert.doesNotMatch("color-mix(in srgb, var(--app-bg) 78%, transparent)", /black\s+\d+%/);
+});
+
+test("el color y la opacidad del velo se escriben UNA vez", () => {
+  // Estaban literales en las dos ramas —la que cierra al tocar y la que no—.
+  // Dos copias de un color se separan el día que alguien toca una, y nadie mira
+  // la rama que no usa la pantalla que está probando.
+  const usos = SRC.match(/background: COLOR_VELO, opacity: OPACIDAD_VELO/g) ?? [];
+  assert.equal(usos.length, 2, "las dos ramas del velo tienen que compartir la constante");
+  const literales = SRC.match(/color-mix\(in srgb, black/g) ?? [];
+  assert.equal(literales.length, 1, "el color del velo volvió a estar escrito más de una vez");
 });
 
 // ── LA CLASE DEL PANEL SE NEGOCIA ──────────────────────────────────────────

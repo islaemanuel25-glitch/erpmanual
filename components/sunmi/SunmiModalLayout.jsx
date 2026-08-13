@@ -45,6 +45,16 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import { declaraAncho } from "@/lib/sunmi/claseAncho";
 import { declaraAnchoMaximo } from "@/lib/sunmi/claseNegociada";
 
+// EL COLOR Y LA OPACIDAD DEL VELO, en un solo lugar y no repetidos en las dos
+// ramas —la que cierra al tocar y la que no—. Estaban escritos dos veces, y dos
+// copias de un color se separan el día que alguien toca una.
+//
+// Los dos números salen de MEDIR, no de elegir: barrido de los catorce temas
+// sobre `/modulos/categorias`, con los dos ejes que el velo tiene que cumplir.
+// El detalle está en `docs/roadmap/kit-sunmi-fases.md`.
+export const COLOR_VELO = "color-mix(in srgb, black 70%, var(--app-bg))";
+export const OPACIDAD_VELO = 0.92;
+
 /**
  * Dónde se para el panel, por forma. La capa y el panel se deciden juntos.
  *
@@ -322,23 +332,42 @@ export default function SunmiModalLayout({
       aria-label={ariaLabel ?? (ariaLabelledBy ? undefined : title)}
       aria-labelledby={ariaLabelledBy}
     >
-      {/* EL VELO. Oscurece lo de atrás para que el modal se lea como una
-          decisión y no como un bloque más de la pantalla.
-          El color sale del FONDO DEL TEMA con transparencia, no de un negro
-          fijo: en un tema claro un velo negro se ve como un apagón, y el token
-          ya cambia con el tema. */}
+      {/* EL VELO. Tiene que decir DOS cosas, y la primera versión solo decía una.
+          Las dos están medidas y el detalle largo está en el roadmap.
+
+          Decía `var(--app-bg) 78%`: el color del fondo de la app con
+          transparencia. Eso apagaba muy bien lo de atrás —mejor que el negro al
+          50 % que usaban las pantallas sin migrar— pero **desvanece hacia el
+          fondo de la app**, y la tarjeta de un modal ES el fondo de la app en la
+          mayoría de los temas. Medido sobre `/modulos/categorias` en los catorce:
+          en DIEZ el relleno de la tarjeta y el del velo daban EXACTAMENTE el
+          mismo color, contraste 1,00, y lo único que separaba el modal de la
+          pantalla era un borde de un píxel. Los otros cuatro no pasaban de 1,12.
+
+          O sea que las trece pantallas ya migradas quedaron peor que antes de
+          tocarlas, que es justo lo que la fase se comprometió a no hacer.
+
+          Ahora el color sigue saliendo del tema —un velo negro fijo en un tema
+          claro se ve como un apagón, y eso no cambió— pero se lo lleva al 30 %
+          hacia el negro antes de aplicarlo. Conserva el matiz del tema y queda
+          más oscuro que cualquier tarjeta.
+
+          `opacity` en vez de un tercer color adentro del `color-mix`: anidar
+          `color-mix` es una función más nueva que la que ya se usaba, y este velo
+          se dibuja en la Sunmi de la caja. Con dos propiedades separadas el piso
+          de soporte no se mueve. */}
       {cierraElVelo ? (
         <button
           type="button"
           aria-label="Cerrar"
           onClick={onClose}
-          style={{ background: "color-mix(in srgb, var(--app-bg) 78%, transparent)" }}
+          style={{ background: COLOR_VELO, opacity: OPACIDAD_VELO }}
           className="absolute inset-0"
         />
       ) : (
         <div
           aria-hidden="true"
-          style={{ background: "color-mix(in srgb, var(--app-bg) 78%, transparent)" }}
+          style={{ background: COLOR_VELO, opacity: OPACIDAD_VELO }}
           className="absolute inset-0"
         />
       )}

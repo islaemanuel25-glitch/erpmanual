@@ -577,6 +577,97 @@ blanca contra un velo `rgb(244,247,250)` —B = 1,08—. El andamio no había me
 **La decisión es de Emanuel** y no entra por una tanda técnica: cambiar el velo
 del kit mueve las 13 pantallas que ya están en producción.
 
+#### ARREGLADO, y medido en los catorce temas
+
+Emanuel lo resolvió con el criterio escrito: *no es una decisión estética
+abierta — esas trece se ven peor que antes de tocarlas, y un modal que no se
+despega del fondo perdió algo que tenía. Que estuviera declarado "el velo pasa al
+del tema" no lo cubre: nadie declaró que la tarjeta iba a dejar de despegarse,
+porque nadie lo sabía.*
+
+**El barrido de los catorce**, sobre `/modulos/categorias` a 1366x900 con el
+modal abierto, recortando al rect de la tarjeta con 200 px de margen. `A` es el
+contraste entre el percentil 5 y el 95 de la banda de velo —cuánto detalle
+sobrevive atrás, más bajo es mejor—; `B` es la mediana de adentro de la tarjeta
+contra la del velo —más alto es mejor—.
+
+- `sunmiDark`: A 1,04 → 1,01 · B **1,00 → 1,13**
+- `sunmiDarkCompact`: A 1,00 → 1,00 · B 1,10 → 1,13
+- `sunmiGraphite`: A 1,00 → 1,00 · B 1,08 → 1,17
+- `sunmiBlueClassic`: A 1,00 → 1,00 · B 1,12 → 1,37
+- `operixNight`: A 1,02 → 1,00 · B 1,08 → 1,17
+- `sunmiLight`: A 1,02 → 1,00 · B **1,08 → 7,15**
+- `sunmiSand`: A 1,02 → 1,01 · B 1,06 → 7,03
+- `sunmiFrance`: A 1,46 → 1,26 · B 1,08 → 7,22
+- `sunmiFranceSplit`: A 1,46 → 1,26 · B 1,08 → 7,22
+- `operixBluePro`: A 1,05 → 1,02 · B 1,05 → 7,10
+- `verdeComercio`: A 1,04 → 1,02 · B 1,04 → 7,04
+- `grafitoEjecutivo`: A 1,08 → 1,05 · B 1,08 → 7,22
+- `ambarCaja`: A 1,04 → 1,02 · B 1,03 → 6,99
+- `violetaSaas`: A 1,06 → 1,03 · B 1,04 → 7,07
+
+**A mejora o queda igual en los catorce. B sube en los catorce.**
+
+Y la sospecha de que `sunmiDark` no era el único quedó corta: con el velo viejo
+**diez de los catorce daban B = 1,00 exacto** —tarjeta y velo del mismo color— y
+los otros cuatro no pasaban de 1,12.
+
+#### Los cinco oscuros mejoran pero quedan bajos, y hay un techo
+
+`sunmiDark`, `sunmiDarkCompact`, `sunmiGraphite`, `sunmiBlueClassic` y
+`operixNight` quedan entre 1,13 y 1,37. Suben respecto del velo viejo y respecto
+de lo que esas pantallas tenían ANTES de migrarse, así que la regresión está
+reparada — pero no llegan a lo de los claros, y **no hay velo que lo consiga**.
+
+El techo es aritmético: la tarjeta de `sunmiDark` es `rgb(15,23,42)`, cuya
+luminancia relativa es 0,0110. Con un velo NEGRO PURO el contraste sería
+(0,0110 + 0,05) / 0,05 = **1,22**. Cualquier número por encima de eso requiere
+mover la TARJETA, no el velo — o sea `theme.card`, que es media aplicación y
+otra fase.
+
+Vale decir además que **el contraste WCAG es mal juez en el extremo oscuro**: el
++0,05 de la fórmula aplasta las diferencias ahí abajo. En la captura de
+`sunmiDark` la tarjeta se despega a simple vista aunque el número diga 1,13. El
+número sirve para comparar antes contra después, no para decidir si algo se ve.
+
+#### La implementación, y por qué así
+
+    export const COLOR_VELO = "color-mix(in srgb, black 70%, var(--app-bg))";
+    export const OPACIDAD_VELO = 0.92;
+
+El color **sigue saliendo del tema** —un negro fijo en un tema claro se ve como
+un apagón, y eso no cambió— pero se lo lleva al 70 % hacia el negro antes de
+aplicarlo: conserva el matiz y queda más oscuro que cualquier tarjeta.
+
+`opacity` como propiedad aparte en vez de un tercer color adentro del
+`color-mix`: **anidar `color-mix` es más nuevo que usarlo suelto**, y este velo se
+dibuja en la Sunmi de la caja. Con dos propiedades el piso de soporte no se
+mueve.
+
+Y las dos ramas del velo —la que cierra al tocar y la que no— comparten la
+constante. Antes tenían el color escrito literal cada una.
+
+#### Dos candados, con su control negativo
+
+Uno impide que el velo vuelva a salir de `--app-bg` sin oscurecer, que es la
+forma exacta del defecto. Otro exige que el color se escriba una sola vez.
+**Ejercidos**: con la constante vuelta a la forma vieja la suite da 2 en rojo con
+el mensaje que nombra el problema, y con la nueva vuelve a 27 en verde.
+
+#### El defecto de la PRIMERA medición, que es el de siempre
+
+El barrido inicial de los catorce dio "B = 1,00 en diez, y el velo nuevo tampoco
+lo arregla". Era falso, y el error era mío: `ficha.recorte` es el recorte **con
+el margen incluido** —440x316 para un elemento de 392x269 con margen 24— y yo lo
+usé como si fuera el tamaño del elemento. La muestra "de adentro de la tarjeta"
+barría entonces la foto entera, velo incluido, y su mediana daba el color del
+velo.
+
+Números perfectamente reproducibles **de otra cosa**. Se descubrió mirando la
+captura, que mostraba el modal despegándose de un velo gris oscuro mientras la
+planilla decía 1,00. **Las fotos estaban bien desde el principio**; se remidieron
+esas mismas y no hizo falta volver a sacarlas.
+
 ### EL PRÓXIMO GRUPO: los siete gemelos del POS
 
 `ModalCanjePuntos`, `ModalCliente`, `ModalDescuento`, `ModalPesoKg`,
