@@ -89,6 +89,9 @@ export default function ModalLocal({
       // texto antes de decidir si el kit lo muestra o si sale.
       subtitle="Configurá los datos del local"
       onClose={onClose}
+      // Es un formulario: un toque al costado con media pantalla escrita tiraría
+      // lo escrito, y en el teléfono ese toque pasa solo.
+      destructivo
       // El espaciado interior queda como estaba: emparejar es la capa y la
       // estructura, no repintar el cuerpo.
       espacioCuerpo=""

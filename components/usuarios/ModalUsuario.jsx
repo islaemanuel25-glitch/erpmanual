@@ -93,6 +93,9 @@ export default function ModalUsuario({
       // lo muestra o si sale.
       subtitle="Configurá los datos del usuario"
       onClose={onClose}
+      // Es un formulario: un toque al costado con media pantalla escrita tiraría
+      // lo escrito, y en el teléfono ese toque pasa solo.
+      destructivo
       // El espaciado interior queda como estaba: emparejar es la capa y la
       // estructura, no repintar el cuerpo.
       espacioCuerpo=""

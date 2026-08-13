@@ -10,6 +10,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { declaraAnchoMaximo } from "@/lib/sunmi/claseNegociada";
@@ -17,6 +18,9 @@ import { declaraAncho } from "@/lib/sunmi/claseAncho";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SRC = fs.readFileSync(path.join(RAIZ, "components/sunmi/SunmiModalLayout.jsx"), "utf8");
+
+/** `git grep` recorre el repo entero; `readdirSync` mira un solo nivel. */
+const ejecutar = (cmd) => execSync(cmd, { cwd: RAIZ, encoding: "utf8" });
 
 // ── LAS FORMAS ─────────────────────────────────────────────────────────────
 
@@ -169,6 +173,64 @@ test("acepta las etiquetas y cae al título cuando no le pasan ninguna", () => {
   assert.match(SRC, /role = "dialog"/);
   assert.match(SRC, /aria-modal="true"/);
   assert.match(SRC, /ariaLabel \?\? \(ariaLabelledBy \? undefined : title\)/);
+});
+
+// ── QUIÉN DECLARA `destructivo` Y QUIÉN NO ─────────────────────────────────
+
+test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
+  // El criterio es qué se PIERDE al cerrar sin querer, no qué tan peligrosa es
+  // la acción. Está escrito al lado del prop y la lista se decidió abriendo cada
+  // pantalla, una por una.
+  //
+  // Este candado existe porque la decisión no vive en ningún lado del código:
+  // sin él, un modal de carga nuevo nace cerrando al tocar afuera y nadie se
+  // entera hasta que alguien pierde un formulario lleno.
+  const declaran = {
+    // Carga y edición: hay algo escrito que se puede perder.
+    "components/locales/ModalLocal.jsx": true,
+    "components/proveedores/ModalProveedor.jsx": true,
+    "components/usuarios/ModalUsuario.jsx": true,
+    "components/operadores/ModalOperador.jsx": true,
+    "components/roles/ModalRol.jsx": true,
+    "components/categorias/ModalCategoria.jsx": true,
+    "components/compras-proveedor/ModalVincularCodigo.jsx": true,
+    // Informativos, de confirmación y de selección: cerrarlos no pierde nada.
+    // Se vuelven a abrir y listo.
+    "components/productos/ModalVerComposicion.jsx": false,
+    "components/proveedores/ModalCodigosProveedor.jsx": false,
+    "components/compras-proveedor/ModalEnviarPedido.jsx": false,
+    "components/comprobantes/PanelComprobantes.jsx": false,
+    // Estos dos lo declaran por el criterio VIEJO —la acción es peligrosa— y
+    // quedan así a propósito. Se revisan al cerrar la fase 2, junto con el
+    // renombre de `destructivo`.
+    "components/proveedores/listas/ModalRevertir.jsx": true,
+    "components/proveedores/listas/ModalTerminar.jsx": true,
+  };
+
+  // Que la lista sea TODOS los que usan la pieza, no los que alguien recordó.
+  // Enumerado sobre el repo entero, no sobre una carpeta.
+  const usan = ejecutar("git grep -l SunmiModalLayout -- app components")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
+  assert.deepEqual(
+    usan.sort(),
+    Object.keys(declaran).sort(),
+    "apareció o desapareció un consumidor de la pieza y esta lista no lo dice"
+  );
+
+  for (const [ruta, esperado] of Object.entries(declaran)) {
+    const texto = fs.readFileSync(path.join(RAIZ, ruta), "utf8");
+    // Se busca el prop pasado a la pieza, no la palabra suelta.
+    const loPasa = /\n\s*destructivo(\s*=\s*\{?(true|false)\}?)?\s*\n/.test(texto);
+    assert.equal(
+      loPasa,
+      esperado,
+      esperado
+        ? `${ruta} es de carga o edición y dejó de declarar destructivo: el velo le tira lo escrito`
+        : `${ruta} no tiene nada que perder al cerrarse y declara destructivo de más`
+    );
+  }
 });
 
 test("los cuatro usos de hoy NO pasan forma: el default es el de siempre", () => {

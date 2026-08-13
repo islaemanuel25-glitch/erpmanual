@@ -112,6 +112,9 @@ export default function ModalCategoria({
       open={open}
       title={editMode ? "Editar categoría" : "Nueva categoría"}
       onClose={onClose}
+      // Es un formulario: un toque al costado con el nombre ya escrito tiraría
+      // lo escrito, y en el teléfono ese toque pasa solo.
+      destructivo
       // El ancho de esta pantalla es `max-w-md`, no el `max-w-xl` del kit. Sin
       // declararlo la tarjeta pasaría de 392 a 504 px a 1366.
       maxWidth="max-w-md"

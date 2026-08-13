@@ -258,6 +258,39 @@ repo a la vez**: sacar el comentario de adentro del `className` de `SunmiCard`
 baja el padding de 21 a 10.5 px en cada tarjeta del sistema. Es un cambio de una
 línea y de una tanda entera de verificación.
 
+### El velo: qué se pierde, no qué tan peligroso es
+
+**PENDIENTE CONFIRMADO — decidido el 2026-08-13, y CORRIGE el criterio anterior.**
+
+El criterio que estaba escrito al lado del prop decía "una acción que escribe y
+no se puede deshacer sola". Eso mezcla dos cosas distintas y lleva a la respuesta
+equivocada.
+
+**El velo no cierra cuando cerrar sin querer PIERDE algo** —lo que la persona
+escribió, o una operación en vuelo—, no cuando la acción es peligrosa.
+
+El caso que lo mostró: "¿Borrar este comprobante?" es todo lo peligrosa que se
+quiera y cerrarla sin querer no cuesta nada, se vuelve a abrir y se confirma. Un
+formulario de proveedor con media pantalla escrita no es peligroso, y un toque al
+costado —que en el teléfono pasa solo— tira lo escrito.
+
+En la práctica: **los modales de CARGA y EDICIÓN lo declaran; los informativos,
+los de confirmación y los de selección no.**
+
+**`destructivo` es candidato a renombrarse al cerrar la fase 2.** El nombre
+arrastra la confusión que este criterio corrige. No se renombra ahora: hacerlo
+mientras se migra ensucia las comparaciones. En esa misma vuelta se revisan
+`ModalRevertir` y `ModalTerminar`, que hoy lo declaran por el criterio viejo y
+quedan como están.
+
+La lista de los dos lados —enumerada con `git grep` sobre `app` y `components`,
+abriendo cada pantalla y no fiándose del conteo de campos— la fija el candado
+`components/sunmi/SunmiModalLayout.test.mjs`, que además exige que la lista sean
+TODOS los consumidores de la pieza y no los que alguien recordó.
+
+Lo que el conteo de campos habría contestado mal: `PanelComprobantes` da tres
+campos, y sus dos modales no tienen ninguno — los campos están en el panel.
+
 ### Props muertos que se conservan a propósito
 
 Se dejan escritos para no perder el texto antes de decidir si el kit los muestra

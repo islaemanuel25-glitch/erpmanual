@@ -76,6 +76,9 @@ export default function ModalRol({
       open={open}
       title={editMode ? "Editar rol" : "Nuevo rol"}
       onClose={onClose}
+      // Es un formulario: un toque al costado con los permisos ya tildados
+      // tiraría lo hecho, y en el teléfono ese toque pasa solo.
+      destructivo
       // El espaciado interior queda como estaba: emparejar es la capa y la
       // estructura, no repintar el cuerpo. Con el `gap-3` del kit, este modal
       // separaría los quince toggles de permisos entre sí.

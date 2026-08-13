@@ -67,9 +67,32 @@ export default function SunmiModalLayout({
   maxWidth = "max-w-xl",
   showCloseButton = true,
   /**
-   * Una acción que escribe y no se puede deshacer sola. Con esto en true, tocar
-   * el velo NO cierra: cerrar sin querer un modal de lectura no cuesta nada,
-   * pero perder de vista una confirmación destructiva a mitad de camino sí.
+   * Con esto en true, tocar el velo NO cierra.
+   *
+   * ── EL CRITERIO: QUÉ SE PIERDE, NO QUÉ TAN PELIGROSO ES ────────────────
+   *
+   * **El velo no cierra cuando cerrar sin querer PIERDE algo** — lo que la
+   * persona escribió, o una operación en vuelo. No cuando la acción es
+   * peligrosa.
+   *
+   * Son dos cosas distintas y mezclarlas lleva a la respuesta equivocada.
+   * "¿Borrar este comprobante?" es todo lo peligrosa que se quiera, y cerrarla
+   * sin querer no cuesta NADA: se vuelve a abrir y se confirma. Un formulario de
+   * proveedor con media pantalla escrita no es peligroso, y un toque al costado
+   * —que en el teléfono pasa solo— tira lo escrito.
+   *
+   * Así que: los modales de CARGA y EDICIÓN lo declaran. Los informativos, los
+   * de confirmación y los de selección NO, porque no hay nada que perder.
+   *
+   * El criterio anterior decía "una acción que escribe y no se puede deshacer
+   * sola", que es la pregunta de si la acción es peligrosa. Por eso está
+   * cambiado.
+   *
+   * **El nombre `destructivo` arrastra esa confusión y es candidato a
+   * renombrarse al cerrar la fase 2** — no antes: renombrar mientras se migra
+   * ensucia las comparaciones. Está anotado en el roadmap junto con los dos
+   * modales que lo declaran por el criterio viejo, `ModalRevertir` y
+   * `ModalTerminar`, que se revisan en esa misma vuelta.
    */
   destructivo = false,
   /** "centrado" | "hoja" | "cajon" | "hoja-o-centrado". Ver arriba de dónde sale cada una. */

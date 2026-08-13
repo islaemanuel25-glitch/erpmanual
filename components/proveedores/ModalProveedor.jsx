@@ -99,6 +99,9 @@ export default function ModalProveedor({
       // Conserva su cinta de título: el kit por defecto dibuja texto normal.
       encabezado="cinta"
       onClose={onClose}
+      // Es un formulario: un toque al costado con media pantalla escrita tiraría
+      // lo escrito, y en el teléfono ese toque pasa solo.
+      destructivo
       // La referencia manda el scroll arriba cuando el modal se reabre. Sin
       // ella, abrirlo para editar otro proveedor lo deja donde quedó el anterior.
       refCuerpo={modalRef}
