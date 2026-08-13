@@ -367,6 +367,16 @@ porque no llama a `conciliarFila` —hace un `update` directo— así que el pat
 buscado no lo encontraba. Era el único de los tres que escribía la autoría de una
 decisión.
 
+**UNA LISTA DE DIFERENCIAS SE ESCRIBE POR LO QUE SE VA A VER, NO POR LO QUE
+CAMBIA EN EL CÓDIGO.** "Pasa al encabezado del kit" es verdad y no le avisa a
+nadie de nada. "El título deja de ser una cinta ámbar en mayúsculas y pasa a
+texto blanco normal" sí.
+
+*Por qué:* con la primera redacción, el punto más visible de una tanda —cinco
+modales perdiendo la cinta de su título— entró como si fuera un detalle de
+plomería, y solo apareció al mirar la captura. Es la diferencia entre una lista
+que sirve para comparar y una que sirve para tranquilizarse.
+
 **UNA FIRMA QUE AGRUPA SE COMPARA CONTRA LO QUE EXISTE, NO CONTRA UNA LISTA DE
 RASGOS ELEGIDA DE ANTEMANO.** Y antes de usar un agrupamiento para planificar, se
 abre UN CASO DE CADA GRUPO y se comprueba que la firma dijo la verdad.

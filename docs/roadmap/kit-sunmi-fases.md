@@ -151,6 +151,40 @@ sacados de pantallas que hoy funcionan:
   **Cuando estén las 36:** mirar si esto debería hacerlo la pieza para todos
   —reabrir un modal arriba es razonable siempre— en vez de recibirlo de afuera.
 
+### PUNTO FIJO DE LA LISTA BASE: el cuerpo con `space-y-*` se separa
+
+**Todo modal cuyo cuerpo traiga `space-y-*` se va a separar unos píxeles al
+migrar.** Va declarado de antemano en cada tanda, con el número medido de esa
+pantalla.
+
+*Por qué:* la pieza pone `flex flex-col` en el cuerpo y los originales son
+bloque. Con un contenedor de bloque, el `space-y-*` y los márgenes internos de
+cada campo **se colapsan**; en un contenedor flex no, así que se suman. No es que
+el `space-y-*` se pierda: se comporta distinto.
+
+Medido en `ModalProveedor`, que fue el primero: **12 píxeles en total** repartidos
+en el formulario entero. "Nombre" pasó de 160 a 171 desde el borde de la tarjeta,
+y el par de botones del pie de 631 a 643.
+
+**Esto es un cambio ACEPTADO, no una verificación de que no lo hubo.** Se decidió
+así por tres motivos, y no se rediscute:
+
+1. Sacar el `flex flex-col` movería los ocho modales ya migrados, que están
+   desplegados y andan bien. Cambiar ocho pantallas vivas para dejar una idéntica
+   es el peor de los tres canjes.
+2. Un séptimo parámetro sería el primero que NO sale de una necesidad de una
+   pantalla sino de dos formas de calcular el mismo espaciado. Los otros seis
+   salieron de algo que una pantalla real necesitaba; este saldría de una
+   diferencia de motor. Esa puerta no se abre.
+3. Doce píxeles repartidos en un formulario entero es "un poco más aireado", no
+   algo roto.
+
+**A cuántos les aplica, contado:** de las **30 capas que quedan por migrar**,
+**8 tienen `space-y-*` en el cuerpo** y 22 no. Las ocho son los tres modales de
+`clientes`, `configuracion/mantenimiento`, `turnos/[id]`, `ModalProcesoPendiente`,
+`ModalCategoria`, `ModalListaPrecio`, `ModalPreviewPrecio` y
+`ModalPedirOperador`. A esas ocho hay que medirles el número antes de migrarlas.
+
 ### Declaraciones
 
 | pantalla | parámetro | valor | por qué |
@@ -159,6 +193,12 @@ sacados de pantallas que hoy funcionan:
 | `locales/ModalLocal` | `espacioCuerpo` / `espacioPie` | `""` | mismo caso: emparejar la capa no puede repintar el formulario |
 | `operadores/ModalOperador` | `espacioCuerpo` / `espacioPie` | `""` | ídem |
 | `usuarios/ModalUsuario` | `espacioCuerpo` / `espacioPie` | `""` | ídem |
+| `proveedores/ModalProveedor` | `encabezado` | `"cinta"` | su título es una cinta ámbar en mayúsculas; el default del kit lo dejaría en texto blanco normal |
+| `proveedores/ModalProveedor` | `refCuerpo` | `modalRef` | manda el scroll arriba al reabrir. **No es aspecto**: sin esto, editar otro proveedor abre el modal donde quedó el anterior |
+| `proveedores/ModalProveedor` | `espacioCuerpo` | `"px-2 pb-4 mt-2 space-y-4"` | el `space-y-4` separa los campos del formulario |
+| `proveedores/ModalProveedor` | `espacioPie` | `"pt-2"` | tenía `pt-2`, no el `mt-3` del kit |
+| `compras-proveedor/ModalEnviarPedido` | `encabezado` | `"cinta"` | mismo caso que proveedor |
+| `compras-proveedor/ModalEnviarPedido` | `espacioCuerpo` / `espacioPie` | `""` | su cuerpo es contenido suelto con sus propios márgenes |
 
 ### Props muertos que se conservan a propósito
 
