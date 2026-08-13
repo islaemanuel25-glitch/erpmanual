@@ -753,6 +753,39 @@ lo trata como "consumidor existente"** y le afirma cosas —que consume
 no corre en ninguna pantalla. Es la misma familia que "un candado puede estar
 mirando el lugar equivocado", con otra cara: acá mira un lugar que no ocurre.
 
+**Las fechas afilan el hallazgo.** El POS reemplazó ese modal por
+`ClientePickerFullscreen` el **2026-02-15** (`e854077`), dos días después de
+estrenarlo. El candado se escribió el **2026-07-30**. O sea que no es un candado
+que se quedó viejo: **nació apuntando a un archivo muerto** y pasó en verde cinco
+meses y medio afirmando sobre algo que ninguna pantalla dibuja.
+
+**Apuntarlo al `ModalCliente` que sí corre no era la respuesta**, y comprobarlo
+fue el paso que valió: el que corre está definido adentro de
+`app/modulos/clientes/page.jsx`, es un formulario de alta y edición —no un
+buscador—, **no consume `clientes/buscar`** y no renderiza el aviso. Apuntarle el
+candado lo habría hecho afirmar algo falso. El que reemplazó al muerto de verdad
+es `ClientePickerFullscreen`, y ya estaba en la lista.
+
+**Lo que se arregló es la pregunta, no la lista.** El candado ahora hace dos
+cosas: enumera los consumidores DESDE EL REPO y exige que cada uno sea
+alcanzable. Derivar la lista solo no alcanzaba —el muerto también contiene la
+cadena, así que un `grep` lo volvía a incluir—; lo que lo destapa es la
+alcanzabilidad.
+
+Y en el camino se comió su propio anzuelo, que es la parte que hay que recordar:
+**la primera versión pasó en verde porque el comentario que explica el caso
+NOMBRA la ruta del archivo muerto.** Un candado que busca texto encuentra el
+texto de su propio comentario. Se arregló como corresponde —un test no renderiza
+nada y un comentario tampoco, las dos exclusiones escritas y `esComentario`
+importada del contador— y no reescribiendo el comentario para esquivarlo, que ya
+está anotado como hábito a evitar.
+
+**El muerto se borró** con los tres chequeos de `GrillaConciliacion` (`ee09abe`):
+como identificador, como cadena suelta —con `MSYS_NO_PATHCONV=1`, que es la
+trampa que casi arruina ese conteo— y el build después. Cero referencias de
+runtime por las tres vías, y ningún módulo huérfano: los tres que importaba
+—`SunmiCard`, `SunmiButton`, `SunmiInput`— tienen 116, 151 y 93 consumidores más.
+
 **Los otros seis están detrás de un POS bloqueado.** `/modulos/pos-ventas` no
 dibuja el punto de venta: dibuja **"Caja vencida — Tenés una caja abierta de un
 día anterior. Cerrala antes de seguir vendiendo."** Y no es de una ubicación:
