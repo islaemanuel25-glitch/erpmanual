@@ -162,6 +162,22 @@ tiene contados.
 | `locales/ModalLocal` | `subtitle` | "Configurá los datos del local" | muerto: `SunmiCardHeader` no lo acepta |
 | `usuarios/ModalUsuario` | `subtitle` | "Configurá los datos del usuario" | muerto: se conserva en la pieza |
 
+### Para la fase 3 — lo que le falta a `SunmiButtonIcon`
+
+Se le arreglaron los props que descartaba —`aria-label` y `disabled`— porque uno
+de ellos era comportamiento y no aspecto. **Le quedan los tres colores fijos**:
+
+    amber: "text-amber-300 hover:text-amber-200"
+    red:   "text-red-400 hover:text-red-300"
+    slate: "text-slate-400 hover:text-slate-200"
+
+Son colores de Tailwind, no tokens del tema, así que en un tema claro se ven
+igual que en el oscuro. Cambiarlos toca todas las pantallas que lo usan, y por
+eso no entró en la tanda del `disabled`: mezclar un arreglo de comportamiento con
+un cambio de aspecto deja una comparación que no prueba ninguno de los dos.
+
+El análisis ya está hecho y no hace falta rehacerlo: son esas tres líneas.
+
 ### Para la fase 4
 
 **Cinco `className` a `SunmiTable`.** El componente los ignora **a propósito** y
