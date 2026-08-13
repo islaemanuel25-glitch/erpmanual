@@ -85,6 +85,10 @@ const MARGEN = Number(arg("margen", "24"));
 // Un botón que hay que tocar antes de medir, buscado por su texto. Los modales
 // no tienen URL propia: si no se los abre, la foto es de la pantalla de atrás.
 const ABRIR = arg("abrir", null);
+// Lo mismo, pero por selector, para los disparadores que NO TIENEN TEXTO. El
+// preview de listas de precios se abre con un botón de ícono sin `aria-label`,
+// así que por texto no hay con qué encontrarlo. Toca el primero que matchee.
+const ABRIR_SELECTOR = arg("abrir-selector", null);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(SALIDA, { recursive: true });
@@ -185,6 +189,21 @@ if (ABRIR) {
   })()`);
   if (!abrio) {
     console.log(`NO HAY NINGÚN BOTÓN QUE DIGA "${ABRIR}". La foto sería de la pantalla de atrás.`);
+    cerrar();
+    process.exit(1);
+  }
+  await sleep(2500);
+}
+
+if (ABRIR_SELECTOR) {
+  const abrio = await evaluar(`(() => {
+    const el = document.querySelector(${JSON.stringify(ABRIR_SELECTOR)});
+    if (el) el.click();
+    return !!el;
+  })()`);
+  if (!abrio) {
+    console.log(`EL SELECTOR DEL DISPARADOR NO ENCONTRÓ NADA: ${ABRIR_SELECTOR}`);
+    console.log("  La foto sería de la pantalla de atrás, y esa foto es determinista.");
     cerrar();
     process.exit(1);
   }
@@ -552,7 +571,7 @@ const ficha = {
   alto: ALTO,
   selector: ELEMENTO || null,
   margen: ELEMENTO ? MARGEN : null,
-  abrir: ABRIR || null,
+  abrir: ABRIR || ABRIR_SELECTOR || null,
   altoCaptura: ELEMENTO ? null : ALTO_CAPTURA,
   recorte: cajaRecorte,
   repeticiones: REPETICIONES,
