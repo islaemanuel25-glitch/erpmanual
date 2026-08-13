@@ -148,6 +148,8 @@ sacados de pantallas que hoy funcionan:
 | --- | --- | --- | --- |
 | `roles/ModalRol` | `espacioCuerpo` / `espacioPie` | `""` | el `gap-3` del kit separaría los quince toggles de permisos entre sí |
 | `locales/ModalLocal` | `espacioCuerpo` / `espacioPie` | `""` | mismo caso: emparejar la capa no puede repintar el formulario |
+| `operadores/ModalOperador` | `espacioCuerpo` / `espacioPie` | `""` | ídem |
+| `usuarios/ModalUsuario` | `espacioCuerpo` / `espacioPie` | `""` | ídem |
 
 ### Props muertos que se conservan a propósito
 
@@ -158,7 +160,7 @@ tiene contados.
 | pantalla | prop | valor | estado |
 | --- | --- | --- | --- |
 | `locales/ModalLocal` | `subtitle` | "Configurá los datos del local" | muerto: `SunmiCardHeader` no lo acepta |
-| `usuarios/ModalUsuario` | `subtitle` | "Configurá los datos del usuario" | ídem, todavía sin migrar |
+| `usuarios/ModalUsuario` | `subtitle` | "Configurá los datos del usuario" | muerto: se conserva en la pieza |
 
 ### Para la fase 4
 
