@@ -12,10 +12,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { clasificarSql, sinComentarios, SALIDA, PATRONES, esRangoDegenerado } from "./clasificar-migraciones.mjs";
+import {
+  clasificarSql,
+  sinComentarios,
+  SALIDA,
+  PATRONES,
+  esRangoDegenerado,
+  shaDeLaEtiqueta,
+} from "./clasificar-migraciones.mjs";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
@@ -195,4 +203,48 @@ test("sin alguno de los dos extremos no se declara degenerado", () => {
   for (const [a, b] of [[null, "x"], ["x", null], [undefined, undefined], ["", ""]]) {
     assert.equal(esRangoDegenerado(a, b), false, `${a} / ${b}`);
   }
+});
+
+// ── LA BASE SALE DE LA IMAGEN QUE ATIENDE ──────────────────────────────────
+//
+// El HEAD de git del VPS lo mueve el paso 1 del despliegue, así que para cuando
+// corre `migrate deploy` ya es el SHA nuevo y el rango salía degenerado SIEMPRE.
+// La imagen del contenedor vivo la mueve el paso 5, después de la ventana.
+
+test("de una etiqueta con SHA completo sale el SHA", () => {
+  assert.equal(
+    shaDeLaEtiqueta("ghcr.io/islaemanuel25-glitch/erpmanual:e93b9eb70306c6ed5c9e8a112ae346313191e455"),
+    "e93b9eb70306c6ed5c9e8a112ae346313191e455"
+  );
+  assert.equal(
+    shaDeLaEtiqueta("  ghcr.io/x/y:E93B9EB70306C6ED5C9E8A112AE346313191E455\n"),
+    "e93b9eb70306c6ed5c9e8a112ae346313191e455",
+    "el salto de línea del docker inspect y las mayúsculas no lo cambian"
+  );
+});
+
+test("UNA ETIQUETA MÓVIL NO SIRVE COMO BASE", () => {
+  // Es la misma razón por la que producción despliega solo por SHA completo:
+  // `latest` apunta a lo último que se construyó y mañana señala otra cosa. Si
+  // se la tomara como base, el rango sería inventado.
+  for (const mala of [
+    "ghcr.io/islaemanuel25-glitch/erpmanual:latest",
+    "erpazul-app:latest",
+    "ghcr.io/x/y:e93b9eb",
+    "ghcr.io/x/y",
+    "",
+    null,
+    undefined,
+  ]) {
+    assert.throws(() => shaDeLaEtiqueta(mala), /no está etiquetada con un SHA de 40/, String(mala));
+  }
+});
+
+test("EL CLASIFICADOR YA NO LE PREGUNTA EL HEAD DE GIT AL VPS", () => {
+  // Si alguien lo revierte, el rango vuelve a salir degenerado en todos los
+  // despliegues y la autorización manual vuelve a ser un paso más — que es
+  // exactamente lo que este cambio vino a cerrar.
+  const src = fs.readFileSync(path.join(AQUI, "clasificar-migraciones.mjs"), "utf8");
+  assert.doesNotMatch(src, /git rev-parse HEAD['"`]?\s*\]/, "volvió a preguntarle el HEAD al VPS");
+  assert.match(src, /docker inspect \$\{CONTENEDOR_APP\} --format/);
 });

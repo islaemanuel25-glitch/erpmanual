@@ -37,8 +37,9 @@
 // ── USO ─────────────────────────────────────────────────────────────────────
 //
 //   node scripts/clasificar-migraciones.mjs --vps
-//       Pide el HEAD desplegado al VPS por ssh y clasifica lo que este árbol
-//       introduce por encima. Es el modo del despliegue.
+//       Pide por ssh el SHA de la IMAGEN QUE ESTÁ ATENDIENDO —no el HEAD de git
+//       del VPS, que el paso 1 del despliegue ya movió— y clasifica lo que este
+//       árbol introduce por encima. Es el modo del despliegue.
 //
 //   node scripts/clasificar-migraciones.mjs --desde <SHA> [--hasta <SHA>]
 //       El mismo análisis con el rango dado a mano. `--hasta` es HEAD por
@@ -63,7 +64,7 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
 const DIR_MIGRACIONES = path.join(ROOT, "prisma", "migrations");
 const ALIAS_VPS = "vps-erp";
-const RUTA_VPS = "/srv/produccion/erpazul";
+const CONTENEDOR_APP = "erpazul_app";
 
 export const SALIDA = { LIMPIO: 0, MARCADO: 1, INDETERMINADO: 2 };
 
@@ -191,17 +192,65 @@ function correr(programa, argumentos, comoFalla) {
   }
 }
 
-/** El SHA que hoy corre en producción. Si el ssh falla, no se adivina. */
-function shaDelVps() {
-  const sha = correr(
+/**
+ * EL SHA QUE ESTÁ ATENDIENDO, sacado de la imagen del contenedor vivo.
+ *
+ * ── POR QUÉ NO EL HEAD DE GIT DEL VPS, QUE ES LO QUE PREGUNTABA ANTES ──────
+ *
+ * El paso 1 del despliegue hace `git merge --ff-only` en el VPS, así que para
+ * cuando corre `migrate deploy` —paso 4— ese HEAD ya es el SHA NUEVO. El
+ * clasificador comparaba el árbol contra sí mismo, salía INDETERMINADO por rango
+ * degenerado, y la guardia frenaba.
+ *
+ * Eso pasa en TODOS los despliegues, traigan migraciones o no. Y ahí está el
+ * daño real, que no es la molestia: si la única salida es
+ * `DEPLOY_MIGRACION_AUTORIZADA=1`, la autorización manual deja de ser la
+ * excepción y se vuelve un paso más del procedimiento. **Una puerta que se abre
+ * en todos los despliegues no es una puerta.** Dos autorizaciones seguidas el
+ * 2026-08-13 fueron el aviso.
+ *
+ * La imagen del contenedor que atiende NO la mueve el paso 1: la mueve el paso
+ * 5, que es el que recrea la app, y para entonces la ventana ya se cerró. Es
+ * además el dato semánticamente correcto: lo que importa durante la ventana es
+ * qué CÓDIGO está sirviendo pedidos, no qué commit tiene checkouteado el repo
+ * del servidor. Los dos coinciden casi siempre; el casi es este caso.
+ *
+ * Y es el mismo SHA que el procedimiento ya anota como referencia de rollback en
+ * el paso 2, así que no hay un dato nuevo que mantener.
+ *
+ * Si el ssh falla, si el contenedor no está, o si la etiqueta no es un SHA de 40
+ * —`latest`, una imagen construida a mano— no se adivina: INDETERMINADO.
+ */
+function shaQueAtiende() {
+  const etiqueta = correr(
     "ssh",
-    ["-o", "ConnectTimeout=20", "-o", "BatchMode=yes", ALIAS_VPS, `cd ${RUTA_VPS} && git rev-parse HEAD`],
-    "no se pudo leer el HEAD del VPS por ssh"
+    [
+      "-o", "ConnectTimeout=20", "-o", "BatchMode=yes", ALIAS_VPS,
+      `docker inspect ${CONTENEDOR_APP} --format '{{.Config.Image}}'`,
+    ],
+    `no se pudo leer la imagen del contenedor ${CONTENEDOR_APP} por ssh`
   );
-  if (!/^[0-9a-f]{40}$/i.test(sha)) {
-    throw new Indeterminado(`el VPS devolvió algo que no es un SHA de 40: ${JSON.stringify(sha.slice(0, 80))}`);
+  return shaDeLaEtiqueta(etiqueta);
+}
+
+/**
+ * El SHA de 40 que lleva una etiqueta de imagen, o INDETERMINADO.
+ *
+ * Aparte para poder ejercerlo sin ssh. Una etiqueta móvil —`latest`— no sirve
+ * como base: apunta a lo último que se construyó y mañana señala otra cosa, que
+ * es la misma razón por la que producción despliega solo por SHA completo.
+ */
+export function shaDeLaEtiqueta(etiqueta) {
+  const m = /:([0-9a-f]{40})\s*$/i.exec(String(etiqueta ?? "").trim());
+  if (!m) {
+    throw new Indeterminado(
+      `la imagen que atiende no está etiquetada con un SHA de 40: ${JSON.stringify(String(etiqueta ?? "").slice(0, 80))}.\n\n` +
+        "Sin saber qué código está sirviendo pedidos no se puede decir qué introduce\n" +
+        "este despliegue por encima. Si la imagen se etiquetó a mano o con `latest`,\n" +
+        "pasá el SHA previo con --desde <SHA>."
+    );
   }
-  return sha;
+  return m[1].toLowerCase();
 }
 
 /** Los migration.sql que `hasta` introduce por encima de `desde`. */
@@ -272,6 +321,11 @@ const flag = (n) => process.argv.includes(`--${n}`);
  * clasificador informó "Archivos a mirar: 0" y la guardia automática, que corre
  * este mismo script, tampoco frenó nada.
  *
+ * **Desde el 2026-08-13 la base sale de la imagen que atiende y no del HEAD de
+ * git**, así que ese caso concreto ya no ocurre en un despliegue normal. Este
+ * chequeo se queda igual: sigue cubriendo `--desde` mal pasado, y un contenedor
+ * recreado antes de tiempo. Lo que dejó de pasar es que saltara SIEMPRE.
+ *
  * Es el TERCER caso en que "0 archivos" no significa lo que parece:
  *   1. La migración está escrita pero sin commitear — el rango se calcula con
  *      `git diff`, y lo que no está en un commit no aparece.
@@ -311,7 +365,7 @@ function principal() {
     if (!fs.existsSync(DIR_MIGRACIONES)) {
       throw new Indeterminado(`no existe ${path.relative(ROOT, DIR_MIGRACIONES)}: el repo no está donde el script cree`);
     }
-    const base = desde || shaDelVps();
+    const base = desde || shaQueAtiende();
 
     // Antes de mirar nada: que el rango no sea el vacío disfrazado de "limpio".
     if (esRangoDegenerado(resolverSha(base), resolverSha(hasta))) {
@@ -319,16 +373,16 @@ function principal() {
         `el rango es degenerado: la base y el extremo son el mismo commit (${String(base).slice(0, 12)}).\n\n` +
           (desde
             ? "La base que se pasó con --desde ya es este árbol, así que no hay nada que comparar."
-            : "El HEAD del VPS ya está en este mismo commit. Si el despliegue ya hizo\n" +
-              "`git merge` en el VPS, el clasificador llega tarde: hay que correrlo ANTES\n" +
-              "de traer el código, o pasarle el SHA previo con --desde <SHA>.") +
+            : "La imagen que está atendiendo YA es este mismo commit: no hay nada que\n" +
+              "desplegar por encima. Si igual estás desplegando, mirá si el contenedor se\n" +
+              "recreó antes de tiempo, o pasá el SHA previo con --desde <SHA>.") +
           "\n\nNo se sale con 0 a propósito: un rango vacío y un despliegue sin migraciones\n" +
           "se imprimen igual, y este script existe para que esos dos no se confundan."
       );
     }
 
     archivos = migracionesDelRango(base, hasta);
-    origen = `${base.slice(0, 12)}..${hasta}${desde ? "" : " (HEAD del VPS)"}`;
+    origen = `${base.slice(0, 12)}..${hasta}${desde ? "" : " (la imagen que atiende)"}`;
   } else {
     throw new Indeterminado("hace falta --vps, --desde <SHA> o --dir <ruta>. Sin rango no se clasifica nada");
   }
