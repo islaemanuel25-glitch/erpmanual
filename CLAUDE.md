@@ -269,6 +269,21 @@ el test, el bug seguiría ahí con el suite en verde.
 Cuando un cambio deja candados del contrato viejo en rojo y no hay margen para
 reescribirlos bien, **se revierte el cambio y se anota**, no se commitean rojos.
 
+**UN CANDADO Y LO QUE NECESITA PARA CORRER SON LA MISMA UNIDAD REVERTIBLE.** Un
+commit trajo un candado que importaba `esComentario` del contador y la
+exportación se quedó en el árbol sin commitear. Ese commit, en `origin/main`, no
+compilaba su propio candado.
+
+Corolario, y es el que lo ataja: **antes de empujar, la suite se corre contra el
+COMMIT, no contra el árbol.** Con `git stash` o con un clon limpio. Es un paso
+del procedimiento, no una intención.
+
+*Por qué:* el verde de la suite era del escritorio, no del commit. Todo estaba en
+verde y lo empujado no compilaba. Un `git stash` de treinta segundos lo mostró
+—`does not provide an export named 'esComentario'`— y fue el mismo comando que
+después sirvió para diagnosticarlo. Correrlo antes cuesta lo mismo que correrlo
+después de romper.
+
 Corolario que solo aparece al mudar código: **después de sacar algo a un
 componente, hay que releer los candados que tocaban el archivo original —sobre
 todo los que quedaron en VERDE.** Un candado que lee un archivo y busca un patrón

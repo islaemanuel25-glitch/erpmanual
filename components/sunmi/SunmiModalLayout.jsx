@@ -74,6 +74,26 @@ export default function SunmiModalLayout({
   /** "centrado" | "hoja" | "cajon" | "hoja-o-centrado". Ver arriba de dónde sale cada una. */
   forma = "centrado",
   /**
+   * A qué altura se apila. UN SOLO NÚMERO, y va en la capa.
+   *
+   * ── POR QUÉ UNO SOLO, Y POR QUÉ ACÁ ────────────────────────────────────
+   *
+   * La capa es `fixed` con `z-index`, así que crea un contexto de apilado: todo
+   * lo que está adentro —el velo y el panel— se apila ENTRE SÍ y nada de afuera
+   * se puede meter en el medio. El velo y el panel no llevan z propio a
+   * propósito: se ordenan por el orden en que están escritos, que es el único
+   * orden que hace falta.
+   *
+   * Si alguna vez se les pusiera un z a cada uno, ese contexto dejaría de ser
+   * atómico y volvería a existir el hueco. Hay un candado que lo fija.
+   *
+   * El default es el de siempre. Se parametriza porque el repo tiene un
+   * escalonado con intención que no se puede pisar: 40 el fondo del cajón, 50 el
+   * modal, 60 el desplegable que se abre adentro del modal. Unificar se mira
+   * cuando estén todas migradas y se puedan comparar al lado.
+   */
+  z = 9999,
+  /**
    * Clases del panel. NEGOCIA, no concatena: si acá viene un ancho o un ancho
    * máximo, la pieza retira el suyo. Dos clases de la misma familia tienen la
    * misma especificidad y ganaría la que Tailwind haya puesto última en la hoja
@@ -105,7 +125,8 @@ export default function SunmiModalLayout({
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] ${f.capa}`}
+      style={{ zIndex: z }}
+      className={`fixed inset-0 ${f.capa}`}
       role={role}
       aria-modal="true"
       aria-label={ariaLabel ?? (ariaLabelledBy ? undefined : title)}

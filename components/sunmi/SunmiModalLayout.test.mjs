@@ -88,6 +88,44 @@ test("la pieza retira lo suyo cuando la pantalla declara", () => {
   assert.match(bloque, /declaraAnchoMaximo\(pedido\) \? "" : maxWidth/);
 });
 
+// ── EL APILADO ES UN SOLO NÚMERO ───────────────────────────────────────────
+
+test("hay UN z y va en la capa, con el default de siempre", () => {
+  assert.match(SRC, /z = 9999/, "cambió el default: eso mueve todos los modales");
+  assert.match(SRC, /style=\{\{ zIndex: z \}\}/);
+  assert.match(SRC, /className=\{`fixed inset-0 \$\{f\.capa\}`\}/, "la capa no puede traer su propio z-*");
+});
+
+test("EL VELO Y EL PANEL NO LLEVAN Z PROPIO", () => {
+  // Es lo que mantiene atómico el contexto de apilado. El día que cada uno tenga
+  // el suyo, algo de afuera se puede volver a meter en el medio — que es
+  // exactamente lo que le pasó al cartel de identificarse en producción.
+  const cuerpo = SRC.slice(SRC.indexOf("return ("));
+  const velos = cuerpo.match(/className="absolute inset-0[^"]*"/g) ?? [];
+  assert.equal(velos.length, 2, "el velo dejó de tener dos formas: revisar este candado");
+  for (const v of velos) assert.doesNotMatch(v, /\bz-/, v);
+  const panel = SRC.slice(SRC.indexOf("const clasesDelPanel"), SRC.indexOf("const cierraElVelo"));
+  assert.doesNotMatch(panel, /\bz-\[/, "el panel se ganó un z propio");
+});
+
+test("NO HAY UN SEGUNDO NÚMERO que se pueda pasar por separado", () => {
+  // Ni zVelo, ni zPanel, ni nada parecido. Si aparece, el número deja de ser uno
+  // y vuelve el hueco.
+  const firma = SRC.slice(SRC.indexOf("export default function"), SRC.indexOf("}) {"));
+  const zetas = [...firma.matchAll(/^\s*(z[A-Za-z]*)\s*[=,]/gm)].map((m) => m[1]);
+  assert.deepEqual(zetas, ["z"], zetas.join(", "));
+});
+
+test("el cartel de identificarse sigue arriba de este default", () => {
+  // La otra mitad de la misma regla. El candado de ModalPedirOperador mira que
+  // ninguna capa lo tape; este mira desde el otro lado, para que subir el default
+  // del kit no lo deje debajo sin que nadie lo note.
+  const cartel = fs.readFileSync(path.join(RAIZ, "components/operador/ModalPedirOperador.jsx"), "utf8");
+  const zCartel = Number(cartel.match(/fixed inset-0 z-\[(\d+)\]/)[1]);
+  const zKit = Number(SRC.match(/z = (\d+)/)[1]);
+  assert.ok(zCartel > zKit, `el cartel quedó en ${zCartel} y el kit en ${zKit}`);
+});
+
 // ── ACCESIBILIDAD ──────────────────────────────────────────────────────────
 
 test("acepta las etiquetas y cae al título cuando no le pasan ninguna", () => {

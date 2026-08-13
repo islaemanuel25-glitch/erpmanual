@@ -99,6 +99,24 @@ tabla no pone su `px` y sí conserva su `py`. No hacen falta densidades nuevas.
 - **Falta:** que la conciliación de comprobantes importe `SunmiPar`, y el pie de
   totales.
 
+## Fase 5 — al cerrar la fase 2, antes de la 3
+
+**PENDIENTE CONFIRMADO.** Decidido el 2026-08-13, con dos evidencias y no una.
+
+Lo único que le falta a la fase 5 es que los chequeos corran **del lado del
+servidor** y no solo en la máquina de quien está trabajando. Las dos cosas que
+ya se escaparon las atajaría eso mismo:
+
+- **El trinquete avisa pero no obliga.** Corre en un hook local, que solo existe
+  dentro de una sesión de Claude Code en este repo. Una terminal cualquiera lo
+  esquiva sin querer.
+- **Un commit que no compilaba llegó a `origin/main`.** Traía un candado que
+  importaba algo que su propio commit no exportaba. La suite estaba en verde
+  porque corrió contra el árbol de trabajo, donde la exportación sí estaba.
+
+No se adelanta porque partir la fase 2 al medio cuesta más de lo que ahorra,
+pero queda fijado el momento: al cerrar la fase 2, antes de empezar la 3.
+
 ## Deuda anotada de esta fase
 
 - **Los 9.5 px contra los 10 px del kit.** `SunmiPar` a propósito no lo decide:
