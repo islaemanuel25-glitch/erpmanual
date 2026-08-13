@@ -406,6 +406,35 @@ que hay que llevarse:
 Tercera vez en esta fase que una firma elegida a ojo dice una cosa y abrir los
 archivos dice otra.
 
+#### Y el 13 TAMPOCO es el total: es un piso
+
+Al abrir las 6 "sin decidir" —que era el paso que faltaba— aparecieron capas con
+superficie propia que el conteo no había visto, **por dos puntos ciegos del
+método**:
+
+- **El `className` armado con template literal.** `SidebarPro` pinta su panel con
+  `${theme.sidebar.bg}` adentro de un `` className={`…`} ``: es una superficie
+  interpolada del tema, una cuarta forma además de `sunmi-surface`,
+  `sunmi-pos-panel` y `sunmi-card`. Una expresión que busca clases literales no
+  la ve. Lo mismo `SidebarMobile` y `MobileNav`.
+- **Un comentario largo empuja la tarjeta fuera de la ventana.** La hoja de
+  `CarritoPedido` cayó en "sin decidir" solo porque entre la capa y su tarjeta
+  hay un bloque de comentario de nueve líneas, y la ventana era de dieciocho.
+  Su tarjeta es `sunmi-surface`, medido al migrarla.
+
+Confirmadas por ahora: **la hoja de `CarritoPedido`** y **`SubmenuPanel`**
+—`bg-[color:var(--card-bg)] border border-[color:var(--card-border)]`—, más los
+tres de navegación, que interpolan.
+
+**Así que el balde de superficie propia es de 13 PARA ARRIBA y el número no está
+cerrado.** Las 24 con `SunmiCard` sí son firmes: se clasificaron por un `<SunmiCard`
+presente, que es una señal positiva y no una ausencia.
+
+**No se elige grupo con este censo.** Elegir sobre un conteo que se acaba de
+mostrar poco confiable es exactamente el error que la regla de abrir un caso de
+cada grupo existe para evitar — y sería la cuarta vez en la fase. Lo que falta es
+rehacerlo mirando el `className` compuesto, no solo el literal.
+
 ### LA MIGRACIÓN DEL CARRITO SE ESCRIBIÓ, SE MIDIÓ Y SE REVIRTIÓ
 
 **2026-08-13.** Se escribió entera —los dos caminos, con `encabezado="ninguno"`—
