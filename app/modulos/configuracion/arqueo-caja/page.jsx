@@ -119,7 +119,16 @@ export default function ConfigArqueoCajaPage() {
 
   return (
     <div className="w-full min-h-full p-2 lg:p-3 space-y-3">
-      <SunmiHeader titulo="Retiros de recaudación" subtitulo="Alertas de retiro de recaudación de este local" />
+      {/* SIN TÍTULO, y es a propósito. Acá decía `titulo=` y `subtitulo=` en
+          español; `SunmiHeader` acepta `title`, así que los dos se descartaban y
+          esta cinta se dibuja vacía desde siempre.
+          No se arreglan: "Retiros de recaudación" ya está veinte líneas más
+          abajo como título de la primera tarjeta, y repetirlo arriba no agrega
+          nada. Subirlo y sacar el de abajo dejaría la pantalla mejor, pero eso
+          es rediseñarla y esta fase mueve la capa, no el contenido. Si algún día
+          esta cinta tiene que llevar título, se decide mirando la pantalla
+          entera. Queda anotado en docs/roadmap/kit-sunmi-fases.md. */}
+      <SunmiHeader />
 
       {mensaje && (
         <div

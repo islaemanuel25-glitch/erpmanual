@@ -162,6 +162,20 @@ tiene contados.
 | `locales/ModalLocal` | `subtitle` | "Configurá los datos del local" | muerto: `SunmiCardHeader` no lo acepta |
 | `usuarios/ModalUsuario` | `subtitle` | "Configurá los datos del usuario" | muerto: se conserva en la pieza |
 
+### Props muertos que se DESCARTARON, con el motivo
+
+Para que el que los encuentre dentro de un año no rehaga el análisis.
+
+| pantalla | prop | texto | por qué se descarta |
+| --- | --- | --- | --- |
+| `configuracion/arqueo-caja` | `titulo` | "Retiros de recaudación" | el texto está vivo y es correcto, pero **ya aparece veinte líneas más abajo** como título de la primera tarjeta. Repetirlo arriba no agrega nada. Subirlo y sacar el de abajo dejaría la pantalla mejor, pero eso es rediseñarla: esta fase mueve la capa, no el contenido |
+| `configuracion/arqueo-caja` | `subtitulo` | "Alertas de retiro de recaudación de este local" | además de estar en español, `SunmiHeader` **no tiene** subtítulo. Agregárselo para un texto que se iba a descartar sería trabajo para nada |
+
+**El criterio que salió de acá, y que vale para los siete `subtitle` que
+quedan:** no alcanza con preguntar si el texto está vivo. Hay que preguntar
+también **si repite lo que la pantalla ya dice**. Arqueo-caja fue el primer caso
+y no va a ser el único.
+
 ### Para la fase 3 — lo que le falta a `SunmiButtonIcon`
 
 Se le arreglaron los props que descartaba —`aria-label` y `disabled`— porque uno
