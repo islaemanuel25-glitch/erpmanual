@@ -146,7 +146,27 @@ sacados de pantallas que hoy funcionan:
 
 | pantalla | parámetro | valor | por qué |
 | --- | --- | --- | --- |
-| _(ninguna todavía)_ | | | |
+| `roles/ModalRol` | `espacioCuerpo` / `espacioPie` | `""` | el `gap-3` del kit separaría los quince toggles de permisos entre sí |
+| `locales/ModalLocal` | `espacioCuerpo` / `espacioPie` | `""` | mismo caso: emparejar la capa no puede repintar el formulario |
+
+### Props muertos que se conservan a propósito
+
+Se dejan escritos para no perder el texto antes de decidir si el kit los muestra
+o si salen. Hoy NO se dibujan, y el candado `lib/sunmi/propsDelKit.test.mjs` los
+tiene contados.
+
+| pantalla | prop | valor | estado |
+| --- | --- | --- | --- |
+| `locales/ModalLocal` | `subtitle` | "Configurá los datos del local" | muerto: `SunmiCardHeader` no lo acepta |
+| `usuarios/ModalUsuario` | `subtitle` | "Configurá los datos del usuario" | ídem, todavía sin migrar |
+
+### Para la fase 4
+
+**Cinco `className` a `SunmiTable`.** El componente los ignora **a propósito** y
+está escrito en su encabezado: implementarlo cambiaría el aspecto de esas
+pantallas solo por existir. Pero cinco pantallas escribieron algo creyendo que
+hacía efecto, así que la decisión no es "está documentado y listo": o el
+componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco.
 
 ## Deuda anotada de esta fase
 

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -80,26 +79,37 @@ export default function ModalLocal({
     onSubmit(form);
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className="
-        fixed inset-0
-        z-[9999]
-        flex items-center justify-center
-      "
+    <SunmiModalLayout
+      open={open}
+      title={editMode ? "Editar local" : "Nuevo local"}
+      // El `subtitle` que estaba acá se conserva tal cual: hoy NO SE DIBUJA,
+      // porque `SunmiCardHeader` no acepta ese prop. Se deja escrito, y anotado
+      // en el registro del roadmap como prop muerto pendiente, para no perder el
+      // texto antes de decidir si el kit lo muestra o si sale.
+      subtitle="Configurá los datos del local"
+      onClose={onClose}
+      // El espaciado interior queda como estaba: emparejar es la capa y la
+      // estructura, no repintar el cuerpo.
+      espacioCuerpo=""
+      espacioPie=""
+      footer={
+        <>
+          <SunmiButton color="slate" onClick={onClose}>
+            Cancelar
+          </SunmiButton>
+
+          <SunmiButton onClick={handleSubmit}>
+            {editMode ? "Guardar cambios" : "Crear local"}
+          </SunmiButton>
+        </>
+      }
     >
-      <div className="w-full max-w-xl">
-        <SunmiCard>
-          <SunmiCardHeader
-            title={editMode ? "Editar local" : "Nuevo local"}
-            subtitle="Configurá los datos del local"
-           
-          />
 
           {/* CONTENIDO CON SCROLL */}
-          <div className="flex flex-col max-h-[65vh] overflow-y-auto">
+      {/* El cuerpo va directo: el `flex flex-col max-h-[65vh] overflow-y-auto`
+          que estaba acá ahora lo pone la pieza, con el mismo valor. */}
+      <>
             <SunmiSeparator label="Datos" />
 
             {/* Nombre */}
@@ -201,21 +211,8 @@ export default function ModalLocal({
                 onChange={(v) => setField("activo", v)}
               />
             </Field>
-          </div>
-
-          {/* ACCIONES */}
-          <div className="flex justify-end gap-2">
-            <SunmiButton color="slate" onClick={onClose}>
-              Cancelar
-            </SunmiButton>
-
-            <SunmiButton onClick={handleSubmit}>
-              {editMode ? "Guardar cambios" : "Crear local"}
-            </SunmiButton>
-          </div>
-        </SunmiCard>
-      </div>
-    </div>
+      </>
+    </SunmiModalLayout>
   );
 }
 
