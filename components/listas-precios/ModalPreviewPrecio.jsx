@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
@@ -186,11 +185,10 @@ export default function ModalPreviewPrecio({ open, lista, onClose }) {
               <p className="text-sm sunmi-text-muted">
                 Para previsualizar precios, activá un local desde la pantalla de Inicio.
               </p>
-              <div className="flex justify-end">
-                <SunmiButton color="slate" onClick={onClose}>
-                  Cerrar
-                </SunmiButton>
-              </div>
+              {/* Acá había otro "Cerrar", por el mismo motivo que el de abajo:
+                  el kit ya pone uno arriba. Esta rama es la de "sin local
+                  activo" y NO se pudo fotografiar sin sacarle el contexto al
+                  navegador, así que va por simetría con la otra y está dicho. */}
             </div>
           ) : (
             <>
@@ -290,13 +288,16 @@ export default function ModalPreviewPrecio({ open, lista, onClose }) {
                 </>
               ) : null}
 
-              <SunmiSeparator />
+              {/* El "Cerrar" de abajo se sacó al migrar: el kit ya pone uno
+                  arriba y quedaban DOS botones con el mismo texto en la misma
+                  ventana, que es lo que esta fase viene a limpiar. En el
+                  teléfono no se pierde alcance — este modal es informativo y
+                  también cierra tocando el velo, así que el pulgar tiene salida
+                  sin llegar hasta arriba.
 
-              <div className="flex justify-end">
-                <SunmiButton color="slate" onClick={onClose}>
-                  Cerrar
-                </SunmiButton>
-              </div>
+                  Ojo: no es el caso de `ModalListaPrecio` ni de
+                  `ModalCategoria`, donde abajo dice "Cancelar". Cerrar y
+                  descartar son cosas distintas y ahí no hay duplicación. */}
             </>
           )}
         </>

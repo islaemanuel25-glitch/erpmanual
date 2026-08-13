@@ -325,6 +325,13 @@ y no va a ser el único.
 
 ### Para la fase 3 — lo que le falta a `SunmiButtonIcon`
 
+**Y lo que le falta a QUIEN LO USA, que es del mismo viaje.** El botón que abre
+el preview en `configuracion/listas-precios` es un `SunmiButtonIcon` con el ícono
+de ojo y **sin `aria-label`**: no tiene ningún nombre accesible, así que un
+lector de pantalla no puede decir qué hace. La pieza ya acepta el prop desde
+`95ac86e`; lo que falta es que las pantallas lo pasen. Va en la misma vuelta que
+los colores: son los dos el mismo componente y la misma comparación.
+
 Se le arreglaron los props que descartaba —`aria-label` y `disabled`— porque uno
 de ellos era comportamiento y no aspecto. **Le quedan los tres colores fijos**:
 
