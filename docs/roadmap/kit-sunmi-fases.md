@@ -364,6 +364,37 @@ pone la suite en rojo si aparece trackeado cualquier `app/andamio-*`. Sirve para
 todos los que vengan, y van a venir. Comprobado que atrapa la versión mala:
 con el andamio del carrito stageado a la fuerza, el candado se pone rojo.
 
+### LA MIGRACIÓN DEL CARRITO SE ESCRIBIÓ, SE MIDIÓ Y SE REVIRTIÓ
+
+**2026-08-13.** Se escribió entera —los dos caminos, con `encabezado="ninguno"`—
+y la comparación la rechazó. Se revirtió: no se commitea una migración que mueve
+el carrito. Las capturas de antes quedan sacadas y el diagnóstico también, así
+que la próxima arranca sabiendo qué arreglar.
+
+**A 360 la hoja pasó de 574 a 416 px de alto**, y en la captura se ve el efecto:
+la lista queda cortada a la mitad del segundo producto y el tercero no entra.
+
+La causa está encontrada y es exacta: la forma `hoja` aplica el `alto` **a la
+tarjeta**, y no se le pasó ninguno, así que tomó el default del kit —`max-h-[65vh]`—.
+**640 × 0,65 = 416.** El carrito no tiene tope en su tarjeta: crece con el
+contenido, y quien acota es la lista, con su `max-h-[46dvh]`.
+
+O sea que el default del `alto`, que es correcto para un modal centrado, es
+**equivocado para una hoja**. Está anotado como lo que hay que decidir antes de
+retomar: o la hoja no tiene default y lo exige, o el default de la hoja es
+"ninguno" y quien quiera topar lo dice.
+
+**A 1366 el cajón conserva la caja exacta —420x900 en x=946— y aun así difieren
+50.053 píxeles de 399.600, el 12,53 %**, repartidos por toda la superficie. Las
+filas más movidas son la 0 y la 899 enteras, o sea los bordes: la tarjeta pasa de
+`sunmi-surface` con `border-l sunmi-divider` a lo que dibuja `SunmiCard`
+—`bg-slate-900` con `border border-slate-800`—. Fondo y borde distintos, y un
+borde de más en tres lados.
+
+Eso NO estaba en la lista declarada, y es la diferencia que importa: **la tarjeta
+del kit y la tarjeta del carrito no están hechas del mismo material.** Hasta acá
+las pantallas migradas usaban `SunmiCard`, así que el punto nunca apareció.
+
 ### LO QUE FRENA LA MIGRACIÓN DE `CarritoPedido`: el encabezado del kit no se puede apagar
 
 Leído antes de escribir una línea, y por eso se frena acá y no después.
