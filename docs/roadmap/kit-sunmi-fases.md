@@ -568,6 +568,12 @@ modal fuera una figura sobre un fondo.
 borde alcanza para que la tarjeta se lea; lo que se perdió es el golpe de vista.
 Y va peor en `sunmiDark`, que es el default, no en los claros.
 
+**CONFIRMADO SOBRE LA PANTALLA REAL, no solo sobre el andamio.** Con la clave del
+admin local, `ModalCategoria` abierto en `/modulos/categorias` a 1366x900 da los
+mismos números que el andamio: en `sunmiDark` el relleno de la tarjeta y el del
+velo son los dos `rgb(15,23,42)` —B = 1,00— y en `sunmiLight` la tarjeta es
+blanca contra un velo `rgb(244,247,250)` —B = 1,08—. El andamio no había mentido.
+
 **La decisión es de Emanuel** y no entra por una tanda técnica: cambiar el velo
 del kit mueve las 13 pantallas que ya están en producción.
 

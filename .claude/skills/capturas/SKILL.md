@@ -211,6 +211,35 @@ elemento cambió de tamaño entre las dos corridas, y eso es información: la
 tarjeta de `ModalCategoria` creció 3 px de alto al migrarla y el comparador lo
 dijo antes de mirar un solo píxel.
 
+### `--usuario` / `--clave`: el arnés se loguea solo
+
+`medir-desborde.mjs` acepta las mismas credenciales que `generar-huellas.mjs`, y
+hace los mismos tres pasos —cookie vigente, login real, grupo y ubicación—
+porque los dos importan `scripts/lib/sesionArnes.mjs`. **No hay dos copias**: si
+el ERP agrega un paso al contexto, se toca un solo lado.
+
+    MSYS_NO_PATHCONV=1 node scripts/medir-desborde.mjs --url /modulos/categorias \
+      --usuario admin@admin.com --clave <clave> --tema sunmiLight \
+      --abrir "Nueva" --elemento '[data-sunmi-modal="tarjeta"]' ...
+
+Sin credenciales el arnés usa lo que haya en el perfil, y **cuando la cookie
+vence eso es la pantalla de login**: una foto perfectamente determinista de la
+pantalla equivocada, que pasa `--repeticiones 3` sin despeinarse. Pasó el
+2026-08-13.
+
+### `--tema`: con qué tema se mide
+
+Deja la clave en `localStorage` antes de navegar, que es donde la pone el
+dispositivo cuando alguien elige un tema en Apariencia. **No se fija `data-theme`
+a mano**: el tema mueve las variables CSS Y el objeto que `SunmiThemeProvider`
+reparte por React —de donde salen las clases Tailwind de cada pieza—, así que
+escribir el atributo cambia una sola y retrata un render que no existe.
+
+**El tema queda pegado al perfil entre corridas.** Como el Edge vivo se reusa, el
+`localStorage` sobrevive: una corrida sin `--tema` hereda el de la anterior. Se
+pasa siempre, aunque se quiera el de siempre. El tema entra en la ficha y
+`comparar-capturas.mjs` se niega a comparar dos fotos de temas distintos.
+
 ### La sesión no sobrevive al perfil
 
 **El perfil de Edge NO conserva la cookie de sesión.** Al navegador se lo mata

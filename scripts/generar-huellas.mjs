@@ -20,6 +20,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { prepararSesion } from "./lib/sesionArnes.mjs";
 
 const arg = (n, def = null) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -324,77 +325,10 @@ async function esperarTablaEstable(intentos = 80, intervalo = 300) {
   return ultimo;
 }
 
-// El perfil de Edge se reusa entre tandas, así que la cookie de sesión sobrevive.
-// Conviene aprovecharla: /api/login limita a 10 intentos cada 15 minutos por IP y
-// una corrida por tandas los consume enseguida.
-async function sesionVigente() {
-  await navegar(`${BASE}/login`);
-  const r = await evaluar(
-    `fetch("/api/contexto-activo/get", { credentials: "same-origin" })
-       .then((r) => r.status + "").catch(() => "err")`,
-    true
-  );
-  return r === "200";
-}
-
-async function iniciarSesion() {
-  await navegar(`${BASE}/login`);
-  const res = await evaluar(
-    `fetch("/api/login", {
-       method: "POST",
-       headers: { "Content-Type": "application/json" },
-       credentials: "same-origin",
-       body: JSON.stringify({ email: ${JSON.stringify(USUARIO)}, password: ${JSON.stringify(CLAVE)} }),
-     }).then(r => r.status + "")`,
-    true
-  );
-  if (res !== "200") throw new Error(`Login real falló con status ${res}`);
-  log(`  login real OK como ${USUARIO}`);
-}
-
-// Un admin sin local fijo entra sin contexto operativo y el ERP lo desvía a
-// /inicio. Hay que fijar grupo activo y ubicación como haría el selector de la
-// interfaz, si no todas las pantallas de módulo redirigen y no hay tabla que medir.
-async function fijarContexto() {
-  const contexto = await evaluar(
-    `(async () => {
-       const j = (r) => r.json();
-       const grupos = await fetch("/api/grupos/listar", { credentials: "same-origin" }).then(j).catch(() => null);
-       const g = (grupos?.items || grupos?.grupos || [])[0];
-       if (g) {
-         await fetch("/api/grupo-activo/set", {
-           method: "POST", headers: { "Content-Type": "application/json" },
-           credentials: "same-origin", body: JSON.stringify({ grupoId: g.id }),
-         });
-       }
-       const locales = await fetch("/api/locales/listar", { credentials: "same-origin" }).then(j).catch(() => null);
-       const items = locales?.items || [];
-       // /api/locales/listar devuelve esDeposito (camelCase); toleramos ambas grafías.
-       const esDep = (l) => l.esDeposito === true || l.es_deposito === true;
-       const elegido = items.find(esDep) || items[0];
-       if (!elegido) return JSON.stringify({ error: "sin locales" });
-       const r = await fetch("/api/contexto-activo/set", {
-         method: "POST", headers: { "Content-Type": "application/json" },
-         credentials: "same-origin",
-         body: JSON.stringify({ localId: elegido.id, esDeposito: esDep(elegido) }),
-       });
-       return JSON.stringify({
-         grupo: g ? g.nombre : null,
-         local: elegido.nombre,
-         deposito: esDep(elegido),
-         disponibles: items.map((l) => l.nombre + (esDep(l) ? " (depósito)" : "")),
-         status: r.status,
-       });
-     })()`,
-    true
-  );
-  const c = JSON.parse(contexto);
-  if (c.error || c.status !== 200) {
-    throw new Error(`No se pudo fijar el contexto: ${contexto}`);
-  }
-  log(`  contexto: grupo ${c.grupo ?? "(ninguno)"}, local ${c.local}${c.deposito ? " (depósito)" : ""}`);
-  log(`  ubicaciones visibles: ${(c.disponibles || []).join(", ")}`);
-}
+// El login, la vigencia de la cookie y el contexto viven en
+// `scripts/lib/sesionArnes.mjs`: los usa también `medir-desborde.mjs`, que antes
+// no sabía loguearse y por eso fotografiaba la pantalla de login.
+const sesion = () => ({ navegar, evaluar, base: BASE, usuario: USUARIO, clave: CLAVE, log });
 
 // --- Corrida ----------------------------------------------------------------
 const edge = spawn(
@@ -416,12 +350,7 @@ process.on("SIGINT", () => { cerrar(); process.exit(130); });
 try {
   fs.mkdirSync(SALIDA, { recursive: true });
   await conectar();
-  if (await sesionVigente()) {
-    log("  sesión del perfil todavía vigente: no se repite el login");
-  } else {
-    await iniciarSesion();
-  }
-  await fijarContexto();
+  await prepararSesion(sesion());
 
   // --solo permite recapturar pantallas sueltas, que es lo que hace falta cuando
   // una línea de base salió mal y hay que rehacer sólo esa.

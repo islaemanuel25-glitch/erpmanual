@@ -26,6 +26,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { prepararSesion } from "./lib/sesionArnes.mjs";
 
 const arg = (n, d = null) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -101,6 +102,12 @@ const ABRIR_SELECTOR = arg("abrir-selector", null);
 // existe**, que es la trampa que ya nos costó dos diagnósticos: reproducible y
 // correcto son preguntas distintas.
 const TEMA = arg("tema", null);
+// CON QUÉ USUARIO SE ENTRA. Sin esto el arnés fotografiaba lo que hubiera en el
+// perfil, y cuando la cookie vencía eso era **la pantalla de login** — una foto
+// perfectamente determinista de la pantalla equivocada, que pasa cualquier
+// control de estabilidad. Ya nos pasó hoy.
+const USUARIO = arg("usuario", null);
+const CLAVE = arg("clave", null);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(SALIDA, { recursive: true });
@@ -129,12 +136,29 @@ async function urlDepurador() {
   throw new Error("Edge no respondió al puerto de depuración");
 }
 
-async function evaluar(expresion) {
-  const r = await send("Runtime.evaluate", { expression: expresion, returnByValue: true });
+// `esperaPromesa` existe porque `sesionArnes` evalúa `fetch(...)`: sin esto el
+// valor que vuelve es la promesa sin resolver y el login parece fallar siempre.
+async function evaluar(expresion, esperaPromesa = false) {
+  const r = await send("Runtime.evaluate", {
+    expression: expresion,
+    returnByValue: true,
+    awaitPromise: esperaPromesa,
+  });
   if (r.exceptionDetails) {
     throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
   }
   return r.result.value;
+}
+
+async function navegar(url) {
+  await send("Page.navigate", { url });
+  for (let i = 0; i < 80; i++) {
+    await sleep(150);
+    const listo = await evaluar(
+      `document.readyState === "complete" && location.pathname !== "about:blank"`
+    );
+    if (listo) return;
+  }
 }
 
 const edge = spawn(
@@ -181,6 +205,15 @@ if (TEMA) {
     source: `try { window.localStorage.setItem("erp-sunmi-theme", ${JSON.stringify(TEMA)}); } catch (e) {}`,
   });
   console.log("tema personal fijado en localStorage:", TEMA);
+}
+
+// La sesión ANTES de navegar a la pantalla: si el módulo se abre sin contexto,
+// el ERP desvía a /inicio y no hay nada que medir.
+if (USUARIO && CLAVE) {
+  await prepararSesion({
+    navegar, evaluar, base: BASE, usuario: USUARIO, clave: CLAVE,
+    log: (m) => console.log(m),
+  });
 }
 
 const destino = String(BASE) + String(URL_REL);
