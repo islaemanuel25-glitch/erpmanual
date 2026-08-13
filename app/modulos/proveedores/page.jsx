@@ -259,7 +259,7 @@ export default function ProveedoresPage() {
             ]}
           >
             {loading ? (
-              <SunmiTableEmpty label="Cargando..." />
+              <SunmiTableEmpty message="Cargando..." />
             ) : (() => {
               const itemsFiltrados = soloHoy
                 ? items.filter((p) => recibeHoy(p.dias_pedido))
@@ -268,7 +268,7 @@ export default function ProveedoresPage() {
               if (itemsFiltrados.length === 0) {
                 return (
                   <SunmiTableEmpty
-                    label={soloHoy ? "Sin proveedores que reciban pedido hoy" : "Sin proveedores"}
+                    message={soloHoy ? "Sin proveedores que reciban pedido hoy" : "Sin proveedores"}
                   />
                 );
               }

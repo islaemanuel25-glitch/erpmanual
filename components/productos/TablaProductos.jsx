@@ -147,7 +147,7 @@ export default function TablaProductos({
         headers={[...colsVisibles.map((c) => c.titulo), "Acciones"]}
       >
         {rows.length === 0 ? (
-          <SunmiTableEmpty label="Sin productos" />
+          <SunmiTableEmpty message="Sin productos" />
         ) : (
           rows.map((row) => (
             <SunmiTableRow key={row.id}>

@@ -214,7 +214,7 @@ export default function GananciaComprasPage() {
             <div className="overflow-x-auto rounded border sunmi-border">
               <SunmiTable headers={["#", "Proveedor", "Recibido", "Nro Fact.", "Facturado", "Real", "Ganancia", ""]}>
                 {data.compras.length === 0 ? (
-                  <SunmiTableEmpty label="Sin compras en el período" />
+                  <SunmiTableEmpty message="Sin compras en el período" />
                 ) : (
                   data.compras.map((c) => (
                     <SunmiTableRow key={c.id}>

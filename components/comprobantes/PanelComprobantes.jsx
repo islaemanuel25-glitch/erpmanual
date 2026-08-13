@@ -381,7 +381,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
           <div className="hidden md:block overflow-x-auto rounded border sunmi-border">
             <SunmiTable headers={["", "Comprobante", "Estado", "Fotos", "Líneas", "Último intento", ""]}>
               {items.length === 0 ? (
-                <SunmiTableEmpty label="Todavía no hay comprobantes" />
+                <SunmiTableEmpty message="Todavía no hay comprobantes" />
               ) : (
                 items.map((c) => (
                   <SunmiTableRow key={c.id}>

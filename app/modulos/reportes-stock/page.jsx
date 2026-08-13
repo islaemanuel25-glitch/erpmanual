@@ -305,9 +305,9 @@ export default function ReportesStockPage() {
             ]}
           >
             {loading ? (
-              <SunmiTableEmpty label="Cargando..." />
+              <SunmiTableEmpty message="Cargando..." />
             ) : items.length === 0 ? (
-              <SunmiTableEmpty label="Sin productos para los filtros aplicados" />
+              <SunmiTableEmpty message="Sin productos para los filtros aplicados" />
             ) : (
               items.map((it) => (
                 <SunmiTableRow

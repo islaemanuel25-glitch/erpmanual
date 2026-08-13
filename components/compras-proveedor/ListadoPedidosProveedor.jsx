@@ -200,13 +200,13 @@ export default function ListadoPedidosProveedor({
         loading ? (
           <div className="hidden md:block overflow-x-auto rounded-2xl border sunmi-border">
             <SunmiTable headers={TABLE_HEADERS}>
-              <SunmiTableEmpty label="Cargando..." />
+              <SunmiTableEmpty message="Cargando..." />
             </SunmiTable>
           </div>
         ) : items.length === 0 ? (
           <div className="hidden md:block overflow-x-auto rounded-2xl border sunmi-border">
             <SunmiTable headers={TABLE_HEADERS}>
-              <SunmiTableEmpty label="Sin pedidos" />
+              <SunmiTableEmpty message="Sin pedidos" />
             </SunmiTable>
           </div>
         ) : (
