@@ -331,7 +331,22 @@ export default function SunmiModalLayout({
       )}
 
       <div className={clasesDelPanel}>
+        {/* LA MARCA DE LA TARJETA, que existe para poder COMPARARLA.
+
+            El arnés de capturas recorta por selector, y el antes y el después
+            tienen que compartirlo o la comparación mide regiones distintas. Un
+            selector posicional no sirve: al migrar, la tarjeta deja de ser el
+            primer hijo de la capa —ahora el primero es el velo— y eso va a pasar
+            en TODAS las migraciones que quedan. Con un selector posicional
+            perderíamos la resta de píxeles todas las veces; pasó con
+            `ModalCambioPrevio`, que quedó verificado por geometría.
+
+            Así que la tarjeta se marca, y el marcador es el mismo para todos los
+            modales del sistema. Para el "antes" se le pone el mismo atributo a
+            la tarjeta hecha a mano —no cambia un píxel— y con eso los dos lados
+            comparten selector. */}
         <SunmiCard
+          data-sunmi-modal="tarjeta"
           className={[f.tarjeta, altoEnLaTarjeta, paddingTarjeta, sombraTarjeta]
             .filter(Boolean)
             .join(" ")}

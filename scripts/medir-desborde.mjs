@@ -358,7 +358,18 @@ await sleep(400);
 let caja = null;
 if (ELEMENTO) {
   caja = await evaluar(`(() => {
-    const el = document.querySelector(${JSON.stringify(ELEMENTO)});
+    // EL PRIMERO QUE SE VE, no el primero del documento.
+    //
+    // Una pantalla puede tener dos versiones del mismo modal y mostrar una según
+    // el ancho: CarritoPedido tiene hoja y cajón en el mismo archivo. Con
+    // querySelector a secas el recorte podía salir del que está escondido, que
+    // mide 0 y no se ve: una foto en blanco, determinista, de nada.
+    const el = [...document.querySelectorAll(${JSON.stringify(ELEMENTO)})].find((n) => {
+      const r = n.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return false;
+      const cs = getComputedStyle(n);
+      return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
+    });
     if (!el) return null;
     const r = el.getBoundingClientRect();
     const doc = document.scrollingElement || document.documentElement;
@@ -444,7 +455,14 @@ if (salud.error || salud.largo < 10) {
 // pasar es que algo de adentro del elemento se derrame fuera de la foto.
 const encaje = ELEMENTO
   ? await evaluar(`(() => {
-      const el = document.querySelector(${JSON.stringify(ELEMENTO)});
+      // El mismo "primero que se ve" del recorte: si acá se mirara otro nodo, el
+      // chequeo estaría hablando de un elemento distinto del fotografiado.
+      const el = [...document.querySelectorAll(${JSON.stringify(ELEMENTO)})].find((n) => {
+        const r = n.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) return false;
+        const cs = getComputedStyle(n);
+        return cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0";
+      });
       if (!el) return null;
       const R = ${JSON.stringify(cajaRecorte)};
       const sx = window.scrollX, sy = window.scrollY;

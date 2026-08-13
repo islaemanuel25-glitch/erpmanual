@@ -226,6 +226,19 @@ test("LO QUE LA TARJETA RECIBE VIENE CON `!`, PORQUE SunmiCard CONCATENA", () =>
   }
 });
 
+test("LA TARJETA LLEVA SU MARCA, que es lo que la hace comparable", () => {
+  // El arnés recorta por selector y el antes y el después tienen que compartirlo.
+  // Un selector posicional se rompe en cada migración, porque la tarjeta deja de
+  // ser el primer hijo de la capa en cuanto aparece el velo. Si esta marca se
+  // cae, la comparación byte a byte se pierde y nadie se entera hasta la
+  // siguiente tanda.
+  assert.match(SRC, /data-sunmi-modal="tarjeta"/);
+  // Y que SunmiCard reenvíe lo que le llega, o la marca no llega al DOM.
+  const card = fs.readFileSync(path.join(RAIZ, "components/sunmi/SunmiCard.jsx"), "utf8");
+  assert.match(card, /\.\.\.props/, "SunmiCard dejó de reenviar props: la marca no llega al DOM");
+  assert.match(card, /<div\s*\n?\s*\{\.\.\.props\}/, "los props no se reenvían al div");
+});
+
 test("el padding y la sombra de la tarjeta son props, con el default del kit", () => {
   // La alternativa era hacer negociable el className de SunmiCard, y se descartó
   // contando: 246 usos, 151 con className, 109 declaran padding. Todas dibujan

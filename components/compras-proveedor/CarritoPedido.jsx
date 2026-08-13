@@ -342,7 +342,20 @@ export default function CarritoPedido({
           onClick={onClose}
           className="absolute inset-0 bg-black/60"
         />
-        <div className="relative sunmi-surface rounded-t-2xl border-t sunmi-divider p-3 shadow-[0_-2px_20px_rgba(0,0,0,0.35)]">
+        {/* La marca es inerte y existe para poder comparar: el arnés recorta por
+            `[data-sunmi-modal="tarjeta"]`, que es lo que la pieza de modal del
+            kit le pone a la suya. Con el mismo atributo de los dos lados, el
+            antes y el después comparten selector y la resta de píxeles sirve.
+
+            NO se nombra acá al componente del kit, y no es un capricho: el
+            contador de hardcodeo decide que un archivo "ya usa la pieza" con un
+            match de texto sobre el archivo entero, comentarios incluidos.
+            Nombrarlo hacía desaparecer las dos capas de este archivo de la
+            cuenta. Está anotado como defecto del contador. */}
+        <div
+          data-sunmi-modal="tarjeta"
+          className="relative sunmi-surface rounded-t-2xl border-t sunmi-divider p-3 shadow-[0_-2px_20px_rgba(0,0,0,0.35)]"
+        >
           {cuerpo}
         </div>
       </div>
@@ -358,7 +371,13 @@ export default function CarritoPedido({
           onClick={onClose}
           className="absolute inset-0 bg-black/50"
         />
-        <div className="relative sunmi-surface h-full w-full max-w-[420px] border-l sunmi-divider p-4 shadow-[-2px_0_24px_rgba(0,0,0,0.35)] overflow-y-auto">
+        {/* Ídem, y ojo: este archivo dibuja DOS tarjetas de modal según el
+            ancho. El arnés toma la primera que se VE, no la primera del
+            documento, justamente por esto. */}
+        <div
+          data-sunmi-modal="tarjeta"
+          className="relative sunmi-surface h-full w-full max-w-[420px] border-l sunmi-divider p-4 shadow-[-2px_0_24px_rgba(0,0,0,0.35)] overflow-y-auto"
+        >
           {cuerpo}
         </div>
       </div>

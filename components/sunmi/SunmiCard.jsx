@@ -20,11 +20,16 @@ import { useSunmiTheme } from "./SunmiThemeProvider";
 // Bajar las tarjetas de 21 a 10.5 px es una decisión de aspecto, se toma
 // mirando pantallas y nadie la pidió. Verificado con capturas de una tarjeta de
 // modal, una de lista y una de detalle: cero píxeles de diferencia.
-export default function SunmiCard({ children, className = "" }) {
+// Acepta y reenvía el resto de los props. Hoy nadie le pasa otra cosa que
+// `className` y `key` —comprobado sobre los 233 usos, y `key` React nunca lo
+// reenvía—, así que esto no enciende nada que estuviera apagado. Existe para que
+// la pieza de modal pueda marcar su tarjeta con un atributo estable.
+export default function SunmiCard({ children, className = "", ...props }) {
   const { theme } = useSunmiTheme();
 
   return (
     <div
+      {...props}
       className={`
         ${theme.card}
         rounded-xl

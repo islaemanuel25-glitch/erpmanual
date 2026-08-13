@@ -183,10 +183,21 @@ del costo de una tanda de migración.
   defecto). **Falla nombrándolo si el selector no encuentra nada**, y el chequeo
   de "entra entero" pasa a preguntar por ese elemento en vez de por todo lo
   pintado.
-- El selector elegido tiene que encontrar **la misma cosa antes y después**. Para
-  la tarjeta de un modal, `.fixed.inset-0 .rounded-xl.shadow-md` sirve en los
-  dos: la capa es `fixed inset-0` con o sin `SunmiModalLayout`, y la tarjeta es
-  una `SunmiCard`.
+- El selector elegido tiene que encontrar **la misma cosa antes y después**, y
+  **no puede ser posicional**. Al migrar un modal, la tarjeta deja de ser el
+  primer hijo de la capa —aparece el velo adelante—, así que un
+  `> div:nth-child(1)` mide la tarjeta antes y el velo después. Pasó con
+  `ModalCambioPrevio` y costó la comparación byte a byte de esa tanda.
+
+  **Para la tarjeta de un modal el selector es `[data-sunmi-modal="tarjeta"]`.**
+  La pone `SunmiModalLayout`, y para el "antes" se le agrega el mismo atributo a
+  la tarjeta hecha a mano: es inerte, no mueve un píxel, y con eso los dos lados
+  comparten selector y la resta de píxeles vuelve a estar disponible.
+
+- Si el selector matchea varios, el arnés toma **el primero que se VE**, no el
+  primero del documento. Una pantalla puede traer dos versiones del mismo modal
+  y mostrar una según el ancho —`CarritoPedido` tiene hoja y cajón en el mismo
+  archivo—, y recortar el escondido da una foto en blanco, determinista, de nada.
 
 Cada captura deja una ficha `.json` al lado con el selector, el margen y el
 recorte. Comparar es:

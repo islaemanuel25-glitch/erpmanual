@@ -463,6 +463,20 @@ componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco
 
 ## Deuda anotada de esta fase
 
+- **EL CONTADOR DECIDE "ya usa la pieza" CON UN MATCH DE TEXTO, comentarios
+  incluidos.** `lib/hardcodeo/contador.js` hace
+  `importaModalDelKit = /SunmiModalLayout/.test(contenido)` sobre el archivo
+  entero. Nombrar el componente en un comentario hace que sus capas
+  **desaparezcan de la cuenta**: pasó el 2026-08-13 al marcar las tarjetas de
+  `CarritoPedido`, y el trinquete bajó de 42 a 40 sin que se migrara nada.
+
+  Es la misma familia que el comentario adentro del `className` de `SunmiCard`:
+  **un comentario cambiando comportamiento.** Hoy está tapado reescribiendo el
+  comentario, que es un hábito y no un candado. El arreglo es mirar un `import`
+  de verdad en vez de un match de texto, y necesita su propio candado porque
+  puede cambiar la cifra. Comprobado que hoy **ningún otro archivo** lo nombra
+  sin importarlo, así que la cuenta actual es correcta.
+
 - **`ModalProcesoPendiente` queda SIN MIGRAR y SIN VERIFICAR**, junto al de
   `PanelComprobantes`. Solo se dibuja cuando hay un proceso de caja pendiente, y
   en `erpazul_al` no hay ninguno: no se puede abrir ni medir. **No se fabricó la
