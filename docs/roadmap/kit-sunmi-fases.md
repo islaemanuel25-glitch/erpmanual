@@ -197,8 +197,11 @@ Los 12 píxeles de `ModalProveedor` salieron de que sus campos sí los traen.
 
 O sea que la pregunta no es "¿tiene `space-y-*`?" sino "¿los hijos del cuerpo
 tienen márgenes propios?". La lista de ocho sigue siendo la lista de sospechosos
-—hay que medirlos igual—, pero el número puede dar cero, y dio cero la primera
-vez. Cómo se mide, sin tocar una línea: se abre el modal, se anotan los `top` de
+—hay que medirlos igual—, pero el número puede dar cero, y dio cero las tres
+primeras veces: `ModalCategoria`, `ModalListaPrecio` y `ModalPreviewPrecio`, las
+tres a 1366 y a 360. **Tres ceros seguidos no autorizan a saltearse la medición
+en la cuarta**, que es exactamente el razonamiento que este párrafo existe para
+frenar: los 12 px de `ModalProveedor` fueron reales. Cómo se mide, sin tocar una línea: se abre el modal, se anotan los `top` de
 cada hijo contra el borde de la tarjeta, se le pone `display:flex` con
 `flexDirection:column` al div del cuerpo desde el navegador, y se vuelven a
 anotar.
@@ -223,6 +226,10 @@ anotar.
 | `proveedores/ModalCodigosProveedor` | `espacioCuerpo` / `espacioPie` | `""` | es de solo lectura y no tiene pie: el único botón es el de cerrar, que lo pone la pieza |
 | `categorias/ModalCategoria` | `maxWidth` | `"max-w-md"` | su tarjeta es `max-w-md`; con el `max-w-xl` del kit pasaría de 392 a 504 px a 1366 |
 | `categorias/ModalCategoria` | `espacioCuerpo` | `"p-4 space-y-4"` | el cuerpo trae su propio padding y su propia separación de campos |
+| `listas-precios/ModalListaPrecio` | `maxWidth` | `"max-w-md"` | su tarjeta es `max-w-md`, no el `max-w-xl` del kit |
+| `listas-precios/ModalListaPrecio` | `espacioCuerpo` | `"p-4 space-y-4"` | ídem categorías |
+| `listas-precios/ModalPreviewPrecio` | `maxWidth` | `"max-w-2xl"` | su tarjeta es `max-w-2xl` |
+| `listas-precios/ModalPreviewPrecio` | `espacioCuerpo` | `"p-4 space-y-4"` | ídem |
 
 ### El padding de la tarjeta NO se escribió, y este es el motivo
 

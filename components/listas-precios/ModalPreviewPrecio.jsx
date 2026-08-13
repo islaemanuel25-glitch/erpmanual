@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -144,22 +143,22 @@ export default function ModalPreviewPrecio({ open, lista, onClose }) {
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className="
-        fixed inset-0 z-50
-        bg-black/50
-        backdrop-blur-sm
-        flex items-center justify-center
-        p-4
-      "
+    <SunmiModalLayout
+      open={open}
+      title={`Preview de "${lista?.nombre || ""}"`}
+      onClose={onClose}
+      // NO lleva `destructivo`: es un preview de solo lectura. Lo único que se
+      // escribe acá es el buscador, y perder un término de búsqueda no es
+      // perder nada — se vuelve a escribir. El criterio es qué se pierde.
+      // El ancho de esta pantalla es `max-w-2xl`, no el `max-w-xl` del kit.
+      maxWidth="max-w-2xl"
+      // El cuerpo trae su propio padding y su propia separación de bloques.
+      // Medido antes de migrar: el paso de bloque a `flex flex-col` no mueve
+      // nada acá, cero píxeles a 1366 y a 360.
+      espacioCuerpo="p-4 space-y-4"
     >
-      <SunmiCard className="w-full max-w-2xl p-0 overflow-hidden">
-        <SunmiCardHeader title={`Preview de "${lista?.nombre || ""}"`} />
-
-        <div className="p-4 space-y-4">
+        <>
           {/* Resumen de la lista */}
           <div className="flex flex-wrap items-center gap-2">
             <SunmiPill color="amber">{tipoLabel(lista?.tipoBase)}</SunmiPill>
@@ -300,8 +299,7 @@ export default function ModalPreviewPrecio({ open, lista, onClose }) {
               </div>
             </>
           )}
-        </div>
-      </SunmiCard>
-    </div>
+        </>
+    </SunmiModalLayout>
   );
 }

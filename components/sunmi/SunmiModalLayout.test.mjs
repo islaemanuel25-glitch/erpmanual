@@ -194,7 +194,12 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/roles/ModalRol.jsx": true,
     "components/categorias/ModalCategoria.jsx": true,
     "components/compras-proveedor/ModalVincularCodigo.jsx": true,
+    "components/listas-precios/ModalListaPrecio.jsx": true,
     // Informativos, de confirmación y de selección: cerrarlos no pierde nada.
+    // `ModalPreviewPrecio` tiene un campo y NO lleva destructivo a propósito: lo
+    // único que se escribe ahí es el buscador, y perder un término de búsqueda
+    // no es perder nada. El criterio es qué se pierde, no si hay un input.
+    "components/listas-precios/ModalPreviewPrecio.jsx": false,
     // Se vuelven a abrir y listo.
     "components/productos/ModalVerComposicion.jsx": false,
     "components/proveedores/ModalCodigosProveedor.jsx": false,

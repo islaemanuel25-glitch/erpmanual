@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -196,26 +195,25 @@ export default function ModalListaPrecio({
   // =========================
   // RENDER
   // =========================
-  if (!open) return null;
 
   const mostrarMargen = form.tipoBase === "COSTO";
 
   return (
-    <div
-      className="
-        fixed inset-0 z-50
-        bg-black/50
-        backdrop-blur-sm
-        flex items-center justify-center
-        p-4
-      "
+    <SunmiModalLayout
+      open={open}
+      title={editMode ? "Editar lista de precios" : "Nueva lista de precios"}
+      onClose={onClose}
+      // Es un formulario: un toque al costado con media pantalla escrita tiraría
+      // lo escrito, y en el teléfono ese toque pasa solo.
+      destructivo
+      // El ancho de esta pantalla es `max-w-md`, no el `max-w-xl` del kit.
+      maxWidth="max-w-md"
+      // El cuerpo trae su propio padding y su propia separación de campos.
+      // Medido antes de migrar: el paso de bloque a `flex flex-col` no mueve
+      // nada acá, cero píxeles a 1366 y a 360.
+      espacioCuerpo="p-4 space-y-4"
     >
-      <SunmiCard className="w-full max-w-md p-0 overflow-hidden">
-        <SunmiCardHeader
-          title={editMode ? "Editar lista de precios" : "Nueva lista de precios"}
-        />
-
-        <div className="p-4 space-y-4">
+        <>
           {/* NOMBRE */}
           <div>
             <label className="text-[11px] sunmi-label mb-1 block">Nombre</label>
@@ -320,8 +318,7 @@ export default function ModalListaPrecio({
               {loading ? "Guardando..." : "Guardar"}
             </SunmiButton>
           </div>
-        </div>
-      </SunmiCard>
-    </div>
+        </>
+    </SunmiModalLayout>
   );
 }
