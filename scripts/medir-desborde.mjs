@@ -17,6 +17,11 @@
 // Uso:
 //   node scripts/medir-desborde.mjs --url /modulos/proveedores/recetas \
 //     --ancho 360 --alto 640 --salida /tmp/desborde [--abrir-primero]
+//
+//   Para un modal, recortado a su tarjeta:
+//   node scripts/medir-desborde.mjs --url /modulos/categorias \
+//     --abrir "Nueva" --elemento "[role=dialog] > div:nth-child(2)" \
+//     --repeticiones 3 --salida /tmp/x --nombre categoria
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -56,6 +61,30 @@ const ALTO_CAPTURA = Number(arg("alto-captura", "2400"));
 // fotos se comparan por sus bytes: mismo codificador y mismo tamaño, así que
 // bytes iguales es píxeles iguales. Con 1 no se comprueba nada.
 const REPETICIONES = Number(arg("repeticiones", "1"));
+
+// ── EL RECORTE AL ELEMENTO QUE SE ESTÁ MIRANDO ─────────────────────────────
+//
+// Hasta acá la foto salía de toda la banda y había que UBICAR A MANO la caja de
+// la tarjeta en cada captura para poder compararlas. Medido sobre las tandas de
+// modales, esa parte manual es dos tercios del costo de cada una, y quedan 26
+// capas por migrar.
+//
+// Con `--elemento` el arnés mide el `getBoundingClientRect` de ese nodo y
+// recorta a esa caja con un margen fijo. Dos cosas que van con esto y no son
+// opcionales:
+//
+//   · Si el selector no encuentra nada, SALE EN ROJO NOMBRÁNDOLO. Sin ese
+//     candado un selector viejo recorta la zona equivocada y la comparación
+//     informa una diferencia que no existe, sin que nada lo diga.
+//   · El selector queda GUARDADO junto a la captura, en una ficha `.json` al
+//     lado. Comparar un antes recortado por un selector contra un después
+//     recortado por otro mide regiones distintas: `comparar-capturas.mjs` lo
+//     rechaza leyendo esas fichas.
+const ELEMENTO = arg("elemento", null);
+const MARGEN = Number(arg("margen", "24"));
+// Un botón que hay que tocar antes de medir, buscado por su texto. Los modales
+// no tienen URL propia: si no se los abre, la foto es de la pantalla de atrás.
+const ABRIR = arg("abrir", null);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(SALIDA, { recursive: true });
@@ -139,6 +168,26 @@ if (arg("abrir-primero")) {
     if (b) b.click();
     return !!b;
   })()`);
+  await sleep(2500);
+}
+
+// Tocar un botón por su texto. Falla nombrándolo, por el mismo motivo que el
+// selector: un botón que no se encontró deja la foto de la pantalla de atrás, y
+// esa foto es perfectamente determinista.
+if (ABRIR) {
+  const abrio = await evaluar(`(() => {
+    const buscado = ${JSON.stringify(String(ABRIR).toLowerCase())};
+    const b = [...document.querySelectorAll("button, a")].find(
+      (x) => (x.textContent || "").toLowerCase().includes(buscado)
+    );
+    if (b) b.click();
+    return !!b;
+  })()`);
+  if (!abrio) {
+    console.log(`NO HAY NINGÚN BOTÓN QUE DIGA "${ABRIR}". La foto sería de la pantalla de atrás.`);
+    cerrar();
+    process.exit(1);
+  }
   await sleep(2500);
 }
 
@@ -259,10 +308,53 @@ await evaluar(`(() => {
 })()`);
 await sleep(400);
 
-const recorte =
-  ALTO_CAPTURA > 0
-    ? { clip: { x: 0, y: 0, width: ANCHO, height: Math.min(ALTO_CAPTURA, alto), scale: 1 } }
-    : {};
+// ── DÓNDE ESTÁ EL ELEMENTO QUE SE PIDIÓ ────────────────────────────────────
+//
+// Se mide DESPUÉS de abrir el recorte y de apagar las transiciones: antes de eso
+// la caja todavía se está moviendo, y un rectángulo tomado a mitad de camino
+// recorta un poco corrido.
+let caja = null;
+if (ELEMENTO) {
+  caja = await evaluar(`(() => {
+    const el = document.querySelector(${JSON.stringify(ELEMENTO)});
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const doc = document.scrollingElement || document.documentElement;
+    return {
+      x: r.left + window.scrollX,
+      y: r.top + window.scrollY,
+      w: r.width,
+      h: r.height,
+      anchoPagina: Math.max(doc.scrollWidth, window.innerWidth),
+      altoPagina: doc.scrollHeight,
+    };
+  })()`);
+  if (!caja) {
+    console.log(`EL SELECTOR NO ENCONTRÓ NADA: ${ELEMENTO}`);
+    console.log("  No se saca la foto: un recorte mal ubicado compara la zona equivocada");
+    console.log("  y da una diferencia que no existe, sin que nada lo diga.");
+    cerrar();
+    process.exit(1);
+  }
+  console.log(
+    `\nRecorte al elemento "${ELEMENTO}": ${Math.round(caja.w)}x${Math.round(caja.h)}px` +
+      ` en (${Math.round(caja.x)}, ${Math.round(caja.y)}), con ${MARGEN}px de margen.`
+  );
+}
+
+const cajaRecorte = caja
+  ? (() => {
+      const x0 = Math.max(0, Math.round(caja.x - MARGEN));
+      const y0 = Math.max(0, Math.round(caja.y - MARGEN));
+      const x1 = Math.min(Math.round(caja.anchoPagina), Math.round(caja.x + caja.w + MARGEN));
+      const y1 = Math.min(Math.round(caja.altoPagina), Math.round(caja.y + caja.h + MARGEN));
+      return { x: x0, y: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0), scale: 1 };
+    })()
+  : ALTO_CAPTURA > 0
+    ? { x: 0, y: 0, width: ANCHO, height: Math.min(ALTO_CAPTURA, alto), scale: 1 }
+    : null;
+
+const recorte = cajaRecorte ? { clip: cajaRecorte } : {};
 
 // ── ¿LA PÁGINA SE DIBUJÓ, O ES LA PANTALLA DE ERROR? ───────────────────────
 //
@@ -303,29 +395,82 @@ if (salud.error || salud.largo < 10) {
 // La regla: nada pintado puede quedar por encima de y=0, y con recorte pedido,
 // nada por debajo del recorte. Lo de arriba NO se puede recuperar scrolleando
 // —la capa es `fixed`—, así que es siempre un error del arnés, no del que mira.
-const encaje = await evaluar(`(() => {
-  let arriba = 0, abajo = 0;
-  for (const el of document.querySelectorAll("body *")) {
-    const r = el.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2) continue;
-    const cs = getComputedStyle(el);
-    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
-    if (r.top < arriba) arriba = r.top;
-    if (r.bottom > abajo) abajo = r.bottom;
-  }
-  return { arriba: Math.round(arriba), abajo: Math.round(abajo) };
-})()`);
+//
+// CON `--elemento` LA PREGUNTA CAMBIA, y es el punto: deja de ser "entra todo lo
+// pintado" y pasa a ser "entra ENTERO el elemento que se está mirando". Con el
+// recorte al elemento, lo de afuera queda afuera a propósito; lo que no puede
+// pasar es que algo de adentro del elemento se derrame fuera de la foto.
+const encaje = ELEMENTO
+  ? await evaluar(`(() => {
+      const el = document.querySelector(${JSON.stringify(ELEMENTO)});
+      if (!el) return null;
+      const R = ${JSON.stringify(cajaRecorte)};
+      const sx = window.scrollX, sy = window.scrollY;
+      let arriba = 0, abajo = 0, izquierda = 0, derecha = 0;
+      for (const n of [el, ...el.querySelectorAll("*")]) {
+        const r = n.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        const cs = getComputedStyle(n);
+        if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
+        arriba = Math.max(arriba, R.y - (r.top + sy));
+        izquierda = Math.max(izquierda, R.x - (r.left + sx));
+        abajo = Math.max(abajo, (r.bottom + sy) - (R.y + R.height));
+        derecha = Math.max(derecha, (r.right + sx) - (R.x + R.width));
+      }
+      return {
+        arriba: Math.round(arriba), abajo: Math.round(abajo),
+        izquierda: Math.round(izquierda), derecha: Math.round(derecha),
+      };
+    })()`)
+  : await evaluar(`(() => {
+      let arriba = 0, abajo = 0;
+      for (const el of document.querySelectorAll("body *")) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        const cs = getComputedStyle(el);
+        if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
+        if (r.top < arriba) arriba = r.top;
+        if (r.bottom > abajo) abajo = r.bottom;
+      }
+      return { arriba: Math.round(arriba), abajo: Math.round(abajo) };
+    })()`);
 
 const recorteAlto = ALTO_CAPTURA > 0 ? Math.min(ALTO_CAPTURA, alto) : alto;
-const faltaArriba = encaje.arriba < -1 ? Math.abs(encaje.arriba) : 0;
-const faltaAbajo = encaje.abajo > recorteAlto + 1 ? encaje.abajo - recorteAlto : 0;
-if (faltaArriba || faltaAbajo) {
-  console.log("NO ENTRA ENTERO EN LA FOTO. La captura NO prueba nada.");
+const faltaArriba = ELEMENTO
+  ? Math.max(0, encaje.arriba - 1)
+  : encaje.arriba < -1
+    ? Math.abs(encaje.arriba)
+    : 0;
+const faltaAbajo = ELEMENTO
+  ? Math.max(0, encaje.abajo - 1)
+  : encaje.abajo > recorteAlto + 1
+    ? encaje.abajo - recorteAlto
+    : 0;
+const faltaCostado = ELEMENTO
+  ? Math.max(0, encaje.izquierda - 1) + Math.max(0, encaje.derecha - 1)
+  : 0;
+if (faltaArriba || faltaAbajo || faltaCostado) {
+  console.log(
+    ELEMENTO
+      ? `EL ELEMENTO "${ELEMENTO}" NO ENTRA ENTERO EN LA FOTO. La captura NO prueba nada.`
+      : "NO ENTRA ENTERO EN LA FOTO. La captura NO prueba nada."
+  );
   if (faltaArriba) {
     console.log(`  se corta ${faltaArriba}px POR ARRIBA — eso no se recupera scrolleando:`);
-    console.log(`  subí el viewport: --alto ${Math.ceil((alto + faltaArriba * 2) / 100) * 100}`);
+    console.log(
+      ELEMENTO
+        ? `  el elemento empieza arriba del recorte: subí el viewport con --alto`
+        : `  subí el viewport: --alto ${Math.ceil((alto + faltaArriba * 2) / 100) * 100}`
+    );
   }
-  if (faltaAbajo) console.log(`  se corta ${faltaAbajo}px por abajo — subí --alto-captura`);
+  if (faltaAbajo) {
+    console.log(
+      ELEMENTO
+        ? `  se derrama ${faltaAbajo}px por abajo del recorte — subí --margen o --alto`
+        : `  se corta ${faltaAbajo}px por abajo — subí --alto-captura`
+    );
+  }
+  if (faltaCostado) console.log(`  se derrama ${faltaCostado}px por los costados — subí --margen`);
 }
 
 // UNA TOMA QUE SE DESCARTA, SIEMPRE.
@@ -355,7 +500,14 @@ for (let i = 0; i < Math.max(1, REPETICIONES); i++) {
 
 const archivo = path.join(SALIDA, `${arg("nombre", "captura")}-${ANCHO}-completa.png`);
 fs.writeFileSync(archivo, Buffer.from(fotos[0], "base64"));
-console.log(`\nCaptura: ${archivo}${ALTO_CAPTURA > 0 ? ` (banda fija de ${Math.min(ALTO_CAPTURA, alto)}px)` : " (página completa)"}`);
+console.log(
+  `\nCaptura: ${archivo}` +
+    (ELEMENTO
+      ? ` (recorte al elemento, ${cajaRecorte.width}x${cajaRecorte.height}px)`
+      : ALTO_CAPTURA > 0
+        ? ` (banda fija de ${Math.min(ALTO_CAPTURA, alto)}px)`
+        : " (página completa)")
+);
 
 // ── EL ARNÉS SE DECLARA APTO O NO ──────────────────────────────────────────
 //
@@ -387,5 +539,37 @@ if (REPETICIONES > 1) {
   }
 }
 
+// ── LA FICHA, QUE ES LO QUE HACE COMPARABLE A LA FOTO ──────────────────────
+//
+// Una captura sola no dice qué región retrató. Si el antes se recortó por un
+// selector y el después por otro, la comparación mide regiones distintas y da
+// una diferencia que no existe. Acá queda escrito con qué se recortó, y
+// `comparar-capturas.mjs` se niega a comparar dos fotos que no coincidan.
+const ficha = {
+  captura: path.basename(archivo),
+  url: destino,
+  ancho: ANCHO,
+  alto: ALTO,
+  selector: ELEMENTO || null,
+  margen: ELEMENTO ? MARGEN : null,
+  abrir: ABRIR || null,
+  altoCaptura: ELEMENTO ? null : ALTO_CAPTURA,
+  recorte: cajaRecorte,
+  repeticiones: REPETICIONES,
+  apto,
+};
+fs.writeFileSync(`${archivo}.json`, JSON.stringify(ficha, null, 2));
+console.log(`Ficha:    ${archivo}.json`);
+
 cerrar();
-process.exit(medida.desbordan.length || apto === false || salud.error || salud.largo < 10 || faltaArriba || faltaAbajo ? 1 : 0);
+process.exit(
+  medida.desbordan.length ||
+    apto === false ||
+    salud.error ||
+    salud.largo < 10 ||
+    faltaArriba ||
+    faltaAbajo ||
+    faltaCostado
+    ? 1
+    : 0
+);

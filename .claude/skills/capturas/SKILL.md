@@ -165,6 +165,58 @@ es peor que no tener, porque produce ceros que uno se cree.
 **Una pantalla con formulario largo no se da por revisada con una captura de
 viewport.** Se mide, y recién después se mira la imagen completa.
 
+### Para comparar un modal: `--abrir` y `--elemento`
+
+Un modal no tiene URL propia, y su tarjeta ocupa un pedacito de la foto. Sin esto
+hay que abrirlo a mano y ubicar la caja a ojo en cada captura, que es dos tercios
+del costo de una tanda de migración.
+
+    MSYS_NO_PATHCONV=1 node scripts/medir-desborde.mjs --url /modulos/categorias \
+      --ancho 1366 --alto 900 --perfil /tmp/desborde-edge \
+      --abrir "Nueva" --elemento ".fixed.inset-0 .rounded-xl.shadow-md" \
+      --repeticiones 3 --salida /tmp/cat-antes --nombre categoria
+
+- `--abrir <texto>` toca el primer botón cuyo texto lo contenga. **Falla
+  nombrándolo si no hay ninguno**: sin eso la foto sale de la pantalla de atrás,
+  y esa foto es perfectamente determinista, así que pasa todos los chequeos.
+- `--elemento <selector>` recorta a la caja de ese nodo con `--margen` (24 px por
+  defecto). **Falla nombrándolo si el selector no encuentra nada**, y el chequeo
+  de "entra entero" pasa a preguntar por ese elemento en vez de por todo lo
+  pintado.
+- El selector elegido tiene que encontrar **la misma cosa antes y después**. Para
+  la tarjeta de un modal, `.fixed.inset-0 .rounded-xl.shadow-md` sirve en los
+  dos: la capa es `fixed inset-0` con o sin `SunmiModalLayout`, y la tarjeta es
+  una `SunmiCard`.
+
+Cada captura deja una ficha `.json` al lado con el selector, el margen y el
+recorte. Comparar es:
+
+    node scripts/comparar-capturas.mjs /tmp/cat-antes/x.png /tmp/cat-despues/x.png
+
+Sale con **0** si son idénticas, **1** si difieren —dice cuántos píxeles, entre
+qué esquinas y en qué filas— y **2** si NO son comparables: falta una ficha, o
+las fichas dicen que retratan regiones distintas. Ese 2 también salta cuando el
+elemento cambió de tamaño entre las dos corridas, y eso es información: la
+tarjeta de `ModalCategoria` creció 3 px de alto al migrarla y el comparador lo
+dijo antes de mirar un solo píxel.
+
+### La sesión no sobrevive al perfil
+
+**El perfil de Edge NO conserva la cookie de sesión.** Al navegador se lo mata
+con `kill` y no con un cierre limpio, así que la base de cookies nunca se escribe
+al disco. Reusar `--perfil` no alcanza: la pantalla sale en blanco porque el
+módulo hace `if (!perfil) return null`.
+
+Lo que funciona es dejar **un Edge vivo** en el puerto que usa el arnés (9224),
+logueado contra `/api/login` y con grupo y ubicación fijados como hace
+`generar-huellas.mjs`. Cuando el arnés intenta levantar el suyo, el perfil ya
+está tomado, su Edge se muere solo y `urlDepurador()` se engancha al que está.
+
+Y antes de culpar a la sesión: **si el 3111 corre `next start`, sirve el build
+que había cuando arrancó**. Un `npm run build` posterior deja al server con un
+manifiesto viejo y el navegador informa `Failed to load chunk`, con la pantalla
+en blanco. Se reinicia el server, no se persigue el síntoma.
+
 ## Qué mide la huella y qué no
 
 Mide **estructura en reposo**: columnas, alineaciones, padding, fondo efectivo
