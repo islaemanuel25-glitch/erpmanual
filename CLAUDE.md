@@ -252,6 +252,22 @@ el test, el bug seguiría ahí con el suite en verde.
 Cuando un cambio deja candados del contrato viejo en rojo y no hay margen para
 reescribirlos bien, **se revierte el cambio y se anota**, no se commitean rojos.
 
+Corolario que solo aparece al mudar código: **después de sacar algo a un
+componente, hay que releer los candados que tocaban el archivo original —sobre
+todo los que quedaron en VERDE.** Un candado que lee un archivo y busca un patrón
+sigue pasando cuando el patrón se fue a otro lado: no afirma nada y no se queja.
+
+Al mudar la tabla del detalle del pedido, dos se pusieron en rojo y esos avisaron
+solos. El que importa es el tercero: el del botón de editar producto afirmaba
+cuatro cosas sobre un archivo, y después de la mudanza tres seguían ahí y una se
+había ido. Reescribirlo obligó a mirar qué quedaba de cada lado, y ahí apareció
+lo que faltaba: **nadie comprobaba que la página le PASARA el permiso a la
+tabla.** Sin eso el botón no aparece nunca, y las afirmaciones viejas seguirían
+todas en verde. La mudanza abrió esa grieta y solo se vio releyendo.
+
+En la práctica: `git grep` el nombre del archivo mudado en los `*.test.mjs`, y
+releer cada uno preguntando qué afirma HOY, no si pasa.
+
 ### 6. Scripts que tocan la base
 
 Ver la sección **"Scripts que tocan la base"** más abajo, que tiene las reglas

@@ -59,12 +59,38 @@ const OPCIONES = { patronesColor: FORBIDDEN, excepcionesColor: WHITELIST };
 const git = (...args) =>
   execFileSync("git", args, { cwd: RAIZ, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
-/** Todos los archivos de interfaz del repo, enumerados con git. */
+/**
+ * Todos los archivos de interfaz del repo, enumerados con git.
+ *
+ * ── LOS NO TRACKEADOS TAMBIÉN ──────────────────────────────────────────────
+ *
+ * `git ls-files` a secas lista SOLO lo trackeado, así que un archivo nuevo no lo
+ * veía nadie hasta que alguien hiciera `git add`. Eso no es fallar abierto: es no
+ * mirar. Y el síntoma fue el peor posible — al mudar una tabla a un archivo
+ * nuevo, el trinquete informó que el hardcodeo había BAJADO catorce celdas,
+ * siete medidas y un elemento crudo. No había bajado nada: se había mudado a un
+ * archivo que el conteo no estaba leyendo.
+ *
+ * `--others --exclude-standard` agrega lo no trackeado respetando `.gitignore`,
+ * que es lo que hay que respetar: `node_modules` y `.next` tienen que seguir
+ * afuera.
+ *
+ * `--cached` se escribe explícito aunque sea el default, porque al agregar
+ * `--others` deja de serlo.
+ */
 function archivosDeInterfaz() {
-  return git("ls-files", "app/**/*.jsx", "components/**/*.jsx")
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const salida = git(
+    "ls-files",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "app/**/*.jsx",
+    "components/**/*.jsx"
+  );
+  // `--cached` y `--others` pueden nombrar el mismo archivo: se deduplica, o un
+  // archivo nuevo ya agregado contaría dos veces y el trinquete informaría una
+  // subida que no existe.
+  return [...new Set(salida.split("\n").map((s) => s.trim()).filter(Boolean))];
 }
 
 /**
