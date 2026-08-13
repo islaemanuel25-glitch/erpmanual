@@ -117,6 +117,72 @@ ya se escaparon las atajaría eso mismo:
 No se adelanta porque partir la fase 2 al medio cuesta más de lo que ahorra,
 pero queda fijado el momento: al cerrar la fase 2, antes de empezar la 3.
 
+## Cuántas capas quedan: UNA cifra, y de dónde sale
+
+**PENDIENTE CONFIRMADO — reconciliado el 2026-08-13.** Había tres números
+circulando —54, 43 y 21— y ninguno era comparable con los otros. Es la segunda
+vez del mismo patrón, después del 43 contra el 54, y así es como se planifica
+mal.
+
+### El criterio, que es lo que faltaba escribir
+
+**Una capa de modal es un `fixed inset-0` que tapa la pantalla para poner algo
+encima y bloquear lo de atrás.** Cuenta:
+
+- si el panel está ADENTRO de la capa (el modal centrado de siempre), y
+- si el panel es HERMANO de la capa (un velo suelto al lado de un cajón o de una
+  hoja). El kit dibuja las dos cosas: para eso están `hoja` y `cajon`.
+
+Se cuentan **capas y no archivos**, porque un archivo puede tener varias:
+`clientes/page.jsx` tiene tres, y `CarritoPedido` tiene dos que además son formas
+distintas. Se saltean las líneas comentadas: una capa nombrada en un comentario
+no es una capa.
+
+Un archivo que ya importa `SunmiModalLayout` no aporta ninguna, aunque adentro le
+quede algo a mano. Es una limitación conocida del contador y se anota acá para
+que no se descubra de nuevo.
+
+### La cifra
+
+**43 capas de modal armadas a mano**, en 37 archivos. Enumerado con `git ls-files`
+sobre `app` y `components` —el repo entero, no un nivel— aplicando el criterio de
+arriba.
+
+**Y es exactamente el número que imprime el trinquete** como "modales armados a
+mano". O sea que ya estaba automatizado y no hacía falta un segundo conteo: **de
+acá en adelante la cifra es la del trinquete**, y cualquier otra que aparezca en
+un informe hay que reconciliarla contra esa antes de usarla.
+
+### Los que creí que había que descontar, y por qué NO se descuentan
+
+Dije que seis no eran modales. Al abrirlos, **cinco sí lo son** por el criterio de
+arriba, y el sexto nunca estuvo en la cuenta:
+
+- `sidebar/SidebarPro`, `sidebar/SidebarMobile`, `layout/MobileNav` y
+  `notificaciones/CampanaNotificaciones` son **velos sueltos**: el `fixed inset-0`
+  oscurece el fondo y el panel se dibuja al lado, con su propio `fixed`. Los
+  descarté por el nombre —"eso es navegación, no un modal"— y estructuralmente
+  son exactamente lo que `cajon` y `hoja` vienen a dibujar. Son candidatos, no
+  ruido.
+- `layout/SubmenuPanel` es **un modal centrado de verdad**, con
+  `flex items-center justify-center` y el panel adentro. Se llama panel y eso me
+  alcanzó para descartarlo. No alcanzaba.
+- `components/sunmi/SunmiModalLayout` nunca estuvo en la cuenta: el contador
+  excluye los archivos que importan la pieza, y la pieza se nombra a sí misma.
+
+**Lo que esto deja como aviso, y es la parte que se repite:** cinco de seis salieron
+de mirar el nombre del archivo. Abrirlos costó dos minutos y cambió la cifra en
+cinco. Es la misma familia que la firma que agrupaba por cuatro rasgos elegidos a
+ojo y daba 12 grupos donde había 23.
+
+### Un hallazgo del recuento
+
+**`components/sunmi/SunmiSelectConCrearRapido` arma su propio modal a mano**, con
+`fixed inset-0 z-[60] flex items-center justify-center bg-black/50` y una tarjeta
+adentro. Es un componente DEL KIT que no usa la pieza de modal del kit. No se
+toca en esta fase —no es una pantalla— pero queda anotado: cuando se migre, es el
+que más raro se lee si sigue como está.
+
 ## Fase 2 — qué declaró cada pantalla contra el default del kit
 
 **EL PARÁMETRO ES UNA POSTERGACIÓN, NO UN PERDÓN.** Sin esta cuenta, la fase 2
@@ -179,8 +245,9 @@ así por tres motivos, y no se rediscute:
 3. Doce píxeles repartidos en un formulario entero es "un poco más aireado", no
    algo roto.
 
-**A cuántos les aplica, contado:** de las **30 capas que quedan por migrar**,
-**8 tienen `space-y-*` en el cuerpo** y 22 no. Las ocho son los tres modales de
+**A cuántos les aplica, contado:** medido sobre `ee09abe`, cuando quedaban 30
+capas por migrar —esa cifra está **superada**, ver "Cuántas capas quedan" arriba:
+la que vale es la del trinquete—, **8 tenían `space-y-*` en el cuerpo** y 22 no. Las ocho son los tres modales de
 `clientes`, `configuracion/mantenimiento`, `turnos/[id]`, `ModalProcesoPendiente`,
 `ModalCategoria`, `ModalListaPrecio`, `ModalPreviewPrecio` y
 `ModalPedirOperador`. A esas ocho hay que medirles el número antes de migrarlas.
