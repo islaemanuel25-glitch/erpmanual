@@ -221,9 +221,11 @@ export default function SunmiModalLayout({
             )}
 
             {showCloseButton && onClose && (
+              // `SunmiButton` no acepta `size`: lo desparramaba sobre el
+              // `<button>` con el resto de los props, así que el botón nunca se
+              // achicó y quedaba un atributo inválido en el DOM.
               <SunmiButton
                 color="slate"
-                size="sm"
                 onClick={onClose}
               >
                 Cerrar

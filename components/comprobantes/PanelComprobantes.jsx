@@ -41,6 +41,7 @@ import {
   resumenDeLista,
 } from "@/lib/compras-proveedor/comprobante/pantalla";
 import { sePuedeBorrar, textoDeBorrado } from "@/lib/compras-proveedor/comprobante/borrado";
+import { queHacerHttp, SIN_RESPUESTA } from "@/lib/compras-proveedor/comprobante/subida";
 
 const TONOS = {
   ok: "sunmi-text-success",
