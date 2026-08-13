@@ -212,6 +212,7 @@ if (TEMA) {
 if (USUARIO && CLAVE) {
   await prepararSesion({
     navegar, evaluar, base: BASE, usuario: USUARIO, clave: CLAVE,
+    ubicacion: arg("ubicacion", null),
     log: (m) => console.log(m),
   });
 }

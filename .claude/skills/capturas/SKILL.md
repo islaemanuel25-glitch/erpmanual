@@ -257,6 +257,27 @@ que había cuando arrancó**. Un `npm run build` posterior deja al server con un
 manifiesto viejo y el navegador informa `Failed to load chunk`, con la pantalla
 en blanco. Se reinicia el server, no se persigue el síntoma.
 
+## El contraste WCAG es MAL JUEZ en el extremo oscuro
+
+Sirve para **comparar un antes contra un después**. No sirve para decidir si algo
+se ve.
+
+El motivo es la fórmula: `(L1 + 0,05) / (L2 + 0,05)`. Ese `+0,05` domina cuando
+las dos luminancias son chiquitas, así que **abajo de todo aplasta las
+diferencias** y devuelve números pegados a 1 aunque el ojo separe las dos cosas
+sin esfuerzo.
+
+El caso, medido el 2026-08-13: la tarjeta de un modal en `sunmiDark` es
+`rgb(15,23,42)`, luminancia 0,0110. Contra el velo nuevo el contraste da **1,13**,
+que leído como un número de accesibilidad suena a "no se distingue". En la
+captura la tarjeta se despega a simple vista. Y el techo de ese tema es **1,22**
+—el que daría un velo NEGRO PURO—, así que ningún velo iba a dar un número
+"bueno": lo que hay que mover ahí es la tarjeta, no el velo.
+
+En la práctica: informar el contraste como **delta entre dos versiones** —"pasó
+de 1,00 a 1,13"— y no como veredicto. Si hace falta el veredicto, se mira la
+captura y se dice que se miró.
+
 ## Qué mide la huella y qué no
 
 Mide **estructura en reposo**: columnas, alineaciones, padding, fondo efectivo

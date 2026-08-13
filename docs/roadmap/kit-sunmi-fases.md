@@ -727,6 +727,52 @@ estos se mire con la atención que se miró la del carrito.
    en este punto y **eso no autoriza el quinto**: se mide antes de tocar, con el
    arnés, como se hizo con categorías.
 
+**El punto 1 cambió con el arreglo del velo, y para bien.** Ya no es "de negro al
+50 % al fondo de la app al 78 %": ahora el velo del kit lleva el fondo del tema
+al 70 % hacia el negro. Medido contra lo que estos siete tienen hoy, **la tarjeta
+se va a despegar MÁS que ahora**: en los temas claros el contraste pasa de ~4,3 a
+~7,1, y en los oscuros de ~1,10 a ~1,13. Es la única diferencia declarada que
+mejora en lugar de solo cambiar.
+
+#### AL IR A SACAR LAS CAPTURAS, EL GRUPO SE CAYÓ A SEIS Y SE TRABÓ
+
+**`ModalCliente` de `pos-ventas` NO LO RENDERIZA NADIE.** Cero importadores en
+todo el repo, buscado con `git grep` sobre `app`, `components`, `lib` y `hooks`,
+y también por importación dinámica. La página de clientes tiene su PROPIO
+`ModalCliente` definido adentro del archivo —otra función, con otros props— y es
+esa la que se usa.
+
+Migrar un componente que ninguna pantalla dibuja **no se puede verificar**: la
+prueba de la fase es que la pantalla de donde salió quede idéntica, y acá no hay
+pantalla. Sale del grupo. Qué hacer con él —borrarlo o dejarlo— es una decisión
+aparte y no de esta fase.
+
+Y arrastra un segundo hallazgo: **`lib/ventas-internas/avisoVentaInterna.test.mjs`
+lo trata como "consumidor existente"** y le afirma cosas —que consume
+`clientes/buscar`, que no renderiza el aviso—. Son candados sobre un archivo que
+no corre en ninguna pantalla. Es la misma familia que "un candado puede estar
+mirando el lugar equivocado", con otra cara: acá mira un lugar que no ocurre.
+
+**Los otros seis están detrás de un POS bloqueado.** `/modulos/pos-ventas` no
+dibuja el punto de venta: dibuja **"Caja vencida — Tenés una caja abierta de un
+día anterior. Cerrala antes de seguir vendiendo."** Y no es de una ubicación:
+`depo` tiene una caja abierta del 30/07/2026 y `mini el 7` una del 04/08/2026.
+Comprobado en las dos, con `--ubicacion`.
+
+Destrabarlo es **cerrar una caja**, que es una acción de negocio real sobre datos
+de Emanuel y cambia el estado del que dependen otras capturas. No se hizo.
+
+Las salidas posibles, que las decide Emanuel:
+
+1. **Cerrar una caja desde la interfaz** —acción real de la aplicación, permitida
+   por la regla— y sacar las capturas del POS de verdad. Es lo único que prueba
+   que la pantalla queda idéntica.
+2. **Montar los seis en un andamio**, como se hizo con `CarritoPedido`. Compara
+   el componente contra sí mismo, pero **no prueba la pantalla**, que es
+   justamente el control que vale.
+3. **Cambiar de grupo** y dejar los del POS para cuando haya una caja abierta del
+   día.
+
 ### LA MIGRACIÓN DEL CARRITO SE ESCRIBIÓ, SE MIDIÓ Y SE REVIRTIÓ
 
 **2026-08-13.** Se escribió entera —los dos caminos, con `encabezado="ninguno"`—
@@ -917,6 +963,28 @@ un cambio de aspecto deja una comparación que no prueba ninguno de los dos.
 El análisis ya está hecho y no hace falta rehacerlo: son esas tres líneas.
 
 ### Para la fase 4
+
+**LOS CINCO TEMAS OSCUROS LLEGAN A LA FASE 4 CON SU NÚMERO MEDIDO.** El velo se
+arregló y la tarjeta volvió a despegarse en los catorce temas, pero en los
+oscuros el margen quedó chico y **el techo es aritmético, no de esfuerzo**: con
+un velo negro puro `sunmiDark` daría 1,22, así que subirlo pide mover
+`theme.card`. Eso es la misma deuda de la superficie —las 18 capas con superficie
+propia y las 117 del padding— y por eso llega acá y no se resolvió en la fase 2.
+
+Los cinco, tarjeta contra velo, con el velo nuevo:
+
+- `sunmiBlueClassic`: 1,37 — tarjeta `rgb(16,42,77)`
+- `sunmiGraphite`: 1,17 — tarjeta `rgb(22,27,34)`
+- `operixNight`: 1,17 — tarjeta `rgb(15,27,45)`
+- `sunmiDark`: 1,13 — tarjeta `rgb(15,23,42)`
+- `sunmiDarkCompact`: 1,13 — tarjeta `rgb(14,22,40)`
+
+Los nueve claros, para comparar, están entre 6,99 y 7,22.
+
+**La palanca es la luminancia de la tarjeta.** `sunmiBlueClassic` es el más
+claro de los cinco y también el que mejor da: no es casualidad, es la misma
+variable. Aclarar `theme.card` en los oscuros sube este número sin tocar el velo.
+La decisión llega con estos datos y no hay que volver a medir.
 
 **Cinco `className` a `SunmiTable`.** El componente los ignora **a propósito** y
 está escrito en su encabezado: implementarlo cambiaría el aspecto de esas

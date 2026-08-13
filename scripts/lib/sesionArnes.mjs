@@ -54,8 +54,14 @@ export async function iniciarSesion({ navegar, evaluar, base, usuario, clave, lo
  * Sin esto un admin sin local fijo entra SIN CONTEXTO y el ERP lo desvía a
  * `/inicio`: la pantalla que se quería medir no se llega a dibujar nunca y la
  * foto sale de otro lado.
+ *
+ * `ubicacion` elige un local POR NOMBRE en vez del depósito. Existe porque hay
+ * pantallas que solo viven en un local —el POS— y su estado depende de ESE
+ * local: el del depósito puede estar bloqueado por una caja vencida y el otro
+ * no. Sin esto la única salida era escribir en la base para destrabarlo, que es
+ * justo lo que no se hace.
  */
-export async function fijarContexto({ evaluar, log }) {
+export async function fijarContexto({ evaluar, log, ubicacion = null }) {
   const contexto = await evaluar(
     `(async () => {
        const j = (r) => r.json();
@@ -71,7 +77,19 @@ export async function fijarContexto({ evaluar, log }) {
        const items = locales?.items || [];
        // /api/locales/listar devuelve esDeposito (camelCase); toleramos ambas grafías.
        const esDep = (l) => l.esDeposito === true || l.es_deposito === true;
-       const elegido = items.find(esDep) || items[0];
+       const pedido = ${JSON.stringify(ubicacion)};
+       const porNombre = pedido
+         ? items.find((l) => String(l.nombre).toLowerCase() === String(pedido).toLowerCase())
+         : null;
+       // Si se pidió una ubicación por nombre y no está, se FALLA nombrándola.
+       // Caer al depósito en silencio mediría otra pantalla y la foto saldría
+       // igual de convincente.
+       if (pedido && !porNombre)
+         return JSON.stringify({
+           error: "no existe la ubicación " + pedido,
+           disponibles: items.map((l) => l.nombre),
+         });
+       const elegido = porNombre || items.find(esDep) || items[0];
        if (!elegido) return JSON.stringify({ error: "sin locales" });
        const r = await fetch("/api/contexto-activo/set", {
          method: "POST", headers: { "Content-Type": "application/json" },
@@ -98,11 +116,13 @@ export async function fijarContexto({ evaluar, log }) {
 }
 
 /** Los tres pasos en orden, que es como los usan los dos arneses. */
-export async function prepararSesion({ navegar, evaluar, base, usuario, clave, log }) {
+export async function prepararSesion({
+  navegar, evaluar, base, usuario, clave, log, ubicacion = null,
+}) {
   if (await sesionVigente({ navegar, evaluar, base })) {
     log?.("  sesión del perfil todavía vigente: no se repite el login");
   } else {
     await iniciarSesion({ navegar, evaluar, base, usuario, clave, log });
   }
-  return fijarContexto({ evaluar, log });
+  return fijarContexto({ evaluar, log, ubicacion });
 }
