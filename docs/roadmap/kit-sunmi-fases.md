@@ -696,9 +696,15 @@ estos se mire con la atención que se miró la del carrito.
 
 #### La lista declarada, escrita por lo que se va a ver
 
-1. **El velo cambia de tono.** Hoy es negro al 50 %; pasa a ser el fondo de la
-   app al 78 %. En un tema oscuro se van a parecer; en uno claro hoy oscurece y
-   con el kit aclara.
+1. **La ventana se va a DESPEGAR MÁS del fondo, no solo cambiar de tono.**
+   Reescrito después de arreglar el velo, porque la diferencia dejó de ser
+   neutral. Hoy estos seis usan `sunmi-overlay`, negro al 50 %. El velo del kit
+   lleva el fondo del tema al 70 % hacia el negro, y medido eso da **más**
+   separación entre la tarjeta y el velo, no menos: en los temas claros pasa de
+   ~4,3 a ~7,1, y en los oscuros de ~1,10 a ~1,13. Lo de atrás además queda más
+   apagado. **Es el único punto de esta lista que mejora en vez de solo
+   cambiar**, y conviene mirarlo con esa expectativa: si en la comparación la
+   ventana NO se despega más, algo salió mal.
 2. **El modal se ensancha 7 px.** El padding de la capa pasa de `p-4` a `p-3`,
    14 → 10,5 px, 3,5 de cada lado. En un monitor no se nota; en la pantalla
    angosta de la caja, sí.
@@ -794,6 +800,17 @@ Comprobado en las dos, con `--ubicacion`.
 
 Destrabarlo es **cerrar una caja**, que es una acción de negocio real sobre datos
 de Emanuel y cambia el estado del que dependen otras capturas. No se hizo.
+
+**Y la base que sirve el 3111 NO es `erpazul_al`, es `erpazul_dev`.** Apareció al
+ir a sacar la copia de seguridad: el `DATABASE_URL` del `.env` apunta a
+`erpazul_dev`. El skill `/capturas` dice "base `erpazul_al`", así que una de las
+dos cosas está desactualizada y conviene saber cuál antes de comparar contra la
+línea de base de huellas —los conteos de filas de `tests/huellas/baseline` se
+tomaron sobre otra base—.
+
+Las comparaciones de esta fase NO se caen por esto: el antes y el después se
+sacaron los dos contra la misma base, que es la condición que hace que la resta
+valga. Lo que no sirve es cruzarlas contra el baseline viejo.
 
 Las salidas posibles, que las decide Emanuel:
 
