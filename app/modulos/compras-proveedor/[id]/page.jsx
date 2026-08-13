@@ -679,7 +679,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               ]}
             >
               {(pedido.detalles || []).length === 0 ? (
-                <SunmiTableEmpty label="Sin items" />
+                <SunmiTableEmpty message="Sin items" />
               ) : (
                 pedido.detalles.map((det) => {
                   const base = det.producto?.base;
