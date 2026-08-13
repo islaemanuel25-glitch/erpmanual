@@ -288,6 +288,46 @@ if (salud.error || salud.largo < 10) {
   );
 }
 
+// ── ¿ENTRA ENTERO LO QUE SE ESTÁ FOTOGRAFIANDO? ────────────────────────────
+//
+// Tercera vez de la misma familia: la comprobación preguntaba por lo que rodea y
+// no por lo que se quiere probar. Primero fue "las tres fotos son iguales"
+// —cierto, y eran de una página de error—. Después "la página se dibujó"
+// —cierto, y el modal salía cortado por arriba—.
+//
+// Un modal más alto que el viewport lo centra la capa, así que sobresale por
+// ARRIBA tanto como por abajo, y la parte de arriba —el encabezado, que es donde
+// suelen estar las diferencias que se comparan— queda fuera de la foto. La
+// captura sale reproducible y de medio modal.
+//
+// La regla: nada pintado puede quedar por encima de y=0, y con recorte pedido,
+// nada por debajo del recorte. Lo de arriba NO se puede recuperar scrolleando
+// —la capa es `fixed`—, así que es siempre un error del arnés, no del que mira.
+const encaje = await evaluar(`(() => {
+  let arriba = 0, abajo = 0;
+  for (const el of document.querySelectorAll("body *")) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
+    if (r.top < arriba) arriba = r.top;
+    if (r.bottom > abajo) abajo = r.bottom;
+  }
+  return { arriba: Math.round(arriba), abajo: Math.round(abajo) };
+})()`);
+
+const recorteAlto = ALTO_CAPTURA > 0 ? Math.min(ALTO_CAPTURA, alto) : alto;
+const faltaArriba = encaje.arriba < -1 ? Math.abs(encaje.arriba) : 0;
+const faltaAbajo = encaje.abajo > recorteAlto + 1 ? encaje.abajo - recorteAlto : 0;
+if (faltaArriba || faltaAbajo) {
+  console.log("NO ENTRA ENTERO EN LA FOTO. La captura NO prueba nada.");
+  if (faltaArriba) {
+    console.log(`  se corta ${faltaArriba}px POR ARRIBA — eso no se recupera scrolleando:`);
+    console.log(`  subí el viewport: --alto ${Math.ceil((alto + faltaArriba * 2) / 100) * 100}`);
+  }
+  if (faltaAbajo) console.log(`  se corta ${faltaAbajo}px por abajo — subí --alto-captura`);
+}
+
 // UNA TOMA QUE SE DESCARTA, SIEMPRE.
 //
 // La primera foto después de forzar el recorte y apagar las transiciones no es
@@ -325,7 +365,7 @@ console.log(`\nCaptura: ${archivo}${ALTO_CAPTURA > 0 ? ` (banda fija de ${Math.m
 let apto = null;
 if (REPETICIONES > 1) {
   apto = fotos.every((f) => f === fotos[0]);
-  const sana = !salud.error && salud.largo >= 10;
+  const sana = !salud.error && salud.largo >= 10 && !faltaArriba && !faltaAbajo;
   console.log(
     !apto
       ? `ARNÉS CON RUIDO: ${REPETICIONES} corridas NO dieron idénticas. Esta captura NO prueba nada.`
@@ -334,7 +374,7 @@ if (REPETICIONES > 1) {
         // Una página de error es perfectamente determinista. Decir las dos cosas
         // seguidas —"no prueba nada" y "sirve como prueba"— es peor que no decir
         // ninguna: el que lee se queda con la que le conviene.
-        : `ARNÉS DETERMINISTA, pero la página no se dibujó: sigue sin probar nada.`
+        : `ARNÉS DETERMINISTA, pero la foto no muestra lo que dice: sigue sin probar nada.`
   );
   // Con ruido se guardan TODAS, que es lo único que deja encontrar la causa.
   // Sin esto queda "da distinto" y nada más, que no alcanza para arreglarlo.
@@ -348,4 +388,4 @@ if (REPETICIONES > 1) {
 }
 
 cerrar();
-process.exit(medida.desbordan.length || apto === false || salud.error || salud.largo < 10 ? 1 : 0);
+process.exit(medida.desbordan.length || apto === false || salud.error || salud.largo < 10 || faltaArriba || faltaAbajo ? 1 : 0);
