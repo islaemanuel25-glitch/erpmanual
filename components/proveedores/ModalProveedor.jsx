@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -94,38 +93,34 @@ export default function ModalProveedor({
   ];
 
   return (
-    <div
-      className="
-        fixed inset-0 z-[9999]
-        bg-black/60 backdrop-blur-sm
-        flex items-center justify-center
-        p-3
-      "
+    <SunmiModalLayout
+      open
+      title={editMode ? "Editar proveedor" : "Nuevo proveedor"}
+      // Conserva su cinta de título: el kit por defecto dibuja texto normal.
+      encabezado="cinta"
+      onClose={onClose}
+      // La referencia manda el scroll arriba cuando el modal se reabre. Sin
+      // ella, abrirlo para editar otro proveedor lo deja donde quedó el anterior.
+      refCuerpo={modalRef}
+      // El espaciado del cuerpo queda como estaba: el `space-y-4` separa todos
+      // los campos del formulario y no es del kit ponerlo.
+      espacioCuerpo="px-2 pb-4 mt-2 space-y-4"
+      // El pie tenía `pt-2`, no el `mt-3` del kit. Es espaciado interior y se
+      // conserva: si no, el par de botones se separaría del formulario.
+      espacioPie="pt-2"
+      footer={
+        <>
+          <SunmiButton color="slate" onClick={onClose}>
+            Cancelar
+          </SunmiButton>
+
+          <SunmiButton onClick={handleSubmitInternal}>
+            {editMode ? "Guardar cambios" : "Crear proveedor"}
+          </SunmiButton>
+        </>
+      }
     >
-      <div className="w-[95%] max-w-xl rounded-2xl overflow-hidden">
-        <SunmiCard>
-          {/* HEADER */}
-          <div className="flex items-center justify-between">
-            <SunmiHeader
-              title={editMode ? "Editar proveedor" : "Nuevo proveedor"}
-             
-            />
-
-            <SunmiButton color="slate" onClick={onClose}>
-              Cerrar
-            </SunmiButton>
-          </div>
-
-          {/* CONTENIDO */}
-          <div
-            ref={modalRef}
-            className="
-              max-h-[65vh]
-              overflow-y-auto 
-              px-2 pb-4 mt-2 
-              space-y-4
-            "
-          >
+      <>
             <SunmiSeparator label="Datos" />
 
             {/* Nombre */}
@@ -197,21 +192,8 @@ export default function ModalProveedor({
                 onChange={(v) => setField("activo", v)}
               />
             </Field>
-          </div>
-
-          {/* FOOTER */}
-          <div className="flex justify-end gap-2 pt-2">
-            <SunmiButton color="slate" onClick={onClose}>
-              Cancelar
-            </SunmiButton>
-
-            <SunmiButton onClick={handleSubmitInternal}>
-              {editMode ? "Guardar cambios" : "Crear proveedor"}
-            </SunmiButton>
-          </div>
-        </SunmiCard>
-      </div>
-    </div>
+      </>
+    </SunmiModalLayout>
   );
 }
 
