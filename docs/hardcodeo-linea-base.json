@@ -1,12 +1,13 @@
 {
   "_lea_esto": "Línea de base del hardcodeo. La genera scripts/hardcodeo.mjs --linea-base. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
-  "generada": "2026-08-12 22:23",
-  "commit": "fa5ee55cb2457d7efd349abf22432b2d7674977e",
+  "generada": "2026-08-13 00:01",
+  "commit": "24f977049a8f41c81e28318dbb19a330e1e648da",
   "total": {
     "color": 297,
     "medida": 1852,
     "modal": 54,
     "crudo": 324,
+    "celda": 479,
     "kit-pisado": 3,
     "tema-paralelo": 129
   },
@@ -16,6 +17,7 @@
       "medida": 30,
       "modal": 1,
       "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -24,6 +26,7 @@
       "medida": 10,
       "modal": 0,
       "crudo": 2,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -32,6 +35,7 @@
       "medida": 3,
       "modal": 0,
       "crudo": 0,
+      "celda": 8,
       "kit-pisado": 0,
       "tema-paralelo": 1
     },
@@ -40,6 +44,7 @@
       "medida": 187,
       "modal": 0,
       "crudo": 13,
+      "celda": 61,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -48,6 +53,7 @@
       "medida": 0,
       "modal": 0,
       "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -56,6 +62,7 @@
       "medida": 59,
       "modal": 2,
       "crudo": 9,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -64,6 +71,7 @@
       "medida": 2,
       "modal": 1,
       "crudo": 0,
+      "celda": 3,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -72,6 +80,7 @@
       "medida": 64,
       "modal": 4,
       "crudo": 33,
+      "celda": 54,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -80,6 +89,7 @@
       "medida": 2,
       "modal": 0,
       "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -88,6 +98,7 @@
       "medida": 188,
       "modal": 6,
       "crudo": 21,
+      "celda": 40,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -96,6 +107,7 @@
       "medida": 0,
       "modal": 0,
       "crudo": 0,
+      "celda": 7,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -104,6 +116,7 @@
       "medida": 18,
       "modal": 1,
       "crudo": 1,
+      "celda": 6,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -112,6 +125,7 @@
       "medida": 23,
       "modal": 1,
       "crudo": 5,
+      "celda": 4,
       "kit-pisado": 0,
       "tema-paralelo": 2
     },
@@ -120,6 +134,7 @@
       "medida": 14,
       "modal": 0,
       "crudo": 3,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -128,6 +143,7 @@
       "medida": 21,
       "modal": 1,
       "crudo": 4,
+      "celda": 6,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -136,6 +152,7 @@
       "medida": 3,
       "modal": 0,
       "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -144,6 +161,7 @@
       "medida": 27,
       "modal": 2,
       "crudo": 5,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -152,6 +170,7 @@
       "medida": 20,
       "modal": 2,
       "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -160,6 +179,7 @@
       "medida": 3,
       "modal": 1,
       "crudo": 0,
+      "celda": 7,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -168,6 +188,7 @@
       "medida": 21,
       "modal": 1,
       "crudo": 9,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -176,6 +197,7 @@
       "medida": 10,
       "modal": 1,
       "crudo": 3,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -184,6 +206,7 @@
       "medida": 4,
       "modal": 1,
       "crudo": 1,
+      "celda": 4,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -192,6 +215,7 @@
       "medida": 68,
       "modal": 0,
       "crudo": 16,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 1
     },
@@ -200,6 +224,7 @@
       "medida": 119,
       "modal": 0,
       "crudo": 29,
+      "celda": 15,
       "kit-pisado": 3,
       "tema-paralelo": 1
     },
@@ -208,6 +233,7 @@
       "medida": 140,
       "modal": 18,
       "crudo": 65,
+      "celda": 16,
       "kit-pisado": 0,
       "tema-paralelo": 119
     },
@@ -216,6 +242,7 @@
       "medida": 192,
       "modal": 2,
       "crudo": 30,
+      "celda": 95,
       "kit-pisado": 0,
       "tema-paralelo": 5
     },
@@ -224,6 +251,7 @@
       "medida": 309,
       "modal": 2,
       "crudo": 35,
+      "celda": 39,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -232,6 +260,7 @@
       "medida": 4,
       "modal": 0,
       "crudo": 0,
+      "celda": 12,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -240,6 +269,7 @@
       "medida": 142,
       "modal": 0,
       "crudo": 12,
+      "celda": 34,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -248,6 +278,7 @@
       "medida": 0,
       "modal": 1,
       "crudo": 0,
+      "celda": 3,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -256,6 +287,7 @@
       "medida": 3,
       "modal": 2,
       "crudo": 3,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -264,6 +296,7 @@
       "medida": 33,
       "modal": 2,
       "crudo": 14,
+      "celda": 10,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -272,6 +305,7 @@
       "medida": 67,
       "modal": 0,
       "crudo": 7,
+      "celda": 29,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -280,6 +314,7 @@
       "medida": 60,
       "modal": 1,
       "crudo": 4,
+      "celda": 19,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -288,6 +323,7 @@
       "medida": 5,
       "modal": 1,
       "crudo": 0,
+      "celda": 7,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -296,6 +332,7 @@
       "medida": 0,
       "modal": 0,
       "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -304,6 +341,7 @@
       "medida": 1,
       "modal": 0,
       "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     }

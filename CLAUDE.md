@@ -47,6 +47,22 @@ que dan cero.** Si la captura tiene ruido, cualquier diagnóstico es inventado �
 se estaría explicando una diferencia que el cambio no produjo. Acá dieron cero, y
 recién por eso los 44 píxeles se pudieron atribuir.
 
+**EL CÓDIGO NO SE ESCRIBE POR SHELL.** Ni `sed`, ni `>`, ni heredoc, ni
+`node -e` que escriba archivos. Se escribe con el editor, siempre. Son dos
+motivos y el segundo es peor que el primero.
+
+*El primero:* el shell se come las barras invertidas. Escribir `/\s+/` desde
+Bash dejó `/s+/` —que borra las eses de los nombres de clase— y la pantalla se
+movió 20.362 píxeles. Peor todavía: eso llevó a informar que el cambio de la
+alineación movía la pantalla, cuando lo que la movía era el destrozo. Un
+diagnóstico falso sobre una medición correcta. Ya pasó tres veces con backticks,
+con `${}` y con `\n`.
+
+*El segundo, que es el que importa:* **un cambio escrito desde Bash no lo ve el
+hook del trinquete**, que intercepta `Edit` y `Write`. Por ese camino entra
+hardcodeo sin que nadie lo cuente, que es exactamente lo que el trinquete existe
+para impedir.
+
 Corolario de cómo nace una pieza: **negocia el `className`, no lo concatena.**
 Dos clases de Tailwind de la misma familia tienen la misma especificidad, así que
 no decide el orden dentro del atributo sino el de la hoja de estilos — poner las
