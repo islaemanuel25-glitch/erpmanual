@@ -45,15 +45,42 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import { declaraAncho } from "@/lib/sunmi/claseAncho";
 import { declaraAnchoMaximo } from "@/lib/sunmi/claseNegociada";
 
-/** Dónde se para el panel, por forma. La capa y el panel se deciden juntos. */
+/**
+ * Dónde se para el panel, por forma. La capa y el panel se deciden juntos.
+ *
+ * ── EL REDONDEO LO DERIVA LA FORMA, Y NO ES UNA PREFERENCIA DE PANTALLA ────
+ *
+ * Una hoja pegada al borde de abajo con las esquinas de abajo redondeadas se ve
+ * ROTA: quedan dos medialunas de fondo entre la tarjeta y el borde de la
+ * pantalla. Eso no es gusto, es parte de lo que la forma significa.
+ *
+ * Por eso lo pone la forma y no la pantalla. Si se dejara declarar, la próxima
+ * que use `hoja` y se olvide nace mal, y nadie lo va a ver hasta que alguien
+ * abra esa pantalla en un teléfono.
+ *
+ * El `!` no es decoración: `SunmiCard` CONCATENA su `rounded-xl` en vez de
+ * negociarlo, así que sin `!important` gana la que Tailwind haya escrito última
+ * en la hoja de estilos. Está anotado como deuda en el roadmap; el día que la
+ * tarjeta negocie, estos `!` se sacan.
+ */
 const FORMAS = {
   centrado: { capa: "flex items-center justify-center p-3", panel: "", tarjeta: "" },
-  hoja: { capa: "flex flex-col justify-end", panel: "", tarjeta: "" },
+  // Pegada abajo: se redondea arriba y queda recta abajo.
+  hoja: { capa: "flex flex-col justify-end", panel: "", tarjeta: "!rounded-t-2xl !rounded-b-none" },
   // El cajón ocupa el alto entero: si la tarjeta quedara del alto de su
   // contenido, el panel se vería pegado arriba y no como un cajón. Se midió
   // dibujándolo — sin esto la tarjeta terminaba a los 105 píxeles.
+  //
+  // Su redondeo NO se deriva todavía: ninguna pantalla lo usa, y adivinar de qué
+  // lado se redondea un cajón es exactamente lo que este kit no hace. Se decide
+  // cuando migre CarritoPedido, que es de donde salió la forma.
   cajon: { capa: "flex justify-end", panel: "h-full", tarjeta: "h-full flex flex-col" },
-  "hoja-o-centrado": { capa: "flex items-end sm:items-center justify-center", panel: "", tarjeta: "" },
+  // Hoja en el teléfono, centrada de `sm` para arriba: el redondeo acompaña.
+  "hoja-o-centrado": {
+    capa: "flex items-end sm:items-center justify-center",
+    panel: "",
+    tarjeta: "!rounded-t-2xl !rounded-b-none sm:!rounded-t-xl sm:!rounded-b-xl",
+  },
 };
 
 export default function SunmiModalLayout({
@@ -137,6 +164,37 @@ export default function SunmiModalLayout({
    */
   espacioCuerpo = "mt-2 gap-3",
   espacioPie = "mt-3",
+  /**
+   * El ALTO del cuerpo. Estaba decidido en el roadmap desde el principio y sin
+   * escribir, esperando a la primera pantalla que lo necesitara: hoy conviven
+   * 65, 70, 80, 90 y 92vh en el repo. La primera fue `ModalCambioPrevio`, con su
+   * 92vh.
+   */
+  altoCuerpo = "max-h-[65vh]",
+  /**
+   * El PADDING y la SOMBRA de la tarjeta, por props explícitas.
+   *
+   * ── POR QUÉ ASÍ Y NO HACIENDO NEGOCIABLE A `SunmiCard` ────────────────────
+   *
+   * Lo primero que se pensó fue que la tarjeta negociara su `className`, como ya
+   * lo hace el panel. Contado antes de escribirlo: `SunmiCard` tiene 246 usos,
+   * 151 con `className`, y **109 declaran un padding**. Hoy todas dibujan 21px
+   * igual, porque el `p-6` de la pieza le gana a lo que escribieron. Con la
+   * negociación, esas 109 pasarían a recibir el padding que declararon —treinta
+   * de ellas escribieron `p-3`— y eso es cambiar el aspecto de media aplicación
+   * por una pantalla.
+   *
+   * Así que no. Dos props, con el default del kit, y las usa quien las necesita.
+   * Hoy es una sola.
+   *
+   * **Tienen que venir con `!`**, por lo mismo que el redondeo: `SunmiCard`
+   * concatena en vez de negociar. Hay un candado que lo exige, para que no entre
+   * una sin `!` que parezca aplicarse y no se aplique — que es el defecto que
+   * este kit ya se comió una vez, con el `p-0 overflow-hidden` de tres modales
+   * que nunca hizo nada.
+   */
+  paddingTarjeta = "",
+  sombraTarjeta = "",
   /**
    * Una referencia al div del CUERPO.
    *
@@ -231,7 +289,7 @@ export default function SunmiModalLayout({
       )}
 
       <div className={clasesDelPanel}>
-        <SunmiCard className={f.tarjeta}>
+        <SunmiCard className={[f.tarjeta, paddingTarjeta, sombraTarjeta].filter(Boolean).join(" ")}>
           <div className="flex items-start justify-between gap-2">
             {encabezado === "cinta" ? (
               <SunmiHeader title={title} color={color} />
@@ -258,7 +316,7 @@ export default function SunmiModalLayout({
 
           <div
             ref={refCuerpo}
-            className={`flex flex-col max-h-[65vh] overflow-y-auto ${espacioCuerpo}`.trim()}
+            className={`flex flex-col ${altoCuerpo} overflow-y-auto ${espacioCuerpo}`.trim()}
           >
             {children}
           </div>

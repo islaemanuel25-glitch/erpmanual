@@ -423,6 +423,31 @@ componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco
 
 ## Deuda anotada de esta fase
 
+- **`ModalProcesoPendiente` queda SIN MIGRAR y SIN VERIFICAR**, junto al de
+  `PanelComprobantes`. Solo se dibuja cuando hay un proceso de caja pendiente, y
+  en `erpazul_al` no hay ninguno: no se puede abrir ni medir. **No se fabricó la
+  fila y no se ejerció un retiro real**, porque dejar estado en la base que otras
+  capturas usan cuesta más que migrar a ciegas una pantalla, justo en la tanda
+  que existe para verificar una forma. Se retoma la próxima vez que haya un
+  proceso de verdad. Es de los ocho con `space-y-*` y su número sigue sin medir.
+
+- **104 tarjetas declararon un padding que nunca se aplicó**, y por eso hoy el
+  sistema es uniforme en 21 px **por accidente**. Contado: `SunmiCard` tiene 233
+  usos, 130 con `className`, y de esos **104 declaran padding** y **26 no**. Los
+  103 restantes no pasan `className`. Todas dibujan 21 px porque el `p-6` que
+  venía del comentario le gana a lo que escribieron.
+
+  **Esto NO entra por la puerta de atrás de una tanda técnica.** Se pensó hacer
+  negociable el `className` de la tarjeta —como ya lo hace el panel— y se
+  descartó al contarlo: las 104 pasarían a recibir el padding que declararon
+  —treinta escribieron `p-3`, o sea 10.5 px— y eso es cambiar el aspecto de media
+  aplicación por una pantalla. **Lo decide Emanuel al cierre de la fase**, junto
+  con los seis parámetros.
+
+  Y si algún día se unifica, **las 26 que traen `className` sin padding son las
+  que hay que mirar una por una**: son las que no declararon nada y por lo tanto
+  no dicen qué querían.
+
 - **El segundo "Cerrar" de `ModalPreviewPrecio` está SIN VERIFICAR**, con esas
   palabras. Al migrarlo quedaban dos botones con el mismo texto y se sacó el de
   abajo; había un tercero igual en la rama de "activá un local desde Inicio" y

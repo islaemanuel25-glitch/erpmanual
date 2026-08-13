@@ -140,7 +140,7 @@ test("el espaciado del cuerpo y del pie es parámetro, con el valor de siempre",
 test("EL `gap-3` NO ESTÁ CLAVADO en el cuerpo", () => {
   // Si volviera a estarlo, migrar la capa de una pantalla le separaría todos los
   // campos del formulario — que es exactamente lo que emparejar NO es.
-  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col max-h-"), SRC.indexOf("{children}"));
+  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col ${altoCuerpo}"), SRC.indexOf("{children}"));
   assert.doesNotMatch(cuerpo, /gap-3/, "el gap volvió a ser fijo");
   assert.doesNotMatch(cuerpo, /mt-2/, "el margen volvió a ser fijo");
   assert.match(cuerpo, /\$\{espacioCuerpo\}/);
@@ -152,17 +152,63 @@ test("EL CUERPO ACEPTA UNA REFERENCIA, y va en el div que scrollea", () => {
   // seguiría compilando y el scroll no volvería nunca: `scrollTop = 0` sobre algo
   // que no scrollea no hace nada y no avisa.
   const cuerpo = SRC.slice(SRC.indexOf("ref={refCuerpo}"), SRC.indexOf("{children}"));
-  assert.match(cuerpo, /max-h-\[65vh\]/, "la referencia no está en el div que scrollea");
-  assert.match(cuerpo, /overflow-y-auto/);
+  assert.match(cuerpo, /\$\{altoCuerpo\}/, "la referencia no está en el div que lleva el alto");
+  assert.match(cuerpo, /overflow-y-auto/, "la referencia no está en el div que scrollea");
 });
 
-test("lo que SÍ es del kit sigue clavado: el alto y el scroll", () => {
-  // El parámetro es del espaciado, no de la estructura. Si el alto o el scroll
-  // se volvieran negociables acá, la pieza dejaría de garantizar que un modal
-  // largo scrollea en vez de empujar la pantalla.
-  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col max-h-"), SRC.indexOf("{children}"));
-  assert.match(cuerpo, /max-h-\[65vh\]/);
-  assert.match(cuerpo, /overflow-y-auto/);
+test("el alto del cuerpo es parámetro, con el 65vh de siempre por default", () => {
+  // Estaba decidido en el roadmap y sin escribir, esperando a la primera
+  // pantalla que lo necesitara. El default no se toca: cambiarlo mueve los
+  // quince modales ya migrados.
+  assert.match(SRC, /altoCuerpo = "max-h-\[65vh\]"/, "cambió el default: eso mueve todos los migrados");
+  const cuerpo = SRC.slice(SRC.indexOf("flex flex-col ${altoCuerpo}"), SRC.indexOf("{children}"));
+  assert.match(cuerpo, /overflow-y-auto/, "el scroll sí sigue clavado: sin él un modal largo empuja la pantalla");
+});
+
+// ── EL REDONDEO LO DERIVA LA FORMA ─────────────────────────────────────────
+
+test("UNA HOJA SE REDONDEA ARRIBA Y QUEDA RECTA ABAJO", () => {
+  // Una hoja pegada al borde con las esquinas de abajo redondeadas deja dos
+  // medialunas de fondo y se ve rota. Es parte de lo que la forma significa, no
+  // una preferencia: si lo declarara la pantalla, la próxima que use `hoja` y se
+  // olvide nace mal.
+  const bloque = SRC.slice(SRC.indexOf("const FORMAS"), SRC.indexOf("export default"));
+  const forma = (nombre) => {
+    const i = bloque.indexOf(nombre);
+    return bloque.slice(i, bloque.indexOf("}", i));
+  };
+  for (const nombre of ["hoja:", '"hoja-o-centrado"']) {
+    const f = forma(nombre);
+    assert.match(f, /!rounded-t-2xl/, `${nombre} no redondea arriba`);
+    assert.match(f, /!rounded-b-none/, `${nombre} no queda recta abajo`);
+  }
+  // Y la que se centra de `sm` para arriba recupera las cuatro esquinas ahí.
+  assert.match(forma('"hoja-o-centrado"'), /sm:!rounded-t-xl sm:!rounded-b-xl/);
+  // La centrada no declara nada: se queda con el `rounded-xl` de la tarjeta.
+  assert.doesNotMatch(forma("centrado:"), /rounded/);
+});
+
+test("LO QUE LA TARJETA RECIBE VIENE CON `!`, PORQUE SunmiCard CONCATENA", () => {
+  // Sin `!important` gana la clase que Tailwind haya escrito última en la hoja
+  // de estilos, no la que alguien quiso. Es el defecto que ya se comió una vez:
+  // el `p-0 overflow-hidden` de tres modales nunca hizo nada y nadie lo sabía.
+  const bloque = SRC.slice(SRC.indexOf("const FORMAS"), SRC.indexOf("export default"));
+  for (const m of bloque.matchAll(/tarjeta:\s*"([^"]*)"/g)) {
+    for (const token of m[1].split(/\s+/).filter(Boolean)) {
+      if (/^(h-full|flex|flex-col)$/.test(token)) continue; // estructura, no pelea con nada
+      assert.match(token, /^[a-z0-9:]*!/, `la forma pasa "${token}" sin !: no le va a ganar a SunmiCard`);
+    }
+  }
+});
+
+test("el padding y la sombra de la tarjeta son props, con el default del kit", () => {
+  // La alternativa era hacer negociable el className de SunmiCard, y se descartó
+  // contando: 246 usos, 151 con className, 109 declaran padding. Todas dibujan
+  // 21px hoy porque el p-6 de la pieza les gana; negociar movería media
+  // aplicación por una pantalla.
+  assert.match(SRC, /paddingTarjeta = ""/);
+  assert.match(SRC, /sombraTarjeta = ""/);
+  assert.match(SRC, /\[f\.tarjeta, paddingTarjeta, sombraTarjeta\]/);
 });
 
 // ── ACCESIBILIDAD ──────────────────────────────────────────────────────────
