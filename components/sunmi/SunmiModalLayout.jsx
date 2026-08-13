@@ -40,6 +40,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { declaraAncho } from "@/lib/sunmi/claseAncho";
 import { declaraAnchoMaximo } from "@/lib/sunmi/claseNegociada";
@@ -133,6 +134,20 @@ export default function SunmiModalLayout({
    */
   refCuerpo,
   /**
+   * Qué encabezado dibuja: `"tarjeta"` —el de siempre— o `"cinta"`.
+   *
+   * ── QUÉ SE VE DISTINTO, QUE ES LO QUE IMPORTA ──────────────────────────
+   *
+   * No es "usar otro componente": es que el título deje de ser una CINTA ÁMBAR
+   * EN MAYÚSCULAS con borde y pase a ser texto blanco normal. Cinco modales del
+   * sistema tienen la cinta, y perderla de golpe es un cambio que nadie pidió.
+   *
+   * Sexta cosa de la misma familia —el alto, el apilado, el padding de la
+   * tarjeta, el espaciado, la referencia y esto— y se resuelve igual: parámetro,
+   * con el del kit por defecto, y anotado en el registro quién declara qué.
+   */
+  encabezado = "tarjeta",
+  /**
    * Clases del panel. NEGOCIA, no concatena: si acá viene un ancho o un ancho
    * máximo, la pieza retira el suyo. Dos clases de la misma familia tienen la
    * misma especificidad y ganaría la que Tailwind haya puesto última en la hoja
@@ -195,11 +210,15 @@ export default function SunmiModalLayout({
       <div className={clasesDelPanel}>
         <SunmiCard className={f.tarjeta}>
           <div className="flex items-start justify-between gap-2">
-            <SunmiCardHeader
-              title={title}
-              subtitle={subtitle}
-              color={color}
-            />
+            {encabezado === "cinta" ? (
+              <SunmiHeader title={title} color={color} />
+            ) : (
+              <SunmiCardHeader
+                title={title}
+                subtitle={subtitle}
+                color={color}
+              />
+            )}
 
             {showCloseButton && onClose && (
               <SunmiButton

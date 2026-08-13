@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import useAccionesEnvioPedido from "@/hooks/useAccionesEnvioPedido";
 
@@ -55,15 +54,19 @@ export default function ModalEnviarPedido({ pedido, onClose, onEnviado }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-3">
-      <SunmiCard className="w-[95%] max-w-md">
-        <div className="flex items-center justify-between mb-3">
-          <SunmiHeader title={`Enviar pedido #${pedido?.id}`} />
-          <SunmiButton color="slate" type="button" onClick={onClose} disabled={enviando}>
-            Cerrar
-          </SunmiButton>
-        </div>
-
+    <SunmiModalLayout
+      open
+      title={`Enviar pedido #${pedido?.id}`}
+      // Conserva su cinta de título: el kit por defecto dibuja texto normal.
+      encabezado="cinta"
+      onClose={onClose}
+      maxWidth="max-w-md"
+      // El cuerpo de este modal es contenido suelto con sus propios márgenes: no
+      // tiene scroll propio ni separación entre bloques que el kit deba poner.
+      espacioCuerpo=""
+      espacioPie=""
+    >
+      <>
         <p className="text-xs sunmi-text-muted mb-4">
           Compartí el pedido con el proveedor. Cuando lo hayas enviado, marcalo como
           enviado para pasarlo a Recibir mercadería.
@@ -96,7 +99,7 @@ export default function ModalEnviarPedido({ pedido, onClose, onEnviado }) {
         <p className="text-[11px] sunmi-text-muted mt-2 text-center">
           Usá esta opción después de haber enviado el PDF o texto al proveedor.
         </p>
-      </SunmiCard>
-    </div>
+      </>
+    </SunmiModalLayout>
   );
 }
