@@ -321,6 +321,46 @@ es `center` y la tarjeta queda a 448x673 centrada; a 360 es `flex-end`, la
 tarjeta mide 360x589 pegada al borde de abajo —**la misma caja exacta que antes
 de migrar**— con 14 px de radio arriba y 0 abajo.
 
+### El redondeo del `cajon`, CONTESTADO Y MEDIDO: no se redondea de ningún lado
+
+Se había dejado pendiente a propósito, para no adivinar de qué lado se redondea
+un cajón que ninguna pantalla usaba. La respuesta salió de mirar la pantalla de
+origen, no de razonar qué queda bien.
+
+`CarritoPedido` en modo cajón dibuja
+`relative sunmi-surface h-full w-full max-w-[420px] border-l sunmi-divider p-4
+shadow-[-2px_0_24px_rgba(0,0,0,0.35)] overflow-y-auto`: **ninguna clase
+`rounded-*`**. Es un panel de alto completo pegado al borde derecho, con un borde
+a la izquierda. Confirmado en la captura: 420x900 en x=946 a 1366 de ancho, o sea
+tocando el borde.
+
+O sea que la forma `cajon` no declara redondeo, y eso ahora es un hecho medido y
+no una omisión.
+
+**Y el archivo tiene TRES caminos, no dos.** Además de la hoja y el cajón hay un
+tercero —`variant="aside"`, el default— que **no es un modal**: dibuja una
+tarjeta en línea con `rounded-2xl ring-2 ring-inset`. Ese no se toca.
+
+**No tiene `space-y-*`.** El punto fijo no corresponde, comprobado.
+
+### El andamio para fotografiar un componente aislado
+
+La pantalla de pedido nuevo arranca sin proveedor y sin carrito, así que para que
+el modal exista habría que elegir proveedor y agregar productos. `CarritoPedido`
+es un componente con props, así que se monta solo: una ruta descartable que lo
+dibuja con un carrito de mentira. **No toca la base.**
+
+Dos cosas que costaron una corrida cada una y conviene saber antes:
+
+- **Una carpeta que empieza con `_` NO crea ruta en Next**: es una carpeta
+  privada. `app/_andamio-carrito` daba 404. Va sin guion bajo.
+- **La forma de los datos se saca de leer al consumidor.** Los campos son los que
+  el componente lee y los props son los del objeto `resumenProps` de la pantalla
+  real. Es la regla que ya se cobró una tanda con los grupos del sidebar.
+
+**El andamio NO se commitea**: es una ruta de la aplicación y se desplegaría.
+Queda en el árbol sin trackear mientras dure la migración del carrito.
+
 ### El `!` es el defecto de la fase 4 apareciendo adentro del kit mismo
 
 Todo lo que la pieza le pasa a la tarjeta tiene que llevar `!`, y hay un candado
