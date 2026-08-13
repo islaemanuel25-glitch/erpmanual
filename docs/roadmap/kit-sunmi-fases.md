@@ -371,7 +371,11 @@ propia = el panel se pinta el fondo y el borde a mano en vez de usar `SunmiCard`
 Migrarlas con el kit les cambia fondo y bordes, y eso no es una diferencia que se
 declare y se acepte.
 
-De las **43 capas a mano**:
+⚠️ **LAS CIFRAS DE ESTA SECCIÓN QUEDARON VIEJAS.** La buena está más abajo, en
+"EL CENSO CERRADO". Lo que sigue se conserva porque las tres pasadas que
+mintieron valen más que el número: son el registro de cómo se equivocó.
+
+De las **43 capas a mano** (tercera pasada, superada):
 
 - **13 con superficie propia** — `compras-proveedor/nueva` (dos),
   `configuracion/mantenimiento`, `ModalProcesoPendiente`, `CarritoPedido` (el
@@ -389,7 +393,7 @@ lo mismo que el componente—.
 kit tiene una opinión sobre la superficie que media aplicación no comparte. Un
 prop de superficie sería el séptimo, y llegaríamos ahí por el mismo camino por el
 que llegamos a seis. Vuelven cuando `SunmiCard` se toque de verdad en la fase 4,
-**junto con las 104 del padding, que es la misma deuda con otra cara**.
+**junto con las 117 del padding, que es la misma deuda con otra cara**.
 
 **EL CONTEO NECESITÓ TRES PASADAS Y LAS DOS PRIMERAS MINTIERON**, que es la parte
 que hay que llevarse:
@@ -434,6 +438,145 @@ presente, que es una señal positiva y no una ausencia.
 mostrar poco confiable es exactamente el error que la regla de abrir un caso de
 cada grupo existe para evitar — y sería la cuarta vez en la fase. Lo que falta es
 rehacerlo mirando el `className` compuesto, no solo el literal.
+
+### EL CENSO CERRADO — quinta pasada, y las tres correcciones de método
+
+**Relevado el 2026-08-13.** Enumerado con `git ls-files app components`, sobre
+los `.jsx`, salteando los archivos que ya importan `SunmiModalLayout`. Sigue
+dando **43 capas a mano**, o sea el criterio de enumeración no se movió; lo que
+se movió es en qué balde cae cada una.
+
+- **18 con superficie propia** — las 13 de antes, más la hoja de `CarritoPedido`,
+  `SubmenuPanel`, `MobileNav`, `SidebarMobile` y `SidebarPro`.
+- **24 con `SunmiCard`** — el grupo migrable. **No se movió ni una**, y era
+  esperable: se clasificaron por un `<SunmiCard` PRESENTE. Un punto ciego hace
+  perder positivos, no inventarlos.
+- **1 que no es de nadie**: `SunmiModalLayout.jsx:314` es la capa que dibuja **el
+  kit mismo**. Entró al conteo porque el filtro saca a los que IMPORTAN la pieza
+  y la pieza no se importa a sí misma. Se descuenta: no es una migración
+  pendiente.
+
+18 + 24 + 1 = 43.
+
+#### Las tres correcciones de método, que valen más que el 18
+
+1. **La ventana no se agranda: se saltean los comentarios.** Agrandarla solo
+   mueve el umbral hasta el próximo comentario más largo. `esComentario` ya está
+   exportada del contador para esto, y usarla arregló sola a `CarritoPedido`.
+2. **La superficie se busca en el `className` COMPUESTO.** Y "compuesto" resultó
+   tener dos formas, no una: el template literal con `${theme.sidebar.bg}` —que
+   era la que se había visto— y el **valor arbitrario con variable CSS**,
+   `bg-[color:var(--card-bg)]`, que es literal y aun así no matcheaba porque la
+   expresión enumeraba paletas de Tailwind (`bg-slate`, `bg-zinc`…) en vez de la
+   familia entera. `theme.sidebar.bg` resultó ser `bg-[var(--sidebar-bg)]`: las
+   dos formas eran la misma cosa escrita distinto.
+3. **Lo que no se puede resolver leyendo va a un balde que dice "abrir".** Un
+   censo que solo sabe contestar sí o no miente justo donde no sabe.
+
+#### Y una que se había escapado, que es lo que había que buscar
+
+**`ClientePickerFullscreen`** cayó entre las 24 porque usa `<SunmiCard` — y es
+verdad—, pero **su capa es `fixed inset-0 z-[80] sunmi-surface p-2 lg:p-3`**: se
+pinta una superficie sólida de pantalla completa y **no tiene velo**. No es un
+modal velado, es una pantalla. Migrarla al kit le pondría un velo donde hoy hay
+una superficie opaca.
+
+Queda **fuera del grupo migrable** y anotada aparte: no es del balde de
+superficie propia por su tarjeta —esa es del kit— sino por su CAPA. Es una
+tercera manera de traer superficie que ninguna de las dos preguntas anteriores
+hacía.
+
+**Así que el grupo migrable es de 23, no de 24.**
+
+#### Los cuatro tonos de velo que conviven en esas 23
+
+Sale de mirar la capa de las 23, y hace falta saberlo antes de declarar
+diferencias: `sunmi-overlay` (negro 50 %) en 11, `sunmi-pos-overlay` en 5,
+`sunmi-overlay-strong` (negro 80 %) en 3, y `bg-black/50`, `/60` y `/80` escritos
+a mano en 3. Una —`ModalDetalleVenta`— no pinta la capa: tiene un velo aparte con
+`style` en línea, `var(--pos-overlay)`.
+
+El velo del kit no es ninguno de esos: es
+`color-mix(in srgb, var(--app-bg) 78%, transparent)`. **Cada migración que quede
+cambia el tono del velo**, y eso va en la lista declarada de todas.
+
+#### Las 23 desde el OTRO lado: ¿alguna le escribe superficie a la tarjeta?
+
+Tener `<SunmiCard` las salva de estar en el balde equivocado, pero no de pasarle
+un `className` que le sobrescriba la superficie **al kit**: `SunmiCard` pinta con
+`${theme.card}` y después concatena lo que le den, dos clases de la misma familia
+con la misma especificidad, y gana el orden de la hoja de estilos.
+
+**Una de las 23 lo hace: `ModalDetalleVenta`**, con
+`"p-4 border border-current/10 shadow-lg"`. Le escribe un borde y una sombra
+encima de los del tema. Migrarla mueve borde y sombra igual que le pasó al
+carrito, y **eso aparecería recién en la comparación** si no estuviera declarado.
+Las otras 22 solo escriben ancho, padding, alto y `overflow`.
+
+Y **la primera respuesta a esta pregunta fue "ninguna", y era mía, no del repo**:
+la expresión que buscaba superficie enumeraba paletas de Tailwind y
+`border-current/10` no es ninguna. Se vio imprimiendo las 24 clases y leyéndolas,
+que era el paso que la expresión pretendía ahorrar. Cuarta vez en esta fase que
+una firma dice una cosa y abrir los archivos dice otra.
+
+### EL PRÓXIMO GRUPO: los siete gemelos del POS
+
+`ModalCanjePuntos`, `ModalCliente`, `ModalDescuento`, `ModalPesoKg`,
+`ModalTicket`, `ModalTicketOffline` y el modal de detalle de `HistorialDia`
+(línea 240).
+
+**Por qué estos.** La firma se comparó contra los siete rasgos que el kit dibuja
+—capa, velo, panel, tarjeta, encabezado, botón y cuerpo—, no contra rasgos
+elegidos a ojo, y **se abrieron los siete archivos antes de proponerlos**, no uno
+de muestra. Los siete escriben la capa carácter por carácter igual:
+
+    fixed inset-0 sunmi-overlay flex items-center justify-center p-4 z-50
+
+y la tarjeta también:
+
+    <SunmiCard className="w-full max-w-md p-4">
+
+La única diferencia entre los siete es el `z-[60]` de `HistorialDia`, y el `z` ya
+es un parámetro del kit. Es el grupo más uniforme que queda entre las 23, por
+lejos: el que le sigue son dos (`ModalImporteServicio` y `ModalPagoEfectivo`, con
+`max-w-xl p-6 max-h-[90vh]`).
+
+**Y son del POS**, o sea que si algo se corre se ve en la caja. Eso no es motivo
+para saltearlos —hay que migrarlos igual— pero sí para que la comparación de
+estos se mire con la atención que se miró la del carrito.
+
+#### La lista declarada, escrita por lo que se va a ver
+
+1. **El velo cambia de tono.** Hoy es negro al 50 %; pasa a ser el fondo de la
+   app al 78 %. En un tema oscuro se van a parecer; en uno claro hoy oscurece y
+   con el kit aclara.
+2. **El modal se ensancha 7 px.** El padding de la capa pasa de `p-4` a `p-3`,
+   14 → 10,5 px, 3,5 de cada lado. En un monitor no se nota; en la pantalla
+   angosta de la caja, sí.
+3. **El título se ve más chico, menos grueso y más separado.** Hoy es
+   `text-lg font-bold` —15,75 px, peso 700—; con `SunmiCardHeader` queda en
+   15 px, peso 600 y `tracking-wide`. Y se corre 3,5 px a la derecha por el
+   `px-1` del encabezado.
+4. **Aparece un SEGUNDO botón de cerrar, arriba a la derecha.** Los siete ya
+   tienen el suyo abajo: "Cancelar" en `ModalCanjePuntos`, `ModalCliente`,
+   `ModalDescuento` y `ModalPesoKg`; "Cerrar" en `ModalTicket`,
+   `ModalTicketOffline` y `HistorialDia`. El del kit se suma, no reemplaza a
+   ninguno. **Los cuatro "Cancelar" son la mitad de un par Cancelar/Confirmar**,
+   así que sacarlos no es lo mismo que sacar un "Cerrar" suelto — pendiente de
+   decisión, no de trabajo.
+5. **Aparece un tope de alto con scroll donde hoy no hay.** El cuerpo del kit
+   trae `max-h-[65vh] overflow-y-auto`. El que lo va a notar es
+   `ModalTicketOffline`, que hoy scrollea adentro con su propio `max-h-96` y
+   pasaría a tener dos topes.
+6. **El ancho máximo hay que declararlo**: `maxWidth="max-w-md"`. Sin eso los
+   siete pasan de 392 a 504 px.
+7. **El padding de la tarjeta NO cambia, y ese es el punto.** Los siete declaran
+   `p-4` y dibujan 21 px, porque nunca se aplicó. Con el kit siguen dibujando 21.
+   Cero.
+8. **La separación del cuerpo está SIN MEDIR.** Hoy es un `space-y-3` con el
+   `mb-3` del `h3` adelante; el kit usa `mt-2 gap-3`. Van cuatro ceros seguidos
+   en este punto y **eso no autoriza el quinto**: se mide antes de tocar, con el
+   arnés, como se hizo con categorías.
 
 ### LA MIGRACIÓN DEL CARRITO SE ESCRIBIÓ, SE MIDIÓ Y SE REVIRTIÓ
 
@@ -656,20 +799,49 @@ componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco
   que existe para verificar una forma. Se retoma la próxima vez que haya un
   proceso de verdad. Es de los ocho con `space-y-*` y su número sigue sin medir.
 
-- **104 tarjetas declararon un padding que nunca se aplicó**, y por eso hoy el
-  sistema es uniforme en 21 px **por accidente**. Contado: `SunmiCard` tiene 233
-  usos, 130 con `className`, y de esos **104 declaran padding** y **26 no**. Los
-  103 restantes no pasan `className`. Todas dibujan 21 px porque el `p-6` que
-  venía del comentario le gana a lo que escribieron.
+- **117 tarjetas declararon un padding que nunca se aplicó**, y por eso hoy el
+  sistema es uniforme en 21 px **por accidente**. Todas dibujan 21 px porque el
+  `p-6` que venía del comentario le gana a lo que escribieron.
+
+  **RECONTADO EL 2026-08-13 CON EL MÉTODO NUEVO, y el número se movió.** Es el
+  que va a sostener la decisión al cierre de la fase, así que convenía que no se
+  cayera entonces. Enumerado con `git ls-files app components lib hooks` y con
+  `etiquetasDeApertura` del contador —que ya sabe dónde termina una apertura
+  JSX—: **234 usos de `SunmiCard`, 150 con `className`, 117 declaran padding, 31
+  no declaran ninguno**, y 2 no son tarjetas de consumidor (la del kit y
+  `SunmiEntityCard`, que reenvía el `className` de quien la use y **no la usa
+  nadie**: cero usos). Los 84 restantes no pasan `className`.
+
+  Qué declararon las 117: **`p-3` cincuenta y seis** (55 más un `!p-3`), `p-4`
+  treinta y tres, `p-6` nueve, `p-0` ocho, `p-5` seis y `p-2` cinco.
+
+  Antes decía 233 / 130 / 104 / 26, y "treinta escribieron `p-3`". **Los cuatro
+  números daban de menos, y las tres causas son de la misma familia** — todas
+  hacen que algo escrito no se vea:
+
+  1. El límite de la expresión del padding era `(^|\s)`, y la clase viene con su
+     comilla pegada adelante: `"p-4 …"` **nunca matcheaba**. Un `p-N` al empezar
+     la cadena no se contaba jamás.
+  2. El valor del `className` se recortaba hasta el primer `}`, que en
+     `` {`${CARD_BASE} p-5 …`} `` es el `}` de `${CARD_BASE}` — y se llevaba el
+     `p-5`. Es el mismo defecto del `>` que `etiquetasDeApertura` ya resuelve, un
+     nivel más adentro.
+  3. **El agujero no era el template literal, era la INDIRECCIÓN.**
+     `className={cardClass}` no tiene un solo `$` y declara `p-4`: se resolvió
+     abriendo el archivo. Buscar `${` habría dejado esas cuatro afuera igual.
+
+  El repo tenía además **dos cifras distintas para lo mismo**: este registro
+  decía 233/130/104 y el comentario de `SunmiModalLayout` decía 246/151/109.
+  Quedaron las dos apuntando al mismo número.
 
   **Esto NO entra por la puerta de atrás de una tanda técnica.** Se pensó hacer
   negociable el `className` de la tarjeta —como ya lo hace el panel— y se
-  descartó al contarlo: las 104 pasarían a recibir el padding que declararon
-  —treinta escribieron `p-3`, o sea 10.5 px— y eso es cambiar el aspecto de media
-  aplicación por una pantalla. **Lo decide Emanuel al cierre de la fase**, junto
-  con los seis parámetros.
+  descartó al contarlo: las 117 pasarían a recibir el padding que declararon
+  —cincuenta y seis escribieron `p-3`, o sea 10,5 px— y eso es cambiar el aspecto
+  de media aplicación por una pantalla. **Lo decide Emanuel al cierre de la
+  fase**, junto con los seis parámetros.
 
-  Y si algún día se unifica, **las 26 que traen `className` sin padding son las
+  Y si algún día se unifica, **las 31 que traen `className` sin padding son las
   que hay que mirar una por una**: son las que no declararon nada y por lo tanto
   no dicen qué querían.
 

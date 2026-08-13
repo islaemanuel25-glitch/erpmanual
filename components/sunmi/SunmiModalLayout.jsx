@@ -220,12 +220,17 @@ export default function SunmiModalLayout({
    * ── POR QUÉ ASÍ Y NO HACIENDO NEGOCIABLE A `SunmiCard` ────────────────────
    *
    * Lo primero que se pensó fue que la tarjeta negociara su `className`, como ya
-   * lo hace el panel. Contado antes de escribirlo: `SunmiCard` tiene 246 usos,
-   * 151 con `className`, y **109 declaran un padding**. Hoy todas dibujan 21px
+   * lo hace el panel. Contado antes de escribirlo: `SunmiCard` tiene 234 usos,
+   * 150 con `className`, y **117 declaran un padding**. Hoy todas dibujan 21px
    * igual, porque el `p-6` de la pieza le gana a lo que escribieron. Con la
-   * negociación, esas 109 pasarían a recibir el padding que declararon —treinta
-   * de ellas escribieron `p-3`— y eso es cambiar el aspecto de media aplicación
-   * por una pantalla.
+   * negociación, esas 117 pasarían a recibir el padding que declararon
+   * —cincuenta y seis de ellas escribieron `p-3`— y eso es cambiar el aspecto de
+   * media aplicación por una pantalla.
+   *
+   * Acá decía 246 / 151 / 109 y el registro decía 233 / 130 / 104: dos cifras
+   * para el mismo hecho, las dos contadas buscando clases literales. El recuento
+   * del 2026-08-13 las reemplazó por una sola, y el porqué de cada corrección
+   * está en `docs/roadmap/kit-sunmi-fases.md`.
    *
    * Así que no. Dos props, con el default del kit, y las usa quien las necesita.
    * Hoy es una sola.
