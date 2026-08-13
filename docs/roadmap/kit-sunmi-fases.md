@@ -356,6 +356,22 @@ componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco
 
 ## Deuda anotada de esta fase
 
+- **El segundo "Cerrar" de `ModalPreviewPrecio` está SIN VERIFICAR**, con esas
+  palabras. Al migrarlo quedaban dos botones con el mismo texto y se sacó el de
+  abajo; había un tercero igual en la rama de "activá un local desde Inicio" y
+  se sacó también, **por simetría**. Esa rama **no se fotografió**: necesita un
+  navegador sin contexto activo. El razonamiento es bueno y no es lo mismo que
+  haberlo visto. Dentro de tres meses la diferencia no se va a poder
+  reconstruir, y por eso queda escrita acá.
+
+- **Dos puntos que FALTARON en la declaración previa de `ModalPreviewPrecio`.**
+  Están contados en el commit, pero después del hecho: al sacar ese botón se fue
+  también **la línea separadora que tenía encima** —sin el botón quedaba
+  colgando— y la tarjeta **bajó de 263 a 198 px** de alto a 1366. Los dos eran
+  previsibles mirando el JSX antes de tocarlo: el separador está tres líneas
+  arriba del botón. **La lista se escribe antes justamente para que esto no
+  pase**, y contarlo después no es lo mismo que haberlo declarado.
+
 - **`PanelComprobantes`: el import se verificó en la imagen, no ejerciendo el
   error.** El 2026-08-13 se arregló que usara `queHacerHttp` y `SIN_RESPUESTA`
   sin importarlos, y se comprobó que el import viajó a la imagen desplegada. Lo

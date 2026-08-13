@@ -218,15 +218,39 @@ corre desde la máquina local, con el VPS todavía en el SHA viejo:
 node scripts/clasificar-migraciones.mjs --vps
 ```
 
-**Por qué antes y no después:** el rango sale del HEAD del VPS, y el paso 1
-—`git merge --ff-only`— mueve ese HEAD al SHA nuevo. Corrido después, el script
-compara el árbol contra sí mismo, informa `Archivos a mirar: 0` y no frena nada.
-Pasó el 2026-08-11, en un despliegue que sí traía una migración de datos: el
-clasificador dio cero y la guardia automática, que corre este mismo script,
-tampoco frenó. Hoy ese caso sale con 2 en vez de con 0 —ver "el rango
-degenerado" abajo—, pero el orden correcto sigue siendo este.
+**Por qué antes:** para leerlo con tiempo y no con el despliegue a medio hacer.
+El orden ya no es lo que decide si el chequeo sirve — eso cambió el 2026-08-13 y
+está abajo.
 
-Si por lo que sea ya se hizo el merge, se le pasa el SHA anterior a mano:
+### LA BASE SALE DE LA IMAGEN QUE ATIENDE, no del HEAD de git del VPS
+
+Hasta el 2026-08-13 el clasificador preguntaba `git rev-parse HEAD` en el VPS. El
+paso 1 —`git merge --ff-only`— mueve ese HEAD al SHA nuevo, así que para cuando
+corre `migrate deploy` el rango salía **degenerado**: el script comparaba el
+árbol contra sí mismo y la guardia frenaba con INDETERMINADO.
+
+Eso pasaba en **todos** los despliegues, trajeran migraciones o no, y la única
+salida era `DEPLOY_MIGRACION_AUTORIZADA=1`. Ahí está el daño, que no es la
+molestia: **una puerta que se abre en todos los despliegues no es una puerta.**
+Dos autorizaciones manuales seguidas el 2026-08-13 fueron el aviso.
+
+Ahora la base sale del SHA de la **imagen del contenedor que atiende**
+—`docker inspect erpazul_app --format '{{.Config.Image}}'`—, que es el mismo dato
+que el paso 2 ya anota como referencia de rollback. Ese SHA no lo mueve el paso 1
+sino el paso 5, cuando la ventana ya se cerró. Y es el dato correcto: durante la
+ventana lo que importa es qué CÓDIGO está sirviendo pedidos, no qué commit tiene
+checkouteado el repo del servidor.
+
+Sigue fallando cerrado: si el ssh no llega, si el contenedor no está, o si la
+etiqueta no es un SHA de 40 —`latest`, una imagen construida a mano— sale con 2.
+
+Comprobado en los dos sentidos, que es lo que hace que el arreglo valga: con un
+rango sano y cero migraciones **pasa sin pedir nada**; y con una migración de
+verdad en el rango —una rama descartable con un `DROP COLUMN`— **la guardia
+denegó el comando**, nombrando el archivo, la línea y el motivo. Sin ese segundo
+sentido el arreglo habría cambiado un pedido molesto por un control muerto.
+
+Si por lo que sea la imagen no sirve como base, se le pasa el SHA a mano:
 `--desde <SHA_QUE_CORRÍA_ANTES>`.
 
 No se saltea aunque el despliegue "no traiga migraciones": eso es justamente lo
@@ -405,26 +429,29 @@ un script versionado, con sus candados:
 node scripts/clasificar-migraciones.mjs --vps
 ```
 
-Pide el HEAD desplegado al VPS por ssh y clasifica exactamente lo que este árbol
-introduce por encima. El rango sale del HEAD del VPS y no de `migrate status`:
-son las migraciones que este despliegue mete sobre lo que hoy corre.
+Pide por ssh el SHA de la imagen que está atendiendo y clasifica exactamente lo
+que este árbol introduce por encima. El rango sale de ahí y no de
+`migrate status`: son las migraciones que este despliegue mete sobre el código
+que hoy sirve pedidos.
 
 **«Archivos a mirar: 0» tiene TRES formas de mentir.** Las tres terminan en un
 cero tranquilizador sobre un despliegue que sí trae migraciones:
 
 1. **La migración no está commiteada.** El rango se calcula con
-   `git diff --name-only <HEAD_VPS>..HEAD -- prisma/migrations`, y un archivo sin
-   trackear no está en `HEAD`. Pasó el 2026-08-10: dio cero antes del commit y
+   `git diff --name-only <SHA_QUE_ATIENDE>..HEAD -- prisma/migrations`, y un
+   archivo sin trackear no está en `HEAD`. Pasó el 2026-08-10: dio cero antes del commit y
    marcó la migración como no aditiva después. Se corre **después** de
    commitear, no antes. **Este caso todavía sale con 0 y hay que tenerlo
    presente**: el script no puede distinguirlo.
 2. **El directorio de migraciones no está donde el script cree.** Cubierto: sale
    con 2 por el `existsSync` de `principal()`.
 3. **El rango es degenerado** — la base y el extremo son el mismo commit.
-   Cubierto desde el 2026-08-11: sale con 2. Es lo que pasa si se corre el
-   clasificador después del `git merge` del paso 1, y es la razón por la que ese
-   chequeo se movió antes. Los candados están en
-   `scripts/clasificar-migraciones.test.mjs`, sobre `esRangoDegenerado`.
+   Cubierto desde el 2026-08-11: sale con 2. **Desde el 2026-08-13 ya no salta en
+   un despliegue normal**, porque la base dejó de ser el HEAD de git del VPS y
+   pasa a ser la imagen que atiende; sigue cubriendo un `--desde` mal pasado y un
+   contenedor recreado antes de tiempo. Los candados están en
+   `scripts/clasificar-migraciones.test.mjs`, sobre `esRangoDegenerado` y
+   `shaDeLaEtiqueta`.
 
 De las tres, **la primera es la única que sigue sin cubrir**, y no se puede
 cubrir con este mecanismo: un archivo que no está en ningún commit no existe
