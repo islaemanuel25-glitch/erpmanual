@@ -47,6 +47,23 @@ que dan cero.** Si la captura tiene ruido, cualquier diagnóstico es inventado �
 se estaría explicando una diferencia que el cambio no produjo. Acá dieron cero, y
 recién por eso los 44 píxeles se pudieron atribuir.
 
+Y el corolario del corolario, que es el que faltaba: **reproducible y correcto
+son dos preguntas distintas.** Tres fotos idénticas prueban que no hay ruido; no
+prueban que la foto sea de lo que uno cree. **Una página de error es
+perfectamente determinista.** El arnés informó "la captura sirve como prueba"
+sobre una pantalla de error dos veces en la misma tarde — una con el build roto,
+otra con un componente que explotaba— y las dos veces las tres fotos salieron
+idénticas. Cualquier arnés que se declare apto tiene que contestar las dos
+preguntas: que no varía, y que retrató lo que dice retratar.
+
+Corolario sobre los datos del andamio, y es la SEGUNDA vez del mismo patrón —el
+primero está más abajo, en el candado del pie con `total: 0`—: **cuando un
+andamio necesite datos, la forma se saca de donde vive de verdad en el repo, no
+se escribe de memoria.** El menú del sidebar son GRUPOS con ítems adentro; se
+escribió como una lista de ítems planos y los dos componentes explotaron. Treinta
+segundos de leer el consumidor real habrían evitado dos corridas y un
+diagnóstico equivocado.
+
 **EL CÓDIGO NO SE ESCRIBE POR SHELL.** Ni `sed`, ni `>`, ni heredoc, ni
 `node -e` que escriba archivos. Se escribe con el editor, siempre. Son dos
 motivos y el segundo es peor que el primero.
