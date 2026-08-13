@@ -185,6 +185,24 @@ así por tres motivos, y no se rediscute:
 `ModalCategoria`, `ModalListaPrecio`, `ModalPreviewPrecio` y
 `ModalPedirOperador`. A esas ocho hay que medirles el número antes de migrarlas.
 
+**Y TENER `space-y-*` NO ALCANZA PARA QUE EL NÚMERO SEA DISTINTO DE CERO.**
+Medido en `ModalCategoria`, que es el primero de las ocho que se migró: **cero
+píxeles a 1366 y cero a 360**, campo por campo y en el alto de la tarjeta.
+
+El motivo, que es el que hay que llevarse: lo que el `flex flex-col` cambia es
+que los márgenes **dejen de colapsar entre sí**. El `space-y-4` le pone
+`margin-top` a los hijos del segundo en adelante; si esos hijos **no traen
+márgenes propios**, no hay nada con qué colapsar y bloque y flex dan lo mismo.
+Los 12 píxeles de `ModalProveedor` salieron de que sus campos sí los traen.
+
+O sea que la pregunta no es "¿tiene `space-y-*`?" sino "¿los hijos del cuerpo
+tienen márgenes propios?". La lista de ocho sigue siendo la lista de sospechosos
+—hay que medirlos igual—, pero el número puede dar cero, y dio cero la primera
+vez. Cómo se mide, sin tocar una línea: se abre el modal, se anotan los `top` de
+cada hijo contra el borde de la tarjeta, se le pone `display:flex` con
+`flexDirection:column` al div del cuerpo desde el navegador, y se vuelven a
+anotar.
+
 ### Declaraciones
 
 | pantalla | parámetro | valor | por qué |
@@ -203,6 +221,42 @@ así por tres motivos, y no se rediscute:
 | `compras-proveedor/ModalVincularCodigo` | `espacioCuerpo` / `espacioPie` | `""` | el cuerpo trae sus propios márgenes |
 | `proveedores/ModalCodigosProveedor` | `encabezado` | `"cinta"` | mismo caso |
 | `proveedores/ModalCodigosProveedor` | `espacioCuerpo` / `espacioPie` | `""` | es de solo lectura y no tiene pie: el único botón es el de cerrar, que lo pone la pieza |
+| `categorias/ModalCategoria` | `maxWidth` | `"max-w-md"` | su tarjeta es `max-w-md`; con el `max-w-xl` del kit pasaría de 392 a 504 px a 1366 |
+| `categorias/ModalCategoria` | `espacioCuerpo` | `"p-4 space-y-4"` | el cuerpo trae su propio padding y su propia separación de campos |
+
+### El padding de la tarjeta NO se escribió, y este es el motivo
+
+**PENDIENTE CONFIRMADO — decidido el 2026-08-13, midiendo.**
+
+`ModalCategoria` era, según el plan, "la primera pantalla que lo necesita":
+declara `p-0 overflow-hidden` en su `SunmiCard` y pone su propio padding adentro.
+Al medirlo antes de tocar nada, **ese `p-0` nunca se aplicó**. La tarjeta tiene
+21 px de padding hoy, y sigue teniendo 21 px después de migrada.
+
+De dónde salen los 21 px, que es lo que hay que saber antes de tocar esto:
+**`SunmiCard` tiene un comentario adentro del `className`**, y por eso las tres
+piezas del comentario entran como clases de verdad:
+
+    p-3           /* antes p-4 / p-6 */
+
+El navegador ve `p-3`, `p-4` y `p-6` en la misma tarjeta. Las tres existen en la
+hoja de estilos porque el repo las usa en otro lado, tienen la misma
+especificidad, y gana la última que Tailwind haya escrito: `p-6`. Con la raíz en
+14 px eso da 21. **Le pasa a TODAS las tarjetas del sistema**, no solo a los
+modales: la sonda contra una tarjeta cualquiera de la pantalla de categorías da
+los mismos 21 px.
+
+Así que el `p-0` de esas tres pantallas no perdía contra el `p-3` del kit —que ya
+sería el defecto de concatenar en vez de negociar—: perdía contra una clase que
+nadie escribió. **Una pantalla que declara algo que nunca se aplicó no es una
+pantalla que necesite un parámetro**, y escribirlo igual sería inventar la
+séptima pieza sin una necesidad detrás, que es el error que este documento
+prohíbe en la primera línea.
+
+Queda para decidir, y **no se resolvió acá porque mueve todas las tarjetas del
+repo a la vez**: sacar el comentario de adentro del `className` de `SunmiCard`
+baja el padding de 21 a 10.5 px en cada tarjeta del sistema. Es un cambio de una
+línea y de una tanda entera de verificación.
 
 ### Props muertos que se conservan a propósito
 
@@ -282,6 +336,50 @@ La causa de aquel ruido era el tiempo: transiciones y animaciones fotografiadas
 a mitad de camino. Antes de la foto el arnés las apaga, manda el scroll a cero y
 saca el foco. Aun así el chequeo queda: quedó una intermitencia de
 aproximadamente una corrida de cada seis, y **el chequeo la agarra**.
+
+### `--elemento`: el recorte deja de ubicarse a mano
+
+Hasta el 2026-08-13 la foto salía de la banda entera y había que **ubicar a mano
+la caja de la tarjeta** en cada captura para poder compararlas. Medido sobre las
+tandas de modales, esa parte manual era dos tercios del costo de cada una, y
+quedan 26 capas.
+
+    --elemento ".fixed.inset-0 .rounded-xl.shadow-md" [--margen 24]
+
+El arnés mide el `getBoundingClientRect` de ese nodo y recorta a esa caja. Va con
+tres cosas que no son opcionales:
+
+- **Si el selector no encuentra nada, sale en rojo nombrándolo y NO saca la
+  foto.** Ese candado no existía, y sin él un selector viejo recorta la zona
+  equivocada: la comparación informa una diferencia que no existe y nadie se
+  entera.
+- **El chequeo de "entra entero" pasa a preguntar por ESE elemento**, no por todo
+  lo pintado. Con recorte al elemento, lo de afuera queda afuera a propósito; lo
+  que no puede pasar es que algo de adentro se derrame fuera de la foto.
+- **El selector queda guardado en una ficha `.json` al lado de la captura**, y
+  `scripts/comparar-capturas.mjs` se niega a comparar dos fotos cuyas fichas no
+  coincidan. Si el antes se recortó por un selector y el después por otro, la
+  resta mide regiones distintas.
+
+`comparar-capturas.mjs` sale con **0** si son idénticas, **1** si difieren
+—informa cuántos píxeles, entre qué esquinas y en qué filas— y **2** si no son
+comparables. El 2 también salta cuando **el elemento cambió de tamaño**, que es
+información y no una molestia: al migrar `ModalCategoria` la tarjeta creció 3 px
+de alto y el comparador lo dijo antes de mirar un solo píxel.
+
+Y una que se paga en cada tanda: **el perfil de Edge NO conserva la sesión**. Al
+navegador se lo mata con `kill`, no con un cierre limpio, así que la cookie nunca
+se escribe al disco del perfil. Lo que funciona es dejar UN Edge vivo en el
+puerto 9224, logueado y con el contexto fijado: cuando el arnés intenta levantar
+el suyo, el perfil ya está tomado, su Edge se muere solo y se engancha a ese.
+
+### Y el otro `--abrir`
+
+Un modal no tiene URL propia. Si no se lo abre, la foto es de la pantalla de
+atrás — y esa foto es perfectamente determinista, así que pasa todos los
+chequeos. `--abrir "Nueva"` toca el primer botón cuyo texto lo contenga, y falla
+nombrándolo si no hay ninguno. El `--abrir-primero` que ya estaba busca
+`/Cargar|Cambiar/` y servía para una pantalla sola.
 
 Rehecha con el arnés arreglado, la comparación de la recepción contra el commit
 anterior a `SunmiPar` da **idéntico byte a byte** a 360 y a 1366.

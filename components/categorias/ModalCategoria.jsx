@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
@@ -108,56 +107,50 @@ export default function ModalCategoria({
   // =========================
   // RENDER
   // =========================
-  if (!open) return null;
-
   return (
-    <div
-      className="
-        fixed inset-0 z-50 
-        bg-black/50 
-        backdrop-blur-sm 
-        flex items-center justify-center
-        p-4
-      "
+    <SunmiModalLayout
+      open={open}
+      title={editMode ? "Editar categoría" : "Nueva categoría"}
+      onClose={onClose}
+      // El ancho de esta pantalla es `max-w-md`, no el `max-w-xl` del kit. Sin
+      // declararlo la tarjeta pasaría de 392 a 504 px a 1366.
+      maxWidth="max-w-md"
+      // El cuerpo tenía su propio `p-4 space-y-4` y se conserva tal cual: el
+      // `mt-2 gap-3` del kit le separaría los campos del formulario, que es lo
+      // que emparejar la capa NO es. Medido: el paso de bloque a `flex flex-col`
+      // no mueve nada acá, cero píxeles a 1366 y a 360.
+      espacioCuerpo="p-4 space-y-4"
     >
-      <SunmiCard className="w-full max-w-md p-0 overflow-hidden">
-        <SunmiCardHeader
-          title={editMode ? "Editar categoría" : "Nueva categoría"}
+      <div>
+        <label className="text-[11px] sunmi-label mb-1 block">Nombre</label>
+        <SunmiInput
+          value={form.nombre}
+          onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+          placeholder="Ingresar nombre"
         />
+      </div>
 
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="text-[11px] sunmi-label mb-1 block">Nombre</label>
-            <SunmiInput
-              value={form.nombre}
-              onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-              placeholder="Ingresar nombre"
-            />
-          </div>
+      <SunmiSeparator />
 
-          <SunmiSeparator />
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] sunmi-label">Activo</span>
+        <SunmiToggleEstado
+          value={form.activo}
+          onChange={(v) => setForm((f) => ({ ...f, activo: v }))}
+        />
+      </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] sunmi-label">Activo</span>
-            <SunmiToggleEstado
-              value={form.activo}
-              onChange={(v) => setForm((f) => ({ ...f, activo: v }))}
-            />
-          </div>
+      <SunmiSeparator />
 
-          <SunmiSeparator />
+      <div className="flex justify-end gap-3">
+        <SunmiButton color="slate" onClick={onClose}>
+          Cancelar
+        </SunmiButton>
 
-          <div className="flex justify-end gap-3">
-            <SunmiButton color="slate" onClick={onClose}>
-              Cancelar
-            </SunmiButton>
-
-            <SunmiButton onClick={handleSubmit} disabled={loading}>
-              {loading ? "Guardando..." : "Guardar"}
-            </SunmiButton>
-          </div>
-        </div>
-      </SunmiCard>
-    </div>
+        <SunmiButton onClick={handleSubmit} disabled={loading}>
+          {loading ? "Guardando..." : "Guardar"}
+        </SunmiButton>
+      </div>
+    </SunmiModalLayout>
   );
 }
