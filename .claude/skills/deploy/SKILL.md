@@ -238,7 +238,9 @@ cuarto comando.
 ssh vps-erp 'cd /srv/produccion/erpazul && git merge --ff-only origin/main'
 
 # 2. APUNTAR A LA IMAGEN NUEVA — antes que nada que use compose
-ssh vps-erp 'cd /srv/produccion/erpazul && cp -a .env .env.bak-pre<SHA_CORTO> && \
+#    La copia del .env va FUERA DEL ÁRBOL. Ver abajo por qué.
+ssh vps-erp 'install -d -m 700 /srv/produccion/backups/env && cd /srv/produccion/erpazul && \
+  cp -a .env /srv/produccion/backups/env/env-pre<SHA_CORTO>-$(date +%Y%m%d_%H%M%S) && \
   sed -i "s#^APP_IMAGE=.*#APP_IMAGE=ghcr.io/islaemanuel25-glitch/erpmanual:<SHA_COMPLETO>#" .env'
 ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod.yml config --images'
 
@@ -254,6 +256,43 @@ ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod
 
 El `config --images` del paso 2 no es adorno: es la confirmación barata de que
 compose ya ve el tag nuevo, antes de que importe.
+
+### LA COPIA DEL `.env` VA FUERA DEL ÁRBOL, Y NO ES ORDEN
+
+Hasta el 2026-08-13 el paso 2 escribía `.env.bak-pre<SHA>` **al lado del
+compose**, o sea adentro del repo del VPS. Un archivo por despliegue, sin
+trackear. Para esa fecha había **26 acumulados**.
+
+El daño no es el desorden: es que **apagan un control**. La verificación de
+cierre pide `git status --porcelain` del VPS vacío, y ese chequeo existe para
+avisar que alguien tocó algo a mano en el servidor. Con 26 archivos sin trackear
+nunca sale vacío, así que la única respuesta posible es ruido — y **un control
+que siempre devuelve ruido se lee salteado**. Deja de avisar de lo que existe
+para avisar, sin que nadie lo apague a propósito.
+
+Por eso la copia va a `/srv/produccion/backups/env/`, con el directorio en 700,
+y con la fecha en el nombre para que dos despliegues del mismo SHA no se pisen.
+
+Lo que se limpió ese día, y lo que se miró antes de borrar:
+
+- Los **26 `.env.bak-pre*`** estaban todos en 600 y **contenían una sola
+  variable, `APP_IMAGE`**: no llevaban ninguna clave. Comprobado listando los
+  NOMBRES de variable con `cut -d= -f1`, sin imprimir un solo valor. Borrados.
+- Las dos `.env.prod.bak-*` son otra cosa: son copias de `.env.prod`, el
+  `env_file` del contenedor, y **sí llevan claves** —`AUTH_SECRET`,
+  `DATABASE_URL`, `POSTGRES_PASSWORD`, `GEMINI_API_KEY`, `GROQ_API_KEY`,
+  `WEB_PUSH_PRIVATE_KEY`—. No se borraron: se movieron a ese mismo directorio de
+  afuera del árbol, conservando el 600.
+
+**Cómo mirar uno de estos archivos sin exponerlo:** `cut -d= -f1` da los nombres
+de las variables y ningún valor. `stat -c "%a %U:%G %s"` da permisos, dueño y
+tamaño. Nunca `cat`, nunca `grep` de un valor, nunca `docker compose config` sin
+filtrar.
+
+Y un detalle que hizo perder un minuto: `ls`, `stat` y `mv` con `*` **no matchean
+nombres que empiezan con punto**. Un `stat dir/*` sobre un directorio lleno de
+`.env.*` informa "No such file or directory" y parece que la copia falló cuando
+está hecha.
 
 `git merge --ff-only`: si el VPS tiene algo que no está en `origin/main`, el
 merge falla en vez de fabricar un commit de merge en producción.

@@ -342,6 +342,14 @@ componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco
 
 ## Deuda anotada de esta fase
 
+- **`PanelComprobantes`: el import se verificó en la imagen, no ejerciendo el
+  error.** El 2026-08-13 se arregló que usara `queHacerHttp` y `SIN_RESPUESTA`
+  sin importarlos, y se comprobó que el import viajó a la imagen desplegada. Lo
+  que NO se hizo es forzar una subida fallida en producción para ver el mensaje
+  correcto: cuesta más de lo que agrega y toca un módulo que se está usando.
+  **Queda pendiente para la próxima vez que falle una de verdad**: cuando pase,
+  mirar que salga el texto y no un ReferenceError.
+
 - **Los 9.5 px contra los 10 px del kit.** `SunmiPar` a propósito no lo decide:
   unificar hoy movería una pantalla viva. Se mira cuando las dos estén migradas
   y el cambio se pueda medir en las dos a la vez.
