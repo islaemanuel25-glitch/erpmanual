@@ -290,21 +290,44 @@ if (medida.desbordan.length === 0) {
 //
 // Se toca solo para la foto y en una pestaña descartable: no cambia nada de la
 // aplicación, y sin esto el 92 % de la pantalla no aparece en ninguna imagen.
-const alto = await evaluar(`(() => {
-  for (const el of document.querySelectorAll("*")) {
-    const o = getComputedStyle(el).overflowY;
-    if (o === "auto" || o === "scroll") {
-      el.style.overflow = "visible";
-      el.style.maxHeight = "none";
-      el.style.height = "auto";
-    }
-  }
-  document.documentElement.style.height = "auto";
-  document.body.style.height = "auto";
-  return (document.scrollingElement || document.documentElement).scrollHeight;
-})()`);
+// ── Y CON `--elemento` NO SE ABRE, QUE ES JUSTO AL REVÉS ──────────────────
+//
+// Abrir el recorte sirve para fotografiar un formulario largo ENTERO. Cuando se
+// recorta a un elemento pelea contra el recorte: al expandir los scrollers
+// internos, el elemento crece y deja de entrar en su propia caja.
+//
+// Medido en `ModalCambioPrevio` a 360: la página pasó de 640 a 770px, el cuerpo
+// del modal se estiró y un descendiente se derramó 6px por debajo de la tarjeta.
+// El chequeo de "entra entero" lo agarró y dijo que la captura no probaba nada —
+// y tenía razón, pero el problema era del arnés.
+//
+// Y hay un motivo de fondo: para comparar un modal se lo quiere retratar COMO SE
+// VE, con su scroll adentro, no desplegado. Un modal desplegado no es una
+// pantalla que exista.
+//
+// Va apagado por DEFAULT y no por bandera: una bandera que alguien tiene que
+// acordarse de pasar es una bandera que un día no se pasa.
+const alto = ELEMENTO
+  ? await evaluar(`(document.scrollingElement || document.documentElement).scrollHeight`)
+  : await evaluar(`(() => {
+      for (const el of document.querySelectorAll("*")) {
+        const o = getComputedStyle(el).overflowY;
+        if (o === "auto" || o === "scroll") {
+          el.style.overflow = "visible";
+          el.style.maxHeight = "none";
+          el.style.height = "auto";
+        }
+      }
+      document.documentElement.style.height = "auto";
+      document.body.style.height = "auto";
+      return (document.scrollingElement || document.documentElement).scrollHeight;
+    })()`);
 await sleep(500);
-console.log(`\nPara la foto se abre el recorte: la pantalla completa mide ${alto}px.`);
+console.log(
+  ELEMENTO
+    ? `\nEl recorte NO se abre: se retrata el elemento como se ve. La página mide ${alto}px.`
+    : `\nPara la foto se abre el recorte: la pantalla completa mide ${alto}px.`
+);
 
 // ── SE LE SACA EL TIEMPO DE ENCIMA ─────────────────────────────────────────
 //
@@ -425,12 +448,29 @@ const encaje = ELEMENTO
       if (!el) return null;
       const R = ${JSON.stringify(cajaRecorte)};
       const sx = window.scrollX, sy = window.scrollY;
+
+      // LO QUE UN ANCESTRO YA RECORTA NO SE DERRAMA EN LA FOTO.
+      //
+      // Un modal con el cuerpo scrolleando tiene contenido cuyo rectángulo se
+      // extiende mucho más abajo que la tarjeta — y el navegador lo tapa. Sin
+      // esto, el chequeo informaba 30px de derrame sobre una tarjeta que entra
+      // perfecta, y esa clase de falso positivo es peor que no chequear: enseña
+      // a ignorar el aviso.
+      const loRecortaUnAncestro = (n) => {
+        for (let p = n.parentElement; p && p !== el.parentElement; p = p.parentElement) {
+          const cs = getComputedStyle(p);
+          if (cs.overflowX !== "visible" || cs.overflowY !== "visible") return true;
+        }
+        return false;
+      };
+
       let arriba = 0, abajo = 0, izquierda = 0, derecha = 0;
       for (const n of [el, ...el.querySelectorAll("*")]) {
         const r = n.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) continue;
         const cs = getComputedStyle(n);
         if (cs.visibility === "hidden" || cs.display === "none" || cs.opacity === "0") continue;
+        if (n !== el && loRecortaUnAncestro(n)) continue;
         arriba = Math.max(arriba, R.y - (r.top + sy));
         izquierda = Math.max(izquierda, R.x - (r.left + sx));
         abajo = Math.max(abajo, (r.bottom + sy) - (R.y + R.height));
