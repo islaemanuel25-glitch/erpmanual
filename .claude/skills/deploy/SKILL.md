@@ -124,6 +124,72 @@ ahí adentro es tiempo de sitio caído en cada recreación, multiplicado por cad
 despliegue del día. Lo que va en ese archivo tiene que ser instantáneo o correr
 en segundo plano.
 
+## PASO 0 — ¿HAY ALGO QUE DESPLEGAR, Y ESTÁ PUBLICADO?
+
+**Esto va PRIMERO, antes del backup y antes de cualquier otra cosa. Y FRENA: no
+avisa y sigue.**
+
+### Por qué existe
+
+El 2026-08-14 el procedimiento se corrió entero con **17 commits sin empujar** y
+terminó **sin desplegar nada**. Nada falló: el VPS bajó la imagen de
+`origin/main`, los cinco valores coincidieron entre sí, y todo quedó consistente
+—en el commit VIEJO—. Un despliegue que no despliega y no lo dice es peor que uno
+que falla, porque el que lo corrió se queda creyendo que su trabajo está en
+producción.
+
+La causa es de una línea y está arriba, en la primera regla dura: **el VPS no
+construye, Actions construye a partir de `origin/main`.** Si lo que se quiere
+desplegar no llegó a `origin/main`, no existe ninguna imagen que lo contenga, y
+todos los chequeos de este procedimiento van a dar bien igual — porque son
+chequeos de consistencia, no de contenido.
+
+### El chequeo
+
+```bash
+git fetch origin
+LOCAL=$(git rev-parse HEAD)
+REMOTO=$(git rev-parse origin/main)
+SIN_EMPUJAR=$(git rev-list --count origin/main..HEAD)
+DESPLEGADO=$(curl -s -m 10 https://operix.cloud/api/version | grep -o '[0-9a-f]\{40\}')
+
+echo "local:      $LOCAL"
+echo "origin/main:$REMOTO"
+echo "desplegado: $DESPLEGADO"
+echo "sin empujar: $SIN_EMPUJAR"
+```
+
+**El `git fetch` no es opcional.** Sin él, `origin/main` es la referencia local de
+la última vez que esta máquina habló con GitHub, y la comparación mide contra un
+recuerdo. Es el mismo defecto que el paso 4.1 ya tenía del lado del VPS.
+
+### Las dos frenadas, y hay que decir CUÁL de las dos es
+
+**A) Hay commits sin empujar** —`SIN_EMPUJAR` mayor que cero—:
+
+> FRENO: hay N commits sin empujar. Actions construye desde `origin/main`, así que
+> lo que se desplegaría NO es lo que tenés local. Empujá primero y volvé a
+> empezar.
+
+**B) No hay nada nuevo que publicar** —`SIN_EMPUJAR` en cero y `REMOTO` igual a
+`DESPLEGADO`—:
+
+> FRENO: `origin/main` ya está desplegado. No hay nada nuevo que publicar, y
+> desplegar igual sería un corte de producción a cambio de nada.
+
+**Solo se sigue si `SIN_EMPUJAR` es cero Y `REMOTO` difiere de `DESPLEGADO`.**
+
+### Lo que este chequeo NO contesta
+
+Que `origin/main` tenga el commit **no** prueba que Actions haya terminado de
+construir y publicar su imagen. Eso se comprueba en el paso 3, que es donde vive.
+Este paso solo contesta si hay algo que desplegar y si está publicado en la rama.
+
+Y tampoco reemplaza a los cinco valores del paso 5: aquellos comparan lo que
+quedó corriendo, éste compara lo que se va a empezar a desplegar. Son los dos
+extremos de la misma cadena y ninguno tapa al otro — la corrida del 2026-08-14
+pasó los cinco valores con todo bien y aun así no desplegó la tanda.
+
 ## Antes de empezar
 
 - Árbol limpio y todo commiteado. `git status` de la máquina local.
