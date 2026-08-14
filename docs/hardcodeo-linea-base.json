@@ -1,11 +1,11 @@
 {
   "_lea_esto": "Línea de base del hardcodeo. La genera scripts/hardcodeo.mjs --linea-base. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
-  "generada": "2026-08-14 14:44",
-  "commit": "81715716ca9ece92e420101b802ff6be2f1cf212",
+  "generada": "2026-08-14 16:12",
+  "commit": "69b68d81167859e6d4a33f8f95d5ef045de68fc8",
   "total": {
-    "color": 290,
+    "color": 289,
     "medida": 1849,
-    "modal": 39,
+    "modal": 38,
     "crudo": 319,
     "celda": 465,
     "kit-pisado": 3,
@@ -139,9 +139,9 @@
       "tema-paralelo": 0
     },
     "grupos": {
-      "color": 10,
+      "color": 9,
       "medida": 21,
-      "modal": 1,
+      "modal": 0,
       "crudo": 4,
       "celda": 6,
       "kit-pisado": 0,

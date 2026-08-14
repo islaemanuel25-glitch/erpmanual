@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -151,18 +150,41 @@ export default function ModalGrupo({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
-      <div className="w-full max-w-xl">
-        <SunmiCard>
-          <SunmiCardHeader
-            title={editMode ? "Editar grupo" : "Nuevo grupo"}
-          />
-          <p className="text-[11px] sunmi-text-muted -mt-1 mb-2">
+    <SunmiModalLayout
+      open
+      title={editMode ? "Editar grupo" : "Nuevo grupo"}
+      onClose={onClose}
+      // El velo NO cierra: es un formulario de alta y edición con nombre, locales
+      // y depósitos cargados, y un toque al costado tira todo eso.
+      destructivo
+      z={50}
+      // NO se declara `maxWidth`: su tarjeta ya era `max-w-xl`, que es el default
+      // del kit. Y NO lleva `altoVa`: su tarjeta no estaba topada —`max-height:
+      // none` medido— y el tope vivía en el cuerpo, que es exactamente lo que
+      // hace `centrado`. Es la primera migrada que no necesita el séptimo
+      // parámetro.
+      //
+      // `pr-1` sí se declara: son 3,5 px a la derecha que existen para que la
+      // barra de scroll no se coma el borde de los campos, y el kit no los trae.
+      espacioCuerpo="mt-2 gap-3 pr-1"
+      footer={
+        <>
+          <SunmiButton color="slate" onClick={onClose}>
+            Cancelar
+          </SunmiButton>
+          <SunmiButton color="amber" onClick={handleSubmit}>
+            {editMode ? "Guardar cambios" : "Crear grupo"}
+          </SunmiButton>
+        </>
+      }
+    >
+          {/* El subtítulo va escrito a mano y no por `subtitle`: la pieza no
+              reenvía ese prop a propósito. Pierde su `-mt-1 mb-2`, que eran
+              relativos al encabezado viejo: ahora lo separa el `gap-3` del
+              cuerpo. */}
+          <p className="text-[11px] sunmi-text-muted">
             Configurá el grupo y sus asignaciones.
           </p>
-
-          {/* CONTENIDO SCROLLEABLE */}
-          <div className="flex flex-col gap-3 max-h-[65vh] overflow-y-auto pr-1">
 
             {/* Datos */}
             <Field label="Nombre del grupo *">
@@ -262,20 +284,7 @@ export default function ModalGrupo({
                 ))}
               </SunmiListCard>
             )}
-          </div>
-
-          {/* ACCIONES */}
-          <div className="flex justify-end gap-2 mt-3 pt-3 border-t sunmi-divider">
-            <SunmiButton color="slate" onClick={onClose}>
-              Cancelar
-            </SunmiButton>
-            <SunmiButton color="amber" onClick={handleSubmit}>
-              {editMode ? "Guardar cambios" : "Crear grupo"}
-            </SunmiButton>
-          </div>
-        </SunmiCard>
-      </div>
-    </div>
+    </SunmiModalLayout>
   );
 }
 

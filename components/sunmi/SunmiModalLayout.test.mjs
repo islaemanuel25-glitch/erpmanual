@@ -383,6 +383,9 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/compras-proveedor/ModalVincularCodigo.jsx": true,
     "components/listas-precios/ModalListaPrecio.jsx": true,
     "components/caja/ModalCambioPrevio.jsx": true,
+    // Alta y edición de grupo: nombre escrito más los locales y depósitos que se
+    // fueron agregando. Cerrar sin querer tira todo eso.
+    "components/grupos/ModalGrupo.jsx": true,
     // Informativos, de confirmación y de selección: cerrarlos no pierde nada.
     // `ModalPreviewPrecio` tiene un campo y NO lleva destructivo a propósito: lo
     // único que se escribe ahí es el buscador, y perder un término de búsqueda

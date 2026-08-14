@@ -1653,6 +1653,108 @@ del renglón.
 - `destructivo` → es un formulario de alta y edición: cerrar sin querer tira lo
   escrito.
 
+### `ModalGrupo` — LA LISTA DECLARADA, escrita ANTES de tocar
+
+**2026-08-14.** **Todos los números de abajo son a 1366x900**, y se dice porque la
+tanda anterior enseñó que un número sin su ancho al lado engaña: el ensanche de
+7 px de `ModalCliente` no aparecía a 1366 y sí a 360.
+
+**Lo que hay hoy, medido:** tarjeta **504x577,5** a 1366, `display: block`,
+`max-height: none`, padding 21. Cuatro hijos: el encabezado —que **ya es un
+`SunmiCardHeader`**, 22,5 px—, un `<p>` de subtítulo escrito a mano, el cuerpo
+—`flex flex-col gap-3 max-h-[65vh] overflow-y-auto pr-1`, 422,5 px— y el pie
+—`flex justify-end gap-2 mt-3 pt-3 border-t sunmi-divider`, 47,5 px—.
+Separaciones: **7, 7 y 10,5**.
+
+**Es la más parecida al kit de las cuatro**: ya usa el encabezado del kit y su
+cuerpo ya tiene exactamente la forma del cuerpo del kit.
+
+#### LOS DOS PUNTOS QUE HABÍA QUE MIRAR, contestados antes de tocar
+
+**1. El div intermedio `w-full max-w-xl` ES EL PANEL, y el del kit es casi el
+mismo.** El kit arma su panel con `["relative", w-full si no declaran ancho,
+maxWidth si no declaran uno, f.panel, lo pedido]`. Para `centrado` sin declarar
+nada eso da **`relative w-full max-w-xl`**. O sea que lo único que se agrega es
+`relative`, que crea contexto de posicionamiento y **no mueve nada por sí solo**
+—no hay `top`/`left`/`inset` que resolver contra él—.
+
+Y el `max-w-xl` es **el default del kit**, así que **no hay que declarar
+`maxWidth`**: la tarjeta tiene que seguir en 504.
+
+**2. El `SunmiCard` sin `className`: el kit tampoco le pone nada.** La pieza le
+pasa `[f.tarjeta, columnaEnLaTarjeta, altoEnLaTarjeta, paddingTarjeta,
+sombraTarjeta].filter(Boolean).join(" ")`. Para `centrado`, sin `altoVa` y sin
+padding ni sombra declarados, **las cinco dan vacío** y el resultado es la cadena
+`""`. Y el prop ya tiene `className = ""` por default, así que recibir `""` y no
+recibir nada son lo mismo. **Donde hoy no hay nada escrito, el kit sigue sin
+escribir nada.**
+
+#### La lista, por lo que se va a ver
+
+1. **APARECE UN BOTÓN "Cerrar" ARRIBA A LA DERECHA, DONDE HOY NO HAY NINGUNO.** Es
+   el punto más visible y el más distinto de las tres anteriores: este modal
+   **no tiene botón de cerrar en el encabezado** —ni ✕ ni nada— y hoy solo se
+   cierra con "Cancelar" abajo o tocando el velo. El encabezado va a crecer de
+   22,5 a unos 36 px, como pasó en `ModalCliente`.
+2. **El pie pierde su línea separadora de arriba y su `pt-3`.** Hoy es
+   `mt-3 pt-3 border-t sunmi-divider`; el del kit es `shrink-0 flex justify-end
+   gap-2 mt-3`. Se va la línea y 10,5 px de padding, así que el bloque del pie
+   baja de 47,5 a unos 37. **Va declarado antes por el precedente de
+   `ModalPreviewPrecio`**, donde el separador se fue con el botón y se contó
+   después.
+3. **El subtítulo se separa 3,5 px más del primer campo.** Sigue escrito a mano
+   —`subtitle` no se reenvía— pero pasa a ser el primer hijo del cuerpo, así que
+   lo que lo separa deja de ser su `mb-2` (7 px) y pasa a ser el `gap-3` del
+   cuerpo (10,5). Se le sacan el `-mt-1` y el `mb-2`, que eran relativos al
+   encabezado.
+4. **El velo cambia de tono y la ventana se despega más del fondo.** Hoy es
+   `bg-black/50` escrito a mano.
+5. **El ancho NO cambia, a ningún ancho de pantalla.** La tarjeta sigue en 504 a
+   1366 porque `max-w-xl` es el default del kit, y el padding de la capa **ya es
+   `p-3`**, el mismo que pone `centrado`. Acá no hay ensanche ni a 1366 ni a 360:
+   es la diferencia con las tres anteriores, que venían de `p-4`.
+6. **NO lleva `altoVa`.** Su tarjeta no está topada —`max-height: none`— y el tope
+   vive en el cuerpo, `max-h-[65vh]`, que es exactamente lo que hace `centrado`
+   por default. **Es la primera de las migradas que no necesita el séptimo
+   parámetro**, y eso confirma que el parámetro no se está usando por costumbre.
+7. **Hay que declarar `espacioCuerpo="mt-2 gap-3 pr-1"`** para conservar el
+   `pr-1`. Son 3,5 px de padding a la derecha que hoy existen para que la barra
+   de scroll no se coma el borde de los campos; el default del kit no los tiene.
+
+#### MIGRADO Y COMPARADO: nada apareció fuera de la lista
+
+Migrado el 2026-08-14. **La tarjeta pasa de 504x578 a 504x583 a 1366**: crece
+**5 px de alto** y no cambia de ancho.
+
+- **1 cumplido y el número dio.** Aparece el botón "Cerrar" y el encabezado pasa
+  de **22,5 a 36 px**, los ~36 declarados.
+- **2 cumplido.** El pie queda en `shrink-0 flex justify-end gap-2 mt-3` —sin
+  `border-t` y sin `pt-3`— y baja de **47,5 a 36 px**. Declaré "unos 37".
+- **3 cumplido.** El `<p>` es ahora el primer hijo del cuerpo y lo separa el
+  `gap-3` del cuerpo, 10,5 px, contra los 7 de su `mb-2`.
+- **5 cumplido.** 504 px antes y después. No hay ensanche, porque `max-w-xl` es el
+  default del kit y el padding de la capa ya era `p-3`.
+- **6 cumplido.** La tarjeta sigue con `max-height: none` y el tope sigue en el
+  cuerpo. **No lleva `altoVa`.**
+- **7 cumplido.** El cuerpo quedó
+  `flex flex-col max-h-[65vh] overflow-y-auto mt-2 gap-3 pr-1`.
+
+**Y los 5 px cierran con la aritmética**, que es lo que confirma que no hay nada
+suelto: el encabezado suma 13,5, el pie resta 11,5, y el cuerpo sube 27 porque el
+subtítulo —16,5 px más su hueco de 10,5— se mudó adentro de él. La cuenta da lo
+medido dentro del redondeo.
+
+**Lo que declara esta pantalla, para el registro:** `espacioCuerpo` con
+`"mt-2 gap-3 pr-1"` y `destructivo`. **Nada más** — ni `maxWidth`, ni `alto`, ni
+`altoVa`. Es la migración más liviana de las cuatro, y confirma que el séptimo
+parámetro no se está usando por costumbre.
+
+**Un defecto de lint que NO es de esta tanda y queda anotado:** `ModalGrupo.jsx`
+tiene un error de eslint —"Calling setState synchronously within an effect can
+trigger cascading renders"— en su primer `useEffect`. Comprobado que **ya estaba
+antes de migrar**: aparece igual en la versión anterior, una línea más abajo. No
+se tocó.
+
 #### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
 
 **Decidido el 2026-08-14: se revisa junto con los seis del POS, después de la
