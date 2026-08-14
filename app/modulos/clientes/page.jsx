@@ -1491,7 +1491,7 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
 
   return (
     <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
-      <SunmiCard className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <SunmiCard data-sunmi-modal="tarjeta" className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold">Historial de Ventas</h3>
@@ -1703,7 +1703,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
 
   return (
     <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
-      <SunmiCard className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <SunmiCard data-sunmi-modal="tarjeta" className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>

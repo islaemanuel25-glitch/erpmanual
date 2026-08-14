@@ -991,6 +991,146 @@ Las salidas posibles, que las decide Emanuel:
 3. **Cambiar de grupo** y dejar los del POS para cuando haya una caja abierta del
    día.
 
+### EL GRUPO NUEVO: el par de `clientes` — "Historial de Ventas" y "Cuenta Corriente"
+
+**Elegido el 2026-08-14, con el criterio nuevo y en su orden**: primero se
+preguntó cuáles abren, después se midió la firma.
+
+`app/modulos/clientes/page.jsx:1493` y `app/modulos/clientes/page.jsx:1705`.
+
+#### De dónde sale el universo, y por qué son solo estas dos
+
+Reconciliado contra el trinquete, que es la cifra oficial: **41 capas**. De ahí,
+18 con superficie propia quedan fuera de la fase 2, y **23 tienen `SunmiCard`**.
+Menos `ClientePickerFullscreen`, que sale por su capa, el migrable es **22**. De
+esas, **13 viven en `components/pos-ventas/`** y salen del universo elegible por
+la decisión de arriba — no de la cuenta.
+
+**Quedan 9 elegibles**, y esta es la lista entera:
+
+- `clientes/page.jsx:1124` — alta y edición de cliente
+- `clientes/page.jsx:1493` — Historial de Ventas
+- `clientes/page.jsx:1705` — Cuenta Corriente
+- `turnos/[id]/page.jsx:604` — ingreso y retiro de efectivo
+- `clientes/ModalMergeClientes.jsx:146` — unificar duplicados
+- `dashboard/ModalDetalleVenta.jsx:93` — detalle de venta
+- `grupos/ModalGrupo.jsx:154` — alta y edición de grupo
+- `operador/ModalPedirOperador.jsx:31` — identificate para seguir
+- `productos/ModalProductoFinal.jsx:22` — alta y edición de producto
+
+Comparadas capa Y tarjeta carácter por carácter, **hay un solo conjunto de más de
+uno**, y son estas dos:
+
+    capa:    fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50
+    tarjeta: w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col
+
+Las otras siete son singletons. **`clientes:1124` comparte la capa exacta pero no
+la tarjeta** —es `max-w-md … overflow-y-auto` en vez de `max-w-3xl … overflow-hidden
+flex flex-col`—, así que no entra. Es justamente el caso que el criterio viejo
+habría metido adentro mirando solo la capa.
+
+#### Que abren, comprobado EJECUTANDO
+
+Los dos, contra `erpazul_dev` en el 3111, con sesión real y `--ubicacion depo`.
+Se abren tocando el botón de la fila —"Ventas" y "Cta Cte"— sobre los **5
+clientes que ya existen** en la base. No se fabricó ninguna fila.
+
+Con datos de verdad: el historial de "Minimarket ayala" trae 8 ventas, tickets
+#8 a #64; su cuenta corriente da saldo $0,00 y "Sin movimientos registrados",
+que es su estado real y no un vacío inventado.
+
+**Una trampa que costó una corrida y conviene no repetir:** `--abrir "Ventas"`
+NO sirve, porque toca el primer botón cuyo texto lo contenga y el sidebar tiene
+un ítem "Ventas". La foto salió de la pantalla sin modal y el selector del
+recorte fue lo único que avisó. Los disparadores van por
+`--abrir-selector "button.sunmi-link-accent.text-xs"` y
+`--abrir-selector "button.sunmi-link-success.text-xs"`.
+
+**El que sí queda afuera por no poder abrirse es `ModalPedirOperador`**, y esto
+es leído y no ejecutado: se dibuja con `!exento && !operador && huboOperador`, o
+sea que hace falta que una sesión de operario **haya existido y se caiga a mitad
+de camino**, y el admin además es `exento`. No hay forma de llegar ahí sin
+fabricar la condición. Las otras seis no se verificaron ejecutando porque son
+singletons y no podían formar grupo de todos modos; su apertura queda por
+comprobar el día que les toque.
+
+#### LO QUE ESTAS DOS TIENEN Y NADIE ESPERABA: no hay div de cuerpo
+
+Medido con una sonda de geometría sobre la pantalla real, no leído del JSX.
+
+**La tarjeta ya es `flex flex-col`** y los hijos cuelgan directo de ella. No hay
+ningún contenedor de cuerpo, ni `space-y-*`, ni `gap`: la tarjeta declara
+`gap: normal`. Lo que separa a los hijos es **el margen propio de cada uno**.
+
+Historial de Ventas — tarjeta 672x424,5, padding 21 px, `max-height` 810 px:
+
+- encabezado, `top` 22, alto 42, `margin-bottom` 14
+- la tabla, `overflow-y-auto flex-1`, `top` 78, alto 259,5
+- el pie, `mt-4 pt-4 border-t`, `top` 351,5, alto 51, `margin-top` 14
+
+Cuenta Corriente — cinco hijos, mismos 21 px de padding:
+
+- encabezado, `top` 22, alto 42, `mb` 14
+- el saldo, `top` 78, alto 47,5, `mb` 14
+- los dos botones, `top` 139,5, alto 36, `mb` 14
+- "Sin movimientos registrados", `top` 189,5, alto 77
+- el pie, `top` 280,5, alto 51, `mt` 14
+
+**La separación medida es 14 px, pareja, en los dos y entre todos los hijos.**
+
+#### La lista declarada, escrita por lo que se va a ver
+
+1. **Los bloques del modal se van a separar 10 px más.** Hoy hay 14 px entre cada
+   par de bloques, puestos por el margen de cada uno. El cuerpo del kit agrega
+   `gap-3` —10,5 px— **encima** de esos márgenes, así que la separación pasaría a
+   24,5 px si los márgenes se conservan. En Cuenta Corriente eso son cuatro
+   separaciones: el modal se estira unos 42 px. Es el punto que hay que decidir
+   antes de escribir: o se sacan los `mb-4` de los hijos, o se declara el
+   ensanchamiento.
+2. **LA TABLA DEL HISTORIAL PUEDE DEJAR DE ESTIRARSE, y esto no es cosmético.**
+   Su contenedor es `overflow-y-auto flex-1`, y el `flex-1` funciona porque su
+   padre es la TARJETA, que es la que tiene el `max-h-[90vh]`. Envolver los hijos
+   en el div de cuerpo del kit mete un contenedor en el medio, y el `flex-1` pasa
+   a resolverse contra ese envoltorio. **Si la tabla deja de ocupar el alto
+   disponible, la migración está mal**, y hay que mirarlo expresamente.
+3. **Aparece un tope de alto con scroll donde ya había uno.** El cuerpo del kit
+   trae `max-h-[65vh] overflow-y-auto`. La tarjeta ya declara `max-h-[90vh]
+   overflow-hidden` —810 px medidos— y el historial ya scrollea adentro con su
+   `overflow-y-auto`. Quedarían tres.
+4. **El velo cambia de tono y la ventana se va a DESPEGAR MÁS del fondo.** Hoy
+   los dos usan `sunmi-pos-overlay`. El velo del kit lleva el fondo del tema al
+   70 % hacia el negro y eso, medido, da más separación entre tarjeta y velo, no
+   menos. Es el único punto que mejora en vez de solo cambiar: **si en la
+   comparación la ventana no se despega más, algo salió mal.**
+5. **El modal se ensancha 7 px.** El padding de la capa pasa de `p-4` a `p-3`,
+   14 → 10,5 px, 3,5 de cada lado.
+6. **El título se ve más chico, menos grueso y más separado.** Hoy es
+   `text-lg font-bold`; con `SunmiCardHeader` queda en 15 px, peso 600 y
+   `tracking-wide`, y se corre 3,5 px a la derecha por el `px-1` del encabezado.
+7. **El subtítulo YA EXISTE y hay que decidir qué pasa con él.** Los dos dibujan
+   el nombre del cliente debajo del título, con `text-sm sunmi-text-muted`. No
+   repite el título, así que por el criterio de arqueo-caja se enciende — pero
+   `SunmiModalLayout` **no reenvía `subtitle`**, así que hoy no hay por dónde
+   pasarlo sin tocar la pieza. Es el primer caso real que pide esa puerta.
+8. **Aparece un segundo botón de cerrar arriba a la derecha.** Los dos ya tienen
+   su ✕ en el encabezado Y su "Cerrar" abajo. Con el del kit serían tres formas
+   de cerrar el mismo modal.
+9. **El ancho máximo hay que declararlo**: `maxWidth="max-w-3xl"`. Sin eso los
+   dos pasan de 672 px a los 504 del `max-w-xl` del kit — se ACHICAN, que es al
+   revés de lo que pasó en los grupos anteriores.
+
+#### Las capturas de antes, ya sacadas
+
+A 1366x900 contra `erpazul_dev`, tema `sunmiDark` pasado explícito,
+`--repeticiones 3`, `--ubicacion depo`, sin `--alto-captura`, y recortadas a
+`[data-sunmi-modal="tarjeta"]` — el atributo se le agregó a mano a las dos
+tarjetas, que es inerte y no mueve un píxel.
+
+Las dos fichas dicen `repeticiones: 3` y `apto: true`, y el arnés informó "3
+corridas idénticas" en las dos. Recortes: 672x425 el historial, 672x354 la cuenta
+corriente. **Ojo con la ficha:** `recorte` trae el margen incluido —720x473 y
+720x401— y confundirlo con el tamaño del elemento ya arruinó una medición.
+
 ### LA MIGRACIÓN DEL CARRITO SE ESCRIBIÓ, SE MIDIÓ Y SE REVIRTIÓ
 
 **2026-08-13.** Se escribió entera —los dos caminos, con `encabezado="ninguno"`—
