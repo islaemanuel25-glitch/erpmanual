@@ -90,6 +90,32 @@ const ABRIR = arg("abrir", null);
 // preview de listas de precios se abre con un botón de ícono sin `aria-label`,
 // así que por texto no hay con qué encontrarlo. Toca el primero que matchee.
 const ABRIR_SELECTOR = arg("abrir-selector", null);
+// ── LOS PASOS QUE LLEVAN AL ESTADO QUE SE QUIERE FOTOGRAFIAR ───────────────
+//
+// Abrir un modal alcanzaba mientras los modales tuvieran UN solo estado. No es el
+// caso: `ModalMergeClientes` recién dibuja su tabla después de elegir un cliente
+// principal y buscar candidatos, y el relevamiento lo había dado por
+// INALCANZABLE justamente porque se lo miró apenas abierto. La tabla estaba a dos
+// pasos, con datos reales y sin fabricar nada.
+//
+// Cada paso es un objeto y hay tres:
+//
+//   { "escribir": "<selector>", "texto": "ma" }   escribe en un input
+//   { "tocar": "<selector>" }                     toca un nodo
+//   { "esperar": "<selector>" }                   espera a que exista
+//
+// `escribir` usa el setter nativo del prototipo y después emite el evento: poner
+// `.value` a secas NO dispara el `onChange` de React, así que el paso parecería
+// darse y la pantalla no se movería — otra foto determinista del estado anterior.
+//
+// Los tres FALLAN NOMBRANDO el selector. Es la misma razón que en `--abrir`: un
+// paso que no ocurrió deja la foto del estado de antes, y esa foto es
+// perfectamente determinista y pasa `--repeticiones 3` sin despeinarse.
+//
+// Y `esperar` existe para no esperar por reloj. Un `sleep` fijo mide una pantalla
+// que todavía no llegó, y con la búsqueda de por medio —350 ms de debounce más el
+// viaje a la API— eso pasa siempre en la máquina cargada y nunca en la libre.
+const PASOS = JSON.parse(arg("pasos", "[]"));
 // CON QUÉ TEMA SE MIDE. La clave va al `localStorage` ANTES de que cargue la
 // página, que es exactamente donde la deja el dispositivo cuando alguien elige
 // un tema en Apariencia.
@@ -265,6 +291,49 @@ if (ABRIR_SELECTOR) {
     process.exit(1);
   }
   await sleep(2500);
+}
+
+// Los pasos hacia el estado que se quiere fotografiar — ver el comentario de
+// `--pasos`. Se corren en orden y cualquiera que no ocurra corta la corrida.
+for (const [i, paso] of PASOS.entries()) {
+  const n = `paso ${i + 1}/${PASOS.length}`;
+
+  if (paso.esperar) {
+    let apareció = false;
+    for (let t = 0; t < 60; t++) {
+      apareció = await evaluar(`!!document.querySelector(${JSON.stringify(paso.esperar)})`);
+      if (apareció) break;
+      await sleep(250);
+    }
+    if (!apareció) {
+      console.log(`${n}: NUNCA APARECIÓ ${paso.esperar}`);
+      console.log("  La foto sería del estado anterior, y ese estado también es determinista.");
+      cerrar();
+      process.exit(1);
+    }
+    console.log(`${n}: apareció ${paso.esperar}`);
+    continue;
+  }
+
+  const sel = paso.escribir || paso.tocar;
+  const hecho = await evaluar(`(() => {
+    const el = document.querySelector(${JSON.stringify(sel)});
+    if (!el) return false;
+    ${paso.escribir
+      ? `const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+         setter.call(el, ${JSON.stringify(String(paso.texto ?? ""))});
+         el.dispatchEvent(new Event("input", { bubbles: true }));`
+      : `el.click();`}
+    return true;
+  })()`);
+  if (!hecho) {
+    console.log(`${n}: EL SELECTOR NO ENCONTRÓ NADA: ${sel}`);
+    console.log("  La foto sería del estado anterior, y ese estado también es determinista.");
+    cerrar();
+    process.exit(1);
+  }
+  console.log(`${n}: ${paso.escribir ? `escrito "${paso.texto}" en` : "tocado"} ${sel}`);
+  await sleep(600);
 }
 
 // ── LA MEDICIÓN ──────────────────────────────────────────────────────────

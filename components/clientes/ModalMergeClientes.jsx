@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -143,18 +143,43 @@ export default function ModalMergeClientes({ localId, onCerrar, onMerged }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-      <SunmiCard data-sunmi-modal="tarjeta" className="w-full max-w-2xl p-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold">Unificar clientes duplicados</h3>
-          <button
-            onClick={onCerrar}
-            className="text-xl text-slate-400 hover:text-slate-200"
-          >
-            ✕
-          </button>
-        </div>
+    <SunmiModalLayout
+      open
+      title="Unificar clientes duplicados"
+      onClose={onCerrar}
+      // El velo NO cierra: hay dos buscadores escritos y una selección de
+      // duplicados armada a mano, y un toque al costado —que en el teléfono pasa
+      // solo— tira las tres cosas.
+      destructivo
+      z={50}
+      // 588 medidos, que es exactamente `max-w-2xl` a 14px de raíz. Sin
+      // declararlo tomaría el `max-w-xl` del kit, 504, y el modal se ACHICARÍA
+      // 84 px: es el primero de la fase donde olvidarlo encoge en vez de
+      // ensanchar.
+      maxWidth="max-w-2xl"
+      alto="max-h-[90vh]"
+      // El tope está declarado en la TARJETA —810px medidos— igual que en
+      // `ModalCliente`, así que va allá y no al cuerpo.
+      altoVa="tarjeta"
+      // VACÍO, y no el `mt-2` del kit ni el `mt-4` que se había anotado. La
+      // separación real entre el encabezado y el primer separador es 21 y no 14:
+      // el `mb-4` del encabezado COLAPSA contra el `margin-top` de 21 del
+      // `SunmiSeparator`, y en flujo de bloque gana el más grande. Cualquier `mt`
+      // acá se sumaría a esos 21. El separador ya trae su propia separación.
+      espacioCuerpo=""
+    >
+      {/* EL ENVOLTORIO NO ES DECORATIVO: mantiene el flujo de bloque.
 
+          En una columna flex los márgenes NO COLAPSAN, se suman. Medido acá: el
+          bloque del cliente principal tiene `mb-3` —10,5px— y lo sigue el segundo
+          separador con `mt` de 21; hoy colapsan a 21 y sueltos en el cuerpo del
+          kit darían 31,5. Como hijo de un contenedor flex, este div establece su
+          propio contexto de formato, así que sus hijos siguen colapsando igual
+          que cuando colgaban de la tarjeta.
+
+          Es el mismo recurso que en `ModalCliente`, donde el `space-y-3` entró
+          entero como hijo único por esta misma razón. */}
+      <div>
         {/* Paso 1: Cliente principal */}
         <SunmiSeparator label="1. Cliente principal (el que queda)" />
 
@@ -317,7 +342,10 @@ export default function ModalMergeClientes({ localId, onCerrar, onMerged }) {
           </div>
         )}
 
-        {/* Botones */}
+        {/* LOS BOTONES SE QUEDAN ADENTRO DEL CUERPO, y no van al `footer` del
+            kit. Son `flex-1`, mitad y mitad, y el pie del kit es `justify-end`:
+            allá quedarían chicos y pegados a la derecha. Eso no es migrar la
+            capa, es repintar el interior. */}
         <div className="flex gap-2 pt-2">
           <SunmiButton
             color="slate"
@@ -338,7 +366,7 @@ export default function ModalMergeClientes({ localId, onCerrar, onMerged }) {
               : `Unificar ${seleccionadosList.length > 0 ? seleccionadosList.length : ""} cliente(s)`}
           </SunmiButton>
         </div>
-      </SunmiCard>
-    </div>
+      </div>
+    </SunmiModalLayout>
   );
 }

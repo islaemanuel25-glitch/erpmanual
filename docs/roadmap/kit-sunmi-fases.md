@@ -1875,7 +1875,12 @@ entienda por qué la URL pierde el parámetro. Su lugar lo toma
 extra es que tiene una tabla adentro, y eso ya está resuelto con el `shrink-0`.
 
 Orden vigente: `ModalCliente` (hecho), `ModalGrupo` (hecho),
-**`ModalMergeClientes`**, y después `ModalProductoFinal` si se destraba.
+`ModalMergeClientes` (**hecho el 2026-08-14**), y después `ModalProductoFinal`
+si se destraba.
+
+**Con eso la fase 2 se queda sin candidatos abribles.** Lo que sigue es la
+**tanda del `?editar=`** —por qué la URL pierde el parámetro— y después la
+**tabla de declaraciones**, que es el cierre de la fase.
 
 ### `ModalMergeClientes` — LA LISTA DECLARADA, escrita ANTES de tocar
 
@@ -1907,28 +1912,144 @@ el bloque del cliente principal con `mb-3`; y el pie `flex gap-2 pt-2` de 43 px.
 6. **El ensanche de 7 px de la capa NO se ve a 1366** —588 está muy por debajo del
    ancho disponible— y **sí se vería a 360**, donde el padding de la capa decide.
    Se dice el ancho porque sin él el renglón engaña.
-7. **Las separaciones desiguales se conservan.** Se declara
-   `espacioCuerpo="mt-4"` —los 14 px del `mb-4` del encabezado— **y no se declara
-   gap**: los 21, 21 y 10,5 los ponen los márgenes propios de cada bloque, y
-   meter un `gap` los emparejaría a todos, que es repintar el interior.
+7. **Las separaciones desiguales se conservan.** ~~Se declara
+   `espacioCuerpo="mt-4"` —los 14 px del `mb-4` del encabezado—~~ **CORREGIDO
+   MIDIENDO: va `espacioCuerpo=""` y con un div que envuelva el cuerpo.** El
+   porqué está más abajo, en "dos números de la lista declarada estaban mal". Lo
+   que no cambia es que **no se declara gap**: los 21, 21 y 10,5 los ponen los
+   márgenes propios de cada bloque, y meter un `gap` los emparejaría a todos, que
+   es repintar el interior.
 8. **El par Cancelar/Unificar se queda ADENTRO del cuerpo.** Son `flex-1`, mitad
    y mitad; el pie del kit es `justify-end` y los haría chicos y a la derecha.
 
-#### LO QUE NO SE VA A PODER VERIFICAR, y se dice en vez de darlo por bueno
+#### LA TABLA SÍ SE PUEDE VER, Y DECIR QUE NO SE PODÍA FUE UN ERROR DE MÉTODO
 
-Este modal **tiene una tabla adentro**, y era el motivo por el que quedó último
-del orden. **Pero en el estado en que se lo puede abrir hoy no la dibuja**: sin
-candidatos cargados, el modal muestra el separador y el bloque vacío del cliente
-principal, y nada más. Medido: cuatro hijos, ninguno es una tabla.
+**Escrito primero:** que este modal "no dibuja su tabla y por eso esa parte se
+migra sin verificar". **Es falso, y se comprobó ejecutando el 2026-08-14.**
 
-O sea que **la interacción entre `SunmiTable` y el cuerpo del kit —el `shrink-0`
-que se arregló para esto— NO se va a poder ejercer en esta migración** con los
-datos de hoy. Haría falta que existan clientes duplicados detectables.
+La tabla está a **dos pasos** del estado en que se abre, y los dos son uso normal:
+escribir en "Buscar cliente principal", elegir uno de los resultados, y escribir
+en "Buscar duplicados". Ahí aparece, con **cuatro filas de clientes reales de
+`erpazul_dev`**. Ninguna condición fabricada: los dos pasos son GET a
+`/api/clientes/buscar`, no se toca la base y no se toca "Unificar".
 
-No se fabrica esa condición. Queda declarado que esa parte se migra **sin
-verificar**, con esas palabras, y que la primera vez que alguien abra este modal
-con duplicados de verdad conviene mirar que la tabla se estire y que el scroll
-siga siendo uno solo.
+**Por qué la conclusión anterior estaba mal, que es lo que hay que recordar:**
+`resultadosDuplicados` **no son duplicados detectados**. Son los resultados de una
+búsqueda cualquiera menos el principal. O sea que la tabla se dibuja con cualquier
+par de clientes que compartan letras, y la premisa —"haría falta que existan
+clientes duplicados detectables"— salió de leer el nombre de la variable en vez de
+leer qué la llena.
+
+**Y es el mismo error que el de `ModalProductoFinal`, en su otra cara.** Ahí se
+concluyó "abre" mirando una sola vez; acá se concluyó "no se puede llegar" mirando
+un solo estado. Las dos veces la conclusión se sacó del primer estado que la
+pantalla mostró. **La regla que queda: un modal con pasos se releva recorriendo
+sus pasos, no fotografiando el primero.**
+
+**Y hay una segunda cosa mal, que sobrevivía desde el orden de trabajo.** Este
+modal quedó último porque "tiene una tabla adentro y eso ya está resuelto con el
+`shrink-0`". **No usa `SunmiTable`**: es un `<table className="w-full text-xs">`
+escrito a mano dentro de un `div.max-h-48.overflow-y-auto`, y sus importaciones
+son `SunmiCard`, `SunmiButton`, `SunmiInput` y `SunmiSeparator`. El arreglo del
+`shrink-0` **no tiene nada que ver con esta pantalla**. Lo que sí hay que mirar es
+que ese div con `max-h-48` no se encoja al pasar a ser hijo de una columna flex.
+
+**Consecuencia práctica: no queda nada sin verificar.** Se sacaron las dos
+capturas de antes, las dos con `--repeticiones 3` y las dos deterministas: el
+modal recién abierto (588x210,5) y el modal con la tabla y sus cuatro filas
+(588x454).
+
+#### LO QUE HIZO FALTA AGREGARLE AL ARNÉS: `--pasos`
+
+`--abrir` alcanzaba mientras un modal tuviera un solo estado. Este no. Para poder
+fotografiar el estado con la tabla se le agregó a `scripts/medir-desborde.mjs` un
+`--pasos` con tres verbos —`escribir`, `tocar` y `esperar`—, y sale del caso que
+lo necesitó, no de adivinar los que vengan.
+
+Dos detalles que no se deducen leyendo y por eso están en el comentario del
+archivo: `escribir` usa el **setter nativo del prototipo** y después emite el
+evento, porque poner `.value` a secas no dispara el `onChange` de React y el paso
+parecería darse sin que la pantalla se mueva; y los tres **fallan nombrando el
+selector**, por lo mismo que `--abrir` — un paso que no ocurrió deja la foto del
+estado anterior, y ese estado es perfectamente determinista.
+
+#### DOS NÚMEROS DE LA LISTA DECLARADA ESTABAN MAL, medidos antes de tocar
+
+**`espacioCuerpo` va vacío, no `"mt-4"`.** La lista decía `mt-4` "para conservar
+los 14 px del `mb-4` del encabezado", y **los 14 no son la separación real**:
+medida, es **21**. El `mb-4` del encabezado vale 14 px pero **colapsa** contra el
+`margin-top` de 21 px del `SunmiSeparator` que le sigue, y en flujo de bloque gana
+el más grande. Declarar `mt-4` habría sumado 14 a los 21 del separador y bajado
+todo 14 px.
+
+**Y hace falta un div que envuelva el cuerpo, por el mismo motivo.** En una
+columna flex los márgenes **no colapsan, se suman**. Medido: el bloque del cliente
+principal tiene `mb-3` (10,5 px) y lo sigue el segundo `SunmiSeparator` con
+`mt` de 21; hoy colapsan a **21** y sueltos en la columna del kit darían **31,5**.
+Con el envoltorio —que como hijo de un contenedor flex establece su propio
+contexto de formato— los cuatro a siete hijos siguen en flujo de bloque y sus
+márgenes siguen colapsando igual que hoy. **Es el mismo recurso que en
+`ModalCliente`**, donde el envoltorio ya existía y se pasó entero como hijo único.
+
+#### LA MIGRACIÓN, VERIFICADA: dos estados, y solo apareció lo declarado
+
+**2026-08-14.** Los dos estados fotografiados con `--repeticiones 3`, los dos
+deterministas, los dos a 1366x900 y los dos recortados por
+`[data-sunmi-modal="tarjeta"]`.
+
+**Recién abierto:** 588x210,5 → **588x222**. **Con la tabla y sus cuatro filas:**
+588x454 → **588x465,5**.
+
+**El ancho no se movió ni un píxel en ninguno de los dos**, que es lo que
+comprueba el `max-w-2xl` declarado. Y **el alto creció 11,5 en los dos, que es
+exactamente lo que mide el encabezado nuevo**: 24,5 el `<h3>` con el ✕, 36 el del
+kit con el botón "Cerrar". No hay ningún otro alto de más escondido en ese
+número.
+
+**Las separaciones internas se conservaron una por una**, que es lo que el
+envoltorio existía para lograr: **21, 21, 21, 7 y 10,5** antes y después. Sin el
+envoltorio la tercera habría dado 31,5.
+
+**La tabla quedó igual**: 542x137,5 sobre un padre de 544, cuatro filas. No se
+encogió al pasar a ser hija de una columna flex, que era el único riesgo real
+—`SunmiTable` nunca estuvo en juego acá—.
+
+**El scroll se mudó, y se comprobó forzándolo.** A 900 no desborda nada ni antes
+ni después, así que el punto se midió con la ventana a **400**, donde el
+`max-h-[90vh]` topa la tarjeta en 360:
+
+- **Antes** el único que scrolleaba de verdad era **la tarjeta misma** —452 de
+  contenido en 358 de caja—, así que el título se iba con el scroll.
+- **Después** el único que scrollea es **el cuerpo del kit** —386 en 280— y el
+  encabezado queda fijo.
+
+**Uno solo en los dos casos**, que es la mitad del candado que esta fase se
+comprometió a mirar. Es la diferencia 1 de la lista declarada, ejercida y no
+supuesta.
+
+**El contador bajó exactamente lo que tenía que bajar.** Modales armados a mano
+**38 → 37**, y las otras dos bajas están atribuidas una por una a las cuatro
+líneas que se borraron de este archivo: colores fijos **289 → 287** —el
+`bg-black/80` de la capa y el `text-slate-` del ✕— y elementos crudos **319 →
+318** —el `<button>` del ✕—. Comprobado comparando la ficha del módulo `clientes`
+contra la misma ficha con el archivo sin migrar: cuatro hallazgos menos, los
+cuatro de este archivo, ninguno de otro lado.
+
+Suite: **3.257 candados, 0 en rojo.** El único que se puso en rojo fue el registro
+de `destructivo`, que es lo que tiene que pasar cuando aparece un consumidor
+nuevo; se le agregó la entrada con su motivo. **No se aflojó nada.**
+
+#### Y de paso: `SunmiSeparator` tiene un comentario CSS aplicándose como clase
+
+`my-2` sugiere 7 px y el separador mide **21**. El motivo es que su `className` es
+un template literal con un comentario adentro —`my-2 /* antes my-4 o my-6 */`—,
+así que el atributo termina conteniendo las palabras sueltas, y entre ellas
+**`my-4` y `my-6` son clases de Tailwind de verdad**: gana `my-6`, 1,5rem, 21 px.
+
+**No se toca en esta tanda**, porque arreglarlo movería el espaciado de todas las
+pantallas que usan el separador y esta tanda migra una capa. Queda anotado como
+deuda propia: hoy el número que se ve no es el que está escrito, y cualquiera que
+lea `my-2` para calcular un espaciado va a errarle por 14 px.
 
 #### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
 

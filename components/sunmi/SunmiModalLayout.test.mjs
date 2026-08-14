@@ -386,6 +386,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // Alta y edición de grupo: nombre escrito más los locales y depósitos que se
     // fueron agregando. Cerrar sin querer tira todo eso.
     "components/grupos/ModalGrupo.jsx": true,
+    // Unificar duplicados: no se escribe un formulario, pero se ARMA una
+    // selección —el cliente principal elegido más los duplicados tildados uno por
+    // uno—, y rehacerla cuesta lo mismo que rellenar un formulario. El criterio
+    // es qué se pierde, y acá se pierde el trabajo de haberlos encontrado.
+    "components/clientes/ModalMergeClientes.jsx": true,
     // Informativos, de confirmación y de selección: cerrarlos no pierde nada.
     // `ModalPreviewPrecio` tiene un campo y NO lleva destructivo a propósito: lo
     // único que se escribe ahí es el buscador, y perder un término de búsqueda
