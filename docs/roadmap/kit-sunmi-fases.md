@@ -2052,6 +2052,107 @@ lo va a empezar a elegir el número 23.
 **Ninguna de las seis se aplicó en esta tanda.** La tabla es el insumo de la
 decisión, y la decisión es de Emanuel.
 
+### ⚑ LA REGLA QUE SALE DE LA TABLA
+
+**UN DEFAULT QUE NINGÚN CONSUMIDOR ELIGE SE SACA O SE CAMBIA, NO SE DEJA.**
+
+No es una preferencia de estilo. Un default existe para que el caso común no haya
+que escribirlo; si **cero** de los consumidores lo eligen, dejó de ser el caso
+común y pasó a ser **lo que le va a tocar al próximo que no sepa que tiene que
+declarar algo**.
+
+*El caso, medido:* el default del `alto` es `max-h-[65vh]` y **ninguno de los 22
+modales lo usa**. La migración de `CarritoPedido` lo tomó por no declarar nada y
+**la hoja quedó a 416 px de alto contra 574**: 640 × 0,65. La lista quedó cortada
+a la mitad del segundo producto. La migración se revirtió, y el default sigue ahí
+esperando al siguiente.
+
+Y hay una segunda parte que este caso enseña y que no se ve contando: **el destino
+del valor también es un default.** Los cinco que declaran `alto` lo mandan todos a
+la TARJETA —cuatro con `altoVa="tarjeta"` y `ModalCambioPrevio` por su forma— y
+**ninguno al cuerpo**, que es adonde lo manda el default de `centrado`. Cuando un
+default no lo elige nadie, hay que preguntarse si lo que sobra es el valor o el
+camino.
+
+### LO QUE PASA SI SE CAMBIA EL DEFAULT DEL `alto` — medido, no razonado
+
+**2026-08-14. El cambio se escribió, se midió y SE REVIRTIÓ.** No está commiteado.
+
+**Un tope solo se nota cuando el contenido lo alcanza**, así que la pregunta no es
+cuántos toman el default —son 17— sino cuántos **tienen contenido que lo toca**.
+Medido abriendo cada uno con sesión real:
+
+- **A 1366x900** (65vh = 585 px), de los 8 que se pudieron abrir, **tocan el tope
+  2**: `ModalLocal` (contenido 643) y `ModalRol` (contenido 2117).
+- **A 360x640** (65vh = 416 px), de los 7 medidos, **tocan el tope 4**:
+  `ModalGrupo` (450), `ModalLocal` (643), `ModalRol` (2117) y `ModalProveedor`
+  (529). En el teléfono es donde un formulario se pasa, y por eso se mide ahí
+  también.
+
+**Con `max-h-[90vh]` a secas —el tope sigue yendo al cuerpo— se rompe una
+pantalla.** `ModalLocal` pasa de 701 a 759 y deja de scrollear. Y `ModalRol` pasa
+de 701 a **926 en una ventana de 900**: la tarjeta arranca en **y = −13**, se corta
+12 px arriba y 12 abajo, y **los de arriba no se recuperan scrolleando**, porque la
+capa centra y no tiene scroll propio. El encabezado y el botón de cerrar quedan
+fuera de la pantalla. Los otros seis quedaron idénticos al dígito.
+
+Es exactamente lo que el comentario de `FORMAS` ya advertía para `hoja`: **90 % del
+cuerpo más el encabezado más el pie pasa del 100 %.**
+
+**Con `max-h-[90vh]` Y el tope en la TARJETA para `centrado`, nada sale de la
+ventana, pero igual se mueven dos.** `ModalRol` 701 → 810 —entra, y su cuerpo
+muestra 694 de 2117 en vez de 585— y `ModalLocal` 701 → 759. El resto, idéntico.
+
+**Conclusión: la comprobación de que no se mueva ninguna NO PUEDE PASAR**, por
+ningún camino, porque hay pantallas que hoy tocan ese tope de verdad. Cambiar el
+default **es** cambiar esas pantallas. Lo que queda para decidir no es si se
+mueven, sino **cuáles y cuánto**, y eso ya está medido acá arriba.
+
+### LOS OTROS DOS DEFAULTS: los dos números de cada camino
+
+**Medido y NO aplicado**, por pedido expreso.
+
+#### `espacioCuerpo` — default `mt-2 gap-3`
+
+- **17 de 22 lo declaran, y 8 de esos lo declaran VACÍO.** Los otros 5 no lo
+  declaran: los dos de `PanelComprobantes`, `ModalVerComposicion`, `ModalRevertir`
+  y `ModalTerminar`.
+- **Cambiar el default a vacío:** se mueven **5 modales**, hay que tocar **0
+  archivos**.
+- **Sacarle el default y obligar a declararlo:** se mueven **0 modales**, hay que
+  escribir **5 declaraciones** nuevas.
+
+**Y hay un dato que inclina la balanza: los cinco afectados NO SE PUEDEN ABRIR
+HOY.** Comprobado: en productos no hay ningún combo, así que `ModalVerComposicion`
+no tiene de dónde salir; `/modulos/proveedores/listas` dice "Todavía no importaste
+ninguna lista", así que `ModalRevertir` y `ModalTerminar` tampoco; y los dos de
+`PanelComprobantes` son confirmaciones que necesitan un comprobante subido y una
+acción sobre él.
+
+O sea que **el camino de cambiar el default movería cinco pantallas que no se
+pueden fotografiar para comprobar que quedaron bien.** El otro camino no mueve
+nada y deja las cinco declaraciones escritas, que es lo que este documento viene
+pidiendo desde el principio.
+
+#### `z` — default `9999`
+
+- **5 de 22 lo declaran, y los cinco declaran `{50}`.** Los otros 17 toman 9999.
+- **Cambiar el default a 50:** cambian de altura de apilado **17 modales**, y hay
+  que tocar **0 archivos**.
+- **Sacarle el default:** **22 declaraciones obligatorias**, de las cuales 17 son
+  nuevas, y **0 modales** cambian.
+
+**Y esto no es cosmético, porque hay cosas por encima de 50 que están FUERA del
+modal** —o sea que no las protege el contexto de apilado de la capa—. Inventario
+del repo entero: `CampanaNotificaciones` a **9998 y 9999**, el `ColumnManager` de
+productos a **9999**, `ModalPedirOperador` a **10000**, `ClientePickerFullscreen` a
+80, `HistorialDia` y `SunmiSelectConCrearRapido` a 60.
+
+Con el default en 50, esos 17 modales quedarían **debajo** de la campana de
+notificaciones y del gestor de columnas. **Y los cinco que hoy declaran 50 ya están
+ahí**: no es un riesgo hipotético, es lo que hay, y conviene mirarlo cuando se
+decida.
+
 ### `ModalMergeClientes` — LA LISTA DECLARADA, escrita ANTES de tocar
 
 **2026-08-14.** **Todos los números son a 1366x900.**
