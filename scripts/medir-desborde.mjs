@@ -396,9 +396,20 @@ console.log(
 // Se apagan las transiciones y las animaciones, se manda el scroll a cero en
 // todos lados, y se saca el cursor de texto que parpadea. Todo en una pestaña
 // descartable: no cambia nada de la aplicación.
+// Y SE ESCONDE EL INDICADOR DE NEXT EN DESARROLLO, que NO es la aplicación.
+//
+// Es el círculo de abajo a la izquierda. Cambia con el estado del SERVIDOR —si
+// hubo un error de compilación queda con su marca— así que dos capturas sacadas
+// contra instancias distintas del dev server difieren ahí sin que la pantalla
+// haya cambiado. Costó un diagnóstico: `usuarios` informó 2.254 píxeles de
+// diferencia en la esquina (1,840)-(77,899) y el cambio no tocaba nada de eso.
+//
+// Se esconde en la pestaña descartable, con `visibility` y no con `display`,
+// para no correr nada de lo que tiene alrededor.
 await evaluar(`(() => {
   const s = document.createElement("style");
-  s.textContent = "*,*::before,*::after{transition:none !important;animation:none !important;caret-color:transparent !important}";
+  s.textContent = "*,*::before,*::after{transition:none !important;animation:none !important;caret-color:transparent !important}"
+    + "nextjs-portal,#__next-build-watcher,[data-nextjs-toast],[data-nextjs-dev-tools-button]{visibility:hidden !important}";
   document.head.appendChild(s);
   window.scrollTo(0, 0);
   for (const el of document.querySelectorAll("*")) { el.scrollTop = 0; el.scrollLeft = 0; }
