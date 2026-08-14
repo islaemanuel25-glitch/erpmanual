@@ -398,6 +398,19 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // renombre de `destructivo`.
     "components/proveedores/listas/ModalRevertir.jsx": true,
     "components/proveedores/listas/ModalTerminar.jsx": true,
+    // ── EL ÚNICO ARCHIVO CON DOS MODALES, Y NO CONTESTAN LO MISMO ────────────
+    //
+    // `app/modulos/clientes/page.jsx` tiene "Cuenta Corriente", que SÍ lo declara
+    // —sus mini-formularios de pago y ajuste tienen monto y nota escritos—, y
+    // "Historial de Ventas", que NO, porque es de solo lectura.
+    //
+    // Este chequeo mira el ARCHIVO, así que solo puede afirmar que alguno lo
+    // declara. Es la misma limitación que el contador tenía hasta el 2026-08-14
+    // —la unidad es el archivo cuando debería ser la capa— y queda anotada acá
+    // para que se arregle con la misma forma el día que un archivo tenga dos
+    // modales que difieran EN CONTRA: uno que deba declararlo y no lo haga.
+    // Hoy no puede pasar sin que alguien lo vea, porque son dos.
+    "app/modulos/clientes/page.jsx": true,
   };
 
   // Que la lista sea TODOS los que usan la pieza, no los que alguien recordó.

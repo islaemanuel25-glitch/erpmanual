@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
@@ -1490,22 +1491,31 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
   };
 
   return (
-    <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
-      <SunmiCard data-sunmi-modal="tarjeta" className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-bold">Historial de Ventas</h3>
-            <p className="text-sm sunmi-text-muted">{cliente.nombre}</p>
-          </div>
-          <button
-            onClick={onCerrar}
-            className="text-xl sunmi-link-muted"
-          >
-            ✕
-          </button>
-        </div>
+    <SunmiModalLayout
+      open
+      title="Historial de Ventas"
+      onClose={onCerrar}
+      z={50}
+      maxWidth="max-w-3xl"
+      alto="max-h-[90vh]"
+      // EL TOPE VA A LA TARJETA, no al cuerpo — es la excepción declarable que se
+      // agregó al kit el 2026-08-14, y sale de acá: esta pantalla declaraba
+      // `max-h-[90vh]` en la TARJETA. Sin esto, medido forzando el desborde con
+      // una ventana de 250px, la tarjeta pasaba de 225px topada a 312 sin tope.
+      altoVa="tarjeta"
+      // `gap-4` y no el `gap-3` del kit: la raíz de este proyecto es de 14px, así
+      // que `-4` da 14 y `-3` da 10,5. Los hijos se separaban 14 con su `mb-4`
+      // propio —medido, no deducido— y esos márgenes se sacaron para que el
+      // espaciado lo decida el kit.
+      espacioCuerpo="mt-2 gap-4"
+    >
+      {/* EL NOMBRE DEL CLIENTE VA ESCRITO A MANO, NO POR `subtitle`.
+          `SunmiModalLayout` no reenvía ese prop a propósito: hacerlo encendería
+          los seis subtítulos de modal que hoy están apagados, y dos de ellos
+          repiten su propio título. Esa es su propia tanda. */}
+      <p className="text-sm sunmi-text-muted shrink-0">{cliente.nombre}</p>
 
-        {loading ? (
+      {loading ? (
           <div className="text-center py-8 sunmi-text-muted">
             Cargando ventas...
           </div>
@@ -1518,11 +1528,14 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
             Sin ventas registradas
           </div>
         ) : (
-          <div className="overflow-y-auto flex-1">
-            <SunmiTable
-              headers={["Fecha", "Ticket", "Total", "Local"]}
-              className="text-xs"
-            >
+          // El envoltorio `overflow-y-auto flex-1` se SACÓ: su papel lo hace ahora
+          // el cuerpo del kit, que con el tope en la tarjeta nace
+          // `flex-1 min-h-0 overflow-y-auto` — la misma cadena de antes con el div
+          // de la pieza en lugar del escrito a mano.
+          <SunmiTable
+            headers={["Fecha", "Ticket", "Total", "Local"]}
+            className="text-xs"
+          >
               {ventas.map((venta) => (
                 <SunmiTableRow key={venta.id}>
                   <td className="px-2 py-1.5 text-sm">
@@ -1539,17 +1552,9 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
                   </td>
                 </SunmiTableRow>
               ))}
-            </SunmiTable>
-          </div>
+          </SunmiTable>
         )}
-
-        <div className="mt-4 pt-4 border-t sunmi-divider">
-          <SunmiButton color="slate" onClick={onCerrar} className="w-full">
-            Cerrar
-          </SunmiButton>
-        </div>
-      </SunmiCard>
-    </div>
+    </SunmiModalLayout>
   );
 }
 
@@ -1702,25 +1707,31 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
   const tipoLabel = { VENTA: "Venta", PAGO: "Pago", AJUSTE: "Ajuste" };
 
   return (
-    <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
-      <SunmiCard data-sunmi-modal="tarjeta" className="w-full max-w-3xl p-4 max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-bold">Cuenta Corriente</h3>
-            <p className="text-sm sunmi-text-muted">{cliente.nombre}</p>
-          </div>
-          <button
-            onClick={onCerrar}
-            className="text-xl sunmi-link-muted"
-          >
-            ✕
-          </button>
-        </div>
+    <SunmiModalLayout
+      open
+      title="Cuenta Corriente"
+      onClose={onCerrar}
+      // EL VELO NO CIERRA, por el criterio de qué se PIERDE y no de qué tan
+      // peligrosa es la acción: los mini-formularios de "Registrar Pago" y
+      // "Ajuste" tienen monto y nota escritos, y un toque al costado —que en el
+      // teléfono pasa solo— los tira. El historial de ventas de más arriba es de
+      // solo lectura y por eso NO lo declara.
+      destructivo
+      z={50}
+      maxWidth="max-w-3xl"
+      alto="max-h-[90vh]"
+      // Mismo motivo que en `ModalVentasCliente`: el `max-h-[90vh]` estaba
+      // declarado en la TARJETA, así que el tope va allá y no al cuerpo.
+      altoVa="tarjeta"
+      espacioCuerpo="mt-2 gap-4"
+    >
+      {/* El nombre del cliente va escrito a mano y no por `subtitle`, por lo
+          mismo que en el historial de ventas. */}
+      <p className="text-sm sunmi-text-muted shrink-0">{cliente.nombre}</p>
 
-        {/* Saldo */}
+      {/* Saldo */}
         <div
-          className={`rounded-lg px-4 py-3 mb-4 text-center font-bold text-lg ${
+          className={`rounded-lg px-4 py-3 text-center font-bold text-lg shrink-0 ${
             saldo > 0
               ? "sunmi-state-danger sunmi-text-danger"
               : "sunmi-state-success sunmi-text-success"
@@ -1733,7 +1744,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
         </div>
 
         {/* Botones de acción */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 shrink-0">
           <SunmiButton
             color="amber"
             onClick={() => {
@@ -1760,7 +1771,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
 
         {/* Mini-form Pago */}
         {mostrarPago && (
-          <SunmiCard className="p-3 mb-4">
+          <SunmiCard className="p-3 shrink-0">
             <p className="text-sm font-medium mb-2">Registrar Pago</p>
             <div className="flex gap-2 items-end">
               <div className="flex-1">
@@ -1799,7 +1810,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
 
         {/* Mini-form Ajuste */}
         {mostrarAjuste && (
-          <SunmiCard className="p-3 mb-4">
+          <SunmiCard className="p-3 shrink-0">
             <p className="text-sm font-medium mb-2">Registrar Ajuste</p>
             <div className="flex gap-2 items-end">
               <div className="flex-1">
@@ -1850,7 +1861,7 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
         )}
 
         {errorMsg && (
-          <div className="text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5 mb-3">
+          <div className="text-xs sunmi-text-danger text-center sunmi-state-danger rounded px-2 py-1.5 shrink-0">
             {errorMsg}
           </div>
         )}
@@ -1865,11 +1876,12 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
             Sin movimientos registrados
           </div>
         ) : (
-          <div className="overflow-y-auto flex-1">
-            <SunmiTable
-              headers={["Fecha", "Tipo", "Nota", "Debe", "Haber"]}
-              className="text-xs"
-            >
+          // Mismo motivo que en el historial: el cuerpo del kit ya hace de
+          // envoltorio que scrollea, con la misma cadena `flex-1 min-h-0`.
+          <SunmiTable
+            headers={["Fecha", "Tipo", "Nota", "Debe", "Haber"]}
+            className="text-xs"
+          >
               {movimientos.map((m) => (
                 <SunmiTableRow key={m.id}>
                   <td className="px-2 py-1.5 text-sm">
@@ -1891,16 +1903,8 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
                   </td>
                 </SunmiTableRow>
               ))}
-            </SunmiTable>
-          </div>
+          </SunmiTable>
         )}
-
-        <div className="mt-4 pt-4 border-t sunmi-divider">
-          <SunmiButton color="slate" onClick={onCerrar} className="w-full">
-            Cerrar
-          </SunmiButton>
-        </div>
-      </SunmiCard>
-    </div>
+    </SunmiModalLayout>
   );
 }
