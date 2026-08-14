@@ -1,6 +1,6 @@
 ---
 name: capturas
-description: Levanta el arnés de huellas sobre erpazul_al y saca capturas verificables a 1366x900 (y Sunmi 360x640), con las condiciones que hacen que la comparación valga.
+description: Levanta el arnés de huellas sobre erpazul_dev y saca capturas verificables a 1366x900 (y Sunmi 360x640), con las condiciones que hacen que la comparación valga.
 context: fork
 agent: verificador
 allowed-tools: Bash, Read, Glob, Grep
@@ -39,9 +39,22 @@ Sin estas, la comparación informa diferencias que no existen:
   de scroll usa `max-h-[70dvh]`, así que a 900 mide 630px y a 800 mide 560px. A
   1280 de ancho todas las tablas salen 86px más angostas. **Los dos lados de una
   comparación se miden con el mismo ancho Y el mismo alto.**
-- **Base `erpazul_al`**, servidor en el 3111, contexto en el grupo del depósito y
+- **Base `erpazul_dev`**, servidor en el 3111, contexto en el grupo del depósito y
   ubicación `depo`. Con otro local cambian los conteos de filas por las reglas de
   visibilidad.
+
+  **Decía `erpazul_al` y el viejo era el skill, comprobado el 2026-08-14.** El
+  `DATABASE_URL` del `.env` apunta a `erpazul_dev`, o sea que es la que el 3111
+  sirve de verdad. Y lo que lo decide no es cuál se usa sino cuál puede usarse:
+  `erpazul_al` está **7 migraciones atrasada** —90 aplicadas contra las 97 del
+  árbol—, así que hoy no puede servir ni la aplicación ni las capturas sin
+  migrarla primero. `erpazul_dev` está en 97 de 97.
+
+  **Consecuencia que hay que tener presente:** la línea de base de
+  `tests/huellas/baseline` se tomó sobre `erpazul_al`, así que **no es comparable
+  contra una corrida de hoy**. Un antes y un después sacados los dos contra
+  `erpazul_dev` sí valen —esa es la condición que hace que la resta signifique
+  algo—; cruzar cualquiera de los dos contra el baseline viejo, no.
 - **Datos cargados de verdad.** El arnés espera a que la tabla se asiente, no a
   que pase un tiempo — ver abajo.
 - **Pantallas que dependen del día**: Turnos arranca filtrada por "hoy" y
