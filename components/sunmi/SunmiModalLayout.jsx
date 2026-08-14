@@ -397,12 +397,27 @@ export default function SunmiModalLayout({
               tarjeta una columna, lo único que tiene que ceder alto es el
               cuerpo. En las formas que no son columna no hace nada. */}
           <div className="shrink-0 flex items-start justify-between gap-2">
+            {/* EL SUBTÍTULO NO SE REENVÍA, Y ES A PROPÓSITO.
+
+                `SunmiCardHeader` acaba de aprender a dibujarlo. Si esta línea lo
+                pasara, se encenderían solos los SEIS subtítulos de modal que hoy
+                están muertos —`ModalLocal`, `ModalUsuario`, `ModalRevertir`,
+                `ModalTerminar` y los dos de `PanelComprobantes`— y esa no era la
+                tanda: la tanda son los diez de PANTALLA.
+
+                Y no es solo cuestión de alcance. Dos de esos seis —"Configurá
+                los datos del local" y "Configurá los datos del usuario"— repiten
+                lo que ya dice su título, así que por el criterio que se aprobó
+                habría que BORRARLOS, no mostrarlos. Reenviarlo acá publicaría
+                justo la repetición que el criterio saca.
+
+                Los seis se deciden aparte, con el mismo criterio, y ese día esta
+                línea vuelve. Está anotado en el roadmap. */}
             {encabezado === "cinta" ? (
               <SunmiHeader title={title} color={color} />
             ) : (
               <SunmiCardHeader
                 title={title}
-                subtitle={subtitle}
                 color={color}
               />
             )}

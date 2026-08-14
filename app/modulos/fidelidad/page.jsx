@@ -221,7 +221,6 @@ export default function FidelidadPage() {
       <SunmiCard>
         <SunmiCardHeader
           title="Fidelidad — Puntos"
-          subtitle="Configurá el sistema de puntos por local"
         />
 
         <p className="text-sm sunmi-text-accent font-medium mt-1">

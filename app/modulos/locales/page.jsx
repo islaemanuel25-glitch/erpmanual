@@ -218,8 +218,7 @@ export default function LocalesPage() {
       <SunmiCard>
         <SunmiCardHeader
           title="Locales del sistema"
-          subtitle="Gestioná los locales y depósitos"
-         
+
         />
 
         {/* FILTROS */}

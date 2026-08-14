@@ -240,8 +240,7 @@ export default function UsuariosPage() {
       <SunmiCard>
         <SunmiCardHeader
           title="Usuarios del sistema"
-          subtitle="Gestioná los usuarios y sus permisos"
-         
+
         />
 
         {/* FILTROS */}

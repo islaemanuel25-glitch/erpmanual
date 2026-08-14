@@ -173,8 +173,7 @@ export default function RolesPage() {
       <SunmiCard>
         <SunmiCardHeader
           title="Roles del sistema"
-          subtitle="Gestioná los roles y sus permisos"
-         
+
         />
 
         {/* FILTROS */}
