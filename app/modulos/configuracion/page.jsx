@@ -85,8 +85,8 @@ export default function ConfiguracionPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <SunmiHeader
-        title="Configuracion"
-        subtitle="Elegi una seccion para configurar."
+        title="Configuración"
+        subtitle="Elegí una sección para configurar."
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
