@@ -263,7 +263,32 @@ export default function SunmiTable({
   return (
     <div
       id={scrollId}
-      className={stickyHeader ? `overflow-auto ${maxHeightClass}` : "overflow-x-auto"}
+      // ── `shrink-0` EN EL ENVOLTORIO QUE NO SCROLLEA VERTICAL A PROPÓSITO ────
+      //
+      // Este envoltorio existe para el scroll HORIZONTAL. Pero `overflow-x: auto`
+      // obliga al `overflow-y` a calcular `auto` —medido, no citado: declararle
+      // `overflow-y-visible` al lado NO lo cambia, sigue dando `auto`—, así que
+      // también puede scrollear vertical.
+      //
+      // Eso no molestaba mientras su padre fuera un bloque: un hijo de bloque no
+      // se encoge, conserva su alto de contenido, y el scroll se lo queda el
+      // contenedor de afuera, que es el que alguien puso a propósito. Adentro de
+      // una COLUMNA FLEX sí se encoge, y entonces el scroll se lo queda ÉL: la
+      // barra aparece adentro del área de la tabla y la tabla pierde su ancho.
+      //
+      // Medido al migrar los modales de `clientes` al cuerpo del kit, que es una
+      // columna flex: el que scrolleaba pasaba a ser este envoltorio y la tabla
+      // caía de 628 a 620 px.
+      //
+      // La palanca es `flex-shrink`, no el overflow: sin encogerse conserva su
+      // alto de contenido y vuelve a comportarse como cuando el padre era bloque.
+      // Fuera de un contenedor flex la propiedad es INERTE, así que las pantallas
+      // cuyo envoltorio no esté en una columna flex no pueden moverse.
+      //
+      // La rama de `stickyHeader` NO lo lleva: ahí el scroll vertical es
+      // deliberado —declara `overflow-auto` con su propio tope de alto— y
+      // encogerse es parte de lo que hace.
+      className={stickyHeader ? `overflow-auto ${maxHeightClass}` : "overflow-x-auto shrink-0"}
     >
       <table
         className="
