@@ -1820,6 +1820,53 @@ sobre un dato que no estaba medido con el mismo estándar.
 **La regla que queda:** cuando el relevamiento diga "abre", eso también se repite.
 Una vez no es una medición.
 
+#### EL CAMINO NORMAL NO PASA POR AHÍ — pero `?editar=` TAMPOCO es solo a mano
+
+**Comprobado ejecutando, 4 de 4 corridas**, tocando el lápiz de una fila del
+listado de productos: **navega a `/modulos/productos/<id>/editar`**, que es una
+PÁGINA aparte y no abre ningún modal. Esa ruta usa `FormProducto` directo, con su
+botón de volver. **No pasa por `?editar=` ni por la carrera.** Las cuatro
+corridas dieron lo mismo, así que el camino de uso diario del módulo de productos
+está sano.
+
+**Pero `?editar=` no se escribe solo a mano**, y eso lo destapó buscar más ancho:
+`components/proveedores/listas/VistaProductosSistema.jsx` arma
+`/modulos/productos?editar=<id>` para abrir la ficha de un producto, y tiene el
+motivo escrito al lado — eligieron esa ruta **a propósito** porque la otra "no
+llega a montar el formulario sin el contexto del listado".
+
+Así que la carrera **sí afecta a un camino de usuario**, solo que no al que yo
+suponía: no al lápiz del listado de productos, sino al botón de ficha de la vista
+de listas de proveedor. **4 de 7.**
+
+**Y `?editar=` es la convención de la casa**, no una rareza: la usan clientes,
+grupos, locales, operadores, proveedores y roles. Enumerado con `git grep` sobre
+`app`, `components`, `hooks` y `lib`. Lo que no se midió es si la carrera existe
+también en esas otras pantallas — acá solo se midió la de productos.
+
+**Lo que NO se verificó y se dice:** si la vista de listas de proveedor es
+alcanzable hoy con estos datos. Se midió la URL, que es la misma, no el recorrido
+completo desde esa pantalla.
+
+#### LA REGLA QUE SALE DE ACÁ: relevar también se repite
+
+**Escrita el 2026-08-14.** Estaba solo en un informe y por eso sube al documento.
+
+**Cuando el relevamiento diga "abre", eso se comprueba TRES VECES, igual que una
+captura.** El arnés usa `--repeticiones 3` porque un resultado que parece
+determinista no lo es hasta que se repite, y ese estándar **se estaba aplicando al
+fotografiar y no al relevar**.
+
+El caso: `ModalProductoFinal` quedó anotado como "abre por URL" sin reservas, y
+esa afirmación salía de **una sola corrida**. Repetida, abre 4 de 7. Con una sola
+observación se armó un orden de trabajo sobre un dato que no estaba medido con el
+mismo estándar que todo lo demás.
+
+Y el motivo por el que importa más acá que en otros lados: **una apertura fallida
+produce una captura perfectamente determinista de la pantalla sin el modal**, que
+pasa `--repeticiones 3` sin despeinarse. La repetición al relevar es lo único que
+lo atrapa antes.
+
 #### El orden se reacomoda
 
 `ModalProductoFinal` **sale del tercer puesto** y queda esperando a que se
@@ -1829,6 +1876,59 @@ extra es que tiene una tabla adentro, y eso ya está resuelto con el `shrink-0`.
 
 Orden vigente: `ModalCliente` (hecho), `ModalGrupo` (hecho),
 **`ModalMergeClientes`**, y después `ModalProductoFinal` si se destraba.
+
+### `ModalMergeClientes` — LA LISTA DECLARADA, escrita ANTES de tocar
+
+**2026-08-14.** **Todos los números son a 1366x900.**
+
+**Abre 3 de 3**, con el botón "Unificar duplicados" de `/modulos/clientes` — la
+regla nueva aplicada antes de escribir una línea de esta lista.
+
+**Lo que hay hoy, medido:** tarjeta **588x210,5**, `display: block`,
+`max-height: 810px`, `overflow: auto` — o sea que **scrollea la tarjeta misma**,
+igual que le pasaba a `ModalCliente` y al revés de los dos de arriba. **No tiene
+div de cuerpo**: los cuatro hijos cuelgan de la tarjeta.
+
+Encabezado 24,5 px con `mb-4`; el `SunmiSeparator` con `mt-21` y `mb-21` propios;
+el bloque del cliente principal con `mb-3`; y el pie `flex gap-2 pt-2` de 43 px.
+**Separaciones desiguales: 21, 21 y 10,5**, dadas por el margen de cada uno.
+
+1. **La tarjeta deja de scrollear y scrollea el cuerpo.** Hoy el `SunmiCard` se
+   lleva todo el scroll, título incluido. Con el kit el encabezado queda fijo.
+2. **Aparece un botón "Cerrar" y se va el ✕.** El encabezado pasa de 24,5 a unos
+   36 px, como en las dos anteriores.
+3. **El velo cambia de tono, y este es el salto más grande de los cuatro.** Hoy es
+   `bg-black/80` escrito a mano — el más oscuro de todos los que quedaban.
+4. **HAY QUE DECLARAR `maxWidth="max-w-2xl"` o el modal SE ACHICA 84 px.** Su
+   tarjeta es 588 y el default del kit es `max-w-xl`, 504. Es la primera de las
+   migradas donde olvidarse del `maxWidth` **encoge** en vez de ensanchar.
+5. **Va con `altoVa="tarjeta"` y `alto="max-h-[90vh]"`**, porque su tope está
+   declarado en la tarjeta —`max-height: 810px` medido— igual que `ModalCliente`.
+6. **El ensanche de 7 px de la capa NO se ve a 1366** —588 está muy por debajo del
+   ancho disponible— y **sí se vería a 360**, donde el padding de la capa decide.
+   Se dice el ancho porque sin él el renglón engaña.
+7. **Las separaciones desiguales se conservan.** Se declara
+   `espacioCuerpo="mt-4"` —los 14 px del `mb-4` del encabezado— **y no se declara
+   gap**: los 21, 21 y 10,5 los ponen los márgenes propios de cada bloque, y
+   meter un `gap` los emparejaría a todos, que es repintar el interior.
+8. **El par Cancelar/Unificar se queda ADENTRO del cuerpo.** Son `flex-1`, mitad
+   y mitad; el pie del kit es `justify-end` y los haría chicos y a la derecha.
+
+#### LO QUE NO SE VA A PODER VERIFICAR, y se dice en vez de darlo por bueno
+
+Este modal **tiene una tabla adentro**, y era el motivo por el que quedó último
+del orden. **Pero en el estado en que se lo puede abrir hoy no la dibuja**: sin
+candidatos cargados, el modal muestra el separador y el bloque vacío del cliente
+principal, y nada más. Medido: cuatro hijos, ninguno es una tabla.
+
+O sea que **la interacción entre `SunmiTable` y el cuerpo del kit —el `shrink-0`
+que se arregló para esto— NO se va a poder ejercer en esta migración** con los
+datos de hoy. Haría falta que existan clientes duplicados detectables.
+
+No se fabrica esa condición. Queda declarado que esa parte se migra **sin
+verificar**, con esas palabras, y que la primera vez que alguien abra este modal
+con duplicados de verdad conviene mirar que la tabla se estire y que el scroll
+siga siendo uno solo.
 
 #### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
 
