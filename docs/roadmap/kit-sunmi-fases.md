@@ -262,6 +262,11 @@ sacados de pantallas que hoy funcionan:
   permisos con quince toggles.
 - **el alto del cuerpo** — decidido, todavía sin escribir: se agrega cuando migre
   la primera pantalla que lo necesite. Hoy conviven 65, 70, 80, 90 y 92vh.
+- **`altoVa`** — DÓNDE cae ese alto: en la tarjeta o en el cuerpo. **Escrito el
+  2026-08-14**, con el default intacto: sin declararlo lo sigue derivando la
+  forma. Es una EXCEPCIÓN DECLARABLE y no la regla cayéndose — ver la sección
+  "EL SÉPTIMO PARÁMETRO" más abajo. **Todavía no lo declara ninguna pantalla**:
+  nació para las dos de `clientes`, cuya migración se frenó por otro motivo.
 - **el padding de la tarjeta** — decidido, todavía sin escribir, por lo mismo.
   Tres modales tienen `p-0 overflow-hidden` y ponen su propio padding adentro.
 - **`refCuerpo`** — una referencia al div del cuerpo. **Lo usa UNO SOLO**:
@@ -1226,6 +1231,138 @@ decide cosas que la pantalla necesita decidir.**
 
 Mientras tanto el grupo queda elegido, medido y con las capturas de antes
 sacadas. Retomarlo cuesta la migración, no el relevamiento.
+
+### EL SÉPTIMO PARÁMETRO: `altoVa`, y es una EXCEPCIÓN DECLARABLE
+
+**Aprobado por Emanuel y escrito el 2026-08-14.** Con el default intacto.
+
+**La regla NO se cayó.** "El alto lo deriva la forma" sigue siendo el default y
+sigue siendo la regla: sin declarar nada, `dondeVaElAlto = altoVa ?? f.altoVa`
+da exactamente lo de antes. Lo único que se agrega es **poder declarar lo
+contrario a mano, con el porqué al lado**.
+
+Y el porqué de que eso no rompa nada: la regla existía para que nadie los pusiera
+incoherentes **por descuido**. Un parámetro que hay que escribir a propósito no
+hace eso — y además obliga a que quien lo escriba quede anotado en el registro de
+declaraciones, como los otros seis.
+
+**La columna viaja con el alto.** Cuando el tope va a la tarjeta, la tarjeta tiene
+que ser columna, o el `flex-1 min-h-0` del cuerpo no resuelve contra nada y el
+scroll no aparece nunca. Las tres formas que ya nacían con el tope en la tarjeta
+traen su `flex flex-col` en `FORMAS`; `centrado` no, así que se lo agrega la
+pieza. Son dos caras de lo mismo y por eso no se declaran por separado.
+
+#### Cómo se comprobó que el default no se movió, y por qué no son cuatro capturas
+
+Lo pedido era una captura de un caso de cada forma, antes y después. **De las
+cuatro, hoy solo UNA se puede abrir**, y eso salió de enumerar y no de suponer:
+`git grep` sobre `app` y `components` da **16 consumidores**, de los cuales **15
+usan `centrado`** por default y el único que declara forma es `ModalCambioPrevio`
+con `hoja-o-centrado`. **`hoja` y `cajon` no tienen NINGÚN consumidor.**
+
+Y `ModalCambioPrevio` vive bajo `pos-ventas`: al abrir `/modulos/pos-ventas/retiros/nuevo`
+la pantalla dice **"No hay una caja abierta a tu nombre en este local."** Es el
+mismo bloqueo que sacó al POS de la fase 2.
+
+Así que:
+
+- **`centrado`, con captura sobre pantalla real.** `ModalCategoria` en
+  `/modulos/categorias`, 1366x900, tema `sunmiDark` explícito, `--repeticiones 3`,
+  recorte a `[data-sunmi-modal="tarjeta"]`. Antes y después del cambio en el kit:
+  **IDÉNTICAS byte a byte, cero píxeles de diferencia**, 440x316 las dos.
+- **Las otras tres, con un candado**, porque no hay foto posible sin fabricar la
+  condición. El candado afirma que la clase resuelta es la misma con y sin el
+  parámetro para las cuatro formas, que `altoVa` no trae default en la firma, y
+  que el operador es `??` y no `||` —con `||` un `altoVa=""` caería a la forma sin
+  que nadie lo note—.
+- **Ejercido contra la versión mala**, que es lo que hace que el candado valga:
+  cambiando `??` por `||` la suite se pone en rojo nombrando el problema, y
+  volviendo atrás vuelve a verde.
+
+### EL PATRÓN, que ya tiene DOS casos: la pieza decide algo que la pantalla necesita decidir
+
+Anotado como patrón el 2026-08-14 **para que el tercero se reconozca al toque y no
+se resuelva de nuevo desde cero.**
+
+La forma es siempre la misma: el kit toma una decisión de diseño razonable y la
+deja fija; después aparece una pantalla real que necesita decidir esa misma cosa,
+y la migración se traba. No se descubre leyendo el kit: se descubre cuando una
+pantalla concreta no entra.
+
+1. **El encabezado, que no se puede apagar.** `SunmiModalLayout` dibuja su fila de
+   encabezado siempre. `CarritoPedido` trae el suyo adentro del cuerpo y lo
+   comparte con un tercer camino que no se migra, así que las dos salidas se ven.
+   **Sigue sin resolver, y no se resuelve en esta tanda.**
+2. **El alto, que lo decidía la forma.** Resuelto acá con `altoVa`.
+
+Los dos comparten diagnóstico y los dos comparten la salida: **un parámetro con el
+default intacto, nacido de una pantalla real y anotado en el registro.** Lo que
+hay que mirar cuando aparezca el tercero es si encaja en esa forma antes de
+inventar otra.
+
+### LAS DOS DE CLIENTES, SEGUNDO INTENTO: el parámetro anduvo, y frenó otra cosa
+
+**2026-08-14.** Se rehizo la migración con `altoVa="tarjeta"`. **La mitad que
+frenó la vez anterior quedó arreglada y medida**; frenó una segunda, que no es de
+esta tanda.
+
+**Lo que el parámetro arregló, medido forzando el desborde con la ventana de 250
+px, que es el caso que a 900 no se ve:**
+
+- **antes de migrar:** tarjeta 225 px, `max-height` 225
+- **primer intento, sin el parámetro:** 312 px, `max-height: none` — los 87 px
+- **segundo intento, con `altoVa="tarjeta"`:** **225 px, `max-height` 225 px**
+
+O sea **idéntica a antes de migrar**. Y a 900 la tarjeta queda en 378 —de 424,5—
+con la cadena entera de vuelta: tarjeta `flex flex-col` topada en 810, cuerpo
+`flex flex-col flex-1 min-h-0 overflow-y-auto mt-2 gap-4`. Las capturas salieron
+deterministas las dos.
+
+#### LO QUE LA FRENÓ AHORA, y afecta a 18 pantallas: `SunmiTable` arrastra el scroll vertical
+
+`components/sunmi/SunmiTable.jsx:266` envuelve la tabla en `overflow-x-auto` (o
+`overflow-auto` con `stickyHeader`). **En CSS, un `overflow-x` distinto de
+`visible` obliga al `overflow-y` a calcular `auto`**, así que ese envoltorio
+también scrollea vertical.
+
+Con el desborde forzado, el que scrollea de verdad **sigue siendo el de
+`SunmiTable`** —260 sobre 107— y no el envoltorio deliberado. Y la tabla queda en
+**620 px de un padre de 628**: los 8 px se los come una barra que aparece adentro
+del área de la tabla.
+
+**Antes de migrar no pasaba**, y el motivo es de una línea: el envoltorio hecho a
+mano era un BLOQUE —`overflow-y-auto flex-1`— y el cuerpo del kit es una COLUMNA
+FLEX. En un bloque el hijo no se encoge y clipea el de afuera; en una columna
+flex el hijo se encoge y el scroll se lo queda el de adentro.
+
+**Por eso se frena y no se declara:** no es una diferencia de estas dos pantallas,
+es de `SunmiTable` contra el cuerpo del kit, y **`SunmiTable` la usan 18 pantallas
+bajo `app/` y 41 archivos en total** (enumerado con `git ls-files` vía `git grep
+-l`). Cualquier migración que meta una `SunmiTable` adentro del cuerpo del kit va
+a heredar esto.
+
+El código de las dos migraciones se revirtió. El parámetro queda, verificado y con
+su candado.
+
+#### Y UNA QUE APARECIÓ SOLA: el contador se queda CIEGO al primer import
+
+**Medido el 2026-08-14 y es la limitación documentada mordiendo de verdad.**
+
+Al migrar dos de las TRES capas de `app/modulos/clientes/page.jsx`, el trinquete
+pasó de **41 a 38**. Se migraron dos, no tres. La tercera —`ModalCliente`, la capa
+de la línea 1125— **sigue armada a mano y dejó de contarse**, porque
+`importaModalDelKit` mira si el ARCHIVO importa la pieza, y ahora la importa.
+
+O sea que **un archivo con varias capas desaparece entero de la cuenta apenas se
+migra la primera**, y la cifra oficial queda corta sin que nada avise. Es la misma
+familia que el comentario que hacía bajar el trinquete sin migrar nada, con otra
+cara: allá el defecto era mirar texto en vez de un import, y acá es que la unidad
+es el archivo cuando debería ser la capa.
+
+**Consecuencia práctica, y hay que tenerla presente el día que esto se retome:**
+apenas se migre la primera capa de `clientes/page.jsx`, la cifra del trinquete
+deja de ser comparable contra las anteriores hasta que se migren las tres. No se
+tocó la línea de base a propósito.
 
 #### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
 
