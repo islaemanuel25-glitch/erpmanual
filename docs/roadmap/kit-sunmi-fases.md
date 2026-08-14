@@ -1509,6 +1509,17 @@ capa queda en el DOM con `display: none`. El único camino que lo abre es
 existe, existe y está OCULTA, y se ve—; con dos, "existe y está oculta" se habría
 leído como "no existe" y el diagnóstico habría ido al lugar equivocado.
 
+#### ⚑ EL PRÓXIMO HITO ES LA TABLA DE DECLARACIONES, NO LA FASE 5
+
+**Decidido por Emanuel el 2026-08-14, y se anota acá para que no se saltee.** Al
+terminar los cuatro abribles, la fase 2 **no** pasa directo a la fase 5: primero
+se mira la tabla de declaraciones entera y se decide **qué se unifica y qué tiene
+razón de ser distinto**. Es lo que este documento pide desde el principio —"el
+parámetro es una postergación, no un perdón"— y saltearlo dejaría la fase cerrada
+con siete parámetros y ninguna revisión.
+
+Recién después de esa revisión se pasa a la fase 5.
+
 #### Los dos que HOY NO SE PUEDEN ABRIR, y por qué
 
 - **`ModalDetalleVenta`** (`dashboard/ModalDetalleVenta.jsx:93`) — necesita una
@@ -1519,8 +1530,13 @@ leído como "no existe" y el diagnóstico habría ido al lugar equivocado.
   pantalla de turnos filtrada por "Abiertas" dice "No hay cajas para estos
   filtros", y el turno 42 dice "Estado Cerrado".
 
-**No se fabricó ninguna de las dos condiciones** y no se planifican hasta que el
-dato exista solo.
+**No se fabricó ninguna de las dos condiciones.**
+
+**Decidido el 2026-08-14: quedan ESPERANDO, y van después de los cuatro
+abribles.** Cuando les toque, si el dato no apareció solo, se le avisa a Emanuel y
+él arma el rato para operar la caja de verdad —abrir un turno, hacer una venta—.
+**No se fabrican**: escribir en la base para simularlas es exactamente lo que la
+regla 4 prohíbe, y además dejaría estado del que dependen otras capturas.
 
 #### EL ORDEN ELEGIDO, de menor a mayor costo de verificación
 
@@ -1549,6 +1565,93 @@ agregado a mano—. Ficha: `repeticiones: 3`, `apto: true`. La tarjeta mide **39
 o sea que está TOCANDO su tope de `90vh` y scrollea: es un formulario largo, no una
 tarjeta que crece con su contenido. Eso lo pone en la misma familia que las dos
 recién migradas y anticipa que va a necesitar `altoVa="tarjeta"`.
+
+### `ModalCliente` — LA LISTA DECLARADA, escrita ANTES de tocar
+
+**2026-08-14.** Con los números DE ESTA PANTALLA, medidos con la sonda sobre
+`/modulos/clientes` a 1366x900, y no prestados de las dos anteriores.
+
+**Lo que hay hoy, medido:** tarjeta 392x810, `display: block`, `max-height: 810px`,
+`overflow: auto`. Dos hijos: el encabezado —`flex items-center justify-between
+mb-4`, 24,5 px de alto— y el cuerpo —`space-y-3`, 895,5 px—, separados 14 px.
+
+Y una diferencia estructural con las dos ya migradas, que cambia qué hay que
+mirar: **acá el que scrollea es LA TARJETA misma** —976 sobre 808—, no un
+envoltorio interno. Las otras dos eran `flex flex-col overflow-hidden` con un div
+adentro que scrolleaba.
+
+1. **LA TARJETA DEJA DE SCROLLEAR Y EL TÍTULO DEJA DE IRSE.** Hoy el `SunmiCard`
+   se lleva todo el scroll, encabezado incluido: al bajar en el formulario, el
+   "Nuevo Cliente" se va de la vista. Con el kit el encabezado queda fijo y
+   scrollea solo el cuerpo. **Es la diferencia más visible de esta migración** y
+   es una mejora, pero es un cambio: si al comparar el título sigue subiéndose,
+   algo salió mal.
+2. **El título se ve más chico, menos grueso y más separado, y el ✕ pasa a ser un
+   botón "Cerrar".** Hoy el encabezado mide 24,5 px de alto; el del kit midió 36
+   en las dos anteriores, así que la tarjeta redistribuye unos 11,5 px.
+3. **El velo cambia de tono y la ventana se despega más del fondo.** Hoy usa
+   `sunmi-pos-overlay`.
+4. **El modal se ensancha 7 px**: el padding de la capa pasa de `p-4` a `p-3`,
+   3,5 de cada lado.
+5. **El ancho máximo hay que declararlo**, `maxWidth="max-w-md"`. Sin eso pasa de
+   392 a 504 px.
+6. **El alto va a la TARJETA**, `altoVa="tarjeta"`, para que siga topada en 810 y
+   no crezca. Es la misma familia que las dos anteriores y por eso se anticipó al
+   relevar: 392x810 ya estaba tocando el tope.
+7. **La separación entre encabezado y cuerpo se mantiene en 14 px**, declarando
+   `espacioCuerpo="mt-4"`. El `mt-2` del kit la dejaría en 7, y el `gap-3` no
+   hace nada acá porque el cuerpo tiene UN SOLO hijo.
+8. **El interior NO se toca.** El `space-y-3` entra entero como único hijo del
+   cuerpo, así que sus campos siguen en contexto de bloque y sus márgenes siguen
+   colapsando igual que hoy. El punto fijo del `space-y-*` **no corresponde**, y
+   por eso: lo que lo dispara es que el contenedor de los campos pase de bloque a
+   flex, y acá ese contenedor sigue siendo el mismo div de bloque.
+9. **El par Cancelar/Guardar se queda ADENTRO del cuerpo**, no pasa al pie del
+   kit. El pie del kit es `justify-end` y estos dos son `flex-1`, mitad y mitad:
+   mandarlos al pie los haría chicos y alineados a la derecha.
+
+#### MIGRADO Y COMPARADO: los nueve puntos, contra la medición
+
+Migrado el 2026-08-14. **Nada apareció fuera de la lista.** Punto por punto:
+
+- **1 cumplido, y es el más importante.** El que scrollea pasó de ser la TARJETA
+  —976 sobre 808— a ser el CUERPO —896 sobre 716—. El encabezado queda fijo.
+- **2 cumplido, y el número dio exacto**: el encabezado pasa de 24,5 a **36 px**,
+  los 11,5 declarados. El ✕ es ahora un botón "Cerrar".
+- **3 cumplido.** Se ve en la captura: el velo viejo dejaba pasar la barra ámbar
+  de arriba; el nuevo la apaga.
+- **5, 6 y 7 cumplidos y medidos**: la tarjeta sigue en **392x810** con
+  `max-height: 810px` —o sea que el `maxWidth` y el `altoVa` hicieron lo suyo— y
+  la separación entre encabezado y cuerpo sigue siendo **14 px**, con el cuerpo
+  arrancando en `top` 72 contra 60,5 de antes.
+- **8 cumplido.** El cuerpo tiene un solo hijo, el `space-y-3` de siempre.
+- **9 cumplido**: el par sigue adentro del cuerpo.
+
+**Y EL PUNTO 4 PEDÍA UNA ACLARACIÓN QUE NO TENÍA.** Decía "el modal se ensancha
+7 px" a secas. A **1366 no se ensancha nada**: la tarjeta mide 392 antes y
+después, porque el `max-w-md` la topa muy por debajo del ancho disponible y el
+padding de la capa no llega a decidir.
+
+Medido a **360**, que es donde sí decide: **332 → 339 px**, exactamente los 7.
+
+O sea que el punto era correcto y estaba mal redactado: **ese ensanche solo se ve
+en una pantalla lo bastante angosta como para que la tarjeta toque el padding de
+la capa** — la Sunmi de la caja, no un monitor. Se anota porque **el mismo punto
+se declaró así en las listas anteriores**, sin la aclaración, y una diferencia que
+se declara y después no aparece a 1366 hace dudar de la lista entera en vez de
+del renglón.
+
+#### Lo que declara esta pantalla, para el registro
+
+- `maxWidth` → `"max-w-md"`, porque su tarjeta es `max-w-md`.
+- `alto` → `"max-h-[90vh]"`, el que ya declaraba.
+- **`altoVa` → `"tarjeta"`. Es la PRIMERA pantalla que declara el séptimo
+  parámetro**, y por el motivo por el que se escribió: su tope estaba en la
+  tarjeta y ya lo estaba tocando.
+- `espacioCuerpo` → `"mt-4"`, para conservar los 14 px. El `gap` no se declara
+  porque el cuerpo tiene un solo hijo y no haría nada.
+- `destructivo` → es un formulario de alta y edición: cerrar sin querer tira lo
+  escrito.
 
 #### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
 

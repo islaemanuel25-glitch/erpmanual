@@ -1122,20 +1122,28 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
   };
 
   return (
-    <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
-      <SunmiCard data-sunmi-modal="tarjeta" className="w-full max-w-md p-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold">
-            {esEdicion ? "Editar Cliente" : "Nuevo Cliente"}
-          </h3>
-          <button
-            onClick={onCerrar}
-            className="text-xl sunmi-link-muted"
-          >
-            ✕
-          </button>
-        </div>
-
+    <SunmiModalLayout
+      open
+      title={esEdicion ? "Editar Cliente" : "Nuevo Cliente"}
+      onClose={onCerrar}
+      // El velo NO cierra: es un formulario de alta y edición, y un toque al
+      // costado —que en el teléfono pasa solo— tira lo que se haya escrito.
+      destructivo
+      z={50}
+      maxWidth="max-w-md"
+      alto="max-h-[90vh]"
+      // El tope va a la TARJETA: esta pantalla lo declaraba ahí y ya estaba
+      // TOCÁNDOLO —392x810 medido antes de migrar—, así que sin esto la tarjeta
+      // dejaría de estar topada y crecería con el formulario.
+      altoVa="tarjeta"
+      // `mt-4` y no el `mt-2` del kit, para conservar los 14 px que hoy separan
+      // el encabezado del cuerpo. El `gap` no se declara porque no haría nada:
+      // el cuerpo tiene UN SOLO hijo, el `space-y-3` que ya estaba.
+      espacioCuerpo="mt-4"
+    >
+        {/* El `space-y-3` entra ENTERO como único hijo, a propósito: así sus
+            campos siguen en contexto de bloque y sus márgenes siguen colapsando
+            igual que hoy. Migrar la capa no repinta el interior. */}
         <div className="space-y-3">
           <div>
             <label className="text-[11px] sunmi-text-muted mb-1 block">
@@ -1416,8 +1424,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
             </SunmiButton>
           </div>
         </div>
-      </SunmiCard>
-    </div>
+    </SunmiModalLayout>
   );
 }
 
