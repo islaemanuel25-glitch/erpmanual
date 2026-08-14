@@ -133,10 +133,38 @@ export default function ProductosPage() {
 
   const urlSyncRef = useRef(false);
   useEffect(() => {
+    // ── LA URL EN MODO MODAL NO ES DEL LISTADO, ASÍ QUE NO SE PISA ──────────
+    //
+    // `buildListingUrl` arma la query DESDE CERO con los parámetros del listado,
+    // así que cualquier otro —`editar`, `nuevo`— desaparece. Eso está bien cuando
+    // se vuelve al listado a propósito (al cerrar el modal, o al fallar la carga)
+    // y está mal acá, donde la URL se sincroniza sola.
+    //
+    // MEDIDO, no deducido: entrando por `/modulos/productos?editar=<id>`, este
+    // efecto disparaba un `replaceState` a `/modulos/productos` alrededor de un
+    // segundo después de cargar, y el modal abría o no según quién llegara
+    // primero — la respuesta del `fetch` o el re-render sin el parámetro. Siete
+    // corridas seguidas dieron 4, y otras siete dieron 1. Sin ningún error a la
+    // vista: no salta ningún alert y la URL simplemente queda sin el parámetro.
+    //
+    // El disparador es que el guardia de abajo NO ALCANZA: React en modo estricto
+    // monta, desmonta y vuelve a montar, y en la segunda montada el `ref` ya está
+    // en `true`, así que el efecto pasa de largo y pisa la URL. Comprobado
+    // apagando `reactStrictMode` en `next.config.mjs`: con eso pasó a abrir 5 de
+    // 5 y el parámetro sobrevivió las cinco veces.
+    //
+    // **Eso significa que en producción hoy no ocurre**, porque el doble montado
+    // es de desarrollo. No se arregla apagando el modo estricto —sería apagar el
+    // detector— sino sacando el motivo: el listado no escribe la URL cuando la
+    // URL está en manos del modal. Y de paso deja de ser una bomba para
+    // producción, donde el mismo pisotón ocurriría si cualquiera de las cuatro
+    // dependencias de `buildListingUrl` cambiara con el modal abierto.
+    if (editarId || nuevo === "1") return;
+
     // Saltar el primer render (la URL ya tiene los params correctos)
     if (!urlSyncRef.current) { urlSyncRef.current = true; return; }
     router.replace(buildListingUrl(), { scroll: false });
-  }, [buildListingUrl]);
+  }, [buildListingUrl, editarId, nuevo]);
 
   const allColumns = [
     { key: "imagenUrl", label: "Imagen" },

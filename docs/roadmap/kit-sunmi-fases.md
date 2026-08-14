@@ -1882,6 +1882,82 @@ si se destraba.
 **tanda del `?editar=`** —por qué la URL pierde el parámetro— y después la
 **tabla de declaraciones**, que es el cierre de la fase.
 
+### LA CARRERA DEL `?editar=`, CONTESTADA Y ARREGLADA
+
+**2026-08-14.** Tanda propia, corrida justo después de `ModalMergeClientes`
+porque después de él la fase se queda sin candidatos igual.
+
+#### Quién le sacaba el parámetro
+
+Enganchando `history.pushState` y `replaceState` **antes** de que la página
+cargue —única forma de ver las llamadas de arranque, que son las que importan—
+apareció uno solo y siempre el mismo: un `replaceState` a `/modulos/productos`
+alrededor de un segundo después de cargar. Sale de
+[productos/page.jsx:138](../../app/modulos/productos/page.jsx#L138), el efecto que
+sincroniza el estado del listado con la URL.
+
+**`buildListingUrl` arma la query desde cero** con los parámetros del listado, así
+que cualquier otro —`editar`, `nuevo`— desaparece. Eso está bien en los tres
+lugares donde se vuelve al listado a propósito, y está mal en el efecto que
+sincroniza solo.
+
+#### Por qué a veces abría: la carrera, medida
+
+El efecto de `editar` pide el producto a la API. El modal abre cuando esa
+respuesta llega; se cierra cuando el `replaceState` deja la URL sin el parámetro y
+el efecto vuelve a correr por su última rama. **Gana el que llegue último**, y por
+eso el resultado cambia entre corridas: siete dieron 4, otras siete dieron 1.
+
+#### Y el disparador es de DESARROLLO, que es la parte que cambia el diagnóstico
+
+El guardia del efecto —un `ref` que saltea el primer render— **no alcanza en modo
+estricto**: React monta, desmonta y vuelve a montar, y en la segunda montada el
+`ref` ya está en `true`, así que el efecto pasa de largo y pisa la URL.
+
+Comprobado apagando `reactStrictMode` en `next.config.mjs` y volviendo a medir:
+**5 de 5 abriendo, y el parámetro sobrevivió las cinco veces.** El cambio se
+revirtió enseguida — era el experimento, no el arreglo.
+
+**Consecuencia: en producción hoy esto no pasa**, porque el doble montado es de
+desarrollo. Lo que quedaba era una bomba: el mismo pisotón ocurre en producción el
+día que cualquiera de las cuatro dependencias de `buildListingUrl` cambie con el
+modal abierto.
+
+#### El arreglo, y por qué no fue apagar el modo estricto
+
+Apagarlo habría sido apagar el detector. El arreglo saca el motivo: **el listado
+no escribe la URL cuando la URL está en manos del modal** — `if (editarId || nuevo
+=== "1") return;`.
+
+**Verificado ejerciendo: 7 de 7**, con el modo estricto puesto, y el parámetro
+intacto las siete veces. Y la contraprueba está de antes: la versión sin el
+guardia dio 1 de 7 y 4 de 7, o sea que la medición sí atrapa la versión mala.
+
+**Y se comprobó que el efecto sigue haciendo lo suyo**, que es la otra mitad:
+escribir en el buscador deja `?q=leche` en la URL, y cerrar el modal devuelve la
+URL al listado. Un guardia que apagara el sync rompería los enlaces guardados, que
+es justamente para lo que el efecto existe.
+
+#### El relevamiento de las otras pantallas con `?editar=`
+
+Son ocho las que leen el parámetro. **Ninguna otra tiene la carrera**, y el motivo
+es distinto según el grupo:
+
+- **`grupos`, `locales`, `operadores`, `roles` y `usuarios`** son inmunes por
+  construcción: abren con `useState(Boolean(nuevo || editar))`, o sea en el primer
+  render y desde la URL inicial. Aunque algo borrara el parámetro después, el
+  estado del modal ya está en `true` y no depende más de él.
+- **`clientes`** sí borra el parámetro, pero bien: lo hace **después** de abrir el
+  modal y **conservando los demás** —`new URLSearchParams(searchParams)` y
+  `delete("editar")`, no una query armada de cero—. Ejercido: **7 de 7**.
+- **`proveedores` tiene la misma FORMA que productos** —el modal se dibuja con
+  `{editarId && editData && …}`, así que depende de que el parámetro sobreviva—
+  **pero no tiene el disparador**: en ese archivo no hay ningún `router.replace`.
+  Es la que hay que mirar el día que alguien le agregue un sync de filtros a la
+  URL.
+
+**No se arregló ninguna**, porque ninguna está rota por esto.
+
 ### `ModalMergeClientes` — LA LISTA DECLARADA, escrita ANTES de tocar
 
 **2026-08-14.** **Todos los números son a 1366x900.**
