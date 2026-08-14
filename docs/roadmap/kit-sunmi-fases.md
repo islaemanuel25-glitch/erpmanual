@@ -964,16 +964,66 @@ TODOS los consumidores de la pieza y no los que alguien recordó.
 Lo que el conteo de campos habría contestado mal: `PanelComprobantes` da tres
 campos, y sus dos modales no tienen ninguno — los campos están en el panel.
 
-### Props muertos que se conservan a propósito
+### LOS SEIS SUBTÍTULOS DE MODAL, QUE SIGUEN APAGADOS A PROPÓSITO
 
-Se dejan escritos para no perder el texto antes de decidir si el kit los muestra
-o si salen. Hoy NO se dibujan, y el candado `lib/sunmi/propsDelKit.test.mjs` los
-tiene contados.
+**Actualizado el 2026-08-14** — esta sección decía que `SunmiCardHeader` no
+aceptaba `subtitle`, y desde `42e7e27` sí lo acepta y lo dibuja. Lo que quedó
+apagado es otra cosa y por otro motivo.
 
-| pantalla | prop | valor | estado |
-| --- | --- | --- | --- |
-| `locales/ModalLocal` | `subtitle` | "Configurá los datos del local" | muerto: `SunmiCardHeader` no lo acepta |
-| `usuarios/ModalUsuario` | `subtitle` | "Configurá los datos del usuario" | muerto: se conserva en la pieza |
+Los diez subtítulos **de pantalla** ya se resolvieron: seis se encienden y cuatro
+se borraron por repetir su propio título. Los seis **de modal** no entraron en esa
+tanda, y `SunmiModalLayout` **no reenvía** el prop justamente para que no se
+prendieran solos.
+
+| pantalla | valor | por qué sigue apagado |
+| --- | --- | --- |
+| `locales/ModalLocal` | "Configurá los datos del local" | **repite el título**: por el criterio de arqueo-caja habría que borrarlo, no mostrarlo |
+| `usuarios/ModalUsuario` | "Configurá los datos del usuario" | ídem: repite el título |
+| `proveedores/listas/ModalRevertir` | "Los productos vuelven al costo que tenían antes de aplicar esta lista." | dice algo que el título no dice: candidato a encenderse |
+| `proveedores/listas/ModalTerminar` | "Se cierra el trabajo sobre esta lista. No se toca ningún costo." | ídem |
+| `comprobantes/PanelComprobantes` | `identidad(borrando)` | ídem, y es **calculado**: hay que mirarlo con datos reales |
+| `comprobantes/PanelComprobantes` | "Contestá ahora, con el papel en la mano" | ídem |
+
+El candado `lib/sunmi/propsDelKit.test.mjs` los tiene contados, y la excepción
+—`SunmiModalLayout.subtitle` declarado y no reenviado— está anotada ahí en
+`DECLARADOS_SIN_USAR`, con un segundo test que se pone rojo si algún día se
+reenvía y nadie saca la excepción.
+
+#### Y LO QUE HAY QUE SABER ANTES DE ENCENDER ESOS SEIS: LOS BOTONES BAJAN LA MITAD
+
+**Medido el 2026-08-13**, sobre `BitacoraAuditoria`, que fue el único
+`SunmiCardHeader` con subtítulo de la tanda. Es una propiedad de la pieza, no de
+esa pantalla, y hoy **no tiene ningún consumidor que la sufra** — por eso se
+anota acá y no en el cuerpo de un commit, donde nadie la va a encontrar el día
+que pase.
+
+`SunmiCardHeader` dibuja su encabezado como `flex items-center justify-between`:
+a la izquierda el título, a la derecha el hueco de los `children`, que son los
+botones. Con subtítulo, el título pasa a ser una columna de dos renglones y **la
+fila entera crece** — en la bitácora, de 22,5 a 40,75 px.
+
+El hueco de los botones no crece: lo **recentra** el `items-center`. Medido, se
+corre **9,13 px, la mitad de los 18,25** que se corre todo lo de abajo. En
+`BitacoraAuditoria` es invisible porque ese hueco mide 0x0 —no le pasa botones—,
+pero **la primera pantalla que pase subtítulo Y botones a la vez va a ver los
+botones bajar la mitad del alto agregado**, y eso no va a estar en ninguna lista
+de diferencias declarada si no se lee esto antes.
+
+Cuatro de los seis de arriba son de modal, así que sus botones los pone
+`SunmiModalLayout` y no van en esa fila; el caso llega el día que una pantalla
+—no un modal— use `SunmiCardHeader` con subtítulo y botones juntos.
+
+**Lo que hay que decidir ese día, y no ahora:** si la fila alinea arriba
+—`items-start`— en vez de centrar cuando hay subtítulo, que dejaría los botones
+quietos, o si el corrimiento se acepta y se declara. Cambiar el `items-center`
+mueve **todos** los encabezados de tarjeta del sistema, así que no es un
+detalle de esa tanda.
+
+**Y un segundo efecto del mismo cambio, también medido y también invisible hoy:**
+el `<h2>` del título pasa de ser un item de flex dimensionado por su contenido a
+un bloque dentro de la columna, así que **se estira al ancho entero** — en la
+bitácora, de 157,72 a 442,67 px. No mueve un píxel porque el texto va alineado a
+la izquierda y no lleva fondo. El día que un título se centre o tenga fondo, sí.
 
 ### Props muertos que se DESCARTARON, con el motivo
 
