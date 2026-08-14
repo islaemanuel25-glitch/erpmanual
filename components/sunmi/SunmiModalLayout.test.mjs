@@ -194,18 +194,19 @@ test("EL CUERPO ACEPTA UNA REFERENCIA, y va en el div que scrollea", () => {
   assert.match(cuerpo, /overflow-y-auto/, "la referencia no está en el div que scrollea");
 });
 
-test("EL ALTO ES UNO SOLO Y LA FORMA DECIDE DÓNDE CAE", () => {
-  // Mismo patrón que el `z`: un valor del que la pieza deriva los destinos. Dos
-  // parámetros sueltos dejarían ponerlos incoherentes sin que nadie se entere.
+test("EL ALTO ES UNO SOLO, Y SU DESTINO LO DERIVA LA FORMA POR DEFAULT", () => {
+  // El VALOR sigue siendo uno: mismo patrón que el `z`. Lo que cambió el
+  // 2026-08-14 es que su DESTINO pasó a ser una excepción declarable — ver el
+  // test de abajo, que fija que el default no se movió.
   const firma = SRC.slice(SRC.indexOf("export default function"), SRC.indexOf("}) {"));
   const altos = [...firma.matchAll(/^\s*(alto[A-Za-z]*)\s*=/gm)].map((m) => m[1]);
-  assert.deepEqual(altos, ["alto"], altos.join(", "));
+  assert.deepEqual(altos, ["alto"], `un segundo alto CON DEFAULT: ${altos.join(", ")}`);
 
   // Dónde cae cada forma, y que el cuerpo crezca contra la tarjeta cuando el
   // tope está allá: sin `min-h-0` un hijo flex no baja de su contenido y el
   // scroll no aparece nunca.
-  assert.match(SRC, /const altoEnLaTarjeta = f\.altoVa === "tarjeta" \? alto : ""/);
-  assert.match(SRC, /const altoEnElCuerpo = f\.altoVa === "cuerpo" \? alto : "flex-1 min-h-0"/);
+  assert.match(SRC, /const altoEnLaTarjeta = dondeVaElAlto === "tarjeta" \? alto : ""/);
+  assert.match(SRC, /const altoEnElCuerpo = dondeVaElAlto === "cuerpo" \? alto : "flex-1 min-h-0"/);
 
   const bloque = SRC.slice(SRC.indexOf("const FORMAS"), SRC.indexOf("export default"));
   const destino = (nombre) => {
@@ -217,6 +218,48 @@ test("EL ALTO ES UNO SOLO Y LA FORMA DECIDE DÓNDE CAE", () => {
   assert.equal(destino('"hoja-o-centrado"'), "tarjeta");
   // El cajón ya fija su alto con `h-full`: un tope encima sería contradictorio.
   assert.equal(destino("cajon:"), "ninguno");
+});
+
+test("EL DEFAULT DE `altoVa` NO SE MOVIÓ: sin declararlo, manda la forma", () => {
+  // ── POR QUÉ ESTE CANDADO Y NO CAPTURAS DE LAS CUATRO FORMAS ────────────────
+  //
+  // La comprobación pedida era fotografiar un caso de cada forma antes y después
+  // del cambio. Enumerado con `git grep` sobre `app` y `components`, HOY SOLO
+  // UNA de las cuatro tiene una pantalla que se pueda abrir: de los 16
+  // consumidores, 15 usan `centrado` por default y el único que declara forma es
+  // `ModalCambioPrevio` con `hoja-o-centrado` — y vive bajo `pos-ventas`, detrás
+  // de "No hay una caja abierta a tu nombre en este local". `hoja` y `cajon` no
+  // tienen NINGÚN consumidor.
+  //
+  // O sea que para tres de las cuatro no hay foto posible sin fabricar la
+  // condición. Este candado contesta la misma pregunta y de forma más fuerte:
+  // afirma que la clase resuelta es la MISMA con y sin el parámetro.
+  assert.match(
+    SRC,
+    /const dondeVaElAlto = altoVa \?\? f\.altoVa;/,
+    "el destino tiene que caer en la forma cuando no se declara"
+  );
+
+  // Sin default en la firma: `altoVa = "cuerpo"` haría que centrado siguiera
+  // andando y que hoja y cajón cambiaran en silencio.
+  const firma = SRC.slice(SRC.indexOf("export default function"), SRC.indexOf("}) {"));
+  assert.match(firma, /^\s*altoVa,\s*$/m, "`altoVa` no puede traer default: lo deriva la forma");
+
+  // El `??` y no `||`: con `||` un `altoVa=""` caería a la forma sin que nadie
+  // lo note, y con `??` solo cae si es undefined o null.
+  assert.doesNotMatch(SRC, /altoVa \|\| f\.altoVa/, "con `||` una cadena vacía se traga el destino");
+});
+
+test("LA COLUMNA VIAJA CON EL ALTO, y solo si la forma no la trae", () => {
+  // Cuando el tope va a la TARJETA, la tarjeta tiene que ser columna o el
+  // `flex-1 min-h-0` del cuerpo no resuelve contra nada y el scroll no aparece.
+  // `centrado` es la única forma sin `flex flex-col` propio.
+  assert.match(SRC, /const columnaEnLaTarjeta =/);
+  assert.match(SRC, /dondeVaElAlto === "tarjeta" && !\/\(\^\|\\s\)flex\(\\s\|\$\)\/\.test\(f\.tarjeta\)/);
+
+  // Y tiene que llegar a la tarjeta, no quedarse calculada.
+  const tarjeta = SRC.slice(SRC.indexOf("<SunmiCard"), SRC.indexOf("shrink-0 flex items-start"));
+  assert.match(tarjeta, /columnaEnLaTarjeta/, "se calcula y no se usa");
 });
 
 test("el alto conserva el 65vh de siempre por default", () => {
@@ -284,7 +327,29 @@ test("el padding y la sombra de la tarjeta son props, con el default del kit", (
   // aplicación por una pantalla.
   assert.match(SRC, /paddingTarjeta = ""/);
   assert.match(SRC, /sombraTarjeta = ""/);
-  assert.match(SRC, /\[f\.tarjeta, altoEnLaTarjeta, paddingTarjeta, sombraTarjeta\]/);
+
+  // LAS PIEZAS DEL `className` DE LA TARJETA, EN ORDEN Y SIN NINGUNA DE MÁS.
+  //
+  // Afirmaba el array literal en una línea y se puso en rojo el 2026-08-14 al
+  // entrar `columnaEnLaTarjeta`, que es exactamente para lo que servía: avisar
+  // cuando algo se mete en la composición de la tarjeta. Se reescribe leyendo el
+  // bloque real y normalizando espacios, así sigue afirmando lo mismo —qué
+  // compone la tarjeta, en qué orden y nada más— sin romperse porque el array
+  // ahora se escriba en varias líneas.
+  const desdeLaTarjeta = SRC.indexOf("<SunmiCard");
+  const abre = SRC.indexOf("className={[", desdeLaTarjeta);
+  const lista = SRC.slice(abre, SRC.indexOf("]", abre) + 1);
+  const piezas = lista
+    .replace(/\s+/g, " ")
+    .match(/\[(.*)\]/)[1]
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  assert.deepEqual(
+    piezas,
+    ["f.tarjeta", "columnaEnLaTarjeta", "altoEnLaTarjeta", "paddingTarjeta", "sombraTarjeta"],
+    piezas.join(" | ")
+  );
 });
 
 // ── ACCESIBILIDAD ──────────────────────────────────────────────────────────

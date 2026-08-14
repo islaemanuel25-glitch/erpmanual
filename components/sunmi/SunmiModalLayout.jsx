@@ -225,6 +225,49 @@ export default function SunmiModalLayout({
    */
   alto = "max-h-[65vh]",
   /**
+   * DÓNDE CAE EL `alto`: `"tarjeta"`, `"cuerpo"` o `"ninguno"`.
+   *
+   * ── ES UNA EXCEPCIÓN DECLARABLE, NO LA REGLA CAYÉNDOSE ─────────────────────
+   *
+   * **Sin declarar, lo sigue derivando la FORMA**, y eso sigue siendo el default
+   * y la regla: ver el comentario de `FORMAS`. Lo único que se agrega es poder
+   * decir lo contrario A MANO, con el porqué al lado.
+   *
+   * La regla existía para que nadie los pusiera incoherentes POR DESCUIDO, y un
+   * parámetro que hay que escribir a propósito no rompe eso. Lo que sí hace es
+   * obligar a que quien lo escriba quede anotado en el registro del roadmap,
+   * como los otros seis.
+   *
+   * ── DE DÓNDE SALE, QUE ES UNA NECESIDAD REAL Y NO UNA PREVISIÓN ────────────
+   *
+   * Los dos modales de `clientes` —"Historial de Ventas" y "Cuenta Corriente"—
+   * son CENTRADOS y declaran `max-h-[90vh]` en la TARJETA, con
+   * `overflow-hidden`. Migrarlos sin esto movía la pantalla: medido forzando el
+   * desborde con una ventana de 250 px, la tarjeta pasaba de 225 px topada a
+   * **312 px sin tope**, porque el alto se le aplicaba al cuerpo y la tarjeta
+   * quedaba creciendo con su contenido. 87 píxeles.
+   *
+   * Y el caso normal NO lo mostraba: a 900 de ventana el contenido entra y todo
+   * se ve bien. El defecto solo aparece con contenido largo.
+   *
+   * ── EL PATRÓN DEL QUE ESTE ES EL SEGUNDO CASO ──────────────────────────────
+   *
+   * **La pieza decide algo que la pantalla necesita decidir.** El primero fue el
+   * encabezado, que no se puede apagar y por eso frenó a `CarritoPedido`; este
+   * es el alto. Está anotado como patrón en el roadmap para que el tercero se
+   * reconozca al toque y no se vuelva a resolver desde cero.
+   *
+   * ── Y LA COLUMNA VIAJA CON EL ALTO ─────────────────────────────────────────
+   *
+   * Cuando el tope va a la TARJETA, la tarjeta tiene que ser una columna: el
+   * cuerpo crece contra ella con `flex-1 min-h-0`, y sin la columna ese `flex-1`
+   * no resuelve contra nada y el scroll no aparece nunca. Las formas que ya
+   * nacen con el tope en la tarjeta traen su `flex flex-col` en `FORMAS`;
+   * `centrado` no, así que se lo agrega acá. Son dos caras de lo mismo y por eso
+   * no se declaran por separado.
+   */
+  altoVa,
+  /**
    * El PADDING y la SOMBRA de la tarjeta, por props explícitas.
    *
    * ── POR QUÉ ASÍ Y NO HACIENDO NEGOCIABLE A `SunmiCard` ────────────────────
@@ -318,8 +361,20 @@ export default function SunmiModalLayout({
   // contra ella: `flex-1` para que ocupe lo que sobra y `min-h-0` para que
   // pueda encogerse — sin eso un hijo flex no baja de su contenido y el scroll
   // nunca aparece.
-  const altoEnLaTarjeta = f.altoVa === "tarjeta" ? alto : "";
-  const altoEnElCuerpo = f.altoVa === "cuerpo" ? alto : "flex-1 min-h-0";
+  // Sin `altoVa` declarado esto es EXACTAMENTE lo que era antes: lo deriva la
+  // forma. El `??` no cambia una clase de ninguno de los consumidores que no lo
+  // pasen, y hay un candado que lo fija para las cuatro formas.
+  const dondeVaElAlto = altoVa ?? f.altoVa;
+
+  const altoEnLaTarjeta = dondeVaElAlto === "tarjeta" ? alto : "";
+  const altoEnElCuerpo = dondeVaElAlto === "cuerpo" ? alto : "flex-1 min-h-0";
+
+  // La columna viaja con el alto — ver el comentario de `altoVa`. Solo se agrega
+  // si la forma no la trae ya, para no escribir la misma clase dos veces.
+  const columnaEnLaTarjeta =
+    dondeVaElAlto === "tarjeta" && !/(^|\s)flex(\s|$)/.test(f.tarjeta)
+      ? "flex flex-col"
+      : "";
 
   const cierraElVelo = !destructivo && typeof onClose === "function";
 
@@ -389,7 +444,13 @@ export default function SunmiModalLayout({
             comparten selector. */}
         <SunmiCard
           data-sunmi-modal="tarjeta"
-          className={[f.tarjeta, altoEnLaTarjeta, paddingTarjeta, sombraTarjeta]
+          className={[
+            f.tarjeta,
+            columnaEnLaTarjeta,
+            altoEnLaTarjeta,
+            paddingTarjeta,
+            sombraTarjeta,
+          ]
             .filter(Boolean)
             .join(" ")}
         >
