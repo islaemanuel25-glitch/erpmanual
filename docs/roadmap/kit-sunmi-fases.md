@@ -1364,6 +1364,113 @@ apenas se migre la primera capa de `clientes/page.jsx`, la cifra del trinquete
 deja de ser comparable contra las anteriores hasta que se migren las tres. No se
 tocó la línea de base a propósito.
 
+### EL SCROLL DE `SunmiTable`: LA PALANCA ERA `flex-shrink`, NO EL OVERFLOW
+
+**2026-08-14.** Corregido por Emanuel antes de escribir una línea, y comprobado
+midiendo.
+
+**Lo que NO funciona, y quedó medido para que nadie lo reintente:** declarar
+`overflow-y-visible` al lado del `overflow-x-auto`. Lo pisa el navegador, por la
+misma regla que hace aparecer el problema. Medido en el navegador, preguntando por
+el valor CALCULADO, con las dos formas de escribirlo:
+
+- clase `overflow-x-auto` → calculado `overflow-x: auto`, **`overflow-y: auto`**
+- clase `overflow-x-auto overflow-y-visible` → **exactamente lo mismo**
+- inline `overflow-x:auto; overflow-y:visible` → **exactamente lo mismo**
+- control, sin declarar nada → `visible` / `visible`
+
+El control importa: sin él, cuatro filas iguales no prueban que la sonda mire algo.
+
+**La palanca es `flex-shrink`.** El problema no es que el envoltorio PUEDA
+scrollear: es que **se encoge** adentro de una columna flex, y al encogerse el
+scroll se lo queda él en vez del contenedor de afuera. Un envoltorio que no se
+encoge conserva su alto de contenido y se comporta como cuando el padre era un
+bloque, que es como se comportaba antes de que existiera esto.
+
+`components/sunmi/SunmiTable.jsx:266` pasa a `overflow-x-auto shrink-0`. La rama
+de `stickyHeader` NO lo lleva: ahí el scroll vertical es deliberado —declara
+`overflow-auto` con su propio tope— y encogerse es parte de lo que hace.
+
+#### Medido, con el desborde forzado a 250 px de ventana
+
+Sobre el historial de ventas de `clientes` migrado al kit:
+
+- **sin `shrink-0`:** scrollea el envoltorio de `SunmiTable` —260 sobre 107— y la
+  tabla queda en **620 px de un padre de 628**
+- **con `shrink-0`:** scrollea **el cuerpo del kit** —291 sobre 138—, que es el
+  envoltorio deliberado, y la tabla vuelve a **620 de 620**
+
+Las dos mitades del candado quedan: **cuántos scrollean de verdad Y CUÁL.**
+
+#### A cuántas pantallas les puede cambiar algo: CERO, y así se enumeró
+
+`flex-shrink` es **inerte fuera de un contenedor flex**, así que la pregunta no es
+cuáles usan `SunmiTable` —son 18 bajo `app/`, enumeradas con `git grep -l`— sino
+**en cuáles el envoltorio de la tabla tiene un padre que es contenedor flex**.
+
+Se midió en el navegador y no leyendo el JSX, porque eso depende del CSS calculado
+y no del texto: se visitaron las 18 rutas con sesión real, buscando los divs con
+`overflow-x` auto que contienen una tabla y preguntando por el `display` del
+padre.
+
+**De 13 rutas con tabla visible, CERO tienen el envoltorio en un contenedor
+flex.** Ninguna puede moverse.
+
+**Cinco quedaron sin medir y se dice cuáles**, porque con los datos de hoy no
+dibujan tabla: `reportes-ventas`, `transferencias`, `turnos`, `clientes/[id]` y
+`turnos/[id]`. No se fabricó nada para que la dibujaran.
+
+Y además se comprobó **empíricamente** que es inerte, que no es lo mismo que
+deducirlo de la regla: `/modulos/categorias` a 1366x1400 —el alto hace falta
+porque la tabla mide 946 px y a 900 no entra entera—, recortando al `<table>`,
+con `--repeticiones 3` a los dos lados. **IDÉNTICAS byte a byte, cero píxeles.**
+
+Vale anotar el rodeo, porque se va a repetir: los dos primeros intentos dieron
+"IDÉNTICAS" **y el arnés las descalificó igual**, con "ARNÉS DETERMINISTA, pero la
+foto no muestra lo que dice". Se cortaba contenido por abajo. El cero de una foto
+que no entra entera no vale, y el arnés lo dijo antes que nadie.
+
+### EL CONTADOR: LA UNIDAD PASA A SER LA CAPA, NO EL ARCHIVO
+
+**Arreglado el 2026-08-14**, y era más urgente que todo lo demás.
+
+`importaModalDelKit` miraba si el ARCHIVO importaba la pieza, así que **un archivo
+con varias capas desaparecía entero de la cuenta apenas se migraba la primera**.
+Medido: al migrar dos de las tres capas de `app/modulos/clientes/page.jsx` el
+trinquete pasó de 41 a 38 —bajó tres— y la tercera seguía escrita a mano.
+
+La pregunta correcta no era "¿este archivo usa la pieza?" sino **"¿ESTA capa está
+escrita a mano?"**, y esa se contesta sola: si una línea escribe `fixed inset-0`,
+la capa la dibuja la pantalla. Un archivo puede usar la pieza para dos modales y
+escribir el tercero a mano — que es el estado de cualquiera a medio migrar, o sea
+justo cuando hace falta que la cuenta sea fiel. La pieza misma se sigue sacando
+por su RUTA.
+
+#### La línea de base, con el número viejo al lado del nuevo
+
+**Modales armados a mano: 42 → 40.** El 42 es del 2026-08-13, commit `127b9d6`.
+**No subió ni bajó solo**, y se descompone en tres:
+
+- **−1** el `ModalCliente` de `pos-ventas`, que era código muerto y se borró
+  (`pos-ventas` pasa de 18 a 17)
+- **−2** los dos de `clientes` migrados en esta tanda (`clientes` pasa de 4 a 2)
+- **+1** una capa que ANTES ERA INVISIBLE y ahora se ve: `app/andamio-velo/page.jsx`
+  escribe su capa a mano **y** importa la pieza, así que el contador viejo la
+  descontaba. Aparece bajo `(suelto)`, que pasa de 0 a 1.
+
+Ese +1 es la mejor confirmación de que el arreglo hace lo suyo: la primera capa
+que destapó es exactamente del tipo que el defecto escondía.
+
+**Y hay que saberlo antes de leer el próximo trinquete:** el andamio no está
+trackeado y se borra, así que cuando se vaya la cifra va a bajar a 39. Esa baja no
+es progreso, es que se fue un archivo descartable.
+
+**Cómo se reconcilió, que es parte del número:** el enumerador que usa el contador
+sobre `git ls-files app components` da **39**, y el trinquete da **40**. No es una
+contradicción: `scripts/hardcodeo.mjs` enumera con
+`git ls-files --cached --others --exclude-standard`, o sea trackeados **y** no
+trackeados, a propósito. La diferencia es el andamio.
+
 #### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
 
 **Decidido el 2026-08-14: se revisa junto con los seis del POS, después de la

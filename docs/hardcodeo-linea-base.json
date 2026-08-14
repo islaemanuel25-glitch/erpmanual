@@ -1,12 +1,12 @@
 {
   "_lea_esto": "Línea de base del hardcodeo. La genera scripts/hardcodeo.mjs --linea-base. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
-  "generada": "2026-08-13 17:37",
-  "commit": "127b9d60bcdf404b319a287d219a112564901bba",
+  "generada": "2026-08-14 12:17",
+  "commit": "ee4f3674c526e4e60cf88007e33b94db73a35dd2",
   "total": {
     "color": 290,
-    "medida": 1851,
-    "modal": 42,
-    "crudo": 324,
+    "medida": 1849,
+    "modal": 40,
+    "crudo": 320,
     "celda": 465,
     "kit-pisado": 3,
     "tema-paralelo": 129
@@ -14,7 +14,7 @@
   "porPantalla": {
     "(kit)": {
       "color": 32,
-      "medida": 30,
+      "medida": 32,
       "modal": 1,
       "crudo": 0,
       "celda": 0,
@@ -24,7 +24,7 @@
     "(suelto)": {
       "color": 5,
       "medida": 10,
-      "modal": 0,
+      "modal": 1,
       "crudo": 2,
       "celda": 0,
       "kit-pisado": 0,
@@ -78,8 +78,8 @@
     "clientes": {
       "color": 28,
       "medida": 64,
-      "modal": 4,
-      "crudo": 33,
+      "modal": 2,
+      "crudo": 31,
       "celda": 54,
       "kit-pisado": 0,
       "tema-paralelo": 0
@@ -230,9 +230,9 @@
     },
     "pos-ventas": {
       "color": 37,
-      "medida": 140,
-      "modal": 18,
-      "crudo": 65,
+      "medida": 136,
+      "modal": 17,
+      "crudo": 63,
       "celda": 16,
       "kit-pisado": 0,
       "tema-paralelo": 119
