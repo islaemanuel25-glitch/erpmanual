@@ -1131,6 +1131,119 @@ corridas idénticas" en las dos. Recortes: 672x425 el historial, 672x354 la cuen
 corriente. **Ojo con la ficha:** `recorte` trae el margen incluido —720x473 y
 720x401— y confundirlo con el tamaño del elemento ya arruinó una medición.
 
+#### LAS CUATRO DECISIONES DE EMANUEL, tomadas el 2026-08-14
+
+Ninguna abre tanda nueva, y quedan escritas para cuando esto se retome:
+
+1. **Los márgenes se sacan y el gap se declara.** A los hijos se les sacan los
+   `mb-*`, porque el kit tiene que ser el único que decide el espaciado. Pero el
+   gap se declara **para que dé los mismos 14 px de hoy**, no los 10,5 del
+   default. Ni el apretón de 4 px ni el estirón de 42: las dos son la pantalla
+   moviéndose, y esta fase empareja la capa.
+2. **El subtítulo NO se abre.** El nombre del cliente queda escrito a mano dentro
+   del cuerpo. Reenviar `subtitle` encendería los seis subtítulos de modal que
+   están apagados a propósito, y esa es su propia tanda.
+3. **Se saca el "Cerrar" de abajo**, por el precedente de `ModalPreviewPrecio`.
+4. **`ModalPedirOperador` se revisa junto con los seis del POS después de la
+   fase 4** — ver abajo.
+
+##### LA CLASE DEL GAP NO ES `gap-3.5`, ES `gap-4`. La raíz de este proyecto es 14 px.
+
+Vale anotarlo porque el número se calculó dos veces mal antes de mirarlo:
+`app/globals.css:1124` fija `font-size: 14px` en `html, body`. Con esa raíz,
+`gap-3` es 10,5 px, **`gap-3.5` es 12,25** y **`gap-4` es 14**. La aritmética de
+16 px —la que hace que `-3.5` dé 14— no es la de este repo.
+
+Y no hizo falta deducirlo: la sonda ya había medido `margin-bottom: 14px` sobre
+un hijo con `mb-4`. **El número estaba medido antes de que nadie lo calculara.**
+
+#### SE ESCRIBIÓ, SE MIDIÓ Y SE REVIRTIÓ — 2026-08-14
+
+Se escribieron las dos migraciones enteras, con las cuatro decisiones aplicadas,
+y **la comparación las rechazó**. Se revirtió. El atributo
+`data-sunmi-modal="tarjeta"` queda commiteado en las dos tarjetas: es inerte y es
+lo que va a permitir comparar el día que se retome.
+
+**Lo que sí salió bien, medido en el caso normal** (1366x900, cliente con 8
+ventas): las dos tarjetas se achican y el resto queda donde tiene que quedar. La
+tarjeta del historial pasa de 424,5 a 378 px y la de cuenta corriente de 354 a
+307. **Y acá una corrección de la lista declarada:** yo había declarado que la
+tarjeta subiría "unos 65 px" tomando el precedente de `ModalPreviewPrecio`. El
+número real es **46,5 y 47**. Los 65 son lo que se va con el pie; el encabezado
+del kit devuelve unos 18. Declarar un número prestado de otra pantalla no es
+declarar.
+
+##### LO QUE LA FRENÓ: el `alto` de un modal centrado va al CUERPO, no a la TARJETA
+
+Es una limitación real de la pieza, y aparece recién con contenido largo — por eso
+el caso normal no la mostró.
+
+`FORMAS.centrado` tiene `altoVa: "cuerpo"`, y está escrito a propósito en el
+encabezado de `SunmiModalLayout`: para un modal centrado, el tope va al cuerpo y
+la tarjeta crece con su contenido. **Estas dos declaran `max-h-[90vh]` en la
+TARJETA**, con `overflow-hidden`.
+
+Medido forzando el desborde con una ventana de 250 px de alto —que no fabrica
+datos, solo achica la ventana—, sobre el mismo cliente y con la misma sesión:
+
+- **antes:** tarjeta 225 px, `max-height` 225, `overflow: hidden`
+- **después:** tarjeta **312 px**, `max-height: none`, `overflow: visible`
+
+**+87 px, y la tarjeta deja de estar topada.** Es más del estirón de 42 que la
+decisión 1 rechaza expresamente, y por eso se frena acá y no se declara.
+
+Y el caso normal no lo mostraba: a 900 de ventana el contenido entra, así que las
+dos capturas daban una tarjeta más chica y todo bien. **La medición que encontró
+el defecto es la que forzó el caso que no se ve.**
+
+##### Y un segundo hallazgo, del mismo cambio: el scroll se muda adentro de la tabla
+
+`SunmiTable` envuelve su tabla en un `overflow-x-auto`. En CSS, `overflow-x`
+distinto de `visible` obliga a `overflow-y` a calcular `auto`, así que ese
+envoltorio **también scrollea vertical**.
+
+Antes el que scrolleaba era el envoltorio deliberado —`overflow-y-auto flex-1`,
+medido con `scrollHeight` 260 sobre `clientHeight` 60— y la tabla ocupaba los 620
+px enteros de su padre. Después, el que scrollea es el `overflow-x-auto` de
+`SunmiTable` —260 sobre 194— y **la tabla pasa a 620 de un padre de 628**: los 8
+px se los come una barra de scroll que ahora vive ADENTRO del área de la tabla.
+
+La cuenta de scrolls que scrollean de verdad sigue siendo **uno** antes y después,
+así que esa mitad del candado pasa. Lo que no pasa es cuál: el scroll dejó de
+estar donde alguien lo puso y apareció donde nadie lo pidió.
+
+##### Lo que hace falta antes de retomar, y es una decisión de Emanuel
+
+Que la pieza sepa poner el `alto` en la **tarjeta** también en `centrado`. Sería
+el séptimo parámetro y sale de una necesidad real de dos pantallas reales, que es
+como nacieron los otros seis — **pero contradice una decisión escrita del kit**:
+hoy dónde cae el alto lo deriva la FORMA a propósito, para que no se puedan poner
+incoherentes. Abrirlo es cambiar esa regla, y eso no entra por una tanda técnica.
+
+Es la misma familia que "el encabezado del kit no se puede apagar", que frenó
+`CarritoPedido`. Dos pantallas distintas llegaron al mismo lugar: **la pieza
+decide cosas que la pantalla necesita decidir.**
+
+Mientras tanto el grupo queda elegido, medido y con las capturas de antes
+sacadas. Retomarlo cuesta la migración, no el relevamiento.
+
+#### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
+
+**Decidido el 2026-08-14: se revisa junto con los seis del POS, después de la
+fase 4.** Queda escrito acá para que nadie lo tome suelto creyendo que es un
+singleton más de la lista de nueve.
+
+Su capa y su tarjeta están perfectamente en condiciones de migrarse. Lo que no se
+puede es **verificar** que la pantalla quede idéntica: se dibuja con
+`!exento && !operador && huboOperador`, o sea que hace falta que una sesión de
+operario haya existido y se caiga a mitad de camino, y el admin con el que se
+mide es `exento`. No hay forma de abrirlo sin fabricar la condición.
+
+Es exactamente el caso que el criterio nuevo existe para atajar: firma impecable,
+pantalla inalcanzable. Va con los del POS porque comparte el motivo —una
+condición de negocio que no se puede montar sin ensuciar datos— y no porque
+comparta el módulo.
+
 ### LA MIGRACIÓN DEL CARRITO SE ESCRIBIÓ, SE MIDIÓ Y SE REVIRTIÓ
 
 **2026-08-13.** Se escribió entera —los dos caminos, con `encabezado="ninguno"`—

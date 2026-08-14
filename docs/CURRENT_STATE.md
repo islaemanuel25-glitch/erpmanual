@@ -8,6 +8,48 @@
 > contradicciones y cinco puntos de deuda, marcados abajo como RESUELTO. El resto
 > del documento sigue describiendo el commit del encabezado.
 >
+> ---
+>
+> ## ⚠️ ACTUALIZACIÓN DEL 2026-08-14 — leer esto antes que lo de abajo
+>
+> **El hash del encabezado NO se movió a propósito.** Mover el hash sin volver a
+> relevar el sistema entero afirmaría que todo lo que sigue se reverificó contra
+> el commit nuevo, y no es así. Lo que se verificó hoy es lo que está en este
+> bloque; **todo lo que viene después del bloque sigue describiendo `d20afa9`** y
+> hay que tratarlo como histórico, comparando contra `git rev-parse HEAD` antes de
+> confiar en cualquier afirmación puntual.
+>
+> Verificado contra el árbol de `e5e745f`, ejecutando y no leyendo:
+>
+> - **La base de desarrollo es `erpazul_dev`, no `erpazul_al`.** El `DATABASE_URL`
+>   del `.env` apunta ahí y es la que sirve el dev server. `erpazul_al` está **7
+>   migraciones atrasada** —90 aplicadas contra 97— así que hoy no puede servir ni
+>   la aplicación ni las capturas sin migrarla antes.
+> - **La línea de base de `tests/huellas/baseline` NO es comparable**: se tomó
+>   sobre `erpazul_al`. Un antes y un después sacados los dos contra `erpazul_dev`
+>   sí valen; cruzar cualquiera de los dos contra el baseline viejo, no.
+> - **Capas de modal armadas a mano: 41**, que es la cifra que imprime el
+>   trinquete y la única oficial. Enumeradas con el contador mismo sobre los
+>   `.jsx` de `git ls-files app components`. Reparto: 18 con superficie propia, 23
+>   con `SunmiCard`; menos `ClientePickerFullscreen` el migrable es **22**, y 13
+>   de esos viven en `components/pos-ventas`.
+> - **`pos-ventas` queda fuera de la fase 2**, para después de la fase 4: la
+>   pantalla está bloqueada por una caja vencida y destrabarla es una acción de
+>   negocio sobre datos reales. El relevamiento de sus seis modales está hecho y
+>   archivado en `docs/roadmap/kit-sunmi-fases.md`.
+> - **La raíz tipográfica del proyecto es 14 px** (`app/globals.css:1124`), no 16.
+>   Es la razón de que `p-6` dibuje 21 px y de que `gap-3` sea 10,5 y `gap-4` sea
+>   14. Cualquier cuenta de espaciado hecha con la escala de 16 da mal.
+> - **La credencial de desarrollo de la semilla funciona**: `admin@admin.com` con
+>   la clave que documenta `prisma/seed.js`. Login real contra `/api/login`, que
+>   limita a 10 intentos cada 15 minutos por IP.
+> - **Hay 5 clientes en `depo`** y ventas reales asociadas (tickets #8 a #64 en
+>   uno de ellos), así que los modales de esa pantalla se pueden abrir y
+>   fotografiar sin fabricar filas.
+> - **Sin verificar y anotado como tal:** el estado de producción, el despliegue y
+>   todo lo que describe el cuerpo del documento. Nada de eso se tocó ni se
+>   revisó en esta tanda.
+>
 > ## En producción
 >
 > **Commit desplegado:** `f79cdafbabbf0a1e1865854ff27d5de6ff5f5cd8`
