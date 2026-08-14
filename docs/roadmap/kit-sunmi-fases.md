@@ -1755,6 +1755,81 @@ trigger cascading renders"— en su primer `useEffect`. Comprobado que **ya esta
 antes de migrar**: aparece igual en la versión anterior, una línea más abajo. No
 se tocó.
 
+### `ModalProductoFinal` — NO SE MIGRÓ, y el motivo corrige el relevamiento
+
+**2026-08-14.** Se frenó antes de tocar una línea. Los dos hallazgos van por
+separado porque son de distinta naturaleza.
+
+#### 1. EL CAMBIO DE MONTAJE ES REAL PERO INERTE, y lo contrario de lo que se temía
+
+La pregunta era qué implica que hoy su capa viva siempre en el DOM apagada con
+`hidden` mientras el kit no dibuja nada con `open` en falso — en concreto, si el
+estado del formulario se comporta distinto al cerrar y volver a abrir.
+
+**Medido, no deducido**, sobre `/modulos/productos?editar=1` a 1366:
+
+- **abierto:** la capa existe y se ve, `display: flex`, y tiene **9 inputs
+  adentro** con el producto cargado.
+- **cerrado, tocando "Cerrar":** la capa **sigue en el DOM** con `display: none`,
+  y tiene **0 inputs adentro**.
+
+O sea que **el formulario ya se desmonta hoy**, y no por el `hidden` sino porque
+el archivo ya lo tiene detrás de `{open && <FormProducto …/>}`. Quien lo escribió
+ya había resuelto el problema.
+
+**Consecuencia: migrar al kit NO cambia el comportamiento del estado.** Hoy
+cerrar y volver a abrir arranca de cero, y con el kit también. Lo único que se va
+es el envoltorio vacío —la capa, el encabezado y el contenedor de scroll— que hoy
+queda colgando en el DOM mientras el modal está cerrado. Eso no se ve y no cambia
+nada que alguien pueda notar.
+
+**Queda declarado igual**, porque el día que alguien saque ese `{open && …}`
+creyendo que el kit ya lo cubre, lo va a cubrir — pero al revés que hoy: sería el
+`return null` del kit el que desmonta, y no el guard del archivo.
+
+#### 2. LO QUE LO FRENÓ: la pantalla abre A VECES, y eso invalida la verificación
+
+`?editar=<id>` **no abre siempre**. Medido: **4 de 7 corridas**, con sesión real
+y el mismo producto —`id=1`, que la API devuelve bien cuando se la consulta
+directo—.
+
+Cuando falla no hay error a la vista: **no dispara ningún `alert`** —comprobado
+interceptando `window.alert` antes de navegar— y **la URL queda en
+`/modulos/productos`, sin el `?editar=`**. O sea que algo reescribe la URL y le
+saca el parámetro, y entonces el efecto cae en su última rama y cierra el modal.
+Es una carrera entre dos efectos de esa página, y no se investigó más porque
+excede esta fase.
+
+**Por qué eso frena la migración y no es un detalle:** la verificación de esta
+fase es comparar una captura de antes contra una de después. Con una apertura que
+funciona la mitad de las veces, **una corrida fallida produce una captura
+perfectamente determinista de la pantalla SIN el modal** — y pasaría
+`--repeticiones 3` sin despeinarse. Es exactamente la trampa que este documento ya
+tiene anotada dos veces.
+
+#### Y CORRIGE EL RELEVAMIENTO: una sola observación no alcanzaba
+
+En el relevamiento de los siete quedó anotado que `ModalProductoFinal` **"abre por
+URL"**, sin reservas. Esa afirmación salió de **UNA sola corrida**.
+
+El propio arnés de este proyecto usa `--repeticiones 3` justamente porque un
+resultado que parece determinista no lo es hasta que se repite. **La regla se
+aplicó al fotografiar y no al relevar**, y por eso el orden de trabajo se armó
+sobre un dato que no estaba medido con el mismo estándar.
+
+**La regla que queda:** cuando el relevamiento diga "abre", eso también se repite.
+Una vez no es una medición.
+
+#### El orden se reacomoda
+
+`ModalProductoFinal` **sale del tercer puesto** y queda esperando a que se
+entienda por qué la URL pierde el parámetro. Su lugar lo toma
+**`ModalMergeClientes`**, que abre con un botón —comprobado— y cuyo único costo
+extra es que tiene una tabla adentro, y eso ya está resuelto con el `shrink-0`.
+
+Orden vigente: `ModalCliente` (hecho), `ModalGrupo` (hecho),
+**`ModalMergeClientes`**, y después `ModalProductoFinal` si se destraba.
+
 #### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
 
 **Decidido el 2026-08-14: se revisa junto con los seis del POS, después de la
