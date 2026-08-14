@@ -1,7 +1,7 @@
 # INC-0006 — Editar un proveedor devuelve 500 desde el 2026-07-26, y nadie lo ve
 
 **Fecha:** 2026-08-14
-**Estado:** ABIERTO. Medido y diagnosticado; no arreglado.
+**Estado:** arreglado en local el 2026-08-14, **sin desplegar todavía**.
 **Alcance:** `/modulos/proveedores`, el lápiz de cada fila y cualquier entrada
 por `?editar=<id>`. **Está en producción.**
 
@@ -60,23 +60,110 @@ en `CLAUDE.md`:
    `app/api` que contestan lo mismo**: el candado de mensajes que explican cubre
    solo las rutas del módulo de comprobante, y esta no es una de ellas.
 
-## Qué habría que hacer, y por qué no se hizo acá
+## LA REGLA DE NEGOCIO, DECIDIDA — y el chequeo que se le hizo antes de aplicarla
 
-**El arreglo no es borrar el filtro**: sacarlo dejaría la ruta sin ningún alcance,
-que es justo lo que `ba94fc2` vino a cerrar.
+**Decidido por Emanuel el 2026-08-14: cada local tiene sus propios proveedores.**
+Un proveedor cargado en un local no se ve desde los otros.
 
-La forma correcta ya existe al lado y es la que manda la regla 1 —reusar, no
-escribir una parecida—: `app/api/proveedores/listar/route.js:25` usa
-`proveedorVisibleWhere(scope.localId, scope.grupoId)`, el predicado compartido de
-`lib/visibilidad.js`, que es el que sabe de verdad qué proveedor ve quién.
+Antes de aplicarla se preguntó contra los datos si esconde algo en uso. Corrido
+contra **`erpazul_dev`** — dos locales, `depo` (1) y `mini el 7` (2), grupo 1, 42
+proveedores — y usando **el predicado real del repo**, no una copia:
 
-**No se aplicó en esta tanda porque cambia QUIÉN VE QUÉ**, y eso es una decisión
-de negocio, no una corrección de tipeo. Corresponde su propia tanda, con la
-consulta ejercida contra Postgres antes de commitear y comprobando que esa corrida
-atrapa la versión mala.
+- **Proveedores con productos o pedidos en un local distinto del que los creó:
+  42, o sea todos.** Pero **no por lo que la pregunta buscaba**: los 42 tienen
+  `creadoEnLocalId` en **null**. Son filas viejas, anteriores al campo. La ruta de
+  crear sí lo escribe hoy (`crear/route.js:23`), así que un proveedor nuevo nace
+  con su local puesto.
+- **Proveedores que quedarían invisibles en un local donde se los usa: 0.**
+
+**Ese segundo número es el que decide**, y es el que la consigna pedía de verdad:
+"que la regla no esconda nada que hoy esté en uso". Tener productos en otro local
+no rompe nada por sí solo — el predicado hace visible al proveedor justamente
+donde tiene productos. Lo que rompería es un uso **sin** productos ahí, y de eso
+no hay ninguno.
+
+**Y hay un argumento que lo refuerza:** la ruta del LISTADO ya usaba
+`proveedorVisibleWhere` desde antes. O sea que la regla **ya estaba viva** y esta
+ruta era la única que no la respetaba. Aplicarla no esconde nada nuevo: hace que
+la ficha coincida con la lista de la que se entra.
+
+**Sin verificar:** todo esto se midió contra `erpazul_dev`, no contra producción.
+
+## El arreglo, y las TRES cosas que estaban mal
+
+**1. El campo que no existe.** `where: { id, grupoId: scope.grupoId }` pasó a
+`where: { id, ...proveedorVisibleWhere(scope.localId, scope.grupoId) }`. Se reusa
+el predicado canónico y no se escribe una condición parecida al lado.
+
+**2. Y había un SEGUNDO desacuerdo, que apareció recién al ejercerlo.** Con el
+predicado ya puesto, la ficha seguía dando **404 en el local donde el proveedor sí
+tiene sus productos**, mientras el listado lo devolvía. El motivo: esta ruta
+resolvía el alcance con `resolveGrupo` y el listado con `resolveLocalAndGrupo`.
+**Dos resolutores distintos para la misma pregunta**, y por eso contestaban
+distinto. Ahora usa el mismo que el listado.
+
+Esto **no lo habría encontrado ninguna lectura del código**: las dos funciones se
+llaman parecido y las dos devuelven un `grupoId`. Lo encontró correrlo.
+
+**3. La pantalla tiraba el error.** Los dos `fetch` de lectura de
+`proveedores/page.jsx` preguntaban por el caso bueno y no tenían rama para el
+malo. Un 500 se veía **exactamente igual que un botón que no hace nada**. Ahora
+se muestra, con un texto que distingue los dos casos: un 404 no es una falla, es
+la regla diciendo que ese proveedor no es de este local.
+
+**Y esa tercera parte se rompió una vez más antes de quedar bien**, con un solo
+estado `errorMsg`: el listado terminaba después que la ficha y **borraba el aviso**
+que la ficha había puesto. Compilaba y el candado estaba en verde. **Lo encontró
+mirar la captura.** Quedaron dos estados, cada consulta dueña del suyo, y el
+candado ahora exige que sigan siendo dos.
+
+## Verificado ejerciendo
+
+Con sesión real, siete corridas por local, en los dos locales:
+
+- **`depo`: abre 7 de 7**, y la API contesta 200 con el proveedor.
+- **`mini el 7`: 0 de 7, con 404** — que es lo correcto: la regla dice que ese
+  proveedor no es de ese local. **Y el listado de ese local devuelve `items: []`**,
+  o sea que la ficha y la lista por fin dicen lo mismo.
+- **El aviso se ve**, comprobado en la captura: "Ese proveedor no es de este
+  local. Cada local tiene sus propios proveedores."
+
+Antes del arreglo: **0 de 7 con 500**, en los dos locales.
+
+## Qué cierra esto, y qué NO
+
+Se agregó `lib/visibilidad.proveedores.test.mjs`, con la contraprueba hecha:
+restaurando el `grupoId` viejo, el candado se pone en rojo nombrando archivo y
+línea.
+
+**Cierra**, para todo el repo: que ninguna ruta acote `Proveedor` por `grupoId`;
+que las cinco rutas que acotan proveedores por ubicación usen el predicado
+compartido; que esta ruta no vuelva a contestar un mensaje mudo; y que esta
+pantalla no vuelva a descartar una respuesta en silencio.
+
+**NO cierra**, y conviene que quede dicho:
+
+- **La validez de las consultas de Prisma en general.** Un campo mal escrito que
+  no sea `grupoId` sobre `Proveedor` pasa igual. Eso solo lo atrapa ejercer la
+  consulta contra Postgres. Sigue siendo lo que dice el `CLAUDE.md`.
+- **Los mensajes mudos.** El candado que los prohíbe está acotado a las rutas de
+  comprobantes. Contadas hoy: **18 rutas bajo `app/api/proveedores` y 206 en todo
+  `app/api`** siguen contestando "Error interno". Este arreglo tapó **una**.
+- **Las pantallas que descartan errores.** Se arregló la de proveedores. No se
+  relevó cuántas más hacen lo mismo.
 
 ## Lo que queda sin verificar
 
-**No se comprobó contra producción.** Todo lo de acá se midió contra
-`erpazul_dev`. Lo que sí está comprobado es que **el código desplegado tiene la
-misma línea**, así que el 500 es esperable — pero esperable no es medido.
+**No se comprobó contra producción**, ni el defecto ni el arreglo. Todo se midió
+contra `erpazul_dev`. Lo que sí está comprobado es que **el código desplegado
+tiene la línea mala**, así que el 500 en producción es esperable — pero esperable
+no es medido.
+
+**Y el arreglo no está desplegado.** Hasta que se despliegue, el botón sigue roto
+para Emanuel.
+
+**Nota de método:** la auditoría de datos se corrió con un cliente Prisma armado
+fuera de `scripts/`, sin la fábrica. El motivo está escrito en el archivo: la
+fábrica exige que la URL la ponga el operador, y para pasársela habría que leer el
+`.env`, que el guardia de permisos bloquea — con razón. Es de solo lectura y la
+corrida imprime contra qué base se conectó, que fue `erpazul_dev`.

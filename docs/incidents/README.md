@@ -31,7 +31,7 @@ un incidente y una anécdota.
 | [INC-0003](INC-0003-stock-negativo.md) | Stock negativo grande y silencioso | **ABIERTO** |
 | [INC-0004](INC-0004-mauro-no-es-una-factura.md) | El comprobante de Mauro no es una factura | Cerrado |
 | [INC-0005](INC-0005-caidas-por-despliegue.md) | El sitio se cayó dos veces en una jornada de 15 despliegues | **ABIERTO** |
-| [INC-0006](INC-0006-editar-proveedor-500.md) | Editar un proveedor devuelve 500 desde el 2026-07-26 | **ABIERTO** |
+| [INC-0006](INC-0006-editar-proveedor-500.md) | Editar un proveedor devuelve 500 desde el 2026-07-26 | Arreglado, sin desplegar |
 
 ## Incidentes que existen pero no se documentaron acá
 

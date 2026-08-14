@@ -48,6 +48,33 @@ export default function ProveedoresPage() {
 
   const [editData, setEditData] = useState(null);
 
+  // ── EL TERCER LUGAR DONDE UN ERROR SE VUELVE "NO PASA NADA" ────────────────
+  //
+  // El 500 de `obtener` estuvo diecinueve días sin que nadie lo viera, y no fue
+  // solo porque el mensaje fuera mudo: **esta pantalla lo TIRABA**. Los dos
+  // `fetch` de lectura preguntaban por el caso bueno y no tenían rama para el
+  // malo, así que un fallo se veía exactamente igual que un botón que no hace
+  // nada.
+  //
+  // El incidente del 2026-08-12 ya había enseñado que los mensajes viven en tres
+  // lugares y los candados miraban dos. Este es un cuarto: el consumidor. Un
+  // mensaje perfecto que nadie muestra sigue siendo "Error interno".
+  //
+  // ── Y SON DOS ESTADOS, NO UNO. Se probó con uno y NO SE VEÍA ──────────────
+  //
+  // Con un solo `errorMsg`, las dos consultas se pisaban: la ficha escribía el
+  // aviso y el listado —que en ese local devuelve una lista vacía con `ok: true`,
+  // o sea que le va bien— lo borraba al terminar. La pantalla volvía a no decir
+  // nada, que es exactamente el defecto que este cambio venía a sacar.
+  //
+  // No lo encontró ningún candado: compilaba, y el candado de "la pantalla
+  // muestra el error" estaba en verde porque el código para mostrarlo estaba
+  // escrito. Lo encontró ABRIR LA PANTALLA y mirar la captura.
+  //
+  // Cada consulta es dueña de su mensaje y solo limpia el suyo.
+  const [errorLista, setErrorLista] = useState("");
+  const [errorFicha, setErrorFicha] = useState("");
+
   // Vista solo lectura de productos vinculados por código interno
   const [vinculadosProv, setVinculadosProv] = useState(null);
 
@@ -68,6 +95,9 @@ export default function ProveedoresPage() {
       if (data.ok) {
         setItems(data.items || []);
         setTotal(data.total || 0);
+        setErrorLista("");
+      } else {
+        setErrorLista(data.error || "No se pudo cargar la lista de proveedores.");
       }
     } finally {
       setLoading(false);
@@ -90,7 +120,19 @@ export default function ProveedoresPage() {
       });
 
       const data = await res.json();
-      if (data.ok) setEditData(data.item);
+      if (data.ok) {
+        setEditData(data.item);
+        setErrorFicha("");
+      } else {
+        // Un 404 acá NO es una falla: es la regla de visibilidad diciendo que ese
+        // proveedor no es de este local. Se dice eso y no "error", que mandaría a
+        // buscar el problema al lugar equivocado.
+        setErrorFicha(
+          res.status === 404
+            ? "Ese proveedor no es de este local. Cada local tiene sus propios proveedores."
+            : data.error || "No se pudo abrir la ficha del proveedor."
+        );
+      }
     };
     loadEdit();
   }, [editarId]);
@@ -241,6 +283,18 @@ export default function ProveedoresPage() {
         </div>
 
         <SunmiSeparator label="Listado" className="my-4" />
+
+        {/* El aviso va ACÁ y no adentro del modal a propósito: cuando `obtener`
+            falla, el modal es justamente lo que no se dibuja. Un mensaje que
+            vive en el modal roto no lo lee nadie. */}
+        {[errorFicha, errorLista].filter(Boolean).map((texto) => (
+          <div
+            key={texto}
+            className="mb-4 text-xs sunmi-text-danger sunmi-state-danger rounded px-3 py-2 text-center"
+          >
+            {texto}
+          </div>
+        ))}
 
         {/* ===================== */}
         {/* TABLA */}
