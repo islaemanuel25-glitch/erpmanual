@@ -1958,6 +1958,100 @@ es distinto según el grupo:
 
 **No se arregló ninguna**, porque ninguna está rota por esto.
 
+## LA TABLA DE DECLARACIONES — el cierre de la fase 2
+
+**2026-08-14.** Es el hito que Emanuel puso antes de la fase 5: mirar todo lo que
+se declaró y decidir **qué se unifica y qué tiene razón de ser distinto**. El
+compromiso del documento fue siempre que un parámetro es una postergación y no un
+perdón; esto es cobrar la postergación.
+
+**Cómo se enumeró, que es parte de la afirmación:** `git grep -l SunmiModalLayout
+-- app components`, que recorre el repo entero, sacando la pieza y los candados. Y
+se cortó **por cada etiqueta de apertura**, no una por archivo, porque
+`clientes/page.jsx` tiene tres modales y `PanelComprobantes.jsx` dos. Da **22
+modales en 19 archivos**. El conteo de archivos coincide con la lista del candado
+de `destructivo`, que se mantiene aparte y a mano.
+
+### Lo que declara cada uno
+
+- **`espacioCuerpo` — 17 de 22.** El más declarado por lejos.
+- **`espacioPie` — 9 de 22.**
+- **`maxWidth` — 14 de 22**, con cinco anchos distintos: `max-w-md`, `max-w-lg`,
+  `max-w-2xl`, `max-w-3xl` y `sm:max-w-lg`.
+- **`destructivo` — 15 de 22.**
+- **`alto` — 5 de 22**, con dos valores: `max-h-[90vh]` (cuatro) y
+  `max-h-[92vh] sm:max-h-[88vh]` (uno).
+- **`z` — 5 de 22**, y los cinco declaran `{50}`.
+- **`altoVa` — 4 de 22**, y los cuatro declaran `"tarjeta"`.
+- **`encabezado` — 4 de 22**, y los cuatro declaran `"cinta"`.
+- **`subtitle` — 6 de 22.**
+- **`forma` — 1 de 22** (`hoja-o-centrado`).
+- **`paddingTarjeta`, `sombraTarjeta`, `refCuerpo` — 1 cada uno.**
+- **`showCloseButton` — 0 de 22.**
+
+### LO QUE LA TABLA MUESTRA, que no se veía migrando de a uno
+
+**1. Hay tres defaults del kit que NADIE quiere, y son los tres más caros.**
+
+- **`alto`.** El default es `max-h-[65vh]` y **ninguno de los 22 lo usa**. Los
+  cinco que declaran algo declaran 90 u 88/92. Y ya sabemos que ese default hace
+  daño cuando llega alguien nuevo: la migración del carrito quedó a 416 px de alto
+  contra 574 justamente por tomarlo (640 × 0,65).
+- **`espacioCuerpo`.** El default es `mt-2 gap-3` y **ocho de los diecisiete lo
+  declaran VACÍO** —`ModalEnviarPedido`, `ModalVincularCodigo`, `ModalLocal`,
+  `ModalOperador`, `ModalRol`, `ModalUsuario`, `ModalCodigosProveedor` y
+  `ModalMergeClientes`—, o sea que le piden al kit que no ponga nada. Con
+  `espacioPie` pasa lo mismo: siete de los nueve lo declaran vacío.
+- **`z`.** El default es `9999` y los cinco que declaran algo declaran `50`.
+  Ninguno declara 40 ni 60 desde acá.
+
+**Un default que cero consumidores eligen no es un default: es una trampa para el
+próximo.** Los tres son candidatos directos a cambiar, y el criterio para decidir
+está a la vista en los números.
+
+**2. Cuatro parámetros nacieron para una pantalla y siguen sirviendo a una.**
+`paddingTarjeta`, `sombraTarjeta`, `refCuerpo` y `forma` tienen **un solo
+consumidor cada uno**, y los cuatro son de pantallas que hoy funcionan. Eso es lo
+que el criterio pedía y no hay nada que unificar: son excepciones reales,
+declaradas, con su motivo escrito al lado.
+
+**3. `altoVa` se usó exactamente donde se dijo que iba a usarse.** Cuatro
+consumidores, los cuatro `"tarjeta"`, los cuatro de `clientes`. Nadie declaró
+`"cuerpo"` ni `"ninguno"`. **Queda una pregunta abierta que la tabla destapa:** si
+los únicos que hablan piden todos lo contrario del default de `centrado`, capaz el
+default de `centrado` debería ser `"tarjeta"`. **No se cambia sin medir** — habría
+que mirar los otros dieciocho centrados forzando el desborde, uno por uno, porque
+es precisamente el caso que a 900 de ventana no se ve.
+
+**4. Los seis `subtitle` siguen muertos, y ahora están contados.** La pieza no los
+reenvía a propósito —está escrito en su comentario— así que esos seis declaran un
+subtítulo que no se dibuja. Dos de ellos, "Configurá los datos del local" y
+"Configurá los datos del usuario", **repiten el título**, así que por el criterio
+aprobado habría que borrarlos y no encenderlos. Es la decisión que quedó pendiente
+y ahora tiene su número: **seis, de los cuales dos se borran y cuatro se
+encienden.**
+
+**5. Dos de las cuatro formas no tienen NINGÚN consumidor.** `hoja` y `cajon`
+salieron de `CarritoPedido`, y esa migración se escribió, se midió y **se
+revirtió**. O sea que hoy están probadas por candado y por andamio, **no por una
+pantalla real**. Es exactamente lo que este documento advierte de las piezas
+escritas adivinando, con el atenuante de que estas no se adivinaron: se sacaron de
+una pantalla que existe y que todavía no las usa.
+
+**6. `showCloseButton` no lo declara nadie.** Es el único de los parámetros viejos
+con cero uso. Candidato a sacarse cuando se revise la lista, no antes.
+
+### Lo que NO decide esta tabla
+
+Las 22 son las migradas. **Quedan siete modales sin migrar** —los dos bloqueados
+por datos, `ModalProductoFinal`, `ModalPedirOperador` y los del POS— y cualquiera
+de ellos puede pedir algo nuevo. La tabla se vuelve a mirar cuando estén, pero las
+decisiones de arriba **no dependen de ellos**: un default que hoy nadie elige no
+lo va a empezar a elegir el número 23.
+
+**Ninguna de las seis se aplicó en esta tanda.** La tabla es el insumo de la
+decisión, y la decisión es de Emanuel.
+
 ### `ModalMergeClientes` — LA LISTA DECLARADA, escrita ANTES de tocar
 
 **2026-08-14.** **Todos los números son a 1366x900.**
