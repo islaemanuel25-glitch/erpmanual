@@ -732,6 +732,50 @@ PostgreSQL healthy, 0 reinicios, logs sin errores, migraciones al día, `/login`
 en 200 y el árbol del VPS limpio. Si algo de esto no da, se informa — no se
 maquilla.
 
+### CÓMO SE ELIGE UN MARCADOR PARA MIRAR ADENTRO DE LA IMAGEN
+
+Los cinco valores prueban que el despliegue es **consistente**, no que la imagen
+tenga lo que se quería desplegar. Para eso hay que buscar algo adentro del build
+—`docker exec erpazul_app grep -r … /app/.next`— y ahí se elige un marcador. Se
+elige mal muy fácil.
+
+**El marcador TIENE QUE NO EXISTIR ANTES, y eso se comprueba contra el commit
+desplegado, no contra la memoria de quien lo escribió.**
+
+```bash
+git show <SHA_QUE_ESTABA>:ruta/al/archivo.jsx | grep -c "mi-marcador"   # tiene que dar 0
+```
+
+*El caso, del 2026-08-14:* se eligió `altoVa` como marcador de una tanda que
+agregaba ese parámetro al kit. Dio **positivo en la imagen vieja**, o sea en una
+imagen que no tenía la tanda. No era un error del grep: `altoVa` ya vivía adentro
+de la tabla `FORMAS` desde antes, como clave. El que lo escribió se acordaba de
+haberlo agregado como PROP y no de que el identificador ya estaba. Leído rápido,
+ese positivo decía "mi cambio viajó" — y era falso.
+
+El que sirvió fue `overflow-x-auto shrink-0`, comprobado con el `git show` de
+arriba: cero apariciones en el commit desplegado.
+
+**Y su par, que es la otra mitad: un vacío solo significa algo si la misma
+búsqueda encuentra algo cuando tiene que encontrarlo.**
+
+```bash
+docker exec erpazul_app sh -c 'grep -rl "overflow-x-auto shrink-0" /app/.next'  # vacío = no está
+docker exec erpazul_app sh -c 'grep -rl "overflow-x-auto" /app/.next'           # con líneas = la búsqueda anda
+```
+
+Sin esa segunda línea, un grep mal escrito, una ruta equivocada o un `docker exec`
+que falló en silencio dan el mismo vacío que "no está" — y ese vacío se lee como
+la respuesta que uno esperaba.
+
+**En una tanda que solo QUITA código**, el marcador es al revés: algo que tiene
+que haber DESAPARECIDO, y el control es que siga apareciendo antes. Misma regla
+dada vuelta y las dos mitades siguen haciendo falta.
+
+Y si para algo no se puede armar un marcador con su control —porque el cambio no
+deja rastro en el build, por ejemplo—, **se dice que no se pudo verificar** en vez
+de darlo por bueno.
+
 ### Y antes de escribir el reporte: la bitácora de autorizaciones
 
 ```bash
