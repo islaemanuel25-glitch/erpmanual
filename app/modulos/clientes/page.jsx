@@ -1123,7 +1123,7 @@ function ModalCliente({ cliente, localId, onCerrar, onGuardado }) {
 
   return (
     <div className="fixed inset-0 sunmi-pos-overlay flex items-center justify-center p-4 z-50">
-      <SunmiCard className="w-full max-w-md p-4 max-h-[90vh] overflow-y-auto">
+      <SunmiCard data-sunmi-modal="tarjeta" className="w-full max-w-md p-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold">
             {esEdicion ? "Editar Cliente" : "Nuevo Cliente"}

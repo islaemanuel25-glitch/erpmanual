@@ -1471,6 +1471,85 @@ contradicción: `scripts/hardcodeo.mjs` enumera con
 `git ls-files --cached --others --exclude-standard`, o sea trackeados **y** no
 trackeados, a propósito. La diferencia es el andamio.
 
+### LOS SIETE QUE QUEDAN: relevados ANTES de migrar ninguno
+
+**2026-08-14.** Es la regla nueva aplicada en su orden: **primero si abre, después
+la firma.** Comprobado EJECUTANDO contra `erpazul_dev` en el 3111, con sesión real
+y `--ubicacion depo` por nombre, y **leyendo el texto de la pantalla** en cada
+caso — porque una foto determinista de un cartel de error también es determinista.
+
+`ModalPedirOperador` no se intentó: ya está anotado abajo como no verificable y va
+con los del POS después de la fase 4.
+
+#### Los cuatro que ABREN sin fabricar condiciones
+
+- **`ModalCliente`** (`clientes/page.jsx:1125`) — `/modulos/clientes`, botón
+  "+ Nuevo Cliente". La capa dice "Nuevo Cliente ✕ Nombre * DNI / CUIT Teléfono
+  Email Lista de precios…". Capa `sunmi-pos-overlay …p-4 z-50`, tarjeta
+  `w-full max-w-md p-4 max-h-[90vh] overflow-y-auto`. **Sin tabla adentro.**
+- **`ModalGrupo`** (`grupos/ModalGrupo.jsx:154`) — `/modulos/grupos`, botón "Nuevo
+  grupo". La capa dice "Nuevo grupo Configurá el grupo y sus asignaciones…". Capa
+  `z-50 …bg-black/50 p-3`, y entre la capa y la tarjeta hay un div intermedio
+  `w-full max-w-xl` con una `<SunmiCard>` **sin `className`**. **Sin tabla.**
+- **`ModalProductoFinal`** (`productos/ModalProductoFinal.jsx:22`) — **abre por
+  URL**, `/modulos/productos?editar=<id>` sobre un producto que ya existe. La capa
+  dice "EDITAR PRODUCTO Cerrar Identidad Nombre *…". **Sin tabla** en el
+  envoltorio, que son 51 líneas: el contenido vive en subcomponentes.
+- **`ModalMergeClientes`** (`clientes/ModalMergeClientes.jsx:146`) —
+  `/modulos/clientes`, botón "Unificar duplicados". La capa dice "Unificar
+  clientes duplicados ✕ 1. Cliente principal (el que queda) Cancelar Unificar
+  cliente(s)". Capa `bg-black/80`, tarjeta `max-w-2xl p-4 max-h-[90vh]
+  overflow-y-auto`. **TIENE TABLA adentro.**
+
+**Y una trampa que costó una corrida, anotada para no repetirla:** el botón
+"+ Producto" del listado **no abre el modal**, hace `router.push` a
+`/modulos/productos/nuevo`, que es otra página. Y `?nuevo=1` tampoco lo abre: la
+capa queda en el DOM con `display: none`. El único camino que lo abre es
+`?editar=`. Se descubrió porque la sonda distingue tres estados y no dos —no
+existe, existe y está OCULTA, y se ve—; con dos, "existe y está oculta" se habría
+leído como "no existe" y el diagnóstico habría ido al lugar equivocado.
+
+#### Los dos que HOY NO SE PUEDEN ABRIR, y por qué
+
+- **`ModalDetalleVenta`** (`dashboard/ModalDetalleVenta.jsx:93`) — necesita una
+  venta **del día** para tener una fila que tocar en `UltimasVentas`. El dashboard
+  dice hoy "VENTAS HOY $0,00 · 0 TICKETS". Hay ventas en la base, pero de mayo.
+- **El ingreso/retiro de `turnos/[id]`** (`turnos/[id]/page.jsx:604`) — sus botones
+  se dibujan con `{operativo && …}`, o sea que hace falta un turno **abierto**. La
+  pantalla de turnos filtrada por "Abiertas" dice "No hay cajas para estos
+  filtros", y el turno 42 dice "Estado Cerrado".
+
+**No se fabricó ninguna de las dos condiciones** y no se planifican hasta que el
+dato exista solo.
+
+#### EL ORDEN ELEGIDO, de menor a mayor costo de verificación
+
+1. **`ModalCliente`.** Abre con un botón, no tiene tabla, y **vive en el mismo
+   archivo que las dos ya migradas**, así que el import ya está y su capa es
+   idéntica a la de ellas. Es el más barato por lejos.
+2. **`ModalGrupo`.** Abre con un botón y no tiene tabla. Cuesta un poco más porque
+   trae un div intermedio entre la capa y la tarjeta —que es lo que el panel del
+   kit dibuja— y su tarjeta no declara nada, así que hay que mirar qué le pone el
+   kit donde hoy no hay nada escrito.
+3. **`ModalProductoFinal`.** Abre, pero por URL y sobre un producto existente, y
+   su montaje es distinto: la capa vive SIEMPRE en el DOM y se apaga con `hidden`,
+   mientras que el kit no dibuja nada con `open` en falso. Ese cambio de patrón hay
+   que declararlo.
+4. **`ModalMergeClientes`.** Tiene tabla adentro. Con el `shrink-0` de
+   `SunmiTable` ya resuelto no debería traer sorpresas, pero es el que más
+   superficie de verificación tiene y por eso va último de los que abren.
+
+Después de esos cuatro, la fase 2 se queda **sin ningún candidato abrible**: los
+tres que sobran son los dos bloqueados por datos y `ModalPedirOperador`.
+
+**Capturas de antes del primero, ya sacadas.** `ModalCliente` a 1366x900 contra
+`erpazul_dev`, tema `sunmiDark` explícito, `--repeticiones 3`, `--ubicacion depo`,
+sin `--alto-captura`, recortado a `[data-sunmi-modal="tarjeta"]` —atributo inerte
+agregado a mano—. Ficha: `repeticiones: 3`, `apto: true`. La tarjeta mide **392x810**,
+o sea que está TOCANDO su tope de `90vh` y scrollea: es un formulario largo, no una
+tarjeta que crece con su contenido. Eso lo pone en la misma familia que las dos
+recién migradas y anticipa que va a necesitar `altoVa="tarjeta"`.
+
 #### `ModalPedirOperador`: migrable por firma y NO VERIFICABLE
 
 **Decidido el 2026-08-14: se revisa junto con los seis del POS, después de la
