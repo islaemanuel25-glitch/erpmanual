@@ -18,6 +18,46 @@ de los que hay. `SunmiModalLayout` solo sabe centrar y hay dos pantallas que por
 eso no lo pueden usar; `SunmiButtonIcon` trae tres colores fijos adentro y no
 acepta `title` ni `aria-label`.
 
+## CÓMO SE ELIGE UN GRUPO — corregido el 2026-08-14, y es una corrección del método
+
+**EL CRITERIO ANTERIOR ESTABA MAL, y no por poco.** Decía: un grupo es un
+conjunto de capas cuya CAPA y cuya TARJETA coinciden carácter por carácter. Con
+ese criterio se eligieron los siete gemelos del POS, y el grupo se cayó dos veces
+—primero a seis, cuando uno resultó ser código muerto, y después a cero, cuando
+la pantalla no se pudo abrir—. No se cayó por un error de medición: la firma
+decía la verdad. Se cayó porque **la firma contestaba la pregunta equivocada.**
+
+Que dos capas se escriban igual es **una señal sobre el código**. Y en esta fase
+el trabajo de escribir la migración es la parte barata: lo caro es **verificar**
+—abrir la pantalla, sacar el antes, migrar, sacar el después y restar—. Un
+criterio que solo mira el código optimiza justo lo que no cuesta.
+
+**De ahora en más un grupo se elige por DOS cosas juntas, y las dos son
+obligatorias:**
+
+1. **Que la capa y la tarjeta coincidan** carácter por carácter. Sin esto, las
+   diferencias declaradas no son las mismas para todos los del grupo y la lista
+   deja de servir para comparar.
+2. **Que la pantalla se pueda abrir SIN FABRICAR CONDICIONES.** O sea: con la
+   sesión y el local que ya existen, navegando y tocando, sin escribir en la base
+   ni ejercer una acción de negocio que deje estado del que dependan otras
+   capturas.
+
+**NO ALCANZA CON LA PRIMERA.** Ese es el punto entero de esta sección, y es el
+error que ya se cometió: un grupo perfectamente uniforme cuya pantalla no se
+puede abrir **no es un grupo**, es una lista de archivos. La prueba de la fase es
+que la pantalla de donde salió la pieza quede idéntica; sin pantalla no hay
+prueba, y sin prueba la migración no se puede commitear. Migrarlo igual sería
+exactamente lo que la regla de oro prohíbe en la primera línea.
+
+En la práctica, el orden importa: **primero se pregunta si se abre, después se
+mide la firma.** Al revés se paga el relevamiento entero de un grupo que después
+hay que archivar — que es lo que pasó con el POS.
+
+Y "abrir sin fabricar condiciones" se comprueba **ejecutando**, no leyendo el
+JSX. Un modal que el código dice que se dibuja con `{estado && …}` no dice nada
+sobre si ese estado es alcanzable hoy, con estos datos, en esta base.
+
 ## Fase 1 — Sacar la fila y sus partes. CORREGIDA.
 
 **Lo que decía:** crear una celda y un encabezado nuevos.
@@ -144,7 +184,24 @@ que no se descubra de nuevo.
 
 ### La cifra
 
-**43 capas de modal armadas a mano**, en 37 archivos. Enumerado con `git ls-files`
+⚠️ **ACTUALIZADO EL 2026-08-14: HOY SON 41, y las dos bajas están explicadas.**
+El trinquete imprime 41 contra una línea de base de 42. Reconciliado enumerando
+con el contador mismo —`contarArchivo` sobre los `.jsx` de `git ls-files app
+components`, filtrando `categoria === "modal"`—, que da **exactamente 41** y por
+lo tanto la lista y la cifra oficial son la misma cosa. De 43 a 41:
+
+- **−1 la pieza del kit.** `SunmiModalLayout.jsx:314` entraba a la cuenta porque
+  el filtro sacaba a los que IMPORTAN la pieza y la pieza no se importa a sí
+  misma. El contador ahora la saca por su ruta (`esLaPiezaDeModal`). Ya estaba
+  descontada a mano en el censo de abajo; ahora la descuenta el contador.
+- **−1 `ModalCliente` de `pos-ventas`**, que era código muerto y se borró.
+
+El reparto de las 41: **18 con superficie propia** —las mismas 18 del censo
+cerrado— y **23 con `SunmiCard`**. Menos `ClientePickerFullscreen`, que queda
+afuera por su CAPA, **el grupo migrable es de 22**.
+
+**43 capas de modal armadas a mano**, en 37 archivos —cifra del 2026-08-13, ver
+la corrección de arriba—. Enumerado con `git ls-files`
 sobre `app` y `components` —el repo entero, no un nivel— aplicando el criterio de
 arriba.
 
@@ -668,7 +725,118 @@ captura, que mostraba el modal despegándose de un velo gris oscuro mientras la
 planilla decía 1,00. **Las fotos estaban bien desde el principio**; se remidieron
 esas mismas y no hizo falta volver a sacarlas.
 
-### EL PRÓXIMO GRUPO: los siete gemelos del POS
+### POS-VENTAS SALE DE LA FASE 2 — decidido el 2026-08-14, con el relevamiento ya hecho
+
+**Aprobado por Emanuel.** `pos-ventas` entero —no solo los seis gemelos— queda
+**para después de la fase 4**. El motivo no es que la migración sea difícil: es
+que la pantalla no se puede abrir sin cerrar una caja, y cerrarla es una acción
+de negocio real sobre los datos de Emanuel que además cambia el estado del que
+dependen otras capturas.
+
+Las cuatro que estaban abiertas quedan contestadas, todas por la negativa: **no**
+se abre la caja de `depo`, **no** se cobran ventas contra la base de desarrollo
+para destrabar los modales que necesitan una venta, **no** se parte la tanda en
+cuatro, y **sí** se corrige el roadmap — que es esta sección.
+
+**Este relevamiento NO se tira: se archiva.** Todo lo que sigue —la firma de los
+siete, la lista declarada de ocho puntos, los tres desajustes de abajo y las
+condiciones de negocio— queda escrito para el día que le toque. Rehacerlo costaría
+otra vez lo mismo, y lo medido no se vence salvo que el código cambie.
+
+**Y queda una consecuencia que hay que saber antes de retomar:** el grupo se
+eligió con el criterio viejo, el que solo miraba el código. Cuando se retome hay
+que pasarle el criterio nuevo —ver "CÓMO SE ELIGE UN GRUPO" arriba— y la primera
+pregunta ya no es la firma sino si la pantalla abre.
+
+#### LOS TRES DESAJUSTES ENTRE EL PLAN Y LOS NÚMEROS REALES
+
+Medidos el 2026-08-14 abriendo los seis archivos, no deduciéndolos del texto del
+plan. Los tres estaban mal en la lista declarada de más abajo, y los tres se
+habrían visto recién en la comparación.
+
+**1. El reparto de "Cancelar" y "Cerrar" no es cuatro y tres: es TRES Y DOS, más
+un botón que no es ninguno de los dos.** El punto 4 de la lista declarada decía
+"'Cancelar' en `ModalCanjePuntos`, `ModalCliente`, `ModalDescuento` y
+`ModalPesoKg`; 'Cerrar' en `ModalTicket`, `ModalTicketOffline` y `HistorialDia`".
+Lo real:
+
+- **"Cancelar" son tres**: `ModalCanjePuntos`, `ModalDescuento` y `ModalPesoKg`.
+  El cuarto era `ModalCliente`, que estaba muerto y se borró.
+- **"Cerrar" son dos**: `ModalTicketOffline` —que además lo escribe en
+  mayúsculas, "CERRAR"— y el detalle de `HistorialDia`.
+- **`ModalTicket` no dice "Cerrar": dice "No imprimir".** Y no es la mitad de un
+  par: su pie es una PILA de tres botones de ancho completo —"Imprimir ticket
+  (termica)", "Descargar PDF" y "No imprimir"—, no una fila de dos.
+- **Y donde el plan decía "par" hay un TRÍO.** `ModalCanjePuntos` y
+  `ModalDescuento` dibujan un tercer botón "Quitar" entre el Cancelar y el
+  confirmar, condicionado a que ya haya un canje o un descuento aplicado
+  (`canjeActual > 0` y `descuentoActual`). O sea que su pie es
+  Cancelar/Quitar/Canjear y Cancelar/Quitar/Aplicar cuando esa condición se
+  cumple, y Cancelar/Canjear y Cancelar/Aplicar cuando no.
+
+Por qué importa y no es un detalle de redacción: la decisión pendiente era "¿se
+saca el botón de abajo cuando aparezca el del kit?". Sacar la mitad de un par no
+es lo mismo que sacar uno de tres, y no es lo mismo que sacar el "No imprimir" de
+una pila donde los otros dos son acciones de verdad.
+
+**2. `ModalPesoKg` y el detalle de `HistorialDia` NO TIENEN CUERPO.** El punto 8
+decía "hoy es un `space-y-3` con el `mb-3` del `h3` adelante". Eso es cierto para
+cuatro de los seis. En estos dos **no hay ningún div de cuerpo**: los hijos
+cuelgan directo de la tarjeta y cada uno se separa con su propio margen de abajo.
+
+- `ModalPesoKg`: `mb-1` en el `h3` del nombre, `mb-4` en la línea del precio por
+  kg y `mb-4` en la grilla del selector de modo.
+- El detalle de `HistorialDia`: `mb-3` en el encabezado, `mb-3` en la fila de
+  cajero y turno, y `mb-3` en la lista de ítems.
+
+O sea que los márgenes que hay que medir son **1, 3 y 4**, y no un `space-y-3`
+uniforme. Y el cambio al migrar no es "de `space-y-3` a `gap-3`": es que aparece
+un contenedor donde hoy no hay ninguno. La medición del punto 8 tiene que
+hacerse en estos dos por separado, porque la pregunta no es la misma.
+
+**3. El detalle de `HistorialDia` está ANIDADO adentro de otro modal, y ya trae
+su propio scroll.** El archivo tiene dos capas: la de la línea 120, que es el
+historial —`fixed inset-0 sunmi-overlay-strong … z-50 overflow-y-auto`— y la de
+la 240, que es el detalle —`z-[60]`—, dibujada **adentro** del mismo return. Y la
+lista de ítems del detalle declara `max-h-48 overflow-y-auto`.
+
+El punto 5 de la lista declarada avisaba que el cuerpo del kit agrega
+`max-h-[65vh] overflow-y-auto` y nombraba a `ModalTicketOffline` como el que lo
+iba a notar. **El detalle de `HistorialDia` lo nota más**, y por otro motivo: no
+pasaría a tener dos topes sino **tres contenedores de scroll anidados** —el
+`overflow-y-auto` del modal de afuera, el `max-h-[65vh]` que agregaría el kit y
+su propio `max-h-48`—. Eso no estaba en ninguna lista.
+
+#### LAS CONDICIONES DE NEGOCIO: qué hace falta para que cada uno se dibuje
+
+Leídas de las guardas de render en `app/modulos/pos-ventas/page.jsx`. Esto es lo
+que hay que tener el día que se retome, y es la parte que el criterio viejo no
+preguntaba:
+
+- **`ModalDescuento`** (línea 1930) — `state.modalDescuento`. Es el único de los
+  seis que depende solo de un botón, aunque necesita un carrito con subtotal para
+  que muestre algo.
+- **`ModalCanjePuntos`** (1941) — `state.modalCanjePuntos && state.clienteSeleccionado`.
+  **Hace falta un cliente elegido**, y con saldo de puntos para que el "Quitar"
+  aparezca.
+- **`ModalTicket`** (1981) — `state.modalTicket`, que se llena **al registrar una
+  venta**. No hay forma de abrirlo sin cobrar.
+- **`ModalTicketOffline`** (1990) — `ultimoTicketOffline`: hace falta una venta
+  hecha **con la aplicación sin conexión**.
+- **`HistorialDia`** (2011) — `mostrarHistorial`; y su detalle necesita además que
+  haya **al menos una venta del día** para poder tocarla.
+- **`ModalPesoKg`** (2031) — `productoKgPendiente`: hace falta agregar al carrito
+  **un producto que se venda por peso**.
+
+**Cuántos "no se dibujan solos" depende de dónde se corte, y el corte es parte de
+la afirmación.** Si la línea es "necesita algo más que abrir el POS y tocar un
+botón", son **cinco** y no cuatro: los únicos que quedan afuera son
+`ModalDescuento`. Si la línea es "necesita ESCRIBIR en la base", son **tres**:
+`ModalTicket`, `ModalTicketOffline` y el detalle de `HistorialDia`. La cifra de
+cuatro que circulaba no corresponde a ninguno de los dos cortes, así que no se
+usa: se usan estos dos, con su criterio escrito al lado.
+
+#### LA FIRMA QUE SE ARCHIVA: los siete gemelos, como estaban
 
 `ModalCanjePuntos`, `ModalCliente`, `ModalDescuento`, `ModalPesoKg`,
 `ModalTicket`, `ModalTicketOffline` y el modal de detalle de `HistorialDia`
@@ -1196,6 +1364,24 @@ componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco
   `lib/sunmi/claseNegociada.js` tienen la forma.
 
 ## El arnés de captura, y por qué una captura sola no prueba nada
+
+### ⚠️ LA LÍNEA DE BASE DE HUELLAS YA NO ES COMPARABLE
+
+**Anotado el 2026-08-14.** Los conteos de filas de `tests/huellas/baseline` se
+tomaron **sobre `erpazul_al`**, y esa base está **7 migraciones atrasada** —90
+aplicadas contra las 97 del árbol—, así que hoy no puede servir ni la aplicación
+ni una captura sin migrarla antes. La que sirve el dev server es `erpazul_dev`,
+que está en 97 de 97.
+
+**Qué se cae y qué no**, que es la parte que importa: un antes y un después
+sacados **los dos** contra `erpazul_dev` valen, porque la condición que hace que
+la resta sirva es que los dos lados midan lo mismo. Lo que **no** sirve es cruzar
+cualquiera de los dos contra el baseline viejo: eso compara dos bases distintas y
+va a informar diferencias que no son del cambio.
+
+En la práctica: hasta que el baseline se retome sobre `erpazul_dev`, **no se usa
+como término de comparación de nada.** Las comparaciones de esta fase se hacen
+antes-contra-después dentro de la misma corrida.
 
 `scripts/medir-desborde.mjs` toma la foto. Dos cosas que no son opcionales:
 
