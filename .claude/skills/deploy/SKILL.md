@@ -258,8 +258,8 @@ que el chequeo comprueba. Si igual se lo saltea, la guardia lo intercepta en el
 cuarto comando.
 
 ```bash
-# 1. Traer el código
-ssh vps-erp 'cd /srv/produccion/erpazul && git merge --ff-only origin/main'
+# 1. Traer el código — EL FETCH NO ES OPCIONAL, ver abajo
+ssh vps-erp 'cd /srv/produccion/erpazul && git fetch origin --quiet && git merge --ff-only origin/main'
 
 # 2. APUNTAR A LA IMAGEN NUEVA — antes que nada que use compose
 #    La copia del .env va FUERA DEL ÁRBOL. Ver abajo por qué.
@@ -280,6 +280,30 @@ ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod
 
 El `config --images` del paso 2 no es adorno: es la confirmación barata de que
 compose ya ve el tag nuevo, antes de que importe.
+
+### SIN EL `git fetch`, EL PASO 1 NO HACE NADA Y NO SE QUEJA
+
+`origin/main` en el repo del VPS es una **referencia local**: la última vez que
+ese repo habló con GitHub. Si nadie la actualiza, `git merge --ff-only
+origin/main` mergea el SHA viejo contra sí mismo, contesta **"Already up to
+date"** y deja el HEAD donde estaba.
+
+Y el despliegue sigue. Los pasos 2 a 5 no miran el HEAD del VPS: `APP_IMAGE` se
+escribe a mano con el SHA nuevo, la imagen que se baja es la nueva y la app se
+recrea con esa imagen. Lo único que queda atrás es el repo del servidor —el que
+usan `migrate deploy` para leer `prisma/migrations` y el clasificador para
+calcular el rango—, así que en un despliegue **con** migraciones el contenedor
+descartable no vería la migración nueva y el síntoma sería el de la trampa del
+contenedor descartable, apuntando al lugar equivocado.
+
+**Lo atrapa el paso 5, pero al final de todo**: el segundo de los cinco valores
+—el HEAD del VPS— sale distinto de los otros cuatro. Falla seguro, no en
+silencio; lo que cuesta es que se entera después de haber recreado la app.
+
+Pasó el 2026-08-14 desplegando `42e7e27`, y el snippet estaba mal desde antes: la
+bitácora muestra que los despliegues del 12 de agosto sí corrían
+`git fetch origin --quiet && git merge --ff-only origin/main`. La línea se perdió
+al escribir este documento, no en el procedimiento.
 
 ### LA COPIA DEL `.env` VA FUERA DEL ÁRBOL, Y NO ES ORDEN
 
