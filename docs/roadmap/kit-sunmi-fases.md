@@ -1882,6 +1882,91 @@ si se destraba.
 **tanda del `?editar=`** —por qué la URL pierde el parámetro— y después la
 **tabla de declaraciones**, que es el cierre de la fase.
 
+## ⚑ `backdrop-filter` CREA BLOQUE CONTENEDOR PARA LOS `fixed` DESCENDIENTES
+
+**De las que se olvidan y se vuelven a pagar, así que va arriba de todo.**
+
+Un elemento con `backdrop-filter`, `filter`, `transform` o `perspective` distinto
+de `none` **deja de ser transparente para sus descendientes `position: fixed`**:
+esos hijos pasan a resolver su `inset` contra ese elemento en vez de contra la
+pantalla. No hay aviso, no hay error de consola, y el `fixed` sigue diciendo
+`fixed` en las herramientas.
+
+**El caso, medido el 2026-08-15:** `SunmiCard` trae `backdrop-blur-sm`. El modal
+de `/modulos/proveedores` se dibuja adentro de una, así que a 360x640 su capa
+medía **1004 px de alto en vez de 640, arrancando en y=131**, y la tarjeta iba de
+346,3 a 918,3 — **278 px fuera de la ventana**. Además quedaba de **273 de ancho
+contra los 339** de los modales sanos, porque el 95 % se calculaba sobre la
+tarjeta y no sobre la pantalla. En `/modulos/productos` pasaba lo mismo y a 1366
+la cortaba 3 px, que es la clase de cosa que no se ve nunca.
+
+**Cómo se reconoce:** un modal descentrado, o más angosto de lo que declara, o que
+se sale por abajo solo en pantallas chicas. Y cómo se confirma: se mide la capa
+—tiene que dar el alto del viewport en y=0— y se enumeran los ancestros con esas
+cuatro propiedades. **Leyendo el JSX no se ve**, porque depende del CSS calculado.
+
+## EL CAMINO C — EL PORTAL AL `body`, evaluado y medido
+
+**2026-08-15. Se escribió, se midió y SE REVIRTIÓ: no está aplicado.**
+
+La idea: si la pieza se hace cargo de la capa, le corresponde garantizar que se
+resuelva contra la pantalla. Hoy no lo hace, y `proveedores` es la prueba.
+
+### ¿Arregla?
+
+**Sí, los diez de una.** Medida la capa de cada modal a 360, tiene que dar 640 en
+y=0: los cuatro que estaban rotos —`proveedores`, `categorias` y los dos de
+`clientes`— pasan a sanos, y los seis que ya estaban bien no se mueven. **Sin
+tocar el `backdrop-blur` y sin mover ningún modal a mano.**
+
+### ¿Rompe algo? Las cinco cosas que se miraron
+
+Medidas antes y después, a 360:
+
+1. **El foco al abrir:** `body` antes y después. El kit no maneja foco hoy y el
+   portal no lo cambia.
+2. **Escape:** **no cierra ni antes ni después.** El kit no lo implementa — eso es
+   una deuda propia, anterior a esto, y queda anotada acá porque apareció
+   midiendo.
+3. **Un clic en el centro de la pantalla** cae adentro del modal en los dos casos.
+4. **El apilado contra la campana de notificaciones: MEJORA.** Antes, en
+   `proveedores`, la campana **quedaba clickeable con el modal abierto** —otra
+   consecuencia de la capa mal resuelta, que no llegaba a cubrirla—. Después queda
+   tapada, como en los sanos.
+5. **El primer render del servidor: no cambia.** Medido apagando el JavaScript, o
+   sea viendo el HTML que manda el servidor sin hidratar: **el modal no viene ni
+   antes ni después**. Estas pantallas resuelven su contexto en el cliente, así
+   que el modal ya era client-only. Y **cero errores o avisos de consola** en las
+   dos versiones: no hay problema de hidratación.
+
+### El costo que sí apareció, y cómo se resolvió
+
+**La primera versión rompió cuatro candados de verdad.** Con
+`useEffect` + estado para montar el portal, el primer render devuelve `null`, y
+`lib/caja/ordenCambioPrevio.test.mjs` **renderiza el modal a HTML** para
+verificar su contenido: recibía vacío. No era una falsa alarma.
+
+La variante que funciona es **portar solo si existe `document`**, y dibujar donde
+cae si no: `typeof document !== "undefined" ? createPortal(capa, document.body) :
+capa`. Con eso el navegador porta y los candados —y cualquier render de
+servidor— siguen viendo el HTML de siempre. **Suite: 3.262, 1 en rojo.**
+
+**El único que queda en rojo es de LANDMARK, no de contenido.** El candado "EL
+VELO Y EL PANEL NO LLEVAN Z PROPIO" delimita el cuerpo del componente con
+`SRC.indexOf("return (")`, y con el portal ese `return (` deja de ser el de la
+capa. Es exactamente el caso que este documento ya tiene escrito: **un candado que
+lee un archivo y busca un patrón deja de afirmar lo que dice cuando el patrón se
+muda.** Si se adopta el camino C, ese candado se reescribe para anclarse a algo
+que no se mueva —`const capa = (`— y no se afloja.
+
+### Lo que el camino C NO cubre, y queda escrito así
+
+**Cubre a los modales que usan `SunmiModalLayout` y a los que vengan. No cubre a
+los 32 archivos que todavía arman la capa a mano**, que siguen exactamente igual
+de expuestos: si alguno se dibuja adentro de un `SunmiCard`, se rompe lo mismo y
+el kit no tiene cómo enterarse. Esos se arreglan migrando, que es la fase 2, o de
+a uno.
+
 ## EL RELEVAMIENTO DEL `backdrop-filter` — medido en el navegador, a 360
 
 **2026-08-15. No se arregló nada en esta pasada, por pedido expreso.**
