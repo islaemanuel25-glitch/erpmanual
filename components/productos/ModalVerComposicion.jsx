@@ -66,6 +66,9 @@ export default function ModalVerComposicion({ open, productoLocalId, localId, on
       title="Composición del combo"
       onClose={onClose}
       maxWidth="max-w-2xl"
+      // El valor que este modal ya tenía: era el default del kit y ahora se
+      // declara, porque el kit dejó de tener uno. No cambia un píxel.
+      espacioCuerpo="mt-2 gap-3"
       footer={
         <div className="flex justify-end gap-2">
           <SunmiButton color="slate" onClick={onClose}>

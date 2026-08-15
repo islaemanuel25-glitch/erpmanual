@@ -108,6 +108,9 @@ export default function ModalRevertir({ abierto, importacionId, onCerrar, onReve
       color="amber"
       onClose={trabajando ? undefined : onCerrar}
       maxWidth="max-w-2xl"
+      // El valor que este modal ya tenía: era el default del kit y ahora se
+      // declara, porque el kit dejó de tener uno. No cambia un píxel.
+      espacioCuerpo="mt-2 gap-3"
       // Escribe cientos de costos: tocar el velo por error no puede cerrarlo.
       destructivo
       footer={

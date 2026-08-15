@@ -521,6 +521,9 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
           subtitle={identidad(borrando)}
           color="red"
           onClose={() => (trabajandoBorrar ? null : setBorrando(null))}
+          // El valor que este modal ya tenía: era el default del kit y ahora se
+          // declara, porque el kit dejó de tener uno. No cambia un píxel.
+          espacioCuerpo="mt-2 gap-3"
         >
           {(() => {
             const d = textoDeBorrado({
@@ -569,6 +572,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
           subtitle="Contestá ahora, con el papel en la mano"
           color="cyan"
           onClose={() => setPregunta(null)}
+          espacioCuerpo="mt-2 gap-3"
         >
           <p className="text-xs sunmi-text-muted mb-3">{pregunta.porque}</p>
 

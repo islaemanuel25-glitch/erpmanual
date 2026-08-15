@@ -185,9 +185,12 @@ test("el cartel de identificarse sigue arriba de este default", () => {
 
 // ── EL INTERIOR NO SE REPINTA ──────────────────────────────────────────────
 
-test("el espaciado del cuerpo y del pie es parámetro, con el valor de siempre", () => {
-  assert.match(SRC, /espacioCuerpo = "mt-2 gap-3"/, "cambió el default: eso mueve los cuatro usos actuales");
-  assert.match(SRC, /espacioPie = "mt-3"/);
+test("el espaciado del cuerpo y del pie es parámetro", () => {
+  // `espacioCuerpo` PERDIÓ su default el 2026-08-15 y ahora lo obliga el candado
+  // de más abajo — ver "`espacioCuerpo` NO TIENE DEFAULT". Lo que este sigue
+  // afirmando es que los dos son parámetros y no valores clavados.
+  assert.match(SRC, /^\s*espacioCuerpo,\s*$/m, "`espacioCuerpo` dejó de ser parámetro");
+  assert.match(SRC, /espacioPie = "mt-3"/, "cambió el default del pie: eso sí mueve los que no lo declaran");
 });
 
 test("EL `gap-3` NO ESTÁ CLAVADO en el cuerpo", () => {
@@ -196,7 +199,10 @@ test("EL `gap-3` NO ESTÁ CLAVADO en el cuerpo", () => {
   const cuerpo = SRC.slice(SRC.indexOf("flex flex-col ${altoEnElCuerpo}"), SRC.indexOf("{children}"));
   assert.doesNotMatch(cuerpo, /gap-3/, "el gap volvió a ser fijo");
   assert.doesNotMatch(cuerpo, /mt-2/, "el margen volvió a ser fijo");
-  assert.match(cuerpo, /\$\{espacioCuerpo\}/);
+  // El `?? ""` es para que un consumidor que se olvide no escriba la palabra
+  // "undefined" adentro del `class`. No es un default: quien obliga a declararlo
+  // es el candado de más abajo.
+  assert.match(cuerpo, /\$\{espacioCuerpo \?\? ""\}/);
 });
 
 test("EL CUERPO ACEPTA UNA REFERENCIA, y va en el div que scrollea", () => {
@@ -285,6 +291,46 @@ test("LA COLUMNA VIAJA CON EL ALTO, y solo si la forma no la trae", () => {
   // Y tiene que llegar a la tarjeta, no quedarse calculada.
   const tarjeta = SRC.slice(SRC.indexOf("<SunmiCard"), SRC.indexOf("shrink-0 flex items-start"));
   assert.match(tarjeta, /columnaEnLaTarjeta/, "se calcula y no se usa");
+});
+
+test("`espacioCuerpo` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
+  // ── POR QUÉ SE LE SACÓ ────────────────────────────────────────────────────
+  //
+  // Tenía `"mt-2 gap-3"`. La tabla de declaraciones mostró que 17 de los 22 lo
+  // declaran y OCHO de esos lo declaran VACÍO. Un default que un tercio pisa con
+  // la nada no es el caso común: es lo que le toca al que no sabe que tiene que
+  // decidirlo.
+  //
+  // Sacarlo mueve CERO pantallas y cuesta cinco declaraciones. La alternativa
+  // —cambiarlo a vacío— movía cinco modales que NO SE PUEDEN ABRIR con los datos
+  // de hoy, o sea que el cambio no se podía fotografiar.
+  assert.doesNotMatch(
+    SRC,
+    /espacioCuerpo\s*=\s*"/,
+    "le volvió el default a `espacioCuerpo`: eso es lo que este candado saca"
+  );
+
+  // Y que TODOS lo declaren, enumerando con git sobre el repo entero. Sin esto,
+  // sacar el default sería empeorar: un modal nuevo nacería sin espaciado y sin
+  // que nadie avisara.
+  const consumidores = ejecutar("git grep -l SunmiModalLayout -- app components")
+    .split("\n").map((l) => l.trim())
+    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
+  const sinDeclarar = [];
+  for (const ruta of consumidores) {
+    const texto = fs.readFileSync(path.join(RAIZ, ruta), "utf8");
+    // Un archivo puede tener más de un modal: se cuentan las aperturas y las
+    // declaraciones, y tienen que dar lo mismo.
+    const modales = (texto.match(/<SunmiModalLayout/g) || []).length;
+    const declara = (texto.match(/\n\s*espacioCuerpo=/g) || []).length;
+    if (declara < modales) sinDeclarar.push(`${ruta} (${declara} de ${modales})`);
+  }
+  assert.deepEqual(
+    sinDeclarar,
+    [],
+    "estos modales no declaran `espacioCuerpo` y el kit ya no tiene uno que ponerles:\n  " +
+      sinDeclarar.join("\n  ")
+  );
 });
 
 test("el default del alto es 90vh, y moverlo mueve pantallas", () => {

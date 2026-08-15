@@ -222,7 +222,26 @@ export default function SunmiModalLayout({
    * declare uno queda anotada ahí con qué declaró y por qué, para que al final
    * de la fase se pueda decidir qué se unifica y qué tiene razón de ser distinto.
    */
-  espacioCuerpo = "mt-2 gap-3",
+  /**
+   * ── SIN DEFAULT, Y A PROPÓSITO ─────────────────────────────────────────
+   *
+   * Tenía `"mt-2 gap-3"`. La tabla de declaraciones del 2026-08-15 mostró que
+   * **17 de los 22 modales lo declaran, y OCHO de esos lo declaran VACÍO**: le
+   * piden al kit que no ponga nada. Un default que la mayoría pisa —y que un
+   * tercio pisa con la nada— no está siendo el caso común: está siendo lo que le
+   * toca al que no sabe que tiene que decidirlo.
+   *
+   * Se midieron los dos caminos antes de elegir. Cambiar el default a vacío
+   * movía **5 modales** sin tocar ningún archivo, y esos cinco **no se pueden
+   * abrir con los datos de hoy**, o sea que el cambio no se podía fotografiar.
+   * Sacarlo mueve **0** y cuesta **5 declaraciones**, todas con el valor que esa
+   * pantalla ya tenía. Se eligió el que no mueve nada.
+   *
+   * **Lo obliga un candado**, no el runtime: `SunmiModalLayout.test.mjs` exige
+   * que los 22 consumidores lo declaren. Un `throw` acá tiraría una pantalla
+   * entera en producción por un espaciado.
+   */
+  espacioCuerpo,
   espacioPie = "mt-3",
   /**
    * HASTA DÓNDE CRECE EL MODAL. Uno solo, y la forma decide dónde lo aplica —
@@ -515,7 +534,10 @@ export default function SunmiModalLayout({
 
           <div
             ref={refCuerpo}
-            className={`flex flex-col ${altoEnElCuerpo} overflow-y-auto ${espacioCuerpo}`.trim()}
+            // El `?? ""` NO es un default disfrazado: es para que un consumidor
+            // que se olvide dibuje sin espaciado en vez de escribir la palabra
+            // "undefined" adentro del `class`. Quien lo obliga es el candado.
+            className={`flex flex-col ${altoEnElCuerpo} overflow-y-auto ${espacioCuerpo ?? ""}`.trim()}
           >
             {children}
           </div>
