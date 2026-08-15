@@ -337,6 +337,35 @@ alcanza con negar permisos si el rol que queda no deja trabajar.
 riesgo de hoy es `Mini`, con un usuario activo, y `DUEÑO_LOCAL`, con tres. Por eso
 el censo se corrió también con `Mini`.
 
+### SEGUNDA ENTRADA: LEER PARA TRABAJAR NO ES LO MISMO QUE VER LA CONFIGURACIÓN
+
+Salió de `config/ticket` y no es un caso suelto: **es una forma que se repite y
+que los permisos de hoy no saben expresar.**
+
+Esa ruta la lee la pantalla de configuración —para editarla— y también el POS, en
+cada impresión, para saber qué encabezado y qué pie poner. Quedó con
+`config_local.ticket` **o** `pos.usar`, y los seis roles reales tienen `pos.usar`,
+así que **no le cierra la puerta a nadie.**
+
+**Decidido el 2026-08-15: queda así**, y el motivo es que lo que devuelve son los
+datos del ticket, o sea lo que igual se imprime y se le entrega al cliente. No hay
+nada que esconder ahí.
+
+**Lo que el caso deja para el rediseño** es la forma: hoy un mismo permiso tiene
+que servir para *leer un dato porque lo necesito para trabajar* y para *ver y
+cambiar la configuración del negocio*. Son dos cosas distintas y se resuelven de
+una de estas maneras, ninguna de las cuales es "otro permiso más":
+
+- partir la ruta en dos —una de lectura mínima para el POS, otra completa para
+  configurar—, o
+- que el ticket se arme del lado del servidor y el POS no necesite la
+  configuración en la mano.
+
+**Los otros dos casos de la misma forma**, medidos en esta tanda, para que se vea
+que no es uno solo: `config/pos-ventas-cliente` —el POS la lee para saber si tiene
+que exigir cliente y operario antes de cobrar— y `operador/listar` —el selector de
+operario del POS—. Las tres terminaron con el mismo par y por la misma razón.
+
 ### ⚑ AUTENTICAR PRIMERO, VALIDAR DESPUÉS
 
 **El orden correcto: hasta que no se sabe quién pregunta, la única respuesta es

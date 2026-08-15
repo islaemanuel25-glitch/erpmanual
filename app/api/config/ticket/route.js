@@ -13,6 +13,19 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 // `lib/pos-ventas/imprimirTicketTermico.js` la pide en cada impresión. Cerrarla
 // solo con el permiso de configuración —que tienen Admin y DUEÑO_LOCAL— dejaría
 // a los cajeros imprimiendo tickets sin encabezado ni pie.
+//
+// ── Y HAY QUE DECIR LO QUE ESTO NO HACE ─────────────────────────────────────
+//
+// Los SEIS roles de producción tienen `pos.usar`, así que en la práctica este
+// permiso no le cierra la puerta a nadie. Queda igual porque deja el contrato
+// declarado y porque el día que exista un rol sin `pos.usar` va a cerrar solo.
+//
+// **Decidido el 2026-08-15 (Emanuel): queda así.** Lo que devuelve son LOS DATOS
+// DEL TICKET —encabezado, pie, si va el CUIT—, o sea lo que igual se imprime y
+// se le da al cliente en la mano. Separar "leer para imprimir" de "ver la
+// configuración" es un cambio de diseño, no un permiso más: habría que partir la
+// ruta en dos, o que el ticket se arme del lado del servidor. Va como entrada
+// del rediseño de roles, en `docs/roadmap/kit-sunmi-fases.md`.
 const PERMISO_LEER_TICKET = ["config_local.ticket", "pos.usar"];
 
 export async function GET(req) {
