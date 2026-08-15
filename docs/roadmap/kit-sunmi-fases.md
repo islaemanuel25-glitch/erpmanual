@@ -3309,6 +3309,35 @@ un cambio de aspecto deja una comparación que no prueba ninguno de los dos.
 
 El análisis ya está hecho y no hace falta rehacerlo: son esas tres líneas.
 
+### ⚑ REGLA DE MEDICIÓN: UNA COMPARACIÓN DE COLOR SE MIDE DONDE LOS VALORES DIFIEREN
+
+**`sunmiDark` es el tema de siempre y es justo el que iguala los dos lados.** Una
+medición hecha ahí puede dar "no cambia nada" sobre un cambio que mueve trece
+apariencias.
+
+*El caso, del 2026-08-15, migrando `SunmiPanel`.* La pregunta era quién gana entre
+el `bg-*` que trae `theme.card` y el `sunmi-surface` que declara la pantalla. Se
+midió en `sunmiDark` y el fondo calculado dio `rgb(15,23,42)` **con y sin**
+`sunmi-surface`: parecía que no había nada que decidir.
+
+No era que no hubiera pelea: era que **en ese tema los dos valen `#0f172a`**.
+`bg-slate-900` es `#0f172a` y `--app-bg` de `sunmiDark` también. La misma medición
+en `sunmiLight` —`bg-white` contra `--app-bg: #f1f5f9`— contestó de una: gana
+Tailwind, y las 28 declaraciones nunca se aplicaron.
+
+**Contado sobre los 14 temas: en 13 los dos valores DIFIEREN y en 1 coinciden.**
+Ese 1 es el de siempre.
+
+**En la práctica:** antes de medir un color, comprobar que en ese tema los dos
+lados valgan distinto. Si valen igual, la medición no distingue y hay que cambiar
+de tema — no sirve repetirla. Y el candado se escribe con **los dos**: uno que los
+iguale y otro que los diferencie, así se ve si el candado distingue o si está
+midiendo un empate.
+
+Vale para cualquier par que se compare, no solo para fondos: es la misma forma que
+el `altoVa` que dio positivo en la imagen vieja. **Un control que no puede fallar
+no es un control.**
+
 ### ⚑ LAS NOTAS DE ESTE DOCUMENTO SE QUEDAN VIEJAS — EJERCER LA PREMISA PRIMERO
 
 **Dos veces en dos días se empezó a trabajar sobre una nota que ya no era cierta.
@@ -3548,7 +3577,33 @@ tiene:**
 **El más barato es `SunmiPanel`**, y no por poco: ocho archivos contra
 veintinueve del siguiente, y **los 29 usos le pasan `className`**, así que cada
 pantalla que se abra ejerce la negociación en vez de solo comprobar que no se
-movió nada. Ese es el próximo.
+movió nada. **HECHO el 2026-08-15** — quedan cuatro.
+
+### LA PREGUNTA DE `SunmiPanel` NO SE REPITE EN `SunmiTableRow`
+
+**Se sondeó antes de empezarlo, para no contestarla una vez por pieza. La
+respuesta es que NO: sus declaraciones no son inertes.** Son otra cosa.
+
+Las cinco, leídas del primer nivel de la etiqueta:
+
+- `"cursor-pointer hover:bg-[var(--table-row-hover)]"`, dos veces, y
+  `"cursor-pointer"`, una. **Son DUPLICADOS de lo que la pieza ya emite**: pone
+  `cursor-pointer` cuando hay `onClick` y ese mismo `hover:bg-…` cuando no hay
+  tono ni selección. Piden lo mismo con el mismo valor, así que gane quien gane
+  se ve igual. Sobran, no fallan.
+- `"transition-colors"` — un eje que la pieza no toca. No hay pelea.
+- `getRowClassName(row.id)` es dinámico y devuelve
+  `"border-l-2 border-l-[var(--pos-accent)]"` o vacío. **Tampoco pelea**: la pieza
+  no pone borde izquierdo.
+
+**Así que `SunmiTableRow` es una migración distinta y más barata de decidir**: no
+hay que resolver qué se ve, solo dejar de concatenar. Lo caro sigue siendo
+verificarla, 29 archivos.
+
+**Y la lección general**: "concatena" no implica "hay una pelea". `SunmiPanel`
+tenía 28 declaraciones perdiendo la cascada; `SunmiTableRow` tiene cinco que
+piden lo mismo o piden otra cosa. **Antes de cada pieza se mira qué ejes chocan
+DE VERDAD**, que es una sonda de media hora y evita migrar a ciegas.
 
 **`SunmiTableRow` engaña**: tiene menos declaraciones que `SunmiPanel` pero está
 repartido en 29 archivos, así que verificarlo cuesta casi cuatro veces más.
