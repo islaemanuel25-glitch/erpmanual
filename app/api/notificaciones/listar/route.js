@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { resolverScopeNotif, whereNotifUsuario } from "@/lib/notificaciones/scope";
+import { resolverScopeNotif, whereNotifUsuario, ventanaNotif } from "@/lib/notificaciones/scope";
 
 // Query params:
 //   filtro=todas|noleidas|leidas  (default todas)
@@ -30,25 +30,10 @@ export async function GET(req) {
         ? { ...base, lecturas: { some: { usuarioId: uid } } }
         : { ...base };
 
-    // Rango temporal OBLIGATORIO (módulo de alto volumen). Si no viene `desde`,
-    // se fuerza a los últimos 7 días. `hasta` es opcional (límite superior).
-    let desde = null;
-    const desdeParam = searchParams.get("desde");
-    if (desdeParam) {
-      const d = new Date(desdeParam);
-      if (!isNaN(d.getTime())) desde = d;
-    }
-    if (!desde) {
-      desde = new Date();
-      desde.setDate(desde.getDate() - 7);
-    }
-    where.createdAt = { gte: desde };
-
-    const hastaParam = searchParams.get("hasta");
-    if (hastaParam) {
-      const h = new Date(hastaParam);
-      if (!isNaN(h.getTime())) where.createdAt.lte = h;
-    }
+    // Rango temporal OBLIGATORIO (módulo de alto volumen). La regla estaba
+    // escrita acá y el contador tenía la suya, distinta; ahora las dos salen de
+    // `ventanaNotif` para que no puedan volver a separarse.
+    where.createdAt = ventanaNotif(searchParams);
 
     const [rows, total] = await Promise.all([
       prisma.notificacion.findMany({

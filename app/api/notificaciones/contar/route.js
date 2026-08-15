@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { resolverScopeNotif, whereNotifUsuario } from "@/lib/notificaciones/scope";
+import { resolverScopeNotif, whereNotifUsuario, ventanaNotif } from "@/lib/notificaciones/scope";
 
 // Query: desde (ISO) opcional → solo cuenta no leídas con createdAt >= desde.
 export async function GET(req) {
@@ -16,11 +16,11 @@ export async function GET(req) {
       ...whereNotifUsuario(scope),
       lecturas: { none: { usuarioId: scope.userId ?? -1 } },
     };
-    const desde = new URL(req.url).searchParams.get("desde");
-    if (desde) {
-      const d = new Date(desde);
-      if (!isNaN(d.getTime())) where.createdAt = { gte: d };
-    }
+    // LA MISMA VENTANA QUE EL LISTADO, y con la misma función. Antes acá solo se
+    // acotaba si venía `desde`, así que el contador miraba TODA la historia y la
+    // lista solo los últimos siete días: la campanita decía 16 y al abrirla no
+    // había nada. Un número que no se puede abrir es peor que ningún número.
+    where.createdAt = ventanaNotif(new URL(req.url).searchParams);
 
     const count = await prisma.notificacion.count({ where });
     return NextResponse.json({ ok: true, count });
