@@ -295,6 +295,48 @@ en el [`INC-0007`](../incidents/INC-0007-proveedores-listar-sin-permiso.md).
 **Lo que esto NO cierra:** las lecturas que se piden por POST, las 148 rutas de
 escritura, y las cinco que contestan 200 vacío porque su tabla no tiene filas.
 
+## ⚑ REDISEÑO DE ROLES — el insumo, dicho por Emanuel el 2026-08-15
+
+**EL TRABAJO REAL DEL CAJERO en un minimercado**, que es contra lo que hay que
+diseñar el rol y no contra su nombre:
+
+1. **Cobrar.**
+2. **Recibir mercadería**, y anotar si llegó toda la transferencia o si hubo un
+   error.
+3. **Hacer los pedidos que NO son a depósito** — pollo, pan, y los productos
+   creados en su propio local.
+4. **Ingresar la factura cuando llega.**
+
+**Una persona por turno tiene esas cuatro responsabilidades**, y el motivo es
+operativo y no de organigrama: **el encargado no está siempre.** Quien está en el
+mostrador a las nueve de la noche es quien recibe al proveedor de pan.
+
+### EL ROL `CAJERO` DE HOY NO PERMITE NADA DE ESO
+
+Sus seis permisos son `pos.usar`, `clientes.crear` y los cuatro de puntos y
+cuenta corriente. Contra la lista de arriba:
+
+- **Cobrar:** sí, `pos.usar`.
+- **Recibir mercadería:** no. Eso es `transferencias.recibir`, que no tiene.
+- **Hacer pedidos:** no. Es `pedidos.solicitar` / `pedidos.ver`, que no tiene.
+- **Ingresar la factura:** no. Es `compras.crear` y `compras.ver`, que no tiene.
+
+**Tres de las cuatro responsabilidades reales están fuera del rol.**
+
+**Y ahí está la explicación del cero.** `CAJERO` tiene **cero usuarios** en
+producción, y no es que nadie haga ese trabajo: es que **con ese rol no se puede
+hacer**. Quien está en el mostrador entra con `Mini` —que sí tiene
+`transferencias.recibir`, `compras.crear` y `compras.ver`— o con `DUEÑO_LOCAL`,
+que tiene 44 permisos.
+
+O sea que **el rol acotado existe y no se usa, y el trabajo se hace con roles
+anchos.** Ese es el problema a resolver, y es más grande que cerrar rutas: no
+alcanza con negar permisos si el rol que queda no deja trabajar.
+
+**Corolario para el censo:** medir `CAJERO` describe un rol que nadie usa. El
+riesgo de hoy es `Mini`, con un usuario activo, y `DUEÑO_LOCAL`, con tres. Por eso
+el censo se corrió también con `Mini`.
+
 ### ⚑ AUTENTICAR PRIMERO, VALIDAR DESPUÉS
 
 **El orden correcto: hasta que no se sabe quién pregunta, la única respuesta es
