@@ -224,6 +224,52 @@ elemento cambió de tamaño entre las dos corridas, y eso es información: la
 tarjeta de `ModalCategoria` creció 3 px de alto al migrarla y el comparador lo
 dijo antes de mirar un solo píxel.
 
+### ⚠️ `--base`: EL PUERTO POR DEFECTO ES 3111, NO 3000
+
+`medir-desborde.mjs` arranca con `http://localhost:3111`. Si el dev server de esta
+máquina levantó en otro puerto —`npm run dev` usa **3000**—, hay que pasarlo:
+
+    ... --base http://localhost:3000 ...
+
+**El síntoma no dice "puerto equivocado".** El arnés navega a `about:blank`,
+después intenta el login con un `fetch` relativo, y eso revienta con:
+
+    Error: TypeError: Failed to fetch
+      at iniciarSesion (scripts/lib/sesionArnes.mjs:38)
+
+La corrida muere **antes de la primera foto**, así que no queda ni una captura que
+mirar para darse cuenta. Leído rápido, "Failed to fetch" parece un problema de
+sesión o de red y se busca en el lugar equivocado.
+
+### ⚠️ `--alto-captura` NO SIRVE SI LA PANTALLA TIENE UN SCROLLER INTERNO
+
+Cuando el arnés dice **"NO ENTRA ENTERO EN LA FOTO"** y sugiere subir
+`--alto-captura`, el consejo vale solo si lo que scrollea es la PÁGINA. Si el
+contenido vive adentro de un contenedor con su propio scroll —la página mide el
+alto de la ventana y el resto se desplaza adentro—, **subirlo no captura más**.
+
+*El caso, del 2026-08-15:* `compras-proveedor/ganancia` avisaba que se cortaban
+726 px. Se subió a `--alto-captura 1800` y la ficha registró `altoCaptura: 1800`
+con `recorte.height: 900`. La misma pantalla con 1800 y con 900 da la misma foto.
+`reportes-stock` avisaba de **51.680 px**, que además no es un alto de captura
+razonable para nada.
+
+**Cómo se reconoce:** la ficha dice `altoCaptura` alto y `recorte.height` chico, y
+el aviso de "se corta N px" no baja al subirlo.
+
+**La salida es `--elemento` con un ATRIBUTO INERTE**, no una foto más alta. Se le
+agrega a la pieza un atributo que no dibuja nada —`data-sunmi-panel`,
+`data-sunmi-modal="tarjeta"`— **en su propio commit**, se comprueba con las
+capturas completas que no mueve un píxel, y recién con eso se recorta a cada
+instancia y se compara una por una.
+
+Es mejor que la foto de pantalla completa, además: compara exactamente lo que
+cambia, y una pantalla con doce paneles pasa a dar doce comparaciones en vez de
+una banda donde la mitad queda abajo del pliegue.
+
+**El atributo no puede reemplazarse por una clase** si la migración va a tocar las
+clases: el selector tiene que encontrar la misma cosa antes y después.
+
 ### `--usuario` / `--clave`: el arnés se loguea solo
 
 `medir-desborde.mjs` acepta las mismas credenciales que `generar-huellas.mjs`, y
