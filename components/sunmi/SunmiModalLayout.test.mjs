@@ -142,7 +142,22 @@ test("EL VELO Y EL PANEL NO LLEVAN Z PROPIO", () => {
   // Es lo que mantiene atómico el contexto de apilado. El día que cada uno tenga
   // el suyo, algo de afuera se puede volver a meter en el medio — que es
   // exactamente lo que le pasó al cartel de identificarse en producción.
-  const cuerpo = SRC.slice(SRC.indexOf("return ("));
+  // ── EL ANCLA SE CAMBIÓ, Y NO SE AFLOJÓ NADA ────────────────────────────
+  //
+  // Esto decía `SRC.indexOf("return (")`. El día que la capa pasó a montarse en
+  // el `body`, el JSX quedó en `const capa = (` y el `return (` pasó a ser el del
+  // portal, tres líneas antes del final: el candado recortaba un pedazo sin
+  // velos, encontraba CERO y se ponía en rojo sin que nada de lo que afirma se
+  // hubiera roto.
+  //
+  // Es el caso que el `CLAUDE.md` describe al revés —un candado que sigue en
+  // VERDE cuando el patrón se muda— y acá salió en rojo, que es la versión
+  // barata. El ancla nueva es la declaración de la capa, que es lo que este
+  // candado mira de verdad; y si algún día también se muda, el `assert` de abajo
+  // lo dice con todas las letras en vez de dejar pasar un cero.
+  const inicio = SRC.indexOf("const capa = (");
+  assert.notEqual(inicio, -1, "se movió la declaración de la capa: reanclar este candado, no borrarlo");
+  const cuerpo = SRC.slice(inicio);
   const velos = cuerpo.match(/className="absolute inset-0[^"]*"/g) ?? [];
   assert.equal(velos.length, 2, "el velo dejó de tener dos formas: revisar este candado");
   for (const v of velos) assert.doesNotMatch(v, /\bz-/, v);

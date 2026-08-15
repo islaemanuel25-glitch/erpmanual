@@ -1905,9 +1905,55 @@ se sale por abajo solo en pantallas chicas. Y cómo se confirma: se mide la capa
 —tiene que dar el alto del viewport en y=0— y se enumeran los ancestros con esas
 cuatro propiedades. **Leyendo el JSX no se ve**, porque depende del CSS calculado.
 
-## EL CAMINO C — EL PORTAL AL `body`, evaluado y medido
+### ⚑ DEUDA DEL KIT: `Escape` NO CIERRA NINGÚN MODAL
 
-**2026-08-15. Se escribió, se midió y SE REVIRTIÓ: no está aplicado.**
+**Apareció midiendo el camino C, y no la causó el camino C.** El kit nunca
+implementó el cierre con teclado: comprobado antes y después del portal, en
+`proveedores` y en `roles`, la tecla no hace nada.
+
+**No se implementó en esa tanda a propósito.** Es **comportamiento nuevo** y
+merece su propia declaración —qué modales lo aceptan, qué pasa con los que
+declaran `destructivo`, y si cerrar con Escape tiene que perder lo escrito—, no
+colarse adentro de un arreglo de capa donde nadie lo estaba mirando.
+
+### ⚑ Y EL ARREGLO DE `productos` YA NO ES LO QUE RESUELVE EL PROBLEMA
+
+`cc1453e` sacó los dos modales de `productos` de adentro de su `SunmiCard`, y
+**queda**: montar un modal afuera de una tarjeta es correcto igual, y esa pantalla
+tiene además su propio historial. Pero **con el camino C aplicado ya no hace
+falta**: el portal resuelve la causa para todos los que usan el kit, incluido ese.
+
+Se escribe para que nadie crea que hacen falta los dos, ni salga a mover los
+demás modales de a uno pensando que eso es lo que arregla.
+
+## EL CAMINO C — EL PORTAL AL `body`, evaluado, medido y APLICADO
+
+**2026-08-15. Evaluado y revertido primero; aplicado después, con las capturas.**
+
+### Aplicado — lo que se midió al aplicarlo
+
+**Capturas a 360, antes y después, de los cuatro que cambian.**
+
+- **`proveedores`**: pasa de **273x572 en (40, 346) —que el arnés se negó a
+  fotografiar porque no entra— a 339x553 en (11, 44)**, entrando entera y con el
+  ancho correcto. Es el que estaba roto de verdad.
+- **`categorias`**, **el de unificar de `clientes`** y **`Nuevo cliente`**:
+  **conservan su tamaño exacto** —339x269, 339x222 y 339x576— y **suben entre 5 y
+  7 píxeles**. Ese corrimiento es el centrado arreglándose.
+- Los tres difieren entre 1,26 % y 2,81 % de píxeles, y mirando las imágenes son
+  indistinguibles: lo que cambia es el marco de velo del recorte, porque la
+  tarjeta se movió esos pocos píxeles.
+
+**Los diez modales vuelven a dar la capa en 640 px en y=0.** Suite: 3.262, cero en
+rojo.
+
+**El candado del landmark se reescribió, no se aflojó**, y su contraprueba está
+hecha en los dos sentidos: se pone en rojo si alguien le da un `z` propio al velo,
+**y también si alguien muda el ancla** —renombrar `capa` lo deja en rojo con el
+mensaje "se movió la declaración de la capa: reanclar este candado, no borrarlo"—.
+Esa segunda mitad es la que faltaba antes: el ancla vieja se mudó en silencio.
+
+### La evaluación previa, que es la que decidió
 
 La idea: si la pieza se hace cargo de la capa, le corresponde garantizar que se
 resuelva contra la pantalla. Hoy no lo hace, y `proveedores` es la prueba.

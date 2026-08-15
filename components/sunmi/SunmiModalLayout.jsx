@@ -38,6 +38,7 @@
 // los cuatro usos actuales tienen que verse idénticos. Las formas nuevas cambian
 // dónde se para el panel, no de qué está hecho.
 
+import { createPortal } from "react-dom";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -378,7 +379,11 @@ export default function SunmiModalLayout({
 
   const cierraElVelo = !destructivo && typeof onClose === "function";
 
-  return (
+  // LA CAPA SE ARMA ACÁ Y SE MONTA MÁS ABAJO — ver el comentario del portal al
+  // final de la función. El nombre importa: hay un candado que delimita el cuerpo
+  // del componente por este `const capa = (`, justamente para no volver a
+  // anclarse a un `return (` que se muda.
+  const capa = (
     <div
       style={{ zIndex: z }}
       className={`fixed inset-0 ${f.capa}`}
@@ -512,4 +517,47 @@ export default function SunmiModalLayout({
       </div>
     </div>
   );
+
+  // ── LA CAPA SE MONTA EN EL `body`, Y NO DONDE CAE EN EL ÁRBOL ─────────────
+  //
+  // `backdrop-filter`, `filter`, `transform` y `perspective` distintos de `none`
+  // **crean un bloque contenedor para los descendientes `position: fixed`**: esos
+  // hijos dejan de resolver su `inset` contra la pantalla y lo resuelven contra
+  // ese ancestro. No hay aviso, no hay error de consola, y el `fixed` sigue
+  // diciendo `fixed` en las herramientas.
+  //
+  // `SunmiCard` trae `backdrop-blur-sm`, y hay pantallas que dibujan sus modales
+  // adentro de una. Medido a 360x640 antes de esto: en `/modulos/proveedores` la
+  // capa medía **1004 px de alto en vez de 640, arrancando en y=131**, la tarjeta
+  // iba de 346,3 a 918,3 —278 px fuera de la ventana— y encima quedaba de **273
+  // de ancho contra los 339** de los modales sanos, porque su 95 % se calculaba
+  // sobre la tarjeta y no sobre la pantalla. En `categorias` y en los dos de
+  // `clientes` el desfase era de 10 a 14 px.
+  //
+  // ── POR QUÉ LO ARREGLA LA PIEZA Y NO CADA PANTALLA ───────────────────────
+  //
+  // Si el kit se hace cargo de la capa, le corresponde garantizar que se resuelva
+  // contra la pantalla. Las dos alternativas que se midieron eran peores: mover
+  // los modales de a uno arregla el caso que se conoce y deja la lista abierta
+  // —el relevamiento no pudo abrir todos—, y sacarle el `backdrop-blur-sm` a
+  // `SunmiCard` toca 240 usos en 62 pantallas para conseguir lo mismo.
+  //
+  // ── POR QUÉ EL `typeof document` Y NO UN EFECTO ──────────────────────────
+  //
+  // Montar el portal con `useEffect` y estado hace que el PRIMER RENDER devuelva
+  // `null`, y eso **rompió cuatro candados de verdad**:
+  // `lib/caja/ordenCambioPrevio.test.mjs` renderiza este modal a HTML para
+  // verificar su contenido y recibía vacío. Así, en cambio, el navegador porta y
+  // cualquier render sin DOM —los candados, y el del servidor si algún día llega—
+  // dibuja la capa donde cae, exactamente como antes.
+  //
+  // Medido: el HTML que manda el servidor **no traía el modal ni antes ni
+  // después** —comprobado apagando el JavaScript—, y no hay ningún aviso de
+  // hidratación en consola.
+  //
+  // ── LO QUE ESTO NO CUBRE ─────────────────────────────────────────────────
+  //
+  // Los 32 archivos que todavía arman su capa a mano siguen igual de expuestos.
+  // El kit no tiene cómo enterarse de ellos: se arreglan migrando.
+  return typeof document !== "undefined" ? createPortal(capa, document.body) : capa;
 }
