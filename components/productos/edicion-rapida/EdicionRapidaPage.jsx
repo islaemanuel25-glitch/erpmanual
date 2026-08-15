@@ -878,7 +878,7 @@ export default function EdicionRapidaPage() {
                     onChange={setBulkProveedor}
                     placeholder="Proveedor..."
                     searchable
-                    className="!w-44"
+                    className="w-44"
                   >
                     <SunmiSelectOption value="">—</SunmiSelectOption>
                     {catalogos.PROVEEDORES.map((p) => (
@@ -903,7 +903,7 @@ export default function EdicionRapidaPage() {
                     onChange={setBulkCategoria}
                     placeholder="Categoría..."
                     searchable
-                    className="!w-44"
+                    className="w-44"
                   >
                     <SunmiSelectOption value="">—</SunmiSelectOption>
                     {catalogos.CATEGORIAS.map((c) => (
@@ -928,7 +928,7 @@ export default function EdicionRapidaPage() {
                     onChange={setBulkArea}
                     placeholder="Área física..."
                     searchable
-                    className="!w-44"
+                    className="w-44"
                   >
                     <SunmiSelectOption value="">—</SunmiSelectOption>
                     {catalogos.AREAS.map((a) => (

@@ -6,6 +6,7 @@ import {
   Children,
   isValidElement,
 } from "react";
+import { componerClaseInput } from "@/lib/sunmi/claseAncho";
 import { createPortal } from "react-dom";
 import { ChevronDown, Check, Search } from "lucide-react";
 
@@ -192,7 +193,26 @@ export default function SunmiSelectAdv({
   ) : null;
 
   return (
-    <div ref={wrapRef} className={`w-full ${className}`} {...restProps}>
+    // EL ANCHO SE NEGOCIA, NO SE CONCATENA.
+    //
+    // Antes era `w-full ${className}` y quedaban los dos anchos en el atributo.
+    // Dos clases de la misma familia tienen la misma especificidad, así que
+    // decide el orden de la hoja de estilos — y decidía a favor de `w-full`.
+    //
+    // ── MEDIDO: TRES DECLARACIONES PERDÍAN Y TRES GANABAN A LA FUERZA ────────
+    //
+    // De los 39 consumidores que pasan `className`, solo 6 declaran un ancho.
+    // Tres —`w-[85px]` y dos `w-[140px]` en `TablaSugeridos`— daban 600 px, o
+    // sea el ancho del contenedor: nunca se aplicaron. Las otras tres usaban
+    // `!w-44`, que gana por `!important` — un parche que con esto deja de hacer
+    // falta y se saca en el mismo commit.
+    //
+    // Los 33 restantes declaran otra cosa —una variante que apunta al hijo, o un
+    // `min-w-`, que es otra propiedad— y no pelean con nada.
+    //
+    // Se reusa `componerClaseInput`, que es la misma pieza que usa `SunmiInput`
+    // y ya resolvía esto. No se escribe una función parecida al lado.
+    <div ref={wrapRef} className={componerClaseInput(className)} {...restProps}>
       <button
         ref={btnRef}
         type="button"
