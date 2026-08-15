@@ -147,6 +147,9 @@ export default function ModalPreviewPrecio({ open, lista, onClose }) {
       open={open}
       title={`Preview de "${lista?.nombre || ""}"`}
       onClose={onClose}
+      // El valor efectivo que esta pantalla ya tenía. El kit dejó de tener
+      // default de `z`.
+      z={9999}
       // NO lleva `destructivo`: es un preview de solo lectura. Lo único que se
       // escribe acá es el buscador, y perder un término de búsqueda no es
       // perder nada — se vuelve a escribir. El criterio es qué se pierde.

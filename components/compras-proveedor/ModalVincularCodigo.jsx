@@ -132,6 +132,9 @@ export default function ModalVincularCodigo({
       // Conserva su cinta de título: el kit por defecto dibuja texto normal.
       encabezado="cinta"
       onClose={onClose}
+      // El valor efectivo que esta pantalla ya tenía. El kit dejó de tener
+      // default de `z`.
+      z={9999}
       // Es un formulario: un toque al costado con los tres campos cargados
       // tiraría lo escrito, y en el teléfono ese toque pasa solo.
       destructivo

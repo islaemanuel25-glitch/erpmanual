@@ -203,7 +203,26 @@ export default function SunmiModalLayout({
    * modal, 60 el desplegable que se abre adentro del modal. Unificar se mira
    * cuando estén todas migradas y se puedan comparar al lado.
    */
-  z = 9999,
+  /**
+   * ── SIN DEFAULT, COMO `espacioCuerpo`, Y POR UN MOTIVO PROPIO ────────────
+   *
+   * Tenía `9999`. Los cinco modales que declaraban algo declaraban **50**, o sea
+   * que el default no lo elegía nadie que hubiera pensado el tema.
+   *
+   * Pero acá hay algo peor que en `espacioCuerpo`: **el número no es cosmético
+   * y no se puede mirar en una captura.** Hay cosas por encima de 50 que viven
+   * FUERA del modal —`CampanaNotificaciones` a 9998 y 9999, el `ColumnManager`
+   * de productos a 9999— así que el contexto de apilado de la capa no las tapa.
+   * Un modal a 50 puede quedar debajo de la campana sin que nada avise, y eso
+   * solo se ve el día que las dos cosas están abiertas.
+   *
+   * Los 17 que no lo declaraban recibieron `z={9999}`, que es **el valor
+   * efectivo que ya tenían, medido en el navegador** y no deducido del código.
+   * Cero pantallas se mueven.
+   *
+   * **Lo obliga un candado**, igual que el espaciado.
+   */
+  z,
   /**
    * El espaciado del CUERPO y del PIE, con el del kit por defecto.
    *

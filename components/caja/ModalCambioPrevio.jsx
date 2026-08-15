@@ -76,6 +76,9 @@ export default function ModalCambioPrevio({
       open={abierto}
       title={TITULO_MODAL_CAMBIO}
       onClose={onCancelar}
+      // El valor efectivo que esta pantalla ya tenía, MEDIDO en el navegador
+      // antes de escribirlo. El kit dejó de tener default de `z`.
+      z={9999}
       // Es un formulario de carga: el desglose de billetes ya escrito se
       // perdería con un toque al costado, y en el teléfono ese toque pasa solo.
       destructivo

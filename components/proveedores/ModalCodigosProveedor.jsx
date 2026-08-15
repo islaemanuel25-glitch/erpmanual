@@ -59,6 +59,9 @@ export default function ModalCodigosProveedor({ open, onClose, proveedor }) {
       // Conserva su cinta de título: el kit por defecto dibuja texto normal.
       encabezado="cinta"
       onClose={onClose}
+      // El valor efectivo que esta pantalla ya tenía. El kit dejó de tener
+      // default de `z`.
+      z={9999}
       maxWidth="max-w-3xl"
       // El cuerpo trae sus propios márgenes. Este modal es de solo lectura y no
       // tiene pie: el único botón es el de cerrar, que lo pone la pieza.

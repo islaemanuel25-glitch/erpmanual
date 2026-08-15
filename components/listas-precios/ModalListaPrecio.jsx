@@ -203,6 +203,9 @@ export default function ModalListaPrecio({
       open={open}
       title={editMode ? "Editar lista de precios" : "Nueva lista de precios"}
       onClose={onClose}
+      // El valor efectivo que esta pantalla ya tenía. El kit dejó de tener
+      // default de `z`.
+      z={9999}
       // Es un formulario: un toque al costado con media pantalla escrita tiraría
       // lo escrito, y en el teléfono ese toque pasa solo.
       destructivo

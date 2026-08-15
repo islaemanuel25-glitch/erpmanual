@@ -132,8 +132,20 @@ test("la pieza retira lo suyo cuando la pantalla declara", () => {
 
 // ── EL APILADO ES UN SOLO NÚMERO ───────────────────────────────────────────
 
-test("hay UN z y va en la capa, con el default de siempre", () => {
-  assert.match(SRC, /z = 9999/, "cambió el default: eso mueve todos los modales");
+test("hay UN z, va en la capa, y NO TIENE DEFAULT", () => {
+  // ── SE LE SACÓ EL DEFAULT EL 2026-08-15 ─────────────────────────────────
+  //
+  // Tenía `z = 9999` y los cinco que declaraban algo declaraban 50: el default
+  // no lo elegía nadie que hubiera pensado el tema. Y acá el número **no es
+  // cosmético**: hay cosas por encima de 50 fuera del modal —la campana de
+  // notificaciones a 9998 y 9999, el gestor de columnas a 9999— que el contexto
+  // de apilado de la capa no tapa. Un modal a 50 puede quedar debajo sin que
+  // nada avise.
+  //
+  // Los 17 que no lo declaraban recibieron el valor efectivo que ya tenían,
+  // MEDIDO en el navegador. Cero pantallas se mueven.
+  assert.doesNotMatch(SRC, /\bz\s*=\s*9999/, "le volvió el default a `z`: eso es lo que este candado saca");
+  assert.match(SRC, /^\s*z,\s*$/m, "`z` dejó de ser parámetro");
   assert.match(SRC, /style=\{\{ zIndex: z \}\}/);
   assert.match(SRC, /className=\{`fixed inset-0 \$\{f\.capa\}`\}/, "la capa no puede traer su propio z-*");
 });
@@ -177,10 +189,33 @@ test("el cartel de identificarse sigue arriba de este default", () => {
   // La otra mitad de la misma regla. El candado de ModalPedirOperador mira que
   // ninguna capa lo tape; este mira desde el otro lado, para que subir el default
   // del kit no lo deje debajo sin que nadie lo note.
+  //
+  // ── REESCRITO EL 2026-08-15, Y QUEDÓ MÁS FUERTE ─────────────────────────
+  //
+  // Miraba el DEFAULT del kit. El kit se quedó sin default de `z`, así que ese
+  // número ya no existe — pero lo que el candado protege sí. Ahora compara
+  // contra **el z más alto que declare cualquier consumidor**, enumerándolos con
+  // git sobre el repo entero. Es la afirmación que de verdad importa: el cartel
+  // tiene que estar arriba de TODOS, no de un default que ya nadie usa.
   const cartel = fs.readFileSync(path.join(RAIZ, "components/operador/ModalPedirOperador.jsx"), "utf8");
   const zCartel = Number(cartel.match(/fixed inset-0 z-\[(\d+)\]/)[1]);
-  const zKit = Number(SRC.match(/z = (\d+)/)[1]);
-  assert.ok(zCartel > zKit, `el cartel quedó en ${zCartel} y el kit en ${zKit}`);
+
+  const consumidores = ejecutar("git grep -l SunmiModalLayout -- app components")
+    .split("\n").map((l) => l.trim())
+    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
+  let masAlto = 0;
+  let quien = "(ninguno declara z)";
+  for (const ruta of consumidores) {
+    const texto = fs.readFileSync(path.join(RAIZ, ruta), "utf8");
+    for (const m of texto.matchAll(/\n\s*z=\{(\d+)\}/g)) {
+      if (Number(m[1]) > masAlto) { masAlto = Number(m[1]); quien = ruta; }
+    }
+  }
+  assert.ok(masAlto > 0, "ningún consumidor declara `z`: el candado no está midiendo nada");
+  assert.ok(
+    zCartel > masAlto,
+    `el cartel quedó en ${zCartel} y el modal más alto es ${masAlto} (${quien})`
+  );
 });
 
 // ── EL INTERIOR NO SE REPINTA ──────────────────────────────────────────────
@@ -293,6 +328,25 @@ test("LA COLUMNA VIAJA CON EL ALTO, y solo si la forma no la trae", () => {
   assert.match(tarjeta, /columnaEnLaTarjeta/, "se calcula y no se usa");
 });
 
+/**
+ * Los consumidores que NO declaran un prop que el kit ya no tiene por default.
+ *
+ * Cuenta APERTURAS contra DECLARACIONES y no busca una sola aparición: hay
+ * archivos con más de un modal —`clientes/page.jsx` tiene tres,
+ * `PanelComprobantes` dos— y con "aparece una vez" alcanzaría con declararlo en
+ * uno solo para que el candado se callara.
+ */
+function sinDeclararlo(consumidores, prop) {
+  const faltan = [];
+  for (const ruta of consumidores) {
+    const texto = fs.readFileSync(path.join(RAIZ, ruta), "utf8");
+    const modales = (texto.match(/<SunmiModalLayout/g) || []).length;
+    const declara = (texto.match(new RegExp("\\n\\s*" + prop, "g")) || []).length;
+    if (declara < modales) faltan.push(`${ruta} (${declara} de ${modales})`);
+  }
+  return faltan;
+}
+
 test("`espacioCuerpo` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
   // ── POR QUÉ SE LE SACÓ ────────────────────────────────────────────────────
   //
@@ -316,20 +370,24 @@ test("`espacioCuerpo` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
   const consumidores = ejecutar("git grep -l SunmiModalLayout -- app components")
     .split("\n").map((l) => l.trim())
     .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
-  const sinDeclarar = [];
-  for (const ruta of consumidores) {
-    const texto = fs.readFileSync(path.join(RAIZ, ruta), "utf8");
-    // Un archivo puede tener más de un modal: se cuentan las aperturas y las
-    // declaraciones, y tienen que dar lo mismo.
-    const modales = (texto.match(/<SunmiModalLayout/g) || []).length;
-    const declara = (texto.match(/\n\s*espacioCuerpo=/g) || []).length;
-    if (declara < modales) sinDeclarar.push(`${ruta} (${declara} de ${modales})`);
-  }
   assert.deepEqual(
-    sinDeclarar,
+    sinDeclararlo(consumidores, "espacioCuerpo="),
     [],
-    "estos modales no declaran `espacioCuerpo` y el kit ya no tiene uno que ponerles:\n  " +
-      sinDeclarar.join("\n  ")
+    "estos modales no declaran `espacioCuerpo` y el kit ya no tiene uno que ponerles"
+  );
+});
+
+test("`z` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
+  // Misma forma que el de `espacioCuerpo`, y por un motivo más caro: un modal
+  // que se quede sin `z` no se ve raro — se ve bien hasta el día que algo de
+  // afuera se le pone encima.
+  const consumidores = ejecutar("git grep -l SunmiModalLayout -- app components")
+    .split("\n").map((l) => l.trim())
+    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
+  assert.deepEqual(
+    sinDeclararlo(consumidores, "z="),
+    [],
+    "estos modales no declaran `z` y el kit ya no tiene uno que ponerles"
   );
 });
 

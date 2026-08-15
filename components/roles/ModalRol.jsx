@@ -76,6 +76,8 @@ export default function ModalRol({
       open={open}
       title={editMode ? "Editar rol" : "Nuevo rol"}
       onClose={onClose}
+      // El valor efectivo que esta pantalla ya tenía, MEDIDO en el navegador.
+      z={9999}
       // Es un formulario: un toque al costado con los permisos ya tildados
       // tiraría lo hecho, y en el teléfono ese toque pasa solo.
       destructivo

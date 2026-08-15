@@ -99,6 +99,8 @@ export default function ModalProveedor({
       // Conserva su cinta de título: el kit por defecto dibuja texto normal.
       encabezado="cinta"
       onClose={onClose}
+      // El valor efectivo que esta pantalla ya tenía, MEDIDO en el navegador.
+      z={9999}
       // Es un formulario: un toque al costado con media pantalla escrita tiraría
       // lo escrito, y en el teléfono ese toque pasa solo.
       destructivo

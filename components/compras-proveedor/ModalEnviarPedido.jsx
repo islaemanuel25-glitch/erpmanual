@@ -60,6 +60,9 @@ export default function ModalEnviarPedido({ pedido, onClose, onEnviado }) {
       // Conserva su cinta de título: el kit por defecto dibuja texto normal.
       encabezado="cinta"
       onClose={onClose}
+      // El valor efectivo que esta pantalla ya tenía. El kit dejó de tener
+      // default de `z`.
+      z={9999}
       maxWidth="max-w-md"
       // El cuerpo de este modal es contenido suelto con sus propios márgenes: no
       // tiene scroll propio ni separación entre bloques que el kit deba poner.

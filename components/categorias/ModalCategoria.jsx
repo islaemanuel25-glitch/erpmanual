@@ -112,6 +112,8 @@ export default function ModalCategoria({
       open={open}
       title={editMode ? "Editar categoría" : "Nueva categoría"}
       onClose={onClose}
+      // El valor efectivo que esta pantalla ya tenía, MEDIDO en el navegador.
+      z={9999}
       // Es un formulario: un toque al costado con el nombre ya escrito tiraría
       // lo escrito, y en el teléfono ese toque pasa solo.
       destructivo

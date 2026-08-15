@@ -42,6 +42,9 @@ export default function ModalTerminar({
       // El valor que este modal ya tenía: era el default del kit y ahora se
       // declara, porque el kit dejó de tener uno. No cambia un píxel.
       espacioCuerpo="mt-2 gap-3"
+      // El valor efectivo que esta pantalla ya tenía. El kit dejó de tener
+      // default de `z`.
+      z={9999}
       destructivo
       footer={
         <div className="flex items-center justify-end gap-2 flex-wrap">
