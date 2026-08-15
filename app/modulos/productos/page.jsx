@@ -1312,29 +1312,39 @@ export default function ProductosPage() {
           )}
         </div>
 
-        <ModalProducto
-          open={modalOpen}
-          onClose={cerrarModal}
-          onSubmit={handleSubmit}
-          catalogos={catalogos}
-          initialData={editing}
-          localId={localId}
-          editandoOverrideLocal={!!editing && localId > 0 && !contexto?.esDeposito}
-          puedeEditarCosto={editFlags.puedeEditarCosto}
-          puedeEditarBase={editFlags.puedeEditarBase}
-        />
-
-        <ModalVerComposicion
-          open={!!verCombo}
-          productoLocalId={verCombo?.productoLocalId}
-          localId={localId}
-          onClose={() => setVerCombo(null)}
-          onEditar={(plId) => {
-            setVerCombo(null);
-            abrirEditarCombo(plId);
-          }}
-        />
       </SunmiCard>
+
+      {/* ── LOS MODALES VAN AFUERA DEL `SunmiCard`, Y NO ES ORDEN ─────────────
+          `SunmiCard` trae `backdrop-blur-sm`, o sea `backdrop-filter`, y esa
+          propiedad **crea un bloque contenedor para los descendientes
+          `position: fixed`**. Con los modales adentro, la capa dejaba de
+          resolverse contra el viewport y pasaba a resolverse contra la tarjeta.
+          Medido a 360x640 antes de moverlos: la capa medía 1095,5 de alto en vez
+          de 640, y la tarjeta del modal quedaba en y=398,8 con el borde de abajo
+          en 943,8 — **304 px fuera de la pantalla**. A 1366x900 el mismo efecto
+          la cortaba 3 px. */}
+      <ModalProducto
+        open={modalOpen}
+        onClose={cerrarModal}
+        onSubmit={handleSubmit}
+        catalogos={catalogos}
+        initialData={editing}
+        localId={localId}
+        editandoOverrideLocal={!!editing && localId > 0 && !contexto?.esDeposito}
+        puedeEditarCosto={editFlags.puedeEditarCosto}
+        puedeEditarBase={editFlags.puedeEditarBase}
+      />
+
+      <ModalVerComposicion
+        open={!!verCombo}
+        productoLocalId={verCombo?.productoLocalId}
+        localId={localId}
+        onClose={() => setVerCombo(null)}
+        onEditar={(plId) => {
+          setVerCombo(null);
+          abrirEditarCombo(plId);
+        }}
+      />
     </div>
   );
 }

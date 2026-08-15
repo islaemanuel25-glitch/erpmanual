@@ -23,7 +23,7 @@ export default function ModalProducto({
         open ? "block" : "hidden"
       }`}
     >
-      <SunmiCard className="w-[95%] max-w-4xl">
+      <SunmiCard data-sunmi-modal="tarjeta" className="w-[95%] max-w-4xl">
         <div className="flex items-center justify-between mb-3">
           <SunmiHeader title={initialData ? "Editar producto" : "Nuevo producto"} />
           <SunmiButton color="cyan" onClick={onClose}>
