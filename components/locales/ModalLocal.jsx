@@ -87,7 +87,6 @@ export default function ModalLocal({
       // porque `SunmiCardHeader` no acepta ese prop. Se deja escrito, y anotado
       // en el registro del roadmap como prop muerto pendiente, para no perder el
       // texto antes de decidir si el kit lo muestra o si sale.
-      subtitle="Configurá los datos del local"
       onClose={onClose}
       // El valor efectivo que esta pantalla ya tenía, MEDIDO en el navegador.
       z={9999}

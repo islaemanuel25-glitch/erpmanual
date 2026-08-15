@@ -1882,6 +1882,66 @@ si se destraba.
 **tanda del `?editar=`** —por qué la URL pierde el parámetro— y después la
 **tabla de declaraciones**, que es el cierre de la fase.
 
+## ⚑ EL CIERRE DE LA FASE 2 — 2026-08-15
+
+La fase arrancó para que los modales del sistema dejaran de tener cada uno su
+capa. Cierra acá, y esto es lo que quedó.
+
+### Qué quedó migrado
+
+**22 modales en 19 archivos usan `SunmiModalLayout`.** Los cuatro últimos de esta
+vuelta —`ModalCliente`, `ModalGrupo`, `ModalMergeClientes` y
+`ModalProductoFinal`— entraron con su lista declarada escrita **antes** de tocar,
+con capturas de los dos anchos y con la diferencia de píxeles explicada hasta el
+último renglón.
+
+El contador de modales armados a mano bajó de **54 al empezar la fase a 36**.
+
+### Qué quedó afuera, y por qué
+
+- **Los dos bloqueados por datos.** `ModalDetalleVenta` necesita una venta del
+  día; el ingreso/retiro de `turnos/[id]` necesita un turno abierto. **No se
+  fabricó ninguna de las dos condiciones.** Cuando les toque, o el dato aparece
+  solo o Emanuel arma el rato para operar la caja de verdad.
+- **`ModalPedirOperador`.** Firma impecable y pantalla inalcanzable: se dibuja con
+  `!exento && !operador && huboOperador`, y el admin con el que se mide es
+  `exento`. Va con los seis del POS, después de la fase 4.
+- **Los seis del POS**, por decisión de negocio tomada al empezar.
+- **Los 32 archivos que todavía arman su capa a mano.** Son el trabajo que queda,
+  y ahora tienen un motivo más para migrar además de la uniformidad: **el portal
+  del kit los cubriría del problema del `backdrop-filter`**, y sueltos siguen
+  expuestos.
+
+### Lo que la fase dejó además de las migraciones
+
+Tres arreglos que no eran el objetivo y salieron de mirar de cerca:
+
+- **La capa del kit se monta en el `body`.** `backdrop-filter` creaba bloque
+  contenedor y dejaba a `ModalProveedor` 278 px fuera de la ventana a 360.
+- **Los tres defaults que nadie elegía.** El `alto` pasó a 90vh con el tope en la
+  tarjeta; `espacioCuerpo` y `z` se quedaron **sin default**, con el valor de cada
+  pantalla escrito y un candado que lo obliga.
+- **Dos subtítulos muertos borrados** —los de `ModalLocal` y `ModalUsuario`, que
+  repetían el título—.
+
+Y una regla que sirve para todo el proyecto: **un default que ningún consumidor
+elige se saca o se cambia, no se deja.**
+
+### EL PRIMER PASO DE LA FASE 5
+
+**Los cuatro subtítulos que quedan vivos y no se dibujan.** `PanelComprobantes`
+tiene dos, `ModalRevertir` y `ModalTerminar` uno cada uno; los cuatro declaran un
+`subtitle` que la pieza **no reenvía a propósito**. Encenderlos es comportamiento
+nuevo en cuatro pantallas y merece su propia tanda, con su lista declarada: hay
+que ver qué dice cada uno, si aporta algo que el título no diga, y cómo queda el
+encabezado con dos renglones.
+
+Es el primer paso porque es chico, está acotado a cuatro pantallas que ya están
+migradas, y cierra una deuda que esta fase abrió y no pagó.
+
+**Y detrás de eso, la deuda más vieja: que `Escape` no cierra ningún modal.** El
+kit nunca lo implementó. Eso sí es comportamiento nuevo en las 22.
+
 ## ⚑ `backdrop-filter` CREA BLOQUE CONTENEDOR PARA LOS `fixed` DESCENDIENTES
 
 **De las que se olvidan y se vuelven a pagar, así que va arriba de todo.**
