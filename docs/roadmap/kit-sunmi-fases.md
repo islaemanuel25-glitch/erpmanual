@@ -1882,6 +1882,112 @@ si se destraba.
 **tanda del `?editar=`** —por qué la URL pierde el parámetro— y después la
 **tabla de declaraciones**, que es el cierre de la fase.
 
+### `ModalProductoFinal` — LA LISTA DECLARADA, escrita ANTES de tocar
+
+**2026-08-15.** Quedó destrabado con el arreglo de la carrera de la URL.
+**Comprobado primero, con el modo estricto puesto: abre 7 de 7**, y la URL
+conserva el parámetro las siete veces. Antes del arreglo daba 4 de 7 y 1 de 7.
+
+**Todo se declara explícito, incluido lo que hoy coincide con el default**, porque
+en la misma tanda el default del `alto` cambia y lo declarado no se mueve.
+
+#### Lo que hay hoy, medido
+
+**A 1366x900:** tarjeta **784x727**, `display: block`, padding 21, **sin tope
+propio** (`max-height: none`). Encabezado **42,5** con `mb-3`. Cuerpo
+`max-h-[70vh] overflow-y-auto px-1` de **630**, que es **exactamente 70vh de 900**:
+lo está tocando. Separación única: **10,5**.
+
+**A 360x640** —el ancho real de la Sunmi—: tarjeta **272,64x545**. Encabezado
+**42,5** igual. Cuerpo de **448**, que es **70vh de 640**: también tocando.
+Separación **10,5**.
+
+**Y hay DOS scrolls anidados, que ya existen hoy**: el cuerpo del modal y, adentro
+de `FormProducto`, un `overflow-auto max-h-[70dvh]` con 1365 de contenido. La
+migración no los toca, pero conviene saber que están antes de mirar una captura.
+
+#### Lo que se va a ver distinto
+
+1. **El velo cambia de tono.** Hoy es `bg-black/60` escrito a mano; pasa al velo
+   del kit, que sale del tema. Se ve en los dos anchos.
+2. **El botón "Cerrar" pasa de cyan a slate.** El kit dibuja el suyo y **no
+   parametriza el color**. Es la diferencia más visible de esta pantalla y no se
+   puede evitar sin tocar el kit.
+3. **El encabezado NO pierde la cinta**, porque se declara `encabezado="cinta"`.
+   Sin declararlo, el título ámbar en mayúsculas pasaría a texto blanco normal.
+4. **Puede moverse la alineación vertical del par título/botón.** El encabezado de
+   hoy es `items-center` y el del kit es `items-start`. Los 42,5 px de alto
+   deberían quedar, pero el botón podría subir. Se mide después.
+5. **Desaparece del DOM el envoltorio vacío cuando está cerrado.** Hoy la capa
+   vive siempre y se apaga con `hidden`; el kit no dibuja nada con `open` en
+   falso. **No cambia el comportamiento del formulario**: ya se desmontaba hoy por
+   el `{open && <FormProducto/>}` que el archivo tiene desde antes. Medido el
+   2026-08-14: cerrado, la capa tenía cero inputs adentro.
+
+#### Lo que se declara, y por qué cada uno
+
+- **`maxWidth="max-w-4xl"` y `className="w-[95%]"`.** La tarjeta declara los dos
+  hoy. El kit negocia el ancho: al recibir `w-[95%]` retira su `w-full`, así que
+  el 95 % se conserva. Sin el `max-w-4xl` el modal se achicaría a `max-w-xl`.
+- **`alto="max-h-[70vh]"` y `altoVa="cuerpo"`, los dos explícitos.** Hoy el tope
+  vive en el CUERPO y lo está tocando en los dos anchos, así que moverlo a la
+  tarjeta cambiaría la pantalla. `altoVa` se escribe aunque hoy sea el default de
+  `centrado`, porque en el bloque siguiente ese default pasa a `"tarjeta"`.
+- **`z={9999}`**, explícito por lo mismo: hoy es el default del kit y en esta
+  misma tanda el default se saca.
+- **`destructivo`.** No es solo por el criterio de qué se pierde —que también, es
+  un formulario de producto lleno—: **hoy el velo NO cierra**, porque la capa a
+  mano no tiene `onClick`. Sin declararlo, el velo del kit pasaría a cerrar y eso
+  sería un cambio de comportamiento en el modal más largo del sistema.
+- **`espacioCuerpo="mt-3 px-1"`.** El `mt-3` son los 10,5 que hoy pone el `mb-3`
+  del encabezado; el `px-1` es el del cuerpo actual. **No se declara gap**: el
+  cuerpo tiene un solo hijo y un gap no haría nada.
+- **`encabezado="cinta"`**, por el punto 3.
+
+#### PRIMERO HUBO QUE ARREGLAR LA PANTALLA, y no era del modal
+
+Las capturas del "antes" **no se pudieron sacar**: el arnés rechazó las dos
+—1366 y 360— porque la tarjeta no entraba entera en la foto. No era el arnés.
+
+Medido: **`SunmiCard` trae `backdrop-blur-sm`**, o sea `backdrop-filter`, y esa
+propiedad **crea un bloque contenedor para los descendientes `position: fixed`**.
+Los dos modales de la pantalla se dibujaban adentro de esa tarjeta, así que la
+capa dejaba de resolverse contra el viewport: medía **1095,5 de alto en vez de
+640**, y a 360 la tarjeta quedaba en y=398,8 con el borde de abajo en 943,8 —
+**304 px fuera de la pantalla**. A 1366 la cortaba 3 px.
+
+**Migrar al kit no lo habría arreglado**: la capa del kit también es `fixed`, así
+que adentro de un `SunmiCard` le pasaría exactamente lo mismo. Se arregló aparte,
+sacando los modales de adentro de la tarjeta, y va en su propio commit porque
+arregla la pantalla tal como está hoy, sin tocar el kit.
+
+Con eso la tarjeta pasa a entrar entera en los dos anchos y **recupera su ancho
+real a 360: de 272,6 a 322**, que es el 95 % de los 339 disponibles que el archivo
+declara. Estaba mal por partida doble.
+
+**Lo que NO se relevó:** cuántos otros modales del repo se dibujan adentro de un
+`SunmiCard`. Se comprobaron los de `roles` y `locales` y los dos resuelven bien
+contra el viewport, así que no es general — pero el universo entero no se miró.
+
+#### La migración, verificada
+
+Los dos anchos con `--repeticiones 3`, los dos deterministas, y **la caja de la
+tarjeta no se movió ni un píxel**: 784x727 en (291, 87) a 1366, y 322x545 en
+(19, 48) a 360, idénticas antes y después.
+
+Los píxeles que cambiaron son **exactamente los dos declarados**. A 1366 difieren
+27.225 de 594.400, y la cuenta cierra sola: el marco de velo de 8 px alrededor de
+la tarjeta son 24.432 px y el botón de cerrar unos 2.880 — **27.312 contra 27.225
+medidos**. No hay diferencia sobrante en ningún otro lado. A 360, 16.926 de
+189.618 con el mismo reparto.
+
+**La cinta ámbar se conservó**, que era el punto 3. **El riesgo del punto 4 —que
+`items-start` moviera el botón— no se materializó**: el encabezado mide lo mismo
+y la tarjeta no cambió de alto.
+
+Contador: modales armados a mano **37 → 36**, y colores fijos **287 → 286** por el
+`bg-black/60` de la capa.
+
 ### LA CARRERA DEL `?editar=`, CONTESTADA Y ARREGLADA
 
 **2026-08-14.** Tanda propia, corrida justo después de `ModalMergeClientes`

@@ -391,6 +391,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // uno—, y rehacerla cuesta lo mismo que rellenar un formulario. El criterio
     // es qué se pierde, y acá se pierde el trabajo de haberlos encontrado.
     "components/clientes/ModalMergeClientes.jsx": true,
+    // El formulario más largo del sistema. Y acá el criterio de qué se pierde no
+    // es lo único: la capa hecha a mano NO TENÍA `onClick`, así que hoy tocar
+    // afuera no cierra. Sin declararlo, migrar habría CAMBIADO el comportamiento
+    // en vez de conservarlo.
+    "components/productos/ModalProductoFinal.jsx": true,
     // Informativos, de confirmación y de selección: cerrarlos no pierde nada.
     // `ModalPreviewPrecio` tiene un campo y NO lleva destructivo a propósito: lo
     // único que se escribe ahí es el buscador, y perder un término de búsqueda
