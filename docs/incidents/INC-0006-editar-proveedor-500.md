@@ -76,6 +76,16 @@ proveedores — y usando **el predicado real del repo**, no una copia:
   con su local puesto.
 - **Proveedores que quedarían invisibles en un local donde se los usa: 0.**
 
+- **Proveedores sin ningún producto y sin ningún pedido, que quedarían invisibles
+  en TODOS los locales: 0.** Esta tercera pregunta se agregó el 2026-08-14 porque
+  las dos anteriores **no la cubrían**: "invisible donde se lo usa" recorre los
+  locales donde se lo usa, y un proveedor que no se usa en ninguno tiene ese
+  recorrido vacío, así que no aparecía por más invisible que quedara. Con
+  `creadoEnLocalId` en null lo estaría en todos —las tres primeras ramas del
+  predicado piden productos y la cuarta compara el campo contra un número—. **Un
+  cero que no mira este caso no dice lo que parece decir.** Acá dio cero porque
+  los 42 tienen productos.
+
 **Ese segundo número es el que decide**, y es el que la consigna pedía de verdad:
 "que la regla no esconda nada que hoy esté en uso". Tener productos en otro local
 no rompe nada por sí solo — el predicado hace visible al proveedor justamente
@@ -147,10 +157,20 @@ pantalla no vuelva a descartar una respuesta en silencio.
   no sea `grupoId` sobre `Proveedor` pasa igual. Eso solo lo atrapa ejercer la
   consulta contra Postgres. Sigue siendo lo que dice el `CLAUDE.md`.
 - **Los mensajes mudos.** El candado que los prohíbe está acotado a las rutas de
-  comprobantes. Contadas hoy: **18 rutas bajo `app/api/proveedores` y 206 en todo
-  `app/api`** siguen contestando "Error interno". Este arreglo tapó **una**.
-- **Las pantallas que descartan errores.** Se arregló la de proveedores. No se
-  relevó cuántas más hacen lo mismo.
+  comprobantes. Contadas con `git grep -l "Error interno" -- app/api`: **206 en
+  todo `app/api`, de las cuales 18 bajo `app/api/proveedores`**. Este arreglo tapó
+  **una**. Queda anotado en `CLAUDE.md`, donde ya vivía el número viejo —188— que
+  este recuento corrige.
+- **Las pantallas que descartan errores.** Se arregló la de proveedores. **No se
+  relevó cuántas más hacen lo mismo**, y es un conteo pendiente: hay que buscar el
+  patrón en todo el repo y no en el módulo que uno tenga abierto.
+
+**Y un caso que hoy no ocurre pero que la regla habilita**, dicho para que no
+sorprenda: un proveedor creado en el local B que después reciba productos **solo**
+en el local A se vuelve invisible en B. Las tres primeras ramas del predicado
+miran dónde están los productos y la cuarta solo corre cuando no hay ninguno en el
+grupo. Hoy no hay ningún caso así —los 42 tienen sus productos en el mismo
+local—, pero es la forma que tendría el primero.
 
 ## Lo que queda sin verificar
 

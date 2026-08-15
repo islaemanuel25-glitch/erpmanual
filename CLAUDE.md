@@ -185,10 +185,22 @@ donde ninguno de los dos miraba. Cuando un defecto que un candado debería haber
 atrapado igual pasa, la primera pregunta no es si el candado es débil: es si está
 mirando donde el problema ocurre.
 
-Deuda anotada de ese mismo episodio: **188 archivos bajo `app/api` contestan
-"Error interno"**. El candado nuevo cubre solo las rutas del módulo de
-comprobante. Cualquier error de cualquier otro módulo sigue llegando igual de
-mudo, y va a costar otra vuelta en otro lado.
+Deuda anotada de ese mismo episodio, **recontada el 2026-08-14 con
+`git grep -l "Error interno" -- app/api`: son 206 archivos**, no los 188 de
+entonces. El candado que los prohíbe cubre solo las rutas del módulo de
+comprobante, más la de obtener un proveedor, que se agregó al arreglar el
+INC-0006. Cualquier error de cualquier otro módulo sigue llegando igual de mudo.
+Bajo `app/api/proveedores` solo quedan **18**.
+
+Y el episodio del INC-0006 le agregó **una segunda mitad que no estaba escrita**:
+el mensaje no es el único lugar donde un error se vuelve invisible. **La pantalla
+puede descartarlo.** `app/modulos/proveedores/page.jsx` preguntaba por el caso
+bueno y no tenía rama para el malo, así que un 500 se veía exactamente igual que
+un botón que no hace nada — y ahí el mensaje, mudo o elocuente, daba lo mismo.
+
+**No se relevó cuántas pantallas más hacen eso.** Se arregló la de proveedores y
+nada más. Es un conteo pendiente y hay que hacerlo con el criterio de la regla 10:
+buscar el patrón en todo el repo, no en el módulo que uno tiene abierto.
 
 Y un corolario sobre los candados: **la forma del dato de prueba tiene que ser la
 forma del dato real.** Un pie con `total: 0` y un pie sin el campo no son lo
