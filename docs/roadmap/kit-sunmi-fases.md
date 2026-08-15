@@ -3309,6 +3309,82 @@ un cambio de aspecto deja una comparación que no prueba ninguno de los dos.
 
 El análisis ya está hecho y no hace falta rehacerlo: son esas tres líneas.
 
+### ⚑ LAS NOTAS DE ESTE DOCUMENTO SE QUEDAN VIEJAS — EJERCER LA PREMISA PRIMERO
+
+**Dos veces en dos días se empezó a trabajar sobre una nota que ya no era cierta.
+Las dos veces el trabajo era arreglar algo que ya estaba arreglado.**
+
+1. **`w-[137px]`.** Estaba anotado que el contador de hardcodeo no lo veía como
+   medida mágica. Ejercido: **lo ve, y lo vio siempre** — `git log -S` sobre el
+   regex muestra que no se tocó desde que se escribió el contador. El agujero
+   real era otro y más grande: las otras familias de longitud y las unidades
+   relativas, 46 medidas que no se contaban.
+2. **`title` y `type` de `SunmiButtonIcon`.** Estaba anotado que la pieza no los
+   aceptaba. Renderizada: **los dos llegan al `<button>`**, junto con
+   `aria-label`, `disabled` y el `className`. Los recoge el `...resto` que entró
+   en `95ac86e`, y `type="button"` está escrito ANTES del spread, así que un
+   consumidor puede reemplazarlo.
+
+**La forma es siempre la misma:** la nota se escribió cuando era verdad, alguien
+lo arregló en otra tanda, y la nota se quedó. Nadie la actualizó porque nadie
+volvió a mirarla hasta el día en que la usó para planificar.
+
+**En la práctica, y no es opcional: antes de trabajar sobre una nota de este
+documento, EJERCER LA PREMISA.** Es un minuto —un `git log -S`, un render, una
+corrida del script— contra media tanda escribiendo lo que ya estaba escrito. Y lo
+peor no es el tiempo: es que el informe habría dicho "arreglado" sobre algo que no
+se tocó, y el que lo lea después no tiene cómo saberlo.
+
+Vale también al revés: si al ejercerla la premisa resulta cierta, se sigue
+tranquilo. Lo que no se puede es no preguntar.
+
+### ⚑ `SunmiButtonIcon` — FRENADO EN LOS COLORES, medido el 2026-08-15
+
+**No se migró, y el motivo es una medición.** Los tres colores fijos pasarían a
+token, y eso **cambia el aspecto en casi todos los temas**. Medido en el navegador
+sobre seis apariencias, con el control puesto: **hoy los tres se ven idénticos en
+las seis** —ámbar `rgb(252,211,77)`, rojo `rgb(248,113,113)`, gris
+`rgb(148,163,184)`—, así que la comparación mide lo que dice medir.
+
+**DECIDIDO por Emanuel: el ámbar y el rojo NO se migran.** Y los dos motivos son
+distintos, así que van separados:
+
+- **El ámbar no ata nada al tema.** `sunmi-text-warning` es
+  `var(--pos-warning, #f59e0b)` y **`--pos-warning` no está definida en ninguno de
+  los 14 temas** — cae siempre al respaldo. Migrarlo cambiaría el color de
+  `#fcd34d` a `#f59e0b` en los catorce por igual y seguiría igual de fijo que
+  antes. Es cambiar un color a cambio de nada.
+- **El rojo es el token equivocado.** `--pos-danger` está pensado para FONDO de
+  botón —`sunmi-btn-red` lo usa como `background` con el texto en `--app-bg`—, no
+  como color de texto sobre fondo oscuro. Contado sobre los 14: **4 temas
+  conservan `#f87171` y 10 pasan a `#dc2626` o `#ef4444`**, que sobre los fondos
+  oscuros de `operixNight` o `verdeComercio` contrasta MENOS que hoy.
+
+**El gris queda esperando decisión.** `sunmi-text-muted` es el 60 % de `--app-fg`,
+y `--app-fg` tiene **12 valores distintos** entre los 14 temas: en los temas
+claros el ícono pasaría de un gris medio a uno muy oscuro. Probablemente sea una
+mejora —hoy un `slate-400` sobre fondo claro tiene poco contraste— pero es visible
+en las seis pantallas que usan la pieza.
+
+**Y hay una razón de fondo para no migrarla igual:** de los 17 usos, **ninguno le
+pasa `className`**. La negociación por eje no tendría un solo caso real que la
+ejerza, y escribir una pieza para casos imaginarios es justo lo que la regla de
+oro prohíbe.
+
+### ⚑ TANDA DE PALETA — definir `--pos-warning` en los 14 temas
+
+**Decide Emanuel. No es una migración del kit: es una decisión de paleta.**
+
+Hoy `--pos-warning` no existe en ningún tema, así que **todo lo que dice "aviso"
+en la aplicación es el mismo naranja fijo `#f59e0b` en las catorce apariencias**,
+por el respaldo de `var()`. Eso incluye `sunmi-text-warning`,
+`sunmi-state-warning` y los `style={{ color: "var(--pos-warning, #f59e0b)" }}`
+escritos a mano en las pantallas de compras.
+
+Mientras no se defina, cualquier migración a ese token es decorativa. Y está el
+caso ya anotado del **ámbar de aviso contra el acento en el tema naranja**, que es
+la misma pregunta desde el otro lado.
+
 ### Para la fase 4
 
 **LOS CINCO TEMAS OSCUROS LLEGAN A LA FASE 4 CON SU NÚMERO MEDIDO.** El velo se
@@ -3436,11 +3512,56 @@ componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco
 - **Los 9.5 px contra los 10 px del kit.** `SunmiPar` a propósito no lo decide:
   unificar hoy movería una pantalla viva. Se mira cuando las dos estén migradas
   y el cambio se pueda medir en las dos a la vez.
-- **15 de los 19 componentes del kit concatenan el `className` en vez de
-  negociarlo**, y por eso un ancho escrito en la pantalla no se aplica. Eran 16:
-  `SunmiTable` ya está hecho en `db47914` —el primero—, así que **la fase 4 no lo
-  rehace**. Ninguna pieza nueva nace con ese defecto; `lib/sunmi/claseAncho.js` y
-  `lib/sunmi/claseNegociada.js` tienen la forma.
+- **16 componentes del kit concatenan el `className` en vez de negociarlo**, y por
+  eso un ancho escrito en la pantalla no se aplica. `SunmiTable` ya está hecho en
+  `db47914` —el primero—, así que **la fase 4 no lo rehace**. Ninguna pieza nueva
+  nace con ese defecto; `lib/sunmi/claseAncho.js` y `lib/sunmi/claseNegociada.js`
+  tienen la forma.
+
+  **El número decía 15 y son 16**, contado el 2026-08-15 buscando la firma de la
+  concatenación en los `components/sunmi/*.jsx`. No cambia el plan; se corrige
+  para que el que reste no se lleve una sorpresa.
+
+### EL ORDEN DE LA FASE 4, POR COSTO DE VERIFICACIÓN
+
+**Dos filtros antes del costo, y los dos son eliminatorios:**
+
+1. **¿Algún consumidor le pasa `className`?** Si no, la negociación no tiene un
+   caso real que la ejerza. `SunmiButtonIcon` tiene 17 usos y **ninguno** le pasa
+   nada; `SunmiRow`, `SunmiBackButton`, `SunmiPageSizer` y las cinco sin usos,
+   tampoco. Esas nueve no se tocan todavía.
+2. **¿La pieza tiene colores fijos adentro?** Entonces arrastra la decisión de
+   paleta, que es de Emanuel. `SunmiSeparator` —`bg-slate-700`, `text-slate-400`—
+   queda ahí junto con `SunmiButtonIcon`.
+
+**Quedan cinco, y el costo es CUÁNTAS PANTALLAS HAY QUE MIRAR, no cuántos usos
+tiene:**
+
+| pieza | usos | pasan className | archivos |
+|---|---|---|---|
+| `SunmiPanel` | 29 | **29** | **8** |
+| `SunmiTableRow` | 40 | 5 | 29 |
+| `SunmiSelectAdv` | 106 | 39 | 51 |
+| `SunmiCard` | 231 | 147 | 114 |
+| `SunmiButton` | 494 | 248 | 150 |
+
+**El más barato es `SunmiPanel`**, y no por poco: ocho archivos contra
+veintinueve del siguiente, y **los 29 usos le pasan `className`**, así que cada
+pantalla que se abra ejerce la negociación en vez de solo comprobar que no se
+movió nada. Ese es el próximo.
+
+**`SunmiTableRow` engaña**: tiene menos declaraciones que `SunmiPanel` pero está
+repartido en 29 archivos, así que verificarlo cuesta casi cuatro veces más.
+
+**Y el conteo de "pasan className" hubo que rehacerlo dos veces**, que es lo que
+conviene recordar del método. La primera versión cortaba la etiqueta en el primer
+`>` y contaba los `className` de los props con JSX anidado. La segunda reusó
+`etiquetasDeApertura` del contador —que sí acota bien la apertura— y seguía
+contando de más, porque el `className` de un `<div>` adentro de un prop sigue
+estando dentro de la etiqueta. **Lo que hay que mirar son los atributos de PRIMER
+NIVEL**, contando llaves. Con el número malo, `SunmiRow` figuraba con un consumidor
+que le pasa `className` y **no le pasa ninguno**: estuvo a punto de ser elegido
+como la migración más barata.
 
 ## El arnés de captura, y por qué una captura sola no prueba nada
 
