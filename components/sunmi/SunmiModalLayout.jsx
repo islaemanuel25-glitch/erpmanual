@@ -98,7 +98,19 @@ export const OPACIDAD_VELO = 0.92;
 // `flex flex-col` va acá y no en la pantalla, igual que ya lo lleva `cajon` por
 // exactamente la misma razón.
 const FORMAS = {
-  centrado: { capa: "flex items-center justify-center p-3", panel: "", tarjeta: "", altoVa: "cuerpo" },
+  // ── EL TOPE DE `centrado` PASÓ AL CUERPO ➜ A LA TARJETA, Y CON MOTIVO ─────
+  //
+  // Decía `altoVa: "cuerpo"`. Lo cambió la tabla de declaraciones: de los cinco
+  // modales que declaran `alto`, **los cinco lo mandan a la TARJETA** —cuatro con
+  // `altoVa="tarjeta"` y `ModalCambioPrevio` por su forma— y **ninguno al
+  // cuerpo**. Un destino que cero consumidores eligen no es un default.
+  //
+  // Y no es solo estadística: con el tope en el cuerpo, la tarjeta mide el tope
+  // MÁS el encabezado y el pie. Con el default nuevo de 90vh eso se pasaba de la
+  // pantalla — medido, `ModalRol` daba 926 px en una ventana de 900 y arrancaba
+  // en y=−13, con el título y el botón de cerrar afuera. Es exactamente lo que el
+  // comentario de `hoja` ya advertía, y le pasaba igual a `centrado`.
+  centrado: { capa: "flex items-center justify-center p-3", panel: "", tarjeta: "", altoVa: "tarjeta" },
   // Pegada abajo: se redondea arriba y queda recta abajo.
   hoja: {
     capa: "flex flex-col justify-end",
@@ -224,7 +236,7 @@ export default function SunmiModalLayout({
    * `max-h-[92vh] sm:max-h-[88vh]` pasa entero y ningún número de una sola
    * pantalla entra al kit.
    */
-  alto = "max-h-[65vh]",
+  alto = "max-h-[90vh]",
   /**
    * DÓNDE CAE EL `alto`: `"tarjeta"`, `"cuerpo"` o `"ninguno"`.
    *

@@ -2422,6 +2422,32 @@ ningún camino, porque hay pantallas que hoy tocan ese tope de verdad. Cambiar e
 default **es** cambiar esas pantallas. Lo que queda para decidir no es si se
 mueven, sino **cuáles y cuánto**, y eso ya está medido acá arriba.
 
+### APLICADO EL 2026-08-15: el alto va a 90vh con el tope en la TARJETA
+
+Se aplicaron **las dos mitades juntas**, porque una sin la otra rompe: 90vh en el
+CUERPO dejaba a `ModalRol` en 926 px sobre una ventana de 900, arrancando en
+y=−13. El destino también era un default que nadie elegía —los cinco que declaran
+`alto` lo mandan a la tarjeta— así que se movió con él.
+
+**Capturas antes y después en los dos anchos, de los cuatro que tocan el tope más
+dos controles.** Todo con `--repeticiones 3`:
+
+- **A 1366x900 se mueven dos, y las dos entran.** `ModalLocal` **701 → 759** y
+  `ModalRol` **701 → 810 en y=45**, o sea 855 de 900. `ModalGrupo` (583) y
+  `ModalProveedor` (666) no se mueven a este ancho porque no tocaban el tope.
+- **A 360x640 se mueven cuatro, y las cuatro entran.** `ModalGrupo` 550 → 576,
+  `ModalLocal` 532 → 576, `ModalRol` 532 → 576 y `ModalProveedor` 553 → 576. Los
+  cuatro quedan en **576, que es 90vh de 640**, arrancando en y=32: **608 de
+  640**. Ninguno sale de la ventana.
+- **El botón de cerrar queda visible**, comprobado en el más alto —`ModalRol`—:
+  54..90 sobre 640.
+- **Los dos controles no se movieron ni un píxel en ninguno de los dos anchos**:
+  `ModalCategoria` 269 y `ModalOperador` 403, idénticos.
+
+**Los dos candados del default se reescribieron, no se aflojaron**: siguen fijando
+un número y un destino exactos, con el motivo del cambio al lado, para que
+moverlos otra vez vuelva a costar una medición.
+
 ### LOS OTROS DOS DEFAULTS: los dos números de cada camino
 
 **Medido y NO aplicado**, por pedido expreso.

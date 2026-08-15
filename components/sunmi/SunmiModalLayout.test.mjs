@@ -228,7 +228,17 @@ test("EL ALTO ES UNO SOLO, Y SU DESTINO LO DERIVA LA FORMA POR DEFAULT", () => {
     const i = bloque.indexOf(nombre);
     return (bloque.slice(i, bloque.indexOf("}", i)).match(/altoVa:\s*"(\w+)"/) || [])[1];
   };
-  assert.equal(destino("centrado:"), "cuerpo");
+  // ── `centrado` PASÓ DE "cuerpo" A "tarjeta" EL 2026-08-15 ────────────────
+  //
+  // Lo decidió la tabla de declaraciones: de los cinco modales que declaran
+  // `alto`, los CINCO lo mandan a la tarjeta y ninguno al cuerpo. Y no es solo
+  // estadística — con el tope en el cuerpo, la tarjeta mide el tope MÁS el
+  // encabezado y el pie, así que con el default nuevo de 90vh `ModalRol` daba
+  // 926 px en una ventana de 900 y arrancaba en y=−13, con el título afuera.
+  //
+  // El candado no se afloja: sigue exigiendo un destino exacto por forma, y si
+  // alguien lo mueve otra vez tiene que venir con su medición.
+  assert.equal(destino("centrado:"), "tarjeta");
   assert.equal(destino("hoja:"), "tarjeta");
   assert.equal(destino('"hoja-o-centrado"'), "tarjeta");
   // El cajón ya fija su alto con `h-full`: un tope encima sería contradictorio.
@@ -277,8 +287,22 @@ test("LA COLUMNA VIAJA CON EL ALTO, y solo si la forma no la trae", () => {
   assert.match(tarjeta, /columnaEnLaTarjeta/, "se calcula y no se usa");
 });
 
-test("el alto conserva el 65vh de siempre por default", () => {
-  assert.match(SRC, /alto = "max-h-\[65vh\]"/, "cambió el default: eso mueve todos los migrados");
+test("el default del alto es 90vh, y moverlo mueve pantallas", () => {
+  // ── DECÍA 65vh, Y SE CAMBIÓ MIDIENDO ────────────────────────────────────
+  //
+  // `max-h-[65vh]` era un default que **ninguno de los 22 modales elegía**, y ya
+  // había cobrado uno: la migración de `CarritoPedido` lo tomó por no declarar
+  // nada y la hoja quedó a 416 px de alto contra 574 —640 × 0,65—.
+  //
+  // El cambio se verificó con capturas en los dos anchos: a 1366 se mueven dos
+  // —`ModalLocal` 701→759 y `ModalRol` 701→810, las dos entrando— y a 360 se
+  // mueven cuatro, todas quedando en 576, que es 90vh de 640, y todas entrando
+  // en la ventana con su botón de cerrar visible. `ModalCategoria` y
+  // `ModalOperador` no se movieron ni un píxel en ninguno de los dos anchos.
+  //
+  // El candado sigue siendo el mismo candado: fija el número para que cambiarlo
+  // vuelva a costar una medición.
+  assert.match(SRC, /alto = "max-h-\[90vh\]"/, "cambió el default: eso mueve todos los migrados");
   const cuerpo = SRC.slice(SRC.indexOf("flex flex-col ${altoEnElCuerpo}"), SRC.indexOf("{children}"));
   assert.match(cuerpo, /overflow-y-auto/, "el scroll sí sigue clavado: sin él un modal largo empuja la pantalla");
 });
