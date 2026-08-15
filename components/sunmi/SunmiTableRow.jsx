@@ -47,6 +47,14 @@ export default function SunmiTableRow({
 
   return (
     <tr
+      // MARCA INERTE PARA EL ARNÉS. No dibuja nada: deja recortar fila por fila
+      // en vez de fotografiar pantallas enteras. Con 29 archivos consumidores es
+      // lo único que vuelve manejable la verificación.
+      //
+      // No puede ser una clase: la migración toca justamente las clases, y el
+      // selector tiene que encontrar la misma cosa antes y después. Es el mismo
+      // recurso que `data-sunmi-panel` y `data-sunmi-modal="tarjeta"`.
+      data-sunmi-row=""
       onClick={onClick}
       className={`
         text-[12px]
