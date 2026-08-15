@@ -29,6 +29,28 @@
 // Sin `tono` la fila produce exactamente las mismas clases que antes. Las
 // pantallas que ya existen no cambian ni un píxel.
 
+import {
+  declaraCursor,
+  declaraHover,
+  declaraSuperficie,
+  declaraTamanoDeLetra,
+} from "@/lib/sunmi/claseNegociada";
+
+// LA PIEZA NEGOCIA POR EJE EN VEZ DE CONCATENAR.
+//
+// Antes juntaba `text-[12px] ${cursor} ${fondo} ${className}` y dejaba decidir a
+// la hoja de estilos. Hoy no se nota —las cinco declaraciones de sus consumidores
+// piden lo mismo con el mismo valor, o piden un eje que la pieza no toca— pero
+// son clases de la misma familia conviviendo, que es la misma bomba que estalló
+// en `SunmiPanel`: ahí 28 declaraciones nunca se aplicaron y nadie lo supo.
+//
+// Los cuatro ejes que la pieza pone, y quién los declara hoy:
+//   text-[12px]      tamaño de letra   — nadie
+//   cursor-pointer   cursor            — tres consumidores, con el mismo valor
+//   hover:bg-…       fondo del hover   — dos, con el mismo valor
+//   bg-… / sunmi-fila fondo            — nadie
+const TAMANO = "text-[12px]";
+
 export default function SunmiTableRow({
   children,
   selected = false,
@@ -39,11 +61,21 @@ export default function SunmiTableRow({
   /** "ambiente" | "fuerte". Ambiente es lo de siempre. */
   intensidad = "ambiente",
 }) {
-  const fondo = tono
+  // CADA EJE CEDE POR SEPARADO si la pantalla lo declaró.
+  const fondoDelKit = tono
     ? `sunmi-fila sunmi-fila-${tono} sunmi-fila-${intensidad}${selected ? " sunmi-fila-seleccionada" : ""}`
     : selected
       ? "bg-[var(--table-row-hover)]"
       : "hover:bg-[var(--table-row-hover)]";
+
+  // El fondo del kit es de UN eje o del otro según el caso: con `tono` o
+  // `selected` pinta el fondo normal, y sin nada pinta solo el hover. Por eso se
+  // pregunta por el eje que corresponde y no siempre por el mismo.
+  const cedeFondo = tono || selected ? declaraSuperficie(className) : declaraHover(className);
+  const fondo = cedeFondo ? "" : fondoDelKit;
+
+  const tamano = declaraTamanoDeLetra(className) ? "" : TAMANO;
+  const cursor = onClick && !declaraCursor(className) ? "cursor-pointer" : "";
 
   return (
     <tr
@@ -56,12 +88,9 @@ export default function SunmiTableRow({
       // recurso que `data-sunmi-panel` y `data-sunmi-modal="tarjeta"`.
       data-sunmi-row=""
       onClick={onClick}
-      className={`
-        text-[12px]
-        ${onClick ? "cursor-pointer" : ""}
-        ${fondo}
-        ${className}
-      `}
+      className={`${tamano} ${cursor} ${fondo} ${className}`
+        .replace(/\s+/g, " ")
+        .trim()}
     >
       {children}
     </tr>
