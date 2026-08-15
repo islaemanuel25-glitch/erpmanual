@@ -99,16 +99,31 @@ const SIN_PERMISO_A_PROPOSITO = new Map([
   ["contexto-activo/get", "La ubicación activa de la propia sesión."],
   ["grupo-activo/get", "El grupo activo de la propia sesión."],
 
-  // ── LAS SEIS QUE ESPERAN DECISIÓN, del censo del INC-0007 ──────────────────
-  // Contestan con datos y NO se arreglaron: hay que decidir antes si un cajero
-  // puede verlas legítimamente. Están acá para que el candado no las tape ni
-  // frene la suite mientras tanto, y con la marca puesta para poder encontrarlas.
-  ["dashboard/resumen", "PENDIENTE DE DECISIÓN (INC-0007). El dashboard es la portada y hoy no pide ningún permiso."],
-  ["dashboard/ventas-recientes", "PENDIENTE DE DECISIÓN (INC-0007). Idem: entrega las ventas del local en la portada."],
-  ["dashboard/actividad", "PENDIENTE DE DECISIÓN (INC-0007). Idem: entrega ventas y ajustes de stock con su autor."],
-  ["notificaciones/contar", "PENDIENTE DE DECISIÓN (INC-0007). Es la campanita del encabezado, que ve todo el mundo."],
-  ["locales/opciones", "PENDIENTE DE DECISIÓN (INC-0007). Ya recorta al local propio cuando la sesión no es admin."],
-  ["grupos/opciones", "PENDIENTE DE DECISIÓN (INC-0007). Ya recorta al grupo propio cuando la sesión no es admin."],
+  // ── TRES DECIDIDAS: QUEDAN ASÍ (Emanuel, 2026-08-15) ───────────────────────
+  //
+  // No están esperando nada: se miraron y se resolvió que está bien que
+  // contesten. Las tres devuelven el CONTEXTO de quien pregunta, no datos de
+  // otro.
+  ["locales/opciones",
+   "DECIDIDA: queda sin permiso. La ruta ya recorta al local propio cuando la " +
+   "sesión no es admin, así que lo que devuelve es dónde está parado quien " +
+   "pregunta. La lee la portada, que la ven todos los roles."],
+  ["grupos/opciones",
+   "DECIDIDA: queda sin permiso. Mismo caso, con el grupo propio."],
+  ["notificaciones/contar",
+   "DECIDIDA: queda sin permiso. Es la campanita del encabezado, que ve todo el " +
+   "mundo. OJO AL LEERLA: cuenta las notificaciones DEL LOCAL, no las del " +
+   "usuario — le devolvió 16 a un cajero que no tiene ninguna propia. Si algún " +
+   "día se quiere que muestre las de cada uno, lo que cambia es el dato, no el " +
+   "permiso."],
+
+  // ── LAS TRES DEL DASHBOARD, QUE SIGUEN ESPERANDO DECISIÓN ──────────────────
+  // El dashboard es la portada y hoy no pide ningún permiso en el registro del
+  // menú, así que cerrarlas dejaría la pantalla de entrada en blanco. Lo decide
+  // Emanuel.
+  ["dashboard/resumen", "PENDIENTE DE DECISIÓN (INC-0007). Los totales de venta del día."],
+  ["dashboard/ventas-recientes", "PENDIENTE DE DECISIÓN (INC-0007). Las ventas del local con total, forma de pago, cliente y vendedor."],
+  ["dashboard/actividad", "PENDIENTE DE DECISIÓN (INC-0007). Ventas y ajustes de stock, con su autor."],
 
   // ── LAS CINCO DE LA TANDA SIGUIENTE ────────────────────────────────────────
   // Son de las que el censo midió contestando **200 con la lista vacía**, y ése
