@@ -3309,6 +3309,49 @@ un cambio de aspecto deja una comparación que no prueba ninguno de los dos.
 
 El análisis ya está hecho y no hace falta rehacerlo: son esas tres líneas.
 
+### ⚑ REGLA DE MEDICIÓN: UNA MEDICIÓN DE CSS SE HACE EN UNA PANTALLA QUE USE ESAS CLASES
+
+**Y con el control de que la clase sola aplica.** Sin eso, un resultado perfecto
+puede ser de una pantalla donde la clase ni existe.
+
+*El caso, del 2026-08-15, sondeando `SunmiSelectAdv`.* La pregunta era quién gana
+entre el `w-full` de la pieza y el ancho que declara la pantalla. Se midió en
+`/login` y dio **600 px en todos los casos, incluido `!w-44`**.
+
+Eso no cerraba: **un `!important` no puede perder**. El control lo explicó — se
+inyectó `w-44` a secas, sin nada que compitiera, y **también dio 600**. Si la
+clase sola no aplica, es que **no está en la hoja que carga esa página**:
+Turbopack en desarrollo parte el CSS por ruta, así que `/login` no trae las
+utilidades que solo usan otras pantallas.
+
+Repetida en `/modulos/productos/edicion-rapida`, que sí las usa, los controles
+dieron 85, 140 y 154 px por separado y la comparación pasó a significar algo:
+tres declaraciones perdían y tres ganaban por el `!`.
+
+**En la práctica:** medir en una ruta que use esas clases, y agregar SIEMPRE la
+fila de control —la clase sola, sin competencia—. Si el control no da lo que la
+clase declara, la medición no vale y no hay que interpretarla.
+
+### ⚑ LAS TRES SON LA MISMA FAMILIA
+
+Las tres formas de un resultado **perfectamente reproducible y de la pregunta
+equivocada**. Conviene leerlas juntas porque el síntoma es siempre el mismo: sale
+lo que uno esperaba.
+
+1. **El marcador que ya existía.** `altoVa` dio positivo en la imagen VIEJA, o sea
+   en una que no tenía la tanda: el identificador ya vivía en la tabla `FORMAS`.
+   Leído rápido decía "mi cambio viajó".
+2. **La captura determinista de una pantalla de error.** Tres fotos idénticas
+   prueban que no hay ruido; no prueban que la foto sea de lo que uno cree. Una
+   página de error es perfectamente determinista.
+3. **La medición de CSS en una pantalla sin esas clases**, que es la de acá.
+
+**Lo que las tres necesitan es el mismo par:** además de la medición, un control
+que FALLE cuando tiene que fallar. El grep que encuentra algo cuando debe
+encontrarlo, el marcador comprobado contra el commit desplegado, la clase sola que
+aplica, el texto adversario que desborda. **Un control que no puede fallar no es
+un control**, y esta sesión lo pagó cuatro veces.
+
 ### ⚑ REGLA DE MEDICIÓN: UNA COMPARACIÓN DE COLOR SE MIDE DONDE LOS VALORES DIFIEREN
 
 **`sunmiDark` es el tema de siempre y es justo el que iguala los dos lados.** Una
@@ -3570,7 +3613,7 @@ tiene:**
 |---|---|---|---|
 | `SunmiPanel` | 29 | **29** | **8** |
 | `SunmiTableRow` | 40 | 5 | 29 |
-| `SunmiSelectAdv` | 106 | 39 | 51 |
+| `SunmiSelectAdv` | 106 | 39 | 51 | HECHO 2026-08-15 |
 | `SunmiCard` | 231 | 147 | 114 |
 | `SunmiButton` | 494 | 248 | 150 |
 
