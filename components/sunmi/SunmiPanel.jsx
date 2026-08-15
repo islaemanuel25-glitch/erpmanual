@@ -1,6 +1,23 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { tarjetaQueSobrevive, paddingQueSobrevive } from "@/lib/sunmi/claseNegociada";
+
+// LA PIEZA NEGOCIA POR EJE EN VEZ DE CONCATENAR.
+//
+// Antes ponía `${theme.card} rounded-2xl ${padding} ${className}` y dejaba que
+// decidiera la hoja de estilos. Dos clases de Tailwind de la misma familia tienen
+// la misma especificidad, así que no gana la que está última en el atributo sino
+// la que está última en el CSS — o sea, cualquiera.
+//
+// ── EL PADDING VA PARTIDO, Y NO ES UN DETALLE ──────────────────────────────
+//
+// El default era `p-4`, que declara los dos ejes en un solo token, así que no se
+// puede ceder solo la mitad. Se escribe `px-4 py-4`, que en CSS vale exactamente
+// lo mismo, y con eso `paddingQueSobrevive` puede soltar el eje Y y conservar el
+// X. Los cuatro consumidores que declaran `py-3` quedan igual que hoy: 10,5 px
+// arriba y 14 px a los costados, medidos.
+const PADDING = "px-4 py-4";
 
 export default function SunmiPanel({
   children,
@@ -8,8 +25,12 @@ export default function SunmiPanel({
   noPadding = false,
 }) {
   const { theme } = useSunmiTheme();
-  const padding = noPadding ? "" : "p-4";
-  
+  const padding = noPadding ? "" : paddingQueSobrevive(PADDING, className);
+  // La tarjeta del tema son DOS ejes en una cadena —fondo y borde—, así que se
+  // filtra token por token: una pantalla que declara fondo no tiene por qué
+  // perder el borde, que no pidió.
+  const tarjeta = tarjetaQueSobrevive(theme.card, className);
+
   return (
     <div
       // MARCA INERTE PARA EL ARNÉS DE CAPTURAS. No dibuja nada: es un atributo
@@ -31,12 +52,9 @@ export default function SunmiPanel({
       // declaraciones—, así que tiene que ser un atributo propio que valga igual
       // antes y después. Es el mismo recurso que `data-sunmi-modal="tarjeta"`.
       data-sunmi-panel=""
-      className={`
-        ${theme.card}
-        rounded-2xl
-        ${padding}
-        ${className}
-      `}
+      className={`${tarjeta} rounded-2xl ${padding} ${className}`
+        .replace(/\s+/g, " ")
+        .trim()}
     >
       {children}
     </div>

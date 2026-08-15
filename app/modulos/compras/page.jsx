@@ -112,7 +112,7 @@ export default function PanelComprasPage() {
           {cards.map((c) => (
             <SunmiPanel
               key={c.key}
-              className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm flex flex-col gap-2"
+              className="ring-2 ring-inset sunmi-ring shadow-sm flex flex-col gap-2"
             >
               <div className="text-[12px] sunmi-text-muted">{c.titulo}</div>
               {c.valor !== undefined && (

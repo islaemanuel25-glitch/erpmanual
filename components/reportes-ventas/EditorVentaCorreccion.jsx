@@ -569,7 +569,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
           )}
 
           {!cargando && data && bloqueado && (
-            <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+            <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm">
               <div className="sunmi-state-warning sunmi-text-accent rounded p-3 text-sm">
                 No se puede corregir esta venta.{" "}
                 {c.motivoBloqueo === "turno_cerrado_no_corregible" ? "El turno original ya está cerrado."
@@ -583,7 +583,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
           {!cargando && data && !bloqueado && (
             <>
               {/* Metadatos del ticket */}
-              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+              <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
                 {/* 7 campos: en pantallas anchas entran en una sola fila. */}
                 <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 text-sm">
                   <div>
@@ -620,7 +620,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
               </SunmiPanel>
 
               {/* Cliente */}
-              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+              <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
                 <div className="flex items-center justify-between pb-2 mb-3 border-b sunmi-divider">
                   <h3 className="text-[13px] font-semibold sunmi-text-strong">Cliente</h3>
                   <span className="text-xs sunmi-text-muted">{clienteSel ? clienteSel.nombre : "Consumidor final"}</span>
@@ -647,7 +647,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
               </SunmiPanel>
 
               {/* Detalle de productos */}
-              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+              <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
                 <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
                   <h3 className="text-[13px] font-semibold sunmi-text-strong">Detalle ({activas.length} items)</h3>
                 </div>
@@ -711,7 +711,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
               </SunmiPanel>
 
               {/* Agregar producto — bloque inline (patrón "Agregar producto extra") */}
-              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+              <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
                 <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
                   <h3 className="text-[13px] font-semibold sunmi-text-strong">Agregar producto</h3>
                 </div>
@@ -765,7 +765,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
               </SunmiPanel>
 
               {/* Pagos */}
-              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+              <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
                 <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
                   <h3 className="text-[13px] font-semibold sunmi-text-strong">Pagos</h3>
                 </div>
@@ -818,7 +818,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
               </SunmiPanel>
 
               {/* Resumen */}
-              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+              <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="sunmi-text-muted text-xs">Total original</span>
@@ -950,7 +950,7 @@ function RevisionVentaCorreccion({ revision, venta, motivo, setMotivo, confirman
           <span className={`px-2 py-0.5 rounded text-xs font-medium ${ESTADO_BADGE[venta.estado] || ""}`}>{String(venta.estado).toUpperCase()}</span>
         )}
       </div>
-      <SunmiPanel className="sunmi-surface">
+      <SunmiPanel className="">
         <div className="grid grid-cols-2 gap-y-1 gap-x-3 text-[13px]">
           <div><span className="sunmi-text-muted">Ticket </span><span className="font-mono font-semibold">#{venta?.numero ?? venta?.id ?? "—"}</span></div>
           <div className="text-right"><span className="sunmi-text-muted">Versión </span><span className="font-semibold">v{vOrig ?? "—"} → v{vProp ?? "—"}</span></div>
@@ -960,7 +960,7 @@ function RevisionVentaCorreccion({ revision, venta, motivo, setMotivo, confirman
       </SunmiPanel>
 
       {/* 2. Resumen económico */}
-      <SunmiPanel className="sunmi-surface">
+      <SunmiPanel className="">
         <div className="text-[13px] font-semibold mb-2">Resumen económico</div>
         <div className="space-y-1 text-sm">
           <div className="flex justify-between"><span className="sunmi-text-muted">Total anterior</span><span className="tabular-nums">{money(t.totalAnterior)}</span></div>
@@ -993,7 +993,7 @@ function RevisionVentaCorreccion({ revision, venta, motivo, setMotivo, confirman
       </SunmiPanel>
 
       {/* 3. Productos */}
-      <SunmiPanel className="sunmi-surface">
+      <SunmiPanel className="">
         <div className="text-[13px] font-semibold mb-2">Productos</div>
         {sinProductos && <div className="text-[12px] sunmi-text-muted">Sin cambios en los productos.</div>}
         {(dp.agregadas || []).length > 0 && (
@@ -1032,7 +1032,7 @@ function RevisionVentaCorreccion({ revision, venta, motivo, setMotivo, confirman
       {/* 4. Impacto de stock (delta NETO por ProductoLocal; el split vuelven/salen no
              viene separado en revisar — se interpreta por el signo del delta). */}
       {(revision.impactoStock || []).length > 0 && (
-        <SunmiPanel className="sunmi-surface">
+        <SunmiPanel className="">
           <div className="text-[13px] font-semibold mb-2">Impacto de stock</div>
           <div className="space-y-1">
             {(revision.impactoStock || []).map((s, i) => (
@@ -1052,7 +1052,7 @@ function RevisionVentaCorreccion({ revision, venta, motivo, setMotivo, confirman
       )}
 
       {/* 5. Motivo (visible antes de confirmar) */}
-      <SunmiPanel className="sunmi-surface">
+      <SunmiPanel className="">
         <div className="text-[11px] sunmi-text-muted mb-1">Motivo de la corrección *</div>
         <SunmiInput value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Por qué se corrige (obligatorio)" className="text-sm" maxLength={300} />
         {!motivo.trim() && <div className="text-[11px] sunmi-text-danger mt-1">El motivo es obligatorio para confirmar.</div>}

@@ -179,7 +179,7 @@ export default function ReportesStockPage() {
         </div>
 
         {/* Filtros */}
-        <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+        <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
           <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
             <h3 className="text-[13px] font-semibold sunmi-text-strong">
               Filtros

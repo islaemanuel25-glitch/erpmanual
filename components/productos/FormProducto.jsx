@@ -1528,7 +1528,7 @@ export default function FormProducto({
 /** Sección visual — panel con fondo diferenciado y borde visible */
 function Section({ title, children }) {
   return (
-    <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+    <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm">
       <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
         <h3 className="text-[13px] sunmi-section-title">{title}</h3>
       </div>

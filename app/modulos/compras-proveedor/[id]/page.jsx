@@ -448,7 +448,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         </div>
 
         {/* Info del pedido */}
-        <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+        <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="sunmi-text-muted text-xs">Proveedor</span>
@@ -523,7 +523,7 @@ export default function DetallePedidoProveedorPage({ params }) {
 
         {/* Panel factura — editable en ENVIADO, readonly en RECIBIDO */}
         {(esRecepcion || pedido.estado === "RECIBIDO") && (
-          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+          <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
             <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
               <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Factura y ganancia
@@ -632,7 +632,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         )}
 
         {/* Detalle de productos */}
-        <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+        <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
           <div className="flex items-center gap-2 flex-wrap pb-2 mb-3 border-b sunmi-divider">
             <h3 className="text-[13px] font-semibold sunmi-text-strong">
               Detalle ({pedido.detalles?.length || 0} items)
@@ -836,7 +836,7 @@ export default function DetallePedidoProveedorPage({ params }) {
 
         {/* Agregar productos al pedido — visible en BORRADOR y ENVIADO */}
         {(esRecepcion || esBorrador) && (
-          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+          <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
             <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
               <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 {esBorrador ? "Agregar productos al pedido" : "Agregar producto extra"}

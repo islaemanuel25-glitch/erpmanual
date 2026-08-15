@@ -105,7 +105,7 @@ export default function GananciaComprasPage() {
         </div>
 
         {/* Filtros */}
-        <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+        <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label className="block text-xs sunmi-text-muted mb-1">Desde</label>
@@ -160,15 +160,15 @@ export default function GananciaComprasPage() {
                 ${r.gananciaTotal.toFixed(2)}
               </p>
             </SunmiPanel>
-            <SunmiPanel className="sunmi-surface ring-1 sunmi-ring text-center py-3">
+            <SunmiPanel className="ring-1 sunmi-ring text-center py-3">
               <p className="text-xs sunmi-text-muted">Total facturado</p>
               <p className="text-lg font-bold sunmi-text-strong">${r.totalFactura.toFixed(2)}</p>
             </SunmiPanel>
-            <SunmiPanel className="sunmi-surface ring-1 sunmi-ring text-center py-3">
+            <SunmiPanel className="ring-1 sunmi-ring text-center py-3">
               <p className="text-xs sunmi-text-muted">Total real (costo)</p>
               <p className="text-lg font-bold sunmi-text-strong">${r.totalReal.toFixed(2)}</p>
             </SunmiPanel>
-            <SunmiPanel className="sunmi-surface ring-1 sunmi-ring text-center py-3">
+            <SunmiPanel className="ring-1 sunmi-ring text-center py-3">
               <p className="text-xs sunmi-text-muted">Compras recibidas</p>
               <p className="text-lg font-bold sunmi-text-strong">{r.cantidadCompras}</p>
             </SunmiPanel>
@@ -177,7 +177,7 @@ export default function GananciaComprasPage() {
 
         {/* Ranking proveedores */}
         {data?.rankingProveedores?.length > 0 && (
-          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+          <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
             <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
               <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Ranking proveedores
@@ -205,7 +205,7 @@ export default function GananciaComprasPage() {
 
         {/* Tabla detalle compras */}
         {data?.compras && (
-          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+          <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm">
             <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
               <h3 className="text-[13px] font-semibold sunmi-text-strong">
                 Compras recibidas ({data.compras.length})

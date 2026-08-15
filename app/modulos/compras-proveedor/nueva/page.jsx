@@ -1960,7 +1960,7 @@ export default function NuevaCompraProveedorPage() {
         )}
 
         {!proveedorId ? (
-          <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+          <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm">
             <p className="text-[13px] sunmi-text-muted py-10 text-center">
               Seleccioná un proveedor para empezar a armar el pedido.
             </p>
@@ -1969,7 +1969,7 @@ export default function NuevaCompraProveedorPage() {
           <div>
             {/* ── Zona principal: catálogo a todo el ancho ── */}
             <div className="min-w-0">
-              <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+              <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm">
                 {/* Buscador protagonista: fila propia, ancho completo, borde visible */}
                 <div className="relative mb-2">
                   <Search

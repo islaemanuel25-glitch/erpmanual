@@ -216,7 +216,7 @@ export default function SeccionCodigosProveedor({
   };
 
   return (
-    <SunmiPanel className="sunmi-surface ring-2 ring-inset sunmi-ring shadow-sm">
+    <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm">
       <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
         <h3 className="text-[13px] sunmi-section-title">Códigos internos por proveedor</h3>
       </div>
