@@ -117,13 +117,22 @@ const SIN_PERMISO_A_PROPOSITO = new Map([
    "día se quiere que muestre las de cada uno, lo que cambia es el dato, no el " +
    "permiso."],
 
-  // ── LAS TRES DEL DASHBOARD, QUE SIGUEN ESPERANDO DECISIÓN ──────────────────
-  // El dashboard es la portada y hoy no pide ningún permiso en el registro del
-  // menú, así que cerrarlas dejaría la pantalla de entrada en blanco. Lo decide
-  // Emanuel.
-  ["dashboard/resumen", "PENDIENTE DE DECISIÓN (INC-0007). Los totales de venta del día."],
-  ["dashboard/ventas-recientes", "PENDIENTE DE DECISIÓN (INC-0007). Las ventas del local con total, forma de pago, cliente y vendedor."],
-  ["dashboard/actividad", "PENDIENTE DE DECISIÓN (INC-0007). Ventas y ajustes de stock, con su autor."],
+  // ── LAS DOS DEL DASHBOARD QUE QUEDAN ABIERTAS A PROPÓSITO ──────────────────
+  //
+  // DECIDIDO (Emanuel, 2026-08-15): quedan sin permiso HASTA EL REDISEÑO DE
+  // ROLES. No es que estén bien: es que cerrarlas hoy le deja la pantalla de
+  // entrada en blanco al cajero, y el dashboard es la portada —no pide ningún
+  // permiso en el registro del menú—. Se cierran cuando los roles digan qué ve
+  // cada uno al entrar.
+  //
+  // `dashboard/actividad` SÍ se cerró: era control y no caja, y su panel degrada
+  // solo, sin romper el resto de la pantalla.
+  ["dashboard/resumen",
+   "ABIERTA HASTA EL REDISEÑO DE ROLES. Los totales de venta del día; es lo que " +
+   "el cajero ve al entrar."],
+  ["dashboard/ventas-recientes",
+   "ABIERTA HASTA EL REDISEÑO DE ROLES. Las ventas del local con total, forma de " +
+   "pago, cliente y vendedor. Mismo motivo: es la portada."],
 
   // ── LAS CINCO DE LA TANDA SIGUIENTE ────────────────────────────────────────
   // Son de las que el censo midió contestando **200 con la lista vacía**, y ése

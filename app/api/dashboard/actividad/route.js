@@ -1,18 +1,35 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
-import { getUsuarioSession } from "@/lib/auth";
+import { requirePerm } from "@/lib/authorize";
 import { getContextoActivo } from "@/lib/contexto";
+
+// ESTE PANEL ES CONTROL, NO CAJA. Devuelve los movimientos de stock CON SU AUTOR
+// —quién ajustó qué y cuándo— junto a las ventas del local. Es material de
+// supervisión, y por eso deja de servirse con solo estar logueado (INC-0007).
+//
+// EL PERMISO SE ELIGIÓ MIRANDO QUIÉN LO TIENE, no solo qué suena bien.
+// `auditoria.ver` parecía el natural —es una bitácora de quién hizo qué— pero
+// contado contra los roles de producción **lo tiene solo Admin**: DUEÑO_LOCAL,
+// que son los tres usuarios que más operan, no lo tiene, ni ENCARGADO ni
+// Deposito. Cerrarlo solo con ése le sacaba el panel a todos menos a uno.
+//
+// Va junto con `stock.ver`, que es lo que sí tienen los cuatro roles de control
+// —Admin, ENCARGADO, Deposito y DUEÑO_LOCAL— y además es exactamente el permiso
+// del contenido: movimientos de stock. Ninguno de los dos lo tienen CAJERO ni
+// Mini, que es lo que se quería.
+const PERMISO_VER_ACTIVIDAD = ["auditoria.ver", "stock.ver"];
 
 export async function GET(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
+    const auth = requirePerm(req, PERMISO_VER_ACTIVIDAD);
+    if (!auth.ok) {
       return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
+        { ok: false, error: auth.error },
+        { status: auth.status }
       );
     }
+    const session = auth.session;
 
     const contexto = getContextoActivo(req, session);
     if (contexto.needsContexto) {

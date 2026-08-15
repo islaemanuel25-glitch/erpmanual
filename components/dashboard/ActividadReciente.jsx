@@ -33,7 +33,7 @@ function formatFechaCorta(fecha) {
   );
 }
 
-export default function ActividadReciente({ actividad = [], cargando = false }) {
+export default function ActividadReciente({ actividad = [], cargando = false, sinPermiso = false }) {
   const [ventaIdAbierta, setVentaIdAbierta] = useState(null);
   const cardClass = "p-4 border border-current/[0.06] shadow-sm";
 
@@ -46,6 +46,23 @@ export default function ActividadReciente({ actividad = [], cargando = false }) 
         <div className="flex items-center justify-center py-6 sunmi-text-muted">
           <Clock size={20} className="animate-spin" />
         </div>
+      </SunmiCard>
+    );
+  }
+
+  // SIN PERMISO NO ES LO MISMO QUE SIN ACTIVIDAD, y hay que decirlo antes de
+  // mirar el largo de la lista: para un rol sin `stock.ver` la lista siempre
+  // llega vacía, y "Sin actividad reciente" le estaría diciendo que en el local
+  // no pasó nada cuando lo que pasa es que no lo puede ver.
+  if (sinPermiso) {
+    return (
+      <SunmiCard className={cardClass}>
+        <h3 className="text-sm font-semibold mb-3 opacity-70">
+          Actividad reciente
+        </h3>
+        <p className="text-sm sunmi-text-muted py-4 text-center">
+          Tu rol no incluye ver la actividad del local.
+        </p>
       </SunmiCard>
     );
   }

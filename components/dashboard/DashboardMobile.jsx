@@ -18,6 +18,7 @@ export default function DashboardMobile({
   cargandoResumen,
   cargandoVentas,
   cargandoActividad,
+  sinPermisoActividad,
   errorCarga,
 }) {
   const { theme } = useSunmiTheme();
@@ -98,7 +99,7 @@ export default function DashboardMobile({
       </div>
 
       <UltimasVentas ventas={ventas} cargando={cargandoVentas} />
-      <ActividadReciente actividad={actividad} cargando={cargandoActividad} />
+      <ActividadReciente actividad={actividad} cargando={cargandoActividad} sinPermiso={sinPermisoActividad} />
     </div>
   );
 }

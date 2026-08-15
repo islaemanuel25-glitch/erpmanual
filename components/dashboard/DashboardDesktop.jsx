@@ -33,6 +33,7 @@ export default function DashboardDesktop({
   cargandoResumen,
   cargandoVentas,
   cargandoActividad,
+  sinPermisoActividad,
   errorCarga,
 }) {
   const { theme } = useSunmiTheme();
@@ -156,7 +157,7 @@ export default function DashboardDesktop({
         </div>
       </div>
 
-      <ActividadReciente actividad={actividad} cargando={cargandoActividad} />
+      <ActividadReciente actividad={actividad} cargando={cargandoActividad} sinPermiso={sinPermisoActividad} />
     </div>
   );
 }

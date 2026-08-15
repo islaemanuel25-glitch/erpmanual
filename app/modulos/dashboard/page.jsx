@@ -20,6 +20,10 @@ export default function DashboardPage() {
   const [cargandoVentas, setCargandoVentas] = useState(true);
   const [cargandoActividad, setCargandoActividad] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
+  // Estado propio, y no una rama de `errorCarga`: "no tengo permiso" y "no se
+  // pudo cargar" son dos hechos distintos y comparten pantalla. Es la misma
+  // razón por la que `proveedores/page.jsx` terminó con dos estados de error.
+  const [sinPermisoActividad, setSinPermisoActividad] = useState(false);
 
   useEffect(() => {
     if (menuMode === "launcher") {
@@ -64,8 +68,21 @@ export default function DashboardPage() {
     if (actRes.status === "fulfilled" && actRes.value.ok) {
       const data = await actRes.value.json();
       if (data.ok) setActividad(data.actividad);
+      setSinPermisoActividad(false);
+    } else if (actRes.status === "fulfilled" && actRes.value.status === 403) {
+      // NO ES UNA FALLA: es el permiso. Desde el INC-0007 esta ruta pide
+      // `auditoria.ver` o `stock.ver`, así que un cajero no la ve — y el resto
+      // del dashboard sí carga.
+      //
+      // Si esto cayera en el `else` de abajo, la pantalla entera mostraría
+      // "No se pudieron cargar los datos. Verificá la conexión", que es rojo,
+      // alarmante y falso. Es la misma familia que el mensaje mudo del INC-0006:
+      // un error que señala al lugar equivocado.
+      setSinPermisoActividad(true);
+      setActividad([]);
     } else {
       hayError = true;
+      setSinPermisoActividad(false);
       if (actRes.status === "fulfilled" && actRes.value.status === 409) esContexto = true;
     }
     setCargandoActividad(false);
@@ -102,6 +119,7 @@ export default function DashboardPage() {
         cargandoResumen={cargandoResumen}
         cargandoVentas={cargandoVentas}
         cargandoActividad={cargandoActividad}
+        sinPermisoActividad={sinPermisoActividad}
         errorCarga={errorCarga}
       />
       <DashboardDesktop
@@ -112,6 +130,7 @@ export default function DashboardPage() {
         cargandoResumen={cargandoResumen}
         cargandoVentas={cargandoVentas}
         cargandoActividad={cargandoActividad}
+        sinPermisoActividad={sinPermisoActividad}
         errorCarga={errorCarga}
       />
     </div>
