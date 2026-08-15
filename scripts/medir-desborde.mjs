@@ -103,6 +103,7 @@ const ABRIR_SELECTOR = arg("abrir-selector", null);
 //   { "escribir": "<selector>", "texto": "ma" }   escribe en un input
 //   { "tocar": "<selector>" }                     toca un nodo
 //   { "esperar": "<selector>" }                   espera a que exista
+//   { "tecla": "Escape" }                         manda una tecla al documento
 //
 // `escribir` usa el setter nativo del prototipo y después emite el evento: poner
 // `.value` a secas NO dispara el `onChange` de React, así que el paso parecería
@@ -312,6 +313,20 @@ for (const [i, paso] of PASOS.entries()) {
       process.exit(1);
     }
     console.log(`${n}: apareció ${paso.esperar}`);
+    continue;
+  }
+
+  if (paso.tecla) {
+    // Va al DOCUMENTO y no a un nodo: el cierre con teclado del kit escucha ahí,
+    // y mandársela a un elemento probaría otro camino que el real.
+    await evaluar(`(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", {
+        key: ${JSON.stringify(paso.tecla)}, bubbles: true, cancelable: true,
+      }));
+      return true;
+    })()`);
+    console.log(`${n}: tecla ${paso.tecla}`);
+    await sleep(1200);
     continue;
   }
 

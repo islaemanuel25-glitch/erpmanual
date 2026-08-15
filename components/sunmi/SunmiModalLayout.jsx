@@ -38,6 +38,7 @@
 // los cuatro usos actuales tienen que verse idénticos. Las formas nuevas cambian
 // dónde se para el panel, no de qué está hecho.
 
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
@@ -55,6 +56,21 @@ import { declaraAnchoMaximo } from "@/lib/sunmi/claseNegociada";
 // El detalle está en `docs/roadmap/kit-sunmi-fases.md`.
 export const COLOR_VELO = "color-mix(in srgb, black 70%, var(--app-bg))";
 export const OPACIDAD_VELO = 0.92;
+
+/**
+ * LA PILA DE MODALES ABIERTOS. Existe para una sola pregunta: con dos modales a
+ * la vez, **`Escape` tiene que cerrar el de arriba y no los dos**.
+ *
+ * Un escucha por modal sobre `document` los recibe TODOS, así que sin pila las
+ * dos capas se cerrarían con una sola tecla. Con pila, cada modal solo actúa si
+ * es el último que se abrió.
+ *
+ * Es una lista a nivel de módulo y no un contexto de React a propósito: los
+ * modales se montan por PORTAL en el `body`, así que uno anidado no
+ * necesariamente es descendiente del otro en el árbol de React, y un contexto
+ * no los vería. El orden de apertura sí los ordena bien.
+ */
+const PILA = [];
 
 /**
  * Dónde se para el panel, por forma. La capa y el panel se deciden juntos.
@@ -393,6 +409,47 @@ export default function SunmiModalLayout({
   "aria-labelledby": ariaLabelledBy,
   role = "dialog",
 }) {
+  // ── `Escape` SIGUE LA MISMA REGLA QUE EL VELO ─────────────────────────────
+  //
+  // Cierra donde el velo cierra, y NO cierra donde la pantalla declara
+  // `destructivo`. No es una categoría nueva: `destructivo` existe para que un
+  // clic afuera no tire un formulario escrito, y **`Escape` es el mismo
+  // accidente por otra tecla**. La decisión ya está tomada en las 23
+  // declaraciones que hay; acá no se vuelve a preguntar.
+  //
+  // Hoy son **16 las que lo declaran y 7 las que no**, así que Escape va a
+  // cerrar esas 7 y a no hacer nada en las otras 16.
+  //
+  // El efecto va ANTES del `if (!open)`: un hook no puede quedar detrás de un
+  // retorno temprano. Quien decide si hay algo que escuchar es el `if` de
+  // adentro.
+  useEffect(() => {
+    if (!open) return undefined;
+
+    // La marca identifica a ESTE modal en la pila. Un objeto vacío alcanza y no
+    // puede colisionar con el de otro, que es lo único que se le pide.
+    const marca = {};
+    PILA.push(marca);
+
+    const alTeclado = (evento) => {
+      if (evento.key !== "Escape") return;
+      // Solo el de arriba contesta. Los de abajo no hacen nada — ni siquiera
+      // cuando el de arriba es `destructivo` y decide no cerrarse: si no,
+      // Escape se "caería" al de atrás, que es peor que no hacer nada.
+      if (PILA[PILA.length - 1] !== marca) return;
+      if (destructivo || typeof onClose !== "function") return;
+      evento.stopPropagation();
+      onClose();
+    };
+
+    document.addEventListener("keydown", alTeclado);
+    return () => {
+      document.removeEventListener("keydown", alTeclado);
+      const i = PILA.indexOf(marca);
+      if (i > -1) PILA.splice(i, 1);
+    };
+  }, [open, destructivo, onClose]);
+
   if (!open) return null;
 
   const f = FORMAS[forma] ?? FORMAS.centrado;

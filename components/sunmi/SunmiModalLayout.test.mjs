@@ -347,6 +347,78 @@ function sinDeclararlo(consumidores, prop) {
   return faltan;
 }
 
+// ── `Escape` SIGUE LA MISMA REGLA QUE EL VELO ──────────────────────────────
+
+test("ESCAPE Y EL VELO DECIDEN CON LO MISMO", () => {
+  // ── QUÉ AFIRMA, Y POR QUÉ NO ES DECORATIVO ────────────────────────────────
+  //
+  // `destructivo` existe para que un clic afuera no tire un formulario escrito.
+  // `Escape` es el mismo accidente por otra tecla, así que tiene que decidir con
+  // lo mismo: cierra donde el velo cierra y no cierra donde el velo no cierra.
+  //
+  // Si alguien le agrega una condición propia a uno de los dos, las 23 pantallas
+  // pasan a tener DOS reglas y ninguna declaración que las distinga — que es
+  // exactamente la clase de cosa que después nadie encuentra.
+  //
+  // ── EL ANCLA ──────────────────────────────────────────────────────────────
+  //
+  // Se ancla en los nombres —`cierraElVelo`, `PILA`, `marca`— y NO en un
+  // `return (` ni en un número de línea. Ya nos pasó: el candado del `z`
+  // delimitaba con `indexOf("return (")` y el día que la capa se mudó a una
+  // constante se puso en rojo sin que nada de lo que afirmaba se hubiera roto.
+  // Y si estos nombres se mudan, los `assert.notEqual` de abajo lo dicen con
+  // todas las letras en vez de dejar pasar un vacío.
+  // ── Y SE MIRA EL CÓDIGO, NO LOS COMENTARIOS ───────────────────────────────
+  //
+  // La primera versión de este candado daba VERDE con el chequeo de
+  // `destructivo` sacado: encontraba la palabra en un comentario de tres líneas
+  // más arriba. Es el mismo defecto que ya cobró dos veces —un contador que
+  // sumaba por un comentario, y otro candado que se anclaba a un texto— y acá lo
+  // atrapó la contraprueba, que para eso está. Sin ejercer la versión mala, el
+  // candado habría quedado escrito, en verde, y sin afirmar nada.
+  const sinComentarios = (t) => t.replace(/\/\/[^\n]*/g, "");
+
+  const iVelo = SRC.indexOf("const cierraElVelo");
+  assert.notEqual(iVelo, -1, "se movió `cierraElVelo`: reanclar este candado, no borrarlo");
+  const velo = sinComentarios(SRC.slice(iVelo, SRC.indexOf("\n", iVelo)));
+
+  const iEsc = SRC.indexOf("const alTeclado");
+  assert.notEqual(iEsc, -1, "se movió el escucha de teclado: reanclar este candado, no borrarlo");
+  const escape = sinComentarios(SRC.slice(iEsc, SRC.indexOf("document.addEventListener", iEsc)));
+
+  // Los dos miran EXACTAMENTE los mismos dos datos, y ninguno mira nada más.
+  for (const [nombre, bloque] of [["el velo", velo], ["Escape", escape]]) {
+    assert.match(bloque, /destructivo/, `${nombre} dejó de mirar \`destructivo\``);
+    assert.match(bloque, /onClose/, `${nombre} dejó de mirar \`onClose\``);
+  }
+  // Y que Escape no se haya inventado una tercera condición: las únicas palabras
+  // del kit que puede nombrar son esas dos, más las de la pila.
+  const inventadas = (escape.match(/\b(forma|alto|altoVa|z|encabezado|footer|subtitle|title)\b/g) || []);
+  assert.deepEqual(
+    inventadas,
+    [],
+    `Escape se ganó una condición propia que el velo no tiene: ${inventadas.join(", ")}`
+  );
+});
+
+test("ESCAPE CIERRA EL DE ARRIBA, NO LOS DOS", () => {
+  // Con dos modales abiertos, un escucha por modal sobre `document` los recibe
+  // TODOS. Sin la pila, una sola tecla cerraría las dos capas.
+  //
+  // Ejercido con `app/andamio-escape`: abiertos los dos y mandando una sola
+  // tecla, el de arriba se cierra y el de abajo queda. Este candado fija el
+  // mecanismo que lo consigue.
+  assert.match(SRC, /const PILA = \[\]/, "desapareció la pila de modales abiertos");
+  assert.match(
+    SRC,
+    /if \(PILA\[PILA\.length - 1\] !== marca\) return;/,
+    "se fue el chequeo de 'solo el de arriba contesta': Escape vuelve a cerrar los dos"
+  );
+  // Y que la pila se limpie: sin el `splice` del cleanup, un modal cerrado
+  // seguiría siendo el 'de arriba' y taparía al que quede abierto.
+  assert.match(SRC, /PILA\.splice\(i, 1\)/, "la pila no se limpia al cerrar");
+});
+
 test("`espacioCuerpo` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
   // ── POR QUÉ SE LE SACÓ ────────────────────────────────────────────────────
   //

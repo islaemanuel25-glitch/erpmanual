@@ -1927,6 +1927,41 @@ Tres arreglos que no eran el objetivo y salieron de mirar de cerca:
 Y una regla que sirve para todo el proyecto: **un default que ningún consumidor
 elige se saca o se cambia, no se deja.**
 
+### LOS CUATRO SUBTÍTULOS — FRENADOS POR DATOS, con lo decidido escrito
+
+**2026-08-15. Ninguno de los cuatro se puede abrir hoy**, comprobado ejecutando:
+`/modulos/proveedores/listas` dice "Todavía no importaste ninguna lista" —así que
+`ModalRevertir` y `ModalTerminar` quedan afuera— y no hay ningún comprobante
+cargado en los tres pedidos que existen, con el agravante de que **el volumen de
+imágenes no está configurado en esta máquina**, así que ni subiendo uno se
+destraba sin montar eso primero.
+
+**No se fabricó ninguna condición.** Se destraban el día que haya una lista
+importada o un comprobante subido.
+
+**Lo que ya está decidido, para cuando se destrabe:**
+
+- **De `ModalTerminar` se corta la PRIMERA ORACIÓN del subtítulo.** "Se cierra el
+  trabajo sobre esta lista" es el título —"Terminar esta importación"— con otras
+  palabras, y por ese mismo criterio se borraron los de `ModalLocal` y
+  `ModalUsuario`. **Queda solo "No se toca ningún costo"**, que es información
+  nueva y además es lo que lo distingue de `ModalRevertir`.
+- **Los otros tres se encienden tal cual están.** Ninguno repite su título:
+  el de borrar comprobante dice **cuál** comprobante —su `subtitle` es
+  `identidad(borrando)`, una función, y lo que produce es `"FACTURA A
+  0001-00012345"` o `"Sin número todavía"`, leído por lo que RENDERIZA y no por
+  el nombre de la variable—; el de la factura nueva dice **cuándo y con qué**
+  contestar; y el de `ModalRevertir` nombra **qué se toca**, los productos y el
+  costo.
+- **El subtítulo cuesta +31 px de alto**, medido. Como los cuatro están cerrados,
+  se midió prestando `ModalCategoria` —que no toca el tope— y pasándole el
+  subtítulo más largo de los cuatro: la tarjeta pasa de **253 a 284 px**, igual a
+  1366 y a 360, y a 360 el texto envuelve en **dos renglones** sin pisar el botón
+  de cerrar. Es el costo de la pieza, no de esas pantallas.
+
+**Lo que queda sin medir:** si alguno de los cuatro toca su tope de alto al
+sumarle los 31 px. Sin poder abrirlos no se sabe.
+
 ### EL PRIMER PASO DE LA FASE 5
 
 **Los cuatro subtítulos que quedan vivos y no se dibujan.** `PanelComprobantes`
@@ -1941,6 +1976,67 @@ migradas, y cierra una deuda que esta fase abrió y no pagó.
 
 **Y detrás de eso, la deuda más vieja: que `Escape` no cierra ningún modal.** El
 kit nunca lo implementó. Eso sí es comportamiento nuevo en las 22.
+
+## `Escape` — HECHO el 2026-08-15
+
+**La regla no es nueva: `Escape` sigue la misma que el velo.** Cierra donde el
+velo cierra, y no cierra donde la pantalla declara `destructivo`. Ese prop existe
+para que un clic afuera no tire un formulario escrito, y **`Escape` es el mismo
+accidente por otra tecla**. No se inventó una tercera categoría ni se preguntó
+pantalla por pantalla: la declaración ya estaba escrita.
+
+**Los dos números, contados antes de escribir el comportamiento: de los 23
+modales —subió de 22 porque `ModalProductoFinal` entró en la tanda anterior—,
+**16 declaran `destructivo` y 7 no**. O sea que Escape cierra 7 y no hace nada en
+16.
+
+Los 7 que cierran: el "Historial de Ventas" de clientes, `ModalEnviarPedido`, los
+dos de `PanelComprobantes`, `ModalPreviewPrecio`, `ModalVerComposicion` y
+`ModalCodigosProveedor`.
+
+### Ejercido en las dos direcciones, con captura
+
+- **`ModalCodigosProveedor`**, que NO declara `destructivo`: **cierra**. La
+  captura muestra el listado de proveedores sin ninguna capa.
+- **`ModalRol`**, que sí lo declara: **no cierra**. La tarjeta sigue ahí después
+  de la tecla —504x810, la misma caja de antes— y la captura salió determinista
+  con `--repeticiones 3`.
+
+### Dos modales a la vez
+
+**El caso que había que mirar no era del kit.** El detalle de `HistorialDia` son
+**dos capas hechas a mano**, una en `z-50` y el detalle en `z-[60]`, así que el
+cierre con teclado del kit no las toca — ni antes ni después.
+
+Y como en el sistema **no hay hoy ningún lugar con dos modales del kit abiertos a
+la vez**, la garantía habría quedado escrita y sin ejercer. Se armó
+`app/andamio-escape` con dos, sin datos de ningún tipo, y **una sola tecla cerró
+el de arriba y dejó el de abajo abierto**, comprobado en la captura.
+
+El mecanismo es una **pila a nivel de módulo**: cada modal se anota al abrirse y
+solo contesta si es el último. Es una lista y no un contexto de React a propósito
+—los modales se montan por portal en el `body`, así que uno anidado no
+necesariamente es descendiente del otro en el árbol—.
+
+Y una decisión que conviene tener escrita: **si el de arriba es `destructivo`,
+Escape no hace nada y NO se cae al de atrás.** Cerrar el de abajo cuando la
+persona quiso cerrar el de arriba es peor que no hacer nada.
+
+### El candado, y la contraprueba que lo corrigió
+
+**La primera versión daba VERDE con el chequeo de `destructivo` sacado**, porque
+encontraba la palabra en un comentario tres líneas más arriba. Es la tercera vez
+del mismo defecto en este proyecto —un contador que sumaba por un comentario, un
+candado anclado a un texto— y esta vez **lo atrapó la contraprueba**. Sin ejercer
+la versión mala, el candado habría quedado escrito, en verde y sin afirmar nada.
+
+Corregido: el candado **saca los comentarios antes de mirar**. Y se ancla en los
+nombres —`cierraElVelo`, `PILA`, `marca`— y no en un `return (`, que ya se mudó
+una vez.
+
+Contraprueba hecha con **cuatro mutaciones, y las cuatro se detectan**: sacar el
+chequeo de `destructivo`, sacar el de la pila, sacar el `splice` que la limpia, y
+mudar el ancla.
 
 ## ⚑ `backdrop-filter` CREA BLOQUE CONTENEDOR PARA LOS `fixed` DESCENDIENTES
 
