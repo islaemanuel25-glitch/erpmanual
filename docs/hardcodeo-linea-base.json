@@ -1,10 +1,10 @@
 {
   "_lea_esto": "Línea de base del hardcodeo. La genera scripts/hardcodeo.mjs --linea-base. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
-  "generada": "2026-08-15 01:50",
-  "commit": "cc1453e78a28b2f2a65256ba7619fe7be0d4ef40",
+  "generada": "2026-08-15 18:35",
+  "commit": "6cb3d5cba8bf36639d2eaaf932bf9f34e6cf3b5c",
   "total": {
     "color": 286,
-    "medida": 1849,
+    "medida": 1895,
     "modal": 36,
     "crudo": 318,
     "celda": 465,
@@ -14,7 +14,7 @@
   "porPantalla": {
     "(kit)": {
       "color": 32,
-      "medida": 32,
+      "medida": 34,
       "modal": 1,
       "crudo": 0,
       "celda": 0,
@@ -41,7 +41,7 @@
     },
     "auditoria-pos-ventas": {
       "color": 43,
-      "medida": 187,
+      "medida": 189,
       "modal": 0,
       "crudo": 13,
       "celda": 61,
@@ -50,7 +50,7 @@
     },
     "auth": {
       "color": 2,
-      "medida": 0,
+      "medida": 1,
       "modal": 0,
       "crudo": 0,
       "celda": 0,
@@ -59,7 +59,7 @@
     },
     "caja": {
       "color": 0,
-      "medida": 59,
+      "medida": 63,
       "modal": 1,
       "crudo": 9,
       "celda": 0,
@@ -77,7 +77,7 @@
     },
     "clientes": {
       "color": 26,
-      "medida": 64,
+      "medida": 69,
       "modal": 0,
       "crudo": 29,
       "celda": 54,
@@ -95,7 +95,7 @@
     },
     "compras-proveedor": {
       "color": 21,
-      "medida": 187,
+      "medida": 190,
       "modal": 4,
       "crudo": 21,
       "celda": 26,
@@ -104,7 +104,7 @@
     },
     "comprobantes": {
       "color": 0,
-      "medida": 0,
+      "medida": 1,
       "modal": 0,
       "crudo": 0,
       "celda": 7,
@@ -113,7 +113,7 @@
     },
     "configuracion": {
       "color": 9,
-      "medida": 18,
+      "medida": 19,
       "modal": 1,
       "crudo": 1,
       "celda": 6,
@@ -158,7 +158,7 @@
     },
     "layout": {
       "color": 10,
-      "medida": 27,
+      "medida": 28,
       "modal": 2,
       "crudo": 5,
       "celda": 0,
@@ -176,7 +176,7 @@
     },
     "locales": {
       "color": 3,
-      "medida": 3,
+      "medida": 4,
       "modal": 0,
       "crudo": 0,
       "celda": 7,
@@ -185,7 +185,7 @@
     },
     "notificaciones": {
       "color": 1,
-      "medida": 21,
+      "medida": 23,
       "modal": 1,
       "crudo": 9,
       "celda": 0,
@@ -203,7 +203,7 @@
     },
     "operadores": {
       "color": 2,
-      "medida": 4,
+      "medida": 5,
       "modal": 0,
       "crudo": 1,
       "celda": 4,
@@ -221,7 +221,7 @@
     },
     "pos-transferencias": {
       "color": 2,
-      "medida": 119,
+      "medida": 120,
       "modal": 0,
       "crudo": 29,
       "celda": 15,
@@ -230,7 +230,7 @@
     },
     "pos-ventas": {
       "color": 37,
-      "medida": 136,
+      "medida": 140,
       "modal": 17,
       "crudo": 63,
       "celda": 16,
@@ -239,7 +239,7 @@
     },
     "productos": {
       "color": 44,
-      "medida": 192,
+      "medida": 193,
       "modal": 1,
       "crudo": 30,
       "celda": 95,
@@ -248,7 +248,7 @@
     },
     "proveedores": {
       "color": 1,
-      "medida": 309,
+      "medida": 323,
       "modal": 0,
       "crudo": 35,
       "celda": 39,
@@ -275,7 +275,7 @@
     },
     "roles": {
       "color": 0,
-      "medida": 0,
+      "medida": 1,
       "modal": 0,
       "crudo": 0,
       "celda": 3,
@@ -320,7 +320,7 @@
     },
     "usuarios": {
       "color": 6,
-      "medida": 5,
+      "medida": 6,
       "modal": 0,
       "crudo": 0,
       "celda": 7,
