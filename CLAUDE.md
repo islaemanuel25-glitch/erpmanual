@@ -312,6 +312,31 @@ todas en verde. La mudanza abrió esa grieta y solo se vio releyendo.
 En la práctica: `git grep` el nombre del archivo mudado en los `*.test.mjs`, y
 releer cada uno preguntando qué afirma HOY, no si pasa.
 
+**Y EL PRIMO HERMANO, QUE YA VA POR LA TERCERA VEZ: UN CANDADO QUE BUSCA TEXTO
+ENCUENTRA LOS COMENTARIOS.** No es el caso de arriba —ahí el patrón se mudaba—:
+acá el patrón está, pero **en prosa**, y el candado lo toma por código.
+
+Las tres, para que se reconozca la forma:
+
+1. **El contador de hardcodeo subió +1** por un comentario que nombraba la clase
+   de la capa de un modal. Falso positivo: molesta y se ve.
+2. **Un candado de la pantalla de proveedores dio ROJO** señalando una línea que
+   estaba adentro de un comentario. Falso positivo otra vez.
+3. **El candado de `Escape` dio VERDE con el chequeo de `destructivo` sacado**,
+   porque encontraba la palabra en un comentario tres líneas más arriba.
+
+**La tercera es la peligrosa y las dos primeras no lo eran.** Un falso positivo
+frena y se mira; un falso VERDE deja el candado escrito, en la suite, afirmando
+nada. Y no se distingue leyéndolo: se ve igual que uno que funciona.
+
+Lo que las separa: **un candado que mira código tiene que sacar los comentarios
+antes de mirar.** Una línea —`texto.replace(/\/\/[^\n]*/g, "")`— y el problema se
+va para los tres casos.
+
+Y lo que lo atrapó no fue leer el candado: **fue la contraprueba.** Romper a
+propósito lo que el candado dice defender es lo único que distingue un candado
+que afirma de uno que acompaña. Por eso no es opcional.
+
 ### 6. Scripts que tocan la base
 
 Ver la sección **"Scripts que tocan la base"** más abajo, que tiene las reglas
