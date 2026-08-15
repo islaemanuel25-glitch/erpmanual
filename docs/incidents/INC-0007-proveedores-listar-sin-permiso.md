@@ -1,10 +1,11 @@
 # INC-0007 — `proveedores/listar` le entrega la lista completa a un rol que no tiene el permiso
 
 **Fecha:** 2026-08-15
-**Estado:** **ABIERTO.** Medido y no arreglado, por pedido expreso: era una
-medición, y taparlo en la misma tanda habría impedido ver el tamaño del problema.
-**Alcance:** `app/api/proveedores/listar`. **La ruta está igual en el commit que
-corre hoy en producción.**
+**Estado:** **arreglado en local el 2026-08-15, sin desplegar todavía.** Trece de
+las diecinueve del censo cierran; seis esperan una decisión y están listadas
+abajo. **Las diecinueve están igual en el commit que corre hoy en producción.**
+**Alcance:** empezó en `app/api/proveedores/listar` y el censo lo llevó a 19
+rutas.
 
 ## La causa, en una línea
 
@@ -142,6 +143,74 @@ elegida, igual que en los otros dos.
   —116 POST, 17 PUT, 1 PATCH, 14 DELETE— repartidas en 142 archivos, 122 de los
   cuales no tienen GET.
 - **Nada contra producción.** Todo contra `erpazul_dev`.
+
+## EL ARREGLO — y la prueba es el censo, no el diff
+
+Se volvieron a pedir **las 147** con la misma cookie de CAJERO. **Las que cierran
+pasaron de 103 a 117**, y las trece arregladas pasaron de 200 a **403 nombrando el
+permiso que falta**. Dos controles al lado: **ninguna que antes cerraba contesta
+ahora**, y **el admin sigue recibiendo 200 en las catorce** —o sea que se cerró la
+puerta, no se rompió la ruta—.
+
+**Cada permiso salió del módulo y del consumidor real**, buscado con `git grep`.
+Eso corrigió tres elecciones que habrían roto pantallas:
+
+- **`locales/[id]` iba a ir con `requireAdmin`**, como su PUT y su DELETE. La
+  llaman el POS —con su propio local— y `pos-transferencias/nueva` con el origen y
+  el destino, así que va con el permiso de esas pantallas.
+- **`operador/listar` iba a ir con `config_local.operadores`**, que es lo que usan
+  sus cinco hermanas. Habría roto el selector de operario del POS: **quien opera la
+  caja no administra operarios.** Va el par con `pos.usar`.
+- **`config/pos-ventas-cliente`** la lee el POS para saber si exige cliente y
+  operario antes de cobrar. Mismo par.
+
+**Las cuatro que tenían el chequeo en otro handler llevan el suyo EN EL GET**, sin
+reaprovechar el del POST.
+
+**Y apareció algo que el censo no había medido:** con la sesión del CAJERO del
+local 1, **`/api/locales/2` contestaba 200 con la ficha entera de "mini el 7"**.
+El `authorize` de esa ruta compara **grupo**, no local. No le faltaba tenancy: le
+faltaba permiso. Era el sondeo de "otro local" que había quedado sin hacer.
+
+**`plantilla` se cerró aunque no estaba entre las 19**: devuelve la planilla de
+importación vacía, sin ningún dato, pero sus columnas son el contrato de la
+importación y el candado nuevo la marcaba con razón.
+
+### LAS SEIS QUE ESPERAN DECISIÓN, sin tocar
+
+No se arreglaron porque **es discutible que un cajero no pueda verlas**, y eso lo
+decide Emanuel:
+
+- **`dashboard/resumen`, `dashboard/ventas-recientes` y `dashboard/actividad`.**
+  El dashboard es la portada y **hoy no pide ningún permiso** en el registro del
+  menú, así que cerrarlas le deja la pantalla de entrada en blanco al cajero.
+- **`notificaciones/contar`** — la campanita del encabezado, que ve todo el mundo.
+- **`locales/opciones` y `grupos/opciones`** — las dos **ya recortan al local y al
+  grupo propios** cuando la sesión no es admin, así que lo que devuelven es el
+  contexto de quien pregunta y no datos ajenos. Probablemente no haya nada que
+  arreglar acá.
+
+### EL CANDADO
+
+`scripts/permisoEnCadaGet.test.mjs`: **ninguna ruta puede exportar un GET sin
+comprobar permiso**, anclado al **handler** y no al archivo — que es exactamente lo
+que falló. `requireAuth` no cuenta.
+
+**Dio rojo tres veces donde el servidor cerraba bien, y las tres las corrigió el
+censo**, no leer el candado: las de `pedidos/` comprueban el permiso a mano, las de
+`auditoria-pos-ventas` delegan en un ayudante importado, y `cierres/[token]` delega
+dos saltos. Ahora sigue las llamadas hasta profundidad dos, por `@/` y por ruta
+relativa.
+
+**Contraprueba con seis mutaciones, las seis se comportan:** cuatro que tienen que
+ponerlo en rojo —sacar el permiso, moverlo al POST, dejarlo solo en un comentario,
+y que deje de encontrar rutas— y dos controles de ruta nueva, con permiso y sin él.
+
+**Y la contraprueba se rompió sola la primera vez**, que es lo que más conviene
+recordar: restauraba con `git checkout`, y como los arreglos todavía no estaban
+commiteados, "volver al original" fue volver a la versión con el agujero — borró
+tres. Es el reverso de la regla ya escrita: **restaurar con git da por hecho que el
+árbol está commiteado.**
 
 ### Por qué estos números sí se sostienen
 

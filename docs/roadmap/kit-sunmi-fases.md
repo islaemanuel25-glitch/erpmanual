@@ -276,7 +276,24 @@ que tiene sesión válida, así que ningún guardia de sesión las frena. Lo que
 es un chequeo de PERMISO en el camino de lectura, y eso es trabajo aparte — más
 grande que la fase 5 y no lo mismo.
 
-**Sin arreglar, por consigna: primero el tamaño.**
+### ARREGLADO EL 2026-08-15 — 117 cierran, y hay candado
+
+**13 de las 19 pasaron a 403**, cada una con el permiso de su módulo sacado del
+consumidor real. **El censo volvió a correr entero y es la prueba:** las que
+cierran pasaron de **103 a 117**, ninguna que antes cerraba contesta ahora, y el
+admin sigue recibiendo 200 en las catorce tocadas.
+
+**Las 6 restantes esperan una decisión y quedaron sin tocar** —las tres del
+dashboard, el contador de notificaciones, y `locales/opciones` y `grupos/opciones`,
+que ya recortan al local y grupo propios—.
+
+**Y ahora hay trinquete:** `scripts/permisoEnCadaGet.test.mjs` impide que ninguna
+ruta exporte un GET sin comprobar permiso, anclado al **handler** —que es lo que
+falló— y con contraprueba de seis mutaciones en los dos sentidos. El detalle está
+en el [`INC-0007`](../incidents/INC-0007-proveedores-listar-sin-permiso.md).
+
+**Lo que esto NO cierra:** las lecturas que se piden por POST, las 148 rutas de
+escritura, y las cinco que contestan 200 vacío porque su tabla no tiene filas.
 
 ### ⚑ AUTENTICAR PRIMERO, VALIDAR DESPUÉS
 
