@@ -1882,6 +1882,83 @@ si se destraba.
 **tanda del `?editar=`** —por qué la URL pierde el parámetro— y después la
 **tabla de declaraciones**, que es el cierre de la fase.
 
+## EL RELEVAMIENTO DEL `backdrop-filter` — medido en el navegador, a 360
+
+**2026-08-15. No se arregló nada en esta pasada, por pedido expreso.**
+
+### Cómo se midió, que es lo que hace que el número valga
+
+**En el navegador y no leyendo el JSX**, porque que un ancestro tenga
+`backdrop-filter` depende del CSS CALCULADO: la clase puede venir de la pieza, de
+un tema o de una concatenación. Y **a 360x640**, porque a 1366 el caso de
+`productos` se cortaba 3 px y nadie lo habría visto nunca.
+
+**Se abrió cada modal y se midió su capa real.** Hubo un primer intento que
+medía distinto —inyectar una capa de prueba adentro de cada elemento con
+`backdrop-filter`— y **daba 12 pantallas "rotas" de 14**. Ese número era falso:
+contestaba "esta página tiene algún elemento que rompería un `fixed` montado
+adentro", que no es lo mismo que "el modal de esta pantalla está roto". Medido:
+`roles` y `locales` tienen uno de esos elementos y sus modales están perfectos.
+**La firma agrupaba mal, y la única forma de saberlo fue abrir un caso de cada
+grupo.**
+
+### El resultado, con la capa real de cada modal
+
+De **diez modales medidos**, la capa tiene que dar 640 de alto en y=0:
+
+- **Sanos, capa 640 en y=0 — cinco:** `grupos`, `locales`, `operadores`, `roles`
+  y `usuarios`.
+- **`productos` también da sano**, porque su arreglo ya está aplicado.
+- **Roto y SALE DE LA VENTANA — uno: `proveedores`.** Capa de 1004 en y=131, y la
+  tarjeta va de 346,3 a 918,3 sobre una ventana de 640. Además queda de **273 de
+  ancho contra los 339 de los sanos**. El botón de cerrar igual queda visible.
+- **Rotos pero la tarjeta ENTRA IGUAL — tres:** `categorias` (capa 626 en y=14) y
+  los dos de `clientes` (capa 630 en y=11). El desfase es de 10 a 14 px: el modal
+  queda apenas descentrado y no se pierde nada.
+
+**O sea que de diez, uno solo está roto de verdad hoy**, y es el mismo
+`proveedores` que ya había frenado el bloque 2.
+
+### Lo que NO cubre este relevamiento
+
+El universo son **52 archivos** —32 con capa hecha a mano y 20 que usan el kit,
+enumerados con `git grep -l` sobre `app` y `components`—. Se midieron **diez
+modales**, que son los que se pueden abrir con los datos de hoy. Los que necesitan
+un comprobante subido, una lista importada, un combo, un turno abierto o una venta
+del día **siguen sin medir**, y no se fabricó ninguna condición.
+
+### LOS DOS CAMINOS, con lo que cuesta cada uno
+
+**Camino A — mover los modales de a uno**, como ya se hizo en `productos`. Cuesta
+una línea por pantalla y **hoy hay un solo caso que lo necesita de verdad**,
+`proveedores`. Los tres descentrados podrían quedar como están. El riesgo es el
+que el propio relevamiento muestra: **la lista no está completa**, así que puede
+aparecer el siguiente el día que alguien abra una pantalla que hoy no se puede
+abrir.
+
+**Camino B — sacarle el `backdrop-blur-sm` a `SunmiCard`.** Alcance: **240 usos en
+116 archivos, y 62 pantallas**. Se probó sacándolo y volviendo a poner, con
+capturas de tres pantallas a 1366:
+
+- `productos` difiere **4,10 %**, `categorias` **1,84 %**, `clientes` **2,00 %**.
+- **Pero las dos fotos son indistinguibles a ojo.** La diferencia no está en el
+  fondo de las tarjetas: está **en las filas de texto** —las más movidas son la
+  paginación de abajo y la fila de encabezados de la tabla—. Es el **antialiasing
+  del texto**, que cambia porque `backdrop-filter` fuerza al elemento a su propia
+  capa de composición.
+- El motivo por el que el desenfoque en sí no se ve: la tarjeta se apoya sobre un
+  fondo plano, así que desenfocar lo que está detrás da el mismo color plano.
+
+**En una línea: el camino B no cambia el aspecto de ninguna pantalla, cambia cómo
+se dibujan los bordes de las letras en las 62.** Es un cambio medible y no
+perceptible — pero es de los que hay que mirar en la Sunmi antes de darlo por
+bueno, porque ahí la pantalla es otra.
+
+**Y si se toma el camino B, el arreglo de `productos` queda innecesario.** No
+molesta —mover los modales afuera de la tarjeta es correcto igual— pero deja de
+ser lo que resuelve el problema. Queda anotado acá para que quien lo lea después
+no crea que hacen falta los dos.
+
 ### `ModalProductoFinal` — LA LISTA DECLARADA, escrita ANTES de tocar
 
 **2026-08-15.** Quedó destrabado con el arreglo de la carrera de la URL.
