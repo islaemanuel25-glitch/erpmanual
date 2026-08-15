@@ -24,7 +24,16 @@ export async function GET(req, { params }) {
     }
     const grupoId = vista.grupoId;
 
-    const id = Number(params?.id || 0);
+    // `params` ES UNA PROMESA en esta versión de Next, y acá se leía sin
+    // esperarla: `params?.id` daba undefined, `Number(0)` daba 0, y la ruta
+    // contestaba "id inválido" A TODO EL MUNDO, admin incluido. Esa pantalla
+    // estaba muerta y no lo sabía nadie.
+    //
+    // No lo ve el build ni ningún candado: es JavaScript leyendo una propiedad
+    // que no existe. Solo aparece pidiendo la ruta. Relevadas las 71 rutas con
+    // parámetro, ésta era la única.
+    const { id: idCrudo } = await params;
+    const id = Number(idCrudo || 0);
     if (!id) {
       return NextResponse.json({ ok: false, error: "id inválido" }, { status: 400 });
     }
