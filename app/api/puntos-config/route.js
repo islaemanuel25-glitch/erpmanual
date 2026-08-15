@@ -5,6 +5,15 @@ import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 
 // GET /api/puntos-config?localId=...
+// Las REGLAS del programa de puntos —cuántos pesos por punto, exclusiones— son
+// configuración del negocio, no el saldo de un cliente. Su único consumidor es
+// `/modulos/fidelidad`, que se cierra con `config_local.fidelidad`.
+//
+// No se le suma `clientes.puntos.ver`: ese permiso es para VER Y CANJEAR los
+// puntos de una persona, y eso lo sirve `clientes/[id]/puntos`, que sigue
+// abierta para el cajero. Ver el saldo de alguien no es ver cómo se calcula.
+const PERMISO_CONFIG_PUNTOS = "config_local.fidelidad";
+
 export async function GET(req) {
   try {
     const scope = await resolveLocalAndGrupo(req);
@@ -12,6 +21,14 @@ export async function GET(req) {
       return NextResponse.json(
         { ok: false, error: scope.error },
         { status: scope.status }
+      );
+    }
+
+    const permiso = checkPerm(scope.session, PERMISO_CONFIG_PUNTOS);
+    if (!permiso.ok) {
+      return NextResponse.json(
+        { ok: false, error: permiso.error },
+        { status: permiso.status }
       );
     }
 

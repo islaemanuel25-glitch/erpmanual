@@ -16,7 +16,17 @@ export async function POST(req) {
       );
     }
 
-    const perm = checkPerm(session, "productos.ver");
+    // PIDE `costos.ver` Y NO `productos.ver`, y el motivo está en lo que baja: el
+    // XLSX trae `precio_costo` y `margen` DE TODO EL CATÁLOGO. Medido: 1,3 MB con
+    // 2.005 productos, y con `productos.ver` se lo llevaba el rol Mini.
+    //
+    // `costos.ver` es el permiso que YA EXISTE para esto —lo usan el detalle de
+    // venta y las dos rutas de listas de proveedor para decidir si muestran el
+    // costo— y contado contra los roles de producción lo tienen Admin y
+    // DUEÑO_LOCAL, que son 4 usuarios activos. No lo tienen Mini ni CAJERO.
+    //
+    // Ver el catálogo y llevárselo con los costos son dos cosas distintas.
+    const perm = checkPerm(session, "costos.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const body = await req.json();

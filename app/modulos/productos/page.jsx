@@ -46,6 +46,11 @@ export default function ProductosPage() {
   const permisosProd = perfilProd?.permisos || [];
   const esAdminProd = Array.isArray(permisosProd) && permisosProd.includes("*");
   const puedeProd = esAdminProd || permisosProd.includes("productos.ver");
+  // El export baja el catálogo CON costos y márgenes, así que desde el INC-0007
+  // pide `costos.ver` y no `productos.ver`. Sin esto quedaría un botón visible
+  // que contesta 403 al tocarlo — un botón que no hace nada es la clase de cosa
+  // que después se reporta como "el sistema anda mal".
+  const puedeExportar = esAdminProd || permisosProd.includes("costos.ver");
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -990,6 +995,15 @@ export default function ProductosPage() {
               {/* =====================================================
                   EXPORTAR
                   ===================================================== */}
+              {!puedeExportar && (
+                <p className="text-sm sunmi-text-muted px-1 py-2">
+                  Tu rol no incluye exportar el catálogo, porque el archivo lleva
+                  los costos y los márgenes.
+                </p>
+              )}
+
+              {puedeExportar && (
+              <>
               <SunmiSeparator label="Exportar productos" className="!my-1" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-1">
@@ -1029,6 +1043,8 @@ export default function ProductosPage() {
                   {expLoading ? "Exportando..." : "Descargar Excel"}
                 </SunmiButton>
               </div>
+              </>
+              )}
 
               {/* =====================================================
                   IMPORTAR

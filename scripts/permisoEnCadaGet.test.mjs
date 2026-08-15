@@ -134,20 +134,41 @@ const SIN_PERMISO_A_PROPOSITO = new Map([
    "ABIERTA HASTA EL REDISEÑO DE ROLES. Las ventas del local con total, forma de " +
    "pago, cliente y vendedor. Mismo motivo: es la portada."],
 
-  // ── LAS CINCO DE LA TANDA SIGUIENTE ────────────────────────────────────────
-  // Son de las que el censo midió contestando **200 con la lista vacía**, y ése
-  // es justamente el caso que el INC-0007 dejó escrito: un vacío no prueba nada
-  // hasta saber POR QUÉ está vacío. Las cinco lo estaban porque su tabla tiene
-  // cero filas en `erpazul_dev`, no porque alguien las cerrara.
+  // ── LA APARIENCIA NO SE CIERRA, Y ES UNA DECISIÓN MEDIDA ───────────────────
   //
-  // NO SE ARREGLARON A PROPÓSITO: quedan para la tanda que las mida con datos
-  // cargados. Están acá para que el candado empiece a morder ya sobre todo lo
-  // demás en vez de esperar a que estén resueltas.
-  ["clientes/tags", "TANDA SIGUIENTE (INC-0007). 200 con items vacío; TagCliente tiene cero filas."],
-  ["config/apariencia-local", "TANDA SIGUIENTE (INC-0007). 200 con apariencia en null."],
-  ["config/ticket", "TANDA SIGUIENTE (INC-0007). 200 con config en null; TicketConfig tiene cero filas."],
-  ["notificaciones/listar", "TANDA SIGUIENTE (INC-0007). 200 vacío mientras notificaciones/contar decía 16."],
-  ["puntos-config", "TANDA SIGUIENTE (INC-0007). 200 con config en null; PuntosConfigLocal tiene cero filas."],
+  // `config/apariencia-local` devuelve el TEMA del local, y la lee
+  // `AparienciaInstitucionalSync`, que está montado en `app/layout.jsx`: corre
+  // para CADA usuario logueado en CADA página. Cerrarla con
+  // `config_local.apariencia` —que tienen Admin y DUEÑO_LOCAL— le sacaría el tema
+  // institucional a todos los demás, **y en silencio**: el componente hace
+  // `.catch(() => setInstitucional(null))`, así que no habría error, solo la app
+  // con otro color.
+  //
+  // No hay ningún permiso que signifique "puede entrar", que es lo que esta ruta
+  // necesita. Es el mismo caso que `locales/opciones`: devuelve el contexto de
+  // quien pregunta. Lo sensible es ESCRIBIRLA, y el PUT ya pide el permiso.
+  ["config/apariencia-local",
+   "DECIDIDA: queda sin permiso. La lee el layout raíz para pintar el tema del " +
+   "local en cada página y cada usuario; cerrarla apagaría el tema institucional " +
+   "en silencio. Lo sensible es el PUT, que sí pide config_local.apariencia."],
+
+  // ── NOTIFICACIONES: EL FILTRO NO ES DE RUTA, ES POR NOTIFICACIÓN ───────────
+  //
+  // `listar` no lleva permiso a propósito: cada notificación trae el suyo en
+  // `permisoRequerido`, y `whereNotifUsuario` lo aplica. Ejercido el 2026-08-15:
+  // se marcó un pedido como enviado, la notificación nació con
+  // `permisoRequerido: "compras.ver"`, y el CAJERO —que no lo tiene— NO la
+  // recibió, mientras Mini y admin sí. Un permiso de ruta sería más grueso y
+  // dejaría a esos roles sin campanita.
+  //
+  // LO QUE SÍ QUEDA ABIERTO son las filas VIEJAS: las anteriores al 2026-07-26
+  // tienen `permisoRequerido` en NULL —122 en producción, 16 acá— y esas las ve
+  // cualquiera con el alcance correcto. Se tapan con una migración de datos, no
+  // tocando esta ruta.
+  ["notificaciones/listar",
+   "DECIDIDA: sin permiso de ruta. El filtro va POR NOTIFICACIÓN, en " +
+   "permisoRequerido, y está ejercido. Pendiente: las filas anteriores al " +
+   "2026-07-26 lo tienen en NULL y necesitan una migración de datos."],
 ]);
 
 const nombreDeRuta = (rel) =>

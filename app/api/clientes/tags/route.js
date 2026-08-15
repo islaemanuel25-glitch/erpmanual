@@ -4,6 +4,16 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 
 // GET /api/clientes/tags?localId=...
+// Las etiquetas llevan el DESCUENTO por segmento, así que son política comercial
+// del local y no un catálogo cualquiera. Sus dos consumidores —la pantalla de
+// clientes y la de analytics— se cierran las dos con `clientes.ver`, que es el
+// permiso de ese módulo en el registro del menú.
+//
+// Contado contra los roles de producción: lo tienen ENCARGADO, Admin, Deposito y
+// DUEÑO_LOCAL —4 usuarios activos—. No lo tienen CAJERO ni Mini, y ninguno de los
+// dos puede abrir esas pantallas tampoco, así que no se rompe ninguna.
+const PERMISO_VER_TAGS = "clientes.ver";
+
 export async function GET(req) {
   try {
     const scope = await resolveLocalAndGrupo(req);
@@ -11,6 +21,14 @@ export async function GET(req) {
       return NextResponse.json(
         { ok: false, error: scope.error },
         { status: scope.status }
+      );
+    }
+
+    const permiso = checkPerm(scope.session, PERMISO_VER_TAGS);
+    if (!permiso.ok) {
+      return NextResponse.json(
+        { ok: false, error: permiso.error },
+        { status: permiso.status }
       );
     }
 

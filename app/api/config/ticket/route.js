@@ -8,6 +8,13 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 // (ajeno → 403); admin → su contexto activo (local/depósito), nunca un localId del
 // request. Escritura: admin o config_local.ticket.
 
+// VA EL PAR, Y NO SOLO `config_local.ticket`. La configuración del ticket la
+// CONFIGURA la pantalla de configuración, pero la LEE el POS para imprimir:
+// `lib/pos-ventas/imprimirTicketTermico.js` la pide en cada impresión. Cerrarla
+// solo con el permiso de configuración —que tienen Admin y DUEÑO_LOCAL— dejaría
+// a los cajeros imprimiendo tickets sin encabezado ni pie.
+const PERMISO_LEER_TICKET = ["config_local.ticket", "pos.usar"];
+
 export async function GET(req) {
   try {
     // Lectura de config: recurso ajeno → 404 (no revelar la config de otra ubicación).
@@ -15,6 +22,12 @@ export async function GET(req) {
     if (scope.error) {
       return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
     }
+
+    const permiso = checkPerm(scope.session, PERMISO_LEER_TICKET);
+    if (!permiso.ok) {
+      return NextResponse.json({ ok: false, error: permiso.error }, { status: permiso.status });
+    }
+
     const { localId } = scope;
 
     const row = await prisma.ticketConfig.findUnique({ where: { localId } });
