@@ -73,9 +73,25 @@ export async function fijarContexto({ evaluar, log, ubicacion = null }) {
            credentials: "same-origin", body: JSON.stringify({ grupoId: g.id }),
          });
        }
-       const locales = await fetch("/api/locales/listar", { credentials: "same-origin" }).then(j).catch(() => null);
+       // ── POR QUÉ "opciones" Y NO "listar" ──────────────────────────────────
+       //
+       // OJO: esto es el CUERPO DE UN TEMPLATE LITERAL. Nada de backticks acá
+       // adentro, ni siquiera en un comentario: cierran la cadena y el archivo
+       // deja de parsear. Ya pasó al escribir este mismo bloque.
+       //
+       // "locales/listar" devuelve TODOS los locales con dirección, teléfono y
+       // CUIL, así que desde el INC-0007 pide administrador. El arnés lo usaba
+       // para elegir dónde pararse, y con eso dejó de poder entrar con cualquier
+       // usuario que no fuera admin: contestaba "sin locales" y la corrida moría
+       // antes de sacar una sola foto.
+       //
+       // "opciones" es la que corresponde para esto: devuelve id, nombre y
+       // esDeposito —los tres campos que se usan acá y nada más— y RECORTA AL
+       // LOCAL PROPIO cuando la sesión no es admin, que es justamente lo que el
+       // arnés quiere para medir una pantalla como la ve esa persona.
+       const locales = await fetch("/api/locales/opciones", { credentials: "same-origin" }).then(j).catch(() => null);
        const items = locales?.items || [];
-       // /api/locales/listar devuelve esDeposito (camelCase); toleramos ambas grafías.
+       // Devuelve esDeposito (camelCase); se tolera la otra grafía por las dudas.
        const esDep = (l) => l.esDeposito === true || l.es_deposito === true;
        const pedido = ${JSON.stringify(ubicacion)};
        const porNombre = pedido
