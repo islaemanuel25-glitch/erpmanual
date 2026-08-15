@@ -205,7 +205,26 @@ export default function SunmiSelectAdv({
           flex items-center justify-between
         "
       >
-        <span className="truncate">{currentText}</span>
+        {/*
+          `min-w-0` NO ES DECORACIÓN: sin él, `truncate` NO TRUNCA.
+
+          Un item de flex arranca con `min-width: auto`, así que se niega a
+          encogerse por debajo del ancho de su contenido. `truncate` pone
+          `overflow: hidden`, `text-overflow: ellipsis` y `white-space: nowrap`,
+          pero si el span nunca se encoge no hay nada que recortar: el texto
+          EMPUJA y se sale de la caja en vez de cortarse con puntos suspensivos.
+
+          ── HOY NO SE ACTIVA, Y POR ESO HAY QUE ARREGLARLO AHORA ──────────────
+
+          Medido: a 140 px el espacio real para el texto son 101, y la opción más
+          larga que existe en la base —"Medicamento"— necesita 84. Entra con 17
+          de sobra. A 85 px quedan 46 y lo más largo son 24.
+
+          O sea que el defecto está y no se ve. El día que alguien agregue una
+          categoría más larga, el texto se va a desbordar y nadie va a entender
+          por qué, porque la clase que debería impedirlo está puesta.
+        */}
+        <span className="truncate min-w-0">{currentText}</span>
         <ChevronDown
           size={16}
           className={`transition-transform sunmi-text-accent ${
