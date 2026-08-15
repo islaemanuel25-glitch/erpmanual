@@ -1,17 +1,22 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { requirePerm } from "@/lib/authorize";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { proveedorVisibleWhere } from "@/lib/visibilidad";
 
+// El permiso sale del módulo, no se inventa uno nuevo: la pantalla
+// `/modulos/proveedores` pide `proveedores.ver`, y `ProveedoresDeHoyAlert` —el
+// otro consumidor, que vive en la portada— ya se muestra a sí mismo con
+// `compras.ver` O `proveedores.ver`. Es el mismo par.
+const PERMISO_VER_PROVEEDORES = ["compras.ver", "proveedores.ver"];
+
 export async function GET(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
-      return NextResponse.json(
-        { ok: false, error: "No autenticado" },
-        { status: 401 }
-      );
+    // ANTES ESTA RUTA SOLO PEDÍA SESIÓN. Un CAJERO con cuatro permisos de
+    // clientes recibía la lista entera con nombres y teléfonos (INC-0007).
+    const auth = requirePerm(req, PERMISO_VER_PROVEEDORES);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
     }
 
     const { searchParams } = new URL(req.url);

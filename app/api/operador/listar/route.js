@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+
+// Devuelve los NOMBRES de los operarios del local. Las otras cinco rutas de
+// `operador/` piden `config_local.operadores`, pero acá no alcanza con ése: el
+// selector de operario del POS y la pantalla de bloqueo también la llaman, y
+// quien opera la caja no administra operarios.
+//
+// Va `pos.usar` al lado, que es exactamente el caso para el que `requirePerm`
+// acepta varios —la misma forma que `clientes/buscar`, que se abre con
+// `clientes.ver` o `pos.usar`—.
+const PERMISO_VER_OPERADORES = ["config_local.operadores", "pos.usar"];
 
 export async function GET(req) {
   try {
-    const auth = requireAuth(req);
+    const auth = requirePerm(req, PERMISO_VER_OPERADORES);
     if (!auth.ok) {
       return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
     }

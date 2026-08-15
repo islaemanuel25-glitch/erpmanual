@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth } from "@/lib/authorize";
+import { requireAdmin } from "@/lib/authorize";
 
 export async function GET(req) {
+  // DEVUELVE TODOS LOS LOCALES con dirección, teléfono, email y CUIL — no el de
+  // la sesión, todos. Sus tres consumidores son los componentes de grupos, y la
+  // pantalla de Grupos es `adminOnly` en el registro del menú; las otras rutas
+  // de este módulo ya usan `requireAdmin`.
+  //
+  // Quien solo necesita saber en qué local está tiene `locales/opciones`, que ya
+  // recorta al local propio cuando la sesión no es admin.
   try {
-    const auth = requireAuth(req);
+    const auth = requireAdmin(req);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(req.url);

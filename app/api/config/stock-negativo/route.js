@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth, checkPerm } from "@/lib/authorize";
+import { requirePerm, checkPerm } from "@/lib/authorize";
 import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
@@ -8,9 +8,14 @@ import { getConfigLocalEfectiva } from "@/lib/config/local";
 // allowNegativeStock ("vender sin stock") es PER LOCAL (config_local.stock).
 // requireMotivoAjusteStock/requireMotivoLimitesStock siguen siendo PER GRUPO (admin).
 
+// El permiso ya estaba en este archivo, en el POST. El GET no lo llamaba.
+// El único consumidor es la pantalla de configuración de stock, que se cierra con
+// este mismo permiso — acá no hace falta el par que sí necesitan las otras dos.
+const PERMISO_CONFIG_STOCK = "config_local.stock";
+
 export async function GET(req) {
   try {
-    const auth = requireAuth(req);
+    const auth = requirePerm(req, PERMISO_CONFIG_STOCK);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     // Lectura de config: recurso ajeno → 404 (no revelar la config de otra ubicación).

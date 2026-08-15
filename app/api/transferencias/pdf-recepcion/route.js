@@ -2,12 +2,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { requireAuth } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
 import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
+
+// El remito de recepción lleva los mismos costos que el de envío, más el motivo
+// de cada diferencia. Mismo permiso que su gemelo.
+const PERMISO_VER_TRANSFERENCIAS = "transferencias.ver";
 
 export async function GET(req) {
   try {
-    const auth = requireAuth(req);
+    const auth = requirePerm(req, PERMISO_VER_TRANSFERENCIAS);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(req.url);

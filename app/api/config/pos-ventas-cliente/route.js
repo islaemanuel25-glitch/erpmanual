@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth, checkPerm } from "@/lib/authorize";
+import { requirePerm, checkPerm } from "@/lib/authorize";
 import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
@@ -9,9 +9,15 @@ import { getConfigLocalEfectiva } from "@/lib/config/local";
 // no, así que hay UN flag efectivo por local: exigirClienteVenta. Se conservan
 // los campos legacy de grupo en el GET para no romper UIs previas (fase 1).
 
+// El chequeo del GET no puede ser el del POST: además de la pantalla de
+// configuración, ESTA LA LEE EL POS para saber si tiene que exigir cliente y
+// operario antes de cobrar. Si acá fuera solo `config_local.pos`, la caja dejaría
+// de poder preguntarlo. Va el par, que es lo que el helper acepta para esto.
+const PERMISO_LEER_CONFIG_POS = ["config_local.pos", "pos.usar"];
+
 export async function GET(req) {
   try {
-    const auth = requireAuth(req);
+    const auth = requirePerm(req, PERMISO_LEER_CONFIG_POS);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     // Lectura de config: recurso ajeno → 404 (no revelar la config de otra ubicación).

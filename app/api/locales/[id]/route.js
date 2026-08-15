@@ -1,8 +1,23 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { requireAdmin } from "@/lib/authorize";
+import { requireAdmin, requirePerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+
+// LEER LA FICHA DE UN LOCAL. Medido con una sesión de CAJERO del local 1: pedía
+// `/api/locales/2` y le contestaba 200 con la ficha entera de "mini el 7". El
+// `authorize` de abajo compara GRUPO, no local, así que cualquier local del
+// mismo grupo pasaba — y a eso no le faltaba tenancy, le faltaba permiso.
+//
+// No va `requireAdmin` aunque el PUT y el DELETE lo usen: la ficha la leen dos
+// pantallas que no son de administración —el POS pide su propio local, y
+// `pos-transferencias/nueva` pide el origen y el destino—. Se pide el permiso de
+// esas pantallas, y el admin pasa igual porque `requirePerm` lo deja pasar solo.
+const PERMISO_VER_LOCAL = [
+  "pos.usar",
+  "pos_transferencias.ver",
+  "pos_transferencias.enviar",
+];
 
 // ── Helper: auth + tenancy sin depender de ?localId ─────
 
@@ -46,6 +61,17 @@ async function authorize(req, numId) {
 // ========================================================
 export async function GET(req, context) {
   try {
+    // EL PERMISO VA PRIMERO, antes de mirar el id: hasta saber quién pregunta, la
+    // forma del pedido tampoco se contesta. Es la regla que el censo dejó escrita
+    // a partir de `pos-ventas/arqueos/listar`.
+    const permiso = requirePerm(req, PERMISO_VER_LOCAL);
+    if (!permiso.ok) {
+      return NextResponse.json(
+        { ok: false, error: permiso.error },
+        { status: permiso.status }
+      );
+    }
+
     const { id } = await context.params;
     const numId = Number(id);
 

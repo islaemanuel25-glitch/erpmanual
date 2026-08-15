@@ -4,7 +4,7 @@
 // tiene su propio ritmo de caja. Mismo patrón que /api/config/pos-ventas-cliente.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireAuth, checkPerm } from "@/lib/authorize";
+import { requirePerm, checkPerm } from "@/lib/authorize";
 import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { configArqueoDeLocal, fondoObjetivoDeLocal } from "@/lib/caja/arqueoServer";
@@ -30,7 +30,15 @@ function enteroEnRango(valor, limites) {
 
 export async function GET(req) {
   try {
-    const auth = requireAuth(req);
+    // EL CHEQUEO VA ACÁ Y NO REAPROVECHA EL DEL POST. El permiso estaba escrito
+    // en este archivo —`PERMISO_CONFIG_ARQUEO`, unas líneas más arriba— y el GET
+    // no lo llamaba: pedía sesión y nada más, así que un CAJERO leía la
+    // configuración de caja del local. Una defensa escrita en otro handler es una
+    // defensa que no corre en el camino que importa.
+    //
+    // El único consumidor es la pantalla de configuración, que ya se cierra con
+    // este mismo permiso.
+    const auth = requirePerm(req, PERMISO_CONFIG_ARQUEO);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const scope = await resolveLocalAndGrupo(req, { lecturaAjena: true });

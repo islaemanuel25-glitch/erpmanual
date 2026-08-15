@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { requireAuth } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
 import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
+
+// ESTE PDF LLEVA COSTOS. Con solo pedir sesión, un CAJERO se bajaba el remito
+// entero —productos, cantidades y el costo de cada línea— con solo estar
+// logueado. Es lo más sensible que encontró el censo del INC-0007.
+//
+// `transferencias.ver` es lo que ya piden las otras tres rutas del módulo y lo
+// que cierra la pantalla que lo descarga.
+const PERMISO_VER_TRANSFERENCIAS = "transferencias.ver";
 
 export async function GET(req) {
   try {
-    const auth = requireAuth(req);
+    const auth = requirePerm(req, PERMISO_VER_TRANSFERENCIAS);
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(req.url);

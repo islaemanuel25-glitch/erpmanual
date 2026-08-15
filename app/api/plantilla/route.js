@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { requireAuth } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+
+// La planilla de importación de productos: encabezados y una fila en blanco, sin
+// ningún dato del negocio. NO estaba entre las 19 que filtraban por eso, y aun
+// así se cierra: sus columnas son el contrato de la importación —`precioCosto`,
+// `margen`, `proveedorId`— y quien no puede importar no tiene por qué recibirlo.
+//
+// `productos.importar` es el permiso que ya usan las dos rutas de importar.
+const PERMISO_PLANTILLA = ["productos.importar", "productos.crear"];
 
 export async function GET(req) {
-  const auth = requireAuth(req);
+  const auth = requirePerm(req, PERMISO_PLANTILLA);
   if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
   const columns = [{
     nombre: "",

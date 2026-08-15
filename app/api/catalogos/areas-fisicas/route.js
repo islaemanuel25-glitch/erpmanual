@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
+import { requirePerm } from "@/lib/authorize";
+
+// La piden las pantallas de producto y las de stock, que se cierran con
+// `productos.ver` y `stock.ver`. Es el mismo criterio que `catalogos/categorias`,
+// que reexporta el GET de `categorias/listar` y por eso ya contestaba
+// "Sin permiso: productos.ver".
+const PERMISO_CATALOGO_AREAS = ["productos.ver", "stock.ver"];
 
 export async function GET(req) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) {
-      return NextResponse.json(
-        { ok: false, items: [], error: "No autenticado" },
-        { status: 401 }
-      );
+    const auth = requirePerm(req, PERMISO_CATALOGO_AREAS);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, items: [], error: auth.error }, { status: auth.status });
     }
 
     const areas = await prisma.areaFisica.findMany({
