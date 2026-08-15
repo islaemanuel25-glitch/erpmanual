@@ -188,9 +188,22 @@ que esa página haga del lado del cliente. Una que no compruebe nada no tiene
 segunda barrera. **No es un incendio —no hay datos del otro lado— pero es la
 razón concreta por la que esta fase existe.**
 
+**CORRECCIÓN DEL NÚMERO, 2026-08-15: son 270 rutas, no 206.**
+
+El 206 era **otra cosa**: la cantidad de archivos que contestan `"Error interno"`,
+contada al cerrar el `INC-0006`. Se arrastró como si fuera el total de rutas
+porque las dos cifras nacieron el mismo día y en el mismo párrafo. El total real
+sale de `git ls-files "app/api/**/route.js"` y da **270**.
+
+Vale la forma del error más que el número: **dos cifras del mismo módulo escritas
+juntas se confunden**, y la que se repite después es la que uno recuerda, no la
+que corresponde. Es la tercera vez —ya pasó con los usos de `SunmiCard`, 246 y
+233 para el mismo hecho—. Cuando se anota un conteo, va con **qué se contó** al
+lado, no solo con el número.
+
 **LO QUE NO SE MIRÓ, y sin esto el párrafo de arriba engaña:**
 
-- **Nueve rutas de 206** bajo `app/api`. Es una muestra, no un censo.
+- **Nueve rutas de 270** bajo `app/api`. Es una muestra, no un censo.
 - **Ninguna de escritura.** Solo se probaron lecturas.
 - **Sin probar con un rol de menos permisos.** Todo lo de arriba es "sin sesión";
   no se probó nada con una sesión válida y acotada.
@@ -211,6 +224,38 @@ ver si contestan con datos o con un 403. **No se probó nada de esto.**
 Y hay un antecedente que la hace menos hipotética: el `INC-0006` mostró que una
 ruta puede tener el alcance escrito **y aplicarlo mal** —`obtener` de proveedores
 acotaba por un campo que no existe— sin que nada avisara durante diecinueve días.
+
+**LO QUE FRENÓ ESTA MEDICIÓN, el 2026-08-15:** en `erpazul_dev` hay **un solo rol
+—`Admin` con el permiso `*`— y un solo usuario**. Para entrar con una sesión real
+de un rol acotado habría que crearlo, y **eso mediría una invención**: el riesgo
+depende de qué permisos tenga el rol que usa de verdad la caja, no de los que a
+uno le parezcan. Queda esperando la configuración real.
+
+### ⚑ AUTENTICAR PRIMERO, VALIDAR DESPUÉS
+
+**El orden correcto: hasta que no se sabe quién pregunta, la única respuesta es
+401.** Validar antes le contesta sobre la forma del pedido a alguien que no tiene
+derecho a que le contesten nada — dice qué parámetros espera la ruta, y con eso se
+puede mapear una API sin credenciales.
+
+**El caso, medido:** `app/api/pos-ventas/arqueos/listar` contesta
+**400 `"turnoId requerido"` sin ninguna sesión**. Con un `turnoId` real contesta
+401, así que **no filtra datos** — lo que filtra es la forma del pedido.
+
+**Cuántas más tienen el orden invertido: una, la misma.** Enumeradas las 270 y
+mirando dentro de cada handler la posición de la primera respuesta 400 o 422
+contra la de la primera llamada a un ayudante de autenticación.
+
+**Y el método tiene un límite que hay que decir, porque ya mintió dos veces
+hoy.** No sigue llamadas: una ruta que autentique adentro de un envoltorio propio
+se le escapa. El primer conteo marcó **30 handlers** como "contestan 400 y no
+autentican", y **es un artefacto**: `grupos/[id]` autentica con un `_guard` local
+y `push/suscribir` con `resolverScopeNotif`, ninguno de los dos en la lista de
+patrones. Se probaron **las seis de lectura de esas 30 sin credenciales y las seis
+contestaron 401**.
+
+Así que el número que vale es **uno**, y sale de ejercerlo, no del grep. **No se
+arregló**, por pedido expreso: es una medición.
 
 ## Cuántas capas quedan: UNA cifra, y de dónde sale
 
