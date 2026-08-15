@@ -22,6 +22,32 @@ const SRC = fs.readFileSync(path.join(RAIZ, "components/sunmi/SunmiModalLayout.j
 /** `git grep` recorre el repo entero; `readdirSync` mira un solo nivel. */
 const ejecutar = (cmd) => execSync(cmd, { cwd: RAIZ, encoding: "utf8" });
 
+/**
+ * LOS CONSUMIDORES DE VERDAD DE LA PIEZA.
+ *
+ * ── POR QUÉ NO ALCANZA CON `git grep -l SunmiModalLayout` ──────────────────
+ *
+ * Ese grep encuentra el NOMBRE, y el nombre aparece también en comentarios.
+ * `app/andamio-carrito/page.jsx` lo menciona al explicar qué mide y **no usa la
+ * pieza**: entraba a la lista de consumidores y los candados le exigían declarar
+ * props de un modal que no dibuja.
+ *
+ * Es la cuarta vez del mismo patrón en este repo —el contador que sumó por un
+ * comentario, el candado que dio rojo por una línea comentada, el que dio verde
+ * con el chequeo sacado— y acá le tocó a la ENUMERACIÓN en vez de a la
+ * afirmación. Está anotado en `CLAUDE.md`.
+ *
+ * La red se deja ancha —el grep del nombre no tiene falsos negativos— y después
+ * se filtra por el USO: un archivo es consumidor si abre la etiqueta.
+ */
+function consumidoresDelKit() {
+  return ejecutar("git grep -l SunmiModalLayout -- app components")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"))
+    .filter((l) => fs.readFileSync(path.join(RAIZ, l), "utf8").includes("<SunmiModalLayout"));
+}
+
 // ── LAS FORMAS ─────────────────────────────────────────────────────────────
 
 test("las formas son EXACTAMENTE cuatro, las que existen en el repo", () => {
@@ -200,9 +226,7 @@ test("el cartel de identificarse sigue arriba de este default", () => {
   const cartel = fs.readFileSync(path.join(RAIZ, "components/operador/ModalPedirOperador.jsx"), "utf8");
   const zCartel = Number(cartel.match(/fixed inset-0 z-\[(\d+)\]/)[1]);
 
-  const consumidores = ejecutar("git grep -l SunmiModalLayout -- app components")
-    .split("\n").map((l) => l.trim())
-    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
+  const consumidores = consumidoresDelKit();
   let masAlto = 0;
   let quien = "(ninguno declara z)";
   for (const ruta of consumidores) {
@@ -439,9 +463,7 @@ test("`espacioCuerpo` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
   // Y que TODOS lo declaren, enumerando con git sobre el repo entero. Sin esto,
   // sacar el default sería empeorar: un modal nuevo nacería sin espaciado y sin
   // que nadie avisara.
-  const consumidores = ejecutar("git grep -l SunmiModalLayout -- app components")
-    .split("\n").map((l) => l.trim())
-    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
+  const consumidores = consumidoresDelKit();
   assert.deepEqual(
     sinDeclararlo(consumidores, "espacioCuerpo="),
     [],
@@ -453,9 +475,7 @@ test("`z` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
   // Misma forma que el de `espacioCuerpo`, y por un motivo más caro: un modal
   // que se quede sin `z` no se ve raro — se ve bien hasta el día que algo de
   // afuera se le pone encima.
-  const consumidores = ejecutar("git grep -l SunmiModalLayout -- app components")
-    .split("\n").map((l) => l.trim())
-    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
+  const consumidores = consumidoresDelKit();
   assert.deepEqual(
     sinDeclararlo(consumidores, "z="),
     [],
@@ -639,14 +659,31 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // modales que difieran EN CONTRA: uno que deba declararlo y no lo haga.
     // Hoy no puede pasar sin que alguien lo vea, porque son dos.
     "app/modulos/clientes/page.jsx": true,
+    // ── LOS ANDAMIOS TAMBIÉN ENTRAN A ESTA LISTA ──────────────────────────
+    //
+    // Desde el 2026-08-15 los andamios se commitean, con su guardia de entorno
+    // —`scripts/andamiosNoSeCommitean.test.mjs`—, así que son consumidores de la
+    // pieza como cualquier otro y les toca contestar lo mismo.
+    //
+    // Los dos contestan que NO, y por el criterio de siempre: no hay nada
+    // escrito que perder. `andamio-velo` es una foto del velo, y los dos modales
+    // de `andamio-escape` solo tienen texto fijo.
+    //
+    // Y `andamio-escape` no necesita declararlo para lo que mide: la rama de
+    // "Escape NO cierra" se ejerció sobre `ModalRol`, una pantalla de verdad. El
+    // andamio existe para la otra pregunta —cuál de dos capas se cierra— y para
+    // eso los dos tienen que cerrar.
+    //
+    // (Un conteo rápido de la palabra en ese archivo da 1, y es un COMENTARIO
+    // que la nombra. La declaración es cero. Cuarta vez del mismo patrón en este
+    // repo; está en `CLAUDE.md`.)
+    "app/andamio-velo/page.jsx": false,
+    "app/andamio-escape/page.jsx": false,
   };
 
   // Que la lista sea TODOS los que usan la pieza, no los que alguien recordó.
   // Enumerado sobre el repo entero, no sobre una carpeta.
-  const usan = ejecutar("git grep -l SunmiModalLayout -- app components")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"));
+  const usan = consumidoresDelKit();
   assert.deepEqual(
     usan.sort(),
     Object.keys(declaran).sort(),
