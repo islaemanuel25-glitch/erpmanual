@@ -41,9 +41,47 @@ const AYUDANTES = /(requirePerm|checkPerm|requireAdmin|tienePermiso|assertPerm)\
 // marcó a las cuatro de `pedidos/` como si no chequearan nada, y el censo las
 // había medido cerrando con 403. Un candado que da rojo donde el servidor cierra
 // bien manda a "arreglar" lo que ya funciona.
-const A_MANO = /\bpermisos\b[\s\S]{0,80}?\.includes\s*\(|\.permisos\s*\.\s*includes\s*\(/;
+// Pide un NOMBRE DE PERMISO —`"pedidos.ver"`— y no cualquier mención de
+// `permisos` cerca de un `.includes`. La primera versión era esa, y por eso
+// `esAdminPorPermisos`, que hace `normalizarPermisos(permisos).includes("*")`,
+// contaba como si fuera una autorización. Ver abajo el agujero que abrió.
+const A_MANO = /permisos\s*\)?\s*\.includes\s*\(\s*["'][a-z_]+\.[a-z_.]+["']/;
 
 const compruebaAlgo = (texto) => AYUDANTES.test(texto) || A_MANO.test(texto);
+
+/**
+ * FUNCIONES QUE NO SON UNA AUTORIZACIÓN, y por las que NO se sigue.
+ *
+ * ── EL AGUJERO QUE ESTO TAPA, encontrado el 2026-08-15 ──────────────────────
+ *
+ * La primera versión de este candado daba por bueno a `dashboard/actividad`, que
+ * no comprueba ningún permiso. El camino era:
+ *
+ *   el GET llama a `getUsuarioSession`
+ *     → que llama a `esAdminPorPermisos`
+ *       → que hace `normalizarPermisos(permisos).includes("*")`
+ *
+ * y ese `.includes` alcanzaba para marcarlo como que chequea. O sea que
+ * **cualquier ruta que pidiera la sesión pasaba el candado** — que es la mayoría,
+ * y justo las que hay que mirar.
+ *
+ * Lo encontró cruzar el veredicto del candado contra el censo corrido: el censo
+ * decía que esa ruta le contesta a un rol sin permiso y el candado decía que
+ * comprueba. Cuando dos mediciones se contradicen, una está mal, y acá estaba mal
+ * la que no se había ejercido.
+ *
+ * Es el mismo principio que ya estaba escrito para `requireAuth`: resolver QUIÉN
+ * es no es decidir si PUEDE. Faltaba aplicarlo también a lo que se sigue.
+ */
+const NO_SON_AUTORIZACION = new Set([
+  "getUsuarioSession",
+  "requireAuth",
+  "normalizarPermisos",
+  "esAdminPorPermisos",
+  "getContextoActivo",
+  "firmarToken",
+  "verificarToken",
+]);
 
 /**
  * RUTAS QUE PUEDEN LEERSE CON SOLO ESTAR LOGUEADO, cada una con su motivo.
@@ -214,6 +252,8 @@ function delegaElChequeo(cuerpo, fuenteLimpia, archivoRel, nivel = 0) {
   const importes = importesLocales(fuenteLimpia, archivoRel);
 
   for (const nombre of llamadas) {
+    // Por acá no se sigue: son de identidad y de contexto, no de autorización.
+    if (NO_SON_AUTORIZACION.has(nombre)) continue;
     // 1) Una función del mismo archivo.
     const propia = cuerpoDeFuncion(fuenteLimpia, nombre);
     if (propia) {
