@@ -157,6 +157,61 @@ ya se escaparon las atajaría eso mismo:
 No se adelanta porque partir la fase 2 al medio cuesta más de lo que ahorra,
 pero queda fijado el momento: al cerrar la fase 2, antes de empezar la 3.
 
+### EL MOTIVO CONCRETO, MEDIDO EL 2026-08-15
+
+Las dos evidencias de arriba son de proceso —un trinquete que no obliga, un
+commit que no compilaba—. **Hay una tercera y es de la aplicación**, medida
+contra producción y sin sesión:
+
+**No existe `middleware`.** No hay ningún guardia que corra en el servidor antes
+de entregar una página. Comprobado: `/inicio` y `/modulos/categorias` devuelven
+**200 a cualquiera**, sin cookie.
+
+**Lo que eso NO es**, y hay que decirlo con el mismo cuidado:
+
+- **La cáscara no filtra.** El HTML de `/modulos/categorias` sin sesión son 9.367
+  caracteres de esqueleto de React: el título, el script del tema, las
+  referencias a los chunks y el árbol de layout vacío, con
+  `institucionalInicial: null`. **Leído, no contado por tamaño**: se buscaron seis
+  nombres que existen en la base —Arcor, Pepsico, Nutrisur, Minimarket, ayala y
+  un código de producto— y los seis dan cero.
+- **La API cierra.** Nueve rutas de lectura pedidas sin ninguna credencial
+  contestaron **401 "No autenticado"** con la lista vacía: `categorias/listar`,
+  `proveedores/listar`, `productos/listar`, `clientes/buscar`,
+  `catalogos/proveedores`, `pedidos/opciones` y `usuarios/listar`. Dos más
+  —`reportes/ventas`, `turnos/listar`— dieron 404 porque no existen con ese
+  nombre. `/api/version` es la única pública y devuelve **solo el buildId**.
+
+**Lo que falta, entonces, es exactamente el guardia de servidor**: hoy cualquier
+página que se agregue queda servida a cualquiera, y lo único que la protege es lo
+que esa página haga del lado del cliente. Una que no compruebe nada no tiene
+segunda barrera. **No es un incendio —no hay datos del otro lado— pero es la
+razón concreta por la que esta fase existe.**
+
+**LO QUE NO SE MIRÓ, y sin esto el párrafo de arriba engaña:**
+
+- **Nueve rutas de 206** bajo `app/api`. Es una muestra, no un censo.
+- **Ninguna de escritura.** Solo se probaron lecturas.
+- **Sin probar con un rol de menos permisos.** Todo lo de arriba es "sin sesión";
+  no se probó nada con una sesión válida y acotada.
+
+### ⚑ PREGUNTA PROPIA, Y ES LA QUE MÁS IMPORTA DE LAS DOS
+
+**¿Un operario puede pedirle a la API algo que su rol no debería ver?**
+
+Es distinta de la de arriba y es peor si la respuesta es que sí, por dos motivos:
+**del otro lado hay datos de verdad**, y **quien pregunta tiene una sesión
+válida**, así que ninguna de las barreras medidas hoy lo frena — el 401 no aplica
+y la cáscara ya la tiene.
+
+Lo que habría que medir: con una sesión de operario, pedir directamente las rutas
+que su pantalla no le muestra —costos, reportes de otro local, usuarios, roles— y
+ver si contestan con datos o con un 403. **No se probó nada de esto.**
+
+Y hay un antecedente que la hace menos hipotética: el `INC-0006` mostró que una
+ruta puede tener el alcance escrito **y aplicarlo mal** —`obtener` de proveedores
+acotaba por un campo que no existe— sin que nada avisara durante diecinueve días.
+
 ## Cuántas capas quedan: UNA cifra, y de dónde sale
 
 **PENDIENTE CONFIRMADO — reconciliado el 2026-08-13.** Había tres números
