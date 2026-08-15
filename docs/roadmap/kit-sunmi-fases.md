@@ -225,11 +225,58 @@ Y hay un antecedente que la hace menos hipotética: el `INC-0006` mostró que un
 ruta puede tener el alcance escrito **y aplicarlo mal** —`obtener` de proveedores
 acotaba por un campo que no existe— sin que nada avisara durante diecinueve días.
 
-**LO QUE FRENÓ ESTA MEDICIÓN, el 2026-08-15:** en `erpazul_dev` hay **un solo rol
-—`Admin` con el permiso `*`— y un solo usuario**. Para entrar con una sesión real
-de un rol acotado habría que crearlo, y **eso mediría una invención**: el riesgo
-depende de qué permisos tenga el rol que usa de verdad la caja, no de los que a
-uno le parezcan. Queda esperando la configuración real.
+**LO QUE FRENÓ ESTA MEDICIÓN, el 2026-08-15:** en `erpazul_dev` había **un solo
+rol —`Admin` con el permiso `*`— y un solo usuario**. Para entrar con una sesión
+real de un rol acotado habría que crearlo, y **eso mediría una invención**: el
+riesgo depende de qué permisos tenga el rol que usa de verdad la caja, no de los
+que a uno le parezcan.
+
+**DESTRABADA EL 2026-08-15, y la respuesta es que SÍ.** Emanuel pasó la
+configuración real —`CAJERO` en producción tiene cuatro permisos: los dos de
+puntos de clientes y los dos de cuenta corriente, y ninguno más—, se armó ese rol
+exacto en la base local y se entró con él.
+
+**`/api/proveedores/listar` le contesta con la lista completa**: nombres,
+teléfonos y días de pedido de los proveedores, a un rol que solo tiene permisos de
+`clientes.*`. La causa es de una línea —la ruta comprueba sesión y no comprueba
+permiso— y está escrita con su medición en
+[`INC-0007`](../incidents/INC-0007-proveedores-listar-sin-permiso.md).
+
+**Lo que ese incidente aporta al método, y vale más que el caso:** la primera
+corrida dio **200 con la lista vacía**, que se lee igual que un cierre. Lo estaba
+protegiendo **el dato y no la autorización** —el usuario de prueba estaba en un
+local sin proveedores—. Un 200 vacío no prueba nada hasta saber por qué está
+vacío.
+
+**Y esto cambia el peso de la fase.** El párrafo de más arriba dice que el guardia
+de servidor "no es un incendio porque no hay datos del otro lado". Eso sigue
+siendo cierto **de las páginas sin sesión**. De la API con una sesión válida y
+acotada ya no.
+
+### EL CENSO — 147 rutas de lectura pedidas corriendo, 2026-08-15
+
+No era una ruta: **son 19**. Se pidieron las 147 rutas que exportan `GET` con la
+cookie del CAJERO, una por una.
+
+- **147 probadas** de las 270 del repo.
+- **103 cierran bien**, todas con 403 y nombrando el permiso que falta.
+- **19 contestan datos que ese rol no debería ver.**
+
+Lo más grave de las 19 son **dos remitos en PDF con productos, cantidades y
+COSTOS** —`transferencias/pdf` y `pdf-recepcion`—, y **las ventas recientes con
+total, forma de pago, cliente y vendedor**. El detalle completo, con lo que
+entregó cada una y lo que el censo NO cierra, está en el `INC-0007`.
+
+**Ninguna de las 19 chequea permiso en su GET.** Cuatro lo tienen escrito, pero en
+el handler de escritura.
+
+**Y la fase 5 ya no alcanza para tapar esto.** Un guardia del lado del servidor
+resuelve que las PÁGINAS se sirvan a cualquiera; estas 19 se le contestan a alguien
+que tiene sesión válida, así que ningún guardia de sesión las frena. Lo que falta
+es un chequeo de PERMISO en el camino de lectura, y eso es trabajo aparte — más
+grande que la fase 5 y no lo mismo.
+
+**Sin arreglar, por consigna: primero el tamaño.**
 
 ### ⚑ AUTENTICAR PRIMERO, VALIDAR DESPUÉS
 
