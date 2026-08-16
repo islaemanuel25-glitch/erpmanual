@@ -1,6 +1,7 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import { declaraMargenVertical } from "@/lib/sunmi/claseNegociada";
 
 export default function SunmiSeparator({ label, className = "" }) {
   const { theme } = useSunmiTheme();
@@ -25,12 +26,22 @@ export default function SunmiSeparator({ label, className = "" }) {
   // separador va entre un título y una tabla.
   //
   // El comentario no se pierde: vive acá, que es donde el navegador no lo lee.
+
+  // Y EL MARGEN SE NEGOCIA: si la pantalla declara uno, la pieza no pone el suyo.
+  //
+  // Es el único eje que los consumidores pelean —las 15 declaraciones del repo
+  // son todas de margen vertical— y el que más falta hacía, porque acá el orden
+  // de la hoja es NUMÉRICO: contra `my-2`, un valor más grande gana solo y uno
+  // más chico pierde. Por eso hoy diez de las quince llevan `!important` y no
+  // por costumbre: sin él no se aplicarían.
+  const margen = declaraMargenVertical(className) ? "" : "my-2";
+
   return (
     <div
       className={`
         flex items-center gap-2
         text-[12px] text-slate-400
-        my-2
+        ${margen}
         ${className}
       `}
     >

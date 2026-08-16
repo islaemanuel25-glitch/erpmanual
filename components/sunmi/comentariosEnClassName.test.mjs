@@ -211,10 +211,28 @@ test("SunmiLoader: el `border-2` está DECLARADO, no filtrado de un comentario",
   assert.match(clases, /\bborder-2\b/, "el spinner se quedó sin anillo");
 });
 
-test("SunmiSeparator: declara `my-2` y ninguna de las que se filtraban", () => {
-  const clases = claseDe("components/sunmi/SunmiSeparator.jsx");
-  assert.match(clases, /\bmy-2\b/, "el separador perdió su margen");
-  assert.doesNotMatch(clases, /\bmy-4\b|\bmy-6\b/, "volvió a colarse el margen del comentario");
+// SE MIRA LA FUENTE ENTERA, NO SOLO LA CADENA DEL `className`.
+//
+// Este candado se puso ROJO al negociar el margen del separador, y tenía razón
+// en lo que preguntaba y no en dónde lo preguntaba: `my-2` dejó de estar DENTRO
+// de la cadena del `className` y pasó a una expresión —`declaraMargenVertical(…)
+// ? "" : "my-2"`—. La pieza sigue poniéndolo; lo que cambió es el lugar.
+//
+// Lo que este candado defiende NO es que el token viva en la cadena: es que al
+// sacar el comentario no se haya perdido lo que el comentario estaba
+// sosteniendo. Eso sigue valiendo igual, así que se lee el archivo sin
+// comentarios en vez del atributo.
+//
+// Que el margen se NEGOCIE bien es otra pregunta y tiene su propio candado, en
+// `lib/sunmi/claseNegociada.test.mjs`.
+test("SunmiSeparator: sigue poniendo `my-2` y ninguna de las que se filtraban", () => {
+  const fuente = fs
+    .readFileSync(path.join(RAIZ, "components/sunmi/SunmiSeparator.jsx"), "utf8")
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+
+  assert.match(fuente, /\bmy-2\b/, "el separador perdió su margen");
+  assert.doesNotMatch(fuente, /\bmy-4\b|\bmy-6\b/, "volvió a colarse el margen del comentario");
 });
 
 test("SunmiToggle: la pista y la perilla declaran lo suyo, sin las del comentario", () => {
