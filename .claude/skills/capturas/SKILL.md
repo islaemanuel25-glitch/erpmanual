@@ -316,6 +316,29 @@ que había cuando arrancó**. Un `npm run build` posterior deja al server con un
 manifiesto viejo y el navegador informa `Failed to load chunk`, con la pantalla
 en blanco. Se reinicia el server, no se persigue el síntoma.
 
+## La otra sonda del arnés: `sonda-cascada.mjs`
+
+No saca fotos. Contesta una pregunta que ninguna captura contesta y ningún
+candado puro puede: **¿una utilidad de Tailwind le sigue ganando a la clase del
+kit?**
+
+    MSYS_NO_PATHCONV=1 node scripts/sonda-cascada.mjs --base http://localhost:3000
+
+No necesita sesión ni credenciales —la hoja la sirve el layout raíz, así que mide
+sobre `/login`— y sale con **0** o **1**. Mide cuatro números:
+`.sunmi-btn-base` solo da 3,5 px y con `py-3` encima 10,5; `.sunmi-input` solo da
+7 px y con `px-3` encima 10,5. Los dos "solo" son el CONTROL: sin ellos, los otros
+dos no distinguen "la utilidad gana" de "la clase del kit no cargó".
+
+**Cuándo correrla:** después de tocar `app/globals.css`, `styles/sunmi.css`,
+cualquier hoja importada desde un layout, o al cambiar de versión de Tailwind. De
+eso cuelgan las 535 declaraciones que las pantallas escriben sobre `SunmiButton` y
+`SunmiInput`, y si se dan vuelta no rompen el build ni ponen la suite en rojo.
+
+El hermano barato es `lib/sunmi/ordenDeCascada.test.mjs`, que mira el orden en el
+archivo y sí está en la suite. Ninguno tapa al otro y está medido cuál agarra qué:
+ver el roadmap del kit, sección "ESCRITOS LOS DOS, Y CON SU CONTRAPRUEBA".
+
 ## El contraste WCAG es MAL JUEZ en el extremo oscuro
 
 Sirve para **comparar un antes contra un después**. No sirve para decidir si algo
