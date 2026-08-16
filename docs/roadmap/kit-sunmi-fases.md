@@ -4029,8 +4029,80 @@ motor, a un `@layer` y a cualquier otra forma de romperlo. El costo es que
 necesita el navegador, o sea que no entra en la suite de candados puros: va como
 sonda del arnés.
 
-**Ninguno de los dos existe hoy**, y `git grep` de `globals.css` en los
-`*.test.mjs` no devuelve nada: **no hay un solo candado que mire ese archivo.**
+#### ESCRITOS LOS DOS, Y CON SU CONTRAPRUEBA — 2026-08-16
+
+Decía *"ninguno de los dos existe hoy"*. Ya existen:
+
+- **El del archivo:** `lib/sunmi/ordenDeCascada.test.mjs`, nueve casos. Saca los
+  comentarios antes de mirar —`globals.css` tiene un bloque de comentario justo
+  encima de cada una de las dos líneas que mide— y falla cerrado en las cuatro
+  formas de no poder afirmar: sin `@import`, sin `@tailwind utilities`, con el
+  import repetido y con la marca duplicada. Lleva además **la premisa**: que
+  `.sunmi-btn-base` y `.sunmi-input` sigan viviendo en `styles/sunmi.css` y no
+  estén redeclaradas en `globals.css` después de las utilidades. Sin eso el orden
+  del `@import` sería correcto y no protegería nada — la forma exacta del candado
+  que mira el lugar equivocado.
+- **La sonda del navegador:** `scripts/sonda-cascada.mjs`. Corre sin sesión sobre
+  `/login`, porque la hoja la sirve el layout raíz. Sale 0 o 1.
+
+**La sonda mide CUATRO cosas y no dos, y ese es su punto.** Con solo el par
+mezclado, un `.sunmi-btn-base` que se quedara sin `padding-block` daría 10,5 px
+igual y la sonda contestaría verde midiendo una utilidad contra nadie. Así que
+cada pieza va con su control:
+
+- `.sunmi-btn-base` solo → **3,5 px**; con `py-3` encima → **10,5 px**.
+- `.sunmi-input` solo → **7 px**; con `px-3` encima → **10,5 px**.
+
+Y antes de medir comprueba que las cuatro reglas ESTÉN en la hoja servida, que es
+la trampa de la sección siguiente: una utilidad que Tailwind nunca generó mide
+exactamente igual que una que no gana.
+
+##### LA CONTRAPRUEBA, Y CORRIGE UNA PREMISA DE ARRIBA
+
+Este párrafo daba por hecho que mover la línea da vuelta las 535 declaraciones
+**en silencio**. Se probó moviéndola, y **no es así**: `@import` tiene que
+preceder a todas las demás reglas, así que con el `@import` debajo de
+`@tailwind utilities` Turbopack no compila el archivo y `/login` contesta **500,
+"Parsing CSS source code failed"**. La inversión literal es ruidosa.
+
+**Lo silencioso es la otra mitad, la que el candado del archivo no puede ver.**
+Se ejerció con una hoja descartable importada desde `app/layout.jsx` que
+redeclara las dos clases del kit después de las utilidades —que es lo que haría
+un `@layer`, otro import, o la migración a v4—:
+
+- **el candado del archivo quedó en VERDE**, 9 de 9, porque `globals.css` estaba
+  intacto;
+- **la sonda se puso ROJA en los cuatro números**: los dos controles siguieron
+  dando 3,5 y 7, y los dos mezclados **cayeron** de 10,5 a 3,5 y de 10,5 a 7. Esa
+  es la firma exacta que busca.
+
+Con el orden bueno los dos vuelven a verde. O sea que el reparto de trabajo entre
+los dos candados no es teórico: **está medido cuál agarra qué.**
+
+Y ante la versión ruidosa —la página de error— la sonda **no informó verde**:
+salió en rojo diciendo que la hoja no tiene `.sunmi-btn-base` y que por eso no
+mide nada. Una página de error es perfectamente determinista, y ese es el modo en
+que este arnés ya mintió dos veces.
+
+##### DOS DEFECTOS DE LA SONDA QUE APARECIERON CORRIÉNDOLA
+
+Ninguno se veía leyéndola, y los dos habrían dejado un candado que acompaña:
+
+1. **`CSSStyleRule` también tiene `cssRules`.** Escrita como *"si tiene
+   `cssRules`, bajá y seguí"*, la recursión que enumera la hoja se saltea **todas**
+   las reglas de estilo, porque en Chrome moderno el anidamiento de CSS es parte
+   del estándar y hasta una regla simple trae la lista, vacía. La primera corrida
+   informó "faltan las cuatro clases" sobre una hoja de 30 reglas. Con el `if`
+   arreglado enumera 1.534.
+2. **La línea del orden informaba la PRIMERA aparición de cada selector.** En la
+   corrida de la contraprueba —donde la clase del kit aparece dos veces— eso
+   imprimió *"la utilidad va después, que es lo que la hace ganar"* justo cuando
+   la utilidad estaba perdiendo. Ahora guarda todas las apariciones, informa la
+   **última**, que es la que decide, y avisa cuando un selector está repetido.
+
+Y una tercera que no es de la sonda sino del método: **el backtick adentro de un
+comentario adentro de un template literal**, por quinta vez en el repo. Lo agarró
+`scripts/scriptsCompilan.test.mjs`, que existe justamente para eso.
 
 ### ⚑ NO SE PUEDE MEDIR "¿GANA SIN EL `!`?" INYECTANDO LA CLASE PELADA
 
