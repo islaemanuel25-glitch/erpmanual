@@ -860,7 +860,7 @@ export default function EdicionRapidaPage() {
                 return count > 0 ? (
                   <SunmiButton
                     color="primary"
-                    className="!text-[11px] !px-3 !py-1 shrink-0 self-center"
+                    className="text-[11px] px-3 py-1 shrink-0 self-center"
                     disabled={bulkSaving}
                     onClick={handleSaveSelected}
                   >
@@ -889,7 +889,7 @@ export default function EdicionRapidaPage() {
                   </SunmiSelectAdv>
                   <SunmiButton
                     color="amber"
-                    className="!text-[11px] !px-2 !py-1"
+                    className="text-[11px] px-2 py-1"
                     disabled={!bulkProveedor}
                     onClick={() => { applyBulk("proveedorId", bulkProveedor); setBulkProveedor(""); }}
                   >
@@ -914,7 +914,7 @@ export default function EdicionRapidaPage() {
                   </SunmiSelectAdv>
                   <SunmiButton
                     color="amber"
-                    className="!text-[11px] !px-2 !py-1"
+                    className="text-[11px] px-2 py-1"
                     disabled={!bulkCategoria}
                     onClick={() => { applyBulk("categoriaId", bulkCategoria); setBulkCategoria(""); }}
                   >
@@ -939,7 +939,7 @@ export default function EdicionRapidaPage() {
                   </SunmiSelectAdv>
                   <SunmiButton
                     color="amber"
-                    className="!text-[11px] !px-2 !py-1"
+                    className="text-[11px] px-2 py-1"
                     disabled={!bulkArea}
                     onClick={() => { applyBulk("areaFisicaId", bulkArea); setBulkArea(""); }}
                   >
@@ -1015,7 +1015,7 @@ export default function EdicionRapidaPage() {
                                   color="amber"
                                   onClick={() => handleSaveRow(row)}
                                   disabled={rowStatus[row.id] === "saving"}
-                                  className="!text-[11px] !px-2 !py-1"
+                                  className="text-[11px] px-2 py-1"
                                 >
                                   {rowStatus[row.id] === "saving" ? "..." : "Guardar"}
                                 </SunmiButton>

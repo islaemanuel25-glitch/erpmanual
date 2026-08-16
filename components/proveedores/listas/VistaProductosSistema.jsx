@@ -126,7 +126,7 @@ export default function VistaProductosSistema({ importacionId, situacion, onVolv
         <SunmiButton
           color="slate"
           onClick={onVolver}
-          className="py-1.5 px-3 !text-[11.5px] inline-flex items-center gap-1 shrink-0"
+          className="py-1.5 px-3 text-[11.5px] inline-flex items-center gap-1 shrink-0"
         >
           <ArrowLeft size={13} aria-hidden="true" />
           Volver a la conciliación
@@ -233,7 +233,7 @@ export default function VistaProductosSistema({ importacionId, situacion, onVolv
             color="slate"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1 || cargando}
-            className="py-1 px-2 !text-[11px]"
+            className="py-1 px-2 text-[11px]"
           >
             Anterior
           </SunmiButton>
@@ -244,7 +244,7 @@ export default function VistaProductosSistema({ importacionId, situacion, onVolv
             color="slate"
             onClick={() => setPage((p) => Math.min(pag.paginas, p + 1))}
             disabled={page >= pag.paginas || cargando}
-            className="py-1 px-2 !text-[11px]"
+            className="py-1 px-2 text-[11px]"
           >
             Siguiente
           </SunmiButton>

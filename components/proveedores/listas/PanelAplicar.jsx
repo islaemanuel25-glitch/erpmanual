@@ -75,7 +75,7 @@ export default function PanelAplicar({
           color="slate"
           onClick={onSeleccionarTodos}
           disabled={trabajando || seleccionables === 0}
-          className="py-1.5 px-3 !text-[11.5px]"
+          className="py-1.5 px-3 text-[11.5px]"
         >
           Seleccionar todas las listas
         </SunmiButton>
@@ -83,7 +83,7 @@ export default function PanelAplicar({
           color="slate"
           onClick={onDeseleccionar}
           disabled={trabajando || seleccionadas === 0}
-          className="py-1.5 px-3 !text-[11.5px]"
+          className="py-1.5 px-3 text-[11.5px]"
         >
           Deseleccionar
         </SunmiButton>
@@ -116,7 +116,7 @@ export default function PanelAplicar({
             onPedirPrevio?.();
           }}
           disabled={!puedeAplicar}
-          className="py-3 px-4 font-bold !text-xs inline-flex items-center justify-center gap-1"
+          className="py-3 px-4 font-bold text-xs inline-flex items-center justify-center gap-1"
         >
           <PlayCircle size={14} aria-hidden="true" />
           Aplicar cambios
@@ -226,7 +226,7 @@ export default function PanelAplicar({
             <SunmiButton
               color="slate"
               onClick={() => setConfirmando(false)}
-              className="py-2 !text-xs order-2 sm:order-1"
+              className="py-2 text-xs order-2 sm:order-1"
             >
               Cancelar
             </SunmiButton>
@@ -237,7 +237,7 @@ export default function PanelAplicar({
                 onAplicar?.(modo);
               }}
               disabled={!confirmadoLeido || cargandoPrevio}
-              className="py-2 font-bold !text-xs order-1 sm:order-2"
+              className="py-2 font-bold text-xs order-1 sm:order-2"
             >
               Sí, aplicar {seleccionadas} {seleccionadas === 1 ? "fila" : "filas"}
             </SunmiButton>

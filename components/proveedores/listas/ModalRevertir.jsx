@@ -118,14 +118,14 @@ export default function ModalRevertir({ abierto, importacionId, onCerrar, onReve
       destructivo
       footer={
         <div className="flex items-center justify-end gap-2 flex-wrap">
-          <SunmiButton color="slate" onClick={onCerrar} disabled={trabajando} className="py-2 !text-xs">
+          <SunmiButton color="slate" onClick={onCerrar} disabled={trabajando} className="py-2 text-xs">
             No, volver
           </SunmiButton>
           <SunmiButton
             color="amber"
             onClick={revertir}
             disabled={!puede}
-            className="py-2 font-bold !text-xs inline-flex items-center gap-1"
+            className="py-2 font-bold text-xs inline-flex items-center gap-1"
           >
             <Undo2 size={14} aria-hidden="true" />
             {trabajando

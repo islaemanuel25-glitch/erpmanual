@@ -160,7 +160,7 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
           {/* El texto NO repite el del botón de la fila. Dos botones con la
               misma etiqueta y distinto efecto —uno abre el panel, el otro elige
               el producto— es una trampa: el usuario cree que ya confirmó. */}
-          <SunmiButton color="cyan" onClick={elegirSugerido} className="py-1.5 px-3 !text-xs">
+          <SunmiButton color="cyan" onClick={elegirSugerido} className="py-1.5 px-3 text-xs">
             Usar este producto
           </SunmiButton>
         </div>
@@ -190,7 +190,7 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
               color="cyan"
               onClick={buscar}
               disabled={buscando}
-              className="py-2 px-3 !text-xs"
+              className="py-2 px-3 text-xs"
             >
               <Search size={14} aria-hidden="true" />
             </SunmiButton>
@@ -273,7 +273,7 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
                 setError(null);
               }}
               disabled={confirmando}
-              className="py-2 !text-xs order-2 sm:order-1"
+              className="py-2 text-xs order-2 sm:order-1"
             >
               Elegir otro
             </SunmiButton>
@@ -281,7 +281,7 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
               color="cyan"
               onClick={confirmar}
               disabled={confirmando}
-              className="py-2 font-bold !text-xs order-1 sm:order-2"
+              className="py-2 font-bold text-xs order-1 sm:order-2"
             >
               {confirmando ? "Vinculando…" : "Confirmar vínculo"}
             </SunmiButton>
