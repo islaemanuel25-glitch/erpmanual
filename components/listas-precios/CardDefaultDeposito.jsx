@@ -102,8 +102,23 @@ export default function CardDefaultDeposito({ puedeEditar = true }) {
       ? `Actualmente el depósito vende por defecto con: ${cfg.listaActual.nombre}`
       : "Actualmente el depósito utiliza el precio normal de cada producto.";
 
+  // ACÁ DECÍA `p-0` Y NUNCA SE APLICÓ: LA TARJETA DIBUJABA 21 px.
+  //
+  // `SunmiCard` concatenaba su `p-6`, y entre dos utilidades de la misma familia
+  // decide el orden de la hoja de Tailwind y no el del atributo. Desde que la
+  // pieza cede ante un pedido de cero, ese `p-0` empezaría a aplicarse — y acá
+  // no corresponde.
+  //
+  // Las otras siete tarjetas que piden cero son TABLAS: el cero las hace ir de
+  // borde a borde, que es para lo que está el `overflow-hidden`. Esta es un
+  // FORMULARIO, y el cero le aprieta el título y el selector contra el marco.
+  // Se miró en una captura antes de decidirlo.
+  //
+  // Queda declarado el `p-6` que ya venía dibujando, así que el código dice lo
+  // que el navegador hace. Si algún día se decide apretar el aire de toda la
+  // aplicación, esta tarjeta entra en esa decisión y no en la de las tablas.
   return (
-    <SunmiCard className="p-0 overflow-hidden">
+    <SunmiCard className="p-6 overflow-hidden">
       <div className="p-3">
         <SunmiCardHeader title={`Lista predeterminada del depósito — ${ubicacionNombre}`} />
         <p className="text-[11px] text-slate-500 mt-1">

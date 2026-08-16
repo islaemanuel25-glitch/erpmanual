@@ -3,6 +3,7 @@
 import { useSunmiTheme } from "./SunmiThemeProvider";
 import {
   declaraDifuminado,
+  declaraPaddingCero,
   declaraSombra,
   tarjetaQueSobrevive,
 } from "@/lib/sunmi/claseNegociada";
@@ -28,7 +29,25 @@ import {
 // entre dos utilidades de la misma familia decide el orden de la hoja y no el del
 // atributo. Es exactamente lo que ya había pasado en `SunmiPanel`.
 
-// EL PADDING DICE p-6 PORQUE p-6 ES LO QUE EL NAVEGADOR DIBUJA.
+// EL PADDING CEDE SOLO CUANDO LA PANTALLA PIDE CERO. EL AIRE TODAVÍA NO.
+//
+// De las 108 declaraciones de padding, OCHO piden cero y las otras 100 piden
+// menos aire —49 `p-3`, 30 `p-4` y el resto sueltas—. Son dos decisiones
+// distintas y por eso se migran por separado: el porqué está entero al lado de
+// `declaraPaddingCero`, en `lib/sunmi/claseNegociada.js`.
+//
+// De las ocho de cero se migraron SIETE: las que son tablas. La octava, la de
+// `CardDefaultDeposito`, es un formulario y quedó afuera declarando el `p-6`
+// que ya dibujaba.
+//
+// Qué se ve al aplicarlo: la tabla pasa a tocar los dos bordes de la tarjeta
+// —para eso está el `overflow-hidden` que las siete traen— y cada tarjeta baja
+// 42 px de alto, que son los 21 de arriba más los 21 de abajo.
+//
+// Medido en la tarjeta real, no en un elemento inyectado: antes daba 21 px por
+// los cuatro lados con `p-0` escrito en el código, y después da 0.
+
+// EL RESTO DEL PADDING DICE p-6 PORQUE p-6 ES LO QUE EL NAVEGADOR DIBUJA.
 //
 // Acá decía `p-3 /* antes p-4 / p-6 */`, y ese comentario NO era un comentario:
 // vive adentro de la cadena del `className`, así que el navegador leía `p-3`,
@@ -58,11 +77,14 @@ export default function SunmiCard({ children, className = "", ...props }) {
   const tarjeta = tarjetaQueSobrevive(theme.card, className);
   const sombra = declaraSombra(className) ? "" : "shadow-md";
   const difuminado = declaraDifuminado(className) ? "" : "backdrop-blur-sm";
+  // Cede el padding SOLO ante un pedido de cero. Ante un `p-3` o un `p-4` la
+  // pieza sigue poniendo su `p-6` y sigue ganando, que es lo de hoy.
+  const relleno = declaraPaddingCero(className) ? "" : "p-6";
 
   return (
     <div
       {...props}
-      className={`${tarjeta} rounded-xl ${sombra} p-6 ${difuminado} ${className}`
+      className={`${tarjeta} rounded-xl ${sombra} ${relleno} ${difuminado} ${className}`
         .replace(/\s+/g, " ")
         .trim()}
     >
