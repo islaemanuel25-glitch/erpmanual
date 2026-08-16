@@ -3661,6 +3661,41 @@ NIVEL**, contando llaves. Con el número malo, `SunmiRow` figuraba con un consum
 que le pasa `className` y **no le pasa ninguno**: estuvo a punto de ser elegido
 como la migración más barata.
 
+### Y HUBO UNA TERCERA VUELTA, QUE ES LA QUE FALTABA: LAS VARIABLES
+
+**2026-08-15, migrando `SunmiCard`.** Acotar la etiqueta al primer nivel arregla
+*dónde* se lee el `className`. No arregla *qué dice*.
+
+Cuando una pantalla escribe `className={cardClass}`, el token que se lee es la
+palabra `cardClass`, que no es de ninguna familia de Tailwind — así que el conteo
+la da por inocente. Y `cardClass` vale, tres líneas más arriba del mismo archivo,
+`p-4 border border-current/[0.06] shadow-sm`: borde Y sombra.
+
+El primer conteo de `SunmiCard` dijo **seis declaraciones en tres pantallas**. El
+verdadero es **once usos en ocho archivos**. Los dos que faltaban son
+`ActividadReciente` y `UltimasVentas`, o sea el tablero entero y `/inicio`.
+
+**Y `UltimasVentas` se escapó una segunda vez, por otro motivo:** su `className`
+es un ternario con `${CARD_BASE}` adentro, y el lector de llaves cerraba en la
+primera `}` que encontraba —la del `${`— en vez de contarlas. Dos agujeros
+distintos en el mismo conteo.
+
+**Lo que lo encontró no fue releer nada.** Fue que `/inicio`, que estaba puesta
+como CONTROL y tenía que dar cero píxeles, se moviera 5.308. Es la misma familia
+que ya viene mordiendo toda la fase: un resultado perfectamente reproducible **de
+la pregunta equivocada**. Tres corridas idénticas prueban que no hay ruido; no
+prueban que se esté midiendo lo que uno cree.
+
+En la práctica, para el próximo conteo de consumidores:
+
+1. Atributos de **primer nivel**, contando llaves.
+2. Al cerrar un valor `{…}`, **contar las llaves**, que `${}` anida.
+3. **Resolver las `const X = "…"` del mismo archivo** antes de clasificar, e
+   informar aparte cuántos quedaron sin resolver — un ternario o una función no
+   se adivinan, y decir cuántos son es parte de la afirmación.
+4. Y poner **controles que puedan fallar**. Ninguno de los tres pasos de arriba
+   se le ocurrió a nadie leyendo: los tres salieron de que un control se moviera.
+
 ## El arnés de captura, y por qué una captura sola no prueba nada
 
 ### ⚠️ LA LÍNEA DE BASE DE HUELLAS YA NO ES COMPARABLE
