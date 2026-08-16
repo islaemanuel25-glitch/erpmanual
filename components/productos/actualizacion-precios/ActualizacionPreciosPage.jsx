@@ -808,7 +808,7 @@ export default function ActualizacionPreciosPage() {
                 <>
                   <SunmiSeparator
                     label="Ajuste de precios"
-                    className="!my-0"
+                    className="my-0"
                   />
 
                   {/* Toolbar sticky: % global + aplicar */}
@@ -953,7 +953,7 @@ export default function ActualizacionPreciosPage() {
               {/* Exportar */}
               <SunmiSeparator
                 label="Exportar productos"
-                className="!my-0"
+                className="my-0"
               />
 
               <SunmiRow
@@ -995,7 +995,7 @@ export default function ActualizacionPreciosPage() {
               {/* Importar */}
               <SunmiSeparator
                 label="Importar cambios"
-                className="!my-0"
+                className="my-0"
               />
 
               <div>
@@ -1021,7 +1021,7 @@ export default function ActualizacionPreciosPage() {
                 <>
                   <SunmiSeparator
                     label={`Preview (${excelPreview.length} productos)`}
-                    className="!my-0"
+                    className="my-0"
                   />
 
                   <SunmiTable
@@ -1071,7 +1071,7 @@ export default function ActualizacionPreciosPage() {
           {/* =================== TAB: MARGEN MASIVO =================== */}
           {tab === "margen" && (
             <>
-              <SunmiSeparator label="Configuración" className="!my-0" />
+              <SunmiSeparator label="Configuración" className="my-0" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <div>
@@ -1125,7 +1125,7 @@ export default function ActualizacionPreciosPage() {
                 )}
               </div>
 
-              <SunmiSeparator label="Filtros (opcionales)" className="!my-0" />
+              <SunmiSeparator label="Filtros (opcionales)" className="my-0" />
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <div>
@@ -1230,7 +1230,7 @@ export default function ActualizacionPreciosPage() {
                 <>
                   <SunmiSeparator
                     label={`Vista previa (${margenItems.length} productos)`}
-                    className="!my-0"
+                    className="my-0"
                   />
                   <SunmiTable
                     headers={[

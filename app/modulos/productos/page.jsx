@@ -888,7 +888,7 @@ export default function ProductosPage() {
           {activeTab === "listado" && (
             <>
               {/* FILTROS */}
-              <SunmiSeparator label="Filtros" className="!my-1" />
+              <SunmiSeparator label="Filtros" className="my-1" />
 
               <FiltrosProductos
                 initial={filtros}
@@ -934,7 +934,7 @@ export default function ProductosPage() {
               </div>
 
               {/* LISTADO */}
-              <SunmiSeparator label="Listado" className="!my-1" />
+              <SunmiSeparator label="Listado" className="my-1" />
 
               <div className="w-full mt-1">
                   <SunmiTablaProductos
@@ -1004,7 +1004,7 @@ export default function ProductosPage() {
 
               {puedeExportar && (
               <>
-              <SunmiSeparator label="Exportar productos" className="!my-1" />
+              <SunmiSeparator label="Exportar productos" className="my-1" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 px-1">
                 <div>
@@ -1049,7 +1049,7 @@ export default function ProductosPage() {
               {/* =====================================================
                   IMPORTAR
                   ===================================================== */}
-              <SunmiSeparator label="Importar productos" className="!my-2" />
+              <SunmiSeparator label="Importar productos" className="my-2" />
 
               {/* Plantilla + Instructivo */}
               <div className="px-1 mt-1 mb-2">
