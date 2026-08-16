@@ -3982,6 +3982,49 @@ ve, no lo que hay.
 
 ## El arnés de captura, y por qué una captura sola no prueba nada
 
+### ⚑ NO SE PUEDE MEDIR "¿GANA SIN EL `!`?" INYECTANDO LA CLASE PELADA
+
+**Encontrado el 2026-08-16, midiendo `SunmiSeparator`. Invalida una vía que se
+usó en la tanda anterior.**
+
+El método era: inyectar la clase con `!`, inyectarla sin `!`, y comparar. Si la
+pelada gana igual, el `!` no hace falta.
+
+**No sirve cuando la clase pelada no está en la hoja.** Tailwind genera **solo lo
+que encuentra escrito en el código**. Si el repo nunca escribe `my-0` sin el `!`,
+la regla `.my-0` **no existe**, y medirla devuelve el valor por defecto — que se
+lee exactamente igual que "no gana".
+
+Comprobado enumerando las reglas `.my-*` que la ruta sirve: están `.\!my-0`,
+`.\!my-1`, `.\!my-2`, `.my-1`, `.my-2`, `.my-3`, `.my-4` y `.my-6`. **`.my-0` no
+está.** Y la sonda decía a la vez "clase ausente" y "el token cambia el valor de
+7 px a 0", que no pueden ser ciertas del mismo selector: eran dos selectores.
+
+**La única vía que queda en pie: editar el archivo y volver a medir**, porque
+recién ahí Tailwind genera la clase. Se hizo así con los diez `!` del separador,
+y el número salió del elemento real —3,5 px con `my-1` a secas— y no de una
+inyección.
+
+#### Y LO DE `SunmiButton` FUE SUERTE, NO DISEÑO — pero se comprobó
+
+Los 151 `!` del botón se sacaron con el método que ahora está invalidado. La
+comprobación hacia atrás dio limpio: **las quince clases peladas ya estaban en la
+hoja** que servía la imagen `a285f1c`, así que las 151 declaraciones se midieron
+contra algo que existía y ninguna se sacó a ciegas.
+
+Por qué estaban: esas clases —`text-xs`, `py-3`, `font-bold`, `text-[11px]`…— se
+usan **sin** `!` en otras partes del repo, así que Tailwind ya las generaba.
+`my-0` no la escribe nadie sin `!` en ningún lado.
+
+**Y así hay que decirlo: fue suerte.** Si el botón hubiera usado un valor que
+solo aparece con `!`, la medición habría sido ciega y el cambio ya estaría
+desplegado.
+
+**Cómo se comprueba, que es la parte reusable:** no se le puede preguntar al dev
+server de hoy —ahí las peladas existen porque las escribió la propia tanda, y la
+comprobación sale circular—. Se saca el CSS de **la imagen anterior**, con un
+contenedor descartable de ese tag, y se busca el selector escapado de cada clase.
+
 ### ⚑ LA FUENTE QUE NO CARGÓ: TRES CORRIDAS IDÉNTICAS DE LA PANTALLA EQUIVOCADA
 
 **Encontrado el 2026-08-16, migrando el aire de `SunmiCard`.**
