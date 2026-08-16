@@ -337,7 +337,7 @@ export default function NuevaImportacionPage() {
                   onClick={() =>
                     router.push(`/modulos/proveedores/listas/${errorEnvio.importacionId}`)
                   }
-                  className="py-2 !text-xs"
+                  className="py-2 text-xs"
                 >
                   Abrir la importación existente
                 </SunmiButton>
@@ -350,7 +350,7 @@ export default function NuevaImportacionPage() {
               color="slate"
               onClick={() => router.push("/modulos/proveedores/listas")}
               disabled={enviando}
-              className="py-3 !text-xs order-2 sm:order-1"
+              className="py-3 text-xs order-2 sm:order-1"
             >
               Cancelar
             </SunmiButton>
@@ -358,7 +358,7 @@ export default function NuevaImportacionPage() {
               color="cyan"
               onClick={importar}
               disabled={!puedeEnviar}
-              className="py-3 font-bold !text-xs order-1 sm:order-2 inline-flex items-center justify-center gap-1"
+              className="py-3 font-bold text-xs order-1 sm:order-2 inline-flex items-center justify-center gap-1"
             >
               <Upload size={14} aria-hidden="true" />
               {enviando ? "Importando…" : "Importar y conciliar"}

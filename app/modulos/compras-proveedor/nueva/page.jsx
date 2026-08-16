@@ -1294,7 +1294,7 @@ export default function NuevaCompraProveedorPage() {
         <div className={compact ? "flex gap-1 shrink-0" : "flex gap-1.5 shrink-0"}>
           <SunmiButton
             color="cyan"
-            className={compact ? "!px-2 !py-0.5 text-[11px]" : "!px-2.5 !py-1 text-[12px]"}
+            className={compact ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-[12px]"}
             onClick={() =>
               router.push(`/modulos/compras-proveedor/nueva?pedidoId=${borradorExistente.id}`)
             }
@@ -1303,7 +1303,7 @@ export default function NuevaCompraProveedorPage() {
           </SunmiButton>
           <SunmiButton
             color="slate"
-            className={compact ? "!px-2 !py-0.5 text-[11px]" : "!px-2.5 !py-1 text-[12px]"}
+            className={compact ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-[12px]"}
             onClick={() => setBorradorExistente(null)}
           >
             {compact ? "Nuevo" : "Crear pedido nuevo"}
@@ -1546,7 +1546,7 @@ export default function NuevaCompraProveedorPage() {
         <div className="flex gap-2">
           <SunmiButton
             color="cyan"
-            className="flex-1 !py-1.5 text-[13px]"
+            className="flex-1 py-1.5 text-[13px]"
             disabled={accionesDeshabilitadas}
             onClick={guardarPendiente}
           >
@@ -1554,7 +1554,7 @@ export default function NuevaCompraProveedorPage() {
           </SunmiButton>
           <SunmiButton
             color="amber"
-            className="flex-1 !py-1.5 text-[13px]"
+            className="flex-1 py-1.5 text-[13px]"
             disabled={accionesDeshabilitadas}
             onClick={enviarPedido}
           >
@@ -1579,7 +1579,7 @@ export default function NuevaCompraProveedorPage() {
           <div className="flex gap-2 shrink-0 ml-auto">
             <SunmiButton
               color="slate"
-              className="!px-3 !py-1.5 text-[13px]"
+              className="px-3 py-1.5 text-[13px]"
               disabled={lineasCount === 0}
               onClick={() => setResumenOpen(true)}
             >
@@ -1587,7 +1587,7 @@ export default function NuevaCompraProveedorPage() {
             </SunmiButton>
             <SunmiButton
               color="cyan"
-              className="!px-3 !py-1.5 text-[13px]"
+              className="px-3 py-1.5 text-[13px]"
               disabled={accionesDeshabilitadas}
               onClick={guardarPendiente}
             >
@@ -1595,7 +1595,7 @@ export default function NuevaCompraProveedorPage() {
             </SunmiButton>
             <SunmiButton
               color="amber"
-              className="!px-3 !py-1.5 text-[13px]"
+              className="px-3 py-1.5 text-[13px]"
               disabled={accionesDeshabilitadas}
               onClick={enviarPedido}
             >
@@ -2272,7 +2272,7 @@ export default function NuevaCompraProveedorPage() {
                 <div className="flex items-center justify-center gap-2 mt-2 text-[11px]">
                   <SunmiButton
                     color="slate"
-                    className="!px-2.5 !py-1"
+                    className="px-2.5 py-1"
                     disabled={pageEff <= 1}
                     onClick={() => setPageNum((n) => Math.max(1, n - 1))}
                   >
@@ -2283,7 +2283,7 @@ export default function NuevaCompraProveedorPage() {
                   </span>
                   <SunmiButton
                     color="slate"
-                    className="!px-2.5 !py-1"
+                    className="px-2.5 py-1"
                     disabled={pageEff >= totalPages}
                     onClick={() => setPageNum((n) => Math.min(totalPages, n + 1))}
                   >

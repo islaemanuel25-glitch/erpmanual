@@ -152,7 +152,7 @@ export default function HistorialListasPage() {
           <SunmiButton
             color="cyan"
             onClick={() => router.push("/modulos/proveedores/listas/nueva")}
-            className="py-2 !text-xs inline-flex items-center gap-1"
+            className="py-2 text-xs inline-flex items-center gap-1"
           >
             <Plus size={14} aria-hidden="true" />
             Nueva importación
@@ -176,7 +176,7 @@ export default function HistorialListasPage() {
             <SunmiButton
               color="cyan"
               onClick={() => router.push("/modulos/proveedores/listas/nueva")}
-              className="py-2 !text-xs"
+              className="py-2 text-xs"
             >
               Nueva importación
             </SunmiButton>
@@ -198,7 +198,7 @@ export default function HistorialListasPage() {
               color="slate"
               onClick={() => setCancelando(null)}
               disabled={trabajandoCancelar}
-              className="py-2 !text-xs order-2 sm:order-1"
+              className="py-2 text-xs order-2 sm:order-1"
             >
               No, volver
             </SunmiButton>
@@ -206,7 +206,7 @@ export default function HistorialListasPage() {
               color="red"
               onClick={() => cancelar(cancelando)}
               disabled={trabajandoCancelar}
-              className="py-2 font-bold !text-xs order-1 sm:order-2"
+              className="py-2 font-bold text-xs order-1 sm:order-2"
             >
               {trabajandoCancelar ? "Cancelando…" : "Sí, cancelar la importación"}
             </SunmiButton>
@@ -276,7 +276,7 @@ export default function HistorialListasPage() {
                         <SunmiButton
                           color="cyan"
                           onClick={() => router.push(`/modulos/proveedores/listas/${i.id}`)}
-                          className="py-1.5 px-3 !text-xs"
+                          className="py-1.5 px-3 text-xs"
                         >
                           Ver
                         </SunmiButton>
@@ -284,7 +284,7 @@ export default function HistorialListasPage() {
                           <SunmiButton
                             color="slate"
                             onClick={() => setCancelando(i.id)}
-                            className="py-1.5 px-3 !text-xs ml-1"
+                            className="py-1.5 px-3 text-xs ml-1"
                           >
                             Cancelar
                           </SunmiButton>
@@ -323,7 +323,7 @@ export default function HistorialListasPage() {
                 <SunmiButton
                   color="cyan"
                   onClick={() => router.push(`/modulos/proveedores/listas/${i.id}`)}
-                  className="w-full py-2 !text-xs"
+                  className="w-full py-2 text-xs"
                 >
                   Ver conciliación
                 </SunmiButton>
@@ -331,7 +331,7 @@ export default function HistorialListasPage() {
                   <SunmiButton
                     color="slate"
                     onClick={() => setCancelando(i.id)}
-                    className="w-full py-2 !text-xs"
+                    className="w-full py-2 text-xs"
                   >
                     Cancelar importación
                   </SunmiButton>

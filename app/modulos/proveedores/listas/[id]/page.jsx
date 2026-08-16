@@ -544,7 +544,7 @@ export default function CatalogoImportacionPage() {
                   <SunmiButton
                     color="slate"
                     onClick={() => setRevirtiendo(true)}
-                    className="py-1.5 px-2.5 !text-[11px] inline-flex items-center gap-1"
+                    className="py-1.5 px-2.5 text-[11px] inline-flex items-center gap-1"
                   >
                     <Undo2 size={13} aria-hidden="true" /> Deshacer la aplicación
                   </SunmiButton>
@@ -568,7 +568,7 @@ export default function CatalogoImportacionPage() {
                   <SunmiButton
                     color="slate"
                     onClick={() => setRevirtiendo(true)}
-                    className="py-1.5 px-2.5 !text-[11px] inline-flex items-center gap-1"
+                    className="py-1.5 px-2.5 text-[11px] inline-flex items-center gap-1"
                   >
                     <Undo2 size={13} aria-hidden="true" /> Deshacer la aplicación
                   </SunmiButton>
@@ -579,7 +579,7 @@ export default function CatalogoImportacionPage() {
                   color="slate"
                   onClick={() => setTerminando(true)}
                   disabled={trabajandoTerminar}
-                  className="py-1.5 px-2.5 !text-[11px] inline-flex items-center gap-1"
+                  className="py-1.5 px-2.5 text-[11px] inline-flex items-center gap-1"
                 >
                   <CheckCheck size={13} aria-hidden="true" /> Terminar importación
                 </SunmiButton>
@@ -587,7 +587,7 @@ export default function CatalogoImportacionPage() {
                   color="slate"
                   onClick={() => setCancelando(true)}
                   disabled={trabajandoCancelar}
-                  className="py-1.5 px-2.5 !text-[11px]"
+                  className="py-1.5 px-2.5 text-[11px]"
                 >
                   Cancelar importación
                 </SunmiButton>
@@ -598,14 +598,14 @@ export default function CatalogoImportacionPage() {
                       No se modifica ningún costo ni producto.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
-                      <SunmiButton color="slate" onClick={() => setCancelando(false)} className="py-2 !text-xs">
+                      <SunmiButton color="slate" onClick={() => setCancelando(false)} className="py-2 text-xs">
                         No, volver
                       </SunmiButton>
                       <SunmiButton
                         color="red"
                         onClick={cancelarImportacion}
                         disabled={trabajandoCancelar}
-                        className="py-2 font-bold !text-xs"
+                        className="py-2 font-bold text-xs"
                       >
                         {trabajandoCancelar ? "Cancelando…" : "Sí, cancelar"}
                       </SunmiButton>
@@ -638,7 +638,7 @@ export default function CatalogoImportacionPage() {
                   setPage(1);
                   setQAplicado(q.trim());
                 }}
-                className="py-1.5 px-3 !text-[11px] inline-flex items-center gap-1"
+                className="py-1.5 px-3 text-[11px] inline-flex items-center gap-1"
               >
                 <Search size={13} aria-hidden="true" /> Buscar
               </SunmiButton>
@@ -650,7 +650,7 @@ export default function CatalogoImportacionPage() {
                   setPage(1);
                 }}
                 disabled={!qAplicado}
-                className="py-1.5 px-3 !text-[11px] inline-flex items-center gap-1"
+                className="py-1.5 px-3 text-[11px] inline-flex items-center gap-1"
               >
                 <X size={13} aria-hidden="true" /> Limpiar
               </SunmiButton>
