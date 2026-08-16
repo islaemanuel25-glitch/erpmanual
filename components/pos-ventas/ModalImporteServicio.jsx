@@ -92,14 +92,14 @@ export default function ModalImporteServicio({ producto, onConfirmar, onCancelar
           )}
 
           <div className="flex gap-2 pt-2">
-            <SunmiButton color="slate" onClick={onCancelar} className="flex-1 !py-3">
+            <SunmiButton color="slate" onClick={onCancelar} className="flex-1 py-3">
               Cancelar
             </SunmiButton>
             <SunmiButton
               color="amber"
               onClick={confirmar}
               disabled={!val.valido}
-              className="flex-1 !font-bold !py-3"
+              className="flex-1 font-bold py-3"
             >
               Agregar
             </SunmiButton>

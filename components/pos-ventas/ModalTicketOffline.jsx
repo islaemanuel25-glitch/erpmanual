@@ -262,14 +262,14 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
           <SunmiButton
             color="cyan"
             onClick={handleImprimir}
-            className="w-full !py-3"
+            className="w-full py-3"
           >
             IMPRIMIR
           </SunmiButton>
           <SunmiButton
             color="slate"
             onClick={onCerrar}
-            className="w-full !py-3"
+            className="w-full py-3"
           >
             CERRAR
           </SunmiButton>

@@ -72,7 +72,7 @@ export default function ModalCanjePuntos({
                 key={opt.label}
                 color={puntosNum === opt.val && opt.val > 0 ? "amber" : "cyan"}
                 onClick={() => setPuntos(String(opt.val))}
-                className="!text-sm !py-1.5"
+                className="text-sm py-1.5"
                 disabled={opt.val <= 0}
               >
                 {opt.label}
@@ -106,7 +106,7 @@ export default function ModalCanjePuntos({
               color="amber"
               onClick={() => onCanjear(puntosNum)}
               disabled={puntosNum <= 0}
-              className="flex-1 !font-bold"
+              className="flex-1 font-bold"
             >
               Canjear
             </SunmiButton>

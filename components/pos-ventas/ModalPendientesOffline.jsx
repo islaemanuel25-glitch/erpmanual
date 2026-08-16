@@ -63,7 +63,7 @@ export default function ModalPendientesOffline({
                 color="cyan"
                 onClick={onProcesarCola}
                 disabled={procesandoCola}
-                className="flex-1 !text-xs !py-2"
+                className="flex-1 text-xs py-2"
               >
                 {procesandoCola ? "Procesando..." : `PROCESAR COLA (${queue.length})`}
               </SunmiButton>
@@ -71,7 +71,7 @@ export default function ModalPendientesOffline({
             <SunmiButton
               color="slate"
               onClick={handleVaciar}
-              className="!text-xs !py-2"
+              className="text-xs py-2"
             >
               Vaciar
             </SunmiButton>
@@ -143,7 +143,7 @@ export default function ModalPendientesOffline({
           <SunmiButton
             color="slate"
             onClick={onClose}
-            className="w-full !py-2 !text-sm"
+            className="w-full py-2 text-sm"
           >
             Cerrar
           </SunmiButton>

@@ -86,7 +86,7 @@ export default function ModalDescuento({
                   key={p}
                   color={valorNum === p ? "amber" : "cyan"}
                   onClick={() => setValor(String(p))}
-                  className="!text-sm !py-1.5"
+                  className="text-sm py-1.5"
                 >
                   {p}%
                 </SunmiButton>
@@ -125,7 +125,7 @@ export default function ModalDescuento({
               color="amber"
               onClick={() => onAplicar(descuento, tipo, valorNum)}
               disabled={descuento <= 0}
-              className="flex-1 !font-bold"
+              className="flex-1 font-bold"
             >
               Aplicar
             </SunmiButton>

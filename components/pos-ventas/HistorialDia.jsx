@@ -164,7 +164,7 @@ export default function HistorialDia({
           </label>
         </div>
         <div className="flex gap-2 mb-3">
-          <SunmiButton color="amber" onClick={handleBuscar} className="!text-sm">
+          <SunmiButton color="amber" onClick={handleBuscar} className="text-sm">
             Buscar
           </SunmiButton>
         </div>
@@ -376,14 +376,14 @@ export default function HistorialDia({
                   }
                   setDetalle(null);
                 }}
-                className="flex-1 !text-sm"
+                className="flex-1 text-sm"
               >
                 Reimprimir
               </SunmiButton>
               <SunmiButton
                 color="slate"
                 onClick={() => setDetalle(null)}
-                className="flex-1 !text-sm"
+                className="flex-1 text-sm"
               >
                 Cerrar
               </SunmiButton>

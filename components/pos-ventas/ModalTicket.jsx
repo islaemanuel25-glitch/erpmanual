@@ -19,21 +19,21 @@ export default function ModalTicket({ venta, onOpcion, onCerrar }) {
           <SunmiButton
             color="amber"
             onClick={() => onOpcion("termica")}
-            className="w-full !py-3"
+            className="w-full py-3"
           >
             Imprimir ticket (termica)
           </SunmiButton>
           <SunmiButton
             color="cyan"
             onClick={() => onOpcion("pdf")}
-            className="w-full !py-3"
+            className="w-full py-3"
           >
             Descargar PDF
           </SunmiButton>
           <SunmiButton
             color="slate"
             onClick={onCerrar}
-            className="w-full !py-3"
+            className="w-full py-3"
           >
             No imprimir
           </SunmiButton>
