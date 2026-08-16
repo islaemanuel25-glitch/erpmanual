@@ -174,7 +174,7 @@ export default function InterpretacionesFila({ fila, importacion, onConfirmada, 
           color="cyan"
           onClick={confirmar}
           disabled={!listo || trabajando}
-          className="py-1.5 px-3 font-bold !text-[11px] inline-flex items-center gap-1"
+          className="py-1.5 px-3 font-bold text-[11px] inline-flex items-center gap-1"
         >
           <Check size={12} aria-hidden="true" />
           {trabajando ? "Confirmando…" : "Confirmar selección"}
@@ -183,7 +183,7 @@ export default function InterpretacionesFila({ fila, importacion, onConfirmada, 
           color="slate"
           onClick={onVincularOtro}
           disabled={trabajando}
-          className="py-1.5 px-3 !text-[11px] inline-flex items-center gap-1"
+          className="py-1.5 px-3 text-[11px] inline-flex items-center gap-1"
         >
           <Link2 size={11} aria-hidden="true" />
           No es este producto

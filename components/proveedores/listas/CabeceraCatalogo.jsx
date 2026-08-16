@@ -157,7 +157,7 @@ export default function CabeceraCatalogo({
                   // pasa a oscuro para seguir existiendo.
                   color={grupoActivo === g ? "slate" : "amber"}
                   onClick={onAplicar}
-                  className="mt-2 w-full py-1.5 !text-[11px] font-bold"
+                  className="mt-2 w-full py-1.5 text-[11px] font-bold"
                 >
                   Aplicar los {n}
                 </SunmiButton>

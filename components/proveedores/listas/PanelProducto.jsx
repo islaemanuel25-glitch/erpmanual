@@ -229,7 +229,7 @@ export default function PanelProducto({
             color="amber"
             onClick={confirmar}
             disabled={!eleccion || trabajando}
-            className="py-1.5 px-3 !text-[11px]"
+            className="py-1.5 px-3 text-[11px]"
           >
             {trabajando ? "Guardando…" : "Confirmar y seguir"}
           </SunmiButton>

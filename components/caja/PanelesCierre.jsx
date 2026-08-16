@@ -230,7 +230,7 @@ export function FilaCierrePendiente({ item, onContinuar }) {
       <SunmiButton
         color="amber"
         onClick={() => onContinuar?.(item)}
-        className="shrink-0 py-2 px-3 !text-xs font-bold"
+        className="shrink-0 py-2 px-3 text-xs font-bold"
       >
         Continuar cierre
       </SunmiButton>

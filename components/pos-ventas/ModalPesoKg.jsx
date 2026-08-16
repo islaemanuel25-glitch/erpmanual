@@ -113,7 +113,7 @@ export default function ModalPesoKg({ producto, onConfirmar, onCancelar }) {
             color="amber"
             onClick={handleConfirmar}
             disabled={!valido}
-            className="flex-1 !font-bold"
+            className="flex-1 font-bold"
           >
             Agregar
           </SunmiButton>

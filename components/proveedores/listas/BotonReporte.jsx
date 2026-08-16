@@ -171,7 +171,7 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
         color="slate"
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
-        className="py-1.5 px-3 !text-[11.5px] inline-flex items-center gap-1"
+        className="py-1.5 px-3 text-[11.5px] inline-flex items-center gap-1"
       >
         <FileText size={13} aria-hidden="true" />
         Descargar / compartir reporte

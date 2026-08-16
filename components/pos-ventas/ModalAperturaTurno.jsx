@@ -182,7 +182,7 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
               color="amber"
               onClick={handleApertura}
               disabled={loading || montoInicial === "" || !!turnoPropio}
-              className="!w-full min-h-14 !text-lg !font-bold"
+              className="!w-full min-h-14 text-lg font-bold"
             >
               {loading ? "Abriendo turno..." : "Abrir Turno"}
             </SunmiButton>

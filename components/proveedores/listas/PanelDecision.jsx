@@ -651,7 +651,7 @@ export default function PanelDecision({
             // que tocar— y sin esto confirmaría con `null`.
             onClick={() => onConfirmar?.(eleccionEfectiva)}
             disabled={!puedeConfirmar}
-            className="py-1.5 px-3 !text-[11px]"
+            className="py-1.5 px-3 text-[11px]"
           >
             {confirmando
               ? "Guardando…"

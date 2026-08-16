@@ -200,7 +200,7 @@ export default function ModalDetalleVenta({ open, ventaId, onClose }) {
 
               {/* Cerrar */}
               <div className="mt-4">
-                <SunmiButton color="slate" onClick={onClose} className="w-full !text-sm">
+                <SunmiButton color="slate" onClick={onClose} className="w-full text-sm">
                   Cerrar
                 </SunmiButton>
               </div>

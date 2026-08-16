@@ -107,7 +107,7 @@ export default function ModalCambioPrevio({
             color="slate"
             onClick={onCancelar}
             disabled={confirmando}
-            className="py-3 !text-xs order-2 sm:order-1"
+            className="py-3 text-xs order-2 sm:order-1"
           >
             Cancelar
           </SunmiButton>
@@ -115,7 +115,7 @@ export default function ModalCambioPrevio({
             color="amber"
             onClick={onConfirmar}
             disabled={confirmando}
-            className="py-3 font-bold !text-xs order-1 sm:order-2"
+            className="py-3 font-bold text-xs order-1 sm:order-2"
           >
             {confirmando ? "Cortando…" : textoConfirmar}
           </SunmiButton>

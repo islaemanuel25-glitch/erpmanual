@@ -396,7 +396,7 @@ export function FilaCard({ fila, onVincular = null, seleccion = null }) {
         <SunmiButton
           color="cyan"
           onClick={() => onVincular(fila)}
-          className="w-full py-2 !text-xs"
+          className="w-full py-2 text-xs"
         >
           {fila.sugerenciaProductoBaseId ? "Vincular sugerido" : "Vincular producto"}
         </SunmiButton>
