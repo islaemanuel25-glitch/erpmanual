@@ -115,8 +115,13 @@ export default function CardDefaultDeposito({ puedeEditar = true }) {
   // Se miró en una captura antes de decidirlo.
   //
   // Queda declarado el `p-6` que ya venía dibujando, así que el código dice lo
-  // que el navegador hace. Si algún día se decide apretar el aire de toda la
-  // aplicación, esta tarjeta entra en esa decisión y no en la de las tablas.
+  // que el navegador hace.
+  //
+  // Y el aire de toda la aplicación SÍ se apretó, en la tanda siguiente: las 86
+  // tarjetas que pedían menos padding pasaron a aplicarlo. Ésta no entró, y no
+  // por olvido — pedía cero, no menos aire, y el cero acá no dibuja una tabla.
+  // Con el eje entero negociado, este `p-6` es lo único que la separa de quedar
+  // con los campos pegados al marco. Tiene su candado.
   return (
     <SunmiCard className="p-6 overflow-hidden">
       <div className="p-3">

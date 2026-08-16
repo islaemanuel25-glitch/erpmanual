@@ -136,8 +136,15 @@ export default function TicketEditor({ config, onChange }) {
           <div className="space-y-2">
             {section.elements.map((el) => {
               const val = config[el.key] || el.defaults;
+              // Acá decía `!p-3`, y el `!` era lo único que hacía ganar a este
+              // padding contra el `p-6` que `SunmiCard` concatenaba. Desde que la
+              // pieza negocia el eje no hay contra qué ganar, y el `!` se sacó
+              // DESPUÉS de medirlo: `p-3` solo y `!p-3` solo dan los mismos
+              // 10.5 px, y la pieza sin nada da 0 — o sea que el `p-6` ya no
+              // compite. Esta pantalla no se pudo fotografiar: es el editor de
+              // ticket del POS y no hay ninguna caja abierta en desarrollo.
               return (
-                <SunmiCard key={el.key} className="!p-3">
+                <SunmiCard key={el.key} className="p-3">
                   <h4 className="text-[12px] font-semibold sunmi-text-strong mb-2">{el.label}</h4>
                   <ElementControls elKey={el.key} val={val} onUpdate={updateField} />
                 </SunmiCard>
