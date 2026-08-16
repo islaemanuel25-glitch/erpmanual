@@ -230,14 +230,14 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
             </div>
 
             <div className="flex gap-2">
-              <SunmiButton color="slate" onClick={onCerrar} disabled={loading} className="flex-1 !py-3">
+              <SunmiButton color="slate" onClick={onCerrar} disabled={loading} className="flex-1 py-3">
                 Cancelar
               </SunmiButton>
               <SunmiButton
                 color="amber"
                 onClick={() => setPaso(2)}
                 disabled={!montoReal}
-                className="flex-1 !py-3 !font-bold"
+                className="flex-1 py-3 font-bold"
               >
                 Continuar
               </SunmiButton>
@@ -311,11 +311,11 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
                   <SunmiButton
                     color="amber"
                     onClick={() => { setPaso(1); setMontoReal(""); }}
-                    className="flex-1 !py-2 !text-sm !font-bold"
+                    className="flex-1 py-2 text-sm font-bold"
                   >
                     Volver a contar
                   </SunmiButton>
-                  <SunmiButton color="slate" onClick={() => setAvisoIgnorado(true)} className="flex-1 !py-2 !text-sm">
+                  <SunmiButton color="slate" onClick={() => setAvisoIgnorado(true)} className="flex-1 py-2 text-sm">
                     Confirmar igualmente
                   </SunmiButton>
                 </div>
@@ -334,14 +334,14 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
             </div>
 
             <div className="flex gap-2">
-              <SunmiButton color="slate" onClick={() => setPaso(1)} disabled={loading} className="flex-1 !py-3">
+              <SunmiButton color="slate" onClick={() => setPaso(1)} disabled={loading} className="flex-1 py-3">
                 Volver
               </SunmiButton>
               <SunmiButton
                 color="amber"
                 onClick={() => setPaso(3)}
                 disabled={aviso.omitido && !avisoIgnorado}
-                className="flex-1 !py-3 !font-bold"
+                className="flex-1 py-3 font-bold"
               >
                 Continuar
               </SunmiButton>
@@ -438,14 +438,14 @@ export default function ModalCierreTurno({ turno, onCerrar, onCerrado }) {
             )}
 
             <div className="flex gap-2">
-              <SunmiButton color="slate" onClick={() => setPaso(2)} disabled={loading} className="flex-1 !py-3">
+              <SunmiButton color="slate" onClick={() => setPaso(2)} disabled={loading} className="flex-1 py-3">
                 Volver
               </SunmiButton>
               <SunmiButton
                 color="amber"
                 onClick={handleCierre}
                 disabled={loading || !repartoOk.valido}
-                className="flex-1 !py-3 !font-bold"
+                className="flex-1 py-3 font-bold"
               >
                 {loading ? "Cerrando..." : "Cerrar Turno"}
               </SunmiButton>

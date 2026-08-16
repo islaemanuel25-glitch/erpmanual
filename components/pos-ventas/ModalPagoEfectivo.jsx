@@ -66,7 +66,7 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar, etiq
                   key={monto}
                   color="cyan"
                   onClick={() => setPagaCon(String(monto))}
-                  className="!text-sm !py-3"
+                  className="text-sm py-3"
                 >
                   ${monto.toLocaleString("es-AR")}
                 </SunmiButton>
@@ -78,7 +78,7 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar, etiq
           <SunmiButton
             color="amber"
             onClick={() => onConfirmar({ pagaCon: total, vuelto: 0 })}
-            className="!text-base !py-3 w-full !font-bold"
+            className="text-base py-3 w-full font-bold"
           >
             PAGO EXACTO ${formatPrecio(total)}
           </SunmiButton>
@@ -101,7 +101,7 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar, etiq
 
           {/* Acciones */}
           <div className="flex gap-2 pt-2">
-            <SunmiButton color="slate" onClick={onCancelar} className="flex-1 !py-3">
+            <SunmiButton color="slate" onClick={onCancelar} className="flex-1 py-3">
               Cancelar
             </SunmiButton>
             <SunmiButton
@@ -110,7 +110,7 @@ export default function ModalPagoEfectivo({ total, onConfirmar, onCancelar, etiq
                 onConfirmar({ pagaCon: pagaConNum, vuelto })
               }
               disabled={!pagaConNum || pagaConNum < total}
-              className="flex-1 !font-bold !py-3"
+              className="flex-1 font-bold py-3"
             >
               Confirmar
             </SunmiButton>

@@ -448,15 +448,15 @@ export function PanelResumenCorte({
 
         {enPestanaNueva ? (
           <div className="grid grid-cols-2 gap-2">
-            <SunmiButton color="slate" onClick={onGuardar} disabled={guardando} className="py-2 !text-xs">
+            <SunmiButton color="slate" onClick={onGuardar} disabled={guardando} className="py-2 text-xs">
               {textoGuardar}
             </SunmiButton>
-            <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="py-2 !text-xs">
+            <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="py-2 text-xs">
               {textoCerrarPestana}
             </SunmiButton>
           </div>
         ) : (
-          <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="w-full py-2 !text-xs">
+          <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="w-full py-2 text-xs">
             {textoVolver}
           </SunmiButton>
         )}
@@ -590,15 +590,15 @@ export function PanelResumen({
             la suya. Guardar y cerrar son dos acciones distintas. */}
         {enPestanaNueva ? (
           <div className="grid grid-cols-2 gap-2">
-            <SunmiButton color="slate" onClick={onGuardar} disabled={guardando} className="py-2 !text-xs">
+            <SunmiButton color="slate" onClick={onGuardar} disabled={guardando} className="py-2 text-xs">
               {textoGuardar}
             </SunmiButton>
-            <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="py-2 !text-xs">
+            <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="py-2 text-xs">
               {textoCerrarPestana}
             </SunmiButton>
           </div>
         ) : (
-          <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="w-full py-2 !text-xs">
+          <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="w-full py-2 text-xs">
             {textoVolver}
           </SunmiButton>
         )}

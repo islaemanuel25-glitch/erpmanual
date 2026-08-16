@@ -127,7 +127,7 @@ export default function ModalProcesoPendiente({
                 color="red"
                 onClick={onCancelar}
                 disabled={cancelando}
-                className="w-full py-3 font-bold !text-xs"
+                className="w-full py-3 font-bold text-xs"
               >
                 {cancelando ? "Cancelando…" : `Sí, cancelar el ${sustantivo}`}
               </SunmiButton>
@@ -135,7 +135,7 @@ export default function ModalProcesoPendiente({
                 color="slate"
                 onClick={() => setConfirmando(false)}
                 disabled={cancelando}
-                className="w-full py-3 !text-xs"
+                className="w-full py-3 text-xs"
               >
                 Volver atrás
               </SunmiButton>
@@ -146,7 +146,7 @@ export default function ModalProcesoPendiente({
                 color="amber"
                 onClick={onContinuar}
                 disabled={cancelando}
-                className="w-full py-3 font-bold !text-xs"
+                className="w-full py-3 font-bold text-xs"
               >
                 {ACCION_CONTINUAR[tipo]}
               </SunmiButton>
@@ -155,7 +155,7 @@ export default function ModalProcesoPendiente({
                   color="red"
                   onClick={() => setConfirmando(true)}
                   disabled={cancelando}
-                  className="w-full py-3 !text-xs"
+                  className="w-full py-3 text-xs"
                 >
                   {ACCION_CANCELAR[tipo]}
                 </SunmiButton>
@@ -164,7 +164,7 @@ export default function ModalProcesoPendiente({
                 color="slate"
                 onClick={onVolver}
                 disabled={cancelando}
-                className="w-full py-3 !text-xs"
+                className="w-full py-3 text-xs"
               >
                 {ACCION_VOLVER}
               </SunmiButton>

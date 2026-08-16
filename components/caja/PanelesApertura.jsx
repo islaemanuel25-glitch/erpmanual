@@ -148,7 +148,7 @@ export function TarjetaCambio({ item, onTomar, onContinuar, ocupado = false }) {
         color="amber"
         onClick={() => (esMio ? onContinuar?.(item) : onTomar?.(item))}
         disabled={ocupado}
-        className="w-full py-2 !text-xs font-bold"
+        className="w-full py-2 text-xs font-bold"
       >
         {esMio ? "Continuar apertura" : "Tomar este cambio"}
       </SunmiButton>
@@ -311,10 +311,10 @@ export function PanelComparacion({
           {guardando ? "Abriendo…" : accion}
         </SunmiButton>
         <div className="grid grid-cols-2 gap-2">
-          <SunmiButton color="slate" onClick={onGuardar} disabled={guardando} className="py-2 !text-xs">
+          <SunmiButton color="slate" onClick={onGuardar} disabled={guardando} className="py-2 text-xs">
             Guardar conteo
           </SunmiButton>
-          <SunmiButton color="slate" onClick={onCancelar} disabled={guardando} className="py-2 !text-xs">
+          <SunmiButton color="slate" onClick={onCancelar} disabled={guardando} className="py-2 text-xs">
             Soltar el cambio
           </SunmiButton>
         </div>
@@ -380,7 +380,7 @@ export function PanelSinCambio({
         >
           {guardando ? "Abriendo…" : "Abrir caja con este conteo"}
         </SunmiButton>
-        <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="w-full py-2 !text-xs">
+        <SunmiButton color="slate" onClick={onVolver} disabled={guardando} className="w-full py-2 text-xs">
           Volver a los cambios pendientes
         </SunmiButton>
       </div>

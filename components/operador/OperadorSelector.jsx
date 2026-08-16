@@ -114,11 +114,11 @@ export default function OperadorSelector({ operador, onLogin, onLogout, forzado 
       )}
 
       <div className="flex gap-1.5">
-        <SunmiButton color="amber" onClick={handleLogin} disabled={loading} className="!py-1 text-xs flex-1">
+        <SunmiButton color="amber" onClick={handleLogin} disabled={loading} className="py-1 text-xs flex-1">
           {loading ? "..." : "Ingresar"}
         </SunmiButton>
         {!forzado && (
-          <SunmiButton color="slate" onClick={() => { setAbierto(false); setError(""); }} className="!py-1 text-xs">
+          <SunmiButton color="slate" onClick={() => { setAbierto(false); setError(""); }} className="py-1 text-xs">
             Cancelar
           </SunmiButton>
         )}
