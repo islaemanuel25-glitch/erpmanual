@@ -3906,6 +3906,62 @@ y cada fila que los contenga. Es una tanda con capturas, no una línea. Y la
 alternativa —dejar 36 y escribir POR QUÉ— también es una decisión, pero al menos
 deja de ser un número sin dueño.
 
+#### ⚑ `ModalCierreTurno` ES CÓDIGO HUÉRFANO, Y ESO NO ES UN DESCUIDO
+
+**Encontrado el 2026-08-16 verificando un despliegue. NO se tocó.**
+
+Nadie lo importa. `git grep` de `import ModalCierreTurno` sobre `app/`,
+`components/` y `lib/` devuelve **una sola línea, y es un candado que prohíbe
+importarlo**. Las otras dos menciones del nombre en el repo están adentro de
+comentarios.
+
+Los dos candados que lo sostienen están en `lib/caja/cierrePantallaRender.test.mjs`:
+
+- **La 29, "el botón del POS ya NO abre el modal clásico"**, afirma que
+  `app/modulos/pos-ventas/page.jsx` no tiene `<ModalCierreTurno`, no lo importa,
+  y que en su lugar llama a `abrirCierre(turnoActual.id)`.
+- **La 30, "el cierre clásico sigue existiendo pero rechaza un turno con corte"**,
+  dice textualmente *"No se borra todavía: queda como vía administrativa
+  acotada"*, y comprueba que el archivo del modal siga teniendo contenido.
+
+O sea que el cierre se migró a las páginas de `/modulos/pos-ventas/cierres/…` y
+esto quedó como resto **a propósito**, junto con su ruta
+`/api/pos-ventas/turnos/cerrar`.
+
+**Qué habría que comprobar el día que se decida, y son dos decisiones distintas:**
+
+*Si se BORRA:* que la ruta `/api/pos-ventas/turnos/cerrar` no la llame nadie más
+—hoy la nombran `arqueos/registrar`, `turnos/resumen` y la página del POS, y hay
+que mirar si la llaman o solo la mencionan—; que la "vía administrativa acotada"
+de la prueba 30 no se esté usando desde afuera de la aplicación; y reescribir las
+dos pruebas, porque la 30 se pone roja sola al borrar el archivo. La 29 en cambio
+sigue verde, que es la trampa: prohíbe importarlo, y un archivo borrado tampoco
+se importa.
+
+*Si se REVIVE:* que la prueba 29 se ponga roja es lo que tiene que pasar, y hay
+que entender por qué se sacó antes de volver a ponerlo — la 30 dice que el cierre
+clásico **rechaza un turno con corte**, así que revivirlo sin eso reabre el caso
+que motivó la migración.
+
+**Y la marca de que estaba muerto no la dio leer el código: la dio el build.**
+Ninguna cadena de ese archivo llega a la imagen. Eso vale como método: un archivo
+puede estar en el repo, compilar, pasar los candados y no existir en el build,
+simplemente porque nadie lo importa.
+
+#### ⚠️ LOS 151 `!` DEL BOTÓN SON 151 EN EL REPO Y 135 EN LA PANTALLA
+
+Los dos números son correctos y hay que escribir los dos, porque el día que
+alguien recuente le va a dar distinto y no va a saber por qué.
+
+**151** es lo que se sacó del repo. **16 de esos salieron de
+`ModalCierreTurno`**, que nadie importa, así que no se ven en ninguna pantalla.
+**135** es lo que efectivamente cambió de código servido.
+
+No rompe nada —sacarle un `!` a código muerto es inocuo— pero el conteo de "lo
+que se ve" no es el mismo que el de "lo que hay". Cualquier medición de este tipo
+sobre el kit tiene el mismo agujero: el censo cuenta usos en el REPO, y el repo
+tiene archivos que no se renderizan.
+
 #### ⚠️ EL 388 ES UN PISO, NO UN TOTAL — dos límites del censo
 
 Los dos son del extractor y los dos hacen que el número salga corto:
