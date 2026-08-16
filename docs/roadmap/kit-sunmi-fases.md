@@ -3982,6 +3982,56 @@ ve, no lo que hay.
 
 ## El arnés de captura, y por qué una captura sola no prueba nada
 
+### ⚠️ EL BOTÓN Y EL INPUT FUNCIONAN POR UN ORDEN DE IMPORT, NO POR UNA DECISIÓN
+
+**Anotado el 2026-08-16. NO se tocó. Es lo más frágil que encontró toda la fase.**
+
+`SunmiButton` pone clases propias de `styles/sunmi.css` —`.sunmi-btn-base`,
+`.sunmi-btn-<color>`— y `SunmiInput` pone `.sunmi-input`. Las declaraciones de
+las pantallas son utilidades de Tailwind. Las dos tienen especificidad 0-1-0, así
+que a igual especificidad **decide cuál se escribió última en la hoja**.
+
+Y lo que decide eso es una línea de `app/globals.css`:
+
+    @import "../styles/sunmi.css";     ← línea 6
+    @tailwind base;                     ← línea 11
+    @tailwind components;
+    @tailwind utilities;                ← línea 13
+
+**`sunmi.css` va ANTES de `@tailwind utilities`. Por eso gana la pantalla.**
+
+Eso no es una decisión declarada en ningún lado: es un orden de import. **El día
+que alguien mueva esa línea —o agregue un `@layer`, o cambie el orden al migrar a
+Tailwind v4— las 388 declaraciones del botón y las 147 del input se dan vuelta en
+silencio y sin que ningún candado lo vea.** No romperían el build, no pondrían un
+test en rojo: cada pantalla que hoy define su tamaño de letra, su padding o su
+ancho pasaría a mostrar el del kit, y solo se vería abriendo las pantallas.
+
+Es la misma familia que todo lo demás de esta fase —algo que no falla donde se
+rompe— pero con el radio más grande de todos: **535 declaraciones medidas** que
+dependen de dos líneas de un archivo que nadie mira.
+
+#### ¿SE PUEDE PONER UN CANDADO? SÍ, Y HAY QUE PONER DOS
+
+**El barato, sobre el archivo:** leer `app/globals.css` y afirmar que el índice
+de `@import "../styles/sunmi.css"` es menor que el de `@tailwind utilities`. Es
+una función pura, cuesta cinco líneas y se pone rojo si alguien mueve la línea.
+Su límite es real y hay que escribirlo al lado: **no ve un `@layer` agregado en
+otro archivo, ni un cambio de motor**, y en Tailwind v4 —que no usa
+`@tailwind utilities`— el candado dejaría de encontrar lo que busca. Por eso el
+candado tiene que fallar cerrado: si no encuentra las dos marcas, ROJO, no verde.
+
+**El que vale de verdad, sobre el resultado:** medir en el navegador que una
+utilidad de Tailwind le gana a la clase del kit. Un elemento con
+`sunmi-btn-base py-3` tiene que dar 10.5 px y no 3.5. Eso no afirma sobre el
+orden del archivo sino sobre lo que el orden PRODUCE, y sobrevive a un cambio de
+motor, a un `@layer` y a cualquier otra forma de romperlo. El costo es que
+necesita el navegador, o sea que no entra en la suite de candados puros: va como
+sonda del arnés.
+
+**Ninguno de los dos existe hoy**, y `git grep` de `globals.css` en los
+`*.test.mjs` no devuelve nada: **no hay un solo candado que mire ese archivo.**
+
 ### ⚑ NO SE PUEDE MEDIR "¿GANA SIN EL `!`?" INYECTANDO LA CLASE PELADA
 
 **Encontrado el 2026-08-16, midiendo `SunmiSeparator`. Invalida una vía que se
