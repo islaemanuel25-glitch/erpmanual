@@ -213,7 +213,7 @@ export default function AperturasPage() {
               <SunmiButton
                 color="slate"
                 onClick={() => router.push("/modulos/pos-ventas/aperturas/sin-cambio")}
-                className="w-full py-3 !text-sm"
+                className="w-full py-3 text-sm"
               >
                 Abrir sin tomar un cambio anterior
               </SunmiButton>

@@ -96,7 +96,7 @@ export default function ClientePickerFullscreen({
             <SunmiButton
               color="amber"
               onClick={() => onSeleccionar(null)}
-              className="w-full !py-3"
+              className="w-full py-3"
             >
               Consumidor Final
             </SunmiButton>

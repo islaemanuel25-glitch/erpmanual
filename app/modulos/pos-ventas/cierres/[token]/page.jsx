@@ -393,7 +393,7 @@ export default function CierrePorTokenPage() {
               </SunmiButton>
             )}
             {/* No hay "volver al POS": esa pestaña ya es del operador que releva. */}
-            <SunmiButton color="slate" onClick={salir} className="w-full py-2 !text-xs">
+            <SunmiButton color="slate" onClick={salir} className="w-full py-2 text-xs">
               {enPestanaNueva ? "Cerrar esta pestaña" : "Ver cierres pendientes"}
             </SunmiButton>
           </div>

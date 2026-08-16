@@ -1689,7 +1689,7 @@ export default function PosVentasPage() {
             <SunmiButton
               color="slate"
               onClick={() => router.push("/modulos")}
-              className="!text-xs !py-1"
+              className="text-xs py-1"
             >
               Salir
             </SunmiButton>

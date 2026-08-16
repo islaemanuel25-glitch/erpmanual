@@ -144,7 +144,7 @@ export default function AuditoriaProductosPage() {
                 className="!py-1 text-xs !border !border-[var(--pos-link)]"
               />
             </div>
-            <SunmiButton color="amber" onClick={ejecutarConsulta} disabled={loading} className="!py-1 text-xs">
+            <SunmiButton color="amber" onClick={ejecutarConsulta} disabled={loading} className="py-1 text-xs">
               {loading ? "Cargando..." : "Consultar"}
             </SunmiButton>
           </div>

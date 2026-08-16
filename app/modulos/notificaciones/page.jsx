@@ -206,7 +206,7 @@ export default function NotificacionesPage() {
               type="button"
               color={filtro === t.key ? "cyan" : "slate"}
               onClick={() => cambiarTab(t.key)}
-              className="w-full text-xs whitespace-nowrap !px-2 sm:w-auto sm:text-[13px] sm:!px-4"
+              className="w-full text-xs whitespace-nowrap px-2 sm:w-auto sm:text-[13px] sm:!px-4"
             >
               {t.label}
             </SunmiButton>
