@@ -3178,6 +3178,92 @@ repo a la vez**: sacar el comentario de adentro del `className` de `SunmiCard`
 baja el padding de 21 a 10.5 px en cada tarjeta del sistema. Es un cambio de una
 línea y de una tanda entera de verificación.
 
+### ⚑ EL CRITERIO DEL PADDING CERO: LA TABLA SÍ, EL FORMULARIO NO
+
+**RESUELTO EN PARTE el 2026-08-15.** Esto cierra la mitad del pendiente de arriba
+y deja la otra abierta a propósito.
+
+La regla, que es lo que hay que recordar de toda esta sección:
+
+**Un `p-0` con `overflow-hidden` sobre una TABLA es una intención estructural
+declarada. Un `p-0` sobre un FORMULARIO, no.**
+
+En la tabla el cero dice "el contenido va de borde a borde y las esquinas se
+recortan" — sin eso la tabla queda flotando adentro de un marco y las filas no
+llegan a los bordes. En el formulario el mismo cero no dibuja ninguna tabla:
+aprieta el título y los campos contra el marco. Escriben lo mismo y piden cosas
+distintas, y por eso no se puede migrar "todos los `p-0`" de un saque.
+
+**El reparto, contado con `git grep` sobre el repo entero y resolviendo las
+`const` del mismo archivo:** de los 231 usos de `SunmiCard` en 114 archivos, 147
+traen `className` propio y 108 de esos declaran padding. Ocho piden CERO y cien
+piden menos aire —49 `p-3`, 30 `p-4`, 9 `p-6`, 3 `p-5` y el resto sueltas—.
+
+De las ocho de cero se migraron **SIETE**, todas tablas. La octava,
+`CardDefaultDeposito`, es un formulario y quedó afuera declarando el `p-6` que ya
+venía dibujando, con el motivo escrito en el archivo.
+
+**Por qué el predicado es `declaraPaddingCero` y no el del eje entero.**
+Negociar el padding completo cambiaría las 108 de una vez, y las 100 del aire son
+una decisión de aspecto de toda la aplicación que no es de quien migra. El
+predicado del cero aplica la intención estructural sin tomar la decisión
+estética. El día que el aire se decida, se reemplaza por
+`declaraPaddingX || declaraPaddingY` y el predicado se va.
+
+**Lo que se mide al aplicarlo:** la tarjeta pasa de 21 px por los cuatro lados a
+0, y baja 42 px de alto. Medido en la tarjeta real de la pantalla, no en un
+elemento inyectado. En cajas se pasan de ver 7 cajas a 12 en la misma altura.
+
+#### Y EL CONTEO DEL AIRE NO ES 100: SON 86 QUE NUNCA SE APLICAN Y 4 A MEDIAS
+
+De las 100 del aire hay que descontar tres grupos antes de decidir nada:
+
+- **9 piden `p-6`**, que es lo que la pieza ya dibuja. Migrarlas no mueve un
+  píxel: son ruido del conteo, no trabajo.
+- **1 es `!p-3`** y ya gana por el `!`. Lo único que cambiaría es que deja de
+  necesitarlo.
+- **4 traen variante `lg:`** —tres `p-2 lg:p-3` y un `p-3 lg:p-4`, todas en el
+  POS— y **ya se aplican por encima de 1024 px**. Medido con su control en los
+  dos sentidos: a 1366 la pantalla gana y dibuja 10.5 y 14 px; a 1000 pierde y
+  dibuja los 21 de la pieza. O sea que esas cuatro están **a medias hoy**: el
+  mostrador ancho ve una cosa y el angosto otra.
+
+Quedan **86 que no se aplican a ningún ancho**. Ese es el número de la decisión
+pendiente, no 100 ni 108.
+
+Las cuatro del `lg:` no se pudieron medir en su pantalla —el POS no se abre desde
+la sesión de capturas— así que lo que está medido es la CASCADA, con el elemento
+inyectado y su control. Se dice cuál de las dos preguntas se contestó.
+
+#### LA CONTRAPRUEBA ENCONTRÓ DOS CANDADOS MUDOS, Y NINGUNO SE VEÍA LEYENDO
+
+El candado que defiende que el formulario siga afuera quedó VERDE dos veces
+seguidas con el `p-0` puesto de vuelta a propósito:
+
+1. **Le pasaba la etiqueta JSX entera al predicado.** Al partir por espacios,
+   `className="p-0` no parece un token de padding. El predicado no veía el cero.
+2. **Miraba solo la PRIMERA etiqueta del archivo.** Y ese archivo tiene DOS
+   `SunmiCard`: la primera es la aclaración que ve un local normal, con `p-3`.
+   El candado afirmaba sobre una tarjeta que no era la del caso — verde, sobre el
+   archivo correcto y la tarjeta equivocada.
+
+Las dos las encontró romper la pieza a propósito, no releer el candado. Es la
+cuarta vez que un candado de texto mira el lugar equivocado y la enésima vez que
+la contraprueba es lo único que lo distingue.
+
+#### Y UN CANDADO QUE AFIRMABA DE MÁS, QUE SE ACOTÓ EN VEZ DE AFLOJARSE
+
+"NUNCA DOS PADDINGS" salió rojo en la primera corrida, sobre reportes-ventas:
+`p-6 p-3`. **Tenía razón el rojo.** Las 100 del aire salen hoy con dos paddings a
+propósito — la pieza pone el suyo, la pantalla el suyo, y gana el de la pieza por
+el orden de la hoja. Esa es la deuda que falta pagar, no un defecto de esta
+migración.
+
+Afirmarlo sobre las dos listas dejaba dos salidas y las dos malas: aflojar el
+candado, o migrar el aire de apuro para ponerlo en verde —que es tomar por error
+una decisión ajena—. Se acotó al cero, con el motivo escrito al lado, y se abre a
+la otra lista el día que el aire se decida.
+
 ### El velo: qué se pierde, no qué tan peligroso es
 
 **PENDIENTE CONFIRMADO — decidido el 2026-08-13, y CORRIGE el criterio anterior.**
