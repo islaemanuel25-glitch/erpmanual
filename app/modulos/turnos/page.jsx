@@ -215,7 +215,7 @@ export default function TurnosPage() {
   // en móvil las fechas van a la par y el resto a ancho completo. Sin separador
   // "Filtros" y sin selector de Local: el local es el del contexto del ERP.
   const filtros = (
-    <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
+    <SunmiCard className="p-3 overflow-visible backdrop-blur-0">
       <div className="mb-3">
         <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
           Cajas

@@ -5,7 +5,7 @@
 // estructura de bloques, en el mismo orden y con los mismos paddings.
 //
 //   contenedor  w-full min-h-full p-2 lg:p-3 space-y-3
-//   1 · franja  SunmiCard p-3 overflow-visible !backdrop-blur-0 → título + filtros
+//   1 · franja  SunmiCard p-3 overflow-visible backdrop-blur-0 → título + filtros
 //   2 · métricas section space-y-2 → SectionHead + grid 2/3/5 de MetricCard
 //   3 · listado  section space-y-2 → SectionHead + acciones a la derecha, SunmiCard
 //   4 · paginación dentro de la card, mt-3 pt-3 border-t
@@ -500,7 +500,7 @@ export default function TransferenciasPage() {
     // propósito), padding p-2 / lg:p-3 y separación vertical space-y-3.
     <div className="w-full min-h-full p-2 lg:p-3 space-y-3">
       {/* 1 · Encabezado + filtros en una franja compacta (una sola fila en desktop) */}
-      <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
+      <SunmiCard className="p-3 overflow-visible backdrop-blur-0">
         {/* Encabezado idéntico al de Ventas: solo título y subtítulo. No lleva
             botón Volver — la barra superior ya ofrece "Inicio" en las dos
             pantallas, y agregarlo acá rompía la simetría de la franja. */}

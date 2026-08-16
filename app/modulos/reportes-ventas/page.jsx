@@ -290,7 +290,7 @@ export default function ReportesVentasPage() {
     // usaba todo el ancho disponible.
     <div className="w-full min-h-full p-2 lg:p-3 space-y-3">
       {/* Encabezado + filtros en una franja compacta (una sola fila en desktop) */}
-      <SunmiCard className="p-3 overflow-visible !backdrop-blur-0">
+      <SunmiCard className="p-3 overflow-visible backdrop-blur-0">
         <div className="mb-3">
           <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">Ventas</h1>
           <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
