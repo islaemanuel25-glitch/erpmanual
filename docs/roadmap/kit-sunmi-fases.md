@@ -3829,6 +3829,101 @@ En la práctica, para el próximo conteo de consumidores:
 4. Y poner **controles que puedan fallar**. Ninguno de los tres pasos de arriba
    se le ocurrió a nadie leyendo: los tres salieron de que un control se moviera.
 
+### ⚑ `SunmiButton` — EL BOTÓN VA AL REVÉS QUE LA TARJETA, medido el 2026-08-16
+
+**Relevado, no migrado.** 494 usos en 150 archivos —contados por etiqueta de
+apertura con nombre exacto; `git grep -o "<SunmiButton"` da 511 en 152 porque
+`<SunmiButtonIcon` empieza igual y son 17 usos de otra pieza—. De esos, 248
+traen `className` propio, y ahí hay **388 declaraciones que pelean con un eje que
+la pieza declara**.
+
+**Por qué es al revés que `SunmiCard`.** La tarjeta peleaba utilidad de Tailwind
+contra utilidad de Tailwind, y el orden de la hoja favorecía a la pieza. El botón
+pone clases PROPIAS —`.sunmi-btn-base`, `.sunmi-btn-<color>`, especificidad
+0-1-0— y `styles/sunmi.css` se importa ANTES de `@tailwind utilities`. A igual
+especificidad gana la última, o sea la utilidad de la pantalla. **Acá la pantalla
+gana casi siempre.**
+
+El reparto medido, con dos controles por forma —que la clase esté en la hoja,
+preguntado a `document.styleSheets` y no deducido, y que la clase sola dé
+distinto de la pieza sola—:
+
+- **1 pierde**, y no por la cascada. Ver abajo.
+- **327 ganan por el orden de la hoja.**
+- **0 ganan por `!important`.**
+- **60 son redundantes**: piden exactamente lo que la pieza ya pone. Entre ellas
+  17 `items-center` y 16 `inline-flex`, que es literalmente lo que
+  `.sunmi-btn-base` declara, y 15 `!py-1`, que son los mismos 3,5 px.
+
+**De ahí sale que 151 declaraciones llevan `!` sin necesitarlo.** Ninguna de las
+388 lo necesita para ganar.
+
+**La que pierde es `h-8` en `components/productos/ColumnManager.jsx:37`**, y el
+motivo no es el orden: `h-8` pone `height: 28px` y la pieza pone
+`min-height: 36px`. El mínimo le gana al alto por regla de layout, no por
+cascada — ponerle `!` no lo arreglaría. El botón quiere ser un cuadrado de 28 y
+mide 36 de alto.
+
+#### DE DÓNDE SALE EL `min-height: 36`, buscado en la historia y no supuesto
+
+**No está documentado como mínimo táctil.** Entró como `height: 36px` en el
+commit `671e616` —"feat: mejoras POS + sidebar overflow fix + redondeo precios",
+2026-03-02—, dentro de la creación de `.sunmi-btn-base` y sin ninguna
+justificación al lado. Lo único escrito sobre ese número es el comentario de
+`becb1ef`, que explica el cambio de alto FIJO a mínimo, y su motivo es el
+desborde del contenido, no que se pueda tocar con el dedo.
+
+**Y el repo sí tiene un criterio táctil escrito, pero es 44 y no 36**, y vive en
+la navegación: `min-h-[44px]` en `Header`, `MobileNav`, `TopbarNav` y
+`SidebarMobile`. Ninguna pieza del kit de botones lo usa.
+
+O sea que las dos mitades de la pregunta se contestan así: el 36 **funciona**
+como piso tocable, pero **no fue puesto por eso** y no hay decisión escrita
+detrás. Y el 28 del `h-8` queda por debajo tanto del 36 del botón como del 44 que
+el propio repo usa donde sí decidió pensar en el dedo.
+
+#### ⚑ EL KIT DE BOTONES NO USA EL MÍNIMO TÁCTIL QUE EL PROPIO REPO ELIGIÓ
+
+**Anotado el 2026-08-16. NO se arregló: queda escrito para decidirlo aparte.**
+
+Es más grande que el caso del `h-8`. El repo tiene **dos** números para "lo
+mínimo que se puede tocar" y no coinciden:
+
+- **44 px** en la navegación —`min-h-[44px]` en `Header`, `MobileNav`,
+  `TopbarNav` y `SidebarMobile`—. Ahí alguien decidió pensando en el dedo.
+- **36 px** en `.sunmi-btn-base`, o sea en **todos los botones del sistema**. Y
+  ese 36 no se decidió por el dedo: entró como `height: 36px` dentro de la
+  creación de la clase, sin justificación, y lo único escrito sobre él explica
+  otra cosa —por qué pasó de alto fijo a mínimo, que fue el desborde—.
+
+O sea que la pieza que más se toca en la aplicación —el botón, 494 usos— usa un
+piso 8 px más chico que el que el repo eligió donde sí lo pensó. En la Sunmi del
+mostrador eso se nota.
+
+**Lo que hay que decidir, y no es un retoque:** subir `.sunmi-btn-base` a 44
+mueve la altura de todos los botones y con eso el alto de cada barra, cada modal
+y cada fila que los contenga. Es una tanda con capturas, no una línea. Y la
+alternativa —dejar 36 y escribir POR QUÉ— también es una decisión, pero al menos
+deja de ser un número sin dueño.
+
+#### ⚠️ EL 388 ES UN PISO, NO UN TOTAL — dos límites del censo
+
+Los dos son del extractor y los dos hacen que el número salga corto:
+
+1. **Siete usos tienen algo en el `className` que no se puede resolver leyendo**
+   —una variable o una llamada—. Sus declaraciones no se cuentan. Es el mismo
+   agujero que con `SunmiCard` dio un conteo falso hasta que `/inicio`, puesta
+   como control, se movió: ahí el `className` era `{cardClass}` y la constante
+   valía tres declaraciones.
+2. **El extractor deja la comilla pegada cuando el `className` es un ternario con
+   cadenas adentro.** Salen tokens como `text-[11px]"` o `"!px-2`, que no
+   matchean ninguna familia y quedan sin clasificar. Son cuatro declaraciones
+   detectadas así, y no hay motivo para pensar que sean las únicas: el borde
+   aparece en cualquier `className={cond ? "..." : "..."}`.
+
+Cualquier afirmación sobre "las 388" tiene que decir que es lo que este extractor
+ve, no lo que hay.
+
 ## El arnés de captura, y por qué una captura sola no prueba nada
 
 ### ⚑ LA FUENTE QUE NO CARGÓ: TRES CORRIDAS IDÉNTICAS DE LA PANTALLA EQUIVOCADA

@@ -34,10 +34,22 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange, locke
 
   return (
     <div className="relative" ref={ref}>
+      {/* El `h-8` que estaba acá NO se aplicaba, y no por la cascada: pedía
+          `height: 28px` y `.sunmi-btn-base` pone `min-height: 36px`, que le gana
+          por regla de layout. Ponerle `!` tampoco lo habría arreglado. Medido:
+          el botón daba 36 px de alto con `h-8` escrito.
+
+          Se saca en vez de forzarlo, y el motivo se buscó en la historia: el 36
+          NO es un mínimo táctil. Entró como `height: 36px` en el commit
+          `671e616`, dentro de la creación de `.sunmi-btn-base` y sin ninguna
+          justificación; el comentario que hoy explica ese número es de otro
+          commit y habla del contenido derramándose, no del dedo. Y el criterio
+          táctil que el repo SÍ eligió es 44 px, en la navegación. Un botón de 28
+          queda por debajo de los dos. */}
       <SunmiButton
         color="slate"
         onClick={() => setOpen((v) => !v)}
-        className="h-8 w-8 flex items-center justify-center rounded-xl"
+        className="w-8 flex items-center justify-center rounded-xl"
       >
         <Settings2 size={16} />
       </SunmiButton>
