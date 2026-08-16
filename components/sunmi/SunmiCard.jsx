@@ -1,6 +1,32 @@
 "use client";
 
 import { useSunmiTheme } from "./SunmiThemeProvider";
+import {
+  declaraDifuminado,
+  declaraSombra,
+  tarjetaQueSobrevive,
+} from "@/lib/sunmi/claseNegociada";
+
+// LOS CUATRO EJES CHICOS SE NEGOCIAN; EL PADDING TODAVÍA NO.
+//
+// De los 147 usos con `className` de primer nivel, 110 declaran alguno de los
+// ejes que la pieza pone. La enorme mayoría —108— son del PADDING, y esos quedan
+// para una segunda tanda porque cambiarlos se ve en 114 archivos. Los otros
+// cuatro ejes suman SEIS declaraciones en TRES pantallas, y son las de acá.
+//
+// Tres pierden hoy en silencio, y al negociar empiezan a aplicarse:
+//   · `sunmi-surface-soft`        en components/turnos/ResumenCierre.jsx
+//   · `border border-red-500/30`  en app/modulos/configuracion/mantenimiento
+//   · `border border-current/10` + `shadow-lg` en ModalDetalleVenta
+//
+// Las otras tres son los `!backdrop-blur-0`, que hoy ganan por el `!` y con la
+// negociación no lo necesitan. El `!` se saca en su propio paso, y recién después
+// de comprobar con una captura que la pantalla no se movía.
+//
+// Por qué perdían: `@import "sunmi.css"` va ANTES de `@tailwind utilities` en
+// `app/globals.css`, así que un `bg-*` de Tailwind le gana a `.sunmi-surface`, y
+// entre dos utilidades de la misma familia decide el orden de la hoja y no el del
+// atributo. Es exactamente lo que ya había pasado en `SunmiPanel`.
 
 // EL PADDING DICE p-6 PORQUE p-6 ES LO QUE EL NAVEGADOR DIBUJA.
 //
@@ -27,17 +53,18 @@ import { useSunmiTheme } from "./SunmiThemeProvider";
 export default function SunmiCard({ children, className = "", ...props }) {
   const { theme } = useSunmiTheme();
 
+  // Fondo y borde vienen juntos en `theme.card`, así que se filtran token por
+  // token: una pantalla que declara fondo no tiene por qué perder el borde.
+  const tarjeta = tarjetaQueSobrevive(theme.card, className);
+  const sombra = declaraSombra(className) ? "" : "shadow-md";
+  const difuminado = declaraDifuminado(className) ? "" : "backdrop-blur-sm";
+
   return (
     <div
       {...props}
-      className={`
-        ${theme.card}
-        rounded-xl
-        shadow-md
-        p-6
-        backdrop-blur-sm
-        ${className}
-      `}
+      className={`${tarjeta} rounded-xl ${sombra} p-6 ${difuminado} ${className}`
+        .replace(/\s+/g, " ")
+        .trim()}
     >
       {children}
     </div>
