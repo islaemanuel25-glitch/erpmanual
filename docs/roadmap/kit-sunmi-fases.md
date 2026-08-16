@@ -3264,6 +3264,53 @@ candado, o migrar el aire de apuro para ponerlo en verde —que es tomar por err
 una decisión ajena—. Se acotó al cero, con el motivo escrito al lado, y se abre a
 la otra lista el día que el aire se decida.
 
+### ⚑ EL AIRE SE MIGRÓ: 86 TARJETAS CAMBIAN, Y ESE ES EL ARREGLO
+
+**RESUELTO el 2026-08-16.** Cierra la otra mitad del pendiente del padding, y con
+esto el eje queda negociado entero.
+
+**El relleno sale de `paddingQueSobrevive`, que ya existía.** Es la misma función
+con la que la tabla negocia el padding de sus celdas, y hace lo que hay que
+hacer: el `p-6` de la pieza sobrevive salvo que la pantalla declare LOS DOS ejes.
+Una tarjeta que declarara solo `px-2` conserva el vertical, en vez de perder los
+cuatro lados por declarar uno. No se escribió un predicado nuevo al lado.
+
+Y para una tarjeta sin `className` la cadena que sale es carácter por carácter la
+de antes. **Eso es lo que se exigió a cero píxeles**, porque el resultado
+esperado de esta tanda NO era cero: 86 tarjetas se mueven a propósito.
+
+**Los tres controles —categorías, usuarios y proveedores— dieron CERO.** Se
+eligieron leyendo el repo, no a ojo: son pantallas donde NINGUNA tarjeta declara
+padding, de las 53 que están en esa condición. Y las tres pantallas de aire se
+movieron: inicio 6,90 %, clientes 13,08 %, clientes/analytics 26,63 %, y clientes
+a 1000 px 18,50 %. El control de ruido previo dio cero en las siete.
+
+**Los números, con la raíz en 14 px:** `p-2` son 7 px, `p-3` son 10.5, `p-4` son
+14, `p-5` son 17.5 y `p-6` son 21. Las 49 de `p-3` pasan de 21 a 10.5 y las 30 de
+`p-4` de 21 a 14.
+
+**Las cuatro del `lg:` dejan de estar a medias, y acá está el número que importa:**
+por encima de 1024 px no cambia nada —ya ganaban—, así que siguen en 10.5 px las
+tres de `p-2 lg:p-3` y en 14 px la de `p-3 lg:p-4`. Por DEBAJO de 1024 es donde
+se nota: pasan de 21 px a **7 px** las tres primeras y de 21 px a **10.5 px** la
+cuarta. O sea que el mostrador angosto era el que estaba viendo el padding que
+nadie había pedido.
+
+**Los nueve `p-6` no mueven un píxel.** Antes ganaba el de la pieza, ahora gana el
+de la pantalla, y son la misma clase.
+
+**El `!p-3` de `TicketEditor` perdió el `!`, y se midió antes de sacarlo.** `p-3`
+solo y `!p-3` solo dan los mismos 10.5 px, y la pieza sin nada da 0 — o sea que
+el `p-6` ya no compite y el `!` no tiene contra qué ganar. Las siete capturas con
+el `!` y sin el `!` dieron idénticas byte a byte.
+
+Lo que **no** se pudo hacer: fotografiar esa pantalla. Es el editor de ticket del
+POS y no hay ninguna caja abierta en la base de desarrollo, ni en el depósito ni
+en el otro local. Abrir una es una acción real de la aplicación y estaría
+permitida, pero escribiría un turno que se vería en las pantallas de turnos y de
+auditoría, y habría contaminado las otras capturas de la tanda. Se dijo en vez de
+hacerlo.
+
 ### El velo: qué se pierde, no qué tan peligroso es
 
 **PENDIENTE CONFIRMADO — decidido el 2026-08-13, y CORRIGE el criterio anterior.**
@@ -3783,6 +3830,50 @@ En la práctica, para el próximo conteo de consumidores:
    se le ocurrió a nadie leyendo: los tres salieron de que un control se moviera.
 
 ## El arnés de captura, y por qué una captura sola no prueba nada
+
+### ⚑ LA FUENTE QUE NO CARGÓ: TRES CORRIDAS IDÉNTICAS DE LA PANTALLA EQUIVOCADA
+
+**Encontrado el 2026-08-16, migrando el aire de `SunmiCard`.**
+
+La corrida de "después" dio diferencias del 1,6 al 3,2 % **en las siete
+pantallas, incluidas las TRES de control** — que no declaran padding y no podían
+haberse movido por ese cambio. El arnés había informado "3 corridas idénticas.
+La captura sirve como prueba" en las siete.
+
+**Era la tipografía.** El texto salió con la fuente de reserva porque la web font
+no había cargado: mismo contenido, mismas cajas, otros glifos. Y como cada
+palabra queda unos píxeles corrida, difieren todas las filas de texto de toda la
+pantalla, que es exactamente la forma que tenía el ruido.
+
+Por qué pasó: esa corrida arrancó **inmediatamente después de editar un archivo**,
+con el dev server recompilando. La fuente perdió la carrera.
+
+**Y por qué el arnés no lo vio, que es lo que hay que aprender:** las tres
+repeticiones viven DENTRO de la misma corrida y comparten su estado. Si la fuente
+falta, falta en las tres. `--repeticiones 3` contesta "esta corrida no varía", y
+no contesta "esta corrida retrató lo que digo". Son las dos preguntas de siempre,
+y ésta es la vez que se separaron solas.
+
+**Lo único que lo atrapó fue el control CRUZADO**: volver a capturar el mismo
+estado en otra corrida. `antes`, la corrida con el `!` y la corrida nueva dieron
+las tres IDÉNTICAS byte a byte entre sí; la contaminada quedó sola, con los
+mismos conteos de píxeles en las tres pantallas de control. Ahí se supo que el
+raro era el retrato y no el cambio.
+
+**Cómo se reconoce sin investigar nada:** si los píxeles que difieren caen sobre
+filas de texto de TODAS las pantallas, incluidas las que no podían moverse, es la
+fuente. Si caen sobre una zona —un bloque, una tarjeta, una columna—, es el
+cambio. Y mirar las dos imágenes al lado tarda diez segundos y lo decide.
+
+**En la práctica: no se captura con el dev server recién tocado.** Y una corrida
+cuyos controles se mueven se descarta entera; no se le busca explicación al
+número, se vuelve a capturar.
+
+Nota sobre la hipótesis que NO era: se sospechó de contenido que cambia solo
+—horas, fechas, "hace X minutos"—, que era razonable porque tres de las pantallas
+muestran cosas recientes. La descartó mirar DÓNDE caían los píxeles: si fueran
+las fechas, las pantallas de control —categorías, usuarios, proveedores— no se
+habrían movido, y se movieron las tres.
 
 ### ⚠️ LA LÍNEA DE BASE DE HUELLAS YA NO ES COMPARABLE
 
