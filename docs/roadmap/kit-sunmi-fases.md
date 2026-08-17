@@ -4617,10 +4617,19 @@ tema— así que cubre blue, `text-white` y los arbitrarios sin enumerar ninguno
 Su alcance son las cuatro piezas que negocian el tamaño; el resto del repo es lo
 que falta.
 
-## ✅ EL CORREDOR DE LA SUITE — RESUELTO el 2026-08-17, y quedan 8
+## ✅ EL CORREDOR DE LA SUITE — RESUELTO el 2026-08-17, sin nada afuera
 
-**Cerrado en `cfc817f` y `394ec20`.** Lo de abajo queda como el relevamiento que
-originó la tanda. Lo que el arreglo agregó:
+**Cerrado en `cfc817f`, `394ec20` y `072c7d0`**, y este último corrige a los dos
+primeros: el resolutor que agregaron era un DUPLICADO de
+`scripts/alias-loader.mjs`, que ya existía. El detalle está más abajo, en "los 8
+que quedaban afuera", junto con la regla que dejó.
+
+**El estado final: la suite entera en verde por primera vez.** 3412 casos, 3390
+pasan, CERO fallos, 21 salteados por fixture y 1 pendiente declarado. Antes de
+esta tanda corrían 2323.
+
+Lo de abajo queda como el relevamiento que originó la tanda. Lo que el arreglo
+agregó:
 
 - **Eran 940 candados mudos, no 739.** A los 739 de los 37 archivos con alias se
   sumaron **101 más** de una segunda causa que no estaba en el relevamiento: el
@@ -4629,39 +4638,51 @@ originó la tanda. Lo que el arreglo agregó:
 - La suite pasa de **2367 casos a 3176**, y de 2301 que pasaban a **3146**.
 - **Ninguno de los 940 estaba en rojo.** Estaban todos bien y callados, que era
   la hipótesis menos probable de las tres.
-- El resolutor vive en el repo —`scripts/test/resolutorAlias.mjs`— y NO se
-  cambiaron los archivos a ruta relativa: así el próximo candado escrito con alias
-  corre solo.
+- **Y NO se cambiaron los archivos a ruta relativa**, que sigue siendo la decisión
+  correcta: el cargador resuelve el alias, así que el próximo candado escrito con
+  alias corre solo. Lo que cambió es cuál cargador — el que ya estaba, no uno
+  nuevo.
 - Y va con `lib/sunmi/todosLosCandadosCorren.test.mjs`, que compara los archivos
   que EXISTEN contra los que pueden correr Y contra los que el comando mira. Sin
   eso esto se arreglaba hoy y se rompía solo.
 
-### Los 8 que quedaron afuera, con lo que necesita cada uno
+### ✅ LOS 8 QUE QUEDABAN AFUERA — RESUELTOS, Y NO HIZO FALTA CONSTRUIR NADA
 
-Están declarados uno por uno en ese candado, con su motivo, y con el conteo al
-lado para que la lista no se estire sola. Son **dos problemas distintos**:
+**Cerrado en `072c7d0`.** Lo de arriba quedó escrito diciendo que faltaba elegir
+una herramienta de transformación de JSX y que `authorize` necesitaba un doble de
+Next. **Las dos cosas eran falsas, y el motivo es el que importa.**
 
-**SIETE PIDEN UNA TRANSFORMACIÓN DE JSX.** Importan un componente `.jsx` y node no
-lo parsea. Son `lib/caja/aperturaRelevo`, `cierrePantallaRender`, `circuitoDinero`,
-`detalleTurnoRender`, `ordenCambioPrevio`, `retiroPantallaRender` y
-`components/sunmi/SunmiButton`.
+`scripts/alias-loader.mjs` ya estaba en el repo —desde `353923b`— y ya hacía todo:
+resuelve el alias, **transforma el JSX con el SWC que Next ya trae**, sustituye
+`next/link` por un doble (`scripts/stub-next-link.mjs`) y cubre los subcaminos de
+Next. Corriendo la suite con ÉL, los ocho arrancan y **los ocho pasan**:
 
-Los seis de `caja` afirman sobre lo que DIBUJAN las pantallas de caja y turnos
-—renderizan el componente y miran el marcado—, así que no son candados menores: son
-los que cuidan lo que Emanuel ve al cerrar una caja. El de `SunmiButton` cuida la
-pieza del kit más usada del proyecto.
+- `aperturaRelevo` 45 · `retiroPantallaRender` 51 · `ordenCambioPrevio` 56 ·
+  `cierrePantallaRender` 37 · `circuitoDinero` 29 · `detalleTurnoRender` 8
+- `components/sunmi/SunmiButton` 4
+- **`lib/authorize.test.mjs` 16 — RESUELTO, no pendiente.** Era el único de los
+  ocho que toca permisos y no necesita ningún doble: el cargador ya trae
+  `next/server` entre sus subcaminos.
 
-La tanda es agregarle al corredor una transformación de JSX. No es enorme, pero es
-otra decisión: qué herramienta, y si se carga siempre o sólo para esos archivos.
+Son **246 candados** que nunca habían corrido, ninguno en rojo.
 
-**Y UNO PIDE OTRA COSA: `lib/authorize.test.mjs`.** Arrastra `next/server` a través
-de `lib/auditoria/interceptor.js`, que lo importa para el `after()` del flush de la
-bitácora. `next/server` resuelve pero apunta a un archivo que no existe fuera del
-runtime de Next, así que falla al cargar. Necesita el resolutor de Next o un doble
-de `after`. Es el único de los ocho que toca permisos.
+**EL AGUJERO REAL ERA QUE `package.json` NO TENÍA SCRIPT `test`**, así que el
+cargador estaba ahí sin que nadie lo invocara. Nada más que eso.
 
-**No se tocó ninguno.** Cuando se haga, el candado de cobertura avisa solo: si uno
-empieza a correr, se pone rojo diciendo que su excepción quedó vieja.
+### La regla que deja, y es la más cara de las tres tandas
+
+**Antes de construir una herramienta: leer `docs/PROJECT.md` y mirar `scripts/`.**
+
+En esta tanda se escribió un resolutor de alias duplicado —`cfc817f`, ya
+empujado— creyendo que faltaba infraestructura. No faltaba, y no estaba
+escondida: `docs/PROJECT.md:245` documenta el comando entero, tres de los seis
+candados de caja lo nombran en su propio encabezado, y también aparece en
+`docs/CURRENT_STATE.md` y en el skill de despliegue.
+
+**Una herramienta duplicada no la atrapa ningún candado, porque las dos andan.**
+No hay rojo, no hay conflicto, no hay nada que avise; el duplicado se descubre
+sólo si alguien lo mira. Es la regla 1 aplicada a las herramientas, y es donde
+más fácil se cuela, porque uno cree que está construyendo y no duplicando.
 
 ## ⚑ 44 ARCHIVOS DE CANDADOS NO CORREN, Y NO SE VE
 
