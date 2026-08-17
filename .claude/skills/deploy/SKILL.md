@@ -787,6 +787,49 @@ ese positivo decía "mi cambio viajó" — y era falso.
 El que sirvió fue `overflow-x-auto shrink-0`, comprobado con el `git show` de
 arriba: cero apariciones en el commit desplegado.
 
+**UN IDENTIFICADOR NO PUEDE SER MARCADOR: EL BUILD DE PRODUCCIÓN LO MINIFICA.**
+
+Es la lección que faltaba del caso de arriba, y no es que `altoVa` estuviera
+elegido con poca memoria: es que **ningún** nombre de función, de variable o de
+prop sirve para esto.
+
+*Medido el 2026-08-16, y lo mostró el control.* Se probaron dos identificadores
+dentro de la imagen que atendía: `declaraMargenVertical`, que **no** existía en
+el commit desplegado, y `declaraPaddingY`, que **sí** existía en él sin ninguna
+duda. Los dos dieron **vacío**. El segundo es el control, y su vacío es lo que
+prueba que el método no anda: un identificador que está no se encuentra igual que
+uno que no está.
+
+O sea que un marcador de identificador **no afirma nada, ni a favor ni en
+contra**. Si se usa uno y da vacío, eso no dice "no viajó" — no dice nada. Lo que
+sirve son las CADENAS: un nombre de clase, un texto de interfaz, un selector CSS.
+Esas no se manglan.
+
+Corolario del corolario: **si el control de un marcador da vacío, el marcador se
+descarta entero.** No se busca una explicación para el marcador y se deja el
+control de lado; el control es el que decide si la pregunta se pudo hacer.
+
+**Y EL MARCADOR VA ANCLADO, NO SUELTO.**
+
+*El caso, del mismo día:* el marcador de la tanda era la clase `my-0`, nueva en
+el commit a desplegar. Buscada **suelta**, como subcadena, dio **positivo en la
+imagen vieja** — porque `my-0` vive adentro de `!my-0`, que sí estaba. Tres
+archivos. Leído rápido, otra vez "mi cambio ya está".
+
+Buscada **anclada en la forma en que aparece en la hoja** —`.my-0{`, con el punto
+y la llave— dio vacío en la vieja y **un archivo en la nueva**, que es lo que
+tenía que dar. El control `.my-2{`, presente en las dos.
+
+Dos cosas que hacen falta para anclar bien y que se pagan si no se saben:
+
+- **En el build de producción el CSS está minificado y es UNA SOLA LÍNEA.** La
+  llave va pegada al selector —`.my-0{`— y no hay espacio. Un patrón copiado de
+  cómo se ve la hoja en desarrollo, con `.my-0 {`, no matchea nada, y ese vacío
+  se lee como "no viajó". Y `grep -c '^\.'` sobre un archivo minificado devuelve
+  **1**, no la cantidad de reglas.
+- **Se busca con `grep -F`**, cadena fija. Un punto y una llave son metacaracteres
+  y ya hicieron dar "ausente" a reglas que estaban.
+
 **Y su par, que es la otra mitad: un vacío solo significa algo si la misma
 búsqueda encuentra algo cuando tiene que encontrarlo.**
 
@@ -826,6 +869,28 @@ Los `.md` y los `.test.mjs` no entran en `content` y no cuentan; los `.js` de
 `lib/` sí. **Es la misma familia que la trampa del archivo huérfano —el código
 del repo y lo que llega al build no son lo mismo— pero al revés: acá el build
 tiene de más, no de menos.**
+
+**CONFIRMADO EN LA HOJA VIVA DE PRODUCCIÓN, 2026-08-17.** Lo de arriba se había
+medido con `npx tailwindcss` en la máquina local. El despliegue de `00fcaf0` lo
+puso a prueba contra la hoja que sirve `operix.cloud`, y el discriminador acertó
+en los dos sentidos:
+
+- `.\!my-0{` y `.\!my-1{` **siguen ahí**, y el `git grep` de arriba devuelve
+  `lib/sunmi/claseNegociada.js` para las dos.
+- `.\!my-2{` **desapareció**, y el mismo `git grep` para `!my-2` devuelve vacío.
+
+Las tres clases las dejó de escribir la misma tanda, en el mismo archivo y el
+mismo día. **La única diferencia entre la que se fue y las dos que quedaron es un
+JSDoc que nombra a dos y no a la tercera.** No hay nada en el código que las
+distinga, así que esto no se deduce mirando el diff: se pregunta con el `git
+grep`, siempre.
+
+Y dejó un rastro que conviene reconocer, porque al principio se leyó como un
+problema: **el total de reglas de la hoja no se movió** —1521 antes y 1521
+después—, y eso hizo sospechar que se estaba midiendo una hoja cacheada. No lo
+era. Es que se fue una regla y llegó otra: menos `.\!my-2`, más `.my-0`. Un conteo
+global que no cambia puede estar tapando dos cambios que se compensan, igual que
+en la verificación de una migración de datos se cruzan los ids y no los totales.
 
 Y si para algo no se puede armar un marcador con su control —porque el cambio no
 deja rastro en el build, por ejemplo—, **se dice que no se pudo verificar** en vez
