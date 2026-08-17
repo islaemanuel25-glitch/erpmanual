@@ -4939,6 +4939,43 @@ la sección "SIETE CANDADOS DEL CONTRATO VIEJO POR REESCRIBIR", unas líneas má
 arriba; se nombra también acá porque en el relevamiento del 2026-08-17 figuraba
 como pendiente sin anotar y conviene que aparezca buscando por "contrato viejo".
 
+## ⚑ `--accent` — DEFECTO VIVO, no deuda. El botón seleccionado no se resalta
+
+**Separado del resto el 2026-08-17 a propósito.** Los otros seis tokens huérfanos
+son deuda: no rompen nada que se vea. Éste sí, y por eso va aparte.
+
+**Dónde.** `app/modulos/auditoria-pos-ventas/balances/page.jsx:220`, en la clase
+condicional del botón de filtro:
+
+    ? "bg-[var(--accent)] text-white shadow-sm"
+
+**Qué se ve, medido en el navegador con control.** `background-color` calculado da
+`rgba(0, 0, 0, 0)` — **exactamente lo mismo que no declarar nada**. `--accent` no
+lo define ningún tema y la declaración no tiene respaldo, así que la propiedad
+queda inválida y el fondo se hereda.
+
+O sea que **el botón SELECCIONADO se dibuja igual que los no seleccionados**,
+salvo por el `text-white` que sí se aplica. Queda texto blanco sobre el fondo
+heredado, sin ningún resalte. En un tema claro eso es blanco sobre casi blanco.
+
+El control de la medición: un gemelo con `var(--pos-accent)` —token que sí
+existe— da `rgb(251, 191, 36)`, así que la medición distingue "se aplicó" de
+"heredó". El primer intento usó `--app-fg` de gemelo y no distinguía; esa corrida
+se descartó.
+
+**Por qué no se arregló en la tanda del `--pos-warning`:** ahí lo que faltaba era
+el valor de un token que ya tenía respaldo y andaba. Acá falta decidir QUÉ COLOR
+va, y eso es de aspecto — es el resalte de un filtro activo en una pantalla de
+auditoría—. Definir `--accent` en los catorce temas es una opción; apuntar la
+clase a `--pos-accent`, que ya existe y está pensado justo para esto, es la otra y
+probablemente la correcta. **No se tocó nada.**
+
+**Lo que hay que mirar al arreglarlo, y no es menor:** si se apunta a
+`--pos-accent`, el `text-white` de al lado pasa a ir sobre el ámbar del tema.
+**Blanco sobre `#fbbf24` da 1,67**, contra un mínimo de 4,5 — o sea que arreglar
+el fondo dejaría el texto ilegible, que es el mismo canje que apareció con el
+recuadro de caja del turno. El par se decide junto, no el fondo primero.
+
 ## ⚑ LOS CINCO TOKENS HUÉRFANOS SIN DEFINIR — MEDIDOS, no arreglados
 
 **Medido el 2026-08-17 en el navegador, sobre las pantallas reales.** No se tocó
