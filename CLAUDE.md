@@ -91,6 +91,17 @@ Corolario: el default de un valor se define UNA vez. Buscar el rango de aumento
 esperado dio cinco lugares distintos, tres de ellos con `?? 10` y `?? 20` escritos
 a mano. Cambiar la constante no los habría tocado.
 
+**ANTES DE CONSTRUIR HERRAMIENTA, LEER `docs/PROJECT.md` Y MIRAR `scripts/`.**
+
+Una herramienta duplicada no la atrapa ningún candado: **las dos andan.** No hay
+rojo, no hay conflicto, no hay nada que avise. Lo que la delata está escrito en la
+documentación y en los encabezados de los candados, no en el código — así que la
+única defensa es haber mirado antes.
+
+*Por qué:* `scripts/alias-loader.mjs` ya resolvía el alias y transformaba JSX, y
+estaba documentado en `docs/PROJECT.md:245` y nombrado en tres candados de caja;
+se escribió un resolutor peor al lado y hubo que deshacerlo en `072c7d0`.
+
 ### 2. Verificar ejecutando, no leyendo
 
 Nada se da por bueno porque compile o porque el código se lea bien.
