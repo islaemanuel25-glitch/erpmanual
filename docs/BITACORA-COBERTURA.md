@@ -56,17 +56,34 @@ las filas de `AuditoriaBitacora` de la misma ventana.
 - **Las escrituras que no cambiaron ningún valor**: sellan `updatedAt` igual y la
   bitácora las descarta a propósito. También pueden ser parte de los 186.
 
-## Los dos lugares que mueven costos
+## Los lugares que mueven costos
+
+**El título decía "los DOS lugares" y la lista tiene TRES.** Se sacó el número el
+2026-08-17 en vez de cambiarlo por otro: contar los ítems de esta lista no prueba
+que sean todos los que hay, y cuántos son de verdad no se relevó. Un número que
+nadie midió es peor que ninguno.
 
 Los costos de producto no se escriben solo desde la ficha del producto:
 
 1. `app/api/productos/editar/[id]` y `crear`, y la importación masiva
    `productos/import/apply`.
 2. **Compras a proveedor**, por `lib/compras-proveedor/costoMaestro.js`, llamado
-   desde `compras-proveedor/crear` y `compras-proveedor/editar-item`. Escribe el
-   costo maestro y **recalcula el precio de venta en todas las ubicaciones**.
-   Verificado con datos: el 2026-08-07 a las 11:56:46 se escribieron 6 productos
-   que son exactamente 6 líneas del pedido 217, creado a las 11:56:45.
+   **solo desde `compras-proveedor/recibir/[id]`**, y ahí adentro de un
+   `if (escribeCosto)`. Escribe el costo maestro y **recalcula el precio de venta
+   en todas las ubicaciones**.
+
+   **CORREGIDO EL 2026-08-17.** Este punto decía "llamado desde
+   `compras-proveedor/crear` y `compras-proveedor/editar-item`". Fue cierto hasta
+   el 2026-08-10: `ed52991` sacó la propagación de las rutas de pedido, porque un
+   pedido registra lo que se PIDIÓ y el costo real recién se conoce cuando llega
+   la mercadería. Reverificado contra el árbol el 2026-08-17, enumerando las 26
+   rutas del módulo de forma recursiva: ninguna otra lo llama.
+
+   **La evidencia con datos de abajo NO se borra, se fecha**, porque prueba algo
+   que era verdad entonces: el 2026-08-07 a las 11:56:46 se escribieron 6
+   productos que son exactamente 6 líneas del pedido 217, creado a las 11:56:45.
+   Eso ocurrió tres días ANTES del cambio, con `crear` todavía propagando. Hoy ese
+   mismo pedido no escribiría nada hasta recibirse.
 3. `proveedores/listas/[id]/aplicar`, que además arrastra la venta por margen.
 
 ## Lo que queda pendiente

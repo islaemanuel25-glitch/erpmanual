@@ -380,12 +380,22 @@ export default function DetallePedidoProveedorPage({ params }) {
   // y eso se compara contra LA BOLETA. Esa comparación ya existe abajo, en la
   // lista de conciliación.
   //
-  // Y ADEMÁS NO SE ENCENDÍA NUNCA. Se probaron los 13 pedidos ENVIADO de
-  // `erpazul_dev` uno por uno buscando `[data-contador-avisos]` en el DOM: en los
-  // 13 el selector no encontró nada. Tiene explicación y no es casualidad —
-  // compras a proveedor reescribe el costo maestro al crear o editar una línea,
-  // así que pedido y catálogo quedan sincronizados por construcción y los dos
-  // números que se comparaban son casi siempre el mismo.
+  // ESE MOTIVO SE SOSTIENE SOLO: el contador sobra acá se encienda o no.
+  //
+  // Se midió además que no se encendía —los 13 pedidos ENVIADO de `erpazul_dev`,
+  // uno por uno, sin `[data-contador-avisos]` en el DOM—, pero el PORQUÉ que se
+  // escribió acá primero era falso y conviene no repetirlo: decía que el módulo
+  // reescribe el costo maestro. NO lo hace. Desde `ed52991` ninguna ruta de pedido
+  // escribe el costo maestro; solo `recibir` propaga.
+  //
+  // Coinciden por otra razón: LA LÍNEA NACE CLONANDO el costo del catálogo cuando
+  // se agrega el producto. Es una fotocopia, no un vínculo — tanto que la pantalla
+  // de armado guarda el valor del catálogo APARTE, para poder compararlos cuando
+  // se separen.
+  //
+  // Así que el contador SÍ PUEDE ENCENDERSE: al editar el costo de la línea, al
+  // editar el producto, o al aplicar una lista de proveedor. El cero de 13 es un
+  // hecho de esos datos, no una ley.
   //
   // `contarLineasConAviso` y `textoContadorAvisos` NO SE BORRARON: siguen en
   // `lib/compras-proveedor/avisoCostoLinea` y los usa `/nueva`, que es donde el

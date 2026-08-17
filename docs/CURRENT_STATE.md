@@ -306,15 +306,29 @@ Devolvía `["*"]` ante un token con permisos corruptos, mientras `login` y
 La regla vive ahora una sola vez en `lib/rbac/permisosSesion.js` y la importan los
 tres. Commit `32e0d51`. Ver contradicción C-01.
 
-### 2. `lib/compras-proveedor/` escribe costos y no tiene candados — **[VERIFICADO]**
+### 2. `lib/compras-proveedor/` escribe costos y no tiene candados — **RESUELTO 2026-08-10, revisado el 2026-08-17**
 
-`costoMaestro.js` y `calculoPedido.js` no tienen `.test.mjs` propio. Los llaman
-tres rutas que escriben en producción: `compras-proveedor/crear`,
-`compras-proveedor/editar-item/[id]` y `compras-proveedor/recibir/[id]`. La única
-cobertura es indirecta: `lib/precios/margenNoSeDeforma.test.mjs`, que los lee
-como texto para verificar que deleguen la fórmula.
+**Este punto tenía DOS afirmaciones y las dos son falsas hoy.** Se dejan escritas
+porque describían el commit del encabezado, y debajo lo que rige.
 
-Contraste: el módulo de listas, que hace lo mismo, tiene ~787 tests.
+Decía: *"`costoMaestro.js` y `calculoPedido.js` no tienen `.test.mjs` propio. Los
+llaman tres rutas que escriben en producción: `compras-proveedor/crear`,
+`compras-proveedor/editar-item/[id]` y `compras-proveedor/recibir/[id]`."*
+
+**Lo que rige, comprobado contra el árbol el 2026-08-17:**
+
+1. **Los dos archivos SÍ tienen candados propios**, desde el 2026-08-10:
+   `costoMaestro.test.mjs` con 27 y `calculoPedido.test.mjs` con 21. Contados con
+   `grep -c "^test("` sobre cada archivo.
+2. **Ya NO son tres rutas: es una.** `ed52991` sacó la propagación de las rutas de
+   pedido el 2026-08-10, porque un pedido registra lo que se PIDIÓ y el costo real
+   recién se conoce al recibir. Hoy solo `compras-proveedor/recibir/[id]` propaga,
+   y adentro de un `if (escribeCosto)`. Reverificado enumerando las 26 rutas del
+   módulo de forma recursiva, y defendido por candados que miran por nombre Y por
+   efecto en `retornoPedido.test.mjs`.
+
+**El "~787 tests" del módulo de listas no se recontó** en esta revisión, así que
+ese número sigue siendo el de entonces y no una medición de hoy.
 
 ### 3. Cero candados sobre el corazón de la plataforma — **[VERIFICADO]**
 

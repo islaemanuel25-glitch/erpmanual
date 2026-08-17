@@ -4560,16 +4560,47 @@ probaron los 13 uno por uno —#9, #11, #12, #24, #25, #26, #27, #28, #29, #30, 
 #34 y #42— buscando el elemento `[data-contador-avisos]` en el DOM: en los 13 el
 selector no encontró nada.
 
-No es casualidad y tiene explicación: **compras a proveedor reescribe el costo
-maestro al crear o editar una línea.** Pedido y catálogo quedan sincronizados por
-construcción, así que la comparación da igual casi siempre y el aviso no se
-enciende. Un contador que compara dos números que el propio módulo mantiene
-iguales no es un aviso: es adorno.
+### EL MECANISMO QUE SE ESCRIBIÓ ACÁ PRIMERO ERA FALSO — corregido el 2026-08-17
 
-**Y ese cero también dice qué NO prueban las capturas de esa tanda:** como el
-contador no se dibujaba en ninguno, sacarlo no mueve un píxel en esta base. La
-captura confirma que no se rompió nada alrededor; **no** confirma que el contador
-se viera y dejara de verse, porque no se veía.
+**Decía: "compras a proveedor reescribe el costo maestro al crear o editar una
+línea, así que pedido y catálogo quedan sincronizados por construcción".** Es
+falso, y hay que decirlo con todas las letras porque se usó para explicar el cero.
+
+Lo cierto es lo contrario, y está decidido y desplegado desde el 2026-08-10 en
+`ed52991`: **ninguna ruta de pedido escribe el costo maestro.** Ni `crear`, ni
+`editar-item`, ni `agregar-item`, ni `confirmar`, ni `marcar-enviado`, ni `anular`.
+Solo `recibir/[id]` propaga, y adentro de un `if (escribeCosto)`. Comprobado
+enumerando las 26 rutas del módulo de forma recursiva, y defendido por candados que
+miran por nombre Y por efecto.
+
+**EL MECANISMO REAL: la línea del pedido NACE CLONANDO el costo del catálogo.**
+Al agregar un producto, la pantalla de armado lee `precio_costo` del producto y lo
+copia al ítem. Coinciden porque la línea es una **fotocopia** del catálogo tomada
+en ese momento, **no un vínculo**. La prueba de que es copia está en el propio
+código: la pantalla guarda **aparte** el valor del catálogo, justamente para poder
+comparar cuando los dos se separan.
+
+**Y esto cambia una conclusión, no solo la explicación.** Se había escrito que el
+contador era incapaz de encenderse. **No es así: se enciende en cuanto la línea y
+el catálogo se separan** — al editar el costo de la línea, al editar el producto, o
+al aplicar una lista de proveedor, que arrastra la venta por margen. Los tres
+caminos existen hoy.
+
+**O sea que el cero de 13 es un hecho de ESTOS datos, no una ley.** Vale como
+medición —los 13 se probaron uno por uno— y no vale como demostración de que el
+contador nunca podría verse.
+
+**LA DECISIÓN DE SACARLO NO SE APOYABA EN ESE CERO.** Se apoya en la regla de
+negocio de más arriba: comparar lo pedido contra el catálogo es la pregunta de
+cuando se ARMA el pedido, y ponerla en la pantalla de cuando LLEGA la mercadería es
+la comparación equivocada, se encienda o no. El cero era refuerzo, y era un
+refuerzo con el porqué mal escrito.
+
+### Y qué NO prueban las capturas de esa tanda
+
+Como el contador no se dibujaba en ninguno de los 13, sacarlo no mueve un píxel en
+esta base. La captura confirma que no se rompió nada alrededor; **no** confirma que
+el contador se viera y dejara de verse, porque no se veía.
 
 ## ✅ `TablaDetallePedido` — BORRADA el 2026-08-17
 
