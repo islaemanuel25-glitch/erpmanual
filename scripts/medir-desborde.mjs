@@ -249,6 +249,52 @@ console.log("navegando a:", destino);
 await send("Page.navigate", { url: destino });
 await sleep(4000);
 
+// ── ¿LLEGÓ A DONDE DIJO QUE IBA? ──────────────────────────────────────────
+//
+// LA ADVERTENCIA DE ARRIBA NO ALCANZABA: decía que sin `--usuario` se fotografía
+// lo que haya en el perfil, y estaba bien escrita — pero era prosa, y el script
+// sacaba la foto igual. El 2026-08-17 se sacaron TRES capturas del pedido 42, se
+// compararon entre sí, dieron cero píxeles de diferencia las tres veces, y las
+// tres eran de la PANTALLA DE LOGIN. El informe salió diciendo "cero píxeles: la
+// pantalla no se movió".
+//
+// Y el control de estabilidad no podía atraparlo: el login es perfectamente
+// determinista. Reproducible y correcto son preguntas distintas, y hasta acá el
+// script solo contestaba la primera.
+//
+// El agravante que lo hace fácil de repetir: EL PERFIL DE EDGE VIVE DENTRO DE
+// `--salida`. Una carpeta de salida nueva —que es lo natural para "antes" y
+// "después"— es un perfil nuevo, o sea SIN SESIÓN. Cuanto más prolijo se es
+// separando las corridas, más seguro se cae en esto.
+//
+// Así que ahora se comprueba, y es ROJO Y NO MIDE, igual que el selector que no
+// encuentra nada: las dos son la misma falla —la foto de otra pantalla— y no
+// tiene sentido que una frene y la otra no.
+const llegoA = await evaluar(`location.pathname + location.search`);
+if (llegoA !== URL_REL) {
+  console.log("");
+  console.log(`NO LLEGÓ A DONDE SE LE PIDIÓ.`);
+  console.log(`  pedido: ${URL_REL}`);
+  console.log(`  llegó a: ${llegoA}`);
+  if (String(llegoA).startsWith("/login")) {
+    console.log("");
+    console.log("  ES LA PANTALLA DE LOGIN: no hay sesión en el perfil.");
+    console.log(`  El perfil de esta corrida es ${PERFIL}`);
+    console.log("  —vive adentro de --salida, así que una carpeta nueva arranca sin sesión—.");
+    console.log("  Se arregla de dos formas: pasando --usuario y --clave, o apuntando");
+    console.log("  --perfil a uno que ya tenga la sesión viva.");
+  } else {
+    console.log("");
+    console.log("  El ERP desvió a otro lado. Suele ser falta de contexto activo");
+    console.log("  (--ubicacion) o de permisos del usuario con el que se entró.");
+  }
+  console.log("");
+  console.log("  NO SE SACA LA FOTO. Una captura de otra pantalla es estable, se");
+  console.log("  compara sin protestar y da cero: prueba que el login no cambió.");
+  cerrar();
+  process.exit(1);
+}
+
 // Abrir el primer formulario, que es donde vive lo que se mide.
 if (arg("abrir-primero")) {
   await evaluar(`(() => {
