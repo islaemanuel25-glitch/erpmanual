@@ -4828,6 +4828,43 @@ vez de aceptar todo lo que empiece con `text-`—, y medir las tres piezas antes
 después. El candado de la tabla se pondrá rojo al arreglarlo, y eso es lo que
 tiene que pasar: le va a mostrar a quien lo arregle qué más estaba tocando.
 
+## ⚑ LOS DATOS DE `erpazul_dev` QUE ESTÁN A PROPÓSITO — no son basura
+
+Todo lo de esta sección se cargó **por la interfaz, con acciones reales de la
+aplicación**. Nada escrito a mano en la base. Está acá para que nadie lo barra
+creyendo que es resto de una prueba.
+
+### Venta 114, ticket #88 — para la pantalla de análisis de clientes
+
+**Cargada el 2026-08-17.** Dos líneas —AGUA OXIGENADA 10V 100ML y ALA CREMOSO
+750ML LIMON AMARILLO—, total $2.303, en efectivo, **con el cliente Minimarket
+casiano elegido desde el selector del POS**.
+
+**Para qué:** `/modulos/clientes/analytics` tiene dos tablas y la primera es el
+ranking de clientes por facturación **del período por defecto, los últimos 30
+días**. Antes de esta venta esa tabla decía "Sin datos en este período", así que
+la pantalla no podía dar una huella honesta: se habría guardado el estado vacío
+como referencia.
+
+Con la venta cargada, las dos tablas tienen filas y la pantalla pasa el corte del
+generador.
+
+**Lo que la distingue de la venta 113:** aquélla se cargó sin cliente —consumidor
+final— y por eso no aparece en el ranking. Las dos siguen haciendo falta y por
+motivos distintos: la 113 destraba `EditorVentaCorreccion`, la 114 destraba
+analytics.
+
+### Y una corrección: el pedido 42 NO sirve para la huella del detalle
+
+Se creía que sí, por tener 24 líneas. **No alcanza.** La única tabla que esa
+pantalla dibuja hoy es la de comprobantes, y dice "Todavía no hay comprobantes":
+la tabla de líneas es `TablaDetallePedido`, que es código muerto —ver su sección
+más arriba—.
+
+O sea que `05-compras-proveedor-detalle` necesita un pedido **con un comprobante
+subido**, no un pedido con líneas. Queda declarada afuera de la línea de base
+hasta que eso exista.
+
 ## ⚑ EL TURNO 49 QUEDA ABIERTO A PROPÓSITO — no es un turno olvidado
 
 En `erpazul_dev`, local `depo`. **No hay que cerrarlo sin leer esto.**
