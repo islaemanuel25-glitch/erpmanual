@@ -4559,3 +4559,147 @@ trabadas, cada una por su motivo:
   el skill `/capturas` es de `erpazul_al`, que está 7 migraciones atrasada.
 - `ListaConciliacion` — vive en la pantalla del pedido y necesita comprobantes; el
   pedido 42 dice "Todavía no hay comprobantes".
+
+## ⚑ UN COLOR FIJO SE LEE COMO TAMAÑO — candidata a la próxima tanda
+
+**Es la que más pesa de las tres que deja esta tanda.** Salió de un stash de la
+sesión que se cortó, no de una medición nueva: esa versión traía el hallazgo y se
+habría perdido con el stash.
+
+`declaraTamanoDeLetra`, en `lib/sunmi/claseNegociada.js`, cuenta como tamaño
+**cualquier `text-…` que no sea alineación**. Así que un COLOR FIJO de Tailwind lo
+lee como si fuera un tamaño: con `className="text-blue-600"` la tabla CEDE su
+`text-[12px]` y se queda con el tamaño heredado, que no es lo que nadie pidió.
+Comprobado corriéndolo, no deducido leyendo.
+
+Los colores del TEMA no tienen el problema —`sunmi-text-muted` no matchea— y
+`text-right` tampoco, que es otra propiedad. Las dos mitades están afirmadas en
+`lib/sunmi/claseDeTabla.test.mjs`: sin la segunda, "cede con todo" no se
+distinguiría de "cede con un color".
+
+**POR QUÉ NO SE ARREGLÓ EN ESTA TANDA, que es lo que hay que entender antes de
+tocarlo:** el predicado NO es de la tabla. Cambiarlo desde el lado de la tabla es
+exactamente lo que la regla 1 prohíbe.
+
+**Son CUATRO lectores, enumerados con `git grep "declaraTamanoDeLetra"` sobre el
+repo entero** —y conviene decir que la primera redacción de esta anotación decía
+"dos", escrita de memoria; el grep la corrigió antes de commitearla, que es
+justamente para lo que está la regla 10—:
+
+- `lib/sunmi/claseNegociada.js:532` — `claseDeTabla`, la tabla. La nueva.
+- `lib/sunmi/claseNegociada.js:567` — `PARTES_DEL_BOTON`, donde
+  `sunmi-btn-parte-letra` cede por él. O sea `SunmiButton` y sus 248 consumidores
+  con `className`.
+- `lib/sunmi/claseNegociada.js:472` — `componerClaseTexto`, el renglón chico de
+  las celdas de dos renglones.
+- `components/sunmi/SunmiTableRow.jsx:77` — **y éste lo llama DIRECTO**, sin pasar
+  por ninguna de las tres de arriba: `const tamano = declaraTamanoDeLetra(className) ? "" : TAMANO;`.
+  Es el que más fácil se pasa por alto porque no vive en el módulo del predicado.
+
+Hay que medir qué se mueve en los cuatro, no en el que uno tiene abierto.
+
+**Y el agujero es ALCANZABLE, no teórico.** Lo que hoy lo mantiene lejos es el
+trinquete de hardcodeo, que persigue slate, red, amber, cyan, emerald, green,
+orange y —desde el 2026-08-17— gray. **`blue` no está en esa lista**, ni indigo,
+ni violet, ni las demás. O sea que nada impide escribir `text-blue-600` sobre una
+pieza del kit y que el eje ceda sin que nadie se entere.
+
+Hoy no afecta a ninguna pantalla: las 57 instancias de `<SunmiTable>` pasan cero
+`className`. Es una bomba con la mecha larga, no un incendio.
+
+**La forma que tendría la tanda:** enumerar los lectores del predicado con
+`git grep`, decidir si la distinción correcta es "tamaño" contra "color" —los
+tamaños de Tailwind son una lista corta y cerrada, así que se pueden enumerar en
+vez de aceptar todo lo que empiece con `text-`—, y medir las tres piezas antes y
+después. El candado de la tabla se pondrá rojo al arreglarlo, y eso es lo que
+tiene que pasar: le va a mostrar a quien lo arregle qué más estaba tocando.
+
+## ⚑ BORRAR `TablaDetallePedido` — tanda propia, con las dos cerraduras medidas
+
+Ya está escrito más arriba por qué es inalcanzable. Acá va lo que hace falta para
+borrarla, que es lo que no se hace de paso.
+
+**LAS DOS CERRADURAS, y son independientes:**
+
+1. **El `return null` de la 382.** `app/modulos/compras-proveedor/[id]/page.jsx`
+   corta con `if (pedido.estado === "BORRADOR") return null;` y define
+   `const esBorrador = pedido.estado === "BORRADOR"` recién en la 385. O sea que
+   **`esBorrador` es siempre `false` por construcción** en todo el JSX de abajo, y
+   el `{esBorrador && <TablaDetallePedido …>}` de la 662 no puede ser verdadero
+   nunca. Esta cerradura sola ya alcanza.
+2. **El redirect de la 153-158**, `router.replace("/nueva?pedidoId=…")`, sin
+   ninguna rama que lo saltee. Comprobado navegando: con el pedido 19 —BORRADOR,
+   6 líneas— la sonda informó que llegó a `/modulos/compras-proveedor/nueva?pedidoId=19`.
+
+**EL ÚNICO IMPORTADOR** es `app/modulos/compras-proveedor/[id]/page.jsx:27`.
+Enumerado con `git grep` sobre el repo entero, trackeado y sin trackear.
+
+**LOS DOS CANDADOS QUE HAY QUE RELEER AL BORRARLA**, y es el punto entero de que
+esto sea una tanda y no un borrado:
+
+- `lib/compras-proveedor/avisoCostoLinea.test.mjs:327`
+- `lib/compras-proveedor/retornoPedido.test.mjs:361`
+
+Los dos LEEN EL ARCHIVO COMO TEXTO y buscan un patrón adentro. Un candado así
+**sigue pasando cuando el archivo que miraba se fue**: deja de afirmar nada y no
+se queja. Si se borra el componente sin releerlos, quedan dos candados verdes que
+no defienden nada, y eso ya pasó en este proyecto al mudar la tabla del detalle
+del pedido. Hay que abrir cada uno y preguntar qué afirma HOY, no si pasa.
+
+**Y LA DECISIÓN QUE FALTA ES DE ASPECTO:** o sobra la tabla, o sobra el redirect.
+Si sobra el redirect, el borrador de un pedido vuelve a editarse en DOS pantallas
+distintas — que es justamente lo que ese redirect vino a terminar—.
+
+## ⚑ EL TURNO 49 QUEDA ABIERTO A PROPÓSITO — no es un turno olvidado
+
+En `erpazul_dev`, local `depo`. **No hay que cerrarlo sin leer esto.**
+
+Es el único camino para volver a medir `EditorVentaCorreccion`, que es la única de
+las cuatro tablas con `tdClassName` que se puede abrir. La pantalla exige que el
+turno ORIGINAL de la venta esté abierto: con el turno cerrado dibuja el panel de
+bloqueo en vez de la tabla, y la sonda se pone roja porque no hay filas que medir.
+
+Cuando se relevó, **las 54 ventas con más de una línea que había en la base tenían
+el turno cerrado**, o sea que no había ni un caso medible. Por eso se creó éste.
+
+**Cómo se creó, que importa porque es la regla 4:** no se escribió nada en la base.
+Se abrió la caja desde la pantalla de "Abrir caja · sin tomar un cambio anterior",
+contando diez billetes de $1.000 —$10.000— con el origen escrito, y se cargó la
+venta apretando el POS: dos productos buscados y tocados, cobro en efectivo con
+pago exacto. Todas acciones reales de la aplicación.
+
+Lo que quedó: **turno 49 abierto** y **venta 113, ticket #87**, dos líneas —AGUA
+OXIGENADA 10V 100ML a $443 y ALA CREMOSO 750ML LIMON AMARILLO a $1.860—, total
+$2.303. Con sus consecuencias de verdad: una unidad menos de stock de cada
+producto y $2.303 más de efectivo en la caja del turno.
+
+**Si alguien lo cierra**, `EditorVentaCorreccion` vuelve a ser inmedible y hay que
+repetir todo el procedimiento de arriba. Cerrarlo no está mal —es dev— pero es una
+decisión, no limpieza.
+
+## ⚑ UN CANDADO EN ROJO QUE NO ES DE ESTA TANDA, y está diciendo algo
+
+`lib/proveedores/listas/detalleSistema.test.mjs` falla con:
+
+    EXCLUIDO volvió a ESTADO_LINEA. La exclusión es una marca, no un estado:
+    usá excluidaManual.
+
+**Es PREEXISTENTE**, comprobado corriendo la suite en un worktree del commit
+`3767e80`, que es el que estaba publicado antes de esta tanda: da los mismos 45
+fallos. No se tocó nada.
+
+Pero no es ruido, y por eso queda anotado y no ignorado. Es exactamente la regla
+3 —un hecho, una columna—: `ESTADO_LINEA.EXCLUIDO` existía en el enum y nada lo
+escribía nunca, porque pisar el estado perdería el motivo por el que la fila
+estaba así, y desexcluir no podría restaurarlo. Ese candado está afirmando que el
+valor **no vuelva** al enum. Que esté rojo significa que volvió, o que algo lo
+está nombrando donde no debe.
+
+Hay que abrirlo y ver cuál de las dos, porque si volvió, el contador que cuenta
+por estado vuelve a dar cero mientras las filas excluidas se cuentan bajo su
+estado original — que es el defecto original, completo.
+
+**Los otros 44 fallos de la suite NO son candados rojos**: son de resolución de
+módulos —el alias `@/lib` y `@/components`, que `node --test` pelado no resuelve—
+así que esos archivos ni llegan a correr. Conviene saberlo antes de leer un "45
+fallos" como 45 problemas.
