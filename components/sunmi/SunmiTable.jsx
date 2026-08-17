@@ -26,10 +26,28 @@
 // nada extra. Es la misma regla con la que se sumó `stickyHeader` sin que se
 // moviera una sola pantalla.
 //
-// ── LO QUE A PROPÓSITO NO ESTÁ ──────────────────────────────────────────────
+// ── `className` EXISTE, Y NEGOCIA POR EJE ───────────────────────────────────
 //
-// No hay prop `className`. Tres pantallas se lo pasan hoy y se ignora en
-// silencio; implementarlo les cambiaría el aspecto solo por existir.
+// Durante mucho tiempo NO existió, y estuvo bien que no existiera: cinco
+// pantallas se lo pasaban y se descartaba en silencio, así que implementarlo les
+// habría cambiado el aspecto solo por existir. Las cinco decían `text-xs`, que
+// son 10,5 px contra los 12 de la pieza.
+//
+// La salida no fue aceptarlo y ver qué pasa: fue sacar las cinco declaraciones
+// primero, en su propio commit, medir que no se moviera nada —no podía: se
+// estaba sacando algo que ya se ignoraba— y recién entonces aceptar la prop. Con
+// cero consumidores pasándola, aceptarla es aditivo puro y las 57 instancias
+// siguen recibiendo exactamente `w-full text-[12px] table-auto`.
+//
+// Lo que hace al recibirla lo decide `claseDeTabla`, en `lib/sunmi/claseNegociada.js`,
+// y el porqué de cada eje está escrito allá. En una línea: el ancho y el tamaño
+// de letra CEDEN —si la pantalla trae el suyo, la pieza no pone el propio, así
+// que nunca hay dos clases de la misma familia peleando— y `table-auto` va
+// siempre, porque hoy no hay una sola pantalla que declare un layout de tabla y
+// un eje que cede sin quién lo ejerza es una rama que nunca corre.
+//
+// ── LO QUE SIGUE SIN ESTAR, A PROPÓSITO ─────────────────────────────────────
+//
 // `headers[].label` sigue aceptando cualquier nodo React: hay pantallas que
 // meten ahí su propio control y romperlas no aporta nada.
 
@@ -40,7 +58,7 @@ import { useSunmiTheme } from "./SunmiThemeProvider";
 import SunmiTableRow from "./SunmiTableRow";
 import SunmiTableEmpty from "./SunmiTableEmpty";
 import { celdasDelPie } from "@/lib/sunmi/pieDeTabla";
-import { paddingQueSobrevive, declaraAlineacion } from "@/lib/sunmi/claseNegociada";
+import { paddingQueSobrevive, declaraAlineacion, claseDeTabla } from "@/lib/sunmi/claseNegociada";
 
 /** El padding de cada densidad. "normal" es exactamente el de siempre. */
 const DENSIDAD = {
@@ -90,6 +108,8 @@ function TituloOrdenable({ columna, ordenClave, ordenDir, onSort }) {
 export default function SunmiTable({
   headers = [],
   children,
+  /** Va al `<table>`. Negocia por eje: ver `claseDeTabla` y el encabezado de acá arriba. */
+  className,
   // Header fijo: el contenedor se vuelve scrolleable (vertical + horizontal) con
   // altura máxima y el thead queda sticky. Default off → no afecta a otras tablas.
   stickyHeader = false,
@@ -290,13 +310,7 @@ export default function SunmiTable({
       // encogerse es parte de lo que hace.
       className={stickyHeader ? `overflow-auto ${maxHeightClass}` : "overflow-x-auto shrink-0"}
     >
-      <table
-        className="
-          w-full
-          text-[12px]
-          table-auto
-        "
-      >
+      <table className={claseDeTabla(className)}>
         {/* ===== HEADER ===== */}
         {encabezados.length > 0 && (
           <thead className={stickyHeader ? `${theadBase} sticky top-0 z-20` : theadBase}>
