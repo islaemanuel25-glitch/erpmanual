@@ -55,6 +55,9 @@
    ================================================== */
 html[data-theme="sunmiDark"],
 html:not([data-theme]) {
+  /* Aviso. Medido sobre el fondo real de este tema: 8,31 contra un mínimo de 4,5.
+     Es el valor que ya se veía por el respaldo de `sunmi.css`, así que no se mueve. */
+  --pos-warning: #f59e0b;
   --app-bg: #0f172a;
   --app-fg: #e2e8f0;
   --app-border: #1e293b;
@@ -124,6 +127,7 @@ html:not([data-theme]) {
 }
 
 html[data-theme="sunmiDarkCompact"] {
+  --pos-warning: #f59e0b; /* 8,31 medido — no se mueve */
   --app-bg: #020617;
   --app-fg: #e2e8f0;
   --app-border: #1e293b;
@@ -193,6 +197,9 @@ html[data-theme="sunmiDarkCompact"] {
 }
 
 html[data-theme="sunmiLight"] {
+  /* Aviso. El ámbar de los oscuros da 2,15 sobre este fondo blanco, contra un
+     mínimo de 4,5: no se leía. `#b45309` da 5,02 y sigue siendo ámbar. */
+  --pos-warning: #b45309;
   --app-bg: #f1f5f9;
   --app-fg: #0f172a;
   --app-border: #cbd5e1;
@@ -273,6 +280,7 @@ html[data-theme="sunmiLight"] {
 }
 
 html[data-theme="sunmiGraphite"] {
+  --pos-warning: #f59e0b; /* 8,05 medido — no se mueve */
   --app-bg: #0e1116;
   --app-fg: #e6edf3;
   --app-border: #2a2f36;
@@ -342,6 +350,9 @@ html[data-theme="sunmiGraphite"] {
 }
 
 html[data-theme="sunmiSand"] {
+  /* 4,83 sobre su fondo crema `rgb(255,250,240)`, que es el más bajo de los nueve
+     claros por ser el fondo menos blanco. Antes daba 2,06. */
+  --pos-warning: #b45309;
   --app-bg: #f6f1e7;
   --app-fg: #1f2937;
   --app-border: #e7d9c3;
@@ -422,6 +433,7 @@ html[data-theme="sunmiSand"] {
 }
 
 html[data-theme="sunmiBlueClassic"] {
+  --pos-warning: #f59e0b; /* 6,70 medido, el más bajo de los oscuros — no se mueve */
   --app-bg: #0b1f3a;
   --app-fg: #e6f0ff;
   --app-border: #1d3b6b;
@@ -491,6 +503,7 @@ html[data-theme="sunmiBlueClassic"] {
 }
 
 html[data-theme="sunmiFrance"] {
+  --pos-warning: #b45309; /* 5,02 medido; antes 2,15 */
   --app-bg: #f3f4f6;
   --app-fg: #0b0f17;
   --app-border: #000000;
@@ -571,6 +584,7 @@ html[data-theme="sunmiFrance"] {
 }
 
 html[data-theme="sunmiFranceSplit"] {
+  --pos-warning: #b45309; /* 5,02 medido; antes 2,15 */
   --app-bg: #f3f4f6;
   --app-fg: #0b0f17;
   --app-border: #000000;
@@ -651,6 +665,7 @@ html[data-theme="sunmiFranceSplit"] {
 }
 
 html[data-theme="operixBluePro"] {
+  --pos-warning: #b45309; /* 5,02 medido; antes 2,15 */
   --app-bg: #F6F8FC;
   --app-fg: #0F172A;
   --app-border: #E2E8F0;
@@ -728,6 +743,7 @@ html[data-theme="operixBluePro"] {
 }
 
 html[data-theme="operixNight"] {
+  --pos-warning: #f59e0b; /* 8,05 medido — no se mueve */
   --app-bg: #07111F;
   --app-fg: #F8FAFC;
   --app-border: #243244;
@@ -805,6 +821,7 @@ html[data-theme="operixNight"] {
 }
 
 html[data-theme="verdeComercio"] {
+  --pos-warning: #b45309; /* 5,02 medido; antes 2,15 */
   --app-bg: #F5FAF7;
   --app-fg: #102019;
   --app-border: #DDEAE2;
@@ -882,6 +899,7 @@ html[data-theme="verdeComercio"] {
 }
 
 html[data-theme="grafitoEjecutivo"] {
+  --pos-warning: #b45309; /* 5,02 medido; antes 2,15 */
   --app-bg: #F4F4F5;
   --app-fg: #18181B;
   --app-border: #D4D4D8;
@@ -959,6 +977,9 @@ html[data-theme="grafitoEjecutivo"] {
 }
 
 html[data-theme="ambarCaja"] {
+  /* Ojo con éste: el tema se llama ámbar y su acento ES `#D97706`, pero el aviso
+     no puede seguir al acento — sobre su fondo blanco daría 3,19 y tampoco llega. */
+  --pos-warning: #b45309; /* 5,02 medido; antes 2,15 */
   --app-bg: #FFFBEB;
   --app-fg: #1F1A0A;
   --app-border: #F3E8C2;
@@ -1036,6 +1057,7 @@ html[data-theme="ambarCaja"] {
 }
 
 html[data-theme="violetaSaas"] {
+  --pos-warning: #b45309; /* 5,02 medido; antes 2,15 */
   --app-bg: #FAF7FF;
   --app-fg: #1E1B2E;
   --app-border: #E7DDF7;
