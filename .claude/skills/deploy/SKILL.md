@@ -203,6 +203,37 @@ pasó los cinco valores con todo bien y aun así no desplegó la tanda.
 - Si se tocó `prisma/schema.prisma`, `npx prisma generate` local antes de probar
   nada: ni el build ni los candados lo ven.
 - `npm run build` compila sin errores.
+- **La sonda de cascada en verde**, al lado del build y con el mismo peso:
+
+      MSYS_NO_PATHCONV=1 node scripts/sonda-cascada.mjs --base http://localhost:3000
+
+  Necesita un servidor sirviendo la aplicación —el `--base` va al que esté
+  levantado— y **no necesita sesión ni credenciales**: la hoja la sirve el layout
+  raíz, así que mide sobre `/login` y no gasta intentos del límite de login.
+  Corre igual contra producción con `--base https://operix.cloud`, que sirve para
+  sacar el "antes" y para volver a preguntar después de recrear.
+
+  **Qué afirma:** que una utilidad de Tailwind le sigue ganando a la clase del
+  kit. De eso cuelgan **535 declaraciones medidas** de `SunmiButton` y
+  `SunmiInput`. Si se dan vuelta no rompen el build ni ponen la suite en rojo:
+  cada pantalla que hoy define su padding, su letra o su ancho pasa a mostrar el
+  del kit, y solo se ve abriéndolas de a una. Por eso el build no la tapa — son
+  preguntas distintas.
+
+  **EL CRITERIO, Y NO SE NEGOCIA: si no puede medir, es ROJO Y FRENA.** La clase
+  no está en la hoja, la utilidad no está generada, la página no responde, el
+  navegador no levantó: todo eso es rojo, no "no se pudo comprobar". La sonda
+  sale con 1 en cada uno de esos casos y dice cuál — está escrita así a propósito.
+  Un despliegue no arranca con una verificación en estado desconocido, porque el
+  desconocido se convierte solo en "supongo que sí" cuando ya hay una imagen
+  construida y ganas de terminar.
+
+  **Veinte segundos por despliegue es el precio de no depender de acordarse.**
+  El hermano barato —`lib/sunmi/ordenDeCascada.test.mjs`— ya viaja en la suite y
+  mira el orden en `app/globals.css`. Esta mira lo que ese orden PRODUCE, que es
+  lo único que sobrevive a un `@layer` de otro archivo, a otra hoja importada
+  después y a un cambio de motor. Está medido cuál agarra qué: ver el roadmap del
+  kit, sección "ESCRITOS LOS DOS, Y CON SU CONTRAPRUEBA".
 
 ## Paso 1 — Backup validado
 
@@ -771,6 +802,30 @@ la respuesta que uno esperaba.
 **En una tanda que solo QUITA código**, el marcador es al revés: algo que tiene
 que haber DESAPARECIDO, y el control es que siga apareciendo antes. Misma regla
 dada vuelta y las dos mitades siguen haciendo falta.
+
+**Y UNA CLASE DE TAILWIND NO DESAPARECE PORQUE LA SAQUES DEL CÓDIGO: DESAPARECE
+CUANDO NADIE LA NOMBRA, NI SIQUIERA EN UN COMENTARIO.** Tailwind escanea el
+CONTENIDO CRUDO de los archivos de `content`, y un comentario es contenido.
+
+*El caso, medido el 2026-08-16:* la tanda sacó los diez `!` del separador, así
+que ningún componente escribe ya `!my-0` ni `!my-1`. Un marcador de desaparición
+sobre eso **habría dado falso**: las dos reglas se siguen generando, porque el
+JSDoc de `lib/sunmi/claseNegociada.js` las nombra al explicar por qué existían.
+Comprobado con tres corridas limpias de `npx tailwindcss`, no con el dev server
+—que además cachea—: con el repo entero salen `.\!my-0` y `.\!my-1`; sacando
+`lib/` del `content`, desaparecen las dos y `.my-0` se queda. Un archivo, un
+comentario.
+
+En la práctica, antes de usar un marcador de desaparición para una clase:
+
+```bash
+git grep -lE 'mi-clase' -- "app/**/*.jsx" "components/**/*.jsx" "lib/**/*.js"   # tiene que dar vacío
+```
+
+Los `.md` y los `.test.mjs` no entran en `content` y no cuentan; los `.js` de
+`lib/` sí. **Es la misma familia que la trampa del archivo huérfano —el código
+del repo y lo que llega al build no son lo mismo— pero al revés: acá el build
+tiene de más, no de menos.**
 
 Y si para algo no se puede armar un marcador con su control —porque el cambio no
 deja rastro en el build, por ejemplo—, **se dice que no se pudo verificar** en vez
