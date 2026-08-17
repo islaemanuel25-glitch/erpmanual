@@ -160,8 +160,38 @@ export default function DetalleTurnoPage() {
             </div>
 
             {/* Datos de caja */}
+            {/*
+              LOS COLORES DE ESTE RECUADRO SON FIJOS A PROPÓSITO, y es una
+              excepción declarada, igual que el resto de los de esta pantalla.
+
+              Esta tarjeta es un DOCUMENTO PARA PAPEL: nace en `bg-white
+              text-gray-900` unas líneas más arriba y todo lo que vive adentro
+              hereda ese negro sobre ese blanco. No sigue al tema, y no debe.
+
+              El recuadro era el ÚNICO elemento de la tarjeta que leía un token,
+              y por eso se rompía: `--card-bg` cambia con los catorce temas, el
+              texto de arriba no cambia nunca, y en los oscuros quedaban uno
+              encima del otro. Medido sobre la pantalla real, el valor daba
+              1,03:1 en sunmiGraphite y operixNight, 1,23 en sunmiBlueClassic,
+              1,31 en sunmiDarkCompact y 3,27 en sunmiDark. Cinco de catorce
+              abajo de 4,5:1 — los números no se leían.
+
+              El tono salió de medir, no de elegir a ojo: gray-50 se separa del
+              blanco apenas 1,78 de L*, que está en el límite de lo perceptible
+              —sirve para un hover, no para delimitar un bloque—. gray-100 se
+              separa 3,83 y deja el valor en 16,12:1. Un solo número y no
+              catorce, porque ya no depende del tema.
+
+              El borde también era un token, y uno MUERTO: `--border` no está
+              definido en ninguna parte del repo. Un var() sin definir invalida
+              la declaración, así que el borde caía en `currentColor` y se
+              dibujaba gray-900. `border-gray-900` pinta exactamente ese color
+              —medido idéntico en los catorce— y saca el token.
+
+              El papel no cambia: el fondo no se imprime y nunca se imprimió.
+            */}
             {(turno.montoEsperadoEfectivo != null || turno.montoRealEfectivo != null) && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-3 text-sm border border-[var(--border)] rounded-xl p-4 bg-[var(--card-bg)]">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-3 text-sm border border-gray-900 rounded-xl p-4 bg-gray-100">
                 {turno.montoInicial != null && (
                   <div>
                     <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Monto inicial</div>
