@@ -4592,11 +4592,38 @@ justamente para lo que está la regla 10—:
   con `className`.
 - `lib/sunmi/claseNegociada.js:472` — `componerClaseTexto`, el renglón chico de
   las celdas de dos renglones.
-- `components/sunmi/SunmiTableRow.jsx:77` — **y éste lo llama DIRECTO**, sin pasar
-  por ninguna de las tres de arriba: `const tamano = declaraTamanoDeLetra(className) ? "" : TAMANO;`.
-  Es el que más fácil se pasa por alto porque no vive en el módulo del predicado.
+- `components/sunmi/SunmiTableRow.jsx:77` — **importa el predicado y lo llama
+  DIRECTO**, sin pasar por ninguna de las tres funciones de arriba:
+  `const tamano = declaraTamanoDeLetra(className) ? "" : TAMANO;`
 
 Hay que medir qué se mueve en los cuatro, no en el que uno tiene abierto.
+
+### EL CUARTO ES LA TRAMPA DE ESTA TANDA, Y NO UN DETALLE DEL CONTEO
+
+Conviene separarlo, porque los tres primeros y el cuarto no se buscan igual.
+
+Los tres primeros son **funciones del módulo**: `claseDeTabla`, `PARTES_DEL_BOTON`
+y `componerClaseTexto` viven todas en `lib/sunmi/claseNegociada.js`, al lado del
+predicado. Quien vaya a cambiarlo abre ese archivo y los tiene los tres a la
+vista, sin buscar nada.
+
+**`SunmiTableRow` no.** Importa `declaraTamanoDeLetra` y lo invoca él mismo, en su
+propio archivo, sin intermediario. No aparece leyendo el módulo del predicado, no
+aparece leyendo las funciones que lo envuelven, y no aparece si uno enumera "las
+funciones que negocian". Aparece **sólo** si se busca el NOMBRE DEL PREDICADO en
+todo el repo.
+
+Y eso ya ocurrió, en esta misma anotación: la primera redacción decía que los
+lectores eran dos —el botón y las celdas—, escrita mirando el módulo. `git grep
+"declaraTamanoDeLetra"` sobre el repo entero la corrigió antes de commitearla.
+Fue el conteo el que se salvó; en la próxima tanda lo que está en juego no es un
+número sino una pieza que se mueve sin que nadie la haya medido.
+
+**Así que el primer paso de la tanda del predicado no es tocar el predicado: es
+`git grep` del nombre sobre el repo entero**, y recién con esa lista completa
+decidir. Un lector que llama directo, desde su propio archivo, es exactamente la
+forma que tenía el script que fue invisible en tres auditorías seguidas — el
+mismo error, en otro plano.
 
 **Y el agujero es ALCANZABLE, no teórico.** Lo que hoy lo mantiene lejos es el
 trinquete de hardcodeo, que persigue slate, red, amber, cyan, emerald, green,
