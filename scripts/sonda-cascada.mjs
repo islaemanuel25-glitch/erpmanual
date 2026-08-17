@@ -82,7 +82,11 @@ const arg = (n, d = null) => {
 const BASE = arg("base", "http://localhost:3000");
 const RUTA = arg("url", "/login");
 const PUERTO = Number(arg("puerto-cdp", "9226"));
-const PERFIL = arg("perfil", path.join(os.tmpdir(), "sonda-cascada-edge"));
+// EL PERFIL VA ATADO AL PUERTO. Con un perfil fijo, correr la sonda en otro
+// puerto —para medir producción sin matar la corrida local— encuentra el perfil
+// tomado por el Edge anterior, el nuevo se muere solo y lo único que se ve es
+// "Edge no respondió al puerto de depuración". El síntoma no nombra al perfil.
+const PERFIL = arg("perfil", path.join(os.tmpdir(), `sonda-cascada-edge-${PUERTO}`));
 const EDGE = arg("edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
