@@ -4616,9 +4616,19 @@ segmentos estáticos, que ganan sobre el `[id]` dinámico.
 
 **Cómo se verificó, que es lo que hace que el borrado valga:**
 
-- **Cero píxeles** en el pedido 42 —no borrador—, a 1366x900. Y antes de eso, dos
-  corridas de la MISMA versión dieron cero también: sin ese control el cero de
-  después no distinguiría un cambio del ruido.
+- **Cero píxeles** en el pedido 42 —no borrador—. ⚠️ **ESTA MEDICIÓN SE HIZO DOS
+  VECES, Y LA PRIMERA NO VALÍA:** las tres capturas de ese día eran de la
+  **pantalla de login**, porque el arnés no tenía sesión y sacaba la foto igual.
+  El login es determinista, así que las tres dieron cero y el control de
+  estabilidad no podía atraparlo. El instrumento se arregló en `135f3a4` —ahora se
+  niega si no llegó a la pantalla pedida— y la medición **se rehízo el mismo día**
+  contra `afeece9^` = `403df63`, poniendo cada punta en el árbol con
+  `git checkout <sha> -- <archivos>` sobre el mismo servidor.
+
+  **El resultado se sostiene: cero píxeles.** Y ahora se sabe que la foto es la
+  buena porque **las dos puntas midieron 3440px de alto** —el detalle real— y no
+  los 900 del login. Ese alto queda escrito en la ficha `.json` de cada captura,
+  así que es comprobable después y no hay que creerle a nadie.
 - **La suite pasó de 3416 a 3414 tests**, de 3394 a 3392 pases, con `fail 0` en los
   dos lados y los mismos 21 salteados y 1 `todo`. El −2 son exactamente los dos
   candados borrados; nada más se movió.
