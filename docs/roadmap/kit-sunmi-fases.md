@@ -4560,7 +4560,98 @@ trabadas, cada una por su motivo:
 - `ListaConciliacion` — vive en la pantalla del pedido y necesita comprobantes; el
   pedido 42 dice "Todavía no hay comprobantes".
 
-## ⚑ UN COLOR FIJO SE LEE COMO TAMAÑO — candidata a la próxima tanda
+## ✅ UN COLOR FIJO SE LEÍA COMO TAMAÑO — RESUELTO el 2026-08-17
+
+**Cerrado en `459aa1a`.** Lo de abajo queda como estaba escrito, porque el
+relevamiento que lo describe sigue siendo el mapa del terreno; lo que cambió es
+que ya no es un pendiente. Tres cosas que el arreglo agregó al diagnóstico:
+
+- **Eran CINCO familias, no sólo los colores.** También `text-wrap`, `text-nowrap`,
+  `text-balance`, `text-pretty`, `text-ellipsis`, `text-clip` y `text-opacity-*`.
+  24 falsos positivos medidos pasándole cada clase al predicado, y **cero falsos
+  negativos**: erraba en una sola dirección.
+- **No había daño escrito en ninguna pantalla.** Las 596 instancias de las cuatro
+  piezas, con las 137 apariciones `text-*` que reciben de verdad, son todas
+  tamaños, alineación o variante. El agujero estaba latente.
+- **El cuarto lector se eliminó en vez de documentarse**: `SunmiTableRow` ya no
+  llama al predicado directo, la expresión vive en `claseDeFila`, y el candado
+  que probaba una copia a mano pasó a ejercer la función real.
+
+## ⚑ AMPLIAR EL TRINQUETE A LOS COLORES QUE NO VE — tanda propia
+
+**Anotada el 2026-08-17, al arreglar el predicado. NO se hizo, y el motivo es lo
+que importa.**
+
+`scripts/check-theme-tokens.js` persigue ocho familias en `text-`: slate, red,
+amber, cyan, emerald, green, orange y gray. **No ve** blue, indigo, violet, sky,
+teal, yellow, purple, rose, ni `text-white`, `text-black`, `text-transparent`,
+`text-current`, `text-inherit`, ni los arbitrarios. Medido: hay **21 `text-white`
+en el repo**, más 5 `text-blue-`, 3 `text-violet-`, 2 `text-indigo-` y 1
+`text-black`, y ninguno le aparece.
+
+**PERO AMPLIAR LA LISTA DE COLORES NO ALCANZA, Y ÉSE ES EL PUNTO ENTERO.** El
+defecto del predicado tenía cinco familias y **cuatro de las cinco no son
+colores**:
+
+- ajuste de línea — `text-wrap`, `text-nowrap`, `text-balance`, `text-pretty`
+- desborde — `text-ellipsis`, `text-clip`
+- opacidad — `text-opacity-*`
+- y cualquier `text-` que Tailwind agregue mañana
+
+**Ninguna lista de colores las ve, por larga que sea.** `text-nowrap` no es
+hardcodeo de nada: es una utilidad legítima que cualquiera escribiría sin que a
+nadie le llamara la atención. Un trinquete de colores no puede cubrirlas ni
+ampliándolo al infinito, porque no son colores.
+
+Por eso el arreglo fue del PREDICADO y no del trinquete: el predicado dejó de
+confundirse aunque alguien escriba cualquiera de las cinco. Ampliar el trinquete
+sigue siendo deseable, pero por otro motivo —que un color fijo no siga al tema— y
+con su propio costo: **mueve la cifra de colores fijos y obliga a declarar
+excepciones una por una**, como pasó con los 23 grises del documento imprimible
+del turno.
+
+Y para las piezas del kit ese trabajo ya está hecho por otro lado:
+`lib/sunmi/colorSobreElKit.test.mjs` reconoce el color POR DESCARTE —cualquier
+`text-` que no sea tamaño, alineación, ajuste, desborde, opacidad ni clase del
+tema— así que cubre blue, `text-white` y los arbitrarios sin enumerar ninguno.
+Su alcance son las cuatro piezas que negocian el tamaño; el resto del repo es lo
+que falta.
+
+## ⚑ 44 ARCHIVOS DE CANDADOS NO CORREN, Y NO SE VE
+
+**Encontrado el 2026-08-17 arreglando el predicado.** De los 45 fallos que
+informaba `node --test "lib/**/*.test.mjs"`, **44 no eran candados en rojo: eran
+archivos que ni llegaban a ejecutarse**, porque importan por el alias `@/lib` o
+`@/components` y `node --test` pelado no resuelve los alias de Next.
+
+Eso es peor que un rojo. **Un candado que no corre se ve igual que uno que pasa**:
+no aparece en la lista de fallos con su nombre, y el conteo global de "45 fallos"
+se lee como ruido conocido.
+
+Se comprobó en carne propia: `lib/sunmi/claseNegociada.test.mjs` era uno de ellos
+y tiene **59 candados** —los del cursor, el hover, el fondo y el tamaño de la
+fila, más los de `SunmiCard` y `SunmiSeparator`—. **Ninguno se había ejecutado
+nunca.** Se arregló ese archivo solo, pasándolo a ruta relativa: es el mismo
+módulo, no se afloja nada, y los 59 corren y pasan.
+
+**Quedan 44, y se parten en dos grupos.** Contados corriendo la suite y mirando
+cada archivo que sale en rojo, no estimados:
+
+- **38 fallan por SU PROPIO import con alias** —`from "@/lib/…"` o
+  `from "@/components/…"` escrito en el archivo de candado—. Ésos se arreglan uno
+  por uno con ruta relativa, como se hizo con `claseNegociada.test.mjs`, y es
+  mecánico.
+- **6 fallan más abajo en la cadena**, no en el candado: el módulo que importan
+  importa por alias, o hace un import de DIRECTORIO. Son `authorize`,
+  `fronteraCosto`, `lineaPorImporte` y los tres de `comprobante`. Ejemplos
+  medidos: `lib/authorize.js` importa el directorio `lib/auth`, y
+  `posVentaReducer.js` importa `@/lib`. Ésos no se arreglan tocando el candado.
+
+Y la pregunta de fondo, que es la que hay que contestar antes de empezar:
+**el proyecto no tiene un comando de suite propio.** `node --test` pelado no es el
+corredor real —no resuelve los alias de Next— y es exactamente lo que dejó el
+agujero abierto. Un `npm test` que resuelva los alias arreglaría los 44 de una vez
+y evitaría que el próximo candado nazca mudo.
 
 **Es la que más pesa de las tres que deja esta tanda.** Salió de un stash de la
 sesión que se cortó, no de una medición nueva: esa versión traía el hallazgo y se
