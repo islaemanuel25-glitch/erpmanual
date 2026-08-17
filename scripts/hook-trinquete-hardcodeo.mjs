@@ -129,6 +129,7 @@ process.stdin.on("end", () => {
       `Para ver qué hay en esa pantalla: node scripts/hardcodeo.mjs --ficha <pantalla>\n\n` +
       `Esto NO revierte nada. Hay dos salidas honestas: usar lo que ya existe —el token, ` +
       `el componente del kit— o, si el aumento es a propósito, subir la línea de base con ` +
-      `node scripts/hardcodeo.mjs --linea-base y decir en el commit por qué.`
+      `node scripts/hardcodeo.mjs --linea-base --sellar y decir en el commit por qué. ` +
+      `Sin --sellar, ese mismo comando solo la muestra.`
   );
 });

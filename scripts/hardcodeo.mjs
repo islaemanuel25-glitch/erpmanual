@@ -2,10 +2,41 @@
 //
 // EL CONTROL POR PANTALLA. Dos modos, un solo contador.
 //
-//   node scripts/hardcodeo.mjs --ficha productos      → qué tiene esa pantalla
-//   node scripts/hardcodeo.mjs --trinquete            → ¿subió algo?
-//   node scripts/hardcodeo.mjs --linea-base           → reescribe la línea de base
+//   node scripts/hardcodeo.mjs --ficha productos       → qué tiene esa pantalla
+//   node scripts/hardcodeo.mjs --trinquete             → ¿subió algo?
+//   node scripts/hardcodeo.mjs --linea-base            → MIRA la línea de base
+//   node scripts/hardcodeo.mjs --linea-base --sellar   → la REESCRIBE
 //   node scripts/hardcodeo.mjs --ficha productos --json
+//
+// ── CONSULTAR NO PUEDE PODER SELLAR ─────────────────────────────────────────
+//
+// Hasta el 2026-08-17 `--linea-base` ESCRIBÍA el archivo. No avisaba, no
+// preguntaba: se corría para mirar los siete números y de paso quedaba sellada
+// la base en lo que hubiera en ese momento.
+//
+// Ese día se corrió así, distraídamente, para leer los contadores en un informe.
+// Los números no habían cambiado, así que lo único que se movió fueron la fecha y
+// el commit del encabezado, y se revirtió. **Pero si alguno hubiera subido, ese
+// mismo comando lo habría fijado como base nueva sin que nadie lo decidiera** — y
+// el trinquete habría vuelto a decir "sin cambios" para siempre, sobre un terreno
+// que se acababa de perder.
+//
+// Un trinquete cuyo comando de consulta sella la base deja de ser un trinquete el
+// día que alguien lo corre distraído. Y no deja rastro de haberse aflojado: el
+// archivo queda igual de bien formado que antes.
+//
+// Por eso ahora son dos cosas y no una:
+//
+//   · **`--linea-base` MIRA.** Imprime lo que dice el archivo y lo que dice el
+//     escaneo de hoy, uno al lado del otro. No escribe nada, nunca, ni aunque los
+//     números hayan subido.
+//   · **`--linea-base --sellar` ESCRIBE.** La palabra tiene que estar en la línea
+//     de comandos, y por eso queda en el historial de la terminal de quien la
+//     corrió.
+//
+// El nombre viejo quedó siendo el seguro a propósito: lo que la memoria muscular
+// y los documentos ya escritos invocan es lo que ahora solo mira. Para lo otro
+// hay que escribir una palabra que antes no existía.
 //
 // ── POR QUÉ UN SOLO SCRIPT ──────────────────────────────────────────────────
 //
@@ -48,7 +79,17 @@ import {
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(AQUI, "..");
-const LINEA_BASE = path.join(RAIZ, "docs", "hardcodeo-linea-base.json");
+// LA RUTA ES SOBREESCRIBIBLE, Y ES PARA EL CANDADO.
+//
+// Sin esta costura, comprobar "consultar no escribe" con los números arriba
+// obliga a ensuciar el archivo real del repo y confiar en restaurarlo desde el
+// propio test. El candado apunta esta variable a una copia descartable, la deja
+// con los números por debajo de los de hoy —así el escaneo da "subió", que es el
+// caso en el que un sellado accidental hace daño— y comprueba que quede byte a
+// byte igual. Ver `scripts/hardcodeoNoSella.test.mjs`.
+const LINEA_BASE = process.env.HARDCODEO_LINEA_BASE
+  ? path.resolve(process.env.HARDCODEO_LINEA_BASE)
+  : path.join(RAIZ, "docs", "hardcodeo-linea-base.json");
 
 // Los patrones de color viven en check-theme-tokens.js. Es CommonJS, así que se
 // carga con createRequire; requerirlo no ejecuta el chequeo.
@@ -238,14 +279,63 @@ function totalesActuales() {
   return { total: sumar(porArchivo.map((a) => a.conteo)), porPantalla };
 }
 
-function escribirLineaBase() {
+/**
+ * ¿La invocación pide SELLAR, o solo mirar?
+ *
+ * Pura y exportada para poder ejercerla sin correr el escaneo entero. El default
+ * es mirar: cualquier cosa que no traiga `--sellar` es de solo lectura.
+ */
+export function debeSellar(args) {
+  return args.includes("--linea-base") && args.includes("--sellar");
+}
+
+/**
+ * MIRAR la línea de base. No escribe. Nunca.
+ *
+ * Imprime las dos columnas —lo que dice el archivo y lo que dice el escaneo de
+ * hoy— porque para eso se consulta. Antes imprimía una sola, la que acababa de
+ * escribir, así que ni siquiera se podía ver la diferencia sin haberla borrado.
+ */
+function mostrarLineaBase() {
+  const base = leerLineaBase();
+  const { total } = totalesActuales();
+
+  if (!base) {
+    console.log("No hay línea de base todavía. Los números de hoy son:\n");
+    for (const k of PRIORIDAD) console.log(`  ${ETIQUETAS[k].padEnd(46)} ${total[k]}`);
+    console.log("\nPara fijarlos:  node scripts/hardcodeo.mjs --linea-base --sellar");
+    return 0;
+  }
+
+  console.log(`LÍNEA DE BASE — generada ${base.generada}, commit ${String(base.commit).slice(0, 7)}`);
+  console.log("(esto solo MIRA: no escribe el archivo)\n");
+  console.log(`  ${"".padEnd(46)} ${"base".padStart(6)} ${"hoy".padStart(6)}   delta`);
+  let hayDelta = false;
+  for (const k of PRIORIDAD) {
+    const antes = base.total[k] ?? 0;
+    const ahora = total[k];
+    const d = ahora - antes;
+    if (d !== 0) hayDelta = true;
+    const marca = d === 0 ? "" : d > 0 ? `  +${d}  ← subió` : `  ${d}`;
+    console.log(`  ${ETIQUETAS[k].padEnd(46)} ${String(antes).padStart(6)} ${String(ahora).padStart(6)}${marca}`);
+  }
+  if (hayDelta) {
+    console.log("\nHay diferencias. NO se sellaron: eso es una decisión y se pide aparte.");
+    console.log("  node scripts/hardcodeo.mjs --linea-base --sellar");
+  }
+  return 0;
+}
+
+/** SELLAR: el único lugar de este script que escribe la línea de base. */
+function sellarLineaBase() {
   const { total, porPantalla } = totalesActuales();
   const commit = git("rev-parse", "HEAD").trim();
   const doc = {
     _lea_esto:
-      "Línea de base del hardcodeo. La genera scripts/hardcodeo.mjs --linea-base. " +
-      "NO se edita a mano: si un número sube, se arregla el código o se decide " +
-      "subir la base a propósito y se dice por qué en el commit.",
+      "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; " +
+      "sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número " +
+      "sube, se arregla el código o se decide subir la base a propósito y se dice por qué " +
+      "en el commit.",
     generada: new Date().toISOString().slice(0, 16).replace("T", " "),
     commit,
     total,
@@ -253,7 +343,7 @@ function escribirLineaBase() {
   };
   fs.mkdirSync(path.dirname(LINEA_BASE), { recursive: true });
   fs.writeFileSync(LINEA_BASE, JSON.stringify(doc, null, 2) + "\n");
-  console.log(`Línea de base escrita en docs/hardcodeo-linea-base.json (commit ${commit.slice(0, 7)})`);
+  console.log(`Línea de base SELLADA en ${path.relative(RAIZ, LINEA_BASE)} (commit ${commit.slice(0, 7)})`);
   for (const k of PRIORIDAD) console.log(`  ${ETIQUETAS[k].padEnd(46)} ${total[k]}`);
   return 0;
 }
@@ -278,14 +368,14 @@ function trinquete() {
     console.error("\nQué hacer: usar lo que ya existe en vez del valor escrito a mano.");
     console.error("Para ver qué hay en una pantalla: node scripts/hardcodeo.mjs --ficha <pantalla>");
     console.error("Si el aumento es a propósito, se sube la base a mano y se dice por qué:");
-    console.error("  node scripts/hardcodeo.mjs --linea-base");
+    console.error("  node scripts/hardcodeo.mjs --linea-base --sellar");
     return 1;
   }
 
   if (estado === "bajo") {
     console.log("TRINQUETE: bajó el hardcodeo. Conviene fijar el terreno ganado.\n");
     for (const b of bajaron) console.log(`  ${ETIQUETAS[b.categoria]}: ${b.antes} → ${b.ahora}  (${b.delta})`);
-    console.log("\n  node scripts/hardcodeo.mjs --linea-base");
+    console.log("\n  node scripts/hardcodeo.mjs --linea-base --sellar");
     return 0;
   }
 
@@ -311,9 +401,35 @@ const valor = (n) => {
   return i >= 0 ? args[i + 1] : null;
 };
 
+// ── SOLO CORRE SI SE LO EJECUTA, NO SI SE LO IMPORTA ───────────────────────
+//
+// Sin esto, `import { debeSellar } from "./hardcodeo.mjs"` ejecuta todo lo de
+// abajo con el argv del que importa, cae en el bloque de uso y llama a
+// `process.exit(2)` — o sea que el candado se mata solo al cargar la función que
+// viene a probar. Lo encontró escribirlo.
+//
+// La comparación es de rutas resueltas y sin distinguir mayúsculas, porque en
+// Windows la unidad puede venir en cualquier caja y ahí el guardia no dejaría
+// correr nunca al script.
+const normalizar = (p) => path.resolve(p).toLowerCase();
+const ejecucionDirecta =
+  process.argv[1] && normalizar(process.argv[1]) === normalizar(fileURLToPath(import.meta.url));
+
 let salida = 0;
-if (flag("--linea-base")) salida = escribirLineaBase();
-else if (flag("--trinquete")) salida = trinquete();
+if (!ejecucionDirecta) {
+  // Importado: no se corre nada y no se sale. Quien importa quiere las funciones.
+} else
+// El sellado se decide con `debeSellar`, que es puro y tiene su candado. Acá no
+// se vuelve a escribir la condición: si viviera en los dos lados, arreglar uno
+// dejaría el otro escribiendo.
+if (flag("--linea-base")) salida = debeSellar(args) ? sellarLineaBase() : mostrarLineaBase();
+else if (flag("--sellar")) {
+  // `--sellar` suelto no sella nada. Sin esto, escribirlo sin `--linea-base`
+  // caería en el bloque de uso y ese mensaje no explicaría por qué no pasó nada.
+  console.error("`--sellar` no va solo: es un modificador de --linea-base.");
+  console.error("  node scripts/hardcodeo.mjs --linea-base --sellar");
+  salida = 2;
+} else if (flag("--trinquete")) salida = trinquete();
 else if (flag("--ranking")) {
   const nombre = valor("--ranking");
   // Sin nombre se explica y se sale con 0, NO con error. Esto lo llama un
@@ -331,7 +447,8 @@ else if (flag("--ranking")) {
   console.error("  node scripts/hardcodeo.mjs --ficha <pantalla> [--json]");
   console.error("  node scripts/hardcodeo.mjs --ranking <pantalla>");
   console.error("  node scripts/hardcodeo.mjs --trinquete");
-  console.error("  node scripts/hardcodeo.mjs --linea-base");
+  console.error("  node scripts/hardcodeo.mjs --linea-base            (solo mira)");
+  console.error("  node scripts/hardcodeo.mjs --linea-base --sellar   (reescribe)");
   salida = 2;
 }
-process.exit(salida);
+if (ejecucionDirecta) process.exit(salida);
