@@ -4828,6 +4828,62 @@ vez de aceptar todo lo que empiece con `text-`—, y medir las tres piezas antes
 después. El candado de la tabla se pondrá rojo al arreglarlo, y eso es lo que
 tiene que pasar: le va a mostrar a quien lo arregle qué más estaba tocando.
 
+## ✅ EL ALMACÉN DE COMPROBANTES EN DESARROLLO — configurado el 2026-08-17
+
+**No pide credenciales de ningún servicio: es una carpeta local y una variable.**
+Medido por descarte además de leído: `grep` de `s3|aws|cloudinary|supabase|bucket|http`
+sobre `almacenDisco.js` y `almacenImagenes.js` da **cero** en los dos.
+
+Lo que necesita son cuatro cosas y las cuatro son locales:
+
+1. `COMPROBANTES_VOLUMEN_PATH` apuntando a un directorio.
+2. Que ese directorio exista.
+3. Que adentro esté el centinela **`.volumen-comprobantes`**.
+4. Que sea escribible.
+
+**El centinela no es burocracia.** Docker crea el punto de montaje aunque el
+volumen falte, así que un directorio vacío no distingue "volumen montado" de
+"carpeta suelta del contenedor". El centinela es lo único que lo prueba.
+
+**Lo configurado en la máquina de desarrollo:**
+
+    C:/Users/emanuel/Desktop/programas/programas/erpazul-comprobantes-dev
+
+Fuera del árbol del repo a propósito. La variable se pasa al levantar el server:
+
+    COMPROBANTES_VOLUMEN_PATH=<esa ruta> npx next dev -p 3111
+
+**Falta la línea permanente en `.env`** — no se pudo escribir desde la sesión que
+lo configuró, que lo tenía bloqueado. Sin esa línea hay que pasar la variable a
+mano en cada arranque.
+
+**Comprobado escribiendo, no leyendo la variable:** se escribió, se leyó y se borró
+un archivo a mano; el inspector del repo —`inspeccionarAlmacen`— devolvió
+`ok: true`; y al arrancar el server imprimió "almacén de imágenes verificado". Y la
+prueba más fuerte la hizo la aplicación sola: subió un comprobante, el archivo
+apareció en el volumen, y al borrarlo desde la aplicación el archivo desapareció.
+
+### Lo que el almacén NO destraba, y es la parte que faltaba saber
+
+La pantalla del detalle de compras **sigue afuera de la línea de base**, y ahora se
+sabe exactamente por qué. Tiene DOS tablas y dependen de cosas distintas:
+
+- **La de comprobantes** —Comprobante, Estado, Fotos, Líneas, Último intento—
+  dibuja su fila **con sólo subir el archivo**. `subir/route.js:219` crea el
+  comprobante en `PENDIENTE_LECTURA` antes de que nadie lo interprete.
+- **La de líneas del comprobante** —Producto, Pedido, Factura— **aparece recién al
+  subir**, y dice "Este comprobante no tiene líneas leídas". **Ésa depende de que
+  el lector haya interpretado el papel.**
+
+O sea que subir una imagen cualquiera no alcanza: **llena una tabla y crea otra
+vacía**, y la línea de base exige que todas tengan filas. Hace falta **una foto de
+un comprobante real** que el lector pueda interpretar — y además la clave del
+modelo, que en desarrollo tampoco está: el server avisa "sin clave de lectura
+configurada".
+
+El comprobante de prueba que se usó para medir esto **se borró** desde la
+aplicación; `erpazul_dev` quedó como estaba.
+
 ## ⚑ LOS ARCHIVOS DE PROVEEDOR VAN FUERA DEL REPO, APUNTADOS POR VARIABLE
 
 **Anotado el 2026-08-17. Es UNA decisión para DOS casos que hasta ahora se
@@ -4867,15 +4923,37 @@ variable, se sube una vez por la interfaz —acción real de la aplicación— y
 destrabadas las dos pantallas Y los 21 candados. Resolverlo por separado significa
 conseguir dos veces el mismo papel.
 
-### Lo que hay que decidir, y no es técnico
+### LA DECISIÓN, tomada el 2026-08-17
 
-Dónde viven. Una carpeta fuera del árbol en la máquina de desarrollo es lo más
-barato y lo que ya se hace con los backups del `.env` del VPS. Lo que cuesta es
-que **cada máquina que quiera correr la suite completa necesita esos archivos**,
-así que la decisión incluye cómo se los pasa a una máquina nueva.
+**Viven en una carpeta FUERA DEL REPO, apuntada por variable de entorno.** Es la
+misma forma que ya usa `COMPROBANTES_VOLUMEN_PATH` para el volumen de fotos, y la
+que los propios candados ya contemplan con `ARCOR_FIXTURE`.
 
 Lo que **no** es una opción es meterlos al repo "por ahora": un archivo con
 precios de proveedor commiteado no se saca del historial con un `git rm`.
+
+### Y SU CONSECUENCIA, que se acepta con los ojos abiertos
+
+**Los 21 candados de `ARCOR_FIXTURE` y la importación de listas corren SÓLO en la
+máquina que tenga esos archivos.**
+
+En una sesión de nube —o en cualquier máquina nueva, o en CI— esos archivos no
+están, así que:
+
+- los **21 candados siguen salteándose**, con su motivo escrito en la salida de la
+  suite: "sin ARCOR_FIXTURE: el Excel real no está en el repositorio";
+- y **`22-listas-conciliacion` y `23-listas-armado-dudoso` siguen fuera de la
+  línea de base**, declaradas en su README.
+
+**Eso es DECLARADO, no ignorado**, y la diferencia importa: un salteo con su
+motivo a la vista es información —dice qué no se probó y por qué— mientras que un
+candado que no corre sin avisar se lee como uno que pasa. Es la misma distinción
+que la tanda del corredor de la suite dejó escrita.
+
+Lo que hay que tener presente al leer un verde: **la suite en verde en una máquina
+sin los fixtures NO significa que el parser de listas esté probado.** Significa que
+se probó todo lo demás. Los 917 productos, las 77 categorías y los 887 códigos
+numéricos que esos candados verifican sólo se comprueban donde el archivo está.
 
 ## ⚑ LOS DATOS DE `erpazul_dev` QUE ESTÁN A PROPÓSITO — no son basura
 
