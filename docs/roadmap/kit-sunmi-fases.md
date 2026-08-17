@@ -4964,17 +4964,46 @@ existe— da `rgb(251, 191, 36)`, así que la medición distingue "se aplicó" d
 se descartó.
 
 **Por qué no se arregló en la tanda del `--pos-warning`:** ahí lo que faltaba era
-el valor de un token que ya tenía respaldo y andaba. Acá falta decidir QUÉ COLOR
-va, y eso es de aspecto — es el resalte de un filtro activo en una pantalla de
-auditoría—. Definir `--accent` en los catorce temas es una opción; apuntar la
-clase a `--pos-accent`, que ya existe y está pensado justo para esto, es la otra y
-probablemente la correcta. **No se tocó nada.**
+el valor de un token que ya tenía respaldo y andaba. Acá hay que decidir DOS
+colores a la vez, y ésa es la tanda entera. **No se tocó nada.**
 
-**Lo que hay que mirar al arreglarlo, y no es menor:** si se apunta a
-`--pos-accent`, el `text-white` de al lado pasa a ir sobre el ámbar del tema.
-**Blanco sobre `#fbbf24` da 1,67**, contra un mínimo de 4,5 — o sea que arreglar
-el fondo dejaría el texto ilegible, que es el mismo canje que apareció con el
-recuadro de caja del turno. El par se decide junto, no el fondo primero.
+### ⚠️ LA DECISIÓN NO ES EL FONDO: ES EL PAR FONDO + TEXTO
+
+Esto es lo que hay que entender antes de escribir una línea, y es el motivo de que
+no sea un pendiente de un renglón.
+
+La reparación obvia es apuntar la clase a `--pos-accent`, que ya existe, está
+definido en los catorce temas y está pensado justo para un resalte. **Y arreglar
+el fondo así rompe el texto**: el `text-white` que va pegado en la misma clase
+pasaría a ir sobre el ámbar del tema, y **blanco sobre `#fbbf24` da 1,67** contra
+un mínimo de 4,5. Calculado, con el control de la fórmula al lado.
+
+O sea que hoy el botón seleccionado no se resalta, y la reparación directa lo
+dejaría resaltado pero con el texto ilegible. **Ninguna de las dos mitades se
+puede decidir sola.**
+
+**ES EL MISMO CANJE DEL RECUADRO DE CAJA DEL TURNO, y conviene tenerlo presente
+porque ya se pagó una vez.** Allá arreglar el fondo del recuadro EMPEORÓ el rótulo
+en cuatro temas —de 5,33–6,81 a 2,31— porque el rótulo pasaba por accidente
+gracias a un fondo que era oscuro por el defecto que se estaba arreglando. Se
+descubrió después, y hubo que abrir una tanda aparte para los grises. Acá el
+número está antes, así que no hay excusa para repetirlo.
+
+**Las tres salidas posibles, y las tres son de aspecto:**
+
+1. Apuntar a `--pos-accent` **y cambiar el texto** —de `text-white` a un color
+   oscuro sobre el ámbar—. Hay que medir el par en los catorce, no en uno.
+2. Definir `--accent` como un color propio del resalte, elegido para que el blanco
+   encima llegue a 4,5. Eso lo cumple un ámbar oscuro o un azul; en los temas
+   claros el margen es chico.
+3. Cambiar la forma del resalte en vez del color: borde, sombra o peso de letra,
+   sin fondo. Se sale del canje por completo y es lo más barato de medir.
+
+**Cómo se verifica, sea cual sea la elegida:** el par se mide con la sonda de
+contraste en los catorce temas —la misma de `--pos-warning`, con sus dos
+controles: la fórmula y que el tema cambie de verdad— y sobre el botón real de
+`balances`, no sobre un color suelto. Y va con captura, porque un resalte se juzga
+mirándolo.
 
 ## ⚑ LOS CINCO TOKENS HUÉRFANOS SIN DEFINIR — MEDIDOS, no arreglados
 
