@@ -13,7 +13,6 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
-import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -24,11 +23,10 @@ import {
 } from "@/lib/compras-proveedor/avisoCostoLinea";
 import SinPermisos from "@/components/auth/SinPermisos";
 import useAccionesEnvioPedido from "@/hooks/useAccionesEnvioPedido";
-import {
-  subtotalLinea,
-  permiteToggleUnidad,
-  unidadDisplay,
-} from "@/lib/compras-proveedor/calculoPedido";
+// Sólo `subtotalLinea`: `permiteToggleUnidad` y `unidadDisplay` los usaba el
+// editor de borrador que se borró. Los dos siguen vivos en el módulo y los usan
+// `/nueva` y `CarritoPedido`, así que no se tocaron ahí.
+import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 
 const ESTADO_BADGE = {
   BORRADOR: "sunmi-badge-muted",
@@ -79,7 +77,6 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [extraResults, setExtraResults] = useState([]);
   const [extraLoading, setExtraLoading] = useState(false);
   const [extraAdding, setExtraAdding] = useState(null);
-  const [deleting, setDeleting] = useState(null);
 
   // Factura / ganancia (totalFactura es computed, no editable)
   const [totalReal, setTotalReal] = useState("");
@@ -280,53 +277,19 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Compartir el pedido al proveedor (PDF / copia) — hook compartido con el modal de /nueva.
   const { descargarPDF, copiarPedido } = useAccionesEnvioPedido(pedido);
 
-  // Persiste cambios de cantidad/unidad/precioCosto de una línea en BORRADOR.
-  // Optimista: actualiza local state primero, después manda al server.
-  const editarItemAPI = async (detalleId, patch) => {
-    try {
-      const res = await fetch(`/api/compras-proveedor/editar-item/${id}`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ detalleId, ...patch }),
-      });
-      const data = await res.json();
-      if (!data.ok) {
-        alert(data.error || "No se pudo guardar el cambio");
-      }
-    } catch {
-      alert("Error de conexión al guardar el cambio");
-    }
-  };
-
-  const eliminarDetalle = async (detalleId) => {
-    if (!confirm("¿Eliminar este ítem del pedido?")) return;
-    setDeleting(detalleId);
-    try {
-      const res = await fetch(`/api/compras-proveedor/eliminar-item/${id}`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ detalleId }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        // Si era el último ítem de un BORRADOR, el pedido se eliminó en la base:
-        // no intentar recargarlo, volver al listado.
-        if (data.pedidoEliminado) {
-          router.push("/modulos/compras-proveedor");
-          return;
-        }
-        await cargar();
-      } else {
-        alert(data.error || "Error al eliminar ítem");
-      }
-    } catch {
-      alert("Error de conexión");
-    } finally {
-      setDeleting(null);
-    }
-  };
+  // ── EDITAR Y QUITAR UNA LÍNEA SE FUERON CON EL EDITOR DE BORRADOR ─────────
+  //
+  // Acá vivían `editarItemAPI` y `eliminarDetalle`. Sólo se llamaban desde el
+  // bloque de `esBorrador`, que no se dibujaba nunca, así que desde esta pantalla
+  // no se pudo editar ni quitar una línea en ningún momento.
+  //
+  // Y NO SE RECONECTARON A PROPÓSITO. Un pedido ENVIADO ya se armó: lo que cambia
+  // de ahí en más lo hace el proveedor, y esa diferencia se captura contra la
+  // boleta al recibir. Editar la línea del pedido acá haría coincidir lo pedido
+  // con lo que llegó y borraría el dato que la recepción existe para registrar.
+  //
+  // LAS RUTAS NO SE TOCARON: `editar-item` y `eliminar-item` siguen en la API,
+  // y las usa `/nueva`, que es donde el borrador sí se edita.
 
   if (!perfil || loadingCtx) return null;
   if (needsContexto) {
@@ -615,21 +578,6 @@ export default function DetallePedidoProveedorPage({ params }) {
           </SunmiPanel>
         )}
 
-        {/* Banner BORRADOR editable */}
-        {esBorrador && (
-          <div
-            className="rounded-2xl border p-3 mb-4 text-[12px]"
-            style={{ borderColor: "var(--pos-link)", color: "var(--pos-link)" }}
-          >
-            <span className="font-semibold">Estás editando un borrador.</span>{" "}
-            <span className="sunmi-text-muted">
-              Podés editar cantidades, unidad y costo de cada línea, o agregar
-              y quitar productos. Cuando esté listo, usá &quot;Confirmar
-              pedido&quot; abajo.
-            </span>
-          </div>
-        )}
-
         {/* Detalle de productos */}
         <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
           <div className="flex items-center gap-2 flex-wrap pb-2 mb-3 border-b sunmi-divider">
@@ -649,150 +597,21 @@ export default function DetallePedidoProveedorPage({ params }) {
             )}
           </div>
 
-          {/* ── LA TABLA VIEJA QUEDA SOLO PARA EL BORRADOR ──────────────────
-              En borrador no hay nada que conciliar: hay un pedido que se está
-              armando, y esta tabla es donde se editan cantidades, unidad y costo,
-              y donde se borra una línea. Una lista de conciliación ahí mostraría
-              un cruce contra nada.
+          {/* ── ACÁ VIVÍA EL EDITOR DE BORRADOR, Y SE BORRÓ ENTERO ──────────
+              La tabla de escritorio, las tarjetas de mobile y el banner "Estás
+              editando un borrador" colgaban todos de `esBorrador`, que es siempre
+              falso por el `return null` de más arriba: no se dibujaron nunca.
+
+              NO SE CONECTARON, SE BORRARON, y es una decisión de negocio y no de
+              plomería: BORRADOR es "todavía se está armando" y se edita en
+              `/nueva`; ENVIADO es "ya se armó". Lo que cambia después no lo hace
+              uno —lo hace el proveedor, que manda de menos o cobra distinto— y eso
+              se captura CONTRA LA BOLETA al recibir, que es a lo que vino el
+              módulo de comprobantes. Editar el pedido acá sería reescribir lo que
+              se pidió para que coincida con lo que llegó, y así la diferencia
+              —que es el dato— desaparece.
 
               En recepción y en recibido va la lista única, abajo. */}
-          {esBorrador && (
-            <>
-          {/* LA TABLA DE ESCRITORIO SE BORRÓ. Vivía acá, en `TablaDetallePedido`,
-              y nunca se dibujó: `esBorrador` es siempre falso por el `return null`
-              de más arriba. Se fue entera en la tanda del 2026-08-17.
-
-              LO QUE QUEDA ABAJO ESTÁ IGUAL DE MUERTO y no se tocó a propósito:
-              las tarjetas de mobile cuelgan de este mismo `esBorrador`. Sacarlas
-              es otra tanda —arrastra `editarItemAPI`, `eliminarDetalle`,
-              `deleting` y el banner de "Estás editando un borrador"— y mezclarla
-              con ésta habría hecho un commit que no se puede revertir de a partes.
-              Está anotada en el roadmap. */}
-
-          {/* MOBILE: cards */}
-          <div className="md:hidden flex flex-col gap-2">
-            {(pedido.detalles || []).length === 0 ? (
-              <p className="text-xs sunmi-text-muted italic px-1">Sin items</p>
-            ) : (
-              pedido.detalles.map((det) => {
-                const base = det.producto?.base;
-                const esFiambre = base?.modoCompraProveedor === "UNIDAD";
-                const r = calcLineaDetalle(det);
-                const puedeToggle = esBorrador && permiteToggleUnidad(base);
-                return (
-                  <div key={`m-${det.id}`} className="rounded-xl border sunmi-border p-3 sunmi-surface flex flex-col gap-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-medium sunmi-text-strong truncate">
-                          {base?.nombre || "-"}
-                          {esFiambre && (<span className="ml-2 text-[10px] sunmi-text-link font-medium">FIAMBRE</span>)}
-                        </div>
-                        <div className="text-[11px] sunmi-text-muted">{base?.sku || ""}</div>
-                      </div>
-                      {(esRecepcion || esBorrador) && (
-                        <SunmiButton color="red" type="button" disabled={deleting === det.id} onClick={() => eliminarDetalle(det.id)}>
-                          {deleting === det.id ? "..." : "Quitar"}
-                        </SunmiButton>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] sunmi-text-muted">Cant. pedida</span>
-                        {esBorrador ? (
-                          <SunmiInput type="text" inputMode="numeric" value={cantidadesEdit[det.id] ?? ""}
-                            onChange={(e) => setCantidadesEdit((prev) => ({ ...prev, [det.id]: e.target.value }))}
-                            onBlur={() => {
-                              const v = parseInt(cantidadesEdit[det.id], 10);
-                              const final = isNaN(v) || v < 1 ? 1 : v;
-                              setCantidadesEdit((prev) => ({ ...prev, [det.id]: String(final) }));
-                              if (final !== Number(det.cantidad)) editarItemAPI(det.id, { cantidad: final });
-                            }}
-                            className="w-[80px] text-center" />
-                        ) : (<span className="sunmi-text-strong">{Number(det.cantidad)}</span>)}
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] sunmi-text-muted">Unidad</span>
-                        {puedeToggle ? (
-                          <div className="w-28">
-                            <SunmiSelectAdv value={unidadesEdit[det.id] || "BULTO"}
-                              onChange={(v) => { setUnidadesEdit((prev) => ({ ...prev, [det.id]: v })); if (v !== det.unidad) editarItemAPI(det.id, { unidad: v }); }}>
-                              <SunmiSelectOption value="BULTO">BULTO</SunmiSelectOption>
-                              <SunmiSelectOption value="UNIDAD">UNIDAD</SunmiSelectOption>
-                            </SunmiSelectAdv>
-                          </div>
-                        ) : (<span className="sunmi-text-muted">{unidadDisplay(base, det.unidad)}</span>)}
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[11px] sunmi-text-muted">Costo</span>
-                        {(esRecepcion || esBorrador) ? (
-                          <div className="flex items-center gap-0.5">
-                            <span className="sunmi-text-muted text-xs">$</span>
-                            <SunmiInput type="text" inputMode="decimal" value={costos[det.id] ?? ""}
-                              onChange={(e) => setCostos((prev) => ({ ...prev, [det.id]: e.target.value.replace(",", ".") }))}
-                              onBlur={() => {
-                                const v = Number(costos[det.id]); const final = isNaN(v) || v < 0 ? 0 : v;
-                                setCostos((prev) => ({ ...prev, [det.id]: String(final) }));
-                                if (esBorrador) { const prevCosto = Number(det.precioCosto); if (final !== prevCosto) editarItemAPI(det.id, { precioCosto: final > 0 ? final : null }); }
-                              }}
-                              className="w-[90px] text-center" />
-                          </div>
-                        ) : (<span className="sunmi-text-strong">{det.precioCosto ? `$${Number(det.precioCosto).toFixed(2)}` : "-"}</span>)}
-                      </div>
-                    </div>
-
-                    {esRecepcion && (
-                      <div className="flex flex-wrap items-end gap-3">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[11px] sunmi-text-muted">Cant. recibida</span>
-                          <div className="flex items-center gap-1">
-                            <SunmiButton color="slate" type="button" onClick={() => { const cur = Number(recibidos[det.id]) || 0; setRecibidos((prev) => ({ ...prev, [det.id]: Math.max(0, cur - 1) })); }}>−</SunmiButton>
-                            <SunmiInput type="text" inputMode="numeric" value={recibidos[det.id] ?? ""}
-                              onChange={(e) => { const raw = e.target.value; if (raw === "") { setRecibidos((prev) => ({ ...prev, [det.id]: "" })); return; } const val = parseInt(raw, 10); setRecibidos((prev) => ({ ...prev, [det.id]: isNaN(val) ? "" : Math.max(0, val) })); }}
-                              onBlur={() => { const cur = Number(recibidos[det.id]); if (isNaN(cur) || cur < 0) setRecibidos((prev) => ({ ...prev, [det.id]: 0 })); }}
-                              className="w-[64px] text-center" />
-                            <SunmiButton color="slate" type="button" onClick={() => { const cur = Number(recibidos[det.id]) || 0; setRecibidos((prev) => ({ ...prev, [det.id]: cur + 1 })); }}>+</SunmiButton>
-                          </div>
-                        </div>
-                        {esFiambre && (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-[11px] sunmi-text-muted">Kg recibidos</span>
-                            <SunmiInput type="number" min="0" step="0.01" value={kgRecibidos[det.id] ?? ""}
-                              onChange={(e) => setKgRecibidos((prev) => ({ ...prev, [det.id]: e.target.value }))}
-                              className="w-28 text-center" placeholder="kg" />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {pedido.estado === "RECIBIDO" && (
-                      <div className="text-[12px] sunmi-text-success">
-                        Recibido: {det.cantidadRecibida != null ? Number(det.cantidadRecibida) : "-"}
-                        {esFiambre && det.kgRecibidos != null ? ` · ${Number(det.kgRecibidos).toFixed(2)} kg` : ""}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between border-t sunmi-divider pt-2">
-                      <span className="text-xs sunmi-text-muted">Subtotal</span>
-                      <span className="text-sm font-bold sunmi-text-accent">
-                        {r.subtotal != null ? `$${r.subtotal.toFixed(2)}` : `⚠ ${r.advertencia}`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            {(pedido.detalles || []).length > 0 && (
-              <div className="flex items-center justify-between rounded-xl border sunmi-border p-3 sunmi-surface">
-                <span className="text-sm font-semibold sunmi-text-strong">TOTAL ESTIMADO</span>
-                <span className="text-base font-bold sunmi-text-accent">${computedTotalFactura.toFixed(2)}</span>
-              </div>
-            )}
-          </div>
-            </>
-          )}
 
           {/* ── LA LISTA ÚNICA ────────────────────────────────────────────────
               Cada línea de la factura con lo que le corresponde del pedido al
