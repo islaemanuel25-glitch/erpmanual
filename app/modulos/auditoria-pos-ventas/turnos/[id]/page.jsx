@@ -137,22 +137,54 @@ export default function DetalleTurnoPage() {
               </p>
             </div>
 
+            {/*
+             * LOS GRISES DE TEXTO DE ESTA TARJETA SON gray-600, Y EL TONO SALIÓ DE
+             * MEDIR CONTRA LOS TRES FONDOS QUE HAY DE VERDAD.
+             *
+             * Eran gray-400 en catorce lugares y no llegaban al mínimo de 4,5:1 en
+             * ninguno de los tres. Medido sobre los elementos reales: 2,54 sobre el
+             * blanco de la tarjeta, 2,43 sobre el gray-50 del hover de las filas y
+             * 2,31 sobre el gray-100 del recuadro de caja.
+             *
+             * No eran solo rótulos: dos de las columnas de la tabla —comisión y
+             * costo— son plata, y se leían a 2,54:1. Con seis ventas eran 25 textos
+             * abajo del mínimo en una sola pantalla.
+             *
+             * gray-500 NO alcanza, y por poco: da 4,83 sobre blanco pero 4,39 sobre
+             * el gray-100 del recuadro. El fondo que manda es el más oscuro de los
+             * tres, no el blanco. gray-600 da 7,56 / 7,23 / 6,87 y pasa en los tres
+             * con margen. Entre los dos no hay ningún paso intermedio en la paleta.
+             *
+             * La jerarquía se mantiene: el rótulo sigue más claro que el valor, que
+             * es gray-900 heredado de la tarjeta.
+             *
+             * El verde y el rojo de la ganancia quedan como están —3,3:1— porque
+             * son la excepción de color ya decidida, y no se tocan acá.
+             *
+             * ── POR QUÉ ESTE COMENTARIO VA CON ASTERISCOS ─────────────────────
+             *
+             * Porque el contador de hardcodeo decide si una línea es comentario
+             * MIRANDO SU PRIMER CARÁCTER: `//`, `*` o otro. Un bloque JSX con
+             * líneas de prosa pelada no lo es para él, y la primera versión de
+             * este comentario le sumó +2 colores fijos por nombrar dos hex.
+             * Con asteriscos, la prosa deja de contarse como código.
+             */}
             {/* Datos del turno */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6 text-sm">
               <div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Apertura</div>
+                <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Apertura</div>
                 <div className="font-bold tabular-nums">
                   {fmtFechaCorta(turno.apertura)} {fmtHora(turno.apertura)}
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Cierre</div>
+                <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Cierre</div>
                 <div className="font-bold tabular-nums">
                   {turno.cierre ? `${fmtFechaCorta(turno.cierre)} ${fmtHora(turno.cierre)}` : "Abierto"}
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Estado</div>
+                <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Estado</div>
                 <div className={`font-bold ${turno.cierre ? "text-green-600" : "text-blue-600"}`}>
                   {turno.cierre ? "Cerrado" : "Abierto"}
                 </div>
@@ -161,64 +193,64 @@ export default function DetalleTurnoPage() {
 
             {/* Datos de caja */}
             {/*
-              LOS COLORES DE ESTE RECUADRO SON FIJOS A PROPÓSITO, y es una
-              excepción declarada, igual que el resto de los de esta pantalla.
-
-              Esta tarjeta es un DOCUMENTO PARA PAPEL: nace en `bg-white
-              text-gray-900` unas líneas más arriba y todo lo que vive adentro
-              hereda ese negro sobre ese blanco. No sigue al tema, y no debe.
-
-              El recuadro era el ÚNICO elemento de la tarjeta que leía un token,
-              y por eso se rompía: `--card-bg` cambia con los catorce temas, el
-              texto de arriba no cambia nunca, y en los oscuros quedaban uno
-              encima del otro. Medido sobre la pantalla real, el valor daba
-              1,03:1 en sunmiGraphite y operixNight, 1,23 en sunmiBlueClassic,
-              1,31 en sunmiDarkCompact y 3,27 en sunmiDark. Cinco de catorce
-              abajo de 4,5:1 — los números no se leían.
-
-              El tono salió de medir, no de elegir a ojo: gray-50 se separa del
-              blanco apenas 1,78 de L*, que está en el límite de lo perceptible
-              —sirve para un hover, no para delimitar un bloque—. gray-100 se
-              separa 3,83 y deja el valor en 16,12:1. Un solo número y no
-              catorce, porque ya no depende del tema.
-
-              El borde también era un token, y uno MUERTO: `--border` no está
-              definido en ninguna parte del repo. Un var() sin definir invalida
-              la declaración, así que el borde caía en `currentColor` y se
-              dibujaba gray-900. `border-gray-900` pinta exactamente ese color
-              —medido idéntico en los catorce— y saca el token.
-
-              El papel no cambia: el fondo no se imprime y nunca se imprimió.
-            */}
+             * LOS COLORES DE ESTE RECUADRO SON FIJOS A PROPÓSITO, y es una
+             * excepción declarada, igual que el resto de los de esta pantalla.
+             *
+             * Esta tarjeta es un DOCUMENTO PARA PAPEL: nace en blanco con texto
+             * gray-900 unas líneas más arriba y todo lo que vive adentro hereda
+             * ese negro sobre ese blanco. No sigue al tema, y no debe.
+             *
+             * El recuadro era el ÚNICO elemento de la tarjeta que leía un token,
+             * y por eso se rompía: --card-bg cambia con los catorce temas, el texto
+             * de arriba no cambia nunca, y en los oscuros quedaban uno encima del
+             * otro. Medido sobre la pantalla real, el valor daba 1,03:1 en
+             * sunmiGraphite y operixNight, 1,23 en sunmiBlueClassic, 1,31 en
+             * sunmiDarkCompact y 3,27 en sunmiDark. Cinco de catorce abajo de
+             * 4,5:1 — los números no se leían.
+             *
+             * El tono salió de medir, no de elegir a ojo: gray-50 se separa del
+             * blanco apenas 1,78 de L*, que está en el límite de lo perceptible
+             * —sirve para un hover, no para delimitar un bloque—. gray-100 se
+             * separa 3,83 y deja el valor en 16,12:1. Un solo número y no
+             * catorce, porque ya no depende del tema.
+             *
+             * El borde también era un token, y uno MUERTO: la variable --border no
+             * está definida en ninguna parte del repo. Un var() sin definir
+             * invalida la declaración, así que el borde caía en currentColor y se
+             * dibujaba gray-900. Fijarlo en gray-900 pinta exactamente ese color
+             * —medido idéntico en los catorce— y saca el token.
+             *
+             * El papel no cambia: el fondo no se imprime y nunca se imprimió.
+             */}
             {(turno.montoEsperadoEfectivo != null || turno.montoRealEfectivo != null) && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-3 text-sm border border-gray-900 rounded-xl p-4 bg-gray-100">
                 {turno.montoInicial != null && (
                   <div>
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Monto inicial</div>
+                    <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Monto inicial</div>
                     <div className="font-bold tabular-nums">${fmt(turno.montoInicial)}</div>
                   </div>
                 )}
                 {turno.totalVentasEfectivo != null && (
                   <div>
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ventas efectivo</div>
+                    <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Ventas efectivo</div>
                     <div className="font-bold tabular-nums">${fmt(turno.totalVentasEfectivo)}</div>
                   </div>
                 )}
                 {turno.totalVentasDigital != null && (
                   <div>
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Ventas digital</div>
+                    <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Ventas digital</div>
                     <div className="font-bold tabular-nums">${fmt(turno.totalVentasDigital)}</div>
                   </div>
                 )}
                 {turno.montoEsperadoEfectivo != null && (
                   <div>
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Esperado efectivo</div>
+                    <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Esperado efectivo</div>
                     <div className="font-bold tabular-nums">${fmt(turno.montoEsperadoEfectivo)}</div>
                   </div>
                 )}
                 {turno.montoRealEfectivo != null && (
                   <div>
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">Real efectivo</div>
+                    <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Real efectivo</div>
                     <div className="font-bold tabular-nums">${fmt(turno.montoRealEfectivo)}</div>
                   </div>
                 )}
@@ -306,9 +338,9 @@ export default function DetalleTurnoPage() {
                           </td>
                           <td className="py-2 px-3 capitalize">{v.formaPago}</td>
                           <td className="py-2 px-3 text-right tabular-nums font-semibold">${fmt(v.total)}</td>
-                          <td className="py-2 px-3 text-right tabular-nums text-gray-400">${fmt(v.comisionBancaria)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums text-gray-600">${fmt(v.comisionBancaria)}</td>
                           <td className="py-2 px-3 text-right tabular-nums">${fmt(v.netoRecibido)}</td>
-                          <td className="py-2 px-3 text-right tabular-nums text-gray-400">${fmt(v.costoTotal)}</td>
+                          <td className="py-2 px-3 text-right tabular-nums text-gray-600">${fmt(v.costoTotal)}</td>
                           <td className={`py-2 pl-3 text-right tabular-nums font-semibold ${v.gananciaNeta < 0 ? "text-red-600" : "text-green-600"}`}>
                             ${fmt(v.gananciaNeta)}
                           </td>
@@ -322,9 +354,9 @@ export default function DetalleTurnoPage() {
                             TOTAL ({ventas.length} ventas)
                           </td>
                           <td className="py-3 px-3 text-right tabular-nums">${fmt(totales.total)}</td>
-                          <td className="py-3 px-3 text-right tabular-nums text-gray-400">${fmt(totales.comision)}</td>
+                          <td className="py-3 px-3 text-right tabular-nums text-gray-600">${fmt(totales.comision)}</td>
                           <td className="py-3 px-3 text-right tabular-nums">${fmt(totales.neto)}</td>
-                          <td className="py-3 px-3 text-right tabular-nums text-gray-400">${fmt(totales.costo)}</td>
+                          <td className="py-3 px-3 text-right tabular-nums text-gray-600">${fmt(totales.costo)}</td>
                           <td className={`py-3 pl-3 text-right tabular-nums ${totales.ganancia < 0 ? "text-red-600" : "text-green-600"}`}>
                             ${fmt(totales.ganancia)}
                           </td>
@@ -335,13 +367,13 @@ export default function DetalleTurnoPage() {
                 </div>
 
                 {ventas.length === 0 && (
-                  <p className="text-center text-gray-400 py-8 text-sm">Este turno no tiene ventas registradas.</p>
+                  <p className="text-center text-gray-600 py-8 text-sm">Este turno no tiene ventas registradas.</p>
                 )}
               </>
             )}
 
             {/* Pie */}
-            <div className="mt-8 pt-4 border-t border-gray-200 text-[10px] text-gray-400 flex justify-between">
+            <div className="mt-8 pt-4 border-t border-gray-200 text-[10px] text-gray-600 flex justify-between">
               <span>Generado: {new Date().toLocaleString("es-AR")}</span>
               <span>ERP Azul</span>
             </div>
