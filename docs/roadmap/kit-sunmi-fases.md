@@ -4828,6 +4828,55 @@ vez de aceptar todo lo que empiece con `text-`—, y medir las tres piezas antes
 después. El candado de la tabla se pondrá rojo al arreglarlo, y eso es lo que
 tiene que pasar: le va a mostrar a quien lo arregle qué más estaba tocando.
 
+## ⚑ LOS ARCHIVOS DE PROVEEDOR VAN FUERA DEL REPO, APUNTADOS POR VARIABLE
+
+**Anotado el 2026-08-17. Es UNA decisión para DOS casos que hasta ahora se
+trataban por separado, y por eso ninguno se resolvía.**
+
+### El motivo, que es el mismo para los dos
+
+**Este repositorio es público.** Un Excel de lista de proveedor lleva precios de
+compra y nombres de proveedores: es información comercial del negocio, no un
+fixture de prueba. No puede entrar al árbol, ni recortado, ni anonimizado a medias
+— un recorte con los precios reales sigue teniendo los precios reales.
+
+Por eso la salida no es "buscar un archivo más chico": es que **vivan afuera y el
+repo los encuentre por una variable de entorno**, exactamente como
+`COMPROBANTES_VOLUMEN_PATH` resuelve el volumen de fotos.
+
+### Los dos casos
+
+**1 · Los 21 candados que hoy se saltean.** Están descritos en su propia sección
+más abajo: 13 esperan `ARCOR_FIXTURE` y 8 `ARCOR_FIXTURE_B`. **La variable ya
+existe y el mecanismo ya está**: cada candado la lee y se saltea con su motivo
+escrito si no está. Lo que falta no es código — es decidir dónde vive el archivo
+y dejarlo ahí.
+
+Mientras tanto, 21 candados que afirman sobre el parser de listas —917 productos,
+77 categorías, 887 códigos numéricos— no corren en ninguna máquina que no tenga
+esos archivos, así que un cambio al parser puede pasar la suite entera sin haber
+sido probado contra un papel real.
+
+**2 · La importación de lista que le falta a la línea de base.**
+`22-listas-conciliacion` y `23-listas-armado-dudoso` quedaron afuera porque en
+`erpazul_dev` no existe ninguna importación: `/api/proveedores/listas/<id>` da 404
+para los ids 1 a 6. Para que existan hay que subir un Excel por la interfaz.
+
+**Son el mismo archivo.** Con el fixture real ubicado afuera y apuntado por
+variable, se sube una vez por la interfaz —acción real de la aplicación— y quedan
+destrabadas las dos pantallas Y los 21 candados. Resolverlo por separado significa
+conseguir dos veces el mismo papel.
+
+### Lo que hay que decidir, y no es técnico
+
+Dónde viven. Una carpeta fuera del árbol en la máquina de desarrollo es lo más
+barato y lo que ya se hace con los backups del `.env` del VPS. Lo que cuesta es
+que **cada máquina que quiera correr la suite completa necesita esos archivos**,
+así que la decisión incluye cómo se los pasa a una máquina nueva.
+
+Lo que **no** es una opción es meterlos al repo "por ahora": un archivo con
+precios de proveedor commiteado no se saca del historial con un `git rm`.
+
 ## ⚑ LOS DATOS DE `erpazul_dev` QUE ESTÁN A PROPÓSITO — no son basura
 
 Todo lo de esta sección se cargó **por la interfaz, con acciones reales de la
