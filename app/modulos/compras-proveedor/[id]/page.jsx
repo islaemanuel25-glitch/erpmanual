@@ -18,13 +18,11 @@ import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelec
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import { TriangleAlert } from "lucide-react";
-import { ORIGENES, linkEditarProducto } from "@/lib/compras-proveedor/retornoPedido";
 import {
   contarLineasConAviso,
   textoContadorAvisos,
 } from "@/lib/compras-proveedor/avisoCostoLinea";
 import SinPermisos from "@/components/auth/SinPermisos";
-import TablaDetallePedido from "@/components/compras-proveedor/TablaDetallePedido";
 import useAccionesEnvioPedido from "@/hooks/useAccionesEnvioPedido";
 import {
   subtotalLinea,
@@ -56,9 +54,10 @@ export default function DetallePedidoProveedorPage({ params }) {
   const router = useRouter();
 
   const { perfil } = useUser();
-  // `contexto` hace falta para el link a editar producto: la edición se hace
-  // parado en la ubicación activa.
-  const { loading: loadingCtx, needsContexto, contexto } = useContextoActivo();
+  // Ya no se saca `contexto`: su único uso era el link a editar producto, que se
+  // fue con la tabla que nunca se dibujaba. Los otros dos SÍ siguen haciendo
+  // falta, para el corte de "elegí una ubicación" de más abajo.
+  const { loading: loadingCtx, needsContexto } = useContextoActivo();
 
   const [pedido, setPedido] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -339,21 +338,21 @@ export default function DetallePedidoProveedorPage({ params }) {
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("compras.ver")) return <SinPermisos />;
 
-  // Editar producto es OTRO permiso, separable de ver o cargar compras.
-  const puedeEditarProductoP = esAdminP || permisosP.includes("productos.editar");
-
-  // Ir a editar el producto de esta línea, y volver a ESTE pedido. El pedido ya
-  // está guardado en el servidor, así que no hace falta preservar nada del lado
-  // del navegador: la vuelta lo recarga.
-  const irAEditarProducto = (base) => {
-    const url = linkEditarProducto({
-      baseId: base?.id,
-      localId: contexto?.localId,
-      origen: ORIGENES.PEDIDO_DETALLE,
-      pedidoId: pedido?.id,
-    });
-    if (url) router.push(url);
-  };
+  // ── EL LÁPIZ DE EDITAR PRODUCTO SE FUE CON LA TABLA ───────────────────────
+  //
+  // Acá vivían `puedeEditarProductoP` y `irAEditarProducto`, que armaban el link
+  // a la ficha del producto con `ORIGENES.PEDIDO_DETALLE` para poder volver. Su
+  // ÚNICO consumidor era `TablaDetallePedido`, que nunca se dibujó, así que el
+  // botón no se veía desde acá ni una vez. Se borraron con ella el 2026-08-17.
+  //
+  // NO ES UNA FUNCIÓN QUE SE PIERDA HOY: es una que ya estaba perdida y que el
+  // código hacía parecer viva. Desde el detalle de un pedido enviado o recibido
+  // no se puede ir a editar un producto, y no se podía antes tampoco.
+  //
+  // `linkEditarProducto` y `ORIGENES.PEDIDO_DETALLE` siguen existiendo en
+  // `lib/compras-proveedor/retornoPedido.js` con sus candados: lo que ya no hay
+  // es nadie en la aplicación que produzca ese origen. Si el lápiz tiene que
+  // volver, el lugar es la lista de conciliación, que es lo que sí se dibuja.
 
   if (loading) {
     return (
@@ -659,24 +658,16 @@ export default function DetallePedidoProveedorPage({ params }) {
               En recepción y en recibido va la lista única, abajo. */}
           {esBorrador && (
             <>
-          <TablaDetallePedido
-            pedido={pedido}
-            esBorrador={esBorrador}
-            esRecepcion={esRecepcion}
-            costos={costos}
-            setCostos={setCostos}
-            cantidadesEdit={cantidadesEdit}
-            setCantidadesEdit={setCantidadesEdit}
-            unidadesEdit={unidadesEdit}
-            setUnidadesEdit={setUnidadesEdit}
-            calcLineaDetalle={calcLineaDetalle}
-            editarItemAPI={editarItemAPI}
-            eliminarDetalle={eliminarDetalle}
-            deleting={deleting}
-            puedeEditarProductoP={puedeEditarProductoP}
-            irAEditarProducto={irAEditarProducto}
-            computedTotalFactura={computedTotalFactura}
-          />
+          {/* LA TABLA DE ESCRITORIO SE BORRÓ. Vivía acá, en `TablaDetallePedido`,
+              y nunca se dibujó: `esBorrador` es siempre falso por el `return null`
+              de más arriba. Se fue entera en la tanda del 2026-08-17.
+
+              LO QUE QUEDA ABAJO ESTÁ IGUAL DE MUERTO y no se tocó a propósito:
+              las tarjetas de mobile cuelgan de este mismo `esBorrador`. Sacarlas
+              es otra tanda —arrastra `editarItemAPI`, `eliminarDetalle`,
+              `deleting` y el banner de "Estás editando un borrador"— y mezclarla
+              con ésta habría hecho un commit que no se puede revertir de a partes.
+              Está anotada en el roadmap. */}
 
           {/* MOBILE: cards */}
           <div className="md:hidden flex flex-col gap-2">

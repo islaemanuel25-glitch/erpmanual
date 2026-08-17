@@ -61,9 +61,11 @@ mostrar datos aparece como regresión. Ya pasó con la línea de base anterior: 
 de sus 16 hubo que recapturarlas por eso.
 
 - **`05-compras-proveedor-detalle`** — dice "Todavía no hay comprobantes". Su única
-  tabla es la de comprobantes: la de líneas es `TablaDetallePedido`, que es código
-  muerto. **Necesita un pedido con un comprobante subido**, no uno con líneas — el
-  42 tiene 24 líneas y no alcanza.
+  tabla es la de comprobantes: la de líneas era `TablaDetallePedido`, borrada el
+  2026-08-17 por no dibujarse nunca. **Necesita un pedido con un comprobante
+  subido**, no uno con líneas — el 42 tiene 24 líneas y no alcanza. Y subirlo no
+  basta: hace falta que el lector lo interprete, o queda una tabla llena y una
+  vacía. Está en el roadmap, con la cadena entera.
 - **`06-compras-proveedor-ganancia`** — dice "Sin compras en el período". El
   período es estado del componente y no se puede fijar por URL, así que hace falta
   una compra recibida dentro del rango por defecto.

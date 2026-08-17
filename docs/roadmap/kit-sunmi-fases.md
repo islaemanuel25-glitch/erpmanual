@@ -4519,7 +4519,94 @@ Es la cuarta vez de la familia "un comentario cambiando el conteo". Arreglarlo d
 raíz —que `esComentario` entienda bloques de varias líneas— movería números de
 todo el repo y es su propia tanda.
 
-## ⚑ `TablaDetallePedido` NO SE DIBUJA NUNCA — tanda de borrado propia
+## ✅ `TablaDetallePedido` — BORRADA el 2026-08-17
+
+**Hecha.** Se borró el componente (283 líneas), su import y su uso, más los cinco
+identificadores que quedaban colgando de él: `puedeEditarProductoP`,
+`irAEditarProducto`, `contexto` de la desestructuración del hook, y los imports de
+`ORIGENES` y `linkEditarProducto`.
+
+**Las tres preguntas se reconfirmaron antes de tocar**, porque el repo pudo haber
+cambiado desde la medición: el redirect sigue sin ramas, el único importador sigue
+siendo la línea 27 de esa misma página, y los seis hermanos de ruta siguen siendo
+segmentos estáticos, que ganan sobre el `[id]` dinámico.
+
+**Cómo se verificó, que es lo que hace que el borrado valga:**
+
+- **Cero píxeles** en el pedido 42 —no borrador—, a 1366x900. Y antes de eso, dos
+  corridas de la MISMA versión dieron cero también: sin ese control el cero de
+  después no distinguiría un cambio del ruido.
+- **La suite pasó de 3416 a 3414 tests**, de 3394 a 3392 pases, con `fail 0` en los
+  dos lados y los mismos 21 salteados y 1 `todo`. El −2 son exactamente los dos
+  candados borrados; nada más se movió.
+- **La sonda de tabla confirmó que la captura retrataba lo que dice**: llegó a
+  `/modulos/compras-proveedor/42` sin redirigir, o sea que el pedido no es
+  borrador. Una página de error es determinista y también habría dado cero.
+
+### Los dos candados que la nombraban: LOS DOS SE BORRARON, y por qué
+
+Es el caso del que avisa la regla 5: un candado que busca un patrón en un archivo
+sigue pasando cuando el archivo se va. Estos dos no llegaron a hacerlo —al borrar
+el archivo `fs.readFileSync` tira excepción y se ponen rojos— pero lo que
+afirmaban ya era falso desde antes.
+
+- **`avisoCostoLinea.test.mjs`, "el DETALLE muestra el aviso por línea".** No se
+  reescribió apuntando a otro lado porque NO HAY OTRO LADO. En un pedido enviado o
+  recibido se dibuja `ListaConciliacion`, y el aviso por línea que hay ahí es otro:
+  compara el precio de la FACTURA contra el catálogo, con el umbral del proveedor
+  y no con `UMBRAL_CENTAVOS`, y solo si la línea llegó por un comprobante leído y
+  vinculado. Apuntarlo ahí lo habría dejado afirmando sobre otra comparación con
+  el nombre de ésta.
+- **`retornoPedido.test.mjs`, "el botón de editar producto está en el DETALLE".**
+  Tampoco hay alternativa: ni `ListaConciliacion` ni `PanelComprobantes` tienen
+  lápiz, y `ORIGENES.PEDIDO_DETALLE` ya no lo produce nadie en la aplicación.
+
+Los dos dejaron su motivo escrito en el lugar donde estaban, con lo que se pierde,
+para que nadie los reescriba sin saber qué contrato describían.
+
+**Y el trinquete bajó, que no es lo mismo que mejorar:** −1 en elementos crudos
+(318→317) y −6 en medidas mágicas (1893→1887). Los otros cinco contadores no se
+movieron. **Es una baja por borrado, no progreso**: nada se migró al kit, se fue
+código que ya no se dibujaba. Se comprobó a qué atribuirla en vez de suponerlo —
+restaurando solo el componente, con la página y los candados ya cambiados, los
+cuatro contadores vuelven a la base exacta, así que el delta entero es del archivo
+y las ediciones de la página aportan cero.
+
+### ⚑ LO QUE EL BORRADO DEJÓ AL DESCUBIERTO — tres cosas, y ninguna la causó
+
+Aparecieron relevando para borrar. **Las tres ya pasaban antes**, y conviene no
+leerlas en el diff como si el borrado las hubiera provocado.
+
+**1 · Desde el detalle se puede AGREGAR una línea pero no quitarla ni editarla.**
+El panel de "Agregar producto extra" está vivo —cuelga de `esRecepcion`— mientras
+que `editarItemAPI` y `eliminarDetalle` solo se invocan desde el bloque muerto. O
+sea que en un pedido enviado se suma un producto y después no hay forma de sacarlo
+desde esa pantalla.
+
+**2 · El contador de arriba cuenta líneas que no se pueden ir a mirar.** Dice "N
+líneas tienen un costo distinto del catálogo" —y ese contador SÍ está vivo, fuera
+del bloque muerto— pero el aviso por línea que decía cuáles vivía en la tabla
+borrada. Contar sin poder señalar es la mitad de un aviso.
+
+**3 · El lápiz de editar producto no existe en el detalle.** Solo se llega a editar
+un producto desde una compra por `/nueva`, que únicamente acepta borradores.
+
+### ⚑ EL RESTO DEL BLOQUE MUERTO — tanda propia, NO se tocó
+
+Adentro del mismo `{esBorrador && …}` quedan, igual de inalcanzables: las tarjetas
+de mobile, el banner azul "Estás editando un borrador", `editarItemAPI`,
+`eliminarDetalle`, el estado `deleting`, los imports de `SunmiSelectAdv` y
+`SunmiSelectOption`, y los de `permiteToggleUnidad` y `unidadDisplay`. Aparte, y
+sin relación con `esBorrador`, `tieneFiambre` se calcula y no se usa en ninguna
+parte.
+
+**Se dejaron a propósito.** Sacarlos es un borrado más grande que arrastra un
+banner visible y cinco identificadores más, y mezclarlo con éste habría hecho un
+commit que no se puede revertir de a partes. Lo que sí hay que decidir antes es lo
+de arriba: si quitar una línea desde el detalle tiene que volver, ese código NO se
+borra, se conecta.
+
+## ⚑ (histórico) `TablaDetallePedido` NO SE DIBUJA NUNCA — la medición que la mandó a borrar
 
 **ES LA ÚNICA ENTRADA DE ESTA TANDA.** Hubo una segunda más abajo —"BORRAR
 `TablaDetallePedido`"— que decía lo mismo con otras palabras: se escribieron el
@@ -5079,8 +5166,9 @@ analytics.
 
 Se creía que sí, por tener 24 líneas. **No alcanza.** La única tabla que esa
 pantalla dibuja hoy es la de comprobantes, y dice "Todavía no hay comprobantes":
-la tabla de líneas es `TablaDetallePedido`, que es código muerto —ver su sección
-más arriba—.
+la tabla de líneas era `TablaDetallePedido`, que **se borró el 2026-08-17** por no
+dibujarse nunca —ver su sección más arriba—. Vuelto a comprobar ese día con la
+sonda de tabla sobre el pedido 42: una sola tabla, cero filas de datos.
 
 O sea que `05-compras-proveedor-detalle` necesita un pedido **con un comprobante
 subido**, no un pedido con líneas. Queda declarada afuera de la línea de base
