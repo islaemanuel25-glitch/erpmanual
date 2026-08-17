@@ -5435,7 +5435,95 @@ la sección "SIETE CANDADOS DEL CONTRATO VIEJO POR REESCRIBIR", unas líneas má
 arriba; se nombra también acá porque en el relevamiento del 2026-08-17 figuraba
 como pendiente sin anotar y conviene que aparezca buscando por "contrato viejo".
 
-## ⚑ `--accent` — DEFECTO VIVO, no deuda. El botón seleccionado no se resalta
+## ⚑ `--accent` — MEDIDO Y DECIDIDO EL 2026-08-17. **NO IMPLEMENTADO.**
+
+> **ESTADO: listo para retomar.** Está todo medido y la decisión está tomada. Lo
+> que falta es escribir el token en los catorce temas y comprobarlo. **Nada de
+> esto se tocó en el código: el defecto sigue vivo en producción.**
+
+### LA DECISIÓN, para no volver a discutirla
+
+**Un `--accent` propio, calculado por tema**, conservando el tono del acento de
+cada uno y bajándole luminosidad hasta que el blanco encima llegue a 4,5.
+
+**Por qué ésa y no otra, en una línea:** es **la única que llega a 14 de 14**, y la
+única que sobrevive a que la pantalla se rehaga — no depende de qué haya detrás del
+botón ni de qué forma tenga el resalte.
+
+Siete temas no necesitan ningún cambio; el resto se oscurece un poco. **Lo que sí
+cambia es el aspecto**: en los temas ámbar el botón seleccionado pasa de amarillo
+brillante a un dorado apagado. Eso está aceptado y forma parte de la decisión.
+
+### LOS SIETE USOS, EN TRES ARCHIVOS — no era un botón
+
+La primera anotación decía "el botón de balances". `git grep` sobre el repo entero
+dio **siete usos y TRES FORMAS distintas**, y eso cambia el alcance de la tanda:
+lo que se decida mueve las tres a la vez.
+
+- **Fondo de un botón seleccionado** (4): `auditoria-pos-ventas/balances/page.jsx:220`
+  y `auditoria-pos-ventas/productos/page.jsx:183`, `:198` y `:210`. Los cuatro con
+  `text-white` al lado.
+- **Borde** (1): `balances/page.jsx:228`, un `border-l-2` en el panel de comparación.
+- **Subrayado** (1): `productos/page.jsx:233`, una barra de 2px.
+- **Círculo con la inicial** (1): `components/operador/OperadorSelector.jsx:51`, con
+  **texto blanco de 10px en negrita** — el caso más exigente de los siete, y encima
+  en un componente compartido, así que aparece en más de una pantalla.
+
+**El candado `tokensDefinidos.test.mjs` sólo nombra el primero.** Al retomar, esa
+lista hay que ampliarla o el candado sigue describiendo un problema más chico del
+que hay.
+
+### QUÉ SE VE HOY, medido
+
+Calculado sobre `app/globals.css` para los catorce, y verificado en pantalla en dos
+—uno claro y uno oscuro— con capturas ancladas al botón.
+
+Como la propiedad es inválida, el fondo no se pinta y queda lo que haya detrás. El
+resultado se parte en dos:
+
+- **Los nueve temas claros: el botón seleccionado es ILEGIBLE.** Blanco sobre el
+  fondo de página da entre 1,04 y 1,13, y **sobre el fondo de tarjeta da 1,00
+  exacto** — blanco puro sobre blanco puro. **El estado activo es PEOR que el
+  inactivo**, que se lee perfecto.
+- **Los cinco oscuros sí se distinguen, pero no por lo que el diseño quería.** El
+  texto pasa de gris apagado a blanco brillante, con 16 a 20 de contraste. Se nota,
+  pero no hay pastilla de color: quedó la mitad del efecto.
+
+En ningún tema son idénticos: en los oscuros se distinguen por brillo, en los claros
+se distinguen para peor.
+
+### LAS CINCO SALIDAS COMPARADAS — cuántos de 14 llegan, y el peor caso
+
+El peor caso es el que decide, porque es el tema donde el botón queda ilegible.
+
+- **Como está hoy** — 5 de 14. Peor: **1,00**.
+- **`--accent` = `--pos-accent`, texto blanco** — 7 de 14. Peor: **1,67**.
+- **`--accent` = `--pos-accent`, texto negro** — 7 de 14. Peor: **1,41**. No mejora:
+  cambia CUÁLES fallan, no cuántos. Los ámbar suben a 12,58 y los azules oscuros se
+  caen a 2,84.
+- **`--accent` propio calculado — LA ELEGIDA** — **14 de 14**. Peor: **4,52**.
+- **Anillo o subrayado, sin tocar el texto** — 13 de 14. Acá el umbral es 3,0 y no
+  es una concesión: 4,5 rige para TEXTO y un anillo es elemento no textual
+  (WCAG 1.4.11). El texto queda con el par del tema —de 13 a 18 en los catorce— y
+  el anillo pasa en trece. Falla `sunmiLight` con **2,91** contra 3,0.
+
+**Por qué se descartó el anillo, que era la otra candidata seria:** llega a 13 y no
+a 14, cambia la forma del resalte de pastilla llena a contorno, y de todos modos
+habría que oscurecerlo en `sunmiLight`. Con eso pierde su ventaja —no tocar ningún
+color— y sigue sin llegar a los catorce.
+
+### AL RETOMAR
+
+El medidor está en el historial de esta sesión y se rehace en minutos; lo que no
+hay que repetir es el error que tuvo: **el primer patrón leyó 13 temas y no 14**,
+porque `sunmiDark` no abre llave en su propia línea —comparte bloque con
+`html:not([data-theme])`, separados por coma— y el medidor informó "13 de 14" tan
+tranquilo. Cualquier medidor por tema tiene que contar los nombres declarados en la
+hoja aparte y frenar si no coinciden.
+
+---
+
+**Lo que sigue es la medición original del 2026-08-17, que sigue valiendo:**
 
 **Separado del resto el 2026-08-17 a propósito.** Los otros seis tokens huérfanos
 son deuda: no rompen nada que se vea. Éste sí, y por eso va aparte.
