@@ -4617,6 +4617,52 @@ tema— así que cubre blue, `text-white` y los arbitrarios sin enumerar ninguno
 Su alcance son las cuatro piezas que negocian el tamaño; el resto del repo es lo
 que falta.
 
+## ✅ EL CORREDOR DE LA SUITE — RESUELTO el 2026-08-17, y quedan 8
+
+**Cerrado en `cfc817f` y `394ec20`.** Lo de abajo queda como el relevamiento que
+originó la tanda. Lo que el arreglo agregó:
+
+- **Eran 940 candados mudos, no 739.** A los 739 de los 37 archivos con alias se
+  sumaron **101 más** de una segunda causa que no estaba en el relevamiento: el
+  glob del comando miraba sólo `lib/**`, así que **12 archivos de `components/` y
+  `scripts/` ni entraban a la suite**. Once corren perfecto.
+- La suite pasa de **2367 casos a 3176**, y de 2301 que pasaban a **3146**.
+- **Ninguno de los 940 estaba en rojo.** Estaban todos bien y callados, que era
+  la hipótesis menos probable de las tres.
+- El resolutor vive en el repo —`scripts/test/resolutorAlias.mjs`— y NO se
+  cambiaron los archivos a ruta relativa: así el próximo candado escrito con alias
+  corre solo.
+- Y va con `lib/sunmi/todosLosCandadosCorren.test.mjs`, que compara los archivos
+  que EXISTEN contra los que pueden correr Y contra los que el comando mira. Sin
+  eso esto se arreglaba hoy y se rompía solo.
+
+### Los 8 que quedaron afuera, con lo que necesita cada uno
+
+Están declarados uno por uno en ese candado, con su motivo, y con el conteo al
+lado para que la lista no se estire sola. Son **dos problemas distintos**:
+
+**SIETE PIDEN UNA TRANSFORMACIÓN DE JSX.** Importan un componente `.jsx` y node no
+lo parsea. Son `lib/caja/aperturaRelevo`, `cierrePantallaRender`, `circuitoDinero`,
+`detalleTurnoRender`, `ordenCambioPrevio`, `retiroPantallaRender` y
+`components/sunmi/SunmiButton`.
+
+Los seis de `caja` afirman sobre lo que DIBUJAN las pantallas de caja y turnos
+—renderizan el componente y miran el marcado—, así que no son candados menores: son
+los que cuidan lo que Emanuel ve al cerrar una caja. El de `SunmiButton` cuida la
+pieza del kit más usada del proyecto.
+
+La tanda es agregarle al corredor una transformación de JSX. No es enorme, pero es
+otra decisión: qué herramienta, y si se carga siempre o sólo para esos archivos.
+
+**Y UNO PIDE OTRA COSA: `lib/authorize.test.mjs`.** Arrastra `next/server` a través
+de `lib/auditoria/interceptor.js`, que lo importa para el `after()` del flush de la
+bitácora. `next/server` resuelve pero apunta a un archivo que no existe fuera del
+runtime de Next, así que falla al cargar. Necesita el resolutor de Next o un doble
+de `after`. Es el único de los ocho que toca permisos.
+
+**No se tocó ninguno.** Cuando se haga, el candado de cobertura avisa solo: si uno
+empieza a correr, se pone rojo diciendo que su excepción quedó vieja.
+
 ## ⚑ 44 ARCHIVOS DE CANDADOS NO CORREN, Y NO SE VE
 
 **Encontrado el 2026-08-17 arreglando el predicado.** De los 45 fallos que
