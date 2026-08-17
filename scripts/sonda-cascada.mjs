@@ -200,9 +200,20 @@ for (let i = 0; i < 80; i++) {
   try {
     hojaLista = await evaluar(`(() => {
       if (document.readyState !== "complete") return false;
+      // EL SELECTOR PUEDE SER UNA LISTA. Comparar por igualdad exacta daba
+      // "la hoja no tiene .sunmi-btn-base" el dia que esa regla paso a ser
+      // ".sunmi-btn-base, .sunmi-btn-parte-alto" al partir la base por eje. La
+      // sonda fallo cerrado, que es lo correcto, pero por el motivo equivocado:
+      // la clase estaba. El inventario de mas abajo ya partia por coma; esta
+      // espera no, y eran dos lugares con la misma pregunta.
       for (const hoja of document.styleSheets) {
         let reglas; try { reglas = hoja.cssRules; } catch { continue; }
-        for (const r of reglas) if (r.selectorText === ".sunmi-btn-base") return true;
+        for (const r of reglas) {
+          if (!r.selectorText) continue;
+          for (const parte of r.selectorText.split(",")) {
+            if (parte.trim() === ".sunmi-btn-base") return true;
+          }
+        }
       }
       return false;
     })()`);

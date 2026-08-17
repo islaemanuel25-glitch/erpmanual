@@ -93,45 +93,137 @@
   transform: scale(0.98);
 }
 
-/* Base para SunmiButton component */
-.sunmi-btn-base {
-  /* ── MÍNIMO, NO FIJO ────────────────────────────────────────────────────
-   *
-   * Era `height: 36px`. Un botón cuyo contenido pasa de 36 píxeles no recorta
-   * ni scrollea: se DERRAMA sobre lo que tiene abajo. En la pantalla de recetas
-   * en 360 de ancho, la opción "Ya está adentro del precio" —título, detalle y
-   * ejemplo— medía 95px de contenido en una caja de 36 y tapaba la tarjeta
-   * siguiente y el título que venía después.
-   *
-   * Medido con `scripts/medir-desborde.mjs`: cuatro botones desbordaban, de
-   * +14px a +59px.
-   *
-   * El mínimo se conserva en 36 y el relleno vertical es menor que el sobrante
-   * de una línea suelta, así que un botón de una línea sigue midiendo
-   * exactamente 36px y ninguna pantalla se mueve. Lo que cambia es solo el que
-   * antes no entraba.
-   *
-   * `align-items: center` reemplaza al centrado que daba el alto fijo. No se
-   * fija `justify-content`: en flex el default es `flex-start`, que es el mismo
-   * alineado horizontal que tenía como inline-block, y así los botones que ya
-   * pasan `justify-start` o `text-left` siguen comportándose igual.
-   */
+/* ══════════════════════════════════════════════════════════════════════════
+   BASE DEL BOTÓN — PARTIDA POR EJE
+   ══════════════════════════════════════════════════════════════════════════
+
+   ── QUÉ CAMBIÓ ACÁ Y QUÉ NO ─────────────────────────────────────────────
+
+   `.sunmi-btn-base` era UNA regla con diez declaraciones. Ahora cada
+   declaración vive en su propia regla, y cada regla nombra DOS selectores: el
+   de siempre y uno por eje.
+
+   **`.sunmi-btn-base` no cambia de efecto ni desaparece.** Sigue recibiendo
+   las diez declaraciones, con la misma especificidad —0-1-0 en todas— y en el
+   mismo lugar de la hoja, así que su relación con las utilidades de Tailwind
+   es exactamente la de antes. Comprobado con `scripts/sonda-estilos.mjs`: las
+   606 propiedades calculadas de un botón con `.sunmi-btn-base` dan idénticas
+   antes y después, y el control —una clase que no existe— da distinto.
+
+   Y no desaparece porque **hay catorce lugares del repo que escriben
+   `sunmi-btn-base` a mano**, sin pasar por la pieza: la auditoría de turnos,
+   `PiezasListas`, `EditorVentaCorreccion`, `geometriaGrilla`,
+   `SunmiBackButton` y los dos toggles de compras. Esos no pueden moverse un
+   píxel y ninguno sabe de sub-clases.
+
+   ── PARA QUÉ SE PARTE ───────────────────────────────────────────────────
+
+   Para que `SunmiButton` pueda emitir la base MENOS el eje que la pantalla
+   declara, en vez de emitirla entera y dejar que decida el orden de la hoja.
+
+   Hoy las 391 declaraciones que las pantallas escriben sobre el botón se
+   aplican **solo porque `styles/sunmi.css` se importa antes que
+   `@tailwind utilities`**: misma especificidad, gana la última. Ese orden no es
+   una decisión declarada en ningún lado —tiene sus dos candados desde el 16/8,
+   `lib/sunmi/ordenDeCascada.test.mjs` y `scripts/sonda-cascada.mjs`— y mientras
+   sea lo único que las sostiene, un `@layer` o un cambio de motor las da vuelta
+   todas en silencio.
+
+   Con el eje negociado no hay pelea que ganar: la pieza no pone lo que la
+   pantalla pidió.
+
+   ── EL REPARTO, Y POR QUÉ ES ASÍ DE FINO ────────────────────────────────
+
+   Un eje por PROPIEDAD que alguien pueda declarar por separado. Agrupar
+   `padding-block` con `padding-inline` haría que un botón que pide `py-3`
+   perdiera también el `px` — y son 135 declaraciones de `py-*` contra 43 de
+   `px-*`, casi nunca juntas.
+
+   Lo único que queda agrupado es `.sunmi-btn-parte-nucleo`, con lo que ninguna
+   pantalla declara —la transición y los dos estados—. Medido: cero
+   declaraciones de `transition` en los 248 consumidores con `className`.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── MÍNIMO, NO FIJO ──────────────────────────────────────────────────────
+ *
+ * Era `height: 36px`. Un botón cuyo contenido pasa de 36 píxeles no recorta
+ * ni scrollea: se DERRAMA sobre lo que tiene abajo. En la pantalla de recetas
+ * en 360 de ancho, la opción "Ya está adentro del precio" —título, detalle y
+ * ejemplo— medía 95px de contenido en una caja de 36 y tapaba la tarjeta
+ * siguiente y el título que venía después.
+ *
+ * Medido con `scripts/medir-desborde.mjs`: cuatro botones desbordaban, de
+ * +14px a +59px.
+ *
+ * El mínimo se conserva en 36 y el relleno vertical es menor que el sobrante
+ * de una línea suelta, así que un botón de una línea sigue midiendo
+ * exactamente 36px y ninguna pantalla se mueve. Lo que cambia es solo el que
+ * antes no entraba.
+ */
+.sunmi-btn-base,
+.sunmi-btn-parte-alto {
   min-height: 36px;
+}
+
+.sunmi-btn-base,
+.sunmi-btn-parte-display {
   display: inline-flex;
+}
+
+/* `align-items: center` reemplaza al centrado que daba el alto fijo. No se
+ * fija `justify-content`: en flex el default es `flex-start`, que es el mismo
+ * alineado horizontal que tenía como inline-block, y así los botones que ya
+ * pasan `justify-start` o `text-left` siguen comportándose igual. */
+.sunmi-btn-base,
+.sunmi-btn-parte-items {
   align-items: center;
+}
+
+.sunmi-btn-base,
+.sunmi-btn-parte-pad-y {
   padding-block: 0.25rem;
+}
+
+.sunmi-btn-base,
+.sunmi-btn-parte-pad-x {
   padding-inline: 1rem;
+}
+
+.sunmi-btn-base,
+.sunmi-btn-parte-radio {
   border-radius: 0.375rem;
+}
+
+.sunmi-btn-base,
+.sunmi-btn-parte-letra {
   font-size: 13px;
+}
+
+.sunmi-btn-base,
+.sunmi-btn-parte-peso {
   font-weight: 500;
-  transition: all 150ms;
+}
+
+.sunmi-btn-base,
+.sunmi-btn-parte-cursor {
   cursor: pointer;
 }
-.sunmi-btn-base:disabled {
+
+/* El núcleo: lo que ninguna pantalla declara, más los dos estados. Lo emite la
+ * pieza siempre y no cede nunca. Los estados van acá y no en `.sunmi-btn-parte-cursor`
+ * a propósito: `:disabled` pisa el cursor con más especificidad, así que ceder
+ * el eje del cursor no puede llevarse puesto el `not-allowed` del deshabilitado. */
+.sunmi-btn-base,
+.sunmi-btn-parte-nucleo {
+  transition: all 150ms;
+}
+.sunmi-btn-base:disabled,
+.sunmi-btn-parte-nucleo:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.sunmi-btn-base:not(:disabled):active {
+.sunmi-btn-base:not(:disabled):active,
+.sunmi-btn-parte-nucleo:not(:disabled):active {
   transform: scale(0.98);
 }
 
