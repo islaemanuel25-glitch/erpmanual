@@ -2296,11 +2296,23 @@ se sale por abajo solo en pantallas chicas. Y cómo se confirma: se mide la capa
 —tiene que dar el alto del viewport en y=0— y se enumeran los ancestros con esas
 cuatro propiedades. **Leyendo el JSX no se ve**, porque depende del CSS calculado.
 
-### ⚑ DEUDA DEL KIT: `Escape` NO CIERRA NINGÚN MODAL
+### ✅ DEUDA DEL KIT: `Escape` NO CERRABA NINGÚN MODAL — HECHO el 2026-08-15
 
-**Apareció midiendo el camino C, y no la causó el camino C.** El kit nunca
-implementó el cierre con teclado: comprobado antes y después del portal, en
-`proveedores` y en `roles`, la tecla no hace nada.
+**Cerrado en `c69fbe3`**, "feat(kit): Escape cierra el modal, con la misma regla
+que el velo". `components/sunmi/SunmiModalLayout.jsx:445` registra el
+`addEventListener("keydown")`, y hay candado en
+`components/sunmi/SunmiModalLayout.test.mjs`.
+
+**La marca quedó vieja dos días**, y se encontró recién el 2026-08-17 revisando el
+archivo entero contra el repo. Es la razón por la que este documento se relee: una
+sección que dice "el kit nunca implementó X" manda a rehacer algo terminado.
+
+Lo que sigue es lo que decía cuando era deuda, y se conserva porque explica por
+qué se hizo aparte en vez de colarse en la tanda de la capa:
+
+**Apareció midiendo el camino C, y no la causó el camino C.** El kit no
+implementaba el cierre con teclado: comprobado antes y después del portal, en
+`proveedores` y en `roles`, la tecla no hacía nada.
 
 **No se implementó en esa tanda a propósito.** Es **comportamiento nuevo** y
 merece su propia declaración —qué modales lo aceptan, qué pasa con los que
@@ -4509,6 +4521,12 @@ todo el repo y es su propia tanda.
 
 ## ⚑ `TablaDetallePedido` NO SE DIBUJA NUNCA — tanda de borrado propia
 
+**ES LA ÚNICA ENTRADA DE ESTA TANDA.** Hubo una segunda más abajo —"BORRAR
+`TablaDetallePedido`"— que decía lo mismo con otras palabras: se escribieron el
+mismo día, con horas de diferencia, sin que la segunda se diera cuenta de que ya
+existía la primera. Se unificó acá el 2026-08-17. Si aparece otra, es un
+duplicado, no una tanda nueva.
+
 **Medido el 2026-08-17 y CONFIRMADO POR LAS TRES PREGUNTAS, con archivo y línea.**
 No se borró nada: va como tanda propia, no de paso.
 
@@ -4684,7 +4702,18 @@ No hay rojo, no hay conflicto, no hay nada que avise; el duplicado se descubre
 sólo si alguien lo mira. Es la regla 1 aplicada a las herramientas, y es donde
 más fácil se cuela, porque uno cree que está construyendo y no duplicando.
 
-## ⚑ 44 ARCHIVOS DE CANDADOS NO CORREN, Y NO SE VE
+## ✅ 44 ARCHIVOS DE CANDADOS NO CORRÍAN — HECHO el 2026-08-17
+
+**Cerrado el mismo día en que se encontró**, en `cfc817f` → `072c7d0`. Hoy la
+suite entera corre: 3412 casos, 3390 pasan, **cero fallos**.
+
+**Esta sección contradecía a la de más arriba** —la del corredor, marcada ✅— en el
+mismo archivo y con dos días de diferencia entre una y otra. La de arriba es la
+que vale y tiene el detalle completo; ésta queda con el relevamiento que la
+originó, que es lo único que aporta, y se cierra acá para que nadie la lea como
+pendiente.
+
+Lo que decía cuando lo era:
 
 **Encontrado el 2026-08-17 arreglando el predicado.** De los 45 fallos que
 informaba `node --test "lib/**/*.test.mjs"`, **44 no eran candados en rojo: eran
@@ -4799,42 +4828,6 @@ vez de aceptar todo lo que empiece con `text-`—, y medir las tres piezas antes
 después. El candado de la tabla se pondrá rojo al arreglarlo, y eso es lo que
 tiene que pasar: le va a mostrar a quien lo arregle qué más estaba tocando.
 
-## ⚑ BORRAR `TablaDetallePedido` — tanda propia, con las dos cerraduras medidas
-
-Ya está escrito más arriba por qué es inalcanzable. Acá va lo que hace falta para
-borrarla, que es lo que no se hace de paso.
-
-**LAS DOS CERRADURAS, y son independientes:**
-
-1. **El `return null` de la 382.** `app/modulos/compras-proveedor/[id]/page.jsx`
-   corta con `if (pedido.estado === "BORRADOR") return null;` y define
-   `const esBorrador = pedido.estado === "BORRADOR"` recién en la 385. O sea que
-   **`esBorrador` es siempre `false` por construcción** en todo el JSX de abajo, y
-   el `{esBorrador && <TablaDetallePedido …>}` de la 662 no puede ser verdadero
-   nunca. Esta cerradura sola ya alcanza.
-2. **El redirect de la 153-158**, `router.replace("/nueva?pedidoId=…")`, sin
-   ninguna rama que lo saltee. Comprobado navegando: con el pedido 19 —BORRADOR,
-   6 líneas— la sonda informó que llegó a `/modulos/compras-proveedor/nueva?pedidoId=19`.
-
-**EL ÚNICO IMPORTADOR** es `app/modulos/compras-proveedor/[id]/page.jsx:27`.
-Enumerado con `git grep` sobre el repo entero, trackeado y sin trackear.
-
-**LOS DOS CANDADOS QUE HAY QUE RELEER AL BORRARLA**, y es el punto entero de que
-esto sea una tanda y no un borrado:
-
-- `lib/compras-proveedor/avisoCostoLinea.test.mjs:327`
-- `lib/compras-proveedor/retornoPedido.test.mjs:361`
-
-Los dos LEEN EL ARCHIVO COMO TEXTO y buscan un patrón adentro. Un candado así
-**sigue pasando cuando el archivo que miraba se fue**: deja de afirmar nada y no
-se queja. Si se borra el componente sin releerlos, quedan dos candados verdes que
-no defienden nada, y eso ya pasó en este proyecto al mudar la tabla del detalle
-del pedido. Hay que abrir cada uno y preguntar qué afirma HOY, no si pasa.
-
-**Y LA DECISIÓN QUE FALTA ES DE ASPECTO:** o sobra la tabla, o sobra el redirect.
-Si sobra el redirect, el borrador de un pedido vuelve a editarse en DOS pantallas
-distintas — que es justamente lo que ese redirect vino a terminar—.
-
 ## ⚑ EL TURNO 49 QUEDA ABIERTO A PROPÓSITO — no es un turno olvidado
 
 En `erpazul_dev`, local `depo`. **No hay que cerrarlo sin leer esto.**
@@ -4862,29 +4855,86 @@ producto y $2.303 más de efectivo en la caja del turno.
 repetir todo el procedimiento de arriba. Cerrarlo no está mal —es dev— pero es una
 decisión, no limpieza.
 
-## ⚑ UN CANDADO EN ROJO QUE NO ES DE ESTA TANDA, y está diciendo algo
+## ⚑ SIETE CANDADOS DEL CONTRATO VIEJO POR REESCRIBIR — pendiente DECLARADO
 
-`lib/proveedores/listas/detalleSistema.test.mjs` falla con:
+**Corregido el 2026-08-17.** Esta sección decía "UN CANDADO EN ROJO QUE NO ES DE
+ESTA TANDA, y está diciendo algo", y **nunca hubo tal rojo**. Lo escribí yo el
+mismo día leyendo mal la salida de la suite: el mensaje que tomé por una
+`AssertionError` suelta venía de una prueba marcada como PENDIENTE a propósito.
 
-    EXCLUIDO volvió a ESTADO_LINEA. La exclusión es una marca, no un estado:
-    usá excluidaManual.
+Lo que hay de verdad está en `lib/proveedores/listas/panelDecision.test.mjs:139`:
 
-**Es PREEXISTENTE**, comprobado corriendo la suite en un worktree del commit
-`3767e80`, que es el que estaba publicado antes de esta tanda: da los mismos 45
-fallos. No se tocó nada.
+    test("EXCLUIDO ya no es un estado del enum",
+         { todo: "quedan 7 candados del contrato viejo por reescribir" }, …)
 
-Pero no es ruido, y por eso queda anotado y no ignorado. Es exactamente la regla
-3 —un hecho, una columna—: `ESTADO_LINEA.EXCLUIDO` existía en el enum y nada lo
-escribía nunca, porque pisar el estado perdería el motivo por el que la fila
-estaba así, y desexcluir no podría restaurarlo. Ese candado está afirmando que el
-valor **no vuelva** al enum. Que esté rojo significa que volvió, o que algo lo
-está nombrando donde no debe.
+Es un `todo` de `node:test`, o sea una anotación deliberada de quien lo escribió.
+El archivo pasa 31 de 31 y no falla nada. En la suite sale con `⚠` y no con `✖`, y
+así se cuenta: **1 pendiente declarado**, no un fallo.
 
-Hay que abrirlo y ver cuál de las dos, porque si volvió, el contador que cuenta
-por estado vuelve a dar cero mientras las filas excluidas se cuentan bajo su
-estado original — que es el defecto original, completo.
+**Lo que SÍ queda por hacer, y es real:** reescribir esos siete candados contra el
+contrato nuevo. `ESTADO_LINEA.EXCLUIDO` existía en el enum y nada lo escribía
+nunca, porque pisar el estado perdería el motivo por el que la fila estaba así y
+desexcluir no podría restaurarlo — la exclusión vive en `excluidaManual`. Es la
+regla 3, un hecho una columna. Los siete todavía afirman sobre el enum viejo.
 
-**Los otros 44 fallos de la suite NO son candados rojos**: son de resolución de
-módulos —el alias `@/lib` y `@/components`, que `node --test` pelado no resuelve—
-así que esos archivos ni llegan a correr. Conviene saberlo antes de leer un "45
-fallos" como 45 problemas.
+**Mientras no se reescriban, ese `todo` es un candado apagado**: no defiende nada
+y no se queja. La forma de la tanda es abrir ese archivo, ver cuáles son los siete
+y reescribirlos contra `excluidaManual`, o borrarlos si el caso ya lo cubre otro.
+
+Y la lección de por qué esta sección estuvo mal dos veces seguidas: **un `todo` y
+un rojo se parecen en la salida de la suite si uno mira el mensaje y no el
+símbolo.** Antes de anotar un candado como rojo, correr ese archivo solo y mirar
+el conteo — `pass`, `fail` y `todo` van en líneas distintas.
+
+## ⚑ LAS CINCO TABLAS DE CLIENTES A `text-xs` — tanda de aspecto
+
+**Debería estar acá desde `64bdb62` y no estaba.** Ese commit dice, textual,
+"Queda anotado en el roadmap como tanda de aspecto propia", y la anotación nunca
+se escribió. Se encontró el 2026-08-17 revisando el archivo entero contra el repo,
+buscando justamente pendientes que figuraran en los commits y no acá.
+
+**Qué pasó.** Cinco `SunmiTable` de clientes pasaban `className="text-xs"` y la
+pieza lo descartaba en silencio, porque no declaraba la prop. Tres en
+`app/modulos/clientes/[id]/page.jsx` —líneas 334, 447 y 785— y dos en
+`app/modulos/clientes/page.jsx` —1542 y 1888—. En `64bdb62` se sacaron las cinco:
+no movían nada, porque ya se ignoraban.
+
+**Por qué es una tanda de aspecto y no plomería.** Ahora `SunmiTable` SÍ acepta y
+negocia `className` (`0eed768`). Devolvérselas haría que se apliquen de verdad: las
+cinco tablas pasarían de 12 px a 10,5, en dos pantallas que Emanuel mira seguido.
+Eso es una decisión de cómo se ve, no de código, y por eso quedó separada del
+commit de plomería.
+
+**Lo que hay que decidir:** si esas cinco tablas van en 10,5 px o se quedan en 12.
+Si van, el cambio es devolver el `className` a las cinco líneas. Si no van, esta
+entrada se cierra y no se toca nada.
+
+## ⚑ LOS 21 CANDADOS QUE SE SALTEAN POR FALTA DE FIXTURE
+
+**Anotado el 2026-08-17.** Es la tercera forma de candado que no se ejecuta, y las
+otras dos ya están cerradas: el archivo corre, pero adentro saltea.
+
+Son 21, todos del mismo módulo y bien declarados —cada uno dice por qué—:
+
+- **13** se saltean sin `ARCOR_FIXTURE`: el Excel real del proveedor no está en el
+  repositorio.
+- **8** se saltean sin `ARCOR_FIXTURE_B`: la exportación con códigos de barras,
+  ídem.
+
+**No es un defecto y por eso no se arregló**: un Excel de proveedor no va en el
+repo. Queda anotado por dos motivos. El primero, que 21 candados que afirman sobre
+el parser de listas —917 productos, 77 categorías, 887 códigos numéricos— **no
+corren en ninguna máquina que no tenga esos archivos**, así que un cambio al parser
+puede pasar la suite entera sin haber sido probado contra un papel real.
+
+El segundo, que el número no está vigilado por nada: si mañana son 40, nadie se
+entera. **Lo que haría falta es decidir dónde viven esos dos archivos** —una
+carpeta fuera del repo con la ruta en el `.env`, o un fixture recortado y anónimo
+que sí se pueda commitear— y que la suite diga en voz alta cuántos salteó.
+
+## ⚑ SIETE CANDADOS DEL CONTRATO VIEJO — ver más arriba
+
+El `todo` de `lib/proveedores/listas/panelDecision.test.mjs:139`. Está descrito en
+la sección "SIETE CANDADOS DEL CONTRATO VIEJO POR REESCRIBIR", unas líneas más
+arriba; se nombra también acá porque en el relevamiento del 2026-08-17 figuraba
+como pendiente sin anotar y conviene que aparezca buscando por "contrato viejo".
