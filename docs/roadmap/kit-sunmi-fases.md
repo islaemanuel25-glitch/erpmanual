@@ -4938,3 +4938,55 @@ El `todo` de `lib/proveedores/listas/panelDecision.test.mjs:139`. Está descrito
 la sección "SIETE CANDADOS DEL CONTRATO VIEJO POR REESCRIBIR", unas líneas más
 arriba; se nombra también acá porque en el relevamiento del 2026-08-17 figuraba
 como pendiente sin anotar y conviene que aparezca buscando por "contrato viejo".
+
+## ⚑ LOS CINCO TOKENS HUÉRFANOS SIN DEFINIR — MEDIDOS, no arreglados
+
+**Medido el 2026-08-17 en el navegador, sobre las pantallas reales.** No se tocó
+nada: la pregunta era qué se está viendo hoy en lugar de lo que alguien escribió.
+
+**EL CONTROL, que es lo que hace que los números valgan.** Cada medición se hace
+contra un GEMELO que usa `--pos-accent` —un token que sí existe— para poder
+separar "se aplicó" de "heredó". El primer intento usó `--app-fg` de gemelo y **no
+distinguía**: ese token vale lo mismo que el color de texto heredado, así que el
+gemelo daba igual que un elemento sin declarar nada. Esas dos mediciones se
+tiraron y se rehicieron.
+
+**Y una corrección al relevamiento anterior: sólo TRES van sin respaldo, no cinco.**
+Se había leído el `var(` sin mirar lo que venía después de la coma.
+
+### Lo que se ve hoy, uno por uno
+
+- **`--accent`** — `bg-[var(--accent)]` en `auditoria-pos-ventas/balances:220`.
+  Da `rgba(0,0,0,0)`: **idéntico a no declarar nada**. Es un NO-OP, y **es el
+  único de los cinco con daño visible**: marca el estado SELECCIONADO de un botón,
+  así que ese botón queda con `text-white` sobre el fondo heredado y sin ningún
+  resalte. Quien lo escribió esperaba un fondo de acento.
+- **`--border`** — `border-[var(--border)]` en `auditoria-pos-ventas/cajas:95`.
+  **NO es un no-op**: da `rgb(226,232,240)` contra `rgb(229,231,235)` sin declarar.
+  Al quedar inválida, la propiedad cae a `currentColor`, o sea al color del texto.
+  El borde se ve, pero es del color de la letra en vez del borde del tema.
+- **`--foreground`** — color de texto en `auditoria-pos-ventas/turnos:372`. Da
+  `rgb(226,232,240)`, **idéntico a no declarar**. NO-OP, y hoy sin daño: hereda
+  justo el color que el token pretendía. Eso depende del tema, así que es suerte y
+  no diseño.
+- **`--pos-bg-soft`** — `BitacoraAuditoria.jsx:216`. **Tiene respaldo** y resuelve
+  a `rgba(127,127,127,0.12)`, que es lo escrito. Anda; lo que falta es que algún
+  tema lo pueda cambiar.
+- **`--sunmi-warning`** — `ModalAperturaTurno.jsx:133`. **Tiene respaldo** y
+  resuelve al ámbar al 12 % adentro del `color-mix`. Ídem.
+
+### El saldo
+
+**De los cinco, uno solo pinta mal algo que se ve**: `--accent`, el resalte del
+botón seleccionado en balances. Dos son no-ops sin consecuencia visible hoy
+—`--foreground` por suerte, `--border` con el color equivocado pero visible— y dos
+funcionan por su respaldo.
+
+Que el daño sea chico no los vuelve inofensivos: **los cinco son declaraciones que
+alguien escribió creyendo que hacían algo.** El que las escribió no tiene forma de
+enterarse, porque no hay error ni pantalla rota. De eso se ocupa ahora
+`lib/sunmi/tokensDefinidos.test.mjs`.
+
+**Todas las mediciones son del tema por defecto** —el oscuro, con `--app-fg`
+`#e2e8f0`—. El no-op de `--accent` no depende del tema; el de `--foreground` sí, y
+en un tema claro podría dejar de ser inofensivo. Falta medirlo en los catorce.
