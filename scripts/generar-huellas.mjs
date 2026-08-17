@@ -12,10 +12,33 @@
 //
 // Uso:
 //   node scripts/generar-huellas.mjs --salida /tmp/despues \
-//     --usuario admin@admin.com --clave <clave> [--tanda 1] [--base http://localhost:3111]
+//     --usuario admin@admin.com --clave <clave> --tema sunmiDark \
+//     [--tanda 1] [--base http://localhost:3111]
 //
-// Sin --tanda captura las 16 pantallas de una. Con --tanda N captura el bloque
+// Sin --tanda captura las pantallas de una. Con --tanda N captura el bloque
 // N de 5 (1..4) y acumula sobre el huellas.json que ya exista en --salida.
+//
+// ── TRES COSAS QUE ESTE GENERADOR NO HACÍA Y AHORA SÍ ──────────────────────
+//
+// Salieron de comparar la línea de base del 2026-08-07 contra una corrida de
+// hoy: dieron CERO pantallas idénticas de 16, y la mayor parte de las
+// diferencias no eran del código.
+//
+// 1. **EL TEMA ES OBLIGATORIO.** Antes no se fijaba: salía de lo que tuviera el
+//    perfil de Edge, que además se reusa entre corridas. La línea de base
+//    quedó tomada con `sunmiGraphite` —su `--table-header-bg` es `#161b22`, o
+//    sea el `rgb(22, 27, 34)` que aparece en las 16 huellas— y cualquier corrida
+//    posterior con otro tema informa 16 diferencias que no son de nadie.
+//
+// 2. **UNA TABLA VACÍA YA NO SE GUARDA: SE PONE ROJA.** Antes esperaba a que la
+//    tabla se asentara —eso ya estaba bien— pero si igual quedaba vacía,
+//    escribía la huella lo mismo. Una huella del estado vacío convierte "acá no
+//    hay nada" en la referencia, y después una pantalla que empieza a mostrar
+//    datos aparece como regresión. Ya pasó: cinco de las 16 hubo que
+//    recapturarlas.
+//
+// 3. **CADA HUELLA SE SACA DOS VECES** y tienen que dar idénticas. Una sola
+//    lectura no distingue una pantalla asentada de una que todavía se mueve.
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -37,8 +60,25 @@ const PUERTO_CDP = Number(arg("puerto-cdp", "9223"));
 const EDGE =
   arg("edge") || "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
 
-if (!SALIDA || !USUARIO || !CLAVE) {
-  console.error("Faltan --salida, --usuario o --clave.");
+/**
+ * EL TEMA, OBLIGATORIO Y SIN DEFAULT.
+ *
+ * Sin default a propósito: un default lo volvería a hacer invisible, y el
+ * problema no era el valor sino que nadie sabía cuál se estaba usando. Que haya
+ * que escribirlo obliga a anotarlo en el README de la línea de base, que es
+ * donde hace falta.
+ */
+const TEMA = arg("tema");
+
+if (!SALIDA || !USUARIO || !CLAVE || !TEMA) {
+  console.error("Faltan --salida, --usuario, --clave o --tema.");
+  console.error("");
+  console.error("`--tema` es obligatorio: sin él, el tema sale del perfil de Edge que se");
+  console.error("reusa entre corridas, y dos corridas con temas distintos informan");
+  console.error("diferencias en TODAS las pantallas que no son del código. La línea de base");
+  console.error("del 2026-08-07 quedó tomada con `sunmiGraphite` sin que nadie lo eligiera.");
+  console.error("");
+  console.error("Ejemplo: --tema sunmiDark");
   process.exit(1);
 }
 
@@ -49,7 +89,14 @@ const PANTALLAS = [
   { nombre: "01-categorias", url: "/modulos/categorias" },
   { nombre: "02-clientes", url: "/modulos/clientes" },
   { nombre: "04-clientes-analytics", url: "/modulos/clientes/analytics" },
-  { nombre: "05-compras-proveedor-detalle", url: "/modulos/compras-proveedor/216" },
+  // EL PEDIDO VA POR ARGUMENTO, como la importación y la fecha de turnos. El 216
+  // estaba escrito adentro y es de `erpazul_al`: con otra base da 404, la
+  // pantalla queda sin tabla y —antes de esta tanda— la huella se guardaba vacía
+  // igual. Ahora eso se pone rojo, pero el id igual tiene que poder pasarse.
+  //
+  // Tiene que ser un pedido CON LÍNEAS y que NO esté en BORRADOR: los borradores
+  // redirigen a `/nueva?pedidoId=…` y ahí no hay tabla que medir.
+  { nombre: "05-compras-proveedor-detalle", url: `/modulos/compras-proveedor/${arg("pedido", "216")}` },
   { nombre: "06-compras-proveedor-ganancia", url: "/modulos/compras-proveedor/ganancia" },
   { nombre: "07-listas-precios", url: "/modulos/configuracion/listas-precios" },
   { nombre: "08-locales", url: "/modulos/locales" },
@@ -99,7 +146,7 @@ const PANTALLAS = [
   // Se busca "Mogul" a propósito: son las filas con stock NEGATIVO grande del
   // depósito (-551,5 con pack 185 y -344,62 con pack 70), que es donde se ven
   // los dos defectos del desglose. En la vista por defecto quedan enterradas.
-  { nombre: "24-stock-locales", url: "/modulos/stock_locales", buscar: "Mogul" },
+  { nombre: "24-stock-locales", url: "/modulos/stock_locales", buscar: arg("buscar-stock", "Mogul") },
 ];
 
 /**
@@ -211,6 +258,14 @@ async function conectar() {
   await send("Page.enable");
   await send("Runtime.enable");
   await send("Network.enable");
+
+  // EL TEMA SE ESCRIBE EN CADA DOCUMENTO NUEVO, no una sola vez. El login
+  // redirige, así que el segundo documento también tiene que nacer con el tema
+  // puesto; si se escribiera una vez sola, la primera pantalla saldría con el
+  // tema del perfil.
+  await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `try { window.localStorage.setItem("erp-sunmi-theme", ${JSON.stringify(TEMA)}); } catch (e) {}`,
+  });
   // El ancho del viewport determina el ancho de las tablas: dos corridas con
   // anchos distintos dan diferencias en anchoTabla que no son del código.
   await send("Emulation.setDeviceMetricsOverride", {
@@ -325,6 +380,58 @@ async function esperarTablaEstable(intentos = 80, intervalo = 300) {
   return ultimo;
 }
 
+/**
+ * LAS FILAS DE DATOS DE **CADA** TABLA DE LA PANTALLA.
+ *
+ * `esperarTablaEstable` mira `document.querySelector("tbody")`, o sea sólo la
+ * PRIMERA tabla. Alcanza para esperar, no para decidir si la huella sirve: en
+ * `04-clientes-analytics` hay dos tablas y la segunda puede estar vacía mientras
+ * la primera tiene filas.
+ *
+ * El relleno se reconoce POR LA FORMA —una celda sola con colspan— y no por el
+ * texto del cartel, que cambia en cada pantalla y con el primero que alguien
+ * agregue deja de matchear. Es el mismo criterio de `scripts/sonda-tabla.mjs`.
+ */
+const FILAS_POR_TABLA = `(() => {
+  const esRelleno = (tr) => {
+    const tds = tr.querySelectorAll(":scope > td");
+    return tds.length === 1 && Number(tds[0].getAttribute("colspan") || 1) > 1;
+  };
+  return JSON.stringify([...document.querySelectorAll("table")].map((t, i) => {
+    const trs = [...t.querySelectorAll(":scope > tbody > tr")];
+    const relleno = trs.filter(esRelleno);
+    return {
+      indice: i,
+      datos: trs.length - relleno.length,
+      relleno: relleno.length ? (relleno[0].innerText || "").trim().slice(0, 50) : null,
+    };
+  }));
+})()`;
+
+/**
+ * ¿Esta pantalla sirve para guardar una huella?
+ *
+ * Sirve si tiene al menos una tabla y **TODAS** tienen filas de datos. Una sola
+ * tabla vacía adentro de la huella sella el estado vacío: después, el día que esa
+ * tabla tenga datos, la comparación lo informa como diferencia y se lee como
+ * regresión.
+ *
+ * Lo que no se puede llenar queda AFUERA y declarado, nunca adentro y vacío.
+ */
+function huellaUtilizable(tablas) {
+  if (!tablas.length) return { ok: false, motivo: "no hay ninguna <table> en la pantalla" };
+  const vacias = tablas.filter((t) => t.datos < 1);
+  if (vacias.length) {
+    return {
+      ok: false,
+      motivo:
+        `tabla(s) ${vacias.map((t) => t.indice).join(", ")} sin filas de datos` +
+        vacias.map((t) => (t.relleno ? ` — dice "${t.relleno}"` : "")).join(""),
+    };
+  }
+  return { ok: true, motivo: null };
+}
+
 // El login, la vigencia de la cookie y el contexto viven en
 // `scripts/lib/sesionArnes.mjs`: los usa también `medir-desborde.mjs`, que antes
 // no sabía loguearse y por eso fotografiaba la pantalla de login.
@@ -372,7 +479,12 @@ try {
     ? JSON.parse(fs.readFileSync(archivo, "utf8"))
     : {};
 
-  log(`Tanda ${TANDA ?? "única"}: ${seleccion.length} pantallas → ${SALIDA}`);
+  // Las que no se pudieron guardar. Al final hacen salir con 1: una corrida con
+  // pantallas caídas no es una línea de base, y darla por buena es cómo se sella
+  // un estado vacío.
+  const fallidas = [];
+
+  log(`Tanda ${TANDA ?? "única"}: ${seleccion.length} pantallas → ${SALIDA}   (tema: ${TEMA})`);
   for (const p of seleccion) {
     await navegar(BASE + p.url);
 
@@ -462,7 +574,34 @@ try {
       await sleep(700);
     }
 
-    const huella = JSON.parse(await evaluar(EXTRAER));
+    // ── EL CORTE: NI VACÍA NI INESTABLE ──────────────────────────────────────
+    const tablasAhora = JSON.parse(await evaluar(FILAS_POR_TABLA));
+    const util = huellaUtilizable(tablasAhora);
+    if (!util.ok) {
+      log(`  ROJO ${p.nombre}: ${util.motivo}`);
+      log(`       NO se guarda la huella. Una huella vacía sella el estado vacío como referencia.`);
+      log(`       O se cargan los datos que esta pantalla necesita, o queda declarada afuera.`);
+      fallidas.push(`${p.nombre} — ${util.motivo}`);
+      continue;
+    }
+
+    // DOS LECTURAS QUE TIENEN QUE DAR IDÉNTICAS. Una sola no distingue una
+    // pantalla asentada de una que todavía se está acomodando; y esa diferencia
+    // no se ve después, porque queda congelada adentro de la línea de base.
+    const primera = await evaluar(EXTRAER);
+    await sleep(600);
+    const segunda = await evaluar(EXTRAER);
+    if (primera !== segunda) {
+      log(`  ROJO ${p.nombre}: dos lecturas seguidas dieron distinto — la pantalla no está quieta`);
+      log(`       NO se guarda. Una huella tomada a mitad de movimiento no se puede comparar.`);
+      fallidas.push(`${p.nombre} — dos lecturas seguidas dieron distinto`);
+      continue;
+    }
+
+    // El tema NO va adentro de la huella: cambiaría su forma y el comparador lo
+    // informaría como una diferencia más contra cualquier línea de base anterior.
+    // Va en `meta.json`, al lado.
+    const huella = JSON.parse(primera);
     huellas[p.nombre] = huella;
 
     // La captura se lleva LA TABLA, no lo primero que se ve al cargar.
@@ -509,7 +648,42 @@ try {
   }
 
   fs.writeFileSync(archivo, JSON.stringify(huellas, null, 1));
+
+  // Los metadatos de la corrida, al lado y no adentro de las huellas. Sin esto,
+  // dentro de un mes nadie sabe con qué tema ni contra qué datos se tomó — que es
+  // exactamente lo que pasó con la línea de base del 2026-08-07.
+  fs.writeFileSync(
+    path.join(SALIDA, "meta.json"),
+    JSON.stringify(
+      {
+        tema: TEMA,
+        base: BASE,
+        ancho: Number(arg("ancho", "1366")),
+        alto: Number(arg("alto", "900")),
+        identificadores: {
+          pedido: arg("pedido", "216"),
+          importacion: arg("importacion", "3"),
+          fechaTurnos: arg("fecha-turnos", "2026-08-06"),
+          buscarStock: arg("buscar-stock", "Mogul"),
+        },
+        pantallasGuardadas: Object.keys(huellas).length,
+        pantallasFallidas: fallidas,
+      },
+      null,
+      1
+    )
+  );
+
   log(`Listo. ${Object.keys(huellas).length} pantallas en ${archivo}`);
+  if (fallidas.length) {
+    log("");
+    log(`ROJO · ${fallidas.length} pantalla(s) NO se guardaron:`);
+    for (const f of fallidas) log(`  ${f}`);
+    log("");
+    log("Una corrida con pantallas caídas NO es una línea de base. O se cargan los datos");
+    log("que faltan, o esas pantallas quedan declaradas afuera en el README con su motivo.");
+    process.exitCode = 1;
+  }
 } catch (e) {
   console.error("Error:", e.message);
   process.exitCode = 1;
