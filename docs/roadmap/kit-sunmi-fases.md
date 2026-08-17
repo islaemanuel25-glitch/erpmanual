@@ -4506,3 +4506,56 @@ dos hex. Los comentarios largos de esa pantalla van con asteriscos por eso.
 Es la cuarta vez de la familia "un comentario cambiando el conteo". Arreglarlo de
 raíz —que `esComentario` entienda bloques de varias líneas— movería números de
 todo el repo y es su propia tanda.
+
+## ⚑ `TablaDetallePedido` NO SE DIBUJA NUNCA — tanda de borrado propia
+
+**Medido el 2026-08-17 y CONFIRMADO POR LAS TRES PREGUNTAS, con archivo y línea.**
+No se borró nada: va como tanda propia, no de paso.
+
+**1 · ¿La rama es inalcanzable?** Sí, y no hace falta el redirect para probarlo.
+`app/modulos/compras-proveedor/[id]/page.jsx:382` corta antes de renderizar:
+
+    if (pedido.estado === "BORRADOR") return null;
+
+y recién en la 385 define `const esBorrador = pedido.estado === "BORRADOR"`. O sea
+que **`esBorrador` es siempre `false` por construcción** en todo el JSX de abajo,
+y el `{esBorrador && <TablaDetallePedido …>}` de la 662 no puede ser verdadero
+nunca. El redirect de la 153-158 —`router.replace("/nueva?pedidoId=…")`, sin
+ninguna rama que lo saltee— es la segunda cerradura, no la única.
+
+Comprobado además navegando, que es lo que importa: con el pedido 19 (BORRADOR, 6
+líneas) la sonda informó que llegó a `/modulos/compras-proveedor/nueva?pedidoId=19`.
+
+**2 · ¿La importa alguien más?** No. `git grep` sobre el repo entero, trackeado y
+sin trackear, da un solo importador —`[id]/page.jsx:27`— más el propio archivo.
+Aparece también en dos candados que lo leen COMO TEXTO y no lo ejecutan:
+`lib/compras-proveedor/avisoCostoLinea.test.mjs:327` y
+`lib/compras-proveedor/retornoPedido.test.mjs:361`. **Esos dos hay que releerlos
+antes de borrar nada**: un candado que busca un patrón en un archivo sigue pasando
+cuando el archivo se va, sin afirmar nada y sin quejarse.
+
+**3 · ¿Se llega por otra ruta?** No. Los hermanos de `compras-proveedor` son
+`activos`, `ganancia`, `historial`, `nueva`, `pendientes` y `recepcion`, todos
+segmentos estáticos, así que ninguno resuelve al `[id]` dinámico. Y el editor de
+borrador de verdad es `/nueva`, que no la importa.
+
+**Lo que hay que decidir, y es de aspecto, no de plomería:** o sobra la tabla, o
+sobra el redirect. Si sobra el redirect, el borrador vuelve a editarse en DOS
+pantallas distintas — que es lo que ese redirect vino a terminar—.
+
+### Y las otras tres tablas con `tdClassName`, que tampoco se podían medir
+
+Son cuatro en todo el repo —`git grep -l "tdClassName"` sobre `app/` y
+`components/`— y al buscar con cuál verificar el commit 2 salieron las cuatro
+trabadas, cada una por su motivo:
+
+- `EditorVentaCorreccion` — **destrabada, y así se midió el commit 2.** De las 54
+  ventas con más de una línea que había en la base, **las 54 tenían el turno
+  original cerrado**, así que la pantalla dibujaba el panel de bloqueo. No se
+  fabricó ninguna fila: se abrió un turno desde el POS y se cargó una venta de dos
+  líneas con acciones reales de la aplicación. Quedó la venta 113, ticket #87.
+- `TablaCatalogo` — sin ninguna importación en `erpazul_dev`:
+  `/api/proveedores/listas/<id>` da 404 para los ids 1 a 6. La abierta que menciona
+  el skill `/capturas` es de `erpazul_al`, que está 7 migraciones atrasada.
+- `ListaConciliacion` — vive en la pantalla del pedido y necesita comprobantes; el
+  pedido 42 dice "Todavía no hay comprobantes".
