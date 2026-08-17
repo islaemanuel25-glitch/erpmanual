@@ -4395,3 +4395,59 @@ nombrándolo si no hay ninguno. El `--abrir-primero` que ya estaba busca
 
 Rehecha con el arnés arreglado, la comparación de la recepción contra el commit
 anterior a `SunmiPar` da **idéntico byte a byte** a 360 y a 1366.
+
+## ⚑ LOS RÓTULOS DE 10px NO SE LEEN — tanda propia, anotada el 2026-08-17
+
+**PENDIENTE, con el número puesto.** Salió midiendo el recuadro de caja del
+detalle de turno, y **no** es un problema de esa pantalla: es del gris.
+
+`text-gray-400` es `#9ca3af`. Sobre blanco da **2,54:1**, y el mínimo de WCAG
+para texto chico es 4,5:1. Medido sobre los elementos reales en los catorce
+temas: **falla en 10 de 14**. Los cuatro donde pasa son temas oscuros, y pasaba
+por accidente — el fondo era oscuro porque el recuadro leía un token, que es
+justamente el defecto que se arregló. Con el recuadro ya en gris fijo, el rótulo
+da **2,31:1 en los catorce**, o sea que ahora falla parejo.
+
+Eso último importa y no hay que taparlo: **arreglar el fondo empeoró el rótulo en
+cuatro temas**, de 5,33–6,81 a 2,31. Es real, y es el precio de que el valor
+—que es lo que no se leía— pasara de 1,03 a 16,12. Los dos no se podían tener a
+la vez sin tocar el gris, y tocar el gris es esta tanda.
+
+### El alcance, que es lo que la hace una tanda y no un arreglo
+
+No se arregla en esta pantalla. Es un relevamiento de la familia de grises claros
+de texto en todo el repo. Enumerado con `git grep -o --untracked` sobre `*.jsx` y
+`*.js` —que recorre el repo entero, trackeado y no trackeado, y no un nivel de
+directorio—:
+
+- `text-gray-400` — **16 apariciones en 2 archivos**, y 14 de las 16 están en
+  `app/modulos/auditoria-pos-ventas/turnos/[id]/page.jsx`. Casi todo el uso de
+  esta clase vive en la pantalla que lo destapó.
+- `text-slate-400` — **24 apariciones en 11 archivos**.
+- `text-slate-300` — **6 en 4**.
+- El resto de la familia —`gray-300`, `zinc-400`, `neutral-400`, `stone-400`— en
+  **cero**.
+
+Total: **46 apariciones en unos 17 archivos**.
+
+### Por qué no es un reemplazo masivo
+
+Porque **el número depende del fondo, y el fondo depende del tema**. `slate-400`
+sobre un fondo oscuro se lee perfecto; el que falla es sobre blanco. Las 24 de
+`text-slate-400` están en pantallas que siguen al tema, así que ahí hay que medir
+caso por caso. Las 14 de esta pantalla son el caso fácil y seguro: la tarjeta es
+blanca fija, siempre, en los catorce temas — ahí `text-gray-500` (`#6b7280`,
+**4,83:1**) alcanza para pasar, y ya se usa en 7 lugares del repo.
+
+### Lo que el contador NO ve
+
+**El contador de colores fijos no cuenta ningún gris.** La lista de
+`scripts/check-theme-tokens.js` persigue `slate`, `red`, `amber`, `cyan`,
+`emerald`, `green` y `orange` — `gray` no está. Por eso el arreglo del recuadro
+dejó la línea de base clavada en 286 colores fijos, delta cero, sin necesidad de
+declarar ninguna excepción.
+
+Lo cual es cómodo hoy y es un agujero mañana: toda esta tanda —46 clases de gris
+que deciden si un número se lee o no— le resulta invisible al trinquete. Si al
+hacerla se decide que los grises también se cuentan, es un cambio de la lista y
+mueve la cifra, así que va con su propio candado.
