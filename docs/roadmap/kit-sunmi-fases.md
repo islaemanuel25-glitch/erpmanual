@@ -4104,6 +4104,43 @@ Y una tercera que no es de la sonda sino del método: **el backtick adentro de u
 comentario adentro de un template literal**, por quinta vez en el repo. Lo agarró
 `scripts/scriptsCompilan.test.mjs`, que existe justamente para eso.
 
+### ⚑ SACAR UN `!` DEL CÓDIGO NO SACA LA CLASE DEL BUNDLE — la mantiene viva un comentario
+
+**Medido el 2026-08-16, eligiendo el marcador del despliegue.** Vale para todo lo
+que queda de la campaña de los `!`, así que va acá y no en el informe de una
+tanda.
+
+Después de sacar los diez `!` del separador, **ningún componente escribe `!my-0`
+ni `!my-1`**. Y las dos reglas se siguen generando igual: `.\!my-0` y `.\!my-1`
+están en la hoja. El motivo es que **Tailwind escanea el contenido CRUDO de los
+archivos de `content`, y un comentario es contenido** — el JSDoc de
+`lib/sunmi/claseNegociada.js` las nombra al explicar por qué existían.
+
+Comprobado con tres corridas limpias de `npx tailwindcss`, no con el dev server,
+que además cachea:
+
+- repo entero → `.\!my-0`, `.\!my-1`, `.my-0`, `.my-1`, `.my-2`, `.my-3`,
+  `.my-4`, `.my-6`;
+- sacando `lib/` del `content` → **desaparecen las dos con `!`** y `.my-0` se
+  queda, o sea que el único que las sostiene es ese archivo;
+- un archivo suelto que escribe solo `!my-0` y `my-7` → genera `.\!my-0` y
+  `.my-7` y **no** `.my-0`, así que el extractor **no** deriva la pelada de la
+  que tiene `!`. Eso es lo que hace que `my-0` sirva como marcador.
+
+**Las tres consecuencias, que son distintas:**
+
+1. **Un marcador de desaparición sobre una clase con `!` da falso.** Antes de
+   usar uno: `git grep` de la clase sobre `app`, `components` y `lib` en `.js` y
+   `.jsx` — los `.md` y los `.test.mjs` no entran en `content`.
+2. **El peso del bundle no baja al sacar los `!`** mientras el comentario los
+   nombre. Es poquísimo y no justifica tocar el comentario, pero no hay que
+   informarlo como una baja que no ocurrió.
+3. **Es la misma familia que el archivo huérfano, al revés.** Con
+   `ModalCierreTurno` el repo tenía de más y el build de menos; acá el build
+   tiene de más. Las dos veces la causa es la misma: **el código del repo y lo
+   que llega al build no son la misma lista**, y ninguna de las dos se deduce
+   leyendo la otra.
+
 ### ⚑ NO SE PUEDE MEDIR "¿GANA SIN EL `!`?" INYECTANDO LA CLASE PELADA
 
 **Encontrado el 2026-08-16, midiendo `SunmiSeparator`. Invalida una vía que se
