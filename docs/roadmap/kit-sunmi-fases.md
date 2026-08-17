@@ -4884,6 +4884,100 @@ configurada".
 El comprobante de prueba que se usó para medir esto **se borró** desde la
 aplicación; `erpazul_dev` quedó como estaba.
 
+## ⚑ LA LÍNEA QUE FALTA EN `.env` — escrita acá para copiar y pegar
+
+**Anotado el 2026-08-17.** El almacén está configurado y probado, pero la variable
+se está pasando a mano en cada arranque porque la sesión que lo configuró tenía
+`.env` bloqueado para escritura. Mientras esa línea no esté, **cualquier arranque
+que se olvide de la variable deja el almacén sin configurar** y la subida de
+comprobantes no funciona — con el aviso en la consola, eso sí, no en silencio.
+
+Va en **`.env`**, en la raíz del repo. Es el único archivo de entorno que existe
+en esta máquina y está en `.gitignore` desde la línea 76, así que no se commitea.
+La línea es ésta, tal cual, en un renglón propio:
+
+    COMPROBANTES_VOLUMEN_PATH=C:/Users/emanuel/Desktop/programas/programas/erpazul-comprobantes-dev
+
+**Con barras normales, no invertidas.** El valor lo lee `almacenDisco.js:38` y se
+lo pasa a `node:path` y a `node:fs`, que en Windows aceptan las dos; las
+invertidas además serían escapes para quien lea el archivo. Sin comillas: no hay
+espacios en la ruta.
+
+**Esa carpeta ya existe y ya tiene su centinela `.volumen-comprobantes` adentro.**
+No hay que crear nada: la línea es lo único que falta. Para comprobar que quedó
+bien, al levantar el server tiene que aparecer
+
+    [comprobantes] almacén de imágenes verificado en C:/Users/…/erpazul-comprobantes-dev
+
+y **no** el aviso de "ALMACÉN DE IMÁGENES NO DISPONIBLE". Ese renglón sale de
+`instrumentation.js`, así que aparece solo, sin abrir ninguna pantalla.
+
+## ⚑ EL DETALLE DE COMPRAS QUEDA FUERA DE LA LÍNEA DE BASE — falta la referencia, no la pantalla
+
+**Anotado el 2026-08-17, después de medirlo.** `05-compras-proveedor-detalle` no
+entra a `tests/huellas/baseline/`, y conviene decir bien qué es lo que falta:
+**no falta la pantalla, falta la referencia.** La pantalla anda. Lo que no hay es
+un estado suyo que sirva para comparar mañana contra hoy.
+
+### La cadena entera, que son tres eslabones y hacen falta LOS TRES
+
+1. **Una foto de un comprobante real.** Una imagen cualquiera no sirve, y por qué
+   está abajo. La consigue Emanuel — no se fabrica un papel para que la captura
+   salga linda, que es la regla 4.
+2. **`GEMINI_API_KEY` configurada en desarrollo.** Hoy no está: el server avisa al
+   arrancar "sin clave de lectura configurada: no se verifica el modelo". Sin
+   clave el lector ni siquiera intenta — `gemini.js:105` devuelve `NO_CONFIGURADO`
+   antes de tocar la red. **Esto gasta plata y es una decisión de Emanuel**, no
+   algo que se resuelva leyendo el repo.
+3. **Que el lector ACIERTE.** Es el eslabón que no depende de nadie de este lado:
+   con la foto y la clave puestas, el modelo puede volver con las líneas o volver
+   con nada. Si vuelve con nada, la tabla queda vacía igual y la pantalla sigue
+   afuera.
+
+### Por qué los tres, y no alcanza con el primero
+
+La pantalla tiene **dos tablas y dependen de cosas distintas** —está medido más
+arriba, en la sección del almacén—: la de comprobantes dibuja su fila con sólo
+subir el archivo, y la de líneas **aparece recién al subir** y depende de la
+lectura.
+
+O sea que subir una imagen cualquiera **empeora la pantalla en vez de arreglarla**:
+antes había una tabla vacía, después hay una llena y una vacía. Y el generador
+—desde `59c0910`— se pone rojo antes que guardar una tabla sin filas, así que ese
+estado no entra ni por descuido.
+
+### Lo que cuesta dejarla afuera, para que la decisión sea con los ojos abiertos
+
+Mientras no esté, **un cambio del kit que mueva esa pantalla no lo ve nadie**.
+Es la única de las 19 con tabla que muestra el detalle de un comprobante, así que
+no hay otra huella que la cubra de rebote. Se revisa a ojo o no se revisa.
+
+## ⚑ LA SEGUNDA TABLA VACÍA AL SUBIR — cosa a mirar, no tarea
+
+**Anotado el 2026-08-17. NO SE TOCA AHORA.** Esto no es una tarea: es una
+observación que apareció midiendo otra cosa y que conviene no perder.
+
+**Qué se vio:** al subir un comprobante, la pantalla del detalle **gana una tabla
+que antes no estaba** —Producto, Pedido, Factura— y esa tabla dice *"Este
+comprobante no tiene líneas leídas"* hasta que el lector corre. O sea que entre la
+subida y la lectura hay una ventana en la que el usuario ve una tabla nueva y
+vacía, sin que nada esté roto.
+
+**Lo que importa: esto pasa IGUAL EN PRODUCCIÓN.** No es un artefacto de
+desarrollo ni una consecuencia de que falte la clave — el comprobante nace en
+`PENDIENTE_LECTURA` en `subir/route.js:219` en las dos partes, y la tabla se dibuja
+a partir de eso. En producción la ventana es más corta porque el lector corre,
+pero existe.
+
+**Y nadie la revisó nunca.** No hay captura de ese estado, no hay candado que lo
+afirme, y no está escrito en ninguna doc del módulo si el texto que se muestra es
+el que se quiere mostrar. Puede estar perfecto; lo que no hay es constancia de que
+alguien lo haya mirado a propósito.
+
+Cuando se lo mire, las preguntas son: si el estado intermedio se entiende sin
+explicación, cuánto dura de verdad en producción, y si conviene que la tabla
+aparezca antes de tener nada que mostrar o que aparezca recién con las líneas.
+
 ## ⚑ LOS ARCHIVOS DE PROVEEDOR VAN FUERA DEL REPO, APUNTADOS POR VARIABLE
 
 **Anotado el 2026-08-17. Es UNA decisión para DOS casos que hasta ahora se
