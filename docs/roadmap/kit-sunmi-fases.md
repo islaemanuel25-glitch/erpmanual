@@ -3620,6 +3620,55 @@ pantallas solo por existir. Pero cinco pantallas escribieron algo creyendo que
 hacía efecto, así que la decisión no es "está documentado y listo": o el
 componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco.
 
+## ⚑ EL COMANDO DE CONSULTA DEL TRINQUETE SELLABA LA BASE — arreglado el 2026-08-17
+
+**No es una deuda: es el trinquete pudiendo aflojarse solo.** Va arriba de todo
+porque afecta al mecanismo con el que se mide toda esta fase.
+
+`node scripts/hardcodeo.mjs --linea-base` **escribía** el archivo. Era el comando
+con nombre de sustantivo, el que uno tipea para MIRAR los siete contadores, y de
+paso sellaba la base en lo que hubiera en ese momento.
+
+Se corrió así, distraídamente, cerrando el despliegue de `00fcaf0`: hacía falta
+leer los números para un informe. Los siete estaban idénticos, así que lo único
+que se movió fueron la fecha y el commit del encabezado, y se revirtió en el acto.
+
+**Pero el daño posible no es el que ocurrió.** Si alguno de los siete hubiera
+subido, ese mismo comando lo habría fijado como base nueva sin que nadie lo
+decidiera, y a partir de ahí el trinquete habría contestado "sin cambios" para
+siempre sobre un terreno recién perdido. Y no queda rastro: el archivo sellado de
+más se ve exactamente igual de bien formado que uno sellado a propósito.
+
+**Un trinquete cuyo comando de consulta sella la base deja de ser un trinquete el
+día que alguien lo corre distraído.** Es la misma forma que el `.env.bak` que
+llenaba el árbol del VPS y dejaba el `git status --porcelain` siempre con ruido:
+nadie apaga el control a propósito, se apaga solo por el camino de uso normal.
+
+**El arreglo.** Ahora son dos cosas: `--linea-base` MIRA —imprime lo del archivo
+y lo del escaneo de hoy en dos columnas, con el delta— y `--linea-base --sellar`
+ESCRIBE. **El nombre viejo quedó siendo el seguro a propósito**, porque es el que
+invocan la memoria muscular, el mensaje del trinquete y el del hook; para lo otro
+hay que escribir una palabra que antes no existía, y queda en el historial de la
+terminal.
+
+**El candado es `scripts/hardcodeoNoSella.test.mjs`, y ejerce el caso que
+importa**, que no es el que pasó: deja la línea de base con los números POR
+DEBAJO de los de hoy —o sea en estado "subió", que es cuando un sellado
+accidental hace daño— y comprueba que el modo de consulta la deje byte a byte
+igual. Con sus dos mitades: que con `--sellar` sí escriba —si no, "no escribe" no
+se distingue de un script roto— y que el modo de consulta ADEMÁS informe la
+subida, porque no escribir también lo hace un script que no mira nada.
+
+Contraprueba corrida: devolviéndole al script el comportamiento viejo, el candado
+se pone rojo nombrando el defecto; restaurado, los seis casos en verde.
+
+Dos cosas que aparecieron escribiéndolo y no leyéndolo. **El script se ejecutaba
+al importarlo**, así que el candado se mataba solo al cargar la función que venía
+a probar — ahora tiene guardia de ejecución directa. Y la ruta de la línea de
+base se puede sobreescribir con `HARDCODEO_LINEA_BASE`, que es la costura que
+permite ejercer todo esto sin ensuciar el archivo real: un test que rompe el repo
+cuando falla es peor que el defecto que cuida.
+
 ## Deuda anotada de esta fase
 
 - **EL CONTADOR DECIDE "ya usa la pieza" CON UN MATCH DE TEXTO, comentarios
@@ -3742,18 +3791,55 @@ componente los acepta y esas cinco cambian a propósito, o se sacan de las cinco
 **Quedan cinco, y el costo es CUÁNTAS PANTALLAS HAY QUE MIRAR, no cuántos usos
 tiene:**
 
-| pieza | usos | pasan className | archivos |
-|---|---|---|---|
-| `SunmiPanel` | 29 | **29** | **8** |
-| `SunmiTableRow` | 40 | 5 | 29 |
+| pieza | usos | pasan className | archivos | estado |
+|---|---|---|---|---|
+| `SunmiPanel` | 29 | **29** | **8** | HECHO 2026-08-15 |
+| `SunmiTableRow` | 40 | 5 | 29 | HECHO |
 | `SunmiSelectAdv` | 106 | 39 | 51 | HECHO 2026-08-15 |
-| `SunmiCard` | 231 | 147 | 114 |
-| `SunmiButton` | 494 | 248 | 150 |
+| `SunmiCard` | 231 | 147 | 114 | HECHO |
+| `SunmiButton` | 494 | 248 | 150 | **FALTA — es el único** |
 
 **El más barato es `SunmiPanel`**, y no por poco: ocho archivos contra
 veintinueve del siguiente, y **los 29 usos le pasan `className`**, así que cada
 pantalla que se abra ejerce la negociación en vez de solo comprobar que no se
-movió nada. **HECHO el 2026-08-15** — quedan cuatro.
+movió nada. **HECHO el 2026-08-15**, y fue el primero de los cinco.
+
+### DÓNDE ESTÁ LA FASE 4 — 2026-08-17: queda UNO
+
+**Cuatro de los cinco ya negocian. El único que falta es `SunmiButton`.**
+
+Y el kit entero va por nueve piezas negociando: `SunmiCard`, `SunmiInput`,
+`SunmiModalLayout`, `SunmiPanel`, `SunmiPar`, `SunmiSelectAdv`, `SunmiSeparator`,
+`SunmiTable` y `SunmiTableRow`. Siete por `lib/sunmi/claseNegociada.js` y tres por
+`lib/sunmi/claseAncho.js`; `SunmiModalLayout` usa las dos.
+
+**`SunmiSeparator` salió del grupo apartado y se hizo.** Lo había parado el
+segundo filtro eliminatorio —tiene `bg-slate-700` y `text-slate-400` adentro, o
+sea arrastra la decisión de paleta— y se migró igual el 2026-08-16, porque el eje
+que se negoció es el MARGEN VERTICAL y ese no toca ningún color. La decisión de
+paleta sigue pendiente y sigue siendo de Emanuel; lo que el caso muestra es que
+**el filtro es por EJE y no por pieza**: una pieza con colores fijos puede
+negociar un eje que no sea el color.
+
+#### CÓMO SE COMPROBÓ, Y POR QUÉ NO POR LAS MARCAS DE HECHO
+
+**Por los imports, uno por uno:** para cada `components/sunmi/*.jsx` enumerado con
+`git ls-files`, si importa `claseNegociada` o `claseAncho`. Una pieza que negocia
+no puede no importar una de las dos, así que la señal es positiva y no una
+ausencia.
+
+**No por las marcas de HECHO de esta misma tabla, y ese es el punto: estaban
+viejas para dos de los cuatro.** `SunmiTableRow` y `SunmiCard` figuraban sin
+marcar y ya negociaban. Leyendo la tabla, la fase parecía tener tres pendientes
+en vez de uno, y el más barato de esos tres habría sido trabajo ya hecho.
+
+Es la sexta vez en esta fase que una firma escrita dice una cosa y abrir los
+archivos dice otra —después de los cuatro rasgos que daban 12 grupos donde había
+23, del balde de superficie propia que necesitó cinco pasadas, de los seis
+modales descartados por el nombre y del conteo de "pasan className" que hubo que
+rehacer dos veces—. **La regla que sale de todas: una marca de estado escrita a
+mano es un recuerdo, no una medición.** Antes de planificar sobre ella, se
+verifica con algo que el código tenga que tener sí o sí.
 
 ### LA PREGUNTA DE `SunmiPanel` NO SE REPITE EN `SunmiTableRow`
 
