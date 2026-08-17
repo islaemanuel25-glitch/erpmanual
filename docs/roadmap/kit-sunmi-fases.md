@@ -4439,15 +4439,70 @@ caso por caso. Las 14 de esta pantalla son el caso fácil y seguro: la tarjeta e
 blanca fija, siempre, en los catorce temas — ahí `text-gray-500` (`#6b7280`,
 **4,83:1**) alcanza para pasar, y ya se usa en 7 lugares del repo.
 
-### Lo que el contador NO ve
+### Lo que el contador NO veía — CERRADO el 2026-08-17
 
-**El contador de colores fijos no cuenta ningún gris.** La lista de
-`scripts/check-theme-tokens.js` persigue `slate`, `red`, `amber`, `cyan`,
-`emerald`, `green` y `orange` — `gray` no está. Por eso el arreglo del recuadro
-dejó la línea de base clavada en 286 colores fijos, delta cero, sin necesidad de
-declarar ninguna excepción.
+**El contador de colores fijos no contaba ningún gris.** La lista de
+`scripts/check-theme-tokens.js` perseguía `slate`, `red`, `amber`, `cyan`,
+`emerald`, `green` y `orange` — `gray` no estaba. Por eso el arreglo del recuadro
+dejó la línea de base clavada en 286, delta cero, sin declarar excepciones.
 
-Lo cual es cómodo hoy y es un agujero mañana: toda esta tanda —46 clases de gris
-que deciden si un número se lee o no— le resulta invisible al trinquete. Si al
-hacerla se decide que los grises también se cuentan, es un cambio de la lista y
-mueve la cifra, así que va con su propio candado.
+Ya está cerrado: entraron los ocho patrones de gris —`text-`, `bg-`, `border-`,
+`ring-`, `divide-`, los dos `hover:` y `placeholder:text-`—.
+
+**Medido ANTES de agregarlos, que era la condición: sube +31, de 286 a 317.** En
+cinco archivos, y contrastado con un conteo independiente que no usa el contador
+del repo y da el mismo 31 con la misma distribución. No bloquea trabajo, así que
+no se congeló nada.
+
+Veintitrés de los 31 son del documento imprimible del turno y van declarados como
+excepción, uno por uno con su rol y su motivo, así que la cifra quedó **sellada en
+294**.
+
+### Los 8 grises que SÍ son deuda
+
+Los que quedaron contando, y son deuda de verdad porque viven en pantallas que
+siguen al tema:
+
+- `components/grupos/TablaDepositos.jsx` — 3. Un vacío en `bg-gray-50
+  text-gray-500`, un `thead` en `bg-gray-100 text-gray-700` y una celda en
+  `text-gray-800`.
+- `components/grupos/TablaLocales.jsx` — 3. Las mismas tres, es el archivo gemelo.
+  Los dos son candidatos a `SunmiTable`.
+- `components/pos-transferencias/nueva/FiltrosDeposito.jsx` — 1. Un botón en
+  `bg-gray-100` que además ya mezcla un token del POS en el borde.
+- `components/pos-transferencias/nueva/ResumenPreparados.jsx` — 1. Un `span` en
+  `text-gray-500`.
+
+### Cómo se declara una excepción ahora, y por qué cambió el mecanismo
+
+La whitelist era una lista de regex sobre la LÍNEA, sin archivo. Declarar
+`text-[10px] text-gray-600 uppercase` para los ocho rótulos del turno habría
+eximido esa combinación en los **300 archivos de interfaz**: una excepción de una
+pantalla perdonando el repo entero.
+
+Ahora conviven dos formas. La regex pelada sigue valiendo en cualquier archivo
+—las dos del kit que ya estaban—, y la nueva es un objeto con `archivo`, `linea`,
+`lineas` y `motivo`.
+
+**`lineas` es la parte que evita el perdón silencioso.** Es la cantidad de líneas
+que la excepción cubre hoy, medida, y
+`lib/hardcodeo/excepcionesDeclaradas.test.mjs` la comprueba contra el archivo
+real. Una excepción escrita para ocho rótulos que mañana cubre catorce dejó de ser
+una excepción declarada: se estiró sola. Sin ese conteo eso pasa sin que nadie se
+entere, que es la forma que tiene el perdón en bloque de entrar por la ventana.
+
+Y la regla de exención vive en UN solo lugar —`estaExento`, en
+`check-theme-tokens.js`— y se le pasa al contador. Los dos consumidores hacían su
+propio `w.test(linea)`; el que no se enterara del `archivo` aplicaría las
+excepciones en todo el repo. Falla cerrado: sin ruta, no exime.
+
+### Y una trampa del contador que conviene saber
+
+**Decide si una línea es comentario mirando su primer carácter:** `//`, `*` o
+nada. Un bloque JSX de varias líneas con prosa pelada NO es comentario para él, y
+la primera versión del comentario del turno le sumó +2 colores fijos por nombrar
+dos hex. Los comentarios largos de esa pantalla van con asteriscos por eso.
+
+Es la cuarta vez de la familia "un comentario cambiando el conteo". Arreglarlo de
+raíz —que `esComentario` entienda bloques de varias líneas— movería números de
+todo el repo y es su propia tanda.

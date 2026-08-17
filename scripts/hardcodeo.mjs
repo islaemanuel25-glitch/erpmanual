@@ -94,8 +94,12 @@ const LINEA_BASE = process.env.HARDCODEO_LINEA_BASE
 // Los patrones de color viven en check-theme-tokens.js. Es CommonJS, así que se
 // carga con createRequire; requerirlo no ejecuta el chequeo.
 const require_ = createRequire(import.meta.url);
-const { FORBIDDEN, WHITELIST } = require_(path.join(AQUI, "check-theme-tokens.js"));
-const OPCIONES = { patronesColor: FORBIDDEN, excepcionesColor: WHITELIST };
+const { FORBIDDEN, WHITELIST, estaExento } = require_(path.join(AQUI, "check-theme-tokens.js"));
+// `estaExento` se pasa en vez de dejar que el contador pruebe la whitelist a mano:
+// desde que las excepciones pueden estar scopeadas a un archivo, quien las evalúe
+// tiene que ver la RUTA. Una segunda copia de esa regla sin la ruta las aplicaría
+// en los 300 archivos de interfaz en vez de en la pantalla declarada.
+const OPCIONES = { patronesColor: FORBIDDEN, excepcionesColor: WHITELIST, exentaColor: estaExento };
 
 const git = (...args) =>
   execFileSync("git", args, { cwd: RAIZ, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
