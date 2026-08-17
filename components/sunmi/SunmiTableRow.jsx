@@ -29,12 +29,7 @@
 // Sin `tono` la fila produce exactamente las mismas clases que antes. Las
 // pantallas que ya existen no cambian ni un píxel.
 
-import {
-  declaraCursor,
-  declaraHover,
-  declaraSuperficie,
-  declaraTamanoDeLetra,
-} from "@/lib/sunmi/claseNegociada";
+import { claseDeFila } from "@/lib/sunmi/claseNegociada";
 
 // LA PIEZA NEGOCIA POR EJE EN VEZ DE CONCATENAR.
 //
@@ -49,7 +44,15 @@ import {
 //   cursor-pointer   cursor            — tres consumidores, con el mismo valor
 //   hover:bg-…       fondo del hover   — dos, con el mismo valor
 //   bg-… / sunmi-fila fondo            — nadie
-const TAMANO = "text-[12px]";
+//
+// ── LA EXPRESIÓN NO VIVE ACÁ, Y ESO ES EL ARREGLO ──────────────────────────
+//
+// Hasta hoy este archivo llamaba a `declaraTamanoDeLetra` directo y armaba la
+// cadena él mismo. Era el único de los cuatro lectores del predicado que no se
+// veía abriendo `claseNegociada.js`, así que quien fuera a cambiar el predicado
+// tenía a los otros tres a la vista y a éste no. La expresión se mudó entera a
+// `claseDeFila` y la pieza la invoca: un solo lugar, y el candado ejerce lo que
+// esto corre de verdad en vez de una copia a mano.
 
 export default function SunmiTableRow({
   children,
@@ -61,22 +64,6 @@ export default function SunmiTableRow({
   /** "ambiente" | "fuerte". Ambiente es lo de siempre. */
   intensidad = "ambiente",
 }) {
-  // CADA EJE CEDE POR SEPARADO si la pantalla lo declaró.
-  const fondoDelKit = tono
-    ? `sunmi-fila sunmi-fila-${tono} sunmi-fila-${intensidad}${selected ? " sunmi-fila-seleccionada" : ""}`
-    : selected
-      ? "bg-[var(--table-row-hover)]"
-      : "hover:bg-[var(--table-row-hover)]";
-
-  // El fondo del kit es de UN eje o del otro según el caso: con `tono` o
-  // `selected` pinta el fondo normal, y sin nada pinta solo el hover. Por eso se
-  // pregunta por el eje que corresponde y no siempre por el mismo.
-  const cedeFondo = tono || selected ? declaraSuperficie(className) : declaraHover(className);
-  const fondo = cedeFondo ? "" : fondoDelKit;
-
-  const tamano = declaraTamanoDeLetra(className) ? "" : TAMANO;
-  const cursor = onClick && !declaraCursor(className) ? "cursor-pointer" : "";
-
   return (
     <tr
       // MARCA INERTE PARA EL ARNÉS. No dibuja nada: deja recortar fila por fila
@@ -88,9 +75,7 @@ export default function SunmiTableRow({
       // recurso que `data-sunmi-panel` y `data-sunmi-modal="tarjeta"`.
       data-sunmi-row=""
       onClick={onClick}
-      className={`${tamano} ${cursor} ${fondo} ${className}`
-        .replace(/\s+/g, " ")
-        .trim()}
+      className={claseDeFila({ pedido: className, tono, intensidad, selected, onClick: !!onClick })}
     >
       {children}
     </tr>
