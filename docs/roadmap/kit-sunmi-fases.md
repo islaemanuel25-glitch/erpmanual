@@ -4519,6 +4519,58 @@ Es la cuarta vez de la familia "un comentario cambiando el conteo". Arreglarlo d
 raíz —que `esComentario` entienda bloques de varias líneas— movería números de
 todo el repo y es su propia tanda.
 
+## ⚑ LA REGLA DE NEGOCIO QUE DECIDIÓ TRES BORRADOS — dicha por Emanuel el 2026-08-17
+
+**Escrita acá porque explica tres tandas que, leídas en el diff, parecen limpieza
+de código y no lo son.** Sin ella, el próximo que las lea va a creer que se borró
+funcionalidad por descuido.
+
+### La regla
+
+**BORRADOR es "todavía se está armando". ENVIADO es "ya se armó".**
+
+Y lo que cambia después de enviar **no lo hace uno: lo hace el proveedor** — manda
+de menos porque no tiene, agrega lo que no se pidió, o cobra más caro de lo
+acordado. **Esa diferencia se compara contra la boleta al recibir**, que es
+exactamente a lo que vino el módulo de recepción por comprobante.
+
+### Qué se sigue de ahí, y por qué no es una preferencia de estilo
+
+Editar la línea de un pedido ENVIADO no es una comodidad que falte: **es un daño.**
+Haría coincidir lo que se pidió con lo que llegó, y así **la diferencia —que es el
+dato que la recepción existe para registrar— desaparece sin dejar rastro.** El
+pedido dejaría de ser el testimonio de lo que se acordó.
+
+Por eso las tres cosas que se borraron no se "desconectaron por ahora": **no van.**
+
+- **El editor de borrador dentro del detalle** —tabla, tarjetas de mobile, banner y
+  las funciones de editar y quitar una línea—. El borrador se edita en `/nueva`,
+  que es el editor único. Tener un segundo editor acá era, además, lo que el
+  redirect a `/nueva` vino a terminar.
+- **El contador "N líneas tienen un costo distinto del catálogo"** en el detalle.
+  Compara **lo pedido contra el catálogo**, que es la pregunta de cuando se arma el
+  pedido, no la de cuando llega la mercadería. La comparación que sirve en el
+  detalle ya existe y es otra: la de la conciliación, que cruza **la factura**
+  contra lo pedido y contra el costo maestro.
+
+### El dato que la respalda, medido y no argumentado
+
+**Ninguno de los 13 pedidos ENVIADO de `erpazul_dev` mostraba ese contador.** Se
+probaron los 13 uno por uno —#9, #11, #12, #24, #25, #26, #27, #28, #29, #30, #31,
+#34 y #42— buscando el elemento `[data-contador-avisos]` en el DOM: en los 13 el
+selector no encontró nada.
+
+No es casualidad y tiene explicación: **compras a proveedor reescribe el costo
+maestro al crear o editar una línea.** Pedido y catálogo quedan sincronizados por
+construcción, así que la comparación da igual casi siempre y el aviso no se
+enciende. Un contador que compara dos números que el propio módulo mantiene
+iguales no es un aviso: es adorno.
+
+**Y ese cero también dice qué NO prueban las capturas de esa tanda:** como el
+contador no se dibujaba en ninguno, sacarlo no mueve un píxel en esta base. La
+captura confirma que no se rompió nada alrededor; **no** confirma que el contador
+se viera y dejara de verse, porque no se veía.
+
 ## ✅ `TablaDetallePedido` — BORRADA el 2026-08-17
 
 **Hecha.** Se borró el componente (283 líneas), su import y su uso, más los cinco
@@ -4583,28 +4635,85 @@ que `editarItemAPI` y `eliminarDetalle` solo se invocan desde el bloque muerto. 
 sea que en un pedido enviado se suma un producto y después no hay forma de sacarlo
 desde esa pantalla.
 
-**2 · El contador de arriba cuenta líneas que no se pueden ir a mirar.** Dice "N
-líneas tienen un costo distinto del catálogo" —y ese contador SÍ está vivo, fuera
-del bloque muerto— pero el aviso por línea que decía cuáles vivía en la tabla
-borrada. Contar sin poder señalar es la mitad de un aviso.
+**2 · El contador de arriba cuenta líneas que no se pueden ir a mirar.** Decía "N
+líneas tienen un costo distinto del catálogo" pero el aviso por línea que señalaba
+cuáles vivía en la tabla borrada. **RESUELTO el mismo día, y no agregando el aviso
+sino sacando el contador** — ver la tanda de más abajo. La comparación estaba mal
+elegida, no incompleta.
 
 **3 · El lápiz de editar producto no existe en el detalle.** Solo se llega a editar
 un producto desde una compra por `/nueva`, que únicamente acepta borradores.
+**Queda así**, por la misma regla: en un pedido enviado no se corrige la ficha para
+que cierre — se registra lo que llegó contra la boleta.
 
-### ⚑ EL RESTO DEL BLOQUE MUERTO — tanda propia, NO se tocó
+### ✅ EL RESTO DEL BLOQUE MUERTO — BORRADO el 2026-08-17, en su tanda propia
 
-Adentro del mismo `{esBorrador && …}` quedan, igual de inalcanzables: las tarjetas
-de mobile, el banner azul "Estás editando un borrador", `editarItemAPI`,
-`eliminarDetalle`, el estado `deleting`, los imports de `SunmiSelectAdv` y
-`SunmiSelectOption`, y los de `permiteToggleUnidad` y `unidadDisplay`. Aparte, y
-sin relación con `esBorrador`, `tieneFiambre` se calcula y no se usa en ninguna
-parte.
+Se fue todo lo que colgaba de `esBorrador`: las tarjetas de mobile, el banner azul
+"Estás editando un borrador", `editarItemAPI`, `eliminarDetalle`, el estado
+`deleting`, y los imports de `SunmiSelectAdv`, `SunmiSelectOption`,
+`permiteToggleUnidad` y `unidadDisplay`.
 
-**Se dejaron a propósito.** Sacarlos es un borrado más grande que arrastra un
-banner visible y cinco identificadores más, y mezclarlo con éste habría hecho un
-commit que no se puede revertir de a partes. Lo que sí hay que decidir antes es lo
-de arriba: si quitar una línea desde el detalle tiene que volver, ese código NO se
-borra, se conecta.
+**Se borró, no se conectó**, por la regla de negocio de más arriba. La pregunta
+estaba abierta y la contestó Emanuel: lo que cambia después de enviar lo hace el
+proveedor y se captura contra la boleta.
+
+**El banner era lo único visible del bloque**, así que se comprobó aparte que no
+existiera en otro lado: el texto "Estás editando un borrador" aparecía en **un solo
+archivo del repo**, dentro del bloque inalcanzable. `/nueva` —que sí acepta
+borradores— no lo tiene ni tiene equivalente; avisa por otro camino, con el aviso
+de "este pedido no es un borrador" cuando no corresponde.
+
+**Los dos helpers NO se borraron del módulo**, solo dejaron de importarse acá: los
+usan `/nueva` y `CarritoPedido`, y sus candados unitarios los siguen ejerciendo.
+Igual con las rutas `editar-item` y `eliminar-item`, que quedan intactas y las usa
+`/nueva`.
+
+Verificación: **cero píxeles** en el pedido 42 —sobre la pantalla real, de 3440px
+de alto, con el control de ruido en cero antes— y **−12 en medidas mágicas**
+(1887→1875), los otros seis contadores quietos. **Baja por borrado, no progreso.**
+
+Lo que **no** se tocó, y queda dicho: los operandos `esBorrador` que sobreviven en
+código vivo —el `if` de `calcLineaDetalle`, el `(esRecepcion || esBorrador)` del
+panel de agregar, y el ternario del título de ese panel, que por eso nunca dice
+"Agregar productos al pedido"—. Son inocuos: evalúan siempre a lo mismo. Y
+`tieneFiambre`, que se calcula y no se usa en ninguna parte, sin relación con
+`esBorrador`.
+
+### ✅ EL CONTADOR CONTRA EL CATÁLOGO — SACADO DEL DETALLE el 2026-08-17
+
+Segunda tanda de la misma regla de negocio, y va aparte porque **borra una cosa
+distinta por un motivo distinto**: el bloque de arriba era código muerto; esto era
+código vivo, con la comparación equivocada.
+
+Se fue el contador "N líneas tienen un costo distinto del catálogo", su cálculo,
+y los imports de `TriangleAlert` y del módulo `avisoCostoLinea`.
+
+**No se movió NADA de `/nueva`.** Ahí el aviso es el que Emanuel usa mientras arma
+el pedido, y ahí la comparación contra el catálogo es la correcta. `CarritoPedido`
+quedó intacto —importa el módulo, calcula el contador y lo marca con
+`data-contador-avisos`—, y los dos candados que lo afirmaban se reescribieron para
+hablar de una pantalla en vez de dos. **Lo que afirman no cambió; cambió de cuántas
+pantallas se afirma.**
+
+**`contarLineasConAviso` y `textoContadorAvisos` NO se borraron.** Quedaron sin uso
+en el detalle pero siguen usadas en `/nueva`, así que el módulo se queda como está.
+
+**Y se agregó un candado que defiende la decisión**, que es lo que hace que esto no
+vuelva por descuido: afirma que el detalle NO importa el módulo ni dibuja el
+contador, y nombra la regla de negocio en su mensaje de error. Saca los comentarios
+antes de mirar —el propio archivo explica por qué se sacó el contador y lo nombra,
+así que un candado que busca texto crudo se ensucia con la prosa—. Contraprueba
+hecha: volviendo a poner el import, ROJO con el mensaje correcto; sacándolo, verde;
+y el archivo quedó idéntico al respaldo, así que la contraprueba no dejó rastro.
+
+**Verificación, y hay que leerla con cuidado:** cero píxeles en el pedido 42.
+**Ese cero NO prueba que el contador se viera y dejara de verse** — prueba que no
+se rompió nada alrededor. El contador **no se dibujaba en ninguno de los 13 pedidos
+enviados**, medido uno por uno, así que en esta base no había nada que desaparecer.
+Decirlo al revés sería vender como prueba lo que es una ausencia.
+
+Trinquete: **−1 en medidas mágicas** (1875→1874), el resto quieto. Baja por
+borrado.
 
 ## ⚑ (histórico) `TablaDetallePedido` NO SE DIBUJA NUNCA — la medición que la mandó a borrar
 

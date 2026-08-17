@@ -16,11 +16,9 @@ import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import { TriangleAlert } from "lucide-react";
-import {
-  contarLineasConAviso,
-  textoContadorAvisos,
-} from "@/lib/compras-proveedor/avisoCostoLinea";
+// Esta pantalla ya no importa `avisoCostoLinea`: el contador que lo usaba
+// comparaba lo pedido contra el catálogo, que es la pregunta de cuando se arma el
+// pedido y no la de cuando llega. El módulo sigue igual y lo usa `/nueva`.
 import SinPermisos from "@/components/auth/SinPermisos";
 import useAccionesEnvioPedido from "@/hooks/useAccionesEnvioPedido";
 // Sólo `subtotalLinea`: `permiteToggleUnidad` y `unidadDisplay` los usaba el
@@ -373,17 +371,25 @@ export default function DetallePedidoProveedorPage({ params }) {
     return subtotalLinea({ base, cantidad: cant, costo, kg });
   };
 
-  // Cuántas líneas tienen precio distinto del catálogo. Se cuenta con el módulo,
-  // no acá: si cada pantalla contara por su cuenta, el día que una cambie el
-  // umbral las dos mostrarían números distintos para el mismo pedido.
-  const lineasConAvisoCosto = contarLineasConAviso(
-    (pedido?.detalles || []).map((d) => ({
-      precioLinea: (esRecepcion || esBorrador) ? (costos[d.id] ?? d.precioCosto) : d.precioCosto,
-      unidad: unidadesEdit[d.id] || d.unidad,
-      costoCatalogo: d.producto?.base?.precio_costo,
-      base: d.producto?.base,
-    }))
-  );
+  // ── ACÁ SE CONTABA "N líneas tienen un costo distinto del catálogo" ────────
+  //
+  // SE SACÓ EL 2026-08-17 porque hacía la comparación de la pantalla equivocada.
+  // Cruzaba LO PEDIDO contra el catálogo, que es la pregunta de cuando se ARMA el
+  // pedido —y ahí sigue viva, en el contador de `/nueva`, que no se tocó—. En el
+  // detalle de un pedido ya enviado la pregunta es otra: qué trajo el proveedor,
+  // y eso se compara contra LA BOLETA. Esa comparación ya existe abajo, en la
+  // lista de conciliación.
+  //
+  // Y ADEMÁS NO SE ENCENDÍA NUNCA. Se probaron los 13 pedidos ENVIADO de
+  // `erpazul_dev` uno por uno buscando `[data-contador-avisos]` en el DOM: en los
+  // 13 el selector no encontró nada. Tiene explicación y no es casualidad —
+  // compras a proveedor reescribe el costo maestro al crear o editar una línea,
+  // así que pedido y catálogo quedan sincronizados por construcción y los dos
+  // números que se comparaban son casi siempre el mismo.
+  //
+  // `contarLineasConAviso` y `textoContadorAvisos` NO SE BORRARON: siguen en
+  // `lib/compras-proveedor/avisoCostoLinea` y los usa `/nueva`, que es donde el
+  // aviso sirve. Lo que se fue es este consumidor, no el módulo.
 
   // Total estimado/factura reactivo = suma de subtotales económicos.
   const computedTotalFactura = (pedido?.detalles || []).reduce(
@@ -584,17 +590,6 @@ export default function DetallePedidoProveedorPage({ params }) {
             <h3 className="text-[13px] font-semibold sunmi-text-strong">
               Detalle ({pedido.detalles?.length || 0} items)
             </h3>
-            {/* Arriba y no solo en la línea: en un pedido de 26 ítems, un aviso
-                que hay que ir a buscar bajando no sirve. */}
-            {lineasConAvisoCosto > 0 && (
-              <span
-                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] sunmi-text-warning ring-1 ring-inset sunmi-ring"
-                data-contador-avisos={lineasConAvisoCosto}
-              >
-                <TriangleAlert size={11} aria-hidden="true" />
-                {textoContadorAvisos(lineasConAvisoCosto)}
-              </span>
-            )}
           </div>
 
           {/* ── ACÁ VIVÍA EL EDITOR DE BORRADOR, Y SE BORRÓ ENTERO ──────────
