@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import ./scripts/test/registrar.mjs --test \"lib/**/*.test.mjs\" \"components/**/*.test.mjs\" \"scripts/**/*.test.mjs\"",
+    "test": "node scripts/test/correr.mjs",
     "check:theme": "node scripts/check-theme-tokens.js",
     "lint:undef": "eslint app components lib hooks --config eslint.undef.config.mjs --no-inline-config"
   },
