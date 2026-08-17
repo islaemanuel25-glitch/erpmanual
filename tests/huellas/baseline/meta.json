@@ -1,0 +1,19 @@
+{
+ "tema": "sunmiDark",
+ "base": "http://localhost:3111",
+ "ancho": 1366,
+ "alto": 900,
+ "identificadores": {
+  "pedido": "42",
+  "importacion": "3",
+  "fechaTurnos": "2026-08-17",
+  "buscarStock": "Mogul"
+ },
+ "pantallasGuardadas": 15,
+ "pantallasFallidas": [
+  "05-compras-proveedor-detalle — tabla(s) 0 sin filas de datos — dice \"Todavía no hay comprobantes\"",
+  "06-compras-proveedor-ganancia — tabla(s) 0 sin filas de datos — dice \"Sin compras en el período\"",
+  "22-listas-conciliacion — no hay ninguna <table> en la pantalla",
+  "23-listas-armado-dudoso — no hay ninguna <table> en la pantalla"
+ ]
+}
