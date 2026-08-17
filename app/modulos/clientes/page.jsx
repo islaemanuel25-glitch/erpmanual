@@ -1541,7 +1541,6 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
           // de la pieza en lugar del escrito a mano.
           <SunmiTable
             headers={["Fecha", "Ticket", "Total", "Local"]}
-            className="text-xs"
           >
               {ventas.map((venta) => (
                 <SunmiTableRow key={venta.id}>
@@ -1887,7 +1886,6 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
           // envoltorio que scrollea, con la misma cadena `flex-1 min-h-0`.
           <SunmiTable
             headers={["Fecha", "Tipo", "Nota", "Debe", "Haber"]}
-            className="text-xs"
           >
               {movimientos.map((m) => (
                 <SunmiTableRow key={m.id}>

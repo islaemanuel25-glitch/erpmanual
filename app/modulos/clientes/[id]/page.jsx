@@ -331,7 +331,7 @@ function TabVentas({ clienteId, localId }) {
         <div className="text-center py-8 sunmi-text-muted">Sin ventas registradas</div>
       ) : (
         <div className="overflow-x-auto mt-3">
-          <SunmiTable headers={["Fecha", "Ticket", "Total", "Local"]} className="text-xs">
+          <SunmiTable headers={["Fecha", "Ticket", "Total", "Local"]}>
             {ventas.map((venta) => (
               <SunmiTableRow key={venta.id}>
                 <td className="px-2 py-1.5 text-sm">{formatFecha(venta.fecha)}</td>
@@ -446,7 +446,6 @@ function TabPuntos({ clienteId, localId }) {
             <div className="overflow-x-auto mt-4">
               <SunmiTable
                 headers={["Fecha", "Tipo", "Dirección", "Puntos", "Nota"]}
-                className="text-xs"
               >
                 {movimientos.map((mov) => (
                   <SunmiTableRow key={mov.id}>
@@ -784,7 +783,6 @@ function TabCuentaCorriente({ cliente, localId }) {
         <div className="overflow-x-auto mt-4">
           <SunmiTable
             headers={["Fecha", "Tipo", "Monto", "Nota"]}
-            className="text-xs"
           >
             {movimientos.map((mov) => (
               <SunmiTableRow key={mov.id}>
