@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-18 09:55
+**Fecha:** 2026-08-18 10:47
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat(productos): la lista de tarjetas pagina, y todas las tarjetas miden lo mismo, fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra, feat(productos): la línea de equivalencia en la tarjeta — sin tocar la API
+- fix(productos): la tarjeta muestra el precio que se cobra, y el servicio no dice $0,00, feat(productos): la lista de tarjetas pagina, y todas las tarjetas miden lo mismo, fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra
 - Archivos: 3 modificados (3 total)
 
 
