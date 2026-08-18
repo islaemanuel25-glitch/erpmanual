@@ -509,9 +509,14 @@ try {
 
   // ── 10 · LOS MARCADORES DE CADA RENGLÓN ─────────────────────────────────
   //
-  // Los tres íconos no son adorno: identifican QUÉ ES cada renglón, y en una
-  // lista de veinticinco tarjetas iguales eso es lo que deja recorrerla sin
-  // leer. Se cuentan sobre la primera tarjeta, que tiene los tres bloques.
+  // Quedan DOS íconos, no tres. El del nombre se sacó con su número: era el
+  // mismo cubo para el 93,9 % del catálogo, así que no distinguía nada y se
+  // comía 24 px de ancho del nombre en cada tarjeta. Los dos que quedan sí
+  // marcan qué es cada renglón —la escala del precio y el código de barras—.
+  //
+  // Y SE AFIRMA QUE EL DEL NOMBRE NO ESTÁ, no solo que los otros dos sí: sin
+  // eso, alguien lo repone y nada se queja. Volver a ponerlo es una decisión que
+  // tiene que costar una medición nueva, no un descuido.
   const marcas = await evaluar(`(() => {
     const t = ${TARJETAS}[0];
     const cuerpo = t.firstElementChild;
@@ -520,7 +525,6 @@ try {
     );
     const pie = t.querySelector('.font-mono');
     return {
-      // El ícono del nombre: hermano del nodo del nombre, dentro del primer bloque.
       enElNombre: !!(cuerpo && cuerpo.firstElementChild && cuerpo.firstElementChild.querySelector('svg')),
       enLaEquivalencia: !!equivalencia,
       enElPie: !!(pie && pie.querySelector('svg')),
@@ -528,9 +532,14 @@ try {
     };
   })()`);
   afirmar(
-    marcas.enElNombre && marcas.enLaEquivalencia && marcas.enElPie,
-    "10a · los tres íconos están: producto, etiqueta y código de barras",
-    `nombre: ${marcas.enElNombre} · equivalencia: ${marcas.enLaEquivalencia} · pie: ${marcas.enElPie}`
+    marcas.enLaEquivalencia && marcas.enElPie,
+    "10a · están los dos íconos que marcan algo: etiqueta y código de barras",
+    `equivalencia: ${marcas.enLaEquivalencia} · pie: ${marcas.enElPie}`
+  );
+  afirmar(
+    !marcas.enElNombre,
+    "10a-bis · el nombre NO lleva ícono: era el mismo para el 93,9 % del catálogo",
+    "volvió el ícono del nombre, y se lleva 24 px de ancho en cada tarjeta"
   );
   afirmar(
     !/#\d/.test(marcas.textoDelPie),
