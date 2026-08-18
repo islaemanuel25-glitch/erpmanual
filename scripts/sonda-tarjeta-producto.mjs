@@ -49,6 +49,13 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { prepararSesion } from "./lib/sesionArnes.mjs";
+// Se importan LAS FUNCIONES DE VERDAD, no una copia de la regla. Si la sonda
+// reimplementara el redondeo o la equivalencia, estaría comparando la pantalla
+// contra una segunda versión escrita por la misma persona el mismo día: las dos
+// coincidirían siempre, incluso estando las dos mal.
+import { formatearMoneda, lineaDeEquivalencia } from "../lib/moneda.js";
+import { precioEnEscalaQueSeCobra } from "../lib/precios/redondeo.js";
+import { esProductoServicio } from "../lib/pos-ventas/servicios.js";
 
 const arg = (n, d = null) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -197,6 +204,32 @@ try {
     source: `window.__alertas = []; window.alert = (m) => { window.__alertas.push(String(m)); };`,
   });
 
+  // ── SE GUARDA LA RESPUESTA QUE LA PROPIA PANTALLA PIDIÓ ──────────────────
+  //
+  // Para poder afirmar que el número que se VE es el que corresponde al dato,
+  // hace falta el dato. Se toma interceptando el fetch del listado, así que es
+  // exactamente la respuesta que esta pantalla usó para dibujar — no otra
+  // consulta parecida armada desde acá, que podría traer otra página, otro
+  // orden u otra ubicación y comparar peras con manzanas.
+  await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `
+      window.__listado = null;
+      window.__urlListado = null;
+      const _fetch = window.fetch;
+      window.fetch = async (...args) => {
+        const r = await _fetch(...args);
+        try {
+          const u = String(args[0]?.url || args[0] || "");
+          if (u.includes("/api/productos/listar")) {
+            window.__urlListado = u;
+            r.clone().json().then((j) => { window.__listado = j; }).catch(() => {});
+          }
+        } catch (e) {}
+        return r;
+      };
+    `,
+  });
+
   await prepararSesion({
     navegar, evaluar, base: BASE, usuario: USUARIO, clave: CLAVE,
     log: (m) => console.log(m),
@@ -275,6 +308,170 @@ try {
     mejor >= MINIMO_ELEVACION,
     `5 · la tarjeta se distingue del fondo (${mejor} · mínimo ${MINIMO_ELEVACION})`,
     `outline ${hayOutline ? cOutline : "sin outline"}, borde ${cBorde}. Sin límite visible, N tarjetas se leen como un bloque.`
+  );
+
+  // ── 8 y 9 · LO QUE SE VE CONTRA LO QUE EL DATO DICE ─────────────────────
+  //
+  // Acá está la afirmación más fuerte de la sonda: para CADA tarjeta se toma la
+  // fila cruda que la pantalla recibió y se calcula, con las funciones de
+  // producción, qué tendría que decir. Después se compara contra lo que dice.
+  //
+  // Cubre los dos arreglos de esta tanda:
+  //   · un servicio de importe variable no puede mostrar un precio;
+  //   · el precio que se muestra es el que el POS COBRA —redondeado a 100 cuando
+  //     el producto lo tiene prendido—, no el que está guardado en la base.
+  //     Medido antes de arreglarlo: 1.130 productos mostraban un número y el
+  //     mostrador cobraba otro.
+  const listado = await evaluar(`window.__listado`);
+  if (!listado || !Array.isArray(listado.items)) {
+    morir("no pude capturar la respuesta del listado: sin el dato no se puede afirmar sobre el número");
+  }
+
+  // EL NOMBRE SE SACA DEL PRIMER HIJO DEL CONTENEDOR, que es el nodo del nombre
+  // y ningún otro. El primer intento usó `div > div` y traía un ENVOLTORIO con
+  // la tarjeta entera adentro, así que ningún nombre casaba con su fila, el
+  // bucle salteaba las veinticinco y esta afirmación no comparaba NADA — verde
+  // siempre, incluso con el redondeo sacado. Lo destapó la contraprueba, no
+  // leerla.
+  const enPantalla = await evaluar(`(() => {
+    return ${TARJETAS}.map((t) => {
+      const cuerpo = t.firstElementChild;
+      const nombre = cuerpo ? cuerpo.firstElementChild : null;
+      const fila = t.querySelector('.items-baseline');
+      const bloque = [...t.querySelectorAll('div')].find(
+        (d) => /Se vende|1 pack =|se carga al vender/i.test(d.textContent) && d.children.length === 0
+      );
+      return {
+        nombre: nombre ? nombre.textContent.trim() : "",
+        valor: fila ? fila.textContent.trim() : "",
+        equivalencia: bloque ? bloque.textContent.trim() : "",
+      };
+    });
+  })()`);
+
+  const porNombre = new Map(listado.items.map((it) => [String(it.nombre || "").trim(), it]));
+  const malPrecio = [];
+  const malServicio = [];
+  // SI LOS NOMBRES NO CASAN, ES ROJO Y NO UN SALTEO. Un `continue` silencioso
+  // acá convierte la afirmación en decoración: pasa en verde sin haber mirado
+  // una sola tarjeta, que es exactamente lo que estaba pasando.
+  const sinFila = enPantalla.filter((v) => !porNombre.has(v.nombre));
+  if (sinFila.length) {
+    morir(
+      `${sinFila.length} de ${enPantalla.length} tarjetas no casan con ninguna fila del listado ` +
+        `(primera: "${sinFila[0].nombre}"). Sin eso, la comparación de precios no mira nada.`
+    );
+  }
+
+  for (const vista of enPantalla) {
+    const fila = porNombre.get(vista.nombre);
+
+    if (esProductoServicio(fila)) {
+      // Un servicio no tiene precio: la columna es obligatoria y guarda cero.
+      if (/\$/.test(vista.valor)) malServicio.push(`${vista.nombre}: ${vista.valor}`);
+      continue;
+    }
+
+    const esperado = formatearMoneda(
+      precioEnEscalaQueSeCobra({
+        precio: fila.precioVenta,
+        factor: fila.factorPack,
+        unidad: fila.unidadMedida,
+        redondeo100: fila.redondeo100,
+      })
+    );
+    if (!vista.valor.includes(esperado)) {
+      malPrecio.push(`${vista.nombre}: se ve "${vista.valor}", corresponde ${esperado}`);
+    }
+
+    const eqEsperada = lineaDeEquivalencia({
+      precio: fila.precioVenta,
+      factor: fila.factorPack,
+      unidad: fila.unidadMedida,
+      redondeo100: fila.redondeo100,
+    });
+    if (vista.equivalencia && vista.equivalencia !== eqEsperada) {
+      malPrecio.push(`${vista.nombre}: equivalencia "${vista.equivalencia}", corresponde "${eqEsperada}"`);
+    }
+  }
+
+  // ── EL SERVICIO SE BUSCA, NO SE ESPERA QUE CAIGA EN LA PRIMERA PÁGINA ────
+  //
+  // Medido: en la base de desarrollo hay UN servicio de importe variable y su
+  // nombre empieza con Q, así que en las primeras 25 ordenadas por nombre no
+  // aparece nunca. Con la afirmación mirando solo lo visible, pasaba EN VERDE
+  // sin haber ejercido el caso — que es indistinguible de funcionar.
+  //
+  // Así que se lo busca: se pide el listado completo, se toma el primero que sea
+  // servicio y se navega con ese nombre en el filtro, que es el mismo camino que
+  // usa una persona. Si no hay ninguno en los datos, se dice y NO se da por
+  // buena la afirmación.
+  const urlListado = await evaluar(`window.__urlListado`);
+  let servicioProbado = null;
+  if (urlListado) {
+    // EL TAMAÑO DE PÁGINA NO PUEDE SER CUALQUIERA. La ruta solo acepta 25, 50 o
+    // 100 y **cae en silencio a 25** con cualquier otro valor: el primer intento
+    // pidió 1000, recibió 25, no encontró el servicio e informó "no hay ninguno"
+    // — una afirmación no ejercida disfrazada de dato. Se recorren páginas de
+    // 100, que es un valor que la ruta sí acepta.
+    const u = new URL(urlListado, BASE);
+    u.searchParams.set("pageSize", "100");
+    let servicio = null;
+    let pagina = 1;
+    let totalPaginas = 1;
+    do {
+      u.searchParams.set("page", String(pagina));
+      const tanda = await evaluar(
+        `fetch(${JSON.stringify(u.pathname)} + ${JSON.stringify(u.search)}, { credentials: "include" }).then(r => r.json())`,
+        true
+      );
+      totalPaginas = Number(tanda?.totalPages || 1);
+      servicio = (tanda?.items || []).find((it) => esProductoServicio(it)) || null;
+      pagina++;
+    } while (!servicio && pagina <= totalPaginas && pagina <= 40);
+    if (servicio) {
+      await send("Page.navigate", {
+        url: `${BASE}/modulos/productos?q=${encodeURIComponent(servicio.nombre)}`,
+      });
+      await sleep(6000);
+      servicioProbado = await evaluar(`(() => {
+        const t = ${TARJETAS};
+        if (!t.length) return { encontrada: false };
+        const fila = t[0].querySelector('.items-baseline');
+        return {
+          encontrada: true,
+          nombre: t[0].innerText.split("\\n")[0].trim(),
+          valor: fila ? fila.textContent.trim() : "",
+          texto: t[0].innerText.replace(/\\n/g, " · ").slice(0, 90),
+        };
+      })()`);
+      if (servicioProbado?.encontrada && /\$/.test(servicioProbado.valor)) {
+        malServicio.push(`${servicioProbado.nombre}: ${servicioProbado.valor}`);
+      }
+      // SE VUELVE A LA LISTA COMPLETA. Las afirmaciones que siguen —alturas,
+      // paginación, la capa— miden la lista de verdad, no una filtrada a una
+      // sola fila: sobre una tarjeta sola, "todas del mismo alto" es trivial.
+      await send("Page.navigate", { url: `${BASE}/modulos/productos` });
+      await sleep(6000);
+    }
+  }
+
+  if (!servicioProbado?.encontrada) {
+    // No se afirma en verde algo que no se pudo ejercer. Se dice, y se sigue: el
+    // resto de la sonda ya midió lo suyo.
+    console.log("  ----  8 · NO EJERCIDO: no hay ningún servicio de importe variable en estos datos");
+    console.log("        No es un pase. Fabricar uno probaría que el código dibuja algo, no que el caso ocurra.");
+  } else {
+    afirmar(
+      malServicio.length === 0,
+      `8 · un servicio de importe variable no muestra un precio (${servicioProbado.nombre})`,
+      `muestra precio: ${malServicio.slice(0, 3).join(" | ")}`
+    );
+  }
+  afirmar(
+    malPrecio.length === 0,
+    `9 · el precio que se ve es el que se cobra, en las ${enPantalla.length} tarjetas`,
+    `${malPrecio.length} diferencia(s). Primera: ${malPrecio[0] ?? ""}`
   );
 
   // ── 6 · TODAS DEL MISMO ALTO ────────────────────────────────────────────
