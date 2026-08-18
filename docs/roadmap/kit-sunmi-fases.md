@@ -5084,7 +5084,10 @@ volumen falte, así que un directorio vacío no distingue "volumen montado" de
 
 **Lo configurado en la máquina de desarrollo:**
 
-    C:/Users/emanuel/Desktop/programas/programas/erpazul-comprobantes-dev
+    <la-carpeta-de-programas>/erpazul-comprobantes-dev
+
+—al lado del repo, como hermana. La ruta va genérica a propósito: este
+repositorio es público y la absoluta decía el nombre de usuario del sistema.
 
 Fuera del árbol del repo a propósito. La variable se pasa al levantar el server:
 
@@ -5133,7 +5136,7 @@ Va en **`.env`**, en la raíz del repo. Es el único archivo de entorno que exis
 en esta máquina y está en `.gitignore` desde la línea 76, así que no se commitea.
 La línea es ésta, tal cual, en un renglón propio:
 
-    COMPROBANTES_VOLUMEN_PATH=C:/Users/emanuel/Desktop/programas/programas/erpazul-comprobantes-dev
+    COMPROBANTES_VOLUMEN_PATH=<la-carpeta-de-programas>/erpazul-comprobantes-dev
 
 **Con barras normales, no invertidas.** El valor lo lee `almacenDisco.js:38` y se
 lo pasa a `node:path` y a `node:fs`, que en Windows aceptan las dos; las
@@ -5434,6 +5437,62 @@ El `todo` de `lib/proveedores/listas/panelDecision.test.mjs:139`. Está descrito
 la sección "SIETE CANDADOS DEL CONTRATO VIEJO POR REESCRIBIR", unas líneas más
 arriba; se nombra también acá porque en el relevamiento del 2026-08-17 figuraba
 como pendiente sin anotar y conviene que aparezca buscando por "contrato viejo".
+
+## ⚑ RUTAS ABSOLUTAS DE LA MÁQUINA EN UN REPO PÚBLICO — corregido HACIA ADELANTE el 2026-08-18
+
+**Este repositorio es público, y había rutas que decían el nombre de usuario del
+sistema y la estructura de carpetas.** No son credenciales, pero son información
+de la máquina que no tiene por qué estar publicada.
+
+### LO QUE ESTA CORRECCIÓN **NO** RESUELVE, Y HAY QUE DECIRLO ASÍ
+
+**El historial de git las sigue teniendo.** Cualquiera puede leerlas en cualquier
+commit anterior. Sacarlas de ahí es otra cosa y es cara: reescribe el historial,
+invalida todos los hashes y obliga a que cualquier clon existente se rehaga. **No
+está hecho y no queda resuelto** — lo que se arregló es que de acá en adelante no
+se agreguen más.
+
+Si alguna vez se decide limpiar el historial, es una tanda propia con su ventana y
+su aviso, no un `git filter-repo` de paso.
+
+### El relevamiento, que salió más grande que el pedido
+
+Se pidió corregir CUATRO rutas. **Buscando el patrón completo aparecieron 347
+ocurrencias en 15 archivos.** La diferencia: la primera búsqueda usó `C:/Users`
+—barra normal— y la mayoría estaban escritas con `C:\Users`, barra invertida. Es
+el mismo error de método que este documento ya tiene anotado dos veces: **una
+lista de coincidencias no está cerrada hasta que se buscó el patrón entero.**
+
+### Lo corregido: 22 ocurrencias en 6 archivos
+
+Se tocó **lo que alguien va a ejecutar o seguir**:
+
+- `ops/backup/notebook-bajar-backup.ps1` — **es código que corre.** Se parametrizó
+  con `$env:USERPROFILE` y se comprobó que resuelve exactamente a la misma ruta,
+  así que la tarea programada sigue funcionando sin tocarle nada.
+- `scripts/medir-endpoint.mjs` — el perfil sale de `os.tmpdir()`.
+- `lib/combos/errores.test.mjs` — la ruta del mensaje de error de ejemplo, que da
+  igual de qué máquina venga: lo que ese candado ejerce es que el detalle técnico
+  NO se filtre al usuario.
+- `docs/RESTAURACION-BACKUP.md`, `.claude/skills/backup/SKILL.md`,
+  `ops/backup/README-tarea-windows.txt` — a `%USERPROFILE%`.
+
+**Y una que importa más que las otras:** el documento de restauración nombraba la
+ruta del archivo donde vive la **frase de cifrado de los backups**. El archivo
+nunca estuvo en el repo, pero decir dónde vive es más que una ruta.
+
+### Las 325 que NO se tocaron, y por qué
+
+- **233 en `scripts/reports/*.txt`** — cuatro volcados de una herramienta, de
+  noviembre de 2025. Son material generado: reescribirlos es maquillar un
+  registro. **Lo que corresponde decidir es si siguen en el repo**, no cambiarles
+  el texto.
+- **92 en auditorías y planes viejos** —`AUDITORIA_VISUAL_…`, `PLAN_CORRECCION_…`,
+  `PLAN_EJECUCION_…`, `CIERRE_FINAL_SELECTORES.md`—. Son documentos de tandas
+  cerradas: describen lo que se hizo en su momento, y editarlos es reescribir un
+  registro histórico.
+
+Las dos decisiones quedan abiertas y son de Emanuel.
 
 ## ⚑ UNIFICAR EL FORMATO DE MONEDA — MEDIDO EL 2026-08-18, **NO HECHO**
 

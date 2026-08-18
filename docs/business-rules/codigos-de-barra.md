@@ -16,6 +16,12 @@ balanza son 13 empezando con 2.
 
 De **2.559 productos**, **2.239 tienen algún código** cargado. De esos:
 
+> **Ese 2.559 es de cuando se hizo esta medición y no dice contra qué base.** El
+> 2026-08-18, `erpazul_dev` tiene **1.790**, contados con
+> `/api/productos/listar`. El número de acá no se corrigió porque el resto de la
+> medición —los 2.239, los 16, los 90— cuelga de él: cambiarlo suelto haría que
+> los otros cuatro dejaran de cerrar. Se remide entero o no se toca.
+
 - **16 pasan de 14 caracteres.**
 - **90 tienen algo que no es un dígito**: 88 con letras, 20 con espacios.
 - **93 en total** están fuera de norma por una cosa o la otra.

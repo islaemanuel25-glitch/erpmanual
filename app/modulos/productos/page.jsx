@@ -21,7 +21,7 @@ import ModalProducto from "@/components/productos/ModalProductoFinal";
 import ModalVerComposicion from "@/components/productos/ModalVerComposicion";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import SunmiProductoCard from "@/components/sunmi/SunmiProductoCard";
-import { formatearMoneda } from "@/lib/moneda";
+import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 // =========================================================
@@ -959,6 +959,11 @@ export default function ProductosPage() {
                     key={p.id ?? p.productoLocalId}
                     nombre={p.nombre}
                     empresa={p.proveedorNombre ?? null}
+                    equivalencia={lineaDeEquivalencia({
+                      precio: p.precioVenta,
+                      factor: p.factorPack,
+                      unidad: p.unidadMedida,
+                    })}
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
                     codigoInterno={p.id ?? p.productoLocalId ?? null}
                     abierta={tarjetaAbierta === (p.id ?? p.productoLocalId)}
