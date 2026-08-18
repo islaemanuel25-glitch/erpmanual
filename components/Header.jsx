@@ -137,8 +137,25 @@ export default function Header({ onOpenMobileMenu }) {
         {esAdmin && contexto && (
           <button
             onClick={() => router.push("/inicio")}
+            // ── SE VE TAMBIÉN EN ANGOSTO, Y NO ES COSMÉTICO ─────────────────
+            //
+            // Llevaba `hidden sm:flex`, así que desaparecía por debajo de 640 px:
+            // desde el celular no había forma de saber en qué ubicación estabas
+            // parado. Y eso importa porque **el precio depende de la ubicación**
+            // —la fila de `ProductoLocal` puede tener otro valor en cada local—,
+            // así que el catálogo mostraba un número sin decir de dónde salía.
+            //
+            // `min-w-0` y `truncate` son lo que hace que un nombre largo NO rompa
+            // la barra: sin ellos el botón crece con el texto y empuja a los
+            // vecinos hasta sacarlos. Con ellos se achica y recorta con puntos
+            // suspensivos, que es lo que ya hace el resto del encabezado.
+            // `max-w-36` es el TECHO, y hace falta: con solo `min-w-0` y
+            // `truncate` el botón crecía con el texto en vez de recortarlo —
+            // medido, un nombre de 63 letras lo llevaba a 450 px y sacaba trece
+            // elementos fuera de la barra—. El techo se suelta de `sm` para
+            // arriba, donde sobra lugar y recortar sería peor.
             className={`
-              hidden sm:flex items-center gap-1.5
+              flex items-center gap-1.5 min-w-0 max-w-36 sm:max-w-none
               text-[11px] px-2.5 py-1 rounded-lg
               border transition cursor-pointer
               ${theme.header.border}
@@ -146,11 +163,11 @@ export default function Header({ onOpenMobileMenu }) {
             `}
           >
             {contexto.esDeposito ? (
-              <Warehouse size={13} className="text-[color:var(--warning-fg)]" />
+              <Warehouse size={13} className="text-[color:var(--warning-fg)] shrink-0" />
             ) : (
-              <Store size={13} className="text-[color:var(--info-fg)]" />
+              <Store size={13} className="text-[color:var(--info-fg)] shrink-0" />
             )}
-            <span className={theme.header.text}>
+            <span className={`${theme.header.text} truncate`}>
               {contexto.esDeposito ? "Depósito: " : "Local: "}{contexto.nombre}
             </span>
           </button>
