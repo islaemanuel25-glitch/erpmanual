@@ -235,6 +235,39 @@ pasó los cinco valores con todo bien y aun así no desplegó la tanda.
   después y a un cambio de motor. Está medido cuál agarra qué: ver el roadmap del
   kit, sección "ESCRITOS LOS DOS, Y CON SU CONTRAPRUEBA".
 
+- **La sonda de la tarjeta de producto en verde**, si la tanda toca el catálogo,
+  la tarjeta o `SunmiPanel`:
+
+      node scripts/sonda-tarjeta-producto.mjs --base http://localhost:3111 \
+        --usuario admin@admin.com --clave <clave-de-desarrollo>
+
+  **Contra el servidor de DESARROLLO, nunca contra producción**: hace login y
+  toca la interfaz.
+
+  **Qué afirma, y por qué ninguna otra cosa lo cubre.** Abre
+  `/modulos/productos` a 390 px con datos reales y ejerce la secuencia —tocar,
+  leer la capa, tocar de nuevo, tocar Editar— afirmando en cada paso: que el
+  rótulo del precio no contradiga a la línea de equivalencia, que Editar entre
+  sin cartel de error, que la capa tenga exactamente los botones esperados, que
+  el segundo toque cierre, y que la tarjeta tenga un límite visible de 3,0 contra
+  el fondo.
+
+  **De dónde salió.** El 2026-08-18 la tarjeta llegó a producción con esos cinco
+  defectos, y ninguno de los controles existentes podía verlos: la suite son
+  funciones puras, el build compila JSX que después explota, el marcador de la
+  hoja de estilos prueba que las clases VIAJARON —no que la pantalla ande—, y el
+  andamio pasó porque tenía los textos escritos a mano y un botón sin manejador.
+  El peor fue un precio de bulto rotulado como unitario: falso en 1.293 de los
+  2.600 productos del catálogo, por 24 veces en el caso que lo destapó.
+
+  **Está verificada por contraprueba**: se reintrodujo cada uno de los cinco
+  defectos y la sonda se puso roja por el que correspondía, uno por uno y sin
+  arrastrar a los otros.
+
+  Mismo criterio que la de cascada: **si no puede medir, es ROJO Y FRENA.** Una
+  sesión que no entró, una pantalla que no cargó o una tarjeta que no apareció no
+  son "no se pudo comprobar".
+
 ## Paso 1 — Backup validado
 
 Antes de cualquier otra cosa, y no se saltea. El procedimiento de backup y sus
