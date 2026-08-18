@@ -277,6 +277,58 @@ try {
     `outline ${hayOutline ? cOutline : "sin outline"}, borde ${cBorde}. Sin límite visible, N tarjetas se leen como un bloque.`
   );
 
+  // ── 6 · TODAS DEL MISMO ALTO ────────────────────────────────────────────
+  //
+  // Una tarjeta sin equivalencia o sin código de barras perdía la fila entera y
+  // quedaba más baja que las vecinas; con veinticinco apiladas eso se lee como
+  // una lista rota. El arreglo NO fue dejar un hueco: la línea está siempre y
+  // dice lo que corresponde —un producto suelto se vende por unidad, y no tener
+  // código de barras es un dato—. Lo que queda parejo lo empareja la grilla.
+  const altos = await evaluar(`(() => {
+    const h = ${TARJETAS}.map((t) => Math.round(t.getBoundingClientRect().height * 10) / 10);
+    return { distintos: [...new Set(h)].sort((a, b) => a - b), cuantas: h.length };
+  })()`);
+  afirmar(
+    altos.distintos.length === 1,
+    `6 · las ${altos.cuantas} tarjetas tienen el mismo alto`,
+    `hay ${altos.distintos.length} altos distintos: ${altos.distintos.join(", ")} px`
+  );
+
+  // Y la mitad que explica POR QUÉ están parejas. Sin esto, alguien "arregla" el
+  // alto con un `min-h` fijo, la afirmación de arriba se pone verde, y las
+  // tarjetas vuelven a no decir en qué escala se vende ni si falta el código.
+  const filas = await evaluar(`(() => {
+    const t = ${TARJETAS};
+    return {
+      sinEquivalencia: t.filter((c) => !/Se vende|1 pack =/.test(c.innerText)).length,
+      sinPie: t.filter((c) => !c.querySelector('.font-mono')).length,
+    };
+  })()`);
+  afirmar(
+    filas.sinEquivalencia === 0 && filas.sinPie === 0,
+    "6b · ninguna tarjeta se quedó sin la línea de escala ni sin el pie de códigos",
+    `sin equivalencia: ${filas.sinEquivalencia} · sin pie: ${filas.sinPie}`
+  );
+
+  // ── 7 · LA LISTA TIENE PAGINACIÓN ───────────────────────────────────────
+  //
+  // La tabla la tenía y la lista de tarjetas no: mostraba los primeros 25 de
+  // 2.600 productos sin forma de llegar al 26. OJO: a este ancho el paginador de
+  // la TABLA sigue en el DOM, oculto por `hidden md:block`, así que preguntar si
+  // existe daría verde igual. Se pregunta por el que se VE.
+  const paginador = await evaluar(`(() => {
+    const todos = [...document.querySelectorAll('button')].filter(b => /Anterior/.test(b.textContent));
+    const visibles = todos.filter(b => b.getBoundingClientRect().height > 0);
+    if (!visibles.length) return { visible: false, enElDom: todos.length };
+    const bloque = visibles[0].closest('div').parentElement;
+    return { visible: true, enElDom: todos.length, texto: bloque.innerText.replace(/\\n/g, " ").slice(0, 60) };
+  })()`);
+  afirmar(
+    paginador.visible,
+    "7 · la lista de tarjetas tiene su paginación a la vista",
+    `paginadores en el DOM: ${paginador.enElDom}, visibles: 0 — el de la tabla no cuenta, está oculto`
+  );
+
   // ── 3 · LA CAPA, Y NINGÚN BOTÓN DE ADORNO ───────────────────────────────
   await evaluar(`${TARJETAS}[0].firstElementChild.click(); true`);
   await sleep(700);
