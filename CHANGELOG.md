@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-18] - Actualización: productos
+
+### Modificado
+- **productos**: fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra
+- **productos**: feat(productos): la línea de equivalencia en la tarjeta — sin tocar la API
+- **productos**: feat(productos): las tarjetas en angosto, la tabla intacta en escritorio
+
+
 ## [2026-08-13] - Actualización: configuracion, usuarios, locales
 
 ### Modificado

@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-08 12:46
+**Última actualización:** 2026-08-18 08:50
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,9 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-18: fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra
+- 2026-08-18: feat(productos): la línea de equivalencia en la tarjeta — sin tocar la API
+- 2026-08-18: feat(productos): las tarjetas en angosto, la tabla intacta en escritorio
 - 2026-08-07: refactor(sunmi): separar el tono de la fila de su intensidad
 - 2026-08-07: SunmiTable: densidad, align, render, ordenable, filaExpandible y tono de fila
 - 2026-08-07: feat(precios): regla de recargo fijo por unidad, por ubicación

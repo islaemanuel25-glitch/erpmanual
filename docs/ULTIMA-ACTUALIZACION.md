@@ -1,20 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-13 11:10
+**Fecha:** 2026-08-18 08:50
 
 ## Módulos modificados recientemente
 
-### configuracion
-- fix(configuracion): sacar los dos props muertos de arqueo-caja
-- Archivos: 1 modificados (1 total)
-
-### usuarios
-- refactor(kit): ModalOperador y ModalUsuario usan SunmiModalLayout
-- Archivos: 1 modificados (1 total)
-
-### locales
-- refactor(kit): ModalRol y ModalLocal usan SunmiModalLayout
-- Archivos: 1 modificados (1 total)
+### productos
+- fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra, feat(productos): la línea de equivalencia en la tarjeta — sin tocar la API, feat(productos): las tarjetas en angosto, la tabla intacta en escritorio
+- Archivos: 2 modificados (2 total)
 
 
 
