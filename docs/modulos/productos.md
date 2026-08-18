@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-18 08:50
+**Última actualización:** 2026-08-18 09:55
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,10 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-18: feat(productos): la lista de tarjetas pagina, y todas las tarjetas miden lo mismo
+- 2026-08-18: fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra
+- 2026-08-18: feat(productos): la línea de equivalencia en la tarjeta — sin tocar la API
+- 2026-08-18: feat(productos): las tarjetas en angosto, la tabla intacta en escritorio
 - 2026-08-18: fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra
 - 2026-08-18: feat(productos): la línea de equivalencia en la tarjeta — sin tocar la API
 - 2026-08-18: feat(productos): las tarjetas en angosto, la tabla intacta en escritorio
