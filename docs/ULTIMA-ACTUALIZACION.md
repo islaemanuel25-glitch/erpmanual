@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-18 17:14
+**Fecha:** 2026-08-18 18:54
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat(productos): la ficha de sólo lectura, y Ver deja de llevar al mismo lado que Editar, feat(productos): los botones van a la vista y la capa superpuesta se saca, fix(productos): la tarjeta muestra el precio que se cobra, y el servicio no dice $0,00
-- Archivos: 1 nuevos, 3 modificados (4 total)
+- feat(productos): la tarjeta avisa cuando un producto se vende sin ganancia, y el botón llega a 44 px, fix(productos): el listado pide los cuatro campos que el mapper leía y nadie traía, feat(productos): la ficha de sólo lectura, y Ver deja de llevar al mismo lado que Editar
+- Archivos: 1 nuevos, 4 modificados (5 total)
 
 
 ## Archivos nuevos desde última sincronización
