@@ -72,7 +72,7 @@
 
 // `Package` se fue con el ícono del nombre: era el mismo cubo para el 93,9 % del
 // catálogo. Quedan los dos que SÍ marcan qué es cada renglón.
-import { Tag, Barcode } from "lucide-react";
+import { Tag, Barcode, TriangleAlert } from "lucide-react";
 
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import {
@@ -135,9 +135,17 @@ export function AccionTarjeta({ icono: Icono, onClick, children, ...resto }) {
     <button
       type="button"
       onClick={onClick}
-      // `text-xs` son los mismos 12 px del prototipo pero SIN medida mágica: está
-      // en la escala de Tailwind, así que no suma al contador de hardcodeo.
-      className="flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium sunmi-text-strong sunmi-row-hover"
+      // ── 44 px ESCRITOS, Y NO `h-11` ─────────────────────────────────────
+      //
+      // Son el mínimo de área táctil de WCAG 2.5.5 y de las guías de Apple, y
+      // van escritos a propósito: **en esta aplicación 1 rem son 14 px**, así
+      // que `h-11` —2,75 rem— da 38,5 y no 44. Se midió: dos clases distintas
+      // daban el mismo número hasta que se fue a mirar el `font-size` de la
+      // raíz. Cualquiera que escriba `h-11` esperando 44 se equivoca.
+      //
+      // Medido después de ponerlo: la tarjeta pasa de 203,4 a 215,9 px y a
+      // 390 px SIGUEN ENTRANDO TRES. No costó la tercera tarjeta.
+      className="flex items-center justify-center gap-1.5 py-2.5 h-[44px] text-xs font-medium sunmi-text-strong sunmi-row-hover"
       {...resto}
     >
       {Icono && <Icono className="w-4 h-4 shrink-0" aria-hidden="true" />}
@@ -153,6 +161,13 @@ export default function SunmiProductoCard({
   codigoBarra = null,
   codigoInterno = null,
   valor = null,
+  // ── EL AVISO ES UNA RANURA, NO UNA REGLA DE LA PIEZA ────────────────────
+  //
+  // La tarjeta sabe DIBUJAR un aviso; no sabe CUÁNDO corresponde. Eso es del
+  // dominio de cada pantalla —en el catálogo es "se vende sin ganancia", en
+  // stock sería otra cosa— y meterlo acá haría que la pieza tuviera que conocer
+  // el negocio de todas las pantallas que la usen.
+  aviso = null,
   acciones = null,
   className = "",
 }) {
@@ -258,6 +273,28 @@ export default function SunmiProductoCard({
           >
             <Tag className="w-3 h-3 shrink-0" aria-hidden="true" />
             <span>{equivalencia}</span>
+          </div>
+        )}
+
+        {/* 4-bis · EL AVISO. Va DEBAJO de la escala y no adentro: la franja
+            contesta "qué estás comprando" y esto contesta otra cosa, "cómo te
+            está yendo con esto". Mezclarlos haría que ninguna de las dos se lea.
+            El color sale de `--pos-warning`, que ya está medido para contraste
+            de texto en los catorce temas — no es un ámbar escrito acá. */}
+        {aviso && (
+          <div
+            className={componerClaseTexto({
+              base: "mt-1.5 flex items-center gap-1.5 [color:var(--pos-warning)]",
+              // `text-xs` y no otra medida escrita: está en la escala y no suma
+              // al contador de hardcodeo. En esta aplicación son 10,5 px reales,
+              // porque 1 rem son 14 — ver el encabezado de `app/globals.css`.
+              tamano: "text-xs",
+              color: "",
+              pedido: className,
+            })}
+          >
+            <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span>{aviso}</span>
           </div>
         )}
 

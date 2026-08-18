@@ -96,6 +96,35 @@ mismo resultado para todo el catálogo. Migrar el POS y el stock al helper
 compartido es una tanda propia — hacerlo de paso tocaría el precio que se cobra
 en el mostrador.
 
+## PENDIENTE 4 — Las 1.691 filas sin regla de precio
+
+**Cuántas:** 1.691 de 10.614 filas activas, medidas en producción el 2026-08-18,
+repartidas casi parejo entre cuatro locales —422, 420, 420 y 420— y con solo 9 en
+Casiano casas. Esa distribución no la explica el código: es un dato de cómo se
+cargaron.
+
+**Qué les pasa, y por qué NO es lo mismo que vender al costo.** No tienen
+porcentaje de venta asignado y su regla es la de margen, así que **no hay nada
+que mueva su precio cuando suba el costo**. Hoy la mayoría vende con ganancia
+igual, porque el precio se puso por otro camino —una lista de proveedor, una
+importación, a mano—. El problema es a futuro.
+
+Las que YA venden al costo o por debajo son **429**, y ésas sí están marcadas en
+la tarjeta desde el 2026-08-18, con el texto "Se vende sin ganancia". Los dos
+conjuntos se superponen poco.
+
+**Por qué no se marcan en la tarjeta, y está decidido:** marcarlas sería marcar
+el 16 % del catálogo por algo que todavía no ocurrió, y un aviso que aparece en
+una de cada seis tarjetas enseña a ignorar los avisos. El problema de estas
+1.691 no es de una tarjeta: es de una pantalla propia, del tipo "qué productos
+quedarían vendiendo bajo costo si sube tal proveedor", que es una pregunta que se
+hace de a lotes y no producto por producto.
+
+**Lo que ya existe y sirve de punto de partida:** `hayReglaAutomatica` en
+`lib/precios/precioDesdeMargen.js` es exactamente el predicado —exige margen
+mayor a cero— y `propagarCostoALocales` ya devuelve aparte los que quedarían bajo
+costo al propagar. La consulta no habría que inventarla.
+
 ## Y uno que está esperando decisión, no relevamiento
 
 **Los 17 `ProductoLocal` con precio en cero.** El catálogo usa un `pick` que solo

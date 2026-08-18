@@ -26,6 +26,7 @@ import { Eye, Pencil } from "lucide-react";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
 import { precioEnEscalaQueSeCobra } from "@/lib/precios/redondeo";
+import { seVendeSinGanancia } from "@/lib/precios/precioDesdeMargen";
 // LA MARCA DEL SERVICIO ES LA DEL POS, no una nueva. `esProductoServicio` mira
 // `modalidad`, que es el mismo campo con el que el POS decide abrir el modal de
 // importe en vez de cobrar un precio fijo.
@@ -48,6 +49,17 @@ const TABS = [
 // concepto, y acá el concepto es "este producto no tiene precio: se carga al
 // vender".
 const TEXTO_IMPORTE_VARIABLE = "Importe variable";
+
+// ── EL AVISO DE LOS QUE NO DEJAN NADA ─────────────────────────────────────
+//
+// Corto, y dice el hecho: la venta no le saca nada al costo. No dice "¡atención!"
+// ni "error" — no es un error del sistema, es una situación del negocio, y un
+// cartel alarmista sobre 429 filas enseña a ignorar los carteles.
+//
+// Se eligió "sin ganancia" y no "sin margen" porque margen es la palabra del
+// campo configurado, que es OTRA cosa: hay 1.691 filas sin margen asignado que
+// igual venden con ganancia.
+const AVISO_SIN_GANANCIA = "Se vende sin ganancia";
 // Y la línea de abajo explica de dónde sale el importe. Va con texto y no vacía
 // porque todas las tarjetas llevan su línea: un hueco haría que estas cuatro
 // quedaran más bajas que las demás.
@@ -1047,6 +1059,18 @@ export default function ProductosPage() {
                     }
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
                     codigoInterno={p.id ?? p.productoLocalId ?? null}
+                    // EL AVISO SOBRE LO QUE YA PASÓ, no sobre lo que podría
+                    // pasar. Son 429 filas en producción que se venden al costo
+                    // o por debajo. Los 1.691 SIN REGLA DE PRECIO no se marcan
+                    // acá: su problema es otro —no se mueven cuando sube el
+                    // costo— y marcaría el 16 % del catálogo por algo que
+                    // todavía no ocurrió. Queda anotado como tanda propia.
+                    aviso={
+                      !esProductoServicio(p) &&
+                      seVendeSinGanancia({ costo: p.precioCosto, venta: p.precioVenta })
+                        ? AVISO_SIN_GANANCIA
+                        : null
+                    }
                     valor={
                       esProductoServicio(p) ? (
                         // UN SERVICIO NO TIENE PRECIO, Y CERO NO ES "GRATIS".
