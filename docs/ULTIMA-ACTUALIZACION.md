@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-18 10:47
+**Fecha:** 2026-08-18 11:58
 
 ## Módulos modificados recientemente
 
 ### productos
-- fix(productos): la tarjeta muestra el precio que se cobra, y el servicio no dice $0,00, feat(productos): la lista de tarjetas pagina, y todas las tarjetas miden lo mismo, fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra
+- feat(productos): los botones van a la vista y la capa superpuesta se saca, fix(productos): la tarjeta muestra el precio que se cobra, y el servicio no dice $0,00, feat(productos): la lista de tarjetas pagina, y todas las tarjetas miden lo mismo
 - Archivos: 3 modificados (3 total)
 
 
