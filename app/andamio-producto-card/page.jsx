@@ -33,9 +33,9 @@
 import { useState } from "react";
 import { notFound } from "next/navigation";
 
-import SunmiProductoCard from "@/components/sunmi/SunmiProductoCard";
+import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiSelectorUnidad, { UNIDAD } from "@/components/sunmi/SunmiSelectorUnidad";
-import SunmiButton from "@/components/sunmi/SunmiButton";
+import { Eye, Pencil } from "lucide-react";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
 
@@ -92,8 +92,9 @@ export default function AndamioProductoCard() {
   // GUARDIA DE ENTORNO — ver `scripts/andamiosNoSeCommitean.test.mjs`.
   if (process.env.NODE_ENV === "production") notFound();
 
-  // Una sola tarjeta abierta a la vez: abrir otra cierra la anterior.
-  const [abierta, setAbierta] = useState(null);
+  // Ya no hay capa que abrir, así que la tarjeta no tiene estado. Lo único que
+  // se guarda es qué botón se tocó último, para que se vea que responden.
+  const [ultimo, setUltimo] = useState(null);
   const [modo, setModo] = useState(UNIDAD.PACK);
 
   return (
@@ -104,6 +105,12 @@ export default function AndamioProductoCard() {
           onCambiar={setModo}
           nota="Mostrando precio por bulto · los de kilo van por kg"
         />
+        {/* Qué botón respondió último. Sin esto los botones del andamio no se
+            distinguen de unos que no hacen nada, que es el error que ya costó
+            una tanda. */}
+        <div className="px-2.5 pt-2 text-xs sunmi-text-muted min-h-5">
+          {ultimo ? `último toque: ${ultimo}` : "ningún botón tocado todavía"}
+        </div>
       </div>
       <div className="mx-auto w-[360px] px-2.5 pb-6 pt-2 flex flex-col gap-[9px]">
         {PRODUCTOS.map((p) => (
@@ -120,8 +127,6 @@ export default function AndamioProductoCard() {
             })}
             codigoBarra={p.codigoBarra}
             codigoInterno={p.codigoInterno}
-            abierta={abierta === p.id}
-            onToggle={() => setAbierta((a) => (a === p.id ? null : p.id))}
             valor={
               <>
                 <span className="text-[22px] font-bold sunmi-text-strong whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em]">
@@ -132,26 +137,25 @@ export default function AndamioProductoCard() {
                 </span>
               </>
             }
-            // UN SOLO BOTÓN, Y ES EL QUE EXISTE.
+            // LOS DOS BOTONES, CON MANEJADOR DE VERDAD.
             //
-            // Acá había además uno rotulado "Información" **sin manejador**, o
-            // sea decoración. Despistó de verdad: el informe de la tanda dijo
-            // "la capa tiene los dos botones", la pantalla real salió con uno
-            // solo, y la diferencia se leyó como una regresión del cableado
-            // cuando en el ERP **no existe ninguna acción de Información** —las
-            // que existen para una fila son Ver composición, Editar combo,
-            // Activar, Subir al depósito, Editar y Eliminar—.
+            // Acá hubo una vez un botón "Información" SIN manejador, o sea
+            // decoración, y despistó: el informe dijo "la capa tiene los dos
+            // botones" y la pantalla real salió con uno. Un botón de mentira en
+            // un andamio no prueba que la acción exista.
             //
-            // Un botón de mentira en un andamio no prueba que la acción exista:
-            // prueba que el kit sabe dibujar dos botones, que no era la pregunta.
-            //
-            // VUELVE cuando se construya la pantalla de ficha completa del
-            // handoff, que es la que le daría a dónde ir. Hasta entonces no se
-            // dibuja, ni siquiera acá.
+            // Por eso ahora los dos hacen algo visible —dejan dicho qué se tocó—
+            // en vez de quedarse mudos. Es un andamio: no navega a ningún lado,
+            // pero se nota si un botón no responde.
             acciones={
-              <SunmiButton color="primary" type="button">
-                Editar
-              </SunmiButton>
+              <>
+                <AccionTarjeta icono={Eye} onClick={() => setUltimo(`Ver ${p.id}`)}>
+                  Ver
+                </AccionTarjeta>
+                <AccionTarjeta icono={Pencil} onClick={() => setUltimo(`Editar ${p.id}`)}>
+                  Editar
+                </AccionTarjeta>
+              </>
             }
           />
         ))}

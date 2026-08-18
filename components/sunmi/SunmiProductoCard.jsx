@@ -1,6 +1,6 @@
 "use client";
 
-// LA TARJETA DE PRODUCTO, con su capa de acciones.
+// LA TARJETA DE PRODUCTO, con su fila de acciones al pie.
 //
 // ── POR QUÉ NACE EN EL KIT Y NO ADENTRO DE LA PANTALLA DE PRODUCTOS ────────
 //
@@ -10,22 +10,36 @@
 // Escrita adentro de `productos/page.jsx`, la próxima pantalla la copia, y ahí
 // ya son dos que se rompen el día que una cambie.
 //
+// ── LA CAPA QUE SE SUPERPONÍA SE FUE, Y CON ELLA TRES PROBLEMAS ───────────
+//
+// Antes los botones vivían en una capa translúcida que aparecía al tocar la
+// tarjeta. Se sacó por decisión de diseño —si los botones están a la vista, no
+// hay nada que abrir— y de paso se llevó puesto lo que esa capa costaba:
+//
+//   · un toque de más para llegar a cualquier acción;
+//   · el estado de "cuál está abierta", que vivía en la pantalla;
+//   · y el defecto del doble disparo, que la mantenía abierta para siempre
+//     porque el clic de la capa burbujeaba al contenedor.
+//
+// No queda `abierta` ni `onToggle`: la tarjeta no tiene estado.
+//
 // ── LAS DOS RANURAS ───────────────────────────────────────────────────────
 //
 // `valor`    — lo que esa pantalla muestra en grande. Catálogo: el precio.
 //              Stock: existencia y mínimo. Pedido: el subtotal.
-// `acciones` — lo que se puede tocar, dibujado en una capa SOBRE la tarjeta.
-//              Catálogo: Información y Editar. Pedido: el selector y la cantidad.
+// `acciones` — la fila fija del pie. Catálogo: Ver y Editar. Pedido: el
+//              selector y la cantidad.
 //
 // El núcleo NO es ranura a propósito: si cada pantalla pudiera reordenarlo,
 // dejaría de reconocerse como la misma tarjeta.
 //
-// ── LA CAPA ES TRANSLÚCIDA, Y ESO NO ES DECORACIÓN ────────────────────────
+// ── LOS ÍCONOS SON PARTE DEL NÚCLEO ───────────────────────────────────────
 //
-// Se lee el producto entero por detrás mientras se decide. Por eso el fondo va
-// al 50 % y el difuminado es de 0,4 px: subirlo tapa el dato que la persona
-// está mirando para decidir. Y los botones NO van centrados: van a la altura de
-// la banda de equivalencia, para dejar libre el precio grande.
+// Van fijos y no como prop: el ícono de producto, el de etiqueta en la línea de
+// escala y el de código de barras en el pie identifican QUÉ ES cada renglón, y
+// en una lista de veinticinco tarjetas iguales eso es lo que deja recorrerla sin
+// leer. Si cada pantalla eligiera los suyos, dos listas del mismo ERP marcarían
+// el mismo dato con dibujos distintos.
 //
 // ── NEGOCIA, COMO EL RESTO DEL KIT ────────────────────────────────────────
 //
@@ -56,6 +70,8 @@
 // Si alguien mide el prototipo contra la pantalla y encuentra estos cuatro
 // puntos, la respuesta es ésta, no un descuido que haya que arreglar.
 
+import { Package, Tag, Barcode } from "lucide-react";
+
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import {
   componerClaseTexto,
@@ -78,6 +94,56 @@ const PADDING = "px-[13px] pt-3.5 pb-3";
  */
 const SIN_CODIGO_BARRA = "sin código de barras";
 
+/**
+ * Y lo mismo cuando no hay proveedor cargado.
+ *
+ * El renglón NO desaparece: si desapareciera, esa tarjeta quedaría más baja que
+ * las vecinas —el defecto que ya costó emparejar la lista entera— y además se
+ * perdería el dato. Que un producto no tenga proveedor es información: es la
+ * respuesta a por qué no aparece al conciliar una factura.
+ */
+const SIN_PROVEEDOR = "(proveedor no especificado)";
+
+/** El rótulo del código interno. Antes era `#2023`, que no dice de qué es. */
+const PREFIJO_CODIGO_INTERNO = "Cod. int.";
+
+/**
+ * UN BOTÓN DE LA FILA DE ACCIONES.
+ *
+ * ── POR QUÉ NO ES `SunmiButton` ───────────────────────────────────────────
+ *
+ * `SunmiButton` es un botón CON CUERPO: fondo de color, esquinas redondeadas y
+ * su propio padding. Esta fila es lo contrario — segmentos planos que ocupan el
+ * ancho entero del pie y se separan con una línea, sin fondo ni esquinas. Para
+ * usar aquél habría que apagarle casi todo, y ya está medido que apagarle las
+ * esquinas sale mal: `baseDeBoton.test.mjs` atrapó que pedirle `rounded-r-none`
+ * le hace ceder LAS OCHO y reponer cuatro.
+ *
+ * No es un botón paralelo: es el mismo recurso que ya usan las acciones por fila
+ * de `SunmiTablaProductos`, que también son `<button>` planos con su ícono.
+ *
+ * ── VIVE EN EL KIT, AL LADO DE LA TARJETA ────────────────────────────────
+ *
+ * Porque la fila es parte de la tarjeta. Si cada pantalla escribiera su botón,
+ * la de stock y la de pedidos tendrían acciones de distinto alto en la misma
+ * lista, y eso rompe justamente lo que costó emparejar.
+ */
+export function AccionTarjeta({ icono: Icono, onClick, children, ...resto }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      // `text-xs` son los mismos 12 px del prototipo pero SIN medida mágica: está
+      // en la escala de Tailwind, así que no suma al contador de hardcodeo.
+      className="flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium sunmi-text-strong sunmi-row-hover"
+      {...resto}
+    >
+      {Icono && <Icono className="w-4 h-4 shrink-0" aria-hidden="true" />}
+      {children}
+    </button>
+  );
+}
+
 export default function SunmiProductoCard({
   nombre,
   empresa = null,
@@ -86,13 +152,9 @@ export default function SunmiProductoCard({
   codigoInterno = null,
   valor = null,
   acciones = null,
-  abierta = false,
-  onToggle = null,
   className = "",
 }) {
   const padding = paddingQueSobrevive(PADDING, className);
-  // `relative` y `overflow-hidden` no ceden: son lo que mantiene la capa DENTRO
-  // de esta tarjeta. Sin ellos se derrama sobre las vecinas.
   const contenedor = [
     "relative overflow-hidden",
     declaraDisplay(className) ? "" : "flex flex-col",
@@ -117,50 +179,42 @@ export default function SunmiProductoCard({
       // Va primero para que, si la pantalla declara su propio alto, el suyo mande.
       className={["h-full", className].filter(Boolean).join(" ")}
     >
-      <div
-        className={contenedor}
-        onClick={onToggle ?? undefined}
-        role={onToggle ? "button" : undefined}
-        tabIndex={onToggle ? 0 : undefined}
-        onKeyDown={
-          onToggle
-            ? (e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onToggle(e);
-                }
-              }
-            : undefined
-        }
-      >
+      <div className={contenedor}>
         {/* 1 · NOMBRE. Envuelve, nunca se corta: los reales son largos y a veces
             en mayúsculas, y recortarlos esconde justo lo que distingue un
-            producto de otro. */}
-        <div
-          className={componerClaseTexto({
-            base: "font-semibold leading-[1.3] [text-wrap:pretty] [overflow-wrap:anywhere]",
-            tamano: "text-[15px]",
-            color: "sunmi-text-strong",
-            pedido: className,
-          })}
-        >
-          {nombre}
-        </div>
-
-        {/* 2 · EMPRESA. Envuelve igual — es uno de los datos que se leen para
-            decidir, así que no lleva ellipsis. */}
-        {empresa && (
+            producto de otro. El ícono va con `shrink-0` y alineado a la primera
+            línea, para que un nombre de tres renglones no lo estire ni lo centre. */}
+        <div className="flex items-start gap-2">
+          <Package
+            className="w-4 h-4 shrink-0 mt-0.5 sunmi-text-muted"
+            aria-hidden="true"
+          />
           <div
             className={componerClaseTexto({
-              base: "leading-[1.35] [overflow-wrap:anywhere]",
-              tamano: "text-[11.5px]",
-              color: "sunmi-text-muted",
+              base: "font-semibold leading-[1.3] [text-wrap:pretty] [overflow-wrap:anywhere]",
+              tamano: "text-[15px]",
+              color: "sunmi-text-strong",
               pedido: className,
             })}
           >
-            {empresa}
+            {nombre}
           </div>
-        )}
+        </div>
+
+        {/* 2 · EMPRESA. Envuelve igual — es uno de los datos que se leen para
+            decidir, así que no lleva ellipsis. Y si no hay, lo dice. */}
+        <div
+          className={componerClaseTexto({
+            base: "leading-[1.35] [overflow-wrap:anywhere]",
+            tamano: "text-[11.5px]",
+            color: "sunmi-text-muted",
+            pedido: className,
+          })}
+        >
+          <span className={empresa ? "" : "italic opacity-70"}>
+            {empresa || SIN_PROVEEDOR}
+          </span>
+        </div>
 
         {/* 3 · LA RANURA DEL VALOR. En el catálogo, el precio. */}
         {valor && (
@@ -170,74 +224,64 @@ export default function SunmiProductoCard({
         )}
 
         {/* 4 · EQUIVALENCIA. Bloque tenue: explica de dónde sale el número de
-            arriba, que es la pregunta que más se hace con un precio por bulto. */}
+            arriba, que es la pregunta que más se hace con un precio por bulto.
+            El ícono de etiqueta lo marca como "esto es la escala del precio". */}
         {equivalencia && (
           <div
             className={componerClaseTexto({
-              base: "rounded-lg px-[9px] py-[7px] leading-[1.4] [background:var(--hover-bg)]",
+              base: "flex items-center gap-1.5 rounded-lg px-[9px] py-[7px] leading-[1.4] [background:var(--hover-bg)]",
               tamano: "text-[11px]",
               color: "[color:var(--pos-muted-strong)]",
               pedido: className,
             })}
           >
-            {equivalencia}
+            <Tag className="w-3 h-3 shrink-0" aria-hidden="true" />
+            <span>{equivalencia}</span>
           </div>
         )}
 
-        {/* 5 y 6 · EL PIE DE CÓDIGOS. Monoespaciada y con cifras tabulares: se
+        {/* 5 · EL PIE DE CÓDIGOS. Monoespaciada y con cifras tabulares: se
             comparan de un vistazo contra una etiqueta o un remito.
             ────────────────────────────────────────────────────────────────
             EL PIE VA SIEMPRE, aunque no haya código. Antes el bloque entero
             desaparecía y las tarjetas sin código de barras quedaban más bajas
-            que las vecinas — en una lista de veinticinco eso se ve como una
-            lista despareja, no como un producto sin código.
-            Y no se resuelve con un hueco vacío: **que un producto no tenga
-            código de barras es un dato**, y es de los que hacen falta cuando
-            alguien está buscando por qué no lo encuentra escaneando. */}
+            que las vecinas — en una lista de veinticinco eso se lee como una
+            lista rota. Y no se resuelve con un hueco vacío: **que un producto no
+            tenga código de barras es un dato**, y es de los que hacen falta
+            cuando alguien está buscando por qué no lo encuentra escaneando.
+            ────────────────────────────────────────────────────────────────
+            `mt-auto` ancla el pie ABAJO. Cuando la lista iguala los altos, el
+            sobrante va entre la equivalencia y el pie, así que los pies de todas
+            las tarjetas quedan alineados entre sí. */}
         <div
           className={componerClaseTexto({
-            // `mt-auto` ancla el pie ABAJO. Cuando la lista iguala los altos, el
-            // sobrante va entre la equivalencia y el pie, así que los pies de
-            // todas las tarjetas quedan alineados entre sí — que es lo que hace
-            // que una lista pareja se lea como pareja y no como estirada.
-            base: "mt-auto flex justify-between gap-2 border-t sunmi-divider pt-[9px] font-mono [font-variant-numeric:tabular-nums]",
+            base: "mt-auto flex justify-between items-center gap-2 border-t sunmi-divider pt-[9px] font-mono [font-variant-numeric:tabular-nums]",
             tamano: "text-[10.5px]",
             color: "sunmi-text-muted",
             pedido: className,
           })}
         >
-          <span className={codigoBarra ? "" : "italic opacity-70"}>
-            {codigoBarra || SIN_CODIGO_BARRA}
+          <span className="flex items-center gap-1.5 min-w-0">
+            <Barcode className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span className={codigoBarra ? "" : "italic opacity-70"}>
+              {codigoBarra || SIN_CODIGO_BARRA}
+            </span>
           </span>
-          {codigoInterno && <span>#{codigoInterno}</span>}
+          {codigoInterno && (
+            <span className="shrink-0">
+              {PREFIJO_CODIGO_INTERNO} {codigoInterno}
+            </span>
+          )}
         </div>
 
-        {/* LA CAPA. Sobre esta tarjeta y ninguna otra: la lista no se mueve ni
-            cambia de alto al abrirla. */}
-        {abierta && acciones && (
-          <div
-            // El velo sale del FONDO DE LA TARJETA, no de un blanco fijo. El
-            // prototipo dice `rgba(255,255,255,.5)` y en `violetaSaas` es lo
-            // mismo —la tarjeta es blanca— pero escrito fijo, en los cinco temas
-            // oscuros quedaría un velo blanco sobre una tarjeta negra.
-            className="absolute inset-0 flex items-end justify-center gap-2.5 pb-10 [background:color-mix(in_srgb,var(--card-bg)_50%,transparent)] [backdrop-filter:blur(.4px)]"
-            // EL TOQUE SE FRENA ACÁ. La capa es HIJA del contenedor, y el
-            // contenedor también escucha el clic: sin cortar la burbuja,
-            // `onToggle` corría DOS veces —cerraba y volvía a abrir en la misma
-            // tanda de React— y la capa se quedaba abierta para siempre.
-            //
-            // No lo introdujo la integración: el andamio tenía el mismo defecto
-            // desde el primer día y el informe dijo que cerraba sin haberlo
-            // ejercido. Lo atrapó tocar dos veces de verdad, no leer el código.
-            onClick={
-              onToggle
-                ? (e) => {
-                    e.stopPropagation();
-                    onToggle(e);
-                  }
-                : undefined
-            }
-          >
+        {/* 6 · LA FILA DE ACCIONES, FIJA Y A LA VISTA.
+            Los hijos se reparten el ancho por igual y el separador va entre
+            ellos con `divide-x`, que dibuja el borde SOLO en los intermedios:
+            escribirlo a mano en cada botón deja una línea colgando en el último.
+            La regla del kit sigue valiendo — el separador sale de
+            `sunmi-divider`, no de un gris escrito acá. */}
+        {acciones && (
+          <div className="flex items-stretch divide-x sunmi-divider border-t sunmi-divider -mx-[13px] -mb-3 mt-1 [&>*]:flex-1">
             {acciones}
           </div>
         )}

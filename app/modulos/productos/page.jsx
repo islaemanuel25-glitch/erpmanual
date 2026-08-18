@@ -20,8 +20,9 @@ import ColumnManager from "@/components/productos/ColumnManager";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
 import ModalVerComposicion from "@/components/productos/ModalVerComposicion";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
-import SunmiProductoCard from "@/components/sunmi/SunmiProductoCard";
+import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
+import { Eye, Pencil } from "lucide-react";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
 import { precioEnEscalaQueSeCobra } from "@/lib/precios/redondeo";
@@ -100,10 +101,9 @@ export default function ProductosPage() {
   // Selección persistente de fila + restauración de scroll al volver de editar.
   // El contenedor scrolleable es el <main> de LayoutBase (no window).
   const restoredScrollRef = useRef(false);
-  // Qué tarjeta tiene la capa de acciones abierta, en la vista angosta. Una sola
-  // a la vez: abrir otra cierra la anterior. Es estado propio de esa vista y no
-  // se mezcla con `selectedProductId`, que es la fila resaltada de la tabla.
-  const [tarjetaAbierta, setTarjetaAbierta] = useState(null);
+  // Acá vivía `tarjetaAbierta`, el estado de qué tarjeta tenía la capa abierta.
+  // Se fue con la capa: los botones están a la vista, así que no hay nada que
+  // abrir y la tarjeta dejó de tener estado.
   const [selectedProductId, setSelectedProductId] = useState(() => {
     if (typeof window === "undefined") return null;
     // Conservar la selección SOLO si venimos de editar (hay scroll guardado).
@@ -610,6 +610,24 @@ export default function ProductosPage() {
     router.push("/modulos/productos/edicion-rapida");
   };
 
+  // ── "VER" NO TIENE PANTALLA PROPIA TODAVÍA, Y ESO ESTÁ DICHO ────────────
+  //
+  // Relevado antes de escribir esto: en todo el ERP **no existe una pantalla de
+  // ver producto**. Las rutas bajo `app/modulos/productos/` son editar, editar
+  // combo, nuevo, nuevo combo, actualización de precios y edición rápida; el
+  // único "ver" que existe es `ModalVerComposicion`, que es de COMBOS. Y la
+  // ficha no tiene modo lectura: `FormProducto` no acepta ninguna prop de sólo
+  // lectura, solo bloquea campos sueltos por permiso.
+  //
+  // Así que hoy "Ver" lleva a la ficha, que es el único lugar donde se ven todos
+  // los datos del producto. NO es un botón muerto —eso es exactamente el defecto
+  // que costó la tanda del botón "Información"— pero SÍ llega al mismo lado que
+  // "Editar", y eso se ve.
+  //
+  // Es una decisión de negocio pendiente y está informada: o "Ver" abre una
+  // ficha de sólo lectura cuando exista, o la fila lleva un solo botón.
+  const abrirVer = (id) => abrirEditar(id);
+
   const abrirEditar = (id) => {
     if (!id || id === 0 || id === "0" || Number.isNaN(Number(id))) {
       alert("Error: ID de producto inválido");
@@ -1025,12 +1043,6 @@ export default function ProductosPage() {
                     }
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
                     codigoInterno={p.id ?? p.productoLocalId ?? null}
-                    abierta={tarjetaAbierta === (p.id ?? p.productoLocalId)}
-                    onToggle={() =>
-                      setTarjetaAbierta((a) =>
-                        a === (p.id ?? p.productoLocalId) ? null : (p.id ?? p.productoLocalId)
-                      )
-                    }
                     valor={
                       esProductoServicio(p) ? (
                         // UN SERVICIO NO TIENE PRECIO, Y CERO NO ES "GRATIS".
@@ -1071,21 +1083,26 @@ export default function ProductosPage() {
                         </>
                       )
                     }
+                    // LOS DOS BOTONES, A LA VISTA. Ya no hay capa que abrir.
+                    //
+                    // EL ID, NO LA FILA: `abrirEditar` valida con `Number(id)`,
+                    // así que pasarle el objeto daba NaN y saltaba "ID de
+                    // producto inválido" sin entrar nunca.
                     acciones={
-                      <SunmiButton
-                        color="primary"
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // EL ID, NO LA FILA. `abrirEditar` valida con
-                          // `Number(id)`, así que pasarle el objeto daba NaN y
-                          // saltaba "ID de producto inválido" sin entrar nunca.
-                          // La tabla ya lo llamaba bien, con `row.id`.
-                          abrirEditar(p.id ?? p.productoLocalId);
-                        }}
-                      >
-                        Editar
-                      </SunmiButton>
+                      <>
+                        <AccionTarjeta
+                          icono={Eye}
+                          onClick={() => abrirVer(p.id ?? p.productoLocalId)}
+                        >
+                          Ver
+                        </AccionTarjeta>
+                        <AccionTarjeta
+                          icono={Pencil}
+                          onClick={() => abrirEditar(p.id ?? p.productoLocalId)}
+                        >
+                          Editar
+                        </AccionTarjeta>
+                      </>
                     }
                   />
                 ))}
