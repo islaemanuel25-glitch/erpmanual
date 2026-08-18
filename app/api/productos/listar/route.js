@@ -238,6 +238,22 @@ export async function GET(req) {
         locales: {
           where: { localId },
           take: 1,
+          // ── LOS CUATRO ÚLTIMOS FALTABAN, Y EL LISTADO MENTÍA EN SILENCIO ──
+          //
+          // `mergeBaseLocalToUi` los LEE. Al no pedirlos, llegaban `undefined`,
+          // caían al default del `??` y la fila salía con un valor inventado:
+          // `reglaPrecio` siempre "MARGEN_PORCENTUAL" aunque en la base fuera
+          // recargo fijo, y los otros tres siempre nulos.
+          //
+          // No rompía nada —por eso duró—: no hay error, no hay rojo, y la
+          // pantalla dibuja. Lo que había era que la FICHA de un producto y su
+          // FILA en el listado decían cosas distintas del mismo producto,
+          // porque `obtener` trae el override sin `select` y ahí sí llegan.
+          //
+          // Medido contra producción: **1.137 de 10.614 filas** —el 10,7 %—
+          // tenían al menos uno de los cuatro con un valor que no es el suyo.
+          // Por campo: 231 de regla de precio, 231 de recargo fijo, 176 de
+          // código propio y 961 de recargo de servicio.
           select: {
             id: true,
             localId: true,
@@ -247,6 +263,10 @@ export async function GET(req) {
             activo: true,
             nombre: true,
             descripcion: true,
+            reglaPrecio: true,
+            recargoFijoUnidad: true,
+            codigo_barra_propio: true,
+            recargoServicioPct: true,
           },
         },
         // Código interno por proveedor (distinto del código de barras).
