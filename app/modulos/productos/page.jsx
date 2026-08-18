@@ -610,23 +610,23 @@ export default function ProductosPage() {
     router.push("/modulos/productos/edicion-rapida");
   };
 
-  // ── "VER" NO TIENE PANTALLA PROPIA TODAVÍA, Y ESO ESTÁ DICHO ────────────
+  // ── "VER" YA TIENE SU PANTALLA ──────────────────────────────────────────
   //
-  // Relevado antes de escribir esto: en todo el ERP **no existe una pantalla de
-  // ver producto**. Las rutas bajo `app/modulos/productos/` son editar, editar
-  // combo, nuevo, nuevo combo, actualización de precios y edición rápida; el
-  // único "ver" que existe es `ModalVerComposicion`, que es de COMBOS. Y la
-  // ficha no tiene modo lectura: `FormProducto` no acepta ninguna prop de sólo
-  // lectura, solo bloquea campos sueltos por permiso.
+  // Hasta este commit "Ver" y "Editar" llevaban al MISMO lado, porque no existía
+  // ninguna pantalla de ver producto en todo el ERP. Ahora existe:
+  // `app/modulos/productos/[id]/page.jsx`, de sólo lectura.
   //
-  // Así que hoy "Ver" lleva a la ficha, que es el único lugar donde se ven todos
-  // los datos del producto. NO es un botón muerto —eso es exactamente el defecto
-  // que costó la tanda del botón "Información"— pero SÍ llega al mismo lado que
-  // "Editar", y eso se ve.
-  //
-  // Es una decisión de negocio pendiente y está informada: o "Ver" abre una
-  // ficha de sólo lectura cuando exista, o la fila lleva un solo botón.
-  const abrirVer = (id) => abrirEditar(id);
+  // EL ID SE VALIDA IGUAL QUE EN EDITAR. El que espera la pantalla es el de
+  // `ProductoBase`, y `p.productoLocalId` es otro número: si se colara, la ficha
+  // pediría un producto que no es, o ninguno.
+  const abrirVer = (id) => {
+    if (!id || Number.isNaN(Number(id))) {
+      alert("Error: ID de producto inválido");
+      return;
+    }
+    const qs = buildListingUrl().split("?")[1] || "";
+    router.push(`/modulos/productos/${Number(id)}${qs ? `?${qs}` : ""}`);
+  };
 
   const abrirEditar = (id) => {
     if (!id || id === 0 || id === "0" || Number.isNaN(Number(id))) {
@@ -1039,6 +1039,10 @@ export default function ProductosPage() {
                             factor: p.factorPack,
                             unidad: p.unidadMedida,
                             redondeo100: p.redondeo100,
+                            // Los 142 combos no se distinguían de un producto
+                            // común en ninguna parte de la tarjeta. Lo dice la
+                            // franja de escala, con palabra y no con un dibujo.
+                            esCombo: p.esCombo,
                           })
                     }
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
