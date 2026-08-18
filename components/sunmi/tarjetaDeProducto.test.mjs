@@ -38,13 +38,23 @@ test("LA CAPA NO VUELVE: la tarjeta no tiene estado ni nada superpuesto", () => 
   assert.doesNotMatch(PAGINA, /tarjetaAbierta/, "volvió el estado en la pantalla");
 });
 
-test("los tres íconos son del núcleo, no props", () => {
+test("los dos íconos que quedan son del núcleo, no props", () => {
   // Si cada pantalla eligiera los suyos, dos listas del mismo ERP marcarían el
   // mismo dato con dibujos distintos.
-  assert.match(TARJETA, /import \{[^}]*Package[^}]*\} from "lucide-react"/);
-  assert.match(TARJETA, /<Package/, "falta el ícono del producto");
   assert.match(TARJETA, /<Tag/, "falta el ícono de la etiqueta en la equivalencia");
   assert.match(TARJETA, /<Barcode/, "falta el ícono del código de barras en el pie");
+});
+
+test("EL ÍCONO DEL NOMBRE NO VUELVE sin una medición nueva", () => {
+  // Se sacó con su número: era el MISMO cubo para 2.231 de los 2.377 productos
+  // activos —el 93,9 %—, así que no distinguía nada y se comía 24 px de ancho
+  // del nombre en todas las tarjetas. Las únicas distinciones reales del dato
+  // son combo (142) y servicio (4); las que sí parten el catálogo —bulto, kilo,
+  // unidad— ya están dichas con palabras en el rótulo de escala.
+  //
+  // Este candado no dice "nunca": dice que reponerlo cuesta volver a medir.
+  assert.doesNotMatch(TARJETA, /<Package/, "volvió el ícono del nombre");
+  assert.doesNotMatch(TARJETA, /Package/, "quedó el import sin uso");
 });
 
 test("el pie ROTULA el código interno en vez de la almohadilla", () => {

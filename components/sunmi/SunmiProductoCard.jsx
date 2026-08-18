@@ -70,7 +70,9 @@
 // Si alguien mide el prototipo contra la pantalla y encuentra estos cuatro
 // puntos, la respuesta es ésta, no un descuido que haya que arreglar.
 
-import { Package, Tag, Barcode } from "lucide-react";
+// `Package` se fue con el ícono del nombre: era el mismo cubo para el 93,9 % del
+// catálogo. Quedan los dos que SÍ marcan qué es cada renglón.
+import { Tag, Barcode } from "lucide-react";
 
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import {
@@ -160,8 +162,16 @@ export default function SunmiProductoCard({
     declaraDisplay(className) ? "" : "flex flex-col",
     // `h-full` para que la tarjeta llene la fila cuando la lista las iguala. Sin
     // esto el panel crece pero el contenido queda flotando en una caja más alta.
+    // ── EL RITMO VERTICAL VA BLOQUE POR BLOQUE, NO CON UN `gap` ÚNICO ──────
+    //
+    // Antes era `gap-[11px]` para todo, así que los cinco huecos medían lo mismo
+    // y no se podía apretar uno sin apretar los otros cuatro. Ahora cada bloque
+    // declara su propio margen de arriba y cada número tiene un motivo:
+    // el nombre y el proveedor son el mismo dato leído en dos renglones y van
+    // juntos; el precio necesita aire porque es el número grande.
+    //
+    // Y de paso se va una medida mágica: los márgenes salen de la escala.
     "h-full",
-    "gap-[11px]",
     padding,
   ]
     .filter(Boolean)
@@ -182,30 +192,35 @@ export default function SunmiProductoCard({
       <div className={contenedor}>
         {/* 1 · NOMBRE. Envuelve, nunca se corta: los reales son largos y a veces
             en mayúsculas, y recortarlos esconde justo lo que distingue un
-            producto de otro. El ícono va con `shrink-0` y alineado a la primera
-            línea, para que un nombre de tres renglones no lo estire ni lo centre. */}
-        <div className="flex items-start gap-2">
-          <Package
-            className="w-4 h-4 shrink-0 mt-0.5 sunmi-text-muted"
-            aria-hidden="true"
-          />
-          <div
-            className={componerClaseTexto({
-              base: "font-semibold leading-[1.3] [text-wrap:pretty] [overflow-wrap:anywhere]",
-              tamano: "text-[15px]",
-              color: "sunmi-text-strong",
-              pedido: className,
-            })}
-          >
-            {nombre}
-          </div>
+            producto de otro.
+            ────────────────────────────────────────────────────────────────
+            ACÁ HABÍA UN ÍCONO DE PRODUCTO Y SE SACÓ, con el número que lo
+            decidió: era el MISMO cubo para el 93,9 % del catálogo —2.231 de
+            2.377 activos—, así que no distinguía nada y se comía 24 px de ancho
+            del nombre en todas las tarjetas. Las únicas distinciones reales del
+            dato son combo (142) y servicio (4); las que sí parten el catálogo
+            —bulto, kilo, unidad— ya están dichas CON PALABRAS dos renglones más
+            abajo, en el rótulo de escala. Un dibujo que repite lo que ya dice el
+            texto no agrega, ocupa. */}
+        <div
+          className={componerClaseTexto({
+            base: "font-semibold leading-[1.3] [text-wrap:pretty] [overflow-wrap:anywhere]",
+            tamano: "text-[15px]",
+            color: "sunmi-text-strong",
+            pedido: className,
+          })}
+        >
+          {nombre}
         </div>
 
         {/* 2 · EMPRESA. Envuelve igual — es uno de los datos que se leen para
             decidir, así que no lleva ellipsis. Y si no hay, lo dice. */}
         <div
           className={componerClaseTexto({
-            base: "leading-[1.35] [overflow-wrap:anywhere]",
+            // `mt-1` y no el hueco general: el nombre y el proveedor son el
+            // mismo dato leído en dos renglones, así que van juntos. Antes los
+            // separaban 11 px, los mismos que separaban todo lo demás.
+            base: "mt-1 leading-[1.35] [overflow-wrap:anywhere]",
             tamano: "text-[11.5px]",
             color: "sunmi-text-muted",
             pedido: className,
@@ -218,7 +233,9 @@ export default function SunmiProductoCard({
 
         {/* 3 · LA RANURA DEL VALOR. En el catálogo, el precio. */}
         {valor && (
-          <div className="flex justify-end items-baseline gap-1.5 min-h-[30px]">
+          // `mt-1.5`: el precio necesita aire porque es el número grande, pero
+          // no los 11 px que tenía — eran el hueco general, no una decisión.
+          <div className="mt-1.5 flex justify-end items-baseline gap-1.5 min-h-[30px]">
             {valor}
           </div>
         )}
@@ -229,7 +246,11 @@ export default function SunmiProductoCard({
         {equivalencia && (
           <div
             className={componerClaseTexto({
-              base: "flex items-center gap-1.5 rounded-lg px-[9px] py-[7px] leading-[1.4] [background:var(--hover-bg)]",
+              // La franja se aprieta de 7 a 4 px arriba y abajo, y se le da su
+              // propio margen de arriba. Con el texto en 11 px y su interlínea,
+              // quedan 23 px de franja: sigue leyéndose como un bloque aparte y
+              // no como una línea pegada al precio.
+              base: "mt-2.5 flex items-center gap-1.5 rounded-lg px-[9px] py-1 leading-[1.4] [background:var(--hover-bg)]",
               tamano: "text-[11px]",
               color: "[color:var(--pos-muted-strong)]",
               pedido: className,
