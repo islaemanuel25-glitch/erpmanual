@@ -56,6 +56,7 @@ import { prepararSesion } from "./lib/sesionArnes.mjs";
 import { formatearMoneda, lineaDeEquivalencia } from "../lib/moneda.js";
 import { precioEnEscalaQueSeCobra } from "../lib/precios/redondeo.js";
 import { esProductoServicio } from "../lib/pos-ventas/servicios.js";
+import { seVendeSinGanancia } from "../lib/precios/precioDesdeMargen.js";
 
 const arg = (n, d = null) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -623,6 +624,87 @@ try {
     console.log("        el texto de reemplazo no se ejerció. No es un pase.");
   }
 
+  // ── 13 · EL AVISO DE LOS QUE NO DEJAN NADA ──────────────────────────────
+  //
+  // Se compara contra el DATO, igual que el precio: para cada tarjeta se calcula
+  // con la función de producción si corresponde el aviso, y se mira si está.
+  // Así la afirmación cubre las dos direcciones —que aparezca donde va y que NO
+  // aparezca donde no va—, que es lo que hace que un aviso siga significando
+  // algo. Un cartel que sale de más enseña a ignorarlo.
+  const avisos = await evaluar(`(() => {
+    const t = ${TARJETAS};
+    const cuerpo = (c) => c.firstElementChild;
+    return t.map((c) => ({
+      nombre: cuerpo(c).firstElementChild.textContent.trim(),
+      tieneAviso: /Se vende sin ganancia/.test(c.innerText),
+    }));
+  })()`);
+  const deMas = [];
+  const deMenos = [];
+  for (const v of avisos) {
+    const fila = porNombre.get(v.nombre);
+    if (!fila) continue;
+    const corresponde =
+      !esProductoServicio(fila) &&
+      seVendeSinGanancia({ costo: fila.precioCosto, venta: fila.precioVenta });
+    if (corresponde && !v.tieneAviso) deMenos.push(v.nombre);
+    if (!corresponde && v.tieneAviso) deMas.push(v.nombre);
+  }
+  const conAviso = avisos.filter((v) => v.tieneAviso).length;
+  afirmar(
+    deMas.length === 0 && deMenos.length === 0,
+    `13 · el aviso de "sin ganancia" está exactamente donde corresponde (${conAviso} de ${avisos.length})`,
+    `de más: ${deMas.slice(0, 3).join(", ") || "ninguno"} · faltan: ${deMenos.slice(0, 3).join(", ") || "ninguno"}`
+  );
+  // ── Y SI EN ESTA PÁGINA NO HAY NINGUNO, SE LO BUSCA ─────────────────────
+  //
+  // Mismo camino que el servicio y el combo, y por el mismo motivo: en la
+  // primera página ordenada por nombre puede no caer ninguno, y entonces la
+  // afirmación de arriba pasa en verde sin haber ejercido el caso — que es
+  // indistinguible de funcionar. En desarrollo hay 103 productos que lo
+  // ameritan; en producción, 429.
+  if (conAviso === 0 && urlListado) {
+    const u3 = new URL(urlListado, BASE);
+    u3.searchParams.set("pageSize", "100");
+    let candidato = null;
+    let pag3 = 1, totalPag3 = 1;
+    do {
+      u3.searchParams.set("page", String(pag3));
+      const tanda = await evaluar(
+        `fetch(${JSON.stringify(u3.pathname)} + ${JSON.stringify(u3.search)}, { credentials: "include" }).then(r => r.json())`,
+        true
+      );
+      totalPag3 = Number(tanda?.totalPages || 1);
+      candidato = (tanda?.items || []).find(
+        (it) => !esProductoServicio(it) &&
+          seVendeSinGanancia({ costo: it.precioCosto, venta: it.precioVenta })
+      ) || null;
+      pag3++;
+    } while (!candidato && pag3 <= totalPag3 && pag3 <= 40);
+
+    if (!candidato) {
+      console.log("  ----  13 · NO EJERCIDO: en estos datos no hay ninguna tarjeta que lo amerite.");
+      console.log("        No es un pase, y no se fabrica una fila para que aparezca.");
+    } else {
+      await send("Page.navigate", {
+        url: `${BASE}/modulos/productos?q=${encodeURIComponent(candidato.nombre)}`,
+      });
+      await sleep(6000);
+      const visto = await evaluar(`(() => {
+        const t = ${TARJETAS};
+        if (!t.length) return { encontrada: false };
+        return { encontrada: true, tieneAviso: /Se vende sin ganancia/.test(t[0].innerText) };
+      })()`);
+      afirmar(
+        visto.encontrada && visto.tieneAviso,
+        `13b · el aviso aparece en un producto que se vende sin ganancia (${candidato.nombre})`,
+        visto.encontrada ? "la tarjeta no lo muestra" : "no se encontró la tarjeta al filtrar"
+      );
+      await send("Page.navigate", { url: `${BASE}/modulos/productos` });
+      await sleep(6000);
+    }
+  }
+
   // ── 7 · LA LISTA TIENE PAGINACIÓN ───────────────────────────────────────
   //
   // La tabla la tenía y la lista de tarjetas no: mostraba los primeros 25 de
@@ -698,6 +780,22 @@ try {
     fila.conIcono >= ESPERADOS.length,
     `3c · cada botón lleva su ícono (${fila.conIcono} de ${ESPERADOS.length})`,
     "un botón sin ícono: el diseño pide uno por acción"
+  );
+
+  // ── 3d · EL ÁREA TÁCTIL DEL BOTÓN ───────────────────────────────────────
+  //
+  // 44 px es el mínimo de WCAG 2.5.5 y de las guías de Apple. Va medido y no
+  // deducido de la clase, porque **en esta aplicación 1 rem son 14 px** y la
+  // escala de Tailwind vale el 87,5 % de lo nominal: `h-11` da 38,5. Este
+  // candado se pone rojo si alguien "simplifica" el `h-[44px]` a `h-11`.
+  const MINIMO_TACTIL = 44;
+  const altoBoton = await evaluar(
+    `Math.round(${TARJETAS}[0].querySelector('button').getBoundingClientRect().height * 10) / 10`
+  );
+  afirmar(
+    altoBoton >= MINIMO_TACTIL,
+    `3d · el botón llega al área táctil mínima (${altoBoton} px · mínimo ${MINIMO_TACTIL})`,
+    `${altoBoton} px. Ojo: 1 rem son 14 px acá, así que h-11 da 38,5 y no 44.`
   );
 
   // ── 4 · EL SEPARADOR ENTRE LOS BOTONES ──────────────────────────────────
