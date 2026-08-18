@@ -389,6 +389,7 @@ try {
       factor: fila.factorPack,
       unidad: fila.unidadMedida,
       redondeo100: fila.redondeo100,
+      esCombo: fila.esCombo,
     });
     if (vista.equivalencia && vista.equivalencia !== eqEsperada) {
       malPrecio.push(`${vista.nombre}: equivalencia "${vista.equivalencia}", corresponde "${eqEsperada}"`);
@@ -449,10 +450,61 @@ try {
         malServicio.push(`${servicioProbado.nombre}: ${servicioProbado.valor}`);
       }
       // SE VUELVE A LA LISTA COMPLETA. Las afirmaciones que siguen —alturas,
-      // paginación, la capa— miden la lista de verdad, no una filtrada a una
-      // sola fila: sobre una tarjeta sola, "todas del mismo alto" es trivial.
+      // paginación, la fila de acciones— miden la lista de verdad, no una
+      // filtrada a una sola fila: sobre una tarjeta sola, "todas del mismo alto"
+      // es trivial.
       await send("Page.navigate", { url: `${BASE}/modulos/productos` });
       await sleep(6000);
+    }
+
+    // ── 11 · EL COMBO SE DICE ─────────────────────────────────────────────
+    //
+    // Mismo camino que el servicio, y por el mismo motivo: en desarrollo los
+    // combos no caen necesariamente en la primera página, así que esperar a que
+    // aparezcan solos dejaría la afirmación pasando sin ejercer el caso.
+    let comboProbado = null;
+    const u2 = new URL(urlListado, BASE);
+    u2.searchParams.set("pageSize", "100");
+    let combo = null;
+    let pag2 = 1, totalPag2 = 1;
+    do {
+      u2.searchParams.set("page", String(pag2));
+      const tanda = await evaluar(
+        `fetch(${JSON.stringify(u2.pathname)} + ${JSON.stringify(u2.search)}, { credentials: "include" }).then(r => r.json())`,
+        true
+      );
+      totalPag2 = Number(tanda?.totalPages || 1);
+      combo = (tanda?.items || []).find((it) => it.esCombo) || null;
+      pag2++;
+    } while (!combo && pag2 <= totalPag2 && pag2 <= 40);
+
+    if (combo) {
+      await send("Page.navigate", {
+        url: `${BASE}/modulos/productos?q=${encodeURIComponent(combo.nombre)}`,
+      });
+      await sleep(6000);
+      comboProbado = await evaluar(`(() => {
+        const t = ${TARJETAS};
+        if (!t.length) return { encontrada: false };
+        return {
+          encontrada: true,
+          nombre: t[0].innerText.split("\\n")[0].trim(),
+          texto: t[0].innerText.replace(/\\n/g, " · "),
+        };
+      })()`);
+      await send("Page.navigate", { url: `${BASE}/modulos/productos` });
+      await sleep(6000);
+    }
+
+    if (!comboProbado?.encontrada) {
+      console.log("  ----  11 · NO EJERCIDO: no hay ningún combo en estos datos.");
+      console.log("        No es un pase. Fabricar uno probaría que el código dibuja algo.");
+    } else {
+      afirmar(
+        /Combo · /.test(comboProbado.texto),
+        `11 · un combo lo dice en la franja de escala (${comboProbado.nombre})`,
+        `la franja no lo nombra: ${comboProbado.texto.slice(0, 90)}`
+      );
     }
   }
 
@@ -669,8 +721,54 @@ try {
     `con ${separadores.total} botones tiene que haber ${Math.max(0, separadores.total - 1)} separador(es)`
   );
 
-  // ── 2 · EDITAR ENTRA ────────────────────────────────────────────────────
+  // ── 12 · VER ENTRA, Y NO AL MISMO LADO QUE EDITAR ───────────────────────
+  //
+  // Durante una tanda entera los dos botones llevaron a la ficha de edición,
+  // porque no existía ninguna pantalla de ver producto. Un botón que no está
+  // muerto pero hace lo mismo que el de al lado se nota igual.
+  const tocadoVer = await evaluar(`(() => {
+    const b = [...${TARJETAS}[0].querySelectorAll('button')]
+      .find((x) => /^ver$/i.test(x.textContent.trim()));
+    if (!b) return false;
+    b.click();
+    return true;
+  })()`);
+  if (!tocadoVer) morir("no encontré el botón Ver en la fila de acciones");
+  await sleep(3000);
+  const trasVer = await evaluar(`({ alertas: window.__alertas || [], donde: location.pathname })`);
+  afirmar(
+    trasVer.alertas.length === 0,
+    "12a · tocar Ver no muestra ningún cartel de error",
+    `alert: ${trasVer.alertas.join(" | ")}`
+  );
+  afirmar(
+    /\/modulos\/productos\/\d+$/.test(trasVer.donde),
+    "12b · tocar Ver entra a la ficha de sólo lectura",
+    `quedó en ${trasVer.donde}`
+  );
+
+  // Y la pantalla tiene que haber cargado SUS secciones, no cualquier título.
+  //
+  // El primer intento contaba los `h3` de la página y pedía tres o más: pasaba
+  // en verde por los OCHO títulos del menú lateral, sin mirar la ficha. Es la
+  // misma trampa que la afirmación del precio, que durante un rato no comparó
+  // nada. Ahora se piden los tres títulos POR NOMBRE.
+  const SECCIONES = ["Qué es", "Cuánto vale", "Con qué se identifica"];
+  const fichaVer = await evaluar(`(() => {
+    const titulos = [...document.querySelectorAll('h3')].map((h) => h.textContent.trim());
+    return { titulos, renglones: document.querySelectorAll('[data-sunmi-panel]').length };
+  })()`);
+  const faltanSecciones = SECCIONES.filter((s) => !fichaVer.titulos.includes(s));
+  afirmar(
+    faltanSecciones.length === 0,
+    `12c · la ficha dibuja sus tres secciones (${SECCIONES.join(" · ")})`,
+    `faltan: ${faltanSecciones.join(", ")}`
+  );
+
+  // ── 2 · EDITAR ENTRA, Y A OTRA RUTA ─────────────────────────────────────
   // Va última porque navega y deja la pantalla.
+  await send("Page.navigate", { url: `${BASE}/modulos/productos` });
+  await sleep(6000);
   const tocado = await evaluar(`(() => {
     const b = [...${TARJETAS}[0].querySelectorAll('button')]
       .find((x) => /editar/i.test(x.textContent));
