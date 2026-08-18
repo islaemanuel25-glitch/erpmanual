@@ -50,9 +50,16 @@ export default function SunmiSelectorUnidad({
           {rotulo}
         </span>
 
-        {/* Pegados: el de la izquierda pierde el radio derecho y monta un píxel
-            sobre el otro, así el par se lee como un control y no como dos. */}
-        <div className="flex">
+        {/* PEGADOS, PERO EL RADIO LO PONE EL ENVOLTORIO Y NO LOS BOTONES.
+            La primera versión les daba `rounded-r-none` / `rounded-l-none` y un
+            candado la frenó con el motivo exacto: `SunmiButton` cede las OCHO
+            esquinas en cuanto el consumidor declara un radio, y un token de un
+            solo lado repone cuatro — las otras cuatro se perdían y el par salía
+            con dos esquinas cuadradas de más.
+
+            Recortando desde el contenedor se ve igual —extremos redondeados,
+            unión recta— sin que los botones declaren radio y sin tocar el kit. */}
+        <div className="flex rounded-[10px] overflow-hidden">
           {opciones.map((o, i) => (
             <SunmiButton
               key={o.clave}
@@ -60,7 +67,7 @@ export default function SunmiSelectorUnidad({
               color={valor === o.clave ? "primary" : "slate"}
               aria-pressed={valor === o.clave}
               onClick={() => onCambiar?.(o.clave)}
-              className={i === 0 ? "rounded-r-none -mr-px" : "rounded-l-none"}
+              className={i === 0 ? "-mr-px" : ""}
             >
               {o.texto}
             </SunmiButton>

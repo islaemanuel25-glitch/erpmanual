@@ -42,9 +42,19 @@
 // mal en trece— y cada uno subiría el contador de hardcodeo. Así que se usan los
 // tokens; en `violetaSaas` dan exactamente los colores del prototipo.
 //
-// La única diferencia medida: el bloque de equivalencia pide `#F5F0FF` y se usa
-// `--hover-bg`, que en este tema es `#F1E8FF`. No existe token para `#F5F0FF` y
-// no se inventa uno acá — definir un token nuevo es una tanda de catorce temas.
+// ── LA ÚNICA DIFERENCIA CON EL PROTOTIPO, Y ESTÁ DECIDIDA ─────────────────
+//
+// El bloque de equivalencia pide `#F5F0FF` y usa `--hover-bg`, que en
+// `violetaSaas` es `#F1E8FF`. **NO ES UN ERROR DE IMPLEMENTACIÓN**: se comparó
+// contra el prototipo, se vio la diferencia y se decidió dejarla el 2026-08-18.
+//
+// El motivo: `#F5F0FF` no existe como token en ningún tema, y crear uno obliga a
+// elegir su valor en los CATORCE —que es una tanda propia, con su medición de
+// contraste, como la que costó `--pos-warning`—. A cambio de esa tanda, la
+// diferencia es de cuatro unidades en cada canal sobre un fondo tenue.
+//
+// Si alguien mide el prototipo contra la pantalla y encuentra estos cuatro
+// puntos, la respuesta es ésta, no un descuido que haya que arreglar.
 
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import {

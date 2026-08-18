@@ -20,6 +20,8 @@ import ColumnManager from "@/components/productos/ColumnManager";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
 import ModalVerComposicion from "@/components/productos/ModalVerComposicion";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
+import SunmiProductoCard from "@/components/sunmi/SunmiProductoCard";
+import { formatearMoneda } from "@/lib/moneda";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 // =========================================================
@@ -78,6 +80,10 @@ export default function ProductosPage() {
   // Selección persistente de fila + restauración de scroll al volver de editar.
   // El contenedor scrolleable es el <main> de LayoutBase (no window).
   const restoredScrollRef = useRef(false);
+  // Qué tarjeta tiene la capa de acciones abierta, en la vista angosta. Una sola
+  // a la vez: abrir otra cierra la anterior. Es estado propio de esa vista y no
+  // se mezcla con `selectedProductId`, que es la fila resaltada de la tabla.
+  const [tarjetaAbierta, setTarjetaAbierta] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(() => {
     if (typeof window === "undefined") return null;
     // Conservar la selección SOLO si venimos de editar (hay scroll guardado).
@@ -936,7 +942,56 @@ export default function ProductosPage() {
               {/* LISTADO */}
               <SunmiSeparator label="Listado" className="my-1" />
 
-              <div className="w-full mt-1">
+              {/* ── ANGOSTO: TARJETAS. ANCHO: LA TABLA DE SIEMPRE ──────────
+                  El corte es `md` (768 px), y no es un número elegido acá: es el
+                  que este repo YA usa para exactamente este problema en reportes
+                  de ventas y en transferencias —`md:hidden` para las tarjetas,
+                  `hidden md:block` para la tabla—. Inventar otro haría que la
+                  misma aplicación cambiara de forma a anchos distintos según la
+                  pantalla en la que uno esté.
+
+                  De escritorio para arriba NO CAMBIA NADA: la tabla es la misma
+                  y su huella de la línea de base, tomada a 1366, tiene que seguir
+                  dando cero. */}
+              <div className="md:hidden mt-1 flex flex-col gap-[9px]">
+                {rows.map((p) => (
+                  <SunmiProductoCard
+                    key={p.id ?? p.productoLocalId}
+                    nombre={p.nombre}
+                    empresa={p.proveedorNombre ?? null}
+                    codigoBarra={p.codigoBarra ?? p.sku ?? null}
+                    codigoInterno={p.id ?? p.productoLocalId ?? null}
+                    abierta={tarjetaAbierta === (p.id ?? p.productoLocalId)}
+                    onToggle={() =>
+                      setTarjetaAbierta((a) =>
+                        a === (p.id ?? p.productoLocalId) ? null : (p.id ?? p.productoLocalId)
+                      )
+                    }
+                    valor={
+                      <>
+                        <span className="text-[22px] font-bold sunmi-text-strong whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em]">
+                          {formatearMoneda(p.precioVenta)}
+                        </span>
+                        <span className="text-[11.5px] sunmi-text-muted">/ un</span>
+                      </>
+                    }
+                    acciones={
+                      <SunmiButton
+                        color="primary"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          abrirEditar(p);
+                        }}
+                      >
+                        Editar
+                      </SunmiButton>
+                    }
+                  />
+                ))}
+              </div>
+
+              <div className="hidden md:block w-full mt-1">
                   <SunmiTablaProductos
                     rows={rows}
                     columns={allColumns.filter((c) =>
