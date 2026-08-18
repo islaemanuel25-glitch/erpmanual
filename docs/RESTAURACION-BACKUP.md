@@ -10,20 +10,27 @@ saber de antemano cómo funciona el sistema de backups.
 **Leé esto antes que nada.** Si el backup que vas a restaurar termina en `.gpg`,
 sin la frase no sirve para nada y ningún otro paso importa.
 
-La frase está en dos lugares:
+La frase está en dos lugares, y son los que valen:
 
 1. **Anotada en papel**, fuera de la notebook. Es la copia que sobrevive a todo.
 2. **En el gestor de contraseñas**, buscando "ERP Azul" o "backup".
 
-Son ocho palabras y cuatro dígitos separados por guiones, así:
-`palabra-palabra-palabra-palabra-palabra-palabra-palabra-palabra-1234`. Los
-guiones son parte de la frase.
+**Copiala tal cual está**, entera y sin agregarle ni quitarle nada: todo lo que
+tenga —separadores, mayúsculas, números— es parte de la frase. Si al descifrar
+aparece `decryption failed: Bad session key`, la frase está mal copiada; el
+sospechoso más común es un espacio de más al pegar, o un carácter que se comió el
+salto de línea.
+
+> **Este documento no dice cómo es la frase, y es a propósito**: el repositorio es
+> público. Quien la tenga en el papel o en el gestor no necesita que acá se le
+> describa la forma, y quien no la tenga tampoco debería poder deducirla.
 
 Existe además una tercera copia, **operativa y desechable**, en
 `%USERPROFILE%\.erpazul-backup\frase-gpg.xml`. La usa la tarea automática para
-cifrar sin intervención. Está protegida con DPAPI: **solo la puede leer el usuario
-`emanuel` en esa misma instalación de Windows**. Si formateaste la notebook, ese
-archivo ya no sirve — y no importa, porque las copias 1 y 2 son las que valen.
+cifrar sin intervención. Está protegida con DPAPI: **solo la puede leer la misma
+cuenta de Windows, en esa misma instalación**. Si formateaste la notebook, o si
+entrás con otro usuario, ese archivo ya no sirve — y no importa, porque las copias
+1 y 2 son las que valen.
 
 Para verla desde la notebook actual, si la tenés a mano:
 
@@ -95,7 +102,7 @@ no termina. Está probado. Si te pasó, cortá con Ctrl+C y usá los comandos de
 arriba.
 
 Si al descifrar dice `decryption failed: Bad session key`, la frase está mal.
-Fijate en los guiones y en que no haya espacios de más al copiarla.
+Fijate en que la hayas copiado ENTERA y sin espacios de más — ver el paso 0.
 
 ---
 

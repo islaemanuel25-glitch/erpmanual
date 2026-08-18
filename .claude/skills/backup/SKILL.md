@@ -210,20 +210,22 @@ rotos.
 
 Vive en tres lugares: **papel** fuera de la notebook, **gestor de contraseñas**,
 y una copia **operativa y desechable** en
-`%USERPROFILE%\.erpazul-backup\frase-gpg.xml` protegida con DPAPI —solo la
-lee el usuario `emanuel` en esa misma instalación de Windows—. Las dos primeras
-son las que valen.
+`%USERPROFILE%\.erpazul-backup\frase-gpg.xml` protegida con DPAPI —solo la lee la
+misma cuenta de Windows, en esa misma instalación—. Las dos primeras son las que
+valen.
 
 **Nunca imprimir la frase** en un informe, un log ni la salida de un comando.
 
 Si al descifrar dice `decryption failed: Bad session key`, la frase está mal —
-mirar los guiones y los espacios de más al copiarla.
+mirar que esté entera y sin espacios de más al copiarla.
 
 ## Restaurar
 
 Restaurar es otro procedimiento y está escrito para el peor día, para seguirse
-sin saber cómo funciona nada: **`docs/RESTAURACION-BACKUP.md`**. Tiene la frase
-de cifrado (paso 0), de dónde sacar el archivo, cómo verificarlo antes de tocar
+sin saber cómo funciona nada: **`docs/RESTAURACION-BACKUP.md`**. Dice dónde
+buscar la frase de cifrado (paso 0) —no la frase, que no está escrita en ningún
+archivo del repositorio—, de dónde sacar el archivo, cómo verificarlo antes de
+tocar
 producción, la restauración obligatoria en una base descartable primero, y qué
 hacer si se formateó la notebook.
 

@@ -5481,18 +5481,57 @@ Se tocó **lo que alguien va a ejecutar o seguir**:
 ruta del archivo donde vive la **frase de cifrado de los backups**. El archivo
 nunca estuvo en el repo, pero decir dónde vive es más que una ruta.
 
-### Las 325 que NO se tocaron, y por qué
+### SEGUNDA PASADA: LO QUE SEÑALABA A LA FRASE DE CIFRADO
 
-- **233 en `scripts/reports/*.txt`** — cuatro volcados de una herramienta, de
-  noviembre de 2025. Son material generado: reescribirlos es maquillar un
-  registro. **Lo que corresponde decidir es si siguen en el repo**, no cambiarles
-  el texto.
-- **92 en auditorías y planes viejos** —`AUDITORIA_VISUAL_…`, `PLAN_CORRECCION_…`,
-  `PLAN_EJECUCION_…`, `CIERRE_FINAL_SELECTORES.md`—. Son documentos de tandas
-  cerradas: describen lo que se hizo en su momento, y editarlos es reescribir un
-  registro histórico.
+Al comprobar que la frase no estuviera publicada aparecieron **dos cosas más que
+la primera corrección no tocaba**, porque no eran rutas.
 
-Las dos decisiones quedan abiertas y son de Emanuel.
+**LA FRASE MISMA NO ESTÁ, ni en el árbol ni en el historial.** Comprobado por tres
+vías: `frase-gpg.xml` nunca fue agregado en ningún commit de ninguna rama; el
+patrón de la frase aparece en un solo lugar y era el ejemplo genérico; y los dos
+únicos commits que alguna vez tocaron ese patrón introdujeron ese mismo ejemplo,
+no un valor.
+
+Lo que sí estaba, y se sacó:
+
+- **El documento de restauración DESCRIBÍA LA FORMA de la frase** —cuántas
+  palabras, cuántos dígitos, qué separador—. No es la frase, y el espacio de
+  búsqueda sigue siendo enorme, pero era información sobre ella que no hacía
+  falta: quien la tiene en el papel no necesita que el repo le recuerde la forma.
+  Se reemplazó por instrucciones de USO —copiala entera, sin agregar ni quitar—
+  que sirven igual en una emergencia sin describir nada.
+- **El nombre de usuario del sistema, en texto y no como ruta**, en ese documento
+  y en el skill de backup: los dos nombraban la cuenta concreta que puede leer el
+  archivo protegido. Ahora dicen "la misma cuenta de Windows, en esa misma
+  instalación", que es lo que la persona necesita saber. (Acá tampoco se repite el
+  nombre: sacarlo de dos archivos y dejarlo en la nota que explica que se sacó no
+  arreglaría nada.)
+- Y de paso, **el skill decía que el documento de restauración "tiene la frase"**,
+  que ya era falso y podía hacer que alguien lo abriera esperando encontrarla.
+
+**Se comprobó que el procedimiento siga siendo seguible**: el paso 0 sigue
+diciendo que la frase hace falta, dónde está guardada, cómo copiarla, qué hacer si
+el descifrado falla, y cuándo la copia operativa deja de servir. Lo único que se
+perdió es la descripción de la forma, que era información y no instrucción.
+
+**Y esto también se corrige HACIA ADELANTE: el historial las sigue teniendo**,
+igual que las rutas. Vale lo mismo que arriba — sacarlas de ahí es una tanda
+propia y cara, y no está hecha.
+
+### Las 92 de auditorías y planes: DECISIÓN DE NO TOCARLAS
+
+**No es un pendiente: está decidido el 2026-08-18 que se quedan.** Son documentos
+de tandas cerradas —`AUDITORIA_VISUAL_…`, `PLAN_CORRECCION_…`, `PLAN_EJECUCION_…`,
+`CIERRE_FINAL_SELECTORES.md`— y describen lo que se hizo en su momento. **Editarlos
+falsea la historia**: un registro que se retoca deja de servir para saber qué pasó,
+que es lo único para lo que existe. Quedan como están.
+
+### Las 233 de `scripts/reports/`, y por qué
+
+Cuatro volcados de una herramienta, de noviembre de 2025. Son material generado:
+reescribirles el texto es maquillar un registro, así que **la pregunta no es cómo
+editarlos sino si siguen en el repo**. Queda abierta hasta relevar qué son, quién
+los lee y si se regeneran corriendo la herramienta.
 
 ## ⚑ UNIFICAR EL FORMATO DE MONEDA — MEDIDO EL 2026-08-18, **NO HECHO**
 
