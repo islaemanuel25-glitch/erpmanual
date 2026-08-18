@@ -507,6 +507,61 @@ try {
     `sin equivalencia: ${filas.sinEquivalencia} · sin pie: ${filas.sinPie}`
   );
 
+  // ── 10 · LOS MARCADORES DE CADA RENGLÓN ─────────────────────────────────
+  //
+  // Los tres íconos no son adorno: identifican QUÉ ES cada renglón, y en una
+  // lista de veinticinco tarjetas iguales eso es lo que deja recorrerla sin
+  // leer. Se cuentan sobre la primera tarjeta, que tiene los tres bloques.
+  const marcas = await evaluar(`(() => {
+    const t = ${TARJETAS}[0];
+    const cuerpo = t.firstElementChild;
+    const equivalencia = [...t.querySelectorAll('div')].find(
+      (d) => /Se vende|1 pack =|se carga al vender/i.test(d.textContent) && d.querySelector('svg')
+    );
+    const pie = t.querySelector('.font-mono');
+    return {
+      // El ícono del nombre: hermano del nodo del nombre, dentro del primer bloque.
+      enElNombre: !!(cuerpo && cuerpo.firstElementChild && cuerpo.firstElementChild.querySelector('svg')),
+      enLaEquivalencia: !!equivalencia,
+      enElPie: !!(pie && pie.querySelector('svg')),
+      textoDelPie: pie ? pie.textContent.trim() : "",
+    };
+  })()`);
+  afirmar(
+    marcas.enElNombre && marcas.enLaEquivalencia && marcas.enElPie,
+    "10a · los tres íconos están: producto, etiqueta y código de barras",
+    `nombre: ${marcas.enElNombre} · equivalencia: ${marcas.enLaEquivalencia} · pie: ${marcas.enElPie}`
+  );
+  afirmar(
+    !/#\d/.test(marcas.textoDelPie),
+    "10b · el código interno se rotula, no lleva almohadilla",
+    `el pie todavía dice: ${marcas.textoDelPie}`
+  );
+
+  // El proveedor ausente se DICE. Si no hubiera ninguno sin proveedor en estos
+  // datos, se avisa en vez de dar la afirmación por buena.
+  const proveedores = await evaluar(`(() => {
+    const t = ${TARJETAS};
+    const sinProveedor = t.filter((c) => /proveedor no especificado/i.test(c.innerText)).length;
+    // Una tarjeta cuyo segundo renglón esté VACÍO es el defecto: el dato falta y
+    // además el renglón desaparece, así que esa tarjeta queda más baja.
+    const vacias = t.filter((c) => {
+      const cuerpo = c.firstElementChild;
+      const segundo = cuerpo ? cuerpo.children[1] : null;
+      return segundo && segundo.textContent.trim() === "";
+    }).length;
+    return { sinProveedor, vacias, total: t.length };
+  })()`);
+  afirmar(
+    proveedores.vacias === 0,
+    `10c · ninguna tarjeta deja el renglón del proveedor en blanco`,
+    `${proveedores.vacias} de ${proveedores.total} con el renglón vacío`
+  );
+  if (proveedores.sinProveedor === 0) {
+    console.log("  ----  10c · en estos datos no hay ninguna tarjeta SIN proveedor:");
+    console.log("        el texto de reemplazo no se ejerció. No es un pase.");
+  }
+
   // ── 7 · LA LISTA TIENE PAGINACIÓN ───────────────────────────────────────
   //
   // La tabla la tenía y la lista de tarjetas no: mostraba los primeros 25 de
@@ -526,16 +581,35 @@ try {
     `paginadores en el DOM: ${paginador.enElDom}, visibles: 0 — el de la tabla no cuenta, está oculto`
   );
 
-  // ── 3 · LA CAPA, Y NINGÚN BOTÓN DE ADORNO ───────────────────────────────
-  await evaluar(`${TARJETAS}[0].firstElementChild.click(); true`);
-  await sleep(700);
-  const capa = await evaluar(`(() => {
-    const c = ${TARJETAS}[0].querySelector('.absolute.inset-0');
-    if (!c) return null;
-    return [...c.querySelectorAll('button')].map((b) => b.textContent.trim());
+  // ── 3 · LA FILA DE ACCIONES, A LA VISTA Y SIN TOCAR NADA ────────────────
+  //
+  // ACÁ HABÍA TRES AFIRMACIONES SOBRE UNA CAPA QUE YA NO EXISTE: que el primer
+  // toque la abría, qué botones tenía adentro, y que el segundo toque la
+  // cerraba. La capa se sacó por decisión de diseño, así que esas tres no se
+  // dejaron en verde sin objeto —un candado que afirma sobre algo que no existe
+  // pasa siempre y no defiende nada—: se reemplazan por lo que hay que defender
+  // ahora, que es que los botones estén VISIBLES sin ningún toque previo.
+  const fila = await evaluar(`(() => {
+    const t = ${TARJETAS}[0];
+    const botones = [...t.querySelectorAll('button')];
+    return {
+      // Visibles de verdad: con caja, no solo presentes en el DOM.
+      textos: botones.filter((b) => b.getBoundingClientRect().height > 0)
+        .map((b) => b.textContent.trim()),
+      // Y con su ícono: el diseño pide uno por botón.
+      conIcono: botones.filter((b) => b.querySelector('svg')).length,
+      // La capa no puede volver por la puerta de atrás.
+      hayCapa: !!t.querySelector('.absolute.inset-0'),
+    };
   })()`);
-  afirmar(capa !== null, "3a · el primer toque abre la capa de acciones",
-    "la capa no apareció: la tarjeta no responde al toque");
+
+  afirmar(
+    fila.textos.length > 0 && !fila.hayCapa,
+    "3a · los botones están a la vista sin tocar la tarjeta",
+    fila.hayCapa
+      ? "volvió la capa superpuesta: el diseño la sacó"
+      : "no hay ningún botón visible en la tarjeta"
+  );
 
   // ── POR QUÉ ES UNA LISTA ESPERADA Y NO "¿TIENE MANEJADOR?" ──────────────
   //
@@ -546,51 +620,56 @@ try {
   // para los DOS, el muerto y el vivo. Un candado escrito así se pone rojo
   // siempre o verde siempre, pero nunca por el motivo que dice.
   //
-  // La lista esperada sí afirma: si alguien vuelve a agregar "Información" antes
-  // de que exista la pantalla a la que iría, esto se pone rojo y lo nombra. Y si
-  // el botón nuevo es legítimo, se agrega acá A PROPÓSITO, que es exactamente el
-  // trámite que tiene que costar.
-  const ESPERADOS = (arg("botones", "Editar") || "").split(",").map((s) => s.trim());
-  const sobran = (capa || []).filter((b) => !ESPERADOS.includes(b));
-  const faltan = ESPERADOS.filter((b) => !(capa || []).includes(b));
+  // La lista esperada sí afirma: si alguien agrega un botón antes de que exista
+  // la pantalla a la que iría, esto se pone rojo y lo nombra. Y si el botón
+  // nuevo es legítimo, se agrega acá A PROPÓSITO, que es el trámite que tiene
+  // que costar.
+  const ESPERADOS = (arg("botones", "Ver,Editar") || "").split(",").map((s) => s.trim());
+  const sobran = fila.textos.filter((b) => !ESPERADOS.includes(b));
+  const faltan = ESPERADOS.filter((b) => !fila.textos.includes(b));
   afirmar(
-    capa !== null && sobran.length === 0 && faltan.length === 0,
-    `3b · la capa tiene exactamente los botones esperados (${ESPERADOS.join(", ")})`,
-    capa === null ? "no hay capa que mirar"
-      : `sobran: ${sobran.join(", ") || "ninguno"} · faltan: ${faltan.join(", ") || "ninguno"}`
+    sobran.length === 0 && faltan.length === 0,
+    `3b · la fila tiene exactamente los botones esperados (${ESPERADOS.join(", ")})`,
+    `sobran: ${sobran.join(", ") || "ninguno"} · faltan: ${faltan.join(", ") || "ninguno"}`
   );
 
-  // ── 4 · EL SEGUNDO TOQUE CIERRA ─────────────────────────────────────────
-  await evaluar(`(() => {
-    const t = ${TARJETAS}[0];
-    const c = t.querySelector('.absolute.inset-0');
-    (c || t.firstElementChild).click();
-    return true;
-  })()`);
-  await sleep(700);
-  const sigueAbierta = await evaluar(`!!${TARJETAS}[0].querySelector('.absolute.inset-0')`);
   afirmar(
-    !sigueAbierta,
-    "4 · el segundo toque cierra la capa",
-    "sigue abierta: el toque en la capa burbujea al contenedor y `onToggle` corre dos veces"
+    fila.conIcono >= ESPERADOS.length,
+    `3c · cada botón lleva su ícono (${fila.conIcono} de ${ESPERADOS.length})`,
+    "un botón sin ícono: el diseño pide uno por acción"
+  );
+
+  // ── 4 · EL SEPARADOR ENTRE LOS BOTONES ──────────────────────────────────
+  //
+  // Reemplaza a la vieja "el segundo toque cierra". Se mide que exista una línea
+  // vertical ENTRE los botones y no en el borde de afuera: `divide-x` la dibuja
+  // solo en los intermedios, y escribirla a mano en cada botón deja una colgando
+  // en el último.
+  const separadores = await evaluar(`(() => {
+    const t = ${TARJETAS}[0];
+    const botones = [...t.querySelectorAll('button')];
+    const conBorde = botones.filter((b) => {
+      const w = parseFloat(getComputedStyle(b).borderLeftWidth) || 0;
+      return w > 0;
+    }).length;
+    return { total: botones.length, conBorde };
+  })()`);
+  afirmar(
+    separadores.conBorde === Math.max(0, separadores.total - 1),
+    `4 · hay una línea entre botones y ninguna colgando (${separadores.conBorde} para ${separadores.total} botones)`,
+    `con ${separadores.total} botones tiene que haber ${Math.max(0, separadores.total - 1)} separador(es)`
   );
 
   // ── 2 · EDITAR ENTRA ────────────────────────────────────────────────────
   // Va última porque navega y deja la pantalla.
-  await evaluar(`(() => {
-    const t = ${TARJETAS}[0];
-    if (!t.querySelector('.absolute.inset-0')) t.firstElementChild.click();
-    return true;
-  })()`);
-  await sleep(600);
   const tocado = await evaluar(`(() => {
-    const b = [...${TARJETAS}[0].querySelectorAll('.absolute.inset-0 button')]
+    const b = [...${TARJETAS}[0].querySelectorAll('button')]
       .find((x) => /editar/i.test(x.textContent));
     if (!b) return false;
     b.click();
     return true;
   })()`);
-  if (!tocado) morir("no encontré el botón Editar dentro de la capa");
+  if (!tocado) morir("no encontré el botón Editar en la fila de acciones");
   await sleep(3000);
 
   const despues = await evaluar(`({ alertas: window.__alertas || [], donde: location.pathname })`);
