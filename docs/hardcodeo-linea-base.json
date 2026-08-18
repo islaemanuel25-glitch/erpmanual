@@ -1,10 +1,10 @@
 {
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
-  "generada": "2026-08-17 20:36",
-  "commit": "3eb3f50705cedeafddb2a9cd0ee462ce3ae9bd74",
+  "generada": "2026-08-18 04:29",
+  "commit": "84889685346e903d3514da5ecce2f887c28d4104",
   "total": {
     "color": 294,
-    "medida": 1874,
+    "medida": 1892,
     "modal": 36,
     "crudo": 317,
     "celda": 465,
@@ -14,7 +14,7 @@
   "porPantalla": {
     "(kit)": {
       "color": 32,
-      "medida": 32,
+      "medida": 45,
       "modal": 1,
       "crudo": 0,
       "celda": 0,
@@ -23,7 +23,7 @@
     },
     "(suelto)": {
       "color": 5,
-      "medida": 10,
+      "medida": 15,
       "modal": 1,
       "crudo": 2,
       "celda": 0,

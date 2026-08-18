@@ -5435,6 +5435,68 @@ la sección "SIETE CANDADOS DEL CONTRATO VIEJO POR REESCRIBIR", unas líneas má
 arriba; se nombra también acá porque en el relevamiento del 2026-08-17 figuraba
 como pendiente sin anotar y conviene que aparezca buscando por "contrato viejo".
 
+## ⚑ UNIFICAR EL FORMATO DE MONEDA — MEDIDO EL 2026-08-18, **NO HECHO**
+
+**Salió del handoff de la tarjeta de producto, que pide "un solo formateador para
+todo el ERP: siempre dos decimales".** Se midió antes de tocar nada y la medición
+dice que NO es acotado: se anota como tanda propia y no se hace de paso.
+
+### El número que lo sostiene
+
+**205 lugares formatean plata a mano, en 82 archivos, con 36 formateadores
+distintos escritos a mano.** No existe ningún formateador compartido de todo el
+ERP: hay dos semi-compartidos —uno de listas de proveedor con 8 consumidores, uno
+de caja con 5— y el resto son definiciones locales encerradas en su archivo, varias
+duplicadas literalmente (el de ticket térmico y el de PDF son la MISMA función
+escrita dos veces).
+
+Los tres módulos más pesados concentran el 63 %: POS-Ventas 60, Caja y turnos 39,
+Auditoría POS 30.
+
+### EL FRENO NO ES LA CANTIDAD: SON LOS CANDADOS, Y SE CONTRADICEN ENTRE SÍ
+
+Unas **45 afirmaciones en 14 archivos de prueba** fijan el formato, y no hay una
+regla única que las deje a todas en verde:
+
+- unas exigen `$ 1.000,00` **con** espacio (listas de proveedor, retiros);
+- otras exigen `$1.000,00` **sin** espacio (vista de turno, apertura de relevo);
+- otras exigen `$1.000` **sin decimales** — las denominaciones de billete, donde
+  `$10.000,00` sería un billete que no existe;
+- y `retiroPantallaRender.test.mjs:433` exige que el importe de la grilla **NO
+  lleve `$`**, con su motivo escrito: el ancho de la columna se reserva para el
+  número.
+
+**Cuatro de esos formatos no son estilo, son regla de negocio con su porqué al
+lado** — entre ellos el nulo que muestra raya y no `$0,00`, para que un producto
+sin costo cargado no se lea como que vale cero.
+
+### Lo que hay que decidir ANTES de escribir una línea
+
+Tres preguntas que el handoff no cubre, y sin las cuales cualquier formateador
+único deja candados rojos: si el peso lleva espacio o no; qué pasa con las
+denominaciones de billete; y si la grilla de retiro deja de ser la excepción que
+su propio candado defiende. **Son de negocio, no de código.**
+
+### Lo que SÍ se hizo
+
+`lib/moneda.js`, el formateador único, **para las piezas nuevas**. La tarjeta de
+producto lo usa. Los 205 lugares viejos quedan como están: reemplazarlos es esta
+tanda.
+
+Y un dato que cambia cómo leer todo esto: **`docs/04-CONVENCIONES.md` ya dice que
+la convención del proyecto es mínimo y máximo de 2 decimales.** No es una idea
+nueva del handoff — es una regla escrita que 36 formateadores nunca cumplieron.
+
+### Una corrección al handoff, medida
+
+El handoff denuncia que en la pantalla de productos conviven `$166860.00` y
+`$1.668.600`. **Conviven tres formatos, pero no ésos dos**: son `$ 1.668.600` (la
+grilla, sin decimales nunca), `$ 166.860,00` (la vista previa de importación, con
+espacio) y `$166.860,00` (el modal de composición, sin espacio) — más un cuarto a
+un clic, en actualización de precios. El `$166860.00` existe en el ERP pero vive en
+Stock por local y en la lista de conciliación, no en productos. La denuncia es
+correcta en el fondo; el ejemplo mezcla dos pantallas.
+
 ## ⚑ `--accent` — MEDIDO Y DECIDIDO EL 2026-08-17. **NO IMPLEMENTADO.**
 
 > **ESTADO: listo para retomar.** Está todo medido y la decisión está tomada. Lo
