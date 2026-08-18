@@ -69,6 +69,15 @@ import {
 // equivalente en la escala, así que ése sí va escrito.
 const PADDING = "px-[13px] pt-3.5 pb-3";
 
+/**
+ * Lo que dice el pie cuando el producto no tiene código de barras.
+ *
+ * No es una raya ni un espacio: una raya se lee como "no sé" y un espacio se lee
+ * como un error de dibujo. Esto se lee como lo que es, que además es la
+ * respuesta a por qué ese producto no aparece al escanear.
+ */
+const SIN_CODIGO_BARRA = "sin código de barras";
+
 export default function SunmiProductoCard({
   nombre,
   empresa = null,
@@ -87,6 +96,9 @@ export default function SunmiProductoCard({
   const contenedor = [
     "relative overflow-hidden",
     declaraDisplay(className) ? "" : "flex flex-col",
+    // `h-full` para que la tarjeta llene la fila cuando la lista las iguala. Sin
+    // esto el panel crece pero el contenido queda flotando en una caja más alta.
+    "h-full",
     "gap-[11px]",
     padding,
   ]
@@ -98,7 +110,13 @@ export default function SunmiProductoCard({
     // fondo del panel y el de la página son el mismo color en los catorce temas
     // —1,00 en `sunmiDark`—, así que veinticinco apiladas se leían como un bloque
     // continuo. Ver `--card-elevacion` en `app/globals.css`.
-    <SunmiPanel noPadding elevado className={className}>
+    <SunmiPanel
+      noPadding
+      elevado
+      // `h-full` para que el panel llene su fila cuando la lista iguala alturas.
+      // Va primero para que, si la pantalla declara su propio alto, el suyo mande.
+      className={["h-full", className].filter(Boolean).join(" ")}
+    >
       <div
         className={contenedor}
         onClick={onToggle ?? undefined}
@@ -167,20 +185,32 @@ export default function SunmiProductoCard({
         )}
 
         {/* 5 y 6 · EL PIE DE CÓDIGOS. Monoespaciada y con cifras tabulares: se
-            comparan de un vistazo contra una etiqueta o un remito. */}
-        {(codigoBarra || codigoInterno) && (
-          <div
-            className={componerClaseTexto({
-              base: "flex justify-between gap-2 border-t sunmi-divider pt-[9px] font-mono [font-variant-numeric:tabular-nums]",
-              tamano: "text-[10.5px]",
-              color: "sunmi-text-muted",
-              pedido: className,
-            })}
-          >
-            <span>{codigoBarra}</span>
-            {codigoInterno && <span>#{codigoInterno}</span>}
-          </div>
-        )}
+            comparan de un vistazo contra una etiqueta o un remito.
+            ────────────────────────────────────────────────────────────────
+            EL PIE VA SIEMPRE, aunque no haya código. Antes el bloque entero
+            desaparecía y las tarjetas sin código de barras quedaban más bajas
+            que las vecinas — en una lista de veinticinco eso se ve como una
+            lista despareja, no como un producto sin código.
+            Y no se resuelve con un hueco vacío: **que un producto no tenga
+            código de barras es un dato**, y es de los que hacen falta cuando
+            alguien está buscando por qué no lo encuentra escaneando. */}
+        <div
+          className={componerClaseTexto({
+            // `mt-auto` ancla el pie ABAJO. Cuando la lista iguala los altos, el
+            // sobrante va entre la equivalencia y el pie, así que los pies de
+            // todas las tarjetas quedan alineados entre sí — que es lo que hace
+            // que una lista pareja se lea como pareja y no como estirada.
+            base: "mt-auto flex justify-between gap-2 border-t sunmi-divider pt-[9px] font-mono [font-variant-numeric:tabular-nums]",
+            tamano: "text-[10.5px]",
+            color: "sunmi-text-muted",
+            pedido: className,
+          })}
+        >
+          <span className={codigoBarra ? "" : "italic opacity-70"}>
+            {codigoBarra || SIN_CODIGO_BARRA}
+          </span>
+          {codigoInterno && <span>#{codigoInterno}</span>}
+        </div>
 
         {/* LA CAPA. Sobre esta tarjeta y ninguna otra: la lista no se mueve ni
             cambia de alto al abrirla. */}

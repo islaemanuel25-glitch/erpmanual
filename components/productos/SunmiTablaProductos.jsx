@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
-import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiPill from "@/components/sunmi/SunmiPill";
-import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
+// El pie de paginación se mudó acá: `useState`, `SunmiButton`, `SunmiInput` y
+// `SunmiPageSizer` se usaban SOLO para él, así que se fueron con la pieza.
+import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 
 import { Pencil, Trash2, Warehouse, Eye, Power, PowerOff } from "lucide-react";
 
@@ -53,17 +52,6 @@ export default function SunmiTablaProductos({
   const AREA = Object.fromEntries(
     (catalogos?.AREAS ?? []).map((a) => [String(a.id), a.nombre])
   );
-
-  // "Ir a página": valida 1..totalPages y delega en onGoToPage.
-  const [goToValue, setGoToValue] = useState("");
-  const submitGoTo = () => {
-    if (goToValue === "" || !onGoToPage) return;
-    let n = parseInt(goToValue, 10);
-    if (Number.isNaN(n)) { setGoToValue(""); return; }
-    n = Math.min(Math.max(1, n), totalPages || 1);
-    onGoToPage(n);
-    setGoToValue("");
-  };
 
   const money = (v) => {
     if (v === null || v === undefined) return "-";
@@ -396,44 +384,20 @@ export default function SunmiTablaProductos({
         )}
       </SunmiTable>
 
-      <div className="flex items-center justify-between px-3 py-2 flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <SunmiButton color="slate" disabled={page <= 1} onClick={onPrev}>
-            « Anterior
-          </SunmiButton>
-
-          <span className="sunmi-text-muted text-[11px]">
-            Página {page} / {totalPages}
-            {totalItems > 0 && <span className="ml-1 opacity-70">({totalItems} items)</span>}
-          </span>
-
-          <SunmiButton color="slate" disabled={page >= totalPages} onClick={onNext}>
-            Siguiente »
-          </SunmiButton>
-
-          {/* Ir directo a una página (valida 1..totalPages) */}
-          {onGoToPage && totalPages > 1 && (
-            <form
-              onSubmit={(e) => { e.preventDefault(); submitGoTo(); }}
-              className="flex items-center gap-1"
-            >
-              <span className="sunmi-text-muted text-[11px] whitespace-nowrap">Ir a</span>
-              <SunmiInput
-                type="text"
-                inputMode="numeric"
-                value={goToValue}
-                onChange={(e) => setGoToValue(e.target.value.replace(/[^\d]/g, ""))}
-                onBlur={submitGoTo}
-                placeholder={String(totalPages)}
-                className="w-16 !text-center !py-1 text-[12px]"
-                aria-label="Ir a página"
-              />
-            </form>
-          )}
-        </div>
-
-        <SunmiPageSizer value={pageSize} onChange={(size) => onPageSizeChange?.(size)} />
-      </div>
+      {/* El pie de paginación se fue a `SunmiPaginador`, sin cambiarle un nodo:
+          la lista de tarjetas del catálogo necesitaba el mismo y no había
+          ninguno. Comprobado que la tabla quedó idéntica midiendo la caja de los
+          catorce nodos del bloque antes y después. */}
+      <SunmiPaginador
+        page={page}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        onNext={onNext}
+        onPrev={onPrev}
+        onGoToPage={onGoToPage}
+        onPageSizeChange={onPageSizeChange}
+      />
     </div>
   );
 }

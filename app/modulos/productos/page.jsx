@@ -21,6 +21,7 @@ import ModalProducto from "@/components/productos/ModalProductoFinal";
 import ModalVerComposicion from "@/components/productos/ModalVerComposicion";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import SunmiProductoCard from "@/components/sunmi/SunmiProductoCard";
+import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -99,6 +100,28 @@ export default function ProductosPage() {
     setSelectedProductId(id);
     try { sessionStorage.setItem("productos:selectedProductId", String(id)); } catch {}
   }, []);
+
+  // ── LA PAGINACIÓN, DEFINIDA UNA SOLA VEZ ─────────────────────────────────
+  //
+  // La consumen DOS vistas de la misma pantalla: la tabla, de 768 px para
+  // arriba, y la lista de tarjetas del celular. Se arma como un objeto y se
+  // pasa entera a las dos, en vez de escribir los cuatro manejadores dos veces:
+  // dos copias no se rompen el día que se escriben, se rompen el día que una
+  // cambia — y acá "cambiar" significa que el celular pagine distinto que la
+  // computadora sobre los mismos 2.600 productos.
+  const propsPaginacion = {
+    page,
+    pageSize,
+    totalPages,
+    totalItems,
+    onNext: () => setPage((p) => p + 1),
+    onPrev: () => setPage((p) => Math.max(1, p - 1)),
+    onGoToPage: (n) => setPage(Math.min(Math.max(1, Number(n) || 1), totalPages || 1)),
+    onPageSizeChange: (size) => {
+      setPageSize(size);
+      setPage(1);
+    },
+  };
 
   const localId = contexto?.localId || 0;
 
@@ -954,7 +977,19 @@ export default function ProductosPage() {
                   De escritorio para arriba NO CAMBIA NADA: la tabla es la misma
                   y su huella de la línea de base, tomada a 1366, tiene que seguir
                   dando cero. */}
-              <div className="md:hidden mt-1 flex flex-col gap-[9px]">
+              {/* ── POR QUÉ GRID Y NO UNA COLUMNA FLEX ────────────────────
+                  `auto-rows-fr` le da a TODAS las filas el alto de la más alta,
+                  así que las tarjetas quedan todas iguales sin recortar ningún
+                  nombre —que es una decisión ya tomada: los nombres reales son
+                  largos y recortarlos esconde justo lo que distingue un producto
+                  de otro—. El sobrante de las más cortas se va entre la
+                  equivalencia y el pie, porque el pie lleva `mt-auto`, así que
+                  los pies quedan alineados de tarjeta a tarjeta.
+
+                  Medido antes de esto: dos alturas conviviendo, 191,9 y 211,4 —
+                  exactamente una línea de nombre de diferencia. */}
+              <div className="md:hidden mt-1">
+                <div className="grid grid-cols-1 auto-rows-fr gap-[9px]">
                 {rows.map((p) => (
                   <SunmiProductoCard
                     key={p.id ?? p.productoLocalId}
@@ -1006,6 +1041,14 @@ export default function ProductosPage() {
                     }
                   />
                 ))}
+                </div>
+
+                {/* EL MISMO PIE QUE LA TABLA, no uno parecido. Sin esto la lista
+                    del celular mostraba los primeros 25 de 2.600 productos y no
+                    había forma de llegar al 26. Va FUERA de la grilla: adentro
+                    sería una fila más y `auto-rows-fr` le daría el alto de una
+                    tarjeta. */}
+                <SunmiPaginador {...propsPaginacion} />
               </div>
 
               <div className="hidden md:block w-full mt-1">
@@ -1014,19 +1057,7 @@ export default function ProductosPage() {
                     columns={allColumns.filter((c) =>
                       c.key === "nombre" ? true : visibleCols.includes(c.key)
                     )}
-                    page={page}
-                    pageSize={pageSize}
-                    totalPages={totalPages}
-                    totalItems={totalItems}
-                    onNext={() => setPage((p) => p + 1)}
-                    onPrev={() => setPage((p) => Math.max(1, p - 1))}
-                    onGoToPage={(n) =>
-                      setPage(Math.min(Math.max(1, Number(n) || 1), totalPages || 1))
-                    }
-                    onPageSizeChange={(size) => {
-                      setPageSize(size);
-                      setPage(1);
-                    }}
+                    {...propsPaginacion}
                     sortKey={sortKey}
                     sortDir={sortDir}
                     onSort={(key) => {
