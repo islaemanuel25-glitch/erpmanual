@@ -577,6 +577,20 @@
 /* --- Utilidades --- */
 .sunmi-row-hover:hover { background: var(--table-row-hover); }
 .sunmi-divider { border-color: var(--app-border); }
+/* ELEVACIÓN DE TARJETA — el límite visible de un panel contra el fondo.
+   ---------------------------------------------------------------------
+   Va como `outline` y NO como `border-color`, y eso no es preferencia: en esta
+   hoja las utilidades de Tailwind van DESPUÉS de las clases del kit —lo mide la
+   sonda de cascada en cada despliegue—, así que un `.sunmi-elevado` que pisara
+   `border-color` perdería contra el `border-slate-800` que trae la tarjeta del
+   tema. El `outline` no compite con ninguna utilidad que el repo use, así que
+   gana sin depender del orden de la hoja.
+
+   `outline-offset: -1px` lo dibuja justo sobre el borde de 1 px que ya está, así
+   que reemplaza ese límite invisible en vez de agregar un segundo anillo, y no
+   mueve ni un píxel de layout: `outline` no ocupa espacio. Sigue el
+   `border-radius`, así que respeta las esquinas redondeadas del panel. */
+.sunmi-elevado { outline: 1px solid var(--card-elevacion); outline-offset: -1px; }
 .sunmi-ring    { --tw-ring-color: var(--app-border); }
 .sunmi-thead   { background: var(--table-header-bg); color: var(--table-header-fg, var(--app-fg)); }
 .sunmi-divide > :not([hidden]) ~ :not([hidden]) { border-color: var(--app-border); }

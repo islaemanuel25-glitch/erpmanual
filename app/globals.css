@@ -61,6 +61,25 @@ html:not([data-theme]) {
   --app-bg: #0f172a;
   --app-fg: #e2e8f0;
   --app-border: #1e293b;
+  /* ELEVACIÓN — el límite de una tarjeta contra el fondo de la página.
+     ------------------------------------------------------------------
+     `--app-border` NO servía para esto y está medido: contra el fondo de este
+     tema da 1,22, y el fondo de la tarjeta da 1,00 —es EL MISMO COLOR que el de
+     la página—. O sea que una tarjeta no tenía límite visible, y apilar
+     veinticinco en el catálogo del celular lo dejó a la vista por primera vez.
+     Agrandar la separación no podía arreglarlo: el hueco entre dos tarjetas es
+     del color de las tarjetas.
+
+     El valor sale de la tinta de este mismo tema diluida hacia su fondo hasta
+     tocar 3,0, que es el mínimo de WCAG 1.4.11 para el contraste de algo que no
+     es texto —el límite de un componente lo es—. Es la misma división que ya
+     usó `--pos-warning`: 4,5 para texto, 3,0 para lo demás. Se derivó por
+     cálculo contra el fondo real de cada tema, no a ojo, así que ninguno de los
+     catorce queda por debajo por olvido.
+
+     Es del KIT, no del catálogo: `SunmiPanel` nunca dio elevación, y stock y
+     pedidos van a apilar tarjetas igual. */
+  --card-elevacion: #5d6473; /* 3,01 contra #0f172a */
   --app-input-bg: #1e293b;
   --app-input-border: #475569;
   --app-scrollbar-track: #0f172a;
@@ -131,6 +150,7 @@ html[data-theme="sunmiDarkCompact"] {
   --app-bg: #020617;
   --app-fg: #e2e8f0;
   --app-border: #1e293b;
+  --card-elevacion: #575c69; /* 3,02 contra #020617 */
   --app-input-bg: #0f172a;
   --app-input-border: #334155;
   --app-scrollbar-track: #020617;
@@ -203,6 +223,7 @@ html[data-theme="sunmiLight"] {
   --app-bg: #f1f5f9;
   --app-fg: #0f172a;
   --app-border: #cbd5e1;
+  --card-elevacion: #888e99; /* 3,01 contra #f1f5f9 */
   --app-input-bg: #ffffff;
   --app-input-border: #cbd5e1;
   --app-scrollbar-track: #f1f5f9;
@@ -284,6 +305,7 @@ html[data-theme="sunmiGraphite"] {
   --app-bg: #0e1116;
   --app-fg: #e6edf3;
   --app-border: #2a2f36;
+  --card-elevacion: #5c6166; /* 3,02 contra #0e1116 */
   --app-input-bg: #161b22;
   --app-input-border: #2a2f36;
   --app-scrollbar-track: #0e1116;
@@ -356,6 +378,7 @@ html[data-theme="sunmiSand"] {
   --app-bg: #f6f1e7;
   --app-fg: #1f2937;
   --app-border: #e7d9c3;
+  --card-elevacion: #898c8e; /* 3,01 contra #f6f1e7 */
   --app-input-bg: #fffaf0;
   --app-input-border: #e7d9c3;
   --app-scrollbar-track: #f6f1e7;
@@ -437,6 +460,7 @@ html[data-theme="sunmiBlueClassic"] {
   --app-bg: #0b1f3a;
   --app-fg: #e6f0ff;
   --app-border: #1d3b6b;
+  --card-elevacion: #5a6a81; /* 3,00 contra #0b1f3a */
   --app-input-bg: #102a4d;
   --app-input-border: #1d3b6b;
   --app-scrollbar-track: #0b1f3a;
@@ -507,6 +531,10 @@ html[data-theme="sunmiFrance"] {
   --app-bg: #f3f4f6;
   --app-fg: #0b0f17;
   --app-border: #000000;
+  /* Los dos temas Francia son los ÚNICOS que ya resolvían esto: su borde negro
+     da 19,0 contra el fondo, muy por encima del mínimo de 3,0. Así que el token
+     toma ese mismo valor y estos dos temas no se mueven ni un píxel. */
+  --card-elevacion: #000000; /* 19,0 contra #f3f4f6 */
   --app-input-bg: #ffffff;
   --app-input-border: #000000;
   --app-scrollbar-track: #ffffff;
@@ -588,6 +616,10 @@ html[data-theme="sunmiFranceSplit"] {
   --app-bg: #f3f4f6;
   --app-fg: #0b0f17;
   --app-border: #000000;
+  /* Los dos temas Francia son los ÚNICOS que ya resolvían esto: su borde negro
+     da 19,0 contra el fondo, muy por encima del mínimo de 3,0. Así que el token
+     toma ese mismo valor y estos dos temas no se mueven ni un píxel. */
+  --card-elevacion: #000000; /* 19,0 contra #f3f4f6 */
   --app-input-bg: #ffffff;
   --app-input-border: #000000;
   --app-scrollbar-track: #ffffff;
@@ -669,6 +701,7 @@ html[data-theme="operixBluePro"] {
   --app-bg: #F6F8FC;
   --app-fg: #0F172A;
   --app-border: #E2E8F0;
+  --card-elevacion: #8b909b; /* 3,01 contra #F6F8FC */
   --app-input-bg: #FFFFFF;
   --app-input-border: #E2E8F0;
   --app-scrollbar-track: #F6F8FC;
@@ -747,6 +780,7 @@ html[data-theme="operixNight"] {
   --app-bg: #07111F;
   --app-fg: #F8FAFC;
   --app-border: #243244;
+  --card-elevacion: #59616b; /* 3,02 contra #07111F */
   --app-input-bg: #0F1B2D;
   --app-input-border: #243244;
   --app-scrollbar-track: #07111F;
@@ -825,6 +859,7 @@ html[data-theme="verdeComercio"] {
   --app-bg: #F5FAF7;
   --app-fg: #102019;
   --app-border: #DDEAE2;
+  --card-elevacion: #89938e; /* 3,00 contra #F5FAF7 */
   --app-input-bg: #FFFFFF;
   --app-input-border: #DDEAE2;
   --app-scrollbar-track: #F5FAF7;
@@ -903,6 +938,7 @@ html[data-theme="grafitoEjecutivo"] {
   --app-bg: #F4F4F5;
   --app-fg: #18181B;
   --app-border: #D4D4D8;
+  --card-elevacion: #8d8d8f; /* 3,01 contra #F4F4F5 */
   --app-input-bg: #FFFFFF;
   --app-input-border: #D4D4D8;
   --app-scrollbar-track: #F4F4F5;
@@ -983,6 +1019,7 @@ html[data-theme="ambarCaja"] {
   --app-bg: #FFFBEB;
   --app-fg: #1F1A0A;
   --app-border: #F3E8C2;
+  --card-elevacion: #969282; /* 3,01 contra #FFFBEB */
   --app-input-bg: #FFFFFF;
   --app-input-border: #F3E8C2;
   --app-scrollbar-track: #FFFBEB;
@@ -1061,6 +1098,7 @@ html[data-theme="violetaSaas"] {
   --app-bg: #FAF7FF;
   --app-fg: #1E1B2E;
   --app-border: #E7DDF7;
+  --card-elevacion: #918e9c; /* 3,02 contra #FAF7FF */
   --app-input-bg: #FFFFFF;
   --app-input-border: #E7DDF7;
   --app-scrollbar-track: #FAF7FF;

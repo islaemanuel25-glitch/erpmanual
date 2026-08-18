@@ -23,6 +23,7 @@ export default function SunmiPanel({
   children,
   className = "",
   noPadding = false,
+  elevado = false,
 }) {
   const { theme } = useSunmiTheme();
   const padding = noPadding ? "" : paddingQueSobrevive(PADDING, className);
@@ -30,6 +31,25 @@ export default function SunmiPanel({
   // filtra token por token: una pantalla que declara fondo no tiene por qué
   // perder el borde, que no pidió.
   const tarjeta = tarjetaQueSobrevive(theme.card, className);
+  // ── ELEVACIÓN, Y POR QUÉ ES UNA PROP Y NO EL DEFAULT ─────────────────────
+  //
+  // `SunmiPanel` NUNCA dio elevación: medido sobre la pantalla real en los
+  // catorce temas, el fondo de un panel está entre 1,00 y 1,15 de contraste
+  // contra el fondo de la página, y su borde no llega a 1,5 en doce de ellos. En
+  // `sunmiDark` panel y página son literalmente el mismo color. Eso no molestó
+  // nunca porque los paneles son pocos, grandes y llenos de contenido que sí
+  // contrasta; apilar veinticinco tarjetas iguales en el catálogo del celular
+  // fue la primera vez que quedó a la vista.
+  //
+  // Va como prop y no como default porque encenderlo en todos lados le cambiaría
+  // el límite a los paneles de las 28 pantallas que ya existen, y eso es una
+  // tanda con su comparación de huellas, no un efecto lateral de ésta.
+  //
+  // Y CEDE, como el resto del kit: si la pantalla declara su propio `outline`,
+  // la pieza no pone el suyo. Sin esto serían dos anillos peleando por el mismo
+  // borde, y ganaría el orden de la hoja en vez de la pantalla.
+  const declaraOutline = /(^|\s)(outline|\[outline)/.test(String(className));
+  const elevacion = elevado && !declaraOutline ? "sunmi-elevado" : "";
 
   return (
     <div
@@ -52,7 +72,7 @@ export default function SunmiPanel({
       // declaraciones—, así que tiene que ser un atributo propio que valga igual
       // antes y después. Es el mismo recurso que `data-sunmi-modal="tarjeta"`.
       data-sunmi-panel=""
-      className={`${tarjeta} rounded-2xl ${padding} ${className}`
+      className={`${tarjeta} rounded-2xl ${elevacion} ${padding} ${className}`
         .replace(/\s+/g, " ")
         .trim()}
     >
