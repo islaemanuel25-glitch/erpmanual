@@ -20,14 +20,14 @@ Son ocho palabras y cuatro dígitos separados por guiones, así:
 guiones son parte de la frase.
 
 Existe además una tercera copia, **operativa y desechable**, en
-`C:\Users\emanuel\.erpazul-backup\frase-gpg.xml`. La usa la tarea automática para
+`%USERPROFILE%\.erpazul-backup\frase-gpg.xml`. La usa la tarea automática para
 cifrar sin intervención. Está protegida con DPAPI: **solo la puede leer el usuario
 `emanuel` en esa misma instalación de Windows**. Si formateaste la notebook, ese
 archivo ya no sirve — y no importa, porque las copias 1 y 2 son las que valen.
 
 Para verla desde la notebook actual, si la tenés a mano:
 
-    powershell -NoProfile -Command "$s = Import-Clixml 'C:\Users\emanuel\.erpazul-backup\frase-gpg.xml'; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))"
+    powershell -NoProfile -Command "$s = Import-Clixml '%USERPROFILE%\.erpazul-backup\frase-gpg.xml'; [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))"
 
 Los backups **diarios NO están cifrados**: viven en el VPS y en la notebook, que
 son lugares bajo tu control. Solo los semanales y mensuales que van al repo de
@@ -39,7 +39,7 @@ GitHub están cifrados, porque salen de tu máquina.
 
 Hay tres destinos. Mirá primero cuál está más al día:
 
-    type C:\Users\emanuel\Backups\erpazul\ESTADO.txt
+    type %USERPROFILE%\Backups\erpazul\ESTADO.txt
 
 Ese archivo dice la fecha de la última copia exitosa a cada destino. Si alguna
 está vieja o dice `NUNCA`, ese destino no sirve para esta restauración.
@@ -47,7 +47,7 @@ está vieja o dice `NUNCA`, ese destino no sirve para esta restauración.
 | Dónde | Qué tiene | Cifrado |
 |---|---|---|
 | VPS `/srv/produccion/backups/` | 30 diarios, 12 semanales, 12 mensuales | no |
-| Notebook `C:\Users\emanuel\Backups\erpazul\` | los diarios bajados | no |
+| Notebook `%USERPROFILE%\Backups\erpazul\` | los diarios bajados | no |
 | Repo `erpazul-backups` en GitHub | semanales y mensuales | **sí, gpg** |
 | Disco externo, etiqueta `BACKUP-ERP` | los diarios, si estaba conectado | no |
 
@@ -66,7 +66,7 @@ VPS**, usá la notebook; y si tampoco la tenés, el repo de GitHub.
 
 ### Opción B: desde la notebook
 
-    dir C:\Users\emanuel\Backups\erpazul\
+    dir %USERPROFILE%\Backups\erpazul\
 
 ### Opción C: desde el repo de GitHub (backups cifrados)
 
@@ -225,8 +225,8 @@ cifrado los domingos y el día 1.
 
 Log y estado:
 
-    type C:\Users\emanuel\Backups\erpazul\backup.log      # historial, una línea por destino
-    type C:\Users\emanuel\Backups\erpazul\ESTADO.txt      # última copia exitosa a cada destino
+    type %USERPROFILE%\Backups\erpazul\backup.log      # historial, una línea por destino
+    type %USERPROFILE%\Backups\erpazul\ESTADO.txt      # última copia exitosa a cada destino
 
 Correrla a mano, forzando también el envío al repo:
 
@@ -246,8 +246,8 @@ deja en el log `disco_externo | NO CONECTADO` y continúa con los demás destino
 3. Recreá la copia operativa de la frase, sacándola del papel o del gestor:
 
        $f = Read-Host "frase" -AsSecureString
-       New-Item -ItemType Directory -Path C:\Users\emanuel\.erpazul-backup -Force
-       $f | Export-Clixml C:\Users\emanuel\.erpazul-backup\frase-gpg.xml
+       New-Item -ItemType Directory -Path %USERPROFILE%\.erpazul-backup -Force
+       $f | Export-Clixml %USERPROFILE%\.erpazul-backup\frase-gpg.xml
 
 4. Volvé a registrar la tarea programada con el bloque que está en
    `ops/backup/README-tarea-windows.txt`.

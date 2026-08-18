@@ -22,7 +22,7 @@ Son **tres**, no cuatro. Los tres se ejecutan y se validan en cada corrida:
 
 1. **VPS** `/srv/produccion/backups/` — 30 diarios, 12 semanales, 12 mensuales.
    Sin cifrar: está bajo control propio.
-2. **Notebook** `C:\Users\emanuel\Backups\erpazul\` — el diario, siempre. Sin
+2. **Notebook** `%USERPROFILE%\Backups\erpazul\` — el diario, siempre. Sin
    cifrar.
 3. **Repo privado `erpazul-backups` en GitHub** — solo semanal y mensual, y
    **cifrados con gpg**, porque salen de la máquina. El diario no va: git guarda
@@ -76,8 +76,8 @@ para recuperar el día si la notebook estaba apagada.
 
 ```powershell
 Get-ScheduledTaskInfo -TaskName "ERP Azul - bajar backup"
-type C:\Users\emanuel\Backups\erpazul\backup.log      # una línea por destino
-type C:\Users\emanuel\Backups\erpazul\ESTADO.txt      # última copia exitosa a cada destino
+type %USERPROFILE%\Backups\erpazul\backup.log      # una línea por destino
+type %USERPROFILE%\Backups\erpazul\ESTADO.txt      # última copia exitosa a cada destino
 ```
 
 Correrla a mano, forzando también el envío al repo:
@@ -210,7 +210,7 @@ rotos.
 
 Vive en tres lugares: **papel** fuera de la notebook, **gestor de contraseñas**,
 y una copia **operativa y desechable** en
-`C:\Users\emanuel\.erpazul-backup\frase-gpg.xml` protegida con DPAPI —solo la
+`%USERPROFILE%\.erpazul-backup\frase-gpg.xml` protegida con DPAPI —solo la
 lee el usuario `emanuel` en esa misma instalación de Windows—. Las dos primeras
 son las que valen.
 

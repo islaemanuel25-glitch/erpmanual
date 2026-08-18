@@ -30,8 +30,12 @@ $ErrorActionPreference = "Stop"
 # ── Configuración ───────────────────────────────────────────────────────────
 $VPS          = "vps-erp"                                   # alias de ~/.ssh/config
 $DIR_REMOTO   = "/srv/produccion/backups"
-$DIR_LOCAL    = "C:\Users\emanuel\Backups\erpazul"
-$DIR_ESTADO   = "C:\Users\emanuel\.erpazul-backup"
+# Salen del perfil del usuario que corre la tarea, no de una ruta escrita a mano:
+# este repositorio es público y el nombre de usuario del sistema no tiene por qué
+# estar acá. `$env:USERPROFILE` resuelve a lo mismo en la máquina donde corre, así
+# que la tarea programada sigue funcionando sin cambiarle nada.
+$DIR_LOCAL    = Join-Path $env:USERPROFILE "Backups\erpazul"
+$DIR_ESTADO   = Join-Path $env:USERPROFILE ".erpazul-backup"
 $ARCHIVO_FRASE= Join-Path $DIR_ESTADO "frase-gpg.xml"
 $LOG          = Join-Path $DIR_LOCAL "backup.log"
 $ESTADO       = Join-Path $DIR_LOCAL "ESTADO.txt"

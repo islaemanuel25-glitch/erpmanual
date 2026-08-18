@@ -6,7 +6,7 @@ falta ser administrador: la tarea corre como tu propio usuario.
 
 Si ya existe, la primera línea la borra para volver a crearla limpia.
 
-    $script = "C:\Users\emanuel\Desktop\programas\programas\erpmanual\ops\backup\notebook-bajar-backup.ps1"
+    $script = "%USERPROFILE%\Desktop\programas\programas\erpmanual\ops\backup\notebook-bajar-backup.ps1"
     $nombre = "ERP Azul - bajar backup"
     Unregister-ScheduledTask -TaskName $nombre -Confirm:$false -ErrorAction SilentlyContinue
 
@@ -44,7 +44,7 @@ está hecho para NO fallar cuando un destino no está disponible —el disco ext
 desconectado, por ejemplo—, así que el 0 no alcanza por sí solo. Lo que hay que
 mirar es el estado:
 
-    type C:\Users\emanuel\Backups\erpazul\ESTADO.txt
+    type %USERPROFILE%\Backups\erpazul\ESTADO.txt
 
 IMPORTANTE sobre el archivo .ps1
 --------------------------------

@@ -13,6 +13,7 @@
 
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { tmpdir } from "node:os";
 
 const arg = (n, d = null) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -22,7 +23,10 @@ const arg = (n, d = null) => {
 const BASE = arg("base", "http://localhost:3111");
 const PAGINA = arg("pagina", "/");
 const RUTA = arg("url", "/api/version");
-const PERFIL = arg("perfil", "C:/Users/emanuel/AppData/Local/Temp/desborde-edge");
+// El perfil sale del temporal del sistema, no de una ruta escrita a mano: este
+// repositorio es público y el nombre de usuario no tiene por qué estar acá.
+// Resuelve al mismo lugar en la máquina donde corre.
+const PERFIL = arg("perfil", path.join(tmpdir(), "desborde-edge"));
 const PUERTO = Number(arg("puerto-cdp", "9225"));
 const EDGE = arg("edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
 
