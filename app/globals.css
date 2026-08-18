@@ -1175,6 +1175,34 @@ html[data-theme="violetaSaas"] {
 /* ==================================================
    ⭐ RESET & BASE GLOBAL
    ================================================== */
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ EN ESTA APLICACIÓN 1 rem SON 14 px, NO 16.
+   ══════════════════════════════════════════════════════════════════════════
+
+   Lo fija la línea `font-size: 14px` de acá abajo, sobre el `html`. Es una
+   decisión vieja del proyecto y no se toca sin medir las 28 pantallas — pero
+   TIENE UNA CONSECUENCIA QUE NO SE DEDUCE LEYENDO NINGÚN COMPONENTE:
+
+   **TODA la escala de Tailwind vale el 87,5 % de lo nominal**, porque está
+   escrita en `rem`. Lo que en cualquier otro proyecto son N píxeles, acá son
+   N × 0,875:
+
+     h-11    →  2,75 rem  →  38,5 px   (NO 44)
+     py-2.5  →  0,625 rem →   8,75 px  (NO 10)
+     text-xs →  0,75 rem  →  10,5 px   (NO 12)
+     gap-2   →  0,5 rem   →   7 px     (NO 8)
+
+   CÓMO SE DESCUBRIÓ, para que se entienda por qué está escrito acá: se quiso
+   subir un botón a los 44 px que pide WCAG 2.5.5 y se escribió `h-11`. Dio
+   38,5. Se probó con `min-h-11` y dio lo mismo, y recién entonces se fue a
+   mirar el `font-size` de la raíz en vez de suponer. Dos mediciones perdidas
+   por un dato que no está en ningún componente.
+
+   **REGLA PRÁCTICA: cuando un número tiene que ser EXACTO —un área táctil, un
+   umbral de accesibilidad, una medida del prototipo— se escribe en píxeles.**
+   Para el ritmo visual, la escala en `rem` está bien y es preferible, porque no
+   suma al contador de hardcodeo.
+   ══════════════════════════════════════════════════════════════════════════ */
 html, body {
   height: 100%;
   width: 100%;
