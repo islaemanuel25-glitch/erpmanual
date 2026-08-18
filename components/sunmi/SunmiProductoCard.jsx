@@ -94,7 +94,11 @@ export default function SunmiProductoCard({
     .join(" ");
 
   return (
-    <SunmiPanel noPadding className={className}>
+    // `elevado` no es adorno: sin él esta tarjeta no tiene límite visible. El
+    // fondo del panel y el de la página son el mismo color en los catorce temas
+    // —1,00 en `sunmiDark`—, así que veinticinco apiladas se leían como un bloque
+    // continuo. Ver `--card-elevacion` en `app/globals.css`.
+    <SunmiPanel noPadding elevado className={className}>
       <div
         className={contenedor}
         onClick={onToggle ?? undefined}
@@ -187,7 +191,22 @@ export default function SunmiProductoCard({
             // mismo —la tarjeta es blanca— pero escrito fijo, en los cinco temas
             // oscuros quedaría un velo blanco sobre una tarjeta negra.
             className="absolute inset-0 flex items-end justify-center gap-2.5 pb-10 [background:color-mix(in_srgb,var(--card-bg)_50%,transparent)] [backdrop-filter:blur(.4px)]"
-            onClick={onToggle ?? undefined}
+            // EL TOQUE SE FRENA ACÁ. La capa es HIJA del contenedor, y el
+            // contenedor también escucha el clic: sin cortar la burbuja,
+            // `onToggle` corría DOS veces —cerraba y volvía a abrir en la misma
+            // tanda de React— y la capa se quedaba abierta para siempre.
+            //
+            // No lo introdujo la integración: el andamio tenía el mismo defecto
+            // desde el primer día y el informe dijo que cerraba sin haberlo
+            // ejercido. Lo atrapó tocar dos veces de verdad, no leer el código.
+            onClick={
+              onToggle
+                ? (e) => {
+                    e.stopPropagation();
+                    onToggle(e);
+                  }
+                : undefined
+            }
           >
             {acciones}
           </div>

@@ -22,6 +22,7 @@ import ModalVerComposicion from "@/components/productos/ModalVerComposicion";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import SunmiProductoCard from "@/components/sunmi/SunmiProductoCard";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
+import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 // =========================================================
@@ -977,7 +978,14 @@ export default function ProductosPage() {
                         <span className="text-[22px] font-bold sunmi-text-strong whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em]">
                           {formatearMoneda(p.precioVenta)}
                         </span>
-                        <span className="text-[11.5px] sunmi-text-muted">/ un</span>
+                        {/* LA ESCALA, NO UN TEXTO FIJO. Decía "/ un" sobre un
+                            número que para pack y cajón está guardado POR BULTO:
+                            1.293 de los 2.600 productos de producción, medidos.
+                            La etiqueta sale de la misma función que rotula la
+                            ficha de producto. */}
+                        <span className="text-[11.5px] sunmi-text-muted">
+                          {etiquetaEscalaPrecio(p.unidadMedida)}
+                        </span>
                       </>
                     }
                     acciones={
@@ -986,7 +994,11 @@ export default function ProductosPage() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          abrirEditar(p);
+                          // EL ID, NO LA FILA. `abrirEditar` valida con
+                          // `Number(id)`, así que pasarle el objeto daba NaN y
+                          // saltaba "ID de producto inválido" sin entrar nunca.
+                          // La tabla ya lo llamaba bien, con `row.id`.
+                          abrirEditar(p.id ?? p.productoLocalId);
                         }}
                       >
                         Editar

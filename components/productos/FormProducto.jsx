@@ -15,6 +15,7 @@ import {
   margenEfectivoDe,
 } from "@/lib/precios/precioDesdeMargen";
 import { redondear100 } from "@/lib/precios/redondeo";
+import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
 import {
   MAX_CODIGO_BARRA,
   alEscribirCodigoBarra,
@@ -441,12 +442,12 @@ export default function FormProducto({
     form.factor_pack
   );
 
-  const labelEscalaPrecio =
-    form.unidad_medida === "kg"
-      ? "(por kg)"
-      : ["pack", "cajon"].includes(form.unidad_medida)
-      ? "(por bulto)"
-      : "(por unidad)";
+  // El texto sale de `lib/precios/escalaPrecio.js`, que es de donde lo lee ahora
+  // también la tarjeta del catálogo. Estaba escrito acá y sólo acá, y la tarjeta
+  // rotulaba "/ un" fijo sobre el mismo número: dos pantallas afirmando cosas
+  // distintas sobre el mismo dato. Los paréntesis los pone esta pantalla porque
+  // son de su formato de etiqueta, no de la escala.
+  const labelEscalaPrecio = `(${etiquetaEscalaPrecio(form.unidad_medida)})`;
 
   // Servicio de importe variable: el importe se carga en el POS. No controla stock,
   // no usa lista de precios / margen ni redondeo.
