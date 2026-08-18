@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-18 12:57
+**Última actualización:** 2026-08-18 17:14
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,13 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-18: feat(productos): la ficha de sólo lectura, y Ver deja de llevar al mismo lado que Editar
+- 2026-08-18: feat(productos): los botones van a la vista y la capa superpuesta se saca
+- 2026-08-18: fix(productos): la tarjeta muestra el precio que se cobra, y el servicio no dice $0,00
+- 2026-08-18: feat(productos): la lista de tarjetas pagina, y todas las tarjetas miden lo mismo
+- 2026-08-18: fix(productos): el precio de la tarjeta dice en qué escala está, y Editar entra
+- 2026-08-18: feat(productos): la línea de equivalencia en la tarjeta — sin tocar la API
+- 2026-08-18: feat(productos): las tarjetas en angosto, la tabla intacta en escritorio
 - 2026-08-18: feat(productos): los botones van a la vista y la capa superpuesta se saca
 - 2026-08-18: fix(productos): la tarjeta muestra el precio que se cobra, y el servicio no dice $0,00
 - 2026-08-18: feat(productos): la lista de tarjetas pagina, y todas las tarjetas miden lo mismo
