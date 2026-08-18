@@ -24,6 +24,11 @@ import SunmiProductoCard from "@/components/sunmi/SunmiProductoCard";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
+import { precioEnEscalaQueSeCobra } from "@/lib/precios/redondeo";
+// LA MARCA DEL SERVICIO ES LA DEL POS, no una nueva. `esProductoServicio` mira
+// `modalidad`, que es el mismo campo con el que el POS decide abrir el modal de
+// importe en vez de cobrar un precio fijo.
+import { esProductoServicio } from "@/lib/pos-ventas/servicios";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 // =========================================================
@@ -33,6 +38,19 @@ const TABS = [
   { key: "listado", label: "Listado" },
   { key: "importexport", label: "Import / Export" },
 ];
+
+// ── LO QUE MUESTRA UN SERVICIO DE IMPORTE VARIABLE ────────────────────────
+//
+// El texto es el MISMO que ya muestra el buscador del POS —"Importe variable"—,
+// copiado de `components/pos-ventas/BuscadorProductos.jsx`. Dos pantallas
+// diciendo lo mismo con dos redacciones distintas es cómo empieza a divergir un
+// concepto, y acá el concepto es "este producto no tiene precio: se carga al
+// vender".
+const TEXTO_IMPORTE_VARIABLE = "Importe variable";
+// Y la línea de abajo explica de dónde sale el importe. Va con texto y no vacía
+// porque todas las tarjetas llevan su línea: un hueco haría que estas cuatro
+// quedaran más bajas que las demás.
+const EQUIVALENCIA_IMPORTE_VARIABLE = "El importe se carga al vender";
 
 // Contenedor scrolleable de la lista: con header sticky el scroll vive en
 // #productos-scroll (la tabla). Fallback al <main> de LayoutBase.
@@ -995,11 +1013,16 @@ export default function ProductosPage() {
                     key={p.id ?? p.productoLocalId}
                     nombre={p.nombre}
                     empresa={p.proveedorNombre ?? null}
-                    equivalencia={lineaDeEquivalencia({
-                      precio: p.precioVenta,
-                      factor: p.factorPack,
-                      unidad: p.unidadMedida,
-                    })}
+                    equivalencia={
+                      esProductoServicio(p)
+                        ? EQUIVALENCIA_IMPORTE_VARIABLE
+                        : lineaDeEquivalencia({
+                            precio: p.precioVenta,
+                            factor: p.factorPack,
+                            unidad: p.unidadMedida,
+                            redondeo100: p.redondeo100,
+                          })
+                    }
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
                     codigoInterno={p.id ?? p.productoLocalId ?? null}
                     abierta={tarjetaAbierta === (p.id ?? p.productoLocalId)}
@@ -1009,19 +1032,44 @@ export default function ProductosPage() {
                       )
                     }
                     valor={
-                      <>
-                        <span className="text-[22px] font-bold sunmi-text-strong whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em]">
-                          {formatearMoneda(p.precioVenta)}
+                      esProductoServicio(p) ? (
+                        // UN SERVICIO NO TIENE PRECIO, Y CERO NO ES "GRATIS".
+                        // La columna es obligatoria, así que el formulario les
+                        // guarda 0 a propósito; la tarjeta mostraba "$0,00 por
+                        // unidad" y eso no se distingue de un producto mal
+                        // cargado. Son 4 en producción, medidos.
+                        // Sin tamaño propio: hereda el de la tarjeta. Ponerle uno
+                        // sería una medida mágica más para decir "no hay precio".
+                        <span className="font-semibold sunmi-text-muted whitespace-nowrap">
+                          {TEXTO_IMPORTE_VARIABLE}
                         </span>
-                        {/* LA ESCALA, NO UN TEXTO FIJO. Decía "/ un" sobre un
-                            número que para pack y cajón está guardado POR BULTO:
-                            1.293 de los 2.600 productos de producción, medidos.
-                            La etiqueta sale de la misma función que rotula la
-                            ficha de producto. */}
-                        <span className="text-[11.5px] sunmi-text-muted">
-                          {etiquetaEscalaPrecio(p.unidadMedida)}
-                        </span>
-                      </>
+                      ) : (
+                        <>
+                          <span className="text-[22px] font-bold sunmi-text-strong whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em]">
+                            {/* EL PRECIO QUE SE COBRA, no el guardado. El POS
+                                redondea a 100 y el catálogo no lo hacía: 1.130
+                                productos mostraban un número y el mostrador
+                                cobraba otro. La regla vive en
+                                `lib/precios/redondeo.js`, no acá. */}
+                            {formatearMoneda(
+                              precioEnEscalaQueSeCobra({
+                                precio: p.precioVenta,
+                                factor: p.factorPack,
+                                unidad: p.unidadMedida,
+                                redondeo100: p.redondeo100,
+                              })
+                            )}
+                          </span>
+                          {/* LA ESCALA, NO UN TEXTO FIJO. Decía "/ un" sobre un
+                              número que para pack y cajón está guardado POR BULTO:
+                              1.293 de los 2.600 productos de producción, medidos.
+                              La etiqueta sale de la misma función que rotula la
+                              ficha de producto. */}
+                          <span className="text-[11.5px] sunmi-text-muted">
+                            {etiquetaEscalaPrecio(p.unidadMedida)}
+                          </span>
+                        </>
+                      )
                     }
                     acciones={
                       <SunmiButton
