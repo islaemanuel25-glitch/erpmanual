@@ -161,6 +161,31 @@ model ConfiguracionLocal {
   /// dejaría la caja sin cambio para seguir vendiendo.
   fondoObjetivoCaja                Decimal? @db.Decimal(12, 2)
 
+  /// LA TARJETA DE PRODUCTO DEL CATÁLOGO, configurada por LOCAL (config_local.apariencia).
+  ///
+  /// Van como COLUMNAS y no dentro de `aparienciaJson`, y el motivo está medido:
+  /// el PUT de apariencia PISA ese JSON entero —`update: { aparienciaJson: … }`
+  /// con lo que venga— así que guardar el tema borraría estas preferencias sin
+  /// aviso. Y su GET está abierto sin permiso a propósito, porque lo lee el
+  /// layout raíz en cada página. Las otras nueve opciones de este modelo ya son
+  /// columnas sueltas: el JSON es la excepción, no la regla.
+  ///
+  /// LAS DOS SON NULLABLE Y `null` SIGNIFICA APAGADO, que es el comportamiento
+  /// histórico. Un local que nunca entre a la pantalla de apariencia ve
+  /// exactamente lo de hoy. Es el mismo criterio que ya usa `exigirOperador` y
+  /// que el encabezado de este modelo declara: "un local sin fila conserva el
+  /// comportamiento histórico".
+
+  /// El número grande muestra SIEMPRE el precio unitario, aunque el producto se
+  /// venda por bulto. Medido en producción: le cambia el número a 6.430 de
+  /// 10.616 filas activas, que son exactamente las de pack y cajón.
+  tarjetaPrecioUnitario            Boolean?
+
+  /// La franja de escala deja de mostrar la equivalencia de bulto —"1 pack = 24
+  /// un · $1.400 por unidad"—. NO apaga la franja: en el 40 % de las filas esa
+  /// línea dice la escala y sacarla les quitaría información.
+  tarjetaOcultarEquivalencia       Boolean?
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
