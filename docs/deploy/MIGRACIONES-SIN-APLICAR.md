@@ -18,7 +18,7 @@ Si la lista está vacía, el despliegue es solo de código.
 
 **Ninguna.** Producción está al día: 98 migraciones en el árbol y 98 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-19 después de desplegar
-`9f425b037d62ca6b616965090d9326e130e7076a`.
+`e9807359fdd19fc791cdc6dd9e5d23a83d1e1ee6`.
 
 No hay ningún corte esperando: `origin/main` y lo desplegado coinciden.
 
