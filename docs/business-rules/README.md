@@ -21,6 +21,10 @@ está claro cuál de las dos es, va como **[ACCIDENTE POSIBLE]** y no como regla
   manda sobre el costo. Es la raíz de casi todo lo demás.
 - [costos-y-precios.md](costos-y-precios.md) — quién puede escribir un costo, cómo
   se propaga, cómo se calcula un precio de venta.
+- [deposito-vende-al-costo.md](deposito-vende-al-costo.md) — **la lista "Costo"
+  del depósito NO es un error de configuración.** Está a propósito y tiene una
+  condición futura para saber cuándo deja de tener sentido. Leerlo antes de
+  tocarla.
 - [caja-y-turnos.md](caja-y-turnos.md) — cuándo se puede vender, qué es un turno
   abierto, cómo se cierra una caja.
 - [contradicciones.md](contradicciones.md) — **empezá por acá si vas a tocar

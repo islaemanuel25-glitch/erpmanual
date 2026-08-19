@@ -187,16 +187,6 @@ puntos lo recalcula el servidor, la auditoría del ajuste pasó a bloqueante, el
 historial del cliente excluye las internas por defecto y las dos funciones de
 redondeo se unificaron en una.
 
-Y se sumaron dos:
-
-00. **¿El depósito le vende a los locales AL COSTO?** Su lista default es
-    `tipoBase = COSTO` con margen 0, así que sin cliente el POS cobra el costo y
-    no el precio de venta: 2.021 de 2.047 filas del depósito, y en 1.991 cobra
-    menos, 12,9 % menos en promedio. Si es a propósito hay que revisar qué
-    muestra la tarjeta ahí; si no, está mal configurada la lista. Medido el
-    2026-08-19, detalle en
-    [el-precio-que-se-cobra.md](el-precio-que-se-cobra.md).
-
 Y se sumó una el 2026-08-18:
 
 0. **¿El costo puede ser una opción de precio de la tarjeta de producto?**

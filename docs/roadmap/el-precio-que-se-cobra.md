@@ -140,15 +140,104 @@ cobraría un bulto y descontaría una unidad sin que nada avisara.
 
 ---
 
-## Dos cosas medidas que no entran en ninguna de las tres
+## GRAVEDAD 2-bis · La tarjeta con el precio resuelto
 
-**El depósito cobra el costo.** `GrupoDeposito.listaPrecioDefaultId` apunta a la
-lista 2, que es `tipoBase = COSTO` con margen 0, o sea COSTO_PURO. Sin cliente,
-el POS del depósito cobra el costo y no el precio de venta. Son **2.021 de 2.047
-filas del depósito**, y en 1.991 cobra menos —12,9 % menos en promedio—.
-**Es una pregunta de negocio antes que un defecto** y está esperando respuesta de
-Emanuel: si el depósito le vende a los locales al costo, está bien y lo que hay
-que revisar es qué muestra la tarjeta ahí.
+**Orden de ejecución: junto con la segunda, no antes.** Medido el 2026-08-19.
+
+### De dónde sale
+
+Que el depósito venda al costo **es a propósito** — la decisión y su condición
+futura están en
+[../business-rules/deposito-vende-al-costo.md](../business-rules/deposito-vende-al-costo.md).
+La consecuencia es que en el depósito la tarjeta muestra `precio_venta` y el POS
+cobra el costo: **2.021 de 2.047 filas** con otro número.
+
+La tarjeta ya corrigió la ESCALA (`ad10fcf`), pero sigue leyendo la COLUMNA en vez
+de preguntar por el precio resuelto.
+
+### Qué haría falta, medido
+
+**Tres piezas, y la del medio es la cara.**
+
+1. **Resolver la lista una vez por pedido** en `app/api/productos/listar`.
+   `resolverListaCliente` ya existe y es reusable tal cual. Cuesta **entre 3 y 4
+   consultas por request** —`local`, `grupoDeposito`, `grupoLocal` y
+   `listaPrecio`—, no por fila. Dos de esas el listado ya las tiene resueltas por
+   su cuenta, así que se pagan de más por reusar en vez de reimplementar; es el
+   precio correcto.
+
+2. **Extraer el bloque que aplica la lista conservando las cuatro escalas**, que
+   hoy vive inline en `mapProductos` de `buscar-producto`. Son **110 líneas de
+   código sin contar comentarios**, entre las líneas 266 y 424, y mezclan: la
+   detección de bulto, el fiambre, el redondeo, la aplicación de la lista y el
+   mantenimiento de la proporción unitario/bulto.
+
+   **Ese bloque ES donde viven las cuatro condiciones divergentes** de la tanda de
+   gravedad 2. No se puede extraer sin decidir cuál gana, así que las dos tandas
+   son en realidad una.
+
+3. **La tarjeta llama a esa pieza** en vez de a `precioEnEscalaQueSeCobra`.
+   Eso es lo barato.
+
+### Qué se puede romper
+
+Lo mismo que la tanda de gravedad 2, porque es el mismo código: el precio que ve
+el POS. Extraer 110 líneas del camino que cobra no es un refactor cosmético.
+
+Y algo propio de ésta: el listado de productos pasa a depender de la resolución
+de listas. Si `resolverListaCliente` devuelve un error de contexto —lo hace, con
+400/403/404— el catálogo tendría que decidir qué hacer, y hoy no tiene esa rama.
+
+### LO QUE HAY QUE DECIDIR ANTES, Y NO ES TÉCNICO
+
+**Mostrar el precio resuelto en el depósito es mostrar el costo.** No es un efecto
+lateral: la lista ES el costo, así que el número que aparecería en la tarjeta es
+el costo del producto.
+
+Medido contra los roles reales: **tres roles ven el catálogo y NO tienen
+`costos.ver`** — `Deposito`, `Mini` y `ENCARGADO`. Uno de ellos se llama
+literalmente `Deposito`, que es justo el que va a estar parado ahí. Hoy hay **1
+usuario activo** en ese grupo, pero el rol es lo que importa, no el conteo de
+hoy.
+
+O sea que esto pone el costo delante de un rol al que el sistema le niega
+`costos.ver` a propósito. **Es la misma decisión que ya se declinó** cuando se
+descartó el costo como opción de la tarjeta —ver
+[el-costo-en-la-tarjeta.md](el-costo-en-la-tarjeta.md)— solo que llegando por otra
+puerta: no como "mostrá el costo" sino como "mostrá lo que se cobra", que resulta
+ser el costo.
+
+Las salidas posibles, y ninguna es obvia:
+
+- Mostrar el precio resuelto solo a quien tenga `costos.ver`, y a los demás
+  seguir mostrando el de venta. Deja dos personas viendo números distintos en la
+  misma pantalla.
+- Mostrarlo a todos, aceptando que en el depósito el costo es visible.
+- No mostrarlo y decir en la tarjeta que en el depósito el precio lo define una
+  lista, sin el número.
+
+### Cómo se verifica
+
+Igual que la de gravedad 2: sacar el precio de las superficies antes y después
+para todo el catálogo, con la lista de diferencias esperadas escrita de antemano
+—que acá son las 2.021 filas del depósito y ninguna de los locales, porque en los
+locales no hay lista default—. Y la sonda de la tarjeta, que ya sabe pedir la
+ubicación activa.
+
+### Veredicto: NO entra en la tanda que se está juntando
+
+Por tres motivos, y el primero alcanza:
+
+1. **Necesita una decisión de negocio** sobre quién ve el costo, que no está
+   tomada.
+2. **Arrastra la tanda de gravedad 2 entera**: el bloque a extraer es donde viven
+   las cuatro condiciones divergentes.
+3. **Cambia el número que se ve en 2.021 filas**, y eso merece su propia lista de
+   diferencias esperadas y su propia medición antes/después.
+
+---
+
+## Una cosa medida que no entra en ninguna
 
 **Cuatro valores más fuera del enum.** `components/transferencias/detallePresentacion.jsx:65-66`
 compara contra "pieza", "piezas", "kilo" y "kilogramo". No se tocaron: ese
