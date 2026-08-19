@@ -180,6 +180,16 @@ puntos lo recalcula el servidor, la auditoría del ajuste pasó a bloqueante, el
 historial del cliente excluye las internas por defecto y las dos funciones de
 redondeo se unificaron en una.
 
+Y se sumó una el 2026-08-18:
+
+0. **¿El costo puede ser una opción de precio de la tarjeta de producto?**
+   Emanuel la dejó afuera de la tanda de la tarjeta editable —"es otra idea y
+   además sensible"—. El motivo por el que no es una tercera preferencia del
+   local, y las tres cosas que hay que decidir antes de escribir código, están
+   en [el-costo-en-la-tarjeta.md](el-costo-en-la-tarjeta.md). En una línea:
+   quién ve un costo lo decide `costos.ver`, que es por PERSONA, y un
+   interruptor por local lo atravesaría.
+
 Quedan estas tres:
 
 1. **¿`clientes/listar` y `clientes/buscar` deberían exigir permiso?** — **YA SE
