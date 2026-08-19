@@ -4,7 +4,8 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
-import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
+import { esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
+import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
@@ -202,24 +203,15 @@ export async function GET(req) {
   }
 }
 
-/**
- * Calcula modoSalidaDefault para un producto dado el contexto.
- *
- * - Local normal → siempre UNIDAD (vende unitario al público)
- * - Depósito → según modo_envio configurado del producto:
- *     SOLO_BULTO  → BULTO
- *     MIXTO       → BULTO  (default conservador para depósito)
- *     SOLO_UNIDAD → UNIDAD
- *     null        → usa defaultModoEnvio(unidadMedida) y aplica la misma lógica
- */
-function calcularModoSalida(esDeposito, modoEnvio, unidadMedida) {
-  if (!esDeposito) return "UNIDAD";
-
-  const efectivo = modoEnvio || defaultModoEnvio(unidadMedida);
-  if (efectivo === "SOLO_UNIDAD") return "UNIDAD";
-  // SOLO_BULTO y MIXTO → default BULTO en depósito
-  return "BULTO";
-}
+// `calcularModoSalida` VIVÍA ACÁ y se movió a `lib/precios/escalaDeVenta.js`
+// SIN cambiarle una línea ni la firma. Estaba declarada privada, así que la
+// tarjeta del catálogo no podía preguntar lo mismo que cobra el POS y terminaba
+// mostrando la escala en la que está GUARDADO el precio: 5.450 de 10.521 filas
+// activas decían una escala distinta de la que se vende.
+//
+// Se conserva el nombre local como alias para que las invocaciones de abajo
+// queden idénticas.
+const calcularModoSalida = modoSalidaDeVenta;
 
 function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplicable = null) {
   return lista
@@ -286,7 +278,16 @@ function mapProductos(lista, esDeposito, allowNegativeStock = false, listaAplica
         !fiambreFijo &&
         factorPack > 1 &&
         precioDB > 0 &&
-        ["pack", "cajon", "caja", "carton"].includes(unidadMedida);
+        // "caja" y "carton" NO existen en el enum `UnidadMedida` —son unidad,
+        // pack, cajon y kg— así que esas dos ramas no se podían alcanzar con
+        // ningún dato válido. NO CAMBIA EL COMPORTAMIENTO: solo deja de aparentar
+        // que cubre casos que no hay.
+        //
+        // Y esto NO unifica nada: las otras tres condiciones de "¿el precio está
+        // guardado por bulto?" siguen siendo distintas —`stock_locales` pide
+        // `!== "unidad"` y `lib/stock/mapItem.js` pide solo factor > 1—. Eso es
+        // tanda propia, porque mueve el precio que se cobra.
+        ["pack", "cajon"].includes(unidadMedida);
 
       // Cuatro escalas explícitas: la API es la fuente autoritativa del precio/costo
       // unitario real y del de bulto. El frontend NO debe re-derivar dividiendo.

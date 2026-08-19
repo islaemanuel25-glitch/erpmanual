@@ -5,7 +5,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { defaultModoEnvio, esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
+import { esFiambreFijo as checkFiambreFijo } from "@/lib/conversiones/stock";
+import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { redondear100 } from "@/lib/precios/redondeo";
 import {
   rankearLiteral,
@@ -151,12 +152,11 @@ export async function GET(req) {
   }
 }
 
-function calcularModoSalida(esDeposito, modoEnvio, unidadMedida) {
-  if (!esDeposito) return "UNIDAD";
-  const efectivo = modoEnvio || defaultModoEnvio(unidadMedida);
-  if (efectivo === "SOLO_UNIDAD") return "UNIDAD";
-  return "BULTO";
-}
+// ERA UNA SEGUNDA COPIA, LITERAL, de la de `pos-ventas/buscar-producto`. Las dos
+// se compararon línea por línea antes de mover: se comportaban igual, todavía no
+// habían divergido. Ahora las dos llaman a la misma pieza —
+// `lib/precios/escalaDeVenta.js`— y ese "todavía" deja de ser una apuesta.
+const calcularModoSalida = modoSalidaDeVenta;
 
 function mapProductos(lista, esDeposito) {
   return lista.map((pl) => {

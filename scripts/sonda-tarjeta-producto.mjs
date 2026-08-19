@@ -54,7 +54,12 @@ import { prepararSesion } from "./lib/sesionArnes.mjs";
 // contra una segunda versión escrita por la misma persona el mismo día: las dos
 // coincidirían siempre, incluso estando las dos mal.
 import { formatearMoneda, lineaDeEquivalencia } from "../lib/moneda.js";
-import { precioEnEscalaQueSeCobra } from "../lib/precios/redondeo.js";
+import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "../lib/precios/redondeo.js";
+import {
+  escalaDeVentaDe,
+  seMuestraUnitario,
+  escalaQueLaTarjetaSabeMostrar,
+} from "../lib/precios/escalaDeVenta.js";
 import { esProductoServicio } from "../lib/pos-ventas/servicios.js";
 import { seVendeSinGanancia } from "../lib/precios/precioDesdeMargen.js";
 
@@ -272,14 +277,28 @@ try {
       const rotulo = fila && fila.lastElementChild
         ? fila.lastElementChild.textContent.trim()
         : null;
+      // LAS DOS FORMAS DE LA FRANJA, que ahora dicen cosas distintas:
+      //   "1 pack = 24 un · $1.400,00 por unidad"  -> el número de arriba es el
+      //                                               BULTO, y por eso la franja
+      //                                               tiene que decir el unitario.
+      //   "1 pack = 24 un"                         -> el número de arriba YA es
+      //                                               el unitario: repetirlo
+      //                                               sobraría.
+      const conPack = /1 pack = \\d+ un/.test(texto);
+      const repiteUnitario = /1 pack = \\d+ un\\s*·/.test(texto);
       return {
         texto: texto.split("\\n").slice(0, 2).join(" · "),
-        equivalencia: /1 pack = \\d+ un/.test(texto),
+        equivalenciaConUnitario: conPack && repiteUnitario,
+        equivalenciaSinUnitario: conPack && !repiteUnitario,
         porKilo: /Se vende por kilo/.test(texto),
         rotulo,
       };
     }).filter((c) =>
-      (c.equivalencia && c.rotulo !== "por bulto") ||
+      // Si la franja REPITE el precio unitario, es porque el número de arriba no
+      // lo es: tiene que estar rotulado por bulto.
+      (c.equivalenciaConUnitario && c.rotulo !== "por bulto") ||
+      // Y si la franja NO lo repite, el número de arriba SÍ es el unitario.
+      (c.equivalenciaSinUnitario && c.rotulo !== "por unidad") ||
       (c.porKilo && c.rotulo !== "por kg") ||
       !["por bulto", "por kg", "por unidad"].includes(c.rotulo)
     );
@@ -328,6 +347,27 @@ try {
     morir("no pude capturar la respuesta del listado: sin el dato no se puede afirmar sobre el número");
   }
 
+  // ── LA UBICACIÓN, QUE ES LA MITAD DE LA RESPUESTA ───────────────────────
+  //
+  // Desde el 2026-08-19 la tarjeta muestra la escala en la que se VENDE, y ésa
+  // depende de dónde estás parado: el mismo pack vale $31.900 por bulto en el
+  // depósito y $1.400 por unidad en un local. Sin este dato la sonda no puede
+  // calcular qué tendría que decir la tarjeta, así que si no llega es ROJO y no
+  // un salteo.
+  const ctx = await evaluar(
+    `fetch("/api/contexto-activo/get",{cache:"no-store"}).then(r=>r.json()).catch(()=>null)`,
+    true
+  );
+  if (!ctx || typeof ctx.esDeposito !== "boolean") {
+    morir(
+      "no pude saber si la ubicación activa es depósito. Sin eso no se puede afirmar " +
+      "en qué escala tendría que estar el precio, y una afirmación que no puede " +
+      "calcular lo esperado no afirma nada."
+    );
+  }
+  const esDepositoSonda = ctx.esDeposito === true;
+  console.log(`ubicación activa: ${esDepositoSonda ? "DEPÓSITO" : "local"}\n`);
+
   // EL NOMBRE SE SACA DEL PRIMER HIJO DEL CONTENEDOR, que es el nodo del nombre
   // y ningún otro. El primer intento usó `div > div` y traía un ENVOLTORIO con
   // la tarjeta entera adentro, así que ningún nombre casaba con su fila, el
@@ -373,8 +413,21 @@ try {
       continue;
     }
 
+    // EL ESPERADO SALE DE LA ESCALA DE VENTA, no de la escala guardada.
+    //
+    // Esto pedía siempre `precioEnEscalaQueSeCobra`, que devuelve el precio en la
+    // escala en la que está GUARDADO —o sea, cómo se compra—. Era el guardián
+    // correcto del defecto de su momento (el "/ un" sobre un precio de bulto) y
+    // pasó a ser falso cuando la tarjeta empezó a mostrar cómo se VENDE: medido,
+    // 5.450 de 10.521 filas activas cambian de escala entre una cosa y la otra.
+    const escalaEsperada = escalaQueLaTarjetaSabeMostrar(
+      escalaDeVentaDe(fila, esDepositoSonda)
+    );
+    const calculo = seMuestraUnitario(escalaEsperada)
+      ? precioUnitarioQueSeCobra
+      : precioEnEscalaQueSeCobra;
     const esperado = formatearMoneda(
-      precioEnEscalaQueSeCobra({
+      calculo({
         precio: fila.precioVenta,
         factor: fila.factorPack,
         unidad: fila.unidadMedida,
@@ -385,12 +438,15 @@ try {
       malPrecio.push(`${vista.nombre}: se ve "${vista.valor}", corresponde ${esperado}`);
     }
 
+    // La franja tampoco es independiente: si el número de arriba YA es el
+    // unitario, no lo repite. Se le pasa la misma respuesta.
     const eqEsperada = lineaDeEquivalencia({
       precio: fila.precioVenta,
       factor: fila.factorPack,
       unidad: fila.unidadMedida,
       redondeo100: fila.redondeo100,
       esCombo: fila.esCombo,
+      mostrarUnitario: seMuestraUnitario(escalaEsperada),
     });
     if (vista.equivalencia && vista.equivalencia !== eqEsperada) {
       malPrecio.push(`${vista.nombre}: equivalencia "${vista.equivalencia}", corresponde "${eqEsperada}"`);

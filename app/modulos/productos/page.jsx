@@ -24,7 +24,11 @@ import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProduc
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import { Eye, Pencil } from "lucide-react";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
-import { etiquetaEscalaPrecio, etiquetaEscalaUnitaria } from "@/lib/precios/escalaPrecio";
+import {
+  escalaDeVentaDe,
+  seMuestraUnitario,
+  escalaQueLaTarjetaSabeMostrar,
+} from "@/lib/precios/escalaDeVenta";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "@/lib/precios/redondeo";
 import { seVendeSinGanancia } from "@/lib/precios/precioDesdeMargen";
 import {
@@ -124,8 +128,24 @@ export default function ProductosPage() {
   // Se leen ACÁ y no adentro de `SunmiProductoCard`: la pieza del kit sabe
   // dibujar, no sabe de sesiones ni de locales. Si leyera el contexto por su
   // cuenta, el andamio —que la monta sin sesión— dejaría de funcionar.
-  const tarjetaUnitario = perfilProd?.tarjetaPrecioUnitario === true;
+  // ── EL INTERRUPTOR DE "SIEMPRE UNITARIO" YA NO DECIDE LA ESCALA ─────────
+  //
+  // Y no es un olvido. Desde que la tarjeta muestra la escala en la que se
+  // VENDE —la que decide el POS— ya no hay nada que elegir: el número y su
+  // rótulo salen de `escalaDeVentaDe`. Dejar además una preferencia que los
+  // forzara a otra escala sería reponer el defecto que esta tanda arregla, solo
+  // que a pedido.
+  //
+  // En la práctica el interruptor pasó a no hacer nada, porque en un local el
+  // POS ya vende por unidad —o sea que ahí la tarjeta muestra el unitario igual,
+  // sin prenderlo— y en el depósito forzarlo haría que la tarjeta contradiga al
+  // mostrador. La columna y la pantalla quedan en su lugar; sacarlas es una
+  // decisión de Emanuel y está anotada.
   const tarjetaSinEquivalencia = perfilProd?.tarjetaOcultarEquivalencia === true;
+
+  // La ubicación en la que estoy parado. Es la mitad de la respuesta: el MISMO
+  // producto se vende por bulto en el depósito y por unidad en un local.
+  const esDepositoProd = contexto?.esDeposito === true;
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -1078,7 +1098,22 @@ export default function ProductosPage() {
                   exactamente una línea de nombre de diferencia. */}
               <div className="md:hidden mt-1">
                 <div className="grid grid-cols-1 auto-rows-fr gap-[9px]">
-                {rows.map((p) => (
+                {rows.map((p) => {
+                  // ── LA ESCALA EN LA QUE SE VENDE, NO EN LA QUE SE GUARDA ──
+                  //
+                  // Una sola pregunta por fila, y la contesta la misma pieza que
+                  // usa el POS. De acá salen las TRES cosas que antes se decidían
+                  // por separado y podían contradecirse: el número grande, su
+                  // rótulo y si la equivalencia repite el unitario.
+                  // `escalaQueLaTarjetaSabeMostrar` deja el fiambre de pieza fija
+                  // como está hoy —por kilo—: la tarjeta todavía no sabe poner el
+                  // precio de una pieza, y rotular "por pieza" sobre un número
+                  // por kilo sería peor que no tocarlo. Son 35 filas, anotadas.
+                  const escalaVenta = escalaQueLaTarjetaSabeMostrar(
+                    escalaDeVentaDe(p, esDepositoProd)
+                  );
+                  const muestraUnitario = seMuestraUnitario(escalaVenta);
+                  return (
                   <SunmiProductoCard
                     key={p.id ?? p.productoLocalId}
                     nombre={p.nombre}
@@ -1096,7 +1131,10 @@ export default function ProductosPage() {
                             // franja de escala, con palabra y no con un dibujo.
                             esCombo: p.esCombo,
                             ocultarEquivalencia: tarjetaSinEquivalencia,
-                            mostrarUnitario: tarjetaUnitario,
+                            // Ya NO viene del interruptor: viene de si el número
+                            // de arriba es el unitario. Si lo es, la franja no
+                            // tiene que repetirlo.
+                            mostrarUnitario: muestraUnitario,
                           })
                     }
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
@@ -1174,8 +1212,12 @@ export default function ProductosPage() {
                                 con él: dejarla en "por bulto" sobre un número
                                 unitario es la misma contradicción del "/ un",
                                 dada vuelta. */}
+                            {/* EL NÚMERO SIGUE A LA ESCALA DE VENTA. Cambiar
+                                solo el rótulo habría sido peor que no tocar
+                                nada: diría "$31.900,00 por unidad" sobre un
+                                precio de bulto. */}
                             {formatearMoneda(
-                              tarjetaUnitario
+                              muestraUnitario
                                 ? precioUnitarioQueSeCobra({
                                     precio: p.precioVenta,
                                     factor: p.factorPack,
@@ -1190,15 +1232,12 @@ export default function ProductosPage() {
                                   })
                             )}
                           </span>
-                          {/* LA ESCALA, NO UN TEXTO FIJO. Decía "/ un" sobre un
-                              número que para pack y cajón está guardado POR BULTO:
-                              1.293 de los 2.600 productos de producción, medidos.
-                              La etiqueta sale de la misma función que rotula la
-                              ficha de producto. */}
+                          {/* EL RÓTULO ES LA ESCALA DE VENTA, tal cual. Antes
+                              salía de `unidad_medida`, que dice cómo se COMPRA:
+                              5.450 de 10.521 filas activas nombraban una escala
+                              distinta de la que el POS usa para vender. */}
                           <span className="text-[11.5px] sunmi-text-muted">
-                            {tarjetaUnitario
-                              ? etiquetaEscalaUnitaria(p.unidadMedida)
-                              : etiquetaEscalaPrecio(p.unidadMedida)}
+                            {escalaVenta}
                           </span>
                         </>
                       )
@@ -1225,7 +1264,8 @@ export default function ProductosPage() {
                       </>
                     }
                   />
-                ))}
+                  );
+                })}
                 </div>
 
                 {/* EL MISMO PIE QUE LA TABLA, no uno parecido. Sin esto la lista
