@@ -190,6 +190,24 @@ quedó corriendo, éste compara lo que se va a empezar a desplegar. Son los dos
 extremos de la misma cadena y ninguno tapa al otro — la corrida del 2026-08-14
 pasó los cinco valores con todo bien y aun así no desplegó la tanda.
 
+### Y ACÁ SE LEE QUÉ MIGRACIONES TRAE, ANTES DE TOCAR NADA
+
+**Leer [`docs/deploy/MIGRACIONES-SIN-APLICAR.md`](../../../docs/deploy/MIGRACIONES-SIN-APLICAR.md).**
+Es la lista de lo que está en `main` y todavía no se aplicó en producción, con
+qué hace cada una, qué dijo el clasificador y si el quinto chequeo del backup
+aplica. Vacía significa que el despliegue es solo de código.
+
+**Por qué acá y no más adelante:** el clasificador del paso 4 igual lo va a
+encontrar, porque calcula el rango solo. Pero lo encuentra con el backup ya
+sacado y la imagen ya construida, que es el peor momento para enterarse de que
+hay que decidir algo. Una tanda puede quedar empujada sin desplegar a propósito
+—pasó el 2026-08-18—, y varias tandas después el rango deja de ser de cero sin
+que nadie lo esté esperando.
+
+**Es una lista viva.** Cuando una migración se aplica en producción, se borra de
+ese archivo en el mismo commit que confirma el despliegue. Si el archivo acumula
+filas viejas deja de contestar qué falta.
+
 ## Antes de empezar
 
 - Árbol limpio y todo commiteado. `git status` de la máquina local.

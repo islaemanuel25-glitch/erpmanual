@@ -20,6 +20,12 @@
 
 ## 2. Producción
 
+- [ ] Leer [deploy/MIGRACIONES-SIN-APLICAR.md](deploy/MIGRACIONES-SIN-APLICAR.md)
+      **antes del backup**: es la lista de migraciones que están en `main` y no
+      en producción. Vacía = despliegue de solo código. El clasificador del paso 4
+      las encuentra igual, pero para entonces el backup ya está sacado y la imagen
+      construida — que es el peor momento para enterarse de que hay algo que
+      decidir. Cuando una se aplica, se borra de esa lista.
 - [ ] Backup de PostgreSQL validado **antes** de cualquier cosa (ver §3.bis)
 - [ ] Migraciones aplicadas con un container one-off de la **imagen nueva**, ANTES de
       recrear la app — no con `docker exec` sobre el container viejo:
