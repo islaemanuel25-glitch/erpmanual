@@ -227,7 +227,13 @@ export async function GET(req) {
         tieneDiferencias: t.tieneDiferencias === true,
         cantidadEnviada,
         cantidadRecibida,
-        totalCosto: importeDeDetalle(t.detalle),
+        // ÉSTE es el importe que se ve en cada fila de la lista, y era el que
+        // faltaba: mostraba la #97 en 144.086,40 mientras su detalle decía
+        // 155.486,40. El total de arriba ya pasaba el origen, así que la lista
+        // ni siquiera cerraba consigo misma.
+        totalCosto: importeDeDetalle(t.detalle, {
+          origenEsDeposito: t.origen?.es_deposito === true,
+        }),
         // Autor del remito, para el subtítulo de la columna "Transferencia".
         creadaPorNombre: nombrePorCreador.get(t.creadaPor) || null,
       };

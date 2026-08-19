@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession, getCookieValue } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
-import { resolverCostoTransferencia } from "@/lib/transferencias/costoTransferencia";
+import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
 // EL MISMO helper que usa la recepción para devolver el faltante al origen. Se
 // importa en vez de replicar la fórmula: si la regla cambia, la pantalla no
 // puede quedar mostrando otro número que el que el stock realmente movió.
@@ -127,22 +127,26 @@ export async function GET(req) {
       // Y el fiambre de PIEZA FIJA es el otro caso donde las escalas difieren:
       // su costo está por kilo y la cantidad, saliendo del depósito, en piezas.
       // El origen se pasa porque en un local ese mismo stock se cuenta en kilos.
-      const costoNormalizado = resolverCostoTransferencia({
-        precioCosto,
-        unidadEnviada: d.unidadEnviada,
-        unidadMedida: d.producto?.base?.unidad_medida,
-        factorPack: d.producto?.base?.factor_pack,
-        pesoEsFijo: d.producto?.base?.pesoEsFijo,
-        pesoReferenciaKg: d.producto?.base?.pesoReferenciaKg,
-        modoVentaDeposito: d.producto?.base?.modoVentaDeposito,
-        modoCompraProveedor: d.producto?.base?.modoCompraProveedor,
-        origenEsDeposito: transferencia.origen?.es_deposito === true,
-      });
-
-      // Sin recepción cargada se valoriza lo enviado; con recepción cargada, lo
-      // recibido — incluido 0, que ahora vale 0 y no el total enviado.
-      const subtotal =
-        costoNormalizado * (cantidadRecibida == null ? cantidadEnviada : cantidadRecibida);
+      // LA MISMA FUNCIÓN QUE LA LISTA Y LOS DOS PDF, no una paralela.
+      //
+      // Esta pantalla era la única que llamaba a `resolverCostoTransferencia`
+      // directo y multiplicaba por su cuenta, mientras las otras tres pasaban por
+      // `valorizarDetalle`. Dos cálculos sobre el mismo documento pueden
+      // divergir, y divergieron: la lista mostró la #97 en 144.086,40 y esta
+      // pantalla en 155.486,40.
+      //
+      // Arreglar el parámetro que faltaba habría alineado los números de hoy y
+      // dejado la puerta abierta para mañana. Con una sola función no hay dos
+      // números posibles.
+      //
+      // `valorizarDetalle` ya resuelve la cantidad igual que se resolvía acá:
+      // sin recepción cargada valoriza lo ENVIADO; con recepción, lo recibido,
+      // incluido el 0 —que vale 0 y no el total enviado—.
+      const { costoUnitario: costoNormalizado, subtotal } = valorizarDetalle(
+        { ...d, precioCosto },
+        d.producto?.base,
+        { origenEsDeposito: transferencia.origen?.es_deposito === true }
+      );
 
       itemsEnviados += cantidadEnviada;
       itemsRecibidos += cantidadRecibida ?? 0;
