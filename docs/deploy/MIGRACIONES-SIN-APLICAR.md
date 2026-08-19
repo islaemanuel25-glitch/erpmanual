@@ -18,6 +18,11 @@ Si la lista está vacía, el despliegue es solo de código.
 
 **Ninguna.** Producción está al día: 98 migraciones en el árbol y 98 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-19 después de desplegar
-`b6cc9db17f4233a9468de7b691ab90188969a190`.
+`9f425b037d62ca6b616965090d9326e130e7076a`.
 
 No hay ningún corte esperando: `origin/main` y lo desplegado coinciden.
+
+Los tres despliegues del 2026-08-19 —`b6cc9db`, `289a036` y `9f425b0`— fueron de
+solo código: el clasificador informó cero archivos en los tres rangos y el
+contenedor descartable contó las mismas 98 que el árbol, que es lo que distingue
+"no había nada que aplicar" de "la imagen no conoce la migración".
