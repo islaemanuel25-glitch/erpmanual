@@ -161,6 +161,20 @@ export default function SunmiProductoCard({
   codigoBarra = null,
   codigoInterno = null,
   valor = null,
+  // ── LA MARCA: EL LADO IZQUIERDO DE LA FILA DEL VALOR ────────────────────
+  //
+  // La fila del valor está alineada a la derecha, así que su mitad izquierda
+  // estaba vacía en las 10.521 filas. Ahí entra un dato corto SIN COSTAR UN
+  // RENGLÓN, que es la única forma de agregarle algo a esta tarjeta: cualquier
+  // bloque nuevo la hace crecer y a 390 px se pierde la tercera.
+  //
+  // Es una ranura y no una regla, por lo mismo que `aviso`: la pieza sabe dónde
+  // va y qué tamaño tiene, no sabe qué significa. En el catálogo es la regla de
+  // ganancia —"30 %", "falta %"—; en stock sería otra cosa.
+  //
+  // El COLOR lo trae quien la usa, dentro del nodo. Decidir acá cuál se pinta de
+  // aviso obligaría a la tarjeta a conocer el negocio de cada pantalla.
+  marca = null,
   // ── EL AVISO ES UNA RANURA, NO UNA REGLA DE LA PIEZA ────────────────────
   //
   // La tarjeta sabe DIBUJAR un aviso; no sabe CUÁNDO corresponde. Eso es del
@@ -246,11 +260,15 @@ export default function SunmiProductoCard({
           </span>
         </div>
 
-        {/* 3 · LA RANURA DEL VALOR. En el catálogo, el precio. */}
-        {valor && (
+        {/* 3 · LA RANURA DEL VALOR. En el catálogo, el precio.
+            La marca va PRIMERA y empuja el resto con `mr-auto`, así el valor
+            sigue pegado a la derecha exactamente donde estaba: la fila no cambia
+            de alto ni el precio de lugar cuando no hay marca. */}
+        {(valor || marca) && (
           // `mt-1.5`: el precio necesita aire porque es el número grande, pero
           // no los 11 px que tenía — eran el hueco general, no una decisión.
           <div className="mt-1.5 flex justify-end items-baseline gap-1.5 min-h-[30px]">
+            {marca && <span className="mr-auto min-w-0">{marca}</span>}
             {valor}
           </div>
         )}

@@ -27,6 +27,11 @@ import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { etiquetaEscalaPrecio, etiquetaEscalaUnitaria } from "@/lib/precios/escalaPrecio";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "@/lib/precios/redondeo";
 import { seVendeSinGanancia } from "@/lib/precios/precioDesdeMargen";
+import {
+  reglaDeGananciaDe,
+  textoDeGanancia,
+  GANANCIA_FALTA,
+} from "@/lib/precios/reglaDeGanancia";
 // LA MARCA DEL SERVICIO ES LA DEL POS, no una nueva. `esProductoServicio` mira
 // `modalidad`, que es el mismo campo con el que el POS decide abrir el modal de
 // importe en vez de cobrar un precio fijo.
@@ -60,6 +65,28 @@ const TEXTO_IMPORTE_VARIABLE = "Importe variable";
 // campo configurado, que es OTRA cosa: hay 1.691 filas sin margen asignado que
 // igual venden con ganancia.
 const AVISO_SIN_GANANCIA = "Se vende sin ganancia";
+
+// ── EL PORCENTAJE DE GANANCIA, Y EL QUE FALTA ─────────────────────────────
+//
+// La idea es que se sepa de un vistazo cuál tiene porcentaje asignado y cuál no,
+// y por eso el que falta se ve MÁS que el que está: los 8.613 que tienen uno van
+// en el gris tenue de la tarjeta, y los 1.677 que no van en `--pos-warning`, el
+// mismo ámbar medido del aviso de abajo. Un blanco o un cero no servirían — el
+// blanco no se lee como "falta" y el cero es un valor cargado que significa otra
+// cosa: "vendé al costo".
+//
+// Las 231 filas de RECARGO FIJO no son "sin porcentaje": tienen regla, la suya no
+// se expresa en porcentaje. Van en gris con su valor en pesos —"+$100/un"—, así
+// que se distinguen de las tres cosas a la vez: no son un porcentaje, no son un
+// faltante, y dicen cuál es su regla.
+//
+// Los servicios de importe variable quedan AFUERA, igual que del aviso: no
+// tienen precio fijo, así que no les falta un porcentaje — no les corresponde.
+// Son 12 filas que si no dirían "falta %" mintiendo.
+// `text-xs` y no una medida escrita: está en la escala y no sube el contador de
+// hardcodeo. Son 10,5 px reales —1 rem son 14 acá—, el mismo tamaño que el aviso
+// de abajo, que es el otro elemento de "mirá esto" de la tarjeta.
+const GANANCIA_CLASE = "text-xs [font-variant-numeric:tabular-nums] whitespace-nowrap";
 // Y la línea de abajo explica de dónde sale el importe. Va con texto y no vacía
 // porque todas las tarjetas llevan su línea: un hueco haría que estas cuatro
 // quedaran más bajas que las demás.
@@ -1074,6 +1101,41 @@ export default function ProductosPage() {
                     }
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
                     codigoInterno={p.id ?? p.productoLocalId ?? null}
+                    // LA REGLA DE GANANCIA, en el hueco que ya existía a la
+                    // izquierda del precio. No agrega renglón: la tarjeta sigue
+                    // en 215,9 px y siguen entrando tres a 390.
+                    //
+                    // Qué dice cada fila lo decide `reglaDeGananciaDe`, que es
+                    // la misma pieza con la que se contaron las poblaciones —no
+                    // un criterio escrito acá que después diverja del conteo.
+                    marca={
+                      esProductoServicio(p)
+                        ? null
+                        : (() => {
+                            const regla = reglaDeGananciaDe(p);
+                            const falta = regla.tipo === GANANCIA_FALTA;
+                            return (
+                              <span
+                                className={[
+                                  GANANCIA_CLASE,
+                                  falta
+                                    ? "font-medium [color:var(--pos-warning)]"
+                                    : "sunmi-text-muted",
+                                ].join(" ")}
+                                // El texto ya lo dice; el título explica de qué
+                                // porcentaje se trata, que en una tarjeta con un
+                                // precio al lado no es obvio.
+                                title={
+                                  falta
+                                    ? "Este producto no tiene porcentaje de ganancia asignado"
+                                    : "Porcentaje de ganancia configurado"
+                                }
+                              >
+                                {textoDeGanancia(regla)}
+                              </span>
+                            );
+                          })()
+                    }
                     // EL AVISO SOBRE LO QUE YA PASÓ, no sobre lo que podría
                     // pasar. Son 429 filas en producción que se venden al costo
                     // o por debajo. Los 1.691 SIN REGLA DE PRECIO no se marcan
