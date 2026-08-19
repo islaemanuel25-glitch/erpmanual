@@ -55,3 +55,41 @@ cualquier otra, con el contenedor descartable de la imagen nueva. Lo único que
 cambia respecto de un despliegue de solo código es que el conteo de migraciones
 que informe ese contenedor tiene que subir en uno, y eso hay que comprobarlo:
 está en la regla dura 7.
+
+---
+
+## Con qué más viaja, al 2026-08-18
+
+Tres tandas quedaron empujadas y sin desplegar, a propósito y en este orden. Se
+anota acá porque quien dispare el despliegue tiene que saber **todo** lo que sale
+en ese corte, no solo la migración.
+
+Producción está en `1d012861aec08554da879dcc421ce007ab7bd50c`. Lo que entra son
+seis commits, de `5a62a65` a `978f790`.
+
+1. **Los dos ajustes de la tarjeta por local** (`5a62a65` + `7eda391`) — es la
+   tanda de esta migración. Los dos interruptores nacen APAGADOS, así que el día
+   que se despliegue **producción se ve exactamente igual que hoy** hasta que
+   alguien entre a la pantalla de apariencia y los prenda.
+2. **El porcentaje de ganancia en la tarjeta** (`978f790`) — esto SÍ se ve solo,
+   sin que nadie configure nada: aparece "30 %" al lado del precio, y "falta %"
+   en ámbar en las filas sin porcentaje asignado. Medido sobre la copia con datos
+   reales: **1.677 de 10.521 filas**, el 15,9 %, van a mostrar "falta %".
+   Es el cambio visible del corte, y conviene que Emanuel lo sepa antes y no lo
+   descubra en el mostrador.
+3. **Dos de documentación y uno de herramienta** (`ee4d3b0`, `fdce78b`,
+   `5fd3e82`) — no tocan nada de lo que corre.
+
+Estado de los chequeos previos al 2026-08-18, todos corridos:
+
+- `origin/main` y el HEAD local coinciden, cero commits sin empujar.
+- Suite 3.511 en verde contra el commit, con un `todo` conocido.
+- `npm run build` limpio.
+- Trinquete de hardcodeo sin cambios.
+- Las 15 huellas a 1366 idénticas a la línea de base.
+- Sonda de cascada VERDE — las utilidades le siguen ganando al kit.
+- Clasificador: una sola migración en el rango, `aditiva`, sin coincidencias.
+
+**Lo que falta es lo que solo se hace desplegando**: el backup validado del paso
+1, la referencia de rollback del paso 2, y esperar a que Actions publique la
+imagen. Nada de eso se adelantó.
