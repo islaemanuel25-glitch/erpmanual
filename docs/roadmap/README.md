@@ -53,6 +53,13 @@ Ordenada por lo que puede doler. La evidencia completa está en
 6. **`||` contra `??` al leer el override de costo.** Stock Locales y Reporte
    Valorizado pueden mostrar el mismo producto con costo distinto. **Sigue
    abierta:** se unificó el redondeo, no esto.
+6bis. **El servidor de crear la venta ACEPTA el precio que manda el navegador.**
+   Solo valida que sea mayor a cero (`crear/route.js:360-365`) y lo persiste
+   (`crear:880`). Es lo más grave de la zona de precios y tiene su plan escrito
+   en [el-precio-que-se-cobra.md](el-precio-que-se-cobra.md), junto con las
+   cuatro condiciones divergentes de "¿el precio está guardado por bulto?" y los
+   dos productos —id 924 y id 1881— que hoy valen tres a uno según qué pantalla
+   los mire.
 7. **La vista global rompe `/api/contexto-activo/get` con un 500.**
 8. **`grupo-activo/set` no valida que el grupo exista.**
 9. **`productos/eliminar` no chequea todas las referencias.** Un producto vendido
@@ -179,6 +186,16 @@ Emanuel en la orden de trabajo: `esDefault` salió de la UI, el descuento por
 puntos lo recalcula el servidor, la auditoría del ajuste pasó a bloqueante, el
 historial del cliente excluye las internas por defecto y las dos funciones de
 redondeo se unificaron en una.
+
+Y se sumaron dos:
+
+00. **¿El depósito le vende a los locales AL COSTO?** Su lista default es
+    `tipoBase = COSTO` con margen 0, así que sin cliente el POS cobra el costo y
+    no el precio de venta: 2.021 de 2.047 filas del depósito, y en 1.991 cobra
+    menos, 12,9 % menos en promedio. Si es a propósito hay que revisar qué
+    muestra la tarjeta ahí; si no, está mal configurada la lista. Medido el
+    2026-08-19, detalle en
+    [el-precio-que-se-cobra.md](el-precio-que-se-cobra.md).
 
 Y se sumó una el 2026-08-18:
 
