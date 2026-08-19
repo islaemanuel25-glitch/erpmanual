@@ -443,7 +443,13 @@ const edge = spawn(
   [
     "--headless=new",
     `--remote-debugging-port=${PUERTO_CDP}`,
-    `--user-data-dir=${path.join(SALIDA, "edge-profile")}`,
+    // ABSOLUTA, y no es cosmético: con una ruta RELATIVA Edge no levanta y el
+    // script muere con "Edge no respondió al puerto de depuración", que apunta a
+    // cualquier otro lado. El defecto estaba latente porque la línea de base se
+    // tomó pasando un `--salida` absoluto; con uno relativo —lo normal al
+    // escribirlo a mano— no anda. Medido: mismos argumentos, misma máquina, con
+    // ruta relativa no abre el puerto y con absoluta contesta a los 6 segundos.
+    `--user-data-dir=${path.resolve(SALIDA, "edge-profile")}`,
     "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--hide-scrollbars",
     "about:blank",
   ],
