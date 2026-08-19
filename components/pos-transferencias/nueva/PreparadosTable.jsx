@@ -158,8 +158,7 @@ function PreparadoRow({ p, onDesmarcar, onEditPreparado, bloqueado = false }) {
   const labelBulto =
     p.unidadMedida === "cajon" ? "caj." :
     p.unidadMedida === "pack" ? "packs" :
-    p.unidadMedida === "caja" ? "cajas" :
-    p.unidadMedida === "carton" ? "cart." :
+    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
     "bultos";
 
   const preparadoVal = Number(p.preparado || 0);

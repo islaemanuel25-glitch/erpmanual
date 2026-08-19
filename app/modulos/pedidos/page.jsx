@@ -725,8 +725,7 @@ function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
   const labelBulto =
     unidadMedida === "cajon" ? "Cajón" :
     unidadMedida === "pack" ? "Pack" :
-    unidadMedida === "caja" ? "Caja" :
-    unidadMedida === "carton" ? "Cartón" :
+    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
     "Bulto";
 
   return (
@@ -823,8 +822,7 @@ function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = tru
   const labelBulto =
     unidadMedida === "cajon" ? "caj." :
     unidadMedida === "pack" ? "packs" :
-    unidadMedida === "caja" ? "cajas" :
-    unidadMedida === "carton" ? "cart." :
+    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
     "bultos";
 
   // Botón agregar
@@ -910,8 +908,7 @@ function CarritoItemCard({ item, totalActual, onSetCantidad }) {
   const labelBulto =
     item.unidadMedida === "cajon" ? "caj." :
     item.unidadMedida === "pack" ? "packs" :
-    item.unidadMedida === "caja" ? "cajas" :
-    item.unidadMedida === "carton" ? "cart." :
+    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
     "bultos";
 
   return (

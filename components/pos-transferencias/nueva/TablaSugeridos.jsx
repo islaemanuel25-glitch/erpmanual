@@ -222,8 +222,7 @@ function SugeridoRow({ p, onEditSugerido, onMarcarPreparado }) {
   const labelBulto =
     p.unidadMedida === "cajon" ? "caj." :
     p.unidadMedida === "pack" ? "packs" :
-    p.unidadMedida === "caja" ? "cajas" :
-    p.unidadMedida === "carton" ? "cart." :
+    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
     "bultos";
 
   const [rotura, setRotura] = useState(false);

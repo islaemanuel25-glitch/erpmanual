@@ -959,10 +959,9 @@ export default function NuevaCompraProveedorPage() {
     const codigo = p.codigo_barra || p.sku || "—";
     const disp = unidadDisplay(base, unidadActual);
     const bultoNombre =
-      base.unidad_medida === "cajon" || base.unidad_medida === "caja"
+      // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
+      base.unidad_medida === "cajon"
         ? "Caja"
-        : base.unidad_medida === "carton"
-        ? "Cartón"
         : base.unidad_medida === "pack"
         ? "Pack"
         : "Bulto";

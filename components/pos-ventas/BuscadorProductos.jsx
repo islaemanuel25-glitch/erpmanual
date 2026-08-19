@@ -15,8 +15,7 @@ function labelFormato(unidad) {
   switch (unidad) {
     case "cajon": return "cajones";
     case "pack": return "packs";
-    case "caja": return "cajas";
-    case "carton": return "cartones";
+    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
     default: return "formatos";
   }
 }
