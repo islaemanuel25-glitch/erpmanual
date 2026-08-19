@@ -37,15 +37,20 @@ export function UserProvider({ children }) {
           // Operario obligatorio efectivo del local (null/ausente = true).
           exigirOperador: p.exigirOperador !== false,
 
-          // ── LAS PREFERENCIAS DE LA TARJETA, YA RESUELTAS ────────────────
+          // ── LA PREFERENCIA DE LA TARJETA, YA RESUELTA ───────────────────
           //
           // `=== true` y no `!== false`: acá el default es APAGADO, al revés
-          // que el del operario. Un local que nunca las tocó manda `null`, y un
-          // JWT o un servidor viejo no las manda en absoluto — los dos casos
+          // que el del operario. Un local que nunca la tocó manda `null`, y un
+          // JWT o un servidor viejo no la manda en absoluto — los dos casos
           // tienen que dar `false`, que es lo que se ve hoy. Escrito con
-          // `!== false` darían `true` y le cambiarían el catálogo a todos los
+          // `!== false` daría `true` y le cambiaría el catálogo a todos los
           // que nunca pidieron nada.
-          tarjetaPrecioUnitario: p.tarjetaPrecioUnitario === true,
+          //
+          // ACÁ ERAN DOS. `tarjetaPrecioUnitario` se sacó el 2026-08-19: quedó
+          // sin efecto cuando la tarjeta pasó a mostrar la escala en la que se
+          // VENDE. `/api/me` la sigue mandando —viaja en el mismo `select`, sin
+          // costo— y la columna sigue en la base; lo que no existe más es que
+          // alguien la lea para decidir algo.
           tarjetaOcultarEquivalencia: p.tarjetaOcultarEquivalencia === true,
         });
       } else {

@@ -176,9 +176,17 @@ model ConfiguracionLocal {
   /// que el encabezado de este modelo declara: "un local sin fila conserva el
   /// comportamiento histórico".
 
-  /// El número grande muestra SIEMPRE el precio unitario, aunque el producto se
-  /// venda por bulto. Medido en producción: le cambia el número a 6.430 de
-  /// 10.616 filas activas, que son exactamente las de pack y cajón.
+  /// SIN USO DESDE EL 2026-08-19. Nadie la lee para decidir nada.
+  ///
+  /// Servía para que el número grande mostrara siempre el precio unitario. Quedó
+  /// sin efecto cuando la tarjeta pasó a mostrar la escala en la que se VENDE
+  /// —la que decide el POS—: desde entonces el número no se elige. El
+  /// interruptor se sacó de la pantalla de apariencia y del contexto.
+  ///
+  /// LA COLUMNA SE CONSERVA A PROPÓSITO: borrarla es un `DROP COLUMN` sobre una
+  /// tabla de producción a cambio de dos bytes por local. El PUT la sigue
+  /// aceptando y el GET devolviéndola, así que el dato de un local que la tenía
+  /// prendida no se pierde. El detalle está en `lib/config/aparienciaLocal.js`.
   tarjetaPrecioUnitario            Boolean?
 
   /// La franja de escala deja de mostrar la equivalencia de bulto —"1 pack = 24

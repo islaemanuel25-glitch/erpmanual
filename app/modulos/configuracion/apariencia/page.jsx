@@ -69,7 +69,6 @@ export default function AparienciaPage() {
   // booleano. Si el local nunca las tocó llegan en `false`, que es lo que se ve
   // hoy.
   const [tarjeta, setTarjeta] = useState({
-    tarjetaPrecioUnitario: perfil?.tarjetaPrecioUnitario === true,
     tarjetaOcultarEquivalencia: perfil?.tarjetaOcultarEquivalencia === true,
   });
 
@@ -179,27 +178,22 @@ export default function AparienciaPage() {
           <div className="mt-6 pt-5 border-t sunmi-divider">
             <h3 className="text-sm font-semibold mb-1">Tarjeta de productos</h3>
             <p className="text-xs sunmi-text-muted mb-4">
-              Cómo se ve el catálogo en pantallas angostas, para todo el local. Con las
-              dos apagadas se ve como hasta ahora.
+              Cómo se ve el catálogo en pantallas angostas, para todo el local. Apagada
+              se ve como hasta ahora.
             </p>
 
+            {/* ── ACÁ HABÍA UN SEGUNDO INTERRUPTOR Y SE SACÓ ──────────────────
+                "Mostrar siempre el precio por unidad" quedó SIN EFECTO el
+                2026-08-19, cuando la tarjeta pasó a mostrar la escala en la que
+                se VENDE: desde entonces el número lo decide el POS y no hay nada
+                que elegir. En un local ya muestra el unitario sin prenderlo, y
+                en el depósito forzarlo haría que la tarjeta contradiga al
+                mostrador.
+                Un interruptor que no hace nada es peor que no tenerlo: se toca,
+                no pasa nada, y lo próximo que se reporta es "el sistema anda
+                mal". La COLUMNA de la base se conserva — ver
+                `lib/config/aparienciaLocal.js`. */}
             <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-sm">Mostrar siempre el precio por unidad</div>
-                  <div className="text-xs sunmi-text-muted">
-                    Los productos que se venden por bulto muestran el precio de UNA unidad
-                    en vez del bulto entero.
-                  </div>
-                </div>
-                <div className="shrink-0">
-                  <SunmiToggleEstado
-                    value={tarjeta.tarjetaPrecioUnitario}
-                    onChange={(v) => !guardando && guardarTarjeta("tarjetaPrecioUnitario", v)}
-                  />
-                </div>
-              </div>
-
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="text-sm">Ocultar la equivalencia de bulto</div>
