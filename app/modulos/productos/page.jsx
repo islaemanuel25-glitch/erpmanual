@@ -24,11 +24,7 @@ import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProduc
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import { Eye, Pencil } from "lucide-react";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
-import {
-  escalaDeVentaDe,
-  seMuestraUnitario,
-  escalaQueLaTarjetaSabeMostrar,
-} from "@/lib/precios/escalaDeVenta";
+import { escalaDeVentaDe, valorEnLaEscalaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "@/lib/precios/redondeo";
 import { seVendeSinGanancia } from "@/lib/precios/precioDesdeMargen";
 import {
@@ -117,6 +113,14 @@ export default function ProductosPage() {
   // que contesta 403 al tocarlo — un botón que no hace nada es la clase de cosa
   // que después se reporta como "el sistema anda mal".
   const puedeExportar = esAdminProd || permisosProd.includes("costos.ver");
+
+  // ── EL COSTO EN LA TARJETA VA DETRÁS DEL MISMO PERMISO QUE EL EXPORT ────
+  //
+  // `costos.ver` y no `productos.ver`: hay tres roles —`Deposito`, `Mini` y
+  // `ENCARGADO`— que ven el catálogo y NO tienen costos.ver, y a ésos la tarjeta
+  // les queda como estaba. Sin marca y sin aclaración de que falta algo: un
+  // hueco rotulado sería contarles que hay un dato que no pueden ver.
+  const puedeVerCostos = puedeExportar;
 
   // ── LAS PREFERENCIAS DE LA TARJETA, DEL LOCAL ────────────────────────────
   //
@@ -1105,14 +1109,27 @@ export default function ProductosPage() {
                   // usa el POS. De acá salen las TRES cosas que antes se decidían
                   // por separado y podían contradecirse: el número grande, su
                   // rótulo y si la equivalencia repite el unitario.
-                  // `escalaQueLaTarjetaSabeMostrar` deja el fiambre de pieza fija
-                  // como está hoy —por kilo—: la tarjeta todavía no sabe poner el
-                  // precio de una pieza, y rotular "por pieza" sobre un número
-                  // por kilo sería peor que no tocarlo. Son 35 filas, anotadas.
-                  const escalaVenta = escalaQueLaTarjetaSabeMostrar(
-                    escalaDeVentaDe(p, esDepositoProd)
-                  );
-                  const muestraUnitario = seMuestraUnitario(escalaVenta);
+                  const escalaVenta = escalaDeVentaDe(p, esDepositoProd);
+
+                  // ── LOS DOS NÚMEROS, EN LA MISMA ESCALA ─────────────────
+                  //
+                  // Es la regla dura de este bloque. Un costo por bulto al lado
+                  // de una venta por unidad no es una comparación difícil: es una
+                  // comparación AL REVÉS, que hace parecer sano lo que está mal.
+                  // Por eso los dos salen de la misma función con la misma
+                  // escala, y lo único que difiere es el redondeo: la venta lo
+                  // lleva porque es lo que se cobra, el costo no porque se paga.
+                  const enEscala = (valor, redondeo) =>
+                    valorEnLaEscalaDeVenta({
+                      escala: escalaVenta,
+                      valor,
+                      factor: p.factorPack,
+                      unidad: p.unidadMedida,
+                      redondeo100: redondeo,
+                      pesoReferenciaKg: p.pesoReferenciaKg,
+                    });
+                  const ventaEnEscala = enEscala(p.precioVenta, p.redondeo100);
+                  const costoEnEscala = puedeVerCostos ? enEscala(p.precioCosto, false) : null;
                   return (
                   <SunmiProductoCard
                     key={p.id ?? p.productoLocalId}
@@ -1131,21 +1148,28 @@ export default function ProductosPage() {
                             // franja de escala, con palabra y no con un dibujo.
                             esCombo: p.esCombo,
                             ocultarEquivalencia: tarjetaSinEquivalencia,
-                            // Ya NO viene del interruptor: viene de si el número
-                            // de arriba es el unitario. Si lo es, la franja no
-                            // tiene que repetirlo.
-                            mostrarUnitario: muestraUnitario,
+                            // La escala de VENTA decide qué conversión hace
+                            // falta, y si hace falta alguna: en un suelto la
+                            // franja desaparece porque no hay nada que convertir.
+                            escala: escalaVenta,
+                            pesoReferenciaKg: p.pesoReferenciaKg,
                           })
                     }
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
                     codigoInterno={p.id ?? p.productoLocalId ?? null}
-                    // LA REGLA DE GANANCIA, en el hueco que ya existía a la
-                    // izquierda del precio. No agrega renglón: la tarjeta sigue
-                    // en 215,9 px y siguen entrando tres a 390.
+                    // EL COSTO Y LA GANANCIA, en el hueco que ya existía a la
+                    // izquierda del precio. No agrega renglón: van APILADOS
+                    // dentro de la fila del valor, que tiene 30 px de alto
+                    // mínimo y le sobran para dos líneas de 10,5.
                     //
-                    // Qué dice cada fila lo decide `reglaDeGananciaDe`, que es
-                    // la misma pieza con la que se contaron las poblaciones —no
-                    // un criterio escrito acá que después diverja del conteo.
+                    // Por qué apilados y no en una línea: el peor caso real
+                    // —"Costo $112.450,00 · falta %" al lado de "$142.000,00 por
+                    // bulto"— son 48 caracteres y NO entra a 390 px. Medido antes
+                    // de escribirlo, sobre las 10.509 filas activas.
+                    //
+                    // El costo solo si la persona tiene `costos.ver`. Al que no
+                    // lo tiene la tarjeta le queda como estaba: el porcentaje y
+                    // nada más, sin marca ni aclaración de que falta algo.
                     marca={
                       esProductoServicio(p)
                         ? null
@@ -1153,6 +1177,15 @@ export default function ProductosPage() {
                             const regla = reglaDeGananciaDe(p);
                             const falta = regla.tipo === GANANCIA_FALTA;
                             return (
+                              <span className="flex flex-col items-start leading-tight">
+                                {costoEnEscala !== null && (
+                                  <span
+                                    className={`${GANANCIA_CLASE} sunmi-text-muted`}
+                                    title="Costo, en la misma escala que el precio de venta"
+                                  >
+                                    Costo {formatearMoneda(costoEnEscala)}
+                                  </span>
+                                )}
                               <span
                                 className={[
                                   GANANCIA_CLASE,
@@ -1170,6 +1203,7 @@ export default function ProductosPage() {
                                 }
                               >
                                 {textoDeGanancia(regla)}
+                              </span>
                               </span>
                             );
                           })()
@@ -1216,21 +1250,7 @@ export default function ProductosPage() {
                                 solo el rótulo habría sido peor que no tocar
                                 nada: diría "$31.900,00 por unidad" sobre un
                                 precio de bulto. */}
-                            {formatearMoneda(
-                              muestraUnitario
-                                ? precioUnitarioQueSeCobra({
-                                    precio: p.precioVenta,
-                                    factor: p.factorPack,
-                                    unidad: p.unidadMedida,
-                                    redondeo100: p.redondeo100,
-                                  })
-                                : precioEnEscalaQueSeCobra({
-                                    precio: p.precioVenta,
-                                    factor: p.factorPack,
-                                    unidad: p.unidadMedida,
-                                    redondeo100: p.redondeo100,
-                                  })
-                            )}
+                            {formatearMoneda(ventaEnEscala)}
                           </span>
                           {/* EL RÓTULO ES LA ESCALA DE VENTA, tal cual. Antes
                               salía de `unidad_medida`, que dice cómo se COMPRA:

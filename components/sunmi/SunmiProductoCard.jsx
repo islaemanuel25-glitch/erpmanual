@@ -268,7 +268,13 @@ export default function SunmiProductoCard({
           // `mt-1.5`: el precio necesita aire porque es el número grande, pero
           // no los 11 px que tenía — eran el hueco general, no una decisión.
           <div className="mt-1.5 flex justify-end items-baseline gap-1.5 min-h-[30px]">
-            {marca && <span className="mr-auto min-w-0">{marca}</span>}
+            {/* `self-center` y no la línea base de la fila: cuando la marca trae
+                DOS renglones —el costo y el porcentaje—, alinearla por la base
+                deja el segundo colgando POR DEBAJO de la base del precio y la
+                fila crece. Medido: la tarjeta pasaba de 235,2 a 244,2 px en el
+                peor caso y perdía la tercera tarjeta a 390. Centrada, los dos
+                renglones entran en los 30 px que la fila ya tenía. */}
+            {marca && <span className="mr-auto min-w-0 self-center">{marca}</span>}
             {valor}
           </div>
         )}
@@ -278,6 +284,16 @@ export default function SunmiProductoCard({
             El ícono de etiqueta lo marca como "esto es la escala del precio". */}
         {equivalencia && (
           <div
+            // ── UN ANCLAJE ESTABLE PARA QUIEN MIDA ─────────────────────────
+            //
+            // La sonda buscaba este bloque por su TEXTO —"Se vende", "1 pack ="—
+            // y por tener cero hijos elemento. Las dos cosas eran frágiles: el
+            // texto lo acaba de cambiar esta tanda, y el bloque tiene dos hijos
+            // (el ícono y el span), así que el selector no lo encontraba NUNCA.
+            // Pasaba desapercibido porque la comparación se salteaba cuando no
+            // encontraba nada — el salteo silencioso que la propia sonda advierte
+            // en otro lado. Con un atributo, medir no depende de adivinar.
+            data-sunmi-equivalencia
             className={componerClaseTexto({
               // La franja se aprieta de 7 a 4 px arriba y abajo, y se le da su
               // propio margen de arriba. Con el texto en 11 px y su interlínea,

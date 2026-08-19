@@ -280,15 +280,25 @@ export default function VerProductoPage({ params }) {
             <Renglon rotulo={`Venta (${etiquetaEscalaPrecio(item.unidadMedida)})`}>
               {formatearMoneda(precioMostrado)}
             </Renglon>
-            <Renglon rotulo="Escala">
-              {lineaDeEquivalencia({
+            {/* ── EL RENGLÓN APARECE SOLO SI HAY ALGO QUE CONVERTIR ─────────
+                Se llamaba "Escala" y decía "Se vende por unidad" justo debajo de
+                un renglón rotulado "Venta (por unidad)": la misma palabra dos
+                veces, seguidas. Desde que `lineaDeEquivalencia` devuelve solo la
+                CONVERSIÓN, para un suelto no hay nada que poner — y un renglón
+                rotulado y vacío es peor que ninguno.
+                Cambia también el rótulo, porque cambió lo que muestra. */}
+            {(() => {
+              const conversion = lineaDeEquivalencia({
                 precio: item.precioVenta,
                 factor: item.factorPack,
                 unidad: item.unidadMedida,
                 redondeo100: item.redondeo100,
                 esCombo: item.esCombo,
-              })}
-            </Renglon>
+              });
+              return conversion ? (
+                <Renglon rotulo="Equivalencia">{conversion}</Renglon>
+              ) : null;
+            })()}
             {/* El costo va TAL CUAL ESTÁ GUARDADO: no se cobra, se paga, así que
                 no le corresponde el redondeo comercial que se aplica a la venta. */}
             <Renglon rotulo="Costo guardado">{formatearMoneda(item.precioCosto)}</Renglon>

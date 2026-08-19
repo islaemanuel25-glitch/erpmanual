@@ -55,11 +55,7 @@ import { prepararSesion } from "./lib/sesionArnes.mjs";
 // coincidirían siempre, incluso estando las dos mal.
 import { formatearMoneda, lineaDeEquivalencia } from "../lib/moneda.js";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "../lib/precios/redondeo.js";
-import {
-  escalaDeVentaDe,
-  seMuestraUnitario,
-  escalaQueLaTarjetaSabeMostrar,
-} from "../lib/precios/escalaDeVenta.js";
+import { escalaDeVentaDe, valorEnLaEscalaDeVenta } from "../lib/precios/escalaDeVenta.js";
 import { esProductoServicio } from "../lib/pos-ventas/servicios.js";
 import { seVendeSinGanancia } from "../lib/precios/precioDesdeMargen.js";
 
@@ -290,7 +286,13 @@ try {
         texto: texto.split("\\n").slice(0, 2).join(" · "),
         equivalenciaConUnitario: conPack && repiteUnitario,
         equivalenciaSinUnitario: conPack && !repiteUnitario,
-        porKilo: /Se vende por kilo/.test(texto),
+        // La franja del fiambre de pieza fija. Su sola presencia obliga al
+        // rótulo "por pieza": son la misma afirmación dicha dos veces y no
+        // pueden discrepar.
+        conPieza: /1 pieza = [\\d.,]+ kg/.test(texto),
+        // Y la del kilo, que perdió el "Se vende por kilo" y quedó solo con la
+        // fracción — que es lo que aporta.
+        porKilo: /cada 100 g/.test(texto),
         rotulo,
       };
     }).filter((c) =>
@@ -299,8 +301,9 @@ try {
       (c.equivalenciaConUnitario && c.rotulo !== "por bulto") ||
       // Y si la franja NO lo repite, el número de arriba SÍ es el unitario.
       (c.equivalenciaSinUnitario && c.rotulo !== "por unidad") ||
+      (c.conPieza && c.rotulo !== "por pieza") ||
       (c.porKilo && c.rotulo !== "por kg") ||
-      !["por bulto", "por kg", "por unidad"].includes(c.rotulo)
+      !["por bulto", "por kg", "por unidad", "por pieza"].includes(c.rotulo)
     );
   })()`);
   afirmar(
@@ -379,9 +382,11 @@ try {
       const cuerpo = t.firstElementChild;
       const nombre = cuerpo ? cuerpo.firstElementChild : null;
       const fila = t.querySelector('.items-baseline');
-      const bloque = [...t.querySelectorAll('div')].find(
-        (d) => /Se vende|1 pack =|se carga al vender/i.test(d.textContent) && d.children.length === 0
-      );
+      // Por ATRIBUTO, no por texto ni por forma. Buscarlo por su contenido lo
+      // ataba a las palabras que esta tanda cambió, y la condición de "sin hijos
+      // elemento" era directamente falsa —el bloque tiene el ícono y el span—,
+      // así que no lo encontraba nunca y la comparación se salteaba en silencio.
+      const bloque = t.querySelector('[data-sunmi-equivalencia]');
       return {
         nombre: nombre ? nombre.textContent.trim() : "",
         valor: fila ? fila.textContent.trim() : "",
@@ -392,6 +397,7 @@ try {
 
   const porNombre = new Map(listado.items.map((it) => [String(it.nombre || "").trim(), it]));
   const malPrecio = [];
+  const malCosto = [];
   const malServicio = [];
   // SI LOS NOMBRES NO CASAN, ES ROJO Y NO UN SALTEO. Un `continue` silencioso
   // acá convierte la afirmación en decoración: pasa en verde sin haber mirado
@@ -420,18 +426,15 @@ try {
     // correcto del defecto de su momento (el "/ un" sobre un precio de bulto) y
     // pasó a ser falso cuando la tarjeta empezó a mostrar cómo se VENDE: medido,
     // 5.450 de 10.521 filas activas cambian de escala entre una cosa y la otra.
-    const escalaEsperada = escalaQueLaTarjetaSabeMostrar(
-      escalaDeVentaDe(fila, esDepositoSonda)
-    );
-    const calculo = seMuestraUnitario(escalaEsperada)
-      ? precioUnitarioQueSeCobra
-      : precioEnEscalaQueSeCobra;
+    const escalaEsperada = escalaDeVentaDe(fila, esDepositoSonda);
     const esperado = formatearMoneda(
-      calculo({
-        precio: fila.precioVenta,
+      valorEnLaEscalaDeVenta({
+        escala: escalaEsperada,
+        valor: fila.precioVenta,
         factor: fila.factorPack,
         unidad: fila.unidadMedida,
         redondeo100: fila.redondeo100,
+        pesoReferenciaKg: fila.pesoReferenciaKg,
       })
     );
     if (!vista.valor.includes(esperado)) {
@@ -446,10 +449,42 @@ try {
       unidad: fila.unidadMedida,
       redondeo100: fila.redondeo100,
       esCombo: fila.esCombo,
-      mostrarUnitario: seMuestraUnitario(escalaEsperada),
+      escala: escalaEsperada,
+      pesoReferenciaKg: fila.pesoReferenciaKg,
     });
-    if (vista.equivalencia && vista.equivalencia !== eqEsperada) {
-      malPrecio.push(`${vista.nombre}: equivalencia "${vista.equivalencia}", corresponde "${eqEsperada}"`);
+    // LA AUSENCIA TAMBIÉN SE COMPARA. Antes solo se miraba la franja cuando
+    // estaba, así que una que sobrara —o una que faltara— pasaba sin ruido. Y
+    // desde que la franja PUEDE no estar, ese hueco dejaría de mirarse justo en
+    // el caso nuevo.
+    const eqVista = vista.equivalencia || null;
+    if (eqVista !== (eqEsperada || null)) {
+      malPrecio.push(
+        `${vista.nombre}: equivalencia ${eqVista === null ? "AUSENTE" : `"${eqVista}"`}, ` +
+        `corresponde ${eqEsperada === null ? "AUSENTE" : `"${eqEsperada}"`}`
+      );
+    }
+
+    // ── EL COSTO, EN LA MISMA ESCALA QUE LA VENTA ─────────────────────────
+    //
+    // Es la regla dura del costo en la tarjeta, y la única forma de romperla sin
+    // que se note es dejarlos en escalas distintas: un costo por bulto al lado
+    // de una venta por unidad hace parecer sano lo que está mal. Se compara
+    // contra el valor calculado con la MISMA escala.
+    //
+    // El costo NO lleva el redondeo comercial: no se cobra, se paga.
+    const costoEsperado = valorEnLaEscalaDeVenta({
+      escala: escalaEsperada,
+      valor: fila.precioCosto,
+      factor: fila.factorPack,
+      unidad: fila.unidadMedida,
+      redondeo100: false,
+      pesoReferenciaKg: fila.pesoReferenciaKg,
+    });
+    if (costoEsperado !== null) {
+      const textoCosto = `Costo ${formatearMoneda(costoEsperado)}`;
+      if (!vista.valor.includes(textoCosto)) {
+        malCosto.push(`${vista.nombre}: se ve "${vista.valor}", corresponde "${textoCosto}"`);
+      }
     }
   }
 
@@ -578,6 +613,40 @@ try {
     );
   }
   afirmar(
+    malCosto.length === 0,
+    `9b · el costo se ve EN LA MISMA ESCALA que la venta, en las ${enPantalla.length} tarjetas`,
+    `${malCosto.length} diferencia(s). Primera: ${malCosto[0] ?? ""}`
+  );
+
+  // ── 9c · LA ESCALA NO SE DICE DOS VECES ─────────────────────────────────
+  //
+  // Ésta faltaba, y la falta se destapó con una contraprueba: se repuso el
+  // "Se vende por unidad" de la franja —la repetición exacta que esta tanda
+  // saca— y la sonda siguió en VERDE. Una sonda que no ve volver el defecto que
+  // acaba de arreglarse no está cuidando ese arreglo.
+  //
+  // La regla: la franja NO puede volver a nombrar la escala. Eso lo dice el
+  // rótulo pegado al precio, dos centímetros arriba. Lo que la franja aporta es
+  // la CONVERSIÓN, y por eso las formas válidas empiezan con un número o con un
+  // signo peso.
+  const repetida = await evaluar(`(() => {
+    return ${TARJETAS}.map((t) => {
+      const bloque = t.querySelector('[data-sunmi-equivalencia]');
+      if (!bloque) return null;
+      const texto = bloque.textContent.trim();
+      // "Se vende por …" es la forma exacta que se sacó. "Combo" solo es la
+      // marca del combo y no nombra ninguna escala.
+      return /se vende por/i.test(texto)
+        ? (t.firstElementChild.firstElementChild.textContent.trim() + " → " + texto)
+        : null;
+    }).filter(Boolean);
+  })()`);
+  afirmar(
+    repetida.length === 0,
+    "9c · la franja no vuelve a nombrar la escala que ya dice el rótulo",
+    `${repetida.length} tarjeta(s) la repiten. La primera: ${repetida[0] ?? ""}`
+  );
+  afirmar(
     malPrecio.length === 0,
     `9 · el precio que se ve es el que se cobra, en las ${enPantalla.length} tarjetas`,
     `${malPrecio.length} diferencia(s). Primera: ${malPrecio[0] ?? ""}`
@@ -602,17 +671,29 @@ try {
 
   // Y la mitad que explica POR QUÉ están parejas. Sin esto, alguien "arregla" el
   // alto con un `min-h` fijo, la afirmación de arriba se pone verde, y las
-  // tarjetas vuelven a no decir en qué escala se vende ni si falta el código.
+  // tarjetas vuelven a perder bloques.
+  //
+  // ── ESTO PEDÍA ADEMÁS LA LÍNEA DE ESCALA, Y YA NO ────────────────────────
+  //
+  // La pedía porque su ausencia desnivelaba las tarjetas — un defecto real y
+  // medido en su momento. Desde el 2026-08-19 la franja desaparece A PROPÓSITO
+  // cuando no hay ninguna conversión que aportar: en un suelto decía "Se vende
+  // por unidad" dos centímetros abajo de un rótulo que decía "por unidad".
+  //
+  // El desnivel que preocupaba lo cubre la afirmación 6, que compara los altos
+  // de verdad y sigue exigiendo que sean uno solo. Y que la franja diga lo que
+  // corresponde —incluido no estar— lo cubre la 9. Lo que queda acá es el pie,
+  // que sí tiene que estar siempre.
   const filas = await evaluar(`(() => {
     const t = ${TARJETAS};
     return {
-      sinEquivalencia: t.filter((c) => !/Se vende|1 pack =/.test(c.innerText)).length,
+      sinEquivalencia: 0,
       sinPie: t.filter((c) => !c.querySelector('.font-mono')).length,
     };
   })()`);
   afirmar(
     filas.sinEquivalencia === 0 && filas.sinPie === 0,
-    "6b · ninguna tarjeta se quedó sin la línea de escala ni sin el pie de códigos",
+    "6b · ninguna tarjeta se quedó sin el pie de códigos",
     `sin equivalencia: ${filas.sinEquivalencia} · sin pie: ${filas.sinPie}`
   );
 
