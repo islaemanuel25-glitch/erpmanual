@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR, fechaAR, horaAR, diaSemanaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
@@ -36,7 +37,8 @@ function fmt(n) {
 function fmtHora(d) {
   if (!d) return "";
   try {
-    return new Date(d).toLocaleString("es-AR", { timeStyle: "short" });
+    // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+    return horaAR(d, { vacio: "" });
   } catch {
     return "";
   }
@@ -45,11 +47,7 @@ function fmtHora(d) {
 function fmtFechaCorta(d) {
   if (!d) return "—";
   try {
-    return new Date(d).toLocaleDateString("es-AR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return fechaAR(d);
   } catch {
     return "—";
   }
@@ -58,9 +56,8 @@ function fmtFechaCorta(d) {
 function fmtFechaLargaSecundaria(d) {
   if (!d) return "";
   try {
-    return new Date(d).toLocaleDateString("es-AR", {
-      weekday: "long",
-    });
+    // El día de la semana también se desplaza con la zona: ver el helper.
+    return diaSemanaAR(d);
   } catch {
     return "";
   }
@@ -193,7 +190,7 @@ function AlertaSinTurno({ sinTurno }) {
                   <td className="px-2 py-2 whitespace-nowrap text-xs font-mono">#{v.numero}</td>
                   <td className="px-2 py-2 whitespace-nowrap text-xs">
                     {v.fecha
-                      ? new Date(v.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+                      ? fechaHoraAR(v.fecha)
                       : "—"}
                   </td>
                   <td className="px-2 py-2 whitespace-nowrap text-xs text-right font-mono">${fmt(v.total)}</td>

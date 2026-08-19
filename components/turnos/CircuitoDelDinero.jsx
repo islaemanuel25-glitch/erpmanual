@@ -29,6 +29,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import Link from "next/link";
+import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import { armarCircuito, verificarCircuito, etiquetaEstadoCambio } from "@/lib/caja/circuitoDinero";
 import { DesgloseResumido } from "@/components/caja/PanelesApertura";
 
@@ -40,7 +41,9 @@ const hhmm = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? "—"
-    : d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`. El
+    // `hour12: false` ya estaba acá a propósito; lo que faltaba era la zona.
+    : horaAR(d);
 };
 
 /** Importe que distingue ausencia de cero. */

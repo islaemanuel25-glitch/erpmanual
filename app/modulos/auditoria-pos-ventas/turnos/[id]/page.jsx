@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { fechaHoraAR, fechaAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -18,7 +19,8 @@ function fmt(n) {
 function fmtHora(d) {
   if (!d) return "";
   try {
-    return new Date(d).toLocaleString("es-AR", { timeStyle: "short" });
+    // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+    return horaAR(d, { vacio: "" });
   } catch {
     return "";
   }
@@ -27,11 +29,7 @@ function fmtHora(d) {
 function fmtFechaCorta(d) {
   if (!d) return "\u2014";
   try {
-    return new Date(d).toLocaleDateString("es-AR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return fechaAR(d);
   } catch {
     return "\u2014";
   }
@@ -333,7 +331,7 @@ export default function DetalleTurnoPage() {
                           <td className="py-2 pr-3 font-mono text-xs text-gray-500">{v.numero}</td>
                           <td className="py-2 px-3 tabular-nums whitespace-nowrap">
                             {v.fecha
-                              ? new Date(v.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+                              ? fechaHoraAR(v.fecha)
                               : "\u2014"}
                           </td>
                           <td className="py-2 px-3 capitalize">{v.formaPago}</td>
@@ -374,7 +372,7 @@ export default function DetalleTurnoPage() {
 
             {/* Pie */}
             <div className="mt-8 pt-4 border-t border-gray-200 text-[10px] text-gray-600 flex justify-between">
-              <span>Generado: {new Date().toLocaleString("es-AR")}</span>
+              <span>Generado: {fechaHoraAR(new Date())}</span>
               <span>ERP Azul</span>
             </div>
           </div>

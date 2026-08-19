@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -27,25 +28,10 @@ const fmt = (n) =>
       })
     : "-";
 
-const fmtFecha = (iso) => {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+// Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+const fmtFecha = (iso) => fechaHoraAR(iso, { vacio: "-" });
 
-const fmtHora = (iso) => {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleTimeString("es-AR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+const fmtHora = (iso) => horaAR(iso, { vacio: "-" });
 
 const FORMA_PAGO_LABELS = {
   efectivo: "Efectivo",
@@ -149,7 +135,7 @@ ${totalRetiros > 0 ? `<div class="row"><span>- Retiros:</span><span>$${fmt(total
 ${entregaHtml}
 ${obsHtml}
 <div class="line"></div>
-<div class="center" style="font-size:10px; margin-top:8px;">Impreso: ${new Date().toLocaleString("es-AR")}</div>
+<div class="center" style="font-size:10px; margin-top:8px;">Impreso: ${fechaHoraAR(new Date())}</div>
 </body></html>`;
 
   const win = window.open("", "_blank", "width=320,height=600");

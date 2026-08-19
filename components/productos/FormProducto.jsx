@@ -534,6 +534,10 @@ export default function FormProducto({
             pesoReferenciaKg: form.pesoReferenciaKg === "" ? null : Number(form.pesoReferenciaKg),
             pesoEsFijo: form.pesoEsFijo,
             modoVentaDeposito: form.modoVentaDeposito,
+            // Va SÍ o SÍ: el predicado compartido exige `modoCompraProveedor` en
+            // "UNIDAD" para considerar un producto de pieza fija. Sin este campo
+            // el aviso no se dispararía nunca — la defensa escrita e inalcanzable.
+            modoCompraProveedor: form.modoCompraProveedor,
           },
         }),
       });

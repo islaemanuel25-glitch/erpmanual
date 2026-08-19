@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
@@ -21,7 +22,8 @@ function fmt(n) {
 function fmtFecha(d) {
   if (!d) return "—";
   try {
-    return new Date(d).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+    // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+    return fechaHoraAR(d);
   } catch { return "—"; }
 }
 

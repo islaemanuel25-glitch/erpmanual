@@ -69,6 +69,7 @@ export async function POST(req) {
         pesoReferenciaKg: true,
         pesoEsFijo: true,
         modoVentaDeposito: true,
+        modoCompraProveedor: true,
         precio_venta: true,
         locales: {
           select: {
@@ -102,6 +103,8 @@ export async function POST(req) {
         pesoReferenciaKg: base.pesoReferenciaKg,
         pesoEsFijo: base.pesoEsFijo,
         modoVentaDeposito: base.modoVentaDeposito,
+        // Igual que en el formulario: el predicado compartido lo exige.
+        modoCompraProveedor: base.modoCompraProveedor,
       },
       despues: body.despues,
       ubicaciones,

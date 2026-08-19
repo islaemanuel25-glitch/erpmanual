@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
@@ -40,9 +41,9 @@ const fecha = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? "—"
-    : d.toLocaleString("es-AR", {
-        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
-      });
+    // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`. El
+    // `hour12: false` ya estaba; lo que faltaba era la zona.
+    : fechaHoraAR(d);
 };
 
 const TONO = {

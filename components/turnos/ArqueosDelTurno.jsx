@@ -13,6 +13,7 @@
 // las 12:25 y a las 14:03; es el mismo, no tres veces.
 
 import { useEffect, useState } from "react";
+import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import {
@@ -28,7 +29,8 @@ const fmt = (n) =>
   Number(n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const hora = (iso) =>
-  iso ? new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "-";
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  horaAR(iso, { vacio: "-" });
 
 function tono(dif) {
   const d = Number(dif) || 0;

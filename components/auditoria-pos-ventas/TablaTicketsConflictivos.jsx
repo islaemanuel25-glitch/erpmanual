@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 
 function formatPrecio(n) {
@@ -13,10 +14,8 @@ function formatPrecio(n) {
 function formatFecha(d) {
   if (!d) return "—";
   try {
-    return new Date(d).toLocaleString("es-AR", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
+    // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+    return fechaHoraAR(d);
   } catch {
     return "—";
   }

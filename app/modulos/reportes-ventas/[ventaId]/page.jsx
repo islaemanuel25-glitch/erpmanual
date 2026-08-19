@@ -12,27 +12,18 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { buildVolverUrl, buildCorregirUrl, parseReturnParams } from "@/lib/reportes-ventas/returnParams";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AccionesTicket from "@/components/reportes-ventas/AccionesTicket";
 import VentaDetalleAdmin from "@/components/reportes-ventas/VentaDetalleAdmin";
 
 const FALLBACK_VENTAS = "/modulos/reportes-ventas";
-const TZ_AR = "America/Argentina/Cordoba";
 
-function fmtFechaHoraAR(iso) {
-  if (!iso) return "—";
-  const d = iso instanceof Date ? iso : new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-}
+// Esta pantalla YA convertía a la zona de Argentina —era la única de las tres
+// del caso que lo hacía— pero le faltaba `hour12: false`, así que mostraba
+// "11:16 a. m.". Ahora sale del helper único y queda en 24 horas.
+const fmtFechaHoraAR = (iso) => fechaHoraAR(iso);
 
 export default function VerVentaPage() {
   const router = useRouter();
