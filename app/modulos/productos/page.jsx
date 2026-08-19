@@ -24,8 +24,8 @@ import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProduc
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import { Eye, Pencil } from "lucide-react";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
-import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
-import { precioEnEscalaQueSeCobra } from "@/lib/precios/redondeo";
+import { etiquetaEscalaPrecio, etiquetaEscalaUnitaria } from "@/lib/precios/escalaPrecio";
+import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "@/lib/precios/redondeo";
 import { seVendeSinGanancia } from "@/lib/precios/precioDesdeMargen";
 // LA MARCA DEL SERVICIO ES LA DEL POS, no una nueva. `esProductoServicio` mira
 // `modalidad`, que es el mismo campo con el que el POS decide abrir el modal de
@@ -86,6 +86,19 @@ export default function ProductosPage() {
   // que contesta 403 al tocarlo — un botón que no hace nada es la clase de cosa
   // que después se reporta como "el sistema anda mal".
   const puedeExportar = esAdminProd || permisosProd.includes("costos.ver");
+
+  // ── LAS PREFERENCIAS DE LA TARJETA, DEL LOCAL ────────────────────────────
+  //
+  // Vienen de `/api/me` por el contexto de usuario, el mismo camino que ya usa
+  // `exigirOperador`. Llegan ya resueltas a booleano: `null` —nunca las
+  // tocaron— y un servidor viejo que no las mande dan las dos en `false`, que es
+  // lo que se ve hoy.
+  //
+  // Se leen ACÁ y no adentro de `SunmiProductoCard`: la pieza del kit sabe
+  // dibujar, no sabe de sesiones ni de locales. Si leyera el contexto por su
+  // cuenta, el andamio —que la monta sin sesión— dejaría de funcionar.
+  const tarjetaUnitario = perfilProd?.tarjetaPrecioUnitario === true;
+  const tarjetaSinEquivalencia = perfilProd?.tarjetaOcultarEquivalencia === true;
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -1055,6 +1068,8 @@ export default function ProductosPage() {
                             // común en ninguna parte de la tarjeta. Lo dice la
                             // franja de escala, con palabra y no con un dibujo.
                             esCombo: p.esCombo,
+                            ocultarEquivalencia: tarjetaSinEquivalencia,
+                            mostrarUnitario: tarjetaUnitario,
                           })
                     }
                     codigoBarra={p.codigoBarra ?? p.sku ?? null}
@@ -1091,13 +1106,26 @@ export default function ProductosPage() {
                                 productos mostraban un número y el mostrador
                                 cobraba otro. La regla vive en
                                 `lib/precios/redondeo.js`, no acá. */}
+                            {/* EL LOCAL PUEDE PEDIR SIEMPRE EL UNITARIO. Cambia
+                                el número en 6.430 de 10.616 filas —las de pack—,
+                                y por eso la etiqueta de abajo TIENE que cambiar
+                                con él: dejarla en "por bulto" sobre un número
+                                unitario es la misma contradicción del "/ un",
+                                dada vuelta. */}
                             {formatearMoneda(
-                              precioEnEscalaQueSeCobra({
-                                precio: p.precioVenta,
-                                factor: p.factorPack,
-                                unidad: p.unidadMedida,
-                                redondeo100: p.redondeo100,
-                              })
+                              tarjetaUnitario
+                                ? precioUnitarioQueSeCobra({
+                                    precio: p.precioVenta,
+                                    factor: p.factorPack,
+                                    unidad: p.unidadMedida,
+                                    redondeo100: p.redondeo100,
+                                  })
+                                : precioEnEscalaQueSeCobra({
+                                    precio: p.precioVenta,
+                                    factor: p.factorPack,
+                                    unidad: p.unidadMedida,
+                                    redondeo100: p.redondeo100,
+                                  })
                             )}
                           </span>
                           {/* LA ESCALA, NO UN TEXTO FIJO. Decía "/ un" sobre un
@@ -1106,7 +1134,9 @@ export default function ProductosPage() {
                               La etiqueta sale de la misma función que rotula la
                               ficha de producto. */}
                           <span className="text-[11.5px] sunmi-text-muted">
-                            {etiquetaEscalaPrecio(p.unidadMedida)}
+                            {tarjetaUnitario
+                              ? etiquetaEscalaUnitaria(p.unidadMedida)
+                              : etiquetaEscalaPrecio(p.unidadMedida)}
                           </span>
                         </>
                       )

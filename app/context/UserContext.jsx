@@ -36,6 +36,17 @@ export function UserProvider({ children }) {
           esDeposito: p.esDeposito ?? false,
           // Operario obligatorio efectivo del local (null/ausente = true).
           exigirOperador: p.exigirOperador !== false,
+
+          // ── LAS PREFERENCIAS DE LA TARJETA, YA RESUELTAS ────────────────
+          //
+          // `=== true` y no `!== false`: acá el default es APAGADO, al revés
+          // que el del operario. Un local que nunca las tocó manda `null`, y un
+          // JWT o un servidor viejo no las manda en absoluto — los dos casos
+          // tienen que dar `false`, que es lo que se ve hoy. Escrito con
+          // `!== false` darían `true` y le cambiarían el catálogo a todos los
+          // que nunca pidieron nada.
+          tarjetaPrecioUnitario: p.tarjetaPrecioUnitario === true,
+          tarjetaOcultarEquivalencia: p.tarjetaOcultarEquivalencia === true,
         });
       } else {
         setPerfil(null);

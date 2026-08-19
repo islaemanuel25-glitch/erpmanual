@@ -4,6 +4,7 @@ import { useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { SUNMI_THEMES } from "@/lib/sunmiThemes";
 import { useUser } from "@/app/context/UserContext";
@@ -58,9 +59,55 @@ export default function AparienciaPage() {
     tienePreferenciaPersonal,
   } = useSunmiTheme();
   const { menuMode, setMenuMode } = useLayoutSettings();
-  const { perfil, cargando } = useUser();
+  const { perfil, cargando, refrescar } = useUser();
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
+
+  // ── LAS PREFERENCIAS DE LA TARJETA, EN ESTA MISMA PANTALLA ──────────────
+  //
+  // El estado arranca del perfil, que las trae de `/api/me` ya resueltas a
+  // booleano. Si el local nunca las tocó llegan en `false`, que es lo que se ve
+  // hoy.
+  const [tarjeta, setTarjeta] = useState({
+    tarjetaPrecioUnitario: perfil?.tarjetaPrecioUnitario === true,
+    tarjetaOcultarEquivalencia: perfil?.tarjetaOcultarEquivalencia === true,
+  });
+
+  // ── SE GUARDA UNA SOLA PREFERENCIA POR VEZ, A PROPÓSITO ─────────────────
+  //
+  // El cuerpo lleva ÚNICAMENTE la que cambió. Del otro lado el update es parcial
+  // —`datosAActualizar`—, así que lo que no se manda no se toca. Mandar las dos
+  // siempre funcionaría igual hoy, pero volvería a atar dos decisiones que son
+  // independientes, que es exactamente lo que hacía el JSON de apariencia.
+  const guardarTarjeta = async (campo, valor) => {
+    setGuardando(true);
+    setMensaje(null);
+    const previo = tarjeta[campo];
+    setTarjeta((t) => ({ ...t, [campo]: valor }));
+    try {
+      const res = await fetch("/api/config/apariencia-local", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ [campo]: valor }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setMensaje({ tipo: "ok", texto: "Tarjeta de productos actualizada." });
+        // El catálogo lee esto del perfil, así que hay que refrescarlo o el
+        // cambio recién se vería al volver a entrar a la aplicación.
+        await refrescar?.();
+      } else {
+        setTarjeta((t) => ({ ...t, [campo]: previo }));
+        setMensaje({ tipo: "error", texto: data.error || "No se pudo guardar." });
+      }
+    } catch {
+      setTarjeta((t) => ({ ...t, [campo]: previo }));
+      setMensaje({ tipo: "error", texto: "No se pudo guardar." });
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   if (cargando) return null;
   if (!perfil) return <SinPermisos />;
@@ -122,6 +169,54 @@ export default function AparienciaPage() {
               {mensaje.texto}
             </div>
           )}
+
+          {/* ── LA TARJETA DE PRODUCTOS ──────────────────────────────────
+              Va en esta sección y no en una nueva porque es lo mismo que el
+              tema: apariencia del LOCAL, compartida por todos sus dispositivos,
+              con el mismo permiso. Y va DEBAJO del tema, separada, porque la
+              página ya mezcla tres ámbitos —local, dispositivo y menú— y
+              agregar una cuarta cosa suelta arriba lo empeoraría. */}
+          <div className="mt-6 pt-5 border-t sunmi-divider">
+            <h3 className="text-sm font-semibold mb-1">Tarjeta de productos</h3>
+            <p className="text-xs sunmi-text-muted mb-4">
+              Cómo se ve el catálogo en pantallas angostas, para todo el local. Con las
+              dos apagadas se ve como hasta ahora.
+            </p>
+
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-sm">Mostrar siempre el precio por unidad</div>
+                  <div className="text-xs sunmi-text-muted">
+                    Los productos que se venden por bulto muestran el precio de UNA unidad
+                    en vez del bulto entero.
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <SunmiToggleEstado
+                    value={tarjeta.tarjetaPrecioUnitario}
+                    onChange={(v) => !guardando && guardarTarjeta("tarjetaPrecioUnitario", v)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-sm">Ocultar la equivalencia de bulto</div>
+                  <div className="text-xs sunmi-text-muted">
+                    Saca el renglón &quot;1 pack = 24 un&quot;. La línea sigue diciendo en qué
+                    escala está el precio: no se pierde ese dato.
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <SunmiToggleEstado
+                    value={tarjeta.tarjetaOcultarEquivalencia}
+                    onChange={(v) => !guardando && guardarTarjeta("tarjetaOcultarEquivalencia", v)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
       )}
 
