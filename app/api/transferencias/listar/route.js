@@ -249,7 +249,16 @@ export async function GET(req) {
     // página visible pese a llamarse "global": con más de 25 resultados el
     // importe cambiaba al pasar de página.
     const totalCostoGlobal = desdeCentavos(
-      periodo.reduce((acc, t) => acc + importeDeDetalleCentavos(t.detalle), 0)
+      periodo.reduce(
+        (acc, t) =>
+          acc +
+          // El origen decide cómo se valoriza el fiambre de pieza fija: en el
+          // depósito la cantidad está en piezas y su costo, por kilo.
+          importeDeDetalleCentavos(t.detalle, {
+            origenEsDeposito: t.origen?.es_deposito === true,
+          }),
+        0
+      )
     );
 
     const desgloseEstado = resumenPorEstado(periodo);

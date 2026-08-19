@@ -172,7 +172,10 @@ export async function GET(req) {
           precioCosto:
             d.precioCosto ?? d.producto?.base?.precio_costo ?? 0,
         },
-        d.producto?.base
+        d.producto?.base,
+        // Igual que el remito: el fiambre de pieza fija sale del depósito en
+        // piezas y su costo está por kilo.
+        { origenEsDeposito: transferencia.origen?.es_deposito === true }
       );
 
       const motivo =

@@ -164,7 +164,13 @@ export async function GET(req) {
             d.precioCosto ?? d.producto?.base?.precio_costo ?? 0,
         },
         d.producto?.base,
-        { cantidadModo: "ENVIADA" }
+        {
+          cantidadModo: "ENVIADA",
+          // El fiambre de pieza fija sale del depósito EN PIEZAS y su costo está
+          // por kilo. Sin el origen, el remito valorizaría por kilo una cantidad
+          // que está en piezas.
+          origenEsDeposito: transferencia.origen?.es_deposito === true,
+        }
       );
 
       total += subtotal;

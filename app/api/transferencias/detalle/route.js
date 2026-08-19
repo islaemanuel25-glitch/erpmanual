@@ -124,11 +124,19 @@ export async function GET(req) {
       // El costo persistido está en la escala COMERCIAL del producto (por bulto
       // si la presentación es pack/cajón); la cantidad, en la de unidadEnviada.
       // Se normaliza el costo a la escala del envío antes de multiplicar.
+      // Y el fiambre de PIEZA FIJA es el otro caso donde las escalas difieren:
+      // su costo está por kilo y la cantidad, saliendo del depósito, en piezas.
+      // El origen se pasa porque en un local ese mismo stock se cuenta en kilos.
       const costoNormalizado = resolverCostoTransferencia({
         precioCosto,
         unidadEnviada: d.unidadEnviada,
         unidadMedida: d.producto?.base?.unidad_medida,
         factorPack: d.producto?.base?.factor_pack,
+        pesoEsFijo: d.producto?.base?.pesoEsFijo,
+        pesoReferenciaKg: d.producto?.base?.pesoReferenciaKg,
+        modoVentaDeposito: d.producto?.base?.modoVentaDeposito,
+        modoCompraProveedor: d.producto?.base?.modoCompraProveedor,
+        origenEsDeposito: transferencia.origen?.es_deposito === true,
       });
 
       // Sin recepción cargada se valoriza lo enviado; con recepción cargada, lo
