@@ -819,6 +819,34 @@ try {
     `con ${separadores.total} botones tiene que haber ${Math.max(0, separadores.total - 1)} separador(es)`
   );
 
+  // ── ESPERAR A QUE LA NAVEGACIÓN OCURRA, NO DORMIR UN RATO FIJO ──────────
+  //
+  // Esto era `await sleep(3000)` y dio un ROJO FALSO el 2026-08-18, frenando un
+  // despliegue por un defecto que no existía: la afirmación 12b informó que
+  // tocar Ver "quedó en /modulos/productos".
+  //
+  // La causa es del App Router y hay que conocerla: `router.push` **no cambia la
+  // URL hasta que la navegación se puede confirmar**, y contra el servidor de
+  // DESARROLLO eso incluye compilar la ruta la primera vez que se entra. Una
+  // ruta sin compilar se ve exactamente igual que un botón muerto — misma URL,
+  // sin error, sin nada.
+  //
+  // Comprobado en los dos sentidos antes de tocar la sonda: entrando directo a
+  // `/modulos/productos/2023` la ficha dibuja sus tres secciones, y volviendo a
+  // tocar el botón con la ruta ya caliente entra sin demora.
+  //
+  // El rojo sigue siendo posible y sigue frenando: si la URL no llega en el
+  // presupuesto, es que de verdad no navegó. Lo que se va es el rojo por haber
+  // mirado antes de tiempo.
+  const esperarNavegacion = async (patron) => {
+    for (let i = 0; i < 40; i++) {
+      await sleep(1000);
+      const donde = await evaluar(`location.pathname`).catch(() => "");
+      if (patron.test(donde)) return donde;
+    }
+    return await evaluar(`location.pathname`).catch(() => "");
+  };
+
   // ── 12 · VER ENTRA, Y NO AL MISMO LADO QUE EDITAR ───────────────────────
   //
   // Durante una tanda entera los dos botones llevaron a la ficha de edición,
@@ -832,7 +860,7 @@ try {
     return true;
   })()`);
   if (!tocadoVer) morir("no encontré el botón Ver en la fila de acciones");
-  await sleep(3000);
+  await esperarNavegacion(/\/modulos\/productos\/\d+$/);
   const trasVer = await evaluar(`({ alertas: window.__alertas || [], donde: location.pathname })`);
   afirmar(
     trasVer.alertas.length === 0,
@@ -875,7 +903,10 @@ try {
     return true;
   })()`);
   if (!tocado) morir("no encontré el botón Editar en la fila de acciones");
-  await sleep(3000);
+  // Mismo motivo que arriba. Ésta pasaba, pero por suerte: la ruta de edición ya
+  // venía compilada de otra afirmación anterior. Una afirmación que pasa por el
+  // orden en que corren las otras no está probando lo que dice.
+  await esperarNavegacion(/\/modulos\/productos\/\d+\/editar/);
 
   const despues = await evaluar(`({ alertas: window.__alertas || [], donde: location.pathname })`);
   afirmar(
