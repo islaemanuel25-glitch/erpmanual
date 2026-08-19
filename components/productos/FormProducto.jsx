@@ -30,6 +30,7 @@ import {
 } from "@/lib/precios/recargoFijoUnidad";
 import useVersionGuard from "@/hooks/useVersionGuard";
 import AvisoVersionNueva from "@/components/version/AvisoVersionNueva";
+import AvisoCambioDeEscala from "@/components/productos/AvisoCambioDeEscala";
 import { useUser } from "@/app/context/UserContext";
 
 function parseVoiceNumber(text) {
@@ -498,11 +499,76 @@ export default function FormProducto({
   // deploy, el submit se cancela ANTES de construir y enviar el payload. Un
   // bundle viejo puede calcular precios con reglas que ya no existen —pasó de
   // verdad con el margen— y el servidor solo persiste lo que recibe.
+  // ── EL AVISO DE CAMBIO DE ESCALA ────────────────────────────────────────
+  //
+  // Cuando cambia la unidad de medida, el factor de pack o el modo de pieza
+  // fija, el precio guardado queda con el número viejo y el significado nuevo.
+  // Pasó con la pechuga el 2026-08-01 y nadie se enteró hasta que la tarjeta
+  // mostró 110.700.
+  //
+  // El aviso NO convierte nada: muestra en qué quedaría cada ubicación y deja
+  // que la persona decida. Guardar sigue guardando exactamente lo que se editó.
+  const [avisoEscala, setAvisoEscala] = useState(null);
+  const [escalaConfirmada, setEscalaConfirmada] = useState(false);
+
+  // Al tocar cualquiera de los campos de escala, el aviso vuelve a preguntarse:
+  // una confirmación vieja no puede autorizar un cambio distinto.
+  useEffect(() => {
+    setEscalaConfirmada(false);
+    setAvisoEscala(null);
+  }, [form.unidad_medida, form.factor_pack, form.pesoEsFijo, form.modoVentaDeposito, form.pesoReferenciaKg]);
+
+  const consultarAvisoDeEscala = async () => {
+    // Solo en edición: un producto nuevo no tiene precio viejo que quede mal.
+    if (!initialData?.id) return null;
+    try {
+      const res = await fetch("/api/productos/aviso-escala", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: initialData.id,
+          despues: {
+            unidad_medida: form.unidad_medida,
+            factor_pack: form.factor_pack === "" ? null : Number(form.factor_pack),
+            pesoReferenciaKg: form.pesoReferenciaKg === "" ? null : Number(form.pesoReferenciaKg),
+            pesoEsFijo: form.pesoEsFijo,
+            modoVentaDeposito: form.modoVentaDeposito,
+          },
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        // DEGRADA SIN ROMPER, PERO NO EN SILENCIO: no poder calcular el aviso no
+        // puede impedir guardar un producto. Queda el rastro para que se sepa que
+        // esa vez nadie fue avisado.
+        console.error(
+          `productos/aviso-escala: no se pudo calcular el aviso (id=${initialData.id} status=${res.status}): ${data?.error ?? "sin detalle"}`
+        );
+        return null;
+      }
+      return data.aviso ?? null;
+    } catch (e) {
+      console.error(
+        `productos/aviso-escala: no se pudo consultar el aviso (id=${initialData.id}): ${e?.message}`
+      );
+      return null;
+    }
+  };
+
   const handleSubmit = async () => {
     const err = validar();
     if (err) return alert(err);
 
     if (!(await puedeGuardar())) return; // el aviso ya quedó visible
+
+    if (!escalaConfirmada) {
+      const aviso = await consultarAvisoDeEscala();
+      if (aviso) {
+        setAvisoEscala(aviso);
+        return; // no se guarda todavía: la persona tiene que verlo
+      }
+    }
 
     const p = form;
 
@@ -1505,6 +1571,21 @@ export default function FormProducto({
 
       <div className="mx-auto w-full max-w-5xl mt-4 pt-4 border-t border-slate-800 space-y-3">
         <AvisoVersionNueva visible={versionNueva} />
+
+        {/* Va acá, pegado al de versión y arriba del botón, porque es la misma
+            clase de aviso: algo que hay que leer ANTES de guardar. */}
+        <AvisoCambioDeEscala
+          aviso={avisoEscala}
+          onGuardarIgual={() => {
+            setEscalaConfirmada(true);
+            setAvisoEscala(null);
+            // Se vuelve a llamar al submit ya con la confirmación puesta, para
+            // que pase por las MISMAS validaciones. Saltear a `onSubmit` acá
+            // dejaría un camino de guardado sin el guard de versión.
+            setTimeout(() => handleSubmit(), 0);
+          }}
+          onCancelar={() => setAvisoEscala(null)}
+        />
 
         <div className="flex justify-end gap-2">
           <SunmiButton color="cyan" onClick={onCancel}>
