@@ -7,6 +7,7 @@ import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { evaluarEstructuraCombo } from "@/lib/combos/service";
+import { ubicacionVendeAlCosto } from "@/lib/precios/ubicacionVendeAlCosto";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
@@ -50,6 +51,17 @@ export async function GET(req) {
       );
     }
     const { localId, grupoId } = scope;
+
+    // ── ¿ESTA UBICACIÓN VENDE CON LISTA AL COSTO? ───────────────────────────
+    //
+    // UNA vez por pedido, no una por fila: es un predicado sobre la UBICACIÓN y
+    // no sobre el producto. Cuesta entre 3 y 4 consultas por request.
+    //
+    // La pieza vive en `lib/precios/ubicacionVendeAlCosto.js` —con el porqué de
+    // la degradación escrito ahí— y no inline acá, para que un candado pueda
+    // ejercer el caso de error de verdad en vez de probar una copia.
+    const { alCosto: vendeConListaAlCosto, redondea100: listaAlCostoRedondea100 } =
+      await ubicacionVendeAlCosto({ prisma, grupoId, localId });
 
     // Paginación
     const page = Math.max(Number(searchParams.get("page") || 1), 1);
@@ -347,6 +359,10 @@ export async function GET(req) {
       total,
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      // Propiedad de la UBICACIÓN, no de las filas: viaja una vez al lado de la
+      // página y no repetido en cada uno de los items.
+      vendeConListaAlCosto,
+      listaAlCostoRedondea100,
     });
   } catch (err) {
     console.error("productos/listar", err);

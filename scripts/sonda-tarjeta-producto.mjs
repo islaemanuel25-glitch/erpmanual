@@ -69,6 +69,17 @@ const arg = (n, d = null) => {
 const BASE = arg("base", "http://localhost:3111");
 const USUARIO = arg("usuario");
 const CLAVE = arg("clave");
+// ── EN QUÉ UBICACIÓN SE PARA LA SONDA ───────────────────────────────────────
+//
+// El contexto activo vive en una COOKIE, así que la sonda —que hace su propio
+// login— mide siempre la ubicación por defecto del usuario. Eso alcanzaba
+// mientras la tarjeta se viera igual en todos lados; desde que el número grande
+// depende de la lista de la ubicación, una corrida sola deja el otro caso sin
+// ejercer, y "no ejercido" no es "verde".
+//
+// Con `--local <id>` se para donde uno quiera. Sin el parámetro se comporta como
+// siempre.
+const LOCAL = arg("local");
 const ANCHO = Number(arg("ancho", "390"));
 const ALTO = Number(arg("alto", "844"));
 const PUERTO = Number(arg("puerto-cdp", "9241"));
@@ -237,6 +248,22 @@ try {
     log: (m) => console.log(m),
   });
 
+  // La cookie se setea desde la propia página, que es el mismo camino que usa el
+  // selector de ubicación. Si el servidor la rechaza —local de otro grupo, id
+  // inexistente— es ROJO y no un salteo: medir parado en otro lado que el pedido
+  // daría un verde sobre la ubicación equivocada.
+  if (LOCAL) {
+    const r = await evaluar(
+      `fetch("/api/contexto-activo/set",{method:"POST",headers:{"Content-Type":"application/json"},` +
+        `body:JSON.stringify({localId:${Number(LOCAL)}})}).then(r=>r.json()).catch(e=>({ok:false,error:String(e)}))`,
+      true
+    );
+    if (!r || r.ok !== true) {
+      morir(`no pude pararme en el local ${LOCAL}: ${r?.error ?? "sin respuesta"}`);
+    }
+    console.log(`ubicación pedida: ${r.nombre} (id ${r.localId})`);
+  }
+
   await send("Page.navigate", { url: `${BASE}/modulos/productos` });
   await sleep(6000);
 
@@ -369,7 +396,29 @@ try {
     );
   }
   const esDepositoSonda = ctx.esDeposito === true;
-  console.log(`ubicación activa: ${esDepositoSonda ? "DEPÓSITO" : "local"}\n`);
+
+  // ── ¿ACÁ EL POS COBRA EL COSTO? ─────────────────────────────────────────
+  //
+  // Sale de la respuesta del listado, que es la MISMA que alimenta la pantalla.
+  // No se deduce de `esDeposito`: lo que decide es la lista configurada, no el
+  // tipo de ubicación. Un depósito sin lista al costo cobra su precio de venta, y
+  // la sonda tiene que esperar eso.
+  //
+  // Si el campo no viene —un servidor viejo— queda en false, que es el contrato
+  // anterior. No se muere por eso: se dice cuál de los dos casos se ejerció, y
+  // eso importa porque UNA CORRIDA SOLO EJERCE LA UBICACIÓN ACTIVA. Verde acá no
+  // afirma nada sobre el otro caso; para eso hay que correrla parado en el otro
+  // lado.
+  const alCostoSonda = listado.vendeConListaAlCosto === true;
+  const redondeaSonda = listado.listaAlCostoRedondea100 === true;
+
+  console.log(`ubicación activa: ${esDepositoSonda ? "DEPÓSITO" : "local"}`);
+  console.log(
+    alCostoSonda
+      ? `esta ubicación VENDE CON LISTA AL COSTO: el número grande tiene que ser el costo, ` +
+        `sin porcentaje y sin la línea "Costo"${redondeaSonda ? " (la lista redondea a 100)" : ""}\n`
+      : `esta ubicación vende con su precio de venta: número grande = venta, con costo y porcentaje al lado\n`
+  );
 
   // EL NOMBRE SE SACA DEL PRIMER HIJO DEL CONTENEDOR, que es el nodo del nombre
   // y ningún otro. El primer intento usó `div > div` y traía un ENVOLTORIO con
@@ -427,13 +476,28 @@ try {
     // pasó a ser falso cuando la tarjeta empezó a mostrar cómo se VENDE: medido,
     // 5.450 de 10.521 filas activas cambian de escala entre una cosa y la otra.
     const escalaEsperada = escalaDeVentaDe(fila, esDepositoSonda);
+
+    // ── Y EL NÚMERO ES EL QUE COBRA EL POS, QUE NO SIEMPRE ES `precioVenta` ──
+    //
+    // Esto comparaba siempre contra `fila.precioVenta`. Era correcto mientras la
+    // tarjeta mostrara la columna, y pasó a ser falso el 2026-08-19, cuando el
+    // número grande pasó a ser lo que el POS cobra en esa ubicación.
+    //
+    // Dónde se vende al costo lo dice la MISMA respuesta que alimenta la
+    // pantalla —`vendeConListaAlCosto`, del propio `/api/productos/listar`— y no
+    // una regla escrita acá. Si la sonda lo dedujera por su cuenta, estaría
+    // comparando la pantalla contra una segunda opinión en vez de contra el
+    // motor: podrían coincidir las dos y estar las dos mal.
+    //
+    // El redondeo sigue a quien manda en cada caso: la venta lleva el del
+    // producto; el costo bajo lista, el de la LISTA, que es lo que aplica el POS.
     const esperado = formatearMoneda(
       valorEnLaEscalaDeVenta({
         escala: escalaEsperada,
-        valor: fila.precioVenta,
+        valor: alCostoSonda ? fila.precioCosto : fila.precioVenta,
         factor: fila.factorPack,
         unidad: fila.unidadMedida,
-        redondeo100: fila.redondeo100,
+        redondeo100: alCostoSonda ? redondeaSonda : fila.redondeo100,
         pesoReferenciaKg: fila.pesoReferenciaKg,
       })
     );
@@ -480,7 +544,26 @@ try {
       redondeo100: false,
       pesoReferenciaKg: fila.pesoReferenciaKg,
     });
-    if (costoEsperado !== null) {
+    if (alCostoSonda) {
+      // ── DONDE SE VENDE AL COSTO, LA LÍNEA "Costo" NO VA ──────────────────
+      //
+      // Y esto NO afloja la afirmación: la da vuelta y sigue exigiendo. El
+      // número grande YA es el costo, así que repetirlo chiquito sería el mismo
+      // número dos veces en la misma fila. Antes se exigía que estuviera; ahora
+      // se exige que NO esté, que es igual de comprobable.
+      //
+      // Va junto con el porcentaje: donde no hay margen no hay nada que mostrar.
+      if (/Costo\s*\$/.test(vista.valor)) {
+        malCosto.push(
+          `${vista.nombre}: se ve "${vista.valor}", y acá se vende al costo — la línea "Costo" repite el número grande`
+        );
+      }
+      if (/%/.test(vista.valor)) {
+        malCosto.push(
+          `${vista.nombre}: se ve "${vista.valor}", y acá se vende al costo — el porcentaje afirma un margen que no existe`
+        );
+      }
+    } else if (costoEsperado !== null) {
       const textoCosto = `Costo ${formatearMoneda(costoEsperado)}`;
       if (!vista.valor.includes(textoCosto)) {
         malCosto.push(`${vista.nombre}: se ve "${vista.valor}", corresponde "${textoCosto}"`);

@@ -114,13 +114,23 @@ export default function ProductosPage() {
   // que después se reporta como "el sistema anda mal".
   const puedeExportar = esAdminProd || permisosProd.includes("costos.ver");
 
-  // ── EL COSTO EN LA TARJETA VA DETRÁS DEL MISMO PERMISO QUE EL EXPORT ────
+  // ── EL COSTO EN LA TARJETA NO VA DETRÁS DE NINGÚN PERMISO ───────────────
   //
-  // `costos.ver` y no `productos.ver`: hay tres roles —`Deposito`, `Mini` y
-  // `ENCARGADO`— que ven el catálogo y NO tienen costos.ver, y a ésos la tarjeta
-  // les queda como estaba. Sin marca y sin aclaración de que falta algo: un
-  // hueco rotulado sería contarles que hay un dato que no pueden ver.
-  const puedeVerCostos = puedeExportar;
+  // Estaba atado a `costos.ver` —el mismo del export— y Emanuel lo sacó el
+  // 2026-08-19: el costo y el porcentaje se ven en el catálogo para todos. El
+  // motivo es que nadie vea un número distinto que su compañero, que es lo que
+  // pasaba con los tres roles que ven el catálogo y no tienen el permiso
+  // —`Deposito`, `Mini` y `ENCARGADO`—.
+  //
+  // OJO CON LO QUE NO CAMBIÓ: `puedeExportar` sigue pidiendo `costos.ver` y no
+  // se toca. El export baja el catálogo entero con costos y márgenes a un
+  // archivo, que es otra cosa que mirar un número en pantalla; ese permiso viene
+  // del INC-0007. Estaban compartiendo la misma variable y por eso se separan
+  // acá, en vez de aflojar el del export.
+  //
+  // Queda un pendiente anotado y sin resolver: si el catálogo muestra el costo a
+  // todos, `costos.ver` queda decorativo al menos ahí, y en algún momento hay
+  // que decidir si sigue teniendo sentido en el resto.
 
   // ── LAS PREFERENCIAS DE LA TARJETA, DEL LOCAL ────────────────────────────
   //
@@ -164,6 +174,19 @@ export default function ProductosPage() {
   // =========================================================
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
+
+  // ── ¿ACÁ EL POS COBRA EL COSTO? ─────────────────────────────────────────
+  //
+  // Propiedad de la UBICACIÓN, no de las filas, así que es un estado de la
+  // página y no un campo de cada producto. Lo contesta el servidor con el mismo
+  // resolver que usa el POS; la pantalla no lo deduce de `esDeposito` ni de
+  // ninguna otra pista, porque lo que decide es la lista configurada y no el
+  // tipo de ubicación.
+  //
+  // Arranca en `false`, que es el comportamiento de siempre: mientras no haya
+  // respuesta —o si el servidor degradó— la tarjeta muestra el precio de venta.
+  const [vendeConListaAlCosto, setVendeConListaAlCosto] = useState(false);
+  const [listaAlCostoRedondea100, setListaAlCostoRedondea100] = useState(false);
   const [page, setPage] = useState(() => {
     const p = Number(searchParams.get("page"));
     return p > 0 ? p : 1;
@@ -447,6 +470,10 @@ export default function ProductosPage() {
         setRows(data.items);
         setTotalPages(data.totalPages);
         setTotalItems(data.total);
+        // Un servidor viejo no manda estos campos: `=== true` los deja en false,
+        // que es el comportamiento anterior, en vez de dejarlos en `undefined`.
+        setVendeConListaAlCosto(data.vendeConListaAlCosto === true);
+        setListaAlCostoRedondea100(data.listaAlCostoRedondea100 === true);
       }
     } catch (err) {
       console.error("Error cargando productos:", err);
@@ -1129,7 +1156,29 @@ export default function ProductosPage() {
                       pesoReferenciaKg: p.pesoReferenciaKg,
                     });
                   const ventaEnEscala = enEscala(p.precioVenta, p.redondeo100);
-                  const costoEnEscala = puedeVerCostos ? enEscala(p.precioCosto, false) : null;
+                  // Ya no lo gatea ningún permiso: el costo se ve para todos.
+                  const costoEnEscala = enEscala(p.precioCosto, false);
+
+                  // ── EL NÚMERO GRANDE ES LO QUE COBRA EL POS ─────────────
+                  //
+                  // Y en el depósito el POS cobra el COSTO, porque la lista de
+                  // esa ubicación es al costo. Hasta esta tanda la tarjeta
+                  // mostraba `precio_venta` igual: 2.021 de 2.047 filas con un
+                  // número que el mostrador no cobra, y con un porcentaje de
+                  // ganancia al lado que ahí no existe.
+                  //
+                  // Quién contesta la pregunta: el servidor, con el mismo
+                  // resolver del POS. La tarjeta no la deduce de `esDeposito`,
+                  // porque lo que decide es la lista configurada — un depósito
+                  // sin lista al costo cobraría su precio de venta, y este
+                  // bloque lo mostraría bien sin tocar una línea.
+                  //
+                  // El REDONDEO sigue a quien manda en cada caso: la venta lleva
+                  // el del producto, y el costo bajo lista lleva el de la LISTA,
+                  // que es lo que el POS aplica. Hoy esa lista no redondea.
+                  const precioQueCobraElPos = vendeConListaAlCosto
+                    ? enEscala(p.precioCosto, listaAlCostoRedondea100)
+                    : ventaEnEscala;
                   return (
                   <SunmiProductoCard
                     key={p.id ?? p.productoLocalId}
@@ -1167,11 +1216,24 @@ export default function ProductosPage() {
                     // bulto"— son 48 caracteres y NO entra a 390 px. Medido antes
                     // de escribirlo, sobre las 10.509 filas activas.
                     //
-                    // El costo solo si la persona tiene `costos.ver`. Al que no
-                    // lo tiene la tarjeta le queda como estaba: el porcentaje y
-                    // nada más, sin marca ni aclaración de que falta algo.
+                    // El costo ya no lo gatea ningún permiso: se ve para todos.
+                    //
+                    // ── Y DONDE SE VENDE AL COSTO, ESTE BLOQUE NO VA ────────
+                    //
+                    // Las dos cosas que muestra sobran exactamente ahí, y por
+                    // motivos distintos:
+                    //
+                    // · el PORCENTAJE, porque no hay margen que mostrar. No es
+                    //   que no se sepa: es que vender al costo es no tener
+                    //   ganancia, y un "30 %" al lado del precio afirma una que
+                    //   no existe. Es propiedad del LUGAR, no del permiso de
+                    //   quien mira, así que se va para todos.
+                    //
+                    // · la línea "Costo", porque el número grande YA es el
+                    //   costo. Dejarla sería escribir el mismo número dos veces
+                    //   en la misma fila, una vez grande y otra chiquita.
                     marca={
-                      esProductoServicio(p)
+                      esProductoServicio(p) || vendeConListaAlCosto
                         ? null
                         : (() => {
                             const regla = reglaDeGananciaDe(p);
@@ -1250,7 +1312,12 @@ export default function ProductosPage() {
                                 solo el rótulo habría sido peor que no tocar
                                 nada: diría "$31.900,00 por unidad" sobre un
                                 precio de bulto. */}
-                            {formatearMoneda(ventaEnEscala)}
+                            {/* EL NÚMERO ES EL QUE COBRA EL POS EN ESTA
+                                UBICACIÓN. En un local es el precio de venta; en
+                                el depósito, que vende con lista al costo, es el
+                                costo. La decisión está arriba, en
+                                `precioQueCobraElPos`. */}
+                            {formatearMoneda(precioQueCobraElPos)}
                           </span>
                           {/* EL RÓTULO ES LA ESCALA DE VENTA, tal cual. Antes
                               salía de `unidad_medida`, que dice cómo se COMPRA:
