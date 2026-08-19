@@ -2,6 +2,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -11,13 +12,8 @@ function formatPrecio(n) {
 }
 
 function formatFecha(timestamp) {
-  const fecha = new Date(timestamp);
-  return fecha.toLocaleString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  return fechaHoraAR(timestamp);
 }
 
 export default function ModalPendientesOffline({

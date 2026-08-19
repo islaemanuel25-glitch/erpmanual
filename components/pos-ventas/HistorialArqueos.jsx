@@ -13,31 +13,19 @@
 
 import { useEffect, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import { horaAR, fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
-const TZ_AR = "America/Argentina/Cordoba";
 
 const money = (n) =>
   `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function hora(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR, hour: "2-digit", minute: "2-digit",
-  }).format(d);
-}
+// Estas dos ya declaraban la zona por su cuenta —eran de las pocas— pero les
+// faltaba `hour12: false`. Ahora salen del helper único.
+const hora = (iso) => horaAR(iso);
 
-function fechaHora(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-  }).format(d);
-}
+const fechaHora = (iso) => fechaHoraAR(iso);
 
 /** Cero exacto = correcto. Un centavo ya es diferencia. */
 function clasificar(diferencia) {

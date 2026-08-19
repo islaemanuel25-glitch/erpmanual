@@ -17,6 +17,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import { TriangleAlert, Clock } from "lucide-react";
 
 import { Cifra, Fila, money } from "@/components/caja/CifrasRetiro";
@@ -91,7 +92,8 @@ export const hora = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? "—"
-    : d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    // El `hour12: false` ya estaba acá a propósito; lo que faltaba era la zona.
+    : horaAR(d);
 };
 
 // ── Antes del corte ─────────────────────────────────────────────────────────

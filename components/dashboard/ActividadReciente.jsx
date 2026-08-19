@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import { ShoppingCart, Package, Clock, ChevronRight } from "lucide-react";
 import ModalDetalleVenta from "./ModalDetalleVenta";
@@ -13,7 +14,8 @@ const ICONO_TIPO = {
 
 function formatHora(fecha) {
   const d = new Date(fecha);
-  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  return horaAR(d);
 }
 
 function formatFechaCorta(fecha) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
@@ -20,11 +21,8 @@ function formatPrecio(n) {
 }
 
 function formatHora(iso) {
-  if (!iso) return "-";
-  return new Date(iso).toLocaleTimeString("es-AR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  return horaAR(iso, { vacio: "-" });
 }
 
 const FORMAS_PAGO = [

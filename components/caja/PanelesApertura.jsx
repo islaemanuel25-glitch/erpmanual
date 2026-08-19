@@ -13,6 +13,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { TriangleAlert, Check, Clock, Coins } from "lucide-react";
 
@@ -34,7 +35,8 @@ const hhmm = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? "—"
-    : d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    // El `hour12: false` ya estaba acá a propósito; lo que faltaba era la zona.
+    : horaAR(d);
 };
 
 /** Minutos que faltan para que venza una reserva. Negativo = ya venció. */

@@ -19,6 +19,7 @@
 import { useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { TriangleAlert } from "lucide-react";
@@ -123,7 +124,8 @@ const horaCorta = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? "—"
-    : d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+    // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+    : horaAR(d);
 };
 
 /** Una línea del detalle: hora, tipo, motivo e importe. */

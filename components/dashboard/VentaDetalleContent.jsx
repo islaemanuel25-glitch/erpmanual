@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
 const FORMA_PAGO_LABEL = {
   efectivo: "Efectivo",
@@ -15,15 +16,8 @@ export function fmtMonedaVenta(n) {
 }
 
 export function fmtFechaVenta(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  return fechaHoraAR(iso);
 }
 
 export default function VentaDetalleContent({ venta }) {

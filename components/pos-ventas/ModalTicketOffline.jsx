@@ -2,6 +2,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { subtotalLinea } from "@/lib/pos-ventas/lineaPorImporte";
 
 function formatPrecio(n) {
@@ -12,14 +13,8 @@ function formatPrecio(n) {
 }
 
 function formatFecha(timestamp) {
-  const fecha = new Date(timestamp);
-  return fecha.toLocaleString("es-AR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  return fechaHoraAR(timestamp);
 }
 
 export default function ModalTicketOffline({ ticket, onCerrar }) {

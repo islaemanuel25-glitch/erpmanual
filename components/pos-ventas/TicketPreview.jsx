@@ -1,5 +1,7 @@
 "use client";
 
+import { fechaAR, horaAR } from "@/lib/fechas/formatearFechaHora";
+
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
     minimumFractionDigits: 2,
@@ -34,8 +36,10 @@ export default function TicketPreview({ config }) {
   const c = config;
   const v = SAMPLE_DATA;
   const now = new Date();
-  const fechaStr = now.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const horaStr = now.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const fechaStr = fechaAR(now);
+  // Zona de Argentina y 24 horas, igual que el ticket real: la vista previa de
+  // la configuración tiene que mostrar exactamente el formato que se imprime.
+  const horaStr = horaAR(now, { segundos: true });
 
   const s = (key) => ({
     fontSize: c[key]?.fontSize + "px",

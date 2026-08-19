@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { Bell, X } from "lucide-react";
 
 const MAX_DROPDOWN = 5;
@@ -15,13 +16,8 @@ function desdeHaceDias(dias) {
 }
 
 function fmtFecha(f) {
-  if (!f) return "";
-  return new Date(f).toLocaleString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  return fechaHoraAR(f, { vacio: "" });
 }
 
 // Campanita = acceso rápido (NO historial completo).
