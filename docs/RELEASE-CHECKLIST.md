@@ -20,6 +20,10 @@
 
 ## 2. Producción
 
+- [ ] Leer [deploy/TANDAS-BLOQUEADAS.md](deploy/TANDAS-BLOQUEADAS.md) **antes que
+      nada**: el paso 0 contesta si hay algo nuevo, no si ese algo tiene que
+      salir. Cruzar el rango `git log --oneline <DESPLEGADO>..<REMOTO>` contra esa
+      lista. Vacía = todo lo de `origin/main` se puede desplegar.
 - [ ] Leer [deploy/MIGRACIONES-SIN-APLICAR.md](deploy/MIGRACIONES-SIN-APLICAR.md)
       **antes del backup**: es la lista de migraciones que están en `main` y no
       en producción. Vacía = despliegue de solo código. El clasificador del paso 4

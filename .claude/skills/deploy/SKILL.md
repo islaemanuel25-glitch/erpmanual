@@ -179,6 +179,22 @@ recuerdo. Es el mismo defecto que el paso 4.1 ya tenía del lado del VPS.
 
 **Solo se sigue si `SIN_EMPUJAR` es cero Y `REMOTO` difiere de `DESPLEGADO`.**
 
+### Y ANTES DE SEGUIR: ¿ALGUNO DE ESOS COMMITS ESTÁ FRENADO?
+
+**Leer [`docs/deploy/TANDAS-BLOQUEADAS.md`](../../../docs/deploy/TANDAS-BLOQUEADAS.md).**
+
+El chequeo de arriba contesta **si hay algo nuevo, no si ese algo tiene que
+salir.** Una tanda puede estar empujada a propósito y no aprobada para
+producción; nada de lo que se calcula acá lo sabe.
+
+Mirar el rango real —`git log --oneline $DESPLEGADO..$REMOTO`— y cruzarlo contra
+esa lista. Si incluye un commit frenado, el corte no sale, o se corta antes de
+ese commit. Lista vacía = todo lo que está en `origin/main` se puede desplegar.
+
+**Por qué es un archivo y no algo que se recuerda:** el 2026-08-19 el paso 0 dio
+luz verde sobre una tanda bloqueada y lo único que lo frenó fue que quien
+desplegaba se acordara. El detalle está en el propio archivo.
+
 ### Lo que este chequeo NO contesta
 
 Que `origin/main` tenga el commit **no** prueba que Actions haya terminado de
