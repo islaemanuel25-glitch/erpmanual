@@ -103,10 +103,17 @@ export async function GET(req) {
       where.formaPago = formaPagoParam;
     }
 
+    // Las ANULADAS se muestran acá, marcadas. Es la excepción del filtro y es
+    // segura en esta ruta porque el listado pagina y marca: los totales de
+    // dinero los calcula /api/reportes-ventas/general, que sí las excluye. Si
+    // desaparecieran del listado, quien anuló una por error no tendría dónde
+    // encontrarla.
+    const whereListado = whereVentaComercial(where, { incluirAnuladas: true });
+
     const [total, ventas] = await Promise.all([
-      prisma.venta.count({ where: whereVentaComercial(where) }),
+      prisma.venta.count({ where: whereListado }),
       prisma.venta.findMany({
-        where: whereVentaComercial(where),
+        where: whereListado,
         orderBy: { fecha: "desc" },
         skip,
         take: limit,
@@ -120,6 +127,8 @@ export async function GET(req) {
           // Corrección de ventas: flags para el badge "Corregida · vN" en la card.
           corregida: true,
           version: true,
+          // Para la marca de anulada en la card.
+          anuladaEn: true,
           cliente: { select: { id: true, nombre: true } },
           vendedor: { select: { id: true, nombre: true } },
           local: { select: { id: true, nombre: true } },
@@ -146,6 +155,8 @@ export async function GET(req) {
       // Corrección: la card muestra "Corregida · vN" cuando corregida=true.
       corregida: !!v.corregida,
       version: v.version ?? 0,
+      // La card la muestra tachada con su cinta. No suma en ningún total.
+      anulada: v.anuladaEn != null,
     }));
 
     return NextResponse.json({

@@ -12,6 +12,8 @@ import { useState, useEffect } from "react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import PanelAnularVenta, { CintaAnulada } from "@/components/reportes-ventas/PanelAnularVenta";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
 function num(v) {
   const n = Number(v);
@@ -67,6 +69,7 @@ function construirTicket(venta) {
 
 export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta }) {
   const c = venta?.correccion || {};
+  const anulada = venta?.anulacion?.anulada === true;
   const [msg, setMsg] = useState(null); // { tipo: "ok"|"error"|"info", texto }
   const [panel, setPanel] = useState(null); // "simple" | "historial" | null
   const [busy, setBusy] = useState(false);
@@ -143,6 +146,10 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
 
   return (
     <SunmiCard className="p-3">
+      {/* La cinta de anulada va PRIMERA y antes que la de corregida: es el hecho
+          que cambia cómo se lee todo lo demás de la pantalla. */}
+      <CintaAnulada venta={venta} />
+
       {/* Estado de corrección + datos de la última corrección aplicada.
           En desktop los metadatos van en una fila; en móvil se apilan. */}
       {c.corregida && (
@@ -157,7 +164,7 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
                 <span className="sunmi-text-muted whitespace-nowrap">
                   Corregida el:{" "}
                   <span className="sunmi-text-strong">
-                    {new Date(c.ultimaCorreccion.fecha).toLocaleString("es-AR")}
+                    {fechaHoraAR(c.ultimaCorreccion.fecha)}
                   </span>
                 </span>
                 {c.ultimaCorreccion.usuario && (
@@ -235,6 +242,19 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
         >
           🕑 Historial
         </SunmiButton>
+
+        {/* ANULAR. Va último y en rojo: es la única acción de esta tarjeta que
+            no se puede deshacer desde la pantalla. Solo aparece si la venta no
+            está ya anulada — una anulada no se anula de nuevo. */}
+        {venta?.anulacion?.puedeAnular && (
+          <SunmiButton
+            color="red"
+            onClick={() => { setPanel(panel === "anular" ? null : "anular"); setMsg(null); }}
+            className="text-sm"
+          >
+            ⛔ Anular venta
+          </SunmiButton>
+        )}
       </div>
 
       {/* Aviso de ventana vencida (solo si tiene permiso pero está fuera de plazo) */}
@@ -270,6 +290,20 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
             onCorregido && onCorregido(info);
           }}
           onError={(texto) => flash("error", texto)}
+        />
+      )}
+
+      {panel === "anular" && (
+        <PanelAnularVenta
+          venta={venta}
+          onCerrar={() => setPanel(null)}
+          onAnulada={(info) => {
+            setPanel(null);
+            flash("ok", "Venta anulada.");
+            // Se recarga por el mismo camino que una corrección: la pantalla
+            // vuelve a pedir el detalle y aparece la cinta.
+            onCorregido && onCorregido(info);
+          }}
         />
       )}
 
@@ -479,7 +513,7 @@ function HistorialCorrecciones({ ventaId }) {
           <div key={it.id} className="sunmi-surface-soft sunmi-border rounded-lg p-2.5 text-[12px] space-y-0.5">
             <div className="flex justify-between">
               <span className="font-medium capitalize">{String(it.tipo).toLowerCase()}</span>
-              <span className="sunmi-text-muted">{new Date(it.fecha).toLocaleString("es-AR")}</span>
+              <span className="sunmi-text-muted">{fechaHoraAR(it.fecha)}</span>
             </div>
             <div className="sunmi-text-muted">Por: {it.autor}</div>
             <div>Motivo: {it.motivo}</div>

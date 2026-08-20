@@ -54,6 +54,13 @@ export async function GET(req, { params }) {
         version: true,
         corregida: true,
         ultimaCorreccionId: true,
+        // Anulación: la pantalla la muestra con su cinta y decide si ofrece el
+        // botón. Ésta es una vista de UNA venta, así que la anulada NO se
+        // esconde — se muestra marcada, que es lo contrario de lo que hacen las
+        // vistas agregadas.
+        anuladaEn: true,
+        anuladaPorId: true,
+        motivoAnulacion: true,
         observaciones: true,
         referenciaInterna: true,
         turnoId: true,
@@ -229,6 +236,28 @@ export async function GET(req, { params }) {
       puedeCorregirTurnoCerrado: permiteTurnoCerrado,
     };
 
+    // ── ANULACIÓN ────────────────────────────────────────────────────────────
+    //
+    // `puedeAnular` de acá decide si se OFRECE el botón, no si la anulación es
+    // posible: eso lo contesta el preview de la propia ruta de anular, que mira
+    // el remito y el turno. Acá alcanza con el permiso y con que no esté ya
+    // anulada — pedir el estado completo obligaría a duplicar esa lógica.
+    let anuladaPorNombre = null;
+    if (venta.anuladaPorId) {
+      const u = await prisma.usuario.findUnique({
+        where: { id: venta.anuladaPorId },
+        select: { nombre: true },
+      });
+      anuladaPorNombre = u?.nombre ?? null;
+    }
+    const anulacion = {
+      anulada: venta.anuladaEn != null,
+      fecha: venta.anuladaEn,
+      usuario: anuladaPorNombre,
+      motivo: venta.motivoAnulacion,
+      puedeAnular: permiteCompleta && venta.anuladaEn == null,
+    };
+
     // --- Datos de medios de pago (desglose para UI + reimpresión) ---
     const pagos = lineasPagoTicket(venta).map((l) => ({
       medio: l.medio,
@@ -272,6 +301,7 @@ export async function GET(req, { params }) {
         pagos,
         pagoDividido: dividido,
         correccion,
+        anulacion,
       },
     });
   } catch (error) {

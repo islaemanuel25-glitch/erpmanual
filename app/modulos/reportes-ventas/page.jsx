@@ -478,6 +478,7 @@ export default function ReportesVentasPage() {
                             <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                               <EstadoBadge fiado={esFiado} />
                               <span className="text-[12px] sunmi-text-muted capitalize">{v.formaPago}</span>
+                              {v.anulada && <AnuladaBadge />}
                               {v.corregida && <CorregidaBadge version={v.version} />}
                             </div>
                             <SunmiButton color="amber" size="sm" onClick={() => irADetalle(v.id)} className="w-full mt-1">
@@ -528,7 +529,8 @@ export default function ReportesVentasPage() {
                               <td className="px-2.5 py-3">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <EstadoBadge fiado={esFiado} />
-                                  {v.corregida && <CorregidaBadge version={v.version} />}
+                                  {v.anulada && <AnuladaBadge />}
+                              {v.corregida && <CorregidaBadge version={v.version} />}
                                 </div>
                               </td>
                               <td className="px-2.5 py-3 text-right font-mono font-bold text-[14px] sunmi-text-strong whitespace-nowrap tabular-nums">
@@ -680,6 +682,17 @@ function CorregidaBadge({ version }) {
   return (
     <span className="px-2 py-0.5 rounded-full text-[10px] font-medium sunmi-state-warning sunmi-text-accent whitespace-nowrap">
       ✎ Corregida{version ? ` · v${version}` : ""}
+    </span>
+  );
+}
+
+// Badge de venta ANULADA. Misma forma que el de corregida, en tono de peligro:
+// una anulada sigue apareciendo en el listado —si desapareciera, quien la anuló
+// por error no tendría dónde encontrarla— pero no suma en ningún total.
+function AnuladaBadge() {
+  return (
+    <span className="px-2 py-0.5 rounded-full text-xs2 font-semibold sunmi-state-danger sunmi-text-danger whitespace-nowrap">
+      ⛔ Anulada
     </span>
   );
 }

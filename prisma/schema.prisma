@@ -953,6 +953,29 @@ model Venta {
   version            Int      @default(0)
   corregida          Boolean  @default(false)
   ultimaCorreccionId Int?
+
+  // ── ANULACIÓN ──────────────────────────────────────────────────────────────
+  //
+  // Una venta anulada SE MARCA, no se borra. El ticket conserva su número: el
+  // contador es monótono y borrar la fila dejaría un hueco imposible de explicar
+  // frente a una inspección, además de perder el rastro de que la venta existió.
+  //
+  // NO HAY UN BOOLEANO `anulada`, y es a propósito. El estado se deriva de
+  // `anuladaEn`, igual que `Turno` deriva abierto/cerrado de `cierre`: dos
+  // fuentes de verdad —un flag más una fecha— pueden discrepar, y el día que
+  // discrepan no hay forma de saber cuál manda. Con una sola columna la pregunta
+  // "¿está anulada?" tiene una sola respuesta posible.
+  //
+  // Los tres campos van juntos o no van: una anulación sin autor y sin motivo es
+  // indistinguible dentro de un mes de un error de datos. La ruta los exige.
+  // `anuladaPorId` es un Int suelto y no una relación a Usuario, siguiendo el
+  // precedente de `VentaCorreccion.usuarioId`: una relación obligaría a agregar
+  // el campo inverso en Usuario y ese modelo no se toca por un dato de autoría.
+  // El nombre se resuelve con una consulta aparte donde haga falta mostrarlo.
+  anuladaEn          DateTime?
+  anuladaPorId       Int?
+  motivoAnulacion    String?
+
   // Campos descriptivos editables por corrección SIMPLE (sin stock ni dinero).
   observaciones      String?
   referenciaInterna  String?
@@ -984,6 +1007,10 @@ model Venta {
   @@index([clientTxnId])
   @@index([operadorId])
   @@index([listaPrecioId])
+  // El filtro de venta comercial pregunta `anuladaEn: null` en TODA consulta de
+  // arqueo, reportes y estadísticas. Sin índice, cada una de ésas hace un scan
+  // más por una columna que en el 99,9 % de las filas vale null.
+  @@index([anuladaEn])
 }
 
 // LIBRO DE CORRECCIONES DE VENTA (antes/después) — inmutable, sin FKs duras
