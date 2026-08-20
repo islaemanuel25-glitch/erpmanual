@@ -33,7 +33,6 @@ import { requirePerm } from "@/lib/authorize";
 import { getCookieValue } from "@/lib/auth";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { toUnidades } from "@/lib/conversiones/stock";
-import { WHERE_TURNO_OPERATIVO } from "@/lib/caja/cierreRelevo";
 import {
   reversionStockOrigen,
   politicaDeLaTransferencia,
@@ -106,15 +105,19 @@ function localDeLaSesion(req, session) {
   return session.localId ? Number(session.localId) : null;
 }
 
-/** El turno operativo de un local, o null. */
-function turnoAbiertoDe(db, localId) {
-  if (!localId) return null;
-  return db.turno.findFirst({
-    where: { localId, ...WHERE_TURNO_OPERATIVO },
-    select: { id: true },
-    orderBy: { apertura: "desc" },
-  });
-}
+// ── ACÁ HABÍA UN `turnoAbiertoDe`. SE RETIRÓ EL 2026-08-20 ─────────────────
+//
+// Buscaba una caja abierta en el local vendedor y bloqueaba la cancelación si no
+// había. Era una exigencia heredada del flujo de anular una venta común, donde
+// la diferencia de efectivo tiene que caer en alguna caja.
+//
+// Una venta con remito nunca contó para el arqueo, así que revertirla no genera
+// ninguna diferencia: `impactoEnArqueo` da `deltaEsperado: 0`. Pedir una caja
+// abierta significaba que el depósito tuviera que abrir la suya para que el
+// local destino pudiera deshacer un remito que le llegó por error.
+//
+// `turnoIdCorreccion` queda en null en este flujo. Poner ahí un turno diría que
+// la diferencia impactó en esa caja, y no impactó nada.
 
 // ── GET: el PREVIEW ─────────────────────────────────────────────────────────
 //
@@ -137,7 +140,6 @@ export async function GET(req) {
     if (!t) return j({ ok: false, error: "Transferencia no encontrada" }, 404);
 
     const localId = localDeLaSesion(req, auth.session);
-    const turnoAbierto = t.venta ? await turnoAbiertoDe(prisma, t.venta.localId) : null;
 
     // Se evalúa con un motivo válido de mentira: el preview contesta si el
     // remito es cancelable, no si el operador ya escribió el motivo.
@@ -146,7 +148,6 @@ export async function GET(req) {
       localId,
       esAdmin: !!auth.session.esAdmin,
       motivo: "preview de cancelacion",
-      turnoAbierto,
     });
 
     return j({
@@ -183,14 +184,12 @@ export async function POST(req) {
     if (!t) return j({ ok: false, error: "Transferencia no encontrada" }, 404);
 
     const localId = localDeLaSesion(req, auth.session);
-    const turnoAbierto = t.venta ? await turnoAbiertoDe(prisma, t.venta.localId) : null;
 
     const veredicto = puedeCancelarTransferencia({
       transferencia: t,
       localId,
       esAdmin: !!auth.session.esAdmin,
       motivo,
-      turnoAbierto,
     });
     if (!veredicto.puede) {
       const status =
@@ -259,6 +258,15 @@ export async function POST(req) {
       // ── 3 · La venta vinculada, si la hay ──────────────────────────────────
       //
       // Se reusa el motor de reversión de ventas. No se escribe uno nuevo.
+      //
+      // `transferencia` se le pasa a propósito y NO es decorativo: es lo que hace
+      // que `impactoEnArqueo` sepa que esta venta tenía remito y devuelva
+      // `deltaEsperado: 0`. Sin ese dato, el motor la trataría como una venta
+      // común y el registro diría que el esperado de alguna caja bajó por el
+      // total cobrado, que es falso.
+      //
+      // `turnoDestinoId: null` porque no hay diferencia que imputar. Ver el
+      // bloque de arriba sobre por qué este flujo no necesita una caja abierta.
       let reversion = null;
       if (t.venta) {
         reversion = await revertirVenta(tx, {
@@ -266,7 +274,7 @@ export async function POST(req) {
           grupoId,
           usuarioId: auth.session.id ?? null,
           motivo,
-          turnoDestinoId: turnoAbierto?.id ?? null,
+          turnoDestinoId: null,
           turnoOriginalCerrado: t.venta.turno ? t.venta.turno.cierre != null : false,
           versionEsperada: t.venta.version,
           origen: `cancelacion de la transferencia #${t.id}`,

@@ -218,11 +218,29 @@ export async function GET(req) {
     // deduplican porque una recepción larga la confirma una sola persona pero el
     // dato está por línea.
     // ======================================================
-    const creadaPor = transferencia.creadaPor
-      ? await prisma.usuario.findUnique({
-          where: { id: Number(transferencia.creadaPor) },
+    // ── LOS DOS AUTORES SE RESUELVEN EN UNA SOLA CONSULTA ──────────────────
+    //
+    // `creadaPor` y `canceladaPorId` son los dos `Int` sin relación declarada. Se
+    // piden juntos con un `in`: dos ids, una consulta. Hacer una por cada uno
+    // sería el N+1 en chico, y encima cuando son la misma persona —el caso más
+    // común, el depósito que manda y después se arrepiente— se preguntaría dos
+    // veces por la misma fila.
+    const idsAutores = [
+      ...new Set(
+        [transferencia.creadaPor, transferencia.canceladaPorId]
+          .map((v) => Number(v))
+          .filter((v) => Number.isInteger(v) && v > 0)
+      ),
+    ];
+    const autores = idsAutores.length
+      ? await prisma.usuario.findMany({
+          where: { id: { in: idsAutores } },
           select: { id: true, nombre: true },
         })
+      : [];
+    const autorPorId = new Map(autores.map((u) => [u.id, u]));
+    const creadaPor = transferencia.creadaPor
+      ? autorPorId.get(Number(transferencia.creadaPor)) ?? null
       : null;
 
     const confirmadores = [];
@@ -255,6 +273,36 @@ export async function GET(req) {
       // guardó autor o el usuario ya no existe: la pantalla muestra "—".
       creadaPor: creadaPor ? { id: creadaPor.id, nombre: creadaPor.nombre } : null,
       confirmadores,
+
+      // ── LA CANCELACIÓN, PARA PODER VERLA ────────────────────────────────
+      //
+      // En ERP Azul una corrección nunca hace desaparecer la historia: al abrir
+      // el documento después tiene que entenderse qué ocurrió. El remito
+      // cancelado conserva sus líneas y sus cantidades, y acá viaja el resto.
+      //
+      // `registroCompleto` distingue los dos casos, y la distinción importa:
+      //
+      //   · true  → la cancelación se hizo con el registro ya habilitado y trae
+      //             fecha, autor y motivo.
+      //   · false → el remito está en "Cancelada" pero los tres campos están en
+      //             null, porque se canceló antes de que las columnas
+      //             existieran. La pantalla lo dice con esas palabras en vez de
+      //             mostrar tres huecos, que se leerían como un error.
+      //
+      // NO se rellena con el motivo de la venta vinculada aunque exista: son dos
+      // decisiones distintas y nadie demostró que sean el mismo dato. Inventar
+      // trazabilidad es peor que admitir que no la hay.
+      cancelacion:
+        transferencia.estado === "Cancelada"
+          ? {
+              fecha: transferencia.canceladaEn,
+              usuario: transferencia.canceladaPorId
+                ? autorPorId.get(Number(transferencia.canceladaPorId))?.nombre ?? null
+                : null,
+              motivo: transferencia.motivoCancelacion,
+              registroCompleto: transferencia.canceladaEn != null,
+            }
+          : null,
       resumen: {
         itemsEnviados,
         itemsRecibidos,
