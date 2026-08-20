@@ -16,7 +16,33 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción está al día: 99 migraciones en el árbol y 99 aplicadas,
+### `20260820060000_transferencia_cancelada_auditable` — commit `22e48cd8`, SIN EMPUJAR
+
+Agrega tres columnas nullable a `Transferencia` —`canceladaEn`, `canceladaPorId`,
+`motivoCancelacion`—. Sin índice nuevo: el que ya existe sobre `estado` alcanza.
+
+**Qué dijo el clasificador:** `aditiva`, sin coincidencias. Corrido con `--vps`
+el 2026-08-20 sobre el rango `6398efb..HEAD`.
+
+**Compatible hacia atrás durante la ventana entre migrar y recrear:** el código
+que está atendiendo no mira esas columnas.
+
+**El quinto chequeo del backup NO aplica:** no borra ni transforma ningún dato.
+
+**Hay una transferencia ya cancelada —la #97— y se queda en null a propósito.**
+No se inventa un autor ni un motivo que nadie escribió: un null ahí significa "se
+canceló antes de que esto se registrara", que es la verdad.
+
+**Después de migrar y ANTES de recrear** hay que ejercer contra Postgres el
+`select` y el `update` de `/api/transferencias/cancelar` con los campos nuevos.
+No se pudo hacer al escribirla porque las columnas todavía no existían.
+
+Cuando esto se despliegue, esta entrada se borra en el mismo commit que lo
+confirma.
+
+---
+
+Antes de ésta, producción estaba al día: 99 migraciones en el árbol y 99 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-20 después de desplegar
 `e7c03c70f34e2c9518d9cc1eeb735d6009b8f4fb`.
 
