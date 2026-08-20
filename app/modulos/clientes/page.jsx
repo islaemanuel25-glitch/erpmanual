@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -1477,14 +1478,8 @@ function ModalVentasCliente({ cliente, localId, onCerrar }) {
 
   const formatFecha = (fechaStr) => {
     try {
-      const fecha = new Date(fechaStr);
-      return fecha.toLocaleDateString("es-AR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+      return fechaHoraAR(fechaStr);
     } catch {
       return fechaStr;
     }
@@ -1691,14 +1686,8 @@ function ModalCuentaCorriente({ cliente, localId, onCerrar }) {
 
   const formatFecha = (fechaStr) => {
     try {
-      const fecha = new Date(fechaStr);
-      return fecha.toLocaleDateString("es-AR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+      return fechaHoraAR(fechaStr);
     } catch {
       return fechaStr;
     }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useUser } from "@/app/context/UserContext";
+import { fechaAR, horaAR, diaSemanaAR } from "@/lib/fechas/formatearFechaHora";
 
 function getGreeting(hour) {
   if (hour < 12) return "Buenos días";
@@ -26,19 +27,10 @@ export default function InicioGreeting() {
 
   const nombre = perfil?.nombre || "";
   const greeting = now ? getGreeting(now.getHours()) : "";
-  const fecha = now
-    ? now.toLocaleDateString("es-AR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      })
-    : "";
-  const hora = now
-    ? now.toLocaleTimeString("es-AR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  // El saludo de inicio: el DÍA de la semana también se corrige con la zona —una
+  // visita de las 22:30 es del día siguiente en UTC— y la hora va en 24 horas.
+  const fecha = now ? `${diaSemanaAR(now)} ${fechaAR(now)}` : "";
+  const hora = now ? horaAR(now, { vacio: "" }) : "";
 
   return (
     <div className="flex items-baseline justify-between gap-3 mb-6 px-1">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import Link from "next/link";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -250,21 +251,8 @@ export default function HistorialPedidosPage() {
 // COMPONENTE: Tarjeta de pedido
 // ====================================================
 function PedidoCard({ item, expandido, onToggle }) {
-  const fecha = item.solicitadoAt
-    ? new Date(item.solicitadoAt).toLocaleString("es-AR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : new Date(item.createdAt).toLocaleString("es-AR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  const fecha = fechaHoraAR(item.solicitadoAt ?? item.createdAt);
 
   const badgeClass =
     BADGE_COLORS[item.estado] ||
@@ -318,10 +306,7 @@ function PedidoCard({ item, expandido, onToggle }) {
               {item.transferenciaFechaRecepcion && (
                 <span className="text-[10px] sunmi-text-muted">
                   Recibida el{" "}
-                  {new Date(item.transferenciaFechaRecepcion).toLocaleString(
-                    "es-AR",
-                    { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }
-                  )}
+                  {fechaHoraAR(item.transferenciaFechaRecepcion)}
                 </span>
               )}
             </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { X } from "lucide-react";
@@ -15,22 +16,12 @@ function fmt(n) {
 }
 
 function fmtFecha(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  return fechaHoraAR(iso);
 }
 
 function fmtHora(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("es-AR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return horaAR(iso);
 }
 
 const FORMA_PAGO_LABELS = {

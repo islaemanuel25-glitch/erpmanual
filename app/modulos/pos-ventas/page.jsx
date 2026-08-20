@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useReducer, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 
@@ -1487,16 +1488,8 @@ export default function PosVentasPage() {
   // Caja vencida (turno abierto de un día anterior): pantalla bloqueante
   // ---------------------------------------------------------------------------
   if (localActual && me && turnoActual && turnoVencido) {
-    const fechaAperturaTxt = turnoActual.apertura
-      ? new Intl.DateTimeFormat("es-AR", {
-          timeZone: "America/Argentina/Cordoba",
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }).format(new Date(turnoActual.apertura))
-      : "—";
+    // Ya declaraba la zona; le faltaba `hour12: false`. Del helper único.
+    const fechaAperturaTxt = fechaHoraAR(turnoActual.apertura);
     return (
       <div className="sunmi-bg w-full min-h-full flex items-center justify-center p-4">
         <div className="max-w-md w-full sunmi-surface rounded-xl p-5 space-y-4">
@@ -1816,7 +1809,7 @@ export default function PosVentasPage() {
                 return filtrados.map((v) => (
                   <div key={v.id} className="flex items-center justify-between gap-2 sunmi-surface-soft px-2 py-1 rounded">
                     <span className="sunmi-pos-muted">
-                      {new Date(v.fecha).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                      {horaAR(v.fecha)}
                     </span>
                     <span className="font-medium sunmi-pos-text-accent">
                       ${Number(v.total).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -8,7 +8,7 @@
 // obligaría a modificar Ventas, que está fuera de alcance. Son ~20 líneas de
 // presentación pura: mismas clases, mismos tamaños, mismos tonos.
 
-const TZ_AR = "America/Argentina/Cordoba";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
 export function fmtMoneda(n) {
   if (n == null) return "—";
@@ -37,15 +37,8 @@ export function cantidadOGuion(n) {
 export function fmtFechaHoraAR(iso) {
   if (!iso) return "—";
   const d = iso instanceof Date ? iso : new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  // Ya declaraba la zona; le faltaba `hour12: false`. Del helper único.
+  return fechaHoraAR(d);
 }
 
 // ── PRESENTACIÓN DE LA LÍNEA ────────────────────────────────────────────────

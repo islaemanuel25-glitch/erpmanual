@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { useUser } from "@/app/context/UserContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -298,14 +299,8 @@ function TabVentas({ clienteId, localId }) {
 
   const formatFecha = (fechaStr) => {
     try {
-      const fecha = new Date(fechaStr);
-      return fecha.toLocaleDateString("es-AR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+      return fechaHoraAR(fechaStr);
     } catch {
       return fechaStr;
     }
@@ -391,14 +386,8 @@ function TabPuntos({ clienteId, localId }) {
 
   const formatFecha = (fechaStr) => {
     try {
-      const fecha = new Date(fechaStr);
-      return fecha.toLocaleDateString("es-AR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+      return fechaHoraAR(fechaStr);
     } catch {
       return fechaStr;
     }
@@ -597,14 +586,8 @@ function TabCuentaCorriente({ cliente, localId }) {
 
   const formatFecha = (fechaStr) => {
     try {
-      const fecha = new Date(fechaStr);
-      return fecha.toLocaleDateString("es-AR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+      return fechaHoraAR(fechaStr);
     } catch {
       return fechaStr;
     }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -35,14 +36,9 @@ const ESTADO_BADGE = {
 };
 
 function formatFecha(f) {
-  if (!f) return "-";
-  return new Date(f).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`. El año
+  // pasa de dos dígitos a cuatro, que es el formato del resto del sistema.
+  return fechaHoraAR(f, { vacio: "-" });
 }
 
 export default function DetallePedidoProveedorPage({ params }) {

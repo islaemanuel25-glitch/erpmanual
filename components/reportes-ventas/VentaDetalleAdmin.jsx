@@ -10,8 +10,8 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
-const TZ_AR = "America/Argentina/Cordoba";
 
 const FORMA_PAGO_LABEL = {
   efectivo: "Efectivo",
@@ -107,15 +107,8 @@ function ConsumoFisico({ dep, className = "" }) {
 function fmtFechaHoraAR(iso) {
   if (!iso) return "—";
   const d = iso instanceof Date ? iso : new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  // Ya declaraba la zona; le faltaba `hour12: false`. Del helper único.
+  return fechaHoraAR(d);
 }
 
 // Título de sección alineado a la izquierda (mismo criterio que el listado).

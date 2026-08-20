@@ -19,6 +19,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
@@ -43,15 +44,8 @@ function num(v) {
 function fmtFechaHoraAR(iso) {
   if (!iso) return "—";
   const d = iso instanceof Date ? iso : new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  // Ya declaraba la zona; le faltaba `hour12: false`. Del helper único.
+  return fechaHoraAR(d);
 }
 
 export default function TransferenciaDetallePage() {

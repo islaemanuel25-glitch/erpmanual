@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 
@@ -956,15 +957,8 @@ function CarritoItemCard({ item, totalActual, onSetCantidad }) {
 // COMPONENTE: Banner pedido pendiente (Solicitado)
 // ====================================================
 function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, cancelando }) {
-  const fecha = pendiente.solicitadoAt
-    ? new Date(pendiente.solicitadoAt).toLocaleString("es-AR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  const fecha = pendiente.solicitadoAt ? fechaHoraAR(pendiente.solicitadoAt) : null;
 
   return (
     <div className="mb-3 sunmi-state-warning rounded-xl px-4 py-3">

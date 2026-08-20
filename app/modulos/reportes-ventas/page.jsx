@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import {
   buildDetalleUrl,
   parseReturnParams,
@@ -55,15 +56,9 @@ function hoyArgentinaISO() {
 function formatFechaHoraAR(iso) {
   if (!iso) return "";
   const d = iso instanceof Date ? iso : new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  // Ya declaraba la zona; le faltaba `hour12: false`. `TZ_AR` se conserva porque
+  // el filtro de día de más abajo lo sigue usando.
+  return fechaHoraAR(d, { vacio: "" });
 }
 
 // Restauración de scroll acotada al módulo (por tab). El contenedor scrolleable del

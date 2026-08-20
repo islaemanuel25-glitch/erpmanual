@@ -40,8 +40,8 @@ import {
   escalasDeLineaExistente, rescalarLinea, cantidadStockLinea, costoResoluble,
 } from "@/lib/pos-ventas/lineaModoDeposito";
 import { firmaCorreccion } from "@/lib/reportes-ventas/correccionDirty";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
-const TZ_AR = "America/Argentina/Cordoba";
 const money = (n) => `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtCant = (n) => { const x = Number(n); return Number.isInteger(x) ? String(x) : x.toLocaleString("es-AR", { maximumFractionDigits: 3 }); };
 const MEDIOS = ["EFECTIVO", "DEBITO", "CREDITO", "MERCADOPAGO", "FIADO"];
@@ -59,7 +59,8 @@ function fmtFecha(iso) {
   if (!iso) return "—";
   const d = iso instanceof Date ? iso : new Date(iso);
   if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", { timeZone: TZ_AR, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d);
+  // Ya declaraba la zona; le faltaba `hour12: false`. Del helper único.
+  return fechaHoraAR(d);
 }
 let _k = 0;
 const nextKey = () => `l${++_k}`;

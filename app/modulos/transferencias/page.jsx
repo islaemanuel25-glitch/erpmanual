@@ -33,6 +33,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import {
   Settings2,
   ArrowLeftRight,
@@ -183,19 +184,9 @@ function normalizarColumnas(guardado) {
   return base;
 }
 
-function fechaHoraAR(iso) {
-  if (!iso) return "—";
-  const d = iso instanceof Date ? iso : new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    timeZone: TZ_AR,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-}
+// `fechaHoraAR` viene del helper único (import arriba). Antes había acá un
+// wrapper con el mismo nombre; se sacó. `TZ_AR` se conserva porque el filtro de
+// día de más abajo lo sigue usando.
 
 // Cantidades: enteros sin decimales, fraccionarios con hasta 3 útiles (la escala
 // física de StockLocal).

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
@@ -137,9 +138,10 @@ export async function POST(req) {
       const diaApertura = fechaArgentinaISO(turnoPropio.apertura);
       const esViejo = diaApertura && diaApertura !== hoyArgentinaISO();
       // Hora local argentina; con fecha cuando el turno no es de hoy.
+      // Las dos ya declaraban la zona; les faltaba `hour12: false`. Del helper.
       const cuando = esViejo
-        ? new Date(turnoPropio.apertura).toLocaleString("es-AR", { timeZone: "America/Argentina/Cordoba" })
-        : new Date(turnoPropio.apertura).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Cordoba", hour: "2-digit", minute: "2-digit" });
+        ? fechaHoraAR(turnoPropio.apertura)
+        : horaAR(turnoPropio.apertura);
 
       return NextResponse.json(
         {

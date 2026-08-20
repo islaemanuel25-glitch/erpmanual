@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { horaAR } from "@/lib/fechas/formatearFechaHora";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -56,7 +57,8 @@ function etiquetaDia(f) {
 
 function fmtHora(f) {
   if (!f) return "";
-  return new Date(f).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
+  return horaAR(f, { vacio: "" });
 }
 
 // Agrupa items (ya ordenados desc por createdAt) por día.

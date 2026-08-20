@@ -2,6 +2,7 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import { diasDesde, DIAS_OPERATIVO } from "@/components/compras-proveedor/usePedidosProveedor";
@@ -10,13 +11,9 @@ const TABLE_HEADERS = ["#", "Proveedor", "Depósito", "Items", "Estado", "Creado
 
 function formatFecha(f) {
   if (!f) return "-";
-  return new Date(f).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`. El año
+  // pasa de dos dígitos a cuatro, que es el formato del resto del sistema.
+  return fechaHoraAR(f);
 }
 
 // Clave/título de día (fecha local AR) para agrupar.
