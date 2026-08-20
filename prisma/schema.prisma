@@ -993,7 +993,13 @@ model Venta {
 model VentaCorreccion {
   id                Int      @id @default(autoincrement())
   ventaId           Int
-  tipo              String // "SIMPLE" | "COMPLETA"
+  // "SIMPLE" | "COMPLETA" | "DESVINCULAR"
+  // DESVINCULAR: la venta no era interna (cliente mal elegido en el POS). Cambia
+  // el cliente por uno sin local vinculado y cancela la transferencia en la misma
+  // transacción. No toca plata: totalAnterior, totalNuevo y diferencia van en 0
+  // de diferencia a propósito. Es un String y no un enum, así que este comentario
+  // es lo único que enumera los valores — mantenerlo.
+  tipo              String
   motivo            String
   // Idempotencia de la corrección COMPLETA: dos POST con la misma clave no la
   // aplican dos veces (se devuelve la corrección ya registrada).
