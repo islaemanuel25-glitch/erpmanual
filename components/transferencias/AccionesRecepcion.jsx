@@ -26,8 +26,13 @@ export default function AccionesRecepcion({
   confirmando,
   guardarCambios,
   puedeCancelar,
-  cancelando,
-  cancelarTransferencia,
+  // La cancelación dejó de ser un `confirm()` y pasó a ser un panel: pide el
+  // preview al servidor, dice qué va a pasar con ESTE remito —que no es lo mismo
+  // si vino de una venta— y exige motivo. Este componente solo lo abre y lo
+  // dibuja debajo de los botones.
+  panelCancelarAbierto = false,
+  abrirPanelCancelar,
+  panelCancelar = null,
 }) {
   const handleImprimirTicket = async () => {
     const { default: imprimirTicketTransferencia } = await import(
@@ -78,14 +83,16 @@ export default function AccionesRecepcion({
         {puedeCancelar && (
           <SunmiButton
             color="red"
-            disabled={cancelando}
-            onClick={cancelarTransferencia}
+            onClick={abrirPanelCancelar}
+            aria-expanded={panelCancelarAbierto}
             className="text-sm"
           >
-            {cancelando ? "Cancelando..." : "Cancelar transferencia"}
+            {panelCancelarAbierto ? "Volver" : "⛔ Cancelar transferencia"}
           </SunmiButton>
         )}
       </div>
+
+      {panelCancelar}
     </SunmiCard>
   );
 }

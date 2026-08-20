@@ -61,6 +61,9 @@ export async function GET(req, { params }) {
         anuladaEn: true,
         anuladaPorId: true,
         motivoAnulacion: true,
+        // El remito vinculado: la venta anulada muestra a qué documento
+        // pertenece, que es donde se resolvió.
+        transferencia: { select: { id: true } },
         observaciones: true,
         referenciaInterna: true,
         turnoId: true,
@@ -236,12 +239,17 @@ export async function GET(req, { params }) {
       puedeCorregirTurnoCerrado: permiteTurnoCerrado,
     };
 
-    // ── ANULACIÓN ────────────────────────────────────────────────────────────
+    // ── ANULACIÓN: SOLO PARA MOSTRARLA ───────────────────────────────────────
     //
-    // `puedeAnular` de acá decide si se OFRECE el botón, no si la anulación es
-    // posible: eso lo contesta el preview de la propia ruta de anular, que mira
-    // el remito y el turno. Acá alcanza con el permiso y con que no esté ya
-    // anulada — pedir el estado completo obligaría a duplicar esa lógica.
+    // Es informativa. NO trae `puedeAnular` y eso es a propósito: una venta
+    // interna se anula cancelando su REMITO, desde el módulo Transferencias, que
+    // es el documento que el local destino recibe y revisa. Acá solo se muestra
+    // que pasó, con quién, cuándo y por qué — ERP Azul no borra la historia de
+    // una operación, así que una venta anulada tiene que decirlo en su pantalla.
+    //
+    // Durante unas horas del 2026-08-20 esto tuvo un `puedeAnular` que encendía
+    // un botón en Ventas. Se retiró: tener dos caminos operativos para el mismo
+    // hecho es peor que tener uno incómodo.
     let anuladaPorNombre = null;
     if (venta.anuladaPorId) {
       const u = await prisma.usuario.findUnique({
@@ -255,7 +263,9 @@ export async function GET(req, { params }) {
       fecha: venta.anuladaEn,
       usuario: anuladaPorNombre,
       motivo: venta.motivoAnulacion,
-      puedeAnular: permiteCompleta && venta.anuladaEn == null,
+      // El remito, para que desde la venta se llegue al documento donde se
+      // resuelve. Es un dato, no una acción.
+      transferenciaId: venta.transferencia?.id ?? null,
     };
 
     // --- Datos de medios de pago (desglose para UI + reimpresión) ---

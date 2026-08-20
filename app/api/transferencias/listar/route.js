@@ -17,6 +17,7 @@ import {
   resumenPorEstado,
   productosMasTransferidos,
   recortarPeriodo,
+  soloOperativas,
   MAX_TRANSFERENCIAS,
   MAX_PRODUCTOS,
 } from "@/lib/transferencias/agregadosPeriodo";
@@ -277,11 +278,22 @@ export async function GET(req) {
     // período entra completo.
     const { truncado, periodo } = recortarPeriodo(valorizacionPeriodo, MAX_TRANSFERENCIAS);
 
+    // ── LO QUE SE MOVIÓ DE VERDAD ─────────────────────────────────────────
+    //
+    // Las canceladas se sacan ACÁ, una sola vez, y de acá cuelgan los tres
+    // agregados de movimiento. Antes entraban en todos: el importe del período
+    // decía que el depósito había despachado plata que nunca salió.
+    //
+    // `periodo` completo se conserva para el desglose por estado, que es el
+    // único que tiene que verlas — "cuántas se cancelaron" es justamente lo que
+    // ese bloque contesta.
+    const periodoOperativo = soloOperativas(periodo);
+
     // Importe de TODO el período filtrado. Antes esta clave sumaba solo la
     // página visible pese a llamarse "global": con más de 25 resultados el
     // importe cambiaba al pasar de página.
     const totalCostoGlobal = desdeCentavos(
-      periodo.reduce(
+      periodoOperativo.reduce(
         (acc, t) =>
           acc +
           // El origen decide cómo se valoriza el fiambre de pieza fija: en el
@@ -293,8 +305,10 @@ export async function GET(req) {
       )
     );
 
+    // El desglose ve TODAS y marca cada fila con `esOperativo`.
     const desgloseEstado = resumenPorEstado(periodo);
-    const productos = productosMasTransferidos(periodo, MAX_PRODUCTOS);
+    // Los productos más transferidos son movimiento: sin canceladas.
+    const productos = productosMasTransferidos(periodoOperativo, MAX_PRODUCTOS);
 
     const cuentaEstado = (nombre) =>
       porEstado.find((g) => g.estado === nombre)?._count?._all || 0;

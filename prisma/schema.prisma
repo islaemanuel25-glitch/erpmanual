@@ -610,6 +610,25 @@ model Transferencia {
 
   tieneDiferencias Boolean @default(false)
 
+  // ── CANCELACIÓN ────────────────────────────────────────────────────────────
+  //
+  // ERP Azul no borra la historia de una operación. Una transferencia cancelada
+  // conserva su fila, sus líneas y sus cantidades originales: lo único que cambia
+  // es el estado y que deja de sumar al movimiento operativo del período.
+  //
+  // POR QUÉ NO ALCANZABA CON `updatedAt`. Hasta el 2026-08-20 la cancelación no
+  // registraba nada: el propio código lo decía —"se usa updatedAt como registro
+  // implícito de cuándo se canceló"— y eso no contesta ninguna de las tres
+  // preguntas de una auditoría. `updatedAt` se mueve con CUALQUIER escritura, así
+  // que ni siquiera prueba la fecha; y quién y por qué no estaban en ningún lado.
+  //
+  // Mismo patrón que `Venta.anuladaEn`: el estado se deriva de la fecha, no hay
+  // booleano al lado. Los tres campos van juntos o no van — una cancelación sin
+  // autor y sin motivo es indistinguible dentro de un mes de un error de datos.
+  canceladaEn        DateTime?
+  canceladaPorId     Int?
+  motivoCancelacion  String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -31,6 +31,7 @@ import EstadoTransferenciaBadge, { DiferenciasBadge } from "@/components/transfe
 import TransferenciaHeader from "@/components/transferencias/TransferenciaHeader";
 import TablaDetalleTransferencia from "@/components/transferencias/TablaDetalleTransferencia";
 import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
+import PanelCancelarTransferencia from "@/components/transferencias/PanelCancelarTransferencia";
 import { SectionHead, TotalTile, fmtCantidad, fmtMoneda } from "@/components/transferencias/detallePresentacion";
 
 const LISTADO = "/modulos/transferencias";
@@ -170,9 +171,24 @@ export default function TransferenciaDetallePage() {
 
   const inputsHabilitados = puedeRecibir;
 
-  // Cancelar: solo estado "Enviada" + permiso transferencias.cancelar
+  // ── QUIÉN VE EL BOTÓN DE CANCELAR ──────────────────────────────────────────
+  //
+  // Estado "Enviada" + permiso, y además PARTICIPAR de la transferencia: ser el
+  // origen o el destino. Ese último pedazo faltaba y creaba una contradicción —
+  // la pantalla ofrecía el botón a cualquiera con el permiso y el backend
+  // rechazaba con un 403 al que no fuera el origen.
+  //
+  // Ahora el backend acepta a las dos puntas (el destino es quien descubre que
+  // el remito no le corresponde) y la pantalla pregunta lo mismo, así que botón
+  // visible y backend dicen una sola cosa.
+  const localActual = Number(contexto?.localId || me?.localId || 0);
+  const participa =
+    esAdmin ||
+    (localActual > 0 &&
+      (Number(item?.origen?.id) === localActual || Number(item?.destino?.id) === localActual));
   const puedeCancelar =
     item?.estado === "Enviada" &&
+    participa &&
     (esAdmin || permisos.includes("transferencias.cancelar"));
 
   // ===============================
@@ -261,30 +277,10 @@ export default function TransferenciaDetallePage() {
   // ===============================
   // Cancelar transferencia
   // ===============================
-  const cancelarTransferencia = async () => {
-    if (!confirm("¿Estás seguro de cancelar esta transferencia? Se revertirá el stock en tránsito al origen.")) {
-      return;
-    }
-
-    try {
-      setCancelando(true);
-
-      const res = await fetch("/api/transferencias/cancelar", {
-        method: "POST",
-        body: JSON.stringify({ transferenciaId: item.id }),
-      });
-
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error);
-
-      await cargar();
-
-    } catch (err) {
-      alert("Error cancelando: " + err.message);
-    } finally {
-      setCancelando(false);
-    }
-  };
+  // La cancelación la maneja PanelCancelarTransferencia: pide el preview al
+  // servidor, muestra qué va a pasar con ESTE remito —que no es lo mismo si vino
+  // de una venta— y exige el motivo. Acá solo se abre y se recarga al terminar.
+  const [panelCancelar, setPanelCancelar] = useState(false);
 
   // ===============================
   // Totales
@@ -381,8 +377,20 @@ export default function TransferenciaDetallePage() {
               confirmando={confirmando}
               confirmarRecepcion={confirmarRecepcion}
               puedeCancelar={puedeCancelar}
-              cancelando={cancelando}
-              cancelarTransferencia={cancelarTransferencia}
+              panelCancelarAbierto={panelCancelar}
+              abrirPanelCancelar={() => setPanelCancelar((v) => !v)}
+              panelCancelar={
+                panelCancelar ? (
+                  <PanelCancelarTransferencia
+                    id={id}
+                    onCerrar={() => setPanelCancelar(false)}
+                    onCancelada={async () => {
+                      setPanelCancelar(false);
+                      await cargar();
+                    }}
+                  />
+                ) : null
+              }
             />
 
             {/* 1 · Información general */}

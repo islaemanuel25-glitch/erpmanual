@@ -23,6 +23,7 @@ import {
   ordenarDestinos,
   totalesDeDestinos,
   recortarPeriodo,
+  soloOperativas,
   ORDEN_DESTINO_DEFAULT,
   ORDENES_DESTINO,
   MAX_TRANSFERENCIAS,
@@ -147,7 +148,10 @@ export async function GET(req) {
     // período entra completo. La fila extra se descarta antes de agrupar.
     const { truncado, periodo } = recortarPeriodo(resultados, MAX_TRANSFERENCIAS);
 
-    const grupos = ordenarDestinos(agruparPorDestino(periodo), orden);
+    // Las canceladas no suman al importe transferido a cada destino: no llegó
+    // nada. Se sacan con la misma pieza que usa el listado, para que las dos
+    // vistas no puedan discrepar sobre qué es movimiento operativo.
+    const grupos = ordenarDestinos(agruparPorDestino(soloOperativas(periodo)), orden);
 
     return NextResponse.json({
       ok: true,

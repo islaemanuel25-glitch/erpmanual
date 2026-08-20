@@ -12,7 +12,7 @@ import { useState, useEffect } from "react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import PanelAnularVenta, { CintaAnulada } from "@/components/reportes-ventas/PanelAnularVenta";
+import CintaVentaAnulada from "@/components/reportes-ventas/CintaVentaAnulada";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
 function num(v) {
@@ -69,7 +69,6 @@ function construirTicket(venta) {
 
 export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta }) {
   const c = venta?.correccion || {};
-  const anulada = venta?.anulacion?.anulada === true;
   const [msg, setMsg] = useState(null); // { tipo: "ok"|"error"|"info", texto }
   const [panel, setPanel] = useState(null); // "simple" | "historial" | null
   const [busy, setBusy] = useState(false);
@@ -148,7 +147,7 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
     <SunmiCard className="p-3">
       {/* La cinta de anulada va PRIMERA y antes que la de corregida: es el hecho
           que cambia cómo se lee todo lo demás de la pantalla. */}
-      <CintaAnulada venta={venta} />
+      <CintaVentaAnulada venta={venta} />
 
       {/* Estado de corrección + datos de la última corrección aplicada.
           En desktop los metadatos van en una fila; en móvil se apilan. */}
@@ -243,18 +242,16 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
           🕑 Historial
         </SunmiButton>
 
-        {/* ANULAR. Va último y en rojo: es la única acción de esta tarjeta que
-            no se puede deshacer desde la pantalla. Solo aparece si la venta no
-            está ya anulada — una anulada no se anula de nuevo. */}
-        {venta?.anulacion?.puedeAnular && (
-          <SunmiButton
-            color="red"
-            onClick={() => { setPanel(panel === "anular" ? null : "anular"); setMsg(null); }}
-            className="text-sm"
-          >
-            ⛔ Anular venta
-          </SunmiButton>
-        )}
+        {/* ── ACÁ HUBO UN BOTÓN "ANULAR VENTA". SE SACÓ EL 2026-08-20 ────────
+            Existió unas horas y se retiró por decisión de producto: una venta
+            interna se corrige desde el REMITO, en el módulo Transferencias, que
+            es el documento que el local destino recibe y revisa. Tener el botón
+            acá creaba un segundo camino operativo para el mismo hecho.
+
+            El motor de reversión NO se borró: vive en lib/pos-ventas/anularVenta.js
+            y lo usa la cancelación de transferencias. Si algún día hace falta
+            anular una venta COMÚN —sin remito— el lugar es éste, y el motor ya
+            está. Lo que no vuelve es usarlo como atajo para arreglar un remito. */}
       </div>
 
       {/* Aviso de ventana vencida (solo si tiene permiso pero está fuera de plazo) */}
@@ -290,20 +287,6 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
             onCorregido && onCorregido(info);
           }}
           onError={(texto) => flash("error", texto)}
-        />
-      )}
-
-      {panel === "anular" && (
-        <PanelAnularVenta
-          venta={venta}
-          onCerrar={() => setPanel(null)}
-          onAnulada={(info) => {
-            setPanel(null);
-            flash("ok", "Venta anulada.");
-            // Se recarga por el mismo camino que una corrección: la pantalla
-            // vuelve a pedir el detalle y aparece la cinta.
-            onCorregido && onCorregido(info);
-          }}
         />
       )}
 
