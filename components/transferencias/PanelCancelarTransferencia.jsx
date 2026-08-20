@@ -21,8 +21,6 @@ import { useEffect, useState } from "react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
-const MOTIVO_MIN = 10;
-
 const money = (n) =>
   `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -67,7 +65,9 @@ export default function PanelCancelarTransferencia({ id, onCancelada, onCerrar }
     }
   }
 
-  const motivoOk = motivo.trim().length >= MOTIVO_MIN;
+  // El motivo es OBLIGATORIO y nada más: acá hubo un mínimo de 10 caracteres
+  // que se sacó el 2026-08-20. La regla es que exista, no que tenga un largo.
+  const motivoOk = motivo.trim() !== "";
 
   return (
     <div className="mt-3 border-t sunmi-divider pt-3 space-y-3">
@@ -91,10 +91,18 @@ export default function PanelCancelarTransferencia({ id, onCancelada, onCerrar }
             {(preview.efectos || []).map((e, i) => (
               <div key={i}>· {e}</div>
             ))}
+            {/* `numero` es el número de COMPROBANTE: el ERP lo muestra como
+                "Ticket" y es el que el operador ve impreso. El id interno de la
+                venta es otra cosa —la venta 7726 lleva el ticket 1022— y
+                confundirlos manda a buscar por un número que no existe.
+
+                Los números van sin almohadilla en este comentario a propósito:
+                el contador de hardcodeo lee los comentarios y toma una
+                almohadilla seguida de dígitos por un color hexadecimal. */}
             {preview.revierteVenta && preview.venta && (
               <div className="sunmi-text-accent font-medium">
-                · Se anula la venta #{preview.venta.numero} por {money(preview.venta.total)}.
-                El ticket se conserva.
+                · Se anula el ticket #{preview.venta.numero} por {money(preview.venta.total)}.
+                El número se conserva.
               </div>
             )}
             <div className="sunmi-text-muted pt-1">
@@ -104,7 +112,7 @@ export default function PanelCancelarTransferencia({ id, onCancelada, onCerrar }
 
           <div>
             <div className="text-sm2 sunmi-text-muted mb-1">
-              Motivo de la cancelación * (mínimo {MOTIVO_MIN} caracteres)
+              Motivo de la cancelación *
             </div>
             <SunmiInput
               value={motivo}
