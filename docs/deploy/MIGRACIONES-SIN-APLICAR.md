@@ -16,29 +16,25 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260820060000_transferencia_cancelada_auditable` — commit `22e48cd8`, SIN EMPUJAR
+**Ninguna.** Producción está al día: 100 migraciones en el árbol y 100 aplicadas,
+comprobado con `prisma migrate status` el 2026-08-20 después de desplegar
+`1a6db117f2cc071619cdf105f927257f36bb2c93`.
 
-Agrega tres columnas nullable a `Transferencia` —`canceladaEn`, `canceladaPorId`,
-`motivoCancelacion`—. Sin índice nuevo: el que ya existe sobre `estado` alcanza.
+La última fue `20260820060000_transferencia_cancelada_auditable` —las tres
+columnas de cancelación de `Transferencia`— y **se aplicó de verdad**: la salida
+dijo "Applying migration", el contenedor descartable contó 100 igual que el
+árbol, y las tres columnas se verificaron una por una contra
+`information_schema` después de migrar.
 
-**Qué dijo el clasificador:** `aditiva`, sin coincidencias. Corrido con `--vps`
-el 2026-08-20 sobre el rango `6398efb..HEAD`.
+La comprobación que quedaba anotada se corrió **entre migrar y recrear**, que es
+la única ventana en la que se puede: el `select` de la ruta de cancelar con los
+campos nuevos, el `select` del detalle, y el `update` de cancelación dentro de una
+transacción revertida a propósito. Después se releyó la fila para confirmar que
+no quedó nada escrito de la prueba.
 
-**Compatible hacia atrás durante la ventana entre migrar y recrear:** el código
-que está atendiendo no mira esas columnas.
-
-**El quinto chequeo del backup NO aplica:** no borra ni transforma ningún dato.
-
-**Hay una transferencia ya cancelada —la #97— y se queda en null a propósito.**
-No se inventa un autor ni un motivo que nadie escribió: un null ahí significa "se
-canceló antes de que esto se registrara", que es la verdad.
-
-**Después de migrar y ANTES de recrear** hay que ejercer contra Postgres el
-`select` y el `update` de `/api/transferencias/cancelar` con los campos nuevos.
-No se pudo hacer al escribirla porque las columnas todavía no existían.
-
-Cuando esto se despliegue, esta entrada se borra en el mismo commit que lo
-confirma.
+La #97, que ya estaba cancelada, conserva los tres campos en null. No se
+backfilleó: un null ahí significa "se canceló antes de que esto se registrara",
+que es la verdad, y la pantalla lo dice con esas palabras.
 
 ---
 
