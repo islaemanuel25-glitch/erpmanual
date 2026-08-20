@@ -105,7 +105,12 @@ export async function GET(req) {
         fechaEnvio: true,
         createdAt: true,
         destinoId: true,
-        origen: { select: { id: true, nombre: true } },
+        // `es_deposito` NO es opcional. Sin la columna, `t.origen?.es_deposito`
+        // es `undefined`, el `=== true` de más abajo lo vuelve `false`, y como
+        // `false` es un booleano válido el control de origen obligatorio lo deja
+        // pasar sin quejarse. Ésa fue exactamente la forma del defecto de la #97
+        // en esta vista: no faltó el origen, llegó MENTIDO.
+        origen: { select: { id: true, nombre: true, es_deposito: true } },
         destino: { select: { id: true, nombre: true } },
         detalle: {
           select: {
@@ -117,7 +122,19 @@ export async function GET(req) {
               select: {
                 precio_costo: true,
                 base: {
-                  select: { precio_costo: true, unidad_medida: true, factor_pack: true },
+                  select: {
+                    precio_costo: true,
+                    unidad_medida: true,
+                    factor_pack: true,
+                    // Los cuatro del fiambre de pieza fija. Sin ellos el
+                    // predicado dice "no es fiambre" y el importe sale por kilo
+                    // donde el depósito cuenta piezas. Ver el candado en
+                    // lib/transferencias/formaDelSelect.test.mjs.
+                    pesoEsFijo: true,
+                    pesoReferenciaKg: true,
+                    modoVentaDeposito: true,
+                    modoCompraProveedor: true,
+                  },
                 },
               },
             },

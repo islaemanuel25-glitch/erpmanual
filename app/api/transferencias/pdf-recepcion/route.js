@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requirePerm } from "@/lib/authorize";
-import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
+import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
 
 // El remito de recepción lleva los mismos costos que el de envío, más el motivo
 // de cada diferencia. Mismo permiso que su gemelo.
@@ -175,7 +175,7 @@ export async function GET(req) {
         d.producto?.base,
         // Igual que el remito: el fiambre de pieza fija sale del depósito en
         // piezas y su costo está por kilo.
-        { origenEsDeposito: transferencia.origen?.es_deposito === true }
+        { origenEsDeposito: origenEsDepositoDe(transferencia, "pdf-recepcion") }
       );
 
       const motivo =

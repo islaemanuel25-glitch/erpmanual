@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession, getCookieValue } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
-import { valorizarDetalle } from "@/lib/transferencias/costoTransferencia";
+import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
 // EL MISMO helper que usa la recepción para devolver el faltante al origen. Se
 // importa en vez de replicar la fórmula: si la regla cambia, la pantalla no
 // puede quedar mostrando otro número que el que el stock realmente movió.
@@ -145,7 +145,7 @@ export async function GET(req) {
       const { costoUnitario: costoNormalizado, subtotal } = valorizarDetalle(
         { ...d, precioCosto },
         d.producto?.base,
-        { origenEsDeposito: transferencia.origen?.es_deposito === true }
+        { origenEsDeposito: origenEsDepositoDe(transferencia, "detalle") }
       );
 
       itemsEnviados += cantidadEnviada;

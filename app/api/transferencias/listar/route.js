@@ -20,6 +20,7 @@ import {
   MAX_TRANSFERENCIAS,
   MAX_PRODUCTOS,
 } from "@/lib/transferencias/agregadosPeriodo";
+import { origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
 
 const PAGE_SIZE = 25;
 
@@ -111,6 +112,22 @@ export async function GET(req) {
               unidad_medida: true,
               factor_pack: true,
               nombre: true,
+              // ── LOS CUATRO DEL FIAMBRE DE PIEZA FIJA ────────────────────
+              //
+              // Faltaban, y por eso la #97 seguía mostrando 144.086,40 acá
+              // después del arreglo que se desplegó para eso. El origen se
+              // pasaba bien y la fórmula estaba bien: lo que llegaba a medias
+              // era el PRODUCTO. `esProductoFiambre` mira `unidad_medida`,
+              // `modoCompraProveedor` y `pesoReferenciaKg`, y `esFiambreFijo`
+              // mira además `modoVentaDeposito`. Sin ellos el predicado
+              // contesta "no es fiambre" y la conversión no ocurre.
+              //
+              // No agregan una consulta: son cuatro columnas del mismo SELECT
+              // que ya hace el join a `base`.
+              pesoEsFijo: true,
+              pesoReferenciaKg: true,
+              modoVentaDeposito: true,
+              modoCompraProveedor: true,
             },
           },
         },
@@ -171,6 +188,15 @@ export async function GET(req) {
         select: {
           estado: true,
           tieneDiferencias: true,
+          // EL ORIGEN, que faltaba entero. De este barrido salen los TRES
+          // agregados del período —el importe total, el desglose por estado y
+          // los productos más transferidos— y ninguno podía valorizar el
+          // fiambre de pieza fija porque `t.origen` llegaba `undefined`.
+          //
+          // No se veía porque el `=== true` de los llamadores lo convertía en
+          // `false` sin quejarse. Ahora eso lo hace `origenEsDepositoDe`, que
+          // lanza; este select es lo que hace que no tenga que lanzar.
+          origen: { select: { es_deposito: true } },
           detalle: { select: selectValorizacion },
         },
       }),
@@ -232,7 +258,7 @@ export async function GET(req) {
         // 155.486,40. El total de arriba ya pasaba el origen, así que la lista
         // ni siquiera cerraba consigo misma.
         totalCosto: importeDeDetalle(t.detalle, {
-          origenEsDeposito: t.origen?.es_deposito === true,
+          origenEsDeposito: origenEsDepositoDe(t, "listar/fila"),
         }),
         // Autor del remito, para el subtítulo de la columna "Transferencia".
         creadaPorNombre: nombrePorCreador.get(t.creadaPor) || null,
@@ -261,7 +287,7 @@ export async function GET(req) {
           // El origen decide cómo se valoriza el fiambre de pieza fija: en el
           // depósito la cantidad está en piezas y su costo, por kilo.
           importeDeDetalleCentavos(t.detalle, {
-            origenEsDeposito: t.origen?.es_deposito === true,
+            origenEsDeposito: origenEsDepositoDe(t, "listar/totalDelPeriodo"),
           }),
         0
       )
