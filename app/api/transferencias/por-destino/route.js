@@ -23,7 +23,6 @@ import {
   ordenarDestinos,
   totalesDeDestinos,
   recortarPeriodo,
-  soloOperativas,
   ORDEN_DESTINO_DEFAULT,
   ORDENES_DESTINO,
   MAX_TRANSFERENCIAS,
@@ -148,10 +147,17 @@ export async function GET(req) {
     // período entra completo. La fila extra se descarta antes de agrupar.
     const { truncado, periodo } = recortarPeriodo(resultados, MAX_TRANSFERENCIAS);
 
-    // Las canceladas no suman al importe transferido a cada destino: no llegó
-    // nada. Se sacan con la misma pieza que usa el listado, para que las dos
-    // vistas no puedan discrepar sobre qué es movimiento operativo.
-    const grupos = ordenarDestinos(agruparPorDestino(soloOperativas(periodo)), orden);
+    // ── EL PERÍODO VA COMPLETO, CON LAS CANCELADAS ────────────────────────
+    //
+    // Acá había un `soloOperativas(periodo)` y era el defecto: filtrar antes de
+    // agrupar hace que "no suma" y "no existe" sean lo mismo. El 19/08 el
+    // resumen general decía 7 transferencias y esta pestaña mostraba 6, con la
+    // #97 desaparecida del grupo de Casiano.
+    //
+    // La separación la hace `agruparPorDestino`, que ahora cuenta documentos y
+    // movimiento por separado: el remito cancelado aparece en el sublistado con
+    // su importe original y no entra en el total del grupo.
+    const grupos = ordenarDestinos(agruparPorDestino(periodo), orden);
 
     return NextResponse.json({
       ok: true,

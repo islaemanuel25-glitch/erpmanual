@@ -134,8 +134,16 @@ export default function ReporteTransferenciasPorDestino({
         {totales && (
           <div className="text-[11px] sunmi-text-muted">
             <span className="sunmi-text-strong font-semibold">{totales.destinos}</span> destino{totales.destinos === 1 ? "" : "s"} ·{" "}
-            <span className="sunmi-text-strong font-semibold">{totales.transferencias}</span> transferencia{totales.transferencias === 1 ? "" : "s"} ·{" "}
-            total <span className="sunmi-text-strong font-semibold tabular-nums">{money(totales.importeTotal)}</span>
+            <span className="sunmi-text-strong font-semibold">{totales.transferencias}</span> transferencia{totales.transferencias === 1 ? "" : "s"}
+            {totales.canceladas > 0 && (
+              <>
+                {" ("}
+                <span className="sunmi-text-danger">{totales.canceladas} cancelada{totales.canceladas === 1 ? "" : "s"}</span>
+                {")"}
+              </>
+            )}
+            {" · "}total operativo{" "}
+            <span className="sunmi-text-strong font-semibold tabular-nums">{money(totales.importeTotal)}</span>
           </div>
         )}
       </div>
@@ -187,8 +195,23 @@ export default function ReporteTransferenciasPorDestino({
                     <div className="font-semibold sunmi-text-strong truncate leading-tight">
                       {g.destinoNombre}
                     </div>
+                    {/* DOCUMENTOS y MOVIMIENTO no son lo mismo, así que se
+                        nombran distinto. "transferencias" cuenta todos los
+                        remitos del destino —canceladas incluidas— y los ítems
+                        se dicen "operativos" porque solo suman los que movieron
+                        mercadería. Sin ese adjetivo, dos números de la misma
+                        línea contarían cosas distintas sin avisar. */}
                     <div className="text-[11px] sunmi-text-muted mt-0.5">
-                      {g.cantidadTransferencias} transferencia{g.cantidadTransferencias === 1 ? "" : "s"} · {g.cantidadItems} ítem{g.cantidadItems === 1 ? "" : "s"} · última {fmtFecha(g.ultimaTransferencia)}
+                      {g.cantidadTransferencias} transferencia{g.cantidadTransferencias === 1 ? "" : "s"}
+                      {g.cantidadCanceladas > 0 && (
+                        <>
+                          {" · "}
+                          <span className="sunmi-text-danger">
+                            {g.cantidadCanceladas} cancelada{g.cantidadCanceladas === 1 ? "" : "s"}
+                          </span>
+                        </>
+                      )}
+                      {" · "}{g.cantidadItems} ítem{g.cantidadItems === 1 ? "" : "s"} operativo{g.cantidadItems === 1 ? "" : "s"} · última {fmtFecha(g.ultimaTransferencia)}
                     </div>
                   </div>
                 </div>
@@ -222,10 +245,23 @@ export default function ReporteTransferenciasPorDestino({
                             {t.cantidadItems} ítem{t.cantidadItems === 1 ? "" : "s"} · env {fmtCant(t.cantidadEnviada)} · rec {fmtCant(t.cantidadRecibida)}
                           </span>
                         </div>
+                        {/* El importe HISTÓRICO del remito se muestra siempre:
+                            saber cuánto valía lo cancelado es justamente lo que
+                            alguien va a querer mirar. Lo que se agrega es el
+                            aviso de que no entra en el total del grupo —sin
+                            tachar ni esconder nada, que haría falta para
+                            auditoría—. */}
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="tabular-nums font-mono font-semibold text-[13px] sunmi-text-strong">
-                            {money(t.totalCosto)}
-                          </span>
+                          <div className="text-right">
+                            <span className="tabular-nums font-mono font-semibold text-[13px] sunmi-text-strong">
+                              {money(t.totalCosto)}
+                            </span>
+                            {t.esOperativa === false && (
+                              <div className="text-[10px] sunmi-text-danger font-medium leading-tight">
+                                No suma al total
+                              </div>
+                            )}
+                          </div>
                           <SunmiButton
                             color="amber"
                             onClick={() => onVerTransferencia && onVerTransferencia(t.id)}
