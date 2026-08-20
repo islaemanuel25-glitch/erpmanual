@@ -103,12 +103,32 @@ export async function GET(req) {
       where.formaPago = formaPagoParam;
     }
 
-    // Las ANULADAS se muestran acá, marcadas. Es la excepción del filtro y es
-    // segura en esta ruta porque el listado pagina y marca: los totales de
-    // dinero los calcula /api/reportes-ventas/general, que sí las excluye. Si
-    // desaparecieran del listado, quien anuló una por error no tendría dónde
-    // encontrarla.
-    const whereListado = whereVentaComercial(where, { incluirAnuladas: true });
+    // ── QUÉ SE MUESTRA ACÁ, Y POR QUÉ NO ES LO MISMO QUE QUÉ SUMA ───────────
+    //
+    // Las ANULADAS se muestran siempre, marcadas: si desaparecieran, quien anuló
+    // una por error no tendría dónde encontrarla.
+    //
+    // Las INTERNAS —las que generaron un remito— se muestran solo si se piden
+    // con `?incluirInternas=1`. Mismo mecanismo que el historial del cliente, y
+    // por el mismo motivo: verlas es una decisión explícita, nunca la mezcla por
+    // defecto, porque un movimiento entre dos cajas del mismo grupo no es una
+    // venta y mezclarlo infla lo que se lee como facturación.
+    //
+    // ── DE DÓNDE SALIÓ ESTA SEGUNDA MITAD ───────────────────────────────────
+    //
+    // El 2026-08-20 se desplegó el botón de anular en el detalle de la venta, y
+    // Emanuel no pudo llegar a la venta que quería anular: la 7726 tiene remito,
+    // así que el listado la escondía. Medido ese día sobre el 19/08 en el
+    // depósito: el listado mostraba 5 de 12 ventas. El botón estaba en una
+    // pantalla a la que no se llegaba.
+    //
+    // Las dos condiciones son independientes a propósito: pedir internas NO
+    // muestra las anuladas de arrastre, y viceversa. Cada una se decide sola.
+    const incluirInternas = searchParams.get("incluirInternas") === "1";
+    const whereListado = whereVentaComercial(where, {
+      incluirAnuladas: true,
+      incluirInternas,
+    });
 
     const [total, ventas] = await Promise.all([
       prisma.venta.count({ where: whereListado }),
@@ -129,6 +149,9 @@ export async function GET(req) {
           version: true,
           // Para la marca de anulada en la card.
           anuladaEn: true,
+          // Para la marca de "interna" cuando se piden. Sin esto, con el
+          // interruptor prendido las internas se verían como ventas comunes.
+          transferencia: { select: { id: true } },
           cliente: { select: { id: true, nombre: true } },
           vendedor: { select: { id: true, nombre: true } },
           local: { select: { id: true, nombre: true } },
@@ -157,6 +180,10 @@ export async function GET(req) {
       version: v.version ?? 0,
       // La card la muestra tachada con su cinta. No suma en ningún total.
       anulada: v.anuladaEn != null,
+      // Interna = generó un remito. La card la marca para que no se lea como
+      // una venta más cuando el interruptor está prendido.
+      interna: v.transferencia != null,
+      remitoId: v.transferencia?.id ?? null,
     }));
 
     return NextResponse.json({

@@ -77,10 +77,13 @@ export async function GET(req, context) {
     //
     // Verlas es una decisión explícita, nunca la mezcla por defecto: se prende
     // con `?incluirInternas=1`.
+    // Pedir internas NO trae las anuladas de arrastre. Antes esta rama devolvía
+    // el `where` pelado, así que al agregarse la anulación el 2026-08-20 habría
+    // empezado a mezclar ventas anuladas en el historial del cliente sin que
+    // nada avisara. Las dos condiciones se deciden por separado, y de eso se
+    // encarga el helper.
     const incluirInternas = searchParams.get("incluirInternas") === "1";
-    const where = incluirInternas
-      ? { clienteId, localId }
-      : whereVentaComercial({ clienteId, localId });
+    const where = whereVentaComercial({ clienteId, localId }, { incluirInternas });
     if (cursor) where.id = { lt: cursor };
 
     const rows = await prisma.venta.findMany({

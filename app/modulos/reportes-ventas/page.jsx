@@ -98,6 +98,15 @@ export default function ReportesVentasPage() {
   // no desincronizarse del resumen si el usuario cambia inputs sin re-generar.
   const [filtrosVigentes, setFiltrosVigentes] = useState(null);
 
+  // ── VER LAS OPERACIONES INTERNAS ──────────────────────────────────────────
+  //
+  // Apagado por defecto, y así tiene que quedarse: una venta del depósito a un
+  // local propio no es una venta, y mezclarla infla lo que se lee como
+  // facturación. Pero tiene que poder prenderse, porque el detalle de esas
+  // ventas es donde vive el botón de anular — y sin este interruptor el botón
+  // quedaba en una pantalla a la que no se llegaba. Pasó el 2026-08-20.
+  const [verInternas, setVerInternas] = useState(false);
+
   // Fecha por defecto = hoy, SALVO que volvamos con contexto (query params con
   // fechas válidas): en ese caso no pisamos, la hidratación las restaura.
   useEffect(() => {
@@ -174,9 +183,12 @@ export default function ReportesVentasPage() {
     router.push(buildDetalleUrl(ventaId, ctx));
   };
 
-  const cargarListado = async (page, filtrosOverride) => {
+  const cargarListado = async (page, filtrosOverride, internasOverride) => {
     const filtros = filtrosOverride || filtrosVigentes;
     if (!filtros) return;
+    // El override existe porque al tocar el interruptor hay que recargar YA, y
+    // el estado de React todavía no cambió en ese tick.
+    const internas = internasOverride !== undefined ? internasOverride : verInternas;
 
     setLoadingListado(true);
     try {
@@ -188,6 +200,7 @@ export default function ReportesVentasPage() {
       });
       if (filtros.localId) params.set("localId", String(filtros.localId));
       if (filtros.formaPago) params.set("formaPago", filtros.formaPago);
+      if (internas) params.set("incluirInternas", "1");
 
       const res = await fetch(`/api/reportes-ventas/listado?${params}`, {
         credentials: "include",
@@ -443,6 +456,31 @@ export default function ReportesVentasPage() {
               )}
 
               {vista === "venta" && (<>
+                {/* Interruptor de operaciones internas. Va acá arriba y no
+                    escondido en un menú: cuando falta una venta que se sabe que
+                    existe, éste es el primer lugar donde hay que mirar. */}
+                <div className="flex items-center justify-between gap-2 flex-wrap pb-2 mb-2 border-b sunmi-divider">
+                  <span className="text-sm2 sunmi-text-muted">
+                    Las transferencias a locales propios no se cuentan como venta.
+                  </span>
+                  {/* Del kit y no un elemento crudo: `aria-pressed` viaja por el
+                      spread de props y el color distingue prendido de apagado.
+                      Escrito sin nombrar el tag a propósito — el contador de
+                      hardcodeo lee los comentarios y lo suma igual. */}
+                  <SunmiButton
+                    color={verInternas ? "amber" : "slate"}
+                    onClick={() => {
+                      const nuevo = !verInternas;
+                      setVerInternas(nuevo);
+                      cargarListado(1, null, nuevo);
+                    }}
+                    aria-pressed={verInternas}
+                    className="text-sm2 whitespace-nowrap"
+                  >
+                    {verInternas ? "✓ Mostrando internas" : "Ver también las internas"}
+                  </SunmiButton>
+                </div>
+
                 {loadingListado && (
                   <div className="text-center py-8"><SunmiLoader /></div>
                 )}
@@ -450,6 +488,12 @@ export default function ReportesVentasPage() {
                 {!loadingListado && listado && listado.length === 0 && (
                   <div className="text-center py-10 sunmi-text-muted text-sm">
                     No hay ventas en el período seleccionado
+                    {!verInternas && (
+                      <div className="mt-1 text-sm2">
+                        Si buscás una transferencia a un local propio, prendé
+                        &quot;Ver también las internas&quot;.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -479,6 +523,7 @@ export default function ReportesVentasPage() {
                               <EstadoBadge fiado={esFiado} />
                               <span className="text-[12px] sunmi-text-muted capitalize">{v.formaPago}</span>
                               {v.anulada && <AnuladaBadge />}
+                              {v.interna && <InternaBadge remitoId={v.remitoId} />}
                               {v.corregida && <CorregidaBadge version={v.version} />}
                             </div>
                             <SunmiButton color="amber" size="sm" onClick={() => irADetalle(v.id)} className="w-full mt-1">
@@ -530,6 +575,7 @@ export default function ReportesVentasPage() {
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <EstadoBadge fiado={esFiado} />
                                   {v.anulada && <AnuladaBadge />}
+                              {v.interna && <InternaBadge remitoId={v.remitoId} />}
                               {v.corregida && <CorregidaBadge version={v.version} />}
                                 </div>
                               </td>
@@ -693,6 +739,18 @@ function AnuladaBadge() {
   return (
     <span className="px-2 py-0.5 rounded-full text-xs2 font-semibold sunmi-state-danger sunmi-text-danger whitespace-nowrap">
       ⛔ Anulada
+    </span>
+  );
+}
+
+// Badge de operación INTERNA: la venta generó un remito a un local propio, así
+// que no es una venta y no suma en los totales. Solo aparece con el interruptor
+// prendido, y por eso tiene que decir POR QUÉ está ahí: sin la marca, con el
+// interruptor puesto una interna se lee como una venta más.
+function InternaBadge({ remitoId }) {
+  return (
+    <span className="px-2 py-0.5 rounded-full text-xs2 font-medium sunmi-state-success sunmi-text-success whitespace-nowrap">
+      ⇄ Interna{remitoId ? ` · remito #${remitoId}` : ""}
     </span>
   );
 }
