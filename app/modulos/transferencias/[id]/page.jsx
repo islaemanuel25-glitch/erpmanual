@@ -63,6 +63,24 @@ export default function TransferenciaDetallePage() {
   const [confirmando, setConfirmando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
 
+  // ── ESTE HOOK ESTABA 130 LÍNEAS MÁS ABAJO Y ROMPÍA LA PANTALLA ────────────
+  //
+  // Abre el panel de cancelación. Vivía después de `if (!me) return ...`, y ahí
+  // está el defecto: en el PRIMER render `me` es null, el componente retorna
+  // antes y React cuenta ocho `useState`; en el segundo `me` ya existe, la
+  // ejecución llega hasta acá y React cuenta nueve. Cambiar la cantidad de hooks
+  // entre renders es exactamente lo que las Rules of Hooks prohíben, y el
+  // resultado fue "Application error: a client-side exception has occurred" al
+  // abrir CUALQUIER transferencia.
+  //
+  // Lo introduje al reemplazar el handler `cancelarTransferencia` por este
+  // estado: un handler puede vivir en cualquier lado, un hook no. Que el
+  // reemplazo fuera línea por línea en el mismo lugar es lo que lo hizo
+  // invisible al leer el diff.
+  //
+  // Todo hook de este componente va acá arriba, antes de cualquier return.
+  const [panelCancelar, setPanelCancelar] = useState(false);
+
   const [me, setMe] = useState(null);
 
   // Detecta cambios sin guardar
@@ -275,13 +293,6 @@ export default function TransferenciaDetallePage() {
   };
 
   // ===============================
-  // Cancelar transferencia
-  // ===============================
-  // La cancelación la maneja PanelCancelarTransferencia: pide el preview al
-  // servidor, muestra qué va a pasar con ESTE remito —que no es lo mismo si vino
-  // de una venta— y exige el motivo. Acá solo se abre y se recarga al terminar.
-  const [panelCancelar, setPanelCancelar] = useState(false);
-
   // ===============================
   // Totales
   //
