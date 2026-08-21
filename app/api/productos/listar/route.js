@@ -9,14 +9,8 @@ import { checkPerm } from "@/lib/authorize";
 import { evaluarEstructuraCombo } from "@/lib/combos/service";
 import { ubicacionVendeAlCosto } from "@/lib/precios/ubicacionVendeAlCosto";
 import { esControlValido } from "@/lib/productos/controlesCalidad";
-import {
-  dentroDelTecho,
-  filaMarcadaPor,
-  opcionesDelTecho,
-  seTrunco,
-  SELECT_CONTROLES_BASE,
-  SELECT_CONTROLES_LOCAL,
-} from "@/lib/productos/controlesDesdePrisma";
+import { filaMarcadaPor } from "@/lib/productos/controlesDesdePrisma";
+import { traerFilasParaControles } from "@/lib/productos/sqlControles";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
 
@@ -269,22 +263,19 @@ export async function GET(req) {
     // del flujo siguen siendo los de siempre: el control agrega una condición,
     // no una segunda ruta paralela que después se desincroniza.
     if (control) {
-      const candidatos = await prisma.productoBase.findMany({
+      // El techo, el orden y el corte salen de `traerFilasParaControles`, LA
+      // MISMA función que usa el contador de las cards. Sin eso —dos consultas
+      // escritas al lado— con más de 5.000 productos podían cortar por lugares
+      // distintos: los dos números serían límites inferiores ciertos de muestras
+      // diferentes, y la card diría "+37" sobre una lista de "+41" sin que
+      // ninguno estuviera mal.
+      const { filas: candidatos, truncado } = await traerFilasParaControles(prisma, {
         where,
-        // El techo Y el orden salen de la misma función que usa el contador de
-        // las cards. Sin `orderBy`, con más de 5.000 productos las dos consultas
-        // podían cortar por lugares distintos: los dos números serían límites
-        // inferiores ciertos de muestras diferentes, y la card diría "+37" sobre
-        // una lista de "+41" sin que ninguno estuviera mal.
-        ...opcionesDelTecho(),
-        select: {
-          ...SELECT_CONTROLES_BASE,
-          locales: { where: { localId }, take: 1, select: SELECT_CONTROLES_LOCAL },
-        },
+        localId,
       });
 
-      truncadoPorControl = seTrunco(candidatos);
-      const idsMarcados = dentroDelTecho(candidatos)
+      truncadoPorControl = truncado;
+      const idsMarcados = candidatos
         .filter((p) => filaMarcadaPor(control, p))
         .map((p) => p.id);
 
@@ -432,6 +423,14 @@ export async function GET(req) {
       // de clasificación: un reporte parcial se dice, no se disimula.
       control,
       truncadoPorControl,
+      // ── PARA QUÉ UBICACIÓN SE CONTESTÓ ──────────────────────────────────
+      //
+      // La pantalla puede pedir SIN `localId` —el servidor lo resuelve de la
+      // misma cookie— para no tener que esperar a que el contexto llegue por su
+      // propio pedido. Cuando después llega, compara contra esto: si es la misma
+      // ubicación, no vuelve a pedir. Sin este campo tendría que suponerlo, y
+      // suponer acá significa mostrar el catálogo de otro local.
+      localId,
       // Propiedad de la UBICACIÓN, no de las filas: viaja una vez al lado de la
       // página y no repetido en cada uno de los items.
       vendeConListaAlCosto,
