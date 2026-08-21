@@ -1389,8 +1389,25 @@ export default function ProductosPage() {
 
           {/* =========================================================
               TABS
-              ========================================================= */}
-          <div className="flex gap-1 border-b sunmi-divider pb-1">
+              =========================================================
+              ── EN EL CELULAR NO SE VEN MIENTRAS SE ESTÁ EN EL LISTADO ──
+              La decisión aprobada para el celular deja tres acciones a la vista
+              —+ Producto, Filtros, Más— y manda Import / Export adentro de
+              "Más". Con la fila de tabs también visible, ese acceso quedaba
+              DUPLICADO y en dos lugares distintos de la pantalla.
+
+              Por qué no se esconde siempre: sin las tabs, quien entra a
+              Import / Export desde "Más" no tiene forma de volver al listado.
+              Así que aparecen justamente ahí, que es donde hacen falta y donde
+              ya no duplican nada.
+
+              De `md` para arriba no cambia nada: `md:flex` es lo que la fila
+              tenía. */}
+          <div
+            className={`${
+              activeTab === "listado" ? "hidden md:flex" : "flex"
+            } gap-1 border-b sunmi-divider pb-1`}
+          >
             {TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -1660,7 +1677,6 @@ export default function ProductosPage() {
                       redondeo100: redondeo,
                       pesoReferenciaKg: p.pesoReferenciaKg,
                     });
-                  const ventaEnEscala = enEscala(p.precioVenta, p.redondeo100);
                   // Ya no lo gatea ningún permiso: el costo se ve para todos.
                   const costoEnEscala = enEscala(p.precioCosto, false);
 
@@ -1681,9 +1697,33 @@ export default function ProductosPage() {
                   // El REDONDEO sigue a quien manda en cada caso: la venta lleva
                   // el del producto, y el costo bajo lista lleva el de la LISTA,
                   // que es lo que el POS aplica. Hoy esa lista no redondea.
-                  const precioQueCobraElPos = vendeConListaAlCosto
-                    ? enEscala(p.precioCosto, listaAlCostoRedondea100)
-                    : ventaEnEscala;
+                  //
+                  // ── UN SOLO PRECIO EFECTIVO, Y DE ACÁ SALEN LOS DOS ──────
+                  //
+                  // El número grande y la línea de equivalencia tienen que salir
+                  // de la MISMA fuente. Hasta acá no lo hacían: el número grande
+                  // ya elegía entre costo y venta, y la equivalencia recibía
+                  // siempre `p.precioVenta`.
+                  //
+                  // En el depósito —que vende con lista al costo— eso ponía dos
+                  // números incompatibles en la misma tarjeta. Medido sobre
+                  // `361 LATA X24`: arriba "$24.500,00 por bulto", que es el
+                  // COSTO, y abajo "1 pack = 24 un · $1.400,00 por unidad", que
+                  // sale de la VENTA de 31.900 redondeada por unidad. 24 × 1.400
+                  // da 33.600, y el de arriba dice 24.500. Los dos números están
+                  // bien por separado y juntos no cierran, que es la peor forma:
+                  // el que mira la tarjeta para controlar un precio no tiene cómo
+                  // saber cuál de los dos mirar.
+                  //
+                  // Por eso `precioBaseDelPos` y `redondeoDelPos` se deciden UNA
+                  // vez y los consume todo lo que muestre ese precio. La rama
+                  // desaparece: con `vendeConListaAlCosto` en false esto da
+                  // exactamente lo que daba antes.
+                  const precioBaseDelPos = vendeConListaAlCosto ? p.precioCosto : p.precioVenta;
+                  const redondeoDelPos = vendeConListaAlCosto
+                    ? listaAlCostoRedondea100
+                    : p.redondeo100;
+                  const precioQueCobraElPos = enEscala(precioBaseDelPos, redondeoDelPos);
                   return (
                   <SunmiProductoCard
                     key={p.id ?? p.productoLocalId}
@@ -1699,10 +1739,15 @@ export default function ProductosPage() {
                         : esProductoServicio(p)
                         ? EQUIVALENCIA_IMPORTE_VARIABLE
                         : lineaDeEquivalencia({
-                            precio: p.precioVenta,
+                            // EL MISMO precio que el número grande, no
+                            // `p.precioVenta` — ver `precioBaseDelPos` arriba.
+                            // Recibía siempre la venta, y en el depósito eso
+                            // ponía la conversión de un precio distinto del que
+                            // la tarjeta muestra arriba.
+                            precio: precioBaseDelPos,
                             factor: p.factorPack,
                             unidad: p.unidadMedida,
-                            redondeo100: p.redondeo100,
+                            redondeo100: redondeoDelPos,
                             // Los 142 combos no se distinguían de un producto
                             // común en ninguna parte de la tarjeta. Lo dice la
                             // franja de escala, con palabra y no con un dibujo.

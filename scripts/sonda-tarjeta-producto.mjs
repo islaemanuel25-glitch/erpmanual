@@ -491,13 +491,28 @@ try {
     //
     // El redondeo sigue a quien manda en cada caso: la venta lleva el del
     // producto; el costo bajo lista, el de la LISTA, que es lo que aplica el POS.
+    // ── UN SOLO PRECIO BASE, Y DE ACÁ SALEN LOS DOS ESPERADOS ─────────────
+    //
+    // El número grande y la franja tienen que derivar del MISMO precio. Acá
+    // estaban separados —el grande elegía entre costo y venta, y la franja usaba
+    // siempre `fila.precioVenta`—, que es exactamente el defecto que la pantalla
+    // tenía. Con los dos escritos igual de mal, la sonda comparaba la pantalla
+    // contra una copia de su propio error y daba VERDE: es la trampa de la
+    // segunda implementación escrita por la misma persona el mismo día.
+    //
+    // Lo destapó una revisión visual sobre `361 LATA X24`: arriba "$24.500,00 por
+    // bulto" —el costo— y abajo "1 pack = 24 un · $1.400,00 por unidad", que sale
+    // de la venta de 31.900. 24 × 1.400 da 33.600 y arriba dice 24.500.
+    const precioBase = alCostoSonda ? fila.precioCosto : fila.precioVenta;
+    const redondeoBase = alCostoSonda ? redondeaSonda : fila.redondeo100;
+
     const esperado = formatearMoneda(
       valorEnLaEscalaDeVenta({
         escala: escalaEsperada,
-        valor: alCostoSonda ? fila.precioCosto : fila.precioVenta,
+        valor: precioBase,
         factor: fila.factorPack,
         unidad: fila.unidadMedida,
-        redondeo100: alCostoSonda ? redondeaSonda : fila.redondeo100,
+        redondeo100: redondeoBase,
         pesoReferenciaKg: fila.pesoReferenciaKg,
       })
     );
@@ -506,12 +521,12 @@ try {
     }
 
     // La franja tampoco es independiente: si el número de arriba YA es el
-    // unitario, no lo repite. Se le pasa la misma respuesta.
+    // unitario, no lo repite. Se le pasa la misma respuesta Y EL MISMO PRECIO.
     const eqEsperada = lineaDeEquivalencia({
-      precio: fila.precioVenta,
+      precio: precioBase,
       factor: fila.factorPack,
       unidad: fila.unidadMedida,
-      redondeo100: fila.redondeo100,
+      redondeo100: redondeoBase,
       esCombo: fila.esCombo,
       escala: escalaEsperada,
       pesoReferenciaKg: fila.pesoReferenciaKg,
@@ -729,6 +744,76 @@ try {
     "9c · la franja no vuelve a nombrar la escala que ya dice el rótulo",
     `${repetida.length} tarjeta(s) la repiten. La primera: ${repetida[0] ?? ""}`
   );
+  // ── 1b · LOS DOS NÚMEROS DE LA TARJETA TIENEN QUE CERRAR ENTRE SÍ ───────
+  //
+  // ── POR QUÉ ESTE CHEQUEO EXISTE, Y POR QUÉ NO ALCANZABA EL 9 ────────────
+  //
+  // El 9 compara la pantalla contra las funciones de producción. Es fuerte, pero
+  // tiene un punto ciego: si la sonda le pasa a esas funciones el MISMO precio
+  // equivocado que la pantalla, las dos coinciden y el chequeo pasa en verde
+  // estando las dos mal. Eso es lo que pasó — la franja se calculaba de
+  // `precioVenta` en los dos lados mientras el número grande usaba el costo.
+  //
+  // Este chequeo no reimplementa nada: mira los DOS NÚMEROS QUE SE VEN y
+  // pregunta si cierran. Es aritmética sobre el texto de la tarjeta, así que no
+  // puede heredar el error de ninguna función.
+  //
+  // LA REGLA. Si la franja dice "1 pack = N un · $X por unidad", entonces N × X
+  // tiene que dar el número grande, con dos holguras y ninguna de las dos es
+  // arbitraria:
+  //
+  //   · POR ARRIBA, hasta N × 100. Cuando el producto redondea a 100, cada
+  //     unidad se redondea HACIA ARRIBA, así que el producto puede pasarse.
+  //
+  //   · POR ABAJO, hasta N × 0,01. El unitario se MUESTRA con dos decimales, y
+  //     ese recorte por unidad se multiplica: 24.500 ÷ 24 es 1.020,8333… que se
+  //     escribe "1.020,83", y 24 × 1.020,83 da 24.499,92. Ocho centavos.
+  //     La primera versión de este chequeo no lo contemplaba y se puso roja
+  //     sobre una tarjeta CORRECTA — el defecto era del chequeo, no de la
+  //     pantalla.
+  //
+  // Con el defecto puesto: grande 24.500, N=24, X=1.400 → 33.600, o sea 9.100 de
+  // más contra un margen de 2.400. Se ve, y por lejos.
+  const aNumeroArg = (s) => {
+    const m = String(s || "").match(/\$\s*([\d.]+,\d{2})/);
+    if (!m) return null;
+    return Number(m[1].replace(/\./g, "").replace(",", "."));
+  };
+
+  const noCierran = [];
+  for (const vista of enPantalla) {
+    const eq = vista.equivalencia || "";
+    const m = eq.match(/1 pack = (\d+) un\s*·/);
+    if (!m) continue; // sin conversión de pack no hay dos números que cerrar
+    const n = Number(m[1]);
+    const unitario = aNumeroArg(eq);
+    const grande = aNumeroArg(vista.valor);
+    if (!n || unitario === null || grande === null) continue;
+
+    const reconstruido = n * unitario;
+    const margenArriba = n * 100; // redondeo a 100 por unidad, en el peor caso
+    const margenAbajo = n * 0.01; // el unitario se muestra con dos decimales
+    if (
+      reconstruido < grande - margenAbajo ||
+      reconstruido - grande > margenArriba
+    ) {
+      noCierran.push(
+        `${vista.nombre}: grande ${grande} vs ${n} × ${unitario} = ${reconstruido.toFixed(2)} ` +
+        `(holgura: −${margenAbajo.toFixed(2)} / +${margenArriba})`
+      );
+    }
+  }
+  const conPackVistas = enPantalla.filter((v) => /1 pack = \d+ un\s*·/.test(v.equivalencia || "")).length;
+  afirmar(
+    noCierran.length === 0,
+    `1b · el precio grande y la equivalencia cierran entre sí (${conPackVistas} tarjeta(s) con conversión de pack)`,
+    `${noCierran.length} no cierran. La primera: ${noCierran[0] ?? ""}`
+  );
+  if (conPackVistas === 0) {
+    console.log("  ----  1b · en esta página no hay ninguna tarjeta con conversión de pack:");
+    console.log("        los dos números no se pudieron cruzar. No es un pase.");
+  }
+
   afirmar(
     malPrecio.length === 0,
     `9 · el precio que se ve es el que se cobra, en las ${enPantalla.length} tarjetas`,
@@ -1392,6 +1477,37 @@ try {
       }
     }
   }
+
+  // ── 17 · "IMPORT / EXPORT" ESTÁ EN UN SOLO LUGAR ───────────────────────
+  //
+  // La decisión aprobada para el celular deja tres acciones a la vista —+
+  // Producto, Filtros, Más— y manda Import / Export adentro de "Más". La fila de
+  // tabs seguía visible arriba, así que ese acceso aparecía DUPLICADO y en dos
+  // lugares distintos de la pantalla. Lo encontró una revisión visual de las
+  // capturas; ningún chequeo lo miraba.
+  //
+  // Se afirman las dos mitades, y las dos hacen falta: esconder la tab sin dejar
+  // el acceso en "Más" dejaría Import / Export inalcanzable desde el celular, y
+  // eso pasaría la primera mitad en verde.
+  const importExport = await evaluar(`(() => {
+    const visibles = [...document.querySelectorAll("button")]
+      .filter((b) => b.getBoundingClientRect().height > 0)
+      .map((b) => b.innerText.replace(/\\s+/g, " ").trim());
+    return {
+      enLaPantalla: visibles.filter((t) => /Import \\/ Export/i.test(t)).length,
+      hayMas: visibles.some((t) => /^·*\\s*Más$/.test(t) || /Más$/.test(t)),
+    };
+  })()`);
+  afirmar(
+    importExport.enLaPantalla === 0,
+    "17a · en el listado del celular NO se ve Import / Export",
+    `aparece ${importExport.enLaPantalla} vez/veces fuera de la hoja de "Más"`
+  );
+  afirmar(
+    importExport.hayMas,
+    "17b · y el botón que lo contiene sí está",
+    'no se encontró el botón "Más"'
+  );
 
   // ── 15 · "MÁS" ABRE SU HOJA, Y LLEVA LAS CUATRO ACCIONES ────────────────
   //
