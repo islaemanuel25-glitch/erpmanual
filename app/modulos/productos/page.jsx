@@ -30,7 +30,8 @@ import HojaPersonalizarTarjeta from "@/components/productos/HojaPersonalizarTarj
 // `Eye` se fue con el botón "Ver": la tarjeta del celular deja Editar como única
 // acción. La pantalla de sólo lectura sigue existiendo y se llega desde la tabla
 // de escritorio, que no cambió.
-import { Pencil, Search, SlidersHorizontal, MoreHorizontal, X, CheckCheck } from "lucide-react";
+// `X` se fue con el chip de control: era su única aparición en la pantalla.
+import { Pencil, Search, SlidersHorizontal, MoreHorizontal, CheckCheck } from "lucide-react";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { escalaDeVentaDe, valorEnLaEscalaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "@/lib/precios/redondeo";
@@ -45,6 +46,7 @@ import { reglaDeGananciaDe, textoDeGanancia } from "@/lib/precios/reglaDeGananci
 // importe en vez de cobrar un precio fijo.
 import { esProductoServicio } from "@/lib/pos-ventas/servicios";
 import { CONTROL, esControlValido } from "@/lib/productos/controlesCalidad";
+import { pedidoYaSalio } from "@/lib/productos/pedidoYaSalio";
 import {
   filtrosNeutros,
   mismosFiltros,
@@ -535,8 +537,74 @@ export default function ProductosPage() {
     }
   };
 
+  // ── LOS DOS PEDIDOS NO ESPERAN AL CONTEXTO ────────────────────────────────
+  //
+  // Medido: al abrir la pantalla había una CASCADA de dos vueltas. Primero
+  // `useContextoActivo` iba a buscar `/api/contexto-activo/get`, y recién cuando
+  // volvía —porque `localId` pasaba de 0 a su valor— salían el listado y los
+  // contadores. Dos viajes en serie donde alcanzaba uno.
+  //
+  // Lo que lo hace innecesario: **el servidor ya resuelve la ubicación solo.**
+  // `resolveScope` sin `localId` explícito llama a `getContextoActivo`, que es
+  // LA MISMA función que usa el endpoint del contexto y lee LA MISMA cookie. Un
+  // usuario con local fijo ni siquiera pasa por ahí: sale de la sesión.
+  //
+  // Así que los dos pedidos salen de entrada, sin `localId`, y el servidor
+  // contesta para la ubicación que corresponde. Cuando el contexto llega, se
+  // compara contra el `localId` que la respuesta trae: si es el mismo —que es
+  // siempre, salvo que alguien cambie de local en otra pestaña— no se vuelve a
+  // pedir. Si difiere, se pide de nuevo y gana el dato bueno.
+  //
+  // Lo que NO se toca: el hook sigue existiendo y sigue siendo el que sabe si
+  // hay que mostrar el selector de contexto. Esto no reemplaza esa decisión,
+  // solo deja de esperarla para pedir datos.
+  //
+  // ── SE RECUERDA EL PEDIDO QUE SALIÓ, NO EL QUE VOLVIÓ ──────────────────
+  //
+  // La primera versión de este arreglo guardaba solo los pedidos ya CONTESTADOS,
+  // y se pisaba sola. Medido en el log del servidor: el contexto tarda unos
+  // milisegundos y el listado unos cientos, así que cuando `localId` cambia de 0
+  // a su valor el pedido anticipado **todavía está viajando** — no hay nada
+  // guardado, el efecto no ve motivo para saltear, y sale un segundo pedido
+  // idéntico. En el log se veían los dos: uno sin `localId` y otro con él.
+  //
+  // O sea: el arreglo de la cascada, mal hecho, no la quita — la cambia por dos
+  // pedidos en paralelo. Se ahorra la espera y se gasta el doble de servidor.
+  //
+  // Por eso se anota al SALIR. Y se guarda con qué se pidió:
+  //
+  //   · `localIdPedido: null`  → salió sin ubicación, así que el servidor la
+  //     resuelve de la misma cookie que el contexto: sea cual sea el `localId`
+  //     que llegue después, ese pedido ya está contestando por él;
+  //   · `localIdPedido: N`     → salió por una ubicación concreta, y solo sirve
+  //     si sigue siendo la misma.
+  //
+  // `localIdRespondido` es la red de seguridad: si el servidor contestó por otra
+  // ubicación —la cookie cambió en otra pestaña entre los dos pedidos—, ahí sí se
+  // vuelve a pedir. Es el único caso en el que los dos pueden diferir.
+  //
+  // La clave incluye página, orden y filtros: sin eso, comparar solo la ubicación
+  // haría que un cambio de página se saltease por "ya salió", que es un listado
+  // que deja de actualizarse.
+  // La regla vive en `lib/productos/pedidoYaSalio.js`, que es puro y tiene sus
+  // candados: acá adentro sería una condición de cuatro ramas imposible de
+  // ejercer sin montar la pantalla entera.
+  const pedidoRef = useRef(null);
+  const controlesRef = useRef(null);
+  const yaSalio = (ref, clave, localIdActual) =>
+    pedidoYaSalio(ref.current, clave, localIdActual);
+
+  const claveDelPedido = useMemo(
+    () => JSON.stringify({ page, pageSize, sortKey, sortDir, filtros, control }),
+    [page, pageSize, sortKey, sortDir, filtros, control]
+  );
+
   const fetchProductos = async () => {
     setLoading(true);
+    const claveDeEstePedido = claveDelPedido;
+    // Se anota ANTES de salir: mientras viaja, nadie más tiene que volver a
+    // pedir lo mismo. Ver el comentario largo de `pedidoRef`.
+    pedidoRef.current = { clave: claveDeEstePedido, localIdPedido: localId || null };
     try {
       const params = new URLSearchParams({
         page,
@@ -549,8 +617,12 @@ export default function ProductosPage() {
         areaFisicaId: filtros.area,
         estado: filtros.estado || "activos",
         tipo: filtros.tipo || "todos",
-        localId: String(localId),
       });
+      // El `localId` va SOLO si ya se conoce. Mandarlo en 0 no es "sin dato":
+      // `resolveScope` lo lee con `Number(...) || null`, así que el 0 cae en null
+      // y termina resolviendo igual — pero deja la petición diciendo algo que no
+      // es cierto, y el día que esa conversión cambie el catálogo saldría vacío.
+      if (localId) params.set("localId", String(localId));
       // El control va aparte y solo si hay uno: `URLSearchParams` con un `null`
       // manda el texto "null", que el servidor descartaría por inválido pero
       // dejaría la intención sin registrar en la URL del pedido.
@@ -568,6 +640,15 @@ export default function ProductosPage() {
       const data = await res.json();
 
       if (data.ok) {
+        // Para qué ubicación contestó. Un servidor viejo no manda `localId`: ahí
+        // queda `null` y la comparación nunca dice "ya está", así que el peor caso
+        // es volver a pedir una vez —el comportamiento anterior— y no mostrar el
+        // catálogo de otro local.
+        pedidoRef.current = {
+          clave: claveDeEstePedido,
+          localIdPedido: localId || null,
+          localIdRespondido: Number(data.localId) || null,
+        };
         setRows(data.items);
         setTotalPages(data.totalPages);
         setTotalItems(data.total);
@@ -580,6 +661,10 @@ export default function ProductosPage() {
         setListadoTruncado(data.truncadoPorControl === true);
       }
     } catch (err) {
+      // Se borra la anotación: si el pedido no llegó, el próximo cambio de
+      // dependencia tiene que poder volver a intentarlo. Dejarla puesta
+      // convertiría un error de red en un listado que no se recupera nunca.
+      pedidoRef.current = null;
       console.error("Error cargando productos:", err);
     }
     setLoading(false);
@@ -597,12 +682,21 @@ export default function ProductosPage() {
   //
   // Los dos comparten la MISMA clasificación en el servidor, así que el número de
   // la card y el total de la lista filtrada no se pueden separar.
+  // El conteo no depende de la página ni de los filtros, así que su clave es
+  // constante: lo único que lo invalida es cambiar de ubicación.
+  const CLAVE_CONTROLES = "controles";
+
   const fetchControles = async () => {
     setCargandoControles(true);
+    controlesRef.current = { clave: CLAVE_CONTROLES, localIdPedido: localId || null };
     try {
-      const res = await fetch(`/api/productos/controles?localId=${localId}`, {
-        credentials: "include",
-      });
+      // Igual que el listado: sin `localId` mientras no se conozca, y el servidor
+      // lo resuelve de la cookie. Antes iba `?localId=0` mientras el contexto no
+      // había llegado — y por eso este pedido no salía hasta que llegara.
+      const res = await fetch(
+        localId ? `/api/productos/controles?localId=${localId}` : "/api/productos/controles",
+        { credentials: "include" }
+      );
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -614,6 +708,11 @@ export default function ProductosPage() {
       // Mostrar cuatro ceros sería peor que no mostrar nada: cuatro ceros
       // afirman que el catálogo está sano.
       if (data.ok) {
+        controlesRef.current = {
+          clave: CLAVE_CONTROLES,
+          localIdPedido: localId || null,
+          localIdRespondido: Number(data.localId) || null,
+        };
         setControles(data.controles || []);
         // ── EL CONTEO PARCIAL SE PROPAGA, NO SE DESCARTA ────────────────
         //
@@ -624,11 +723,13 @@ export default function ProductosPage() {
         setControlesTruncado(data.truncado === true);
         setTechoControles(Number(data.techo) || null);
       } else {
+        controlesRef.current = null;
         setControles([]);
         setControlesTruncado(false);
         console.error("productos/controles:", data.error);
       }
     } catch (err) {
+      controlesRef.current = null;
       setControles([]);
       setControlesTruncado(false);
       console.error("Error cargando controles:", err);
@@ -658,14 +759,25 @@ export default function ProductosPage() {
     } catch {}
   };
 
+  // ── SE PIDE DE ENTRADA, Y SE REPITE SOLO SI HACE FALTA ──────────────────
+  //
+  // Antes estos dos efectos arrancaban con `if (!localId) return;`, así que el
+  // primer render no pedía nada y había que esperar la vuelta del contexto. Ver
+  // el comentario largo arriba de `fetchProductos`.
+  //
+  // El guardia de ahora no es "todavía no sé la ubicación" sino "esto ya lo
+  // contestó el servidor para esta ubicación". Con el contexto sin llegar
+  // —`localId` en 0— no se salta nada y el pedido sale.
   useEffect(() => {
-    if (!localId) return;
+    if (yaSalio(pedidoRef, claveDelPedido, localId)) return;
     fetchProductos();
-  }, [page, pageSize, sortKey, sortDir, filtros, localId, control]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveDelPedido, localId]);
 
   useEffect(() => {
-    if (!localId) return;
+    if (yaSalio(controlesRef, CLAVE_CONTROLES, localId)) return;
     fetchControles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localId]);
 
   useEffect(() => {
@@ -1541,19 +1653,25 @@ export default function ProductosPage() {
                         totalItems === 1 ? "" : "s"
                       }`}
                 </span>
+                {/* ── EL CHIP SE RETIRÓ, Y ESTO ES LO QUE QUEDÓ ────────────
+                    Acá había un chip con borde de acento, una ✕ y el nombre del
+                    control, y era LA señal de que el listado estaba filtrado: la
+                    card que se había tocado casi no cambiaba, así que el estado
+                    vivía a un bloque de distancia del elemento que lo había
+                    producido.
+
+                    Ahora la señal es la CARD: se tiñe, se le enciende el anillo y
+                    su renglón de abajo pasa a decir cómo se sale. Lo que queda
+                    acá es texto y no un control: dice POR QUÉ el número es ése
+                    —"2.361 productos · Precios +30 días"— sin competir con la
+                    card por ser el botón de quitar.
+
+                    Ese "por qué" no sobra: sin él, un catálogo de 2.600 que
+                    muestra 3 se lee como un catálogo que perdió productos. */}
                 {controlActivo && (
-                  <button
-                    type="button"
-                    onClick={() => alternarControl(controlActivo.id)}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px]"
-                    style={{
-                      borderColor: "var(--pos-accent)",
-                      color: "var(--pos-accent)",
-                    }}
-                  >
-                    {controlActivo.titulo} {controlActivo.detalle}
-                    <X className="w-3 h-3" aria-hidden="true" />
-                  </button>
+                  <span className="text-[11px] sunmi-text-muted">
+                    · {controlActivo.titulo} {controlActivo.detalle}
+                  </span>
                 )}
                 {/* MARCAR REVISADOS: solo con el control de los 30 días puesto.
                     Fuera de ese contexto no significa nada —"revisado" contesta
