@@ -1,16 +1,17 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-21 00:24
+**Fecha:** 2026-08-21 01:46
 
 ## Módulos modificados recientemente
 
 ### productos
-- fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado, feat(productos): la pantalla del celular sale de la tarjeta gigante y estrena "Para revisar"
-- Archivos: 3 nuevos, 5 modificados (8 total)
+- fix(productos): la card y el listado dan el mismo número, y un conteo parcial deja de verse sano, fix(productos): la revisión de precio se marca donde el precio cambia, y solo ahí, fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado
+- Archivos: 4 nuevos, 7 modificados (11 total)
 
 
 ## Archivos nuevos desde última sincronización
 - components/productos/CarruselControles.jsx
+- components/productos/carruselControlesRender.test.mjs
 - components/productos/HojaMasAcciones.jsx
 - components/productos/HojaPersonalizarTarjeta.jsx
 
