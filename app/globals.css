@@ -958,9 +958,26 @@ html[data-theme="grafitoEjecutivo"] {
   --success-bg-hover: rgba(22, 163, 74, 0.08);
   --danger-fg: #DC2626;
   --danger-bg-hover: rgba(220, 38, 38, 0.08);
-  --warning-fg: #CA8A04;
-  --warning-border: rgba(202, 138, 4, 0.5);
-  --warning-border-hover: rgba(202, 138, 4, 0.7);
+  /* ── ERA #CA8A04 Y NO LLEGABA AL MÍNIMO ────────────────────────────────
+     Medido: 2,94 contra `--card-bg` (#FFFFFF) y 2,67 contra `--app-bg`
+     (#F4F4F5), con un mínimo de 3,0 —WCAG 1.4.11— para texto grande y para
+     bordes de componente. Este tema era el único de los catorce por debajo.
+
+     Lo encontró `scripts/sonda-controles-tokens.mjs`, que mide los tres tokens
+     de salud contra el fondo real en los catorce. No se veía leyendo el CSS:
+     el valor es un ámbar razonable y solo falla contra este fondo claro.
+
+     #B45309 da 5,02 y 4,57, y NO es un color nuevo: es el que ya usan
+     `sunmiGraphite` y `ambarCaja`, así que no entra un tono más a la paleta.
+
+     QUÉ SE MUEVE, además de las cards de Productos: los cinco usos de
+     `components/Header.jsx` —el ícono de depósito, "(sin seleccionar)" y "Sin
+     operador"— en ESTE tema y en ninguno más. Los tres se ven más, que es lo
+     que se buscaba. Son los únicos consumidores: `git grep --warning-fg` fuera
+     de este archivo da 8 usos en 2 archivos. */
+  --warning-fg: #B45309;
+  --warning-border: rgba(180, 83, 9, 0.5);
+  --warning-border-hover: rgba(180, 83, 9, 0.7);
   --info-fg: #27272A;
   --info-bg-hover: rgba(39, 39, 42, 0.08);
 

@@ -127,6 +127,10 @@ export async function GET(req) {
       controles: CONTROLES.map((c) => ({ ...c, cantidad: conteo[c.id] ?? 0 })),
       localId,
       truncado,
+      // El techo viaja con el flag. Sin él la pantalla tendría que escribir 5.000
+      // a mano para poder decir sobre cuántos se contó, y ese número quedaría
+      // definido en dos lugares.
+      techo: MAX_CONTROL,
     });
   } catch (err) {
     console.error("productos/controles", err);

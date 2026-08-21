@@ -34,17 +34,23 @@ import { Pencil, Search, SlidersHorizontal, MoreHorizontal, X, CheckCheck } from
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { escalaDeVentaDe, valorEnLaEscalaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "@/lib/precios/redondeo";
-import { seVendeSinGanancia } from "@/lib/precios/precioDesdeMargen";
-import {
-  reglaDeGananciaDe,
-  textoDeGanancia,
-  GANANCIA_FALTA,
-} from "@/lib/precios/reglaDeGanancia";
+// `seVendeSinGanancia` y `GANANCIA_FALTA` se importaban acá para los dos avisos
+// de mantenimiento de la tarjeta. Los dos avisos se fueron a "Para revisar", que
+// los cuenta y los deja filtrar, así que estos imports quedaron sin consumidor.
+// Se sacan: un import que nadie usa documenta una UX que ya no existe, y el
+// próximo que lea el archivo va a buscar dónde se dibuja ese aviso.
+import { reglaDeGananciaDe, textoDeGanancia } from "@/lib/precios/reglaDeGanancia";
 // LA MARCA DEL SERVICIO ES LA DEL POS, no una nueva. `esProductoServicio` mira
 // `modalidad`, que es el mismo campo con el que el POS decide abrir el modal de
 // importe en vez de cobrar un precio fijo.
 import { esProductoServicio } from "@/lib/pos-ventas/servicios";
 import { CONTROL, esControlValido } from "@/lib/productos/controlesCalidad";
+import {
+  filtrosNeutros,
+  mismosFiltros,
+  hayFiltrosPuestos,
+  CLAVES_DE_FILTRO,
+} from "@/lib/productos/filtrosCatalogo";
 import {
   CAMPO,
   REGION,
@@ -73,37 +79,25 @@ const TABS = [
 // vender".
 const TEXTO_IMPORTE_VARIABLE = "Importe variable";
 
-// ── EL AVISO DE LOS QUE NO DEJAN NADA ─────────────────────────────────────
+// ── LA REGLA DE GANANCIA EN LA TARJETA, YA SIN AVISAR ─────────────────────
 //
-// Corto, y dice el hecho: la venta no le saca nada al costo. No dice "¡atención!"
-// ni "error" — no es un error del sistema, es una situación del negocio, y un
-// cartel alarmista sobre 429 filas enseña a ignorar los carteles.
+// ACÁ VIVÍAN LOS DOS AVISOS DE MANTENIMIENTO, y se fueron enteros: la constante
+// "Se vende sin ganancia" y el ámbar del "falta %". Los dos son ahora controles
+// de "Para revisar", donde se cuentan y se pueden filtrar; en la tarjeta
+// informaban de a uno y no llevaban a ningún lado. Dejar la constante y el texto
+// que la explicaba habría dejado el archivo documentando una pantalla que ya no
+// existe.
 //
-// Se eligió "sin ganancia" y no "sin margen" porque margen es la palabra del
-// campo configurado, que es OTRA cosa: hay 1.691 filas sin margen asignado que
-// igual venden con ganancia.
-const AVISO_SIN_GANANCIA = "Se vende sin ganancia";
-
-// ── EL PORCENTAJE DE GANANCIA, Y EL QUE FALTA ─────────────────────────────
+// Lo que queda es el renglón que dice CUÁL es la regla —un porcentaje, o
+// "+$100/un" en las 231 filas de recargo fijo— en el gris tenue de la tarjeta,
+// sin distinguir al que no tiene ninguna. Esa distinción la hace la card de
+// "Falta regla".
 //
-// La idea es que se sepa de un vistazo cuál tiene porcentaje asignado y cuál no,
-// y por eso el que falta se ve MÁS que el que está: los 8.613 que tienen uno van
-// en el gris tenue de la tarjeta, y los 1.677 que no van en `--pos-warning`, el
-// mismo ámbar medido del aviso de abajo. Un blanco o un cero no servirían — el
-// blanco no se lee como "falta" y el cero es un valor cargado que significa otra
-// cosa: "vendé al costo".
+// Los servicios de importe variable quedan afuera: no tienen precio fijo, así
+// que no les falta un porcentaje — no les corresponde.
 //
-// Las 231 filas de RECARGO FIJO no son "sin porcentaje": tienen regla, la suya no
-// se expresa en porcentaje. Van en gris con su valor en pesos —"+$100/un"—, así
-// que se distinguen de las tres cosas a la vez: no son un porcentaje, no son un
-// faltante, y dicen cuál es su regla.
-//
-// Los servicios de importe variable quedan AFUERA, igual que del aviso: no
-// tienen precio fijo, así que no les falta un porcentaje — no les corresponde.
-// Son 12 filas que si no dirían "falta %" mintiendo.
 // `text-xs` y no una medida escrita: está en la escala y no sube el contador de
-// hardcodeo. Son 10,5 px reales —1 rem son 14 acá—, el mismo tamaño que el aviso
-// de abajo, que es el otro elemento de "mirá esto" de la tarjeta.
+// hardcodeo. Son 10,5 px reales —1 rem son 14 acá—.
 const GANANCIA_CLASE = "text-xs [font-variant-numeric:tabular-nums] whitespace-nowrap";
 // Y la línea de abajo explica de dónde sale el importe. Va con texto y no vacía
 // porque todas las tarjetas llevan su línea: un hueco haría que estas cuatro
@@ -229,6 +223,14 @@ export default function ProductosPage() {
   });
   const [controles, setControles] = useState([]);
   const [cargandoControles, setCargandoControles] = useState(true);
+  // El conteo puede ser PARCIAL: el servidor clasifica en memoria con un techo.
+  // Se guarda para poder decirlo, porque un 0 parcial no significa "no hay
+  // ninguno" sino "no lo sé".
+  const [controlesTruncado, setControlesTruncado] = useState(false);
+  const [techoControles, setTechoControles] = useState(null);
+  // Y el mismo caso del lado del listado: con el filtro puesto, el servidor avisa
+  // si tuvo que cortar. Si corta, el total tampoco es el total.
+  const [listadoTruncado, setListadoTruncado] = useState(false);
   const [marcandoRevisado, setMarcandoRevisado] = useState(false);
 
   // Las tres hojas del celular. Ninguna existe en escritorio.
@@ -310,6 +312,14 @@ export default function ProductosPage() {
     // tipo: todos (default) | productos | combos.
     tipo: searchParams.get("tipo") || "todos",
   });
+
+  // Los filtros que NO reducen el universo: exactamente el que cuenta la card de
+  // "Para revisar". Es el estado al que se vuelve al activar un control.
+  //
+  // `estado: "activos"` y `tipo: "todos"` no son "vacío", son los valores por
+  // defecto — y son los que el contador usa, así que son los que hacen que los
+  // dos números cierren.
+  const filtrosAntesDelControlRef = useRef(null);
 
   // =========================================================
   // SYNC ESTADO LISTADO → URL (query params)
@@ -532,6 +542,9 @@ export default function ProductosPage() {
         // que es el comportamiento anterior, en vez de dejarlos en `undefined`.
         setVendeConListaAlCosto(data.vendeConListaAlCosto === true);
         setListaAlCostoRedondea100(data.listaAlCostoRedondea100 === true);
+        // El filtro por control clasifica en memoria con un techo. Si lo alcanzó,
+        // el total es parcial y hay que decirlo: si no, la lista se ve completa.
+        setListadoTruncado(data.truncadoPorControl === true);
       }
     } catch (err) {
       console.error("Error cargando productos:", err);
@@ -569,12 +582,22 @@ export default function ProductosPage() {
       // afirman que el catálogo está sano.
       if (data.ok) {
         setControles(data.controles || []);
+        // ── EL CONTEO PARCIAL SE PROPAGA, NO SE DESCARTA ────────────────
+        //
+        // El servidor ya mandaba `truncado` y esta pantalla lo tiraba. Con un
+        // catálogo por encima del techo, las cards mostraban conteos parciales
+        // —incluido un 0— con la misma cara que un resultado completo, o sea la
+        // pantalla afirmando "está todo bien" sobre datos que no tiene.
+        setControlesTruncado(data.truncado === true);
+        setTechoControles(Number(data.techo) || null);
       } else {
         setControles([]);
+        setControlesTruncado(false);
         console.error("productos/controles:", data.error);
       }
     } catch (err) {
       setControles([]);
+      setControlesTruncado(false);
       console.error("Error cargando controles:", err);
     }
     setCargandoControles(false);
@@ -837,9 +860,57 @@ export default function ProductosPage() {
   // filtro estuviera en otro lado, el que lo prendió sin querer no sabría cómo
   // volver. La página vuelve a 1 porque el universo cambió — quedarse en la 7 de
   // un listado que ahora tiene 2 páginas muestra una lista vacía.
+  //
+  // ── Y LOS DEMÁS FILTROS SE LIMPIAN, QUE ES EL PUNTO ─────────────────────
+  //
+  // El criterio aprobado es literal: **el número de la card y el total del
+  // listado filtrado tienen que coincidir**.
+  //
+  // La primera versión dejaba los filtros puestos y mostraba los dos números al
+  // lado, confiando en que la diferencia se leyera. No alcanza: la card dice 47,
+  // se toca, y el listado abre con 8 porque había un proveedor elegido de antes.
+  // Los dos números pueden estar bien y aun así la pantalla queda mintiendo sobre
+  // lo que esa card significa.
+  //
+  // Así que al activar un control se limpia todo lo que reduce el universo —la
+  // búsqueda, categoría, proveedor, área, y estado y tipo vuelven a su valor por
+  // defecto—, y la lista que se abre es EXACTAMENTE la población de la card.
+  //
+  // `estado` y `tipo` no son un detalle: el contador cuenta activos de las dos
+  // clases, así que con "inactivos" elegido el total tampoco cerraría.
+  //
+  // ── Y SE DEVUELVEN AL APAGARLO ──────────────────────────────────────────
+  //
+  // Limpiar sin devolver convertiría el toque en algo que hay que pensar antes:
+  // quien filtró por un proveedor y toca una card por curiosidad perdería el
+  // trabajo. Se guardan y se reponen.
+  //
+  // La reposición tiene una condición: solo si mientras el control estuvo puesto
+  // NADIE tocó los filtros. Si la persona escribió una búsqueda con el control
+  // activo, eso es lo que quiere ver ahora, y pisárselo con lo de antes sería la
+  // misma sorpresa al revés.
   const alternarControl = (id) => {
+    const apagando = control === id;
     setPage(1);
-    setControl((actual) => (actual === id ? null : id));
+
+    if (apagando) {
+      setControl(null);
+      const guardados = filtrosAntesDelControlRef.current;
+      filtrosAntesDelControlRef.current = null;
+      if (guardados && mismosFiltros(filtros, filtrosNeutros())) {
+        setFiltros(guardados);
+      }
+      return;
+    }
+
+    // Cambiar de una card a otra no vuelve a guardar: lo guardado es lo que había
+    // ANTES de entrar a los controles, y sobrescribirlo con los filtros neutros
+    // perdería los originales.
+    if (filtrosAntesDelControlRef.current === null) {
+      filtrosAntesDelControlRef.current = filtros;
+    }
+    setControl(id);
+    if (hayFiltrosPuestos(filtros)) setFiltros(filtrosNeutros());
   };
 
   // ── MARCAR COMO REVISADOS LOS DE ESTA PÁGINA ─────────────────────────────
@@ -1205,13 +1276,17 @@ export default function ProductosPage() {
 
   // Cuántos filtros hay puestos, sin contar la búsqueda —que se ve escrita en su
   // propio campo— ni el estado en su valor de siempre.
-  const filtrosActivos = [
-    filtros.categoria,
-    filtros.proveedor,
-    filtros.area,
-    filtros.estado && filtros.estado !== "activos" ? filtros.estado : "",
-    filtros.tipo && filtros.tipo !== "todos" ? filtros.tipo : "",
-  ].filter(Boolean).length;
+  // Cuántos filtros hay puestos, para el globito del botón. La búsqueda no
+  // cuenta: se ve escrita en su propio campo, al lado.
+  //
+  // Los valores por defecto salen de `filtrosNeutros`, la MISMA función que usa
+  // `alternarControl` para limpiar. Estaban escritos a mano acá —"activos",
+  // "todos"— y eso es un default definido en dos lugares: el día que cambie uno,
+  // el globito contaría un filtro que no está puesto.
+  const neutros = filtrosNeutros();
+  const filtrosActivos = CLAVES_DE_FILTRO.filter(
+    (k) => k !== "search" && (filtros[k] ?? "") !== neutros[k]
+  ).length;
 
   // =========================================================
   // RENDER
@@ -1287,6 +1362,8 @@ export default function ProductosPage() {
                   activo={control}
                   onSelect={alternarControl}
                   cargando={cargandoControles}
+                  truncado={controlesTruncado}
+                  techo={techoControles}
                 />
               </div>
 
@@ -1367,10 +1444,22 @@ export default function ProductosPage() {
                   Cuántos productos se están viendo y por qué. Cuando hay un
                   control filtrando, lo dice CON SU NOMBRE y con la forma de
                   sacarlo: un listado filtrado que no explica por qué está
-                  filtrado se lee como un catálogo que perdió productos. */}
+                  filtrado se lee como un catálogo que perdió productos.
+
+                  Y con el control puesto este número tiene que ser EL MISMO que
+                  el de la card. Lo garantiza `alternarControl`, que limpia los
+                  demás filtros al activarlo: sin eso los dos números podían
+                  diferir y la card quedaba prometiendo una población que la
+                  lista no muestra. */}
               <div className="md:hidden flex items-center gap-2 flex-wrap min-h-[24px]">
                 <span className="text-[11px] sunmi-text-muted [font-variant-numeric:tabular-nums]">
-                  {loading ? "Cargando…" : `${totalItems} producto${totalItems === 1 ? "" : "s"}`}
+                  {loading
+                    ? "Cargando…"
+                    : /* Con el filtro truncado el total tampoco es el total: lleva
+                         "+" por lo mismo que las cards. */
+                      `${listadoTruncado ? "+" : ""}${totalItems} producto${
+                        totalItems === 1 ? "" : "s"
+                      }`}
                 </span>
                 {controlActivo && (
                   <button

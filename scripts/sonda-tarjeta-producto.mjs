@@ -1188,53 +1188,134 @@ try {
     );
   }
 
-  // ── 14c · TOCARLA FILTRA, Y EL TOTAL COINCIDE CON EL NÚMERO DE LA CARD ──
+  // ── 14c · CADA CONTROL, Y PARTIENDO CON UNA BÚSQUEDA PUESTA ─────────────
   //
-  // Se elige la primera card con cantidad > 0: con cero no se distingue "filtró
-  // bien" de "no filtró y no había ninguno".
-  const iConDatos = (cards || []).findIndex((c) => c.cantidad > 0);
-  if (iConDatos < 0) {
-    console.log("  ----  14c · ningún control marca productos en estos datos:");
-    console.log("        el filtro no se ejerció. No es un pase.");
-  } else {
-    const esperado = cards[iConDatos].cantidad;
+  // ── QUÉ AFIRMA, Y POR QUÉ ASÍ ───────────────────────────────────────────
+  //
+  // El criterio aprobado es literal: **el número de la card y el total del
+  // listado filtrado tienen que coincidir**. Se comprueba de a uno para LOS
+  // CUATRO, y no para el primero que tenga datos: cada control filtra por un
+  // predicado distinto, así que uno solo prueba uno solo.
+  //
+  // Y se arranca CON UNA BÚSQUEDA ESCRITA a propósito, que es el caso que la
+  // primera implementación no cumplía: con un filtro previo la card decía 47 y al
+  // tocarla el listado abría con 8. Partir de la pantalla limpia habría dejado
+  // ese caso sin ejercer y el chequeo pasando en verde.
+  const teclearBusqueda = async (texto) => {
+    await evaluar(`(() => {
+      const i = document.querySelector('input[aria-label="Buscar productos"]');
+      if (!i) return false;
+      const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      set.call(i, ${JSON.stringify(texto)});
+      i.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()`);
+    await sleep(4000);
+  };
+
+  const tocarCard = async (i) => {
     await evaluar(`(() => {
       const seccion = [...document.querySelectorAll('section')]
         .find((s) => /Para revisar/.test(s.textContent || ""));
-      seccion.querySelectorAll('button[aria-pressed]')[${iConDatos}].click();
+      seccion.querySelectorAll('button[aria-pressed]')[${i}].click();
       return true;
     })()`);
     await sleep(5000);
-    const trasFiltrar = await evaluar(`(() => ({
+  };
+
+  const leerEstado = () =>
+    evaluar(`(() => ({
       url: location.search,
-      texto: (document.body.innerText.match(/(\\d+)\\s+productos?/) || [])[1] || null,
       total: (window.__listado && window.__listado.total) ?? null,
+      busqueda: (document.querySelector('input[aria-label="Buscar productos"]') || {}).value ?? null,
     }))()`);
+
+  const desacuerdos = [];
+  const noEjercidos = [];
+  for (let i = 0; i < (cards || []).length; i++) {
+    // Se repone la búsqueda antes de CADA control: el toque anterior la limpió,
+    // y lo que se quiere ejercer es justamente partir con un filtro puesto.
+    await teclearBusqueda("a");
+    const conBusqueda = await leerEstado();
+
+    await tocarCard(i);
+    const tras = await leerEstado();
+
+    // La cantidad de la card se relee DESPUÉS de tocar: el conteo no cambia al
+    // filtrar, pero leerlo del DOM en vez de confiar en la lectura de antes evita
+    // comparar contra un número viejo.
+    const cantidadAhora = await evaluar(`(() => {
+      const seccion = [...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""));
+      const b = seccion.querySelectorAll('button[aria-pressed]')[${i}];
+      return Number((b.innerText.match(/\\d+/) || [0])[0]);
+    })()`);
+
+    const nombre = cards[i].texto.split("\n").join(" ").slice(0, 40);
+    if (cantidadAhora === 0) {
+      noEjercidos.push(nombre);
+    } else if (Number(tras.total) !== cantidadAhora) {
+      desacuerdos.push(
+        `${nombre}: card ${cantidadAhora} vs listado ${tras.total} (venía de ${conBusqueda.total} con búsqueda)`
+      );
+    }
+
+    // Y la búsqueda tiene que haberse ido: es lo que hace que los dos números
+    // puedan coincidir.
+    if (tras.busqueda) {
+      desacuerdos.push(`${nombre}: la búsqueda quedó puesta ("${tras.busqueda}")`);
+    }
+
+    await tocarCard(i); // apagar antes del siguiente
+  }
+
+  afirmar(
+    desacuerdos.length === 0,
+    `14c · tocar cada control deja card = total, aun partiendo con búsqueda (${cards.length - noEjercidos.length} de ${cards.length} ejercidos)`,
+    desacuerdos.join(" · ")
+  );
+  if (noEjercidos.length > 0) {
+    console.log(`  ----  14c · en cero y por lo tanto NO EJERCIDOS: ${noEjercidos.join(", ")}`);
+    console.log("        con 0 no se distingue 'filtró bien' de 'no filtró y no había'. No es un pase.");
+  }
+
+  // ── 14d/14e · LA URL, Y QUE SE PUEDA DESHACER ──────────────────────────
+  const iConDatos = (cards || []).findIndex((c) => c.cantidad > 0);
+  if (iConDatos >= 0) {
+    await tocarCard(iConDatos);
+    const conControl = await leerEstado();
     afirmar(
-      Number(trasFiltrar.total) === esperado,
-      `14c · tocar la card filtra a los MISMOS ${esperado} que contaba`,
-      `el listado trajo ${trasFiltrar.total} · url ${trasFiltrar.url}`
-    );
-    afirmar(
-      /control=/.test(trasFiltrar.url || ""),
+      /control=/.test(conControl.url || ""),
       "14d · el filtro queda en la URL, así que el botón de atrás lo deshace",
-      `url: ${trasFiltrar.url}`
+      `url: ${conControl.url}`
     );
     // Y tocarla otra vez lo saca: si apagarlo estuviera en otro lado, el que lo
     // prendió sin querer no sabría cómo volver.
-    await evaluar(`(() => {
-      const seccion = [...document.querySelectorAll('section')]
-        .find((s) => /Para revisar/.test(s.textContent || ""));
-      seccion.querySelectorAll('button[aria-pressed]')[${iConDatos}].click();
-      return true;
-    })()`);
-    await sleep(5000);
-    const trasApagar = await evaluar(`location.search`);
+    await tocarCard(iConDatos);
+    const trasApagar = await leerEstado();
     afirmar(
-      !/control=/.test(trasApagar || ""),
+      !/control=/.test(trasApagar.url || ""),
       "14e · tocarla de nuevo saca el filtro",
-      `url: ${trasApagar}`
+      `url: ${trasApagar.url}`
     );
+    // ── 14f · Y DEVUELVE LOS FILTROS QUE HABÍA ────────────────────────────
+    //
+    // Limpiar sin devolver convertiría el toque en algo que hay que pensar antes:
+    // quien filtró por un proveedor y toca una card por curiosidad perdería el
+    // trabajo. Se ejerce con la búsqueda, que es el filtro que se puede escribir
+    // desde afuera de la hoja.
+    await teclearBusqueda("aceite");
+    const antes = await leerEstado();
+    await tocarCard(iConDatos);
+    const durante = await leerEstado();
+    await tocarCard(iConDatos);
+    const despues = await leerEstado();
+    afirmar(
+      durante.busqueda === "" && despues.busqueda === "aceite",
+      "14f · al apagar el control vuelve la búsqueda que había",
+      `durante: "${durante.busqueda}" · después: "${despues.busqueda}" (era "${antes.busqueda}")`
+    );
+    await teclearBusqueda("");
   }
 
   // ── 15 · "MÁS" ABRE SU HOJA, Y LLEVA LAS CUATRO ACCIONES ────────────────
@@ -1284,23 +1365,59 @@ try {
   // interruptores, tiene que cambiar lo que la tarjeta muestra. Se apaga el
   // proveedor —que es un renglón entero— y se comprueba que desaparezca de las
   // 25 tarjetas, no de una.
+  //
+  // Arranca borrando la preferencia guardada y recargando: la corrida empieza
+  // siempre desde el default de fábrica, sin depender de cómo terminó la
+  // anterior. Ver el comentario del cierre de este bloque.
+  await evaluar(`(() => {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith("productos:tarjeta:")) localStorage.removeItem(k);
+    }
+    return true;
+  })()`);
+  await send("Page.navigate", { url: `${BASE}/modulos/productos` });
+  for (let i = 0; i < 40; i++) {
+    const n = await evaluar(`${TARJETAS}.length`).catch(() => 0);
+    if (Number(n) > 0) break;
+    await sleep(1000);
+  }
+
   const antesProveedor = await evaluar(`(() => {
     const t = ${TARJETAS};
     const cuerpo = (c) => c.firstElementChild;
     return t.filter((c) => cuerpo(c).children.length > 1).length;
   })()`);
+  // "Personalizar card" vive DENTRO de la hoja de "Más", así que hay que abrirla:
+  // el bloque recarga la pantalla antes de empezar y ninguna hoja queda abierta.
+  await evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /Más$/.test(x.innerText.trim()));
+    if (b) b.click();
+    return true;
+  })()`);
+  await sleep(1500);
   await evaluar(`(() => {
     const b = [...document.querySelectorAll('button')].find((x) => /Personalizar card/.test(x.innerText));
     if (b) b.click();
     return true;
   })()`);
   await sleep(1500);
+  // ── SE DEJA APAGADO, NO SE "ALTERNA" ────────────────────────────────────
+  //
+  // La preferencia vive en `localStorage` y el perfil de Edge se reusa entre
+  // corridas, así que alternar a ciegas depende de cómo terminó la corrida
+  // anterior: si aquélla no llegó a reponerlo, ésta lo PRENDE y la afirmación se
+  // pone roja por el arnés y no por la pantalla. Pasó, y se ve igual que un
+  // defecto real.
+  //
+  // Se mira `aria-pressed` y se toca solo si hace falta. Una prueba que no
+  // depende del estado en que la dejó la anterior es la única que se puede
+  // repetir.
   const apagado = await evaluar(`(() => {
     const t = document.querySelector('[data-sunmi-modal="tarjeta"]');
     if (!t) return false;
     const b = [...t.querySelectorAll('button[aria-pressed]')].find((x) => /Proveedor/.test(x.innerText));
     if (!b) return false;
-    b.click();
+    if (b.getAttribute('aria-pressed') === 'true') b.click();
     return true;
   })()`);
   if (!apagado) {
@@ -1352,26 +1469,22 @@ try {
       `16b · con un opcional apagado las tarjetas siguen todas del mismo alto`,
       `alturas: ${alturas.join(", ")}`
     );
-    // Se repone, para no dejar el navegador con la preferencia cambiada.
+    // ── Y SE REPONE BORRANDO LA PREFERENCIA, NO VOLVIENDO A TOCAR ─────────
+    //
+    // Reponer con otro clic era lo que dejaba la corrida siguiente a merced de
+    // que ésta llegara al final: si algo fallaba en el medio, la preferencia
+    // quedaba apagada en el `localStorage` del perfil y la próxima corrida
+    // empezaba en otro estado.
+    //
+    // Borrar la clave devuelve el default de fábrica —todo visible— sin depender
+    // de ningún clic. Es la misma clave que usa la pantalla; se borran todas las
+    // de la familia para no tener que saber en qué ubicación se paró la sonda.
     await evaluar(`(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => /Más$/.test(x.innerText.trim()));
-      if (b) b.click();
+      for (const k of Object.keys(localStorage)) {
+        if (k.startsWith("productos:tarjeta:")) localStorage.removeItem(k);
+      }
       return true;
     })()`);
-    await sleep(1200);
-    await evaluar(`(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => /Personalizar card/.test(x.innerText));
-      if (b) b.click();
-      return true;
-    })()`);
-    await sleep(1200);
-    await evaluar(`(() => {
-      const t = document.querySelector('[data-sunmi-modal="tarjeta"]');
-      const b = t && [...t.querySelectorAll('button[aria-pressed]')].find((x) => /Proveedor/.test(x.innerText));
-      if (b) b.click();
-      return true;
-    })()`);
-    await sleep(1000);
   }
 
   // ── 2 · EDITAR ENTRA, Y A OTRA RUTA ─────────────────────────────────────

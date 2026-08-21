@@ -16,15 +16,43 @@
 // ── LOS COLORES SON SEMÁNTICOS Y SALEN DEL THEME ────────────────────────────
 //
 // El dominio dice `rol`: "warning" es hay-que-mirarlo y "danger" es esto-puede-
-// estar-costando-plata. Acá se traduce a los tokens que el ERP ya define en los
-// CATORCE temas —`--pos-warning`, `--pos-danger`, `--pos-success`—, y no a los
-// RGB del prototipo. Escribir los hex haría dos daños: el bloque se vería igual
-// en los catorce temas —o sea, mal en trece— y cada uno subiría el contador de
-// hardcodeo.
+// estar-costando-plata. Acá se traduce a tokens, nunca a los RGB del prototipo:
+// escribir los hex haría que el bloque se viera igual en los catorce temas —o
+// sea, mal en trece— y cada uno subiría el contador de hardcodeo.
+//
+// ── Y SON LOS SEMÁNTICOS GENERALES, NO LOS DEL POS ────────────────────────
+//
+// La primera versión usaba `--pos-success`, `--pos-warning` y `--pos-danger`.
+// Son tokens y se ven bien, pero pertenecen al tema paralelo del POS, y esto es
+// el catálogo: atar la semántica de salud de Productos al POS significa que el
+// día que alguien retoque el rojo del mostrador se mueve también el de acá, sin
+// que nadie lo haya pedido.
+//
+// Los generales del ERP son `--success-fg`, `--warning-fg` y `--danger-fg`. Están
+// definidos en `:root` con valores pensados para tema oscuro y los ocho temas
+// claros los sobrescriben; los cuatro que no lo hacen son oscuros y heredan los
+// de `:root`, así que los catorce tienen un valor válido. Está medido: ver
+// `scripts/sonda-controles-tokens.mjs`, que calcula el contraste de cada uno
+// contra el fondo real de la card en los catorce y exige 3,0.
+//
+// La SUPERFICIE sigue siendo del ERP y no de la semántica: el fondo de la card es
+// `--card-bg`, que existe en los catorce.
 //
 // El verde no es decorativo: un control en 0 pasa a `success` porque el mensaje
 // cambia. Un "0" en rojo se lee como una alarma apagada; en verde se lee como lo
 // que es.
+//
+// ── UN CONTEO PARCIAL NO SE PUEDE MOSTRAR COMO SANO ───────────────────────
+//
+// El servidor clasifica en memoria con un techo de 5.000 productos, así que un
+// catálogo más grande devuelve un conteo PARCIAL. Un 0 parcial no significa "no
+// hay ninguno": significa "no lo sé". Pintarlo de verde con un tilde sería la
+// pantalla afirmando salud sobre datos que no tiene, que es peor que no mostrar
+// nada.
+//
+// Con `truncado`, las cards se dibujan en neutro, sin tilde, con el número
+// prefijado por un "+" —porque hay al menos ésos— y el bloque avisa arriba sobre
+// cuántos se contó. Ninguna dice "al día".
 //
 // ── PAGINA SOLO, Y POR ESO NO HAY QUE TOCARLO PARA AGREGAR UN CONTROL ──────
 //
@@ -33,7 +61,7 @@
 // archivo cambie una línea, y sin que el bloque crezca en alto.
 
 import { useId, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, TriangleAlert } from "lucide-react";
 
 /** Cuántas cards entran en una página: 2×2. */
 const POR_PAGINA = 4;
@@ -45,10 +73,10 @@ const POR_PAGINA = 4;
  * esté cae en el neutro en vez de quedar sin color.
  */
 const TOKEN_POR_ROL = {
-  warning: "var(--pos-warning)",
-  danger: "var(--pos-danger)",
-  success: "var(--pos-success)",
-  neutro: "var(--pos-muted)",
+  warning: "var(--warning-fg)",
+  danger: "var(--danger-fg)",
+  success: "var(--success-fg)",
+  neutro: "var(--pos-muted-strong)",
 };
 
 const colorDe = (rol) => TOKEN_POR_ROL[rol] || TOKEN_POR_ROL.neutro;
@@ -62,14 +90,21 @@ function enPaginas(items) {
   return paginas;
 }
 
-function CardControl({ control, activo, onSelect }) {
+function CardControl({ control, activo, onSelect, truncado = false }) {
   // ── EN CERO, EL ROL CAMBIA ────────────────────────────────────────────
   //
   // Y no es un detalle de color: la card deja de decir "mirá esto" y pasa a
   // decir "esto está bien". El rol del dominio es el del PROBLEMA; el de la
   // card es el del ESTADO ACTUAL, que son dos preguntas distintas.
-  const sano = control.cantidad === 0;
-  const color = sano ? colorDe("success") : colorDe(control.rol);
+  //
+  // ── SALVO QUE EL CONTEO SEA PARCIAL ───────────────────────────────────
+  //
+  // Con `truncado`, un 0 no significa "no hay ninguno": significa "no lo sé,
+  // porque solo miré una parte del catálogo". Ahí NO hay estado sano — la card
+  // queda en neutro, sin tilde y sin el texto de "al día". Afirmar salud sobre
+  // datos incompletos es peor que no decir nada.
+  const sano = !truncado && control.cantidad === 0;
+  const color = truncado ? colorDe("neutro") : sano ? colorDe("success") : colorDe(control.rol);
 
   return (
     <button
@@ -91,7 +126,10 @@ function CardControl({ control, activo, onSelect }) {
         // el panel del theme. Un fondo teñido en cuatro cards seguidas convierte
         // la fila en un semáforo y deja de leerse el número, que es el dato.
         borderColor: color,
-        background: "var(--pos-panel-bg)",
+        // La superficie sale de `--card-bg`, el token de tarjeta del ERP, y no de
+        // la semántica: un fondo teñido en cuatro cards seguidas convierte la
+        // fila en un semáforo y deja de leerse el número, que es el dato.
+        background: "var(--card-bg)",
         "--tw-ring-color": color,
       }}
     >
@@ -103,13 +141,21 @@ function CardControl({ control, activo, onSelect }) {
           className="text-xl font-bold leading-none [font-variant-numeric:tabular-nums]"
           style={{ color }}
         >
-          {control.cantidad}
+          {/* CON CONTEO PARCIAL, EL NÚMERO LLEVA "+". Lo que se sabe es que hay
+              AL MENOS ésos; escribirlo pelado sería afirmar un total que nadie
+              calculó. */}
+          {truncado ? `+${control.cantidad}` : control.cantidad}
         </span>
         {sano && <Check className="w-3.5 h-3.5 shrink-0" style={{ color }} aria-hidden="true" />}
       </span>
       <span className="mt-1 block leading-[1.25]">
         <span className="block text-[11.5px] font-medium sunmi-text-strong">{control.titulo}</span>
-        <span className="block text-[10.5px] sunmi-text-muted">{control.detalle}</span>
+        {/* EN CERO EL TEXTO CAMBIA, no se achica: "Precios +30 días" sobre un 0
+            se sigue leyendo como el nombre de un problema. El texto sano lo
+            decide el dominio, junto con el del problema. */}
+        <span className="block text-[10.5px] sunmi-text-muted">
+          {sano ? control.detalleSano ?? control.detalle : control.detalle}
+        </span>
       </span>
     </button>
   );
@@ -120,12 +166,16 @@ function CardControl({ control, activo, onSelect }) {
  * @param {string} activo     id del control filtrando, o null
  * @param {func}   onSelect   recibe el id; la pantalla decide prender o apagar
  * @param {bool}   cargando   mientras no llegó el conteo
+ * @param {bool}   truncado   el servidor contó solo una parte del catálogo
+ * @param {number} techo      cuántos productos alcanzó a mirar
  */
 export default function CarruselControles({
   controles = [],
   activo = null,
   onSelect = () => {},
   cargando = false,
+  truncado = false,
+  techo = null,
 }) {
   const paginas = enPaginas(controles);
   const [paginaVisible, setPaginaVisible] = useState(0);
@@ -158,6 +208,28 @@ export default function CarruselControles({
         {cargando && <span className="text-[10.5px] sunmi-text-muted">calculando…</span>}
       </div>
 
+      {/* ── EL CÁLCULO PARCIAL SE DICE, NO SE CALLA ────────────────────────
+          Los endpoints ya devolvían el flag y la pantalla no lo miraba, así que
+          un catálogo por encima del techo mostraba conteos parciales —incluido un
+          0— con la misma cara que un resultado completo. Un límite que no se
+          informa es lo mismo que no tenerlo: el que mira no puede saber que está
+          viendo la mitad. */}
+      {truncado && !cargando && (
+        <div
+          // `text-xs` y no `text-[10.5px]`: en esta aplicación 1 rem son 14 px,
+          // así que `text-xs` ES 10,5 px. Mismo píxel, sin sumar al contador.
+          className="flex items-start gap-1.5 mb-1.5 text-xs leading-[1.35]"
+          style={{ color: "var(--warning-fg)" }}
+          role="status"
+        >
+          <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span>
+            Conteo parcial: se miraron los primeros {techo ? techo.toLocaleString("es-AR") : "5.000"}{" "}
+            productos. Puede haber más en cada control.
+          </span>
+        </div>
+      )}
+
       {/* LA PISTA. `snap-x snap-mandatory` con cada página ocupando el 100 % del
           ancho: el dedo no puede dejarla a mitad de camino entre dos páginas,
           que es lo que hace que un carrusel se sienta roto.
@@ -181,6 +253,7 @@ export default function CarruselControles({
                   control={control}
                   activo={activo === control.id}
                   onSelect={onSelect}
+                  truncado={truncado}
                 />
               ))}
             </div>
@@ -201,6 +274,15 @@ export default function CarruselControles({
               aria-current={i === paginaVisible}
               className="w-6 h-6 flex items-center justify-center"
             >
+              {/* ── EL ACENTO SIGUE SIENDO `--pos-accent`, Y ESTÁ DECIDIDO ──
+                  No es semántica de salud: es "cuál está seleccionado". El
+                  guardrail que sacó `--pos-success/warning/danger` de acá es
+                  sobre los estados, y el ERP no tiene otro token de acento —no
+                  existe `--accent` ni `--link-fg` en ningún tema—. Inventar uno
+                  obliga a elegir su valor en los CATORCE, con su medición de
+                  contraste, y eso es una tanda propia. Es el mismo criterio con
+                  el que la tarjeta dejó anotada su diferencia de cuatro puntos
+                  contra el prototipo en vez de crear un token al paso. */}
               <span
                 className="block w-1.5 h-1.5 rounded-full transition-opacity"
                 style={{
