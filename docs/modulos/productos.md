@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-21 01:46
+**Última actualización:** 2026-08-21 16:44
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,11 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-21: fix(productos): la equivalencia sale del mismo precio que el número grande, y Import / Export deja de estar duplicado
+- 2026-08-21: fix(productos): el corte de 5.000 usa el mismo orden en las dos consultas, y se saca un comentario que ya era falso
+- 2026-08-21: fix(productos): `precios/apply` decide la revisión con el precio de la base, no con el del navegador
+- 2026-08-21: fix(productos): el contraste se mide con el umbral que corresponde, y se resuelve sin tocar ningún theme
+- 2026-08-21: fix(productos): con un control activo, la lista ES la población de esa card — siempre
 - 2026-08-21: fix(productos): la card y el listado dan el mismo número, y un conteo parcial deja de verse sano
 - 2026-08-21: fix(productos): la revisión de precio se marca donde el precio cambia, y solo ahí
 - 2026-08-21: fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado

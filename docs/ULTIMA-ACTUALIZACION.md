@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-21 04:53
+**Fecha:** 2026-08-21 16:44
 
 ## Módulos modificados recientemente
 
 ### productos
-- fix(productos): la card y el listado dan el mismo número, y un conteo parcial deja de verse sano, fix(productos): la revisión de precio se marca donde el precio cambia, y solo ahí, fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado
+- fix(productos): la equivalencia sale del mismo precio que el número grande, y Import / Export deja de estar duplicado, fix(productos): el corte de 5.000 usa el mismo orden en las dos consultas, y se saca un comentario que ya era falso, fix(productos): `precios/apply` decide la revisión con el precio de la base, no con el del navegador
 - Archivos: 4 nuevos, 7 modificados (11 total)
 
 
