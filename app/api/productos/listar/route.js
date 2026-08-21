@@ -10,19 +10,20 @@ import { evaluarEstructuraCombo } from "@/lib/combos/service";
 import { ubicacionVendeAlCosto } from "@/lib/precios/ubicacionVendeAlCosto";
 import { esControlValido } from "@/lib/productos/controlesCalidad";
 import {
+  dentroDelTecho,
   filaMarcadaPor,
+  opcionesDelTecho,
+  seTrunco,
   SELECT_CONTROLES_BASE,
   SELECT_CONTROLES_LOCAL,
 } from "@/lib/productos/controlesDesdePrisma";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
 
-// Techo defensivo del filtro por control. Se clasifica en memoria porque los
-// cuatro dependen de precios efectivos que Prisma no puede mergear en un
-// `where`; este número acota cuántas filas se traen para eso. Mismo criterio que
-// el `MAX_TRANSFERENCIAS` de los reportes: preferimos un resultado explícitamente
-// parcial antes que una consulta que tumbe el proceso — pero nunca en silencio.
-const MAX_CONTROL = 5000;
+// El techo defensivo del filtro por control ESTABA ESCRITO ACÁ, con su gemelo en
+// `/api/productos/controles`. Ahora vive en `controlesDesdePrisma` junto con el
+// ORDEN con el que se corta, porque las dos consultas tienen que cortar por el
+// mismo lugar y un número definido en dos archivos un día vale dos cosas.
 const DEFAULT_PAGE_SIZE = 25;
 
 // Whitelist de campos ordenables → mapping a Prisma orderBy
@@ -256,8 +257,9 @@ export async function GET(req) {
     // antes que una consulta ingeniosa distinta a la lógica del ERP.
     //
     // El techo es el mismo criterio defensivo que usan los reportes: se trae
-    // hasta MAX_CONTROL y, si el catálogo lo supera, se avisa en vez de mentir
-    // por lo bajo.
+    // hasta `TECHO_CONTROL` y, si el catálogo lo supera, se avisa en vez de
+    // mentir por lo bajo. El techo y el orden salen de `controlesDesdePrisma`,
+    // compartidos con el contador de las cards.
     const controlPedido = searchParams.get("control") || null;
     const control = esControlValido(controlPedido) ? controlPedido : null;
     let truncadoPorControl = false;
@@ -269,15 +271,20 @@ export async function GET(req) {
     if (control) {
       const candidatos = await prisma.productoBase.findMany({
         where,
-        take: MAX_CONTROL + 1,
+        // El techo Y el orden salen de la misma función que usa el contador de
+        // las cards. Sin `orderBy`, con más de 5.000 productos las dos consultas
+        // podían cortar por lugares distintos: los dos números serían límites
+        // inferiores ciertos de muestras diferentes, y la card diría "+37" sobre
+        // una lista de "+41" sin que ninguno estuviera mal.
+        ...opcionesDelTecho(),
         select: {
           ...SELECT_CONTROLES_BASE,
           locales: { where: { localId }, take: 1, select: SELECT_CONTROLES_LOCAL },
         },
       });
 
-      truncadoPorControl = candidatos.length > MAX_CONTROL;
-      const idsMarcados = (truncadoPorControl ? candidatos.slice(0, MAX_CONTROL) : candidatos)
+      truncadoPorControl = seTrunco(candidatos);
+      const idsMarcados = dentroDelTecho(candidatos)
         .filter((p) => filaMarcadaPor(control, p))
         .map((p) => p.id);
 

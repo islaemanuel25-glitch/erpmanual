@@ -16,27 +16,32 @@
 // producto dado de baja con el precio viejo no es una tarea pendiente, y contarlo
 // inflaría las cards con trabajo que nadie va a hacer.
 //
-// ── EL CONTEO ES DEL CATÁLOGO, NO DE LO QUE HAY FILTRADO ───────────────────
+// ── EL CONTEO ES DEL CATÁLOGO, Y EL LISTADO FILTRADO TAMBIÉN ───────────────
 //
-// Y eso el issue no lo define, así que queda dicho acá con su consecuencia.
+// La card cuenta TODOS los productos activos de la ubicación, y el criterio
+// aprobado del issue #2 es que el total del listado que esa card abre sea el
+// MISMO número. No "parecido" ni "explicado al lado": el mismo.
 //
-// La card cuenta TODOS los productos activos de la ubicación. El listado, cuando
-// se toca la card, aplica ese control **encima de los filtros que ya estén
-// puestos**. Si no hay ninguno —que es cómo se entra a la pantalla— los dos
-// números son el mismo, y eso es lo que la sonda mide. Con una búsqueda escrita o
-// un proveedor elegido, el listado trae menos que la card.
+// Quien lo sostiene es la pantalla, con un invariante: **mientras un control está
+// activo, los filtros están en su valor por defecto**. Vale por los tres caminos
+// —tocar la card, tocar un filtro después, y entrar por una URL que traiga los
+// dos—, y está en `lib/productos/filtrosCatalogo.js` con sus candados.
 //
-// Se eligió así porque el panel contesta "cuánto trabajo de mantenimiento tiene
-// el catálogo", que es una pregunta sobre el catálogo entero: un número que se
-// achicara al escribir en el buscador dejaría de servir para eso.
+// ── ESTE COMENTARIO DECÍA LO CONTRARIO, Y POR ESO SE REESCRIBE ────────────
 //
-// Y para que la diferencia no se lea como un error, la pantalla muestra SIEMPRE
-// el total real del listado en su línea de contexto, al lado del nombre del
-// control que está filtrando. Los dos números están a la vista.
+// Describía la primera implementación: que el listado conservaba los filtros y
+// podía traer menos que la card, y que la pantalla mostraba los dos números para
+// que la diferencia se leyera. Eso se corrigió en `ff5076cc` y el comentario
+// quedó atrás.
 //
-// La alternativa —que el conteo siga a los filtros— es defendible y es un cambio
-// chico: pasarle a esta ruta los mismos parámetros que a `listar`. No se hizo
-// porque nadie lo pidió y cambia lo que la card significa.
+// No es un detalle de prolijidad: un comentario viejo al lado de código nuevo es
+// peor que no tener comentario, porque el que lo lea va a creer que el
+// comportamiento es el que está escrito y va a buscar el defecto en otro lado.
+// En este repo ya pasó con una defensa que estaba escrita y era inalcanzable.
+//
+// Lo que NO cambió: esta ruta no recibe los filtros del listado y no tiene que
+// recibirlos. El panel contesta "cuánto trabajo de mantenimiento tiene el
+// catálogo", que es una pregunta sobre el catálogo entero.
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
@@ -47,13 +52,13 @@ import { checkPerm } from "@/lib/authorize";
 import { CONTROLES } from "@/lib/productos/controlesCalidad";
 import {
   contarDesdePrisma,
+  dentroDelTecho,
+  opcionesDelTecho,
+  seTrunco,
   SELECT_CONTROLES_BASE,
   SELECT_CONTROLES_LOCAL,
+  TECHO_CONTROL,
 } from "@/lib/productos/controlesDesdePrisma";
-
-// Mismo techo que el filtro del listado: los dos clasifican en memoria y tienen
-// que cortar en el mismo lugar, o el contador vería más filas que la lista.
-const MAX_CONTROL = 5000;
 
 export async function GET(req) {
   try {
@@ -109,15 +114,19 @@ export async function GET(req) {
 
     const rows = await prisma.productoBase.findMany({
       where,
-      take: MAX_CONTROL + 1,
+      // El techo Y el orden salen de la misma función que usa el filtro del
+      // listado. Sin `orderBy`, con más de 5.000 productos las dos consultas
+      // podían cortar por lugares distintos y las cards quedarían informando un
+      // límite inferior de otra muestra que la del listado.
+      ...opcionesDelTecho(),
       select: {
         ...SELECT_CONTROLES_BASE,
         locales: { where: { localId }, take: 1, select: SELECT_CONTROLES_LOCAL },
       },
     });
 
-    const truncado = rows.length > MAX_CONTROL;
-    const conteo = contarDesdePrisma(truncado ? rows.slice(0, MAX_CONTROL) : rows);
+    const truncado = seTrunco(rows);
+    const conteo = contarDesdePrisma(dentroDelTecho(rows));
 
     return NextResponse.json({
       ok: true,
@@ -130,7 +139,7 @@ export async function GET(req) {
       // El techo viaja con el flag. Sin él la pantalla tendría que escribir 5.000
       // a mano para poder decir sobre cuántos se contó, y ese número quedaría
       // definido en dos lugares.
-      techo: MAX_CONTROL,
+      techo: TECHO_CONTROL,
     });
   } catch (err) {
     console.error("productos/controles", err);

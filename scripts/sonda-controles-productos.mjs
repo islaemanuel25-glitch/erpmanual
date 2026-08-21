@@ -30,6 +30,8 @@ const {
   SELECT_CONTROLES_LOCAL,
   contarDesdePrisma,
   filaMarcadaPor,
+  opcionesDelTecho,
+  TECHO_CONTROL,
 } = await import("../lib/productos/controlesDesdePrisma.js");
 const { IDS_CONTROL } = await import("../lib/productos/controlesCalidad.js");
 
@@ -65,6 +67,26 @@ await ejercer("select de controles (base + ProductoLocal de la ubicación)", asy
     },
   });
   return `${filas.length} filas`;
+});
+
+// 1-bis. LOS ARGUMENTOS DE CORTE, tal cual los pasan las dos rutas.
+//
+// `orderBy` es un ARGUMENTO de Prisma, así que se valida contra Postgres y no
+// contra el build: un campo mal escrito ahí sale `Unknown argument` en la
+// consulta y en ningún otro lado. Es la misma familia que el `reglaPrecio` que
+// esta sonda ya atrapó una vez.
+//
+// Y el orden se comprueba de verdad —que las filas vuelvan crecientes por id—,
+// no solo que la consulta no explote: un `orderBy` que Prisma acepte pero que no
+// ordene dejaría el corte tan indeterminado como antes.
+await ejercer("techo y orden compartidos, contra Postgres", async () => {
+  const r = await prisma.productoBase.findMany({
+    ...opcionesDelTecho(),
+    select: { id: true },
+  });
+  const ordenadas = r.every((f, i) => i === 0 || f.id > r[i - 1].id);
+  if (!ordenadas) throw new Error("las filas no volvieron ordenadas por id");
+  return `${r.length} filas ordenadas · techo ${TECHO_CONTROL}`;
 });
 
 // 2. `precioRevisadoAt` existe de verdad en la tabla. Un select que la nombre
@@ -131,5 +153,5 @@ await ejercer("updateMany de precio revisado (sin tocar filas)", async () => {
 
 await prisma.$disconnect();
 
-console.log(fallas === 0 ? "\nVERDE: las 7 consultas corren contra Postgres.\n" : `\nROJO: ${fallas} de 7.\n`);
+console.log(fallas === 0 ? "\nVERDE: las 8 consultas corren contra Postgres.\n" : `\nROJO: ${fallas} de 8.\n`);
 process.exit(fallas === 0 ? 0 : 1);
