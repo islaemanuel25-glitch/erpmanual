@@ -136,7 +136,9 @@ export async function POST(req) {
           }
           const localUpd = await tx.productoLocal.updateMany({
             where: { baseId: productoBaseId, localId: operatingLocalId },
-            data: { precio_venta: ventaNueva },
+            // El precio de ESTA ubicación se acaba de decidir, así que queda
+            // revisado. Solo el de ésta: el `where` ya acota a `operatingLocalId`.
+            data: { precio_venta: ventaNueva, precioRevisadoAt: new Date() },
           });
           if (localUpd.count === 0) {
             saltados.push({ productoBaseId, motivo: "el producto no está habilitado en tu local" });
@@ -194,6 +196,18 @@ export async function POST(req) {
           }
           if (ventaLocal === null || Math.abs(ventaLocal - ventaAnterior) < 0.01) {
             data.precio_venta = ventaNueva;
+            // ── SOLO DONDE EL PRECIO REALMENTE SE APLICÓ ────────────────────
+            //
+            // Va DENTRO de este `if` y no afuera, y ahí está todo el punto: la
+            // condición de arriba es la que decide si este local recibe el
+            // precio nuevo. Un local con un override propio distinto del
+            // anterior NO lo recibe —conserva el suyo— y por lo tanto nadie
+            // revisó su precio: marcarlo como revisado lo sacaría del control
+            // sin que nadie lo haya mirado.
+            //
+            // Un local que recibe solo el COSTO tampoco queda revisado: el
+            // control es sobre el precio de venta.
+            data.precioRevisadoAt = new Date();
           }
 
           if (Object.keys(data).length > 0) {

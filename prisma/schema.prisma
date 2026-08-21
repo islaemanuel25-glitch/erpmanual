@@ -462,6 +462,25 @@ model ProductoLocal {
   // códigos globales de ProductoBase: es un tercer código que solo funciona en este
   // local. null = sin código propio (default para productos existentes, sin backfill).
   codigo_barra_propio String?
+
+  // ── ÚLTIMA REVISIÓN DEL PRECIO EN ESTA UBICACIÓN ──────────────────────────
+  //
+  // Es "última REVISIÓN", no "último cambio": mirar un precio hoy y decidir que
+  // sigue estando bien lo pone al día aunque el importe no se toque. De eso vive
+  // el control "Precios +30 días" de la pantalla de Productos.
+  //
+  // POR QUÉ UNA COLUMNA PROPIA Y NO `updatedAt`. Ese campo se mueve con
+  // CUALQUIER escritura de la fila —un cambio de nombre, de proveedor, del
+  // código propio— y diría que el precio se revisó cuando nadie lo miró.
+  //
+  // POR QUÉ POR UBICACIÓN. El precio de venta puede ser distinto por local, así
+  // que revisar el de un local no dice nada sobre el de otro.
+  //
+  // `null` significa "sin evidencia de revisión" y cuenta como pendiente. Las
+  // filas históricas se quedan en null a propósito: no se backfillea con
+  // `updatedAt` porque esa fecha puede corresponder a otra edición.
+  precioRevisadoAt DateTime?
+
   activo       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

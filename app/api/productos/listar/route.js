@@ -8,8 +8,21 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { evaluarEstructuraCombo } from "@/lib/combos/service";
 import { ubicacionVendeAlCosto } from "@/lib/precios/ubicacionVendeAlCosto";
+import { esControlValido } from "@/lib/productos/controlesCalidad";
+import {
+  filaMarcadaPor,
+  SELECT_CONTROLES_BASE,
+  SELECT_CONTROLES_LOCAL,
+} from "@/lib/productos/controlesDesdePrisma";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
+
+// Techo defensivo del filtro por control. Se clasifica en memoria porque los
+// cuatro dependen de precios efectivos que Prisma no puede mergear en un
+// `where`; este número acota cuántas filas se traen para eso. Mismo criterio que
+// el `MAX_TRANSFERENCIAS` de los reportes: preferimos un resultado explícitamente
+// parcial antes que una consulta que tumbe el proceso — pero nunca en silencio.
+const MAX_CONTROL = 5000;
 const DEFAULT_PAGE_SIZE = 25;
 
 // Whitelist de campos ordenables → mapping a Prisma orderBy
@@ -228,6 +241,49 @@ export async function GET(req) {
 
     const where = { AND: [...generalFilters, searchClause] };
 
+    // ── EL FILTRO POR CONTROL DE CALIDAD ────────────────────────────────────
+    //
+    // `?control=precio-vencido|sin-regla|sin-ganancia|escala-riesgo`. Tocar una
+    // card de "Para revisar" trae exactamente los productos que componen ese
+    // contador, y por eso el filtro NO es un `where` propio: usa la misma
+    // clasificación que cuenta. Dos predicados distintos harían que la card diga
+    // 47 sobre una lista de 45.
+    //
+    // POR QUÉ SE PAGINA EN MEMORIA CUANDO HAY CONTROL. Los cuatro dependen del
+    // precio y el costo EFECTIVOS, que salen de mergear la ficha con el
+    // `ProductoLocal` de la ubicación; Prisma no puede expresar eso en un
+    // `where`. El issue lo decide así de frente: priorizar una sola semántica
+    // antes que una consulta ingeniosa distinta a la lógica del ERP.
+    //
+    // El techo es el mismo criterio defensivo que usan los reportes: se trae
+    // hasta MAX_CONTROL y, si el catálogo lo supera, se avisa en vez de mentir
+    // por lo bajo.
+    const controlPedido = searchParams.get("control") || null;
+    const control = esControlValido(controlPedido) ? controlPedido : null;
+    let truncadoPorControl = false;
+
+    // Se resuelven los IDS marcados y se acotan con un `id: { in }` sobre el
+    // mismo `where`. Así el conteo, el orden, la paginación, el map y el resto
+    // del flujo siguen siendo los de siempre: el control agrega una condición,
+    // no una segunda ruta paralela que después se desincroniza.
+    if (control) {
+      const candidatos = await prisma.productoBase.findMany({
+        where,
+        take: MAX_CONTROL + 1,
+        select: {
+          ...SELECT_CONTROLES_BASE,
+          locales: { where: { localId }, take: 1, select: SELECT_CONTROLES_LOCAL },
+        },
+      });
+
+      truncadoPorControl = candidatos.length > MAX_CONTROL;
+      const idsMarcados = (truncadoPorControl ? candidatos.slice(0, MAX_CONTROL) : candidatos)
+        .filter((p) => filaMarcadaPor(control, p))
+        .map((p) => p.id);
+
+      where.AND.push({ id: { in: idsMarcados } });
+    }
+
     const total = await prisma.productoBase.count({ where });
 
     // Ordenamiento dinámico
@@ -279,6 +335,11 @@ export async function GET(req) {
             recargoFijoUnidad: true,
             codigo_barra_propio: true,
             recargoServicioPct: true,
+            // Última revisión del precio EN ESTA UBICACIÓN. Sin esta columna el
+            // control "Precios +30 días" no puede filtrar, y el select acotado
+            // devolvería `undefined` —que la clasificación leería como "sin
+            // evidencia" y marcaría TODO el catálogo como vencido—.
+            precioRevisadoAt: true,
           },
         },
         // Código interno por proveedor (distinto del código de barras).
@@ -359,6 +420,11 @@ export async function GET(req) {
       total,
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      // El control activo vuelve para que la pantalla pueda mostrarlo y ofrecer
+      // limpiarlo. `truncadoPorControl` avisa cuando el catálogo supera el techo
+      // de clasificación: un reporte parcial se dice, no se disimula.
+      control,
+      truncadoPorControl,
       // Propiedad de la UBICACIÓN, no de las filas: viaja una vez al lado de la
       // página y no repetido en cada uno de los items.
       vendeConListaAlCosto,

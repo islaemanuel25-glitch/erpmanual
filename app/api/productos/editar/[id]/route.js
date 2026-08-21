@@ -536,6 +536,17 @@ async function editarBase(baseId, baseData, operandoEnLocalId = null, localData 
   const opId = Number(operandoEnLocalId);
   if (Number.isInteger(opId) && opId > 0) ubicacionesAAlinear.push({ localId: opId });
 
+  // ── LA REVISIÓN SE MARCA DONDE EL PRECIO REALMENTE SE ALINEÓ ──────────────
+  //
+  // Estas son exactamente las ubicaciones cuyo `precio_venta` efectivo queda
+  // escrito por esta edición, así que son las que quedan revisadas. Las demás no
+  // se tocan: conservan su override y su fecha, porque nadie miró su precio.
+  //
+  // Se marca aunque el importe no cambie, y es a propósito: el control es
+  // "última revisión", no "último cambio". Alguien abrió la ficha, miró el precio
+  // y guardó — eso es haberlo revisado.
+  const revisadoAhora = new Date();
+
   await prisma.productoLocal.updateMany({
     where: { baseId, OR: ubicacionesAAlinear },
     data: {
@@ -543,6 +554,7 @@ async function editarBase(baseId, baseData, operandoEnLocalId = null, localData 
       precio_venta: dataFinal.precio_venta,
       margen: dataFinal.margen,
       activo: dataFinal.activo,
+      precioRevisadoAt: revisadoAhora,
     },
   });
 
