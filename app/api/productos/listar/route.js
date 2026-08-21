@@ -2,14 +2,28 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { productoVisibleWhere } from "@/lib/visibilidad";
+import { filtrosBaseDelCatalogo } from "@/lib/productos/whereCatalogo";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { evaluarEstructuraCombo } from "@/lib/combos/service";
 import { ubicacionVendeAlCosto } from "@/lib/precios/ubicacionVendeAlCosto";
+import { esControlValido } from "@/lib/productos/controlesCalidad";
+import {
+  dentroDelTecho,
+  filaMarcadaPor,
+  opcionesDelTecho,
+  seTrunco,
+  SELECT_CONTROLES_BASE,
+  SELECT_CONTROLES_LOCAL,
+} from "@/lib/productos/controlesDesdePrisma";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
+
+// El techo defensivo del filtro por control ESTABA ESCRITO ACÁ, con su gemelo en
+// `/api/productos/controles`. Ahora vive en `controlesDesdePrisma` junto con el
+// ORDEN con el que se corta, porque las dos consultas tienen que cortar por el
+// mismo lugar y un número definido en dos archivos un día vale dos cosas.
 const DEFAULT_PAGE_SIZE = 25;
 
 // Whitelist de campos ordenables → mapping a Prisma orderBy
@@ -121,14 +135,14 @@ export async function GET(req) {
     // WHERE — snake_case SOLO dentro de Prisma.
     // Filtros generales (sin proveedor): aplican siempre.
     const generalFilters = [
-      { grupoId },
-      // Regla A: el depósito no ve productos creados por locales; cada local ve
-      // los del depósito + los suyos, no los de otros locales.
-      productoVisibleWhere(localId),
-      // Combos: visibilidad ESTRICTA por local dueño. A diferencia de los productos
-      // normales (donde lo creado en el depósito baja a todos los locales), un combo
-      // solo se ve en el local que lo creó — incluso si nació en el depósito.
-      { OR: [{ es_combo: false }, { es_combo: true, creadoEnLocalId: localId }] },
+      // ── LAS TRES ESTRUCTURALES SALEN DE UN LUGAR SOLO ───────────────────
+      //
+      // Grupo, visibilidad depósito/local y la regla de combos. Estaban escritas
+      // acá y ahora viven en `filtrosBaseDelCatalogo`, porque el contador de
+      // "Para revisar" tiene que ver EXACTAMENTE el mismo universo: si el
+      // contador mirara uno distinto, el número de la card no cerraría contra el
+      // total de la lista que abre. Ya le faltaba la de combos.
+      ...filtrosBaseDelCatalogo({ grupoId, localId }),
       // Filtro Tipo (Todos/Productos/Combos).
       tipoFilter,
       categoriaId ? { categoria_id: categoriaId } : {},
@@ -228,6 +242,55 @@ export async function GET(req) {
 
     const where = { AND: [...generalFilters, searchClause] };
 
+    // ── EL FILTRO POR CONTROL DE CALIDAD ────────────────────────────────────
+    //
+    // `?control=precio-vencido|sin-regla|sin-ganancia|escala-riesgo`. Tocar una
+    // card de "Para revisar" trae exactamente los productos que componen ese
+    // contador, y por eso el filtro NO es un `where` propio: usa la misma
+    // clasificación que cuenta. Dos predicados distintos harían que la card diga
+    // 47 sobre una lista de 45.
+    //
+    // POR QUÉ SE PAGINA EN MEMORIA CUANDO HAY CONTROL. Los cuatro dependen del
+    // precio y el costo EFECTIVOS, que salen de mergear la ficha con el
+    // `ProductoLocal` de la ubicación; Prisma no puede expresar eso en un
+    // `where`. El issue lo decide así de frente: priorizar una sola semántica
+    // antes que una consulta ingeniosa distinta a la lógica del ERP.
+    //
+    // El techo es el mismo criterio defensivo que usan los reportes: se trae
+    // hasta `TECHO_CONTROL` y, si el catálogo lo supera, se avisa en vez de
+    // mentir por lo bajo. El techo y el orden salen de `controlesDesdePrisma`,
+    // compartidos con el contador de las cards.
+    const controlPedido = searchParams.get("control") || null;
+    const control = esControlValido(controlPedido) ? controlPedido : null;
+    let truncadoPorControl = false;
+
+    // Se resuelven los IDS marcados y se acotan con un `id: { in }` sobre el
+    // mismo `where`. Así el conteo, el orden, la paginación, el map y el resto
+    // del flujo siguen siendo los de siempre: el control agrega una condición,
+    // no una segunda ruta paralela que después se desincroniza.
+    if (control) {
+      const candidatos = await prisma.productoBase.findMany({
+        where,
+        // El techo Y el orden salen de la misma función que usa el contador de
+        // las cards. Sin `orderBy`, con más de 5.000 productos las dos consultas
+        // podían cortar por lugares distintos: los dos números serían límites
+        // inferiores ciertos de muestras diferentes, y la card diría "+37" sobre
+        // una lista de "+41" sin que ninguno estuviera mal.
+        ...opcionesDelTecho(),
+        select: {
+          ...SELECT_CONTROLES_BASE,
+          locales: { where: { localId }, take: 1, select: SELECT_CONTROLES_LOCAL },
+        },
+      });
+
+      truncadoPorControl = seTrunco(candidatos);
+      const idsMarcados = dentroDelTecho(candidatos)
+        .filter((p) => filaMarcadaPor(control, p))
+        .map((p) => p.id);
+
+      where.AND.push({ id: { in: idsMarcados } });
+    }
+
     const total = await prisma.productoBase.count({ where });
 
     // Ordenamiento dinámico
@@ -279,6 +342,11 @@ export async function GET(req) {
             recargoFijoUnidad: true,
             codigo_barra_propio: true,
             recargoServicioPct: true,
+            // Última revisión del precio EN ESTA UBICACIÓN. Sin esta columna el
+            // control "Precios +30 días" no puede filtrar, y el select acotado
+            // devolvería `undefined` —que la clasificación leería como "sin
+            // evidencia" y marcaría TODO el catálogo como vencido—.
+            precioRevisadoAt: true,
           },
         },
         // Código interno por proveedor (distinto del código de barras).
@@ -359,6 +427,11 @@ export async function GET(req) {
       total,
       pageSize,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      // El control activo vuelve para que la pantalla pueda mostrarlo y ofrecer
+      // limpiarlo. `truncadoPorControl` avisa cuando el catálogo supera el techo
+      // de clasificación: un reporte parcial se dice, no se disimula.
+      control,
+      truncadoPorControl,
       // Propiedad de la UBICACIÓN, no de las filas: viaja una vez al lado de la
       // página y no repetido en cada uno de los items.
       vendeConListaAlCosto,

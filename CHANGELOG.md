@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-08-21] - Actualización: productos
+
+### Modificado
+- **productos**: fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado
+- **productos**: feat(productos): la pantalla del celular sale de la tarjeta gigante y estrena "Para revisar"
+
+
 ## [2026-08-18] - Actualización: productos
 
 ### Modificado

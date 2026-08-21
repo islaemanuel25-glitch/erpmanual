@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-18 20:17
+**Última actualización:** 2026-08-21 01:46
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,10 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-21: fix(productos): la card y el listado dan el mismo número, y un conteo parcial deja de verse sano
+- 2026-08-21: fix(productos): la revisión de precio se marca donde el precio cambia, y solo ahí
+- 2026-08-21: fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado
+- 2026-08-21: feat(productos): la pantalla del celular sale de la tarjeta gigante y estrena "Para revisar"
 - 2026-08-18: feat(productos): la tarjeta avisa cuando un producto se vende sin ganancia, y el botón llega a 44 px
 - 2026-08-18: fix(productos): el listado pide los cuatro campos que el mapper leía y nadie traía
 - 2026-08-18: feat(productos): la ficha de sólo lectura, y Ver deja de llevar al mismo lado que Editar

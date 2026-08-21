@@ -335,9 +335,35 @@ function actualizarDocModulo(modulo, data) {
   // Cambios recientes: insertar bajo la sección; si NO existe, crearla al final
   // del archivo (así el doc del módulo se mantiene aunque no la tuviera).
   const cambiosSection = '## Cambios recientes';
+
+  // ── UN COMMIT NO SE ANOTA DOS VECES ──────────────────────────────────────
+  //
+  // El rango de commits se calcula por FECHA —"desde las 00:00 de hoy"—, así que
+  // dos corridas en el mismo día se pisan: la segunda vuelve a incluir todo lo de
+  // la primera y lo agrega de nuevo. Pasó el 2026-08-21 y dejó cuatro entradas
+  // repetidas en `docs/modulos/productos.md`.
+  //
+  // No se cambia cómo se calcula el rango —eso es otra discusión— sino que se
+  // descarta lo que el archivo ya dice. Comparar la línea entera alcanza: es
+  // fecha más asunto, y dos commits distintos del mismo día con el mismo asunto
+  // no existen en este repo.
+  const yaEstan = new Set(
+    contenido
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith('- '))
+      .map((l) => l.trim())
+  );
   const nuevosEntries = data.commits
     .map(c => `- ${c.date}: ${c.subject}`)
+    .filter(linea => !yaEstan.has(linea.trim()))
     .join('\n');
+
+  if (!nuevosEntries) {
+    // Nada nuevo que anotar. Reescribir el archivo igual solo ensuciaría el diff.
+    console.log(`  =  Sin cambios nuevos: docs/modulos/${modulo}.md`);
+    return;
+  }
+
   if (contenido.includes(cambiosSection)) {
     contenido = contenido.replace(
       cambiosSection,

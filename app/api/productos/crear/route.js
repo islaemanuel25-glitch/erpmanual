@@ -236,6 +236,11 @@ export async function POST(req) {
             precio_venta: base.precio_venta,
             margen: base.margen,
             activo: base.activo,
+            // Un producto nuevo NACE revisado: el precio que se acaba de cargar
+            // es, por definición, el precio que alguien decidió hoy. Dejarlo en
+            // null lo mandaría al control "Precios +30 días" desde el minuto
+            // cero, y ese control existe para señalar lo que quedó viejo.
+            precioRevisadoAt: new Date(),
           })),
           skipDuplicates: true,
         });
@@ -277,6 +282,8 @@ export async function POST(req) {
             precio_venta: base.precio_venta,
             margen: base.margen,
             activo: base.activo,
+            // Nace revisado, igual que en el caso de depósito de arriba.
+            precioRevisadoAt: new Date(),
           },
         ],
         skipDuplicates: true,

@@ -1,13 +1,13 @@
 {
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
-  "generada": "2026-08-20 03:19",
-  "commit": "f208c3cfa80a648fe3ec6c6db4b583d8163c6e91",
+  "generada": "2026-08-21 03:08",
+  "commit": "2a72f65c58c239fd6ab3bdc70dd426aa216550dc",
   "total": {
-    "color": 294,
-    "medida": 1904,
+    "color": 288,
+    "medida": 1899,
     "modal": 36,
-    "crudo": 317,
-    "celda": 465,
+    "crudo": 320,
+    "celda": 461,
     "kit-pisado": 0,
     "tema-paralelo": 129
   },
@@ -238,11 +238,11 @@
       "tema-paralelo": 119
     },
     "productos": {
-      "color": 44,
-      "medida": 196,
+      "color": 38,
+      "medida": 195,
       "modal": 1,
-      "crudo": 30,
-      "celda": 95,
+      "crudo": 33,
+      "celda": 91,
       "kit-pisado": 0,
       "tema-paralelo": 5
     },
@@ -266,7 +266,7 @@
     },
     "reportes-ventas": {
       "color": 0,
-      "medida": 148,
+      "medida": 143,
       "modal": 0,
       "crudo": 12,
       "celda": 34,
@@ -302,7 +302,7 @@
     },
     "transferencias": {
       "color": 0,
-      "medida": 67,
+      "medida": 68,
       "modal": 0,
       "crudo": 7,
       "celda": 29,

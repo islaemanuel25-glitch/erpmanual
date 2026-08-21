@@ -41,16 +41,18 @@ distinto de lo desplegado— y lo único que frenó el despliegue fue que quien 
 corría se acordaba del bloqueo, dicho unos mensajes antes en la misma
 conversación. Una sesión nueva no se habría acordado.
 
-Es la misma familia que el 2026-08-14, cuando el procedimiento corrió entero con
-17 commits sin empujar y no desplegó nada: **los chequeos del paso 0 son de
-consistencia, no de contenido ni de intención.** Este archivo es lo que agrega la
-intención, y por eso vale aunque la lista esté vacía.
+El 2026-08-14 el procedimiento corrió entero con 17 commits sin empujar y no
+desplegó nada: **los chequeos del paso 0 son de consistencia, no de contenido ni
+de intención.** Este archivo es lo que agrega la intención, y por eso vale aunque
+la lista esté vacía.
 
 ---
 
 ## Bloqueos vigentes
 
-**Ninguno.** Todo lo que está en `origin/main` se puede desplegar.
+Ninguno.
+
+---
 
 El bloqueo que motivó este archivo —`289a036`, la tanda de la tarjeta— lo levantó
 Emanuel el 2026-08-19 y esa tanda ya está en producción.

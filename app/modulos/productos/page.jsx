@@ -10,6 +10,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
@@ -19,23 +20,47 @@ import FiltrosProductos from "@/components/productos/FiltrosProductos";
 import ColumnManager from "@/components/productos/ColumnManager";
 import ModalProducto from "@/components/productos/ModalProductoFinal";
 import ModalVerComposicion from "@/components/productos/ModalVerComposicion";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
-import { Eye, Pencil } from "lucide-react";
+import CarruselControles from "@/components/productos/CarruselControles";
+import HojaMasAcciones from "@/components/productos/HojaMasAcciones";
+import HojaPersonalizarTarjeta from "@/components/productos/HojaPersonalizarTarjeta";
+// `Eye` se fue con el botón "Ver": la tarjeta del celular deja Editar como única
+// acción. La pantalla de sólo lectura sigue existiendo y se llega desde la tabla
+// de escritorio, que no cambió.
+import { Pencil, Search, SlidersHorizontal, MoreHorizontal, X, CheckCheck } from "lucide-react";
 import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
 import { escalaDeVentaDe, valorEnLaEscalaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "@/lib/precios/redondeo";
-import { seVendeSinGanancia } from "@/lib/precios/precioDesdeMargen";
-import {
-  reglaDeGananciaDe,
-  textoDeGanancia,
-  GANANCIA_FALTA,
-} from "@/lib/precios/reglaDeGanancia";
+// `seVendeSinGanancia` y `GANANCIA_FALTA` se importaban acá para los dos avisos
+// de mantenimiento de la tarjeta. Los dos avisos se fueron a "Para revisar", que
+// los cuenta y los deja filtrar, así que estos imports quedaron sin consumidor.
+// Se sacan: un import que nadie usa documenta una UX que ya no existe, y el
+// próximo que lea el archivo va a buscar dónde se dibuja ese aviso.
+import { reglaDeGananciaDe, textoDeGanancia } from "@/lib/precios/reglaDeGanancia";
 // LA MARCA DEL SERVICIO ES LA DEL POS, no una nueva. `esProductoServicio` mira
 // `modalidad`, que es el mismo campo con el que el POS decide abrir el modal de
 // importe en vez de cobrar un precio fijo.
 import { esProductoServicio } from "@/lib/pos-ventas/servicios";
+import { CONTROL, esControlValido } from "@/lib/productos/controlesCalidad";
+import {
+  filtrosNeutros,
+  mismosFiltros,
+  hayFiltrosPuestos,
+  normalizarEstadoDeUrl,
+  CLAVES_DE_FILTRO,
+} from "@/lib/productos/filtrosCatalogo";
+import {
+  CAMPO,
+  REGION,
+  camposVisiblesDe,
+  campoVisible,
+  claveDeConfiguracion,
+  configuracionPorDefecto,
+  normalizarConfiguracion,
+} from "@/lib/productos/camposTarjeta";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 // =========================================================
@@ -55,42 +80,61 @@ const TABS = [
 // vender".
 const TEXTO_IMPORTE_VARIABLE = "Importe variable";
 
-// ── EL AVISO DE LOS QUE NO DEJAN NADA ─────────────────────────────────────
+// ── LA REGLA DE GANANCIA EN LA TARJETA, YA SIN AVISAR ─────────────────────
 //
-// Corto, y dice el hecho: la venta no le saca nada al costo. No dice "¡atención!"
-// ni "error" — no es un error del sistema, es una situación del negocio, y un
-// cartel alarmista sobre 429 filas enseña a ignorar los carteles.
+// ACÁ VIVÍAN LOS DOS AVISOS DE MANTENIMIENTO, y se fueron enteros: la constante
+// "Se vende sin ganancia" y el ámbar del "falta %". Los dos son ahora controles
+// de "Para revisar", donde se cuentan y se pueden filtrar; en la tarjeta
+// informaban de a uno y no llevaban a ningún lado. Dejar la constante y el texto
+// que la explicaba habría dejado el archivo documentando una pantalla que ya no
+// existe.
 //
-// Se eligió "sin ganancia" y no "sin margen" porque margen es la palabra del
-// campo configurado, que es OTRA cosa: hay 1.691 filas sin margen asignado que
-// igual venden con ganancia.
-const AVISO_SIN_GANANCIA = "Se vende sin ganancia";
-
-// ── EL PORCENTAJE DE GANANCIA, Y EL QUE FALTA ─────────────────────────────
+// Lo que queda es el renglón que dice CUÁL es la regla —un porcentaje, o
+// "+$100/un" en las 231 filas de recargo fijo— en el gris tenue de la tarjeta,
+// sin distinguir al que no tiene ninguna. Esa distinción la hace la card de
+// "Falta regla".
 //
-// La idea es que se sepa de un vistazo cuál tiene porcentaje asignado y cuál no,
-// y por eso el que falta se ve MÁS que el que está: los 8.613 que tienen uno van
-// en el gris tenue de la tarjeta, y los 1.677 que no van en `--pos-warning`, el
-// mismo ámbar medido del aviso de abajo. Un blanco o un cero no servirían — el
-// blanco no se lee como "falta" y el cero es un valor cargado que significa otra
-// cosa: "vendé al costo".
+// Los servicios de importe variable quedan afuera: no tienen precio fijo, así
+// que no les falta un porcentaje — no les corresponde.
 //
-// Las 231 filas de RECARGO FIJO no son "sin porcentaje": tienen regla, la suya no
-// se expresa en porcentaje. Van en gris con su valor en pesos —"+$100/un"—, así
-// que se distinguen de las tres cosas a la vez: no son un porcentaje, no son un
-// faltante, y dicen cuál es su regla.
-//
-// Los servicios de importe variable quedan AFUERA, igual que del aviso: no
-// tienen precio fijo, así que no les falta un porcentaje — no les corresponde.
-// Son 12 filas que si no dirían "falta %" mintiendo.
 // `text-xs` y no una medida escrita: está en la escala y no sube el contador de
-// hardcodeo. Son 10,5 px reales —1 rem son 14 acá—, el mismo tamaño que el aviso
-// de abajo, que es el otro elemento de "mirá esto" de la tarjeta.
+// hardcodeo. Son 10,5 px reales —1 rem son 14 acá—.
 const GANANCIA_CLASE = "text-xs [font-variant-numeric:tabular-nums] whitespace-nowrap";
 // Y la línea de abajo explica de dónde sale el importe. Va con texto y no vacía
 // porque todas las tarjetas llevan su línea: un hueco haría que estas cuatro
 // quedaran más bajas que las demás.
 const EQUIVALENCIA_IMPORTE_VARIABLE = "El importe se carga al vender";
+
+// ── EL ESTADO INICIAL SALE DE LA URL, Y SE NORMALIZA ANTES DE USARSE ──────
+//
+// Las dos lecturas viven acá arriba, fuera del componente, por un motivo
+// concreto: tienen que poder combinarse ANTES de que ninguno de los dos `useState`
+// las use. Leídas cada una en su inicializador —que es como estaban— nunca se
+// miran juntas, y por ahí entraba el agujero de `?control=sin-regla&q=aceite`.
+function controlDeLaUrl(sp) {
+  const pedido = sp.get("control");
+  return esControlValido(pedido) ? pedido : null;
+}
+
+function filtrosDeLaUrl(sp) {
+  return {
+    search: sp.get("q") || "",
+    categoria: sp.get("categoria") || "",
+    proveedor: sp.get("proveedor") || "",
+    area: sp.get("area") || "",
+    // estado: activos (default) | inactivos | todos. Soporta URL vieja con
+    // ?activo=true/false para no romper bookmarks de operadores.
+    estado:
+      sp.get("estado") ||
+      (sp.get("activo") === "false"
+        ? "inactivos"
+        : sp.get("activo") === "true"
+        ? "activos"
+        : "activos"),
+    // tipo: todos (default) | productos | combos.
+    tipo: sp.get("tipo") || "todos",
+  };
+}
 
 // Contenedor scrolleable de la lista: con header sticky el scroll vive en
 // #productos-scroll (la tabla). Fallback al <main> de LayoutBase.
@@ -197,6 +241,63 @@ export default function ProductosPage() {
   const [sortKey, setSortKey] = useState(searchParams.get("sortKey") || "nombre");
   const [sortDir, setSortDir] = useState(searchParams.get("sortDir") || "asc");
 
+  // ── EL CONTROL QUE ESTÁ FILTRANDO ────────────────────────────────────────
+  //
+  // Vive en la URL como los demás filtros: así el botón de atrás del teléfono
+  // deshace el filtro, y un enlace a "los que faltan revisar" se puede mandar.
+  //
+  // Se valida contra el dominio al leerlo. Un id inventado en la URL no puede
+  // dejar la pantalla filtrando por algo que el servidor no sabe contar: quedaría
+  // la lista vacía sin ninguna card marcada, y eso se lee como "no hay productos".
+  //
+  // ── Y SE NORMALIZA CONTRA LOS FILTROS ANTES DE ENTRAR AL ESTADO ─────────
+  //
+  // Una URL con los dos —`?control=sin-regla&q=aceite`— rompía el criterio del
+  // issue sin pasar por ningún manejador: bastaba con recargar la página o abrir
+  // un enlace compartido. `normalizarEstadoDeUrl` decide que gana el control y
+  // los filtros se van, que es lo mismo que hace tocar la card.
+  //
+  // Se calcula UNA vez y de ahí salen los dos `useState`. Leído en cada
+  // inicializador por separado, el control y los filtros nunca se miran juntos —
+  // que es exactamente cómo se coló este caso.
+  const inicialRef = useRef(null);
+  if (inicialRef.current === null) {
+    inicialRef.current = normalizarEstadoDeUrl({
+      control: controlDeLaUrl(searchParams),
+      filtros: filtrosDeLaUrl(searchParams),
+    });
+  }
+
+  const [control, setControl] = useState(inicialRef.current.control);
+  const [controles, setControles] = useState([]);
+  const [cargandoControles, setCargandoControles] = useState(true);
+  // El conteo puede ser PARCIAL: el servidor clasifica en memoria con un techo.
+  // Se guarda para poder decirlo, porque un 0 parcial no significa "no hay
+  // ninguno" sino "no lo sé".
+  const [controlesTruncado, setControlesTruncado] = useState(false);
+  const [techoControles, setTechoControles] = useState(null);
+  // Y el mismo caso del lado del listado: con el filtro puesto, el servidor avisa
+  // si tuvo que cortar. Si corta, el total tampoco es el total.
+  const [listadoTruncado, setListadoTruncado] = useState(false);
+  const [marcandoRevisado, setMarcandoRevisado] = useState(false);
+
+  // Las tres hojas del celular. Ninguna existe en escritorio.
+  const [hojaMas, setHojaMas] = useState(false);
+  const [hojaPersonalizar, setHojaPersonalizar] = useState(false);
+  const [hojaFiltros, setHojaFiltros] = useState(false);
+
+  // ── LA CONFIGURACIÓN DE LA TARJETA ARRANCA EN EL DEFAULT, SIEMPRE ────────
+  //
+  // Y se lee del `localStorage` recién en un efecto, no en el inicializador.
+  // Motivo: esta pantalla se renderiza también en el servidor, donde no hay
+  // `localStorage`. Un inicializador que lea el navegador devuelve una cosa en el
+  // servidor y otra en el cliente, y React lo reporta como error de hidratación
+  // —o peor, no lo reporta y deja el árbol desincronizado.
+  //
+  // `visibleCols` lo hace del otro modo y funciona porque tiene su
+  // `typeof window`; acá se elige el camino que no depende de acordarse.
+  const [configTarjeta, setConfigTarjeta] = useState(() => configuracionPorDefecto());
+
   // Selección persistente de fila + restauración de scroll al volver de editar.
   // El contenedor scrolleable es el <main> de LayoutBase (no window).
   const restoredScrollRef = useRef(false);
@@ -242,23 +343,16 @@ export default function ProductosPage() {
 
   const localId = contexto?.localId || 0;
 
-  const [filtros, setFiltros] = useState({
-    search: searchParams.get("q") || "",
-    categoria: searchParams.get("categoria") || "",
-    proveedor: searchParams.get("proveedor") || "",
-    area: searchParams.get("area") || "",
-    // estado: activos (default) | inactivos | todos. Soporta URL vieja con
-    // ?activo=true/false para no romper bookmarks de operadores.
-    estado:
-      searchParams.get("estado") ||
-      (searchParams.get("activo") === "false"
-        ? "inactivos"
-        : searchParams.get("activo") === "true"
-        ? "activos"
-        : "activos"),
-    // tipo: todos (default) | productos | combos.
-    tipo: searchParams.get("tipo") || "todos",
-  });
+  // Salen del mismo estado inicial normalizado que el control — ver `inicialRef`.
+  const [filtros, setFiltros] = useState(inicialRef.current.filtros);
+
+  // Los filtros que NO reducen el universo: exactamente el que cuenta la card de
+  // "Para revisar". Es el estado al que se vuelve al activar un control.
+  //
+  // `estado: "activos"` y `tipo: "todos"` no son "vacío", son los valores por
+  // defecto — y son los que el contador usa, así que son los que hacen que los
+  // dos números cierren.
+  const filtrosAntesDelControlRef = useRef(null);
 
   // =========================================================
   // SYNC ESTADO LISTADO → URL (query params)
@@ -279,9 +373,12 @@ export default function ProductosPage() {
     if (filtros.tipo && filtros.tipo !== "todos") {
       params.set("tipo", filtros.tipo);
     }
+    // El control filtrando viaja en la URL como un filtro más: así el botón de
+    // atrás lo deshace y el enlace se puede compartir.
+    if (control) params.set("control", control);
     const qs = params.toString();
     return qs ? `/modulos/productos?${qs}` : "/modulos/productos";
-  }, [page, sortKey, sortDir, filtros]);
+  }, [page, sortKey, sortDir, filtros, control]);
 
   const urlSyncRef = useRef(false);
   useEffect(() => {
@@ -454,6 +551,10 @@ export default function ProductosPage() {
         tipo: filtros.tipo || "todos",
         localId: String(localId),
       });
+      // El control va aparte y solo si hay uno: `URLSearchParams` con un `null`
+      // manda el texto "null", que el servidor descartaría por inválido pero
+      // dejaría la intención sin registrar en la URL del pedido.
+      if (control) params.set("control", control);
 
       const res = await fetch(`/api/productos/listar?${params.toString()}`, {
         credentials: "include",
@@ -474,6 +575,9 @@ export default function ProductosPage() {
         // que es el comportamiento anterior, en vez de dejarlos en `undefined`.
         setVendeConListaAlCosto(data.vendeConListaAlCosto === true);
         setListaAlCostoRedondea100(data.listaAlCostoRedondea100 === true);
+        // El filtro por control clasifica en memoria con un techo. Si lo alcanzó,
+        // el total es parcial y hay que decirlo: si no, la lista se ve completa.
+        setListadoTruncado(data.truncadoPorControl === true);
       }
     } catch (err) {
       console.error("Error cargando productos:", err);
@@ -481,14 +585,88 @@ export default function ProductosPage() {
     setLoading(false);
   };
 
+  // ── LOS CONTADORES DE "PARA REVISAR" ────────────────────────────────────
+  //
+  // Pedido aparte del listado y no colgado de él, por dos motivos:
+  //
+  //   · el listado está PAGINADO y filtrado; el conteo es del catálogo entero de
+  //     la ubicación. Sacarlo de `items` daría "los que faltan revisar entre
+  //     estos 25", que no es lo que la card promete;
+  //   · el conteo no cambia al pasar de página, así que atarlo al listado lo
+  //     recalcularía en cada toque de paginador para dar el mismo número.
+  //
+  // Los dos comparten la MISMA clasificación en el servidor, así que el número de
+  // la card y el total de la lista filtrada no se pueden separar.
+  const fetchControles = async () => {
+    setCargandoControles(true);
+    try {
+      const res = await fetch(`/api/productos/controles?localId=${localId}`, {
+        credentials: "include",
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      const data = await res.json();
+      // ── UN ERROR NO SE DESCARTA EN SILENCIO ─────────────────────────────
+      //
+      // Si el servidor falla, las cards se quedan sin conteo Y se dice por qué.
+      // Mostrar cuatro ceros sería peor que no mostrar nada: cuatro ceros
+      // afirman que el catálogo está sano.
+      if (data.ok) {
+        setControles(data.controles || []);
+        // ── EL CONTEO PARCIAL SE PROPAGA, NO SE DESCARTA ────────────────
+        //
+        // El servidor ya mandaba `truncado` y esta pantalla lo tiraba. Con un
+        // catálogo por encima del techo, las cards mostraban conteos parciales
+        // —incluido un 0— con la misma cara que un resultado completo, o sea la
+        // pantalla afirmando "está todo bien" sobre datos que no tiene.
+        setControlesTruncado(data.truncado === true);
+        setTechoControles(Number(data.techo) || null);
+      } else {
+        setControles([]);
+        setControlesTruncado(false);
+        console.error("productos/controles:", data.error);
+      }
+    } catch (err) {
+      setControles([]);
+      setControlesTruncado(false);
+      console.error("Error cargando controles:", err);
+    }
+    setCargandoControles(false);
+  };
+
   useEffect(() => {
     fetchCatalogos();
   }, []);
 
+  // La configuración de la tarjeta, después del primer render — ver el comentario
+  // del `useState`. Se relee al cambiar de ubicación porque la clave es por local.
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem(claveDeConfiguracion(localId));
+      setConfigTarjeta(normalizarConfiguracion(guardado ? JSON.parse(guardado) : null));
+    } catch {
+      setConfigTarjeta(configuracionPorDefecto());
+    }
+  }, [localId]);
+
+  const guardarConfigTarjeta = (siguiente) => {
+    setConfigTarjeta(siguiente);
+    try {
+      localStorage.setItem(claveDeConfiguracion(localId), JSON.stringify(siguiente));
+    } catch {}
+  };
+
   useEffect(() => {
     if (!localId) return;
     fetchProductos();
-  }, [page, pageSize, sortKey, sortDir, filtros, localId]);
+  }, [page, pageSize, sortKey, sortDir, filtros, localId, control]);
+
+  useEffect(() => {
+    if (!localId) return;
+    fetchControles();
+  }, [localId]);
 
   useEffect(() => {
     if (nuevo === "1") {
@@ -709,8 +887,131 @@ export default function ProductosPage() {
     router.push("/modulos/productos/actualizacion-precios");
   };
 
-  const abrirEdicionRapida = () => {
-    router.push("/modulos/productos/edicion-rapida");
+  // ── TOCAR UNA CARD DE CONTROL FILTRA; TOCARLA DE NUEVO SACA EL FILTRO ────
+  //
+  // El mismo toque para las dos cosas, porque es el mismo botón: si apagar el
+  // filtro estuviera en otro lado, el que lo prendió sin querer no sabría cómo
+  // volver. La página vuelve a 1 porque el universo cambió — quedarse en la 7 de
+  // un listado que ahora tiene 2 páginas muestra una lista vacía.
+  //
+  // ── Y LOS DEMÁS FILTROS SE LIMPIAN, QUE ES EL PUNTO ─────────────────────
+  //
+  // El criterio aprobado es literal: **el número de la card y el total del
+  // listado filtrado tienen que coincidir**.
+  //
+  // La primera versión dejaba los filtros puestos y mostraba los dos números al
+  // lado, confiando en que la diferencia se leyera. No alcanza: la card dice 47,
+  // se toca, y el listado abre con 8 porque había un proveedor elegido de antes.
+  // Los dos números pueden estar bien y aun así la pantalla queda mintiendo sobre
+  // lo que esa card significa.
+  //
+  // Así que al activar un control se limpia todo lo que reduce el universo —la
+  // búsqueda, categoría, proveedor, área, y estado y tipo vuelven a su valor por
+  // defecto—, y la lista que se abre es EXACTAMENTE la población de la card.
+  //
+  // `estado` y `tipo` no son un detalle: el contador cuenta activos de las dos
+  // clases, así que con "inactivos" elegido el total tampoco cerraría.
+  //
+  // ── Y SE DEVUELVEN AL APAGARLO ──────────────────────────────────────────
+  //
+  // Limpiar sin devolver convertiría el toque en algo que hay que pensar antes:
+  // quien filtró por un proveedor y toca una card por curiosidad perdería el
+  // trabajo. Se guardan y se reponen.
+  //
+  // Al apagarlo se devuelven, para que el toque no cueste el trabajo de quien
+  // venía filtrando por un proveedor y tocó una card por curiosidad.
+  const alternarControl = (id) => {
+    const apagando = control === id;
+    setPage(1);
+
+    if (apagando) {
+      setControl(null);
+      const guardados = filtrosAntesDelControlRef.current;
+      filtrosAntesDelControlRef.current = null;
+      // Con el invariante, mientras el control estuvo activo los filtros no
+      // pudieron cambiar, así que reponer es siempre correcto. La comprobación
+      // queda igual: si algún día aparece un cuarto camino que los mueva, esto
+      // no pisa lo que la persona haya elegido.
+      if (guardados && mismosFiltros(filtros, filtrosNeutros())) {
+        setFiltros(guardados);
+      }
+      return;
+    }
+
+    // Cambiar de una card a otra no vuelve a guardar: lo guardado es lo que había
+    // ANTES de entrar a los controles, y sobrescribirlo con los filtros neutros
+    // perdería los originales.
+    if (filtrosAntesDelControlRef.current === null) {
+      filtrosAntesDelControlRef.current = filtros;
+    }
+    setControl(id);
+    if (hayFiltrosPuestos(filtros)) setFiltros(filtrosNeutros());
+  };
+
+  // ── TOCAR UN FILTRO CON UN CONTROL ACTIVO LO APAGA ──────────────────────
+  //
+  // El tercer camino, y el que faltaba. Limpiar al ENTRAR cubría el toque de la
+  // card y nada más: el buscador y la hoja de filtros seguían editables con el
+  // control puesto, y ahí la card volvía a contar el catálogo entero mientras el
+  // listado pasaba a ser un subconjunto. El criterio del issue se rompía sin que
+  // nada avisara.
+  //
+  // Las dos salidas posibles eran bloquear los filtros mientras hay un control, o
+  // que el filtro gane y apague el control. Se eligió la segunda: bloquear
+  // controles deja a la persona atrapada —tiene que darse cuenta de que primero
+  // hay que apagar la card— y en un celular eso se lee como una pantalla trabada.
+  // Así, escribir en el buscador simplemente vuelve al catálogo completo, que es
+  // lo que esa persona está pidiendo al escribir.
+  //
+  // Lo guardado se DESCARTA: la persona eligió otro camino, y devolverle después
+  // unos filtros viejos encima de los que acaba de poner sería la sorpresa al
+  // revés.
+  const aplicarFiltros = (nuevos) => {
+    setPage(1);
+    if (control !== null) {
+      setControl(null);
+      filtrosAntesDelControlRef.current = null;
+    }
+    setFiltros(nuevos);
+  };
+
+  // ── MARCAR COMO REVISADOS LOS DE ESTA PÁGINA ─────────────────────────────
+  //
+  // Confirma un precio SIN cambiarlo. Es la contraparte del control de los 30
+  // días: la conclusión más común al mirar un precio viejo es que sigue estando
+  // bien, y sin esto la única forma de sacarlo de la lista sería cambiarle el
+  // importe — o sea, tocar un precio para que deje de avisar.
+  //
+  // Actúa sobre LO QUE SE ESTÁ VIENDO y no sobre todo el catálogo. "Revisado" es
+  // una afirmación de una persona sobre unos precios que miró; un botón que
+  // marcara los 2.600 de una vez la convertiría en una firma en blanco, y el
+  // control quedaría decorativo desde el primer toque.
+  const marcarRevisados = async () => {
+    const ids = rows.map((p) => p.id ?? p.productoLocalId).filter(Boolean);
+    if (ids.length === 0) return;
+    setMarcandoRevisado(true);
+    try {
+      const res = await fetch("/api/productos/precio-revisado", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productoBaseIds: ids, localId: localId || null }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        alert(data.error || "No se pudieron marcar los precios como revisados");
+        return;
+      }
+      // Los dos números se rehacen: el listado —porque estas filas dejan de
+      // estar marcadas— y el conteo de las cards. Si solo se rehiciera uno, la
+      // card diría 47 sobre una lista de 22.
+      await Promise.all([fetchProductos(), fetchControles()]);
+    } catch (err) {
+      console.error("Error marcando precios revisados:", err);
+      alert("No se pudieron marcar los precios como revisados");
+    } finally {
+      setMarcandoRevisado(false);
+    }
   };
 
   // ── "VER" YA TIENE SU PANTALLA ──────────────────────────────────────────
@@ -1018,6 +1319,37 @@ export default function ProductosPage() {
     XLSX.writeFile(wb, `errores_corregir_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
+  // ── LO QUE LA TARJETA MUESTRA, RESUELTO UNA VEZ POR RENDER ──────────────
+  //
+  // Y no adentro del `map`: son las mismas cinco respuestas para las 25 filas.
+  // Resolverlas por fila sería normalizar la configuración veinticinco veces
+  // para obtener veinticinco veces lo mismo.
+  const muestraProveedor = campoVisible(configTarjeta, CAMPO.PROVEEDOR);
+  const muestraEquivalencia = campoVisible(configTarjeta, CAMPO.EQUIVALENCIA);
+  const muestraCodigoBarra = campoVisible(configTarjeta, CAMPO.CODIGO_BARRA);
+  const muestraCodigoInterno = campoVisible(configTarjeta, CAMPO.CODIGO_INTERNO);
+  const ordenMarca = camposVisiblesDe(configTarjeta, REGION.MARCA);
+  const ordenPie = camposVisiblesDe(configTarjeta, REGION.PIE);
+
+  // El control que está filtrando, ya con su título — para el chip de contexto.
+  // Sale de la lista que mandó el servidor y no de una copia local: si el
+  // servidor agrega un quinto control, el chip lo nombra bien sin tocar esto.
+  const controlActivo = controles.find((c) => c.id === control) ?? null;
+
+  // Cuántos filtros hay puestos, sin contar la búsqueda —que se ve escrita en su
+  // propio campo— ni el estado en su valor de siempre.
+  // Cuántos filtros hay puestos, para el globito del botón. La búsqueda no
+  // cuenta: se ve escrita en su propio campo, al lado.
+  //
+  // Los valores por defecto salen de `filtrosNeutros`, la MISMA función que usa
+  // `alternarControl` para limpiar. Estaban escritos a mano acá —"activos",
+  // "todos"— y eso es un default definido en dos lugares: el día que cambie uno,
+  // el globito contaría un filtro que no está puesto.
+  const neutros = filtrosNeutros();
+  const filtrosActivos = CLAVES_DE_FILTRO.filter(
+    (k) => k !== "search" && (filtros[k] ?? "") !== neutros[k]
+  ).length;
+
   // =========================================================
   // RENDER
   // =========================================================
@@ -1027,13 +1359,55 @@ export default function ProductosPage() {
 
   return (
     <div className="sunmi-bg w-full min-h-full p-2">
-      <SunmiCard>
+      {/* ── EN EL CELULAR EL MÓDULO NO VA ADENTRO DE UNA TARJETA ────────────
+          `contents` es `display: contents`: el elemento NO genera caja, así que
+          su fondo, su borde, su sombra, su relleno y su `backdrop-blur` no se
+          dibujan, y los hijos pasan a ser hijos del contenedor de la página. De
+          `md` para arriba vuelve a `block`, que es lo que un `div` es por
+          defecto — o sea que de 768 px para arriba no cambia UN PÍXEL.
+
+          ── POR QUÉ ASÍ Y NO MOVIENDO EL ÁRBOL ──────────────────────────────
+
+          Las dos alternativas eran peores y se descartaron con su motivo:
+
+          · dibujar el árbol dos veces —uno `md:hidden` y otro `hidden md:block`—
+            duplica el DOM entero, y con él los `id`, los campos del formulario y
+            el foco. Dos copias del mismo filtro escribiendo el mismo estado es
+            la clase de cosa que anda hasta que una se desincroniza.
+
+          · pasarle clases a `SunmiCard` para que "apague" su fondo en el celular
+            no funciona: la pieza filtra su token de fondo en cuanto la pantalla
+            declara uno, así que apagarlo abajo lo apagaría también arriba, y
+            reponerlo con `md:bg-...` obligaría a escribir a mano el color del
+            tema — catorce veces mal.
+
+          De regalo se va el problema del `backdrop-filter`, que crea bloque
+          contenedor para los `position: fixed` de adentro: sin caja no hay
+          filtro, así que en el celular ninguna capa se puede desalinear por eso. */}
+      <SunmiCard className="contents md:block">
         <div className="flex flex-col gap-2">
 
           {/* =========================================================
               TABS
-              ========================================================= */}
-          <div className="flex gap-1 border-b sunmi-divider pb-1">
+              =========================================================
+              ── EN EL CELULAR NO SE VEN MIENTRAS SE ESTÁ EN EL LISTADO ──
+              La decisión aprobada para el celular deja tres acciones a la vista
+              —+ Producto, Filtros, Más— y manda Import / Export adentro de
+              "Más". Con la fila de tabs también visible, ese acceso quedaba
+              DUPLICADO y en dos lugares distintos de la pantalla.
+
+              Por qué no se esconde siempre: sin las tabs, quien entra a
+              Import / Export desde "Más" no tiene forma de volver al listado.
+              Así que aparecen justamente ahí, que es donde hacen falta y donde
+              ya no duplican nada.
+
+              De `md` para arriba no cambia nada: `md:flex` es lo que la fila
+              tenía. */}
+          <div
+            className={`${
+              activeTab === "listado" ? "hidden md:flex" : "flex"
+            } gap-1 border-b sunmi-divider pb-1`}
+          >
             {TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -1056,29 +1430,176 @@ export default function ProductosPage() {
               ========================================================= */}
           {activeTab === "listado" && (
             <>
-              {/* FILTROS */}
-              <SunmiSeparator label="Filtros" className="my-1" />
+              {/* ── 2 · PARA REVISAR ─────────────────────────────────────────
+                  Va ARRIBA DE TODO lo operativo y no al final: es lo único de
+                  esta pantalla que dice qué HAY QUE HACER. Debajo del buscador
+                  quedaría después de la acción que la mayoría hace por reflejo
+                  —escribir un nombre— y nadie lo vería nunca. */}
+              <div className="md:hidden">
+                <CarruselControles
+                  controles={controles}
+                  activo={control}
+                  onSelect={alternarControl}
+                  cargando={cargandoControles}
+                  truncado={controlesTruncado}
+                  techo={techoControles}
+                />
+              </div>
 
+              {/* ── 3 · EL BUSCADOR, SUELTO ──────────────────────────────────
+                  En el celular el buscador sale del bloque de filtros y queda a
+                  la vista: de los seis filtros que hay, es el único que se usa
+                  en casi todas las visitas. Los otros cinco viven en la hoja de
+                  "Filtros", que es el botón de al lado.
+
+                  Escribe el MISMO estado `filtros.search` que el buscador de
+                  escritorio, así que no hay dos búsquedas que puedan discrepar:
+                  es el mismo dato con dos entradas. */}
+              <div className="md:hidden relative">
+                <Search
+                  className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 sunmi-text-muted pointer-events-none"
+                  aria-hidden="true"
+                />
+                <SunmiInput
+                  value={filtros.search}
+                  onChange={(e) => {
+                    // Por `aplicarFiltros`, que apaga el control si había uno:
+                    // buscar con una card activa rompía el criterio del issue.
+                    aplicarFiltros({ ...filtros, search: e.target.value });
+                  }}
+                  placeholder="Buscar por nombre o código"
+                  aria-label="Buscar productos"
+                  className="w-full pl-8"
+                />
+              </div>
+
+              {/* ── 4 · LAS TRES ACCIONES DEL CELULAR ────────────────────────
+                  A 390 px entran tres botones legibles en una fila. Antes había
+                  CUATRO apilados en columna —`flex-col md:flex-row`—, o sea
+                  cuatro renglones de botón antes del primer producto.
+
+                  Las tres que quedan son las que se usan todos los días. El
+                  resto está en "Más", con su hoja. */}
+              <div className="md:hidden grid grid-cols-3 gap-1.5">
+                <SunmiButton color="amber" onClick={abrirNuevo} className="w-full">
+                  + Producto
+                </SunmiButton>
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setHojaFiltros(true)}
+                  className="w-full"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
+                    Filtros
+                    {/* CUÁNTOS FILTROS HAY PUESTOS, en el botón. Sin esto, un
+                        filtro olvidado adentro de la hoja explica una lista corta
+                        sin que nada lo diga desde afuera. */}
+                    {filtrosActivos > 0 && (
+                      <span
+                        className="min-w-4 h-4 px-1 rounded-full text-[10px] leading-4 text-center"
+                        style={{
+                          background: "var(--pos-accent)",
+                          color: "var(--pos-panel-bg)",
+                        }}
+                      >
+                        {filtrosActivos}
+                      </span>
+                    )}
+                  </span>
+                </SunmiButton>
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setHojaMas(true)}
+                  className="w-full"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+                    Más
+                  </span>
+                </SunmiButton>
+              </div>
+
+              {/* ── 5 · LA LÍNEA DE CONTEXTO ────────────────────────────────
+                  Cuántos productos se están viendo y por qué. Cuando hay un
+                  control filtrando, lo dice CON SU NOMBRE y con la forma de
+                  sacarlo: un listado filtrado que no explica por qué está
+                  filtrado se lee como un catálogo que perdió productos.
+
+                  Y con el control puesto este número tiene que ser EL MISMO que
+                  el de la card. Lo garantiza `alternarControl`, que limpia los
+                  demás filtros al activarlo: sin eso los dos números podían
+                  diferir y la card quedaba prometiendo una población que la
+                  lista no muestra. */}
+              <div className="md:hidden flex items-center gap-2 flex-wrap min-h-[24px]">
+                <span className="text-[11px] sunmi-text-muted [font-variant-numeric:tabular-nums]">
+                  {loading
+                    ? "Cargando…"
+                    : /* Con el filtro truncado el total tampoco es el total: lleva
+                         "+" por lo mismo que las cards. */
+                      `${listadoTruncado ? "+" : ""}${totalItems} producto${
+                        totalItems === 1 ? "" : "s"
+                      }`}
+                </span>
+                {controlActivo && (
+                  <button
+                    type="button"
+                    onClick={() => alternarControl(controlActivo.id)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px]"
+                    style={{
+                      borderColor: "var(--pos-accent)",
+                      color: "var(--pos-accent)",
+                    }}
+                  >
+                    {controlActivo.titulo} {controlActivo.detalle}
+                    <X className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                )}
+                {/* MARCAR REVISADOS: solo con el control de los 30 días puesto.
+                    Fuera de ese contexto no significa nada —"revisado" contesta
+                    a "hace más de 30 días que nadie lo mira"— y sería un botón
+                    escribiendo una fecha sin motivo. */}
+                {control === CONTROL.PRECIO_VENCIDO && rows.length > 0 && (
+                  <SunmiButton
+                    color="slate"
+                    onClick={marcarRevisados}
+                    disabled={marcandoRevisado}
+                    className="ml-auto text-[11px] disabled:opacity-50"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <CheckCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                      {marcandoRevisado ? "Marcando…" : `Marcar ${rows.length} revisados`}
+                    </span>
+                  </SunmiButton>
+                )}
+              </div>
+
+              {/* FILTROS — de escritorio. En el celular viven en la hoja, y son
+                  EL MISMO componente con el mismo `onChange`: no hay dos bloques
+                  de filtros que puedan interpretar distinto lo mismo. */}
+              <div className="hidden md:block">
+                <SunmiSeparator label="Filtros" className="my-1" />
+              </div>
+
+              <div className="hidden md:block">
               <FiltrosProductos
                 initial={filtros}
                 catalogos={catalogos}
+                // `aplicarFiltros` resuelve las dos cosas: vuelve a la página 1 y
+                // apaga el control si había uno. `mismosFiltros` reemplaza a la
+                // comparación campo por campo que estaba escrita acá —y otra vez
+                // más abajo, en la hoja del celular—, que es un default de
+                // "cambió" definido en dos lugares.
                 onChange={(f) => {
-                  // Solo resetear página si los filtros realmente cambiaron
-                  const changed = f.search !== filtros.search ||
-                    f.categoria !== filtros.categoria ||
-                    f.proveedor !== filtros.proveedor ||
-                    f.area !== filtros.area ||
-                    f.estado !== filtros.estado ||
-                    f.tipo !== filtros.tipo;
-                  if (changed) {
-                    setPage(1);
-                    setFiltros(f);
-                  }
+                  if (!mismosFiltros(f, filtros)) aplicarFiltros(f);
                 }}
               />
+              </div>
 
-              {/* ACCIONES */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-2 w-full mt-1">
+              {/* ACCIONES — de escritorio. En el celular son las tres de arriba
+                  más la hoja de "Más". "Edición rápida" se fue del sistema: la
+                  pantalla y su componente se borraron en esta misma tanda. */}
+              <div className="hidden md:flex flex-row items-center justify-between gap-2 w-full mt-1">
                 <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                   <SunmiButton color="amber" onClick={abrirNuevo}>
                     + Producto
@@ -1088,9 +1609,6 @@ export default function ProductosPage() {
                   </SunmiButton>
                   <SunmiButton color="cyan" onClick={abrirActualizacionPrecios}>
                     Actualización de precios
-                  </SunmiButton>
-                  <SunmiButton color="cyan" onClick={abrirEdicionRapida}>
-                    Edición rápida
                   </SunmiButton>
                 </div>
 
@@ -1102,8 +1620,12 @@ export default function ProductosPage() {
                 />
               </div>
 
-              {/* LISTADO */}
-              <SunmiSeparator label="Listado" className="my-1" />
+              {/* LISTADO — el separador es de escritorio. En el celular la línea
+                  de contexto de arriba ya dice qué se está viendo, y un
+                  separador más sería un renglón que empuja las tarjetas. */}
+              <div className="hidden md:block">
+                <SunmiSeparator label="Listado" className="my-1" />
+              </div>
 
               {/* ── ANGOSTO: TARJETAS. ANCHO: LA TABLA DE SIEMPRE ──────────
                   El corte es `md` (768 px), y no es un número elegido acá: es el
@@ -1155,7 +1677,6 @@ export default function ProductosPage() {
                       redondeo100: redondeo,
                       pesoReferenciaKg: p.pesoReferenciaKg,
                     });
-                  const ventaEnEscala = enEscala(p.precioVenta, p.redondeo100);
                   // Ya no lo gatea ningún permiso: el costo se ve para todos.
                   const costoEnEscala = enEscala(p.precioCosto, false);
 
@@ -1176,22 +1697,57 @@ export default function ProductosPage() {
                   // El REDONDEO sigue a quien manda en cada caso: la venta lleva
                   // el del producto, y el costo bajo lista lleva el de la LISTA,
                   // que es lo que el POS aplica. Hoy esa lista no redondea.
-                  const precioQueCobraElPos = vendeConListaAlCosto
-                    ? enEscala(p.precioCosto, listaAlCostoRedondea100)
-                    : ventaEnEscala;
+                  //
+                  // ── UN SOLO PRECIO EFECTIVO, Y DE ACÁ SALEN LOS DOS ──────
+                  //
+                  // El número grande y la línea de equivalencia tienen que salir
+                  // de la MISMA fuente. Hasta acá no lo hacían: el número grande
+                  // ya elegía entre costo y venta, y la equivalencia recibía
+                  // siempre `p.precioVenta`.
+                  //
+                  // En el depósito —que vende con lista al costo— eso ponía dos
+                  // números incompatibles en la misma tarjeta. Medido sobre
+                  // `361 LATA X24`: arriba "$24.500,00 por bulto", que es el
+                  // COSTO, y abajo "1 pack = 24 un · $1.400,00 por unidad", que
+                  // sale de la VENTA de 31.900 redondeada por unidad. 24 × 1.400
+                  // da 33.600, y el de arriba dice 24.500. Los dos números están
+                  // bien por separado y juntos no cierran, que es la peor forma:
+                  // el que mira la tarjeta para controlar un precio no tiene cómo
+                  // saber cuál de los dos mirar.
+                  //
+                  // Por eso `precioBaseDelPos` y `redondeoDelPos` se deciden UNA
+                  // vez y los consume todo lo que muestre ese precio. La rama
+                  // desaparece: con `vendeConListaAlCosto` en false esto da
+                  // exactamente lo que daba antes.
+                  const precioBaseDelPos = vendeConListaAlCosto ? p.precioCosto : p.precioVenta;
+                  const redondeoDelPos = vendeConListaAlCosto
+                    ? listaAlCostoRedondea100
+                    : p.redondeo100;
+                  const precioQueCobraElPos = enEscala(precioBaseDelPos, redondeoDelPos);
                   return (
                   <SunmiProductoCard
                     key={p.id ?? p.productoLocalId}
                     nombre={p.nombre}
-                    empresa={p.proveedorNombre ?? null}
+                    // `false` es "esta pantalla no lo muestra" y `null` es "no
+                    // hay dato": la tarjeta los dibuja al revés —el segundo deja
+                    // el renglón diciendo qué falta— así que la distinción no se
+                    // puede perder acá.
+                    empresa={muestraProveedor ? p.proveedorNombre ?? null : false}
                     equivalencia={
-                      esProductoServicio(p)
+                      !muestraEquivalencia
+                        ? null
+                        : esProductoServicio(p)
                         ? EQUIVALENCIA_IMPORTE_VARIABLE
                         : lineaDeEquivalencia({
-                            precio: p.precioVenta,
+                            // EL MISMO precio que el número grande, no
+                            // `p.precioVenta` — ver `precioBaseDelPos` arriba.
+                            // Recibía siempre la venta, y en el depósito eso
+                            // ponía la conversión de un precio distinto del que
+                            // la tarjeta muestra arriba.
+                            precio: precioBaseDelPos,
                             factor: p.factorPack,
                             unidad: p.unidadMedida,
-                            redondeo100: p.redondeo100,
+                            redondeo100: redondeoDelPos,
                             // Los 142 combos no se distinguían de un producto
                             // común en ninguna parte de la tarjeta. Lo dice la
                             // franja de escala, con palabra y no con un dibujo.
@@ -1204,8 +1760,10 @@ export default function ProductosPage() {
                             pesoReferenciaKg: p.pesoReferenciaKg,
                           })
                     }
-                    codigoBarra={p.codigoBarra ?? p.sku ?? null}
-                    codigoInterno={p.id ?? p.productoLocalId ?? null}
+                    codigoBarra={muestraCodigoBarra ? p.codigoBarra ?? p.sku ?? null : false}
+                    codigoInterno={
+                      muestraCodigoInterno ? p.id ?? p.productoLocalId ?? null : false
+                    }
                     // EL COSTO Y LA GANANCIA, en el hueco que ya existía a la
                     // izquierda del precio. No agrega renglón: van APILADOS
                     // dentro de la fila del valor, que tiene 30 px de alto
@@ -1233,55 +1791,61 @@ export default function ProductosPage() {
                     //   costo. Dejarla sería escribir el mismo número dos veces
                     //   en la misma fila, una vez grande y otra chiquita.
                     marca={
-                      esProductoServicio(p) || vendeConListaAlCosto
+                      esProductoServicio(p) || vendeConListaAlCosto || ordenMarca.length === 0
                         ? null
                         : (() => {
                             const regla = reglaDeGananciaDe(p);
-                            const falta = regla.tipo === GANANCIA_FALTA;
-                            return (
-                              <span className="flex flex-col items-start leading-tight">
-                                {costoEnEscala !== null && (
+                            // ── EL RENGLÓN DE LA REGLA YA NO AVISA ──────────
+                            //
+                            // Antes el que no tenía porcentaje se pintaba de
+                            // ámbar. Ese aviso se fue de la tarjeta junto con
+                            // "Se vende sin ganancia": las dos cosas son ahora
+                            // controles de "Para revisar", donde se cuentan y se
+                            // pueden filtrar. Dejarlos también acá los diría dos
+                            // veces, y en la tarjeta no hay nada que hacer con
+                            // ellos — no se puede tocar el ámbar para ver los
+                            // otros mil seiscientos.
+                            const bloque = {
+                              [CAMPO.COSTO]:
+                                costoEnEscala !== null ? (
                                   <span
+                                    key={CAMPO.COSTO}
                                     className={`${GANANCIA_CLASE} sunmi-text-muted`}
                                     title="Costo, en la misma escala que el precio de venta"
                                   >
                                     Costo {formatearMoneda(costoEnEscala)}
                                   </span>
-                                )}
-                              <span
-                                className={[
-                                  GANANCIA_CLASE,
-                                  falta
-                                    ? "font-medium [color:var(--pos-warning)]"
-                                    : "sunmi-text-muted",
-                                ].join(" ")}
-                                // El texto ya lo dice; el título explica de qué
-                                // porcentaje se trata, que en una tarjeta con un
-                                // precio al lado no es obvio.
-                                title={
-                                  falta
-                                    ? "Este producto no tiene porcentaje de ganancia asignado"
-                                    : "Porcentaje de ganancia configurado"
-                                }
-                              >
-                                {textoDeGanancia(regla)}
-                              </span>
+                                ) : null,
+                              [CAMPO.MARGEN]: (
+                                <span
+                                  key={CAMPO.MARGEN}
+                                  className={`${GANANCIA_CLASE} sunmi-text-muted`}
+                                  title="Regla de ganancia configurada"
+                                >
+                                  {textoDeGanancia(regla)}
+                                </span>
+                              ),
+                            };
+                            // El ORDEN sale de la configuración: es lo único que
+                            // se puede reordenar de verdad en esta región, y es
+                            // lo que "Personalizar card" promete.
+                            const renglones = ordenMarca.map((id) => bloque[id]).filter(Boolean);
+                            if (renglones.length === 0) return null;
+                            return (
+                              <span className="flex flex-col items-start leading-tight">
+                                {renglones}
                               </span>
                             );
                           })()
                     }
-                    // EL AVISO SOBRE LO QUE YA PASÓ, no sobre lo que podría
-                    // pasar. Son 429 filas en producción que se venden al costo
-                    // o por debajo. Los 1.691 SIN REGLA DE PRECIO no se marcan
-                    // acá: su problema es otro —no se mueven cuando sube el
-                    // costo— y marcaría el 16 % del catálogo por algo que
-                    // todavía no ocurrió. Queda anotado como tanda propia.
-                    aviso={
-                      !esProductoServicio(p) &&
-                      seVendeSinGanancia({ costo: p.precioCosto, venta: p.precioVenta })
-                        ? AVISO_SIN_GANANCIA
-                        : null
-                    }
+                    // ── SIN AVISOS DE MANTENIMIENTO EN LA TARJETA ───────────
+                    //
+                    // "Se vende sin ganancia" salía acá en 429 filas. Ahora es el
+                    // control "Venta ≤ costo" de arriba, que además dice CUÁNTAS
+                    // son y deja verlas todas juntas — que es lo que se necesita
+                    // para arreglarlas. Un triángulo por tarjeta informaba de a
+                    // una y no llevaba a ningún lado.
+                    aviso={null}
                     valor={
                       esProductoServicio(p) ? (
                         // UN SERVICIO NO TIENE PRECIO, Y CERO NO ES "GRATIS".
@@ -1329,26 +1893,30 @@ export default function ProductosPage() {
                         </>
                       )
                     }
-                    // LOS DOS BOTONES, A LA VISTA. Ya no hay capa que abrir.
+                    codigoInternoPrimero={ordenPie[0] === CAMPO.CODIGO_INTERNO}
+                    // ── EDITAR, Y NADA MÁS ────────────────────────────────
+                    //
+                    // "Ver" se fue. Llevaba a una ficha de sólo lectura que
+                    // muestra lo mismo que la tarjeta ya muestra, y desde la que
+                    // igual hay que tocar Editar para hacer algo: era un toque
+                    // de más para llegar al mismo lado. La pantalla no se borró
+                    // —sigue en `/modulos/productos/[id]` y se llega desde la
+                    // tabla de escritorio—, lo que se fue es el botón.
+                    //
+                    // Y con un solo botón la fila deja de partirse en dos, así
+                    // que el blanco táctil pasa de media tarjeta a la tarjeta
+                    // entera.
                     //
                     // EL ID, NO LA FILA: `abrirEditar` valida con `Number(id)`,
                     // así que pasarle el objeto daba NaN y saltaba "ID de
                     // producto inválido" sin entrar nunca.
                     acciones={
-                      <>
-                        <AccionTarjeta
-                          icono={Eye}
-                          onClick={() => abrirVer(p.id ?? p.productoLocalId)}
-                        >
-                          Ver
-                        </AccionTarjeta>
-                        <AccionTarjeta
-                          icono={Pencil}
-                          onClick={() => abrirEditar(p.id ?? p.productoLocalId)}
-                        >
-                          Editar
-                        </AccionTarjeta>
-                      </>
+                      <AccionTarjeta
+                        icono={Pencil}
+                        onClick={() => abrirEditar(p.id ?? p.productoLocalId)}
+                      >
+                        Editar
+                      </AccionTarjeta>
                     }
                   />
                   );
@@ -1754,6 +2322,49 @@ export default function ProductosPage() {
           de 640, y la tarjeta del modal quedaba en y=398,8 con el borde de abajo
           en 943,8 — **304 px fuera de la pantalla**. A 1366x900 el mismo efecto
           la cortaba 3 px. */}
+      {/* ── LAS TRES HOJAS DEL CELULAR ──────────────────────────────────────
+          Van acá, con los modales, por el mismo motivo que ellos. Y no llevan
+          `md:hidden`: se abren solo desde botones que ya lo tienen, así que en
+          escritorio nunca se montan — un `hidden` encima sería una capa abierta
+          e invisible, que es peor que una cerrada. */}
+      <HojaMasAcciones
+        open={hojaMas}
+        onClose={() => setHojaMas(false)}
+        onNuevoCombo={abrirNuevoCombo}
+        onActualizacionPrecios={abrirActualizacionPrecios}
+        onImportExport={() => setActiveTab("importexport")}
+        onPersonalizarCard={() => setHojaPersonalizar(true)}
+        puedeExportar={puedeExportar}
+      />
+
+      <HojaPersonalizarTarjeta
+        open={hojaPersonalizar}
+        onClose={() => setHojaPersonalizar(false)}
+        config={configTarjeta}
+        onChange={guardarConfigTarjeta}
+      />
+
+      {/* LOS FILTROS DEL CELULAR: el MISMO `FiltrosProductos` de escritorio, con
+          el mismo `onChange`. No es una copia — si lo fuera, el día que se agregue
+          un filtro habría que acordarse de los dos lados. */}
+      <SunmiModalLayout
+        open={hojaFiltros}
+        onClose={() => setHojaFiltros(false)}
+        title="Filtros"
+        forma="hoja"
+        z={9999}
+        espacioCuerpo="mt-2"
+        maxWidth="max-w-xl"
+      >
+        <FiltrosProductos
+          initial={filtros}
+          catalogos={catalogos}
+          onChange={(f) => {
+            if (!mismosFiltros(f, filtros)) aplicarFiltros(f);
+          }}
+        />
+      </SunmiModalLayout>
+
       <ModalProducto
         open={modalOpen}
         onClose={cerrarModal}
