@@ -49,6 +49,7 @@ import {
   filtrosNeutros,
   mismosFiltros,
   hayFiltrosPuestos,
+  normalizarEstadoDeUrl,
   CLAVES_DE_FILTRO,
 } from "@/lib/productos/filtrosCatalogo";
 import {
@@ -103,6 +104,37 @@ const GANANCIA_CLASE = "text-xs [font-variant-numeric:tabular-nums] whitespace-n
 // porque todas las tarjetas llevan su línea: un hueco haría que estas cuatro
 // quedaran más bajas que las demás.
 const EQUIVALENCIA_IMPORTE_VARIABLE = "El importe se carga al vender";
+
+// ── EL ESTADO INICIAL SALE DE LA URL, Y SE NORMALIZA ANTES DE USARSE ──────
+//
+// Las dos lecturas viven acá arriba, fuera del componente, por un motivo
+// concreto: tienen que poder combinarse ANTES de que ninguno de los dos `useState`
+// las use. Leídas cada una en su inicializador —que es como estaban— nunca se
+// miran juntas, y por ahí entraba el agujero de `?control=sin-regla&q=aceite`.
+function controlDeLaUrl(sp) {
+  const pedido = sp.get("control");
+  return esControlValido(pedido) ? pedido : null;
+}
+
+function filtrosDeLaUrl(sp) {
+  return {
+    search: sp.get("q") || "",
+    categoria: sp.get("categoria") || "",
+    proveedor: sp.get("proveedor") || "",
+    area: sp.get("area") || "",
+    // estado: activos (default) | inactivos | todos. Soporta URL vieja con
+    // ?activo=true/false para no romper bookmarks de operadores.
+    estado:
+      sp.get("estado") ||
+      (sp.get("activo") === "false"
+        ? "inactivos"
+        : sp.get("activo") === "true"
+        ? "activos"
+        : "activos"),
+    // tipo: todos (default) | productos | combos.
+    tipo: sp.get("tipo") || "todos",
+  };
+}
 
 // Contenedor scrolleable de la lista: con header sticky el scroll vive en
 // #productos-scroll (la tabla). Fallback al <main> de LayoutBase.
@@ -217,10 +249,26 @@ export default function ProductosPage() {
   // Se valida contra el dominio al leerlo. Un id inventado en la URL no puede
   // dejar la pantalla filtrando por algo que el servidor no sabe contar: quedaría
   // la lista vacía sin ninguna card marcada, y eso se lee como "no hay productos".
-  const [control, setControl] = useState(() => {
-    const pedido = searchParams.get("control");
-    return esControlValido(pedido) ? pedido : null;
-  });
+  //
+  // ── Y SE NORMALIZA CONTRA LOS FILTROS ANTES DE ENTRAR AL ESTADO ─────────
+  //
+  // Una URL con los dos —`?control=sin-regla&q=aceite`— rompía el criterio del
+  // issue sin pasar por ningún manejador: bastaba con recargar la página o abrir
+  // un enlace compartido. `normalizarEstadoDeUrl` decide que gana el control y
+  // los filtros se van, que es lo mismo que hace tocar la card.
+  //
+  // Se calcula UNA vez y de ahí salen los dos `useState`. Leído en cada
+  // inicializador por separado, el control y los filtros nunca se miran juntos —
+  // que es exactamente cómo se coló este caso.
+  const inicialRef = useRef(null);
+  if (inicialRef.current === null) {
+    inicialRef.current = normalizarEstadoDeUrl({
+      control: controlDeLaUrl(searchParams),
+      filtros: filtrosDeLaUrl(searchParams),
+    });
+  }
+
+  const [control, setControl] = useState(inicialRef.current.control);
   const [controles, setControles] = useState([]);
   const [cargandoControles, setCargandoControles] = useState(true);
   // El conteo puede ser PARCIAL: el servidor clasifica en memoria con un techo.
@@ -295,23 +343,8 @@ export default function ProductosPage() {
 
   const localId = contexto?.localId || 0;
 
-  const [filtros, setFiltros] = useState({
-    search: searchParams.get("q") || "",
-    categoria: searchParams.get("categoria") || "",
-    proveedor: searchParams.get("proveedor") || "",
-    area: searchParams.get("area") || "",
-    // estado: activos (default) | inactivos | todos. Soporta URL vieja con
-    // ?activo=true/false para no romper bookmarks de operadores.
-    estado:
-      searchParams.get("estado") ||
-      (searchParams.get("activo") === "false"
-        ? "inactivos"
-        : searchParams.get("activo") === "true"
-        ? "activos"
-        : "activos"),
-    // tipo: todos (default) | productos | combos.
-    tipo: searchParams.get("tipo") || "todos",
-  });
+  // Salen del mismo estado inicial normalizado que el control — ver `inicialRef`.
+  const [filtros, setFiltros] = useState(inicialRef.current.filtros);
 
   // Los filtros que NO reducen el universo: exactamente el que cuenta la card de
   // "Para revisar". Es el estado al que se vuelve al activar un control.
@@ -885,10 +918,8 @@ export default function ProductosPage() {
   // quien filtró por un proveedor y toca una card por curiosidad perdería el
   // trabajo. Se guardan y se reponen.
   //
-  // La reposición tiene una condición: solo si mientras el control estuvo puesto
-  // NADIE tocó los filtros. Si la persona escribió una búsqueda con el control
-  // activo, eso es lo que quiere ver ahora, y pisárselo con lo de antes sería la
-  // misma sorpresa al revés.
+  // Al apagarlo se devuelven, para que el toque no cueste el trabajo de quien
+  // venía filtrando por un proveedor y tocó una card por curiosidad.
   const alternarControl = (id) => {
     const apagando = control === id;
     setPage(1);
@@ -897,6 +928,10 @@ export default function ProductosPage() {
       setControl(null);
       const guardados = filtrosAntesDelControlRef.current;
       filtrosAntesDelControlRef.current = null;
+      // Con el invariante, mientras el control estuvo activo los filtros no
+      // pudieron cambiar, así que reponer es siempre correcto. La comprobación
+      // queda igual: si algún día aparece un cuarto camino que los mueva, esto
+      // no pisa lo que la persona haya elegido.
       if (guardados && mismosFiltros(filtros, filtrosNeutros())) {
         setFiltros(guardados);
       }
@@ -911,6 +946,33 @@ export default function ProductosPage() {
     }
     setControl(id);
     if (hayFiltrosPuestos(filtros)) setFiltros(filtrosNeutros());
+  };
+
+  // ── TOCAR UN FILTRO CON UN CONTROL ACTIVO LO APAGA ──────────────────────
+  //
+  // El tercer camino, y el que faltaba. Limpiar al ENTRAR cubría el toque de la
+  // card y nada más: el buscador y la hoja de filtros seguían editables con el
+  // control puesto, y ahí la card volvía a contar el catálogo entero mientras el
+  // listado pasaba a ser un subconjunto. El criterio del issue se rompía sin que
+  // nada avisara.
+  //
+  // Las dos salidas posibles eran bloquear los filtros mientras hay un control, o
+  // que el filtro gane y apague el control. Se eligió la segunda: bloquear
+  // controles deja a la persona atrapada —tiene que darse cuenta de que primero
+  // hay que apagar la card— y en un celular eso se lee como una pantalla trabada.
+  // Así, escribir en el buscador simplemente vuelve al catálogo completo, que es
+  // lo que esa persona está pidiendo al escribir.
+  //
+  // Lo guardado se DESCARTA: la persona eligió otro camino, y devolverle después
+  // unos filtros viejos encima de los que acaba de poner sería la sorpresa al
+  // revés.
+  const aplicarFiltros = (nuevos) => {
+    setPage(1);
+    if (control !== null) {
+      setControl(null);
+      filtrosAntesDelControlRef.current = null;
+    }
+    setFiltros(nuevos);
   };
 
   // ── MARCAR COMO REVISADOS LOS DE ESTA PÁGINA ─────────────────────────────
@@ -1384,8 +1446,9 @@ export default function ProductosPage() {
                 <SunmiInput
                   value={filtros.search}
                   onChange={(e) => {
-                    setPage(1);
-                    setFiltros((f) => ({ ...f, search: e.target.value }));
+                    // Por `aplicarFiltros`, que apaga el control si había uno:
+                    // buscar con una card activa rompía el criterio del issue.
+                    aplicarFiltros({ ...filtros, search: e.target.value });
                   }}
                   placeholder="Buscar por nombre o código"
                   aria-label="Buscar productos"
@@ -1505,18 +1568,13 @@ export default function ProductosPage() {
               <FiltrosProductos
                 initial={filtros}
                 catalogos={catalogos}
+                // `aplicarFiltros` resuelve las dos cosas: vuelve a la página 1 y
+                // apaga el control si había uno. `mismosFiltros` reemplaza a la
+                // comparación campo por campo que estaba escrita acá —y otra vez
+                // más abajo, en la hoja del celular—, que es un default de
+                // "cambió" definido en dos lugares.
                 onChange={(f) => {
-                  // Solo resetear página si los filtros realmente cambiaron
-                  const changed = f.search !== filtros.search ||
-                    f.categoria !== filtros.categoria ||
-                    f.proveedor !== filtros.proveedor ||
-                    f.area !== filtros.area ||
-                    f.estado !== filtros.estado ||
-                    f.tipo !== filtros.tipo;
-                  if (changed) {
-                    setPage(1);
-                    setFiltros(f);
-                  }
+                  if (!mismosFiltros(f, filtros)) aplicarFiltros(f);
                 }}
               />
               </div>
@@ -2257,17 +2315,7 @@ export default function ProductosPage() {
           initial={filtros}
           catalogos={catalogos}
           onChange={(f) => {
-            const changed =
-              f.search !== filtros.search ||
-              f.categoria !== filtros.categoria ||
-              f.proveedor !== filtros.proveedor ||
-              f.area !== filtros.area ||
-              f.estado !== filtros.estado ||
-              f.tipo !== filtros.tipo;
-            if (changed) {
-              setPage(1);
-              setFiltros(f);
-            }
+            if (!mismosFiltros(f, filtros)) aplicarFiltros(f);
           }}
         />
       </SunmiModalLayout>

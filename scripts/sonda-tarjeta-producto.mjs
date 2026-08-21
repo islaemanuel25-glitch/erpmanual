@@ -1316,6 +1316,81 @@ try {
       `durante: "${durante.busqueda}" · después: "${despues.busqueda}" (era "${antes.busqueda}")`
     );
     await teclearBusqueda("");
+
+    // ── 14g · BUSCAR CON EL CONTROL PUESTO LO APAGA ──────────────────────
+    //
+    // El agujero que quedaba: limpiar al ENTRAR cubría el toque de la card y
+    // nada más. El buscador seguía editable con el control activo, y ahí la card
+    // volvía a contar el catálogo entero mientras el listado pasaba a ser un
+    // subconjunto. La revisión lo marcó como bloqueante y tiene razón: el
+    // criterio del issue se rompía sin que nada avisara.
+    await tocarCard(iConDatos);
+    const conControlPuesto = await leerEstado();
+    await teclearBusqueda("aceite");
+    const trasBuscarConControl = await leerEstado();
+    afirmar(
+      /control=/.test(conControlPuesto.url || "") &&
+        !/control=/.test(trasBuscarConControl.url || ""),
+      "14g · escribir en el buscador con un control activo lo apaga",
+      `antes: ${conControlPuesto.url} · después: ${trasBuscarConControl.url}`
+    );
+    // Y el listado tiene que ser el de la búsqueda, no una mezcla de los dos.
+    afirmar(
+      trasBuscarConControl.busqueda === "aceite" &&
+        Number(trasBuscarConControl.total) !== Number(conControlPuesto.total),
+      "14h · y el listado pasa a ser el de la búsqueda, sin el control",
+      `búsqueda "${trasBuscarConControl.busqueda}" · total ${trasBuscarConControl.total} (con el control era ${conControlPuesto.total})`
+    );
+    await teclearBusqueda("");
+
+    // ── 14i · UNA URL CON CONTROL Y BÚSQUEDA SE NORMALIZA ────────────────
+    //
+    // El otro camino, y no pasa por ningún manejador: alcanza con recargar la
+    // página o abrir un enlace compartido. Se entra por URL y se comprueba que la
+    // pantalla queda EXACTAMENTE en la población de la card.
+    // El id del control se toma de la URL después de tocarlo: es el mismo que la
+    // pantalla escribe, así que la URL que se arma abajo es la que se comparte de
+    // verdad y no una inventada por la sonda.
+    await tocarCard(iConDatos);
+    const control = await evaluar(`new URLSearchParams(location.search).get("control")`);
+    await tocarCard(iConDatos);
+    if (!control) {
+      afirmar(false, "14i · no se pudo averiguar el id del control para armar la URL", "");
+    } else {
+      await send("Page.navigate", {
+        url: `${BASE}/modulos/productos?control=${encodeURIComponent(control)}&q=aceite`,
+      });
+      for (let i = 0; i < 40; i++) {
+        const n = await evaluar(`${TARJETAS}.length`).catch(() => 0);
+        if (Number(n) > 0) break;
+        await sleep(1000);
+      }
+      const trasUrl = await leerEstado();
+      const cantidadEnLaCard = await evaluar(`(() => {
+        const seccion = [...document.querySelectorAll('section')]
+          .find((s) => /Para revisar/.test(s.textContent || ""));
+        if (!seccion) return null;
+        const b = [...seccion.querySelectorAll('button[aria-pressed]')]
+          .find((x) => x.getAttribute('aria-pressed') === 'true');
+        return b ? Number((b.innerText.match(/\\d+/) || [0])[0]) : null;
+      })()`);
+      afirmar(
+        trasUrl.busqueda === "",
+        "14i · entrando por URL con control y búsqueda, la búsqueda no queda puesta",
+        `la búsqueda quedó en "${trasUrl.busqueda}"`
+      );
+      afirmar(
+        cantidadEnLaCard !== null && Number(trasUrl.total) === cantidadEnLaCard,
+        `14j · y el listado trae los MISMOS ${cantidadEnLaCard} que cuenta la card`,
+        `el listado trajo ${trasUrl.total} · url ${trasUrl.url}`
+      );
+      await send("Page.navigate", { url: `${BASE}/modulos/productos` });
+      for (let i = 0; i < 40; i++) {
+        const n = await evaluar(`${TARJETAS}.length`).catch(() => 0);
+        if (Number(n) > 0) break;
+        await sleep(1000);
+      }
+    }
   }
 
   // ── 15 · "MÁS" ABRE SU HOJA, Y LLEVA LAS CUATRO ACCIONES ────────────────
