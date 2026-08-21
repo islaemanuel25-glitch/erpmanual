@@ -22,6 +22,11 @@
 //   node scripts/medir-desborde.mjs --url /modulos/categorias \
 //     --abrir "Nueva" --elemento "[role=dialog] > div:nth-child(2)" \
 //     --repeticiones 3 --salida /tmp/x --nombre categoria
+//
+//   Para algo que está a dos toques —una hoja adentro de otra— se encadenan
+//   los textos con `|`:
+//   node scripts/medir-desborde.mjs --url /modulos/productos \
+//     --abrir "Más|Personalizar card" --elemento '[data-sunmi-modal="tarjeta"]'
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -308,21 +313,35 @@ if (arg("abrir-primero")) {
 // Tocar un botón por su texto. Falla nombrándolo, por el mismo motivo que el
 // selector: un botón que no se encontró deja la foto de la pantalla de atrás, y
 // esa foto es perfectamente determinista.
+//
+// ── SE PUEDEN ENCADENAR VARIOS, SEPARADOS POR `|` ─────────────────────────
+//
+// Porque hay pantallas donde lo que se quiere fotografiar está a DOS toques:
+// "Personalizar card" vive adentro de la hoja de "Más", así que con un solo
+// `--abrir` la foto salía de la hoja de afuera. Un texto sin `|` se comporta
+// exactamente como antes.
+//
+// Si falla el segundo, se dice CUÁL falló y en qué paso. Un "no se encontró" a
+// secas sobre una cadena de tres mandaría a buscar el problema en el primero.
 if (ABRIR) {
-  const abrio = await evaluar(`(() => {
-    const buscado = ${JSON.stringify(String(ABRIR).toLowerCase())};
-    const b = [...document.querySelectorAll("button, a")].find(
-      (x) => (x.textContent || "").toLowerCase().includes(buscado)
-    );
-    if (b) b.click();
-    return !!b;
-  })()`);
-  if (!abrio) {
-    console.log(`NO HAY NINGÚN BOTÓN QUE DIGA "${ABRIR}". La foto sería de la pantalla de atrás.`);
-    cerrar();
-    process.exit(1);
+  const pasos = String(ABRIR).split("|").map((s) => s.trim()).filter(Boolean);
+  for (const [i, paso] of pasos.entries()) {
+    const abrio = await evaluar(`(() => {
+      const buscado = ${JSON.stringify(paso.toLowerCase())};
+      const b = [...document.querySelectorAll("button, a")].find(
+        (x) => (x.textContent || "").toLowerCase().includes(buscado)
+      );
+      if (b) b.click();
+      return !!b;
+    })()`);
+    if (!abrio) {
+      const donde = pasos.length > 1 ? ` (paso ${i + 1} de ${pasos.length})` : "";
+      console.log(`NO HAY NINGÚN BOTÓN QUE DIGA "${paso}"${donde}. La foto sería de la pantalla de atrás.`);
+      cerrar();
+      process.exit(1);
+    }
+    await sleep(2500);
   }
-  await sleep(2500);
 }
 
 if (ABRIR_SELECTOR) {
