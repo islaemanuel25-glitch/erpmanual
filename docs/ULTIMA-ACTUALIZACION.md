@@ -1,16 +1,18 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-18 20:17
+**Fecha:** 2026-08-21 00:24
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat(productos): la tarjeta avisa cuando un producto se vende sin ganancia, y el botón llega a 44 px, fix(productos): el listado pide los cuatro campos que el mapper leía y nadie traía, feat(productos): la ficha de sólo lectura, y Ver deja de llevar al mismo lado que Editar
-- Archivos: 1 nuevos, 4 modificados (5 total)
+- fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado, feat(productos): la pantalla del celular sale de la tarjeta gigante y estrena "Para revisar"
+- Archivos: 3 nuevos, 5 modificados (8 total)
 
 
 ## Archivos nuevos desde última sincronización
-- app/modulos/productos/[id]/page.jsx
+- components/productos/CarruselControles.jsx
+- components/productos/HojaMasAcciones.jsx
+- components/productos/HojaPersonalizarTarjeta.jsx
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
