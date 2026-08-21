@@ -16,28 +16,32 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260821030000_producto_local_precio_revisado`
+**Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
+comprobado con `prisma migrate status` el 2026-08-21 después de desplegar
+`45e6dae6a34055ca2c746102c5bd7c585a174277`.
 
-Agrega `ProductoLocal.precioRevisadoAt` —un `TIMESTAMP(3)` que acepta nulos— y su
-índice. Es del issue #2: de esa columna vive el control "Precios +30 días" del
-catálogo.
+La última fue `20260821030000_producto_local_precio_revisado` —la columna
+`ProductoLocal.precioRevisadoAt` y su índice— y **se aplicó de verdad**: el
+contenedor descartable informó "101 migrations found", el mismo número que el
+árbol, y dijo `Applying migration`. Eso es lo que distingue "se aplicó" de "la
+imagen no la conocía", que salen iguales en el código de salida.
 
-**Aditiva y sin paso de datos.** No borra ni reescribe nada, y **no hay
-backfill**: las filas históricas se quedan en `null` a propósito, porque `null`
-significa "sin evidencia de revisión" y rellenarlas con `updatedAt` inventaría
-2.600 revisiones que nadie hizo. El efecto visible el día que salga es que el
-control arranca marcando el catálogo entero, y va bajando a medida que alguien
-revise precios.
+Y las dos cosas que crea se verificaron **una por una contra
+`information_schema`**, no por el código de salida: la columna existe como
+`timestamp(3)` que acepta nulos, y el índice existe como
+`ProductoLocal_precioRevisadoAt_idx`, btree sobre esa columna.
 
-**El quinto chequeo del backup NO aplica**: no se pierde ningún valor, así que no
-hay nada que buscar dentro del dump.
+**NO SE HIZO BACKFILL, Y ESO SE VE EN LOS NÚMEROS.** Medido contra producción
+justo después: `precioRevisadoAt` está en `null` en las 2.610 filas del depósito,
+así que el control "Precios +30 días" arranca marcando casi todo el catálogo
+—2.068 de 2.070 en "mini el 7", 2.361 de 2.363 en "Casiano casas"—. Los dos que
+no marca en cada ubicación son los servicios de importe variable, que quedan
+afuera de los cuatro controles a propósito.
 
-Aplicada en desarrollo con `migrate deploy` el 2026-08-21, y las consultas que la
-usan ejercidas contra Postgres con `scripts/sonda-controles-productos.mjs` (7 de
-7). En producción todavía no.
-
-**OJO:** la tanda que la trae está BLOQUEADA — ver
-[TANDAS-BLOQUEADAS.md](TANDAS-BLOQUEADAS.md).
+Es el comportamiento esperado y **no se corrige marcando productos como
+revisados**: `null` significa "sin evidencia de revisión" y rellenarlo
+inventaría revisiones que nadie hizo. El número baja solo, a medida que alguien
+revise precios de verdad.
 
 ---
 
