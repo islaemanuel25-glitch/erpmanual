@@ -1021,17 +1021,66 @@ try {
   // 2.600 productos sin forma de llegar al 26. OJO: a este ancho el paginador de
   // la TABLA sigue en el DOM, oculto por `hidden md:block`, así que preguntar si
   // existe daría verde igual. Se pregunta por el que se VE.
+  // ── SE BUSCA POR EL NOMBRE ACCESIBLE, NO POR EL TEXTO ────────────────────
+  //
+  // La primera versión buscaba un botón que DIJERA "Anterior". El pie del celular
+  // se rediseñó en la tanda correctiva y sus botones pasaron a ser flechas, así
+  // que dejaron de tener ese texto: la sonda informó "paginadores en el DOM: 2,
+  // visibles: 0" sobre una paginación que estaba perfectamente a la vista.
+  //
+  // El candado no se aflojó, se reescribió sabiendo qué cambió, y afirma MÁS que
+  // antes: que el pie del celular esté visible, que sus dos flechas lleguen al
+  // área táctil mínima, que diga en qué página va, y —lo nuevo— que el pie de
+  // ESCRITORIO no se vea a este ancho. Esto último es lo que separa "hay una
+  // paginación" de "hay la paginación que corresponde a este ancho".
   const paginador = await evaluar(`(() => {
-    const todos = [...document.querySelectorAll('button')].filter(b => /Anterior/.test(b.textContent));
-    const visibles = todos.filter(b => b.getBoundingClientRect().height > 0);
-    if (!visibles.length) return { visible: false, enElDom: todos.length };
-    const bloque = visibles[0].closest('div').parentElement;
-    return { visible: true, enElDom: todos.length, texto: bloque.innerText.replace(/\\n/g, " ").slice(0, 60) };
+    const porNombre = (n) => [...document.querySelectorAll('button')]
+      .filter((b) => (b.getAttribute('aria-label') || '').startsWith(n));
+    const caja = (b) => b.getBoundingClientRect();
+    const visible = (b) => caja(b).height > 0 && caja(b).width > 0;
+
+    const anterior = porNombre('Página anterior');
+    const siguiente = porNombre('Página siguiente');
+    const aLaVista = [...anterior, ...siguiente].filter(visible);
+
+    // El de escritorio: el que escribe la palabra. A 390 px NO puede verse.
+    const escritorio = [...document.querySelectorAll('button')]
+      .filter((b) => /Anterior/.test(b.textContent));
+
+    // El rótulo de la página, que es el que además abre el "ir a".
+    const rotulo = [...document.querySelectorAll('button')]
+      .find((b) => /^Página \\d+ de \\d+$/.test(b.textContent.trim()) && visible(b));
+
+    return {
+      enElDom: anterior.length + siguiente.length,
+      visibles: aLaVista.length,
+      altoMinimo: aLaVista.length ? Math.min(...aLaVista.map((b) => caja(b).height)) : 0,
+      anchoMinimo: aLaVista.length ? Math.min(...aLaVista.map((b) => caja(b).width)) : 0,
+      escritorioVisible: escritorio.filter(visible).length,
+      escritorioEnElDom: escritorio.length,
+      rotulo: rotulo ? rotulo.textContent.trim() : null,
+    };
   })()`);
+
   afirmar(
-    paginador.visible,
+    paginador.visibles === 2,
     "7 · la lista de tarjetas tiene su paginación a la vista",
-    `paginadores en el DOM: ${paginador.enElDom}, visibles: 0 — el de la tabla no cuenta, está oculto`
+    `flechas en el DOM: ${paginador.enElDom}, visibles: ${paginador.visibles} — el pie de la tabla no cuenta, está oculto`
+  );
+  afirmar(
+    paginador.rotulo !== null,
+    `7b · el pie dice en qué página va${paginador.rotulo ? ` ("${paginador.rotulo}")` : ""}`,
+    "no hay ningún rótulo visible que diga 'Página N de M'"
+  );
+  afirmar(
+    paginador.altoMinimo >= 44 && paginador.anchoMinimo >= 44,
+    `7c · las flechas llegan al área táctil mínima (${Math.round(paginador.anchoMinimo)}×${Math.round(paginador.altoMinimo)} px · mínimo 44)`,
+    "una flecha de paginación por debajo de 44 px es un blanco que se falla con el pulgar"
+  );
+  afirmar(
+    paginador.escritorioVisible === 0 && paginador.escritorioEnElDom > 0,
+    "7d · el pie de ESCRITORIO no se ve a 390 px, y sigue existiendo para la tabla",
+    `visibles: ${paginador.escritorioVisible} de ${paginador.escritorioEnElDom} en el DOM`
   );
 
   // ── 3 · LA FILA DE ACCIONES, A LA VISTA Y SIN TOCAR NADA ────────────────
@@ -1254,8 +1303,57 @@ try {
 
   afirmar(
     Array.isArray(cards) && cards.length === 4 && cards.every((c) => c.visible),
-    `14a · "Para revisar" muestra sus cuatro cards a 390 px`,
+    `14a · "Para revisar" dibuja sus cuatro cards a 390 px`,
     cards ? `vinieron ${cards.length}: ${cards.map((c) => c.texto).join(" | ")}` : "no está el bloque"
+  );
+
+  // ── 14a-bis · Y ES UN RIEL, NO UNA GRILLA ───────────────────────────────
+  //
+  // 14a dice que las cuatro EXISTEN y tienen caja. Eso ya era verdad con la
+  // grilla 2×2 y sigue siéndolo ahora, así que por sí solo no distingue los dos
+  // diseños — un candado que pasa igual con las dos versiones no afirma nada
+  // sobre el cambio.
+  //
+  // Lo que la tanda correctiva promete es otra cosa: que el bloque se LEA como
+  // extensible. Eso se mide: la pista tiene que desbordar —hay más riel del que
+  // se ve—, tiene que haber una card cortada por el borde derecho —que es la
+  // señal— y la barra de avance tiene que estar dibujada.
+  const riel = await evaluar(`(() => {
+    const seccion = [...document.querySelectorAll('section')]
+      .find((s) => /Para revisar/.test(s.textContent || ""));
+    if (!seccion) return null;
+    const primera = seccion.querySelector('button[aria-pressed]');
+    const pista = primera ? primera.parentElement : null;
+    if (!pista) return null;
+    const cajaPista = pista.getBoundingClientRect();
+    const cards = [...pista.querySelectorAll('button[aria-pressed]')].map((b) => b.getBoundingClientRect());
+    const enteras = cards.filter((c) => c.left >= cajaPista.left - 1 && c.right <= cajaPista.right + 1).length;
+    const cortadas = cards.filter((c) => c.left < cajaPista.right && c.right > cajaPista.right).length;
+    // La barra: el hermano de la pista, marcado como decorativo.
+    const barra = seccion.querySelector('[aria-hidden="true"] > div');
+    return {
+      desborda: pista.scrollWidth > pista.clientWidth + 1,
+      sobra: pista.scrollWidth - pista.clientWidth,
+      enteras,
+      cortadas,
+      hayBarra: !!barra && barra.getBoundingClientRect().width > 0,
+      // Cuánto ocupa la barra del ancho total: tiene que ser una fracción, no
+      // todo. Una barra completa dice "no hay nada más", que sería mentira.
+      fraccionBarra: barra ? barra.getBoundingClientRect().width / cajaPista.width : null,
+    };
+  })()`);
+
+  afirmar(
+    riel && riel.desborda && riel.cortadas >= 1,
+    `14a-bis · el bloque es un RIEL: ${riel ? riel.enteras : "?"} cards enteras, ${riel ? riel.cortadas : "?"} asomando, ${riel ? Math.round(riel.sobra) : "?"} px de riel fuera de la vista`,
+    riel
+      ? `desborda: ${riel.desborda}, cortadas: ${riel.cortadas} — sin una card cortada el bloque se lee como una grilla fija`
+      : "no se encontró la pista del riel"
+  );
+  afirmar(
+    riel && riel.hayBarra && riel.fraccionBarra > 0 && riel.fraccionBarra < 0.95,
+    `14a-ter · la barra de avance está y ocupa una fracción (${riel && riel.fraccionBarra ? Math.round(riel.fraccionBarra * 100) : "?"} % del ancho)`,
+    "sin barra, o completa: una barra llena afirma que no hay nada más"
   );
 
   // LAS QUE ESTÁN EN CERO TAMBIÉN SE VEN. Es lo que el issue pide expreso, y es
@@ -1298,7 +1396,30 @@ try {
     await sleep(4000);
   };
 
+  // ── ESPERAR AL BLOQUE, Y SI NO APARECE DECIRLO ─────────────────────────
+  //
+  // Las lecturas de acá buscaban el bloque y lo usaban en la misma expresión. Si
+  // el bloque todavía no estaba —React vuelve a montarlo al cambiar el filtro—,
+  // lo que salía era `Cannot read properties of undefined`, o sea un ROJO que no
+  // dice qué pasó y que en la corrida siguiente no se repite. Un rojo así
+  // desgasta la regla de "si no puede medir, frena": la próxima vez que aparezca,
+  // el reflejo va a ser volver a correrla.
+  //
+  // Se espera acotado y, si no aparece, se muere con el motivo escrito. Esperar
+  // NO es aflojar: lo que no puede pasar es dar por bueno un bloque ausente, y
+  // eso sigue matando la sonda.
+  const esperarBloque = async (donde) => {
+    for (let intento = 0; intento < 20; intento++) {
+      const hay = await evaluar(`!![...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""))`);
+      if (hay) return;
+      await sleep(500);
+    }
+    morir(`el bloque "Para revisar" no apareció en 10 s (${donde})`);
+  };
+
   const tocarCard = async (i) => {
+    await esperarBloque(`al tocar la card ${i + 1}`);
     await evaluar(`(() => {
       const seccion = [...document.querySelectorAll('section')]
         .find((s) => /Para revisar/.test(s.textContent || ""));
@@ -1306,6 +1427,7 @@ try {
       return true;
     })()`);
     await sleep(5000);
+    await esperarBloque(`después de tocar la card ${i + 1}`);
   };
 
   const leerEstado = () =>
@@ -1369,6 +1491,79 @@ try {
   if (iConDatos >= 0) {
     await tocarCard(iConDatos);
     const conControl = await leerEstado();
+
+    // ── 14k · LA CARD ENCENDIDA SE VE DISTINTA, MEDIDO EN EL NAVEGADOR ────
+    //
+    // El candado de render ya afirma que el JSX pinta un fondo teñido, pero eso
+    // es sobre el marcado. Acá se le pregunta al navegador por el color
+    // CALCULADO: `color-mix` lo resuelve el motor, y una expresión mal armada
+    // —un paréntesis de más, un token que no existe en ese tema— se resuelve a
+    // "transparent" o al fondo de siempre sin romper nada. El marcado diría que
+    // está teñida y la pantalla no lo estaría.
+    //
+    // Es exactamente el motivo por el que este proyecto no da por buena una
+    // pantalla porque compile.
+    const pintura = await evaluar(`(() => {
+      const seccion = [...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""));
+      const botones = [...seccion.querySelectorAll('button[aria-pressed]')];
+      const fondos = botones.map((b) => getComputedStyle(b).backgroundColor);
+      const activos = botones.filter((b) => b.getAttribute('aria-pressed') === 'true');
+      const iActivo = botones.findIndex((b) => b.getAttribute('aria-pressed') === 'true');
+      return {
+        cuantosActivos: activos.length,
+        iActivo,
+        fondoActivo: iActivo >= 0 ? fondos[iActivo] : null,
+        fondosDeLasOtras: fondos.filter((_, i) => i !== iActivo),
+        // El anillo de ring-2 sale como un box-shadow calculado.
+        sombraActiva: iActivo >= 0 ? getComputedStyle(botones[iActivo]).boxShadow : null,
+      };
+    })()`);
+
+    const otrasIguales = new Set(pintura.fondosDeLasOtras).size === 1;
+    afirmar(
+      pintura.cuantosActivos === 1 &&
+        pintura.fondoActivo !== null &&
+        otrasIguales &&
+        pintura.fondoActivo !== pintura.fondosDeLasOtras[0],
+      `14k · la card encendida tiene OTRO fondo que las demás (${pintura.fondoActivo} vs ${pintura.fondosDeLasOtras[0]})`,
+      `activas: ${pintura.cuantosActivos}; el fondo de la activa ${pintura.fondoActivo === pintura.fondosDeLasOtras[0] ? "es el mismo" : "difiere"} — sin eso, el estado solo se ve en el DOM`
+    );
+    afirmar(
+      !!pintura.sombraActiva && pintura.sombraActiva !== "none",
+      "14k-bis · y tiene su anillo dibujado",
+      `box-shadow calculado: ${pintura.sombraActiva}`
+    );
+
+    // ── 14l · EL CHIP DE ABAJO SE RETIRÓ ──────────────────────────────────
+    //
+    // Era la señal principal del estado activo y estaba fuera del bloque. Se
+    // sacó a propósito, y hay que comprobar que no volvió: si vuelve, vuelve el
+    // problema —dos señales compitiendo, y la de abajo ganando por ser la única
+    // que se movía—.
+    //
+    // Se busca un BOTÓN fuera del riel que nombre el control activo. El texto
+    // sigue estando en la línea de contexto, pero como texto: eso es lo que se
+    // quería.
+    const chip = await evaluar(`(() => {
+      const seccion = [...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""));
+      const activo = [...seccion.querySelectorAll('button[aria-pressed="true"]')][0];
+      if (!activo) return { hayChip: false, titulo: null };
+      // El título del control, que es la primera línea de texto fuerte de la card.
+      const titulo = (activo.innerText.split("\\n")[1] || "").trim();
+      const fuera = [...document.querySelectorAll('button')].filter(
+        (b) => !seccion.contains(b) &&
+               b.getBoundingClientRect().height > 0 &&
+               titulo && b.textContent.includes(titulo)
+      );
+      return { hayChip: fuera.length > 0, titulo, cuantos: fuera.length };
+    })()`);
+    afirmar(
+      chip.hayChip === false,
+      `14l · no volvió el chip de control fuera del bloque (control "${chip.titulo}")`,
+      `hay ${chip.cuantos} botón(es) fuera del riel nombrando el control activo`
+    );
     afirmar(
       /control=/.test(conControl.url || ""),
       "14d · el filtro queda en la URL, así que el botón de atrás lo deshace",
