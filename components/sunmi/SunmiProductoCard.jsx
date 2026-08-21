@@ -154,6 +154,18 @@ export function AccionTarjeta({ icono: Icono, onClick, children, ...resto }) {
   );
 }
 
+// ── `false` ES "ESTA PANTALLA NO LO MUESTRA"; `null` ES "NO HAY DATO" ──────
+//
+// Son dos cosas distintas y la tarjeta tiene que poder distinguirlas, porque las
+// dibuja al revés: sin dato, el renglón SE QUEDA y dice qué falta —"sin código de
+// barras" es la respuesta a por qué ese producto no aparece al escanear—; oculto,
+// el renglón desaparece entero.
+//
+// Sin esta distinción, "Personalizar card" no podría apagar el proveedor: pasarle
+// `null` mostraría "(proveedor no especificado)" en las 10.521 filas, que es
+// exactamente lo contrario de lo que se pidió.
+const OCULTO = (valor) => valor === false;
+
 export default function SunmiProductoCard({
   nombre,
   empresa = null,
@@ -183,6 +195,16 @@ export default function SunmiProductoCard({
   // el negocio de todas las pantallas que la usen.
   aviso = null,
   acciones = null,
+  // ── CUÁL DE LOS DOS CÓDIGOS VA PRIMERO EN EL PIE ────────────────────────
+  //
+  // Es una pregunta de LAYOUT y por eso la contesta la tarjeta, no la pantalla:
+  // los dos slots del pie no son intercambiables —uno lleva ícono y crece, el
+  // otro lleva prefijo y no encoge—, así que darlos vuelta no es reordenar dos
+  // nodos, es cambiar cuál de los dos se queda con el ancho sobrante.
+  //
+  // `order` de flexbox y no dos ramas de JSX: dos ramas serían el mismo pie
+  // escrito dos veces, y el día que cambie una quedaría distinta de la otra.
+  codigoInternoPrimero = false,
   className = "",
 }) {
   const padding = paddingQueSobrevive(PADDING, className);
@@ -243,7 +265,9 @@ export default function SunmiProductoCard({
         </div>
 
         {/* 2 · EMPRESA. Envuelve igual — es uno de los datos que se leen para
-            decidir, así que no lleva ellipsis. Y si no hay, lo dice. */}
+            decidir, así que no lleva ellipsis. Y si no hay, lo dice.
+            Con `empresa={false}` el renglón no va: la pantalla lo apagó. */}
+        {!OCULTO(empresa) && (
         <div
           className={componerClaseTexto({
             // `mt-1` y no el hueco general: el nombre y el proveedor son el
@@ -259,6 +283,7 @@ export default function SunmiProductoCard({
             {empresa || SIN_PROVEEDOR}
           </span>
         </div>
+        )}
 
         {/* 3 · LA RANURA DEL VALOR. En el catálogo, el precio.
             La marca va PRIMERA y empuja el resto con `mr-auto`, así el valor
@@ -344,7 +369,16 @@ export default function SunmiProductoCard({
             ────────────────────────────────────────────────────────────────
             `mt-auto` ancla el pie ABAJO. Cuando la lista iguala los altos, el
             sobrante va entre la equivalencia y el pie, así que los pies de todas
-            las tarjetas quedan alineados entre sí. */}
+            las tarjetas quedan alineados entre sí.
+            ────────────────────────────────────────────────────────────────
+            CON LOS DOS CÓDIGOS APAGADOS EL PIE SE VA, PERO EL `mt-auto` NO.
+            Queda un espaciador vacío en su lugar. Sin él, el `mt-auto` se
+            perdería con el bloque y las acciones dejarían de estar ancladas
+            abajo: en una lista con `auto-rows-fr` eso deja los botones flotando
+            a media altura, cada tarjeta en un lugar distinto. */}
+        {OCULTO(codigoBarra) && (OCULTO(codigoInterno) || !codigoInterno) ? (
+          <div className="mt-auto" />
+        ) : (
         <div
           className={componerClaseTexto({
             base: "mt-auto flex justify-between items-center gap-2 border-t sunmi-divider pt-[9px] font-mono [font-variant-numeric:tabular-nums]",
@@ -353,18 +387,25 @@ export default function SunmiProductoCard({
             pedido: className,
           })}
         >
-          <span className="flex items-center gap-1.5 min-w-0">
-            <Barcode className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            <span className={codigoBarra ? "" : "italic opacity-70"}>
-              {codigoBarra || SIN_CODIGO_BARRA}
+          {!OCULTO(codigoBarra) && (
+            <span
+              className={`flex items-center gap-1.5 min-w-0 ${
+                codigoInternoPrimero ? "order-2" : "order-1"
+              }`}
+            >
+              <Barcode className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span className={codigoBarra ? "" : "italic opacity-70"}>
+                {codigoBarra || SIN_CODIGO_BARRA}
+              </span>
             </span>
-          </span>
-          {codigoInterno && (
-            <span className="shrink-0">
+          )}
+          {!OCULTO(codigoInterno) && codigoInterno && (
+            <span className={`shrink-0 ${codigoInternoPrimero ? "order-1" : "order-2"}`}>
               {PREFIJO_CODIGO_INTERNO} {codigoInterno}
             </span>
           )}
         </div>
+        )}
 
         {/* 6 · LA FILA DE ACCIONES, FIJA Y A LA VISTA.
             Los hijos se reparten el ancho por igual y el separador va entre

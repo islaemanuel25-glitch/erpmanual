@@ -844,13 +844,25 @@ try {
     console.log("        el texto de reemplazo no se ejerció. No es un pase.");
   }
 
-  // ── 13 · EL AVISO DE LOS QUE NO DEJAN NADA ──────────────────────────────
+  // ── 13 · EL AVISO SE FUE DE LA TARJETA, Y NO SE PERDIÓ ──────────────────
   //
-  // Se compara contra el DATO, igual que el precio: para cada tarjeta se calcula
-  // con la función de producción si corresponde el aviso, y se mira si está.
-  // Así la afirmación cubre las dos direcciones —que aparezca donde va y que NO
-  // aparezca donde no va—, que es lo que hace que un aviso siga significando
-  // algo. Un cartel que sale de más enseña a ignorarlo.
+  // ── QUÉ AFIRMABA ANTES Y POR QUÉ CAMBIA ──────────────────────────────────
+  //
+  // Este chequeo comparaba, tarjeta por tarjeta, que "Se vende sin ganancia"
+  // apareciera exactamente donde el dato lo amerita. Era correcto mientras el
+  // aviso vivía en la tarjeta.
+  //
+  // El issue #2 lo saca: ese aviso —y el "falta %"— pasan a ser controles de
+  // "Para revisar", donde se CUENTAN y se pueden filtrar. En la tarjeta
+  // informaban de a uno y no llevaban a ningún lado.
+  //
+  // Así que el candado no se afloja: se da vuelta. Ahora afirma las dos mitades
+  // del cambio, y las dos hacen falta —sin la segunda, "borrar el aviso" pasaría
+  // en verde igual—:
+  //
+  //   13  · ninguna tarjeta lo muestra;
+  //   13b · el control "Venta ≤ costo" cuenta EXACTAMENTE los que lo ameritan,
+  //         medido contra el mismo predicado de producción que usaba el de antes.
   const avisos = await evaluar(`(() => {
     const t = ${TARJETAS};
     const cuerpo = (c) => c.firstElementChild;
@@ -859,34 +871,38 @@ try {
       tieneAviso: /Se vende sin ganancia/.test(c.innerText),
     }));
   })()`);
-  const deMas = [];
-  const deMenos = [];
-  for (const v of avisos) {
-    const fila = porNombre.get(v.nombre);
-    if (!fila) continue;
-    const corresponde =
-      !esProductoServicio(fila) &&
-      seVendeSinGanancia({ costo: fila.precioCosto, venta: fila.precioVenta });
-    if (corresponde && !v.tieneAviso) deMenos.push(v.nombre);
-    if (!corresponde && v.tieneAviso) deMas.push(v.nombre);
-  }
   const conAviso = avisos.filter((v) => v.tieneAviso).length;
+  // Se comprueba que en esta página HAYA alguno que lo ameritaría: si no,
+  // "ninguna tarjeta lo muestra" pasa sin ejercer nada.
+  const ameritan = avisos.filter((v) => {
+    const fila = porNombre.get(v.nombre);
+    return (
+      fila &&
+      !esProductoServicio(fila) &&
+      seVendeSinGanancia({ costo: fila.precioCosto, venta: fila.precioVenta })
+    );
+  }).length;
   afirmar(
-    deMas.length === 0 && deMenos.length === 0,
-    `13 · el aviso de "sin ganancia" está exactamente donde corresponde (${conAviso} de ${avisos.length})`,
-    `de más: ${deMas.slice(0, 3).join(", ") || "ninguno"} · faltan: ${deMenos.slice(0, 3).join(", ") || "ninguno"}`
+    conAviso === 0,
+    `13 · ninguna tarjeta muestra el aviso de mantenimiento (${ameritan} lo ameritarían)`,
+    `lo muestran: ${avisos.filter((v) => v.tieneAviso).slice(0, 3).map((v) => v.nombre).join(", ")}`
   );
-  // ── Y SI EN ESTA PÁGINA NO HAY NINGUNO, SE LO BUSCA ─────────────────────
+  if (ameritan === 0) {
+    console.log("  ----  13 · en esta página no cae ninguno que lo ameritaría:");
+    console.log("        el caso no se ejerció. No es un pase.");
+  }
+
+  // ── 13b · EL CONTROL CUENTA LO QUE LA TARJETA DEJÓ DE DECIR ─────────────
   //
-  // Mismo camino que el servicio y el combo, y por el mismo motivo: en la
-  // primera página ordenada por nombre puede no caer ninguno, y entonces la
-  // afirmación de arriba pasa en verde sin haber ejercido el caso — que es
-  // indistinguible de funcionar. En desarrollo hay 103 productos que lo
-  // ameritan; en producción, 429.
-  if (conAviso === 0 && urlListado) {
+  // Se recorre el catálogo entero de la ubicación con el MISMO predicado de
+  // producción que usaba el chequeo viejo, y se compara contra el número que el
+  // servidor pone en la card. Si el aviso se hubiera borrado sin más, este
+  // número no existiría o daría cero, y acá se ve.
+  if (urlListado) {
     const u3 = new URL(urlListado, BASE);
     u3.searchParams.set("pageSize", "100");
-    let candidato = null;
+    u3.searchParams.delete("control");
+    let esperados = 0;
     let pag3 = 1, totalPag3 = 1;
     do {
       u3.searchParams.set("page", String(pag3));
@@ -895,34 +911,23 @@ try {
         true
       );
       totalPag3 = Number(tanda?.totalPages || 1);
-      candidato = (tanda?.items || []).find(
+      esperados += (tanda?.items || []).filter(
         (it) => !esProductoServicio(it) &&
           seVendeSinGanancia({ costo: it.precioCosto, venta: it.precioVenta })
-      ) || null;
+      ).length;
       pag3++;
-    } while (!candidato && pag3 <= totalPag3 && pag3 <= 40);
+    } while (pag3 <= totalPag3 && pag3 <= 40);
 
-    if (!candidato) {
-      console.log("  ----  13 · NO EJERCIDO: en estos datos no hay ninguna tarjeta que lo amerite.");
-      console.log("        No es un pase, y no se fabrica una fila para que aparezca.");
-    } else {
-      await send("Page.navigate", {
-        url: `${BASE}/modulos/productos?q=${encodeURIComponent(candidato.nombre)}`,
-      });
-      await sleep(6000);
-      const visto = await evaluar(`(() => {
-        const t = ${TARJETAS};
-        if (!t.length) return { encontrada: false };
-        return { encontrada: true, tieneAviso: /Se vende sin ganancia/.test(t[0].innerText) };
-      })()`);
-      afirmar(
-        visto.encontrada && visto.tieneAviso,
-        `13b · el aviso aparece en un producto que se vende sin ganancia (${candidato.nombre})`,
-        visto.encontrada ? "la tarjeta no lo muestra" : "no se encontró la tarjeta al filtrar"
-      );
-      await send("Page.navigate", { url: `${BASE}/modulos/productos` });
-      await sleep(6000);
-    }
+    const cuenta = await evaluar(
+      `fetch("/api/productos/controles", { credentials: "include" }).then(r => r.json())`,
+      true
+    );
+    const card = (cuenta?.controles || []).find((c) => c.id === "sin-ganancia");
+    afirmar(
+      Boolean(card) && card.cantidad === esperados,
+      `13b · el control "Venta ≤ costo" cuenta ${esperados}, los mismos que ameritaban el aviso`,
+      card ? `la card dice ${card.cantidad}` : "la card no vino en la respuesta"
+    );
   }
 
   // ── 7 · LA LISTA TIENE PAGINACIÓN ───────────────────────────────────────
@@ -987,7 +992,10 @@ try {
   // la pantalla a la que iría, esto se pone rojo y lo nombra. Y si el botón
   // nuevo es legítimo, se agrega acá A PROPÓSITO, que es el trámite que tiene
   // que costar.
-  const ESPERADOS = (arg("botones", "Ver,Editar") || "").split(",").map((s) => s.trim());
+  // "Ver" se fue con el issue #2: Editar es la única acción visible de la
+  // tarjeta. La pantalla de sólo lectura sigue existiendo y se llega desde la
+  // tabla de escritorio; lo que se sacó es el botón, no el destino.
+  const ESPERADOS = (arg("botones", "Editar") || "").split(",").map((s) => s.trim());
   const sobran = fila.textos.filter((b) => !ESPERADOS.includes(b));
   const faltan = ESPERADOS.filter((b) => !fila.textos.includes(b));
   afirmar(
@@ -1067,29 +1075,35 @@ try {
     return await evaluar(`location.pathname`).catch(() => "");
   };
 
-  // ── 12 · VER ENTRA, Y NO AL MISMO LADO QUE EDITAR ───────────────────────
+  // ── 12 · LA FICHA DE SÓLO LECTURA NO QUEDÓ HUÉRFANA ─────────────────────
   //
-  // Durante una tanda entera los dos botones llevaron a la ficha de edición,
-  // porque no existía ninguna pantalla de ver producto. Un botón que no está
-  // muerto pero hace lo mismo que el de al lado se nota igual.
-  const tocadoVer = await evaluar(`(() => {
-    const b = [...${TARJETAS}[0].querySelectorAll('button')]
-      .find((x) => /^ver$/i.test(x.textContent.trim()));
-    if (!b) return false;
-    b.click();
-    return true;
-  })()`);
-  if (!tocadoVer) morir("no encontré el botón Ver en la fila de acciones");
+  // ── QUÉ AFIRMABA ANTES Y POR QUÉ CAMBIA ─────────────────────────────────
+  //
+  // Este bloque tocaba "Ver" en la tarjeta y comprobaba que entrara a la ficha.
+  // El issue #2 saca ese botón: Editar es la única acción visible.
+  //
+  // Lo que NO cambió es que la ficha existe y se llega desde la tabla de
+  // escritorio. Y ahí está el riesgo real de sacar un botón: que la pantalla a
+  // la que llevaba quede sin ninguna entrada y nadie se entere, porque una
+  // pantalla huérfana compila igual, no tira ningún error y no rompe ningún
+  // candado. Ya pasó en este repo con el detalle de venta.
+  //
+  // Así que el chequeo se da vuelta: se entra por URL y se exige que la ficha
+  // siga dibujando lo suyo. Que el botón no esté lo afirma 3b, que compara la
+  // fila contra la lista exacta de acciones esperadas.
+  const idParaFicha = (listado.items || []).map((it) => it.id).find(Boolean);
+  if (!idParaFicha) morir("el listado no trajo ningún id con el que abrir la ficha");
+  await send("Page.navigate", { url: `${BASE}/modulos/productos/${idParaFicha}` });
   await esperarNavegacion(/\/modulos\/productos\/\d+$/);
   const trasVer = await evaluar(`({ alertas: window.__alertas || [], donde: location.pathname })`);
   afirmar(
     trasVer.alertas.length === 0,
-    "12a · tocar Ver no muestra ningún cartel de error",
+    "12a · la ficha de sólo lectura abre sin ningún cartel de error",
     `alert: ${trasVer.alertas.join(" | ")}`
   );
   afirmar(
     /\/modulos\/productos\/\d+$/.test(trasVer.donde),
-    "12b · tocar Ver entra a la ficha de sólo lectura",
+    `12b · la ficha de sólo lectura sigue existiendo (producto ${idParaFicha})`,
     `quedó en ${trasVer.donde}`
   );
 
@@ -1100,10 +1114,22 @@ try {
   // misma trampa que la afirmación del precio, que durante un rato no comparó
   // nada. Ahora se piden los tres títulos POR NOMBRE.
   const SECCIONES = ["Qué es", "Cuánto vale", "Con qué se identifica"];
-  const fichaVer = await evaluar(`(() => {
-    const titulos = [...document.querySelectorAll('h3')].map((h) => h.textContent.trim());
-    return { titulos, renglones: document.querySelectorAll('[data-sunmi-panel]').length };
-  })()`);
+  // ── SE ESPERA A QUE LA FICHA DIBUJE, NO A QUE LA URL CAMBIE ─────────────
+  //
+  // Entrando por `Page.navigate`, la URL queda puesta ANTES de que la página
+  // cargue, así que `esperarNavegacion` vuelve enseguida y la afirmación mediría
+  // una pantalla en blanco. Contra el servidor de desarrollo eso además incluye
+  // compilar la ruta la primera vez. Es el mismo motivo por el que la navegación
+  // por botón espera: lo que hay que esperar es el efecto, no el síntoma.
+  let fichaVer = { titulos: [], renglones: 0 };
+  for (let i = 0; i < 40; i++) {
+    fichaVer = await evaluar(`(() => {
+      const titulos = [...document.querySelectorAll('h3')].map((h) => h.textContent.trim());
+      return { titulos, renglones: document.querySelectorAll('[data-sunmi-panel]').length };
+    })()`);
+    if (SECCIONES.every((s) => fichaVer.titulos.includes(s))) break;
+    await sleep(1000);
+  }
   const faltanSecciones = SECCIONES.filter((s) => !fichaVer.titulos.includes(s));
   afirmar(
     faltanSecciones.length === 0,
@@ -1111,10 +1137,255 @@ try {
     `faltan: ${faltanSecciones.join(", ")}`
   );
 
+  // ── 14 · "PARA REVISAR": LAS CUATRO CARDS, Y EL FILTRO QUE PROMETEN ─────
+  //
+  // ── LO QUE SE MIDE, Y POR QUÉ ES ESTO Y NO OTRA COSA ────────────────────
+  //
+  // El criterio de aceptación del issue es literal: **tocar una card de control
+  // tiene que filtrar exactamente los productos que componen ese contador**.
+  //
+  // Que el contador y el filtro compartan función en el servidor lo prueba un
+  // candado, pero eso prueba la SEMÁNTICA, no el camino: el número puede venir
+  // de un endpoint y el filtro puede no llegar a mandarse, o llegar con otro
+  // parámetro, y los dos lados estarían bien por separado. Es la clase de
+  // defecto que vive ENTRE las piezas, que es donde ninguna suite mira.
+  //
+  // Así que se toca la card y se compara el total del listado contra el número
+  // que la card mostraba. Con el navegador, como corresponde.
+  await send("Page.navigate", { url: `${BASE}/modulos/productos` });
+  await sleep(6000);
+
+  const cards = await evaluar(`(() => {
+    const seccion = [...document.querySelectorAll('section')]
+      .find((s) => /Para revisar/.test(s.textContent || ""));
+    if (!seccion) return null;
+    const botones = [...seccion.querySelectorAll('button[aria-pressed]')];
+    return botones.map((b) => ({
+      texto: b.innerText.replace(/\\s+/g, " ").trim(),
+      cantidad: Number((b.innerText.match(/\\d+/) || [0])[0]),
+      visible: b.getBoundingClientRect().height > 0,
+    }));
+  })()`);
+
+  afirmar(
+    Array.isArray(cards) && cards.length === 4 && cards.every((c) => c.visible),
+    `14a · "Para revisar" muestra sus cuatro cards a 390 px`,
+    cards ? `vinieron ${cards.length}: ${cards.map((c) => c.texto).join(" | ")}` : "no está el bloque"
+  );
+
+  // LAS QUE ESTÁN EN CERO TAMBIÉN SE VEN. Es lo que el issue pide expreso, y es
+  // información: una card en 0 dice "ese control está sano", que no es lo mismo
+  // que no saberlo.
+  const enCero = (cards || []).filter((c) => c.cantidad === 0);
+  if (enCero.length === 0) {
+    console.log("  ----  14b · en estos datos ningún control está en cero:");
+    console.log("        que la card en 0 se vea NO se ejerció. No es un pase.");
+  } else {
+    afirmar(
+      enCero.every((c) => c.visible),
+      `14b · las cards en cero se siguen viendo (${enCero.length} de ${cards.length})`,
+      "alguna desapareció al llegar a cero"
+    );
+  }
+
+  // ── 14c · TOCARLA FILTRA, Y EL TOTAL COINCIDE CON EL NÚMERO DE LA CARD ──
+  //
+  // Se elige la primera card con cantidad > 0: con cero no se distingue "filtró
+  // bien" de "no filtró y no había ninguno".
+  const iConDatos = (cards || []).findIndex((c) => c.cantidad > 0);
+  if (iConDatos < 0) {
+    console.log("  ----  14c · ningún control marca productos en estos datos:");
+    console.log("        el filtro no se ejerció. No es un pase.");
+  } else {
+    const esperado = cards[iConDatos].cantidad;
+    await evaluar(`(() => {
+      const seccion = [...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""));
+      seccion.querySelectorAll('button[aria-pressed]')[${iConDatos}].click();
+      return true;
+    })()`);
+    await sleep(5000);
+    const trasFiltrar = await evaluar(`(() => ({
+      url: location.search,
+      texto: (document.body.innerText.match(/(\\d+)\\s+productos?/) || [])[1] || null,
+      total: (window.__listado && window.__listado.total) ?? null,
+    }))()`);
+    afirmar(
+      Number(trasFiltrar.total) === esperado,
+      `14c · tocar la card filtra a los MISMOS ${esperado} que contaba`,
+      `el listado trajo ${trasFiltrar.total} · url ${trasFiltrar.url}`
+    );
+    afirmar(
+      /control=/.test(trasFiltrar.url || ""),
+      "14d · el filtro queda en la URL, así que el botón de atrás lo deshace",
+      `url: ${trasFiltrar.url}`
+    );
+    // Y tocarla otra vez lo saca: si apagarlo estuviera en otro lado, el que lo
+    // prendió sin querer no sabría cómo volver.
+    await evaluar(`(() => {
+      const seccion = [...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""));
+      seccion.querySelectorAll('button[aria-pressed]')[${iConDatos}].click();
+      return true;
+    })()`);
+    await sleep(5000);
+    const trasApagar = await evaluar(`location.search`);
+    afirmar(
+      !/control=/.test(trasApagar || ""),
+      "14e · tocarla de nuevo saca el filtro",
+      `url: ${trasApagar}`
+    );
+  }
+
+  // ── 15 · "MÁS" ABRE SU HOJA, Y LLEVA LAS CUATRO ACCIONES ────────────────
+  //
+  // Las tres de la barra —+ Producto, Filtros, Más— son las que se usan todos los
+  // días; el resto bajó acá. Si la hoja no abriera, esas cuatro acciones
+  // quedarían inalcanzables desde el celular sin que nada avise: el botón
+  // existiría, se tocaría, y no pasaría nada. Es exactamente el defecto que este
+  // repo ya se comió con el detalle de venta.
+  const abrioMas = await evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /^·*\\s*Más$/.test(x.innerText.trim()) || /Más$/.test(x.innerText.trim()));
+    if (!b) return { tocado: false };
+    b.click();
+    return { tocado: true };
+  })()`);
+  await sleep(1500);
+  const hoja = await evaluar(`(() => {
+    const t = document.querySelector('[data-sunmi-modal="tarjeta"]');
+    if (!t) return null;
+    const r = t.getBoundingClientRect();
+    return {
+      texto: t.innerText.replace(/\\s+/g, " "),
+      abajo: Math.round(r.bottom),
+      alto: window.innerHeight,
+    };
+  })()`);
+  const OPCIONES = ["+ Combo", "Actualización de precios", "Import / Export", "Personalizar card"];
+  const faltanOpciones = hoja ? OPCIONES.filter((o) => !hoja.texto.includes(o)) : OPCIONES;
+  afirmar(
+    abrioMas.tocado && Boolean(hoja) && faltanOpciones.length === 0,
+    `15a · "Más" abre su hoja con las cuatro acciones`,
+    `faltan: ${faltanOpciones.join(", ") || "ninguna"}`
+  );
+  // Y PEGADA ABAJO, que es lo que la hace alcanzable con el pulgar. Una hoja
+  // centrada o corrida hacia arriba no es la misma pieza.
+  if (hoja) {
+    afirmar(
+      Math.abs(hoja.abajo - hoja.alto) <= 1,
+      `15b · la hoja queda pegada al borde de abajo (${hoja.abajo} de ${hoja.alto})`,
+      "quedó flotando"
+    );
+  }
+
+  // ── 16 · "PERSONALIZAR CARD" APAGA UN DATO, Y LA TARJETA LO PIERDE ──────
+  //
+  // Es el criterio de aceptación del opcional: no alcanza con que la hoja dibuje
+  // interruptores, tiene que cambiar lo que la tarjeta muestra. Se apaga el
+  // proveedor —que es un renglón entero— y se comprueba que desaparezca de las
+  // 25 tarjetas, no de una.
+  const antesProveedor = await evaluar(`(() => {
+    const t = ${TARJETAS};
+    const cuerpo = (c) => c.firstElementChild;
+    return t.filter((c) => cuerpo(c).children.length > 1).length;
+  })()`);
+  await evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /Personalizar card/.test(x.innerText));
+    if (b) b.click();
+    return true;
+  })()`);
+  await sleep(1500);
+  const apagado = await evaluar(`(() => {
+    const t = document.querySelector('[data-sunmi-modal="tarjeta"]');
+    if (!t) return false;
+    const b = [...t.querySelectorAll('button[aria-pressed]')].find((x) => /Proveedor/.test(x.innerText));
+    if (!b) return false;
+    b.click();
+    return true;
+  })()`);
+  if (!apagado) {
+    afirmar(false, "16 · el interruptor de Proveedor está en la hoja de personalizar", "no se encontró");
+  } else {
+    await sleep(1200);
+    // Se cierra la hoja para poder mirar la lista de atrás.
+    await evaluar(`(() => {
+      const t = document.querySelector('[data-sunmi-modal="tarjeta"]');
+      const c = t && [...t.querySelectorAll('button')].find((x) => /^Cerrar$/.test(x.innerText.trim()));
+      if (c) c.click();
+      return true;
+    })()`);
+    await sleep(1200);
+    // ── CÓMO SE DETECTA QUE EL RENGLÓN SE FUE ──────────────────────────────
+    //
+    // Se compara el TEXTO de cada tarjeta contra el nombre del proveedor que el
+    // servidor mandó para ese producto. Nada de contar hijos: el primer intento
+    // los contaba y daba un número que no significaba nada —con el proveedor
+    // apagado la tarjeta igual tiene cinco bloques—, así que el chequeo se ponía
+    // rojo por su propio detector y no por la pantalla.
+    const textos = await evaluar(`(() => {
+      const t = ${TARJETAS};
+      const cuerpo = (c) => c.firstElementChild;
+      return t.map((c) => ({
+        nombre: cuerpo(c).firstElementChild.textContent.trim(),
+        texto: c.innerText,
+      }));
+    })()`);
+    const conProveedor = textos.filter((v) => {
+      const fila = porNombre.get(v.nombre);
+      const prov = fila?.proveedorNombre;
+      return prov ? v.texto.includes(prov) : /proveedor no especificado/.test(v.texto);
+    }).length;
+    const alturas = await evaluar(`(() => {
+      const t = ${TARJETAS};
+      return [...new Set(t.map((c) => Math.round(c.getBoundingClientRect().height)))];
+    })()`);
+    afirmar(
+      Number(conProveedor) === 0,
+      `16a · apagar Proveedor lo saca de las ${antesProveedor} tarjetas`,
+      `quedaron ${conProveedor} con el renglón`
+    );
+    // Y LAS TARJETAS SIGUEN PAREJAS. Sacar un renglón es justo lo que rompe la
+    // lista si alguna tarjeta lo conserva: quedarían dos alturas conviviendo,
+    // que es el defecto que ya costó emparejarlas una vez.
+    afirmar(
+      alturas.length === 1,
+      `16b · con un opcional apagado las tarjetas siguen todas del mismo alto`,
+      `alturas: ${alturas.join(", ")}`
+    );
+    // Se repone, para no dejar el navegador con la preferencia cambiada.
+    await evaluar(`(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /Más$/.test(x.innerText.trim()));
+      if (b) b.click();
+      return true;
+    })()`);
+    await sleep(1200);
+    await evaluar(`(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /Personalizar card/.test(x.innerText));
+      if (b) b.click();
+      return true;
+    })()`);
+    await sleep(1200);
+    await evaluar(`(() => {
+      const t = document.querySelector('[data-sunmi-modal="tarjeta"]');
+      const b = t && [...t.querySelectorAll('button[aria-pressed]')].find((x) => /Proveedor/.test(x.innerText));
+      if (b) b.click();
+      return true;
+    })()`);
+    await sleep(1000);
+  }
+
   // ── 2 · EDITAR ENTRA, Y A OTRA RUTA ─────────────────────────────────────
   // Va última porque navega y deja la pantalla.
   await send("Page.navigate", { url: `${BASE}/modulos/productos` });
-  await sleep(6000);
+  // Se espera a que HAYA tarjetas, no un tiempo fijo: la pantalla ahora pide
+  // también los contadores de "Para revisar", así que seis segundos dejaron de
+  // alcanzar contra el servidor de desarrollo. Un `sleep` calibrado a ojo es una
+  // afirmación que pasa según lo rápido que esté la máquina.
+  for (let i = 0; i < 40; i++) {
+    const n = await evaluar(`${TARJETAS}.length`).catch(() => 0);
+    if (Number(n) > 0) break;
+    await sleep(1000);
+  }
   const tocado = await evaluar(`(() => {
     const b = [...${TARJETAS}[0].querySelectorAll('button')]
       .find((x) => /editar/i.test(x.textContent));

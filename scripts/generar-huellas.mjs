@@ -111,7 +111,10 @@ const PANTALLAS = [
   { nombre: "16-turnos", url: "/modulos/turnos", fecha: arg("fecha-turnos", "2026-08-06") },
   { nombre: "18-usuarios", url: "/modulos/usuarios" },
   { nombre: "19-productos-fila-seleccionada", url: "/modulos/productos", clicPrimeraFila: true },
-  { nombre: "20-edicion-rapida", url: "/modulos/productos/edicion-rapida" },
+  // 20-edicion-rapida se fue con el módulo: la pantalla se borró al implementar
+  // el issue #2 y su URL da 404. Una huella de una pantalla que ya no existe no
+  // informa "cambió", informa vacío — que es lo que este arnés confunde con "no
+  // se pudo comparar".
   // Pendientes de decisión de una importación de lista. NO tiene línea de base:
   // el relevamiento original no la incluyó, así que la primera corrida la
   // informa como "sólo en la corrida nueva" y a partir de ahí sirve de
