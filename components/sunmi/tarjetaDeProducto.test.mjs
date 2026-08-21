@@ -87,15 +87,36 @@ test("EL BOTÓN DE LA FILA VIVE EN EL KIT, no en la pantalla", () => {
   assert.doesNotMatch(PAGINA, /function AccionTarjeta/, "la pantalla se escribió el suyo");
 });
 
-test("LA PANTALLA PASA LOS DOS BOTONES, y el andamio también", () => {
-  // Sin esto la pieza puede estar perfecta y la pantalla no usarla: es el hueco
-  // de "nadie comprueba que la página se lo pase".
-  for (const [nombre, src] of [["la pantalla", PAGINA], ["el andamio", ANDAMIO]]) {
-    const usos = (src.match(/<AccionTarjeta/g) || []).length;
-    assert.equal(usos, 2, `${nombre} tiene que dibujar Ver y Editar`);
-    assert.match(src, /icono=\{Eye\}/, `${nombre}: falta el ícono de Ver`);
-    assert.match(src, /icono=\{Pencil\}/, `${nombre}: falta el ícono de Editar`);
-  }
+test("LA PANTALLA PASA SU BOTÓN, y el andamio sigue ejerciendo dos", () => {
+  // ── QUÉ AFIRMABA ANTES Y POR QUÉ CAMBIA ─────────────────────────────────
+  //
+  // Exigía DOS botones —Ver y Editar— en la pantalla y en el andamio. El issue #2
+  // saca "Ver" de la tarjeta: Editar queda como única acción, y con un solo botón
+  // la fila deja de partirse en dos, así que el blanco táctil pasa de media
+  // tarjeta a la tarjeta entera. La ficha de sólo lectura no se borró —se llega
+  // desde la tabla de escritorio—, lo que se fue es el botón.
+  //
+  // Lo que el candado defiende NO cambia y por eso no se borra: el hueco de
+  // "nadie comprueba que la página se lo pase". Una pieza puede estar perfecta y
+  // la pantalla no usarla.
+  //
+  // Se separan los dos consumidores porque ya no afirman lo mismo:
+  const enLaPantalla = (PAGINA.match(/<AccionTarjeta/g) || []).length;
+  assert.equal(enLaPantalla, 1, "la pantalla tiene que dibujar Editar, y nada más");
+  assert.match(PAGINA, /icono=\{Pencil\}/, "la pantalla: falta el ícono de Editar");
+  assert.doesNotMatch(
+    PAGINA,
+    /icono=\{Eye\}/,
+    "volvió el botón Ver a la tarjeta: el issue #2 lo sacó"
+  );
+
+  // El ANDAMIO conserva los dos, y es a propósito: la pieza del kit sigue
+  // aceptando varias acciones —stock y pedidos las van a usar— y el andamio es lo
+  // único que ejerce el separador entre botones. Con un solo botón, `divide-x` no
+  // dibuja ninguna línea y ese caso dejaría de probarse.
+  const enElAndamio = (ANDAMIO.match(/<AccionTarjeta/g) || []).length;
+  assert.equal(enElAndamio, 2, "el andamio tiene que seguir ejerciendo dos acciones");
+  assert.match(ANDAMIO, /icono=\{Pencil\}/, "el andamio: falta el ícono de Editar");
 });
 
 test("los botones del andamio HACEN algo", () => {

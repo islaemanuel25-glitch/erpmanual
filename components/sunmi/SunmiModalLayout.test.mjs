@@ -679,6 +679,31 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // repo; está en `CLAUDE.md`.)
     "app/andamio-velo/page.jsx": false,
     "app/andamio-escape/page.jsx": false,
+    // ── LAS TRES HOJAS DE PRODUCTOS EN EL CELULAR (issue #2) ──────────────
+    //
+    // Las tres contestan que NO, y por el criterio de siempre: **el velo no
+    // cierra cuando cerrar sin querer PIERDE algo**. Ninguna tiene nada que
+    // perder, y conviene decir por qué una por una en vez de agruparlas:
+    //
+    // · `HojaMasAcciones` es un menú. Se toca una opción y se va a otro lado; no
+    //   hay nada escrito adentro.
+    //
+    // · `HojaPersonalizarTarjeta` son interruptores que se guardan al tocarlos,
+    //   así que al cerrar ya está todo guardado. Y es reversible: se vuelve a
+    //   abrir y se prende lo que se apagó.
+    //
+    // · `app/modulos/productos/page.jsx` es la hoja de FILTROS del celular, y es
+    //   la única de las tres que tiene un campo de texto. Igual contesta que no:
+    //   los filtros se aplican MIENTRAS se escriben —el listado de atrás ya
+    //   cambió—, así que cerrar el velo no descarta nada. Lo que se escribió
+    //   sigue puesto al reabrirla.
+    //
+    // (Ese archivo tiene además `ModalProducto` y `ModalVerComposicion`, pero son
+    // componentes aparte: acá la unidad sigue siendo el archivo y no la capa, y
+    // esta página usa la pieza una sola vez.)
+    "components/productos/HojaMasAcciones.jsx": false,
+    "components/productos/HojaPersonalizarTarjeta.jsx": false,
+    "app/modulos/productos/page.jsx": false,
   };
 
   // Que la lista sea TODOS los que usan la pieza, no los que alguien recordó.
