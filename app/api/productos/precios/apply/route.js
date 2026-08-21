@@ -101,20 +101,47 @@ export async function POST(req) {
           throw new Error("Item inválido");
         }
 
+        // ── EL PRECIO ANTERIOR SE LEE DE LA BASE, NO DEL CUERPO DEL PEDIDO ──
+        //
+        // `precio_venta` entra en este `select` a propósito. La decisión de si
+        // hay que marcar la revisión se tomaba con `ventaAnterior`, que viene del
+        // navegador: es lo que la pantalla TENÍA cuando se armó la tanda.
+        //
+        // Con una pantalla vieja —o con dos personas aplicando a la vez— ese
+        // número no es el que está en la base, así que la comparación se hacía
+        // contra un precio que ya no existía y la fecha de revisión podía
+        // registrar un cambio que no ocurrió, o saltearse uno que sí.
+        //
+        // Es el mismo principio que ya se aplicó en `editarBase`: leer el "antes"
+        // ANTES de escribir, del lado del servidor. Se lee acá, antes del
+        // `updateMany` de la ficha, así que es el valor previo de verdad.
+        //
+        // Lo que NO cambia es el histórico: `PrecioUpdateItem` sigue guardando el
+        // `costoAnterior`/`ventaAnterior` que informó el cliente, que es otra
+        // discusión y otra tanda.
+        const baseInfo = await tx.productoBase.findUnique({
+          where: { id: productoBaseId },
+          select: {
+            creadoEnLocalId: true,
+            grupoId: true,
+            proveedor_id: true,
+            precio_venta: true,
+          },
+        });
+        if (!baseInfo || baseInfo.grupoId !== grupoId) {
+          throw new Error(`Producto ${productoBaseId} fuera de alcance`);
+        }
+
+        // El precio de venta EFECTIVO que tiene la ficha ahora mismo. De acá sale
+        // el "antes" de cualquier ubicación sin override propio.
+        const ventaEnLaFicha = baseInfo.precio_venta;
+
         // Propiedad: se autoriza POR CAMPO, no por fila. El costo maestro es del
         // dueño (el depósito para sus productos; el local creador para los
         // exclusivos), pero el PRECIO DE VENTA de un local es suyo y no depende de
         // esa propiedad. Antes acá se salteaba la fila entera cuando la ubicación no
         // era dueña del costo, y eso dejaba a un local sin poder actualizar el precio
         // de venta de los productos que toma del depósito.
-        const baseInfo = await tx.productoBase.findUnique({
-          where: { id: productoBaseId },
-          select: { creadoEnLocalId: true, grupoId: true, proveedor_id: true },
-        });
-        if (!baseInfo || baseInfo.grupoId !== grupoId) {
-          throw new Error(`Producto ${productoBaseId} fuera de alcance`);
-        }
-
         const alcance = alcanceEdicionProducto(
           operatingLocalId,
           baseInfo.creadoEnLocalId,
@@ -148,7 +175,8 @@ export async function POST(req) {
           });
           const quedaRevisado = cambioElPrecioEfectivo({
             overrideAnterior: localAntes?.precio_venta ?? null,
-            baseAnterior: ventaAnterior,
+            // De la BASE, no de `ventaAnterior` del cuerpo — ver arriba.
+            baseAnterior: ventaEnLaFicha,
             nuevo: ventaNueva,
           });
 
@@ -231,10 +259,24 @@ export async function POST(req) {
             //
             // Un local que recibe solo el COSTO tampoco queda revisado: el
             // control es sobre el precio de venta.
+            //
+            // ── Y EL "ANTES" SALE DE LA FICHA, NO DEL CUERPO DEL PEDIDO ────
+            //
+            // `ventaAnterior` es lo que la PANTALLA tenía cuando se armó la
+            // tanda. Un local sin override toma su precio de la ficha, así que
+            // con una pantalla vieja la comparación se hacía contra un número
+            // que ya no estaba en la base. `ventaEnLaFicha` se leyó arriba,
+            // antes del `updateMany` que acaba de pisarla.
+            //
+            // El `if` de arriba sigue usando `ventaAnterior` a propósito: ésa es
+            // la condición de "este override coincide con lo que la tanda creía",
+            // que es una decisión sobre la TANDA y no sobre el estado de la base.
+            // Cambiarla movería a qué locales se les aplica el precio, que es
+            // otra cosa y otra tanda.
             if (
               cambioElPrecioEfectivo({
                 overrideAnterior: ventaLocal,
-                baseAnterior: ventaAnterior,
+                baseAnterior: ventaEnLaFicha,
                 nuevo: ventaNueva,
               })
             ) {
