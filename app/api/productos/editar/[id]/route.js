@@ -6,6 +6,10 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
+import {
+  cambioElPrecioEfectivo,
+  localesQueQuedanRevisados,
+} from "@/lib/productos/revisionDePrecio";
 import { esComboBase } from "@/lib/combos/guards";
 import {
   puedeEditarCosto,
@@ -387,6 +391,32 @@ function validarModoPedido(modoPedido, unidadMedida, factorPack) {
 }
 
 async function editarBase(baseId, baseData, operandoEnLocalId = null, localData = null) {
+  // ── EL "ANTES" SE LEE ANTES, QUE ES LO ÚNICO QUE LO HACE POSIBLE ─────────
+  //
+  // Para decidir en qué ubicaciones el precio efectivo CAMBIA hay que conocer el
+  // precio que tenían, y después del `update` de la ficha ya no se puede: el
+  // valor viejo se perdió. Son dos lecturas baratas —una fila de la ficha y las
+  // filas que esta edición alinea— y sin ellas la regla del issue no se puede
+  // implementar, solo aproximar.
+  //
+  // `ubicacionesAAlinear` se arma acá arriba por lo mismo, y más abajo se reusa
+  // la misma constante: si se armara dos veces, un día una de las dos cambiaría y
+  // la revisión se marcaría en filas distintas de las que se escriben.
+  const ubicacionesAAlinear = [{ local: { es_deposito: true } }];
+  const opId = Number(operandoEnLocalId);
+  if (Number.isInteger(opId) && opId > 0) ubicacionesAAlinear.push({ localId: opId });
+
+  const fichaAntes = await prisma.productoBase.findUnique({
+    where: { id: baseId },
+    select: { precio_venta: true },
+  });
+  const ventaAnteriorDeLaFicha = fichaAntes?.precio_venta ?? null;
+
+  const ubicacionesAntes = await prisma.productoLocal.findMany({
+    where: { baseId, OR: ubicacionesAAlinear },
+    select: { id: true, precio_venta: true },
+  });
+
   const dataFinal = {
     nombre: baseData.nombre,
     descripcion: baseData.descripcion,
@@ -532,21 +562,9 @@ async function editarBase(baseId, baseData, operandoEnLocalId = null, localData 
   //
   // Alcance deliberadamente acotado a esas filas: los demás locales conservan el
   // precio y el margen que hayan definido para sí sobre productos del depósito.
-  const ubicacionesAAlinear = [{ local: { es_deposito: true } }];
-  const opId = Number(operandoEnLocalId);
-  if (Number.isInteger(opId) && opId > 0) ubicacionesAAlinear.push({ localId: opId });
-
-  // ── LA REVISIÓN SE MARCA DONDE EL PRECIO REALMENTE SE ALINEÓ ──────────────
   //
-  // Estas son exactamente las ubicaciones cuyo `precio_venta` efectivo queda
-  // escrito por esta edición, así que son las que quedan revisadas. Las demás no
-  // se tocan: conservan su override y su fecha, porque nadie miró su precio.
-  //
-  // Se marca aunque el importe no cambie, y es a propósito: el control es
-  // "última revisión", no "último cambio". Alguien abrió la ficha, miró el precio
-  // y guardó — eso es haberlo revisado.
-  const revisadoAhora = new Date();
-
+  // `ubicacionesAAlinear` y `opId` se arman al principio de la función, para poder
+  // leer el "antes" de estas mismas filas.
   await prisma.productoLocal.updateMany({
     where: { baseId, OR: ubicacionesAAlinear },
     data: {
@@ -554,9 +572,46 @@ async function editarBase(baseId, baseData, operandoEnLocalId = null, localData 
       precio_venta: dataFinal.precio_venta,
       margen: dataFinal.margen,
       activo: dataFinal.activo,
-      precioRevisadoAt: revisadoAhora,
     },
   });
+
+  // ── LA REVISIÓN SE MARCA SOLO DONDE EL PRECIO CAMBIÓ ─────────────────────
+  //
+  // ── LO QUE ESTABA MAL, PORQUE ES LO QUE HAY QUE NO REPETIR ───────────────
+  //
+  // Este `precioRevisadoAt` iba adentro del `updateMany` de arriba, o sea que se
+  // escribía en CUALQUIER guardado de la ficha. El razonamiento era "alguien
+  // abrió el producto, miró el precio y guardó". Es falso: la ficha se abre para
+  // corregir un nombre mal escrito o para cargar el proveedor que faltaba, y ese
+  // guardado declaraba revisado un precio que nadie miró. El control de los 30
+  // días se vaciaba solo a fuerza de ediciones que no tienen que ver con precios.
+  //
+  // El issue lo dice al revés de como estaba: una edición normal actualiza la
+  // revisión **si cambia el precio efectivo**. Para confirmar un precio sin
+  // cambiarlo está la acción explícita `Precio revisado`.
+  //
+  // ── POR QUÉ HAY QUE MIRAR FILA POR FILA ──────────────────────────────────
+  //
+  // El precio efectivo de una ubicación es su override y, solo si está en null,
+  // el de la ficha. Así que la MISMA escritura cambia el precio de unas
+  // ubicaciones y no de otras: subir la ficha de 200 a 250 cambia el efectivo del
+  // depósito si no tenía override, y no cambia nada si ya tenía 250 puesto a
+  // mano. No se puede decidir con una comparación sola.
+  //
+  // Por eso se leen las filas ANTES de escribirlas —junto con el precio anterior
+  // de la ficha, que se capturó al principio de la función— y se marca solo las
+  // que cambian.
+  const idsRevisados = localesQueQuedanRevisados(ubicacionesAntes, {
+    baseAnterior: ventaAnteriorDeLaFicha,
+    nuevo: dataFinal.precio_venta,
+  });
+
+  if (idsRevisados.length > 0) {
+    await prisma.productoLocal.updateMany({
+      where: { id: { in: idsRevisados } },
+      data: { precioRevisadoAt: new Date() },
+    });
+  }
 
   // La regla de precio es POR UBICACIÓN, así que se guarda solo en la del dueño que
   // está editando, nunca en las demás. Va aparte del updateMany de arriba —que
@@ -588,6 +643,27 @@ async function editarOverride(baseId, localId, localData) {
     where: { baseId, localId },
   });
 
+  // ── ESTE CAMINO SÍ DECIDE UN PRECIO, Y NO MARCABA NADA ───────────────────
+  //
+  // Es el simétrico del defecto de `editarBase`: aquél marcaba revisado sin que
+  // el precio cambiara, y éste cambiaba el precio de venta de un local sin marcar
+  // nada. Con eso, un precio recién decidido seguía apareciendo en el control de
+  // los 30 días, que es la forma más rápida de que alguien deje de mirarlo.
+  //
+  // El "antes" es el override de ESTA ubicación y, si no hay, el de la ficha —la
+  // misma regla de siempre. Y la marca es solo para esta fila: un local decide su
+  // precio y no el de los demás.
+  const fichaAntes = await prisma.productoBase.findUnique({
+    where: { id: baseId },
+    select: { precio_venta: true },
+  });
+  const quedaRevisado = cambioElPrecioEfectivo({
+    overrideAnterior: existing?.precio_venta ?? null,
+    baseAnterior: fichaAntes?.precio_venta ?? null,
+    nuevo: localData.precio_venta,
+  });
+  const marcaDeRevision = quedaRevisado ? { precioRevisadoAt: new Date() } : {};
+
   let override;
 
   if (existing) {
@@ -612,6 +688,7 @@ async function editarOverride(baseId, localId, localData) {
           : null,
         nombre: null,
         descripcion: null,
+        ...marcaDeRevision,
       },
     });
   } else {
@@ -625,6 +702,7 @@ async function editarOverride(baseId, localId, localData) {
         activo: localData.activo ?? true,
         nombre: null,
         descripcion: null,
+        ...marcaDeRevision,
       },
     });
   }

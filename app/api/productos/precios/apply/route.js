@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { alcanceEdicionProducto } from "@/lib/productos/propiedadCosto";
+import { cambioElPrecioEfectivo } from "@/lib/productos/revisionDePrecio";
 
 function toNumber(value) {
   const n = Number(value);
@@ -134,11 +135,32 @@ export async function POST(req) {
           if (!esMargenMasivo && Number(baseInfo.proveedor_id) !== proveedorId) {
             throw new Error(`Producto ${productoBaseId} fuera de alcance`);
           }
+          // ── EL "ANTES" DE ESTA UBICACIÓN, PARA SABER SI CAMBIA ────────────
+          //
+          // Antes se marcaba revisado por estar en esta rama, sin comparar. En un
+          // `KEEP_VENTA` —o en una tanda que solo mueve costos— la rama se
+          // ejecuta igual con `ventaNueva` idéntica a la que ya había, y eso
+          // renovaba la revisión de un precio que nadie cambió. El control de los
+          // 30 días se vaciaba con una actualización de costos.
+          const localAntes = await tx.productoLocal.findFirst({
+            where: { baseId: productoBaseId, localId: operatingLocalId },
+            select: { id: true, precio_venta: true },
+          });
+          const quedaRevisado = cambioElPrecioEfectivo({
+            overrideAnterior: localAntes?.precio_venta ?? null,
+            baseAnterior: ventaAnterior,
+            nuevo: ventaNueva,
+          });
+
           const localUpd = await tx.productoLocal.updateMany({
             where: { baseId: productoBaseId, localId: operatingLocalId },
-            // El precio de ESTA ubicación se acaba de decidir, así que queda
-            // revisado. Solo el de ésta: el `where` ya acota a `operatingLocalId`.
-            data: { precio_venta: ventaNueva, precioRevisadoAt: new Date() },
+            // Solo el de ESTA ubicación: el `where` ya acota a
+            // `operatingLocalId`. Y la marca de revisión solo si el importe
+            // efectivo de acá realmente cambió.
+            data: {
+              precio_venta: ventaNueva,
+              ...(quedaRevisado ? { precioRevisadoAt: new Date() } : {}),
+            },
           });
           if (localUpd.count === 0) {
             saltados.push({ productoBaseId, motivo: "el producto no está habilitado en tu local" });
@@ -196,18 +218,28 @@ export async function POST(req) {
           }
           if (ventaLocal === null || Math.abs(ventaLocal - ventaAnterior) < 0.01) {
             data.precio_venta = ventaNueva;
-            // ── SOLO DONDE EL PRECIO REALMENTE SE APLICÓ ────────────────────
+            // ── DOS CONDICIONES, Y HACEN FALTA LAS DOS ─────────────────────
             //
-            // Va DENTRO de este `if` y no afuera, y ahí está todo el punto: la
-            // condición de arriba es la que decide si este local recibe el
-            // precio nuevo. Un local con un override propio distinto del
-            // anterior NO lo recibe —conserva el suyo— y por lo tanto nadie
-            // revisó su precio: marcarlo como revisado lo sacaría del control
-            // sin que nadie lo haya mirado.
+            // La primera es el `if` de arriba: decide si este local RECIBE el
+            // precio nuevo. Un local con override propio distinto del anterior
+            // no lo recibe —conserva el suyo— así que nadie revisó su precio.
+            //
+            // La segunda es ésta: aunque lo reciba, si el importe es el MISMO
+            // que ya tenía no hay nada que revisar. Faltaba, y por eso un
+            // `KEEP_VENTA` o una tanda de solo costos renovaba la revisión de
+            // precios que no se movieron.
             //
             // Un local que recibe solo el COSTO tampoco queda revisado: el
             // control es sobre el precio de venta.
-            data.precioRevisadoAt = new Date();
+            if (
+              cambioElPrecioEfectivo({
+                overrideAnterior: ventaLocal,
+                baseAnterior: ventaAnterior,
+                nuevo: ventaNueva,
+              })
+            ) {
+              data.precioRevisadoAt = new Date();
+            }
           }
 
           if (Object.keys(data).length > 0) {
