@@ -50,7 +50,31 @@ intención, y por eso vale aunque la lista esté vacía.
 
 ## Bloqueos vigentes
 
-**Ninguno.** Todo lo que está en `origin/main` se puede desplegar.
+### Issue #2 — Productos en el celular · `2a72f65c` y `9c79c050`
+
+**Emanuel pidió expresamente NO desplegar** al encargar la tanda. No es un
+problema encontrado: es que todavía no la miró.
+
+Los dos commits van juntos y no se pueden cortar en el medio: el segundo dibuja
+las cards con los números que calcula el primero, así que desplegar solo la
+pantalla la deja llamando a un endpoint que no existe.
+
+**Y trae migración**, la primera desde el 2026-08-20 —ver
+[MIGRACIONES-SIN-APLICAR.md](MIGRACIONES-SIN-APLICAR.md)—. Es aditiva y sin paso
+de datos, pero el despliegue deja de ser de solo código.
+
+Lo que se va a ver el día que salga, para que se pueda comparar: en el celular
+el módulo deja de estar adentro de una tarjeta, aparece el bloque "Para revisar"
+con cuatro cards arriba de todo, el buscador queda suelto, los otros filtros y
+las acciones que no son "+ Producto" pasan a dos hojas, la tarjeta pierde el
+botón "Ver" y los dos avisos ámbar, y "Edición rápida" desaparece del sistema.
+De 768 px para arriba lo único que cambia es que se va el botón de Edición
+rápida — la huella de escritorio, medida, da cero diferencias.
+
+**Para levantarlo:** Emanuel lo abre en el celular, y si está bien se borra esta
+entrada en el mismo commit que autoriza el corte.
+
+---
 
 El bloqueo que motivó este archivo —`289a036`, la tanda de la tarjeta— lo levantó
 Emanuel el 2026-08-19 y esa tanda ya está en producción.

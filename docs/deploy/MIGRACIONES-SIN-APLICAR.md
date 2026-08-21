@@ -16,7 +16,32 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción está al día: 100 migraciones en el árbol y 100 aplicadas,
+### `20260821030000_producto_local_precio_revisado`
+
+Agrega `ProductoLocal.precioRevisadoAt` —un `TIMESTAMP(3)` que acepta nulos— y su
+índice. Es del issue #2: de esa columna vive el control "Precios +30 días" del
+catálogo.
+
+**Aditiva y sin paso de datos.** No borra ni reescribe nada, y **no hay
+backfill**: las filas históricas se quedan en `null` a propósito, porque `null`
+significa "sin evidencia de revisión" y rellenarlas con `updatedAt` inventaría
+2.600 revisiones que nadie hizo. El efecto visible el día que salga es que el
+control arranca marcando el catálogo entero, y va bajando a medida que alguien
+revise precios.
+
+**El quinto chequeo del backup NO aplica**: no se pierde ningún valor, así que no
+hay nada que buscar dentro del dump.
+
+Aplicada en desarrollo con `migrate deploy` el 2026-08-21, y las consultas que la
+usan ejercidas contra Postgres con `scripts/sonda-controles-productos.mjs` (7 de
+7). En producción todavía no.
+
+**OJO:** la tanda que la trae está BLOQUEADA — ver
+[TANDAS-BLOQUEADAS.md](TANDAS-BLOQUEADAS.md).
+
+---
+
+Antes de ésta, producción estaba al día: 100 migraciones en el árbol y 100 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-20 después de desplegar
 `1a6db117f2cc071619cdf105f927257f36bb2c93`.
 
