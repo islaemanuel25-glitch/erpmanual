@@ -974,10 +974,24 @@ html[data-theme="grafitoEjecutivo"] {
      `components/Header.jsx` —el ícono de depósito, "(sin seleccionar)" y "Sin
      operador"— en ESTE tema y en ninguno más. Los tres se ven más, que es lo
      que se buscaba. Son los únicos consumidores: `git grep --warning-fg` fuera
-     de este archivo da 8 usos en 2 archivos. */
-  --warning-fg: #B45309;
-  --warning-border: rgba(180, 83, 9, 0.5);
-  --warning-border-hover: rgba(180, 83, 9, 0.7);
+     de este archivo da 8 usos en 2 archivos.
+
+     ── SE REVIRTIÓ EL 2026-08-21, Y EL MOTIVO NO ES TÉCNICO ──────────────
+     La medición sigue siendo cierta y el color nuevo era mejor. Lo que estaba
+     mal es el ALCANCE: mover este token cambia `components/Header.jsx` en este
+     tema, o sea una pantalla que no es la del issue #2, y eso es una decisión
+     de producto que nadie tomó. Un arreglo transversal no entra de contrabando
+     en la tanda de otra cosa.
+
+     El contraste de las cards de Productos se resolvió DENTRO del componente,
+     sin tocar ningún theme: ver `CarruselControles.jsx`.
+
+     QUEDA COMO PENDIENTE REAL, no como algo resuelto: 2,94 sigue por debajo
+     del mínimo de 3,0 para el borde de un componente, y eso vale para
+     cualquier pantalla de este tema que use el token, no solo para Productos. */
+  --warning-fg: #CA8A04;
+  --warning-border: rgba(202, 138, 4, 0.5);
+  --warning-border-hover: rgba(202, 138, 4, 0.7);
   --info-fg: #27272A;
   --info-bg-hover: rgba(39, 39, 42, 0.08);
 

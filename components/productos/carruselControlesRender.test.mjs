@@ -23,6 +23,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import fs from "node:fs";
+import path from "node:path";
 
 import CarruselControles from "@/components/productos/CarruselControles";
 import { CONTROLES } from "@/lib/productos/controlesCalidad";
@@ -102,6 +104,40 @@ test("G8. NO hay ni un color escrito a mano: todo sale de tokens", () => {
   assert.deepEqual(hexes, [], `colores escritos a mano: ${hexes.join(", ")}`);
   const rgb = html.match(/rgba?\([^)]*\)/g) || [];
   assert.deepEqual(rgb, [], `colores escritos a mano: ${rgb.join(", ")}`);
+});
+
+test("G9-bis. LA SONDA MIDE LA MISMA EXPRESIÓN QUE EL COMPONENTE PINTA", () => {
+  // ── POR QUÉ ESTO NECESITA UN CANDADO ────────────────────────────────────
+  //
+  // El contraste de las cards no lo da el token suelto sino su MEZCLA con el
+  // color de texto de la aplicación. Si el componente cambiara la proporción y la
+  // sonda siguiera midiendo la vieja, la sonda daría verde sobre un color que la
+  // pantalla no dibuja — que es la peor forma de fallar: una medición correcta de
+  // la cosa equivocada.
+  //
+  // Se compara el HTML DIBUJADO contra el texto de la sonda, así que un cambio en
+  // cualquiera de los dos lados lo pone en rojo.
+  const html = renderToStaticMarkup(
+    createElement(CarruselControles, { controles: conCantidad(3) })
+  );
+  const sonda = fs.readFileSync(
+    path.join(process.cwd(), "scripts", "sonda-controles-tokens.mjs"),
+    "utf8"
+  );
+
+  const mezclas = [...html.matchAll(/color-mix\(in srgb, var\(--[a-z-]+\) (\d+)%, var\(--app-fg\)\)/g)];
+  assert.ok(mezclas.length > 0, "el componente dejó de mezclar: se perdió el arreglo de contraste");
+
+  const proporciones = [...new Set(mezclas.map((m) => m[1]))];
+  assert.equal(proporciones.length, 1, `el componente usa dos proporciones: ${proporciones.join(", ")}`);
+
+  const enLaSonda = sonda.match(/var\(\$\{token\}\) (\d+)%, var\(--app-fg\)/);
+  assert.ok(enLaSonda, "la sonda dejó de medir una mezcla");
+  assert.equal(
+    enLaSonda[1],
+    proporciones[0],
+    `el componente mezcla al ${proporciones[0]} % y la sonda mide al ${enLaSonda[1]} %`
+  );
 });
 
 test("G9. la semántica de salud NO sale de los tokens del POS", () => {

@@ -72,10 +72,39 @@ const POR_PAGINA = 4;
  * Un objeto y no un `if`: agregar un rol es agregar una entrada, y un rol que no
  * esté cae en el neutro en vez de quedar sin color.
  */
+// ── LA MEZCLA NO ES ESTÉTICA: ES LO QUE HACE QUE SE LEA ───────────────────
+//
+// El token semántico solo no alcanzaba. Medido contra el fondo real de la card en
+// los catorce temas, `--warning-fg` daba **2,94 en `grafitoEjecutivo`** y su ícono
+// **2,67 sobre el fondo de la página**, con un mínimo de 3,0 para el borde de un
+// componente y para el número —que a 21 px en negrita cuenta como texto grande—.
+//
+// La salida obvia era subir el token de ese tema, y de hecho se hizo y SE
+// REVIRTIÓ: `--warning-fg` lo usa también `components/Header.jsx`, así que mover
+// el token cambia una pantalla que no es la de este issue, y eso es una decisión
+// de producto que nadie tomó. Un arreglo transversal no entra de contrabando en
+// la tanda de otra cosa.
+//
+// Lo que sí es local: mezclar el color semántico con el color de TEXTO de la
+// aplicación. `--app-fg` es, por definición, el color que contrasta contra el
+// fondo en cada tema —oscuro en los claros, claro en los oscuros—, así que
+// empujar hacia él sube el contraste en los catorce y en la dirección correcta,
+// sin que ningún theme cambie.
+//
+// EL 12 % SALE DE MEDIR, no de elegir. Con esa mezcla el peor caso pasa de 2,94 a
+// 3,58 y el del ícono de 2,67 a 3,26; con menos, `grafitoEjecutivo` no llega. Y no
+// se subió más porque el matiz se apaga: a esta altura el ámbar sigue siendo
+// ámbar y el rojo sigue siendo rojo, que es de lo que vive la card.
+//
+// Lo verifica `scripts/sonda-controles-tokens.mjs`, que mide ESTA expresión —no
+// el token suelto— resolviéndola en el navegador, uso por uso y con el umbral que
+// a cada uso le corresponde.
+const conContraste = (token) => `color-mix(in srgb, var(${token}) 88%, var(--app-fg))`;
+
 const TOKEN_POR_ROL = {
-  warning: "var(--warning-fg)",
-  danger: "var(--danger-fg)",
-  success: "var(--success-fg)",
+  warning: conContraste("--warning-fg"),
+  danger: conContraste("--danger-fg"),
+  success: conContraste("--success-fg"),
   neutro: "var(--pos-muted-strong)",
 };
 
@@ -135,10 +164,20 @@ function CardControl({ control, activo, onSelect, truncado = false }) {
     >
       <span className="flex items-baseline gap-1.5">
         <span
-          // `text-xl` y no una medida escrita: está en la escala y no suma al
-          // contador de hardcodeo. Son 17,5 px reales, porque en esta aplicación
-          // 1 rem son 14 — ver el encabezado de `app/globals.css`.
-          className="text-xl font-bold leading-none [font-variant-numeric:tabular-nums]"
+          // ── 21 px BOLD, Y EL NÚMERO NO ES ESTÉTICO ───────────────────────
+          //
+          // Era `text-xl` —17,5 px—. El umbral de WCAG para "texto grande" es
+          // 14 pt en negrita, que son **18,67 px CSS**: a 17,5 el número NO
+          // califica y le corresponde 4,5:1 como a cualquier texto, no 3,0.
+          //
+          // `text-2xl` son 1,5 rem = 21 px en esta aplicación —1 rem son 14—,
+          // así que en negrita SÍ califica y el requisito baja a 3,0, que es el
+          // que los tokens de salud cumplen. Es el ajuste más chico que resuelve
+          // el contraste sin tocar ningún theme.
+          //
+          // Medido después de subirlo: la card pasa de 68 a 71 px de alto y el
+          // bloque 2x2 sigue entrando a 390 px sin empujar las tarjetas.
+          className="text-2xl font-bold leading-none [font-variant-numeric:tabular-nums]"
           style={{ color }}
         >
           {/* CON CONTEO PARCIAL, EL NÚMERO LLEVA "+". Lo que se sabe es que hay
@@ -216,13 +255,30 @@ export default function CarruselControles({
           viendo la mitad. */}
       {truncado && !cargando && (
         <div
+          // ── EL TEXTO NO VA PINTADO, Y EL ÍCONO SÍ ────────────────────────
+          //
+          // Estaba entero en `--warning-fg`. Son 10,5 px: texto chico, así que le
+          // corresponde 4,5:1, y el ámbar de varios temas no llega —en
+          // `sunmiLight` da 3,19 contra el fondo—. Un aviso ilegible es peor que
+          // no ponerlo.
+          //
+          // El texto pasa al color de texto de la aplicación, que es el que ya
+          // cumple en todos los temas por ser el del cuerpo. El ÍCONO se queda
+          // ambar: es un objeto gráfico y su umbral es 3,0, y es el que hace que
+          // el renglón se lea como un aviso de un vistazo.
+          //
           // `text-xs` y no `text-[10.5px]`: en esta aplicación 1 rem son 14 px,
           // así que `text-xs` ES 10,5 px. Mismo píxel, sin sumar al contador.
-          className="flex items-start gap-1.5 mb-1.5 text-xs leading-[1.35]"
-          style={{ color: "var(--warning-fg)" }}
+          className="flex items-start gap-1.5 mb-1.5 text-xs leading-[1.35] sunmi-text-strong"
           role="status"
         >
-          <TriangleAlert className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <TriangleAlert
+            className="w-3.5 h-3.5 shrink-0"
+            // La misma mezcla que las cards, por lo mismo: suelto daba 2,67
+            // contra el fondo de la página en `grafitoEjecutivo`.
+            style={{ color: colorDe("warning") }}
+            aria-hidden="true"
+          />
           <span>
             Conteo parcial: se miraron los primeros {techo ? techo.toLocaleString("es-AR") : "5.000"}{" "}
             productos. Puede haber más en cada control.
