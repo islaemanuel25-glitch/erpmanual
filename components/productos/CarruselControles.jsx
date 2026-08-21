@@ -1,6 +1,36 @@
 "use client";
 
-// "PARA REVISAR": el carrusel de controles de calidad del catálogo.
+// "PARA REVISAR": el riel de controles de calidad del catálogo.
+//
+// ── POR QUÉ DEJÓ DE SER UNA GRILLA 2×2 ──────────────────────────────────────
+//
+// Salió a producción como cuatro cards en dos filas. Funcionaba, y se veía como
+// lo que era: **cuatro cajas fijas**. Nada en la pantalla decía que la lista
+// pudiera crecer, y con exactamente cuatro controles los puntos de paginado no se
+// dibujaban —había una sola página—, así que el bloque no tenía ni un solo
+// elemento que insinuara movimiento.
+//
+// Ahora es un RIEL: una fila que se desliza, con las cards a un ancho que hace que
+// la tercera asome. Un borde cortado es la señal más barata y más entendida de
+// "esto sigue", y no depende de que alguien lea un texto ni de que aparezca un
+// control extra el día que haya cinco controles.
+//
+// ── LO QUE SE GANA Y LO QUE SE PAGA, DICHO ────────────────────────────────
+//
+// SE GANA ALTO. Dos filas de 71 px más su separación eran 148; una fila son 78, y
+// la barra de avance suma 4. El bloque pasa de 148 a 82 px: **66 px menos**, que
+// en un teléfono de 390 es la diferencia entre ver una tarjeta de producto entera
+// o media.
+//
+// SE PAGA VISIBILIDAD. Antes se veían los cuatro números de una; ahora se ven dos
+// y un pedazo del tercero. Los dos que quedan del otro lado son "Venta ≤ costo" y
+// "Escala / precio", que son los dos `danger`. Es una decisión, no un descuido: el
+// pedido de esta tanda fue explícito en que el bloque no podía seguir leyéndose
+// como cuatro cajas estáticas, y no hay forma de que cuatro cards entren enteras
+// en 390 px y a la vez algo asome.
+//
+// El orden lo decide el dominio —`CONTROLES` en `controlesCalidad.js`— así que si
+// mañana se decide que los `danger` van primero, se cambia ahí y no acá.
 //
 // ── POR QUÉ LAS CARDS SE VEN TAMBIÉN EN CERO ────────────────────────────────
 //
@@ -8,10 +38,6 @@
 // Si desapareciera, la fila cambiaría de forma según el día y nadie podría
 // distinguir "no hay ninguno" de "todavía no cargó" — que son dos cosas muy
 // distintas cuando lo que se está mirando es si el catálogo tiene problemas.
-//
-// Y hay un motivo de layout además del de información: con las cards yendo y
-// viniendo, el bloque cambiaría de alto y de cantidad de páginas entre una carga
-// y la siguiente, así que el pulgar no aprendería nunca dónde está cada cosa.
 //
 // ── LOS COLORES SON SEMÁNTICOS Y SALEN DEL THEME ────────────────────────────
 //
@@ -33,7 +59,7 @@
 // claros los sobrescriben; los cuatro que no lo hacen son oscuros y heredan los
 // de `:root`, así que los catorce tienen un valor válido. Está medido: ver
 // `scripts/sonda-controles-tokens.mjs`, que calcula el contraste de cada uno
-// contra el fondo real de la card en los catorce y exige 3,0.
+// contra el fondo real de la card en los catorce y exige el umbral de cada uso.
 //
 // La SUPERFICIE sigue siendo del ERP y no de la semántica: el fondo de la card es
 // `--card-bg`, que existe en los catorce.
@@ -54,30 +80,62 @@
 // prefijado por un "+" —porque hay al menos ésos— y el bloque avisa arriba sobre
 // cuántos se contó. Ninguna dice "al día".
 //
-// ── PAGINA SOLO, Y POR ESO NO HAY QUE TOCARLO PARA AGREGAR UN CONTROL ──────
+// ── NO HAY QUE TOCARLO PARA AGREGAR UN CONTROL ────────────────────────────
 //
-// Recorre lo que le pasen y arma páginas de a cuatro, en 2×2. Hoy los controles
-// son cuatro y hay una sola página; el quinto agrega una segunda sin que este
-// archivo cambie una línea, y sin que el bloque crezca en alto.
+// Recorre lo que le pasen y las pone en el riel. Hoy son cuatro; el quinto entra
+// solo, el riel se hace más largo y la barra de avance se acorta sola.
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Check, TriangleAlert } from "lucide-react";
 
-/** Cuántas cards entran en una página: 2×2. */
-const POR_PAGINA = 4;
+/**
+ * ── EL ANCHO DE CADA CARD, Y POR QUÉ ES ESTE NÚMERO ───────────────────────
+ *
+ * 43 % del riel. A 390 px de pantalla el contenido mide unos 366, así que cada
+ * card queda en 157 y entran dos enteras más 40 px de la tercera.
+ *
+ * Ese pedazo asomando ES el mecanismo: con 50 % entrarían dos justas y el borde
+ * quedaría alineado con el de la pantalla, que es exactamente cómo se ve algo que
+ * no se mueve. Con 33 % entrarían tres pero el número —que es el dato— se
+ * quedaría sin lugar.
+ *
+ * Vive en una constante porque la usan dos cosas: el ancho de la card y el cálculo
+ * inicial de la barra de avance. Si fueran dos números, la barra arrancaría con
+ * una proporción y el riel con otra, y se vería un salto al montar.
+ */
+const ANCHO_CARD_PCT = 43;
 
 /**
- * De rol semántico a token del theme.
+ * Cuánto se tiñe el fondo de la card ACTIVA.
  *
- * Un objeto y no un `if`: agregar un rol es agregar una entrada, y un rol que no
- * esté cae en el neutro en vez de quedar sin color.
+ * ── DE DÓNDE SALE EL NÚMERO ───────────────────────────────────────────────
+ *
+ * De medir, igual que el 88 % de la mezcla de texto. El fondo activo empuja
+ * `--card-bg` hacia el color del estado, así que sube el fondo hacia el color del
+ * texto y **baja el contraste**. Con 12 % el peor caso de los catorce temas sigue
+ * por encima del umbral que a cada uso le corresponde; con más, `grafitoEjecutivo`
+ * no llega.
+ *
+ * Lo verifica `scripts/sonda-controles-tokens.mjs`, que mide los dos fondos —el
+ * normal y el activo— resolviendo estas mismas expresiones en el navegador.
  */
+const TINTE_ACTIVO_PCT = 12;
+
+/**
+ * La pista sobre la que corre la barra de avance del riel.
+ *
+ * `--app-border` aclarado hacia el fondo. El 30 % sale de medir, no de elegir:
+ * el porqué está donde se usa, y `scripts/sonda-controles-tokens.mjs` lo verifica
+ * en los catorce temas contra el color del pulgar.
+ */
+const PISTA_DEL_RIEL = "color-mix(in srgb, var(--app-border) 30%, var(--app-bg))";
+
 // ── LA MEZCLA NO ES ESTÉTICA: ES LO QUE HACE QUE SE LEA ───────────────────
 //
 // El token semántico solo no alcanzaba. Medido contra el fondo real de la card en
 // los catorce temas, `--warning-fg` daba **2,94 en `grafitoEjecutivo`** y su ícono
 // **2,67 sobre el fondo de la página**, con un mínimo de 3,0 para el borde de un
-// componente y para el número —que a 21 px en negrita cuenta como texto grande—.
+// componente y para el número —que en negrita y grande cuenta como texto grande—.
 //
 // La salida obvia era subir el token de ese tema, y de hecho se hizo y SE
 // REVIRTIÓ: `--warning-fg` lo usa también `components/Header.jsx`, así que mover
@@ -110,14 +168,9 @@ const TOKEN_POR_ROL = {
 
 const colorDe = (rol) => TOKEN_POR_ROL[rol] || TOKEN_POR_ROL.neutro;
 
-/** Parte una lista en páginas de a `POR_PAGINA`. */
-function enPaginas(items) {
-  const paginas = [];
-  for (let i = 0; i < items.length; i += POR_PAGINA) {
-    paginas.push(items.slice(i, i + POR_PAGINA));
-  }
-  return paginas;
-}
+/** El fondo de una card según esté activa o no. */
+const fondoDe = (color, activo) =>
+  activo ? `color-mix(in srgb, ${color} ${TINTE_ACTIVO_PCT}%, var(--card-bg))` : "var(--card-bg)";
 
 function CardControl({ control, activo, onSelect, truncado = false }) {
   // ── EN CERO, EL ROL CAMBIA ────────────────────────────────────────────
@@ -135,30 +188,54 @@ function CardControl({ control, activo, onSelect, truncado = false }) {
   const sano = !truncado && control.cantidad === 0;
   const color = truncado ? colorDe("neutro") : sano ? colorDe("success") : colorDe(control.rol);
 
+  // ── EL RENGLÓN DE ABAJO SE CALCULA UNA VEZ ────────────────────────────
+  //
+  // Lo usan el texto visible Y el nombre accesible, y tienen que decir lo
+  // mismo. La primera versión de esta tanda armaba el `aria-label` con
+  // `control.detalle` fijo, así que una card en 0 se veía "Precios · al día" y
+  // se anunciaba "Precios +30 días" — un lector de pantalla habría oído el
+  // nombre de un problema sobre una card sana. Lo encontró el candado G1, que
+  // busca que el nombre del problema NO aparezca sobre un 0: como mira el HTML
+  // entero, el atributo también cuenta.
+  const textoEstado = sano ? control.detalleSano ?? control.detalle : control.detalle;
+
   return (
     <button
       type="button"
       onClick={() => onSelect(control.id)}
       aria-pressed={activo}
+      // ── EL NOMBRE ACCESIBLE DICE EL ESTADO, NO SOLO EL NÚMERO ────────
+      //
+      // `aria-pressed` ya lo dice para un lector de pantalla, pero el nombre
+      // suelto —"2361 Precios +30 días"— no distingue la card que está
+      // filtrando de las otras tres. Acá se dice con palabras.
+      aria-label={
+        activo
+          ? `${control.titulo} ${textoEstado}: ${control.cantidad}. Filtrando. Tocá para quitar el filtro.`
+          : `${control.titulo} ${textoEstado}: ${control.cantidad}. Tocá para filtrar.`
+      }
       // ── 44 px DE ALTO MÍNIMO, ESCRITOS ────────────────────────────────
       //
       // El mínimo táctil de WCAG 2.5.5. Van escritos y no como `h-11` porque
       // **en esta aplicación 1 rem son 14 px**, así que `h-11` da 38,5. Es el
       // mismo número y el mismo motivo que la fila de acciones de la tarjeta.
+      //
+      // `snap-start` y `shrink-0`: sin el segundo, flex las comprimiría para
+      // que las cuatro entren y el riel dejaría de desbordar — o sea, dejaría
+      // de deslizarse, que es todo el punto.
       className={[
         "relative flex flex-col justify-between text-left rounded-xl border px-2.5 py-2 min-h-[44px]",
-        "transition-colors sunmi-row-hover",
+        "shrink-0 snap-start transition-colors sunmi-row-hover",
         activo ? "ring-2" : "",
       ].join(" ")}
       style={{
-        // El borde y el anillo toman el color del estado; el fondo se queda en
-        // el panel del theme. Un fondo teñido en cuatro cards seguidas convierte
-        // la fila en un semáforo y deja de leerse el número, que es el dato.
+        width: `${ANCHO_CARD_PCT}%`,
+        // El borde y el anillo toman el color del estado. El FONDO solo se tiñe
+        // en la card activa: teñir las cuatro convertiría la fila en un
+        // semáforo y dejaría de leerse el número, que es el dato. Teñir UNA es
+        // justamente lo que la separa de las otras tres.
         borderColor: color,
-        // La superficie sale de `--card-bg`, el token de tarjeta del ERP, y no de
-        // la semántica: un fondo teñido en cuatro cards seguidas convierte la
-        // fila en un semáforo y deja de leerse el número, que es el dato.
-        background: "var(--card-bg)",
+        background: fondoDe(color, activo),
         "--tw-ring-color": color,
       }}
     >
@@ -174,9 +251,6 @@ function CardControl({ control, activo, onSelect, truncado = false }) {
           // así que en negrita SÍ califica y el requisito baja a 3,0, que es el
           // que los tokens de salud cumplen. Es el ajuste más chico que resuelve
           // el contraste sin tocar ningún theme.
-          //
-          // Medido después de subirlo: la card pasa de 68 a 71 px de alto y el
-          // bloque 2x2 sigue entrando a 390 px sin empujar las tarjetas.
           className="text-2xl font-bold leading-none [font-variant-numeric:tabular-nums]"
           style={{ color }}
         >
@@ -188,12 +262,34 @@ function CardControl({ control, activo, onSelect, truncado = false }) {
         {sano && <Check className="w-3.5 h-3.5 shrink-0" style={{ color }} aria-hidden="true" />}
       </span>
       <span className="mt-1 block leading-[1.25]">
-        <span className="block text-[11.5px] font-medium sunmi-text-strong">{control.titulo}</span>
-        {/* EN CERO EL TEXTO CAMBIA, no se achica: "Precios +30 días" sobre un 0
-            se sigue leyendo como el nombre de un problema. El texto sano lo
-            decide el dominio, junto con el del problema. */}
-        <span className="block text-[10.5px] sunmi-text-muted">
-          {sano ? control.detalleSano ?? control.detalle : control.detalle}
+        <span className="block text-[11.5px] font-medium sunmi-text-strong truncate">
+          {control.titulo}
+        </span>
+        {/* ── EL RENGLÓN DE ABAJO CAMBIA TRES VECES ──────────────────────
+            · activo  → cómo se sale, que es lo único que falta saber cuando
+              la card ya está encendida y el listado ya está filtrado;
+            · en cero → el texto sano del dominio;
+            · si no   → el nombre del problema.
+
+            El de "activo" va primero porque una card encendida en cero
+            —filtrando por un control que no marca a nadie— tiene que seguir
+            diciendo cómo apagarse, no "al día". */}
+        {/* ── EL TEXTO ACTIVO NO VA PINTADO CON EL COLOR DEL ESTADO ──────
+            La primera versión lo pintaba con `color`, y la sonda de contraste lo
+            puso en ROJO: son 10,5 px —texto chico, umbral 4,5— y sobre el fondo
+            teñido daba **3,14 en `grafitoEjecutivo`** y 3,42 en `verdeComercio`.
+            El mismo color que en el número de 21 px pasa holgado, porque ahí el
+            umbral es 3,0. Es el mismo error que ya se había cometido con el texto
+            del aviso de conteo parcial, y por el mismo motivo: el umbral lo
+            decide el TAMAÑO, no el color.
+
+            Va con el color de texto de la aplicación, que sobre ese mismo fondo
+            mide entre 9,7 y 12,5. Y se distingue igual del renglón de las otras
+            cards, que va apagado: no hace falta el color para eso. */}
+        <span
+          className={`block text-[10.5px] truncate ${activo ? "sunmi-text-strong" : "sunmi-text-muted"}`}
+        >
+          {activo ? "Tocá para quitar" : textoEstado}
         </span>
       </span>
     </button>
@@ -216,27 +312,46 @@ export default function CarruselControles({
   truncado = false,
   techo = null,
 }) {
-  const paginas = enPaginas(controles);
-  const [paginaVisible, setPaginaVisible] = useState(0);
   const pistaRef = useRef(null);
   const etiquetaId = useId();
 
+  // ── LA BARRA DE AVANCE ────────────────────────────────────────────────
+  //
+  // Dos números: qué fracción del riel se ve, y cuánto se corrió. Salen de medir
+  // la pista, no de contar cards: si mañana las cards cambian de ancho o el
+  // teléfono es más grande, la barra sigue diciendo la verdad sin que nadie la
+  // ajuste.
+  //
+  // Arranca con la fracción que la geometría PREDICE —de `ANCHO_CARD_PCT`, la
+  // misma constante que define el ancho— para que no haya un salto entre el
+  // primer pintado y la medición. Un valor cualquiera acá se vería como un
+  // parpadeo de la barra al abrir.
+  const fraccionPrevista = controles.length
+    ? Math.min(1, 100 / (ANCHO_CARD_PCT * controles.length))
+    : 1;
+  const [avance, setAvance] = useState({ fraccion: fraccionPrevista, corrido: 0 });
+
+  const medir = () => {
+    const pista = pistaRef.current;
+    if (!pista || pista.scrollWidth <= 0) return;
+    const fraccion = Math.min(1, pista.clientWidth / pista.scrollWidth);
+    const recorrible = pista.scrollWidth - pista.clientWidth;
+    setAvance({ fraccion, corrido: recorrible > 0 ? pista.scrollLeft / recorrible : 0 });
+  };
+
+  // Se mide al montar y cuando cambia la cantidad de controles. No hace falta un
+  // observador de tamaño: el riel solo cambia de geometría si gira el teléfono, y
+  // ahí el propio scroll dispara la medición de nuevo.
+  useEffect(() => {
+    medir();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controles.length]);
+
   if (controles.length === 0) return null;
 
-  // Qué página se está mirando: se deduce del scroll y no de un estado que la
-  // pantalla mantenga aparte. Con `snap-mandatory` la pista siempre queda
-  // detenida en un múltiplo del ancho, así que la división es exacta.
-  const alDesplazar = (e) => {
-    const ancho = e.currentTarget.clientWidth || 1;
-    const indice = Math.round(e.currentTarget.scrollLeft / ancho);
-    if (indice !== paginaVisible) setPaginaVisible(indice);
-  };
-
-  const irA = (indice) => {
-    const pista = pistaRef.current;
-    if (!pista) return;
-    pista.scrollTo({ left: indice * pista.clientWidth, behavior: "smooth" });
-  };
+  // La barra solo tiene sentido si sobra riel. Con dos controles entrarían los dos
+  // y una barra completa se leería como un control roto.
+  const desborda = avance.fraccion < 0.999;
 
   return (
     <section aria-labelledby={etiquetaId} className="w-full">
@@ -286,72 +401,80 @@ export default function CarruselControles({
         </div>
       )}
 
-      {/* LA PISTA. `snap-x snap-mandatory` con cada página ocupando el 100 % del
-          ancho: el dedo no puede dejarla a mitad de camino entre dos páginas,
-          que es lo que hace que un carrusel se sienta roto.
+      {/* EL RIEL. `snap-x snap-mandatory` con cada card ocupando el 43 %: el dedo
+          suelta siempre sobre el borde de una card y nunca la deja partida al
+          medio, que es lo que hace que un riel se sienta roto.
           `overflow-x-auto` con la barra escondida — en el celular no se ve, y en
           escritorio este bloque no se muestra. */}
       <div
         ref={pistaRef}
-        onScroll={alDesplazar}
-        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={medir}
+        // Asidero estable para recortar la foto al riel y para que las sondas lo
+        // busquen por algo que no sea una clase de Tailwind.
+        data-riel="controles"
+        className="flex gap-1.5 overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {paginas.map((pagina, i) => (
-          <div key={i} className="shrink-0 w-full snap-start pr-px">
-            {/* 2×2 SIEMPRE, aunque la última página venga incompleta.
-                `grid-rows-2` y no filas automáticas: con tres cards, las filas
-                automáticas repartirían el alto entre dos y la página quedaría
-                más baja que la anterior — el bloque saltaría al deslizar. */}
-            <div className="grid grid-cols-2 grid-rows-2 gap-1.5 auto-rows-fr">
-              {pagina.map((control) => (
-                <CardControl
-                  key={control.id}
-                  control={control}
-                  activo={activo === control.id}
-                  onSelect={onSelect}
-                  truncado={truncado}
-                />
-              ))}
-            </div>
-          </div>
+        {controles.map((control) => (
+          <CardControl
+            key={control.id}
+            control={control}
+            activo={activo === control.id}
+            onSelect={onSelect}
+            truncado={truncado}
+          />
         ))}
       </div>
 
-      {/* LOS PUNTOS, SOLO SI HAY MÁS DE UNA PÁGINA. Con una sola serían un punto
-          suelto que no hace nada, y eso se lee como un control roto. */}
-      {paginas.length > 1 && (
-        <div className="flex justify-center gap-1.5 mt-1.5">
-          {paginas.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => irA(i)}
-              aria-label={`Página ${i + 1} de ${paginas.length}`}
-              aria-current={i === paginaVisible}
-              className="w-6 h-6 flex items-center justify-center"
-            >
-              {/* ── EL ACENTO SIGUE SIENDO `--pos-accent`, Y ESTÁ DECIDIDO ──
-                  No es semántica de salud: es "cuál está seleccionado". El
-                  guardrail que sacó `--pos-success/warning/danger` de acá es
-                  sobre los estados, y el ERP no tiene otro token de acento —no
-                  existe `--accent` ni `--link-fg` en ningún tema—. Inventar uno
-                  obliga a elegir su valor en los CATORCE, con su medición de
-                  contraste, y eso es una tanda propia. Es el mismo criterio con
-                  el que la tarjeta dejó anotada su diferencia de cuatro puntos
-                  contra el prototipo en vez de crear un token al paso. */}
-              <span
-                className="block w-1.5 h-1.5 rounded-full transition-opacity"
-                style={{
-                  background: "var(--pos-accent)",
-                  opacity: i === paginaVisible ? 1 : 0.3,
-                }}
-              />
-            </button>
-          ))}
+      {/* ── LA BARRA DE AVANCE ──────────────────────────────────────────────
+          No es decoración: es lo que dice que hay más de lo que se ve, incluso
+          antes de tocar nada. La card cortada en el borde lo insinúa; esto lo
+          afirma, y además dice CUÁNTO falta.
+
+          `aria-hidden`: para un lector de pantalla no aporta —las cards ya están
+          todas en el árbol y se recorren igual— y anunciarla sería ruido. */}
+      {desborda && (
+        <div
+          className="mt-1.5 h-1 rounded-full overflow-hidden"
+          // ── LA PISTA, Y POR QUÉ ESTÁ ACLARADA ────────────────────────────
+          //
+          // Sale de `--app-border`, el mismo gris de la línea divisoria del kit
+          // —lo usa `.sunmi-divider`— y que existe en los catorce temas.
+          //
+          // Va aclarada hacia el fondo porque la MEDICIÓN lo pidió: con el gris
+          // entero, el pulgar daba 2,47 en `sunmiFrance` contra los 3,0 que
+          // necesita un objeto gráfico. Y el número no se puede elegir a ojo: al
+          // 60 % el peor caso EMPEORA a 1,38, al 45 % da 2,34 y recién al 30 %
+          // llega a 3,26. Está en `scripts/sonda-controles-tokens.mjs`, que mide
+          // esta misma expresión en los catorce temas.
+          style={{ background: PISTA_DEL_RIEL }}
+          aria-hidden="true"
+        >
+          <div
+            className="h-full rounded-full transition-transform"
+            style={{
+              width: `${Math.max(avance.fraccion * 100, 12)}%`,
+              // `translateX` en porcentaje del PROPIO ancho: con el pulgar al
+              // 100 % de avance, correrlo (1/f − 1) veces su ancho lo deja
+              // exactamente pegado al borde derecho, sea cual sea la fracción.
+              transform: `translateX(${(avance.corrido * (1 / Math.max(avance.fraccion, 0.12) - 1)) * 100}%)`,
+              // ── EL ACENTO SOLO NO SE VEÍA CONTRA LA PISTA ──────────────
+              //
+              // `var(--pos-accent)` pelado sobre `--app-border` daba **2,15 en
+              // `sunmiLight`**, y un objeto gráfico que informa necesita 3,0: la
+              // barra existía y no se distinguía de su propia pista, o sea que
+              // no decía nada. Lo encontró la sonda de contraste, no el ojo.
+              //
+              // La misma mezcla que usan las cards, por el mismo motivo y con la
+              // misma proporción: empujar hacia el color de texto de la
+              // aplicación sube el contraste en los catorce temas sin tocar
+              // ningún theme.
+              background: conContraste("--pos-accent"),
+            }}
+          />
         </div>
       )}
     </section>
   );
 }
 
-export { TOKEN_POR_ROL, POR_PAGINA, enPaginas };
+export { TOKEN_POR_ROL, ANCHO_CARD_PCT, TINTE_ACTIVO_PCT, PISTA_DEL_RIEL, fondoDe };

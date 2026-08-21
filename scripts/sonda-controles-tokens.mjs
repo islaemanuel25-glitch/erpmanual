@@ -120,49 +120,136 @@ const umbralDeTexto = (px, bold) =>
 // que no se separen.
 const mezcla = (token) => `color-mix(in srgb, var(${token}) 88%, var(--app-fg))`;
 
+/**
+ * ── EL FONDO DE LA CARD ACTIVA, Y POR QUÉ HUBO QUE AGREGARLO ──────────────
+ *
+ * La tanda correctiva hizo que la card que está filtrando se tiña con su propio
+ * color de estado. Eso **baja el contraste**: el fondo se corre hacia el color del
+ * texto, así que todo lo que va escrito encima —el número, el título, el renglón
+ * de abajo— se lee peor que sobre `--card-bg` liso.
+ *
+ * Si la sonda hubiera seguido midiendo solo contra `--card-bg`, habría seguido
+ * dando verde sobre un fondo que la card encendida ya no dibuja: una medición
+ * correcta de la cosa equivocada, que es la peor forma de fallar. Es el mismo
+ * error que este repo ya cometió con el umbral de 3,0 sobre texto de 17,5 px.
+ *
+ * El 12 % tiene que ser el MISMO que el del componente. Hay un candado que lo
+ * exige comparando el HTML dibujado contra el texto de este archivo.
+ */
+const TINTE_ACTIVO = 12;
+const fondoActivo = (color) => `color-mix(in srgb, ${color} ${TINTE_ACTIVO}%, var(--card-bg))`;
+
+/**
+ * La pista sobre la que corre la barra de avance del riel. Tiene que ser la
+ * MISMA expresión que la del componente; hay un candado que lo exige.
+ */
+const PISTA_DEL_RIEL = "color-mix(in srgb, var(--app-border) 30%, var(--app-bg))";
+
+/** Los tres colores de salud, que son los que se repiten en casi todos los usos. */
+const LOS_TRES = [
+  ["success", mezcla("--success-fg")],
+  ["warning", mezcla("--warning-fg")],
+  ["danger", mezcla("--danger-fg")],
+];
+
+// `fondo` es una FUNCIÓN del color del uso, no un token suelto: en la card activa
+// el fondo depende del rol, porque se tiñe con el color de ese rol. En los demás
+// usos la función ignora el argumento y devuelve el token de siempre.
+const sobre = (token) => () => `var(${token})`;
+
 const USOS = [
   {
     nombre: "número de la card",
-    colores: [
-      ["success", mezcla("--success-fg")],
-      ["warning", mezcla("--warning-fg")],
-      ["danger", mezcla("--danger-fg")],
-    ],
-    fondo: "--card-bg",
+    colores: LOS_TRES,
+    fondo: sobre("--card-bg"),
     // 21 px en negrita: `text-2xl` con 1 rem = 14 px.
     px: 21,
     bold: true,
   },
   {
+    nombre: "número de la card ACTIVA",
+    colores: LOS_TRES,
+    fondo: fondoActivo,
+    px: 21,
+    bold: true,
+  },
+  {
     nombre: "borde de la card",
-    colores: [
-      ["success", mezcla("--success-fg")],
-      ["warning", mezcla("--warning-fg")],
-      ["danger", mezcla("--danger-fg")],
-    ],
-    fondo: "--card-bg",
+    colores: LOS_TRES,
+    fondo: sobre("--card-bg"),
     grafico: true,
+  },
+  {
+    nombre: "borde de la card ACTIVA",
+    colores: LOS_TRES,
+    fondo: fondoActivo,
+    grafico: true,
+  },
+  {
+    // El renglón "Tocá para quitar" de la card encendida. Es texto chico —10,5
+    // px, umbral 4,5— y por eso NO va pintado con el color del estado: así lo
+    // tenía la primera versión de la tanda y esta sonda lo puso en rojo con 3,14
+    // en `grafitoEjecutivo`. El fondo sí es el teñido, que es lo que hay que
+    // seguir midiendo.
+    nombre: "texto 'Tocá para quitar' de la card ACTIVA",
+    colores: LOS_TRES,
+    colorFijo: "var(--app-fg)",
+    fondo: fondoActivo,
+    px: 10.5,
+    bold: false,
   },
   {
     nombre: "ícono del aviso de conteo parcial",
     colores: [["warning", mezcla("--warning-fg")]],
     // El aviso va sobre el fondo de la página, no adentro de una card.
-    fondo: "--app-bg",
+    fondo: sobre("--app-bg"),
     grafico: true,
   },
   {
     nombre: "texto del aviso de conteo parcial",
     colores: [["texto", "var(--app-fg)"]],
-    fondo: "--app-bg",
+    fondo: sobre("--app-bg"),
     px: 10.5,
     bold: false,
   },
   {
     nombre: "título de la card",
     colores: [["texto", "var(--app-fg)"]],
-    fondo: "--card-bg",
+    fondo: sobre("--card-bg"),
     px: 11.5,
     bold: true,
+  },
+  {
+    // El mismo título, sobre la card encendida. Va con `--app-fg` igual que el
+    // otro, pero el fondo cambió: hay que medirlo aparte.
+    nombre: "título de la card ACTIVA",
+    colores: LOS_TRES.map(([rol, color]) => [rol, color]),
+    fondo: fondoActivo,
+    px: 11.5,
+    bold: true,
+    // El color del título NO es el del rol: es `--app-fg`. El rol solo decide el
+    // FONDO. Por eso el color se pisa acá en vez de listarlo tres veces.
+    colorFijo: "var(--app-fg)",
+  },
+  {
+    // La barra va MEZCLADA, no con el acento pelado: suelto daba 2,15 sobre su
+    // propia pista en `sunmiLight`, o sea una barra que no se distinguía del
+    // fondo sobre el que corre.
+    nombre: "barra de avance del riel",
+    colores: [["acento", mezcla("--pos-accent")]],
+    // ── LA PISTA SE ACLARÓ PORQUE LA MEDICIÓN LO PIDIÓ ────────────────────
+    //
+    // Sobre `--app-border` a secas, el pulgar daba 2,47 en `sunmiFrance` y no
+    // llegaba a los 3,0 de un objeto gráfico: una barra de avance que no se
+    // distingue de su propia pista no informa nada.
+    //
+    // Y el arreglo no era el obvio. Medido en los catorce, con la pista mezclada
+    // al 60 % hacia el fondo el peor caso EMPEORA a 1,38 —el pulgar pasa por la
+    // luminancia de la pista en el camino—, al 45 % da 2,34 y recién al 30 % sube
+    // a 3,26. Elegir "un gris un poco más claro" a ojo habría dado el 60 %, que
+    // es el peor de los tres.
+    fondo: () => PISTA_DEL_RIEL,
+    grafico: true,
   },
 ];
 
@@ -273,10 +360,22 @@ try {
 
   // Todas las expresiones que hay que resolver, sin repetir. Los fondos van como
   // `var(...)` para que se resuelvan por el mismo camino.
+  // El color que se pinta en cada (uso, rol) y el fondo sobre el que va. El fondo
+  // depende del color en la card activa, así que se resuelven de a pares.
+  const colorDe = (uso, color) => uso.colorFijo ?? color;
+  const paresDe = (uso) =>
+    uso.colores.map(([rol, color]) => ({
+      rol,
+      color: colorDe(uso, color),
+      // El fondo de la card activa se tiñe con el color DEL ROL, no con el del
+      // texto: por eso recibe `color` y no `colorDe(...)`. En el título activo son
+      // distintos —el texto es `--app-fg` y el fondo es del rol— y confundirlos
+      // mediría un fondo que no existe.
+      fondo: uso.fondo(color),
+    }));
+
   const EXPRESIONES = [
-    ...new Set(
-      USOS.flatMap((u) => [`var(${u.fondo})`, ...u.colores.map(([, c]) => c)])
-    ),
+    ...new Set(USOS.flatMap((u) => paresDe(u).flatMap((p) => [p.fondo, p.color]))),
   ];
 
   // El peor caso por (uso, rol), que es la unidad sobre la que se afirma.
@@ -342,9 +441,8 @@ try {
 
     const partes = [];
     for (const uso of USOS) {
-      const fondo = aTerna(`var(${uso.fondo})`);
-      for (const [rol, color] of uso.colores) {
-        const c = contraste(aTerna(color), fondo);
+      for (const { rol, color, fondo: expresionFondo } of paresDe(uso)) {
+        const c = contraste(aTerna(color), aTerna(expresionFondo));
         const p = peor.get(clave(uso, rol));
         if (c < p.valor) peor.set(clave(uso, rol), { valor: c, tema: tema || "(default)" });
         // La línea por tema solo muestra los tres de salud sobre la card, que son
