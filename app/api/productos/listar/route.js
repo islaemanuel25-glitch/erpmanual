@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { productoVisibleWhere } from "@/lib/visibilidad";
+import { filtrosBaseDelCatalogo } from "@/lib/productos/whereCatalogo";
 import { mergeBaseLocalToUi } from "@/lib/mappers/producto";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
@@ -134,14 +134,14 @@ export async function GET(req) {
     // WHERE — snake_case SOLO dentro de Prisma.
     // Filtros generales (sin proveedor): aplican siempre.
     const generalFilters = [
-      { grupoId },
-      // Regla A: el depósito no ve productos creados por locales; cada local ve
-      // los del depósito + los suyos, no los de otros locales.
-      productoVisibleWhere(localId),
-      // Combos: visibilidad ESTRICTA por local dueño. A diferencia de los productos
-      // normales (donde lo creado en el depósito baja a todos los locales), un combo
-      // solo se ve en el local que lo creó — incluso si nació en el depósito.
-      { OR: [{ es_combo: false }, { es_combo: true, creadoEnLocalId: localId }] },
+      // ── LAS TRES ESTRUCTURALES SALEN DE UN LUGAR SOLO ───────────────────
+      //
+      // Grupo, visibilidad depósito/local y la regla de combos. Estaban escritas
+      // acá y ahora viven en `filtrosBaseDelCatalogo`, porque el contador de
+      // "Para revisar" tiene que ver EXACTAMENTE el mismo universo: si el
+      // contador mirara uno distinto, el número de la card no cerraría contra el
+      // total de la lista que abre. Ya le faltaba la de combos.
+      ...filtrosBaseDelCatalogo({ grupoId, localId }),
       // Filtro Tipo (Todos/Productos/Combos).
       tipoFilter,
       categoriaId ? { categoria_id: categoriaId } : {},
