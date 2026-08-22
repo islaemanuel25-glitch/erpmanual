@@ -235,7 +235,7 @@ const USOS = [
     // La barra va MEZCLADA, no con el acento pelado: suelto daba 2,15 sobre su
     // propia pista en `sunmiLight`, o sea una barra que no se distinguía del
     // fondo sobre el que corre.
-    nombre: "barra de avance del riel",
+    nombre: "barra de avance del riel de controles",
     colores: [["acento", mezcla("--pos-accent")]],
     // ── LA PISTA SE ACLARÓ PORQUE LA MEDICIÓN LO PIDIÓ ────────────────────
     //
@@ -249,6 +249,42 @@ const USOS = [
     // a 3,26. Elegir "un gris un poco más claro" a ojo habría dado el 60 %, que
     // es el peor de los tres.
     fondo: () => PISTA_DEL_RIEL,
+    grafico: true,
+  },
+
+  // ── LA SUPERFICIE DEL CARRUSEL DE LA TARJETA DE PRODUCTO ────────────────
+  //
+  // No es del bloque "Para revisar", pero se mide con la misma herramienta y por
+  // el mismo motivo: el cuerpo de la tarjeta pasó a tener fondo propio
+  // —`--hover-bg`, el tenue del ERP— y TODO lo que va escrito encima estaba
+  // medido contra `--card-bg`, que es otro color.
+  //
+  // Sin esto, el cuerpo del carrusel sería el único bloque con texto sobre un
+  // fondo que nadie comprobó en los catorce temas. Es exactamente la forma del
+  // agujero que dejó el tinte de la card activa hasta que se agregó su medición.
+  {
+    nombre: "importe de la tarjeta, sobre el cuerpo del carrusel",
+    colores: [["texto", "var(--app-fg)"]],
+    fondo: sobre("--hover-bg"),
+    // 30 px en negrita: texto grande sin discusión.
+    px: 30,
+    bold: true,
+  },
+  {
+    // La presentación, el rótulo de la cara, el costo y los códigos. El más chico
+    // manda: si pasa el de 10 px, pasan los de 10,5 y 11,5.
+    nombre: "texto chico de la tarjeta, sobre el cuerpo del carrusel",
+    colores: [["texto", "var(--app-fg)"]],
+    fondo: sobre("--hover-bg"),
+    px: 10,
+    bold: false,
+  },
+  {
+    // Mezclado, no pelado: con el acento a secas daba 2,86 en `ambarCaja` sobre
+    // esta superficie. Un indicador que no se distingue del fondo no indica nada.
+    nombre: "puntos del indicador de cara",
+    colores: [["acento", mezcla("--pos-accent")]],
+    fondo: sobre("--hover-bg"),
     grafico: true,
   },
 ];

@@ -2120,6 +2120,77 @@ try {
     "2b · tocar Editar entra a la ficha del producto",
     `quedó en ${despues.donde}`
   );
+
+  // ══ 18 · EL DORSO DE KILO Y PIEZA, EN EL ANDAMIO ═══════════════════════
+  //
+  // ── POR QUÉ ACÁ Y NO EN EL CATÁLOGO ────────────────────────────────────
+  //
+  // Porque en la base de desarrollo NO HAY ningún producto por kilo ni ningún
+  // fiambre de pieza fija. Sobre el catálogo, este caso se informa como NO
+  // EJERCIDO — y ahí vivía el defecto de esta pasada: el dorso de un kilo decía
+  // "Importe variable", que es el rótulo de los servicios, sobre un producto que
+  // sí tiene precio.
+  //
+  // El andamio monta las MISMAS tarjetas del catálogo con entradas fijas. Lo que
+  // fabrica es la entrada, no la respuesta: las caras salen de `carasDeTarjeta`,
+  // o sea de las funciones del POS. Por eso esto ejerce el caso y no lo dibuja.
+  //
+  // Y se toca el botón de verdad, no se renderiza una cara suelta: el candado de
+  // la suite ya hace eso. Acá lo que se prueba es que TOCAR lleve al dorso bueno.
+  await send("Page.navigate", { url: `${BASE}/andamio-producto-card` });
+  await sleep(4000);
+  const andamio = await evaluar(`(() => {
+    const tarjetas = [...document.querySelectorAll('[data-tarjeta-cara]')];
+    if (tarjetas.length === 0) return { sinAndamio: true };
+    const resultado = [];
+    for (const cara of tarjetas) {
+      const boton = cara.querySelector('[data-tarjeta-voltear]');
+      if (!boton) continue;
+      boton.click();
+    }
+    return { sinAndamio: false, cuantas: tarjetas.length };
+  })()`);
+  if (andamio.sinAndamio) {
+    morir("el andamio de la tarjeta no dibujó ninguna cara: el caso de kilo/pieza no se pudo ejercer");
+  }
+  await sleep(600);
+
+  const dorsos = await evaluar(`(() => {
+    return [...document.querySelectorAll('[data-tarjeta-cara]')].map((c) => ({
+      lado: c.getAttribute('data-tarjeta-cara'),
+      texto: c.innerText.replace(/\\n/g, " | "),
+      tieneImporte: !!c.querySelector('[data-cara-importe]'),
+      tieneReferencia: !!c.querySelector('[data-cara-referencia]'),
+    }));
+  })()`);
+
+  const enDorso = dorsos.filter((d) => d.lado === "dorso");
+  afirmar(
+    enDorso.length >= 3,
+    `18a · el andamio deja abrir el dorso de los casos que la base no tiene (${enDorso.length} caras dadas vuelta)`,
+    `solo ${enDorso.length} se dieron vuelta: el caso no se ejerció`
+  );
+
+  // ── LA CONTRAPRUEBA QUE PEDÍA EL DEFECTO ────────────────────────────────
+  //
+  // "Importe variable" es de los servicios. Ningún dorso puede decirlo: kilo y
+  // pieza tienen precio, y lo que su dorso muestra es una línea de referencia.
+  const conImporteVariable = enDorso.filter((d) => /Importe variable/.test(d.texto));
+  afirmar(
+    conImporteVariable.length === 0,
+    "18b · NINGÚN dorso dice 'Importe variable'",
+    `${conImporteVariable.length} lo dicen. El primero: ${conImporteVariable[0]?.texto ?? ""}`
+  );
+
+  // Y el de kilo/pieza muestra su referencia en vez de un importe inventado.
+  const conReferencia = enDorso.filter((d) => d.tieneReferencia);
+  afirmar(
+    conReferencia.length >= 2 && conReferencia.every((d) => !d.tieneImporte),
+    `18c · el dorso de kilo y pieza muestra su referencia y NO un importe (${conReferencia.length} caras)`,
+    conReferencia.length < 2
+      ? "no se encontraron las dos caras de referencia: el caso no se ejerció"
+      : "una cara de referencia dibujó además un importe"
+  );
 } catch (e) {
   morir(e.message);
 }
