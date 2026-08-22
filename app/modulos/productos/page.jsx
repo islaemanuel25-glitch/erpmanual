@@ -22,7 +22,10 @@ import ModalProducto from "@/components/productos/ModalProductoFinal";
 import ModalVerComposicion from "@/components/productos/ModalVerComposicion";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
-import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProductoCard";
+// La tarjeta del celular pasó a tener dos caras, y quien las administra es
+// `TarjetaProductoMovil`: `SunmiProductoCard` sigue siendo la pieza del kit y
+// esta pantalla ya no la monta directo.
+import TarjetaProductoMovil from "@/components/productos/TarjetaProductoMovil";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import CarruselControles from "@/components/productos/CarruselControles";
 import HojaMasAcciones from "@/components/productos/HojaMasAcciones";
@@ -30,11 +33,17 @@ import HojaPersonalizarTarjeta from "@/components/productos/HojaPersonalizarTarj
 // `Eye` se fue con el botón "Ver": la tarjeta del celular deja Editar como única
 // acción. La pantalla de sólo lectura sigue existiendo y se llega desde la tabla
 // de escritorio, que no cambió.
-// `X` se fue con el chip de control: era su única aparición en la pantalla.
-import { Pencil, Search, SlidersHorizontal, MoreHorizontal, CheckCheck } from "lucide-react";
-import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
+// `X` se fue con el chip de control y `Pencil` con la tarjeta: el ícono de
+// Editar lo pone ahora `TarjetaProductoMovil`, junto al botón.
+import { Search, SlidersHorizontal, MoreHorizontal, CheckCheck } from "lucide-react";
+// `lineaDeEquivalencia` se fue con la franja; el único caso donde su texto sigue
+// haciendo falta —kilo y pieza fija— lo pide `carasDeTarjeta`, que la llama
+// igual. Y los dos helpers de redondeo se importaban para armar el número a
+// mano: ahora el número sale de `valorEnLaEscalaDeVenta`, que los llama por
+// dentro. Un import sin consumidor documenta un cálculo que esta pantalla ya no
+// hace, que es justo lo que no puede volver a hacer.
+import { formatearMoneda } from "@/lib/moneda";
 import { escalaDeVentaDe, valorEnLaEscalaDeVenta } from "@/lib/precios/escalaDeVenta";
-import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "@/lib/precios/redondeo";
 // `seVendeSinGanancia` y `GANANCIA_FALTA` se importaban acá para los dos avisos
 // de mantenimiento de la tarjeta. Los dos avisos se fueron a "Para revisar", que
 // los cuenta y los deja filtrar, así que estos imports quedaron sin consumidor.
@@ -54,15 +63,16 @@ import {
   normalizarEstadoDeUrl,
   CLAVES_DE_FILTRO,
 } from "@/lib/productos/filtrosCatalogo";
+// `REGION` y `camposVisiblesDe` se fueron con el reordenamiento: la
+// personalización pasó a ser prender y apagar, y la posición la define el diseño.
 import {
   CAMPO,
-  REGION,
-  camposVisiblesDe,
   campoVisible,
   claveDeConfiguracion,
   configuracionPorDefecto,
   normalizarConfiguracion,
 } from "@/lib/productos/camposTarjeta";
+import { carasDeTarjeta } from "@/lib/productos/carasDeTarjeta";
 import useContextoActivo from "@/hooks/useContextoActivo";
 
 // =========================================================
@@ -75,12 +85,13 @@ const TABS = [
 
 // ── LO QUE MUESTRA UN SERVICIO DE IMPORTE VARIABLE ────────────────────────
 //
-// El texto es el MISMO que ya muestra el buscador del POS —"Importe variable"—,
-// copiado de `components/pos-ventas/BuscadorProductos.jsx`. Dos pantallas
-// diciendo lo mismo con dos redacciones distintas es cómo empieza a divergir un
-// concepto, y acá el concepto es "este producto no tiene precio: se carga al
-// vender".
-const TEXTO_IMPORTE_VARIABLE = "Importe variable";
+// El texto —"Importe variable"— es el mismo que ya muestra el buscador del POS.
+// Vive ahora en `TarjetaProductoMovil`, que es quien dibuja el número: acá la
+// constante quedaba sin consumidor, y una constante que nadie usa documenta una
+// pantalla que ya no existe.
+//
+// Con la constante se fue también `EQUIVALENCIA_IMPORTE_VARIABLE`, el texto de
+// la franja: la franja no existe más.
 
 // ── LA REGLA DE GANANCIA EN LA TARJETA, YA SIN AVISAR ─────────────────────
 //
@@ -102,10 +113,6 @@ const TEXTO_IMPORTE_VARIABLE = "Importe variable";
 // `text-xs` y no una medida escrita: está en la escala y no sube el contador de
 // hardcodeo. Son 10,5 px reales —1 rem son 14 acá—.
 const GANANCIA_CLASE = "text-xs [font-variant-numeric:tabular-nums] whitespace-nowrap";
-// Y la línea de abajo explica de dónde sale el importe. Va con texto y no vacía
-// porque todas las tarjetas llevan su línea: un hueco haría que estas cuatro
-// quedaran más bajas que las demás.
-const EQUIVALENCIA_IMPORTE_VARIABLE = "El importe se carga al vender";
 
 // ── EL ESTADO INICIAL SALE DE LA URL, Y SE NORMALIZA ANTES DE USARSE ──────
 //
@@ -201,7 +208,21 @@ export default function ProductosPage() {
   // sin prenderlo— y en el depósito forzarlo haría que la tarjeta contradiga al
   // mostrador. La columna y la pantalla quedan en su lugar; sacarlas es una
   // decisión de Emanuel y está anotada.
-  const tarjetaSinEquivalencia = perfilProd?.tarjetaOcultarEquivalencia === true;
+  // ── Y "OCULTAR LA EQUIVALENCIA DE BULTO" TAMPOCO SE LEE MÁS ─────────────
+  //
+  // Era la otra preferencia de apariencia por local, y apagaba la franja de
+  // conversión. Esa franja no existe: la presentación pasó a viajar pegada al
+  // precio y la otra escala vive en el dorso.
+  //
+  // **No se repurposeó para apagar el dorso, a propósito.** El interruptor dice
+  // "ocultar la equivalencia", y lo que ocultaba era un bloque PERMANENTE que
+  // aparecía sin pedirlo; el dorso solo se ve si alguien lo pide tocando. Usar
+  // ese booleano guardado para significar otra cosa es cambiarle el sentido a una
+  // preferencia que ya tomó gente, sin avisarles.
+  //
+  // Así que hoy la columna y su interruptor quedan SIN EFECTO sobre esta
+  // pantalla. Está anotado como pendiente: o se le da un sentido nuevo con su
+  // texto nuevo, o se saca. Las dos son decisiones de Emanuel.
 
   // La ubicación en la que estoy parado. Es la mitad de la respuesta: el MISMO
   // producto se vende por bulto en el depósito y por unidad en un local.
@@ -421,7 +442,10 @@ export default function ProductosPage() {
     { key: "imagenUrl", label: "Imagen" },
     { key: "nombre", label: "Nombre" },
     { key: "codigoBarra", label: "Código barra" },
-    { key: "codigoInterno", label: "Código interno" },
+    // El nombre largo: "Código interno" a secas se confundía con el id del
+    // producto y con el SKU — y de hecho la tarjeta del celular llegó a mostrar
+    // el id bajo ese rótulo. Es el código que le da EL PROVEEDOR.
+    { key: "codigoInterno", label: "Código interno por proveedor" },
     { key: "sku", label: "SKU" },
     { key: "categoriaId", label: "Categoría" },
     { key: "proveedorId", label: "Proveedor" },
@@ -1436,12 +1460,13 @@ export default function ProductosPage() {
   // Y no adentro del `map`: son las mismas cinco respuestas para las 25 filas.
   // Resolverlas por fila sería normalizar la configuración veinticinco veces
   // para obtener veinticinco veces lo mismo.
+  // Cinco preguntas booleanas y ninguna de orden: "Personalizar card" prende y
+  // apaga, y la posición de cada dato la define el diseño.
   const muestraProveedor = campoVisible(configTarjeta, CAMPO.PROVEEDOR);
-  const muestraEquivalencia = campoVisible(configTarjeta, CAMPO.EQUIVALENCIA);
+  const muestraCosto = campoVisible(configTarjeta, CAMPO.COSTO);
+  const muestraMargen = campoVisible(configTarjeta, CAMPO.MARGEN);
   const muestraCodigoBarra = campoVisible(configTarjeta, CAMPO.CODIGO_BARRA);
   const muestraCodigoInterno = campoVisible(configTarjeta, CAMPO.CODIGO_INTERNO);
-  const ordenMarca = camposVisiblesDe(configTarjeta, REGION.MARCA);
-  const ordenPie = camposVisiblesDe(configTarjeta, REGION.PIE);
 
   // El control que está filtrando, ya con su título — para el chip de contexto.
   // Sale de la lista que mandó el servidor y no de una copia local: si el
@@ -1841,9 +1866,24 @@ export default function ProductosPage() {
                   const redondeoDelPos = vendeConListaAlCosto
                     ? listaAlCostoRedondea100
                     : p.redondeo100;
-                  const precioQueCobraElPos = enEscala(precioBaseDelPos, redondeoDelPos);
+
+                  // ── LAS DOS CARAS, DE UNA SOLA PASADA POR FILA ──────────
+                  //
+                  // `carasDeTarjeta` no consulta nada ni decide precios: le pide
+                  // a `valorEnLaEscalaDeVenta` —la misma que ya usaba esta
+                  // pantalla— el importe de cada escala y arma las dos caras.
+                  // Dar vuelta una tarjeta después no cuesta ni un pedido.
+                  const caras = carasDeTarjeta({
+                    escala: escalaVenta,
+                    precio: precioBaseDelPos,
+                    redondeo100: redondeoDelPos,
+                    factor: p.factorPack,
+                    unidad: p.unidadMedida,
+                    pesoReferenciaKg: p.pesoReferenciaKg,
+                    esCombo: p.esCombo,
+                  });
                   return (
-                  <SunmiProductoCard
+                  <TarjetaProductoMovil
                     key={p.id ?? p.productoLocalId}
                     nombre={p.nombre}
                     // `false` es "esta pantalla no lo muestra" y `null` es "no
@@ -1851,37 +1891,29 @@ export default function ProductosPage() {
                     // el renglón diciendo qué falta— así que la distinción no se
                     // puede perder acá.
                     empresa={muestraProveedor ? p.proveedorNombre ?? null : false}
-                    equivalencia={
-                      !muestraEquivalencia
-                        ? null
-                        : esProductoServicio(p)
-                        ? EQUIVALENCIA_IMPORTE_VARIABLE
-                        : lineaDeEquivalencia({
-                            // EL MISMO precio que el número grande, no
-                            // `p.precioVenta` — ver `precioBaseDelPos` arriba.
-                            // Recibía siempre la venta, y en el depósito eso
-                            // ponía la conversión de un precio distinto del que
-                            // la tarjeta muestra arriba.
-                            precio: precioBaseDelPos,
-                            factor: p.factorPack,
-                            unidad: p.unidadMedida,
-                            redondeo100: redondeoDelPos,
-                            // Los 142 combos no se distinguían de un producto
-                            // común en ninguna parte de la tarjeta. Lo dice la
-                            // franja de escala, con palabra y no con un dibujo.
-                            esCombo: p.esCombo,
-                            ocultarEquivalencia: tarjetaSinEquivalencia,
-                            // La escala de VENTA decide qué conversión hace
-                            // falta, y si hace falta alguna: en un suelto la
-                            // franja desaparece porque no hay nada que convertir.
-                            escala: escalaVenta,
-                            pesoReferenciaKg: p.pesoReferenciaKg,
-                          })
-                    }
+                    caras={caras}
                     codigoBarra={muestraCodigoBarra ? p.codigoBarra ?? p.sku ?? null : false}
-                    codigoInterno={
-                      muestraCodigoInterno ? p.id ?? p.productoLocalId ?? null : false
-                    }
+                    // ── ACÁ IBA EL ID DEL PRODUCTO, Y ERA UN DEFECTO ────────
+                    //
+                    // Decía `p.id ?? p.productoLocalId`, o sea la clave primaria
+                    // de la tabla, rotulada "Cod. int.". En la captura de
+                    // revisión se ve: `361 LATA X24` mostraba "Cod. int. 2023",
+                    // que es su id y no un código de nadie.
+                    //
+                    // No era un dato "aproximado": era un número técnico
+                    // presentado como un código comercial, en las 2.600 filas.
+                    // Quien lo cotejara contra una lista del proveedor no iba a
+                    // encontrar nada, y no tenía cómo saber por qué.
+                    //
+                    // El dato correcto ya venía en la respuesta del listado:
+                    // `p.codigoInterno`, que el servidor saca de
+                    // `ProductoCodigoProveedor` prefiriendo el del proveedor
+                    // principal. No hace falta ninguna consulta nueva.
+                    //
+                    // Y no se cae a nada: sin código del proveedor, la tarjeta
+                    // dice "Sin cód. prov.". El SKU no sirve de reemplazo —es
+                    // otro concepto, del negocio propio— y el id menos.
+                    codigoInterno={muestraCodigoInterno ? p.codigoInterno ?? null : false}
                     // EL COSTO Y LA GANANCIA, en el hueco que ya existía a la
                     // izquierda del precio. No agrega renglón: van APILADOS
                     // dentro de la fila del valor, que tiene 30 px de alto
@@ -1908,8 +1940,17 @@ export default function ProductosPage() {
                     // · la línea "Costo", porque el número grande YA es el
                     //   costo. Dejarla sería escribir el mismo número dos veces
                     //   en la misma fila, una vez grande y otra chiquita.
+                    // ── EL ORDEN DE ESTOS DOS YA NO ES CONFIGURABLE ─────────
+                    //
+                    // Antes salía de `camposVisiblesDe(config, REGION.MARCA)` y
+                    // el usuario podía subir el costo por encima del porcentaje.
+                    // Personalizar card dejó de reordenar: se prende y se apaga,
+                    // y la posición la define el diseño. Van costo y después
+                    // regla, siempre.
                     marca={
-                      esProductoServicio(p) || vendeConListaAlCosto || ordenMarca.length === 0
+                      esProductoServicio(p) ||
+                      vendeConListaAlCosto ||
+                      (!muestraCosto && !muestraMargen)
                         ? null
                         : (() => {
                             const regla = reglaDeGananciaDe(p);
@@ -1923,18 +1964,17 @@ export default function ProductosPage() {
                             // veces, y en la tarjeta no hay nada que hacer con
                             // ellos — no se puede tocar el ámbar para ver los
                             // otros mil seiscientos.
-                            const bloque = {
-                              [CAMPO.COSTO]:
-                                costoEnEscala !== null ? (
-                                  <span
-                                    key={CAMPO.COSTO}
-                                    className={`${GANANCIA_CLASE} sunmi-text-muted`}
-                                    title="Costo, en la misma escala que el precio de venta"
-                                  >
-                                    Costo {formatearMoneda(costoEnEscala)}
-                                  </span>
-                                ) : null,
-                              [CAMPO.MARGEN]: (
+                            const renglones = [
+                              muestraCosto && costoEnEscala !== null ? (
+                                <span
+                                  key={CAMPO.COSTO}
+                                  className={`${GANANCIA_CLASE} sunmi-text-muted`}
+                                  title="Costo, en la misma escala que el precio de venta"
+                                >
+                                  Costo {formatearMoneda(costoEnEscala)}
+                                </span>
+                              ) : null,
+                              muestraMargen ? (
                                 <span
                                   key={CAMPO.MARGEN}
                                   className={`${GANANCIA_CLASE} sunmi-text-muted`}
@@ -1942,12 +1982,8 @@ export default function ProductosPage() {
                                 >
                                   {textoDeGanancia(regla)}
                                 </span>
-                              ),
-                            };
-                            // El ORDEN sale de la configuración: es lo único que
-                            // se puede reordenar de verdad en esta región, y es
-                            // lo que "Personalizar card" promete.
-                            const renglones = ordenMarca.map((id) => bloque[id]).filter(Boolean);
+                              ) : null,
+                            ].filter(Boolean);
                             if (renglones.length === 0) return null;
                             return (
                               <span className="flex flex-col items-start leading-tight">
@@ -1963,79 +1999,30 @@ export default function ProductosPage() {
                     // son y deja verlas todas juntas — que es lo que se necesita
                     // para arreglarlas. Un triángulo por tarjeta informaba de a
                     // una y no llevaba a ningún lado.
-                    aviso={null}
-                    valor={
-                      esProductoServicio(p) ? (
-                        // UN SERVICIO NO TIENE PRECIO, Y CERO NO ES "GRATIS".
-                        // La columna es obligatoria, así que el formulario les
-                        // guarda 0 a propósito; la tarjeta mostraba "$0,00 por
-                        // unidad" y eso no se distingue de un producto mal
-                        // cargado. Son 4 en producción, medidos.
-                        // Sin tamaño propio: hereda el de la tarjeta. Ponerle uno
-                        // sería una medida mágica más para decir "no hay precio".
-                        <span className="font-semibold sunmi-text-muted whitespace-nowrap">
-                          {TEXTO_IMPORTE_VARIABLE}
-                        </span>
-                      ) : (
-                        <>
-                          <span className="text-[22px] font-bold sunmi-text-strong whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em]">
-                            {/* EL PRECIO QUE SE COBRA, no el guardado. El POS
-                                redondea a 100 y el catálogo no lo hacía: 1.130
-                                productos mostraban un número y el mostrador
-                                cobraba otro. La regla vive en
-                                `lib/precios/redondeo.js`, no acá. */}
-                            {/* EL LOCAL PUEDE PEDIR SIEMPRE EL UNITARIO. Cambia
-                                el número en 6.430 de 10.616 filas —las de pack—,
-                                y por eso la etiqueta de abajo TIENE que cambiar
-                                con él: dejarla en "por bulto" sobre un número
-                                unitario es la misma contradicción del "/ un",
-                                dada vuelta. */}
-                            {/* EL NÚMERO SIGUE A LA ESCALA DE VENTA. Cambiar
-                                solo el rótulo habría sido peor que no tocar
-                                nada: diría "$31.900,00 por unidad" sobre un
-                                precio de bulto. */}
-                            {/* EL NÚMERO ES EL QUE COBRA EL POS EN ESTA
-                                UBICACIÓN. En un local es el precio de venta; en
-                                el depósito, que vende con lista al costo, es el
-                                costo. La decisión está arriba, en
-                                `precioQueCobraElPos`. */}
-                            {formatearMoneda(precioQueCobraElPos)}
-                          </span>
-                          {/* EL RÓTULO ES LA ESCALA DE VENTA, tal cual. Antes
-                              salía de `unidad_medida`, que dice cómo se COMPRA:
-                              5.450 de 10.521 filas activas nombraban una escala
-                              distinta de la que el POS usa para vender. */}
-                          <span className="text-[11.5px] sunmi-text-muted">
-                            {escalaVenta}
-                          </span>
-                        </>
-                      )
-                    }
-                    codigoInternoPrimero={ordenPie[0] === CAMPO.CODIGO_INTERNO}
-                    // ── EDITAR, Y NADA MÁS ────────────────────────────────
+                    // ── EL PRECIO Y SU PRESENTACIÓN LOS DIBUJA EL ENVOLTORIO ─
                     //
-                    // "Ver" se fue. Llevaba a una ficha de sólo lectura que
-                    // muestra lo mismo que la tarjeta ya muestra, y desde la que
-                    // igual hay que tocar Editar para hacer algo: era un toque
-                    // de más para llegar al mismo lado. La pantalla no se borró
-                    // —sigue en `/modulos/productos/[id]` y se llega desde la
-                    // tabla de escritorio—, lo que se fue es el botón.
+                    // Acá se armaba el número grande con su rótulo. Ahora eso
+                    // depende de qué cara se esté mirando, así que lo resuelve
+                    // `TarjetaProductoMovil` a partir de `caras` — que ya trae
+                    // los dos importes calculados por los helpers del POS.
                     //
-                    // Y con un solo botón la fila deja de partirse en dos, así
-                    // que el blanco táctil pasa de media tarjeta a la tarjeta
-                    // entera.
+                    // Lo que NO se movió es la decisión de QUÉ precio se muestra:
+                    // eso sigue arriba, en `precioBaseDelPos` y `redondeoDelPos`,
+                    // que es donde vive el hecho de que el depósito vende con
+                    // lista al costo. El envoltorio no elige precios, los dibuja.
+                    //
+                    // Un servicio de importe variable tampoco se decide acá:
+                    // `escalaDeVentaDe` lo devuelve como "importe variable" y
+                    // `carasDeTarjeta` le deja el importe en null, que es lo que
+                    // hace que la tarjeta diga "Importe variable" en vez de
+                    // "$0,00". La columna es obligatoria y el formulario les
+                    // guarda 0 a propósito; cero no es gratis. Son 4 en
+                    // producción, medidos.
                     //
                     // EL ID, NO LA FILA: `abrirEditar` valida con `Number(id)`,
                     // así que pasarle el objeto daba NaN y saltaba "ID de
                     // producto inválido" sin entrar nunca.
-                    acciones={
-                      <AccionTarjeta
-                        icono={Pencil}
-                        onClick={() => abrirEditar(p.id ?? p.productoLocalId)}
-                      >
-                        Editar
-                      </AccionTarjeta>
-                    }
+                    onEditar={() => abrirEditar(p.id ?? p.productoLocalId)}
                   />
                   );
                 })}
