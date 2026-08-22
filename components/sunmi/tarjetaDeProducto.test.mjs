@@ -29,6 +29,11 @@ const leer = (ruta) =>
 const TARJETA = leer("components/sunmi/SunmiProductoCard.jsx");
 const PAGINA = leer("app/modulos/productos/page.jsx");
 const ANDAMIO = leer("app/andamio-producto-card/page.jsx");
+// El envoltorio de las dos caras. La pantalla dejó de montar la pieza del kit
+// directo: ahora monta esto, y esto monta la pieza. Los candados que hablaban de
+// "la pantalla" tienen que mirar acá o quedan afirmando sobre el archivo
+// equivocado — que es la forma en que un candado se pone verde sin defender nada.
+const ENVOLTORIO = leer("components/productos/TarjetaProductoMovil.jsx");
 
 test("LA CAPA NO VUELVE: la tarjeta no tiene estado ni nada superpuesto", () => {
   assert.doesNotMatch(TARJETA, /absolute inset-0/, "volvió la capa superpuesta");
@@ -38,11 +43,17 @@ test("LA CAPA NO VUELVE: la tarjeta no tiene estado ni nada superpuesto", () => 
   assert.doesNotMatch(PAGINA, /tarjetaAbierta/, "volvió el estado en la pantalla");
 });
 
-test("los dos íconos que quedan son del núcleo, no props", () => {
+test("el ícono que queda es del núcleo, no una prop", () => {
   // Si cada pantalla eligiera los suyos, dos listas del mismo ERP marcarían el
   // mismo dato con dibujos distintos.
-  assert.match(TARJETA, /<Tag/, "falta el ícono de la etiqueta en la equivalencia");
+  //
+  // ── ERAN DOS Y QUEDÓ UNO ────────────────────────────────────────────────
+  //
+  // `Tag` marcaba la franja de equivalencia como "esto es la escala del precio".
+  // La franja se fue: la escala viaja pegada al número, en palabras, y un ícono
+  // para eso sería un dibujo repitiendo lo que el texto ya dice.
   assert.match(TARJETA, /<Barcode/, "falta el ícono del código de barras en el pie");
+  assert.doesNotMatch(TARJETA, /\bTag\b/, "quedó el ícono de la franja, o su import sin uso");
 });
 
 test("EL ÍCONO DEL NOMBRE NO VUELVE sin una medición nueva", () => {
@@ -57,8 +68,13 @@ test("EL ÍCONO DEL NOMBRE NO VUELVE sin una medición nueva", () => {
   assert.doesNotMatch(TARJETA, /Package/, "quedó el import sin uso");
 });
 
-test("el pie ROTULA el código interno en vez de la almohadilla", () => {
-  assert.match(TARJETA, /Cod\. int\./);
+test("el pie ROTULA el código, y dice DE QUIÉN es", () => {
+  // ── EL RÓTULO CAMBIÓ, Y NO ES COSMÉTICO ─────────────────────────────────
+  //
+  // Decía "Cod. int.", y debajo de ese rótulo la pantalla llegó a poner el ID
+  // del producto. "Cod. prov." dice de quién es el código: del PROVEEDOR. Con
+  // ese nombre, poner ahí un id se ve mal a simple vista.
+  assert.match(TARJETA, /Cod\. prov\./);
   // La almohadilla no dice de qué código es. Se busca la forma exacta que tenía,
   // `#{codigoInterno}`, y no un `#` suelto que aparece en mil lados.
   assert.doesNotMatch(TARJETA, /#\{codigoInterno\}/);
@@ -67,8 +83,15 @@ test("el pie ROTULA el código interno en vez de la almohadilla", () => {
 test("lo que falta se DICE, no se borra el renglón", () => {
   // Un renglón que desaparece deja esa tarjeta más baja que las vecinas —el
   // defecto que ya costó emparejar la lista— y además pierde el dato.
-  assert.match(TARJETA, /proveedor no especificado/);
+  assert.match(TARJETA, /Sin proveedor/);
   assert.match(TARJETA, /sin código de barras/);
+  // ── Y EL DEL PROVEEDOR AHORA TAMBIÉN ────────────────────────────────────
+  //
+  // Antes el slot desaparecía sin decir nada, y podía hacerlo porque mostraba el
+  // id: nunca faltaba. Con el dato correcto faltar es lo habitual, y un hueco
+  // deja sin contestar por qué ese producto no machea contra la lista del
+  // proveedor.
+  assert.match(TARJETA, /Sin cód\. prov\./);
 });
 
 test("la fila de acciones existe y separa con la línea del kit", () => {
@@ -79,12 +102,18 @@ test("la fila de acciones existe y separa con la línea del kit", () => {
   assert.match(TARJETA, /divide-x sunmi-divider/);
 });
 
-test("EL BOTÓN DE LA FILA VIVE EN EL KIT, no en la pantalla", () => {
-  // Si cada pantalla escribiera el suyo, stock y pedidos tendrían acciones de
+test("EL BOTÓN DE LA FILA VIVE EN EL KIT, no en quien lo usa", () => {
+  // Si cada consumidor escribiera el suyo, stock y pedidos tendrían acciones de
   // distinto alto en la misma lista.
+  //
+  // El consumidor cambió: la pantalla ya no monta la pieza del kit, la monta
+  // `TarjetaProductoMovil`. El candado sigue afirmando lo mismo, sobre el archivo
+  // que hoy dibuja los botones — mirarlo en `page.jsx` habría dado verde por
+  // ausencia, que es peor que rojo.
   assert.match(TARJETA, /export function AccionTarjeta/);
-  assert.match(PAGINA, /import SunmiProductoCard, \{ AccionTarjeta \}/);
-  assert.doesNotMatch(PAGINA, /function AccionTarjeta/, "la pantalla se escribió el suyo");
+  assert.match(ENVOLTORIO, /import SunmiProductoCard, \{ AccionTarjeta \}/);
+  assert.doesNotMatch(ENVOLTORIO, /function AccionTarjeta\s*\(/, "el envoltorio se escribió el suyo");
+  assert.doesNotMatch(PAGINA, /function AccionTarjeta\s*\(/, "la pantalla se escribió el suyo");
 });
 
 test("LA PANTALLA PASA SU BOTÓN, y el andamio sigue ejerciendo dos", () => {
@@ -100,15 +129,27 @@ test("LA PANTALLA PASA SU BOTÓN, y el andamio sigue ejerciendo dos", () => {
   // "nadie comprueba que la página se lo pase". Una pieza puede estar perfecta y
   // la pantalla no usarla.
   //
-  // Se separan los dos consumidores porque ya no afirman lo mismo:
-  const enLaPantalla = (PAGINA.match(/<AccionTarjeta/g) || []).length;
-  assert.equal(enLaPantalla, 1, "la pantalla tiene que dibujar Editar, y nada más");
-  assert.match(PAGINA, /icono=\{Pencil\}/, "la pantalla: falta el ícono de Editar");
+  // ── Y VOLVIÓ A CAMBIAR CON LAS DOS CARAS ────────────────────────────────
+  //
+  // Ahora son DOS botones otra vez, pero no son los de antes: Editar más el que
+  // da vuelta la tarjeta. El segundo no es "Ver" —la ficha de sólo lectura sigue
+  // sin estar en el celular—: cambia de cara y no navega a ningún lado.
+  //
+  // Y los dibuja el ENVOLTORIO, no la pantalla. Lo que la pantalla tiene que
+  // seguir haciendo es pasar la acción, que es el hueco que este candado nació
+  // para tapar: una pieza puede estar perfecta y la pantalla no usarla.
+  const enElEnvoltorio = (ENVOLTORIO.match(/<AccionTarjeta/g) || []).length;
+  assert.equal(enElEnvoltorio, 2, "el envoltorio dibuja Editar y el de dar vuelta");
+  assert.match(ENVOLTORIO, /icono=\{Pencil\}/, "el envoltorio: falta el ícono de Editar");
   assert.doesNotMatch(
-    PAGINA,
+    ENVOLTORIO,
     /icono=\{Eye\}/,
     "volvió el botón Ver a la tarjeta: el issue #2 lo sacó"
   );
+  // La pantalla le pasa qué hacer al tocar Editar. Sin esto el botón existe y no
+  // lleva a ningún lado, que es exactamente el defecto que ya se coló una vez.
+  assert.match(PAGINA, /onEditar=\{/, "la pantalla dejó de pasar la acción de Editar");
+  assert.match(PAGINA, /abrirEditar\(/, "la pantalla dejó de llamar a abrirEditar");
 
   // El ANDAMIO conserva los dos, y es a propósito: la pieza del kit sigue
   // aceptando varias acciones —stock y pedidos las van a usar— y el andamio es lo

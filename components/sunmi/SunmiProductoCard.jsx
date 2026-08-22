@@ -5,7 +5,7 @@
 // ── POR QUÉ NACE EN EL KIT Y NO ADENTRO DE LA PANTALLA DE PRODUCTOS ────────
 //
 // Porque no es del catálogo: es la tarjeta de producto del ERP. El mismo núcleo
-// —nombre, empresa, equivalencia y pie de códigos— se repite en stock y en
+// —nombre, empresa, cuerpo y pie de códigos— se repite en stock y en
 // pedido, y lo único que cambia es QUÉ muestra en grande y QUÉ se puede tocar.
 // Escrita adentro de `productos/page.jsx`, la próxima pantalla la copia, y ahí
 // ya son dos que se rompen el día que una cambie.
@@ -56,23 +56,19 @@
 // mal en trece— y cada uno subiría el contador de hardcodeo. Así que se usan los
 // tokens; en `violetaSaas` dan exactamente los colores del prototipo.
 //
-// ── LA ÚNICA DIFERENCIA CON EL PROTOTIPO, Y ESTÁ DECIDIDA ─────────────────
+// ── LA DIFERENCIA DE CUATRO PUNTOS YA NO APLICA ───────────────────────────
 //
-// El bloque de equivalencia pide `#F5F0FF` y usa `--hover-bg`, que en
-// `violetaSaas` es `#F1E8FF`. **NO ES UN ERROR DE IMPLEMENTACIÓN**: se comparó
-// contra el prototipo, se vio la diferencia y se decidió dejarla el 2026-08-18.
-//
-// El motivo: `#F5F0FF` no existe como token en ningún tema, y crear uno obliga a
-// elegir su valor en los CATORCE —que es una tanda propia, con su medición de
-// contraste, como la que costó `--pos-warning`—. A cambio de esa tanda, la
-// diferencia es de cuatro unidades en cada canal sobre un fondo tenue.
-//
-// Si alguien mide el prototipo contra la pantalla y encuentra estos cuatro
-// puntos, la respuesta es ésta, no un descuido que haya que arreglar.
+// Acá estaba anotado que el bloque de equivalencia usaba `--hover-bg` en vez del
+// `#F5F0FF` del prototipo, y por qué se dejó así. Ese bloque se fue con la
+// franja: la presentación pasó a viajar pegada al precio. La nota se conserva
+// como historia y no como pendiente — no hay nada que medir contra el prototipo
+// en ese punto, porque el punto no existe.
 
 // `Package` se fue con el ícono del nombre: era el mismo cubo para el 93,9 % del
 // catálogo. Quedan los dos que SÍ marcan qué es cada renglón.
-import { Tag, Barcode, TriangleAlert } from "lucide-react";
+// `Tag` se fue con la franja de equivalencia: era el ícono que la marcaba como
+// "esto es la escala del precio". La escala ahora viaja pegada al número.
+import { Barcode, TriangleAlert } from "lucide-react";
 
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import {
@@ -104,10 +100,25 @@ const SIN_CODIGO_BARRA = "sin código de barras";
  * perdería el dato. Que un producto no tenga proveedor es información: es la
  * respuesta a por qué no aparece al conciliar una factura.
  */
-const SIN_PROVEEDOR = "(proveedor no especificado)";
+const SIN_PROVEEDOR = "Sin proveedor";
 
 /** El rótulo del código interno. Antes era `#2023`, que no dice de qué es. */
-const PREFIJO_CODIGO_INTERNO = "Cod. int.";
+const PREFIJO_CODIGO_INTERNO = "Cod. prov.";
+
+/**
+ * Y lo mismo cuando no hay código interno por proveedor.
+ *
+ * ── POR QUÉ AHORA SE DICE Y ANTES NO ──────────────────────────────────────
+ *
+ * Antes el slot desaparecía si el valor venía vacío. Podía hacerlo porque lo que
+ * mostraba era el **id del producto**, que existe siempre: el hueco no aparecía
+ * nunca. Con el dato correcto —el código que le da el proveedor— faltar es el
+ * caso normal, y un slot que se va deja la pregunta sin contestar.
+ *
+ * "Sin cód. prov." es la respuesta a por qué ese producto no machea contra una
+ * lista de precios del proveedor, que es para lo que se mira este dato.
+ */
+const SIN_CODIGO_INTERNO = "Sin cód. prov.";
 
 /**
  * UN BOTÓN DE LA FILA DE ACCIONES.
@@ -169,7 +180,6 @@ const OCULTO = (valor) => valor === false;
 export default function SunmiProductoCard({
   nombre,
   empresa = null,
-  equivalencia = null,
   codigoBarra = null,
   codigoInterno = null,
   valor = null,
@@ -195,16 +205,13 @@ export default function SunmiProductoCard({
   // el negocio de todas las pantallas que la usen.
   aviso = null,
   acciones = null,
-  // ── CUÁL DE LOS DOS CÓDIGOS VA PRIMERO EN EL PIE ────────────────────────
+  // ── EL ORDEN DEL PIE SE FUE CON EL REORDENAMIENTO ───────────────────────
   //
-  // Es una pregunta de LAYOUT y por eso la contesta la tarjeta, no la pantalla:
-  // los dos slots del pie no son intercambiables —uno lleva ícono y crece, el
-  // otro lleva prefijo y no encoge—, así que darlos vuelta no es reordenar dos
-  // nodos, es cambiar cuál de los dos se queda con el ancho sobrante.
-  //
-  // `order` de flexbox y no dos ramas de JSX: dos ramas serían el mismo pie
-  // escrito dos veces, y el día que cambie una quedaría distinta de la otra.
-  codigoInternoPrimero = false,
+  // Había un `codigoInternoPrimero` que daba vuelta los dos slots, y lo decidía
+  // la configuración del usuario. Personalizar card dejó de reordenar: la
+  // posición de cada dato la define el diseño. El código de barras va primero
+  // porque es el que crece —lleva ícono y valor largo— y el del proveedor va
+  // segundo porque no encoge.
   className = "",
 }) {
   const padding = paddingQueSobrevive(PADDING, className);
@@ -304,36 +311,19 @@ export default function SunmiProductoCard({
           </div>
         )}
 
-        {/* 4 · EQUIVALENCIA. Bloque tenue: explica de dónde sale el número de
-            arriba, que es la pregunta que más se hace con un precio por bulto.
-            El ícono de etiqueta lo marca como "esto es la escala del precio". */}
-        {equivalencia && (
-          <div
-            // ── UN ANCLAJE ESTABLE PARA QUIEN MIDA ─────────────────────────
-            //
-            // La sonda buscaba este bloque por su TEXTO —"Se vende", "1 pack ="—
-            // y por tener cero hijos elemento. Las dos cosas eran frágiles: el
-            // texto lo acaba de cambiar esta tanda, y el bloque tiene dos hijos
-            // (el ícono y el span), así que el selector no lo encontraba NUNCA.
-            // Pasaba desapercibido porque la comparación se salteaba cuando no
-            // encontraba nada — el salteo silencioso que la propia sonda advierte
-            // en otro lado. Con un atributo, medir no depende de adivinar.
-            data-sunmi-equivalencia
-            className={componerClaseTexto({
-              // La franja se aprieta de 7 a 4 px arriba y abajo, y se le da su
-              // propio margen de arriba. Con el texto en 11 px y su interlínea,
-              // quedan 23 px de franja: sigue leyéndose como un bloque aparte y
-              // no como una línea pegada al precio.
-              base: "mt-2.5 flex items-center gap-1.5 rounded-lg px-[9px] py-1 leading-[1.4] [background:var(--hover-bg)]",
-              tamano: "text-[11px]",
-              color: "[color:var(--pos-muted-strong)]",
-              pedido: className,
-            })}
-          >
-            <Tag className="w-3 h-3 shrink-0" aria-hidden="true" />
-            <span>{equivalencia}</span>
-          </div>
-        )}
+        {/* ── ACÁ VIVÍA LA FRANJA DE EQUIVALENCIA, Y SE FUE ─────────────────
+            Era un bloque tenue con fondo propio que decía la conversión —"1 pack
+            = 24 un · $1.300,00 por unidad"— debajo del precio.
+
+            Se sacó porque la presentación pasó a ser parte del precio: el número
+            grande viene con su rótulo, "$31.200 · PACK X 24", y la otra escala
+            vive en el DORSO de la tarjeta. Dejar además la franja repetía abajo
+            lo que el rótulo ya dice arriba, y en las de bulto ponía dos importes
+            a dos centímetros sin decir cuál manda.
+
+            Lo que la franja mostraba para kilo y pieza fija —donde no hay
+            conversión pack ↔ unidad— NO se perdió: `carasDeTarjeta` lo mueve al
+            dorso llamando a la misma `lineaDeEquivalencia`. */}
 
         {/* 4-bis · EL AVISO. Va DEBAJO de la escala y no adentro: la franja
             contesta "qué estás comprando" y esto contesta otra cosa, "cómo te
@@ -376,7 +366,7 @@ export default function SunmiProductoCard({
             perdería con el bloque y las acciones dejarían de estar ancladas
             abajo: en una lista con `auto-rows-fr` eso deja los botones flotando
             a media altura, cada tarjeta en un lugar distinto. */}
-        {OCULTO(codigoBarra) && (OCULTO(codigoInterno) || !codigoInterno) ? (
+        {OCULTO(codigoBarra) && OCULTO(codigoInterno) ? (
           <div className="mt-auto" />
         ) : (
         <div
@@ -388,20 +378,21 @@ export default function SunmiProductoCard({
           })}
         >
           {!OCULTO(codigoBarra) && (
-            <span
-              className={`flex items-center gap-1.5 min-w-0 ${
-                codigoInternoPrimero ? "order-2" : "order-1"
-              }`}
-            >
+            <span className="flex items-center gap-1.5 min-w-0">
               <Barcode className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
               <span className={codigoBarra ? "" : "italic opacity-70"}>
                 {codigoBarra || SIN_CODIGO_BARRA}
               </span>
             </span>
           )}
-          {!OCULTO(codigoInterno) && codigoInterno && (
-            <span className={`shrink-0 ${codigoInternoPrimero ? "order-1" : "order-2"}`}>
-              {PREFIJO_CODIGO_INTERNO} {codigoInterno}
+          {/* EL SLOT DEL CÓDIGO DEL PROVEEDOR SE QUEDA AUNQUE NO HAYA DATO.
+              Antes desaparecía, y podía hacerlo porque lo que mostraba era el id
+              del producto: nunca faltaba. Con el dato correcto faltar es lo
+              habitual, y un slot que se va deja sin contestar por qué ese
+              producto no machea contra la lista del proveedor. */}
+          {!OCULTO(codigoInterno) && (
+            <span className={`shrink-0 ${codigoInterno ? "" : "italic opacity-70"}`}>
+              {codigoInterno ? `${PREFIJO_CODIGO_INTERNO} ${codigoInterno}` : SIN_CODIGO_INTERNO}
             </span>
           )}
         </div>

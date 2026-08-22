@@ -36,7 +36,7 @@ import { notFound } from "next/navigation";
 import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiSelectorUnidad, { UNIDAD } from "@/components/sunmi/SunmiSelectorUnidad";
 import { Eye, Pencil } from "lucide-react";
-import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
+import { formatearMoneda } from "@/lib/moneda";
 import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
 
 const PRODUCTOS = [
@@ -118,15 +118,17 @@ export default function AndamioProductoCard() {
             key={p.id}
             nombre={p.nombre}
             empresa={p.empresa}
-            // Derivada del precio y del factor, con la misma función que el
-            // catálogo. No es un texto escrito al lado — ver el encabezado.
-            equivalencia={lineaDeEquivalencia({
-              precio: p.precio,
-              factor: p.factorPack,
-              unidad: p.unidadMedida,
-            })}
             codigoBarra={p.codigoBarra}
             codigoInterno={p.codigoInterno}
+            // ── LA FRANJA DE EQUIVALENCIA SE FUE DE LA PIEZA ────────────────
+            //
+            // Acá se le pasaba `equivalencia`, derivada con `lineaDeEquivalencia`.
+            // El kit dejó de tener ese bloque: la presentación viaja pegada al
+            // precio y la otra escala vive en el dorso, que administra
+            // `TarjetaProductoMovil` —el envoltorio del catálogo, no la pieza—.
+            //
+            // Este andamio sigue montando la PIEZA pelada, que es para lo que
+            // sirve: comprobar que el núcleo dibuja sin sesión ni datos reales.
             valor={
               <>
                 <span className="text-[22px] font-bold sunmi-text-strong whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em]">
