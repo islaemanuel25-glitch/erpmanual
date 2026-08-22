@@ -337,9 +337,28 @@ try {
   //
   // Y se leen por ATRIBUTO y no por posición ni por texto: la lección de la
   // franja, que nunca se encontró porque el selector adivinaba cuál nodo era.
+  //
+  // ── SEGUNDA REESCRITURA: SE FUE EL RÓTULO, Y LA COMPARACIÓN LLEGÓ ──────
+  //
+  // Hasta acá esto exigía además un rótulo "VENTA CONFIGURADA" arriba del
+  // precio. La card aprobada no lo tiene: el frente es la presentación y el
+  // importe, sin cinta. Exigirlo era pedir que volviera un elemento que se sacó
+  // a propósito, así que ahora se afirma AL REVÉS — que no esté —, para que
+  // tampoco vuelva solo.
+  //
+  // Y en el mismo movimiento se salda una deuda del texto de arriba: decía que
+  // la presentación se cotejaba contra el botón, y el código no lo hacía. Ahora
+  // sí. Es la única defensa que queda contra la contradicción original —número
+  // en una escala, nombre en otra— desde que el rótulo no está.
+  //
+  // El botón puede legítimamente decir "Ver códigos": eso significa que el dorso
+  // es solo identificación porque el producto no tiene equivalencia. Lo que NO
+  // puede es nombrar una escala distinta de la que le toca, ni la misma que ya
+  // muestra el frente.
   const contradicciones = await evaluar(`(() => {
     const ESPERADO = {
       UNIDAD: "pack",     // si adelante va la unidad, atrás va el bulto
+      BULTO: "unidad",
       KG: "referencia",
       PIEZA: "referencia",
       "IMPORTE VARIABLE": null,  // no tiene dorso
@@ -348,30 +367,39 @@ try {
       const cara = t.querySelector('[data-tarjeta-cara]');
       const pres = t.querySelector('[data-cara-presentacion]');
       const rot = t.querySelector('[data-cara-rotulo]');
+      const btn = t.querySelector('[data-tarjeta-voltear]');
       return {
         nombre: t.innerText.split("\\n")[0],
         lado: cara ? cara.getAttribute('data-tarjeta-cara') : null,
         rotulo: rot ? rot.textContent.trim() : null,
         presentacion: pres ? pres.textContent.trim() : null,
+        boton: btn ? btn.textContent.trim() : null,
       };
     }).filter((c) => {
       // Toda tarjeta abre en el frente, y lo dice. Si alguna abriera en el
       // dorso, la lista estaría mostrando la referencia como si fuera lo que se
       // vende.
       if (c.lado !== "frente") return true;
-      if (c.rotulo !== "VENTA CONFIGURADA") return true;
+      // La cinta del rótulo se sacó: si vuelve, esto se pone rojo.
+      if (c.rotulo !== null) return true;
       if (!c.presentacion) return true;
       // La presentación tiene que ser una de las formas conocidas.
       const base = c.presentacion.replace(/ · COMBO$/, "");
       const esPack = /^(PACK|CAJÓN) X \\d+$/.test(base);
-      return !esPack && !(base in ESPERADO) && base !== "BULTO";
+      if (!esPack && !(base in ESPERADO)) return true;
+      // Y el botón no puede prometer otra escala que la que le toca.
+      if (!c.boton) return false;                       // sin dorso no hay qué cotejar
+      const nombrada = (c.boton.match(/^Ver\\s+(.+?)\\s*$/) || [])[1];
+      if (!nombrada || nombrada === "códigos") return false;
+      const toca = esPack ? "unidad" : ESPERADO[base];
+      return nombrada !== toca;
     });
   })()`);
   afirmar(
     contradicciones.length === 0,
-    "1 · toda tarjeta abre en el frente, identificado y con una presentación conocida",
+    "1 · toda tarjeta abre en el frente, sin rótulo, y su botón nombra la escala que le toca",
     contradicciones.length
-      ? `${contradicciones.length} tarjeta(s). La primera: ${contradicciones[0].nombre} — cara ${contradicciones[0].lado}, rótulo ${contradicciones[0].rotulo ?? "AUSENTE"}, presentación ${contradicciones[0].presentacion ?? "AUSENTE"}`
+      ? `${contradicciones.length} tarjeta(s). La primera: ${contradicciones[0].nombre} — cara ${contradicciones[0].lado}, rótulo ${contradicciones[0].rotulo ?? "ninguno"}, presentación ${contradicciones[0].presentacion ?? "AUSENTE"}, botón ${contradicciones[0].boton ?? "AUSENTE"}`
       : ""
   );
 
@@ -1341,20 +1369,77 @@ try {
     "un botón sin ícono: el diseño pide uno por acción"
   );
 
-  // ── 3d · EL ÁREA TÁCTIL DEL BOTÓN ───────────────────────────────────────
+  // ── 3d · EL ÁREA TÁCTIL DE **CADA** BOTÓN DE LA TARJETA ─────────────────
   //
   // 44 px es el mínimo de WCAG 2.5.5 y de las guías de Apple. Va medido y no
   // deducido de la clase, porque **en esta aplicación 1 rem son 14 px** y la
   // escala de Tailwind vale el 87,5 % de lo nominal: `h-11` da 38,5. Este
   // candado se pone rojo si alguien "simplifica" el `h-[44px]` a `h-11`.
+  //
+  // ── QUÉ MEDÍA ANTES, Y POR QUÉ NO ALCANZABA ─────────────────────────────
+  //
+  // Medía `querySelector('button')` —el PRIMERO del DOM— y la caja de su rect.
+  // Las dos cosas estaban mal, y las dos se taparon entre sí durante meses:
+  //
+  //   · el primer botón de la tarjeta NO es Editar, es el que la da vuelta.
+  //     Mientras los dos midieron 44 daba igual cuál agarraba, así que el
+  //     candado pasaba sin que nadie supiera qué estaba mirando. El día que uno
+  //     de los dos bajó, informó el número del otro;
+  //   · y el rect no es el área táctil. Un control puede —y acá debe— extender
+  //     su zona sensible con un pseudo-elemento sin ocupar lugar: escribirle el
+  //     alto al botón sube su renglón de 14 a 44 y estira las 25 tarjetas de la
+  //     lista. El rect diría 14 y el dedo tiene 44.
+  //
+  // Así que ahora se miden TODOS los botones, y se mide lo que el dedo toca:
+  // desde el centro del control se camina pixel por pixel hacia arriba y hacia
+  // abajo preguntándole al navegador qué elemento hay en ese punto. Lo que se
+  // cuenta es el tramo seguido que responde el propio botón — que es la
+  // definición de área táctil, y la única que ve los pseudo-elementos.
   const MINIMO_TACTIL = 44;
-  const altoBoton = await evaluar(
-    `Math.round(${TARJETAS}[0].querySelector('button').getBoundingClientRect().height * 10) / 10`
-  );
+  const tactiles = await evaluar(`(() => {
+    const t = ${TARJETAS}[0];
+    t.scrollIntoView({ block: "center" });
+    return [...t.querySelectorAll('button')]
+      .filter((b) => b.getBoundingClientRect().height > 0)
+      .map((b) => {
+        const c = b.getBoundingClientRect();
+        const cx = Math.round(c.left + c.width / 2);
+        const cy = Math.round(c.top + c.height / 2);
+        const suyo = (y) => {
+          const e = document.elementFromPoint(cx, y);
+          return !!e && (e === b || b.contains(e));
+        };
+        if (!suyo(cy)) return { texto: b.textContent.trim(), alto: 0, ancho: Math.round(c.width), tapado: true };
+        let arriba = cy, abajo = cy;
+        while (arriba - 1 >= 0 && suyo(arriba - 1)) arriba--;
+        while (abajo + 1 < window.innerHeight && suyo(abajo + 1)) abajo++;
+        return {
+          texto: b.textContent.trim(),
+          alto: abajo - arriba + 1,
+          ancho: Math.round(c.width),
+          caja: Math.round(c.height * 10) / 10,
+          tapado: false,
+        };
+      });
+  })()`);
+
+  // SI NO PUEDE MEDIR, ES ROJO. Un botón tapado por otra cosa en su propio
+  // centro no es "no se pudo comprobar": es un control que el dedo no alcanza.
+  const cortos = (tactiles || []).filter((b) => b.tapado || b.alto < MINIMO_TACTIL || b.ancho < MINIMO_TACTIL);
   afirmar(
-    altoBoton >= MINIMO_TACTIL,
-    `3d · el botón llega al área táctil mínima (${altoBoton} px · mínimo ${MINIMO_TACTIL})`,
-    `${altoBoton} px. Ojo: 1 rem son 14 px acá, así que h-11 da 38,5 y no 44.`
+    Array.isArray(tactiles) && tactiles.length > 0 && cortos.length === 0,
+    `3d · los ${tactiles ? tactiles.length : "?"} botones de la tarjeta llegan al área táctil mínima (${
+      tactiles && tactiles.length ? tactiles.map((b) => `${b.texto || "?"} ${b.alto}×${b.ancho}`).join(", ") : "?"
+    } · mínimo ${MINIMO_TACTIL})`,
+    !tactiles || !tactiles.length
+      ? "no se pudo medir ningún botón de la tarjeta"
+      : cortos
+          .map((b) =>
+            b.tapado
+              ? `"${b.texto}" está tapado en su propio centro`
+              : `"${b.texto}" toca ${b.alto}×${b.ancho} px (su caja mide ${b.caja}). Ojo: 1 rem son 14 px acá, así que h-11 da 38,5 y no 44.`
+          )
+          .join(" · ")
   );
 
   // ── 4 · EL SEPARADOR ENTRE LOS BOTONES ──────────────────────────────────
@@ -1526,17 +1611,23 @@ try {
     cards ? `vinieron ${cards.length}: ${cards.map((c) => c.texto).join(" | ")}` : "no está el bloque"
   );
 
-  // ── 14a-bis · Y ES UN RIEL, NO UNA GRILLA ───────────────────────────────
+  // ── 14a-bis · Y ES UNA GRILLA 2×2, NO UN RIEL ───────────────────────────
   //
-  // 14a dice que las cuatro EXISTEN y tienen caja. Eso ya era verdad con la
-  // grilla 2×2 y sigue siéndolo ahora, así que por sí solo no distingue los dos
-  // diseños — un candado que pasa igual con las dos versiones no afirma nada
-  // sobre el cambio.
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ AHORA AFIRMA LO CONTRARIO ─────────────
   //
-  // Lo que la tanda correctiva promete es otra cosa: que el bloque se LEA como
-  // extensible. Eso se mide: la pista tiene que desbordar —hay más riel del que
-  // se ve—, tiene que haber una card cortada por el borde derecho —que es la
-  // señal— y la barra de avance tiene que estar dibujada.
+  // Exigía un riel: pista que desborda, una card cortada por el borde derecho y
+  // una barra de avance. Eso fue un intento de "bloque extensible" que se
+  // descartó — el bloque volvió a las cuatro cards enteras en dos por dos. Este
+  // candado tiene que afirmar el diseño que HAY, no el que se probó; dejarlo
+  // como estaba lo convertía en un rojo permanente que a la tercera corrida
+  // alguien iba a silenciar.
+  //
+  // Y se invierte en vez de borrarse porque el motivo original sigue en pie: 14a
+  // dice que las cuatro EXISTEN y tienen caja, y eso era verdad con las dos
+  // versiones. Sin algo que distinga la forma, volver al riel no pondría nada
+  // rojo. Ahora sí: se mide que las cuatro entren enteras, que nada desborde, y
+  // que estén en DOS filas de DOS —agrupando por coordenada, no por el número de
+  // hijos, que no distingue una grilla de una columna—.
   const riel = await evaluar(`(() => {
     const seccion = [...document.querySelectorAll('section')]
       .find((s) => /Para revisar/.test(s.textContent || ""));
@@ -1548,31 +1639,36 @@ try {
     const cards = [...pista.querySelectorAll('button[aria-pressed]')].map((b) => b.getBoundingClientRect());
     const enteras = cards.filter((c) => c.left >= cajaPista.left - 1 && c.right <= cajaPista.right + 1).length;
     const cortadas = cards.filter((c) => c.left < cajaPista.right && c.right > cajaPista.right).length;
-    // La barra: el hermano de la pista, marcado como decorativo.
-    const barra = seccion.querySelector('[aria-hidden="true"] > div');
+    // Dos filas y dos columnas: se agrupan las coordenadas redondeadas, así una
+    // diferencia de subpíxel no inventa una fila de más.
+    const filas = new Set(cards.map((c) => Math.round(c.top))).size;
+    const columnas = new Set(cards.map((c) => Math.round(c.left))).size;
     return {
       desborda: pista.scrollWidth > pista.clientWidth + 1,
       sobra: pista.scrollWidth - pista.clientWidth,
       enteras,
       cortadas,
-      hayBarra: !!barra && barra.getBoundingClientRect().width > 0,
-      // Cuánto ocupa la barra del ancho total: tiene que ser una fracción, no
-      // todo. Una barra completa dice "no hay nada más", que sería mentira.
-      fraccionBarra: barra ? barra.getBoundingClientRect().width / cajaPista.width : null,
+      filas,
+      columnas,
+      // Los dos rastros del riel. Si vuelve cualquiera de los dos, esto se entera.
+      hayRiel: !!seccion.querySelector('[data-riel]'),
+      hayBarra: !!seccion.querySelector('[data-riel-avance]'),
     };
   })()`);
 
   afirmar(
-    riel && riel.desborda && riel.cortadas >= 1,
-    `14a-bis · el bloque es un RIEL: ${riel ? riel.enteras : "?"} cards enteras, ${riel ? riel.cortadas : "?"} asomando, ${riel ? Math.round(riel.sobra) : "?"} px de riel fuera de la vista`,
+    riel && !riel.desborda && riel.enteras === 4 && riel.cortadas === 0 && riel.filas === 2 && riel.columnas === 2,
+    `14a-bis · el bloque es una GRILLA 2×2: ${riel ? riel.enteras : "?"} cards enteras en ${riel ? riel.filas : "?"} filas por ${riel ? riel.columnas : "?"} columnas`,
     riel
-      ? `desborda: ${riel.desborda}, cortadas: ${riel.cortadas} — sin una card cortada el bloque se lee como una grilla fija`
-      : "no se encontró la pista del riel"
+      ? `desborda: ${riel.desborda}, cortadas: ${riel.cortadas}, ${riel.filas} fila(s) × ${riel.columnas} columna(s) — la grilla aprobada son cuatro cards enteras en dos por dos, sin nada fuera de la vista`
+      : "no se encontró el bloque de las cards"
   );
   afirmar(
-    riel && riel.hayBarra && riel.fraccionBarra > 0 && riel.fraccionBarra < 0.95,
-    `14a-ter · la barra de avance está y ocupa una fracción (${riel && riel.fraccionBarra ? Math.round(riel.fraccionBarra * 100) : "?"} % del ancho)`,
-    "sin barra, o completa: una barra llena afirma que no hay nada más"
+    riel && !riel.hayRiel && !riel.hayBarra,
+    `14a-ter · no volvió el riel ni su barra de avance`,
+    riel
+      ? `riel: ${riel.hayRiel}, barra: ${riel.hayBarra} — una barra de avance sobre una grilla fija promete un desplazamiento que no existe`
+      : "no se encontró el bloque de las cards"
   );
 
   // LAS QUE ESTÁN EN CERO TAMBIÉN SE VEN. Es lo que el issue pide expreso, y es

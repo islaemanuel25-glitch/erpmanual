@@ -117,17 +117,45 @@ test("EL BOTÓN DE LA FILA VIVE EN EL KIT, no en quien lo usa", () => {
 
   // ── Y EL PIE DE CÓDIGOS TAMBIÉN VIVE EN EL KIT ──────────────────────────
   //
-  // Tiene DOS lugares desde que la identificación es del dorso: al pie de la
-  // pieza y adentro del cuerpo del carrusel. Escribirlo dos veces serían dos
-  // pies que se rompen el día que uno cambie, y lo que tienen adentro no es
-  // decorativo: es la distinción entre "no hay dato" y "esta pantalla no lo
-  // muestra", que se dibuja al revés en cada caso.
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ AHORA AFIRMA OTRA COSA ────────────────
+  //
+  // Exigía que el envoltorio NOMBRARA a `PieDeCodigosTarjeta`, porque en la card
+  // anterior lo montaba él, una segunda vez, adentro del cuerpo del carrusel.
+  // La card aprobada no lo monta: le pasa los dos códigos al kit y esconde el
+  // pie en el frente con una clase. O sea que el pie quedó en UN solo lugar, que
+  // es lo que este candado dice defender — exigir el nombre habría obligado a
+  // volver a montarlo para poner el candado en verde, que es justo lo contrario.
+  //
+  // Lo que se afirma ahora es la cadena completa, y son tres eslabones porque
+  // romper cualquiera de los tres deja el frente mostrando los códigos:
   assert.match(TARJETA, /export function PieDeCodigosTarjeta/);
-  assert.match(ENVOLTORIO, /PieDeCodigosTarjeta/);
+
+  // 1. el envoltorio le PASA los códigos al kit en vez de dibujarlos;
+  assert.match(ENVOLTORIO, /codigoBarra=\{/, "el envoltorio no le pasa el código de barras al kit");
+  assert.match(ENVOLTORIO, /codigoInterno=\{/, "el envoltorio no le pasa el código interno al kit");
   assert.doesNotMatch(
     ENVOLTORIO,
     /Sin cód\. prov\.|sin código de barras/,
     "el envoltorio se escribió su propio pie de códigos"
+  );
+
+  // 2. y lo esconde en el frente apuntando a un atributo, no a una clase de
+  //    Tailwind del kit ni a una posición, que es lo que se rompe en silencio;
+  assert.match(
+    ENVOLTORIO,
+    /\[&_\[data-pie-codigos\]\]:invisible/,
+    "el frente ya no esconde el pie de códigos: los códigos son del dorso"
+  );
+
+  // 3. Y ACÁ ESTÁ EL ESLABÓN QUE NADIE MIRABA. El selector de arriba vive en el
+  //    envoltorio y el atributo al que apunta vive en el kit: son dos archivos.
+  //    Si alguien le cambia el nombre al atributo, el envoltorio sigue
+  //    compilando, la suite sigue verde y el frente pasa a mostrar los códigos
+  //    del dorso. Por eso los dos lados se afirman juntos.
+  assert.match(
+    TARJETA,
+    /data-pie-codigos/,
+    "el kit dejó de marcar su pie de códigos: el frente no lo puede esconder"
   );
 });
 
