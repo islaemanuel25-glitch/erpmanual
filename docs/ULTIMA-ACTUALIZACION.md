@@ -1,19 +1,21 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-22 09:17
+**Fecha:** 2026-08-22 10:36
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat(productos): "Para revisar" pasa de grilla 2x2 a riel, y la card activa se enciende, fix(productos): la pantalla deja de esperar al contexto, y se retira el chip, perf(productos): el conteo de "Para revisar" pasa de 504 a 289 ms
-- Archivos: 4 nuevos, 7 modificados (11 total)
+- test(productos): la sonda del navegador mide las dos caras, no la franja, feat(productos): Personalizar card prende y apaga, y ya no reordena, fix(productos): la card mostraba el ID del producto como "código interno"
+- Archivos: 2 nuevos, 3 modificados (5 total)
+
+### configuracion
+- feat(productos): Personalizar card prende y apaga, y ya no reordena
+- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización
-- components/productos/CarruselControles.jsx
-- components/productos/carruselControlesRender.test.mjs
-- components/productos/HojaMasAcciones.jsx
-- components/productos/HojaPersonalizarTarjeta.jsx
+- components/productos/TarjetaProductoMovil.jsx
+- components/productos/tarjetaProductoMovil.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

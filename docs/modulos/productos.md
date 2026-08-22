@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-22 09:17
+**Última actualización:** 2026-08-22 10:36
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,10 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-22: test(productos): la sonda del navegador mide las dos caras, no la franja
+- 2026-08-22: feat(productos): Personalizar card prende y apaga, y ya no reordena
+- 2026-08-22: fix(productos): la card mostraba el ID del producto como "código interno"
+- 2026-08-22: feat(productos): la card del celular pasa a tener frente y dorso
 - 2026-08-21: feat(productos): "Para revisar" pasa de grilla 2x2 a riel, y la card activa se enciende
 - 2026-08-21: fix(productos): la pantalla deja de esperar al contexto, y se retira el chip
 - 2026-08-21: perf(productos): el conteo de "Para revisar" pasa de 504 a 289 ms
