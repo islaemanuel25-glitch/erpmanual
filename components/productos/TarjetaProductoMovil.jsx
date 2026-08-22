@@ -3,30 +3,26 @@
 import { useRef, useState } from "react";
 import { Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 
-import SunmiProductoCard, {
-  AccionTarjeta,
-} from "@/components/sunmi/SunmiProductoCard";
+import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import { nombreCortoDe, nombreDelDorso } from "@/lib/productos/carasDeTarjeta";
 import { formatearMoneda } from "@/lib/moneda";
 
 const UMBRAL_GESTO = 45;
 const SIN_PRECIO_FIJO = "Importe variable";
-const PUNTO_DEL_INDICADOR =
-  "color-mix(in srgb, var(--pos-accent) 88%, var(--app-fg))";
+const ACENTO_CARD = "color-mix(in srgb, var(--pos-accent) 88%, var(--app-fg))";
 const OCULTO = (valor) => valor === false;
 
-function PrecioDeLaCara({
-  importe,
-  presentacion,
-  esCombo = false,
-  atenuado = false,
-}) {
+function PrecioDeLaCara({ importe, presentacion, esCombo = false, atenuado = false }) {
   return (
-    <span className="flex flex-col items-end leading-none">
+    <span
+      data-cara-precio
+      className="flex w-[202px] max-w-full flex-col items-end rounded-xl px-2.5 py-2 leading-none [background:var(--hover-bg)]"
+    >
       {presentacion && (
         <span
           data-cara-presentacion
-          className="mb-1 text-[11.5px] font-medium sunmi-text-muted whitespace-nowrap"
+          className="mb-1 text-[9px] font-bold whitespace-nowrap"
+          style={{ color: ACENTO_CARD }}
         >
           {presentacion}
           {esCombo && " · COMBO"}
@@ -34,13 +30,11 @@ function PrecioDeLaCara({
       )}
       <span
         data-cara-importe
-        className={`text-[30px] font-bold whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em] ${
+        className={`text-[25px] font-semibold whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em] ${
           atenuado ? "sunmi-text-muted" : "sunmi-text-strong"
         }`}
       >
-        {importe === null || importe === undefined
-          ? SIN_PRECIO_FIJO
-          : formatearMoneda(importe)}
+        {importe === null || importe === undefined ? SIN_PRECIO_FIJO : formatearMoneda(importe)}
       </span>
     </span>
   );
@@ -49,49 +43,55 @@ function PrecioDeLaCara({
 function ReferenciaDeLaCara({ detalle }) {
   return (
     <span
-      data-cara-referencia
-      className="block text-sm sunmi-text-strong text-right leading-snug [font-variant-numeric:tabular-nums]"
+      data-cara-precio
+      className="flex w-[202px] max-w-full items-center justify-end rounded-xl px-2.5 py-2 min-h-[54px] [background:var(--hover-bg)]"
     >
-      {detalle}
+      <span
+        data-cara-referencia
+        className="block text-sm sunmi-text-strong text-right leading-snug [font-variant-numeric:tabular-nums]"
+      >
+        {detalle}
+      </span>
+    </span>
+  );
+}
+
+function IdentificacionDeLaCara() {
+  return (
+    <span
+      data-cara-precio
+      data-cara-identificacion
+      className="flex w-[202px] max-w-full items-center justify-end rounded-xl px-2.5 py-2 min-h-[54px] text-[11.5px] font-medium sunmi-text-muted [background:var(--hover-bg)]"
+    >
+      IDENTIFICACIÓN
     </span>
   );
 }
 
 function IndicadorDeCara({ mirandoDorso }) {
   return (
-    <span
-      data-tarjeta-indicador
-      className="flex items-center gap-1.5"
-      aria-hidden="true"
-    >
+    <span data-tarjeta-indicador className="flex items-center gap-1.5" aria-hidden="true">
       {[false, true].map((esDorso) => (
         <span
           key={String(esDorso)}
           className="block w-1.5 h-1.5 rounded-full transition-opacity"
-          style={{
-            background: PUNTO_DEL_INDICADOR,
-            opacity: mirandoDorso === esDorso ? 1 : 0.3,
-          }}
+          style={{ background: ACENTO_CARD, opacity: mirandoDorso === esDorso ? 1 : 0.3 }}
         />
       ))}
     </span>
   );
 }
 
-export function MarcaDeLaCara({
-  cara,
-  regla = null,
-  muestraCosto = true,
-}) {
+export function MarcaDeLaCara({ cara, regla = null, muestraCosto = true }) {
   const costo = muestraCosto ? cara?.costo ?? null : null;
   if (costo === null && !regla) return null;
 
   return (
-    <span className="min-w-0 flex flex-col items-start leading-tight">
+    <span className="min-w-0 flex flex-col items-start gap-1 leading-tight">
       {costo !== null && (
         <span
           data-cara-costo
-          className="text-xs [font-variant-numeric:tabular-nums] whitespace-nowrap sunmi-text-muted"
+          className="text-[10px] [font-variant-numeric:tabular-nums] whitespace-nowrap sunmi-text-muted"
         >
           Costo {nombreCortoDe(cara.presentacion)} · {formatearMoneda(costo)}
         </span>
@@ -122,12 +122,7 @@ export function CuerpoDeLaCara({
       {...manejadoresDeGesto}
     >
       {dorsoSoloIdentificacion ? (
-        <span
-          data-cara-identificacion
-          className="text-sm font-semibold sunmi-text-muted"
-        >
-          IDENTIFICACIÓN
-        </span>
+        <IdentificacionDeLaCara />
       ) : cara?.importe === null && cara?.detalle ? (
         <ReferenciaDeLaCara detalle={cara.detalle} />
       ) : (
@@ -140,7 +135,7 @@ export function CuerpoDeLaCara({
       )}
 
       {hayDorso && (
-        <span className="mt-1.5 flex w-full items-center justify-between gap-2">
+        <span className="mt-1 flex w-[202px] max-w-full items-center justify-between gap-2">
           <IndicadorDeCara mirandoDorso={mirandoDorso} />
           <button
             type="button"
@@ -149,16 +144,12 @@ export function CuerpoDeLaCara({
             aria-pressed={mirandoDorso}
             className="inline-flex items-center gap-1 text-xs font-medium sunmi-text-strong"
           >
-            {mirandoDorso && (
-              <ChevronLeft className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            )}
+            {mirandoDorso && <ChevronLeft className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
             Ver{" "}
             {mirandoDorso
               ? nombreCortoDe(frente.presentacion)
               : nombreDelDorso(hayReferencia ? dorso : null)}
-            {!mirandoDorso && (
-              <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            )}
+            {!mirandoDorso && <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
           </button>
         </span>
       )}
@@ -180,8 +171,7 @@ export default function TarjetaProductoMovil({
   const gesto = useRef(null);
 
   const hayReferencia = !!caras.dorso;
-  const hayIdentificacion =
-    !OCULTO(codigoBarra) || !OCULTO(codigoInterno);
+  const hayIdentificacion = !OCULTO(codigoBarra) || !OCULTO(codigoInterno);
   const hayDorso = hayReferencia || hayIdentificacion;
   const mirandoDorso = hayDorso && enDorso;
   const caraActual = mirandoDorso && hayReferencia ? caras.dorso : caras.frente;
@@ -206,10 +196,7 @@ export default function TarjetaProductoMovil({
     },
   };
 
-  const claseCard =
-    hayIdentificacion && !mirandoDorso
-      ? "[&_[data-pie-codigos]]:invisible"
-      : "";
+  const claseCard = hayIdentificacion && !mirandoDorso ? "[&_[data-pie-codigos]]:invisible" : "";
 
   return (
     <SunmiProductoCard
@@ -245,8 +232,4 @@ export default function TarjetaProductoMovil({
   );
 }
 
-export {
-  UMBRAL_GESTO,
-  SIN_PRECIO_FIJO,
-  PUNTO_DEL_INDICADOR,
-};
+export { UMBRAL_GESTO, SIN_PRECIO_FIJO, ACENTO_CARD };
