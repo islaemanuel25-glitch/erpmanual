@@ -54,11 +54,28 @@ function renderCuerpo(caras, enLaOtraEscala, props = {}) {
   );
 }
 
-test("G1. abre con la venta real en el frente", () => {
+test("G1. abre con la venta real, y el bloque del precio ES el control", () => {
+  // ── QUÉ AFIRMABA ANTES ──────────────────────────────────────────────────
+  //
+  // Que hubiera un botón "Ver unidad" al lado del precio. Ese botón se sacó, y
+  // con él las dos flechas y los dos puntos: eran cuatro elementos anunciando
+  // que el número de al lado se podía cambiar, con el número ahí mismo. Ahora se
+  // toca el número.
   const html = render({ caras: PACK_EN_DEPOSITO });
   assert.match(html, /PACK X 24/);
   assert.match(html, /24\.000/);
-  assert.match(html, /Ver unidad/);
+
+  // El bloque es un `button` y lo dice en su marcador propio, que es lo que la
+  // sonda usa para tocarlo.
+  assert.match(html, /data-cara-precio-alterna/, "el bloque del precio no es el control");
+  assert.match(html, /<button[^>]*data-cara-precio/, "el bloque del precio no es un button");
+
+  // Y NADA DE LO QUE SE SACÓ VOLVIÓ. Van los cuatro por separado: dejar solo el
+  // del botón habría pasado en verde con los puntos todavía dibujados.
+  assert.doesNotMatch(html, /Ver unidad|Ver pack|Ver cajón/, "volvió el botón de texto");
+  assert.doesNotMatch(html, /data-tarjeta-voltear/, "volvió el botón de alternar");
+  assert.doesNotMatch(html, /data-tarjeta-indicador/, "volvieron los dos puntos");
+  assert.doesNotMatch(html, /lucide-chevron/, "volvieron las flechas");
 });
 
 test("G2. conserva el bloque de precio de la card definida", () => {
@@ -150,21 +167,43 @@ test("G2e. SIN CONVERSIÓN NO HAY NADA QUE ALTERNAR", () => {
   assert.doesNotMatch(html, /data-tarjeta-indicador/);
 });
 
-test("G3. Editar queda solo y la navegación queda antes de las acciones", () => {
+test("G3. Editar queda solo en la fila de acciones", () => {
+  // Antes esto además ubicaba el botón de alternar ANTES de la fila. Ese botón
+  // ya no existe; lo que se conserva es lo que protegía del otro lado: que la
+  // fila de acciones tenga UN solo botón y que sea Editar. Si mañana alguien
+  // suma una acción, esto se pone rojo y se decide a propósito.
   const html = render({ caras: PACK_EN_DEPOSITO });
-  const iVoltear = html.indexOf("data-tarjeta-voltear");
   const iAcciones = html.indexOf("divide-x");
-  assert.ok(iVoltear > 0 && iVoltear < iAcciones);
+  assert.ok(iAcciones > 0, "no está la fila de acciones");
   const fila = html.slice(iAcciones);
   assert.equal((fila.match(/<button/g) || []).length, 1);
   assert.match(fila, /Editar/);
 });
 
-test("G4. conserva el carrusel frente dorso y nombra el destino", () => {
-  assert.match(render({ caras: PACK_EN_DEPOSITO }), /Ver unidad/);
-  assert.match(render({ caras: PACK_EN_LOCAL }), /Ver pack/);
-  const html = render({ caras: PACK_EN_DEPOSITO });
-  assert.equal((html.match(/rounded-full/g) || []).length, 2);
+test("G4. ALTERNAR ES TOCAR EL PRECIO, y el rótulo dice a qué escala se llega", () => {
+  // ── QUÉ AFIRMABA ANTES ──────────────────────────────────────────────────
+  //
+  // Que existiera el botón "Ver unidad" / "Ver pack" y los DOS puntos —contaba
+  // `rounded-full` esperando exactamente 2—. Los tres se sacaron.
+  //
+  // Lo que se conserva es la afirmación de fondo: que desde una escala se pueda
+  // llegar a la otra, y que se sepa a cuál. Ahora eso lo dice el rótulo del
+  // propio bloque, que cambia con el importe.
+  const enDeposito = render({ caras: PACK_EN_DEPOSITO });
+  const enLocal = render({ caras: PACK_EN_LOCAL });
+  assert.match(enDeposito, /data-cara-precio-alterna/);
+  assert.match(enLocal, /data-cara-precio-alterna/);
+
+  // Y NO QUEDÓ NINGÚN PUNTO. Se cuenta sobre el cuerpo del precio y no sobre la
+  // tarjeta entera: el kit dibuja sus propios redondeos y contarlos todos haría
+  // que este candado se ponga rojo por cambios que no son suyos.
+  const cuerpo = renderToStaticMarkup(
+    createElement(CuerpoDeLaCara, { caras: PACK_EN_DEPOSITO })
+  );
+  assert.equal((cuerpo.match(/rounded-full/g) || []).length, 0, "quedaron los puntos");
+
+  // La accesibilidad no se pierde con el texto: el bloque dice qué hace.
+  assert.match(cuerpo, /aria-label="Ver el precio por unidad"/);
 });
 
 test("G5. los códigos SE VEN en el frente, y siguen siendo los del kit", () => {
@@ -389,10 +428,21 @@ test("G13. el cambio de cara es local y no agrega una librería", () => {
   }
 });
 
-test("G14. el gesto deja el scroll vertical al navegador", () => {
+test("G14. NO HAY GESTO, así que no hay nada que robarle al scroll", () => {
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ SE DA VUELTA ──────────────────────────
+  //
+  // Que el swipe horizontal no se comiera el scroll vertical: `touch-action:
+  // pan-y` en el cuerpo, y la comparación de dx contra dy antes de aceptar el
+  // gesto. Era la defensa correcta mientras hubo carrusel.
+  //
+  // El carrusel se sacó y con él el gesto. La defensa deja de tener sentido y
+  // pasa a ser al revés: lo que no puede volver es el gesto, porque el riesgo
+  // que traía —un deslizamiento que se confunde con un scroll en una lista de
+  // veinticinco tarjetas— es el que se está evitando al no tenerlo.
   const html = render({ caras: PACK_EN_DEPOSITO });
-  assert.match(html, /touch-action:pan-y/);
-  assert.match(FUENTE, /Math\.abs\(dx\)\s*<=\s*Math\.abs\(dy\)/);
+  assert.doesNotMatch(html, /touch-action/, "volvió a declararse una acción táctil");
+  assert.doesNotMatch(FUENTE, /onPointerDown|onPointerUp|onPointerCancel/, "volvieron los manejadores del gesto");
+  assert.doesNotMatch(FUENTE, /Math\.abs\(dx\)/, "volvió la comparación del gesto");
 });
 
 test("G15. el dorso de sola identificación ya no existe", () => {

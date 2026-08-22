@@ -9,6 +9,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
 import VoiceFieldButton from "@/components/productos/VoiceFieldButton";
 import SeccionCodigosProveedor from "@/components/productos/SeccionCodigosProveedor";
+import CargarFotoProducto from "@/components/productos/CargarFotoProducto";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
 import {
   precioDesdeMargen,
@@ -1385,7 +1386,22 @@ export default function FormProducto({
               />
             </Field>
 
-            <Field label="Imagen URL" fieldKey="imagen_url" colSpan>
+            {/* ── LA FOTO: CARGAR ES LO PRINCIPAL, LA URL ES LO SECUNDARIO ──
+                Hasta acá lo único que había era el campo de la url, y desde el
+                celular —que es donde se cargan los productos— eso no se puede
+                completar: hay que tener la foto ya subida en otro lado.
+
+                El campo NO se saca, porque sigue sirviendo para una foto que ya
+                está en algún lado. Baja de lugar y lo dice. */}
+            <Field label="Foto del producto" fieldKey="imagen_url" colSpan>
+              <CargarFotoProducto
+                productoBaseId={initialData?.id}
+                valor={form.imagen_url}
+                onCambio={(url) => setField("imagen_url", url)}
+              />
+            </Field>
+
+            <Field label="Imagen URL (opcional, si ya está en otro lado)" fieldKey="imagen_url" colSpan>
               <SunmiInput
                 value={form.imagen_url}
                 onChange={(e) => setField("imagen_url", e.target.value)}

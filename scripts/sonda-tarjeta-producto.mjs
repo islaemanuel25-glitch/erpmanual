@@ -393,13 +393,13 @@ try {
       const cara = t.querySelector('[data-tarjeta-cara]');
       const pres = t.querySelector('[data-cara-presentacion]');
       const rot = t.querySelector('[data-cara-rotulo]');
-      const btn = t.querySelector('[data-tarjeta-voltear]');
+      const btn = t.querySelector('[data-cara-precio-alterna]');
       return {
         nombre: t.innerText.split("\\n")[0],
         lado: cara ? cara.getAttribute('data-tarjeta-cara') : null,
         rotulo: rot ? rot.textContent.trim() : null,
         presentacion: pres ? pres.textContent.trim() : null,
-        boton: btn ? btn.textContent.trim() : null,
+        boton: btn ? (btn.getAttribute('aria-label') || '').trim() : null,
       };
     }).filter((c) => {
       // Toda tarjeta abre en la escala de VENTA, la que el POS cobra. Si alguna
@@ -421,7 +421,10 @@ try {
       // El resto: que exista o no lo decide el factor, y eso lo mira el 9. Acá
       // solo se comprueba que, SI está, nombre la escala que le toca.
       if (!c.boton) return false;
-      const nombrada = (c.boton.match(/^Ver\\s+(.+?)\\s*$/) || [])[1];
+      // La escala sale de la ETIQUETA del bloque, no de su texto: lo que se lee
+      // adentro es el rótulo y el importe, y lo que dice qué hace el control es
+      // su \`aria-label\`.
+      const nombrada = (c.boton.match(/^Ver el precio por\\s+(.+?)\\s*$/) || [])[1];
       return nombrada !== (esPack ? "unidad" : ESPERADO[base]);
     });
   })()`);
@@ -529,14 +532,14 @@ try {
       // así que no lo encontraba nunca y la comparación se salteaba en silencio.
       const importe = t.querySelector('[data-cara-importe]');
       const presentacion = t.querySelector('[data-cara-presentacion]');
-      const voltear = t.querySelector('[data-tarjeta-voltear]');
+      const voltear = t.querySelector('[data-cara-precio-alterna]');
       return {
         nombre: nombre ? nombre.textContent.trim() : "",
         valor: fila ? fila.textContent.trim() : "",
         // Si hay botón para dar vuelta, esta tarjeta tiene dorso.
         tieneDorso: !!voltear,
         // Y cómo se llama, para poder cotejarlo contra la cara a la que lleva.
-        etiquetaVoltear: voltear ? voltear.textContent.trim() : null,
+        etiquetaVoltear: voltear ? (voltear.getAttribute('aria-label') || '').trim() : null,
         // La franja de equivalencia se fue con la card de frente y dorso. Lo que
         // la reemplaza es la PRESENTACIÓN pegada al número, y se lee por atributo.
         importe: importe ? importe.textContent.trim() : "",
@@ -689,7 +692,13 @@ try {
       // componente, así que si alguien reescribe una de las dos, se separan.
       // `nombreCortoDe` y no `nombreDelDorso`: el botón nombra una ESCALA, y a
       // esta rama solo se llega habiendo conversión, o sea con presentación.
-      const esperado = `Ver ${nombreCortoDe(carasEsperadas.dorso.presentacion)}`;
+      // ── EL NOMBRE YA NO ES TEXTO A LA VISTA, ES LA ETIQUETA ─────────────
+      //
+      // El botón "Ver unidad" se sacó: el control es el bloque del precio, y lo
+      // único que se lee ahí es el rótulo de la escala. Lo que dice qué hace el
+      // control es su `aria-label`, que además es lo que escucha un lector de
+      // pantalla. Se compara contra eso.
+      const esperado = `Ver el precio por ${nombreCortoDe(carasEsperadas.dorso.presentacion)}`;
       if (vista.etiquetaVoltear !== esperado) {
         malPrecio.push(
           `${vista.nombre}: el botón dice "${vista.etiquetaVoltear}" y tendría que decir "${esperado}"`
@@ -955,7 +964,7 @@ try {
   for (const i of conPack) {
     const par = await evaluar(`(() => {
       const t = ${TARJETAS}[${i}];
-      const boton = t.querySelector('[data-tarjeta-voltear]');
+      const boton = t.querySelector('[data-cara-precio-alterna]');
       if (!boton) return null;
       const leer = () => ({
         lado: t.querySelector('[data-tarjeta-cara]').getAttribute('data-tarjeta-cara'),
@@ -993,7 +1002,7 @@ try {
         hayFoto: !!t.querySelector('[data-tarjeta-foto]'),
         nombreVisible: t.innerText.split("\\n")[0],
       };
-      t.querySelector('[data-tarjeta-voltear]').click();
+      t.querySelector('[data-cara-precio-alterna]').click();
       return d;
     })()`);
     await sleep(250);
@@ -1386,8 +1395,17 @@ try {
       // Visibles de verdad: con caja, no solo presentes en el DOM.
       textos: botones.filter((b) => b.getBoundingClientRect().height > 0)
         .map((b) => b.textContent.trim()),
-      // Y con su ícono: el diseño pide uno por botón.
-      conIcono: botones.filter((b) => b.querySelector('svg')).length,
+      // Cuál de ellos es el bloque del precio. Va por marcador y en el mismo
+      // orden que los textos: reconocerlo por lo que dice sería atarse al
+      // formato de la moneda.
+      esBloqueDePrecio: botones.filter((b) => b.getBoundingClientRect().height > 0)
+        .map((b) => b.hasAttribute('data-cara-precio-alterna')),
+      // Y con su ícono: el diseño pide uno por botón DE ACCIÓN. El bloque del
+      // precio no lleva ícono y no debería: su contenido es el número, que es
+      // más específico que cualquier dibujo.
+      conIcono: botones.filter((b) => !b.hasAttribute('data-cara-precio-alterna'))
+        .filter((b) => b.querySelector('svg')).length,
+      accionesConTexto: botones.filter((b) => !b.hasAttribute('data-cara-precio-alterna')).length,
       // La capa no puede volver por la puerta de atrás.
       hayCapa: !!t.querySelector('.absolute.inset-0'),
     };
@@ -1418,19 +1436,48 @@ try {
   // existiendo y se llega desde la tabla de escritorio. Lo que se sacó es el
   // botón, no el destino.
   //
-  // Con la card de frente y dorso volvieron a ser dos, y el segundo NO es "Ver":
-  // da vuelta la tarjeta y no navega a ningún lado. Su texto nombra la cara a la
-  // que lleva —"Ver unidad", "Ver pack"— así que el esperado depende del
-  // producto; por eso se acepta cualquiera de las formas conocidas y la
-  // coherencia entre el botón y la presentación la comprueba el chequeo 1.
+  // ── Y AHORA EL SEGUNDO BOTÓN ES EL BLOQUE DEL PRECIO ───────────────────
+  //
+  // Con la card de frente y dorso el segundo botón era "Ver unidad", con su
+  // texto. Ese se sacó: el control es el bloque sombreado del precio, así que su
+  // "texto" es el rótulo de la escala y el importe — "PACK X 24$24.500,00".
+  //
+  // Se lo reconoce por su marcador y no por lo que dice: el texto depende del
+  // producto y del precio, y una expresión que intente cazarlo se pone roja el
+  // día que cambie el formato de la moneda. El chequeo 1 es el que comprueba la
+  // coherencia entre ese rótulo y la escala.
   const ESPERADOS = (arg("botones", "Editar") || "").split(",").map((s) => s.trim());
-  const VOLTEAR = /^Ver (unidad|pack|cajón|kilo|pieza|bulto|referencia)$/;
-  const sobran = fila.textos.filter((b) => !ESPERADOS.includes(b) && !VOLTEAR.test(b));
+  const sobran = fila.textos.filter((b, i) => !ESPERADOS.includes(b) && !fila.esBloqueDePrecio?.[i]);
   const faltan = ESPERADOS.filter((b) => !fila.textos.includes(b));
   afirmar(
     sobran.length === 0 && faltan.length === 0,
-    `3b · la fila tiene los botones esperados (${ESPERADOS.join(", ")}) más el de dar vuelta`,
+    `3b · la fila tiene los botones esperados (${ESPERADOS.join(", ")}) más el bloque del precio`,
     `sobran: ${sobran.join(", ") || "ninguno"} · faltan: ${faltan.join(", ") || "ninguno"}`
+  );
+
+  // ── 3b-ter · NO VOLVIÓ NADA DEL CARRUSEL ───────────────────────────────
+  //
+  // Cuatro elementos se sacaron de una vez: el botón de texto, las dos flechas,
+  // los dos puntos y el gesto. Se afirma la ausencia de los cuatro POR SEPARADO,
+  // sobre la pantalla corriendo: dejar solo el del botón habría pasado en verde
+  // con los puntos todavía dibujados, que es exactamente lo que se pidió sacar.
+  const restos = await evaluar(`(() => {
+    const t = ${TARJETAS};
+    return {
+      puntos: t.filter((c) => c.querySelector('[data-tarjeta-indicador]')).length,
+      flechas: t.filter((c) => c.querySelector('svg.lucide-chevron-right, svg.lucide-chevron-left')).length,
+      textoVer: t.filter((c) => /Ver (unidad|pack|cajón|referencia|códigos)/.test(c.innerText)).length,
+      // El gesto se declaraba con esto; sin swipe no tiene por qué estar.
+      panY: t.filter((c) => {
+        const cara = c.querySelector('[data-tarjeta-cara]');
+        return cara && getComputedStyle(cara).touchAction === "pan-y";
+      }).length,
+    };
+  })()`);
+  afirmar(
+    restos.puntos === 0 && restos.flechas === 0 && restos.textoVer === 0 && restos.panY === 0,
+    `3b-ter · no volvió el carrusel: ni puntos, ni flechas, ni "Ver …", ni gesto`,
+    `puntos: ${restos.puntos} · flechas: ${restos.flechas} · con texto "Ver": ${restos.textoVer} · con pan-y: ${restos.panY}`
   );
 
   // Y el de dar vuelta NO puede ser "Ver" a secas: ése era el que llevaba a la
@@ -1441,10 +1488,16 @@ try {
     `botones: ${fila.textos.join(", ")}`
   );
 
+  // ── 3c · CADA BOTÓN DE ACCIÓN LLEVA SU ÍCONO ───────────────────────────
+  //
+  // Contaba TODOS los botones, y ahora el bloque del precio es uno. Ése no lleva
+  // ícono ni debería: su contenido es el número y el rótulo de la escala, que
+  // dicen mucho más que cualquier dibujo. Contarlo hacía que este candado se
+  // pusiera rojo pidiendo un ícono que sería ruido.
   afirmar(
-    fila.conIcono >= fila.textos.length,
-    `3c · cada botón lleva su ícono (${fila.conIcono} de ${fila.textos.length})`,
-    "un botón sin ícono: el diseño pide uno por acción"
+    fila.conIcono >= fila.accionesConTexto,
+    `3c · cada botón de acción lleva su ícono (${fila.conIcono} de ${fila.accionesConTexto})`,
+    "un botón de acción sin ícono: el diseño pide uno por acción"
   );
 
   // ── 3d · EL ÁREA TÁCTIL DE **CADA** BOTÓN DE LA TARJETA ─────────────────
@@ -2318,7 +2371,7 @@ try {
     if (tarjetas.length === 0) return { sinAndamio: true };
     const resultado = [];
     for (const cara of tarjetas) {
-      const boton = cara.querySelector('[data-tarjeta-voltear]');
+      const boton = cara.querySelector('[data-cara-precio-alterna]');
       if (!boton) continue;
       boton.click();
     }
@@ -2336,7 +2389,7 @@ try {
       presentacion: (c.querySelector('[data-cara-presentacion]') || {}).textContent || null,
       tieneImporte: !!c.querySelector('[data-cara-importe]'),
       tieneReferencia: !!c.querySelector('[data-cara-referencia]'),
-      puedeAlternar: !!c.querySelector('[data-tarjeta-voltear]'),
+      puedeAlternar: !!c.querySelector('[data-cara-precio-alterna]'),
     }));
   })()`);
 
@@ -2498,7 +2551,7 @@ try {
     const n = document.querySelector('[data-caso-andamio="pack-con-foto"]');
     if (!n) return false;
     const cara = n.querySelector('[data-tarjeta-cara]');
-    const boton = n.querySelector('[data-tarjeta-voltear]');
+    const boton = n.querySelector('[data-cara-precio-alterna]');
     if (cara && boton && cara.getAttribute('data-tarjeta-cara') !== "venta") boton.click();
     return true;
   })()`);
@@ -2516,7 +2569,7 @@ try {
       alto: Math.round(n.getBoundingClientRect().height * 10) / 10,
     });
     const antes = leer();
-    const boton = n.querySelector('[data-tarjeta-voltear]');
+    const boton = n.querySelector('[data-cara-precio-alterna]');
     if (!boton) return { sinBoton: true, antes };
     boton.click();
     return { antes };
