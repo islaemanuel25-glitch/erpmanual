@@ -78,16 +78,15 @@ function ReferenciaDeLaCara({ detalle }) {
   );
 }
 
-function IdentificacionDeLaCara() {
-  return (
-    <CajaDeLaCara
-      data-cara-identificacion
-      className="items-center justify-end text-[11.5px] font-medium sunmi-text-muted"
-    >
-      IDENTIFICACIÓN
-    </CajaDeLaCara>
-  );
-}
+// ── ACÁ VIVÍA "IDENTIFICACIÓN", Y SE FUE CON EL DORSO QUE LA CONTENÍA ─────
+//
+// Era la cara de atrás de un producto sin equivalencia: un bloque que decía
+// IDENTIFICACIÓN y nada más, porque los códigos estaban abajo, en el pie.
+//
+// Dejó de tener sentido cuando los códigos pasaron al frente. Un producto sin
+// referencia ya no tiene NADA para mostrar atrás, así que no tiene dorso: sin
+// indicador, sin "Ver códigos" y sin botón. Prometer una cara vacía cuesta un
+// gesto y no devuelve ningún dato.
 
 function IndicadorDeCara({ mirandoDorso }) {
   return (
@@ -103,11 +102,78 @@ function IndicadorDeCara({ mirandoDorso }) {
   );
 }
 
-export function MarcaDeLaCara({ cara, regla = null, muestraCosto = true }) {
-  const costo = muestraCosto ? cara?.costo ?? null : null;
-  if (costo === null && !regla) return null;
+// LA MINIATURA DEL PRODUCTO.
+//
+// ── DÓNDE ENTRA SIN MOVER NADA ────────────────────────────────────────────
+//
+// En el hueco que ya existe a la izquierda del precio. Esa fila mide lo que mide
+// el bloque del precio —51,5 px— así que un cuadrado de 44 entra adentro sin
+// empujar: la fila no crece, el precio no se corre, y el pie de códigos, el
+// proveedor y Editar quedan donde estaban.
+//
+// `contain` y no `cover`: las fotos de producto vienen con proporciones
+// cualquiera, y recortar una etiqueta para llenar un cuadrado esconde justo lo
+// que se está mirando.
+const LADO_MINIATURA = "w-[44px] h-[44px]";
+
+function MiniaturaDelProducto({ url }) {
+  // ── UNA FOTO ROTA NO DEJA UN HUECO ──────────────────────────────────────
+  //
+  // Las urls vienen de una columna que nadie valida, así que algunas no cargan.
+  // Sin esto, el navegador dibuja el ícono de imagen rota adentro de la tarjeta
+  // — un cuadrado gris que parece un defecto de la pantalla y no un dato que
+  // falta. Se esconde entera, que es lo mismo que hace la tarjeta cuando no hay
+  // foto: no reservar lugar.
+  const [fallo, setFallo] = useState(false);
+
+  // ── Y `onError` SOLO NO ALCANZA, QUE ES LO QUE LA SONDA ENCONTRÓ ────────
+  //
+  // El manejador se engancha cuando React hidrata. Si el pedido de la imagen ya
+  // falló para entonces —y falla antes, porque el navegador la pide apenas
+  // parsea la etiqueta— ese evento ya pasó y no vuelve: la foto rota se queda
+  // dibujada para siempre. Con la sonda esperando diez segundos seguía en rojo,
+  // así que no era una carrera del arnés.
+  //
+  // `complete` con `naturalWidth` en cero es cómo se pregunta por un error que
+  // ya ocurrió, y hay que preguntarlo apenas el nodo existe.
+  //
+  // ── POR QUÉ EN EL CALLBACK DEL REF Y NO EN UN `useEffect` ──────────────
+  //
+  // Por dos razones que apuntan al mismo lado. G13 prohíbe `useEffect` en este
+  // archivo, para que dar vuelta la tarjeta no se vuelva un efecto; y el lint
+  // marca como error llamar a `setState` sincrónicamente adentro de uno. El
+  // callback del ref corre exactamente cuando el nodo se monta, que es cuando
+  // hay que mirar, y no es ninguna de las dos cosas.
+  //
+  // No cicla: en cuanto `fallo` queda en true la imagen no se dibuja más, así
+  // que el callback no vuelve a recibir un nodo.
+  const alMontarLaImagen = (img) => {
+    if (img && img.complete && img.naturalWidth === 0) setFallo(true);
+  };
+
+  if (fallo) return null;
 
   return (
+    <img
+      ref={alMontarLaImagen}
+      data-tarjeta-foto
+      src={url}
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      onError={() => setFallo(true)}
+      className={`${LADO_MINIATURA} shrink-0 rounded-lg object-contain`}
+    />
+  );
+}
+
+export function MarcaDeLaCara({ cara, regla = null, muestraCosto = true, imagenUrl = null }) {
+  const costo = muestraCosto ? cara?.costo ?? null : null;
+  const hayTexto = costo !== null || !!regla;
+  if (!hayTexto && !imagenUrl) return null;
+
+  const texto = hayTexto ? (
     <span className="min-w-0 flex flex-col items-start gap-1 leading-tight">
       {costo !== null && (
         <span
@@ -119,6 +185,19 @@ export function MarcaDeLaCara({ cara, regla = null, muestraCosto = true }) {
       )}
       {regla}
     </span>
+  ) : null;
+
+  // SIN FOTO SE DEVUELVE EXACTAMENTE LO DE ANTES, sin envoltorio de más.
+  // No es una optimización: un span extra alrededor del texto puede correrlo, y
+  // la mayoría del catálogo no tiene imagen. Que esas tarjetas queden idénticas
+  // no depende de que el envoltorio "no debería" mover nada.
+  if (!imagenUrl) return texto;
+
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <MiniaturaDelProducto url={imagenUrl} />
+      {texto}
+    </span>
   );
 }
 
@@ -126,14 +205,21 @@ export function CuerpoDeLaCara({
   caras,
   mirandoDorso = false,
   hayReferencia,
-  hayIdentificacion,
   manejadoresDeGesto = {},
   onVoltear = null,
 }) {
   const { frente, dorso } = caras;
-  const hayDorso = hayReferencia || hayIdentificacion;
+  // ── EL DORSO LO CREA LA REFERENCIA, Y SOLO ELLA ─────────────────────────
+  //
+  // Antes también lo creaba tener códigos —`hayReferencia || hayIdentificacion`—
+  // porque la identificación era el contenido de atrás. Los códigos se ven en el
+  // frente desde la tanda anterior, así que esa mitad quedó prometiendo una cara
+  // sin nada adentro.
+  //
+  // Ahora la pregunta es una sola: ¿hay una equivalencia real que mostrar? Si no
+  // la hay, la tarjeta tiene UNA cara y no hay gesto que descubrir.
+  const hayDorso = hayReferencia;
   const cara = mirandoDorso ? dorso : frente;
-  const dorsoSoloIdentificacion = mirandoDorso && !hayReferencia;
 
   return (
     <span
@@ -142,9 +228,7 @@ export function CuerpoDeLaCara({
       style={{ touchAction: "pan-y" }}
       {...manejadoresDeGesto}
     >
-      {dorsoSoloIdentificacion ? (
-        <IdentificacionDeLaCara />
-      ) : cara?.importe === null && cara?.detalle ? (
+      {cara?.importe === null && cara?.detalle ? (
         <ReferenciaDeLaCara detalle={cara.detalle} />
       ) : (
         <PrecioDeLaCara
@@ -176,9 +260,10 @@ export function CuerpoDeLaCara({
           >
             {mirandoDorso && <ChevronLeft className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
             Ver{" "}
-            {mirandoDorso
-              ? nombreCortoDe(frente.presentacion)
-              : nombreDelDorso(hayReferencia ? dorso : null)}
+            {/* Sin el ternario: acá solo se llega habiendo referencia, así que
+                `dorso` existe siempre y "Ver códigos" —lo que devolvía este
+                nombre con `null`— ya no es un destino posible. */}
+            {mirandoDorso ? nombreCortoDe(frente.presentacion) : nombreDelDorso(dorso)}
             {!mirandoDorso && <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
           </button>
         </span>
@@ -195,16 +280,27 @@ export default function TarjetaProductoMovil({
   caras,
   regla = null,
   muestraCosto = true,
+  imagenUrl = null,
   onEditar,
 }) {
   const [enDorso, setEnDorso] = useState(false);
   const gesto = useRef(null);
 
+  // ── DOS PREGUNTAS QUE ANTES ERAN UNA ────────────────────────────────────
+  //
+  // `hayDorso` era `hayReferencia || hayIdentificacion`: tener códigos alcanzaba
+  // para crear una cara de atrás, porque la identificación vivía ahí. Desde que
+  // los códigos se ven en el frente, esa mitad prometía una cara vacía.
+  //
+  // Ahora son dos cosas separadas y cada una decide lo suyo: la referencia
+  // decide si hay dorso, y la identificación decide si el pie del kit lleva
+  // datos. Un producto puede tener códigos y una sola cara, que es el caso
+  // normal del catálogo.
   const hayReferencia = !!caras.dorso;
   const hayIdentificacion = !OCULTO(codigoBarra) || !OCULTO(codigoInterno);
-  const hayDorso = hayReferencia || hayIdentificacion;
+  const hayDorso = hayReferencia;
   const mirandoDorso = hayDorso && enDorso;
-  const caraActual = mirandoDorso && hayReferencia ? caras.dorso : caras.frente;
+  const caraActual = mirandoDorso ? caras.dorso : caras.frente;
 
   const alSoltar = (e) => {
     const inicio = gesto.current;
@@ -226,20 +322,37 @@ export default function TarjetaProductoMovil({
     },
   };
 
-  const claseCard = hayIdentificacion && !mirandoDorso ? "[&_[data-pie-codigos]]:invisible" : "";
-
+  // ── LOS CÓDIGOS SE VEN EN EL FRENTE ───────────────────────────────────────
+  //
+  // Hasta acá el pie del kit venía puesto pero escondido con una clase mientras
+  // se miraba el frente: el lugar quedaba reservado, para que dar vuelta no
+  // moviera la grilla, y el dato solo aparecía en el dorso.
+  //
+  // Ya no. El código de barras y el del proveedor son lo que se mira para
+  // reponer y para conciliar una factura, y hacerlos costar un gesto los volvía
+  // invisibles en la práctica.
+  //
+  // Se sacó SOLO la clase que los ocultaba, y eso importa: el pie sigue siendo
+  // el del kit, en el mismo lugar y con el mismo alto ya reservado, así que la
+  // card no se mueve ni un pixel. Lo único que cambia es que el texto que ya
+  // estaba dibujado ahora se lee.
   return (
     <SunmiProductoCard
       nombre={nombre}
       empresa={empresa}
       codigoBarra={hayIdentificacion ? codigoBarra : false}
       codigoInterno={hayIdentificacion ? codigoInterno : false}
-      className={claseCard}
       marca={
         <MarcaDeLaCara
           cara={caraActual}
           regla={regla}
-          muestraCosto={muestraCosto && (!mirandoDorso || hayReferencia)}
+          // Sin la salvedad de antes: al dorso solo se llega habiendo
+          // referencia, así que `!mirandoDorso || hayReferencia` era siempre
+          // verdadero y solo tapaba la lectura.
+          muestraCosto={muestraCosto}
+          // LA FOTO ES DEL FRENTE Y NADA MÁS. El dorso es la equivalencia, y
+          // repetir la miniatura ahí solo diría de nuevo qué producto es.
+          imagenUrl={mirandoDorso ? null : imagenUrl}
         />
       }
       valor={
@@ -247,7 +360,6 @@ export default function TarjetaProductoMovil({
           caras={caras}
           mirandoDorso={mirandoDorso}
           hayReferencia={hayReferencia}
-          hayIdentificacion={hayIdentificacion}
           manejadoresDeGesto={manejadoresDeGesto}
           onVoltear={() => setEnDorso((v) => !v)}
         />

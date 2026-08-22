@@ -139,23 +139,28 @@ test("EL BOTÓN DE LA FILA VIVE EN EL KIT, no en quien lo usa", () => {
     "el envoltorio se escribió su propio pie de códigos"
   );
 
-  // 2. y lo esconde en el frente apuntando a un atributo, no a una clase de
-  //    Tailwind del kit ni a una posición, que es lo que se rompe en silencio;
-  assert.match(
+  // 2. y NO LO ESCONDE. Éste afirmaba lo contrario hasta que los códigos
+  //    pasaron a verse en el frente: pedía la clase `invisible` sobre el pie,
+  //    porque la identificación era del dorso y el frente solo le reservaba el
+  //    lugar. La decisión cambió —se miran para reponer y para conciliar, y un
+  //    gesto de más los volvía invisibles en la práctica— así que el candado se
+  //    da vuelta en vez de borrarse: reponer esa clase saca el dato de la
+  //    pantalla sin romper nada que se note.
+  assert.doesNotMatch(
     ENVOLTORIO,
     /\[&_\[data-pie-codigos\]\]:invisible/,
-    "el frente ya no esconde el pie de códigos: los códigos son del dorso"
+    "volvió la clase que escondía los códigos en el frente"
   );
 
-  // 3. Y ACÁ ESTÁ EL ESLABÓN QUE NADIE MIRABA. El selector de arriba vive en el
-  //    envoltorio y el atributo al que apunta vive en el kit: son dos archivos.
-  //    Si alguien le cambia el nombre al atributo, el envoltorio sigue
-  //    compilando, la suite sigue verde y el frente pasa a mostrar los códigos
-  //    del dorso. Por eso los dos lados se afirman juntos.
+  // 3. Y EL ATRIBUTO SIGUE SIENDO LA JUNTA ENTRE LOS DOS ARCHIVOS. Ya no lo usa
+  //    el envoltorio para esconder, pero sí la sonda para afirmar sobre la
+  //    pantalla corriendo, y es lo único que marca ese pie. Si alguien le cambia
+  //    el nombre, todo compila, la suite queda verde y la sonda pasa a medir un
+  //    nodo que no existe — que es un verde por ausencia, el peor de los dos.
   assert.match(
     TARJETA,
     /data-pie-codigos/,
-    "el kit dejó de marcar su pie de códigos: el frente no lo puede esconder"
+    "el kit dejó de marcar su pie de códigos: nadie lo puede encontrar"
   );
 });
 

@@ -2,9 +2,8 @@
 
 import { useRef, useState, useEffect, useCallback, memo } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import { showError } from "@/components/sunmi/SunmiToast";
-import { Search } from "lucide-react";
 import { fromUnidades } from "@/lib/conversiones/stock";
 import { rankearProductos } from "@/lib/pos-ventas/rankearProductos";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
@@ -31,7 +30,6 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
   const debounceRef = useRef(null);
   const lastKeyTime = useRef(0);
   const scanBuffer = useRef("");
-  const recognitionRef = useRef(null);
 
   // Autofocus al montar
   useEffect(() => {
@@ -115,37 +113,19 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
     [localId, clienteId, onAgregar, searchApi]
   );
 
-  // Busqueda por voz
-  const iniciarVoz = () => {
-    const SpeechRecognition =
-      typeof window !== "undefined" &&
-      (window.SpeechRecognition || window.webkitSpeechRecognition);
-
-    if (!SpeechRecognition) return;
-
-    if (escuchando && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setEscuchando(false);
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "es-AR";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => setEscuchando(true);
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setQuery(transcript);
-      buscar(transcript, false, true);
-      setEscuchando(false);
-    };
-    recognition.onerror = () => setEscuchando(false);
-    recognition.onend = () => setEscuchando(false);
-
-    recognitionRef.current = recognition;
-    recognition.start();
+  // ── LA VOZ Y EL CAMPO SE FUERON AL KIT ────────────────────────────────────
+  //
+  // El reconocimiento, el idioma, el botón del micrófono y el "Escuchando..."
+  // vivían acá adentro, y este era el ÚNICO lugar del ERP que los tenía. Ahora
+  // son `SunmiCampoBusquedaVoz`, que usan este buscador y el de Productos.
+  //
+  // Lo que quedó de este lado es lo que NO es compartible: el escáner, el
+  // auto-agregado por código exacto, el ranking y `fromVoice`. Por eso la pieza
+  // avisa la voz por `onVoz` y no por `onChange` — acá dictar y teclear hacen
+  // cosas distintas, y en Productos hacen la misma.
+  const alDictar = (transcripcion) => {
+    setQuery(transcripcion);
+    buscar(transcripcion, false, true);
   };
 
   // Deteccion de scanner: Enter rapido (<200ms entre teclas)
@@ -238,67 +218,25 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
     inputRef.current?.focus();
   };
 
-  // Verificar soporte de voz
-  const soportaVoz =
-    typeof window !== "undefined" &&
-    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-
   const contenido = (
     <>
-      {/* Input con boton de voz */}
-      <div className="relative">
-        <Search
-          size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
-          style={{ color: "var(--pos-link)" }}
-        />
-        <SunmiInput
-          ref={inputRef}
-          id="buscar-producto"
-          type="text"
-          placeholder="Codigo o nombre del producto..."
-          value={query}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          className={`w-full text-base min-h-12 lg:min-h-10 !py-2 !pl-9 !border-2 pulse-neon ${soportaVoz ? "!pr-12" : ""}`}
-          style={{ borderColor: "var(--pos-link)" }}
-          autoFocus
-          // Sin historial/autocompletado nativo del navegador (no afecta el
-          // desplegable de productos del ERP, que es propio).
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="none"
-          spellCheck={false}
-        />
-        {soportaVoz && (
-          <button
-            onClick={iniciarVoz}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
-              escuchando
-                ? "sunmi-btn-red animate-pulse"
-                : "pos-control"
-            }`}
-            title="Buscar por voz"
-            type="button"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" x2="12" y1="19" y2="22" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {loading && (
-        <div className="text-xs pos-text-muted mt-2">Buscando...</div>
-      )}
-
-      {escuchando && (
-        <div className="text-xs pos-text-danger mt-2 animate-pulse">
-          Escuchando...
-        </div>
-      )}
+      {/* Input con boton de voz — la pieza es del kit, ver el comentario de
+          `alDictar`. "Buscando..." va por la ranura para conservar el orden de
+          los renglones exactamente como estaba. */}
+      <SunmiCampoBusquedaVoz
+        inputRef={inputRef}
+        id="buscar-producto"
+        placeholder="Codigo o nombre del producto..."
+        value={query}
+        onChange={(texto) => handleChange({ target: { value: texto } })}
+        onVoz={alDictar}
+        onEscuchandoChange={setEscuchando}
+        onKeyDown={handleKeyDown}
+        autoFocus
+        avisoDeEstado={
+          loading ? <div className="text-xs pos-text-muted mt-2">Buscando...</div> : null
+        }
+      />
 
       {!loading && !escuchando && queryInterpretada && resultados.length > 0 && (
         <div className="text-[11px] pos-text-muted mt-2 italic">

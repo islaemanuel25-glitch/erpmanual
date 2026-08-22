@@ -110,6 +110,49 @@ const CARAS = [
       unidad: "unidad",
     }),
   },
+  // ── LOS DOS CASOS DE LA FOTO, Y POR QUÉ VIVEN ACÁ ────────────────────────
+  //
+  // En la base de desarrollo hay UN producto con `imagen_url` cargada sobre
+  // 2.005, y viene vacía. O sea que abriendo la pantalla no se puede ver una
+  // tarjeta con foto — y fabricar la fila para que la captura salga linda es
+  // justo lo que la regla 4 prohíbe: probaría que el código dibuja algo, no que
+  // el caso ocurra.
+  //
+  // Acá el dato de entrada es declarado y se ve que lo es, que es para lo que
+  // existe este andamio. Van los dos casos juntos porque lo que hay que poder
+  // comparar de un vistazo es el PAR: con foto y sin foto tienen que tener la
+  // misma altura y el precio en la misma posición.
+  {
+    id: "con-foto",
+    nombre: "Yerba mate Playadito 1 kg",
+    empresa: "Cooperativa Liebig",
+    codigoBarra: "7792200000123",
+    codigoInterno: "40219",
+    // Una imagen que existe en `public/`, no una url inventada: si apuntara a un
+    // archivo que no está, esto mediría el camino del error y no el de la foto.
+    //
+    // La primera versión decía `/favicon.ico`, que en este repo NO existe —da
+    // 404—, así que los dos casos eran el mismo y el "con foto" estaba midiendo
+    // el ícono de imagen rota. Lo destapó la sonda, no la lectura.
+    imagenUrl: "/globe.svg",
+    caras: carasDeTarjeta({
+      escala: ESCALA_UNIDAD, precio: 4850, costo: 3600, factor: 1, unidad: "unidad",
+    }),
+  },
+  {
+    id: "foto-rota",
+    nombre: "Yerba mate Playadito 1 kg",
+    empresa: "Cooperativa Liebig",
+    codigoBarra: "7792200000123",
+    codigoInterno: "40219",
+    // Y EL CAMINO DEL ERROR, ejercido a propósito. Las urls salen de una columna
+    // que nadie valida, así que esta es la que va a pasar de verdad: la tarjeta
+    // tiene que quedar como la de al lado y no con un cuadrado roto adentro.
+    imagenUrl: "/no-existe-esta-foto.png",
+    caras: carasDeTarjeta({
+      escala: ESCALA_UNIDAD, precio: 4850, costo: 3600, factor: 1, unidad: "unidad",
+    }),
+  },
 ];
 
 const PRODUCTOS = [
@@ -212,16 +255,22 @@ export default function AndamioProductoCard() {
           Tarjeta del catálogo, con sus dos caras. Tocá la flecha para dar vuelta.
         </div>
         {CARAS.map((c) => (
+          // El par de la foto va MARCADO, no se ubica por posición. La sonda
+          // compara el alto de estas dos contra sí mismas y no contra el resto:
+          // las otras tienen equivalencia, así que llevan el renglón del
+          // carrusel y miden 37 px más por un motivo que no es la foto.
+          <div key={c.id} data-caso-andamio={c.id}>
           <TarjetaProductoMovil
-            key={c.id}
             nombre={c.nombre}
             empresa={c.empresa}
             codigoBarra={c.codigoBarra}
             codigoInterno={c.codigoInterno}
             caras={c.caras}
+            imagenUrl={c.imagenUrl ?? null}
             muestraCosto
             onEditar={() => setUltimo(`Editar ${c.id}`)}
           />
+          </div>
         ))}
       </div>
 

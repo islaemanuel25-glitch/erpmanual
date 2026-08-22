@@ -10,7 +10,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
-import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
@@ -35,7 +35,7 @@ import HojaPersonalizarTarjeta from "@/components/productos/HojaPersonalizarTarj
 // de escritorio, que no cambió.
 // `X` se fue con el chip de control y `Pencil` con la tarjeta: el ícono de
 // Editar lo pone ahora `TarjetaProductoMovil`, junto al botón.
-import { Search, SlidersHorizontal, MoreHorizontal, CheckCheck } from "lucide-react";
+import { SlidersHorizontal, MoreHorizontal, CheckCheck } from "lucide-react";
 // `lineaDeEquivalencia` se fue con la franja; el único caso donde su texto sigue
 // haciendo falta —kilo y pieza fija— lo pide `carasDeTarjeta`, que la llama
 // igual. Y los dos helpers de redondeo se importaban para armar el número a
@@ -1111,6 +1111,11 @@ export default function ProductosPage() {
     setFiltros(nuevos);
   };
 
+  // El buscador del celular, en un solo lugar: lo usan la ranura de teclear y
+  // la de dictar, que acá tienen que hacer exactamente lo mismo. Pasar dos
+  // funciones "iguales" escritas al lado es cómo empiezan a no serlo.
+  const alBuscarEnElCelular = (texto) => aplicarFiltros({ ...filtros, search: texto });
+
   // ── MARCAR COMO REVISADOS LOS DE ESTA PÁGINA ─────────────────────────────
   //
   // Confirma un precio SIN cambiarlo. Es la contraparte del control de los 30
@@ -1591,22 +1596,28 @@ export default function ProductosPage() {
 
                   Escribe el MISMO estado `filtros.search` que el buscador de
                   escritorio, así que no hay dos búsquedas que puedan discrepar:
-                  es el mismo dato con dos entradas. */}
-              <div className="md:hidden relative">
-                <Search
-                  className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 sunmi-text-muted pointer-events-none"
-                  aria-hidden="true"
-                />
-                <SunmiInput
+                  es el mismo dato con dos entradas.
+
+                  ── Y ES EL MISMO CAMPO QUE EL DEL POS ─────────────────────
+                  La pieza es `SunmiCampoBusquedaVoz`, la que ya usaba el POS:
+                  mismo alto, mismo borde de acento, mismo ícono, mismo
+                  micrófono y mismo "Escuchando...". No es un campo parecido
+                  escrito al lado — es el mismo, y por eso no pueden divergir.
+
+                  DICTAR ES EXACTAMENTE ESCRIBIR ACÁ, y por eso las dos ranuras
+                  reciben la MISMA función. En el POS no es así —allá la voz
+                  viaja con `fromVoice` para que el servidor devuelva cómo
+                  interpretó lo dictado—, y esa diferencia queda a la vista en
+                  el llamado en vez de escondida adentro de la pieza. */}
+              <div className="md:hidden">
+                <SunmiCampoBusquedaVoz
                   value={filtros.search}
-                  onChange={(e) => {
-                    // Por `aplicarFiltros`, que apaga el control si había uno:
-                    // buscar con una card activa rompía el criterio del issue.
-                    aplicarFiltros({ ...filtros, search: e.target.value });
-                  }}
+                  // Por `aplicarFiltros`, que apaga el control si había uno:
+                  // buscar con una card activa rompía el criterio del issue.
+                  onChange={alBuscarEnElCelular}
+                  onVoz={alBuscarEnElCelular}
                   placeholder="Buscar por nombre o código"
-                  aria-label="Buscar productos"
-                  className="w-full pl-8"
+                  ariaLabel="Buscar productos"
                 />
               </div>
 
@@ -1894,6 +1905,11 @@ export default function ProductosPage() {
                     // puede perder acá.
                     empresa={muestraProveedor ? p.proveedorNombre ?? null : false}
                     caras={caras}
+                    // LA FOTO SALE DEL DATO QUE YA VIAJA. `imagenUrl` lo arma
+                    // `mergeBaseLocalToUi` desde `ProductoBase.imagen_url`, así
+                    // que no hay consulta nueva ni almacenamiento nuevo: el
+                    // listado ya lo traía y nadie lo estaba mirando.
+                    imagenUrl={p.imagenUrl ?? null}
                     codigoBarra={muestraCodigoBarra ? p.codigoBarra ?? p.sku ?? null : false}
                     // ── ACÁ IBA EL ID DEL PRODUCTO, Y ERA UN DEFECTO ────────
                     //
