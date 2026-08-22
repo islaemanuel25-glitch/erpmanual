@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-22 10:36
+**Fecha:** 2026-08-22 11:20
 
 ## Módulos modificados recientemente
 
 ### productos
-- test(productos): la sonda del navegador mide las dos caras, no la franja, feat(productos): Personalizar card prende y apaga, y ya no reordena, fix(productos): la card mostraba el ID del producto como "código interno"
+- refactor(productos): alinear el carrusel con el Figma aprobado, test(productos): la sonda del navegador mide las dos caras, no la franja, feat(productos): Personalizar card prende y apaga, y ya no reordena
 - Archivos: 2 nuevos, 3 modificados (5 total)
 
 ### configuracion
