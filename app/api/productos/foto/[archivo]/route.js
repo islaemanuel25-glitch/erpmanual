@@ -7,21 +7,27 @@
 // guardada ahí se pierde al recrear el contenedor. Es exactamente lo que el
 // centinela del almacén existe para impedir.
 //
-// ── POR QUÉ NO PIDE SESIÓN ────────────────────────────────────────────────
+// ── PIDE PERMISO, COMO TODO GET DEL ERP ───────────────────────────────────
 //
-// Es una decisión, no un olvido. Esta url va adentro de `<img src>` en el
-// listado de productos, y un `<img>` no manda credenciales de forma confiable en
-// todos los contextos. Lo que se expone es la foto de un producto del catálogo,
-// con un nombre que incluye ocho caracteres al azar: no se puede enumerar.
+// La primera versión la dejó abierta, con un motivo escrito que era FALSO: que
+// un `<img src>` no manda credenciales de forma confiable. Sí las manda — la
+// url es del mismo origen, y una cookie `SameSite=Lax` viaja en subrecursos del
+// mismo sitio sin problema. Lo que restringe Lax es lo que viene de OTRO sitio.
 //
-// No es material sensible —una foto de un paquete de yerba— y el resto del ERP
-// sigue detrás de sesión. Si algún día hay que cerrarla, el cambio es acá y en
-// cómo la pide la tarjeta, no en el almacén.
+// Lo destapó el candado "ningún GET se sirve sin comprobar permiso", que existe
+// justamente para esto: para que una excepción sea una decisión escrita en su
+// lista y no un párrafo convincente adentro de una ruta.
+//
+// El permiso es el del módulo, `productos.ver`, sacado del hermano más cercano
+// —la ruta de listar— y no uno nuevo: quien no puede ver el catálogo tampoco
+// tiene por qué ver sus fotos.
 
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 import { TIPOS_ACEPTADOS, esNombreDeFotoValido } from "@/lib/productos/fotoProducto";
 import { inspeccionarAlmacenDeFotos } from "@/lib/productos/almacenFotos";
 
@@ -31,8 +37,17 @@ const TIPO_POR_EXTENSION = Object.fromEntries(
   Object.entries(TIPOS_ACEPTADOS).map(([tipo, ext]) => [ext, tipo])
 );
 
-export async function GET(_req, { params }) {
+export async function GET(req, { params }) {
   try {
+    const ctx = await resolveLocalAndGrupo(req);
+    if (ctx.error) {
+      return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
+    }
+    const perm = checkPerm(ctx.session, "productos.ver");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+    }
+
     const { archivo } = await params;
 
     // ── LA FORMA SE VALIDA ANTES DE TOCAR EL DISCO ───────────────────────

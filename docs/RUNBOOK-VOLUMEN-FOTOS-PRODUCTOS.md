@@ -80,17 +80,124 @@ Es el mismo criterio que el resto del repo: verificar ejecutando, no leyendo.
 
 ---
 
-## Pendiente anotado: el backup
+## El backup
 
-**Este volumen NO está en la cadena de backup todavía, y a diferencia del de
-comprobantes sí tendría que estarlo.**
+**Este volumen ESTÁ en la cadena de backup**, desde el 2026-08-22. No es una
+contradicción con `DEC-0008` —que dejó afuera las fotos de comprobante— y el
+contraste está escrito en `DEC-0009`: aquéllas se borran a los siete días por
+diseño y respaldarlas sería guardar lo que ya decidimos tirar; éstas no se borran
+nunca y son parte del catálogo.
 
-Aquéllas son fotos de papeles que se tiran a la semana —por eso `DEC-0008` las
-dejó afuera a propósito—. Éstas son parte del catálogo: si se pierde el volumen,
-se pierden todas las fotos de los productos y hay que sacarlas de nuevo una por
-una.
+### Qué se guarda y dónde
 
-Mientras eso no esté hecho, **el riesgo es real y conviene decirlo con el número
-que corresponda**: a 1200 px comprimidos son unos cientos de KB por producto, así
-que el catálogo entero con foto entra en pocos cientos de MB. No es un problema
-de tamaño; es un pendiente de la cadena de backup.
+El mismo timer que saca el dump de la base saca también un paquete del volumen:
+`fotos-diario-AAAAMMDD_HHMMSS.tar.gz`, en `/srv/produccion/backups/`, con series
+semanal y mensual por enlace duro igual que la base.
+
+**Retiene menos copias que la base** —14 diarias, 8 semanales, 12 mensuales— y el
+motivo es el tamaño: el dump pesa unos 2,7 MB y el paquete de fotos crece con el
+catálogo. Lo que hace que eso igual alcance es que las fotos **no cambian**: el
+nombre lleva un azar adentro, así que una foto nueva es un archivo nuevo y
+ninguna se pisa. Cuando el volumen no cambió de un día para el otro, el paquete
+del día es un **enlace duro** al anterior y no ocupa nada.
+
+**No va al repo git cifrado, y eso es a propósito.** Ahí van el semanal y el
+mensual de la base porque pesan megabytes; git guarda todas las versiones para
+siempre, así que meter un paquete que puede llegar a cientos de MB haría crecer
+el repo sin techo y sin poder deshacerlo. El paquete de fotos va a la notebook y
+al disco externo, que es una copia menos que la base. Está aceptado en
+`DEC-0009`.
+
+### Qué se verifica, y por qué no alcanza con `gzip -t`
+
+Un tar **vacío** está perfectamente bien comprimido. Si el volumen no estuviera
+montado, Docker crearía igual el punto de montaje y el paquete saldría bien: unos
+bytes, sin nada adentro, y el log diría que todo salió. Por eso son cuatro
+preguntas y no una:
+
+1. El volumen existe y **tiene su centinela** — antes de empaquetar.
+2. El `.gz` está entero (`gzip -t`).
+3. El tar se puede listar y **el centinela está adentro del paquete**. Es la
+   marca de cierre del dump traducida a este formato: prueba que se empaquetó el
+   volumen y no un directorio que se le parecía.
+4. Se cuentan las fotos por su forma de nombre. **Cero fotos NO es un error** —es
+   lo que hay antes de que alguien cargue la primera— pero queda registrado.
+
+Si algo de eso falla, el paquete se borra y **no se rota nada**: un respaldo roto
+no desplaza a uno bueno.
+
+**El respaldo de fotos corre DESPUÉS de que el dump ya está verificado y
+rotado.** Si el volumen no está, el servicio queda en rojo con código 3, pero el
+backup de la base del día ya quedó bueno. Al revés se cambiaría un riesgo chico
+por el más grande que hay.
+
+---
+
+## La restauración
+
+### Restaurar el volumen entero
+
+Con el paquete en el VPS —bajado de la notebook o del disco externo—:
+
+```
+# 1. El volumen tiene que existir. Si se perdió, se crea de nuevo.
+docker volume create erpazul_fotos_productos
+
+# 2. Se vuelca el paquete adentro. `-C /vol` porque las rutas del tar son
+#    relativas: no dependen de dónde estaba montado cuando se sacó.
+docker run --rm -i -v erpazul_fotos_productos:/vol alpine \
+  tar -xzf - -C /vol < /srv/produccion/backups/fotos-diario-AAAAMMDD_HHMMSS.tar.gz
+
+# 3. Comprobar que el centinela quedó adentro: sin él la aplicación se niega a
+#    escribir, y con razón.
+docker run --rm -v erpazul_fotos_productos:/vol:ro alpine \
+  sh -c 'test -f /vol/.volumen-fotos-productos && ls -1 /vol | wc -l'
+```
+
+El último comando imprime cuántos archivos quedaron. **Ese número se compara
+contra el que el backup registró en su log** —"paquete con N foto(s)"— y tienen
+que coincidir. Sin esa comparación, "el comando no falló" es lo único que se
+sabe, y un tar que se cortó a la mitad tampoco falla al extraer.
+
+### Restaurar UNA foto sola
+
+Pasa más seguido que perder el volumen: alguien borró un archivo o una fila
+quedó apuntando a algo que no está.
+
+```
+tar -xzf fotos-diario-AAAAMMDD_HHMMSS.tar.gz -O ./p2023-0a1b2c3d.webp > /tmp/foto.webp
+docker cp /tmp/foto.webp erpazul_app:/vol/fotos-productos/p2023-0a1b2c3d.webp
+```
+
+El nombre sale de `ProductoBase.imagen_url`: es lo último de la url.
+
+### Cómo se comprueba que la restauración FUNCIONA, no que el comando salió con 0
+
+**Este es el paso que no se saltea**, y es el mismo criterio que el resto del
+repo: verificar ejecutando.
+
+1. Restaurar el paquete en un volumen **descartable**, no en el de producción:
+   `docker volume create prueba_fotos` y extraer ahí.
+2. Contar los archivos y comparar contra el número del log del backup.
+3. Comprobar que el centinela está.
+4. Abrir una de las fotos y ver que es una imagen de verdad —`file` dice el
+   formato— y no un archivo truncado con el nombre correcto.
+5. Borrar el volumen de prueba.
+
+```
+docker volume create prueba_fotos
+docker run --rm -i -v prueba_fotos:/vol alpine tar -xzf - -C /vol < <paquete>
+docker run --rm -v prueba_fotos:/vol:ro alpine sh -c \
+  'ls -1 /vol | wc -l; test -f /vol/.volumen-fotos-productos && echo "centinela OK"'
+docker run --rm -v prueba_fotos:/vol:ro alpine sh -c \
+  'for f in /vol/p*; do file "$f"; break; done'
+docker volume rm prueba_fotos
+```
+
+**Mientras esto no se haya corrido al menos una vez con un paquete real, la
+restauración está escrita y no probada** — que es distinto, y es exactamente lo
+que le pasa al rollback de migraciones. Cuando se corra, se anota acá con la
+fecha y el número de fotos.
+
+**Estado hoy: NO EJERCIDA.** El volumen todavía no existe en producción, así que
+no hay ningún paquete real contra el cual probarla.
