@@ -342,9 +342,12 @@ export default function CarruselControles({
   // Se mide al montar y cuando cambia la cantidad de controles. No hace falta un
   // observador de tamaño: el riel solo cambia de geometría si gira el teléfono, y
   // ahí el propio scroll dispara la medición de nuevo.
+  // Sin `eslint-disable`: la regla no se queja de este efecto, y una directiva de
+  // silencio que no silencia nada es ruido que el próximo lector va a leer como
+  // "acá hay algo raro". Lo dijo el lint —"Unused eslint-disable directive"— y
+  // se sacó.
   useEffect(() => {
     medir();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [controles.length]);
 
   if (controles.length === 0) return null;
