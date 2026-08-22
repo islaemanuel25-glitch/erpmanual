@@ -18,6 +18,49 @@ Si la lista está vacía, el despliegue es solo de código.
 
 **Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-22 después de desplegar
+`af506512b0639601039dc812fd80fb584c9c20ae` — el merge del PR #5, que completa
+Productos móvil y fue **solo de código**.
+
+Sin migraciones, comprobado antes de tocar nada de las tres formas de siempre:
+`git diff --name-only 8b0bab0a..af506512 -- prisma/` no devolvió nada, el
+clasificador informó "Archivos a mirar: 0" con el rango tomado de la imagen que
+atendía, y este archivo ya decía que no había pendientes. El contenedor
+descartable contó **101**, el mismo número que el árbol.
+
+El corte fue de **2 segundos**. Cero reinicios, logs sin errores, `/login` en
+200 y el árbol del VPS limpio.
+
+### Y ACÁ EL MARCADOR COSTÓ TRES INTENTOS, QUE ES LO QUE HAY QUE RECORDAR
+
+Comprobar que el cambio VIAJÓ es otra pregunta que los cinco valores, y esta vez
+la búsqueda se equivocó dos veces antes de medir algo:
+
+1. **El marcador elegido a ojo no servía.** `w-[44px]` —el lado de la miniatura—
+   ya existía en el commit desplegado, dentro de `min-w-[44px]` y de
+   `sm:!w-[44px]`. Buscado suelto habría dado positivo en la imagen vieja.
+   Anclado como regla de la hoja, `.w-\[44px\]{`, sí distingue: ninguna de esas
+   dos genera ese selector.
+2. **La primera corrida dio cero en las DOS imágenes, control incluido.** Eso no
+   es "no está": es que la búsqueda no funcionó. El patrón iba sin las barras de
+   escape que Tailwind pone en el selector —lo que hay en el archivo es
+   `.w-\[44px\]{`— así que no matcheaba nada en ningún lado.
+
+Con el patrón correcto la comparación quedó en los dos sentidos, que es lo único
+que la hace valer: en la imagen **vieja** el marcador da 0 y el control
+—`.w-\[202px\]{`, que existía desde antes— da 1; en la **nueva** los dos dan 1.
+
+Y las dos pantallas se ejercieron contra producción sin sesión, que es hasta
+donde se llega desde acá: `/modulos/productos`, `/modulos/pos-ventas` y
+`/modulos/productos/nuevo` contestan 200, sus tres rutas de datos contestan 401
+—o sea que viven y piden sesión— y los logs del contenedor no tienen un solo
+error después de pedirlas. **Lo que NO se hizo es abrirlas con una sesión real
+de producción**: no hay credenciales en esta máquina. La verificación visual a
+390 px de este mismo contenido se hizo contra desarrollo, antes del corte.
+
+---
+
+Antes de ése, producción estaba al día: 101 migraciones en el árbol y 101 aplicadas,
+comprobado con `prisma migrate status` el 2026-08-22 después de desplegar
 `8b0bab0a8fb96b461e7aaf3b0a9f489cb1e83753` — la restauración de la interfaz de
 Productos móvil, que fue **solo de código**.
 
