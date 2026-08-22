@@ -18,6 +18,29 @@ Si la lista está vacía, el despliegue es solo de código.
 
 **Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-22 después de desplegar
+`8b0bab0a8fb96b461e7aaf3b0a9f489cb1e83753` — la restauración de la interfaz de
+Productos móvil, que fue **solo de código**.
+
+Ese despliegue tampoco trajo migraciones, comprobado igual que el anterior:
+`git diff --name-only daedcbfd..origin/main -- prisma/` no devolvió nada, el
+clasificador informó "Archivos a mirar: 0" con el rango tomado de la imagen que
+atendía, y este archivo ya decía que no había pendientes. El contenedor
+descartable informó **101 migrations found**, el mismo número que el árbol.
+
+El corte fue de **2 segundos**, con el reloj arrancando inmediatamente después
+del `up -d`. Cero reinicios y los logs sin errores.
+
+Y se comprobó que el cambio VIAJÓ, no solo que los cinco valores coinciden —que
+son preguntas distintas—: la clase `min-h-[51.5px]` no existía en el commit
+desplegado y aparece en la hoja de la imagen nueva, con `min-h-[44px]` de
+control positivo en el mismo archivo para probar que la búsqueda encuentra lo
+que está. Se eligió una CADENA de CSS y no un identificador, que el build
+minifica y por lo tanto no afirma nada.
+
+---
+
+Antes de ésa, producción estaba al día: 101 migraciones en el árbol y 101 aplicadas,
+comprobado con `prisma migrate status` el 2026-08-22 después de desplegar
 `daedcbfddea4da28e41fd589defc90cc7e54ecbd` — la tanda de Productos móvil, que
 fue **solo de código**.
 
