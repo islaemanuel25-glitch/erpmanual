@@ -19,10 +19,7 @@ import {
 
 const RAIZ = path.resolve(import.meta.dirname, "../..");
 const FUENTE = fs
-  .readFileSync(
-    path.join(RAIZ, "components/productos/TarjetaProductoMovil.jsx"),
-    "utf8"
-  )
+  .readFileSync(path.join(RAIZ, "components/productos/TarjetaProductoMovil.jsx"), "utf8")
   .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/\/\/[^\n]*/g, "");
@@ -39,29 +36,9 @@ const render = (props) =>
     })
   );
 
-const PACK_EN_DEPOSITO = carasDeTarjeta({
-  escala: ESCALA_BULTO,
-  precio: 24000,
-  costo: 20000,
-  factor: 24,
-  unidad: "pack",
-});
-
-const PACK_EN_LOCAL = carasDeTarjeta({
-  escala: ESCALA_UNIDAD,
-  precio: 24000,
-  costo: 20000,
-  factor: 24,
-  unidad: "pack",
-});
-
-const SUELTO = carasDeTarjeta({
-  escala: ESCALA_UNIDAD,
-  precio: 1500,
-  costo: 1000,
-  factor: 1,
-  unidad: "unidad",
-});
+const PACK_EN_DEPOSITO = carasDeTarjeta({ escala: ESCALA_BULTO, precio: 24000, costo: 20000, factor: 24, unidad: "pack" });
+const PACK_EN_LOCAL = carasDeTarjeta({ escala: ESCALA_UNIDAD, precio: 24000, costo: 20000, factor: 24, unidad: "pack" });
+const SUELTO = carasDeTarjeta({ escala: ESCALA_UNIDAD, precio: 1500, costo: 1000, factor: 1, unidad: "unidad" });
 
 function renderCuerpo(caras, mirandoDorso, props = {}) {
   return renderToStaticMarkup(
@@ -82,10 +59,13 @@ test("G1. abre con la venta real en el frente", () => {
   assert.match(html, /Ver unidad/);
 });
 
-test("G2. usa la card existente: no crea una superficie nueva adentro", () => {
+test("G2. conserva el bloque de precio de la card definida", () => {
   const html = render({ caras: PACK_EN_DEPOSITO });
-  assert.doesNotMatch(html, /background:var\(--hover-bg\)/);
-  assert.doesNotMatch(FUENTE, /rounded-xl px-2\.5 py-2/);
+  assert.match(html, /data-cara-precio/);
+  assert.match(html, /background:var\(--hover-bg\)/);
+  assert.match(html, /text-\[9px\]/);
+  assert.match(html, /text-\[25px\]/);
+  assert.match(html, /w-\[202px\]/);
   assert.match(html, /data-tarjeta-cara="frente"/);
 });
 
@@ -119,29 +99,15 @@ test("G6. sin referencia pero con identificación sigue habiendo dorso", () => {
 });
 
 test("G7. sin referencia y con los dos códigos apagados queda una sola cara", () => {
-  const html = render({
-    caras: SUELTO,
-    codigoBarra: false,
-    codigoInterno: false,
-  });
+  const html = render({ caras: SUELTO, codigoBarra: false, codigoInterno: false });
   assert.doesNotMatch(html, /data-tarjeta-voltear/);
   assert.match(html, /1\.500/);
   assert.match(html, /Editar/);
 });
 
 test("G8. el costo sigue usando la escala de cada cara", () => {
-  const frente = renderToStaticMarkup(
-    createElement(MarcaDeLaCara, {
-      cara: PACK_EN_LOCAL.frente,
-      muestraCosto: true,
-    })
-  );
-  const dorso = renderToStaticMarkup(
-    createElement(MarcaDeLaCara, {
-      cara: PACK_EN_LOCAL.dorso,
-      muestraCosto: true,
-    })
-  );
+  const frente = renderToStaticMarkup(createElement(MarcaDeLaCara, { cara: PACK_EN_LOCAL.frente, muestraCosto: true }));
+  const dorso = renderToStaticMarkup(createElement(MarcaDeLaCara, { cara: PACK_EN_LOCAL.dorso, muestraCosto: true }));
   assert.match(frente, /Costo unidad ·/);
   assert.match(dorso, /Costo pack ·/);
 });
@@ -160,19 +126,8 @@ test("G9. apagar costo no apaga la regla", () => {
 
 test("G10. kilo y pieza muestran referencia sin inventar importe variable", () => {
   for (const caras of [
-    carasDeTarjeta({
-      escala: ESCALA_KG,
-      precio: 1300,
-      costo: 900,
-      unidad: "kg",
-    }),
-    carasDeTarjeta({
-      escala: ESCALA_PIEZA,
-      precio: 1000,
-      costo: 800,
-      unidad: "kg",
-      pesoReferenciaKg: 6,
-    }),
+    carasDeTarjeta({ escala: ESCALA_KG, precio: 1300, costo: 900, unidad: "kg" }),
+    carasDeTarjeta({ escala: ESCALA_PIEZA, precio: 1000, costo: 800, unidad: "kg", pesoReferenciaKg: 6 }),
   ]) {
     const html = renderCuerpo(caras, true);
     assert.doesNotMatch(html, /Importe variable/);
@@ -182,19 +137,8 @@ test("G10. kilo y pieza muestran referencia sin inventar importe variable", () =
 });
 
 test("G11. un servicio sí dice Importe variable y no $0", () => {
-  const servicio = {
-    frente: {
-      importe: null,
-      costo: null,
-      presentacion: "IMPORTE VARIABLE",
-    },
-    dorso: null,
-  };
-  const html = render({
-    caras: servicio,
-    codigoBarra: false,
-    codigoInterno: false,
-  });
+  const servicio = { frente: { importe: null, costo: null, presentacion: "IMPORTE VARIABLE" }, dorso: null };
+  const html = render({ caras: servicio, codigoBarra: false, codigoInterno: false });
   assert.match(html, /Importe variable/);
   assert.doesNotMatch(html, /\$\s*0,00/);
 });
@@ -209,21 +153,9 @@ test("G12. en una referencia con precio, presentación va arriba del importe", (
 test("G13. el cambio de cara es local y no agrega una librería", () => {
   assert.doesNotMatch(FUENTE, /\bfetch\s*\(/);
   assert.doesNotMatch(FUENTE, /useEffect/);
-  const paquete = JSON.parse(
-    fs.readFileSync(path.join(RAIZ, "package.json"), "utf8")
-  );
-  const deps = Object.keys({
-    ...paquete.dependencies,
-    ...paquete.devDependencies,
-  });
-  for (const nombre of [
-    "embla",
-    "swiper",
-    "keen-slider",
-    "slick",
-    "flickity",
-    "splide",
-  ]) {
+  const paquete = JSON.parse(fs.readFileSync(path.join(RAIZ, "package.json"), "utf8"));
+  const deps = Object.keys({ ...paquete.dependencies, ...paquete.devDependencies });
+  for (const nombre of ["embla", "swiper", "keen-slider", "slick", "flickity", "splide"]) {
     assert.equal(deps.some((d) => d.includes(nombre)), false);
   }
 });
