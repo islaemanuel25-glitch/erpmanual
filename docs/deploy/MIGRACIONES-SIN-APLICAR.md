@@ -17,6 +17,24 @@ Si la lista está vacía, el despliegue es solo de código.
 ## Pendientes
 
 **Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
+comprobado con `prisma migrate status` el 2026-08-22 después de desplegar
+`daedcbfddea4da28e41fd589defc90cc7e54ecbd` — la tanda de Productos móvil, que
+fue **solo de código**.
+
+Ese despliegue no trajo ninguna migración y eso se comprobó de tres formas antes
+de tocar nada: `git diff --name-only 45e6dae6..HEAD -- prisma/` no devolvió nada,
+el clasificador informó "Archivos a mirar: 0" con el rango sano —tomado de la
+imagen que atendía, no del HEAD del VPS—, y este archivo ya decía que no había
+pendientes.
+
+Y aun así el conteo se comparó, porque el código de salida no prueba nada: el
+árbol tiene 101 y el contenedor descartable informó **101 migrations found**. Ese
+número es lo que distingue "estaba todo aplicado" de "la imagen no conoce la
+migración", que salen iguales en la salida.
+
+---
+
+Antes de ésa, producción estaba al día: 101 migraciones en el árbol y 101 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-21 después de desplegar
 `45e6dae6a34055ca2c746102c5bd7c585a174277`.
 
