@@ -9,6 +9,17 @@
 // interruptor apagable convertiría en apagable lo que no lo es. La regla vive en
 // `lib/productos/camposTarjeta.js`, con un candado, y acá solo se dibuja.
 //
+// ── ESTA HOJA PRENDE Y APAGA. NO REORDENA. ─────────────────────────────────
+//
+// Tenía flechas de subir y bajar en cada campo, y movían el dato dentro de su
+// región. **Se sacaron por decisión de diseño**: la posición de cada dato la
+// define el layout aprobado.
+//
+// Con las flechas se fue `moverCampo` y también `tieneConQuienIntercambiarse`,
+// que existía solo para decidir a quién ofrecerle las flechas. Y el orden de esta
+// lista dejó de salir del guardado: es el del catálogo de campos, fijo, porque ya
+// no hay nada que reflejar.
+//
 // ── ESTO NO EDITA VALORES, Y ES A PROPÓSITO ─────────────────────────────────
 //
 // Elige qué se VE, no cambia ningún dato del producto. El issue lo pide expreso y
@@ -17,21 +28,13 @@
 // —Editar, que es la acción fija de la tarjeta.
 
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
-import { ChevronUp, ChevronDown, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import {
   CAMPOS_FIJOS,
   CAMPOS_OPCIONALES,
   normalizarConfiguracion,
-  moverCampo,
   alternarCampo,
 } from "@/lib/productos/camposTarjeta";
-
-/** Cuántos campos comparten región con éste. De uno, no se puede reordenar. */
-function tieneConQuienIntercambiarse(id) {
-  const campo = CAMPOS_OPCIONALES.find((c) => c.id === id);
-  if (!campo) return false;
-  return CAMPOS_OPCIONALES.filter((c) => c.region === campo.region).length > 1;
-}
 
 export default function HojaPersonalizarTarjeta({ open, onClose, config, onChange }) {
   const actual = normalizarConfiguracion(config);
@@ -47,8 +50,12 @@ export default function HojaPersonalizarTarjeta({ open, onClose, config, onChang
       espacioCuerpo="mt-2 gap-1"
       maxWidth="max-w-xl"
     >
+      {/* EL TEXTO DICE QUE NO SE REORDENA. Sin esto, alguien que conoció la
+          versión con flechas las va a buscar y va a creer que se rompieron. */}
       <p className="text-[10.5px] sunmi-text-muted leading-[1.35] mb-1">
-        Elegí qué datos muestra cada producto. Nombre, precio y Editar van siempre.
+        Elegí qué datos muestra cada producto. Nombre, precio con su presentación y
+        Editar van siempre. La posición de cada dato la define el diseño de la card:
+        acá se prende y se apaga.
       </p>
 
       {CAMPOS_FIJOS.map((campo) => (
@@ -64,23 +71,19 @@ export default function HojaPersonalizarTarjeta({ open, onClose, config, onChang
 
       <div className="border-t sunmi-divider my-1" />
 
-      {/* EL ORDEN DE ESTA LISTA ES EL CONFIGURADO, no el del catálogo: si se
-          mostrara siempre en el orden de fábrica, mover un campo no se vería
-          acá y el botón parecería no hacer nada. */}
-      {actual.orden.map((id) => {
-        const campo = CAMPOS_OPCIONALES.find((c) => c.id === id);
-        if (!campo) return null;
-        const visible = actual.visibles[id] === true;
-        const ordenable = tieneConQuienIntercambiarse(id);
+      {/* EL ORDEN DE ESTA LISTA ES EL DEL CATÁLOGO DE CAMPOS, no el guardado:
+          ya no hay orden configurable que reflejar. */}
+      {CAMPOS_OPCIONALES.map((campo) => {
+        const visible = actual.visibles[campo.id] === true;
 
         return (
-          <div key={id} className="flex items-center gap-1 px-1 py-0.5 rounded-lg sunmi-row-hover">
+          <div key={campo.id} className="flex items-center gap-1 px-1 py-0.5 rounded-lg sunmi-row-hover">
             {/* EL INTERRUPTOR ES EL RENGLÓN ENTERO, no una casilla de 16 px.
                 A 390 px una casilla nativa es el blanco más difícil de acertar
                 de toda la pantalla, y equivocarle esconde un dato. */}
             <button
               type="button"
-              onClick={() => onChange(alternarCampo(actual, id))}
+              onClick={() => onChange(alternarCampo(actual, campo.id))}
               aria-pressed={visible}
               className="flex-1 flex items-center gap-2.5 text-left px-1.5 py-2 min-h-[44px]"
             >
@@ -108,32 +111,6 @@ export default function HojaPersonalizarTarjeta({ open, onClose, config, onChang
                 {campo.etiqueta}
               </span>
             </button>
-
-            {/* SUBIR Y BAJAR SOLO DONDE SE PUEDE. El proveedor y la equivalencia
-                tienen posición estructural propia —pegado al nombre uno, franja
-                bajo el precio la otra— y no hay con qué intercambiarlos. Ofrecer
-                el botón igual sería prometer un movimiento que la tarjeta no va
-                a mostrar. */}
-            {ordenable && (
-              <span className="flex shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onChange(moverCampo(actual, id, "arriba"))}
-                  aria-label={`Subir ${campo.etiqueta}`}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg sunmi-row-hover sunmi-text-muted"
-                >
-                  <ChevronUp className="w-4 h-4" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChange(moverCampo(actual, id, "abajo"))}
-                  aria-label={`Bajar ${campo.etiqueta}`}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg sunmi-row-hover sunmi-text-muted"
-                >
-                  <ChevronDown className="w-4 h-4" aria-hidden="true" />
-                </button>
-              </span>
-            )}
           </div>
         );
       })}

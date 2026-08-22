@@ -4,7 +4,8 @@ import { useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiToggleEstado from "@/components/sunmi/SunmiToggleEstado";
+// `SunmiToggleEstado` se fue con los dos interruptores de la tarjeta. La pieza
+// sigue en el kit y la usan otras pantallas; acá quedó sin consumidor.
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { SUNMI_THEMES } from "@/lib/sunmiThemes";
 import { useUser } from "@/app/context/UserContext";
@@ -59,54 +60,20 @@ export default function AparienciaPage() {
     tienePreferenciaPersonal,
   } = useSunmiTheme();
   const { menuMode, setMenuMode } = useLayoutSettings();
-  const { perfil, cargando, refrescar } = useUser();
+  // `refrescar` lo usaba el guardado de las preferencias de la tarjeta, que se
+  // fue con ellas.
+  const { perfil, cargando } = useUser();
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
 
-  // ── LAS PREFERENCIAS DE LA TARJETA, EN ESTA MISMA PANTALLA ──────────────
+  // ── ACÁ ESTABA EL ESTADO DE LAS PREFERENCIAS DE LA TARJETA ──────────────
   //
-  // El estado arranca del perfil, que las trae de `/api/me` ya resueltas a
-  // booleano. Si el local nunca las tocó llegan en `false`, que es lo que se ve
-  // hoy.
-  const [tarjeta, setTarjeta] = useState({
-    tarjetaOcultarEquivalencia: perfil?.tarjetaOcultarEquivalencia === true,
-  });
-
-  // ── SE GUARDA UNA SOLA PREFERENCIA POR VEZ, A PROPÓSITO ─────────────────
+  // Con los dos interruptores fuera, no queda ninguna que guardar desde esta
+  // pantalla: se fueron el estado y su `guardarTarjeta`. El endpoint sigue
+  // aceptando las dos columnas —el PUT es parcial— y el perfil las sigue
+  // trayendo; lo que no existe más es una pantalla que las escriba.
   //
-  // El cuerpo lleva ÚNICAMENTE la que cambió. Del otro lado el update es parcial
-  // —`datosAActualizar`—, así que lo que no se manda no se toca. Mandar las dos
-  // siempre funcionaría igual hoy, pero volvería a atar dos decisiones que son
-  // independientes, que es exactamente lo que hacía el JSON de apariencia.
-  const guardarTarjeta = async (campo, valor) => {
-    setGuardando(true);
-    setMensaje(null);
-    const previo = tarjeta[campo];
-    setTarjeta((t) => ({ ...t, [campo]: valor }));
-    try {
-      const res = await fetch("/api/config/apariencia-local", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ [campo]: valor }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setMensaje({ tipo: "ok", texto: "Tarjeta de productos actualizada." });
-        // El catálogo lee esto del perfil, así que hay que refrescarlo o el
-        // cambio recién se vería al volver a entrar a la aplicación.
-        await refrescar?.();
-      } else {
-        setTarjeta((t) => ({ ...t, [campo]: previo }));
-        setMensaje({ tipo: "error", texto: data.error || "No se pudo guardar." });
-      }
-    } catch {
-      setTarjeta((t) => ({ ...t, [campo]: previo }));
-      setMensaje({ tipo: "error", texto: "No se pudo guardar." });
-    } finally {
-      setGuardando(false);
-    }
-  };
+  // El motivo de cada una está más abajo, donde estaban los interruptores.
 
   if (cargando) return null;
   if (!perfil) return <SinPermisos />;
@@ -169,48 +136,33 @@ export default function AparienciaPage() {
             </div>
           )}
 
-          {/* ── LA TARJETA DE PRODUCTOS ──────────────────────────────────
-              Va en esta sección y no en una nueva porque es lo mismo que el
-              tema: apariencia del LOCAL, compartida por todos sus dispositivos,
-              con el mismo permiso. Y va DEBAJO del tema, separada, porque la
-              página ya mezcla tres ámbitos —local, dispositivo y menú— y
-              agregar una cuarta cosa suelta arriba lo empeoraría. */}
-          <div className="mt-6 pt-5 border-t sunmi-divider">
-            <h3 className="text-sm font-semibold mb-1">Tarjeta de productos</h3>
-            <p className="text-xs sunmi-text-muted mb-4">
-              Cómo se ve el catálogo en pantallas angostas, para todo el local. Apagada
-              se ve como hasta ahora.
-            </p>
+          {/* ── ACÁ VIVÍAN LAS PREFERENCIAS DE LA TARJETA, Y NO QUEDA NINGUNA ──
+              Eran dos interruptores de apariencia del LOCAL, y los dos quedaron
+              sin efecto por el mismo motivo: la tarjeta del celular dejó de
+              tener lo que apagaban.
 
-            {/* ── ACÁ HABÍA UN SEGUNDO INTERRUPTOR Y SE SACÓ ──────────────────
-                "Mostrar siempre el precio por unidad" quedó SIN EFECTO el
-                2026-08-19, cuando la tarjeta pasó a mostrar la escala en la que
-                se VENDE: desde entonces el número lo decide el POS y no hay nada
-                que elegir. En un local ya muestra el unitario sin prenderlo, y
-                en el depósito forzarlo haría que la tarjeta contradiga al
-                mostrador.
-                Un interruptor que no hace nada es peor que no tenerlo: se toca,
-                no pasa nada, y lo próximo que se reporta es "el sistema anda
-                mal". La COLUMNA de la base se conserva — ver
-                `lib/config/aparienciaLocal.js`. */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-sm">Ocultar la equivalencia de bulto</div>
-                  <div className="text-xs sunmi-text-muted">
-                    Saca el renglón &quot;1 pack = 24 un&quot;. La línea sigue diciendo en qué
-                    escala está el precio: no se pierde ese dato.
-                  </div>
-                </div>
-                <div className="shrink-0">
-                  <SunmiToggleEstado
-                    value={tarjeta.tarjetaOcultarEquivalencia}
-                    onChange={(v) => !guardando && guardarTarjeta("tarjetaOcultarEquivalencia", v)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+              "Mostrar siempre el precio por unidad" se fue el 2026-08-19, cuando
+              la tarjeta pasó a mostrar la escala en la que se VENDE: el número lo
+              decide el POS y no hay nada que elegir.
+
+              "Ocultar la equivalencia de bulto" se va ahora, con la franja de
+              equivalencia. La presentación pasó a viajar pegada al precio
+              —"$31.200 · PACK X 24"— y la otra escala se mudó al dorso.
+
+              La regla es la misma las dos veces: un interruptor que no hace nada
+              es peor que no tenerlo. Se toca, no pasa nada, y lo próximo que se
+              reporta es "el sistema anda mal".
+
+              Y el de la equivalencia NO se reutilizó para apagar el dorso. Lo que
+              ocultaba era un bloque PERMANENTE que aparecía sin pedirlo; el dorso
+              solo se ve si alguien lo pide tocando. Darle un sentido nuevo a un
+              booleano ya guardado es cambiarle el significado a una preferencia
+              que la gente ya tomó, sin avisarles.
+
+              LAS DOS COLUMNAS DE LA BASE SE CONSERVAN. Borrarlas es un DROP
+              COLUMN sobre producción a cambio de dos bytes por local, y con ellas
+              se iría el dato de cualquiera que las haya prendido. El porqué está
+              en `lib/config/aparienciaLocal.js`. */}
         </section>
       )}
 
