@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-21 16:44
+**Fecha:** 2026-08-22 09:17
 
 ## Módulos modificados recientemente
 
 ### productos
-- fix(productos): la equivalencia sale del mismo precio que el número grande, y Import / Export deja de estar duplicado, fix(productos): el corte de 5.000 usa el mismo orden en las dos consultas, y se saca un comentario que ya era falso, fix(productos): `precios/apply` decide la revisión con el precio de la base, no con el del navegador
+- feat(productos): "Para revisar" pasa de grilla 2x2 a riel, y la card activa se enciende, fix(productos): la pantalla deja de esperar al contexto, y se retira el chip, perf(productos): el conteo de "Para revisar" pasa de 504 a 289 ms
 - Archivos: 4 nuevos, 7 modificados (11 total)
 
 
