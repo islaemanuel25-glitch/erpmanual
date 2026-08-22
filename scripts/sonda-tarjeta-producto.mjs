@@ -57,7 +57,7 @@ import { prepararSesion } from "./lib/sesionArnes.mjs";
 // franja se fue: lo que hay que comparar ahora son las dos caras, y eso lo arma
 // `carasDeTarjeta` — la misma pieza que usa la pantalla.
 import { formatearMoneda } from "../lib/moneda.js";
-import { carasDeTarjeta } from "../lib/productos/carasDeTarjeta.js";
+import { carasDeTarjeta, nombreDelDorso } from "../lib/productos/carasDeTarjeta.js";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "../lib/precios/redondeo.js";
 import { escalaDeVentaDe, valorEnLaEscalaDeVenta } from "../lib/precios/escalaDeVenta.js";
 import { esProductoServicio } from "../lib/pos-ventas/servicios.js";
@@ -297,9 +297,20 @@ try {
     morir(`quedó en ${donde} en vez de /modulos/productos — la sesión no entró`);
   }
 
-  // La tarjeta se reconoce por el pie de códigos monoespaciado, que es suyo y de
-  // ningún otro panel de la pantalla.
-  const TARJETAS = `[...document.querySelectorAll('[data-sunmi-panel]')].filter(p => p.querySelector('.font-mono'))`;
+  // ── LA TARJETA SE RECONOCE POR SU CARA, NO POR EL PIE DE CÓDIGOS ────────
+  //
+  // Se filtraba por `.font-mono`, que era el pie de códigos. Eso ató el selector
+  // a un bloque OPCIONAL: desde que la identificación es del dorso, un catálogo
+  // con los dos códigos apagados en "Personalizar card" no tiene ningún
+  // `.font-mono` en el frente, y la sonda moría diciendo "no hay ninguna tarjeta
+  // de producto a 390 px" sobre una pantalla llena de tarjetas.
+  //
+  // Lo comprobó una contraprueba: al sacar la reserva del frente, la sonda dio
+  // rojo por el selector y no por lo que se estaba probando — un rojo correcto
+  // por el motivo equivocado, que es tan malo como un verde falso.
+  //
+  // `data-tarjeta-cara` lo pone el envoltorio y está en las dos caras siempre.
+  const TARJETAS = `[...document.querySelectorAll('[data-sunmi-panel]')].filter(p => p.querySelector('[data-tarjeta-cara]'))`;
   const cuantas = await evaluar(`${TARJETAS}.length`);
   if (!cuantas) {
     morir("no hay ninguna tarjeta de producto a 390 px — o no hay datos, o no se dibujó");
@@ -336,46 +347,31 @@ try {
     return ${TARJETAS}.map((t) => {
       const cara = t.querySelector('[data-tarjeta-cara]');
       const pres = t.querySelector('[data-cara-presentacion]');
-      const boton = t.querySelector('[data-tarjeta-voltear]');
-      const presentacion = pres ? pres.textContent.trim() : null;
-      const voltear = boton ? boton.textContent.trim() : null;
+      const rot = t.querySelector('[data-cara-rotulo]');
       return {
         nombre: t.innerText.split("\\n")[0],
         lado: cara ? cara.getAttribute('data-tarjeta-cara') : null,
-        presentacion,
-        voltear,
+        rotulo: rot ? rot.textContent.trim() : null,
+        presentacion: pres ? pres.textContent.trim() : null,
       };
     }).filter((c) => {
-      // Toda tarjeta abre en el frente. Si alguna abriera en el dorso, la lista
-      // estaría mostrando la referencia como si fuera lo que se vende.
+      // Toda tarjeta abre en el frente, y lo dice. Si alguna abriera en el
+      // dorso, la lista estaría mostrando la referencia como si fuera lo que se
+      // vende.
       if (c.lado !== "frente") return true;
+      if (c.rotulo !== "VENTA CONFIGURADA") return true;
       if (!c.presentacion) return true;
       // La presentación tiene que ser una de las formas conocidas.
       const base = c.presentacion.replace(/ · COMBO$/, "");
       const esPack = /^(PACK|CAJÓN) X \\d+$/.test(base);
-      if (!esPack && !(base in ESPERADO) && base !== "BULTO") return true;
-      // ── SI EL BOTÓN NO ESTÁ, ESTA TARJETA ES DE UNA SOLA CARA ────────────
-      //
-      // Y eso es legítimo: un suelto sin pack no tiene segunda referencia. La
-      // primera versión de este chequeo daba rojo sobre las cinco tarjetas
-      // sueltas de la página, porque asumía que toda presentación "UNIDAD" tenía
-      // un pack detrás. El defecto era del chequeo.
-      //
-      // Que el botón esté cuando TIENE que estar no se puede saber mirando la
-      // pantalla: hace falta el dato. Eso lo comprueba el chequeo 9, que compara
-      // contra la fila del listado.
-      if (c.voltear === null) return false;
-      // Si el botón está, tiene que nombrar la OTRA cara.
-      const destino = esPack ? "unidad" : ESPERADO[base];
-      if (destino === null || destino === undefined) return true;
-      return c.voltear !== "Ver " + destino;
+      return !esPack && !(base in ESPERADO) && base !== "BULTO";
     });
   })()`);
   afirmar(
     contradicciones.length === 0,
-    "1 · la presentación del frente no contradice al botón que lleva al dorso",
+    "1 · toda tarjeta abre en el frente, identificado y con una presentación conocida",
     contradicciones.length
-      ? `${contradicciones.length} tarjeta(s) se contradicen. La primera: ${contradicciones[0].nombre} — cara ${contradicciones[0].lado}, presentación ${contradicciones[0].presentacion ?? "AUSENTE"}, botón ${contradicciones[0].voltear ?? "AUSENTE"}`
+      ? `${contradicciones.length} tarjeta(s). La primera: ${contradicciones[0].nombre} — cara ${contradicciones[0].lado}, rótulo ${contradicciones[0].rotulo ?? "AUSENTE"}, presentación ${contradicciones[0].presentacion ?? "AUSENTE"}`
       : ""
   );
 
@@ -481,6 +477,8 @@ try {
         valor: fila ? fila.textContent.trim() : "",
         // Si hay botón para dar vuelta, esta tarjeta tiene dorso.
         tieneDorso: !!voltear,
+        // Y cómo se llama, para poder cotejarlo contra la cara a la que lleva.
+        etiquetaVoltear: voltear ? voltear.textContent.trim() : null,
         // La franja de equivalencia se fue con la card de frente y dorso. Lo que
         // la reemplaza es la PRESENTACIÓN pegada al número, y se lee por atributo.
         importe: importe ? importe.textContent.trim() : "",
@@ -595,20 +593,34 @@ try {
       );
     }
 
-    // ── Y SI TIENE QUE TENER DORSO, TIENE QUE OFRECERLO ────────────────────
+    // ── SI TIENE QUE TENER DORSO, TIENE QUE OFRECERLO, Y BIEN NOMBRADO ─────
     //
     // Mirando la pantalla no se puede saber: un suelto y un pack se ven igual de
-    // bien sin botón. Con la fila del listado sí — `carasDeTarjeta` dice si hay
-    // segunda referencia, y de ahí sale si el botón corresponde.
+    // bien sin botón. Con la fila del listado sí.
     //
-    // Es la mitad que le falta al chequeo 1: aquél comprueba que el botón, SI
-    // está, diga la verdad; éste comprueba que esté cuando hace falta. Sin los
-    // dos, una tarjeta que perdiera su dorso pasaría en verde.
-    const deberiaTenerDorso = carasEsperadas.dorso !== null;
+    // LA REGLA APROBADA: el dorso existe si aporta REFERENCIA o IDENTIFICACIÓN.
+    // `carasDeTarjeta` contesta lo primero; lo segundo depende de qué códigos
+    // tenga prendidos "Personalizar card", y la sonda corre con los dos prendidos
+    // —es la configuración de fábrica y es la que se está midiendo—.
+    //
+    // Es la mitad que le falta al chequeo 1: aquél comprueba la estructura de la
+    // cara que se ve; éste comprueba que la otra cara exista cuando corresponde y
+    // que el botón nombre la cara a la que lleva.
+    const hayIdentificacion = true;
+    const deberiaTenerDorso = carasEsperadas.dorso !== null || hayIdentificacion;
     if (vista.tieneDorso !== deberiaTenerDorso) {
       malPrecio.push(
         `${vista.nombre}: ${deberiaTenerDorso ? "le falta el botón de dar vuelta" : "ofrece un dorso que no existe"}`
       );
+    } else if (deberiaTenerDorso) {
+      // El nombre corto de la cara de atrás. Sale de la MISMA función que usa el
+      // componente, así que si alguien reescribe una de las dos, se separan.
+      const esperado = `Ver ${nombreDelDorso(carasEsperadas.dorso)}`;
+      if (vista.etiquetaVoltear !== esperado) {
+        malPrecio.push(
+          `${vista.nombre}: el botón dice "${vista.etiquetaVoltear}" y tendría que decir "${esperado}"`
+        );
+      }
     }
 
     // ── EL COSTO, EN LA MISMA ESCALA QUE LA VENTA ─────────────────────────
@@ -877,8 +889,9 @@ try {
         presentacion: (t.querySelector('[data-cara-presentacion]') || {}).textContent,
       });
       const frente = leer();
+      const alto = Math.round(t.getBoundingClientRect().height * 10) / 10;
       boton.click();
-      return { frente, nombre: t.innerText.split("\\n")[0] };
+      return { frente, alto, nombre: t.innerText.split("\\n")[0] };
     })()`);
     if (!par) continue; // esta tarjeta no tiene dorso: no hay dos números que cruzar
     await sleep(250);
@@ -888,6 +901,11 @@ try {
         lado: t.querySelector('[data-tarjeta-cara]').getAttribute('data-tarjeta-cara'),
         importe: (t.querySelector('[data-cara-importe]') || {}).textContent,
         presentacion: (t.querySelector('[data-cara-presentacion]') || {}).textContent,
+        alto: Math.round(t.getBoundingClientRect().height * 10) / 10,
+        // La identificación es del dorso: acá tiene que estar visible.
+        codigosVisibles: [...t.querySelectorAll('[data-pie-codigos]')].filter(
+          (p) => getComputedStyle(p).visibility !== "hidden"
+        ).length,
       };
       t.querySelector('[data-tarjeta-voltear]').click();
       return d;
@@ -897,6 +915,28 @@ try {
     if (dorso.lado !== "dorso") {
       noCierran.push(`${par.nombre}: tocar el botón no cambió de cara`);
       continue;
+    }
+
+    // ── LAS DOS CARAS TIENEN QUE MEDIR LO MISMO ──────────────────────────
+    //
+    // La lista usa `auto-rows-fr`, que le da a todas las filas el alto de la más
+    // alta. Si el dorso fuera más alto, dar vuelta UNA tarjeta estiraría TODAS
+    // las filas: el catálogo entero saltaría, y nadie relacionaría el salto con
+    // el toque.
+    //
+    // Esto no se deduce del código: la reserva del frente puede quedar corta por
+    // un renglón que envuelve. Se mide.
+    if (Math.abs(dorso.alto - par.alto) > 0.5) {
+      noCierran.push(
+        `${par.nombre}: el dorso mide ${dorso.alto} px y el frente ${par.alto} — dar vuelta mueve la grilla`
+      );
+    }
+
+    // Y la identificación tiene que estar A LA VISTA en el dorso. En el frente su
+    // lugar queda reservado pero oculto; si acá siguiera oculta, los códigos no
+    // se verían en ninguna cara.
+    if (dorso.codigosVisibles === 0) {
+      noCierran.push(`${par.nombre}: el dorso no muestra la identificación`);
     }
 
     const pres = `${par.frente.presentacion || ""} ${dorso.presentacion || ""}`;
@@ -976,17 +1016,30 @@ try {
   // de verdad y sigue exigiendo que sean uno solo. Y que la franja diga lo que
   // corresponde —incluido no estar— lo cubre la 9. Lo que queda acá es el pie,
   // que sí tiene que estar siempre.
+  // ── Y EL PIE SE MUDÓ AL DORSO, ASÍ QUE ACÁ SE MIDE LA RESERVA ───────────
+  //
+  // La identificación es contenido del dorso. En el frente su lugar queda
+  // RESERVADO —el bloque está, con `visibility: hidden`— y eso es lo que impide
+  // que dar vuelta una tarjeta estire todas las filas de la grilla.
+  //
+  // O sea que lo que este chequeo mira cambió de sentido: antes era "el pie está
+  // a la vista", ahora es "el lugar del pie está reservado y NO se ve". Que se
+  // vea en el dorso lo comprueba el cruce de caras del 1b, tocando el botón.
+  //
+  // Se afirman las dos mitades: que el bloque esté —sin él, la grilla salta— y
+  // que esté oculto —si se viera, la identificación estaría en las dos caras—.
   const filas = await evaluar(`(() => {
     const t = ${TARJETAS};
+    const pies = t.map((c) => c.querySelector('[data-pie-codigos]'));
     return {
-      sinEquivalencia: 0,
-      sinPie: t.filter((c) => !c.querySelector('.font-mono')).length,
+      sinPie: pies.filter((p) => !p).length,
+      visiblesEnElFrente: pies.filter((p) => p && getComputedStyle(p).visibility !== "hidden").length,
     };
   })()`);
   afirmar(
-    filas.sinEquivalencia === 0 && filas.sinPie === 0,
-    "6b · ninguna tarjeta se quedó sin el pie de códigos",
-    `sin equivalencia: ${filas.sinEquivalencia} · sin pie: ${filas.sinPie}`
+    filas.sinPie === 0 && filas.visiblesEnElFrente === 0,
+    "6b · el lugar de la identificación está reservado en el frente, y oculto",
+    `sin el bloque: ${filas.sinPie} · visibles en el frente: ${filas.visiblesEnElFrente}`
   );
 
   // ── 10 · LOS MARCADORES DE CADA RENGLÓN ─────────────────────────────────
@@ -1002,7 +1055,10 @@ try {
   const marcas = await evaluar(`(() => {
     const t = ${TARJETAS}[0];
     const cuerpo = t.firstElementChild;
-    const pie = t.querySelector('.font-mono');
+    // El bloque de identificación, esté a la vista o reservado: el ícono tiene
+    // que estar dibujado en los dos casos, porque es el mismo nodo que se ve al
+    // dar vuelta la tarjeta.
+    const pie = t.querySelector('[data-pie-codigos]');
     return {
       enElNombre: !!(cuerpo && cuerpo.firstElementChild && cuerpo.firstElementChild.querySelector('svg')),
       enElPie: !!(pie && pie.querySelector('svg')),
@@ -1307,15 +1363,27 @@ try {
   // vertical ENTRE los botones y no en el borde de afuera: `divide-x` la dibuja
   // solo en los intermedios, y escribirla a mano en cada botón deja una colgando
   // en el último.
+  // ── SOLO LOS BOTONES DE LA FILA, NO TODOS LOS DE LA TARJETA ─────────────
+  //
+  // Contaba `querySelectorAll('button')` de la tarjeta entera. Desde que el
+  // control de dar vuelta vive adentro del cuerpo del carrusel, eso cuenta dos
+  // botones y pide un separador que no corresponde: el `divide-x` es de la FILA
+  // de acciones, y el otro botón no está ahí.
+  //
+  // Se acota a la fila. La afirmación no cambia: en la fila, una línea entre cada
+  // par y ninguna colgando.
   const separadores = await evaluar(`(() => {
     const t = ${TARJETAS}[0];
-    const botones = [...t.querySelectorAll('button')];
+    const fila = [...t.querySelectorAll('div')].find((d) => d.className.includes('divide-x'));
+    if (!fila) return { total: 0, conBorde: 0, sinFila: true };
+    const botones = [...fila.querySelectorAll('button')];
     const conBorde = botones.filter((b) => {
       const w = parseFloat(getComputedStyle(b).borderLeftWidth) || 0;
       return w > 0;
     }).length;
     return { total: botones.length, conBorde };
   })()`);
+  if (separadores.sinFila) morir("no se encontró la fila de acciones de la tarjeta");
   afirmar(
     separadores.conBorde === Math.max(0, separadores.total - 1),
     `4 · hay una línea entre botones y ninguna colgando (${separadores.conBorde} para ${separadores.total} botones)`,
