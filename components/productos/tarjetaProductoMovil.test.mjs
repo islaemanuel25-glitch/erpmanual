@@ -20,9 +20,16 @@ import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 
-import TarjetaProductoMovil from "@/components/productos/TarjetaProductoMovil";
+import TarjetaProductoMovil, {
+  CuerpoDeLaCara,
+} from "@/components/productos/TarjetaProductoMovil";
 import { carasDeTarjeta } from "@/lib/productos/carasDeTarjeta";
-import { ESCALA_BULTO, ESCALA_UNIDAD, ESCALA_KG } from "@/lib/precios/escalaDeVenta";
+import {
+  ESCALA_BULTO,
+  ESCALA_UNIDAD,
+  ESCALA_KG,
+  ESCALA_PIEZA,
+} from "@/lib/precios/escalaDeVenta";
 
 const RAIZ = path.resolve(import.meta.dirname, "../..");
 const FUENTE = fs
@@ -276,6 +283,118 @@ test("G16. el dorso de kilo ofrece su referencia y no un importe inventado", () 
   assert.match(html, /Ver referencia/);
   // Y su dorso no tiene importe propio: la referencia es una línea de texto.
   assert.equal(kg.dorso.importe, null);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EL DORSO, EJERCIDO DE VERDAD.
+//
+// ── POR QUÉ HIZO FALTA ESTO, Y POR QUÉ G16 NO ALCANZABA ────────────────────
+//
+// `renderToStaticMarkup` dibuja el estado INICIAL, y la tarjeta abre siempre en
+// el frente. O sea que todos los candados de arriba miran una sola cara: el
+// dorso estaba escrito y nunca se ejercía.
+//
+// Y ahí vivía un defecto real. `carasDeTarjeta` le devuelve a kilo y pieza un
+// dorso con `importe: null` y el texto en `detalle`; el envoltorio le pasaba ese
+// `null` a `PrecioDeLaCara`, que lo interpreta como "no hay precio fijo" y
+// escribía **"Importe variable"** —el rótulo de los servicios— y debajo, además,
+// la referencia. El dorso de un fiambre por kilo afirmaba que su importe es
+// variable.
+//
+// Ninguno de los diecisiete candados anteriores lo veía, porque ninguno abría el
+// dorso.
+//
+// ── CÓMO SE ABRE SIN NAVEGADOR ────────────────────────────────────────────
+//
+// Se monta la tarjeta adentro de un componente que llama a `setEnDorso` en el
+// primer render. No es un truco para engañar al componente: es el mismo camino
+// que sigue un toque —el estado interno cambia— y por eso el marcado que sale es
+// el mismo que se ve en la pantalla.
+//
+// Los datos salen de `carasDeTarjeta` con entradas fijas, así que el caso no
+// depende de que exista un fiambre de pieza fija en la base de desarrollo — que
+// hoy no existe, y por eso la sonda del navegador lo informa como NO EJERCIDO.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Dibuja el DORSO de una tarjeta.
+ *
+ * Monta `CuerpoDeLaCara` —la mitad sin estado— con `mirandoDorso` en `true`. No
+ * es un atajo para engañar al componente: es exactamente el mismo nodo que el
+ * envoltorio monta cuando alguien toca el botón, con la misma prop que le pasa.
+ * Lo único que se saltea es el `useState`, que es lo que `renderToStaticMarkup`
+ * no puede mover.
+ */
+function renderDorsoDe(caras, props = {}) {
+  return renderToStaticMarkup(
+    createElement(CuerpoDeLaCara, {
+      caras,
+      mirandoDorso: true,
+      hayReferencia: !!caras.dorso,
+      hayIdentificacion: true,
+      codigoBarra: "7791234998877",
+      codigoInterno: "30112",
+      muestraCosto: true,
+      ...props,
+    })
+  );
+}
+
+test("G18. EL DORSO DE KILO NO DICE 'Importe variable'", () => {
+  // El defecto exacto que esta pasada arregla. "Importe variable" es de los
+  // servicios: un kilo tiene precio, y está en el frente.
+  const kg = carasDeTarjeta({ escala: ESCALA_KG, precio: 1300, costo: 900, unidad: "kg" });
+  assert.equal(kg.dorso.importe, null, "el caso no se ejerció: este dorso tiene importe");
+  assert.ok(kg.dorso.detalle, "el caso no se ejerció: este dorso no tiene referencia");
+
+  const html = renderDorsoDe(kg);
+  assert.doesNotMatch(html, /Importe variable/, "el dorso de un kilo dijo que su importe es variable");
+  // Y muestra la referencia que devuelve `lineaDeEquivalencia`, tal cual.
+  assert.ok(html.includes(kg.dorso.detalle), "el dorso no muestra su línea de referencia");
+  assert.match(html, /data-cara-referencia/);
+  // Sin inventarle una segunda escala.
+  assert.doesNotMatch(html, /data-cara-importe/, "el dorso de un kilo dibujó un importe");
+});
+
+test("G19. lo mismo para la PIEZA FIJA, que es el otro caso sin segunda escala", () => {
+  const pieza = carasDeTarjeta({
+    escala: ESCALA_PIEZA,
+    precio: 1000,
+    costo: 800,
+    unidad: "kg",
+    pesoReferenciaKg: 6,
+  });
+  assert.equal(pieza.dorso.importe, null);
+
+  const html = renderDorsoDe(pieza);
+  assert.doesNotMatch(html, /Importe variable/);
+  assert.ok(html.includes(pieza.dorso.detalle));
+});
+
+test("G20. y un dorso que SÍ tiene importe lo muestra, con su presentación arriba", () => {
+  // La contraprueba de G18 y G19: si el envoltorio dejara de dibujar importes en
+  // el dorso, los dos de arriba pasarían en verde sobre una cara vacía.
+  const html = renderDorsoDe(PACK_EN_DEPOSITO);
+  assert.match(html, /data-cara-importe/);
+  assert.doesNotMatch(html, /data-cara-referencia/);
+  assert.match(html, /UNIDAD/, "el dorso no dice en qué escala está su importe");
+  assert.doesNotMatch(html, /Importe variable/);
+
+  // Y el orden es presentación ARRIBA, importe abajo — el del diseño.
+  const iPres = html.indexOf("data-cara-presentacion");
+  const iImporte = html.indexOf("data-cara-importe");
+  assert.ok(iPres < iImporte, "el importe quedó arriba de su presentación");
+});
+
+test("G21. el COSTO del dorso nombra la escala del dorso, no la del frente", () => {
+  // "Costo $24.000" no dice de qué: en el frente ese número es de la unidad y en
+  // el dorso del pack, y son la misma palabra.
+  const frente = render({ caras: PACK_EN_LOCAL });
+  assert.match(frente, /Costo unidad ·/, "el costo del frente no nombra su escala");
+
+  const dorso = renderDorsoDe(PACK_EN_LOCAL);
+  assert.match(dorso, /Costo pack ·/, "el costo del dorso no nombra su escala");
+  assert.doesNotMatch(dorso, /Costo unidad ·/, "el dorso muestra el costo de la otra cara");
 });
 
 test("G17. el indicador tiene DOS puntos, uno por cara", () => {
