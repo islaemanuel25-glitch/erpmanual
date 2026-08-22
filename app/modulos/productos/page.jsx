@@ -1803,25 +1803,16 @@ export default function ProductosPage() {
                   // rótulo y si la equivalencia repite el unitario.
                   const escalaVenta = escalaDeVentaDe(p, esDepositoProd);
 
-                  // ── LOS DOS NÚMEROS, EN LA MISMA ESCALA ─────────────────
+                  // ── EL COSTO EN LA ESCALA YA NO SE CALCULA ACÁ ──────────
                   //
-                  // Es la regla dura de este bloque. Un costo por bulto al lado
-                  // de una venta por unidad no es una comparación difícil: es una
-                  // comparación AL REVÉS, que hace parecer sano lo que está mal.
-                  // Por eso los dos salen de la misma función con la misma
-                  // escala, y lo único que difiere es el redondeo: la venta lo
-                  // lleva porque es lo que se cobra, el costo no porque se paga.
-                  const enEscala = (valor, redondeo) =>
-                    valorEnLaEscalaDeVenta({
-                      escala: escalaVenta,
-                      valor,
-                      factor: p.factorPack,
-                      unidad: p.unidadMedida,
-                      redondeo100: redondeo,
-                      pesoReferenciaKg: p.pesoReferenciaKg,
-                    });
-                  // Ya no lo gatea ningún permiso: el costo se ve para todos.
-                  const costoEnEscala = enEscala(p.precioCosto, false);
+                  // Había un `enEscala` local y un `costoEnEscala`: UN costo, el
+                  // de la escala de venta. Con dos caras eso no alcanza —el dorso
+                  // necesita el suyo, en la escala de referencia— y tener uno solo
+                  // habría puesto un costo por bulto al lado de un precio
+                  // unitario, que es una comparación al revés.
+                  //
+                  // Los dos los arma `carasDeTarjeta`, con la misma función y sin
+                  // redondeo comercial: el costo no se cobra, se paga.
 
                   // ── EL NÚMERO GRANDE ES LO QUE COBRA EL POS ─────────────
                   //
@@ -1876,6 +1867,17 @@ export default function ProductosPage() {
                   const caras = carasDeTarjeta({
                     escala: escalaVenta,
                     precio: precioBaseDelPos,
+                    // ── EL COSTO TAMBIÉN VIAJA, Y POR CARA ────────────────
+                    //
+                    // Cada cara muestra el costo EN SU ESCALA: el frente en la de
+                    // venta, el dorso en la de referencia. Si el dorso se quedara
+                    // con el costo del frente, pondría un costo por bulto al lado
+                    // de un precio unitario — una comparación al revés, que hace
+                    // parecer sano lo que está mal.
+                    //
+                    // La conversión la hace `carasDeTarjeta` con la misma función
+                    // de siempre; acá solo se le pasa el valor guardado.
+                    costo: p.precioCosto,
                     redondeo100: redondeoDelPos,
                     factor: p.factorPack,
                     unidad: p.unidadMedida,
@@ -1914,91 +1916,53 @@ export default function ProductosPage() {
                     // dice "Sin cód. prov.". El SKU no sirve de reemplazo —es
                     // otro concepto, del negocio propio— y el id menos.
                     codigoInterno={muestraCodigoInterno ? p.codigoInterno ?? null : false}
-                    // EL COSTO Y LA GANANCIA, en el hueco que ya existía a la
-                    // izquierda del precio. No agrega renglón: van APILADOS
-                    // dentro de la fila del valor, que tiene 30 px de alto
-                    // mínimo y le sobran para dos líneas de 10,5.
+                    // ── EL COSTO VA EN LAS DOS CARAS, CADA UNO EN SU ESCALA ─
                     //
-                    // Por qué apilados y no en una línea: el peor caso real
-                    // —"Costo $112.450,00 · falta %" al lado de "$142.000,00 por
-                    // bulto"— son 48 caracteres y NO entra a 390 px. Medido antes
-                    // de escribirlo, sobre las 10.509 filas activas.
+                    // La pantalla ya no arma el bloque: pasa el DATO —si el costo
+                    // se muestra— y el envoltorio lo dibuja con el valor que
+                    // corresponde a la cara. El costo por cara sale de
+                    // `carasDeTarjeta`, arriba.
                     //
-                    // El costo ya no lo gatea ningún permiso: se ve para todos.
+                    // Antes se armaba acá con `costoEnEscala`, que era UNO SOLO:
+                    // el de la escala de venta. En el dorso ese número quedaría al
+                    // lado de un precio de otra escala — un costo por bulto contra
+                    // un precio unitario, que es una comparación al revés.
                     //
-                    // ── Y DONDE SE VENDE AL COSTO, ESTE BLOQUE NO VA ────────
+                    // ── DONDE SE VENDE AL COSTO NO VA NINGUNO DE LOS DOS ────
                     //
-                    // Las dos cosas que muestra sobran exactamente ahí, y por
-                    // motivos distintos:
+                    // Y esa regla NO cambió, en ninguna de las caras:
                     //
-                    // · el PORCENTAJE, porque no hay margen que mostrar. No es
-                    //   que no se sepa: es que vender al costo es no tener
-                    //   ganancia, y un "30 %" al lado del precio afirma una que
-                    //   no existe. Es propiedad del LUGAR, no del permiso de
-                    //   quien mira, así que se va para todos.
+                    // · el PORCENTAJE, porque no hay margen que mostrar. Vender al
+                    //   costo es no tener ganancia, y un "30 %" al lado del precio
+                    //   afirma una que no existe. Es propiedad del LUGAR, no del
+                    //   permiso de quien mira.
                     //
-                    // · la línea "Costo", porque el número grande YA es el
-                    //   costo. Dejarla sería escribir el mismo número dos veces
-                    //   en la misma fila, una vez grande y otra chiquita.
-                    // ── EL ORDEN DE ESTOS DOS YA NO ES CONFIGURABLE ─────────
-                    //
-                    // Antes salía de `camposVisiblesDe(config, REGION.MARCA)` y
-                    // el usuario podía subir el costo por encima del porcentaje.
-                    // Personalizar card dejó de reordenar: se prende y se apaga,
-                    // y la posición la define el diseño. Van costo y después
-                    // regla, siempre.
-                    marca={
-                      esProductoServicio(p) ||
-                      vendeConListaAlCosto ||
-                      (!muestraCosto && !muestraMargen)
-                        ? null
-                        : (() => {
-                            const regla = reglaDeGananciaDe(p);
-                            // ── EL RENGLÓN DE LA REGLA YA NO AVISA ──────────
-                            //
-                            // Antes el que no tenía porcentaje se pintaba de
-                            // ámbar. Ese aviso se fue de la tarjeta junto con
-                            // "Se vende sin ganancia": las dos cosas son ahora
-                            // controles de "Para revisar", donde se cuentan y se
-                            // pueden filtrar. Dejarlos también acá los diría dos
-                            // veces, y en la tarjeta no hay nada que hacer con
-                            // ellos — no se puede tocar el ámbar para ver los
-                            // otros mil seiscientos.
-                            const renglones = [
-                              muestraCosto && costoEnEscala !== null ? (
-                                <span
-                                  key={CAMPO.COSTO}
-                                  className={`${GANANCIA_CLASE} sunmi-text-muted`}
-                                  title="Costo, en la misma escala que el precio de venta"
-                                >
-                                  Costo {formatearMoneda(costoEnEscala)}
-                                </span>
-                              ) : null,
-                              muestraMargen ? (
-                                <span
-                                  key={CAMPO.MARGEN}
-                                  className={`${GANANCIA_CLASE} sunmi-text-muted`}
-                                  title="Regla de ganancia configurada"
-                                >
-                                  {textoDeGanancia(regla)}
-                                </span>
-                              ) : null,
-                            ].filter(Boolean);
-                            if (renglones.length === 0) return null;
-                            return (
-                              <span className="flex flex-col items-start leading-tight">
-                                {renglones}
-                              </span>
-                            );
-                          })()
+                    // · la línea "Costo", porque el número grande YA es el costo.
+                    //   Dejarla sería escribir el mismo número dos veces.
+                    muestraCosto={
+                      muestraCosto && !esProductoServicio(p) && !vendeConListaAlCosto
                     }
-                    // ── SIN AVISOS DE MANTENIMIENTO EN LA TARJETA ───────────
+                    // ── LA REGLA DE GANANCIA, LA MISMA EN LAS DOS CARAS ─────
                     //
-                    // "Se vende sin ganancia" salía acá en 429 filas. Ahora es el
-                    // control "Venta ≤ costo" de arriba, que además dice CUÁNTAS
-                    // son y deja verlas todas juntas — que es lo que se necesita
-                    // para arreglarlas. Un triángulo por tarjeta informaba de a
-                    // una y no llevaba a ningún lado.
+                    // El renglón NO avisa: el que no tiene porcentaje ya no se
+                    // pinta de ámbar. Ese aviso se fue de la tarjeta junto con
+                    // "Se vende sin ganancia" — las dos cosas son ahora controles
+                    // de "Para revisar", donde se cuentan y se pueden filtrar. En
+                    // la tarjeta informaban de a uno y no llevaban a ningún lado.
+                    //
+                    // Y el orden ya no es configurable: Personalizar card prende y
+                    // apaga, y la posición la define el diseño. Va el costo y
+                    // después la regla, siempre.
+                    regla={
+                      muestraMargen && !esProductoServicio(p) && !vendeConListaAlCosto ? (
+                        <span
+                          className={`${GANANCIA_CLASE} sunmi-text-muted`}
+                          title="Regla de ganancia configurada"
+                        >
+                          {textoDeGanancia(reglaDeGananciaDe(p))}
+                        </span>
+                      ) : null
+                    }
                     // ── EL PRECIO Y SU PRESENTACIÓN LOS DIBUJA EL ENVOLTORIO ─
                     //
                     // Acá se armaba el número grande con su rótulo. Ahora eso

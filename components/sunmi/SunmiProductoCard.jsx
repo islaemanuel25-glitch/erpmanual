@@ -177,6 +177,58 @@ export function AccionTarjeta({ icono: Icono, onClick, children, ...resto }) {
 // exactamente lo contrario de lo que se pidió.
 const OCULTO = (valor) => valor === false;
 
+/**
+ * EL PIE DE CÓDIGOS. Monoespaciado y con cifras tabulares: se comparan de un
+ * vistazo contra una etiqueta o un remito.
+ *
+ * ── POR QUÉ ES UNA PIEZA CON NOMBRE Y NO JSX ADENTRO DE LA TARJETA ────────
+ *
+ * Porque tiene DOS lugares. En la tarjeta del kit va al pie, anclado abajo; en la
+ * tarjeta del catálogo del celular la identificación pertenece al DORSO, así que
+ * va adentro del cuerpo, arriba de la navegación.
+ *
+ * Escribirlo dos veces sería dos pies que se rompen el día que uno cambie — y lo
+ * que tienen adentro no es decorativo: es la distinción entre "no hay dato" y
+ * "esta pantalla no lo muestra", que se dibuja al revés en cada caso.
+ *
+ * Lo que NO trae es su posición. El `mt-auto` que lo ancla abajo es de la
+ * tarjeta, y en el dorso no corresponde: ahí el pie va en medio del cuerpo. Por
+ * eso el posicionamiento lo pone quien lo usa.
+ */
+export function PieDeCodigosTarjeta({ codigoBarra = null, codigoInterno = null, className = "" }) {
+  if (OCULTO(codigoBarra) && OCULTO(codigoInterno)) return null;
+  return (
+    <div
+      data-pie-codigos
+      className={componerClaseTexto({
+        base: "flex justify-between items-center gap-2 border-t sunmi-divider pt-[9px] font-mono [font-variant-numeric:tabular-nums]",
+        tamano: "text-[10.5px]",
+        color: "sunmi-text-muted",
+        pedido: className,
+      })}
+    >
+      {!OCULTO(codigoBarra) && (
+        <span className="flex items-center gap-1.5 min-w-0">
+          <Barcode className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span className={codigoBarra ? "" : "italic opacity-70"}>
+            {codigoBarra || SIN_CODIGO_BARRA}
+          </span>
+        </span>
+      )}
+      {/* EL SLOT DEL CÓDIGO DEL PROVEEDOR SE QUEDA AUNQUE NO HAYA DATO.
+          Antes desaparecía, y podía hacerlo porque lo que mostraba era el id
+          del producto: nunca faltaba. Con el dato correcto faltar es lo
+          habitual, y un slot que se va deja sin contestar por qué ese
+          producto no machea contra la lista del proveedor. */}
+      {!OCULTO(codigoInterno) && (
+        <span className={`shrink-0 ${codigoInterno ? "" : "italic opacity-70"}`}>
+          {codigoInterno ? `${PREFIJO_CODIGO_INTERNO} ${codigoInterno}` : SIN_CODIGO_INTERNO}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function SunmiProductoCard({
   nombre,
   empresa = null,
@@ -369,33 +421,11 @@ export default function SunmiProductoCard({
         {OCULTO(codigoBarra) && OCULTO(codigoInterno) ? (
           <div className="mt-auto" />
         ) : (
-        <div
-          className={componerClaseTexto({
-            base: "mt-auto flex justify-between items-center gap-2 border-t sunmi-divider pt-[9px] font-mono [font-variant-numeric:tabular-nums]",
-            tamano: "text-[10.5px]",
-            color: "sunmi-text-muted",
-            pedido: className,
-          })}
-        >
-          {!OCULTO(codigoBarra) && (
-            <span className="flex items-center gap-1.5 min-w-0">
-              <Barcode className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-              <span className={codigoBarra ? "" : "italic opacity-70"}>
-                {codigoBarra || SIN_CODIGO_BARRA}
-              </span>
-            </span>
-          )}
-          {/* EL SLOT DEL CÓDIGO DEL PROVEEDOR SE QUEDA AUNQUE NO HAYA DATO.
-              Antes desaparecía, y podía hacerlo porque lo que mostraba era el id
-              del producto: nunca faltaba. Con el dato correcto faltar es lo
-              habitual, y un slot que se va deja sin contestar por qué ese
-              producto no machea contra la lista del proveedor. */}
-          {!OCULTO(codigoInterno) && (
-            <span className={`shrink-0 ${codigoInterno ? "" : "italic opacity-70"}`}>
-              {codigoInterno ? `${PREFIJO_CODIGO_INTERNO} ${codigoInterno}` : SIN_CODIGO_INTERNO}
-            </span>
-          )}
-        </div>
+          <PieDeCodigosTarjeta
+            codigoBarra={codigoBarra}
+            codigoInterno={codigoInterno}
+            className={`mt-auto ${className}`}
+          />
         )}
 
         {/* 6 · LA FILA DE ACCIONES, FIJA Y A LA VISTA.

@@ -111,9 +111,24 @@ test("EL BOTÓN DE LA FILA VIVE EN EL KIT, no en quien lo usa", () => {
   // que hoy dibuja los botones — mirarlo en `page.jsx` habría dado verde por
   // ausencia, que es peor que rojo.
   assert.match(TARJETA, /export function AccionTarjeta/);
-  assert.match(ENVOLTORIO, /import SunmiProductoCard, \{ AccionTarjeta \}/);
+  assert.match(ENVOLTORIO, /AccionTarjeta,?\s*\n?\s*\}? from "@\/components\/sunmi\/SunmiProductoCard"|AccionTarjeta,/);
   assert.doesNotMatch(ENVOLTORIO, /function AccionTarjeta\s*\(/, "el envoltorio se escribió el suyo");
   assert.doesNotMatch(PAGINA, /function AccionTarjeta\s*\(/, "la pantalla se escribió el suyo");
+
+  // ── Y EL PIE DE CÓDIGOS TAMBIÉN VIVE EN EL KIT ──────────────────────────
+  //
+  // Tiene DOS lugares desde que la identificación es del dorso: al pie de la
+  // pieza y adentro del cuerpo del carrusel. Escribirlo dos veces serían dos
+  // pies que se rompen el día que uno cambie, y lo que tienen adentro no es
+  // decorativo: es la distinción entre "no hay dato" y "esta pantalla no lo
+  // muestra", que se dibuja al revés en cada caso.
+  assert.match(TARJETA, /export function PieDeCodigosTarjeta/);
+  assert.match(ENVOLTORIO, /PieDeCodigosTarjeta/);
+  assert.doesNotMatch(
+    ENVOLTORIO,
+    /Sin cód\. prov\.|sin código de barras/,
+    "el envoltorio se escribió su propio pie de códigos"
+  );
 });
 
 test("LA PANTALLA PASA SU BOTÓN, y el andamio sigue ejerciendo dos", () => {
@@ -129,17 +144,19 @@ test("LA PANTALLA PASA SU BOTÓN, y el andamio sigue ejerciendo dos", () => {
   // "nadie comprueba que la página se lo pase". Una pieza puede estar perfecta y
   // la pantalla no usarla.
   //
-  // ── Y VOLVIÓ A CAMBIAR CON LAS DOS CARAS ────────────────────────────────
+  // ── Y VOLVIÓ A CAMBIAR DOS VECES ────────────────────────────────────────
   //
-  // Ahora son DOS botones otra vez, pero no son los de antes: Editar más el que
-  // da vuelta la tarjeta. El segundo no es "Ver" —la ficha de sólo lectura sigue
-  // sin estar en el celular—: cambia de cara y no navega a ningún lado.
+  // Primero pasaron a ser dos —Editar y el de dar vuelta—. Después el de dar
+  // vuelta se fue de la fila: no es una acción sobre el producto, es moverse
+  // entre caras, y ponerlos hermanos los igualaba. Vive adentro del cuerpo del
+  // carrusel, con el indicador.
   //
-  // Y los dibuja el ENVOLTORIO, no la pantalla. Lo que la pantalla tiene que
-  // seguir haciendo es pasar la acción, que es el hueco que este candado nació
-  // para tapar: una pieza puede estar perfecta y la pantalla no usarla.
+  // Así que la fila vuelve a tener UNO. Y los dibuja el ENVOLTORIO, no la
+  // pantalla; lo que la pantalla tiene que seguir haciendo es pasar la acción,
+  // que es el hueco que este candado nació para tapar: una pieza puede estar
+  // perfecta y la pantalla no usarla.
   const enElEnvoltorio = (ENVOLTORIO.match(/<AccionTarjeta/g) || []).length;
-  assert.equal(enElEnvoltorio, 2, "el envoltorio dibuja Editar y el de dar vuelta");
+  assert.equal(enElEnvoltorio, 1, "la fila de acciones tiene que dibujar Editar y nada más");
   assert.match(ENVOLTORIO, /icono=\{Pencil\}/, "el envoltorio: falta el ícono de Editar");
   assert.doesNotMatch(
     ENVOLTORIO,
