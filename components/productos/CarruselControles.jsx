@@ -5,6 +5,7 @@ import { Check, TriangleAlert } from "lucide-react";
 
 const POR_PAGINA = 4;
 const TINTE_ACTIVO_PCT = 12;
+const ACENTO_ACTIVO = "var(--pos-accent)";
 
 const conContraste = (token) =>
   `color-mix(in srgb, var(${token}) 88%, var(--app-fg))`;
@@ -18,9 +19,9 @@ const TOKEN_POR_ROL = {
 
 const colorDe = (rol) => TOKEN_POR_ROL[rol] || TOKEN_POR_ROL.neutro;
 
-const fondoDe = (color, activo) =>
+const fondoDe = (activo) =>
   activo
-    ? `color-mix(in srgb, ${color} ${TINTE_ACTIVO_PCT}%, var(--card-bg))`
+    ? `color-mix(in srgb, ${ACENTO_ACTIVO} ${TINTE_ACTIVO_PCT}%, var(--card-bg))`
     : "var(--card-bg)";
 
 function enPaginas(items) {
@@ -58,9 +59,9 @@ function CardControl({ control, activo, onSelect, truncado = false }) {
         activo ? "ring-2" : "",
       ].join(" ")}
       style={{
-        borderColor: color,
-        background: fondoDe(color, activo),
-        "--tw-ring-color": color,
+        borderColor: activo ? ACENTO_ACTIVO : color,
+        background: fondoDe(activo),
+        "--tw-ring-color": activo ? ACENTO_ACTIVO : color,
       }}
     >
       <span className="flex items-baseline gap-1.5">
@@ -195,4 +196,4 @@ export default function CarruselControles({
   );
 }
 
-export { TOKEN_POR_ROL, POR_PAGINA, TINTE_ACTIVO_PCT, enPaginas };
+export { TOKEN_POR_ROL, POR_PAGINA, TINTE_ACTIVO_PCT, ACENTO_ACTIVO, enPaginas };
