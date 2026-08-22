@@ -86,10 +86,37 @@ test("G4. conserva el carrusel frente dorso y nombra el destino", () => {
   assert.equal((html.match(/rounded-full/g) || []).length, 2);
 });
 
-test("G5. los códigos pertenecen al dorso y el frente reserva su espacio", () => {
+test("G5. los códigos SE VEN en el frente, y siguen siendo los del kit", () => {
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ AHORA AFIRMA LO CONTRARIO ─────────────
+  //
+  // Exigía que el frente ESCONDIERA el pie —`[&_[data-pie-codigos]]:invisible`—
+  // porque los códigos eran del dorso y el frente solo reservaba el lugar. La
+  // decisión cambió: el código de barras y el del proveedor se miran para
+  // reponer y para conciliar, y hacerlos costar un gesto los volvía invisibles
+  // en la práctica.
+  //
+  // Se invierte en vez de borrarse, porque las dos cosas que el candado
+  // protegía siguen valiendo y son distintas entre sí:
   const html = render({ caras: PACK_EN_DEPOSITO });
+
+  // 1. el pie sigue siendo el del kit y no uno escrito acá al lado;
   assert.match(html, /data-pie-codigos/);
-  assert.match(html, /data-pie-codigos\]\]:invisible/);
+
+  // 2. y NADIE lo vuelve a esconder. Si alguien repone la clase, el dato
+  //    desaparece del frente sin romper nada más: compila, la card se ve igual
+  //    de bien, y solo se nota abriendo la pantalla a buscar un código.
+  assert.doesNotMatch(
+    html,
+    /data-pie-codigos\]\]:invisible/,
+    "volvió la clase que esconde los códigos en el frente"
+  );
+
+  // 3. Y ESTÁN LOS DOS DATOS, no solo el hueco. El candado viejo se conformaba
+  //    con que el atributo existiera, y el atributo existe igual cuando el pie
+  //    viene vacío: sin esto, un frente que muestre dos rótulos sin número
+  //    pasaría en verde.
+  assert.match(html, /7790580132286/, "no está el código de barras en el frente");
+  assert.match(html, /1229/, "no está el código del proveedor en el frente");
 });
 
 test("G6. sin referencia pero con identificación sigue habiendo dorso", () => {

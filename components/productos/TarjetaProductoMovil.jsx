@@ -226,15 +226,26 @@ export default function TarjetaProductoMovil({
     },
   };
 
-  const claseCard = hayIdentificacion && !mirandoDorso ? "[&_[data-pie-codigos]]:invisible" : "";
-
+  // ── LOS CÓDIGOS SE VEN EN EL FRENTE ───────────────────────────────────────
+  //
+  // Hasta acá el pie del kit venía puesto pero escondido con una clase mientras
+  // se miraba el frente: el lugar quedaba reservado, para que dar vuelta no
+  // moviera la grilla, y el dato solo aparecía en el dorso.
+  //
+  // Ya no. El código de barras y el del proveedor son lo que se mira para
+  // reponer y para conciliar una factura, y hacerlos costar un gesto los volvía
+  // invisibles en la práctica.
+  //
+  // Se sacó SOLO la clase que los ocultaba, y eso importa: el pie sigue siendo
+  // el del kit, en el mismo lugar y con el mismo alto ya reservado, así que la
+  // card no se mueve ni un pixel. Lo único que cambia es que el texto que ya
+  // estaba dibujado ahora se lee.
   return (
     <SunmiProductoCard
       nombre={nombre}
       empresa={empresa}
       codigoBarra={hayIdentificacion ? codigoBarra : false}
       codigoInterno={hayIdentificacion ? codigoInterno : false}
-      className={claseCard}
       marca={
         <MarcaDeLaCara
           cara={caraActual}

@@ -1044,30 +1044,38 @@ try {
   // de verdad y sigue exigiendo que sean uno solo. Y que la franja diga lo que
   // corresponde —incluido no estar— lo cubre la 9. Lo que queda acá es el pie,
   // que sí tiene que estar siempre.
-  // ── Y EL PIE SE MUDÓ AL DORSO, ASÍ QUE ACÁ SE MIDE LA RESERVA ───────────
+  // ── Y EL PIE SE VE EN EL FRENTE ─────────────────────────────────────────
   //
-  // La identificación es contenido del dorso. En el frente su lugar queda
-  // RESERVADO —el bloque está, con `visibility: hidden`— y eso es lo que impide
-  // que dar vuelta una tarjeta estire todas las filas de la grilla.
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ AHORA AFIRMA LO CONTRARIO ─────────────
   //
-  // O sea que lo que este chequeo mira cambió de sentido: antes era "el pie está
-  // a la vista", ahora es "el lugar del pie está reservado y NO se ve". Que se
-  // vea en el dorso lo comprueba el cruce de caras del 1b, tocando el botón.
+  // Este chequeo ya cambió de sentido una vez: nació como "el pie está a la
+  // vista" y pasó a "el lugar del pie está RESERVADO y no se ve", cuando la
+  // identificación se mudó al dorso y el hueco quedaba solo para que dar vuelta
+  // una tarjeta no estirara la grilla.
   //
-  // Se afirman las dos mitades: que el bloque esté —sin él, la grilla salta— y
-  // que esté oculto —si se viera, la identificación estaría en las dos caras—.
+  // Vuelve al primero. El código de barras y el del proveedor son lo que se mira
+  // para reponer y para conciliar una factura, y hacerlos costar un gesto los
+  // volvía invisibles en la práctica.
+  //
+  // Se afirman las dos mitades, y la segunda es la que importa: que el bloque
+  // esté —sin él la grilla salta— y que se VEA. Un pie presente y escondido es
+  // exactamente el estado anterior, y es el único que hay que poder distinguir.
   const filas = await evaluar(`(() => {
     const t = ${TARJETAS};
     const pies = t.map((c) => c.querySelector('[data-pie-codigos]'));
     return {
       sinPie: pies.filter((p) => !p).length,
-      visiblesEnElFrente: pies.filter((p) => p && getComputedStyle(p).visibility !== "hidden").length,
+      escondidos: pies.filter((p) => p && getComputedStyle(p).visibility === "hidden").length,
+      // Y con TEXTO adentro: el bloque existe igual vacío, así que contar nodos
+      // no distingue "muestra los códigos" de "muestra dos rótulos pelados".
+      conTexto: pies.filter((p) => p && p.innerText.trim().length > 0).length,
+      total: t.length,
     };
   })()`);
   afirmar(
-    filas.sinPie === 0 && filas.visiblesEnElFrente === 0,
-    "6b · el lugar de la identificación está reservado en el frente, y oculto",
-    `sin el bloque: ${filas.sinPie} · visibles en el frente: ${filas.visiblesEnElFrente}`
+    filas.sinPie === 0 && filas.escondidos === 0 && filas.conTexto === filas.total,
+    `6b · la identificación se ve en el frente, en las ${filas.total} tarjetas`,
+    `sin el bloque: ${filas.sinPie} · escondidos: ${filas.escondidos} · con texto: ${filas.conTexto} de ${filas.total}`
   );
 
   // ── 10 · LOS MARCADORES DE CADA RENGLÓN ─────────────────────────────────
