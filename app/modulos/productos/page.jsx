@@ -1905,6 +1905,11 @@ export default function ProductosPage() {
                     // puede perder acá.
                     empresa={muestraProveedor ? p.proveedorNombre ?? null : false}
                     caras={caras}
+                    // LA FOTO SALE DEL DATO QUE YA VIAJA. `imagenUrl` lo arma
+                    // `mergeBaseLocalToUi` desde `ProductoBase.imagen_url`, así
+                    // que no hay consulta nueva ni almacenamiento nuevo: el
+                    // listado ya lo traía y nadie lo estaba mirando.
+                    imagenUrl={p.imagenUrl ?? null}
                     codigoBarra={muestraCodigoBarra ? p.codigoBarra ?? p.sku ?? null : false}
                     // ── ACÁ IBA EL ID DEL PRODUCTO, Y ERA UN DEFECTO ────────
                     //

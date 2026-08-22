@@ -626,16 +626,22 @@ try {
     // Mirando la pantalla no se puede saber: un suelto y un pack se ven igual de
     // bien sin botón. Con la fila del listado sí.
     //
-    // LA REGLA APROBADA: el dorso existe si aporta REFERENCIA o IDENTIFICACIÓN.
-    // `carasDeTarjeta` contesta lo primero; lo segundo depende de qué códigos
-    // tenga prendidos "Personalizar card", y la sonda corre con los dos prendidos
-    // —es la configuración de fábrica y es la que se está midiendo—.
+    // ── LA REGLA CAMBIÓ: EL DORSO LO CREA LA REFERENCIA, Y SOLO ELLA ───────
     //
-    // Es la mitad que le falta al chequeo 1: aquél comprueba la estructura de la
-    // cara que se ve; éste comprueba que la otra cara exista cuando corresponde y
-    // que el botón nombre la cara a la que lleva.
-    const hayIdentificacion = true;
-    const deberiaTenerDorso = carasEsperadas.dorso !== null || hayIdentificacion;
+    // Decía "referencia O IDENTIFICACIÓN", y con la identificación siempre
+    // prendida eso hacía que TODAS las tarjetas tuvieran que ofrecer un dorso.
+    // Era cierto mientras los códigos vivían atrás; desde que se ven en el
+    // frente, ese dorso quedó siendo una cara vacía.
+    //
+    // Ahora la pregunta es una sola y la contesta `carasDeTarjeta`, que es la
+    // misma pieza que usa la pantalla: ¿hay equivalencia? Si no la hay, la
+    // tarjeta tiene UNA cara y ofrecer un botón sería prometer algo que no está.
+    //
+    // Se conserva la mitad que importaba: que el dorso exista CUANDO
+    // corresponde, y que el botón nombre la cara a la que lleva. Y ahora también
+    // afirma lo contrario —"ofrece un dorso que no existe"—, que antes no podía
+    // dispararse nunca porque el lado derecho era siempre verdadero.
+    const deberiaTenerDorso = carasEsperadas.dorso !== null;
     if (vista.tieneDorso !== deberiaTenerDorso) {
       malPrecio.push(
         `${vista.nombre}: ${deberiaTenerDorso ? "le falta el botón de dar vuelta" : "ofrece un dorso que no existe"}`
@@ -2294,6 +2300,110 @@ try {
     conReferencia.length < 2
       ? "no se encontraron las dos caras de referencia: el caso no se ejerció"
       : "una cara de referencia dibujó además un importe"
+  );
+
+  // ── 19 · LA MINIATURA DEL PRODUCTO ──────────────────────────────────────
+  //
+  // ── POR QUÉ ACÁ Y NO SOBRE EL CATÁLOGO ──────────────────────────────────
+  //
+  // Porque en la base de desarrollo hay UN producto con `imagen_url` sobre
+  // 2.005, y viene vacía: abriendo la pantalla no hay ninguna tarjeta con foto
+  // que mirar. Fabricar la fila probaría que el código dibuja algo, no que el
+  // caso ocurra. El andamio declara los dos casos y se ve que los declara.
+  //
+  // Lo que se afirma es lo que ningún candado de la suite puede ver, porque
+  // depende de que el navegador CARGUE la imagen:
+  //
+  //   · que la foto entre en el alto que la tarjeta ya tenía —si empujara, con
+  //     `auto-rows-fr` estiraría todas las filas de la grilla—;
+  //   · que la tarjeta con foto y la de al lado sin foto midan lo MISMO;
+  //   · y que una url rota no deje nada dibujado. Ese es el caso que de verdad
+  //     va a pasar, y es el único que el `renderToStaticMarkup` de la suite no
+  //     puede ejercer: ahí el `onError` no corre nunca.
+  // ── SE ESPERA A QUE EL NAVEGADOR TERMINE CON LAS DOS IMÁGENES ───────────
+  //
+  // La url rota tarda en fallar: el pedido sale, vuelve 404 y recién ahí corre
+  // el manejador. Leyendo el DOM antes, la imagen rota todavía está y el chequeo
+  // se pone rojo por una carrera y no por un defecto. Se espera a que las dos
+  // hayan resuelto —`complete` es true tanto si cargó como si falló— y recién
+  // ahí se mide.
+  const MEDIR_FOTO = `(() => {
+    const t = [...document.querySelectorAll('[data-sunmi-panel]')]
+      .filter((c) => c.querySelector('[data-tarjeta-cara]'));
+    const conFoto = t.filter((c) => c.querySelector('[data-tarjeta-foto]'));
+    const sinFoto = t.filter((c) => !c.querySelector('[data-tarjeta-foto]'));
+    const r = (n) => Math.round(n * 10) / 10;
+    const img = conFoto[0] ? conFoto[0].querySelector('[data-tarjeta-foto]') : null;
+    const caja = img ? img.getBoundingClientRect() : null;
+    return {
+      tarjetas: t.length,
+      conFoto: conFoto.length,
+      sinFoto: sinFoto.length,
+      lado: caja ? [r(caja.width), r(caja.height)] : null,
+      // ── EL PAR SE COMPARA CONTRA SÍ MISMO, NO CONTRA EL RESTO ────────────
+      //
+      // La primera versión comparaba la tarjeta con foto contra la más alta sin
+      // foto, y dio 183,8 contra 220,8: parecía que la foto ACHICABA la tarjeta.
+      // No era la foto — las otras tienen equivalencia y llevan el renglón del
+      // carrusel, que son 37 px que no tienen nada que ver con esto.
+      //
+      // Los dos casos del andamio son el mismo producto con el mismo dato: uno
+      // con una foto que carga y otro con una url rota, que después del error no
+      // dibuja nada. Esa es la comparación que aísla la foto, y por eso van
+      // marcados en el andamio en vez de ubicarse por posición.
+      altoConFoto: (() => {
+        const n = document.querySelector('[data-caso-andamio="con-foto"]');
+        return n ? r(n.getBoundingClientRect().height) : null;
+      })(),
+      altoSinFoto: (() => {
+        const n = document.querySelector('[data-caso-andamio="foto-rota"]');
+        return n ? r(n.getBoundingClientRect().height) : null;
+      })(),
+      ajuste: img ? getComputedStyle(img).objectFit : null,
+      // Y la que apunta a un archivo que no existe: el navegador ya intentó
+      // cargarla, así que si el manejador de error anda, no quedó ninguna.
+      rotasDibujadas: [...document.querySelectorAll('[data-tarjeta-foto]')]
+        .filter((i) => i.getAttribute('src').includes('no-existe')).length,
+      // Todas las imágenes que quedan resolvieron: ya cargaron o ya fallaron.
+      // Sin esto no se distingue "el manejador no anda" de "todavía no pasó".
+      resueltas: [...document.querySelectorAll('[data-tarjeta-foto]')].every((i) => i.complete),
+    };
+  })()`;
+
+  let foto = await evaluar(MEDIR_FOTO);
+  for (let i = 0; i < 40 && (!foto || !foto.resueltas || foto.rotasDibujadas > 0); i++) {
+    await sleep(250);
+    foto = await evaluar(MEDIR_FOTO);
+  }
+
+  if (!foto || foto.conFoto === 0) {
+    morir(
+      "el andamio no dibujó ninguna tarjeta con foto. Sin eso este chequeo no mide nada, " +
+        "y un 'no se pudo comprobar' no es un pase."
+    );
+  }
+
+  afirmar(
+    foto.lado && foto.lado[0] === 44 && foto.lado[1] === 44,
+    `19a · la miniatura es un cuadrado de 44 px (${foto.lado ? foto.lado.join(" × ") : "?"})`,
+    "cambió el lado: la fila del precio mide 51,5 y un cuadrado más grande la estira"
+  );
+  afirmar(
+    foto.ajuste === "contain",
+    `19b · la foto entra entera y no se recorta (object-fit: ${foto.ajuste})`,
+    "con `cover` se recorta la etiqueta, que es justo lo que se está mirando"
+  );
+  afirmar(
+    foto.altoConFoto !== null && foto.altoSinFoto !== null && foto.altoConFoto === foto.altoSinFoto,
+    `19c · con foto y sin foto, el MISMO producto mide igual (${foto.altoConFoto} vs ${foto.altoSinFoto} px)`,
+    foto.altoConFoto === null || foto.altoSinFoto === null
+      ? "no están los dos casos marcados en el andamio: el par no se pudo comparar"
+      : "la foto empuja: con `auto-rows-fr` eso estira TODAS las filas de la grilla"
+  );
+  afirmar(
+    foto.rotasDibujadas === 0,
+    `19d · una url rota no deja nada dibujado`,
+    `quedaron ${foto.rotasDibujadas} imagen(es) rota(s): el navegador dibuja su propio ícono adentro de la tarjeta`
   );
 } catch (e) {
   morir(e.message);
