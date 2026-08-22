@@ -26,7 +26,11 @@ import { createElement } from "react";
 import fs from "node:fs";
 import path from "node:path";
 
-import CarruselControles from "@/components/productos/CarruselControles";
+import CarruselControles, {
+  ANCHO_CARD_PCT,
+  TINTE_ACTIVO_PCT,
+  PISTA_DEL_RIEL,
+} from "@/components/productos/CarruselControles";
 import { CONTROLES } from "@/lib/productos/controlesCalidad";
 
 const render = (props) => renderToStaticMarkup(createElement(CarruselControles, props));
@@ -137,6 +141,161 @@ test("G9-bis. LA SONDA MIDE LA MISMA EXPRESIÓN QUE EL COMPONENTE PINTA", () => 
     enLaSonda[1],
     proporciones[0],
     `el componente mezcla al ${proporciones[0]} % y la sonda mide al ${enLaSonda[1]} %`
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LO QUE AGREGÓ LA TANDA CORRECTIVA: el riel y el estado activo.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("G10. LA CARD ACTIVA SE VE DISTINTA, no solo distinta para el navegador", () => {
+  // ── EL PEDIDO QUE ORIGINÓ ESTE CANDADO ───────────────────────────────────
+  //
+  // En producción, el único cambio visible al tocar una card era un chip que
+  // aparecía MÁS ABAJO, fuera del bloque. La card apenas se movía, así que la
+  // señal principal de "estoy filtrando por esto" estaba en otro lado de la
+  // pantalla que el elemento que se había tocado.
+  //
+  // `aria-pressed` ya estaba y no alcanza: no lo ve nadie que mire la pantalla.
+  // Este candado exige que la card activa se distinga por PINTURA — fondo teñido
+  // y anillo — y que las otras tres no.
+  const html = render({ controles: conCantidad(7), activo: CONTROLES[0].id });
+
+  // Se busca por el FINAL de la expresión y no por la de adentro: el fondo
+  // activo es un `color-mix` que envuelve a OTRO `color-mix` —el del color de
+  // estado—, así que cualquier patrón que intente describir el interior con
+  // `[^)]*` se corta en el primer paréntesis de `var(--warning-fg)` y no matchea
+  // nada. La primera versión de este candado se cortaba justo ahí.
+  const tinte = new RegExp(`${TINTE_ACTIVO_PCT}%, var\\(--card-bg\\)\\)`, "g");
+  const teñidas = html.match(tinte) || [];
+  assert.equal(teñidas.length, 1, "tiene que haber exactamente UNA card con el fondo teñido");
+
+  // El anillo también, y también una sola vez.
+  const anillos = html.match(/ring-2/g) || [];
+  assert.equal(anillos.length, 1, "tiene que haber exactamente UN anillo");
+
+  // Y el resto sigue con el fondo liso del kit.
+  const lisas = html.match(/background:var\(--card-bg\)/g) || [];
+  assert.equal(lisas.length, CONTROLES.length - 1, "las cards no activas cambiaron de fondo");
+});
+
+test("G11. contraprueba de G10: sin control activo no hay ninguna teñida", () => {
+  // Si el fondo teñido saliera siempre, G10 pasaría en verde mientras la card
+  // activa deja de distinguirse — que es el mismo falso verde que ya se comió
+  // este repo tres veces.
+  const html = render({ controles: conCantidad(7) });
+  assert.doesNotMatch(html, new RegExp(`${TINTE_ACTIVO_PCT}%, var\\(--card-bg\\)`));
+  assert.doesNotMatch(html, /ring-2/);
+  assert.equal((html.match(/background:var\(--card-bg\)/g) || []).length, CONTROLES.length);
+});
+
+test("G12. la card activa dice cómo se sale, y ninguna otra lo dice", () => {
+  // El chip de abajo se retiró en esta tanda. Sin él, la única forma de quitar
+  // el filtro es volver a tocar la card — y eso hay que decirlo en algún lado o
+  // queda como un estado del que no se sabe salir.
+  const html = render({ controles: conCantidad(7), activo: CONTROLES[1].id });
+  // El texto VISIBLE, delimitado por sus etiquetas. Contar la frase suelta daba
+  // 2, porque el nombre accesible dice "Tocá para quitar el filtro" y la
+  // subcadena aparece ahí también — o sea, el candado contaba una vez el texto y
+  // otra el atributo, y hacía fallar a la implementación correcta.
+  const visible = html.match(/>Tocá para quitar</g) || [];
+  assert.equal(visible.length, 1, "el texto de salida tiene que estar en la card activa y en ninguna otra");
+  // Y el nombre accesible lo dice también, una sola vez: `aria-pressed` solo no
+  // explica cómo deshacerlo.
+  const anunciado = html.match(/Filtrando\. Tocá para quitar el filtro\./g) || [];
+  assert.equal(anunciado.length, 1, "el nombre accesible del estado activo tiene que estar en una sola card");
+});
+
+test("G13. EL BLOQUE ES UN RIEL: las cards no entran todas, y por eso se lee que sigue", () => {
+  // ── QUÉ AFIRMA, Y POR QUÉ ASÍ ────────────────────────────────────────────
+  //
+  // El pedido fue que el bloque dejara de leerse como cuatro cajas fijas. Lo que
+  // lo consigue es que las cards NO entren todas: la que queda cortada en el
+  // borde es la señal.
+  //
+  // Se mira la geometría declarada y no una captura: `ANCHO_CARD_PCT` por la
+  // cantidad de controles tiene que pasarse del 100 %. Si alguien las achicara
+  // para que entren las cuatro, esto se pone rojo — y esa es exactamente la
+  // regresión que hay que atajar, porque no rompe nada y se ve igual de prolijo.
+  assert.ok(
+    ANCHO_CARD_PCT * CONTROLES.length > 100,
+    `con ${CONTROLES.length} controles al ${ANCHO_CARD_PCT} % entran todas: el riel dejó de desbordar`
+  );
+
+  const html = render({ controles: conCantidad(7) });
+  // Y que las cards no se compriman para entrar: sin `shrink-0`, flex las
+  // achicaría hasta que quepan y el riel dejaría de deslizarse.
+  assert.equal(
+    (html.match(/shrink-0 snap-start/g) || []).length,
+    CONTROLES.length,
+    "alguna card dejó de ser rígida: flex la va a comprimir hasta que entren todas"
+  );
+  assert.match(html, /snap-x snap-mandatory/, "el riel dejó de enganchar en el borde de cada card");
+  // La grilla 2×2 se fue. Si volviera, las cards entrarían todas otra vez.
+  assert.doesNotMatch(html, /grid-cols-2/);
+});
+
+test("G14. la barra de avance aparece SOLO cuando sobra riel", () => {
+  const conCuatro = render({ controles: conCantidad(7) });
+  assert.match(conCuatro, /var\(--app-border\)/, "falta la barra de avance con cuatro controles");
+
+  // La contraprueba: con uno solo entra entero y una barra completa se leería
+  // como un control roto.
+  const conUno = render({ controles: [{ ...CONTROLES[0], cantidad: 7 }] });
+  assert.doesNotMatch(conUno, /var\(--app-border\)/, "la barra sale aunque no haya nada que deslizar");
+});
+
+test("G15. la sonda de contraste mide TAMBIÉN el fondo activo", () => {
+  // El hermano de G9-bis, por el mismo motivo y para el fondo nuevo. El tinte
+  // empuja el fondo hacia el color del texto, así que BAJA el contraste: si la
+  // sonda siguiera midiendo solo contra `--card-bg`, estaría dando verde sobre
+  // un fondo que la pantalla ya no dibuja en la card encendida.
+  const html = render({ controles: conCantidad(3), activo: CONTROLES[0].id });
+  const sonda = fs.readFileSync(
+    path.join(process.cwd(), "scripts", "sonda-controles-tokens.mjs"),
+    "utf8"
+  );
+
+  const enElComponente = html.match(/\) (\d+)%, var\(--card-bg\)\)/);
+  assert.ok(enElComponente, "el componente dejó de teñir el fondo de la card activa");
+  assert.equal(Number(enElComponente[1]), TINTE_ACTIVO_PCT);
+
+  // La sonda arma la expresión con una plantilla, así que en su TEXTO el
+  // porcentaje no es un dígito sino `${TINTE_ACTIVO}`. Se comprueban las dos
+  // mitades: que arme un fondo sobre `--card-bg`, y con qué número lo hace.
+  assert.match(
+    sonda,
+    /%, var\(--card-bg\)\)`/,
+    "la sonda no arma ningún fondo teñido sobre --card-bg"
+  );
+  const enLaSonda = sonda.match(/const TINTE_ACTIVO = (\d+)/);
+  assert.ok(enLaSonda, "la sonda no declara con cuánto tiñe el fondo activo");
+  assert.equal(
+    Number(enLaSonda[1]),
+    TINTE_ACTIVO_PCT,
+    `el componente tiñe al ${TINTE_ACTIVO_PCT} % y la sonda mide al ${enLaSonda[1]} %`
+  );
+});
+
+test("G16. y mide la MISMA pista sobre la que corre la barra", () => {
+  // El caso de la pista es el que más se presta a que los dos lados se separen,
+  // porque su valor no se eligió: se derivó de medir. Con la pista al 60 % el
+  // contraste EMPEORA a 1,38 y al 30 % pasa a 3,26, así que un cambio de ese
+  // número cambia el veredicto — y si la sonda siguiera midiendo el viejo, daría
+  // verde sobre una barra que la pantalla dibuja de otro color.
+  const html = render({ controles: conCantidad(3) });
+  assert.ok(
+    html.includes(PISTA_DEL_RIEL),
+    "el componente dejó de pintar la pista con la expresión que exporta"
+  );
+
+  const sonda = fs.readFileSync(
+    path.join(process.cwd(), "scripts", "sonda-controles-tokens.mjs"),
+    "utf8"
+  );
+  assert.ok(
+    sonda.includes(PISTA_DEL_RIEL),
+    `la sonda no mide la pista del componente: ${PISTA_DEL_RIEL}`
   );
 });
 

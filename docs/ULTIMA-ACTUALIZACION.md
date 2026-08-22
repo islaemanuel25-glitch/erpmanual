@@ -1,19 +1,21 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-21 04:53
+**Fecha:** 2026-08-22 11:20
 
 ## Módulos modificados recientemente
 
 ### productos
-- fix(productos): la card y el listado dan el mismo número, y un conteo parcial deja de verse sano, fix(productos): la revisión de precio se marca donde el precio cambia, y solo ahí, fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado
-- Archivos: 4 nuevos, 7 modificados (11 total)
+- refactor(productos): alinear el carrusel con el Figma aprobado, test(productos): la sonda del navegador mide las dos caras, no la franja, feat(productos): Personalizar card prende y apaga, y ya no reordena
+- Archivos: 2 nuevos, 3 modificados (5 total)
+
+### configuracion
+- feat(productos): Personalizar card prende y apaga, y ya no reordena
+- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización
-- components/productos/CarruselControles.jsx
-- components/productos/carruselControlesRender.test.mjs
-- components/productos/HojaMasAcciones.jsx
-- components/productos/HojaPersonalizarTarjeta.jsx
+- components/productos/TarjetaProductoMovil.jsx
+- components/productos/tarjetaProductoMovil.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

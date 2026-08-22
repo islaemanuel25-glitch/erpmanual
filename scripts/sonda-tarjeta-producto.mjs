@@ -53,7 +53,11 @@ import { prepararSesion } from "./lib/sesionArnes.mjs";
 // reimplementara el redondeo o la equivalencia, estaría comparando la pantalla
 // contra una segunda versión escrita por la misma persona el mismo día: las dos
 // coincidirían siempre, incluso estando las dos mal.
-import { formatearMoneda, lineaDeEquivalencia } from "../lib/moneda.js";
+// `lineaDeEquivalencia` se importaba para reconstruir el texto de la franja. La
+// franja se fue: lo que hay que comparar ahora son las dos caras, y eso lo arma
+// `carasDeTarjeta` — la misma pieza que usa la pantalla.
+import { formatearMoneda } from "../lib/moneda.js";
+import { carasDeTarjeta, nombreDelDorso } from "../lib/productos/carasDeTarjeta.js";
 import { precioEnEscalaQueSeCobra, precioUnitarioQueSeCobra } from "../lib/precios/redondeo.js";
 import { escalaDeVentaDe, valorEnLaEscalaDeVenta } from "../lib/precios/escalaDeVenta.js";
 import { esProductoServicio } from "../lib/pos-ventas/servicios.js";
@@ -264,6 +268,27 @@ try {
     console.log(`ubicación pedida: ${r.nombre} (id ${r.localId})`);
   }
 
+  /**
+   * Espera acotada al bloque "Para revisar".
+   *
+   * Vive acá arriba porque la usan dos partes de la sonda que están muy
+   * separadas. Con un `sleep` fijo, una recompilación del servidor de desarrollo
+   * deja la lectura en `null` y la sonda muere con un TypeError — un rojo que no
+   * dice qué pasó y que no se repite al reintentar. Un rojo así desgasta la regla
+   * de "si no puede medir, frena": la próxima vez el reflejo es volver a correrla.
+   *
+   * Si el bloque no aparece, muere igual, con el motivo escrito.
+   */
+  const esperarBloqueDeControles = async (donde) => {
+    for (let intento = 0; intento < 20; intento++) {
+      const hay = await evaluar(`!![...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""))`);
+      if (hay) return;
+      await sleep(500);
+    }
+    morir(`el bloque "Para revisar" no apareció en 10 s (${donde})`);
+  };
+
   await send("Page.navigate", { url: `${BASE}/modulos/productos` });
   await sleep(6000);
 
@@ -272,72 +297,81 @@ try {
     morir(`quedó en ${donde} en vez de /modulos/productos — la sesión no entró`);
   }
 
-  // La tarjeta se reconoce por el pie de códigos monoespaciado, que es suyo y de
-  // ningún otro panel de la pantalla.
-  const TARJETAS = `[...document.querySelectorAll('[data-sunmi-panel]')].filter(p => p.querySelector('.font-mono'))`;
+  // ── LA TARJETA SE RECONOCE POR SU CARA, NO POR EL PIE DE CÓDIGOS ────────
+  //
+  // Se filtraba por `.font-mono`, que era el pie de códigos. Eso ató el selector
+  // a un bloque OPCIONAL: desde que la identificación es del dorso, un catálogo
+  // con los dos códigos apagados en "Personalizar card" no tiene ningún
+  // `.font-mono` en el frente, y la sonda moría diciendo "no hay ninguna tarjeta
+  // de producto a 390 px" sobre una pantalla llena de tarjetas.
+  //
+  // Lo comprobó una contraprueba: al sacar la reserva del frente, la sonda dio
+  // rojo por el selector y no por lo que se estaba probando — un rojo correcto
+  // por el motivo equivocado, que es tan malo como un verde falso.
+  //
+  // `data-tarjeta-cara` lo pone el envoltorio y está en las dos caras siempre.
+  const TARJETAS = `[...document.querySelectorAll('[data-sunmi-panel]')].filter(p => p.querySelector('[data-tarjeta-cara]'))`;
   const cuantas = await evaluar(`${TARJETAS}.length`);
   if (!cuantas) {
     morir("no hay ninguna tarjeta de producto a 390 px — o no hay datos, o no se dibujó");
   }
   console.log(`\ntarjetas de producto a ${ANCHO} px: ${cuantas}\n`);
 
-  // ── 1 · EL RÓTULO NO PUEDE CONTRADECIR A LA EQUIVALENCIA ────────────────
+  // ── 1 · LA PRESENTACIÓN NO PUEDE CONTRADECIR AL BOTÓN QUE LLEVA AL DORSO ─
   //
-  // No se afirma cuál es el rótulo correcto —eso depende del producto—, se
-  // afirma que las dos mitades de la tarjeta no digan cosas opuestas. Si la
-  // tarjeta explica "1 pack = N un", entonces el número de arriba es de bulto y
-  // rotularlo como unitario es falso. Es la contradicción exacta que llegó a
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ AHORA AFIRMA OTRA COSA ────────────────
+  //
+  // Comparaba el rótulo del precio contra la franja de equivalencia: si la franja
+  // decía "1 pack = 24 un · $1.400 por unidad", el número de arriba era de bulto
+  // y rotularlo unitario era falso. Es la contradicción exacta que llegó a
   // producción sobre 1.293 de 2.600 productos.
-  // EL RÓTULO SE LEE DEL NODO, NO DEL TEXTO PLANO. En `innerText` la palabra
-  // "por unidad" aparece DOS veces —una es el rótulo y la otra el final de la
-  // equivalencia, "…$1.329,17 por unidad"—, así que buscarla por texto encuentra
-  // la que no es y el candado pasa a afirmar cualquier cosa. El rótulo es el
-  // último hijo de la fila del precio, y eso no es ambiguo.
+  //
+  // La franja se fue con la card de frente y dorso. **La contradicción que hay
+  // que atajar no se fue**: sigue siendo posible que la tarjeta muestre un número
+  // en una escala y lo rotule con otra. Lo que cambió es contra qué se coteja.
+  //
+  // Ahora se coteja contra el BOTÓN, que nombra la cara a la que lleva. Frente
+  // "PACK X 24" tiene que ofrecer "Ver unidad"; frente "UNIDAD", "Ver pack". Los
+  // dos textos salen de la misma pieza —`presentacionDe` y `nombreCortoDe`— así
+  // que si alguien reescribe uno de los dos por su cuenta, esto se pone rojo.
+  //
+  // Y se leen por ATRIBUTO y no por posición ni por texto: la lección de la
+  // franja, que nunca se encontró porque el selector adivinaba cuál nodo era.
   const contradicciones = await evaluar(`(() => {
+    const ESPERADO = {
+      UNIDAD: "pack",     // si adelante va la unidad, atrás va el bulto
+      KG: "referencia",
+      PIEZA: "referencia",
+      "IMPORTE VARIABLE": null,  // no tiene dorso
+    };
     return ${TARJETAS}.map((t) => {
-      const texto = t.innerText;
-      const fila = t.querySelector('.items-baseline');
-      const rotulo = fila && fila.lastElementChild
-        ? fila.lastElementChild.textContent.trim()
-        : null;
-      // LAS DOS FORMAS DE LA FRANJA, que ahora dicen cosas distintas:
-      //   "1 pack = 24 un · $1.400,00 por unidad"  -> el número de arriba es el
-      //                                               BULTO, y por eso la franja
-      //                                               tiene que decir el unitario.
-      //   "1 pack = 24 un"                         -> el número de arriba YA es
-      //                                               el unitario: repetirlo
-      //                                               sobraría.
-      const conPack = /1 pack = \\d+ un/.test(texto);
-      const repiteUnitario = /1 pack = \\d+ un\\s*·/.test(texto);
+      const cara = t.querySelector('[data-tarjeta-cara]');
+      const pres = t.querySelector('[data-cara-presentacion]');
+      const rot = t.querySelector('[data-cara-rotulo]');
       return {
-        texto: texto.split("\\n").slice(0, 2).join(" · "),
-        equivalenciaConUnitario: conPack && repiteUnitario,
-        equivalenciaSinUnitario: conPack && !repiteUnitario,
-        // La franja del fiambre de pieza fija. Su sola presencia obliga al
-        // rótulo "por pieza": son la misma afirmación dicha dos veces y no
-        // pueden discrepar.
-        conPieza: /1 pieza = [\\d.,]+ kg/.test(texto),
-        // Y la del kilo, que perdió el "Se vende por kilo" y quedó solo con la
-        // fracción — que es lo que aporta.
-        porKilo: /cada 100 g/.test(texto),
-        rotulo,
+        nombre: t.innerText.split("\\n")[0],
+        lado: cara ? cara.getAttribute('data-tarjeta-cara') : null,
+        rotulo: rot ? rot.textContent.trim() : null,
+        presentacion: pres ? pres.textContent.trim() : null,
       };
-    }).filter((c) =>
-      // Si la franja REPITE el precio unitario, es porque el número de arriba no
-      // lo es: tiene que estar rotulado por bulto.
-      (c.equivalenciaConUnitario && c.rotulo !== "por bulto") ||
-      // Y si la franja NO lo repite, el número de arriba SÍ es el unitario.
-      (c.equivalenciaSinUnitario && c.rotulo !== "por unidad") ||
-      (c.conPieza && c.rotulo !== "por pieza") ||
-      (c.porKilo && c.rotulo !== "por kg") ||
-      !["por bulto", "por kg", "por unidad", "por pieza"].includes(c.rotulo)
-    );
+    }).filter((c) => {
+      // Toda tarjeta abre en el frente, y lo dice. Si alguna abriera en el
+      // dorso, la lista estaría mostrando la referencia como si fuera lo que se
+      // vende.
+      if (c.lado !== "frente") return true;
+      if (c.rotulo !== "VENTA CONFIGURADA") return true;
+      if (!c.presentacion) return true;
+      // La presentación tiene que ser una de las formas conocidas.
+      const base = c.presentacion.replace(/ · COMBO$/, "");
+      const esPack = /^(PACK|CAJÓN) X \\d+$/.test(base);
+      return !esPack && !(base in ESPERADO) && base !== "BULTO";
+    });
   })()`);
   afirmar(
     contradicciones.length === 0,
-    "1 · el rótulo del precio no contradice a la línea de equivalencia",
+    "1 · toda tarjeta abre en el frente, identificado y con una presentación conocida",
     contradicciones.length
-      ? `${contradicciones.length} tarjeta(s) se contradicen. La primera: ${contradicciones[0].texto} — rótulo ${contradicciones[0].rotulo ?? "AUSENTE"}`
+      ? `${contradicciones.length} tarjeta(s). La primera: ${contradicciones[0].nombre} — cara ${contradicciones[0].lado}, rótulo ${contradicciones[0].rotulo ?? "AUSENTE"}, presentación ${contradicciones[0].presentacion ?? "AUSENTE"}`
       : ""
   );
 
@@ -435,11 +469,20 @@ try {
       // ataba a las palabras que esta tanda cambió, y la condición de "sin hijos
       // elemento" era directamente falsa —el bloque tiene el ícono y el span—,
       // así que no lo encontraba nunca y la comparación se salteaba en silencio.
-      const bloque = t.querySelector('[data-sunmi-equivalencia]');
+      const importe = t.querySelector('[data-cara-importe]');
+      const presentacion = t.querySelector('[data-cara-presentacion]');
+      const voltear = t.querySelector('[data-tarjeta-voltear]');
       return {
         nombre: nombre ? nombre.textContent.trim() : "",
         valor: fila ? fila.textContent.trim() : "",
-        equivalencia: bloque ? bloque.textContent.trim() : "",
+        // Si hay botón para dar vuelta, esta tarjeta tiene dorso.
+        tieneDorso: !!voltear,
+        // Y cómo se llama, para poder cotejarlo contra la cara a la que lleva.
+        etiquetaVoltear: voltear ? voltear.textContent.trim() : null,
+        // La franja de equivalencia se fue con la card de frente y dorso. Lo que
+        // la reemplaza es la PRESENTACIÓN pegada al número, y se lee por atributo.
+        importe: importe ? importe.textContent.trim() : "",
+        presentacion: presentacion ? presentacion.textContent.trim() : "",
       };
     });
   })()`);
@@ -520,27 +563,64 @@ try {
       malPrecio.push(`${vista.nombre}: se ve "${vista.valor}", corresponde ${esperado}`);
     }
 
-    // La franja tampoco es independiente: si el número de arriba YA es el
-    // unitario, no lo repite. Se le pasa la misma respuesta Y EL MISMO PRECIO.
-    const eqEsperada = lineaDeEquivalencia({
+    // ── Y LA PRESENTACIÓN, QUE REEMPLAZÓ A LA FRANJA ───────────────────────
+    //
+    // Acá se comparaba el texto de la franja contra `lineaDeEquivalencia`. La
+    // franja se fue: la presentación viaja pegada al número —"PACK X 24"— y la
+    // otra escala vive en el dorso.
+    //
+    // La afirmación se conserva con la misma forma y contra la misma fuente:
+    // `carasDeTarjeta`, que es la pieza que la pantalla usa. **La ausencia
+    // también se compara** — antes solo se miraba la franja cuando estaba, así
+    // que una que sobrara o faltara pasaba sin ruido.
+    const carasEsperadas = carasDeTarjeta({
+      escala: escalaEsperada,
       precio: precioBase,
+      redondeo100: redondeoBase,
       factor: fila.factorPack,
       unidad: fila.unidadMedida,
-      redondeo100: redondeoBase,
-      esCombo: fila.esCombo,
-      escala: escalaEsperada,
       pesoReferenciaKg: fila.pesoReferenciaKg,
+      esCombo: fila.esCombo,
     });
-    // LA AUSENCIA TAMBIÉN SE COMPARA. Antes solo se miraba la franja cuando
-    // estaba, así que una que sobrara —o una que faltara— pasaba sin ruido. Y
-    // desde que la franja PUEDE no estar, ese hueco dejaría de mirarse justo en
-    // el caso nuevo.
-    const eqVista = vista.equivalencia || null;
-    if (eqVista !== (eqEsperada || null)) {
+    const presEsperada =
+      carasEsperadas.frente.presentacion +
+      (carasEsperadas.frente.esCombo ? " · COMBO" : "");
+    const presVista = vista.presentacion || null;
+    if (presVista !== presEsperada) {
       malPrecio.push(
-        `${vista.nombre}: equivalencia ${eqVista === null ? "AUSENTE" : `"${eqVista}"`}, ` +
-        `corresponde ${eqEsperada === null ? "AUSENTE" : `"${eqEsperada}"`}`
+        `${vista.nombre}: presentación ${presVista === null ? "AUSENTE" : `"${presVista}"`}, ` +
+        `corresponde "${presEsperada}"`
       );
+    }
+
+    // ── SI TIENE QUE TENER DORSO, TIENE QUE OFRECERLO, Y BIEN NOMBRADO ─────
+    //
+    // Mirando la pantalla no se puede saber: un suelto y un pack se ven igual de
+    // bien sin botón. Con la fila del listado sí.
+    //
+    // LA REGLA APROBADA: el dorso existe si aporta REFERENCIA o IDENTIFICACIÓN.
+    // `carasDeTarjeta` contesta lo primero; lo segundo depende de qué códigos
+    // tenga prendidos "Personalizar card", y la sonda corre con los dos prendidos
+    // —es la configuración de fábrica y es la que se está midiendo—.
+    //
+    // Es la mitad que le falta al chequeo 1: aquél comprueba la estructura de la
+    // cara que se ve; éste comprueba que la otra cara exista cuando corresponde y
+    // que el botón nombre la cara a la que lleva.
+    const hayIdentificacion = true;
+    const deberiaTenerDorso = carasEsperadas.dorso !== null || hayIdentificacion;
+    if (vista.tieneDorso !== deberiaTenerDorso) {
+      malPrecio.push(
+        `${vista.nombre}: ${deberiaTenerDorso ? "le falta el botón de dar vuelta" : "ofrece un dorso que no existe"}`
+      );
+    } else if (deberiaTenerDorso) {
+      // El nombre corto de la cara de atrás. Sale de la MISMA función que usa el
+      // componente, así que si alguien reescribe una de las dos, se separan.
+      const esperado = `Ver ${nombreDelDorso(carasEsperadas.dorso)}`;
+      if (vista.etiquetaVoltear !== esperado) {
+        malPrecio.push(
+          `${vista.nombre}: el botón dice "${vista.etiquetaVoltear}" y tendría que decir "${esperado}"`
+        );
+      }
     }
 
     // ── EL COSTO, EN LA MISMA ESCALA QUE LA VENTA ─────────────────────────
@@ -716,33 +796,30 @@ try {
     `${malCosto.length} diferencia(s). Primera: ${malCosto[0] ?? ""}`
   );
 
-  // ── 9c · LA ESCALA NO SE DICE DOS VECES ─────────────────────────────────
+  // ── 9c · LA FRANJA NO VUELVE ────────────────────────────────────────────
   //
-  // Ésta faltaba, y la falta se destapó con una contraprueba: se repuso el
-  // "Se vende por unidad" de la franja —la repetición exacta que esta tanda
-  // saca— y la sonda siguió en VERDE. Una sonda que no ve volver el defecto que
-  // acaba de arreglarse no está cuidando ese arreglo.
+  // Ésta nació de una contraprueba: se repuso el "Se vende por unidad" de la
+  // franja —la repetición exacta que se estaba sacando— y la sonda siguió en
+  // VERDE. Una sonda que no ve volver el defecto que acaba de arreglarse no está
+  // cuidando ese arreglo.
   //
-  // La regla: la franja NO puede volver a nombrar la escala. Eso lo dice el
-  // rótulo pegado al precio, dos centímetros arriba. Lo que la franja aporta es
-  // la CONVERSIÓN, y por eso las formas válidas empiezan con un número o con un
-  // signo peso.
+  // La franja entera se fue con la card de frente y dorso. La afirmación se
+  // mantiene y se endurece: no puede volver el bloque, y la presentación —que es
+  // lo que lo reemplaza— no puede escribir la escala con la preposición, que era
+  // la forma exacta de la repetición.
   const repetida = await evaluar(`(() => {
     return ${TARJETAS}.map((t) => {
-      const bloque = t.querySelector('[data-sunmi-equivalencia]');
-      if (!bloque) return null;
-      const texto = bloque.textContent.trim();
-      // "Se vende por …" es la forma exacta que se sacó. "Combo" solo es la
-      // marca del combo y no nombra ninguna escala.
-      return /se vende por/i.test(texto)
-        ? (t.firstElementChild.firstElementChild.textContent.trim() + " → " + texto)
-        : null;
+      const nombre = t.innerText.split("\\n")[0];
+      if (t.querySelector('[data-sunmi-equivalencia]')) return nombre + " → volvió la franja";
+      const pres = t.querySelector('[data-cara-presentacion]');
+      const texto = pres ? pres.textContent.trim() : "";
+      return /se vende por|^por /i.test(texto) ? nombre + " → " + texto : null;
     }).filter(Boolean);
   })()`);
   afirmar(
     repetida.length === 0,
-    "9c · la franja no vuelve a nombrar la escala que ya dice el rótulo",
-    `${repetida.length} tarjeta(s) la repiten. La primera: ${repetida[0] ?? ""}`
+    "9c · no volvió la franja de equivalencia ni su forma de nombrar la escala",
+    `${repetida.length} tarjeta(s). La primera: ${repetida[0] ?? ""}`
   );
   // ── 1b · LOS DOS NÚMEROS DE LA TARJETA TIENEN QUE CERRAR ENTRE SÍ ───────
   //
@@ -780,38 +857,125 @@ try {
     return Number(m[1].replace(/\./g, "").replace(",", "."));
   };
 
-  const noCierran = [];
-  for (const vista of enPantalla) {
-    const eq = vista.equivalencia || "";
-    const m = eq.match(/1 pack = (\d+) un\s*·/);
-    if (!m) continue; // sin conversión de pack no hay dos números que cerrar
-    const n = Number(m[1]);
-    const unitario = aNumeroArg(eq);
-    const grande = aNumeroArg(vista.valor);
-    if (!n || unitario === null || grande === null) continue;
+  // ── AHORA LOS DOS NÚMEROS ESTÁN EN DOS CARAS, ASÍ QUE HAY QUE DARLA VUELTA ─
+  //
+  // Antes los dos se veían juntos —el grande y el de la franja— y alcanzaba con
+  // leer. Con el dorso hay que TOCAR el botón, leer la otra cara y volver.
+  //
+  // Se hace sobre una muestra y no sobre las 25: cada vuelta es un toque y una
+  // espera, y con 25 la sonda pasaría de segundos a minutos. Cuántas se
+  // ejercieron se informa siempre — un "verde" sobre cero tarjetas no es un pase,
+  // y por eso el número va en el propio título de la afirmación.
+  const MUESTRA_CARAS = 6;
+  const conPack = [];
+  for (let i = 0; i < enPantalla.length && conPack.length < MUESTRA_CARAS; i++) {
+    if (/^(PACK|CAJÓN) X \d+/.test(enPantalla[i].presentacion || "")) conPack.push(i);
+    else if (enPantalla[i].presentacion === "UNIDAD") {
+      // También sirve el caso del local: adelante la unidad, atrás el pack.
+      conPack.push(i);
+    }
+  }
 
-    const reconstruido = n * unitario;
-    const margenArriba = n * 100; // redondeo a 100 por unidad, en el peor caso
-    const margenAbajo = n * 0.01; // el unitario se muestra con dos decimales
-    if (
-      reconstruido < grande - margenAbajo ||
-      reconstruido - grande > margenArriba
-    ) {
+  const noCierran = [];
+  let cruzadas = 0;
+  for (const i of conPack) {
+    const par = await evaluar(`(() => {
+      const t = ${TARJETAS}[${i}];
+      const boton = t.querySelector('[data-tarjeta-voltear]');
+      if (!boton) return null;
+      const leer = () => ({
+        lado: t.querySelector('[data-tarjeta-cara]').getAttribute('data-tarjeta-cara'),
+        importe: (t.querySelector('[data-cara-importe]') || {}).textContent,
+        presentacion: (t.querySelector('[data-cara-presentacion]') || {}).textContent,
+      });
+      const frente = leer();
+      const alto = Math.round(t.getBoundingClientRect().height * 10) / 10;
+      boton.click();
+      return { frente, alto, nombre: t.innerText.split("\\n")[0] };
+    })()`);
+    if (!par) continue; // esta tarjeta no tiene dorso: no hay dos números que cruzar
+    await sleep(250);
+    const dorso = await evaluar(`(() => {
+      const t = ${TARJETAS}[${i}];
+      const d = {
+        lado: t.querySelector('[data-tarjeta-cara]').getAttribute('data-tarjeta-cara'),
+        importe: (t.querySelector('[data-cara-importe]') || {}).textContent,
+        presentacion: (t.querySelector('[data-cara-presentacion]') || {}).textContent,
+        alto: Math.round(t.getBoundingClientRect().height * 10) / 10,
+        // La identificación es del dorso: acá tiene que estar visible.
+        codigosVisibles: [...t.querySelectorAll('[data-pie-codigos]')].filter(
+          (p) => getComputedStyle(p).visibility !== "hidden"
+        ).length,
+      };
+      t.querySelector('[data-tarjeta-voltear]').click();
+      return d;
+    })()`);
+    await sleep(250);
+
+    if (dorso.lado !== "dorso") {
+      noCierran.push(`${par.nombre}: tocar el botón no cambió de cara`);
+      continue;
+    }
+
+    // ── LAS DOS CARAS TIENEN QUE MEDIR LO MISMO ──────────────────────────
+    //
+    // La lista usa `auto-rows-fr`, que le da a todas las filas el alto de la más
+    // alta. Si el dorso fuera más alto, dar vuelta UNA tarjeta estiraría TODAS
+    // las filas: el catálogo entero saltaría, y nadie relacionaría el salto con
+    // el toque.
+    //
+    // Esto no se deduce del código: la reserva del frente puede quedar corta por
+    // un renglón que envuelve. Se mide.
+    if (Math.abs(dorso.alto - par.alto) > 0.5) {
       noCierran.push(
-        `${vista.nombre}: grande ${grande} vs ${n} × ${unitario} = ${reconstruido.toFixed(2)} ` +
+        `${par.nombre}: el dorso mide ${dorso.alto} px y el frente ${par.alto} — dar vuelta mueve la grilla`
+      );
+    }
+
+    // Y la identificación tiene que estar A LA VISTA en el dorso. En el frente su
+    // lugar queda reservado pero oculto; si acá siguiera oculta, los códigos no
+    // se verían en ninguna cara.
+    if (dorso.codigosVisibles === 0) {
+      noCierran.push(`${par.nombre}: el dorso no muestra la identificación`);
+    }
+
+    const pres = `${par.frente.presentacion || ""} ${dorso.presentacion || ""}`;
+    const m = pres.match(/(?:PACK|CAJÓN) X (\d+)/);
+    const bulto = /^(PACK|CAJÓN)/.test(par.frente.presentacion || "")
+      ? aNumeroArg(par.frente.importe)
+      : aNumeroArg(dorso.importe);
+    const unitario = /^(PACK|CAJÓN)/.test(par.frente.presentacion || "")
+      ? aNumeroArg(dorso.importe)
+      : aNumeroArg(par.frente.importe);
+    if (!m || bulto === null || unitario === null) continue;
+
+    const n = Number(m[1]);
+    cruzadas++;
+    const reconstruido = n * unitario;
+    // Las dos holguras son las mismas de antes y por los mismos motivos:
+    //   · POR ARRIBA hasta n × 100, porque con el redondeo a 100 cada unidad sube;
+    //   · POR ABAJO hasta n × 0,01, porque el unitario se MUESTRA con dos
+    //     decimales y ese recorte se multiplica. 24.500 ÷ 24 es 1.020,8333… que
+    //     se escribe "1.020,83", y 24 × 1.020,83 da 24.499,92. Ocho centavos.
+    //     La primera versión no lo contemplaba y se puso roja sobre una tarjeta
+    //     CORRECTA: el defecto era del chequeo.
+    const margenArriba = n * 100;
+    const margenAbajo = n * 0.01;
+    if (reconstruido < bulto - margenAbajo || reconstruido - bulto > margenArriba) {
+      noCierran.push(
+        `${par.nombre}: bulto ${bulto} vs ${n} × ${unitario} = ${reconstruido.toFixed(2)} ` +
         `(holgura: −${margenAbajo.toFixed(2)} / +${margenArriba})`
       );
     }
   }
-  const conPackVistas = enPantalla.filter((v) => /1 pack = \d+ un\s*·/.test(v.equivalencia || "")).length;
   afirmar(
     noCierran.length === 0,
-    `1b · el precio grande y la equivalencia cierran entre sí (${conPackVistas} tarjeta(s) con conversión de pack)`,
+    `1b · el frente y el dorso cierran entre sí (${cruzadas} tarjeta(s) cruzadas de ${conPack.length} probadas)`,
     `${noCierran.length} no cierran. La primera: ${noCierran[0] ?? ""}`
   );
-  if (conPackVistas === 0) {
-    console.log("  ----  1b · en esta página no hay ninguna tarjeta con conversión de pack:");
-    console.log("        los dos números no se pudieron cruzar. No es un pase.");
+  if (cruzadas === 0) {
+    console.log("  ----  1b · en esta página no se pudo cruzar ninguna cara con su dorso:");
+    console.log("        los dos números no se compararon. No es un pase.");
   }
 
   afirmar(
@@ -852,17 +1016,30 @@ try {
   // de verdad y sigue exigiendo que sean uno solo. Y que la franja diga lo que
   // corresponde —incluido no estar— lo cubre la 9. Lo que queda acá es el pie,
   // que sí tiene que estar siempre.
+  // ── Y EL PIE SE MUDÓ AL DORSO, ASÍ QUE ACÁ SE MIDE LA RESERVA ───────────
+  //
+  // La identificación es contenido del dorso. En el frente su lugar queda
+  // RESERVADO —el bloque está, con `visibility: hidden`— y eso es lo que impide
+  // que dar vuelta una tarjeta estire todas las filas de la grilla.
+  //
+  // O sea que lo que este chequeo mira cambió de sentido: antes era "el pie está
+  // a la vista", ahora es "el lugar del pie está reservado y NO se ve". Que se
+  // vea en el dorso lo comprueba el cruce de caras del 1b, tocando el botón.
+  //
+  // Se afirman las dos mitades: que el bloque esté —sin él, la grilla salta— y
+  // que esté oculto —si se viera, la identificación estaría en las dos caras—.
   const filas = await evaluar(`(() => {
     const t = ${TARJETAS};
+    const pies = t.map((c) => c.querySelector('[data-pie-codigos]'));
     return {
-      sinEquivalencia: 0,
-      sinPie: t.filter((c) => !c.querySelector('.font-mono')).length,
+      sinPie: pies.filter((p) => !p).length,
+      visiblesEnElFrente: pies.filter((p) => p && getComputedStyle(p).visibility !== "hidden").length,
     };
   })()`);
   afirmar(
-    filas.sinEquivalencia === 0 && filas.sinPie === 0,
-    "6b · ninguna tarjeta se quedó sin el pie de códigos",
-    `sin equivalencia: ${filas.sinEquivalencia} · sin pie: ${filas.sinPie}`
+    filas.sinPie === 0 && filas.visiblesEnElFrente === 0,
+    "6b · el lugar de la identificación está reservado en el frente, y oculto",
+    `sin el bloque: ${filas.sinPie} · visibles en el frente: ${filas.visiblesEnElFrente}`
   );
 
   // ── 10 · LOS MARCADORES DE CADA RENGLÓN ─────────────────────────────────
@@ -878,21 +1055,26 @@ try {
   const marcas = await evaluar(`(() => {
     const t = ${TARJETAS}[0];
     const cuerpo = t.firstElementChild;
-    const equivalencia = [...t.querySelectorAll('div')].find(
-      (d) => /Se vende|1 pack =|se carga al vender/i.test(d.textContent) && d.querySelector('svg')
-    );
-    const pie = t.querySelector('.font-mono');
+    // El bloque de identificación, esté a la vista o reservado: el ícono tiene
+    // que estar dibujado en los dos casos, porque es el mismo nodo que se ve al
+    // dar vuelta la tarjeta.
+    const pie = t.querySelector('[data-pie-codigos]');
     return {
       enElNombre: !!(cuerpo && cuerpo.firstElementChild && cuerpo.firstElementChild.querySelector('svg')),
-      enLaEquivalencia: !!equivalencia,
       enElPie: !!(pie && pie.querySelector('svg')),
       textoDelPie: pie ? pie.textContent.trim() : "",
     };
   })()`);
+  // ── ERAN DOS ÍCONOS Y QUEDÓ UNO ─────────────────────────────────────────
+  //
+  // El de etiqueta marcaba la franja de equivalencia como "esto es la escala del
+  // precio". La franja se fue: la escala viaja pegada al número, EN PALABRAS, y
+  // un ícono ahí sería un dibujo repitiendo lo que el texto ya dice — que es el
+  // mismo argumento con el que se sacó el del nombre.
   afirmar(
-    marcas.enLaEquivalencia && marcas.enElPie,
-    "10a · están los dos íconos que marcan algo: etiqueta y código de barras",
-    `equivalencia: ${marcas.enLaEquivalencia} · pie: ${marcas.enElPie}`
+    marcas.enElPie,
+    "10a · está el ícono que marca algo: el código de barras del pie",
+    `pie: ${marcas.enElPie}`
   );
   afirmar(
     !marcas.enElNombre,
@@ -1021,17 +1203,66 @@ try {
   // 2.600 productos sin forma de llegar al 26. OJO: a este ancho el paginador de
   // la TABLA sigue en el DOM, oculto por `hidden md:block`, así que preguntar si
   // existe daría verde igual. Se pregunta por el que se VE.
+  // ── SE BUSCA POR EL NOMBRE ACCESIBLE, NO POR EL TEXTO ────────────────────
+  //
+  // La primera versión buscaba un botón que DIJERA "Anterior". El pie del celular
+  // se rediseñó en la tanda correctiva y sus botones pasaron a ser flechas, así
+  // que dejaron de tener ese texto: la sonda informó "paginadores en el DOM: 2,
+  // visibles: 0" sobre una paginación que estaba perfectamente a la vista.
+  //
+  // El candado no se aflojó, se reescribió sabiendo qué cambió, y afirma MÁS que
+  // antes: que el pie del celular esté visible, que sus dos flechas lleguen al
+  // área táctil mínima, que diga en qué página va, y —lo nuevo— que el pie de
+  // ESCRITORIO no se vea a este ancho. Esto último es lo que separa "hay una
+  // paginación" de "hay la paginación que corresponde a este ancho".
   const paginador = await evaluar(`(() => {
-    const todos = [...document.querySelectorAll('button')].filter(b => /Anterior/.test(b.textContent));
-    const visibles = todos.filter(b => b.getBoundingClientRect().height > 0);
-    if (!visibles.length) return { visible: false, enElDom: todos.length };
-    const bloque = visibles[0].closest('div').parentElement;
-    return { visible: true, enElDom: todos.length, texto: bloque.innerText.replace(/\\n/g, " ").slice(0, 60) };
+    const porNombre = (n) => [...document.querySelectorAll('button')]
+      .filter((b) => (b.getAttribute('aria-label') || '').startsWith(n));
+    const caja = (b) => b.getBoundingClientRect();
+    const visible = (b) => caja(b).height > 0 && caja(b).width > 0;
+
+    const anterior = porNombre('Página anterior');
+    const siguiente = porNombre('Página siguiente');
+    const aLaVista = [...anterior, ...siguiente].filter(visible);
+
+    // El de escritorio: el que escribe la palabra. A 390 px NO puede verse.
+    const escritorio = [...document.querySelectorAll('button')]
+      .filter((b) => /Anterior/.test(b.textContent));
+
+    // El rótulo de la página, que es el que además abre el "ir a".
+    const rotulo = [...document.querySelectorAll('button')]
+      .find((b) => /^Página \\d+ de \\d+$/.test(b.textContent.trim()) && visible(b));
+
+    return {
+      enElDom: anterior.length + siguiente.length,
+      visibles: aLaVista.length,
+      altoMinimo: aLaVista.length ? Math.min(...aLaVista.map((b) => caja(b).height)) : 0,
+      anchoMinimo: aLaVista.length ? Math.min(...aLaVista.map((b) => caja(b).width)) : 0,
+      escritorioVisible: escritorio.filter(visible).length,
+      escritorioEnElDom: escritorio.length,
+      rotulo: rotulo ? rotulo.textContent.trim() : null,
+    };
   })()`);
+
   afirmar(
-    paginador.visible,
+    paginador.visibles === 2,
     "7 · la lista de tarjetas tiene su paginación a la vista",
-    `paginadores en el DOM: ${paginador.enElDom}, visibles: 0 — el de la tabla no cuenta, está oculto`
+    `flechas en el DOM: ${paginador.enElDom}, visibles: ${paginador.visibles} — el pie de la tabla no cuenta, está oculto`
+  );
+  afirmar(
+    paginador.rotulo !== null,
+    `7b · el pie dice en qué página va${paginador.rotulo ? ` ("${paginador.rotulo}")` : ""}`,
+    "no hay ningún rótulo visible que diga 'Página N de M'"
+  );
+  afirmar(
+    paginador.altoMinimo >= 44 && paginador.anchoMinimo >= 44,
+    `7c · las flechas llegan al área táctil mínima (${Math.round(paginador.anchoMinimo)}×${Math.round(paginador.altoMinimo)} px · mínimo 44)`,
+    "una flecha de paginación por debajo de 44 px es un blanco que se falla con el pulgar"
+  );
+  afirmar(
+    paginador.escritorioVisible === 0 && paginador.escritorioEnElDom > 0,
+    "7d · el pie de ESCRITORIO no se ve a 390 px, y sigue existiendo para la tabla",
+    `visibles: ${paginador.escritorioVisible} de ${paginador.escritorioEnElDom} en el DOM`
   );
 
   // ── 3 · LA FILA DE ACCIONES, A LA VISTA Y SIN TOCAR NADA ────────────────
@@ -1077,21 +1308,36 @@ try {
   // la pantalla a la que iría, esto se pone rojo y lo nombra. Y si el botón
   // nuevo es legítimo, se agrega acá A PROPÓSITO, que es el trámite que tiene
   // que costar.
-  // "Ver" se fue con el issue #2: Editar es la única acción visible de la
-  // tarjeta. La pantalla de sólo lectura sigue existiendo y se llega desde la
-  // tabla de escritorio; lo que se sacó es el botón, no el destino.
+  // "Ver" se fue con el issue #2: llevaba a la ficha de sólo lectura, que sigue
+  // existiendo y se llega desde la tabla de escritorio. Lo que se sacó es el
+  // botón, no el destino.
+  //
+  // Con la card de frente y dorso volvieron a ser dos, y el segundo NO es "Ver":
+  // da vuelta la tarjeta y no navega a ningún lado. Su texto nombra la cara a la
+  // que lleva —"Ver unidad", "Ver pack"— así que el esperado depende del
+  // producto; por eso se acepta cualquiera de las formas conocidas y la
+  // coherencia entre el botón y la presentación la comprueba el chequeo 1.
   const ESPERADOS = (arg("botones", "Editar") || "").split(",").map((s) => s.trim());
-  const sobran = fila.textos.filter((b) => !ESPERADOS.includes(b));
+  const VOLTEAR = /^Ver (unidad|pack|cajón|kilo|pieza|bulto|referencia)$/;
+  const sobran = fila.textos.filter((b) => !ESPERADOS.includes(b) && !VOLTEAR.test(b));
   const faltan = ESPERADOS.filter((b) => !fila.textos.includes(b));
   afirmar(
     sobran.length === 0 && faltan.length === 0,
-    `3b · la fila tiene exactamente los botones esperados (${ESPERADOS.join(", ")})`,
+    `3b · la fila tiene los botones esperados (${ESPERADOS.join(", ")}) más el de dar vuelta`,
     `sobran: ${sobran.join(", ") || "ninguno"} · faltan: ${faltan.join(", ") || "ninguno"}`
   );
 
+  // Y el de dar vuelta NO puede ser "Ver" a secas: ése era el que llevaba a la
+  // ficha de sólo lectura, y el issue #2 lo sacó del celular.
   afirmar(
-    fila.conIcono >= ESPERADOS.length,
-    `3c · cada botón lleva su ícono (${fila.conIcono} de ${ESPERADOS.length})`,
+    !fila.textos.includes("Ver"),
+    "3b-bis · no volvió el botón 'Ver' que llevaba a la ficha de sólo lectura",
+    `botones: ${fila.textos.join(", ")}`
+  );
+
+  afirmar(
+    fila.conIcono >= fila.textos.length,
+    `3c · cada botón lleva su ícono (${fila.conIcono} de ${fila.textos.length})`,
     "un botón sin ícono: el diseño pide uno por acción"
   );
 
@@ -1117,15 +1363,27 @@ try {
   // vertical ENTRE los botones y no en el borde de afuera: `divide-x` la dibuja
   // solo en los intermedios, y escribirla a mano en cada botón deja una colgando
   // en el último.
+  // ── SOLO LOS BOTONES DE LA FILA, NO TODOS LOS DE LA TARJETA ─────────────
+  //
+  // Contaba `querySelectorAll('button')` de la tarjeta entera. Desde que el
+  // control de dar vuelta vive adentro del cuerpo del carrusel, eso cuenta dos
+  // botones y pide un separador que no corresponde: el `divide-x` es de la FILA
+  // de acciones, y el otro botón no está ahí.
+  //
+  // Se acota a la fila. La afirmación no cambia: en la fila, una línea entre cada
+  // par y ninguna colgando.
   const separadores = await evaluar(`(() => {
     const t = ${TARJETAS}[0];
-    const botones = [...t.querySelectorAll('button')];
+    const fila = [...t.querySelectorAll('div')].find((d) => d.className.includes('divide-x'));
+    if (!fila) return { total: 0, conBorde: 0, sinFila: true };
+    const botones = [...fila.querySelectorAll('button')];
     const conBorde = botones.filter((b) => {
       const w = parseFloat(getComputedStyle(b).borderLeftWidth) || 0;
       return w > 0;
     }).length;
     return { total: botones.length, conBorde };
   })()`);
+  if (separadores.sinFila) morir("no se encontró la fila de acciones de la tarjeta");
   afirmar(
     separadores.conBorde === Math.max(0, separadores.total - 1),
     `4 · hay una línea entre botones y ninguna colgando (${separadores.conBorde} para ${separadores.total} botones)`,
@@ -1239,6 +1497,16 @@ try {
   // que la card mostraba. Con el navegador, como corresponde.
   await send("Page.navigate", { url: `${BASE}/modulos/productos` });
   await sleep(6000);
+  // ── SE ESPERA AL BLOQUE, Y SI NO APARECE SE DICE QUÉ FALTÓ ──────────────
+  //
+  // Con un `sleep` fijo, una recompilación del servidor de desarrollo deja la
+  // lectura de abajo en `null` y la sonda muere con "Cannot read properties of
+  // null" — un rojo que no dice qué pasó y que no se repite al reintentar. Ya
+  // ocurrió al agregar el cruce de caras, que deja la página trabajando más.
+  //
+  // Esperar NO es aflojar: si el bloque no aparece en 10 s, la sonda muere igual,
+  // con el motivo escrito.
+  await esperarBloqueDeControles("antes de leer las cards de Para revisar");
 
   const cards = await evaluar(`(() => {
     const seccion = [...document.querySelectorAll('section')]
@@ -1254,8 +1522,57 @@ try {
 
   afirmar(
     Array.isArray(cards) && cards.length === 4 && cards.every((c) => c.visible),
-    `14a · "Para revisar" muestra sus cuatro cards a 390 px`,
+    `14a · "Para revisar" dibuja sus cuatro cards a 390 px`,
     cards ? `vinieron ${cards.length}: ${cards.map((c) => c.texto).join(" | ")}` : "no está el bloque"
+  );
+
+  // ── 14a-bis · Y ES UN RIEL, NO UNA GRILLA ───────────────────────────────
+  //
+  // 14a dice que las cuatro EXISTEN y tienen caja. Eso ya era verdad con la
+  // grilla 2×2 y sigue siéndolo ahora, así que por sí solo no distingue los dos
+  // diseños — un candado que pasa igual con las dos versiones no afirma nada
+  // sobre el cambio.
+  //
+  // Lo que la tanda correctiva promete es otra cosa: que el bloque se LEA como
+  // extensible. Eso se mide: la pista tiene que desbordar —hay más riel del que
+  // se ve—, tiene que haber una card cortada por el borde derecho —que es la
+  // señal— y la barra de avance tiene que estar dibujada.
+  const riel = await evaluar(`(() => {
+    const seccion = [...document.querySelectorAll('section')]
+      .find((s) => /Para revisar/.test(s.textContent || ""));
+    if (!seccion) return null;
+    const primera = seccion.querySelector('button[aria-pressed]');
+    const pista = primera ? primera.parentElement : null;
+    if (!pista) return null;
+    const cajaPista = pista.getBoundingClientRect();
+    const cards = [...pista.querySelectorAll('button[aria-pressed]')].map((b) => b.getBoundingClientRect());
+    const enteras = cards.filter((c) => c.left >= cajaPista.left - 1 && c.right <= cajaPista.right + 1).length;
+    const cortadas = cards.filter((c) => c.left < cajaPista.right && c.right > cajaPista.right).length;
+    // La barra: el hermano de la pista, marcado como decorativo.
+    const barra = seccion.querySelector('[aria-hidden="true"] > div');
+    return {
+      desborda: pista.scrollWidth > pista.clientWidth + 1,
+      sobra: pista.scrollWidth - pista.clientWidth,
+      enteras,
+      cortadas,
+      hayBarra: !!barra && barra.getBoundingClientRect().width > 0,
+      // Cuánto ocupa la barra del ancho total: tiene que ser una fracción, no
+      // todo. Una barra completa dice "no hay nada más", que sería mentira.
+      fraccionBarra: barra ? barra.getBoundingClientRect().width / cajaPista.width : null,
+    };
+  })()`);
+
+  afirmar(
+    riel && riel.desborda && riel.cortadas >= 1,
+    `14a-bis · el bloque es un RIEL: ${riel ? riel.enteras : "?"} cards enteras, ${riel ? riel.cortadas : "?"} asomando, ${riel ? Math.round(riel.sobra) : "?"} px de riel fuera de la vista`,
+    riel
+      ? `desborda: ${riel.desborda}, cortadas: ${riel.cortadas} — sin una card cortada el bloque se lee como una grilla fija`
+      : "no se encontró la pista del riel"
+  );
+  afirmar(
+    riel && riel.hayBarra && riel.fraccionBarra > 0 && riel.fraccionBarra < 0.95,
+    `14a-ter · la barra de avance está y ocupa una fracción (${riel && riel.fraccionBarra ? Math.round(riel.fraccionBarra * 100) : "?"} % del ancho)`,
+    "sin barra, o completa: una barra llena afirma que no hay nada más"
   );
 
   // LAS QUE ESTÁN EN CERO TAMBIÉN SE VEN. Es lo que el issue pide expreso, y es
@@ -1298,7 +1615,22 @@ try {
     await sleep(4000);
   };
 
+  // ── ESPERAR AL BLOQUE, Y SI NO APARECE DECIRLO ─────────────────────────
+  //
+  // Las lecturas de acá buscaban el bloque y lo usaban en la misma expresión. Si
+  // el bloque todavía no estaba —React vuelve a montarlo al cambiar el filtro—,
+  // lo que salía era `Cannot read properties of undefined`, o sea un ROJO que no
+  // dice qué pasó y que en la corrida siguiente no se repite. Un rojo así
+  // desgasta la regla de "si no puede medir, frena": la próxima vez que aparezca,
+  // el reflejo va a ser volver a correrla.
+  //
+  // Se espera acotado y, si no aparece, se muere con el motivo escrito. Esperar
+  // NO es aflojar: lo que no puede pasar es dar por bueno un bloque ausente, y
+  // eso sigue matando la sonda.
+  const esperarBloque = esperarBloqueDeControles;
+
   const tocarCard = async (i) => {
+    await esperarBloque(`al tocar la card ${i + 1}`);
     await evaluar(`(() => {
       const seccion = [...document.querySelectorAll('section')]
         .find((s) => /Para revisar/.test(s.textContent || ""));
@@ -1306,6 +1638,7 @@ try {
       return true;
     })()`);
     await sleep(5000);
+    await esperarBloque(`después de tocar la card ${i + 1}`);
   };
 
   const leerEstado = () =>
@@ -1369,6 +1702,79 @@ try {
   if (iConDatos >= 0) {
     await tocarCard(iConDatos);
     const conControl = await leerEstado();
+
+    // ── 14k · LA CARD ENCENDIDA SE VE DISTINTA, MEDIDO EN EL NAVEGADOR ────
+    //
+    // El candado de render ya afirma que el JSX pinta un fondo teñido, pero eso
+    // es sobre el marcado. Acá se le pregunta al navegador por el color
+    // CALCULADO: `color-mix` lo resuelve el motor, y una expresión mal armada
+    // —un paréntesis de más, un token que no existe en ese tema— se resuelve a
+    // "transparent" o al fondo de siempre sin romper nada. El marcado diría que
+    // está teñida y la pantalla no lo estaría.
+    //
+    // Es exactamente el motivo por el que este proyecto no da por buena una
+    // pantalla porque compile.
+    const pintura = await evaluar(`(() => {
+      const seccion = [...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""));
+      const botones = [...seccion.querySelectorAll('button[aria-pressed]')];
+      const fondos = botones.map((b) => getComputedStyle(b).backgroundColor);
+      const activos = botones.filter((b) => b.getAttribute('aria-pressed') === 'true');
+      const iActivo = botones.findIndex((b) => b.getAttribute('aria-pressed') === 'true');
+      return {
+        cuantosActivos: activos.length,
+        iActivo,
+        fondoActivo: iActivo >= 0 ? fondos[iActivo] : null,
+        fondosDeLasOtras: fondos.filter((_, i) => i !== iActivo),
+        // El anillo de ring-2 sale como un box-shadow calculado.
+        sombraActiva: iActivo >= 0 ? getComputedStyle(botones[iActivo]).boxShadow : null,
+      };
+    })()`);
+
+    const otrasIguales = new Set(pintura.fondosDeLasOtras).size === 1;
+    afirmar(
+      pintura.cuantosActivos === 1 &&
+        pintura.fondoActivo !== null &&
+        otrasIguales &&
+        pintura.fondoActivo !== pintura.fondosDeLasOtras[0],
+      `14k · la card encendida tiene OTRO fondo que las demás (${pintura.fondoActivo} vs ${pintura.fondosDeLasOtras[0]})`,
+      `activas: ${pintura.cuantosActivos}; el fondo de la activa ${pintura.fondoActivo === pintura.fondosDeLasOtras[0] ? "es el mismo" : "difiere"} — sin eso, el estado solo se ve en el DOM`
+    );
+    afirmar(
+      !!pintura.sombraActiva && pintura.sombraActiva !== "none",
+      "14k-bis · y tiene su anillo dibujado",
+      `box-shadow calculado: ${pintura.sombraActiva}`
+    );
+
+    // ── 14l · EL CHIP DE ABAJO SE RETIRÓ ──────────────────────────────────
+    //
+    // Era la señal principal del estado activo y estaba fuera del bloque. Se
+    // sacó a propósito, y hay que comprobar que no volvió: si vuelve, vuelve el
+    // problema —dos señales compitiendo, y la de abajo ganando por ser la única
+    // que se movía—.
+    //
+    // Se busca un BOTÓN fuera del riel que nombre el control activo. El texto
+    // sigue estando en la línea de contexto, pero como texto: eso es lo que se
+    // quería.
+    const chip = await evaluar(`(() => {
+      const seccion = [...document.querySelectorAll('section')]
+        .find((s) => /Para revisar/.test(s.textContent || ""));
+      const activo = [...seccion.querySelectorAll('button[aria-pressed="true"]')][0];
+      if (!activo) return { hayChip: false, titulo: null };
+      // El título del control, que es la primera línea de texto fuerte de la card.
+      const titulo = (activo.innerText.split("\\n")[1] || "").trim();
+      const fuera = [...document.querySelectorAll('button')].filter(
+        (b) => !seccion.contains(b) &&
+               b.getBoundingClientRect().height > 0 &&
+               titulo && b.textContent.includes(titulo)
+      );
+      return { hayChip: fuera.length > 0, titulo, cuantos: fuera.length };
+    })()`);
+    afirmar(
+      chip.hayChip === false,
+      `14l · no volvió el chip de control fuera del bloque (control "${chip.titulo}")`,
+      `hay ${chip.cuantos} botón(es) fuera del riel nombrando el control activo`
+    );
     afirmar(
       /control=/.test(conControl.url || ""),
       "14d · el filtro queda en la URL, así que el botón de atrás lo deshace",
@@ -1713,6 +2119,77 @@ try {
     /\/modulos\/productos\/\d+\/editar/.test(despues.donde),
     "2b · tocar Editar entra a la ficha del producto",
     `quedó en ${despues.donde}`
+  );
+
+  // ══ 18 · EL DORSO DE KILO Y PIEZA, EN EL ANDAMIO ═══════════════════════
+  //
+  // ── POR QUÉ ACÁ Y NO EN EL CATÁLOGO ────────────────────────────────────
+  //
+  // Porque en la base de desarrollo NO HAY ningún producto por kilo ni ningún
+  // fiambre de pieza fija. Sobre el catálogo, este caso se informa como NO
+  // EJERCIDO — y ahí vivía el defecto de esta pasada: el dorso de un kilo decía
+  // "Importe variable", que es el rótulo de los servicios, sobre un producto que
+  // sí tiene precio.
+  //
+  // El andamio monta las MISMAS tarjetas del catálogo con entradas fijas. Lo que
+  // fabrica es la entrada, no la respuesta: las caras salen de `carasDeTarjeta`,
+  // o sea de las funciones del POS. Por eso esto ejerce el caso y no lo dibuja.
+  //
+  // Y se toca el botón de verdad, no se renderiza una cara suelta: el candado de
+  // la suite ya hace eso. Acá lo que se prueba es que TOCAR lleve al dorso bueno.
+  await send("Page.navigate", { url: `${BASE}/andamio-producto-card` });
+  await sleep(4000);
+  const andamio = await evaluar(`(() => {
+    const tarjetas = [...document.querySelectorAll('[data-tarjeta-cara]')];
+    if (tarjetas.length === 0) return { sinAndamio: true };
+    const resultado = [];
+    for (const cara of tarjetas) {
+      const boton = cara.querySelector('[data-tarjeta-voltear]');
+      if (!boton) continue;
+      boton.click();
+    }
+    return { sinAndamio: false, cuantas: tarjetas.length };
+  })()`);
+  if (andamio.sinAndamio) {
+    morir("el andamio de la tarjeta no dibujó ninguna cara: el caso de kilo/pieza no se pudo ejercer");
+  }
+  await sleep(600);
+
+  const dorsos = await evaluar(`(() => {
+    return [...document.querySelectorAll('[data-tarjeta-cara]')].map((c) => ({
+      lado: c.getAttribute('data-tarjeta-cara'),
+      texto: c.innerText.replace(/\\n/g, " | "),
+      tieneImporte: !!c.querySelector('[data-cara-importe]'),
+      tieneReferencia: !!c.querySelector('[data-cara-referencia]'),
+    }));
+  })()`);
+
+  const enDorso = dorsos.filter((d) => d.lado === "dorso");
+  afirmar(
+    enDorso.length >= 3,
+    `18a · el andamio deja abrir el dorso de los casos que la base no tiene (${enDorso.length} caras dadas vuelta)`,
+    `solo ${enDorso.length} se dieron vuelta: el caso no se ejerció`
+  );
+
+  // ── LA CONTRAPRUEBA QUE PEDÍA EL DEFECTO ────────────────────────────────
+  //
+  // "Importe variable" es de los servicios. Ningún dorso puede decirlo: kilo y
+  // pieza tienen precio, y lo que su dorso muestra es una línea de referencia.
+  const conImporteVariable = enDorso.filter((d) => /Importe variable/.test(d.texto));
+  afirmar(
+    conImporteVariable.length === 0,
+    "18b · NINGÚN dorso dice 'Importe variable'",
+    `${conImporteVariable.length} lo dicen. El primero: ${conImporteVariable[0]?.texto ?? ""}`
+  );
+
+  // Y el de kilo/pieza muestra su referencia en vez de un importe inventado.
+  const conReferencia = enDorso.filter((d) => d.tieneReferencia);
+  afirmar(
+    conReferencia.length >= 2 && conReferencia.every((d) => !d.tieneImporte),
+    `18c · el dorso de kilo y pieza muestra su referencia y NO un importe (${conReferencia.length} caras)`,
+    conReferencia.length < 2
+      ? "no se encontraron las dos caras de referencia: el caso no se ejerció"
+      : "una cara de referencia dibujó además un importe"
   );
 } catch (e) {
   morir(e.message);

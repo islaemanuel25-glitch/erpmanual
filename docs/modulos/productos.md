@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-21 01:46
+**Última actualización:** 2026-08-22 11:20
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,19 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-22: refactor(productos): alinear el carrusel con el Figma aprobado
+- 2026-08-22: test(productos): la sonda del navegador mide las dos caras, no la franja
+- 2026-08-22: feat(productos): Personalizar card prende y apaga, y ya no reordena
+- 2026-08-22: fix(productos): la card mostraba el ID del producto como "código interno"
+- 2026-08-22: feat(productos): la card del celular pasa a tener frente y dorso
+- 2026-08-21: feat(productos): "Para revisar" pasa de grilla 2x2 a riel, y la card activa se enciende
+- 2026-08-21: fix(productos): la pantalla deja de esperar al contexto, y se retira el chip
+- 2026-08-21: perf(productos): el conteo de "Para revisar" pasa de 504 a 289 ms
+- 2026-08-21: fix(productos): la equivalencia sale del mismo precio que el número grande, y Import / Export deja de estar duplicado
+- 2026-08-21: fix(productos): el corte de 5.000 usa el mismo orden en las dos consultas, y se saca un comentario que ya era falso
+- 2026-08-21: fix(productos): `precios/apply` decide la revisión con el precio de la base, no con el del navegador
+- 2026-08-21: fix(productos): el contraste se mide con el umbral que corresponde, y se resuelve sin tocar ningún theme
+- 2026-08-21: fix(productos): con un control activo, la lista ES la población de esa card — siempre
 - 2026-08-21: fix(productos): la card y el listado dan el mismo número, y un conteo parcial deja de verse sano
 - 2026-08-21: fix(productos): la revisión de precio se marca donde el precio cambia, y solo ahí
 - 2026-08-21: fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado

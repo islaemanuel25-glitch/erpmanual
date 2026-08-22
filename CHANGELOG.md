@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-08-22] - Actualización: productos
+
+### Modificado
+- **productos**: feat(productos): "Para revisar" pasa de grilla 2x2 a riel, y la card activa se enciende
+- **productos**: fix(productos): la pantalla deja de esperar al contexto, y se retira el chip
+- **productos**: perf(productos): el conteo de "Para revisar" pasa de 504 a 289 ms
+- **productos**: fix(productos): la equivalencia sale del mismo precio que el número grande, y Import / Export deja de estar duplicado
+- **productos**: fix(productos): el corte de 5.000 usa el mismo orden en las dos consultas, y se saca un comentario que ya era falso
+- **productos**: fix(productos): `precios/apply` decide la revisión con el precio de la base, no con el del navegador
+- **productos**: fix(productos): el contraste se mide con el umbral que corresponde, y se resuelve sin tocar ningún theme
+- **productos**: fix(productos): con un control activo, la lista ES la población de esa card — siempre
+- **productos**: fix(productos): la card y el listado dan el mismo número, y un conteo parcial deja de verse sano
+- **productos**: fix(productos): la revisión de precio se marca donde el precio cambia, y solo ahí
+- **productos**: fix(productos): el contador de "Para revisar" miraba un universo distinto que el listado
+- **productos**: feat(productos): la pantalla del celular sale de la tarjeta gigante y estrena "Para revisar"
+
+
 ## [2026-08-21] - Actualización: productos
 
 ### Modificado

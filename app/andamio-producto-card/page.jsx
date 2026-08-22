@@ -35,9 +35,82 @@ import { notFound } from "next/navigation";
 
 import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiSelectorUnidad, { UNIDAD } from "@/components/sunmi/SunmiSelectorUnidad";
+import TarjetaProductoMovil from "@/components/productos/TarjetaProductoMovil";
 import { Eye, Pencil } from "lucide-react";
-import { formatearMoneda, lineaDeEquivalencia } from "@/lib/moneda";
+import { formatearMoneda } from "@/lib/moneda";
 import { etiquetaEscalaPrecio } from "@/lib/precios/escalaPrecio";
+import { carasDeTarjeta } from "@/lib/productos/carasDeTarjeta";
+import {
+  ESCALA_BULTO,
+  ESCALA_KG,
+  ESCALA_PIEZA,
+  ESCALA_UNIDAD,
+} from "@/lib/precios/escalaDeVenta";
+
+/**
+ * ── LOS CUATRO CASOS DE DORSO, UNO POR CADA FORMA QUE PUEDE TENER ─────────
+ *
+ * Y los dos del medio —kilo y pieza fija— son los que NO EXISTEN en la base de
+ * desarrollo, así que sin este fixture su dorso no se puede abrir ni mirar.
+ *
+ * Las caras salen de `carasDeTarjeta`, o sea de las funciones del POS: lo que el
+ * andamio fabrica es la ENTRADA, nunca la respuesta. Escribir a mano lo que cada
+ * cara tiene que decir es exactamente lo que hizo que este andamio tapara tres
+ * defectos la primera vez.
+ */
+const CARAS = [
+  {
+    id: "pack",
+    nombre: "361 LATA X24",
+    empresa: "Colombres",
+    codigoBarra: "7790580132286",
+    codigoInterno: "1254",
+    caras: carasDeTarjeta({
+      escala: ESCALA_BULTO,
+      precio: 24500,
+      costo: 20000,
+      factor: 24,
+      unidad: "pack",
+    }),
+  },
+  {
+    id: "kilo",
+    nombre: "QUESO SARDO LA PAULINA HORMA ENTERA X KG",
+    empresa: "La Paulina Alimentos S.A.",
+    codigoBarra: "7791234998877",
+    codigoInterno: "30112",
+    caras: carasDeTarjeta({ escala: ESCALA_KG, precio: 1300, costo: 900, unidad: "kg" }),
+  },
+  {
+    id: "pieza",
+    nombre: "PALETA COCIDA PIEZA FIJA",
+    empresa: "Paladini",
+    codigoBarra: null,
+    codigoInterno: null,
+    caras: carasDeTarjeta({
+      escala: ESCALA_PIEZA,
+      precio: 1000,
+      costo: 800,
+      unidad: "kg",
+      pesoReferenciaKg: 6,
+    }),
+  },
+  {
+    id: "suelto",
+    nombre: "Yerba mate Playadito 1 kg",
+    empresa: "Cooperativa Liebig",
+    codigoBarra: "7792200000123",
+    codigoInterno: "40219",
+    // Sin conversión: su dorso existe solo por la identificación.
+    caras: carasDeTarjeta({
+      escala: ESCALA_UNIDAD,
+      precio: 4850,
+      costo: 3600,
+      factor: 1,
+      unidad: "unidad",
+    }),
+  },
+];
 
 const PRODUCTOS = [
   {
@@ -97,9 +170,16 @@ export default function AndamioProductoCard() {
   const [ultimo, setUltimo] = useState(null);
   const [modo, setModo] = useState(UNIDAD.PACK);
 
+  // La columna del andamio: 360 px, que es el ancho para el que la tarjeta está
+  // diseñada. Se define UNA vez y la usan los tres bloques — repetirla era el
+  // mismo número escrito tres veces, y el día que se mida a otro ancho quedarían
+  // dos bloques a 360 y uno a otra cosa.
+  const COLUMNA = "mx-auto w-[360px]";
+  const LISTA = `${COLUMNA} px-2.5 flex flex-col gap-[9px]`;
+
   return (
     <div className="sunmi-surface min-h-screen">
-      <div className="mx-auto w-[360px]">
+      <div className={COLUMNA}>
         <SunmiSelectorUnidad
           valor={modo}
           onCambiar={setModo}
@@ -112,21 +192,59 @@ export default function AndamioProductoCard() {
           {ultimo ? `último toque: ${ultimo}` : "ningún botón tocado todavía"}
         </div>
       </div>
-      <div className="mx-auto w-[360px] px-2.5 pb-6 pt-2 flex flex-col gap-[9px]">
+      {/* ── LAS DOS CARAS, CON FIXTURE DETERMINÍSTICO ────────────────────────
+          Estas tarjetas son las del CATÁLOGO —`TarjetaProductoMovil`, con su
+          frente y su dorso— y no la pieza pelada del kit.
+
+          Están acá por un motivo concreto: **el dorso de kilo y de pieza fija no
+          se puede ejercer con los datos de desarrollo.** No hay ningún producto
+          por kilo ni ningún fiambre de pieza fija en la base, así que la sonda
+          del navegador los informa como NO EJERCIDOS — y ahí vivía el defecto de
+          esta pasada, un dorso que decía "Importe variable" sobre un producto que
+          sí tiene precio.
+
+          Los datos son de mentira y se ven, pero las CARAS no: salen de
+          `carasDeTarjeta` con las mismas funciones del POS. Lo que el andamio
+          fabrica es la entrada, no la respuesta — que es la diferencia entre
+          ejercer un caso y dibujarlo. */}
+      <div className={`${LISTA} pt-4`}>
+        <div className="text-xs sunmi-text-muted">
+          Tarjeta del catálogo, con sus dos caras. Tocá la flecha para dar vuelta.
+        </div>
+        {CARAS.map((c) => (
+          <TarjetaProductoMovil
+            key={c.id}
+            nombre={c.nombre}
+            empresa={c.empresa}
+            codigoBarra={c.codigoBarra}
+            codigoInterno={c.codigoInterno}
+            caras={c.caras}
+            muestraCosto
+            onEditar={() => setUltimo(`Editar ${c.id}`)}
+          />
+        ))}
+      </div>
+
+      <div className={`${LISTA} pb-6 pt-6`}>
+        <div className="text-xs sunmi-text-muted">
+          Pieza pelada del kit, sin las caras.
+        </div>
         {PRODUCTOS.map((p) => (
           <SunmiProductoCard
             key={p.id}
             nombre={p.nombre}
             empresa={p.empresa}
-            // Derivada del precio y del factor, con la misma función que el
-            // catálogo. No es un texto escrito al lado — ver el encabezado.
-            equivalencia={lineaDeEquivalencia({
-              precio: p.precio,
-              factor: p.factorPack,
-              unidad: p.unidadMedida,
-            })}
             codigoBarra={p.codigoBarra}
             codigoInterno={p.codigoInterno}
+            // ── LA FRANJA DE EQUIVALENCIA SE FUE DE LA PIEZA ────────────────
+            //
+            // Acá se le pasaba `equivalencia`, derivada con `lineaDeEquivalencia`.
+            // El kit dejó de tener ese bloque: la presentación viaja pegada al
+            // precio y la otra escala vive en el dorso, que administra
+            // `TarjetaProductoMovil` —el envoltorio del catálogo, no la pieza—.
+            //
+            // Este andamio sigue montando la PIEZA pelada, que es para lo que
+            // sirve: comprobar que el núcleo dibuja sin sesión ni datos reales.
             valor={
               <>
                 <span className="text-[22px] font-bold sunmi-text-strong whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em]">
