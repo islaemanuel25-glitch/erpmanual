@@ -57,6 +57,10 @@ import { esProductoServicio } from "@/lib/pos-ventas/servicios";
 import { CONTROL, esControlValido } from "@/lib/productos/controlesCalidad";
 import { pedidoYaSalio } from "@/lib/productos/pedidoYaSalio";
 import {
+  controlesPuedenSalir,
+  listadoTermino,
+} from "@/lib/productos/ordenDeCargaProductos";
+import {
   filtrosNeutros,
   mismosFiltros,
   hayFiltrosPuestos,
@@ -618,6 +622,47 @@ export default function ProductosPage() {
   const yaSalio = (ref, clave, localIdActual) =>
     pedidoYaSalio(ref.current, clave, localIdActual);
 
+  // ── LOS CONTROLES ESPERAN AL PRIMER LISTADO ────────────────────────────────
+  //
+  // Los dos efectos de abajo no se conocían, así que en el primer render los dos
+  // pedidos salían en el MISMO tick. Y no cuestan lo mismo: el listado trae 25
+  // filas y los controles recorren el catálogo entero hasta `TECHO_CONTROL`.
+  //
+  // Medido en la pantalla real antes de esto: listado de 4623 a 6096 ms,
+  // controles arrancando a los 4624. **1472 ms compitiendo**, y las primeras
+  // filas recién a los 6580 ms.
+  //
+  // Esto es lo único que se agrega: una puerta que los controles miran antes de
+  // salir. La decisión vive en `ordenDeCargaProductos.js` —pura, con sus
+  // candados— porque acá adentro sería una condición imposible de ejercer sin
+  // montar la pantalla entera. Es el mismo criterio que `pedidoYaSalio`.
+  //
+  // Se guardan DOS primitivos y no un objeto a propósito: React descarta un
+  // `setState` que repite el mismo valor, así que cambiar de página —que vuelve
+  // a anotar lo mismo— no vuelve a disparar el efecto de los controles. Con un
+  // objeto, cada anotación sería una identidad nueva y el efecto correría de
+  // gusto en cada paginada.
+  const [listadoTerminoOk, setListadoTerminoOk] = useState(null); // null = ninguno todavía
+  const [listadoRespondioPara, setListadoRespondioPara] = useState(null);
+
+  const puerta =
+    listadoTerminoOk === null
+      ? null
+      : listadoTermino({ ok: listadoTerminoOk, localIdRespondido: listadoRespondioPara });
+
+  // ── Y UNA RESPUESTA VIEJA NO PISA A LA NUEVA ───────────────────────────────
+  //
+  // Cambiar de ubicación dispara un pedido nuevo con el anterior todavía en el
+  // aire. Sin esto, si el viejo vuelve último, sus filas —las del OTRO local—
+  // sobrescriben las del actual, y el `pedidoRef` queda diciendo que la
+  // ubicación correcta ya está pedida. La pantalla mostraría el catálogo
+  // equivocado sin un solo error.
+  //
+  // El token se lee al volver: si ya no es el último que salió, la respuesta se
+  // descarta entera —estado y anotación— en vez de aplicarse tarde.
+  const tokenListadoRef = useRef(0);
+  const tokenControlesRef = useRef(0);
+
   const claveDelPedido = useMemo(
     () => JSON.stringify({ page, pageSize, sortKey, sortDir, filtros, control }),
     [page, pageSize, sortKey, sortDir, filtros, control]
@@ -626,6 +671,7 @@ export default function ProductosPage() {
   const fetchProductos = async () => {
     setLoading(true);
     const claveDeEstePedido = claveDelPedido;
+    const miToken = ++tokenListadoRef.current;
     // Se anota ANTES de salir: mientras viaja, nadie más tiene que volver a
     // pedir lo mismo. Ver el comentario largo de `pedidoRef`.
     pedidoRef.current = { clave: claveDeEstePedido, localIdPedido: localId || null };
@@ -663,6 +709,10 @@ export default function ProductosPage() {
 
       const data = await res.json();
 
+      // Una respuesta que ya no es la última se descarta ENTERA: ni pinta filas
+      // ni anota nada. Ver el comentario de `tokenListadoRef`.
+      if (miToken !== tokenListadoRef.current) return;
+
       if (data.ok) {
         // Para qué ubicación contestó. Un servidor viejo no manda `localId`: ahí
         // queda `null` y la comparación nunca dice "ya está", así que el peor caso
@@ -673,6 +723,11 @@ export default function ProductosPage() {
           localIdPedido: localId || null,
           localIdRespondido: Number(data.localId) || null,
         };
+        // Se abre la puerta de los controles. Va acá y no en el efecto porque lo
+        // que la abre es que ESTE pedido terminó, no que algo se haya
+        // re-renderizado.
+        setListadoTerminoOk(true);
+        setListadoRespondioPara(Number(data.localId) || null);
         setRows(data.items);
         setTotalPages(data.totalPages);
         setTotalItems(data.total);
@@ -683,12 +738,27 @@ export default function ProductosPage() {
         // El filtro por control clasifica en memoria con un techo. Si lo alcanzó,
         // el total es parcial y hay que decirlo: si no, la lista se ve completa.
         setListadoTruncado(data.truncadoPorControl === true);
+      } else {
+        // El servidor contestó que no. La puerta se abre igual: las cards son
+        // independientes del listado y no tienen por qué quedarse en su
+        // esqueleto porque el listado falló.
+        pedidoRef.current = null;
+        setListadoTerminoOk(false);
+        setListadoRespondioPara(null);
       }
     } catch (err) {
       // Se borra la anotación: si el pedido no llegó, el próximo cambio de
       // dependencia tiene que poder volver a intentarlo. Dejarla puesta
       // convertiría un error de red en un listado que no se recupera nunca.
       pedidoRef.current = null;
+      // Y LA PUERTA SE ABRE IGUAL. Si un fallo del listado la dejara cerrada,
+      // las cards quedarían cargando para siempre: un error de red se
+      // convertiría en media pantalla muerta hasta recargar. La puerta es una
+      // PRIORIDAD, no un control de corrección — falla abierta.
+      if (miToken === tokenListadoRef.current) {
+        setListadoTerminoOk(false);
+        setListadoRespondioPara(null);
+      }
       console.error("Error cargando productos:", err);
     }
     setLoading(false);
@@ -712,6 +782,7 @@ export default function ProductosPage() {
 
   const fetchControles = async () => {
     setCargandoControles(true);
+    const miToken = ++tokenControlesRef.current;
     controlesRef.current = { clave: CLAVE_CONTROLES, localIdPedido: localId || null };
     try {
       // Igual que el listado: sin `localId` mientras no se conozca, y el servidor
@@ -726,6 +797,9 @@ export default function ProductosPage() {
         return;
       }
       const data = await res.json();
+      // Igual que el listado: una respuesta de un local que ya no es el actual
+      // no pisa los contadores del actual.
+      if (miToken !== tokenControlesRef.current) return;
       // ── UN ERROR NO SE DESCARTA EN SILENCIO ─────────────────────────────
       //
       // Si el servidor falla, las cards se quedan sin conteo Y se dice por qué.
@@ -798,11 +872,22 @@ export default function ProductosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claveDelPedido, localId]);
 
+  // ── Y ÉSTE ESPERA AL PRIMER LISTADO ────────────────────────────────────
+  //
+  // La puerta es lo único que se agregó. Los controles no salen hasta que el
+  // primer listado de ESTA ubicación terminó —bien o mal—, así que la consulta
+  // cara deja de competir con la que la persona está esperando ver.
+  //
+  // Las dependencias siguen SIN la clave del pedido: cambiar de página, de orden
+  // o de filtros no toca `puerta` ni `localId`, y por lo tanto no vuelve a pedir
+  // los contadores. Su universo es el catálogo entero de la ubicación y no
+  // depende de nada de eso.
   useEffect(() => {
+    if (!controlesPuedenSalir(puerta, localId)) return;
     if (yaSalio(controlesRef, CLAVE_CONTROLES, localId)) return;
     fetchControles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localId]);
+  }, [localId, listadoTerminoOk, listadoRespondioPara]);
 
   useEffect(() => {
     if (nuevo === "1") {
