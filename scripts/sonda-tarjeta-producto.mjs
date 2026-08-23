@@ -301,6 +301,63 @@ try {
     morir(`el bloque "Para revisar" no apareció en 10 s (${donde})`);
   };
 
+  /**
+   * Espera a que las cards de "Para revisar" TERMINEN de calcular.
+   *
+   * ── POR QUÉ NO ALCANZA CON ESPERAR LAS TARJETAS DEL LISTADO ─────────────
+   *
+   * Es el defecto que frenó el despliegue de `3cc3c337` el 2026-08-23. La
+   * afirmación 14j navegaba por URL, esperaba a que aparecieran las tarjetas y
+   * leía el número de la card. Eso alcanzaba mientras el listado y los controles
+   * salían a la vez.
+   *
+   * Desde que los controles salen DESPUÉS de que termina el primer listado
+   * —`lib/productos/ordenDeCargaProductos.js`—, cuando las tarjetas aparecen las
+   * cards todavía están calculando. La sonda leía `null` y 14j daba rojo
+   * señalando la coherencia de los números, que era lo único que NO estaba mal.
+   *
+   * ── LOS TRES ESTADOS, SACADOS DE CÓMO DIBUJA EL COMPONENTE ──────────────
+   *
+   * De `components/productos/CarruselControles.jsx`, no de una idea:
+   *
+   *   · `sin-bloque`   — con `controles` vacío devuelve `null`: la sección NO
+   *     EXISTE. Esperar adentro de algo que no está no es esperar.
+   *   · `calculando`   — mientras carga dibuja la etiqueta "calculando…".
+   *   · `sin-card-activa` / `sin-numero` — la sección está pero la card todavía
+   *     no trae su cuenta.
+   *
+   * ── UN CERO ES UN RESULTADO, NO UN "TODAVÍA NO" ─────────────────────────
+   *
+   * La condición mira que haya un DÍGITO, no que el número sea mayor que cero.
+   * Con `> 0`, una card que legítimamente cuenta 0 —no hay nada para revisar— se
+   * leería como "sigue calculando" y la sonda vencería sobre una pantalla sana.
+   *
+   * ── VENCE EN ROJO, NUNCA EN OMITIDO ─────────────────────────────────────
+   *
+   * Devuelve el último estado observado en vez de morir: quien llama lo usa para
+   * que el rojo diga QUÉ se quedó esperando. Un timeout acá no se degrada a
+   * warning ni saltea la comparación — 14j se evalúa igual y falla.
+   */
+  const esperarControlesResueltos = async (donde, cuantoMs = 30000) => {
+    const hasta = Date.now() + cuantoMs;
+    let ultimo = "sin-mirar";
+    while (Date.now() < hasta) {
+      ultimo = await evaluar(`(() => {
+        const s = [...document.querySelectorAll('section')]
+          .find((x) => /Para revisar/.test(x.textContent || ""));
+        if (!s) return "sin-bloque";
+        if (/calculando/i.test(s.textContent || "")) return "calculando";
+        const b = [...s.querySelectorAll('button[aria-pressed]')]
+          .find((x) => x.getAttribute('aria-pressed') === 'true');
+        if (!b) return "sin-card-activa";
+        return /\\d/.test(b.innerText || "") ? "listo" : "sin-numero";
+      })()`).catch(() => "no-se-pudo-leer");
+      if (ultimo === "listo") return { ok: true, estado: ultimo, donde };
+      await sleep(250);
+    }
+    return { ok: false, estado: ultimo, donde };
+  };
+
   await send("Page.navigate", { url: `${BASE}/modulos/productos` });
   await sleep(6000);
 
@@ -2122,6 +2179,12 @@ try {
         if (Number(n) > 0) break;
         await sleep(1000);
       }
+      // Y ADEMÁS a que las cards terminen de calcular. Esperar solo las tarjetas
+      // dejó de significar "ya está todo": los controles arrancan recién cuando
+      // el primer listado termina. Ver `esperarControlesResueltos`.
+      const listasLasCards = await esperarControlesResueltos(
+        "antes de comparar el contador de la card contra el total del listado"
+      );
       const trasUrl = await leerEstado();
       const cantidadEnLaCard = await evaluar(`(() => {
         const seccion = [...document.querySelectorAll('section')]
@@ -2137,9 +2200,29 @@ try {
         `la búsqueda quedó en "${trasUrl.busqueda}"`
       );
       afirmar(
-        cantidadEnLaCard !== null && Number(trasUrl.total) === cantidadEnLaCard,
+        // ── EL TIMEOUT DECIDE, NO SOLO DECORA EL MENSAJE ──────────────────
+        //
+        // La primera versión de este arreglo usaba `listasLasCards` únicamente
+        // para redactar el motivo. La contraprueba lo destapó: con la espera
+        // venciendo a propósito, 14j igual daba VERDE, porque para cuando se
+        // leía la card ya estaba lista de casualidad. Un estado indeterminado
+        // que termina en verde es exactamente lo que la sonda no puede hacer.
+        //
+        // Ahora vencer es fallar. La comparación de coherencia no se tocó: sigue
+        // siendo igualdad exacta entre el total del listado y el número de la
+        // card, y sigue rechazando un contador ausente.
+        listasLasCards.ok &&
+          cantidadEnLaCard !== null &&
+          Number(trasUrl.total) === cantidadEnLaCard,
         `14j · y el listado trae los MISMOS ${cantidadEnLaCard} que cuenta la card`,
-        `el listado trajo ${trasUrl.total} · url ${trasUrl.url}`
+        // El motivo dice si la card NUNCA terminó de calcular o si terminó y los
+        // números difieren. Son dos fallas distintas y antes se veían iguales:
+        // el rojo del 2026-08-23 decía "null" y parecía una diferencia de
+        // conteo cuando era una espera que miraba lo que no debía.
+        listasLasCards.ok
+          ? `el listado trajo ${trasUrl.total} y la card ${cantidadEnLaCard} · url ${trasUrl.url}`
+          : `las cards no terminaron de calcular en 30 s (quedaron en "${listasLasCards.estado}") · ` +
+            `el listado trajo ${trasUrl.total} · url ${trasUrl.url}`
       );
       await send("Page.navigate", { url: `${BASE}/modulos/productos` });
       for (let i = 0; i < 40; i++) {
