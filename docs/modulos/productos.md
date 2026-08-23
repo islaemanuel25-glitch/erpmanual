@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-08-22 11:20
+**Última actualización:** 2026-08-23 20:13
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,10 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-08-23: feat: reutilizar kit de productos en stock móvil
+- 2026-08-23: fix(productos): el token cubre TODOS los caminos, no solo el que sale bien
+- 2026-08-23: fix(productos): los contadores de "para revisar" esperan al listado, y dejan de competir
+- 2026-08-23: fix(fotos): la foto de un producto no se guarda en ninguna caché compartida
 - 2026-08-22: refactor(productos): alinear el carrusel con el Figma aprobado
 - 2026-08-22: test(productos): la sonda del navegador mide las dos caras, no la franja
 - 2026-08-22: feat(productos): Personalizar card prende y apaga, y ya no reordena

@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-07-29 08:16
+**Última actualización:** 2026-08-23 20:13
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -78,6 +78,7 @@ stockUnidades = stockBultos * factor_pack
 ```
 
 ## Cambios recientes
+- 2026-08-23: feat: reutilizar kit de productos en stock móvil
 - 2026-07-28: feat(productos): codigo de barras propio por ubicacion
 - 2026-07-26: fix(security): cerrar fugas operativas entre ubicaciones
 - 2026-07-26: feat(ui): desactivar historial/autocompletado nativo del navegador en buscadores

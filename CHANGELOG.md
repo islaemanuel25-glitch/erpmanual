@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-23] - Actualización: stock, productos
+
+### Modificado
+- **stock**: feat: reutilizar kit de productos en stock móvil
+- **productos**: feat: reutilizar kit de productos en stock móvil
+- **productos**: fix(productos): el token cubre TODOS los caminos, no solo el que sale bien
+- **productos**: fix(productos): los contadores de "para revisar" esperan al listado, y dejan de competir
+- **productos**: fix(fotos): la foto de un producto no se guarda en ninguna caché compartida
+
+
 ## [2026-08-22] - Actualización: productos
 
 ### Modificado

@@ -1,21 +1,21 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-22 11:20
+**Fecha:** 2026-08-23 20:13
 
 ## Módulos modificados recientemente
 
-### productos
-- refactor(productos): alinear el carrusel con el Figma aprobado, test(productos): la sonda del navegador mide las dos caras, no la franja, feat(productos): Personalizar card prende y apaga, y ya no reordena
+### stock
+- feat: reutilizar kit de productos en stock móvil
 - Archivos: 2 nuevos, 3 modificados (5 total)
 
-### configuracion
-- feat(productos): Personalizar card prende y apaga, y ya no reordena
-- Archivos: 1 modificados (1 total)
+### productos
+- feat: reutilizar kit de productos en stock móvil, fix(productos): el token cubre TODOS los caminos, no solo el que sale bien, fix(productos): los contadores de "para revisar" esperan al listado, y dejan de competir
+- Archivos: 4 modificados (4 total)
 
 
 ## Archivos nuevos desde última sincronización
-- components/productos/TarjetaProductoMovil.jsx
-- components/productos/tarjetaProductoMovil.test.mjs
+- components/stock_locales/TarjetaStockMovil.jsx
+- components/stock_locales/tarjetaStockMovil.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
