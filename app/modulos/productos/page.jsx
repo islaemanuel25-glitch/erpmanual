@@ -35,7 +35,13 @@ import HojaPersonalizarTarjeta from "@/components/productos/HojaPersonalizarTarj
 // de escritorio, que no cambió.
 // `X` se fue con el chip de control y `Pencil` con la tarjeta: el ícono de
 // Editar lo pone ahora `TarjetaProductoMovil`, junto al botón.
-import { SlidersHorizontal, MoreHorizontal, CheckCheck } from "lucide-react";
+import {
+  SlidersHorizontal,
+  MoreHorizontal,
+  CheckCheck,
+  Upload,
+  Download,
+} from "lucide-react";
 // `lineaDeEquivalencia` se fue con la franja; el único caso donde su texto sigue
 // haciendo falta —kilo y pieza fija— lo pide `carasDeTarjeta`, que la llama
 // igual. Y los dos helpers de redondeo se importaban para armar el número a
@@ -235,6 +241,22 @@ export default function ProductosPage() {
   // TAB ACTIVO
   // =========================================================
   const [activeTab, setActiveTab] = useState("listado");
+  const [archivoDestino, setArchivoDestino] = useState(null);
+
+  const abrirArchivo = (destino) => {
+    setArchivoDestino(destino);
+    setActiveTab("importexport");
+  };
+
+  useEffect(() => {
+    if (activeTab !== "importexport" || !archivoDestino) return;
+    const frame = requestAnimationFrame(() => {
+      document
+        .getElementById(`productos-${archivoDestino}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab, archivoDestino]);
 
   // =========================================================
   // ESTADO LISTADO — inicializado desde URL query params
@@ -799,10 +821,32 @@ export default function ProductosPage() {
   }, [claveDelPedido, localId]);
 
   useEffect(() => {
-    if (yaSalio(controlesRef, CLAVE_CONTROLES, localId)) return;
-    fetchControles();
+    // El listado tiene prioridad. El conteo recorre el catálogo completo y, si
+    // sale en paralelo, compite por CPU y conexión con los 25 productos que la
+    // persona necesita ver primero. La grilla reserva el espacio con su skeleton,
+    // pero la consulta recién empieza cuando el listado terminó.
+    if (loading || yaSalio(controlesRef, CLAVE_CONTROLES, localId)) return;
+
+    let cancelado = false;
+    const ejecutar = () => {
+      if (!cancelado) fetchControles();
+    };
+
+    const idleId =
+      typeof window !== "undefined" && "requestIdleCallback" in window
+        ? window.requestIdleCallback(ejecutar, { timeout: 1500 })
+        : setTimeout(ejecutar, 0);
+
+    return () => {
+      cancelado = true;
+      if (typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      } else {
+        clearTimeout(idleId);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localId]);
+  }, [localId, loading]);
 
   useEffect(() => {
     if (nuevo === "1") {
@@ -1587,7 +1631,7 @@ export default function ProductosPage() {
               tenía. */}
           <div
             className={`${
-              activeTab === "listado" ? "hidden md:flex" : "flex"
+              activeTab === "listado" ? "hidden" : "flex md:hidden"
             } gap-1 border-b sunmi-divider pb-1`}
           >
             {TABS.map((tab) => (
@@ -1617,7 +1661,7 @@ export default function ProductosPage() {
                   esta pantalla que dice qué HAY QUE HACER. Debajo del buscador
                   quedaría después de la acción que la mayoría hace por reflejo
                   —escribir un nombre— y nadie lo vería nunca. */}
-              <div className="md:hidden">
+              <div>
                 <CarruselControles
                   controles={controles}
                   activo={control}
@@ -1794,7 +1838,7 @@ export default function ProductosPage() {
                   más la hoja de "Más". "Edición rápida" se fue del sistema: la
                   pantalla y su componente se borraron en esta misma tanda. */}
               <div className="hidden md:flex flex-row items-center justify-between gap-2 w-full mt-1">
-                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                <div className="flex items-center gap-2">
                   <SunmiButton color="amber" onClick={abrirNuevo}>
                     + Producto
                   </SunmiButton>
@@ -1806,19 +1850,38 @@ export default function ProductosPage() {
                   </SunmiButton>
                 </div>
 
-                <ColumnManager
-                  allColumns={allColumns}
-                  visibleKeys={visibleCols}
-                  onChange={handleVisibleColsChange}
-                  lockedKeys={LOCKED_COLS}
-                />
+                <div className="flex items-center gap-2">
+                  <SunmiButton color="slate" onClick={() => abrirArchivo("importar")}>
+                    <span className="inline-flex items-center gap-2">
+                      <Upload className="h-4 w-4" aria-hidden="true" />
+                      Importar
+                    </span>
+                  </SunmiButton>
+                  {puedeExportar && (
+                    <SunmiButton color="slate" onClick={() => abrirArchivo("exportar")}>
+                      <span className="inline-flex items-center gap-2">
+                        <Download className="h-4 w-4" aria-hidden="true" />
+                        Exportar
+                      </span>
+                    </SunmiButton>
+                  )}
+                  <ColumnManager
+                    allColumns={allColumns}
+                    visibleKeys={visibleCols}
+                    onChange={handleVisibleColsChange}
+                    lockedKeys={LOCKED_COLS}
+                    defaultKeys={allColumns
+                      .map((column) => column.key)
+                      .filter((key) => key !== "codigoInterno")}
+                  />
+                </div>
               </div>
 
               {/* LISTADO — el separador es de escritorio. En el celular la línea
                   de contexto de arriba ya dice qué se está viendo, y un
                   separador más sería un renglón que empuja las tarjetas. */}
               <div className="hidden md:block">
-                <SunmiSeparator label="Listado" className="my-1" />
+                <SunmiSeparator label="Listado de productos" className="my-1" />
               </div>
 
               {/* ── ANGOSTO: TARJETAS. ANCHO: LA TABLA DE SIEMPRE ──────────
@@ -2105,6 +2168,7 @@ export default function ProductosPage() {
               {/* =====================================================
                   EXPORTAR
                   ===================================================== */}
+              <section id="productos-exportar" className="scroll-mt-4">
               {!puedeExportar && (
                 <p className="text-sm sunmi-text-muted px-1 py-2">
                   Tu rol no incluye exportar el catálogo, porque el archivo lleva
@@ -2155,10 +2219,12 @@ export default function ProductosPage() {
               </div>
               </>
               )}
+              </section>
 
               {/* =====================================================
                   IMPORTAR
                   ===================================================== */}
+              <section id="productos-importar" className="scroll-mt-4">
               <SunmiSeparator label="Importar productos" className="my-2" />
 
               {/* Plantilla + Instructivo */}
@@ -2434,6 +2500,7 @@ export default function ProductosPage() {
                   )}
                 </>
               )}
+              </section>
             </>
           )}
         </div>
@@ -2459,7 +2526,7 @@ export default function ProductosPage() {
         onClose={() => setHojaMas(false)}
         onNuevoCombo={abrirNuevoCombo}
         onActualizacionPrecios={abrirActualizacionPrecios}
-        onImportExport={() => setActiveTab("importexport")}
+        onImportExport={() => abrirArchivo("importar")}
         onPersonalizarCard={() => setHojaPersonalizar(true)}
         puedeExportar={puedeExportar}
       />
