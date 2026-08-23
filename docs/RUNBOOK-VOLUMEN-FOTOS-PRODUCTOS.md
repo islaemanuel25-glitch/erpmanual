@@ -280,3 +280,74 @@ es el mismo código.
 O sea que **el montaje del volumen se prueba la primera vez en el VPS**, cuando
 se cree. El paso está en la sección de arriba: subir una foto, recrear el
 contenedor y ver que sigue ahí.
+
+## Purgar las fotos de la caché de Cloudflare
+
+### Por qué existe este paso
+
+El 2026-08-23 se midió en producción que una foto se estaba sirviendo **sin
+sesión**: 200 sin credenciales, con `cf-cache-status: HIT` y `Age: 11572`. La
+ruta comprobaba `productos.ver` y lo seguía comprobando; lo que pasaba es que la
+respuesta llevaba `Cache-Control: public`, Cloudflare la guardó, y desde entonces
+la servía desde el borde sin volver a preguntarle al servidor.
+
+La cabecera ya está corregida —`private`, más `Cloudflare-CDN-Cache-Control:
+no-store`— y tiene sus candados. Esto es lo otro: **lo que Cloudflare ya tiene
+guardado no se va solo.** El `max-age` que se mandó es de un año.
+
+### EL ORDEN IMPORTA: PRIMERO DESPLEGAR, DESPUÉS PURGAR
+
+Purgar antes del despliegue no sirve de nada y hasta empeora: el origen todavía
+contesta `public`, así que la primera petición autenticada que llegue después de
+la purga vuelve a dejar la foto en el borde, con el reloj de un año arrancando de
+cero.
+
+La secuencia es: desplegar la corrección, comprobar que el origen manda `private`,
+y recién entonces purgar.
+
+### Cuántas URLs son
+
+Las que haya en el volumen, y hoy es **una sola** —`p181-bed80329.webp`,
+comprobado el 2026-08-23—. La lista se saca del volumen, no de la memoria:
+
+    ssh vps-erp 'docker run --rm -v erpazul_fotos_productos:/v --entrypoint sh alpine \
+      -c "ls -1 /v | grep -v \"^\\.\""'
+
+Cada archivo se convierte en `https://operix.cloud/api/productos/foto/<archivo>`.
+
+### Cómo purgar
+
+Tres caminos, y los tres sirven en el plan actual. **Ninguno se puede correr
+desde esta máquina: no hay credenciales de Cloudflare acá, y no se inventan.**
+
+1. **Por prefijo** —`operix.cloud/api/productos/foto/`—. Es el que corresponde
+   conceptualmente, porque cubre también las que se suban antes de que alguien se
+   acuerde de rehacer la lista. Purge by Prefix está disponible en todos los
+   planes.
+2. **Por URL**, con la lista de arriba. El tope es de 100 operaciones por pedido
+   en Free, Pro y Business, así que con una foto sobra muchísimo. Es el más
+   preciso y el que no toca nada más.
+3. **Purge Everything**, desde el panel. Es el más burdo y acá cuesta poco: el
+   resto de lo que sirve el sitio son los chunks de Next, que llevan el hash del
+   contenido en el nombre y se vuelven a bajar una vez.
+
+Los tres se hacen desde Caching → Configuration en el panel, o con la API de
+purga usando un token con permiso de purga sobre la zona.
+
+### Cómo se comprueba que la purga funcionó
+
+No alcanza con que el panel diga que sí. Se pide la foto **sin ninguna
+credencial** y tiene que contestar 401, no la imagen:
+
+    curl -s -D - -o /dev/null https://operix.cloud/api/productos/foto/<archivo>
+
+Lo que hay que leer son tres cosas: que el código sea 401, que `cf-cache-status`
+ya no diga `HIT` —lo esperable es `BYPASS` o `MISS`—, y que el cuerpo no sean los
+bytes de una imagen. Si vuelve a decir `HIT` con 200, la purga no alcanzó o hay
+una Cache Rule en el panel que ignora lo que manda el origen; en ese caso lo que
+queda es esa regla, y hay que mirarla.
+
+Y la otra mitad, que es la que prueba que no se rompió nada: **con sesión tiene
+que seguir contestando 200 con la imagen**, y la segunda vez que el mismo
+navegador la pide no debería volver a bajarla, porque `private, max-age` la deja
+en su caché local.

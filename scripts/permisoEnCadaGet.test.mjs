@@ -401,6 +401,60 @@ test("ningún GET se sirve sin comprobar permiso", () => {
   );
 });
 
+// ── Y UN PERMISO QUE SE COMPRUEBA TAMBIÉN SE PUEDE SALTEAR POR AFUERA ────────
+//
+// Los tres candados de arriba preguntan si la ruta comprueba. Éste pregunta algo
+// distinto y que ninguno de ellos ve: **si esa comprobación llega a correr.**
+//
+// EL CASO, MEDIDO EN PRODUCCIÓN EL 2026-08-23. `productos/foto/[archivo]` pedía
+// `productos.ver` —pasaba el candado de arriba sin problema— y respondía con
+// `Cache-Control: public`. Cloudflare guardó la foto y desde entonces la servía
+// desde el borde a peticiones SIN sesión, que ya no llegaban al servidor: 200 sin
+// credenciales, `cf-cache-status: HIT`, `Age: 11572`.
+//
+// Es la forma más difícil de ver de todas: la defensa está escrita, se ejecuta
+// cuando la llaman, y aun así no defiende — porque el tráfico dejó de llegarle.
+// Un censo de permisos la da por buena, porque el permiso está.
+//
+// LA REGLA: si una ruta decide con un permiso, su respuesta es para quien lo
+// tiene, y una caché compartida no puede quedársela para repartirla. `private` sí
+// —esa es del navegador de esa persona—; `public` no.
+const CACHE_COMPARTIDA = /["']Cache-Control["']\s*:\s*["'][^"']*\bpublic\b/;
+
+test("ninguna ruta con permiso se declara cacheable por una caché compartida", () => {
+  const culpables = relevar()
+    .filter((r) => r.chequea)
+    .filter((r) => CACHE_COMPARTIDA.test(sinComentarios(fs.readFileSync(path.join(RAIZ, r.rel), "utf8"))));
+
+  assert.deepEqual(
+    culpables.map((r) => r.nombre),
+    [],
+    `Estas rutas comprueban permiso y aun así dejan que una caché compartida guarde ` +
+      `la respuesta:\n` +
+      culpables.map((r) => `  ${r.rel}`).join("\n") +
+      `\n\nUn CDN que la guarda se la sirve después a cualquiera con la url, sin ` +
+      `volver a pasar por el chequeo. Usá "private" si querés conservar la caché ` +
+      `del navegador, que es la que ahorra datos en el celular.`
+  );
+});
+
+// Y EL CANDADO SABE MIRAR, igual que los de arriba: si la expresión dejara de
+// encontrar la forma en que el repo escribe la cabecera, el de arriba pasaría en
+// verde sobre un conjunto vacío sin afirmar nada. Se comprueba contra un texto
+// armado acá, que no depende de que ninguna ruta esté mal hoy.
+test("la expresión de caché compartida reconoce las formas que hay que atrapar", () => {
+  assert.ok(CACHE_COMPARTIDA.test(`"Cache-Control": "public, max-age=31536000, immutable"`));
+  assert.ok(CACHE_COMPARTIDA.test(`'Cache-Control': 'public'`));
+  assert.ok(CACHE_COMPARTIDA.test(`"Cache-Control": "max-age=60, public"`));
+  // Y no marca lo que está bien. `private` lleva la palabra adentro de otra
+  // —"no-cache" no, pero conviene fijar los dos casos buenos del repo—.
+  assert.ok(!CACHE_COMPARTIDA.test(`"Cache-Control": "private, max-age=31536000, immutable"`));
+  assert.ok(!CACHE_COMPARTIDA.test(`"Cache-Control": "no-store, no-cache, must-revalidate"`));
+  // La cabecera del CDN NO es la que se mira acá: prohíbe la caché compartida en
+  // vez de permitirla, y confundirlas daría un rojo al revés.
+  assert.ok(!CACHE_COMPARTIDA.test(`"Cloudflare-CDN-Cache-Control": "no-store"`));
+});
+
 // Que la lista de excepciones no se convierta en el basurero donde se tira lo que
 // molesta: una entrada que ya no corresponde a ninguna ruta es una que quedó
 // vieja, y las que están vivas hay que poder encontrarlas.

@@ -79,10 +79,49 @@ export async function GET(req, { params }) {
     return new NextResponse(bytes, {
       headers: {
         "Content-Type": TIPO_POR_EXTENSION[extension] || "application/octet-stream",
-        // Un año, e inmutable: el nombre lleva un azar adentro, así que una foto
+
+        // ── LA CACHÉ ES DEL NAVEGADOR, NUNCA DE UNA COMPARTIDA ─────────────
+        //
+        // Un año e inmutable, porque el nombre lleva un azar adentro y una foto
         // nueva es una url nueva. Sin esto la lista vuelve a bajar las 25 fotos
-        // en cada visita, que en un celular con datos es lo que se nota.
-        "Cache-Control": "public, max-age=31536000, immutable",
+        // en cada visita, que en un celular con datos es lo que se nota. Eso no
+        // cambia: lo que cambia es QUIÉN puede guardarlas.
+        //
+        // ── EL DEFECTO QUE ESTO CIERRA, MEDIDO EN PRODUCCIÓN ───────────────
+        //
+        // Acá decía `public`. El chequeo de permiso de arriba se cumplía —una
+        // petición sin sesión llegaba y se iba con 401— pero la respuesta que sí
+        // salía la guardaba Cloudflare, y a partir de ahí la servía el borde a
+        // cualquiera que tuviera la url, sin volver a pasar por este archivo.
+        //
+        // Comprobado el 2026-08-23 contra `operix.cloud`: la foto contestó 200
+        // sin ninguna credencial, con `cf-cache-status: HIT` y `Age: 11572`. El
+        // permiso no fallaba; lo estaban salteando por afuera.
+        //
+        // Es la forma más difícil de ver de todas: la defensa está escrita, se
+        // ejecuta, y aun así no defiende — porque el tráfico dejó de llegarle.
+        //
+        // Y la url ayudaba a que pasara: termina en `.webp`, que está en la
+        // lista de extensiones que Cloudflare cachea por defecto. Parece un
+        // archivo estático y no lo es.
+        //
+        // `private` es lo que lo arregla: el navegador la sigue guardando y una
+        // caché compartida tiene prohibido hacerlo.
+        "Cache-Control": "private, max-age=31536000, immutable",
+
+        // ── Y EL CINTURÓN, PORQUE `private` SE PUEDE PISAR DESDE AFUERA ────
+        //
+        // Una Cache Rule del panel que diga "guardá igual, ignorá lo que mande
+        // el origen" vuelve a dejar la foto en el borde, y desde acá no hay
+        // forma de ver si esa regla existe. Esta cabecera es la que Cloudflare
+        // mira ANTES que `Cache-Control` para decidir su propia caché, así que
+        // sobrevive a esa configuración; solo le gana una Cache Response Rule
+        // con `set_cache_control`.
+        //
+        // No toca la caché del navegador: es exclusiva de la del CDN. Por eso
+        // se pueden pedir las dos cosas a la vez y no se contradicen.
+        "Cloudflare-CDN-Cache-Control": "no-store",
+
         "Content-Length": String(bytes.length),
       },
     });
