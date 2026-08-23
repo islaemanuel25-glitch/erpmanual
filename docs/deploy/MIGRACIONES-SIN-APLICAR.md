@@ -18,8 +18,54 @@ Si la lista está vacía, el despliegue es solo de código.
 
 **Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-23 después de desplegar
-`887d247a6571ea338d14bc1e1ba02051309ffaa3` — el merge del PR #6: card única y
-fotos de producto. **Solo código y un volumen nuevo**, sin ninguna migración.
+`9b37d0b4110fe05f61597192a7aba4f12c6f174a` — el merge del PR #7, que corrige la
+edición de combos en el celular. **Solo código.**
+
+Corte de **2 segundos**. Cinco valores coincidentes, cero reinicios, logs sin
+errores, `/login` en 200 y el árbol del VPS limpio.
+
+### EL FIX SE VERIFICÓ LEYENDO EL CÓDIGO DESPLEGADO, NO CONTANDO
+
+Contar apariciones no alcanzó y conviene que quede escrito por qué: el primer
+intento comparó cuántas veces aparecía `.productoLocalId` en los chunks —13
+contra 12— y con esa diferencia de uno no se puede atribuir nada, porque el
+mismo nombre lo usan otras pantallas. Acotarlo por una cadena de la pantalla
+tampoco sirvió a la primera: el chunk que contenía el texto del buscador daba
+cero en TODOS los controles, o sea que la búsqueda no estaba mirando el archivo
+que se creía.
+
+Lo que sí sirvió fue identificar el chunk que CAMBIÓ —los nombres son hash del
+contenido, así que se comparan las dos listas— y después leer el código
+minificado alrededor de la ruta del combo. Ahí el fix se lee entero:
+
+En la imagen VIEJA:
+
+    onEditar:()=>at(e.id??e.productoLocalId)
+
+En la que está desplegada AHORA:
+
+    onEditar:()=>{e?.esCombo===!0?t4(e.localProductoId):at(e.id)}
+
+donde `t4` es `abrirEditarCombo`, que hace
+`` g.push(`/modulos/productos/editar-combo/${e}`) ``, y `at` es `abrirEditar`.
+Las tres cosas que había que comprobar están a la vista: el producto normal va al
+editor normal con `e.id`, el combo va a editar-combo con `e.localProductoId`, y
+la rama del combo NO tiene ningún camino hacia el id del producto base. El
+contador de `esCombo===!0?` da 0 en la vieja y 1 en la nueva.
+
+### Y APARECIÓ UNA FOTO REAL EN EL VOLUMEN
+
+`p181-bed80329.webp`. O sea que alguien ya cargó una foto de producto desde la
+aplicación, con el camino completo —cámara, achicado, subida, escritura en el
+volumen—. Eso cierra el pendiente que había quedado del despliegue anterior: era
+lo único de la tanda de fotos que no se había ejercido contra producción.
+
+### Lo que NO se pudo hacer
+
+**No se abrió Productos móvil en producción con una sesión real.** No hay
+credenciales productivas en esta máquina. La prueba del flujo completo —crear un
+combo, tocar Editar, ver el FormCombo precargado y guardar— se corrió contra
+desarrollo antes del corte, con once afirmaciones en verde y captura a 390 px.
 
 Sin migraciones, comprobado antes de tocar nada de las tres formas de siempre.
 El contenedor descartable contó **101**, el mismo número que el árbol.
