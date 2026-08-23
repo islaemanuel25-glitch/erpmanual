@@ -242,21 +242,108 @@ que comparar.
 
 ### Lo que cuesta, medido y no estimado
 
-Una dependencia nueva, `onnxruntime-web` 1.27.0, licencia MIT. El modelo es
-Apache-2.0. Los dos archivos se sirven desde nuestro dominio y la foto no sale
-del teléfono.
+Una dependencia nueva, `onnxruntime-web` **fijada en 1.27.0 exacta** —sin `^`,
+porque el `.wasm` está commiteado y corresponde a esa versión—, licencia MIT. El
+modelo es Apache-2.0. Los dos archivos se sirven desde nuestro dominio y la foto
+no sale del teléfono.
 
     u2netp.onnx                    4.574.861 B crudo  ·  4.237.634 B gzip
     ort-wasm-simd-threaded.wasm   13.479.978 B crudo  ·  3.428.070 B gzip
                                   18.054.839 B        ·  7.665.704 B
 
-O sea **unos 7,7 MB la primera vez** en cada teléfono. Es bastante más que los
-"8 MB" que se habían estimado arriba contando solo el modelo con una idea vieja
-del tamaño del runtime — aquel número era del modelo, no del total.
+Eso son los BINARIOS medidos con `stat` y `gzip -9` sobre los archivos del repo.
 
-Se bajan una sola vez: quedan en la Cache API con el nombre del almacén
-versionado. Comprobado recargando la página y volviendo a recortar con **cero
-pedidos de red**.
+#### El total real de la primera vez, medido en un navegador
+
+El número de arriba estaba incompleto y se sabía: el import dinámico de
+`onnxruntime-web` también trae JavaScript, y ese JavaScript el navegador lo baja
+igual. Lo que faltaba era el número. Se midió con `scripts/sonda-u2netp-peso.mjs`
+—perfil de navegador limpio, contra un build de producción servido en el 3111,
+leyendo `transferSize` de Resource Timing— el 2026-08-23:
+
+    recursos de IA        2 archivos    7,66 MB transferidos   17,22 MB sin comprimir
+        ort-wasm-simd-threaded.wasm     3,30 MB                12,86 MB
+        u2netp.onnx                     4,36 MB                 4,36 MB
+    JS de onnxruntime-web  2 trozos    23,5 kB transferidos      68,9 kB sin comprimir
+    ────────────────────────────────────────────────────────────────────
+    TOTAL atribuible a quitar el fondo  7,68 MB transferidos
+
+**El 7,7 MB documentado no cambia, y ahora se sabe por qué.** El JS del runtime
+son 23,5 kB comprimidos —un 0,3 % del total—, así que la sospecha de que el
+número estuviera subestimado era razonable y resultó que no: lo que domina son
+los binarios. El `.wasm` sí viaja comprimido, de 12,86 a 3,30 MB; el `.onnx` no
+comprime nada, porque los pesos ya son entropía alta.
+
+Un detalle de la medición, para que se pueda repetir: la sonda informa además
+39,9 kB de "otros" que NO se cuentan arriba. Son prefetches de rutas que Next
+dispara solo y que habrían ocurrido igual sin tocar una foto. Meterlos en el
+total sería cargarle al motor algo que no provoca.
+
+#### La segunda vez
+
+Página recargada y otro recorte, con el caché caliente: **cero bytes de recursos
+de IA y cero de JS**. Lo único que vuelve por red son 41,9 kB del documento y su
+carga de datos, que es lo que cuesta abrir la pantalla y no tiene que ver con el
+recorte. Los binarios quedan en la Cache API y el JS en la caché del navegador.
+
+#### Y el almacén ya no se invalida a mano
+
+Antes el almacén se llamaba `u2netp-v1`, y el comentario prometía que cambiar el
+modelo lo invalidaba solo. Era falso: `v1` no está atado a nada, así que
+reemplazar el `.onnx` y no acordarse de tocar esa línea dejaba a cada teléfono
+leyendo los bytes viejos, en silencio y para siempre.
+
+Ahora el nombre ES el contenido: `u2netp-<huella>`, donde la huella son los
+primeros 16 hex del sha256 de la versión del runtime más los sha256 de los dos
+binarios. Hoy da `u2netp-2f0522c45b463c6b`. El candado U13 la recalcula desde
+`MANIFIESTO.json` y se pone rojo si cambia cualquiera de los tres datos sin que
+cambie el nombre del almacén.
+
+### Un caché podrido se cura, y cuánto tarda en curarse
+
+La primera versión guardaba los bytes apenas los bajaba, **antes** de saber si
+ORT podía crear una sesión con ellos. Una descarga cortada quedaba guardada como
+buena, y a partir de ahí ese teléfono recortaba por bordes en cada foto, para
+siempre, sin un solo error visible — porque los dos motores devuelven una imagen
+plausible.
+
+Ahora se guarda recién después de que la sesión se creó, y si los bytes salieron
+del almacén y la sesión falla, se invalidan las dos entradas de esa versión, se
+baja de red **una sola vez más** y se reintenta. Si vuelve a fallar, tira y cae a
+bordes. El reintento está atado a que los bytes vinieran del caché, que es lo que
+hace que esto termine: bytes de red que no sirven no se reintentan.
+
+**Los dos casos no se curan en el mismo momento**, y salió de leer
+`node_modules/onnxruntime-web/lib/wasm/wasm-factory.ts`:
+
+- **modelo podrido** — se cura en la MISMA carga. La persona no ve nada.
+- **wasm podrido** — ORT prende su bandera `aborted` y no la vuelve a apagar
+  nunca, así que esa foto sale por el respaldo. Lo que sí queda hecho es borrar
+  las entradas podridas, y **la recarga siguiente se cura sola**.
+
+Los dos casos están ejercidos por separado en `scripts/sonda-u2netp-cache.mjs`,
+que pudre la entrada del almacén a propósito. Contraprobada: sacándole el
+reintento al código, la sonda da 5 rojos, incluido "sigue en el respaldo: el
+teléfono quedó pegado", que es exactamente el defecto que había.
+
+### Las licencias viajan con los binarios
+
+No alcanzaba con `"licencia": "Apache-2.0"` escrito en el manifiesto. Los dos
+binarios se DISTRIBUYEN —cada navegador que abre una ficha se los baja—, y
+Apache-2.0 pide en su punto 4 que la copia de la licencia acompañe a la obra,
+mientras que MIT pide que el aviso de copyright viaje con el software.
+
+Están al lado de los binarios, en `public/modelos/u2netp/`, copiados exactos de
+upstream y sin editar:
+
+- `LICENSE-u2net-Apache-2.0.txt` — de `xuebinqin/U-2-Net`, commit `89d9a2e6`
+- `LICENSE-onnxruntime-web-MIT.txt` — de `microsoft/onnxruntime`, tag `v1.27.0`,
+  commit `950c941f`
+
+Ninguno de los dos repositorios tiene `NOTICE`, así que no hay nada más que
+redistribuir. El candado U15 comprueba que los archivos estén y que su sha256 sea
+el del texto upstream; el `.gitattributes` los marca `-text` para que la
+normalización de finales de línea de git no los altere, que ya pasó una vez.
 
 ### El motor viejo no se borró
 

@@ -1,2 +1,22 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# ── LAS LICENCIAS DE TERCEROS NO SE NORMALIZAN ────────────────────────────────
+#
+# Son copias EXACTAS de los textos upstream y hay un candado —U15— que compara su
+# sha256 contra el que quedó anotado en `public/modelos/u2netp/MANIFIESTO.json`.
+#
+# Con `text=auto` y `core.autocrlf=true`, git convierte los finales de línea a
+# CRLF al escribirlos en el árbol de trabajo. Eso cambia el archivo: el MIT pasa
+# de 1073 a 1094 bytes —21 saltos de línea— y el sha256 deja de coincidir. El
+# candado se pone rojo por una razón que no tiene NADA que ver con lo que
+# defiende, y el mensaje ("no es el texto que se bajó de upstream") apunta
+# justamente al lado equivocado.
+#
+# No es hipotético: pasó al escribir esto. Un `git stash` de treinta segundos
+# —hecho para medir otra cosa— fue suficiente para convertir el archivo al
+# volver, y le pasaría igual a cualquiera que clone el repo en Windows.
+#
+# `-text` desactiva toda conversión: los bytes que se commitean son los que
+# quedan en el disco, acá y en cualquier máquina.
+public/modelos/u2netp/LICENSE-*.txt -text

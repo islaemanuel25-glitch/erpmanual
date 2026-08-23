@@ -8,7 +8,12 @@
     "origen": "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
     "bytes": 13479978,
     "sha256": "d1ab1b94b16a65b29d710d0b587b29e7bed336827577623913479b8afe8113e6",
-    "cuidado": "Tiene que ser el .wasm de la MISMA version de onnxruntime-web que declara package.json. Si se actualiza la dependencia hay que volver a copiarlo; el candado U8 compara las dos versiones."
+    "cuidado": "Tiene que ser el .wasm de la MISMA version de onnxruntime-web que declara package.json Y que resuelve package-lock.json. Si se actualiza la dependencia hay que volver a copiarlo; el candado U8 compara las tres versiones.",
+    "atribucion": "ONNX Runtime, Copyright (c) Microsoft Corporation",
+    "licenciaArchivo": "LICENSE-onnxruntime-web-MIT.txt",
+    "licenciaOrigen": "https://github.com/microsoft/onnxruntime/blob/v1.27.0/LICENSE",
+    "licenciaCommit": "950c941f116d43a20adb5272a5ff875064d48480",
+    "licenciaSha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
   },
   "modelo": {
     "nombre": "u2netp",
@@ -19,11 +24,28 @@
     "bytes": 4574861,
     "sha256": "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8",
     "entrada": "1x3x320x320 float32, NCHW, normalizacion ImageNet sobre la imagen dividida por su propio maximo",
-    "salida": "siete mapas de 1x1x320x320; la buena es la primera"
+    "salida": "siete mapas de 1x1x320x320; la buena es la primera",
+    "atribucion": "U-2-Net, xuebinqin/U-2-Net. Qin et al., U2-Net: Going Deeper with Nested U-Structure for Salient Object Detection, Pattern Recognition 106 (2020)",
+    "licenciaArchivo": "LICENSE-u2net-Apache-2.0.txt",
+    "licenciaOrigen": "https://github.com/xuebinqin/U-2-Net/blob/master/LICENSE",
+    "licenciaCommit": "89d9a2e60d4e114de742feb17ea62445f1c9f4e5",
+    "licenciaSha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  "licencias": {
+    "porQueEstanLosArchivos": "Los dos binarios se distribuyen al navegador de cada persona que usa el ERP. Apache-2.0 pide en su punto 4 que la copia de la licencia acompañe a la obra distribuida, y MIT pide que el aviso de copyright viaje con el software. Escribir el nombre de la licencia en este JSON no cumple ninguna de las dos cosas: hacen falta los textos, y son los de arriba.",
+    "sonCopiasExactas": "Se bajaron de los repositorios upstream y no se editaron. El sha256 de cada uno esta en licenciaSha256 y el candado U15 lo recalcula.",
+    "upstreamSinNotice": "Ninguno de los dos repositorios tiene archivo NOTICE (comprobado el 2026-08-23: los dos devuelven 404), asi que no hay nada mas que redistribuir por el punto 4d de Apache-2.0."
+  },
+  "cache": {
+    "huella": "2f0522c45b463c6b",
+    "almacen": "u2netp-2f0522c45b463c6b",
+    "comoSeCalcula": "Primeros 16 hex del sha256 de u2netp|<runtime.paquete>|<runtime.version>|<runtime.sha256>|<modelo.nombre>|<modelo.sha256>, unidos con barra vertical y sin espacios.",
+    "porQue": "El nombre del almacen de la Cache API tiene que estar atado al CONTENIDO. Con un v1 escrito a mano, cambiar el modelo y olvidarse de tocar esa linea deja a cada telefono leyendo los bytes viejos en silencio para siempre. El candado U13 recalcula esta huella desde este mismo archivo y se pone rojo si no coincide con la del codigo."
   },
   "pesoTotal": {
     "crudoBytes": 18054839,
     "gzipBytes": 7665704,
-    "comoSeMidio": "stat para el crudo y gzip -9 para el comprimido, el 2026-08-23"
+    "comoSeMidio": "stat para el crudo y gzip -9 para el comprimido, el 2026-08-23",
+    "ojo": "Estos son SOLO los dos binarios. El total que baja un telefono la primera vez incluye ademas el JavaScript de onnxruntime-web que trae el import dinamico. El numero completo, medido en un navegador con perfil limpio, esta en docs/decisions/DEC-0010-motor-de-quitar-fondo.md y lo produce scripts/sonda-u2netp-peso.mjs."
   }
 }
