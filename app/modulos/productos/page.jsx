@@ -1128,7 +1128,10 @@ export default function ProductosPage() {
   // marcara los 2.600 de una vez la convertiría en una firma en blanco, y el
   // control quedaría decorativo desde el primer toque.
   const marcarRevisados = async () => {
-    const ids = rows.map((p) => p.id ?? p.productoLocalId).filter(Boolean);
+    // El campo es `localProductoId`; decía `productoLocalId`, que no existe en
+    // la fila, así que el `??` era una red que no atajaba nada. Misma línea
+    // torcida que mandaba los combos al editor equivocado.
+    const ids = rows.map((p) => p.id ?? p.localProductoId).filter(Boolean);
     if (ids.length === 0) return;
     setMarcandoRevisado(true);
     try {
@@ -1192,6 +1195,43 @@ export default function ProductosPage() {
     const editUrl = `/modulos/productos/${Number(id)}/editar${qs ? `?${qs}` : ""}`;
     router.push(editUrl);
   };
+
+  // ── A DÓNDE LLEVA "EDITAR" DE LA CARD DEL CELULAR ─────────────────────────
+  //
+  // ── EL DEFECTO ────────────────────────────────────────────────────────────
+  //
+  // Decía `abrirEditar(p.id ?? p.productoLocalId)`, o sea que TODO iba al editor
+  // normal. Un combo terminaba en `/modulos/productos/<ProductoBase.id>/editar`,
+  // que es el formulario de un producto común: sin componentes, sin la
+  // composición, y editando la ficha maestra de algo que no es un producto
+  // maestro. La tabla de escritorio ya despachaba bien —`row.esCombo` decide—;
+  // el celular no tenía esa rama.
+  //
+  // ── Y UN SEGUNDO DEFECTO QUE ESTABA ESCONDIDO EN ESA MISMA LÍNEA ─────────
+  //
+  // `p.productoLocalId` NO EXISTE. El mapper produce `localProductoId` —así lo
+  // lee la tabla de escritorio, y así lo usa `abrirVerComposicion` tres líneas
+  // más arriba—. O sea que el `??` nunca disparaba: era una red de seguridad
+  // que no atajaba nada, y de paso hacía creer que el caso estaba contemplado.
+  //
+  // ── LA REGLA ──────────────────────────────────────────────────────────────
+  //
+  // Un combo se identifica SIEMPRE por `ProductoLocal.id`, nunca por
+  // `ProductoBase.id`. No es una preferencia de nombres: son dos números
+  // distintos, y el backend valida pertenencia al local contra el primero. Pasar
+  // el segundo no da un error de permisos, da otra fila o ninguna.
+  const editarDesdeLaCard = (p) => {
+    if (p?.esCombo === true) {
+      // Sin `?? p.id`: si por lo que sea la fila no trae su `localProductoId`,
+      // caer al id del producto base mandaría el combo al editor equivocado —que
+      // es justamente el defecto que se está arreglando— y encima parecería que
+      // funciona. `abrirEditarCombo` no hace nada con un id vacío.
+      abrirEditarCombo(p.localProductoId);
+      return;
+    }
+    abrirEditar(p.id);
+  };
+
 
   // =========================================================
   // EXPORT: Descargar Excel
@@ -1897,7 +1937,7 @@ export default function ProductosPage() {
                   });
                   return (
                   <TarjetaProductoMovil
-                    key={p.id ?? p.productoLocalId}
+                    key={p.id ?? p.localProductoId}
                     nombre={p.nombre}
                     // `false` es "esta pantalla no lo muestra" y `null` es "no
                     // hay dato": la tarjeta los dibuja al revés —el segundo deja
@@ -2002,7 +2042,9 @@ export default function ProductosPage() {
                     // EL ID, NO LA FILA: `abrirEditar` valida con `Number(id)`,
                     // así que pasarle el objeto daba NaN y saltaba "ID de
                     // producto inválido" sin entrar nunca.
-                    onEditar={() => abrirEditar(p.id ?? p.productoLocalId)}
+                    //
+                    // Y UN COMBO NO VA AL EDITOR NORMAL: ver `editarDesdeLaCard`.
+                    onEditar={() => editarDesdeLaCard(p)}
                   />
                   );
                 })}
