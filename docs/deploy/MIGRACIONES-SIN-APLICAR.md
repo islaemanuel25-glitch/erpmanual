@@ -17,9 +17,88 @@ Si la lista está vacía, el despliegue es solo de código.
 ## Pendientes
 
 **Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
-comprobado con `prisma migrate status` el 2026-08-22 después de desplegar
-`af506512b0639601039dc812fd80fb584c9c20ae` — el merge del PR #5, que completa
-Productos móvil y fue **solo de código**.
+comprobado con `prisma migrate status` el 2026-08-23 después de desplegar
+`887d247a6571ea338d14bc1e1ba02051309ffaa3` — el merge del PR #6: card única y
+fotos de producto. **Solo código y un volumen nuevo**, sin ninguna migración.
+
+Sin migraciones, comprobado antes de tocar nada de las tres formas de siempre.
+El contenedor descartable contó **101**, el mismo número que el árbol.
+
+El corte fue de **2 segundos**. Cero reinicios y los logs sin errores.
+
+### ESTA TANDA TRAJO INFRAESTRUCTURA, Y ESO NO SE VE EN EL RANGO
+
+Es la primera que necesita un paso en el VPS **antes** de levantar la app: crear
+el volumen `erpazul_fotos_productos`. Un despliegue de solo código no lo habría
+necesitado, y el clasificador de migraciones no mira volúmenes — así que si
+alguien lo hubiera saltado, la aplicación habría levantado bien y se habría
+negado a guardar fotos, con el motivo escrito pero sin que nadie lo esperara.
+
+Lo que se hizo, en orden y antes de recrear nada:
+
+1. `docker volume create erpazul_fotos_productos`.
+2. El centinela `.volumen-fotos-productos` adentro.
+3. **Y LOS PERMISOS, QUE NO ESTABAN EN EL RUNBOOK.** El volumen recién creado
+   queda `755 root:root`, y el contenedor corre como `node` (1000:1000): la
+   aplicación no habría podido escribir. Se igualó al de comprobantes —`775
+   1000:1000`— y se comprobó ESCRIBIENDO con ese usuario, no mirando el modo.
+
+### LA PERSISTENCIA SE COMPROBÓ RECREANDO, NO LEYENDO
+
+Se escribió un archivo en el volumen, se recreó el contenedor con
+`--force-recreate` y se volvió a leer: **sobrevivió, con su contenido intacto**.
+Es la única prueba que distingue un volumen montado del disco del contenedor, y
+sin ella "el directorio existe" no dice nada.
+
+### EL BACKUP DE FOTOS CORRIÓ DE VERDAD, Y FALTABA INSTALARLO
+
+El timer no corre el script del repo sino una copia en `~/bin`, y esa copia era
+la versión vieja. El script nuevo **carga dos archivos** —`comunes.sh` y
+`respaldar-fotos.sh`— así que copiar solo el principal lo habría roto al
+arrancar. Se instalaron los tres, con la copia anterior guardada como
+`vps-backup-erpazul.sh.pre887d247a`.
+
+Corrido a mano, el backup completo salió con 0 y empaquetó las fotos. Después se
+restauró en un volumen **descartable** y se verificó: centinela presente, la
+cantidad restaurada igual a la registrada, y el contenido del archivo intacto. El
+volumen descartable se borró.
+
+### LO QUE SE LIMPIÓ, PARA NO DEJAR DATOS INVENTADOS
+
+El archivo que se usó para probar la persistencia y la restauración se sacó del
+volumen productivo, junto con el paquete que lo contenía y la huella. El backup
+se volvió a correr con el volumen limpio e informó **0 fotos**, que es la verdad
+hoy: todavía nadie cargó ninguna.
+
+### EL CAMBIO VIAJÓ, COMPROBADO EN LOS DOS SENTIDOS
+
+Esta tanda saca cosas, así que el marcador es al revés: `top:-22px` —el
+pseudo-elemento del botón que se eliminó— está **1 vez en la imagen vieja y 0 en
+la nueva**, con `.w-\[202px\]{` de control dando 1 en las dos, que es lo que
+prueba que la búsqueda funciona.
+
+Y las rutas nuevas se comprobaron por comportamiento, que es más fuerte que un
+grep: `/api/productos/foto/subir` contesta 405 —existe y es POST— y
+`/api/productos/foto/<nombre>` contesta 401 —existe y pide permiso—, contra una
+ruta inventada que contesta 404.
+
+### LO QUE NO SE PUDO HACER, Y NO SE MAQUILLA
+
+**NO se abrió Productos móvil a 390 px en producción con una sesión real.** No
+hay credenciales productivas en la máquina desde la que se desplegó, y adivinar
+gasta el límite de login y puede trabar una cuenta.
+
+Lo que sí se comprobó sin sesión: las tres pantallas contestan 200, sus rutas de
+datos contestan 401 —o sea que viven y piden sesión—, los logs no tienen un solo
+error después de pedirlas, y la sonda de cascada contra producción da verde. La
+verificación visual a 390 px de este mismo contenido está hecha contra
+desarrollo, antes del corte.
+
+**Queda pendiente, y hace falta que lo haga alguien con sesión:** abrir Productos
+móvil a 390 px, tocar el bloque del precio de un producto con pack para ver que
+alterna, y cargar una foto de punta a punta para confirmar que se guarda en el
+volumen y se ve en la tarjeta. Eso último es lo único que todavía no se ejerció
+con el camino completo.
 
 Sin migraciones, comprobado antes de tocar nada de las tres formas de siempre:
 `git diff --name-only 8b0bab0a..af506512 -- prisma/` no devolvió nada, el

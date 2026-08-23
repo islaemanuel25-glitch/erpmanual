@@ -57,9 +57,39 @@ docker run --rm -v erpazul_fotos_productos:/vol alpine \
 
 Tiene que listar `.volumen-fotos-productos`.
 
-**3. Permisos.** El contenedor escribe con su usuario; si no puede, la
-aplicación lo dice con el motivo "el volumen está montado pero no se puede
-escribir". Se corrige con el mismo criterio que el de comprobantes.
+**3. Permisos. ESTE PASO HACE FALTA SIEMPRE, no es un "si no puede".**
+
+Un volumen recién creado queda `755 root:root`, y el contenedor corre como
+`node` (1000:1000). O sea que **por defecto la aplicación NO puede escribir**, y
+lo descubrió el despliegue de `887d247a`: el volumen estaba creado, el centinela
+estaba, y el modo era el equivocado.
+
+Se iguala al de comprobantes, que es `775 1000:1000`:
+
+```
+docker run --rm -v erpazul_fotos_productos:/vol alpine \
+  sh -c 'chown -R 1000:1000 /vol && chmod 775 /vol && stat -c "%a %u:%g" /vol'
+```
+
+Y **se comprueba escribiendo con ese usuario**, no mirando el modo — un modo que
+se ve bien y un `chown` que no se aplicó dan la misma salida en `stat`:
+
+```
+docker run --rm --user 1000:1000 -v erpazul_fotos_productos:/vol alpine \
+  sh -c 'touch /vol/.prueba-escritura && echo ESCRIBIÓ OK && rm -f /vol/.prueba-escritura'
+```
+
+**4.bis Y EL BACKUP: el timer no corre el script del repo.** Corre una copia en
+`~/bin`, y desde esta tanda el script principal **carga otros dos** —
+`comunes.sh` y `respaldar-fotos.sh`—. Copiar solo el principal lo rompe al
+arrancar. Se instalan los tres:
+
+```
+for f in comunes.sh respaldar-fotos.sh vps-backup-erpazul.sh; do
+  install -m 755 /srv/produccion/erpazul/ops/backup/$f ~/bin/$f
+done
+bash -n ~/bin/vps-backup-erpazul.sh
+```
 
 **4. Comprobar que la aplicación lo ve**, después de recrear:
 
