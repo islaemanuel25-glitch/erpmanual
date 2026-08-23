@@ -193,6 +193,44 @@ El SHA que está corriendo se ve con:
 
 ---
 
+## PASO 6 — LAS FOTOS DE PRODUCTO SON OTRO ARCHIVO
+
+**Restaurar la base NO restaura las fotos de los productos.** Son dos cosas
+distintas y hay que restaurar las dos: la base trae la fila con
+`ProductoBase.imagen_url`, y esa url apunta a un archivo que vive en un volumen
+aparte. Con la base restaurada y el volumen vacío, cada tarjeta queda apuntando a
+una foto que no está — no rompe nada, la tarjeta esconde la imagen sola, pero
+todas las fotos desaparecieron.
+
+El paquete está al lado de los dumps, con el mismo esquema de nombres:
+
+    /srv/produccion/backups/fotos-diario-AAAAMMDD_HHMMSS.tar.gz
+    /srv/produccion/backups/fotos-semanal-*.tar.gz
+    /srv/produccion/backups/fotos-mensual-*.tar.gz
+
+**No está en el repo de GitHub.** A diferencia del dump, el paquete de fotos solo
+existe en el VPS, en la notebook y en el disco externo. El motivo —y la
+consecuencia aceptada— están en `docs/decisions/DEC-0009`.
+
+**El procedimiento completo, con su verificación, está en
+`docs/RUNBOOK-VOLUMEN-FOTOS-PRODUCTOS.md`.** En una línea:
+
+    docker volume create erpazul_fotos_productos
+    docker run --rm -i -v erpazul_fotos_productos:/vol alpine \
+      tar -xzf - -C /vol < /srv/produccion/backups/fotos-diario-<FECHA>.tar.gz
+
+Y **lo que hace que valga**, que es lo mismo que en el paso 3: contar los
+archivos que quedaron y comparar contra el número que el backup registró en su
+log —"paquete con N foto(s)"—. Que el comando salga con 0 no dice nada; un tar
+cortado a la mitad tampoco falla al extraer.
+
+**Y NO se restauran las fotos de comprobantes**, que son otro volumen y no están
+respaldadas a propósito: viven siete días y se decidió que no entraran. Eso es
+`DEC-0008`, y sigue vigente. Las dos decisiones conviven porque los dos ciclos de
+vida son opuestos.
+
+---
+
 ## Cómo funciona el sistema de backups
 
 Por si necesitás tocarlo o entender por qué algo no corrió.

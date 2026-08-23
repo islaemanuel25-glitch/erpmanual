@@ -69,9 +69,15 @@ services:
       # si la aplicación mirara una ruta y Docker montara otra, el chequeo del
       # arranque diría "no existe el directorio" y nadie sabría por qué.
       COMPROBANTES_VOLUMEN_PATH: "${COMPROBANTES_VOLUMEN_PATH:-/vol/comprobantes}"
+      # Y el de fotos de PRODUCTO, que es otro volumen y no una carpeta adentro
+      # del anterior. El motivo es la retención: los comprobantes se borran a los
+      # siete días por diseño, y una foto de producto tiene que durar para
+      # siempre. Compartir el volumen la pondría en ese reloj.
+      FOTOS_PRODUCTOS_VOLUMEN_PATH: "${FOTOS_PRODUCTOS_VOLUMEN_PATH:-/vol/fotos-productos}"
     volumes:
       - ./backups:/app/backups
       - erpazul_comprobantes:${COMPROBANTES_VOLUMEN_PATH:-/vol/comprobantes}
+      - erpazul_fotos_productos:${FOTOS_PRODUCTOS_VOLUMEN_PATH:-/vol/fotos-productos}
     depends_on:
       db:
         condition: service_healthy
@@ -88,4 +94,25 @@ services:
 # NO va al backup, a propósito: docs/decisions/DEC-0008.
 volumes:
   erpazul_comprobantes:
+    external: true
+
+  # ── EL VOLUMEN DE FOTOS DE PRODUCTO ───────────────────────────────────────
+  #
+  # Mismo `external: true` y por el mismo motivo que el de arriba: sin eso
+  # Compose crea uno propio con el nombre del proyecto adelante, vacío, y el que
+  # se aprovisionó a mano —con su centinela `.volumen-fotos-productos` adentro—
+  # no se monta nunca.
+  #
+  # ES UN VOLUMEN APARTE Y NO UNA CARPETA DEL ANTERIOR, y la diferencia es la
+  # retención: los comprobantes se borran a los siete días por diseño y estas
+  # fotos NO SE BORRAN NUNCA. Compartir el volumen las pondría en ese reloj — la
+  # foto andaría una semana y después la tarjeta mostraría un cuadrado roto, sin
+  # ningún error y sin que nadie relacione una cosa con la otra.
+  #
+  # Se crea con docs/RUNBOOK-VOLUMEN-FOTOS-PRODUCTOS.md, no con Compose.
+  #
+  # A DIFERENCIA DEL DE COMPROBANTES, ÉSTE SÍ TENDRÍA QUE IR AL BACKUP: aquéllas
+  # son copias de papeles que se tiran a la semana, y éstas son parte del
+  # catálogo. Todavía no está hecho — queda anotado en el runbook.
+  erpazul_fotos_productos:
     external: true

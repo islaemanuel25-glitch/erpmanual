@@ -1,13 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { Pencil } from "lucide-react";
 
 import SunmiProductoCard, { AccionTarjeta } from "@/components/sunmi/SunmiProductoCard";
-import { nombreCortoDe, nombreDelDorso } from "@/lib/productos/carasDeTarjeta";
+import { hayEquivalenciaDeBulto, nombreCortoDe } from "@/lib/productos/carasDeTarjeta";
 import { formatearMoneda } from "@/lib/moneda";
 
-const UMBRAL_GESTO = 45;
 const SIN_PRECIO_FIJO = "Importe variable";
 const ACENTO_CARD = "color-mix(in srgb, var(--pos-accent) 88%, var(--app-fg))";
 const OCULTO = (valor) => valor === false;
@@ -28,21 +27,76 @@ const OCULTO = (valor) => valor === false;
 // `py-2` da 7 y `mb-1` da 3,5.
 const ALTO_CARA = "min-h-[51.5px]";
 
-function CajaDeLaCara({ className = "", children, ...resto }) {
+// ── EL BLOQUE DEL PRECIO ES EL CONTROL, Y POR ESO ES UN `button` ──────────
+//
+// Antes había un botón aparte —"Ver pack"— con dos flechas y dos puntos al lado.
+// Cuatro elementos para decir que el número de al lado se puede cambiar. Ahora
+// se toca el número.
+//
+// Cuando alterna se dibuja como `button`; cuando no, como `span`. NO se deja
+// siempre el botón deshabilitado: un control que existe y no responde se toca
+// igual, y no tener nada que tocar es una respuesta más clara que una que no
+// pasa nada.
+//
+// El área táctil deja de ser un problema por construcción: son 202 × 51,5 px,
+// muy por encima de los 44 de WCAG 2.5.5. El pseudo-elemento que le agrandaba
+// la zona al botón viejo se fue con él.
+// `esControl` y `alTocar` son dos cosas distintas a propósito: la primera dice
+// si este bloque ALTERNA, la segunda qué hacer cuando lo toquen. Atarlas —"es
+// botón si me pasaron función"— hacía que un consumidor que se olvida el
+// manejador perdiera el control entero sin que nada se queje, y eso ya pasó acá:
+// el candado de la etiqueta se puso rojo sobre un cuerpo que alternaba.
+function CajaDeLaCara({
+  className = "",
+  children,
+  esControl = false,
+  alTocar = null,
+  etiqueta = null,
+  activo = false,
+  ...resto
+}) {
+  const clases = `flex w-[202px] max-w-full rounded-xl px-2.5 py-2 [background:var(--hover-bg)] ${ALTO_CARA} ${className}`;
+  if (!esControl) {
+    return (
+      <span data-cara-precio className={clases} {...resto}>
+        {children}
+      </span>
+    );
+  }
   return (
-    <span
+    <button
+      type="button"
       data-cara-precio
-      className={`flex w-[202px] max-w-full rounded-xl px-2.5 py-2 [background:var(--hover-bg)] ${ALTO_CARA} ${className}`}
+      data-cara-precio-alterna
+      onClick={alTocar ?? undefined}
+      aria-label={etiqueta ?? undefined}
+      aria-pressed={activo}
+      className={`${clases} text-left`}
       {...resto}
     >
       {children}
-    </span>
+    </button>
   );
 }
 
-function PrecioDeLaCara({ importe, presentacion, esCombo = false, atenuado = false }) {
+function PrecioDeLaCara({
+  importe,
+  presentacion,
+  esCombo = false,
+  atenuado = false,
+  esControl = false,
+  alTocar = null,
+  etiqueta = null,
+  activo = false,
+}) {
   return (
-    <CajaDeLaCara className="flex-col items-end leading-none">
+    <CajaDeLaCara
+      className="flex-col items-end leading-none"
+      esControl={esControl}
+      alTocar={alTocar}
+      etiqueta={etiqueta}
+      activo={activo}
+    >
       {presentacion && (
         <span
           data-cara-presentacion
@@ -65,42 +119,32 @@ function PrecioDeLaCara({ importe, presentacion, esCombo = false, atenuado = fal
   );
 }
 
-function ReferenciaDeLaCara({ detalle }) {
-  return (
-    <CajaDeLaCara className="items-center justify-end">
-      <span
-        data-cara-referencia
-        className="block text-sm sunmi-text-strong text-right leading-snug [font-variant-numeric:tabular-nums]"
-      >
-        {detalle}
-      </span>
-    </CajaDeLaCara>
-  );
-}
-
-// ── ACÁ VIVÍA "IDENTIFICACIÓN", Y SE FUE CON EL DORSO QUE LA CONTENÍA ─────
+// ── ACÁ VIVÍAN LAS OTRAS DOS CARAS, Y LAS DOS SE FUERON ───────────────────
 //
-// Era la cara de atrás de un producto sin equivalencia: un bloque que decía
-// IDENTIFICACIÓN y nada más, porque los códigos estaban abajo, en el pie.
+// "IDENTIFICACIÓN" era la cara de atrás de un producto sin equivalencia: un
+// bloque con esa palabra y nada más, porque los códigos estaban abajo, en el
+// pie. Dejó de tener sentido cuando los códigos pasaron al frente.
 //
-// Dejó de tener sentido cuando los códigos pasaron al frente. Un producto sin
-// referencia ya no tiene NADA para mostrar atrás, así que no tiene dorso: sin
-// indicador, sin "Ver códigos" y sin botón. Prometer una cara vacía cuesta un
-// gesto y no devuelve ningún dato.
+// `ReferenciaDeLaCara` era la de kilo y pieza fija: una línea de texto —"1 pieza
+// = 6 kg · $1.000,00 por kilo"— que la franja de equivalencia había dejado sin
+// casa y que se había mudado al dorso.
+//
+// Las dos se van con el dorso. La tarjeta pasa a ser UNA sola, fija, y lo único
+// que puede cambiar es el bloque sombreado del precio, alternando entre las dos
+// escalas de una conversión unidad ↔ pack. Kilo y pieza no tienen esa
+// conversión, así que no alternan y su línea de referencia ya no se dibuja.
 
-function IndicadorDeCara({ mirandoDorso }) {
-  return (
-    <span data-tarjeta-indicador className="flex items-center gap-1.5" aria-hidden="true">
-      {[false, true].map((esDorso) => (
-        <span
-          key={String(esDorso)}
-          className="block w-1.5 h-1.5 rounded-full transition-opacity"
-          style={{ background: ACENTO_CARD, opacity: mirandoDorso === esDorso ? 1 : 0.3 }}
-        />
-      ))}
-    </span>
-  );
-}
+// ── Y ACÁ VIVÍA EL RENGLÓN DEL CARRUSEL, QUE TAMBIÉN SE FUE ───────────────
+//
+// Eran cuatro elementos para decir una sola cosa: un botón "Ver pack", dos
+// flechas y dos puntos. Todos anunciaban que el número de al lado se podía
+// cambiar — y el número está justo ahí, así que ahora se toca el número.
+//
+// Con ellos se va el swipe. El gesto existía porque el control era chico y estaba
+// abajo; con el bloque entero tocable no hay nada que descubrir deslizando, y
+// `touch-action: pan-y` deja de hacer falta: no había otro motivo para escribirlo
+// que devolverle el scroll vertical al navegador después de capturar el
+// horizontal.
 
 // LA MINIATURA DEL PRODUCTO.
 //
@@ -173,12 +217,31 @@ export function MarcaDeLaCara({ cara, regla = null, muestraCosto = true, imagenU
   const hayTexto = costo !== null || !!regla;
   if (!hayTexto && !imagenUrl) return null;
 
+  // ── EL COSTO ENVUELVE, Y ESO LO DESTAPÓ LA FOTO ─────────────────────────
+  //
+  // Tenía `whitespace-nowrap`, que estaba bien mientras el renglón era el costo
+  // y el precio: entraba en una línea siempre.
+  //
+  // Con la miniatura al lado ya no entra. La foto se lleva 44 px y el bloque del
+  // precio son 202 fijos, así que al costo le quedan poco más de 90 — y un texto
+  // que no envuelve no se achica: se DESBORDA. La sonda lo midió montándose 23,4
+  // px sobre el precio, y como la tarjeta recorta lo que sobra, "$20.000,00" se
+  // leía "$20.000,0". Un número de dinero cortado no se lee como un error: se
+  // lee como otro número.
+  //
+  // Envolviendo entra en dos renglones de 10 px, que caben de sobra en los 51,5
+  // que el bloque del precio ya ocupa: la tarjeta no crece. Y donde no hay foto
+  // sigue entrando en una línea, así que esas tarjetas no se mueven.
+  //
+  // El comentario va ACÁ y no adentro del `&&`: puesto ahí, el operando derecho
+  // pasa a tener dos hijos sin fragmento y el build muere con "Expected '</',
+  // got 'data'". Es la tercera vez que este repo se come ese error.
   const texto = hayTexto ? (
     <span className="min-w-0 flex flex-col items-start gap-1 leading-tight">
       {costo !== null && (
         <span
           data-cara-costo
-          className="text-[10px] [font-variant-numeric:tabular-nums] whitespace-nowrap sunmi-text-muted"
+          className="text-[10px] [font-variant-numeric:tabular-nums] sunmi-text-muted"
         >
           Costo {nombreCortoDe(cara.presentacion)} · {formatearMoneda(costo)}
         </span>
@@ -201,73 +264,57 @@ export function MarcaDeLaCara({ cara, regla = null, muestraCosto = true, imagenU
   );
 }
 
-export function CuerpoDeLaCara({
-  caras,
-  mirandoDorso = false,
-  hayReferencia,
-  manejadoresDeGesto = {},
-  onVoltear = null,
-}) {
+/**
+ * ── LA TARJETA ES UNA SOLA, Y LO ÚNICO QUE ALTERNA ES EL PRECIO ───────────
+ *
+ * Antes esto dibujaba DOS CARAS: el frente y un dorso al que se llegaba dando
+ * vuelta la tarjeta entera. Al dorso viajaban también el costo y la marca, así
+ * que un gesto cambiaba media tarjeta.
+ *
+ * Ahora cambia UN bloque: el sombreado del precio, que alterna entre las dos
+ * escalas de una conversión unidad ↔ pack. El nombre, el proveedor, la foto, el
+ * costo, los códigos y Editar se quedan donde están y con lo que tienen. Por eso
+ * el costo ya no viaja: lo elige el envoltorio una sola vez, con la escala de
+ * venta, y no depende de qué se esté mirando.
+ *
+ * Qué cuenta como alternancia lo contesta `hayEquivalenciaDeBulto`, que vive en
+ * `carasDeTarjeta` —la pieza que arma las caras— y no acá: la sonda necesita el
+ * mismo predicado y no puede importar un componente de React.
+ */
+export function CuerpoDeLaCara({ caras, enLaOtraEscala = false, onAlternar = null }) {
   const { frente, dorso } = caras;
-  // ── EL DORSO LO CREA LA REFERENCIA, Y SOLO ELLA ─────────────────────────
-  //
-  // Antes también lo creaba tener códigos —`hayReferencia || hayIdentificacion`—
-  // porque la identificación era el contenido de atrás. Los códigos se ven en el
-  // frente desde la tanda anterior, así que esa mitad quedó prometiendo una cara
-  // sin nada adentro.
-  //
-  // Ahora la pregunta es una sola: ¿hay una equivalencia real que mostrar? Si no
-  // la hay, la tarjeta tiene UNA cara y no hay gesto que descubrir.
-  const hayDorso = hayReferencia;
-  const cara = mirandoDorso ? dorso : frente;
+  const alterna = hayEquivalenciaDeBulto(caras);
+  const mostrado = alterna && enLaOtraEscala ? dorso : frente;
+
+  // LO QUE EL BLOQUE HACE, DICHO CON PALABRAS. Sin el botón de antes, el único
+  // texto del control es el rótulo de la escala —"PACK X 24"— y eso no explica
+  // que se pueda tocar. Un lector de pantalla necesita la frase; la vista no,
+  // porque el número está ahí.
+  const laOtra = alterna ? nombreCortoDe((enLaOtraEscala ? frente : dorso).presentacion) : null;
 
   return (
     <span
-      data-tarjeta-cara={mirandoDorso ? "dorso" : "frente"}
+      // El valor dice QUÉ ESCALA se está mostrando, no qué cara: ya no hay
+      // caras. "venta" es la escala configurada, la que cobra el POS.
+      data-tarjeta-cara={enLaOtraEscala && alterna ? "equivalente" : "venta"}
       className="flex min-w-0 flex-col items-end"
-      style={{ touchAction: "pan-y" }}
-      {...manejadoresDeGesto}
     >
-      {cara?.importe === null && cara?.detalle ? (
-        <ReferenciaDeLaCara detalle={cara.detalle} />
-      ) : (
-        <PrecioDeLaCara
-          importe={cara?.importe ?? null}
-          presentacion={cara?.presentacion}
-          esCombo={!mirandoDorso && frente.esCombo}
-          atenuado={mirandoDorso}
-        />
-      )}
-
-      {hayDorso && (
-        <span className="mt-1 flex w-[202px] max-w-full items-center justify-between gap-2">
-          <IndicadorDeCara mirandoDorso={mirandoDorso} />
-          {/* EL ÁREA TÁCTIL LLEGA A 44 PX SIN QUE LA TARJETA CREZCA.
-              Escribir el alto mínimo en el propio botón —como estaba antes de
-              esta card— sube este renglón de 14 a 44 y estira las 25 tarjetas
-              de la lista, que es justamente lo que la card restaurada vino a
-              deshacer. La capa invisible del pseudo-elemento recibe el toque y
-              no ocupa lugar: no participa del flujo, así que no mueve un pixel.
-              Crece 22 hacia arriba, contra el bloque del precio que no es
-              tocable, y solo 8 hacia abajo, para no comerle el borde a Editar.
-              14 + 22 + 8 = 44, el mínimo de WCAG 2.5.5. */}
-          <button
-            type="button"
-            data-tarjeta-voltear
-            onClick={onVoltear ?? undefined}
-            aria-pressed={mirandoDorso}
-            className="relative inline-flex items-center gap-1 text-xs font-medium sunmi-text-strong after:absolute after:inset-x-0 after:-top-[22px] after:-bottom-[8px] after:content-['']"
-          >
-            {mirandoDorso && <ChevronLeft className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
-            Ver{" "}
-            {/* Sin el ternario: acá solo se llega habiendo referencia, así que
-                `dorso` existe siempre y "Ver códigos" —lo que devolvía este
-                nombre con `null`— ya no es un destino posible. */}
-            {mirandoDorso ? nombreCortoDe(frente.presentacion) : nombreDelDorso(dorso)}
-            {!mirandoDorso && <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
-          </button>
-        </span>
-      )}
+      <PrecioDeLaCara
+        importe={mostrado?.importe ?? null}
+        presentacion={mostrado?.presentacion}
+        // El combo se dice una sola vez y es del producto, no de la escala: no
+        // se apaga al alternar.
+        esCombo={frente.esCombo}
+        // Y NO SE ATENÚA. Atenuar era del dorso: decía "esto es de consulta, no
+        // es lo que se cobra". Las dos escalas de una conversión son igual de
+        // reales —el POS cobra las dos, según cómo se venda— así que atenuar una
+        // afirmaría algo falso.
+        atenuado={false}
+        esControl={alterna}
+        alTocar={onAlternar}
+        etiqueta={alterna ? `Ver el precio por ${laOtra}` : null}
+        activo={enLaOtraEscala}
+      />
     </span>
   );
 }
@@ -283,44 +330,31 @@ export default function TarjetaProductoMovil({
   imagenUrl = null,
   onEditar,
 }) {
-  const [enDorso, setEnDorso] = useState(false);
-  const gesto = useRef(null);
+  const [enLaOtraEscala, setEnLaOtraEscala] = useState(false);
 
-  // ── DOS PREGUNTAS QUE ANTES ERAN UNA ────────────────────────────────────
+  // ── TRES PREGUNTAS SEPARADAS, Y NINGUNA DEPENDE DE LAS OTRAS ────────────
   //
-  // `hayDorso` era `hayReferencia || hayIdentificacion`: tener códigos alcanzaba
-  // para crear una cara de atrás, porque la identificación vivía ahí. Desde que
-  // los códigos se ven en el frente, esa mitad prometía una cara vacía.
+  // `alterna` decide si el bloque del precio puede cambiar de escala.
+  // `hayIdentificacion` decide si el pie del kit lleva datos.
+  // Y el resto de la tarjeta —nombre, proveedor, foto, costo, Editar— no
+  // depende de ninguna de las dos: se dibuja una vez y se queda.
   //
-  // Ahora son dos cosas separadas y cada una decide lo suyo: la referencia
-  // decide si hay dorso, y la identificación decide si el pie del kit lleva
-  // datos. Un producto puede tener códigos y una sola cara, que es el caso
-  // normal del catálogo.
-  const hayReferencia = !!caras.dorso;
+  // Antes eran una sola pregunta encadenada, y por eso un gesto cambiaba media
+  // tarjeta.
+  const alterna = hayEquivalenciaDeBulto(caras);
   const hayIdentificacion = !OCULTO(codigoBarra) || !OCULTO(codigoInterno);
-  const hayDorso = hayReferencia;
-  const mirandoDorso = hayDorso && enDorso;
-  const caraActual = mirandoDorso ? caras.dorso : caras.frente;
+  const alternando = alterna && enLaOtraEscala;
 
-  const alSoltar = (e) => {
-    const inicio = gesto.current;
-    gesto.current = null;
-    if (!inicio || !hayDorso) return;
-    const dx = e.clientX - inicio.x;
-    const dy = e.clientY - inicio.y;
-    if (Math.abs(dx) < UMBRAL_GESTO || Math.abs(dx) <= Math.abs(dy)) return;
-    setEnDorso(dx < 0);
-  };
-
-  const manejadoresDeGesto = {
-    onPointerDown: (e) => {
-      gesto.current = { x: e.clientX, y: e.clientY };
-    },
-    onPointerUp: alSoltar,
-    onPointerCancel: () => {
-      gesto.current = null;
-    },
-  };
+  // ── ACÁ ESTABA EL GESTO, Y SE FUE CON EL CARRUSEL ───────────────────────
+  //
+  // Eran tres manejadores de puntero, un umbral de 45 px y la comparación de dx
+  // contra dy para no robarle el scroll vertical al navegador. Todo eso existía
+  // para descubrir un control que estaba abajo y era chico.
+  //
+  // El bloque del precio es el control ahora, mide 202 × 51,5 y está a la vista:
+  // no hay nada que descubrir deslizando. Sacar el gesto se lleva además el
+  // riesgo que traía —un swipe que se confunde con un scroll—, que era la razón
+  // de la mitad de esas líneas.
 
   // ── LOS CÓDIGOS SE VEN EN EL FRENTE ───────────────────────────────────────
   //
@@ -342,26 +376,30 @@ export default function TarjetaProductoMovil({
       empresa={empresa}
       codigoBarra={hayIdentificacion ? codigoBarra : false}
       codigoInterno={hayIdentificacion ? codigoInterno : false}
+      // ── LA MARCA YA NO ALTERNA, Y ES LA MITAD DEL CAMBIO ──────────────
+      //
+      // Recibía `caraActual`, así que el costo cambiaba de escala junto con el
+      // precio y la foto se apagaba al dar vuelta. Ahora recibe SIEMPRE el
+      // frente: el costo es el de la escala de venta —la que el POS cobra— y
+      // se queda ahí, alterne o no el bloque de al lado.
+      //
+      // Queda dicho lo que eso implica y no se tapa: mientras el precio muestra
+      // la otra escala, al lado sigue el costo de la escala de venta. No es
+      // ambiguo —cada uno lleva su rótulo, "Costo unidad" contra "PACK X 24"—
+      // pero son dos escalas a la vista al mismo tiempo, y eso es nuevo.
       marca={
         <MarcaDeLaCara
-          cara={caraActual}
+          cara={caras.frente}
           regla={regla}
-          // Sin la salvedad de antes: al dorso solo se llega habiendo
-          // referencia, así que `!mirandoDorso || hayReferencia` era siempre
-          // verdadero y solo tapaba la lectura.
           muestraCosto={muestraCosto}
-          // LA FOTO ES DEL FRENTE Y NADA MÁS. El dorso es la equivalencia, y
-          // repetir la miniatura ahí solo diría de nuevo qué producto es.
-          imagenUrl={mirandoDorso ? null : imagenUrl}
+          imagenUrl={imagenUrl}
         />
       }
       valor={
         <CuerpoDeLaCara
           caras={caras}
-          mirandoDorso={mirandoDorso}
-          hayReferencia={hayReferencia}
-          manejadoresDeGesto={manejadoresDeGesto}
-          onVoltear={() => setEnDorso((v) => !v)}
+          enLaOtraEscala={alternando}
+          onAlternar={() => setEnLaOtraEscala((v) => !v)}
         />
       }
       aviso={null}
@@ -374,4 +412,4 @@ export default function TarjetaProductoMovil({
   );
 }
 
-export { UMBRAL_GESTO, SIN_PRECIO_FIJO, ACENTO_CARD };
+export { SIN_PRECIO_FIJO, ACENTO_CARD };

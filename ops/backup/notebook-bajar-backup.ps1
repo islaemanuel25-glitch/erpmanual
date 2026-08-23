@@ -177,6 +177,67 @@ try {
   Registrar "notebook" "ERROR" $_.Exception.Message
 }
 
+# ── 1.bis Notebook: el paquete de fotos de producto ─────────────────────────
+#
+# ── POR QUÉ BAJA A LA NOTEBOOK Y NO AL REPO GIT ─────────────────────────────
+#
+# El dump de la base pesa unos 2,7 MB y por eso el semanal y el mensual entran
+# cifrados en un repo git. El paquete de fotos crece con el catálogo: a 300 KB
+# por foto, dos mil productos son unos 600 MB. Git guarda todas las versiones
+# para siempre, así que meterlo ahí es hacer crecer el repo sin techo y sin
+# poder deshacerlo.
+#
+# Así que va a la notebook y al disco externo, que es donde ya va el diario. Es
+# una copia menos que la base, y está dicho a propósito en DEC-0009.
+#
+# EL PAQUETE ES GRANDE Y SE BAJA ENTERO CADA VEZ QUE CAMBIA. Cuando el volumen no
+# cambió, el VPS deja el mismo archivo por enlace duro y el nombre cambia igual
+# —lleva la fecha—, así que acá se compara el HASH contra lo que ya se tiene
+# antes de bajar: si es el mismo contenido, se copia local en vez de por la red.
+$nombreFotos = $null
+try {
+  $nombreFotos = EjecutarSsh "cat $DIR_REMOTO/ULTIMO_FOTOS_DIARIO.txt"
+  if (-not $nombreFotos) {
+    # NO es un error: hasta que el volumen exista en producción, no hay paquete.
+    # Un "no hay" registrado es información; una excepción sería ruido diario.
+    Registrar "fotos_notebook" "SIN PAQUETE" "el VPS todavía no reporta ningún paquete de fotos"
+  } else {
+    $destinoFotos = Join-Path $DIR_LOCAL $nombreFotos
+    $shaRemotoFotos = (EjecutarSsh "sha256sum $DIR_REMOTO/$nombreFotos").Split(" ")[0]
+
+    if (Test-Path $destinoFotos) {
+      Registrar "fotos_notebook" "YA ESTABA" $nombreFotos
+    } else {
+      # ── SI YA TENEMOS ESE CONTENIDO, NO SE BAJA DE NUEVO ──────────────────
+      #
+      # El VPS enlaza el paquete del día al anterior cuando nada cambió, pero le
+      # pone nombre nuevo. Sin esto, se bajarían 600 MB por día para guardar el
+      # mismo contenido con otro nombre.
+      $yaLoTengo = Get-ChildItem -Path $DIR_LOCAL -Filter "fotos-diario-*.tar.gz" -ErrorAction SilentlyContinue |
+        Where-Object { (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower() -eq $shaRemotoFotos } |
+        Select-Object -First 1
+      if ($yaLoTengo) {
+        Copy-Item $yaLoTengo.FullName $destinoFotos -Force
+        Registrar "fotos_notebook" "SIN CAMBIOS" ("copiado de {0}" -f $yaLoTengo.Name)
+      } else {
+        EjecutarNativo $SCP @("-o", "ConnectTimeout=20", "${VPS}:$DIR_REMOTO/$nombreFotos", $destinoFotos) "scp del paquete de fotos" | Out-Null
+      }
+    }
+
+    # La verificación es el punto, igual que con el dump: sin esto solo sabemos
+    # que hay un archivo, no que sea el mismo.
+    $shaLocalFotos = (Get-FileHash -Path $destinoFotos -Algorithm SHA256).Hash.ToLower()
+    if ($shaLocalFotos -ne $shaRemotoFotos) {
+      Remove-Item $destinoFotos -Force   # una copia que no verifica es peor que ninguna
+      throw "SHA-256 NO COINCIDE en el paquete de fotos (remoto=$shaRemotoFotos local=$shaLocalFotos). Copia descartada."
+    }
+    Registrar "fotos_notebook" "OK" ("{0} sha256={1}..." -f $nombreFotos, $shaLocalFotos.Substring(0, 16))
+    ActualizarEstado "fotos_notebook" $nombreFotos
+  }
+} catch {
+  Registrar "fotos_notebook" "ERROR" $_.Exception.Message
+}
+
 # ── 2. Disco externo: el diario, si está ────────────────────────────────────
 # Todavía no existe el disco. Queda escrito para que sumarlo sea enchufarlo y
 # ponerle la etiqueta, sin tocar este script.
@@ -199,6 +260,28 @@ try {
       if ($shaDisco -ne $shaOrig) { throw "SHA-256 no coincide tras copiar al disco" }
       Registrar "disco_externo" "OK" ("{0}\{1}" -f $dirDisco, $nombreDiario)
       ActualizarEstado "disco_externo" $nombreDiario
+
+      # ── Y EL PAQUETE DE FOTOS, AL MISMO DISCO ────────────────────────────
+      #
+      # Va acá adentro y no en su propio bloque a propósito: si el disco no está,
+      # el bloque entero ya se saltó y no hay que repetir esa comprobación. Y si
+      # está, las dos cosas que hay que respaldar van juntas — un disco con la
+      # base y sin las fotos es media restauración.
+      if ($nombreFotos) {
+        $origenFotos = Join-Path $DIR_LOCAL $nombreFotos
+        if (Test-Path $origenFotos) {
+          Copy-Item $origenFotos (Join-Path $dirDisco $nombreFotos) -Force
+          $shaDiscoFotos = (Get-FileHash -Path (Join-Path $dirDisco $nombreFotos) -Algorithm SHA256).Hash.ToLower()
+          $shaOrigFotos  = (Get-FileHash -Path $origenFotos -Algorithm SHA256).Hash.ToLower()
+          if ($shaDiscoFotos -ne $shaOrigFotos) { throw "SHA-256 no coincide tras copiar las fotos al disco" }
+          Registrar "fotos_disco_externo" "OK" ("{0}\{1}" -f $dirDisco, $nombreFotos)
+          ActualizarEstado "fotos_disco_externo" $nombreFotos
+        } else {
+          Registrar "fotos_disco_externo" "OMITIDO" "el paquete de fotos no está en la notebook"
+        }
+      } else {
+        Registrar "fotos_disco_externo" "OMITIDO" "no hubo paquete de fotos que copiar"
+      }
     }
   }
 } catch {

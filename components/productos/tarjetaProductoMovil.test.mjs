@@ -9,7 +9,11 @@ import TarjetaProductoMovil, {
   CuerpoDeLaCara,
   MarcaDeLaCara,
 } from "@/components/productos/TarjetaProductoMovil";
-import { carasDeTarjeta } from "@/lib/productos/carasDeTarjeta";
+import { carasDeTarjeta, nombreCortoDe } from "@/lib/productos/carasDeTarjeta";
+// El importe se compara contra el MISMO formateador que dibuja la tarjeta. Con
+// un número escrito a mano, el candado y la pantalla se separan el día que
+// cambie el formato y nadie se entera.
+import { formatearMoneda } from "@/lib/moneda";
 import {
   ESCALA_BULTO,
   ESCALA_UNIDAD,
@@ -40,23 +44,38 @@ const PACK_EN_DEPOSITO = carasDeTarjeta({ escala: ESCALA_BULTO, precio: 24000, c
 const PACK_EN_LOCAL = carasDeTarjeta({ escala: ESCALA_UNIDAD, precio: 24000, costo: 20000, factor: 24, unidad: "pack" });
 const SUELTO = carasDeTarjeta({ escala: ESCALA_UNIDAD, precio: 1500, costo: 1000, factor: 1, unidad: "unidad" });
 
-function renderCuerpo(caras, mirandoDorso, props = {}) {
+// El segundo argumento era `mirandoDorso` y ahora es `enLaOtraEscala`: la
+// tarjeta es una sola y lo que se pide es qué escala mostrar en el bloque del
+// precio. `hayReferencia` y `hayIdentificacion` se fueron — el cuerpo ya no los
+// recibe, porque quién puede alternar lo decide él preguntándole a las caras.
+function renderCuerpo(caras, enLaOtraEscala, props = {}) {
   return renderToStaticMarkup(
-    createElement(CuerpoDeLaCara, {
-      caras,
-      mirandoDorso,
-      hayReferencia: !!caras.dorso,
-      hayIdentificacion: true,
-      ...props,
-    })
+    createElement(CuerpoDeLaCara, { caras, enLaOtraEscala, ...props })
   );
 }
 
-test("G1. abre con la venta real en el frente", () => {
+test("G1. abre con la venta real, y el bloque del precio ES el control", () => {
+  // ── QUÉ AFIRMABA ANTES ──────────────────────────────────────────────────
+  //
+  // Que hubiera un botón "Ver unidad" al lado del precio. Ese botón se sacó, y
+  // con él las dos flechas y los dos puntos: eran cuatro elementos anunciando
+  // que el número de al lado se podía cambiar, con el número ahí mismo. Ahora se
+  // toca el número.
   const html = render({ caras: PACK_EN_DEPOSITO });
   assert.match(html, /PACK X 24/);
   assert.match(html, /24\.000/);
-  assert.match(html, /Ver unidad/);
+
+  // El bloque es un `button` y lo dice en su marcador propio, que es lo que la
+  // sonda usa para tocarlo.
+  assert.match(html, /data-cara-precio-alterna/, "el bloque del precio no es el control");
+  assert.match(html, /<button[^>]*data-cara-precio/, "el bloque del precio no es un button");
+
+  // Y NADA DE LO QUE SE SACÓ VOLVIÓ. Van los cuatro por separado: dejar solo el
+  // del botón habría pasado en verde con los puntos todavía dibujados.
+  assert.doesNotMatch(html, /Ver unidad|Ver pack|Ver cajón/, "volvió el botón de texto");
+  assert.doesNotMatch(html, /data-tarjeta-voltear/, "volvió el botón de alternar");
+  assert.doesNotMatch(html, /data-tarjeta-indicador/, "volvieron los dos puntos");
+  assert.doesNotMatch(html, /lucide-chevron/, "volvieron las flechas");
 });
 
 test("G2. conserva el bloque de precio de la card definida", () => {
@@ -66,24 +85,125 @@ test("G2. conserva el bloque de precio de la card definida", () => {
   assert.match(html, /text-\[9px\]/);
   assert.match(html, /text-\[25px\]/);
   assert.match(html, /w-\[202px\]/);
-  assert.match(html, /data-tarjeta-cara="frente"/);
+  // El atributo dice qué ESCALA se muestra, no qué cara: la tarjeta es una sola
+  // y ya no hay frente ni dorso. "venta" es la escala configurada, la que cobra
+  // el POS, y es con la que toda tarjeta abre.
+  assert.match(html, /data-tarjeta-cara="venta"/);
 });
 
-test("G3. Editar queda solo y la navegación queda antes de las acciones", () => {
+// ── LA TARJETA ES UNA SOLA: ALTERNA EL PRECIO Y NADA MÁS ──────────────────
+//
+// El defecto que estos candados impiden no rompe nada: si mañana alguien vuelve
+// a pasarle la cara mostrada al costo o a la foto, todo compila, la tarjeta se
+// ve bien y media card cambia con un gesto. Solo se nota tocándola.
+
+test("G2b. ALTERNAR CAMBIA EL PRECIO Y SU RÓTULO, y solo eso", () => {
+  const venta = render({ caras: PACK_EN_DEPOSITO, imagenUrl: "/globe.svg" });
+  const otra = renderToStaticMarkup(
+    createElement(CuerpoDeLaCara, { caras: PACK_EN_DEPOSITO, enLaOtraEscala: true })
+  );
+
+  // El bloque sombreado sí cambia: importe y rótulo.
+  assert.match(venta, /PACK X 24/);
+  assert.match(venta, /24\.000/);
+  assert.match(otra, /UNIDAD/);
+  assert.match(otra, /1\.000/);
+  assert.doesNotMatch(otra, /PACK X 24/, "el rótulo no siguió al importe");
+});
+
+test("G2c. EL COSTO NO ALTERNA: es el de la escala de venta, siempre", () => {
+  // ── POR QUÉ ESTO ES UN CANDADO Y NO UNA PREFERENCIA ─────────────────────
+  //
+  // Antes el costo viajaba en la cara: al dar vuelta mostraba "Costo unidad" o
+  // "Costo pack" según dónde estuvieras. Ahora la tarjeta es una y el costo es
+  // el de la escala que el POS cobra, fijo.
+  //
+  // Lo que se afirma es que la marca recibe SIEMPRE `caras.frente`. Con
+  // `caras.dorso` la tarjeta compilaría igual y mostraría un costo que cambia
+  // solo, que es la mitad de la card moviéndose con un gesto.
+  assert.match(
+    FUENTE,
+    /<MarcaDeLaCara\s+cara=\{caras\.frente\}/,
+    "la marca volvió a recibir la cara que se está mostrando"
+  );
+
+  // Y el costo dibujado es el de la venta, comparado contra la pieza que lo
+  // calcula y no contra un número escrito acá.
+  // El nombre de la escala sale del MISMO helper que usa la tarjeta, no escrito
+  // a mano: si alguien le cambia el rótulo a "PACK X 24", esto lo sigue.
   const html = render({ caras: PACK_EN_DEPOSITO });
-  const iVoltear = html.indexOf("data-tarjeta-voltear");
+  const escalaDeVenta = nombreCortoDe(PACK_EN_DEPOSITO.frente.presentacion);
+  assert.ok(
+    html.includes(`Costo ${escalaDeVenta} ·`),
+    `el costo no se rotula con la escala de venta ("${escalaDeVenta}")`
+  );
+  assert.ok(html.includes(formatearMoneda(PACK_EN_DEPOSITO.frente.costo)));
+
+  // Y NO con la de la otra escala, que es el error que se está impidiendo.
+  const otraEscala = nombreCortoDe(PACK_EN_DEPOSITO.dorso.presentacion);
+  assert.ok(
+    !html.includes(`Costo ${otraEscala} ·`),
+    `el costo se rotuló con la escala equivalente ("${otraEscala}")`
+  );
+});
+
+test("G2d. LA FOTO NO SE APAGA AL ALTERNAR", () => {
+  // Recibía `mirandoDorso ? null : imagenUrl`, así que la miniatura desaparecía
+  // al dar vuelta. Con una sola card no hay dónde esconderla.
+  assert.match(
+    FUENTE,
+    /imagenUrl=\{imagenUrl\}/,
+    "la foto volvió a depender de qué escala se está mirando"
+  );
+  const html = render({ caras: PACK_EN_DEPOSITO, imagenUrl: "/globe.svg" });
+  assert.match(html, /data-tarjeta-foto/);
+});
+
+test("G2e. SIN CONVERSIÓN NO HAY NADA QUE ALTERNAR", () => {
+  // Un suelto: `carasDeTarjeta` no le arma dorso, así que no hay ni botón ni
+  // puntos. Es el caso mayoritario del catálogo.
+  const html = render({ caras: SUELTO });
+  assert.doesNotMatch(html, /data-tarjeta-voltear/);
+  assert.doesNotMatch(html, /data-tarjeta-indicador/);
+});
+
+test("G3. Editar queda solo en la fila de acciones", () => {
+  // Antes esto además ubicaba el botón de alternar ANTES de la fila. Ese botón
+  // ya no existe; lo que se conserva es lo que protegía del otro lado: que la
+  // fila de acciones tenga UN solo botón y que sea Editar. Si mañana alguien
+  // suma una acción, esto se pone rojo y se decide a propósito.
+  const html = render({ caras: PACK_EN_DEPOSITO });
   const iAcciones = html.indexOf("divide-x");
-  assert.ok(iVoltear > 0 && iVoltear < iAcciones);
+  assert.ok(iAcciones > 0, "no está la fila de acciones");
   const fila = html.slice(iAcciones);
   assert.equal((fila.match(/<button/g) || []).length, 1);
   assert.match(fila, /Editar/);
 });
 
-test("G4. conserva el carrusel frente dorso y nombra el destino", () => {
-  assert.match(render({ caras: PACK_EN_DEPOSITO }), /Ver unidad/);
-  assert.match(render({ caras: PACK_EN_LOCAL }), /Ver pack/);
-  const html = render({ caras: PACK_EN_DEPOSITO });
-  assert.equal((html.match(/rounded-full/g) || []).length, 2);
+test("G4. ALTERNAR ES TOCAR EL PRECIO, y el rótulo dice a qué escala se llega", () => {
+  // ── QUÉ AFIRMABA ANTES ──────────────────────────────────────────────────
+  //
+  // Que existiera el botón "Ver unidad" / "Ver pack" y los DOS puntos —contaba
+  // `rounded-full` esperando exactamente 2—. Los tres se sacaron.
+  //
+  // Lo que se conserva es la afirmación de fondo: que desde una escala se pueda
+  // llegar a la otra, y que se sepa a cuál. Ahora eso lo dice el rótulo del
+  // propio bloque, que cambia con el importe.
+  const enDeposito = render({ caras: PACK_EN_DEPOSITO });
+  const enLocal = render({ caras: PACK_EN_LOCAL });
+  assert.match(enDeposito, /data-cara-precio-alterna/);
+  assert.match(enLocal, /data-cara-precio-alterna/);
+
+  // Y NO QUEDÓ NINGÚN PUNTO. Se cuenta sobre el cuerpo del precio y no sobre la
+  // tarjeta entera: el kit dibuja sus propios redondeos y contarlos todos haría
+  // que este candado se ponga rojo por cambios que no son suyos.
+  const cuerpo = renderToStaticMarkup(
+    createElement(CuerpoDeLaCara, { caras: PACK_EN_DEPOSITO })
+  );
+  assert.equal((cuerpo.match(/rounded-full/g) || []).length, 0, "quedaron los puntos");
+
+  // La accesibilidad no se pierde con el texto: el bloque dice qué hace.
+  assert.match(cuerpo, /aria-label="Ver el precio por unidad"/);
 });
 
 test("G5. los códigos SE VEN en el frente, y siguen siendo los del kit", () => {
@@ -249,15 +369,38 @@ test("G9. apagar costo no apaga la regla", () => {
   assert.match(html, /30 %/);
 });
 
-test("G10. kilo y pieza muestran referencia sin inventar importe variable", () => {
+test("G10. kilo y pieza NO alternan, y siguen sin inventar importe variable", () => {
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ CAMBIA ────────────────────────────────
+  //
+  // Exigía que el dorso de kilo y pieza mostrara su línea de referencia —"1
+  // pieza = 6 kg · $1.000,00 por kilo"—. Ese dorso ya no existe: la tarjeta es
+  // una sola y lo único que alterna es el bloque del precio, entre las dos
+  // escalas de una conversión unidad ↔ pack. Kilo y pieza no tienen esa
+  // conversión, así que no alternan.
+  //
+  // Lo que NO cambia es la preocupación que le dio origen, y por eso se
+  // conserva: que un producto sin segunda escala no termine diciendo "Importe
+  // variable", que es de los servicios. Ese defecto ya llegó a producción una
+  // vez y este es el candado barato que lo mira.
   for (const caras of [
     carasDeTarjeta({ escala: ESCALA_KG, precio: 1300, costo: 900, unidad: "kg" }),
     carasDeTarjeta({ escala: ESCALA_PIEZA, precio: 1000, costo: 800, unidad: "kg", pesoReferenciaKg: 6 }),
   ]) {
+    // `carasDeTarjeta` sí les arma un dorso, y es a propósito: es una línea de
+    // texto, no una escala. Que exista y que la tarjeta NO lo use es
+    // exactamente lo que hay que afirmar — si mañana alguien decide alternar
+    // "por si hay dorso", esto se pone rojo.
+    assert.ok(caras.dorso, "el fixture perdió el dorso: el caso no se está ejerciendo");
+    assert.equal(caras.dorso.presentacion, null, "este dorso no es una escala con nombre");
+
     const html = renderCuerpo(caras, true);
     assert.doesNotMatch(html, /Importe variable/);
-    assert.ok(html.includes(caras.dorso.detalle));
-    assert.match(html, /data-cara-referencia/);
+    assert.doesNotMatch(html, /data-cara-referencia/, "volvió la cara de referencia");
+    assert.doesNotMatch(html, /data-tarjeta-voltear/, "kilo y pieza ofrecen alternar y no tienen a qué");
+    assert.doesNotMatch(html, /data-tarjeta-indicador/, "quedaron los puntos de alternancia");
+
+    // Y aunque se le pida la otra escala, muestra la suya: no hay a dónde ir.
+    assert.match(html, /data-tarjeta-cara="venta"/);
   }
 });
 
@@ -285,10 +428,21 @@ test("G13. el cambio de cara es local y no agrega una librería", () => {
   }
 });
 
-test("G14. el gesto deja el scroll vertical al navegador", () => {
+test("G14. NO HAY GESTO, así que no hay nada que robarle al scroll", () => {
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ SE DA VUELTA ──────────────────────────
+  //
+  // Que el swipe horizontal no se comiera el scroll vertical: `touch-action:
+  // pan-y` en el cuerpo, y la comparación de dx contra dy antes de aceptar el
+  // gesto. Era la defensa correcta mientras hubo carrusel.
+  //
+  // El carrusel se sacó y con él el gesto. La defensa deja de tener sentido y
+  // pasa a ser al revés: lo que no puede volver es el gesto, porque el riesgo
+  // que traía —un deslizamiento que se confunde con un scroll en una lista de
+  // veinticinco tarjetas— es el que se está evitando al no tenerlo.
   const html = render({ caras: PACK_EN_DEPOSITO });
-  assert.match(html, /touch-action:pan-y/);
-  assert.match(FUENTE, /Math\.abs\(dx\)\s*<=\s*Math\.abs\(dy\)/);
+  assert.doesNotMatch(html, /touch-action/, "volvió a declararse una acción táctil");
+  assert.doesNotMatch(FUENTE, /onPointerDown|onPointerUp|onPointerCancel/, "volvieron los manejadores del gesto");
+  assert.doesNotMatch(FUENTE, /Math\.abs\(dx\)/, "volvió la comparación del gesto");
 });
 
 test("G15. el dorso de sola identificación ya no existe", () => {

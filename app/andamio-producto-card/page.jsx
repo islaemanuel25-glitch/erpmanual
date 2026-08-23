@@ -139,6 +139,26 @@ const CARAS = [
       escala: ESCALA_UNIDAD, precio: 4850, costo: 3600, factor: 1, unidad: "unidad",
     }),
   },
+  // ── EL CASO QUE CRUZA TODO: ALTERNA, TIENE FOTO Y TIENE COSTO ───────────
+  //
+  // Existe porque el chequeo "alternar no mueve el resto de la tarjeta" NO SE
+  // PUEDE EJERCER contra el catálogo de desarrollo: el depósito vende al costo
+  // y por eso no dibuja la línea de costo, y ningún producto tiene foto. Las dos
+  // comparaciones quedaban con null de los dos lados —pasaban sin mirar nada—,
+  // que es un verde por ausencia.
+  //
+  // Acá los tres están a la vez, así que alternar tiene algo que romper.
+  {
+    id: "pack-con-foto",
+    nombre: "361 LATA X24",
+    empresa: "Colombres",
+    codigoBarra: "7790580132286",
+    codigoInterno: "1254",
+    imagenUrl: "/globe.svg",
+    caras: carasDeTarjeta({
+      escala: ESCALA_BULTO, precio: 24500, costo: 20000, factor: 24, unidad: "pack",
+    }),
+  },
   {
     id: "foto-rota",
     nombre: "Yerba mate Playadito 1 kg",
