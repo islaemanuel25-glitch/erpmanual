@@ -18,32 +18,78 @@ Si la lista está vacía, el despliegue es solo de código.
 
 **Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-23 después de desplegar
-`e8e236127e634e648582a9c60d5ef5d2d52a31b5` — la tanda de robustez de u2netp
-(versión fijada, caché atada al contenido, recuperación de caché corrupto y
-licencias de terceros). **Solo código.**
+`03e41244a751842210e17c6ae6a5093a022fe52f` — la coordinación de carga de
+Productos (el listado primero, los contadores de "Para revisar" después) más la
+corrección de la sonda que la vigila. **Solo código.**
 
 Corte de **2 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
 reinicios**, `erpazul_db` healthy y **no recreado** —todo el despliegue fue con
-`--no-deps app`—, logs sin errores nuevos, `/login` en 200 y el árbol del VPS
-limpio. **No hubo rollback**, y quedó disponible a
-`ghcr.io/islaemanuel25-glitch/erpmanual:45e0b8c5da101689733ef18b40812ec9762594fd`
-(imagen `sha256:8c699d81d297…`).
+`--no-deps app`—, logs sin errores nuevos, `/login` en 200, `APP_IMAGE` sin
+filtrarse dentro del contenedor y el árbol del VPS limpio. **No hubo rollback**,
+y quedó disponible a
+`ghcr.io/islaemanuel25-glitch/erpmanual:e8e236127e634e648582a9c60d5ef5d2d52a31b5`
+(imagen `sha256:175f7038be1b…`).
 
 Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
-`gzip -t` limpio, marca de cierre presente, 61 tablas—: 
-`/srv/produccion/backups/pre-e8e23612_20260823_184526.sql.gz`, 2.821.399 bytes.
+`gzip -t` limpio, marca de cierre presente, 61 tablas—:
+`/srv/produccion/backups/pre-03e41244_20260823_215705.sql.gz`, 2.829.309 bytes.
 
 Sin migraciones, comprobado de tres formas antes de tocar nada:
-`git diff --name-only 45e0b8c5..e8e23612 -- prisma/` no devolvió nada, el
+`git diff --name-only e8e23612..03e41244 -- prisma/` no devolvió nada, el
 clasificador informó "Archivos a mirar: 0" con el rango tomado de la imagen que
 atendía, y este archivo ya decía que no había pendientes. El contenedor
 descartable contó **101**, el mismo número que el árbol — que es lo que distingue
-"no había nada que aplicar" de "la imagen no conoce la migración".
+"no había nada que aplicar" de "la imagen no conoce la migración". Y `migrate
+status` al cierre volvió a informar 101 y "Database schema is up to date!".
 
 Reapareció el warning `The "POSTGRES_PASSWORD" variable is not set` en los
 comandos de compose. Es el **pendiente conocido y preexistente** de
 interpolación, no algo que trajera esta tanda, y es exactamente el motivo por el
 que nunca se recrea el servicio `db`.
+
+### ESTE DESPLIEGUE FRENÓ UNA VEZ, Y FRENÓ BIEN
+
+El primer intento —sobre `3cc3c337`, el merge de la coordinación de carga— no
+llegó a tocar producción: la sonda predeploy de la tarjeta dio **rojo** en su
+afirmación 14j, que compara el contador de la card contra el total del listado.
+Leía `null` y el listado traía 1766, determinista en dos corridas.
+
+**La sonda estaba esperando lo que ya no correspondía.** Tras navegar por URL
+aguardaba solo a que aparecieran las tarjetas del listado, y eso alcanzaba
+mientras listado y controles salían a la vez. Justamente esta tanda los separa,
+así que cuando las tarjetas aparecen las cards siguen calculando. El rojo
+señalaba la coherencia de los números, que era lo único que NO estaba mal.
+
+Se corrigió en `8c80ac16` —PR #10, mergeado antes de reintentar— y el despliegue
+salió con `03e41244`, que contiene las dos cosas. Vale como recordatorio de por
+qué la sonda se corre desde el árbol local: desplegar el merge viejo habría
+dejado la corrección afuera y habría vuelto a frenar por lo mismo.
+
+Predeploy de esta corrida: cascada **verde** contra producción y contra el build
+local, y la sonda de tarjeta **verde**, con 14j comparando **1766 contra 1766**
+—el mismo punto que antes leía `null`—. Después del corte, cascada verde otra vez
+contra producción, y las rutas de Productos respondiendo: `/modulos/productos` en
+200, `listar` y `controles` en 401 sin sesión, que es rechazar bien.
+
+### DOS COSAS QUE NO SE PUDIERON VERIFICAR, Y NO SE DAN POR BUENAS
+
+**El marcador de contenido dentro de la imagen no se pudo armar.** Los dos
+archivos de esta tanda que entran al build —`app/modulos/productos/page.jsx` y
+`lib/productos/ordenDeCargaProductos.js`— no agregan ninguna CADENA: aportan solo
+identificadores, y el build de producción los minifica. Lo único que suman es la
+ruta del import y la palabra `"object"`, ninguna útil como marcador. Las cadenas
+que sí aparecen en el diff son todas del archivo de candados, que no viaja al
+build.
+
+O sea que acá **no hay evidencia de contenido**, solo de consistencia: los cinco
+valores y el `APP_BUILD_ID` de la propia imagen. Es exactamente el caso que el
+procedimiento manda declarar en vez de suponer.
+
+**La medición del orden listado→controles no se ejerció en producción.**
+`scripts/sonda-productos-orden-de-carga.mjs` hace login real y manipula la
+interfaz, y su encabezado dice que no se corre contra producción. El orden está
+medido y contraprobado en desarrollo —listado 1360→1990 ms, controles arrancando
+a los 2342, holgura de +352 ms— y **no** en el sitio real.
 
 ### LOS DOS BINARIOS DE u2netp SE VERIFICARON ANTES DEL CORTE, NO DESPUÉS
 
