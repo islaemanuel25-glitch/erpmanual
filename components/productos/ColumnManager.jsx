@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Settings2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { LockKeyhole, RotateCcw, Settings2 } from "lucide-react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiCheckbox from "@/components/sunmi/SunmiCheckbox";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
-export default function ColumnManager({ allColumns, visibleKeys, onChange, lockedKeys = [] }) {
+export default function ColumnManager({
+  allColumns,
+  visibleKeys,
+  onChange,
+  lockedKeys = [],
+  defaultKeys = [],
+}) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    const handler = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -21,50 +28,49 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange, locke
   const toggle = (key) => {
     if (lockedKeys.includes(key)) return;
     const next = visibleKeys.includes(key)
-      ? visibleKeys.filter((k) => k !== key)
+      ? visibleKeys.filter((item) => item !== key)
       : [...visibleKeys, key];
     onChange(next);
   };
 
-  const filtered = allColumns.filter(
-    (c) =>
-      c.label.toLowerCase().includes(q.toLowerCase()) ||
-      c.key.toLowerCase().includes(q.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const term = q.trim().toLocaleLowerCase("es");
+    if (!term) return allColumns;
+    return allColumns.filter(
+      (column) =>
+        column.label.toLocaleLowerCase("es").includes(term) ||
+        column.key.toLocaleLowerCase("es").includes(term)
+    );
+  }, [allColumns, q]);
+
+  const puedeRestablecer =
+    defaultKeys.length > 0 &&
+    (defaultKeys.length !== visibleKeys.length ||
+      defaultKeys.some((key) => !visibleKeys.includes(key)));
 
   return (
     <div className="relative" ref={ref}>
-      {/* El `h-8` que estaba acá NO se aplicaba, y no por la cascada: pedía
-          `height: 28px` y `.sunmi-btn-base` pone `min-height: 36px`, que le gana
-          por regla de layout. Ponerle `!` tampoco lo habría arreglado. Medido:
-          el botón daba 36 px de alto con `h-8` escrito.
-
-          Se saca en vez de forzarlo, y el motivo se buscó en la historia: el 36
-          NO es un mínimo táctil. Entró como `height: 36px` en el commit
-          `671e616`, dentro de la creación de `.sunmi-btn-base` y sin ninguna
-          justificación; el comentario que hoy explica ese número es de otro
-          commit y habla del contenido derramándose, no del dedo. Y el criterio
-          táctil que el repo SÍ eligió es 44 px, en la navegación. Un botón de 28
-          queda por debajo de los dos. */}
       <SunmiButton
         color="slate"
-        onClick={() => setOpen((v) => !v)}
-        className="w-8 flex items-center justify-center rounded-xl"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
       >
-        <Settings2 size={16} />
+        <span className="inline-flex items-center gap-2">
+          <Settings2 className="h-4 w-4" aria-hidden="true" />
+          Columnas
+        </span>
       </SunmiButton>
 
       {open && (
         <div
-          className="absolute right-0 mt-2 w-56 z-[9999] rounded-xl p-3 shadow-xl"
-          style={{
-            background: "var(--card-bg)",
-            border: "1px solid var(--app-border)",
-          }}
+          className="sunmi-card absolute right-0 z-[9999] mt-2 mb-0 min-w-64"
+          role="dialog"
+          aria-label="Configurar columnas visibles"
         >
           <SunmiInput
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(event) => setQ(event.target.value)}
             placeholder="Buscar columna..."
             autoComplete="off"
             autoCorrect="off"
@@ -73,38 +79,39 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange, locke
             icon="search"
           />
 
-          <p className="text-[12px] sunmi-text-muted mt-3 mb-2 px-1">
+          <p className="text-xs sunmi-text-muted mt-3 mb-2">
             Columnas visibles
           </p>
 
-          <div className="max-h-56 overflow-y-auto pr-1 space-y-1">
-            {filtered.map((c) => {
-              const isLocked = lockedKeys.includes(c.key);
-              const checked = visibleKeys.includes(c.key);
+          <div className="max-h-56 overflow-y-auto space-y-1">
+            {filtered.map((column) => {
+              const isLocked = lockedKeys.includes(column.key);
+              const checked = visibleKeys.includes(column.key);
+
               return (
                 <label
-                  key={c.key}
+                  key={column.key}
                   className={`
-                    flex items-center justify-between
-                    px-2 py-2 rounded-lg text-sm
+                    sunmi-control flex items-center justify-between gap-3
+                    rounded-lg px-2 py-2 text-sm
                     ${isLocked ? "opacity-60" : "cursor-pointer"}
-                  `}
-                  style={{
-                    background: "var(--app-input-bg)",
-                    color: "var(--app-fg)",
-                  }}
-                  onMouseEnter={(e) => { if (!isLocked) e.currentTarget.style.background = "var(--hover-bg, var(--app-input-bg))"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "var(--app-input-bg)"; }}
+                  `.trim()}
                 >
-                  <span className="truncate">{c.label}</span>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(c.key)}
-                    disabled={isLocked}
-                    className={`w-4 h-4 ${isLocked ? "opacity-50" : "cursor-pointer"}`}
-                    style={{ accentColor: "var(--pos-accent)" }}
-                  />
+                  <span className="truncate">{column.label}</span>
+                  <span className="inline-flex shrink-0 items-center gap-2">
+                    {isLocked && (
+                      <LockKeyhole
+                        className="h-3.5 w-3.5 sunmi-text-muted"
+                        aria-label="Columna fija"
+                      />
+                    )}
+                    <SunmiCheckbox
+                      checked={checked}
+                      disabled={isLocked}
+                      onChange={() => toggle(column.key)}
+                      ariaLabel={`${column.label}: ${checked ? "visible" : "oculta"}`}
+                    />
+                  </span>
                 </label>
               );
             })}
@@ -115,6 +122,23 @@ export default function ColumnManager({ allColumns, visibleKeys, onChange, locke
               </div>
             )}
           </div>
+
+          {puedeRestablecer && (
+            <SunmiButton
+              color="slate"
+              onClick={() => onChange([...defaultKeys])}
+              className="w-full mt-3"
+            >
+              <span className="inline-flex items-center gap-2">
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                Restablecer columnas
+              </span>
+            </SunmiButton>
+          )}
+
+          <p className="text-xs sunmi-text-muted mt-3">
+            Se aplica al instante y se guarda en este navegador.
+          </p>
         </div>
       )}
     </div>

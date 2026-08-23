@@ -61,8 +61,11 @@ test("G6. las cuatro cards se dibujan aunque estén todas en cero", () => {
   for (const c of CONTROLES) assert.ok(html.includes(c.titulo), `falta la card de ${c.titulo}`);
 });
 
-test("G7. mientras no llegaron controles no se afirma salud", () => {
-  assert.equal(render({ controles: [], cargando: true }), "");
+test("G7. mientras no llegaron controles reserva el espacio sin afirmar salud", () => {
+  const html = render({ controles: [], cargando: true });
+  assert.match(html, /Calculando controles del catálogo/);
+  assert.equal((html.match(/animate-pulse/g) || []).length, POR_PAGINA);
+  assert.doesNotMatch(html, /al día|sin pendientes/);
 });
 
 test("G8. no hay colores escritos a mano", () => {
@@ -83,11 +86,12 @@ test("G9. la sonda mide la misma mezcla de contraste que el componente", () => {
   assert.equal(enLaSonda[1], proporciones[0]);
 });
 
-test("G10. vuelve la estructura 2x2 de cuatro cards por página", () => {
+test("G10. conserva 2x2 en móvil y usa cuatro columnas en escritorio", () => {
   assert.equal(POR_PAGINA, 4);
   assert.equal(enPaginas(CONTROLES).length, 1);
   const html = render({ controles: conCantidad(7) });
   assert.match(html, /grid-cols-2 grid-rows-2/);
+  assert.match(html, /md:grid-cols-4 md:grid-rows-1/);
   assert.doesNotMatch(html, /width:43%/);
 });
 

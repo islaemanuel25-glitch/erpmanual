@@ -1,50 +1,36 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiSelectAdv, {
   SunmiSelectOption,
 } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import { Search } from "lucide-react";
 
 export default function FiltrosProductos({ onChange, catalogos, initial }) {
   const [search, setSearch] = useState(initial.search || "");
   const [categoria, setCategoria] = useState(initial.categoria || "");
   const [proveedor, setProveedor] = useState(initial.proveedor || "");
   const [area, setArea] = useState(initial.area || "");
-  // estado: activos | inactivos | todos. Por defecto solo activos.
   const [estado, setEstado] = useState(initial.estado || "activos");
-  // tipo: todos | productos | combos.
   const [tipo, setTipo] = useState(initial.tipo || "todos");
 
-  const [open, setOpen] = useState(false);
-
-  // Refs para voz y scanner
   const inputRef = useRef(null);
-  const [escuchando, setEscuchando] = useState(false);
-  const recognitionRef = useRef(null);
   const lastKeyTime = useRef(0);
   const scanBuffer = useRef("");
   const debounceRef = useRef(null);
 
-  // Soporte de voz
-  const soportaVoz =
-    typeof window !== "undefined" &&
-    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-
-  // ============================
-  // Debounce 250ms para cambios de texto
-  // ============================
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
       onChange({ search, categoria, proveedor, area, estado, tipo });
     }, 250);
 
     return () => clearTimeout(debounceRef.current);
+    // onChange llega inline desde la página; los valores del filtro son la fuente
+    // del pedido y evitan reiniciar el debounce por identidad de función.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, categoria, proveedor, area, estado, tipo]);
 
-  // Busqueda inmediata (bypass debounce) — para Enter, scanner y voz
   const buscarInmediato = useCallback(
     (texto) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -53,60 +39,21 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
     [onChange, categoria, proveedor, area, estado, tipo]
   );
 
-  // ============================
-  // Busqueda por voz
-  // ============================
-  const iniciarVoz = () => {
-    const SpeechRecognition =
-      typeof window !== "undefined" &&
-      (window.SpeechRecognition || window.webkitSpeechRecognition);
-
-    if (!SpeechRecognition) return;
-
-    if (escuchando && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setEscuchando(false);
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "es-AR";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => setEscuchando(true);
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setSearch(transcript);
-      buscarInmediato(transcript);
-      setEscuchando(false);
-    };
-    recognition.onerror = () => setEscuchando(false);
-    recognition.onend = () => setEscuchando(false);
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  };
-
-  // ============================
-  // Deteccion de scanner + Enter + Escape
-  // ============================
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (event) => {
     const now = Date.now();
     const diff = now - lastKeyTime.current;
     lastKeyTime.current = now;
 
-    if (e.key === "Escape") {
+    if (event.key === "Escape") {
       setSearch("");
       buscarInmediato("");
       inputRef.current?.focus();
       return;
     }
 
-    if (e.key === "Enter") {
-      e.preventDefault();
+    if (event.key === "Enter") {
+      event.preventDefault();
 
-      // Scanner: caracteres rapidos + Enter
       if (diff < 200 && scanBuffer.current.length > 3) {
         setSearch(scanBuffer.current);
         buscarInmediato(scanBuffer.current);
@@ -114,18 +61,14 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
         return;
       }
 
-      // Enter normal: buscar inmediatamente
-      if (search.trim()) {
-        buscarInmediato(search);
-      }
+      buscarInmediato(search);
       scanBuffer.current = "";
       return;
     }
 
-    // Acumular buffer del scanner
-    if (e.key.length === 1) {
+    if (event.key.length === 1) {
       if (diff > 500) scanBuffer.current = "";
-      scanBuffer.current += e.key;
+      scanBuffer.current += event.key;
     }
   };
 
@@ -138,67 +81,38 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
     setTipo("todos");
   };
 
+  const hayFiltrosActivos =
+    search !== "" ||
+    categoria !== "" ||
+    proveedor !== "" ||
+    area !== "" ||
+    estado !== "activos" ||
+    tipo !== "todos";
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* ================================= */}
-      {/* BARRA PRINCIPAL */}
-      {/* ================================= */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        {/* BUSCADOR CON VOZ */}
-        <div className="flex-1 relative">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ color: "var(--pos-link)" }}
-          />
-          <SunmiInput
-            ref={inputRef}
-            placeholder="Buscar producto, código o categoría..."
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="none"
-            spellCheck={false}
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col md:flex-row md:items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <SunmiCampoBusquedaVoz
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={setSearch}
+            onVoz={(texto) => {
+              setSearch(texto);
+              buscarInmediato(texto);
+            }}
+            inputRef={inputRef}
             onKeyDown={handleKeyDown}
-            className={`!pl-9 !border-2 pulse-neon ${soportaVoz ? "!pr-12" : ""}`}
-            style={{ borderColor: "var(--pos-link)" }}
-            icon="search"
+            placeholder="Buscar producto, código o categoría..."
+            ariaLabel="Buscar productos"
           />
-          {soportaVoz && (
-            <button
-              onClick={iniciarVoz}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
-                escuchando
-                  ? "bg-red-600 text-white animate-pulse"
-                  : "sunmi-text-muted hover:text-[var(--app-fg)] hover:bg-[var(--pos-control-bg)]"
-              }`}
-              title="Buscar por voz"
-              type="button"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" x2="12" y1="19" y2="22" />
-              </svg>
-            </button>
-          )}
         </div>
 
-        {/* INDICADOR DE VOZ */}
-        {escuchando && (
-          <span className="text-xs text-red-400 animate-pulse md:shrink-0">
-            Escuchando...
-          </span>
-        )}
-
-        {/* SELECT TIPO (todos / productos / combos) */}
         <div className="w-full md:w-40 md:shrink-0">
           <SunmiSelectAdv
             value={tipo}
             onChange={setTipo}
-            placeholder="Tipo..."
-            className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+            placeholder="Tipo"
+            aria-label="Tipo de producto"
           >
             <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
             <SunmiSelectOption value="productos">Productos</SunmiSelectOption>
@@ -206,99 +120,78 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
           </SunmiSelectAdv>
         </div>
 
-        {/* SELECT ESTADO (activos / inactivos / todos) */}
         <div className="w-full md:w-44 md:shrink-0">
           <SunmiSelectAdv
             value={estado}
             onChange={setEstado}
-            placeholder="Estado..."
-            className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
+            placeholder="Estado"
+            aria-label="Estado del producto"
           >
             <SunmiSelectOption value="activos">Activos</SunmiSelectOption>
             <SunmiSelectOption value="inactivos">Inactivos</SunmiSelectOption>
             <SunmiSelectOption value="todos">Todos</SunmiSelectOption>
           </SunmiSelectAdv>
         </div>
-
-        {/* BOTON MAS FILTROS */}
-        <SunmiButton
-          color="slate"
-          className="w-full md:w-auto !border !border-[var(--pos-link)]"
-          onClick={() => setOpen(!open)}
-        >
-          {open ? "Ocultar filtros" : "Más filtros"}
-        </SunmiButton>
       </div>
 
-      {/* ================================= */}
-      {/* PANEL DE FILTROS AVANZADOS */}
-      {/* ================================= */}
-      {open && (
-        <div
-          className="
-            rounded-2xl p-4
-            border border-[var(--app-border)]
-            bg-[var(--app-input-bg)]
-            shadow-md
-            animate-fadeIn
-          "
-        >
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* CATEGORIA */}
-            <SunmiSelectAdv
-              value={categoria}
-              onChange={setCategoria}
-              placeholder="Categoría..."
-              searchable
-              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-            >
-              <SunmiSelectOption value="">Categoría...</SunmiSelectOption>
-              {catalogos.CATEGORIAS?.map((c) => (
-                <SunmiSelectOption key={c.id} value={String(c.id)}>
-                  {c.nombre}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
-
-            {/* PROVEEDOR */}
-            <SunmiSelectAdv
-              value={proveedor}
-              onChange={setProveedor}
-              placeholder="Proveedor..."
-              searchable
-              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-            >
-              <SunmiSelectOption value="">Proveedor...</SunmiSelectOption>
-              {catalogos.PROVEEDORES?.map((p) => (
-                <SunmiSelectOption key={p.id} value={String(p.id)}>
-                  {p.nombre}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
-
-            {/* AREA FISICA */}
-            <SunmiSelectAdv
-              value={area}
-              onChange={setArea}
-              placeholder="Área física..."
-              searchable
-              className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-            >
-              <SunmiSelectOption value="">Área física...</SunmiSelectOption>
-              {catalogos.AREAS?.map((a) => (
-                <SunmiSelectOption key={a.id} value={String(a.id)}>
-                  {a.nombre}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
-
-            {/* LIMPIAR */}
-            <SunmiButton color="cyan" onClick={limpiar} className="!border !border-[var(--pos-link)]">
-              Limpiar
-            </SunmiButton>
-          </div>
+      <div className="flex flex-col md:flex-row md:items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <SunmiSelectAdv
+            value={categoria}
+            onChange={setCategoria}
+            placeholder="Categoría"
+            searchable
+            aria-label="Categoría"
+          >
+            <SunmiSelectOption value="">Todas las categorías</SunmiSelectOption>
+            {catalogos.CATEGORIAS?.map((c) => (
+              <SunmiSelectOption key={c.id} value={String(c.id)}>
+                {c.nombre}
+              </SunmiSelectOption>
+            ))}
+          </SunmiSelectAdv>
         </div>
-      )}
+
+        <div className="flex-1 min-w-0">
+          <SunmiSelectAdv
+            value={proveedor}
+            onChange={setProveedor}
+            placeholder="Proveedor"
+            searchable
+            aria-label="Proveedor"
+          >
+            <SunmiSelectOption value="">Todos los proveedores</SunmiSelectOption>
+            {catalogos.PROVEEDORES?.map((p) => (
+              <SunmiSelectOption key={p.id} value={String(p.id)}>
+                {p.nombre}
+              </SunmiSelectOption>
+            ))}
+          </SunmiSelectAdv>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <SunmiSelectAdv
+            value={area}
+            onChange={setArea}
+            placeholder="Área física"
+            searchable
+            aria-label="Área física"
+          >
+            <SunmiSelectOption value="">Todas las áreas</SunmiSelectOption>
+            {catalogos.AREAS?.map((a) => (
+              <SunmiSelectOption key={a.id} value={String(a.id)}>
+                {a.nombre}
+              </SunmiSelectOption>
+            ))}
+          </SunmiSelectAdv>
+        </div>
+
+        {hayFiltrosActivos && (
+          <SunmiButton color="slate" onClick={limpiar} className="md:shrink-0">
+            Limpiar filtros
+          </SunmiButton>
+        )}
+      </div>
     </div>
   );
 }
