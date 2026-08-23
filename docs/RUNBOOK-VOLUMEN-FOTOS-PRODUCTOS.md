@@ -194,10 +194,59 @@ docker run --rm -v prueba_fotos:/vol:ro alpine sh -c \
 docker volume rm prueba_fotos
 ```
 
-**Mientras esto no se haya corrido al menos una vez con un paquete real, la
-restauración está escrita y no probada** — que es distinto, y es exactamente lo
-que le pasa al rollback de migraciones. Cuando se corra, se anota acá con la
-fecha y el número de fotos.
+### RESTAURACIÓN EJERCIDA — 2026-08-22
 
-**Estado hoy: NO EJERCIDA.** El volumen todavía no existe en producción, así que
-no hay ningún paquete real contra el cual probarla.
+**Se corrió de punta a punta y dio verde.** No es una lectura del procedimiento:
+hay un script que lo ejecuta, y lo que ejecuta son **las mismas funciones que
+corren en producción**.
+
+    bash ops/backup/probar-restauracion-fotos.sh
+
+Carga `ops/backup/respaldar-fotos.sh` —el mismo archivo que carga el backup del
+VPS— y llama a `respaldar_fotos`, `restaurar_fotos` y `verificar_restauracion`.
+No transcribe los pasos: los corre. Una prueba que copia los comandos prueba la
+copia, y el día que el respaldo cambie sigue verde mientras la restauración real
+deja de andar.
+
+Qué afirmó, sobre un volumen de mentira con **cinco PNG reales** y un archivo que
+no es foto:
+
+1. El respaldo registró **5 fotos** y dejó afuera el archivo que no lo es.
+2. El paquete existe y no está vacío.
+3. Se extrajo en un destino descartable.
+4. **La cantidad restaurada coincide con la registrada** (5 contra 5).
+5. El centinela está en lo restaurado.
+6. Los cinco archivos son **byte a byte idénticos** al original **y siguen siendo
+   imágenes**, comprobado por la firma del PNG y no por la extensión — un `.png`
+   lleno de texto tiene extensión de imagen y no se puede dibujar.
+7. El archivo que no era foto viajó igual: el respaldo guarda el volumen entero,
+   el patrón filtra el CONTEO y no lo que se guarda.
+8. **Contraprueba:** con una foto de menos, la verificación falla.
+9. **Contraprueba:** sin centinela, la verificación falla.
+
+El entorno descartable se borra al salir, con un `trap`, incluso si algo falla en
+el medio. No toca producción: todo pasa en un directorio temporal.
+
+#### Lo que ESTA prueba encontró
+
+El patrón que cuenta las fotos estaba escrito como `${PATRON_FOTO:=…{8}…}`, y
+**bash corta ese default en la primera llave de cierre** — la de `{8}`. El patrón
+quedaba truncado y no matcheaba ningún nombre.
+
+Eso no rompía nada visible: el respaldo se hacía igual, el paquete quedaba bien,
+y el log decía "paquete con 0 foto(s)" **para siempre**. La verificación de la
+restauración habría comparado 0 contra 0 y dado verde sobre un volumen lleno.
+Leyendo el script no se ve; corriéndolo, sí.
+
+#### Lo que esta prueba NO ejerce, y hay que decirlo
+
+**El envoltorio de Docker.** En producción el volumen se lee con
+`docker run --rm -v vol:/vol:ro alpine tar …`; en la prueba se lee un directorio
+directo, por `FOTOS_DIR_DIRECTO`. Son las dos ramas de tres funciones cortas
+—`volumen_disponible`, `centinela_presente`, `empaquetar_volumen`— y lo único que
+cambia es cómo se llega a los bytes: el `-C <raíz> .` y todo lo que viene después
+es el mismo código.
+
+O sea que **el montaje del volumen se prueba la primera vez en el VPS**, cuando
+se cree. El paso está en la sección de arriba: subir una foto, recrear el
+contenedor y ver que sigue ahí.

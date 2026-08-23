@@ -36,7 +36,17 @@ import {
 } from "@/lib/productos/fotoProducto";
 
 const RAIZ = path.resolve(import.meta.dirname, "../..");
-const SCRIPT = fs.readFileSync(path.join(RAIZ, "ops/backup/vps-backup-erpazul.sh"), "utf8");
+
+// ── EL RESPALDO DE FOTOS SE MUDÓ A SU PROPIO ARCHIVO ──────────────────────
+//
+// Salió de `vps-backup-erpazul.sh` para que la PRUEBA de restauración pueda
+// cargarlo y correr las mismas funciones que corren en producción. Estos
+// candados miran los tres archivos juntos cuando la afirmación es sobre la
+// cadena entera, y el que corresponde cuando es sobre una pieza.
+const FOTOS = fs.readFileSync(path.join(RAIZ, "ops/backup/respaldar-fotos.sh"), "utf8");
+const PRINCIPAL = fs.readFileSync(path.join(RAIZ, "ops/backup/vps-backup-erpazul.sh"), "utf8");
+const COMUNES = fs.readFileSync(path.join(RAIZ, "ops/backup/comunes.sh"), "utf8");
+const SCRIPT = `${PRINCIPAL}\n${FOTOS}\n${COMUNES}`;
 
 /**
  * Corre un comando de shell EN un directorio, con nombres RELATIVOS.
@@ -87,9 +97,18 @@ test("B2. EL PATRÓN QUE CUENTA FOTOS ES EL MISMO QUE LAS NOMBRA", () => {
   //
   // Se saca la expresión DEL SCRIPT y se la compara contra la de la aplicación,
   // caso por caso. No se escribe una tercera acá.
-  const m = SCRIPT.match(/grep -cE '\^\\\.\/([^']+)'/);
-  assert.ok(m, "no se encontró el patrón que cuenta fotos en el script");
+  // ── EL PATRÓN SE LEE DE SU ASIGNACIÓN, NO DEL `grep` ──────────────────
+  //
+  // Antes estaba escrito adentro del `grep -cE '...'`. Se sacó a una variable
+  // porque escribirlo con `${VAR:=...}` cortaba el patrón en la llave de `{8}` —
+  // y ese defecto no rompía nada: el respaldo informaba "0 fotos" para siempre y
+  // la verificación comparaba 0 contra 0. Lo encontró la prueba de restauración.
+  const m = FOTOS.match(/PATRON_FOTO='\^\\\.\/([^']+)'/);
+  assert.ok(m, "no se encontró la asignación de PATRON_FOTO");
   const patronDelScript = new RegExp(`^${m[1]}$`);
+
+  // Y se comprueba que el `grep` USE la variable, no una copia escrita al lado.
+  assert.match(FOTOS, /grep -cE "\$PATRON_FOTO"/, "el conteo no usa la variable del patrón");
 
   for (const nombre of ["p1-0a1b2c3d.webp", "p2023-ffffffff.jpg", "p7-00000000.png"]) {
     assert.equal(
@@ -125,9 +144,10 @@ test("B3. LA VERIFICACIÓN DISTINGUE UN PAQUETE BUENO DE UNO VACÍO", () => {
     assert.ok(listadoBueno.includes(NOMBRE_CENTINELA_FOTOS));
     assert.ok(!listadoVacio.includes(NOMBRE_CENTINELA_FOTOS), "el vacío trajo centinela");
 
-    // Y el conteo, con el patrón del script.
-    const m = SCRIPT.match(/grep -cE '(\^\\\.\/[^']+)'/);
-    const cuantas = (listadoBueno.match(new RegExp(m[1].replace(/\\\./g, "\\."), "gm")) || []).length;
+    // Y el conteo, con el patrón sacado del script.
+    const m = FOTOS.match(/PATRON_FOTO='(\^\\\.\/[^']+)'/);
+    assert.ok(m, "no se encontró el patrón");
+    const cuantas = (listadoBueno.match(new RegExp(m[1], "gm")) || []).length;
     assert.equal(cuantas, 2, "no contó las dos fotos del paquete");
   } finally {
     fs.rmSync(bueno.dir, { recursive: true, force: true });
@@ -178,6 +198,52 @@ test("B6. LAS FOTOS VAN DESPUÉS DE LA BASE, Y NO LA PUEDEN ARRUINAR", () => {
   // Y su fallo se informa con un código propio: tiene que verse en el estado del
   // servicio, no perderse en el log.
   assert.match(SCRIPT, /exit 3/);
+});
+
+test("B8. LA PRUEBA DE RESTAURACIÓN CORRE LAS FUNCIONES DE PRODUCCIÓN", () => {
+  // ── POR QUÉ ESTO ES UN CANDADO Y NO UNA COSTUMBRE ───────────────────────
+  //
+  // Una prueba que TRANSCRIBE los pasos del runbook no prueba el runbook: prueba
+  // la transcripción. El día que el respaldo cambie, la copia sigue verde y la
+  // restauración real deja de andar — y eso se descubre restaurando de verdad,
+  // que es el peor momento.
+  //
+  // Se afirma que la prueba CARGA el mismo archivo que carga el backup y que
+  // llama a las tres funciones por su nombre, en vez de repetir los comandos.
+  const prueba = fs.readFileSync(path.join(RAIZ, "ops/backup/probar-restauracion-fotos.sh"), "utf8");
+  assert.match(prueba, /\. "\$\{AQUI\}\/respaldar-fotos\.sh"/, "la prueba no carga el respaldo real");
+  assert.match(PRINCIPAL, /\. "\$\{AQUI\}\/respaldar-fotos\.sh"/, "el backup no carga el respaldo real");
+  for (const fn of ["respaldar_fotos", "restaurar_fotos", "verificar_restauracion"]) {
+    assert.match(prueba, new RegExp(`\\b${fn}\\b`), `la prueba no llama a ${fn}`);
+  }
+
+  // Y NO TOCA PRODUCCIÓN: trabaja en un temporal y lo borra al salir.
+  assert.match(prueba, /mktemp -d/, "la prueba no usa un directorio temporal");
+  assert.match(prueba, /trap limpiar EXIT/, "la prueba no borra el entorno descartable");
+  assert.doesNotMatch(prueba, /\/srv\/produccion/, "la prueba apunta a una ruta de producción");
+
+  // Las tres funciones existen del lado del respaldo, o la prueba llamaría a
+  // nada y el shell no se quejaría hasta ejecutarla.
+  for (const fn of ["respaldar_fotos", "restaurar_fotos", "verificar_restauracion"]) {
+    assert.match(FOTOS, new RegExp(`^${fn}\\(\\)`, "m"), `falta ${fn} en respaldar-fotos.sh`);
+  }
+});
+
+test("B9. LA RESTAURACIÓN ESTÁ AL LADO DEL RESPALDO, NO SOLO EN PROSA", () => {
+  // El runbook explica; el shell ejecuta. Si la restauración viviera solo en el
+  // documento, no habría nada que correr y "probada" sería una palabra.
+  //
+  // Y lo que la hace valer es la comparación contra el número REGISTRADO: que
+  // `tar -xzf` salga con 0 no dice nada, un paquete cortado a la mitad tampoco
+  // falla al extraer.
+  assert.match(FOTOS, /verificar_restauracion\(\)/);
+  assert.match(FOTOS, /se restauraron \$\{cuantas\} foto\(s\) y el respaldo registró/);
+
+  const runbook = fs.readFileSync(
+    path.join(RAIZ, "docs/RUNBOOK-VOLUMEN-FOTOS-PRODUCTOS.md"),
+    "utf8"
+  );
+  assert.match(runbook, /probar-restauracion-fotos\.sh/, "el runbook no nombra la prueba");
 });
 
 test("B7. HAY PUNTEROS DE FOTOS, COMO LOS DE LA BASE", () => {

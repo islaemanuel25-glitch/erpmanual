@@ -57,13 +57,21 @@ hace que eso alcance es que las fotos no cambian —el nombre lleva un azar
 adentro, ninguna se pisa— así que cuando el volumen no cambió, el paquete del día
 es un enlace duro al anterior y no ocupa nada.
 
-## Lo que todavía no está probado
+## La restauración está EJERCIDA — 2026-08-22
 
-La restauración está **escrita y no ejercida**: el volumen no existe en
-producción todavía, así que no hay ningún paquete real contra el cual probarla.
-El procedimiento y el criterio para darla por buena están en
-`docs/RUNBOOK-VOLUMEN-FOTOS-PRODUCTOS.md`.
+`bash ops/backup/probar-restauracion-fotos.sh` respalda, restaura y verifica de
+punta a punta, **corriendo las mismas funciones que corren en producción** y no
+una transcripción de los pasos. Verde, con dos contrapruebas adentro: una foto de
+menos y sin centinela, y las dos ponen la verificación en rojo.
 
-Decirlo así importa: un procedimiento escrito y uno probado no son lo mismo, y la
-diferencia se nota el día que hace falta. Es la misma distinción que ya está
-anotada para el rollback de migraciones.
+Encontró un defecto real que la lectura no mostraba: el patrón que cuenta las
+fotos estaba truncado por la forma de escribirlo en bash, y el respaldo habría
+informado "0 fotos" para siempre — con la verificación comparando 0 contra 0 y
+dando verde sobre un volumen lleno.
+
+**Lo que NO ejerce es el envoltorio de Docker**, que es cómo se llega a los bytes
+del volumen. Eso se prueba la primera vez en el VPS, al crearlo. El detalle está
+en `docs/RUNBOOK-VOLUMEN-FOTOS-PRODUCTOS.md`.
+
+Se dice así a propósito: "ejercida" no es "ejercida entera", y la diferencia
+importa el día que haga falta.
