@@ -58,6 +58,7 @@ import { CONTROL, esControlValido } from "@/lib/productos/controlesCalidad";
 import { pedidoYaSalio } from "@/lib/productos/pedidoYaSalio";
 import {
   controlesPuedenSalir,
+  haceElUltimoPedido,
   listadoTermino,
 } from "@/lib/productos/ordenDeCargaProductos";
 import {
@@ -672,6 +673,10 @@ export default function ProductosPage() {
     setLoading(true);
     const claveDeEstePedido = claveDelPedido;
     const miToken = ++tokenListadoRef.current;
+    // TODOS los caminos terminales preguntan por acá antes de escribir, no solo
+    // el exitoso: un pedido viejo que falla tarde tampoco puede borrar la
+    // referencia del nuevo ni apagarle el spinner. Ver `haceElUltimoPedido`.
+    const vigente = () => haceElUltimoPedido(tokenListadoRef, miToken);
     // Se anota ANTES de salir: mientras viaja, nadie más tiene que volver a
     // pedir lo mismo. Ver el comentario largo de `pedidoRef`.
     pedidoRef.current = { clave: claveDeEstePedido, localIdPedido: localId || null };
@@ -711,7 +716,7 @@ export default function ProductosPage() {
 
       // Una respuesta que ya no es la última se descarta ENTERA: ni pinta filas
       // ni anota nada. Ver el comentario de `tokenListadoRef`.
-      if (miToken !== tokenListadoRef.current) return;
+      if (!vigente()) return;
 
       if (data.ok) {
         // Para qué ubicación contestó. Un servidor viejo no manda `localId`: ahí
@@ -747,21 +752,33 @@ export default function ProductosPage() {
         setListadoRespondioPara(null);
       }
     } catch (err) {
-      // Se borra la anotación: si el pedido no llegó, el próximo cambio de
-      // dependencia tiene que poder volver a intentarlo. Dejarla puesta
-      // convertiría un error de red en un listado que no se recupera nunca.
-      pedidoRef.current = null;
+      // ── UN PEDIDO VIEJO QUE FALLA NO TOCA NADA DEL VIGENTE ──────────────
+      //
+      // Acá estaba el defecto moderado que encontró la auditoría: `pedidoRef` se
+      // borraba SIEMPRE. Con dos pedidos en vuelo y el viejo fallando, eso
+      // borraba la marca del NUEVO, y el siguiente disparo del efecto mandaba un
+      // tercer pedido duplicado — justo lo que `pedidoYaSalio` existe para
+      // evitar.
+      //
+      // Adentro del guardia, la anotación sigue borrándose cuando corresponde:
+      // si el pedido vigente no llegó, el próximo cambio de dependencia tiene
+      // que poder reintentar. Dejarla puesta convertiría un error de red en un
+      // listado que no se recupera nunca.
+      //
       // Y LA PUERTA SE ABRE IGUAL. Si un fallo del listado la dejara cerrada,
       // las cards quedarían cargando para siempre: un error de red se
       // convertiría en media pantalla muerta hasta recargar. La puerta es una
       // PRIORIDAD, no un control de corrección — falla abierta.
-      if (miToken === tokenListadoRef.current) {
+      if (vigente()) {
+        pedidoRef.current = null;
         setListadoTerminoOk(false);
         setListadoRespondioPara(null);
       }
       console.error("Error cargando productos:", err);
     }
-    setLoading(false);
+    // El spinner lo apaga SOLO el pedido vigente. Si lo apagara uno viejo, la
+    // pantalla diría "listo" con el pedido nuevo todavía en vuelo.
+    if (vigente()) setLoading(false);
   };
 
   // ── LOS CONTADORES DE "PARA REVISAR" ────────────────────────────────────
@@ -783,6 +800,9 @@ export default function ProductosPage() {
   const fetchControles = async () => {
     setCargandoControles(true);
     const miToken = ++tokenControlesRef.current;
+    // Igual que el listado, y acá importa más: un pedido viejo que falla no
+    // puede vaciar los contadores que el nuevo ya pintó. Ver `haceElUltimoPedido`.
+    const vigente = () => haceElUltimoPedido(tokenControlesRef, miToken);
     controlesRef.current = { clave: CLAVE_CONTROLES, localIdPedido: localId || null };
     try {
       // Igual que el listado: sin `localId` mientras no se conozca, y el servidor
@@ -799,7 +819,7 @@ export default function ProductosPage() {
       const data = await res.json();
       // Igual que el listado: una respuesta de un local que ya no es el actual
       // no pisa los contadores del actual.
-      if (miToken !== tokenControlesRef.current) return;
+      if (!vigente()) return;
       // ── UN ERROR NO SE DESCARTA EN SILENCIO ─────────────────────────────
       //
       // Si el servidor falla, las cards se quedan sin conteo Y se dice por qué.
@@ -827,12 +847,26 @@ export default function ProductosPage() {
         console.error("productos/controles:", data.error);
       }
     } catch (err) {
-      controlesRef.current = null;
-      setControles([]);
-      setControlesTruncado(false);
+      // ── ACÁ ESTABA EL DEFECTO GRAVE, Y CONVIENE SABER CUÁL ERA ──────────
+      //
+      // Estas tres líneas corrían SIEMPRE. La carrera: sale A por el local 7, se
+      // cambia de ubicación, sale B por el 9, B contesta bien y pinta los
+      // contadores de 9 — y después A falla y entra acá. `setControles([])`
+      // dejaba en cero los contadores CORRECTOS del local 9, y
+      // `controlesRef.current = null` borraba la marca de que ya se habían
+      // pedido. Sin un solo error a la vista.
+      //
+      // El guardia del camino exitoso no lo tapaba: este camino no pasa por ahí.
+      if (vigente()) {
+        controlesRef.current = null;
+        setControles([]);
+        setControlesTruncado(false);
+      }
       console.error("Error cargando controles:", err);
     }
-    setCargandoControles(false);
+    // Y el indicador de carga, igual: si lo apagara el pedido viejo, las cards
+    // mostrarían "sin datos" mientras el pedido nuevo sigue viajando.
+    if (vigente()) setCargandoControles(false);
   };
 
   useEffect(() => {
