@@ -1,8 +1,9 @@
 # DEC-0010 — Qué motor quita el fondo de las fotos de producto
 
 **Fecha:** 2026-08-22
-**Estado:** decidido para la primera versión, con una puerta abierta y sin umbral
-fijado — ver "Lo que se hace después"
+**Estado:** SUPERADO el 2026-08-23 — u2netp entró como motor principal. Lo de
+abajo se conserva porque explica por qué NO había entrado antes y qué se
+descartó; lo que rige hoy está en "Lo que pasó después" al final.
 **Alcance:** la foto de un producto, cargada desde el celular en `FormProducto`
 
 ## El problema
@@ -191,6 +192,79 @@ no se sabe si hay que tomar. Se corrige la afirmación, que era lo que estaba ma
 Ninguno. Cero dependencias nuevas, cero bytes de descarga, cero pesos por mes, y
 la foto no sale del teléfono. Todo lo que se usa —`canvas`, `createImageBitmap`—
 ya está en el navegador.
+
+## Lo que pasó después — u2netp ENTRÓ, el 2026-08-23
+
+Todo lo de arriba describe la decisión de NO adoptarlo todavía. Duró un día. Lo
+que sigue es lo que rige.
+
+**Emanuel lo aprobó con el objetivo escrito:** que al subir una foto quede, en la
+mayoría de los casos, solamente el producto con fondo transparente. El motor por
+bordes no llega a eso, y sus fallas no eran de ajuste.
+
+### Lo que se midió, y es la comparación que faltaba
+
+Los dos motores, sobre las MISMAS imágenes, corriendo en un navegador
+—`scripts/sonda-u2netp-casos.mjs`—. La medida no es "cuánto quitó" sino cuánto
+acertó, que se puede calcular porque las imágenes se generan y se sabe qué pixel
+es producto:
+
+| caso | bordes: producto que sobrevive | u2netp |
+|---|---|---|
+| caja sobre fondo liso | 100 % | 100 % |
+| **producto blanco sobre fondo claro** | **0 %** | **100 %** |
+| **fondo del mismo tono que el producto** | **0 %** | **100 %** |
+| botella con vidrio y reflejo | 100 % | 99,9 % |
+| bolsa con borde dentado | 100 % | 100 % |
+| **producto tocando el borde** | se lo comía | **100 %** |
+
+Los tres casos en negrita son los que motivaron la tanda y los tres quedaron
+resueltos. Los ceros del motor viejo no salen de la memoria: se midieron en la
+contraprueba, apuntando el modelo a un archivo inexistente para forzar el
+respaldo.
+
+### Dónde sigue fallando u2netp, medido
+
+**La bolsa de borde dentado es el único caso donde el motor viejo salía mejor.**
+u2netp quita el 82,2 % del fondo contra el 98,5 % del de bordes: rellena las
+muescas finas y deja un halo alrededor del contorno.
+
+No es del umbral. Subir el piso del alfa de 0,28 a 0,45 lo llevó a 83,9 % y bajó
+el producto de la botella de 99,9 a 99,7: no alcanza y empieza a comer producto.
+La máscara se infiere a 320×320 y unas muescas de siete píxeles sobre una imagen
+de ochenta no existen a esa escala.
+
+**Y lo que NO se probó:** fotos reales. Todo lo de arriba son rectángulos,
+círculos y ruido generados con canvas. Prueban que el motor distingue forma de
+color —que es exactamente lo que el viejo no podía— y no cómo sale una foto del
+depósito con luz de tubo y un estante atrás. Sigue sin haber fotos reales con las
+que comparar.
+
+### Lo que cuesta, medido y no estimado
+
+Una dependencia nueva, `onnxruntime-web` 1.27.0, licencia MIT. El modelo es
+Apache-2.0. Los dos archivos se sirven desde nuestro dominio y la foto no sale
+del teléfono.
+
+    u2netp.onnx                    4.574.861 B crudo  ·  4.237.634 B gzip
+    ort-wasm-simd-threaded.wasm   13.479.978 B crudo  ·  3.428.070 B gzip
+                                  18.054.839 B        ·  7.665.704 B
+
+O sea **unos 7,7 MB la primera vez** en cada teléfono. Es bastante más que los
+"8 MB" que se habían estimado arriba contando solo el modelo con una idea vieja
+del tamaño del runtime — aquel número era del modelo, no del total.
+
+Se bajan una sola vez: quedan en la Cache API con el nombre del almacén
+versionado. Comprobado recargando la página y volviendo a recortar con **cero
+pedidos de red**.
+
+### El motor viejo no se borró
+
+Quedó en `motorBordes.js` como respaldo, y solo corre si u2netp no puede. Cuando
+eso pasa lo dice por consola, porque los dos devuelven una imagen plausible y
+desde afuera "anda" y "anda el de atrás" se ven igual. Ese detalle no es teórico:
+al escribir esta tanda un diagnóstico equivocado dio por muerto a u2netp cuando
+estaba funcionando.
 
 ## Relacionado
 

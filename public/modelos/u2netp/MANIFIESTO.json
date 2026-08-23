@@ -1,0 +1,29 @@
+{
+  "porQueExiste": "Los dos binarios de al lado están commiteados, no copiados en el build. Este archivo dice de dónde salieron y con qué versión se corresponden, para que un candado pueda comprobarlo en vez de que alguien se acuerde.",
+  "runtime": {
+    "paquete": "onnxruntime-web",
+    "version": "1.27.0",
+    "licencia": "MIT",
+    "archivo": "ort-wasm-simd-threaded.wasm",
+    "origen": "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
+    "bytes": 13479978,
+    "sha256": "d1ab1b94b16a65b29d710d0b587b29e7bed336827577623913479b8afe8113e6",
+    "cuidado": "Tiene que ser el .wasm de la MISMA version de onnxruntime-web que declara package.json. Si se actualiza la dependencia hay que volver a copiarlo; el candado U8 compara las dos versiones."
+  },
+  "modelo": {
+    "nombre": "u2netp",
+    "licencia": "Apache-2.0",
+    "origenUpstream": "https://github.com/xuebinqin/U-2-Net",
+    "descargadoDe": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx",
+    "archivo": "u2netp.onnx",
+    "bytes": 4574861,
+    "sha256": "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8",
+    "entrada": "1x3x320x320 float32, NCHW, normalizacion ImageNet sobre la imagen dividida por su propio maximo",
+    "salida": "siete mapas de 1x1x320x320; la buena es la primera"
+  },
+  "pesoTotal": {
+    "crudoBytes": 18054839,
+    "gzipBytes": 7665704,
+    "comoSeMidio": "stat para el crudo y gzip -9 para el comprimido, el 2026-08-23"
+  }
+}
