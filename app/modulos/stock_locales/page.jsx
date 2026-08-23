@@ -65,7 +65,10 @@ export default function StockLocalesPage() {
   // ============================================================
   return (
     <div className="p-2 sunmi-bg w-full min-h-screen">
-      <SunmiCard className="p-2 flex flex-col gap-2">
+      {/* En móvil se elimina la tarjeta gigante que envolvía todo el módulo, la
+          misma decisión ya aplicada en Productos. Desde `md` conserva su caja,
+          padding y layout de escritorio. */}
+      <SunmiCard className="contents md:flex md:p-2 md:flex-col md:gap-2">
 
         <SunmiSeparator
           label={`Stock${localActual.nombre ? ` — ${localActual.nombre}` : ""}`}

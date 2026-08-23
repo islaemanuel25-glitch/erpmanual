@@ -4,6 +4,9 @@ import { fromUnidades, kgToPiezas } from "@/lib/conversiones/stock";
 import { useStockData } from "@/hooks/useStockData";
 import { useColumnasVisibles } from "@/hooks/useColumnasVisibles";
 import ColumnPicker from "@/components/stock_locales/ColumnPicker";
+import TarjetaStockMovil from "@/components/stock_locales/TarjetaStockMovil";
+import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
+import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import {
   formatCantidad,
   esPackDeposito,
@@ -97,15 +100,49 @@ export default function TablaStock({
 
   return (
     <div>
-      {/* Barra superior: columnas */}
-      <ColumnPicker columnDefs={COLUMN_DEFS} isVisible={isVisible} toggleCol={toggleCol} />
+      {/* Columnas pertenece a la tabla: en móvil no hay columnas que elegir. */}
+      <div className="hidden md:block">
+        <ColumnPicker columnDefs={COLUMN_DEFS} isVisible={isVisible} toggleCol={toggleCol} />
+      </div>
 
       {loading && (
         <p className="sunmi-text-muted text-[13px] mb-3">Cargando stock...</p>
       )}
       {error && <p className="sunmi-text-danger text-[13px] mb-3">{error}</p>}
 
-      <div className="overflow-x-auto rounded-xl border sunmi-border">
+      {/* MÓVIL: la card real del kit de Productos, con las ranuras de Stock. */}
+      <div className="md:hidden mt-1">
+        {!loading && items.length === 0 ? (
+          <p className="py-4 text-center text-sm sunmi-text-muted">
+            No hay productos para mostrar.
+          </p>
+        ) : (
+          <SunmiListaProductoCards>
+            {items.map((producto) => (
+              <TarjetaStockMovil
+                key={producto.id}
+                producto={producto}
+                esDeposito={localEsDeposito}
+                onAjustar={onAjustar}
+                onEditarLimites={onEditarLimites}
+              />
+            ))}
+          </SunmiListaProductoCards>
+        )}
+
+        <SunmiPaginador
+          page={page}
+          pageSize={25}
+          totalPages={totalPages}
+          totalItems={total}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+          onGoToPage={setPage}
+        />
+      </div>
+
+      {/* ESCRITORIO: la tabla existente, sin cambiar filas ni columnas. */}
+      <div className="hidden md:block overflow-x-auto rounded-xl border sunmi-border">
         <table className="min-w-full text-[12px] sunmi-table">
           <thead className="sunmi-thead">
             <tr>
@@ -222,7 +259,7 @@ export default function TablaStock({
       </div>
 
       {/* PAGINACIÓN */}
-      <div className="flex items-center justify-between mt-4 text-[12px] sunmi-text-muted">
+      <div className="hidden md:flex items-center justify-between mt-4 text-[12px] sunmi-text-muted">
         <div>
           Total: <strong className="sunmi-text-strong">{total}</strong> productos
         </div>

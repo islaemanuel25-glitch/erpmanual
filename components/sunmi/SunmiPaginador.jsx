@@ -170,7 +170,9 @@ export default function SunmiPaginador({
           <span className="text-sm2 sunmi-text-muted [font-variant-numeric:tabular-nums]">
             {totalItems === 0 ? "sin resultados" : `viendo ${desde}–${hasta} de ${totalItems}`}
           </span>
-          <SunmiPageSizer value={pageSize} onChange={(size) => onPageSizeChange?.(size)} />
+          {onPageSizeChange && (
+            <SunmiPageSizer value={pageSize} onChange={onPageSizeChange} />
+          )}
         </div>
       </div>
 
@@ -211,7 +213,9 @@ export default function SunmiPaginador({
           )}
         </div>
 
-        <SunmiPageSizer value={pageSize} onChange={(size) => onPageSizeChange?.(size)} />
+        {onPageSizeChange && (
+          <SunmiPageSizer value={pageSize} onChange={onPageSizeChange} />
+        )}
       </div>
     </>
   );
