@@ -99,6 +99,14 @@ const EDGE = arg("edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msed
 // que se derivó `--card-elevacion` en los catorce temas.
 const MINIMO_ELEVACION = 3.0;
 
+// El sufijo con el que la tarjeta marca un combo, pegado al rótulo del precio
+// (`TarjetaProductoMovil`, en `data-cara-presentacion`). Está acá y no escrito
+// dos veces porque dos afirmaciones lo miran —la 1 lo arma para comparar contra
+// `carasDeTarjeta`, la 11 lo busca sobre un combo traído del listado— y el día
+// que la marca cambie de forma tienen que ponerse rojas las dos juntas. La
+// anterior cambió de lugar y sólo se enteró una.
+const MARCA_COMBO = " · COMBO";
+
 if (!USUARIO || !CLAVE) {
   console.error("Faltan --usuario y --clave. Sin sesión esto mide la pantalla de login.");
   process.exit(1);
@@ -409,8 +417,12 @@ try {
       // La cinta del rótulo se sacó: si vuelve, esto se pone rojo.
       if (c.rotulo !== null) return true;
       if (!c.presentacion) return true;
-      // La presentación tiene que ser una de las formas conocidas.
-      const base = c.presentacion.replace(/ · COMBO$/, "");
+      // La presentación tiene que ser una de las formas conocidas, sacándole
+      // antes la marca de combo — que es un sufijo y no una forma aparte.
+      const MARCA = ${JSON.stringify(MARCA_COMBO)};
+      const base = c.presentacion.endsWith(MARCA)
+        ? c.presentacion.slice(0, -MARCA.length)
+        : c.presentacion;
       const esPack = /^(PACK|CAJÓN) X \\d+$/.test(base);
       if (!esPack && !(base in ESPERADO) && !NUNCA_ALTERNAN.includes(base)) return true;
 
@@ -645,7 +657,7 @@ try {
     });
     const presEsperada =
       carasEsperadas.frente.presentacion +
-      (carasEsperadas.frente.esCombo ? " · COMBO" : "");
+      (carasEsperadas.frente.esCombo ? MARCA_COMBO : "");
     const presVista = vista.presentacion || null;
     if (presVista !== presEsperada) {
       malPrecio.push(
@@ -815,6 +827,27 @@ try {
     // Mismo camino que el servicio, y por el mismo motivo: en desarrollo los
     // combos no caen necesariamente en la primera página, así que esperar a que
     // aparezcan solos dejaría la afirmación pasando sin ejercer el caso.
+    //
+    // ── QUÉ AFIRMABA ANTES, Y POR QUÉ CAMBIÓ ────────────────────────────────
+    //
+    // Buscaba "Combo · " en el texto entero de la tarjeta, porque hasta `289a036`
+    // la marca la ponía `lineaDeEquivalencia` en la FRANJA de escala, con ese
+    // prefijo. Esa franja se fue en ese mismo commit —la presentación pasó a
+    // viajar pegada al precio— y la marca pasó a ser un sufijo del rótulo:
+    // "UNIDAD · COMBO". El texto viejo no vuelve a aparecer nunca, así que la
+    // afirmación quedó en rojo permanente señalando algo que no es un defecto.
+    //
+    // No se afloja: se apunta a donde la marca vive HOY, y encima a un lugar más
+    // preciso que antes. Ya no se mira el `innerText` de la tarjeta entera —donde
+    // la palabra podía venir del nombre del producto— sino el rótulo mismo.
+    //
+    // ── LO QUE SIGUE EXIGIENDO, Y POR QUÉ NO LO TAPA LA AFIRMACIÓN 1 ────────
+    //
+    // La 1 compara la presentación contra `carasDeTarjeta` y ya incluye el
+    // sufijo, pero sobre las tarjetas que estén en pantalla: si en la primera
+    // página no cae ningún combo, no ejerce el caso. Ésta lo BUSCA por el
+    // listado, hasta cuarenta páginas, y lo trae. Son la misma regla medida sobre
+    // poblaciones distintas.
     let comboProbado = null;
     const u2 = new URL(urlListado, BASE);
     u2.searchParams.set("pageSize", "100");
@@ -839,9 +872,11 @@ try {
       comboProbado = await evaluar(`(() => {
         const t = ${TARJETAS};
         if (!t.length) return { encontrada: false };
+        const pres = t[0].querySelector('[data-cara-presentacion]');
         return {
           encontrada: true,
           nombre: t[0].innerText.split("\\n")[0].trim(),
+          presentacion: pres ? pres.textContent.trim() : null,
           texto: t[0].innerText.replace(/\\n/g, " · "),
         };
       })()`);
@@ -854,9 +889,13 @@ try {
       console.log("        No es un pase. Fabricar uno probaría que el código dibuja algo.");
     } else {
       afirmar(
-        /Combo · /.test(comboProbado.texto),
-        `11 · un combo lo dice en la franja de escala (${comboProbado.nombre})`,
-        `la franja no lo nombra: ${comboProbado.texto.slice(0, 90)}`
+        String(comboProbado.presentacion || "").endsWith(MARCA_COMBO),
+        `11 · un combo lo dice al lado del precio (${comboProbado.nombre})`,
+        `el rótulo no lo nombra: ${
+          comboProbado.presentacion === null
+            ? "AUSENTE, la tarjeta no dibujó rótulo"
+            : `"${comboProbado.presentacion}"`
+        }`
       );
     }
   }
