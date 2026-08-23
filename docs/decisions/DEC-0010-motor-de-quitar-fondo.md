@@ -1,7 +1,8 @@
 # DEC-0010 — Qué motor quita el fondo de las fotos de producto
 
 **Fecha:** 2026-08-22
-**Estado:** decidido para la primera versión, con una puerta abierta y medida
+**Estado:** decidido para la primera versión, con una puerta abierta y sin umbral
+fijado — ver "Lo que se hace después"
 **Alcance:** la foto de un producto, cargada desde el celular en `FormProducto`
 
 ## El problema
@@ -43,7 +44,7 @@ Licencia MIT, o sea que por ese lado entra. El problema es el tamaño: el ONNX
 completo son 973 MB, la versión "lite" 224 MB y la de media precisión 115 MB.
 Ninguna de las tres se puede bajar a un teléfono para recortar una foto.
 
-### u2netp sobre onnxruntime-web — VIABLE, y es el candidato para la segunda vuelta
+### u2netp sobre onnxruntime-web — VIABLE, candidato pendiente, NO aprobado
 
 Apache-2.0, **4,7 MB** de modelo, entrada de 320×320, alrededor de 30 ms por
 imagen en CPU. Corre en el navegador, así que la foto no sale del teléfono.
@@ -150,16 +151,40 @@ CON fondo sigue yendo a JPEG si no hay WebP, que es el caso viejo y no cambió.
 
 ## Lo que se hace después, y con qué se decide
 
-Cuando haya fotos reales cargadas —digamos veinte o treinta productos—, se toman
-esas mismas fotos y se corren por los dos motores. Si el de bordes obliga a
-elegir "usar original" seguido, entra u2netp por la costura, con su costo
-declarado: unos 8 MB de descarga la primera vez, una dependencia nueva
-Apache-2.0, y la foto sigue sin salir del teléfono.
+La primera versión queda con el motor de bordes que está descrito arriba.
+**u2netp sigue siendo un candidato pendiente y no está aprobado**: nadie
+comprometió la dependencia ni los megabytes.
 
-**El dato para decidir ya se está juntando solo**: cada vez que alguien elige, la
-pantalla sabe si confió o no. Es la misma forma que el conteo de renglones del
-comprobante — guardar los dos números y mirarlos dentro de veinte casos, en vez
-de discutirlo.
+Cuando haya fotos reales sacadas en el depósito —del orden de veinte o treinta—,
+se toman **esas mismas imágenes** y se corren por los dos motores. La decisión se
+toma ahí, mirando los resultados reales uno al lado del otro. Si entra u2netp,
+entra por la costura y con su costo declarado: unos 8 MB de descarga la primera
+vez, una dependencia nueva Apache-2.0, y la foto sigue sin salir del teléfono.
+
+**No se fija todavía cuántos fallos obligan a cambiar de motor.** Un umbral
+—"tantos por ciento y se cambia"— tendría la forma de un criterio medido sin
+serlo: no hay ninguna evidencia real todavía con la que justificar ese número, y
+escribirlo ahora sería inventarlo y después obedecerlo.
+
+### CORRECCIÓN — ACÁ DECÍA QUE EL DATO SE JUNTABA SOLO, Y ES FALSO
+
+La versión anterior de esta sección afirmaba que "el dato para decidir ya se está
+juntando solo", porque la pantalla sabe si el motor confió en cada recorte.
+**Saberlo no es guardarlo.**
+
+`confia` y el botón que se apretó —"Usar sin fondo" contra "Usar original"— viven
+únicamente en el estado de `CargarFotoProducto`, y se pierden al cerrar la
+pantalla. La ruta de subida recibe el producto y el archivo, y nada más: no hay
+columna, ni evento, ni registro de ningún tipo. Al día de hoy **no queda rastro
+de ninguna de las dos cosas**.
+
+Así que la comparación de arriba es un trabajo a mano, con las fotos en la
+pantalla, y no la lectura de un dato que se esté acumulando. Quien la haga la
+tiene que hacer entera.
+
+Y no se agrega nada para arreglarlo. Ponerle telemetría, una columna o un evento
+de auditoría a esto sería construir infraestructura para una decisión que todavía
+no se sabe si hay que tomar. Se corrige la afirmación, que era lo que estaba mal.
 
 ## Costo y dependencias que agrega esta decisión
 
