@@ -105,7 +105,7 @@ export default function CarruselControles({
   const pistaRef = useRef(null);
   const etiquetaId = useId();
 
-  if (controles.length === 0) return null;
+  if (controles.length === 0 && !cargando) return null;
 
   const alDesplazar = (e) => {
     const ancho = e.currentTarget.clientWidth || 1;
@@ -148,27 +148,42 @@ export default function CarruselControles({
         </div>
       )}
 
-      <div
-        ref={pistaRef}
-        onScroll={alDesplazar}
-        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {paginas.map((pagina, i) => (
-          <div key={i} className="shrink-0 w-full snap-start pr-px">
-            <div className="grid grid-cols-2 grid-rows-2 gap-1.5 auto-rows-fr">
-              {pagina.map((control) => (
-                <CardControl
-                  key={control.id}
-                  control={control}
-                  activo={activo === control.id}
-                  onSelect={onSelect}
-                  truncado={truncado}
-                />
-              ))}
+      {controles.length === 0 && cargando ? (
+        <div
+          className="grid grid-cols-2 grid-rows-2 md:grid-cols-4 md:grid-rows-1 gap-1.5"
+          aria-label="Calculando controles del catálogo"
+        >
+          {Array.from({ length: POR_PAGINA }, (_, index) => (
+            <div
+              key={index}
+              className="sunmi-control min-h-[44px] rounded-xl animate-pulse"
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          ref={pistaRef}
+          onScroll={alDesplazar}
+          className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {paginas.map((pagina, i) => (
+            <div key={i} className="shrink-0 w-full snap-start pr-px">
+              <div className="grid grid-cols-2 grid-rows-2 md:grid-cols-4 md:grid-rows-1 gap-1.5 auto-rows-fr">
+                {pagina.map((control) => (
+                  <CardControl
+                    key={control.id}
+                    control={control}
+                    activo={activo === control.id}
+                    onSelect={onSelect}
+                    truncado={truncado}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {paginas.length > 1 && (
         <div className="flex justify-center gap-1.5 mt-1.5">
