@@ -18,18 +18,53 @@ Si la lista está vacía, el despliegue es solo de código.
 
 **Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-23 después de desplegar
-`45e0b8c5da101689733ef18b40812ec9762594fd` — la corrección de la caché compartida
-de las fotos de producto. **Solo código.**
+`e8e236127e634e648582a9c60d5ef5d2d52a31b5` — la tanda de robustez de u2netp
+(versión fijada, caché atada al contenido, recuperación de caché corrupto y
+licencias de terceros). **Solo código.**
 
-Corte de **4 segundos**. Cinco valores coincidentes, cero reinicios, logs sin
-errores, `/login` en 200 y el árbol del VPS limpio.
+Corte de **2 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` healthy y **no recreado** —todo el despliegue fue con
+`--no-deps app`—, logs sin errores nuevos, `/login` en 200 y el árbol del VPS
+limpio. **No hubo rollback**, y quedó disponible a
+`ghcr.io/islaemanuel25-glitch/erpmanual:45e0b8c5da101689733ef18b40812ec9762594fd`
+(imagen `sha256:8c699d81d297…`).
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre presente, 61 tablas—: 
+`/srv/produccion/backups/pre-e8e23612_20260823_184526.sql.gz`, 2.821.399 bytes.
 
 Sin migraciones, comprobado de tres formas antes de tocar nada:
-`git diff --name-only ecba0408..45e0b8c5 -- prisma/` no devolvió nada, el
+`git diff --name-only 45e0b8c5..e8e23612 -- prisma/` no devolvió nada, el
 clasificador informó "Archivos a mirar: 0" con el rango tomado de la imagen que
 atendía, y este archivo ya decía que no había pendientes. El contenedor
 descartable contó **101**, el mismo número que el árbol — que es lo que distingue
 "no había nada que aplicar" de "la imagen no conoce la migración".
+
+Reapareció el warning `The "POSTGRES_PASSWORD" variable is not set` en los
+comandos de compose. Es el **pendiente conocido y preexistente** de
+interpolación, no algo que trajera esta tanda, y es exactamente el motivo por el
+que nunca se recrea el servicio `db`.
+
+### LOS DOS BINARIOS DE u2netp SE VERIFICARON ANTES DEL CORTE, NO DESPUÉS
+
+Esta tanda mete 18 MB de binarios nuevos en la imagen, así que la pregunta
+—¿llegaron?— se contestó con un contenedor descartable de la imagen nueva
+**antes** de recrear nada. Si faltaban, el corte no salía.
+
+Adentro de la imagen, con sha256 idéntico al de `MANIFIESTO.json`:
+
+    u2netp.onnx                    4.574.861 B   309c8469…
+    ort-wasm-simd-threaded.wasm   13.479.978 B   d1ab1b94…
+
+Y después del corte, servidos por el dominio: los dos en 200 y con el mismo
+número de bytes, más `MANIFIESTO.json` en 200. Las dos licencias también
+viajaron intactas —1073 y 11357 bytes—, o sea que la marca `-text` del
+`.gitattributes` sobrevivió al build; sin ella, git las habría convertido a CRLF
+y el candado U15 estaría rojo en cualquier clon de Windows.
+
+Las fotos de producto siguen accesibles: el volumen conserva su centinela y sus
+archivos, y `/api/productos/foto/[archivo]` responde **401** sin sesión — que es
+rechazar bien, no romperse.
 
 ### LA FOTO DE UN PRODUCTO YA NO SE PUEDE GUARDAR EN UNA CACHÉ COMPARTIDA
 
