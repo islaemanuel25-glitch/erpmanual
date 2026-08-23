@@ -18,6 +18,119 @@ Si la lista está vacía, el despliegue es solo de código.
 
 **Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
 comprobado con `prisma migrate status` el 2026-08-23 después de desplegar
+`45e0b8c5da101689733ef18b40812ec9762594fd` — la corrección de la caché compartida
+de las fotos de producto. **Solo código.**
+
+Corte de **4 segundos**. Cinco valores coincidentes, cero reinicios, logs sin
+errores, `/login` en 200 y el árbol del VPS limpio.
+
+Sin migraciones, comprobado de tres formas antes de tocar nada:
+`git diff --name-only ecba0408..45e0b8c5 -- prisma/` no devolvió nada, el
+clasificador informó "Archivos a mirar: 0" con el rango tomado de la imagen que
+atendía, y este archivo ya decía que no había pendientes. El contenedor
+descartable contó **101**, el mismo número que el árbol — que es lo que distingue
+"no había nada que aplicar" de "la imagen no conoce la migración".
+
+### LA FOTO DE UN PRODUCTO YA NO SE PUEDE GUARDAR EN UNA CACHÉ COMPARTIDA
+
+El incidente que esta tanda cierra: `/api/productos/foto/[archivo]` comprobaba
+`productos.ver` y respondía `Cache-Control: public`. Cloudflare guardó la
+respuesta y la servía desde el borde a peticiones **sin sesión**, que ya no
+llegaban al servidor. Medido el 2026-08-23 antes de arreglarlo: 200 sin
+credenciales, `cf-cache-status: HIT`, `Age: 11572`.
+
+El permiso nunca falló. Lo que pasó es que dejó de correr, porque el tráfico
+dejó de llegarle. La ruta ahora responde `private, max-age=31536000, immutable`
+—el navegador la sigue guardando, una caché compartida no puede— más
+`Cloudflare-CDN-Cache-Control: no-store`, que es la única cabecera que sobrevive
+a una Cache Rule del panel que ignore lo que manda el origen.
+
+### EL CÓDIGO VIAJÓ, COMPROBADO EN LOS DOS SENTIDOS
+
+Con las cadenas exactas de las cabeceras, que son literales y no identificadores
+—un identificador no sirve de marcador porque el build lo minifica—.
+
+En la imagen que atiende: `Cloudflare-CDN-Cache-Control` aparece,
+`private, max-age=31536000, immutable` aparece, y `public, max-age=31536000`
+**no**. En la imagen vieja, corrida en un contenedor descartable, exactamente al
+revés. El control `max-age=31536000, immutable` aparece en las dos, que es lo que
+prueba que la búsqueda funciona.
+
+### LA PURGA ERA UN PASO APARTE, Y CON ORDEN
+
+Cambiar la cabecera no desaloja lo que Cloudflare ya tenía, y el `max-age` que se
+había mandado era de un año. La purga va **después** de desplegar: al revés no
+sirve, porque el origen todavía contesta `public` y la primera petición
+autenticada lo vuelve a guardar con el reloj en cero.
+
+Se comprobó ese estado intermedio en vez de suponerlo: recién desplegado, la url
+exacta seguía dando 200 con `Age: 49969` y `cf-cache-status: HIT`, mientras la
+misma foto con un parámetro agregado —que Cloudflare no podía tener guardada— ya
+daba 401. O sea que el código nuevo servía y lo único que quedaba era la entrada
+vieja.
+
+**Emanuel purgó esa url a mano desde el panel.** No se purgó desde la máquina de
+despliegue: no hay credenciales de Cloudflare ahí y no se inventan. El
+procedimiento completo —los tres caminos, cómo sacar la lista de urls del volumen
+y cómo verificar— está en
+[`docs/RUNBOOK-VOLUMEN-FOTOS-PRODUCTOS.md`](../RUNBOOK-VOLUMEN-FOTOS-PRODUCTOS.md).
+
+### INCIDENTE CERRADO, CON LA MEDICIÓN DE CIERRE
+
+Pedida **tres veces sin sesión ni cookies**,
+`https://operix.cloud/api/productos/foto/p181-bed80329.webp` devolvió las tres:
+
+- HTTP **401**;
+- `cf-cache-status: BYPASS` — nunca `HIT`;
+- **sin `Age`** — antes venía con 49969;
+- cuerpo `{"ok":false,"error":"No autenticado"}`, 37 bytes de json. Los primeros
+  bytes son `{ " o k "` y no `RIFF`: no es una imagen. Antes eran 64.814 bytes de
+  WebP;
+- y no volvió a convertirse en `HIT` ni en 200 en ninguna de las repeticiones.
+
+Desapareció también el `Cache-Control: public` que traía la respuesta cacheada.
+
+**Lo que NO se observó, y hay que decirlo:** las dos cabeceras nuevas sobre una
+respuesta **200** en producción. Solo salen en el camino bueno, que exige sesión,
+y no hay credenciales productivas en la máquina desde la que se desplegó. Lo que
+sí hay es que las cadenas exactas están adentro de la imagen desplegada, y que el
+mismo código medido en el cable en desarrollo devolvió
+`cache-control: private, max-age=31536000, immutable` y
+`cloudflare-cdn-cache-control: no-store`, con el sha256 de lo que bajó idéntico al
+del archivo en disco. Falta un vistazo con sesión real, de diez segundos.
+
+### LOS CANDADOS QUE QUEDARON
+
+Uno específico de la ruta y uno general: **ninguna ruta que comprueba permiso
+puede declararse cacheable por una caché compartida**, aplicado al censo de las
+147 rutas con GET. Los candados de ese censo preguntaban si la ruta comprueba;
+éste pregunta si esa comprobación llega a correr, que es lo que ninguno miraba.
+
+---
+
+Antes de ése, producción estaba al día: 101 migraciones en el árbol y 101
+aplicadas, comprobado con `prisma migrate status` el 2026-08-23 después de
+desplegar `ecba0408b7335d77ddafa5448bb0b4acead5e65d` — la tanda de quitar el fondo
+de la foto de producto. **Solo código.**
+
+Corte de **4 segundos**. Cinco valores coincidentes, cero reinicios, logs sin
+errores, `/login` en 200 y el árbol del VPS limpio. El contenedor descartable
+contó 101, igual que el árbol.
+
+El cambio viajó, comprobado con el texto de interfaz "Quitando el fondo" —cero
+apariciones en el commit que estaba desplegado, dos chunks en la imagen nueva—,
+con "Cargar foto" de control dando positivo en las dos.
+
+**Lo que no se pudo hacer:** la carga de una foto de punta a punta en producción,
+que necesita una sesión real. Es el mismo pendiente que arrastran los despliegues
+anteriores de este módulo. El flujo completo —con la lectura de los bytes del
+archivo producido, para confirmar que el recorte no sale en JPEG— está verde
+contra desarrollo.
+
+---
+
+Antes de ése, producción estaba al día: 101 migraciones en el árbol y 101 aplicadas,
+comprobado con `prisma migrate status` el 2026-08-23 después de desplegar
 `9b37d0b4110fe05f61597192a7aba4f12c6f174a` — el merge del PR #7, que corrige la
 edición de combos en el celular. **Solo código.**
 
