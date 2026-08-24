@@ -113,12 +113,34 @@ export async function GET(req) {
         COUNT(*)                                                 AS "total"
       FROM "ProductoLocal" pl
       JOIN "ProductoBase" pb ON pb."id" = pl."baseId"
+      LEFT JOIN "Local" cel ON cel."id" = pb."creadoEnLocalId"
       LEFT JOIN "StockLocal" sl
         ON sl."productoId" = pl."id" AND sl."localId" = pl."localId"
       WHERE pl."localId" = $1
         AND pl."activo" = true
         AND pb."activo" = true
         AND pb."es_combo" = false
+        -- ── LA MISMA REGLA DE VISIBILIDAD QUE EL LISTADO ──────────────────
+        --
+        -- OJO: esto vive DENTRO de un template literal, así que acá adentro no
+        -- pueden ir acentos graves. Poner uno cierra la cadena y el archivo deja
+        -- de parsear; ya pasó al escribir este bloque, y el error que da nombra
+        -- un identificador y no la comilla.
+        --
+        -- productoVisibleWhere(localId) esconde el producto creado en OTRO
+        -- local que no sea depósito. El listado lo aplica en sus dos ramas; el
+        -- resumen no lo hacía, así que contaba cáscaras de ProductoLocal que la
+        -- lista nunca muestra: la card decía un número más alto y no había forma
+        -- de llegar a esas filas.
+        --
+        -- Escrito en POSITIVO y no como un NOT (...): con creadoEnLocalId en
+        -- null, el NOT da NULL y la fila se cae del conteo, que es justamente el
+        -- caso más común porque el producto sin local creador lo ven todos.
+        AND (
+          pb."creadoEnLocalId" IS NULL
+          OR cel."es_deposito" = true
+          OR pb."creadoEnLocalId" = $1
+        )
     `;
 
     const filas = await prisma.$queryRawUnsafe(sql, localId);

@@ -6,6 +6,7 @@ import { useStockData } from "@/hooks/useStockData";
 import { useColumnasVisibles } from "@/hooks/useColumnasVisibles";
 import ColumnPicker from "@/components/stock_locales/ColumnPicker";
 import TarjetaStockMovil from "@/components/stock_locales/TarjetaStockMovil";
+import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import {
   formatCantidad,
@@ -68,17 +69,45 @@ export default function TablaStock({
   // para siempre.
   const avisadoRef = useRef(null);
   const arrancoRef = useRef(false);
+  const genRef = useRef(0);
+  // La intención de recontar se anota cuando alguien PRENDE `refrescar` —al
+  // guardar—, no cuando el listado termina: para entonces ya volvió a false.
+  const pendienteRef = useRef(false);
+  useEffect(() => {
+    if (refrescar) pendienteRef.current = true;
+  }, [refrescar]);
   useEffect(() => {
     if (loading) arrancoRef.current = true;
   }, [loading]);
   useEffect(() => {
     if (!localSeleccionado || loading || !arrancoRef.current) return;
-    const clave = `${localSeleccionado}`;
-    if (avisadoRef.current === clave) return;
-    avisadoRef.current = clave;
-    onPrimeraCarga?.({ ok: !error, localId: Number(localSeleccionado) || null });
+
+    // ── SE AVISA POR LA PRIMERA CARGA Y POR CADA GUARDADO ──────────────────
+    //
+    // No se puede mirar `refrescar` acá: `useStockData` lo devuelve a false en
+    // el MISMO tick en que apaga `loading`, así que para cuando este efecto
+    // corre ya vale false y el guardado sería indistinguible de una carga
+    // cualquiera. Por eso la intención se anota cuando el booleano se PRENDE, y
+    // se consume cuando el listado termina.
+    //
+    // Lo que sube es una GENERACIÓN: un contador que solo avanza. El hook del
+    // resumen se apoya en eso —una generación nueva vale por una invalidación,
+    // exactamente una— en vez de mirar un booleano que va y vuelve.
+    //
+    // Cambiar de página u ordenar NO avisa: no prenden `refrescar` y la
+    // ubicación no cambió, así que no hay nada que recontar.
+    const esPrimeraDeEsteLocal = avisadoRef.current !== String(localSeleccionado);
+    if (!esPrimeraDeEsteLocal && !pendienteRef.current) return;
+    avisadoRef.current = String(localSeleccionado);
+    pendienteRef.current = false;
+    genRef.current += 1;
+    onPrimeraCarga?.({
+      ok: !error,
+      localId: Number(localSeleccionado) || null,
+      gen: genRef.current,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localSeleccionado, loading, error]);
+  }, [localSeleccionado, loading, error, refrescar]);
 
   // Columnas visibles (estado + localStorage extraído a hook).
   const { isVisible, toggleCol, visibleCount, COLUMN_DEFS } = useColumnasVisibles();
@@ -157,7 +186,8 @@ export default function TablaStock({
           La tabla vive dentro de un `overflow-x-auto`, así que en un teléfono se
           arrastraba de costado para leer una fila. El encargo pide una vista
           móvil real, y es la mitad del sentido de esta tanda. */}
-      <div className="md:hidden flex flex-col gap-2">
+      <div className="md:hidden">
+        <SunmiListaProductoCards>
         {items.map((p) => (
           <TarjetaStockMovil
             key={p.id}
@@ -168,6 +198,7 @@ export default function TablaStock({
             puedeAjustar={puedeAjustar}
           />
         ))}
+        </SunmiListaProductoCards>
         {!loading && items.length === 0 && (
           <p className="sunmi-text-muted text-sm2 py-4">No hay productos con estos filtros.</p>
         )}

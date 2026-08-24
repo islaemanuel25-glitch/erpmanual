@@ -297,6 +297,73 @@ try {
     );
   }
 
+  // ── 5bis. LA CARD SOBREVIVE AL BUSCADOR Y A LOS FILTROS ────────────────
+  //
+  // El defecto: `FiltrosStock` emite el juego COMPLETO de filtros, así que
+  // pasarle `setFiltro` directo se llevaba puesto `estado`. La card se apagaba
+  // sola al escribir una letra en el buscador, y el listado volvía a traer todo.
+  console.log("── card + buscador ──────────────────────────────────────────────\n");
+  const iCard2 = (cards || []).findIndex((c) => c.cantidad > 0);
+  if (iCard2 >= 0) {
+    await evaluar(`(() => {
+      const s = [...document.querySelectorAll('section')].find((x) => /Para revisar|Estado del stock/.test(x.textContent || ""));
+      s.querySelectorAll('button[aria-pressed]')[${iCard2}].click(); return true; })()`);
+    await sleep(2200);
+    await evaluar(`performance.clearResourceTimings(); true`);
+
+    // Se escribe en el buscador con la card prendida.
+    await evaluar(`(() => {
+      const i = document.querySelector('input[type="text"], input[type="search"], input:not([type])');
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(i, "a");
+      i.dispatchEvent(new Event("input", { bubbles: true }));
+      return true; })()`);
+    await sleep(3000);
+    await esperarA(`!/Cargando stock/i.test(document.body.innerText)`, 30000);
+
+    const sigueActiva = JSON.parse(await leerCards()).filter((c) => c.activa).length;
+    afirmar(
+      sigueActiva === 1,
+      `la card sigue activa después de buscar (${sigueActiva})`,
+      "escribir en el buscador apagó la card: los filtros pisaron el estado"
+    );
+
+    // Y el pedido lleva LOS DOS a la vez: el estado y la búsqueda.
+    const urls = JSON.parse(await evaluar(`JSON.stringify(
+      performance.getEntriesByType("resource")
+        .filter((e) => e.name.includes("/api/stock_locales/listar"))
+        .map((e) => e.name))`));
+    const conAmbos = urls.filter((u) => u.includes("estado=") && u.includes("q="));
+    afirmar(
+      conAmbos.length >= 1,
+      `el pedido lleva estado y búsqueda juntos (${conAmbos.length} de ${urls.length})`,
+      `ninguno de los ${urls.length} pedidos lleva los dos: ${urls.map((u) => u.split("?")[1] || "").join(" | ").slice(0, 200)}`
+    );
+
+    // Se limpia para lo que sigue.
+    await evaluar(`(() => {
+      const i = document.querySelector('input[type="text"], input[type="search"], input:not([type])');
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(i, "");
+      i.dispatchEvent(new Event("input", { bubbles: true }));
+      return true; })()`);
+    await sleep(2200);
+    await evaluar(`(() => {
+      const s = [...document.querySelectorAll('section')].find((x) => /Para revisar|Estado del stock/.test(x.textContent || ""));
+      s.querySelectorAll('button[aria-pressed]')[${iCard2}].click(); return true; })()`);
+    await sleep(1800);
+  }
+
+  // ── 5ter. UN SOLO PEDIDO DE CATÁLOGO ───────────────────────────────────
+  const pedidosCatalogo = await evaluar(
+    `performance.getEntriesByType("resource").filter((e) => e.name.includes("/api/catalogos/proveedores")).length`
+  );
+  afirmar(
+    Number(pedidosCatalogo) <= 1,
+    `el catálogo de proveedores se pidió una sola vez (${pedidosCatalogo})`,
+    `se pidió ${pedidosCatalogo} veces: la pantalla y FiltrosStock lo traen por separado`
+  );
+
   // ── 6. LAS DOS ACCIONES ABREN, Y NO SE PIERDE LA PÁGINA ────────────────
   const antesDeAbrir = await tarjetas();
   const abrio = await evaluar(`(() => {
@@ -316,6 +383,81 @@ try {
     );
   } else {
     console.log("  (no hay botón Límites visible: no se pudo ejercer)\n");
+  }
+
+  // ── 7. LA SECUENCIA EXACTA DESPUÉS DE GUARDAR ──────────────────────────
+  //
+  //   guardar → listar inicia → listar termina → resumen inicia UNA vez
+  //
+  // El defecto que esto atrapa: el hook componía su clave con el booleano
+  // `refrescar`, que hace un viaje de IDA Y VUELTA —lo prende quien guarda y el
+  // listado lo devuelve a false—. La clave cambiaba dos veces, así que salían
+  // DOS pedidos a `/resumen`, y el primero mientras el listado seguía en vuelo.
+  //
+  // Los dos devolvían el mismo número, así que la pantalla se veía perfecta.
+  console.log("\n── secuencia después de guardar ─────────────────────────────────\n");
+  const contadorAntes = JSON.parse(await leerCards());
+  await evaluar(`performance.clearResourceTimings(); true`);
+
+  const guardo = await evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === "Límites");
+    if (!b) return false; b.click(); return true; })()`);
+  if (!guardo) {
+    console.log("  (no se pudo abrir Límites para ejercer el guardado)\n");
+  } else {
+    await sleep(1200);
+    // Se guarda SIN cambiar los valores: alcanza para disparar la recarga y no
+    // altera datos de la base de desarrollo más de lo necesario.
+    const confirmo = await evaluar(`(() => {
+      const b = [...document.querySelectorAll('[data-sunmi-modal] button')].find((x) => /guardar/i.test(x.textContent || ""));
+      if (!b) return false; b.click(); return true; })()`);
+    if (!confirmo) {
+      console.log("  (no se encontró el botón de guardar)\n");
+    } else {
+      await sleep(4500);
+      await esperarA(`!/Cargando stock/i.test(document.body.innerText)`, 30000);
+      await esperarA(`!/calculando/i.test(document.body.innerText)`, 30000);
+      await sleep(1200);
+
+      const secuencia = JSON.parse(await evaluar(`JSON.stringify(
+        performance.getEntriesByType("resource")
+          .filter((e) => e.name.includes("/api/stock_locales/"))
+          .map((e) => ({ ruta: e.name.includes("/resumen") ? "resumen" : (e.name.includes("/listar") ? "listar" : (e.name.includes("/ajustar") ? "guardar" : "otro")),
+                         inicio: Math.round(e.startTime), fin: Math.round(e.responseEnd) }))
+          .filter((e) => e.ruta !== "otro")
+          .sort((a, b) => a.inicio - b.inicio))`));
+      for (const p of secuencia) console.log(`     ${p.ruta.padEnd(8)} ${p.inicio} → ${p.fin} ms`);
+      console.log("");
+
+      const resumenesPost = secuencia.filter((p) => p.ruta === "resumen");
+      const listadosPost = secuencia.filter((p) => p.ruta === "listar");
+
+      afirmar(
+        resumenesPost.length === 1,
+        `un solo pedido a /resumen después del cambio (${resumenesPost.length})`,
+        `salieron ${resumenesPost.length}: el booleano de refresco vuelve a disparar dos veces`
+      );
+      if (resumenesPost.length && listadosPost.length) {
+        const finUltimoListado = Math.max(...listadosPost.map((l) => l.fin));
+        const holguraPost = resumenesPost[0].inicio - finUltimoListado;
+        afirmar(
+          holguraPost >= 0,
+          `cero solapamiento con /listar (holgura ${holguraPost} ms)`,
+          `el resumen arrancó ${-holguraPost} ms antes de que terminara el listado`
+        );
+      }
+
+      const contadorDespues = JSON.parse(await leerCards());
+      afirmar(
+        Array.isArray(contadorDespues) && contadorDespues.length === 4,
+        "los contadores siguen presentes después del cambio",
+        `quedaron ${JSON.stringify(contadorDespues)}`
+      );
+      if (Array.isArray(contadorAntes) && Array.isArray(contadorDespues)) {
+        console.log(`     contadores antes:   ${contadorAntes.map((c) => c.cantidad).join(" · ")}`);
+        console.log(`     contadores después: ${contadorDespues.map((c) => c.cantidad).join(" · ")}`);
+      }
+    }
   }
 } catch (e) {
   morir(e?.message || String(e));

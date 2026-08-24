@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import CarruselControles from "@/components/productos/CarruselControles";
 import { useResumenStock } from "@/hooks/useResumenStock";
@@ -29,7 +29,7 @@ export default function StockLocalesPage() {
   // habría dos verdades sobre qué se está mostrando.
   const estadoActivo = filtro.estado || null;
 
-  const alTocarCard = (id) => {
+  const alTocarCard = useCallback((id) => {
     setPage(1);
     setFiltro((prev) => {
       // Tocar la card activa la apaga. Solo una puede estar prendida.
@@ -39,25 +39,44 @@ export default function StockLocalesPage() {
       }
       return { ...prev, estado: id };
     });
-  };
+  }, []);
 
-  // Nombre del proveedor por id: el listado devuelve `proveedorId` y la tarjeta
-  // móvil muestra el nombre. Se arma con el MISMO catálogo que el filtro ya
-  // consulta, sin pedirle nada nuevo al servidor.
+  // ── LA CARD SOBREVIVE A BUSCAR Y FILTRAR ─────────────────────────────────
+  //
+  // `FiltrosStock` emite el juego COMPLETO de sus filtros, así que pasarle
+  // `setFiltro` directo reemplazaba el objeto entero y se llevaba puesto
+  // `estado` —la card activa— apenas se escribía en el buscador o se elegía una
+  // categoría. La card se apagaba sola y el listado volvía a traer todo.
+  //
+  // Acá se FUSIONA: los filtros normales pisan lo suyo y `estado` se conserva.
+  // El pedido del listado lleva los dos a la vez, que es lo que se pidió.
+  //
+  // La card solo se apaga por las dos vías previstas: tocarla de nuevo, o
+  // Limpiar —que sí borra todo, incluida ella—.
+  const alCambiarFiltros = useCallback((nuevos) => {
+    setPage(1);
+    setFiltro((prev) => (prev.estado ? { ...nuevos, estado: prev.estado } : nuevos));
+  }, []);
+
+  const alLimpiar = useCallback(() => {
+    setPage(1);
+    setFiltro({});
+  }, []);
+
+  // ── EL CATÁLOGO SE PIDE UNA SOLA VEZ ─────────────────────────────────────
+  //
+  // Acá había un `fetch` propio a `/api/catalogos/proveedores`, y `FiltrosStock`
+  // ya lo traía por su lado: dos pedidos idénticos en cada entrada a la pantalla.
+  // Ahora lo informa el componente que lo carga y esta pantalla solo lo recibe.
+  //
+  // `useCallback` no es prolijidad: el efecto de `FiltrosStock` que dispara el
+  // filtrado tiene `onFiltroChange` entre sus dependencias, y una función inline
+  // se recrea en cada render. Lo mismo vale para este handler.
   const [proveedoresPorId, setProveedoresPorId] = useState({});
-  useEffect(() => {
-    let vivo = true;
-    fetch("/api/catalogos/proveedores", { credentials: "include" })
-      .then((r) => r.json())
-      .then((j) => {
-        if (!vivo) return;
-        const lista = j?.items || j?.proveedores || [];
-        const mapa = {};
-        for (const p of lista) mapa[p.id] = p.nombre;
-        setProveedoresPorId(mapa);
-      })
-      .catch(() => {});
-    return () => (vivo = false);
+  const alCargarCatalogos = useCallback(({ proveedores }) => {
+    const mapa = {};
+    for (const p of proveedores || []) mapa[p.id] = p.nombre;
+    setProveedoresPorId(mapa);
   }, []);
 
   // Lo que el listado le informa a los contadores: cuándo terminó su primera
@@ -76,7 +95,6 @@ export default function StockLocalesPage() {
   } = useResumenStock({
     localSeleccionado: localSeleccionadoParaResumen,
     listadoListo,
-    refrescar,
   });
 
   const [openAjuste, setOpenAjuste] = useState(false);
@@ -149,8 +167,9 @@ export default function StockLocalesPage() {
         <FiltrosStock
           compact
           localSeleccionado={localSeleccionado}
-          onFiltroChange={setFiltro}
-          onReset={() => setFiltro({})}
+          onFiltroChange={alCambiarFiltros}
+          onReset={alLimpiar}
+          onCatalogos={alCargarCatalogos}
         />
 
         <SunmiSeparator label="Listado" />

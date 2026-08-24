@@ -27,6 +27,7 @@ import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 // esta pantalla ya no la monta directo.
 import TarjetaProductoMovil from "@/components/productos/TarjetaProductoMovil";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
+import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import CarruselControles from "@/components/productos/CarruselControles";
 import HojaMasAcciones from "@/components/productos/HojaMasAcciones";
 import HojaPersonalizarTarjeta from "@/components/productos/HojaPersonalizarTarjeta";
@@ -1963,7 +1964,7 @@ export default function ProductosPage() {
                   Medido antes de esto: dos alturas conviviendo, 191,9 y 211,4 —
                   exactamente una línea de nombre de diferencia. */}
               <div className="md:hidden mt-1">
-                <div className="grid grid-cols-1 auto-rows-fr gap-[9px]">
+                <SunmiListaProductoCards>
                 {rows.map((p) => {
                   // ── LA ESCALA EN LA QUE SE VENDE, NO EN LA QUE SE GUARDA ──
                   //
@@ -2167,7 +2168,7 @@ export default function ProductosPage() {
                   />
                   );
                 })}
-                </div>
+                </SunmiListaProductoCards>
 
                 {/* EL MISMO PIE QUE LA TABLA, no uno parecido. Sin esto la lista
                     del celular mostraba los primeros 25 de 2.600 productos y no

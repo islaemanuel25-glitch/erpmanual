@@ -59,8 +59,18 @@ test("MOV4. LA TARJETA NO TRAE NADA DEL CATÁLOGO", () => {
 });
 
 test("MOV5. SE USA EL KIT, no botones ni paginadores a mano", () => {
-  assert.match(TARJETA, /SunmiButton/, "la tarjeta arma botones crudos");
-  assert.match(TARJETA, /SunmiPanel/);
+  // ── ESTE CANDADO SE REESCRIBIÓ, Y CONVIENE SABER POR QUÉ ────────────────
+  //
+  // Afirmaba `SunmiButton` y `SunmiPanel` porque la tarjeta armaba SU PROPIA
+  // card. Ahora consume `SunmiProductoCard`, que es la del catálogo, y sus
+  // acciones son `AccionTarjeta` — la misma pieza que usa Productos para su
+  // botón de editar.
+  //
+  // O sea que el candado seguía siendo verdad y describía una arquitectura peor.
+  // Si se hubiera dejado como estaba, habría OBLIGADO a conservar la card
+  // duplicada: un candado que fija el defecto en vez de defenderlo.
+  assert.match(TARJETA, /AccionTarjeta/, "las acciones no usan la pieza del kit");
+  assert.match(TARJETA, /SunmiProductoCard/, "la tarjeta no consume la card del kit");
   assert.doesNotMatch(TARJETA, /<button/, "quedó un <button> crudo en la tarjeta");
   assert.doesNotMatch(TARJETA, /<input/, "quedó un <input> crudo en la tarjeta");
 
@@ -116,7 +126,11 @@ test("MOV9. LOS CONTADORES ESPERAN AL LISTADO, y reusan la puerta de Productos",
 
   // El listado avisa cuándo terminó, bien o mal: si solo avisara del éxito, un
   // listado fallido dejaría las cards cargando para siempre.
-  assert.match(TABLA, /onPrimeraCarga\?\.\(\{ ok: !error/, "el aviso no contempla el listado fallido");
+  // El aviso lleva `ok` —para que un listado fallido no deje las cards cargando
+  // para siempre— y ahora además una generación, que es lo que evita el segundo
+  // pedido por cada guardado. Ver `stockKitYRecarga.test.mjs`.
+  assert.match(TABLA, /onPrimeraCarga\?\.\(\{/, "se perdió el aviso al resumen");
+  assert.match(TABLA, /ok: !error/, "el aviso no contempla el listado fallido");
 });
 
 test("MOV10. UN ERROR DEL RESUMEN NO SE DISFRAZA DE CATÁLOGO SANO", () => {

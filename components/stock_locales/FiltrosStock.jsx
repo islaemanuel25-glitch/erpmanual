@@ -12,6 +12,10 @@ export default function FiltrosStock({
   localSeleccionado,
   onFiltroChange,
   onReset,
+  // Los catálogos que este componente ya trae, para que la pantalla no vuelva a
+  // pedirlos. Tiene que ser estable —`useCallback`— porque el efecto de abajo lo
+  // tendría entre sus dependencias si fuera inline.
+  onCatalogos = null,
   compact = false,
 }) {
   const [q, setQ] = useState("");
@@ -49,11 +53,28 @@ export default function FiltrosStock({
         setCategorias(cat.items ?? []);
         setProveedores(prov.items ?? []);
         setAreas(ar.items ?? []);
+        // ── EL CATÁLOGO SE INFORMA HACIA ARRIBA, NO SE PIDE DOS VECES ─────
+        //
+        // La tarjeta móvil muestra el NOMBRE del proveedor y el listado solo
+        // devuelve `proveedorId`, así que la pantalla necesitaba el mismo
+        // catálogo que este componente ya trae. Se estaba pidiendo dos veces
+        // `/api/catalogos/proveedores` en cada entrada: una acá y otra en la
+        // página.
+        //
+        // Ahora se pasa el que ya llegó. Es un `useCallback` del lado de la
+        // pantalla: si fuera una función inline, entraría en las dependencias
+        // del efecto de abajo y lo haría correr en cada render.
+        onCatalogos?.({ categorias: cat.items ?? [], proveedores: prov.items ?? [], areas: ar.items ?? [] });
       } catch (err) {
         console.error("Error cargando catálogos para filtros:", err);
       }
     };
     cargar();
+    // `onCatalogos` queda FUERA de las dependencias a propósito: este efecto
+    // carga los catálogos UNA vez y meterlo acá los volvería a pedir cada vez que
+    // el padre recree la función. Sería reintroducir, por otra puerta, el pedido
+    // duplicado que este callback vino a eliminar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounce + mapeo estadoStock -> {conStock, sinStock, faltantes, negativo}

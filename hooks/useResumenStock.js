@@ -32,7 +32,19 @@ import {
 // y no tienen por qué quedarse en su esqueleto porque el listado no llegó. El
 // único caso que las retiene es "el primer listado todavía no terminó".
 
-export function useResumenStock({ localSeleccionado, listadoListo, refrescar }) {
+// ── POR QUÉ NO SE MIRA `refrescar` ────────────────────────────────────────
+//
+// La primera versión componía una clave `"<local>|inicial"` / `"<local>|post-cambio"`
+// a partir del booleano `refrescar`. Ese booleano hace un viaje de ida y vuelta:
+// lo pone en true quien guarda, y `useStockData` lo devuelve a false cuando
+// termina. O sea que cambia DOS veces por cada guardado, y la clave cambiaba dos
+// veces con él: **dos pedidos a `/resumen` por cada Ajustar o Límites**, el
+// primero mientras el listado todavía estaba en vuelo.
+//
+// Ahora lo que manda es una GENERACIÓN que avanza una sola vez, cuando el
+// listado termina. Un contador que solo sube no puede volver sobre sus pasos, y
+// por eso no puede disparar dos veces por el mismo cambio.
+export function useResumenStock({ localSeleccionado, listadoListo }) {
   const [estados, setEstados] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -43,15 +55,20 @@ export function useResumenStock({ localSeleccionado, listadoListo, refrescar }) 
   // correría de gusto en cada paginada.
   const [termino, setTermino] = useState(null);
   const [respondioPara, setRespondioPara] = useState(null);
+  // La generación que el listado invalida. Sube UNA vez por cada listado que
+  // termina y que corresponde recontar.
+  const [generacion, setGeneracion] = useState(0);
 
   const tokenRef = useRef(0);
   const pedidoRef = useRef(null);
 
-  // El listado avisa cuándo terminó su primera carga y para qué ubicación.
+  // El listado avisa cuándo terminó y con qué generación. Cada aviso nuevo
+  // —identificado por `gen`— invalida el conteo anterior exactamente una vez.
   useEffect(() => {
     if (!listadoListo) return;
     setTermino(listadoListo.ok !== false);
     setRespondioPara(listadoListo.localId ?? null);
+    setGeneracion(Number(listadoListo.gen) || 0);
   }, [listadoListo]);
 
   const puerta =
@@ -61,10 +78,9 @@ export function useResumenStock({ localSeleccionado, listadoListo, refrescar }) 
     if (!localSeleccionado) return;
     if (!controlesPuedenSalir(puerta, Number(localSeleccionado) || 0)) return;
 
-    // Ya salió para esta ubicación y no hay nada que lo invalide: no se repite.
-    // `refrescar` sí lo invalida, porque después de ajustar o de tocar límites
-    // los conteos cambiaron.
-    const clave = `${localSeleccionado}|${refrescar ? "post-cambio" : "inicial"}`;
+    // Ubicación más generación: sube solo hacia adelante, así que un mismo
+    // cambio no puede pedir dos veces.
+    const clave = `${localSeleccionado}|${generacion}`;
     if (pedidoRef.current === clave) return;
     pedidoRef.current = clave;
 
@@ -105,7 +121,7 @@ export function useResumenStock({ localSeleccionado, listadoListo, refrescar }) 
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localSeleccionado, termino, respondioPara, refrescar]);
+  }, [localSeleccionado, termino, respondioPara, generacion]);
 
   return { estados, cargando, error };
 }

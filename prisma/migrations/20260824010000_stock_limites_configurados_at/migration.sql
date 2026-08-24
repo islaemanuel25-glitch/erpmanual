@@ -5,17 +5,19 @@
 -- rutas creaban la fila con stockMin/stockMax en 0 mientras otras tres la creaban
 -- en null. Abrir la pantalla de stock, sin tocar nada, creaba filas con ceros.
 --
--- Esta columna es un hecho propio y no derivado: la escribe únicamente
--- /api/stock_locales/limites cuando alguien guarda.
+-- Esta columna es un hecho propio y no derivado. La escribe
+-- /api/stock_locales/ajustar con modo "limites", que es la ruta que los dos
+-- modales usan de verdad; /api/stock_locales/limites es una duplicada que hoy no
+-- se consume y se mantiene coherente, pero no es la escritora.
 
 ALTER TABLE "StockLocal" ADD COLUMN "limitesConfiguradosAt" TIMESTAMP(3);
 
 -- ── BACKFILL 1: LO QUE LA AUDITORÍA PUEDE PROBAR ────────────────────────────
 --
--- /api/stock_locales/limites escribe una fila en AuditoriaStock con
--- accion='LIMITES' en sus DOS ramas (crear y actualizar), así que su presencia
--- prueba que alguien pasó por ahí. Se toma la fecha de la auditoría MÁS RECIENTE,
--- que es la del último ajuste.
+-- El guardado de límites escribe una fila en AuditoriaStock con accion='LIMITES'
+-- —tanto la ruta viva, /ajustar con modo "limites", como la duplicada—, así que
+-- su presencia prueba que alguien pasó por ahí. Se toma la fecha de la auditoría
+-- MÁS RECIENTE, que es la del último ajuste.
 --
 -- Esto es lo que rescata el caso que los valores no pueden: una fila en 0/0 CON
 -- auditoría es un cero deliberado y tiene que quedar configurada. En erpazul_dev
@@ -36,7 +38,7 @@ WHERE sl."productoId" = a."productoLocalId";
 
 -- ── BACKFILL 2: LA RED PARA LAS BASES SIN ESA AUDITORÍA ─────────────────────
 --
--- La auditoría es completa para el camino de /limites, pero NINGUNA otra ruta que
+-- La auditoría es completa para el camino del guardado de límites, pero NINGUNA otra ruta que
 -- toca stockMin/stockMax escribe AuditoriaStock —importar, nuevo, import/apply,
 -- sync-productos—. En erpazul_dev todas esas escriben 0 al CREAR la fila, así que
 -- no dejan límites reales sin auditar; pero eso es una propiedad de ESTA base y

@@ -402,7 +402,20 @@ export async function GET(req) {
             modoVentaDeposito: true,
           },
         },
-        stock: { take: 1, select: { cantidad: true, stockMin: true, stockMax: true } },
+        // ── `limitesConfiguradosAt` TAMBIÉN ACÁ, Y FALTABA ─────────────────
+        //
+        // La rama LOCAL ya lo traía y ésta no: `mapStockItemDeposito` lo recibía
+        // `undefined`, así que `limitesConfigurados` daba false para TODO el
+        // depósito. Consecuencia: cada producto del depósito se dibujaba como
+        // "Sin ajustar" aunque tuviera límites, y `faltante` no se disparaba
+        // nunca — la card contaba bien pero la lista mentía.
+        //
+        // No fallaba en ningún lado: un `undefined` en un `!= null` es
+        // exactamente igual de válido que un null.
+        stock: {
+          take: 1,
+          select: { cantidad: true, stockMin: true, stockMax: true, limitesConfiguradosAt: true },
+        },
       };
 
       const orderByDepo = { base: { nombre: "asc" } };
