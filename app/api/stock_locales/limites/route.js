@@ -7,6 +7,11 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import {
+  esConfiguracion,
+  interpretarLimite,
+  valorAGuardar,
+} from "@/lib/stock/limites";
 
 export async function POST(req) {
   try {
@@ -37,10 +42,13 @@ export async function POST(req) {
     const productoLocalId = Number(body.productoLocalId || 0);
     const motivo = (body.motivo || "").trim();
 
-    const nuevoMin =
-      body.nuevoMin !== undefined ? Number(body.nuevoMin) : null;
-    const nuevoMax =
-      body.nuevoMax !== undefined ? Number(body.nuevoMax) : null;
+    // Tres ramas y no dos: no vino / vino vacío / vino un número. Ver
+    // `lib/stock/limites.js` — `Number(null)` y `Number("")` dan 0, y eso
+    // convertía "sacá el límite" en "poné cero".
+    const minPedido = interpretarLimite(body.nuevoMin);
+    const maxPedido = interpretarLimite(body.nuevoMax);
+    const nuevoMin = minPedido.valor;
+    const nuevoMax = maxPedido.valor;
 
     // ======================================================
     // 2) RESOLVER localId REAL
@@ -127,8 +135,18 @@ export async function POST(req) {
           localId,
           productoId: productoLocalId,
           cantidad: 0,
-          stockMin: nuevoMin ?? 0,
-          stockMax: nuevoMax ?? 0,
+          // ── EL 0 SE GUARDA COMO 0, Y EL null COMO null ──────────────────
+          //
+          // Antes acá decía `nuevoMin ?? 0`, así que "no fijé mínimo" y "fijé
+          // mínimo en cero" terminaban escritos igual. Con un 0 que ES un valor
+          // configurado válido, eso borraba la diferencia justo en el endpoint
+          // que existe para configurarla.
+          stockMin: nuevoMin,
+          stockMax: nuevoMax,
+          // Pasar por acá ES configurar, aunque lo que se guarde sea un cero o
+          // incluso un null: alguien abrió Límites y decidió. Ésta es la única
+          // ruta que sella esta marca.
+          limitesConfiguradosAt: new Date(),
         },
       });
 
@@ -141,10 +159,12 @@ export async function POST(req) {
             productoLocalId,
             userId: session.id,
             accion: "LIMITES",
-            stockMinAnterior: 0,
-            stockMinNuevo: Number(registro.stockMin || 0),
-            stockMaxAnterior: 0,
-            stockMaxNuevo: Number(registro.stockMax || 0),
+            // La fila no existía, así que no había límite anterior. `null` dice
+            // eso; un 0 diría "antes valía cero", que es otra cosa.
+            stockMinAnterior: null,
+            stockMinNuevo: registro.stockMin === null ? null : Number(registro.stockMin),
+            stockMaxAnterior: null,
+            stockMaxNuevo: registro.stockMax === null ? null : Number(registro.stockMax),
             motivo: motivo || null,
           },
         }).catch((e) => console.error("Error auditoría stock:", e.message));
@@ -157,8 +177,9 @@ export async function POST(req) {
           localId: registro.localId,
           productoId: registro.productoId,
           cantidad: Number(registro.cantidad || 0),
-          stockMin: Number(registro.stockMin || 0),
-          stockMax: Number(registro.stockMax || 0),
+          stockMin: registro.stockMin === null ? null : Number(registro.stockMin),
+          stockMax: registro.stockMax === null ? null : Number(registro.stockMax),
+          limitesConfigurados: registro.limitesConfiguradosAt !== null,
         },
       });
     }
@@ -166,16 +187,25 @@ export async function POST(req) {
     // ======================================================
     // 5) ACTUALIZAR LÍMITES
     // ======================================================
-    const minAnterior = Number(registro.stockMin || 0);
-    const maxAnterior = Number(registro.stockMax || 0);
+    // El anterior conserva su null: `Number(null || 0)` daba 0 y la auditoría
+    // decía "antes valía cero" sobre un límite que no existía.
+    const minAnterior = registro.stockMin === null ? null : Number(registro.stockMin);
+    const maxAnterior = registro.stockMax === null ? null : Number(registro.stockMax);
 
     const actualizado = await prisma.stockLocal.update({
       where: {
         localId_productoId: { localId, productoId: productoLocalId },
       },
       data: {
-        stockMin: nuevoMin ?? registro.stockMin ?? 0,
-        stockMax: nuevoMax ?? registro.stockMax ?? 0,
+        // Lo que no vino no se toca; lo que vino vacío se borra; lo que vino como
+        // número se guarda, cero incluido.
+        stockMin: valorAGuardar(minPedido, minAnterior),
+        stockMax: valorAGuardar(maxPedido, maxAnterior),
+        // Se sella solo si el guardado pidió cambiar algo. Un PUT que no trae
+        // ninguno de los dos campos no configuró nada y no debe marcar la fila.
+        ...(esConfiguracion(minPedido, maxPedido)
+          ? { limitesConfiguradosAt: new Date() }
+          : {}),
       },
     });
 
@@ -189,9 +219,9 @@ export async function POST(req) {
           userId: session.id,
           accion: "LIMITES",
           stockMinAnterior: minAnterior,
-          stockMinNuevo: Number(actualizado.stockMin || 0),
+          stockMinNuevo: actualizado.stockMin === null ? null : Number(actualizado.stockMin),
           stockMaxAnterior: maxAnterior,
-          stockMaxNuevo: Number(actualizado.stockMax || 0),
+          stockMaxNuevo: actualizado.stockMax === null ? null : Number(actualizado.stockMax),
           motivo: motivo || null,
         },
       }).catch((e) => console.error("Error auditoría stock:", e.message));
@@ -204,8 +234,9 @@ export async function POST(req) {
         localId: actualizado.localId,
         productoId: actualizado.productoId,
         cantidad: Number(actualizado.cantidad || 0),
-        stockMin: Number(actualizado.stockMin || 0),
-        stockMax: Number(actualizado.stockMax || 0),
+        stockMin: actualizado.stockMin === null ? null : Number(actualizado.stockMin),
+        stockMax: actualizado.stockMax === null ? null : Number(actualizado.stockMax),
+        limitesConfigurados: actualizado.limitesConfiguradosAt !== null,
       },
     });
   } catch (err) {

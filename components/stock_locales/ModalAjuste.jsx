@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X } from "lucide-react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
 import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
 
@@ -88,24 +89,37 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
     }
   };
 
+  // El modal lo arma el kit. Ver el comentario de `ModalLimites`: acá había el
+  // mismo `fixed inset-0` a mano, con su velo y su encabezado propios.
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="sunmi-card relative w-full max-w-md">
+    <SunmiModalLayout
+      open={open}
+      title="Ajustar stock"
+      onClose={() => onClose(false)}
+      maxWidth="max-w-md"
+      // Ver el comentario de `ModalLimites`: los dos primeros no tienen default
+      // a propósito, y `destructivo` conserva que tocar afuera NO cierre, que es
+      // lo que hacía la capa a mano. Acá lo que se pierde es la cantidad
+      // escrita y su motivo.
+      espacioCuerpo="mt-2 gap-3"
+      z={9999}
+      destructivo
+      footer={
+        <SunmiButton color="amber" className="w-full" onClick={guardar}>
+          Guardar ajuste
+        </SunmiButton>
+      }
+    >
+      <div>
+        <div>
 
-        {/* HEADER */}
-        <div className="sunmi-header-accent flex items-center justify-between">
-          <span>Ajustar stock</span>
-          <button className="opacity-80 hover:opacity-100" onClick={() => onClose(false)}>
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="mt-4">
-
-          <p className="text-[14px] font-medium sunmi-text-strong">
+          {/* El nombre volvió al cuerpo: `SunmiModalLayout` declara `subtitle`
+              pero no lo dibuja, así que pasarlo por ahí perdía de vista QUÉ
+              producto se está ajustando. Se vio en la captura. */}
+          <p className="text-sm2 font-medium sunmi-text-strong">
             {producto.nombre}
           </p>
-          <p className="text-[12px] sunmi-text-muted mt-0.5">
+          <p className="text-xs sunmi-text-muted">
             {local.nombre}
           </p>
 
@@ -291,15 +305,9 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
             />
           </div>
 
-          {/* Botón guardar */}
-          <button
-            className="sunmi-btn sunmi-btn-primary w-full mt-5 py-2 text-[13px] font-bold"
-            onClick={guardar}
-          >
-            Guardar ajuste
-          </button>
+          {/* El botón de guardar se fue al `footer` del layout. */}
         </div>
       </div>
-    </div>
+    </SunmiModalLayout>
   );
 }

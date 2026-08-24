@@ -26,6 +26,10 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
     if (filtro.sinStock) params.set("sinStock", "true");
     if (filtro.faltantes) params.set("faltantes", "true");
     if (filtro.negativo) params.set("negativo", "true");
+    // El estado que viene de tocar una card de "Estado del stock". El servidor
+    // lo valida contra la lista del dominio: si llega cualquier otra cosa, lo
+    // ignora en vez de devolver una lista vacía sin explicación.
+    if (filtro.estado) params.set("estado", filtro.estado);
 
     return params.toString();
   };

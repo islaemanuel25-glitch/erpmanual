@@ -5,6 +5,11 @@ import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { mapStockItemLocal, mapStockItemDeposito } from "@/lib/stock/mapItem";
+import {
+  condicionesPrisma,
+  condicionesSql,
+  esEstadoValido,
+} from "@/lib/stock/estadosDeStock";
 
 const PAGE_SIZE = 25;
 
@@ -87,6 +92,11 @@ export async function GET(req) {
     const sinStock = searchParams.get("sinStock") === "true";
     const faltantes = searchParams.get("faltantes") === "true";
     const negativo = searchParams.get("negativo") === "true";
+    // El estado que viene de tocar una card. Se valida contra la lista del
+    // dominio: cualquier otra cosa se ignora en vez de filtrar por un id
+    // inventado, que devolvería una lista vacía sin decir por qué.
+    const estadoCrudo = searchParams.get("estado");
+    const estadoCard = esEstadoValido(estadoCrudo) ? estadoCrudo : null;
 
     const local = await prisma.local.findUnique({
       where: { id: localId },
@@ -133,6 +143,37 @@ export async function GET(req) {
         });
       if (negativo) estadoStockClauses.push({ stock: { some: { cantidad: { lt: 0 } } } });
 
+      // ── EL FILTRO DE LAS CARDS, CON LA MISMA CONDICIÓN QUE EL CONTEO ─────
+      //
+      // Sale de `lib/stock/estadosDeStock.js`, que es de donde la toma
+      // `/api/stock_locales/resumen`. Escribirla acá de nuevo dejaría que el
+      // número de la card y el total del listado se separaran sin que nada
+      // fallara.
+      //
+      // Dos de los cuatro comparan columna contra columna —`cantidad <
+      // stockMin`— y el `where` de Prisma no lo expresa, así que esos resuelven
+      // sus ids por SQL y entran como un `IN`. El conjunto es chico por
+      // definición: los productos bajo mínimo o sobre máximo son la excepción.
+      // Los otros dos entran directo en la consulta paginada.
+      if (estadoCard) {
+        const receta = condicionesPrisma()[estadoCard];
+        if (receta?.prisma) {
+          estadoStockClauses.push(receta.prisma);
+        } else {
+          const cond = condicionesSql("sl")[estadoCard];
+          const filas = await prisma.$queryRawUnsafe(
+            `SELECT sl."productoId" AS id
+               FROM "StockLocal" sl
+              WHERE sl."localId" = $1 AND ${cond}`,
+            localId
+          );
+          const ids = filas.map((f) => Number(f.id));
+          // Sin coincidencias, `in: []` deja el listado vacío — que es lo
+          // correcto y no "sin filtro".
+          estadoStockClauses.push({ id: { in: ids } });
+        }
+      }
+
       // WHERE único, compartido por count(), findMany paginado y camino hybrid.
       const whereLocal = {
         localId,
@@ -169,7 +210,9 @@ export async function GET(req) {
         },
         stock: {
           take: 1,
-          select: { cantidad: true, stockMin: true, stockMax: true },
+          // `limitesConfiguradosAt` viaja porque `mapItem` lo necesita para poder
+          // decir `limitesConfigurados` sin adivinarlo desde los valores.
+          select: { cantidad: true, stockMin: true, stockMax: true, limitesConfiguradosAt: true },
         },
       };
 
@@ -268,7 +311,12 @@ export async function GET(req) {
         });
         if (nuevos.length) {
           await prisma.stockLocal.createMany({
-            data: nuevos.map((pl) => ({ localId, productoId: pl.id, cantidad: 0, stockMin: 0, stockMax: 0 })),
+            // stockMin/stockMax en NULL y no en 0: esta fila la está creando el
+            // listado al abrirse, no un encargado configurando límites. Con 0,
+            // "nunca configurado" y "ajustado en cero" quedaban idénticos — y
+            // como acá se crean filas por el solo hecho de MIRAR la pantalla,
+            // ésta era la vía que más contaminaba el dato.
+            data: nuevos.map((pl) => ({ localId, productoId: pl.id, cantidad: 0, stockMin: null, stockMax: null })),
             skipDuplicates: true,
           });
         }
@@ -298,6 +346,25 @@ export async function GET(req) {
           OR: [{ stock: { none: {} } }, { stock: { some: { cantidad: 0 } } }],
         });
       if (negativo) estadoStockClausesDepo.push({ stock: { some: { cantidad: { lt: 0 } } } });
+
+      // El mismo filtro de cards que la rama LOCAL, con la misma condición del
+      // dominio. Se repite la llamada, no la regla: si esto se escribiera a mano
+      // acá, depósito y local podrían empezar a contestar distinto.
+      if (estadoCard) {
+        const recetaDepo = condicionesPrisma()[estadoCard];
+        if (recetaDepo?.prisma) {
+          estadoStockClausesDepo.push(recetaDepo.prisma);
+        } else {
+          const condDepo = condicionesSql("sl")[estadoCard];
+          const filasDepo = await prisma.$queryRawUnsafe(
+            `SELECT sl."productoId" AS id
+               FROM "StockLocal" sl
+              WHERE sl."localId" = $1 AND ${condDepo}`,
+            localId
+          );
+          estadoStockClausesDepo.push({ id: { in: filasDepo.map((f) => Number(f.id)) } });
+        }
+      }
 
       const whereDepo = {
         localId,

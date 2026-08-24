@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X } from "lucide-react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
 import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
 
@@ -18,15 +19,28 @@ export default function ModalLimites({ open, onClose, producto, local }) {
 
   useEffect(() => {
     if (open && producto) {
+      // ── UN 0 CONFIGURADO SE DIBUJA COMO 0, NO COMO VACÍO ────────────────
+      //
+      // Acá decía `producto.stockMin || ""`, y con un límite en 0 eso daba
+      // cadena vacía: el input se abría en blanco. Y como vacío ahora significa
+      // "borrá el límite", abrir Límites y guardar sin tocar nada BORRABA un
+      // cero puesto a propósito.
+      //
+      // Es la misma confusión que la tanda vino a cerrar, del lado de la
+      // pantalla: `|| ""` no distingue el 0 del null porque los dos son falsy.
+      const aTexto = (v) => (v === null || v === undefined ? "" : String(v));
+
       if (usarBultos) {
         // Mostrar en bultos: convertir unidades → bultos
-        const minUds = Number(producto.stockMin || 0);
-        const maxUds = Number(producto.stockMax || 0);
-        setMinimo(minUds ? fromUnidades({ unidades: minUds, factorPack }).bultos : "");
-        setMaximo(maxUds ? fromUnidades({ unidades: maxUds, factorPack }).bultos : "");
+        const minUds = producto.stockMin === null || producto.stockMin === undefined
+          ? null : Number(producto.stockMin);
+        const maxUds = producto.stockMax === null || producto.stockMax === undefined
+          ? null : Number(producto.stockMax);
+        setMinimo(minUds === null ? "" : String(fromUnidades({ unidades: minUds, factorPack }).bultos));
+        setMaximo(maxUds === null ? "" : String(fromUnidades({ unidades: maxUds, factorPack }).bultos));
       } else {
-        setMinimo(producto.stockMin || "");
-        setMaximo(producto.stockMax || "");
+        setMinimo(aTexto(producto.stockMin));
+        setMaximo(aTexto(producto.stockMax));
       }
       // Autofocus y seleccionar al abrir
       setTimeout(() => {
@@ -77,25 +91,53 @@ export default function ModalLimites({ open, onClose, producto, local }) {
     }
   };
 
+  // ── EL MODAL LO ARMA EL KIT, NO ESTE ARCHIVO ────────────────────────────
+  //
+  // Acá había un `fixed inset-0 bg-black/50` a mano: su propio velo, su propia
+  // capa, su propio encabezado y su propio botón de cerrar. Eso significa que en
+  // un celular no traía nada de lo que `SunmiModalLayout` ya resuelve —cierre con
+  // Escape, foco atrapado, alto máximo, comportamiento del velo— y que cualquier
+  // cambio del kit no lo alcanzaba.
+  //
+  // El título y el subtítulo pasan a ser props: los dibuja el layout.
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="sunmi-card relative w-full max-w-md">
-
-        {/* HEADER */}
-        <div className="sunmi-header-accent flex items-center justify-between">
-          <span>Límites de stock</span>
-          <button className="opacity-80 hover:opacity-100" onClick={() => onClose(false)}>
-            <X size={18} />
-          </button>
+    <SunmiModalLayout
+      open={open}
+      title="Límites de stock"
+      onClose={() => onClose(false)}
+      maxWidth="max-w-md"
+      // ── LOS TRES QUE EL KIT NO ADIVINA ──────────────────────────────────
+      //
+      // `espacioCuerpo` y `z` no tienen default a propósito: el kit obliga a
+      // declararlos para que ningún modal nazca con un espaciado o una capa que
+      // nadie decidió. Hay un candado que lo exige.
+      //
+      // `destructivo` es "no cerrar al tocar el velo", y acá CONSERVA el
+      // comportamiento anterior: la capa hecha a mano no tenía `onClick`, así
+      // que tocar afuera nunca cerró. Sin declararlo, migrar al kit habría
+      // cambiado el comportamiento en vez de conservarlo — y lo que se pierde es
+      // un formulario con los dos límites escritos.
+      espacioCuerpo="mt-2 gap-3"
+      z={9999}
+      destructivo
+      footer={
+        <SunmiButton color="amber" className="w-full" onClick={guardar}>
+          Guardar límites
+        </SunmiButton>
+      }
+    >
+      <div>
+        {/* ── EL PRODUCTO VA EN EL CUERPO, NO EN `subtitle` ─────────────────
+            `SunmiModalLayout` DECLARA la prop `subtitle` y no la dibuja: se
+            acepta y se descarta. Se vio en la captura, no leyendo el código — el
+            modal salía diciendo "Límites de stock" sin decir de qué producto.
+            El modal a mano sí lo mostraba, así que pasarlo por ahí habría sido
+            perder información al migrar. */}
+        <div>
+          <p className="text-sm2 font-medium sunmi-text-strong">{producto.nombre}</p>
+          <p className="text-xs sunmi-text-muted">{local.nombre}</p>
         </div>
-
-        <div className="mt-4">
-          <p className="text-[14px] font-medium sunmi-text-strong">
-            {producto.nombre}
-          </p>
-          <p className="text-[12px] sunmi-text-muted mt-0.5">
-            {local.nombre}
-          </p>
+        <div>
 
           {/* Inputs */}
           <div className="flex flex-col gap-3 mt-4">
@@ -154,15 +196,10 @@ export default function ModalLimites({ open, onClose, producto, local }) {
             </div>
           </div>
 
-          {/* Botón guardar */}
-          <button
-            className="sunmi-btn sunmi-btn-primary w-full mt-5 py-2 text-[13px] font-bold"
-            onClick={guardar}
-          >
-            Guardar límites
-          </button>
+          {/* El botón de guardar se fue al `footer` del layout: así queda fijo
+              abajo cuando el contenido scrollea, que en un celular importa. */}
         </div>
       </div>
-    </div>
+    </SunmiModalLayout>
   );
 }

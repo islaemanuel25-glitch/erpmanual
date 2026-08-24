@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { fromUnidades, kgToPiezas } from "@/lib/conversiones/stock";
 import { useStockData } from "@/hooks/useStockData";
 import { useColumnasVisibles } from "@/hooks/useColumnasVisibles";
 import ColumnPicker from "@/components/stock_locales/ColumnPicker";
+import TarjetaStockMovil from "@/components/stock_locales/TarjetaStockMovil";
+import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import {
   formatCantidad,
   esPackDeposito,
@@ -25,6 +28,18 @@ export default function TablaStock({
   setRefrescar,
   onAjustar,
   onEditarLimites,
+  // Mapa id → nombre del proveedor. Lo arma la pantalla con el catálogo que ya
+  // carga para el filtro: el listado devuelve `proveedorId` y no el nombre, y
+  // sumarle un join a un endpoint que también sirve al escritorio sería un
+  // cambio de alcance por un renglón de texto.
+  proveedoresPorId = null,
+  // La tabla ya decidía si mostrar las acciones; la tarjeta usa la misma
+  // decisión en vez de tomar una propia.
+  puedeAjustar = true,
+  // Le avisa a la pantalla cuándo terminó la PRIMERA carga del listado y para
+  // qué ubicación. De eso cuelga que los contadores no salgan a competir con
+  // esta consulta: ver `hooks/useResumenStock.js`.
+  onPrimeraCarga = null,
 }) {
   // Datos del listado (fetch/estado extraído a hook).
   const { items, total, totalPages, loading, error } = useStockData({
@@ -34,6 +49,36 @@ export default function TablaStock({
     refrescar,
     setRefrescar,
   });
+
+  // ── EL AVISO SALE CUANDO UNA CARGA TERMINÓ, NO CUANDO NO HAY NINGUNA ────
+  //
+  // La primera versión de esto miraba `!loading` a secas, y se abría sola en el
+  // primer render: `useStockData` pone `loading` en true DENTRO de su función
+  // async, así que entre que el efecto corre y el fetch arranca hay un instante
+  // en que `loading` todavía es false y no empezó nada.
+  //
+  // Medido en la pantalla real: el resumen salía a los 2.777 ms y el listado
+  // recién terminaba a los 4.294 — 1.517 ms compitiendo, o sea exactamente lo
+  // que la puerta existe para evitar. La sonda lo agarró; leyendo el código
+  // parecía correcto.
+  //
+  // Ahora hacen falta las DOS cosas: que haya empezado una carga y que haya
+  // terminado. `error` sin `loading` es un final tan válido como los items: si
+  // solo se avisara del éxito, un listado que falla dejaría las cards cargando
+  // para siempre.
+  const avisadoRef = useRef(null);
+  const arrancoRef = useRef(false);
+  useEffect(() => {
+    if (loading) arrancoRef.current = true;
+  }, [loading]);
+  useEffect(() => {
+    if (!localSeleccionado || loading || !arrancoRef.current) return;
+    const clave = `${localSeleccionado}`;
+    if (avisadoRef.current === clave) return;
+    avisadoRef.current = clave;
+    onPrimeraCarga?.({ ok: !error, localId: Number(localSeleccionado) || null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSeleccionado, loading, error]);
 
   // Columnas visibles (estado + localStorage extraído a hook).
   const { isVisible, toggleCol, visibleCount, COLUMN_DEFS } = useColumnasVisibles();
@@ -97,15 +142,38 @@ export default function TablaStock({
 
   return (
     <div>
-      {/* Barra superior: columnas */}
-      <ColumnPicker columnDefs={COLUMN_DEFS} isVisible={isVisible} toggleCol={toggleCol} />
+      {/* El selector de columnas es de la TABLA, así que se esconde con ella: en
+          el celular no hay columnas que elegir. */}
+      <div className="hidden md:block">
+        <ColumnPicker columnDefs={COLUMN_DEFS} isVisible={isVisible} toggleCol={toggleCol} />
+      </div>
 
       {loading && (
-        <p className="sunmi-text-muted text-[13px] mb-3">Cargando stock...</p>
+        <p className="sunmi-text-muted text-sm2 mb-3">Cargando stock...</p>
       )}
-      {error && <p className="sunmi-text-danger text-[13px] mb-3">{error}</p>}
+      {error && <p className="sunmi-text-danger text-sm2 mb-3">{error}</p>}
 
-      <div className="overflow-x-auto rounded-xl border sunmi-border">
+      {/* ── CELULAR: TARJETAS DE VERDAD, NO LA TABLA CON SCROLL ─────────────
+          La tabla vive dentro de un `overflow-x-auto`, así que en un teléfono se
+          arrastraba de costado para leer una fila. El encargo pide una vista
+          móvil real, y es la mitad del sentido de esta tanda. */}
+      <div className="md:hidden flex flex-col gap-2">
+        {items.map((p) => (
+          <TarjetaStockMovil
+            key={p.id}
+            item={p}
+            proveedorNombre={proveedoresPorId?.[p.proveedorId] ?? null}
+            onAjustar={onAjustar}
+            onLimites={onEditarLimites}
+            puedeAjustar={puedeAjustar}
+          />
+        ))}
+        {!loading && items.length === 0 && (
+          <p className="sunmi-text-muted text-sm2 py-4">No hay productos con estos filtros.</p>
+        )}
+      </div>
+
+      <div className="hidden md:block overflow-x-auto rounded-xl border sunmi-border">
         <table className="min-w-full text-[12px] sunmi-table">
           <thead className="sunmi-thead">
             <tr>
@@ -222,32 +290,18 @@ export default function TablaStock({
       </div>
 
       {/* PAGINACIÓN */}
-      <div className="flex items-center justify-between mt-4 text-[12px] sunmi-text-muted">
-        <div>
-          Total: <strong className="sunmi-text-strong">{total}</strong> productos
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            className="sunmi-btn sunmi-control disabled:opacity-40 px-3 py-1"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-          >
-            ◀
-          </button>
-
-          <span className="sunmi-text-strong">
-            Página {page} de {totalPages}
-          </span>
-
-          <button
-            className="sunmi-btn sunmi-control disabled:opacity-40 px-3 py-1"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-          >
-            ▶
-          </button>
-        </div>
+      {/* El paginador del kit reemplaza a los dos botones a mano: trae el "ir a
+          página", los tamaños y el conteo, y se ve igual que en el resto del
+          ERP. Sirve a las dos vistas, así que va fuera del par móvil/escritorio. */}
+      <div className="mt-4">
+        <SunmiPaginador
+          page={page}
+          totalPages={totalPages}
+          totalItems={total}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+          onGoToPage={(n) => setPage(Math.min(Math.max(1, Number(n) || 1), totalPages))}
+        />
       </div>
     </div>
   );

@@ -198,8 +198,10 @@ export async function POST(req) {
             localId: l.localId,
             productoId: pl.id,
             cantidad: 0,     // 🟢 stock inicial
-            stockMin: 0,
-            stockMax: 0,
+            // NULL: alta de la fila, no configuración de límites. Ver
+            // `limitesConfiguradosAt` en el esquema.
+            stockMin: null,
+            stockMax: null,
           },
         });
       }

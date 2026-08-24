@@ -618,6 +618,14 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/compras-proveedor/ModalVincularCodigo.jsx": true,
     "components/listas-precios/ModalListaPrecio.jsx": true,
     "components/caja/ModalCambioPrevio.jsx": true,
+    // Stock: los dos son formularios cortos pero se pierde lo escrito —la
+    // cantidad y su motivo en uno, los dos límites en el otro—. Y hay un motivo
+    // extra que no es de criterio sino de CONSERVAR: los dos estaban armados a
+    // mano con un `fixed inset-0` SIN `onClick` en la capa, así que tocar afuera
+    // nunca cerró. Migrarlos al kit sin declarar esto habría cambiado el
+    // comportamiento en vez de conservarlo.
+    "components/stock_locales/ModalAjuste.jsx": true,
+    "components/stock_locales/ModalLimites.jsx": true,
     // Alta y edición de grupo: nombre escrito más los locales y depósitos que se
     // fueron agregando. Cerrar sin querer tira todo eso.
     "components/grupos/ModalGrupo.jsx": true,

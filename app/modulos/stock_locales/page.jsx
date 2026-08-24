@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import CarruselControles from "@/components/productos/CarruselControles";
+import { useResumenStock } from "@/hooks/useResumenStock";
 import FiltrosStock from "@/components/stock_locales/FiltrosStock";
 import TablaStock from "@/components/stock_locales/TablaStock";
 import ModalAjuste from "@/components/stock_locales/ModalAjuste";
@@ -20,13 +22,68 @@ export default function StockLocalesPage() {
   const [filtro, setFiltro] = useState({});
   const [page, setPage] = useState(1);
 
+  // ── LA CARD ACTIVA VIVE EN EL FILTRO, NO AL LADO ─────────────────────────
+  //
+  // Se guarda dentro de `filtro` y no en un estado paralelo para que no puedan
+  // desincronizarse: el listado lee `filtro`, así que si la card viviera aparte
+  // habría dos verdades sobre qué se está mostrando.
+  const estadoActivo = filtro.estado || null;
+
+  const alTocarCard = (id) => {
+    setPage(1);
+    setFiltro((prev) => {
+      // Tocar la card activa la apaga. Solo una puede estar prendida.
+      if (prev.estado === id) {
+        const { estado, ...resto } = prev;
+        return resto;
+      }
+      return { ...prev, estado: id };
+    });
+  };
+
+  // Nombre del proveedor por id: el listado devuelve `proveedorId` y la tarjeta
+  // móvil muestra el nombre. Se arma con el MISMO catálogo que el filtro ya
+  // consulta, sin pedirle nada nuevo al servidor.
+  const [proveedoresPorId, setProveedoresPorId] = useState({});
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/catalogos/proveedores", { credentials: "include" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!vivo) return;
+        const lista = j?.items || j?.proveedores || [];
+        const mapa = {};
+        for (const p of lista) mapa[p.id] = p.nombre;
+        setProveedoresPorId(mapa);
+      })
+      .catch(() => {});
+    return () => (vivo = false);
+  }, []);
+
+  // Lo que el listado le informa a los contadores: cuándo terminó su primera
+  // carga y para qué ubicación. Es la puerta de `ordenDeCargaProductos`.
+  const [listadoListo, setListadoListo] = useState(null);
+
+  // Se declara ACÁ y no más abajo porque el resumen depende de él: después de
+  // ajustar o de tocar límites los conteos cambiaron y hay que volver a pedirlos.
+  const [refrescar, setRefrescar] = useState(false);
+
+  const localSeleccionadoParaResumen = contexto?.localId || null;
+  const {
+    estados,
+    cargando: cargandoResumen,
+    error: errorResumen,
+  } = useResumenStock({
+    localSeleccionado: localSeleccionadoParaResumen,
+    listadoListo,
+    refrescar,
+  });
+
   const [openAjuste, setOpenAjuste] = useState(false);
   const [productoAjuste, setProductoAjuste] = useState(null);
 
   const [openLimites, setOpenLimites] = useState(false);
   const [productoLimites, setProductoLimites] = useState(null);
-
-  const [refrescar, setRefrescar] = useState(false);
 
   const abrirAjuste = (producto) => {
     setProductoAjuste(producto);
@@ -71,6 +128,23 @@ export default function StockLocalesPage() {
           label={`Stock${localActual.nombre ? ` — ${localActual.nombre}` : ""}`}
         />
 
+        {/* ── ESTADO DEL STOCK: VA ARRIBA DEL BUSCADOR ────────────────────
+            Es el orden del diseño aprobado. Las cards filtran el listado y no
+            tocan datos: son controles de revisión, y por eso se superponen
+            entre sí en vez de repartir el catálogo. */}
+        <CarruselControles
+          titulo="Estado del stock"
+          controles={estados}
+          activo={estadoActivo}
+          onSelect={alTocarCard}
+          cargando={cargandoResumen}
+        />
+        {errorResumen && (
+          <p className="text-xs sunmi-text-danger" role="status">
+            {errorResumen}
+          </p>
+        )}
+
         {/* FILTROS compactos */}
         <FiltrosStock
           compact
@@ -93,6 +167,8 @@ export default function StockLocalesPage() {
           setRefrescar={setRefrescar}
           onAjustar={abrirAjuste}
           onEditarLimites={abrirLimites}
+          proveedoresPorId={proveedoresPorId}
+          onPrimeraCarga={setListadoListo}
         />
 
       </SunmiCard>

@@ -153,8 +153,10 @@ export async function POST(req) {
       localId: pl.localId,
       productoId: pl.id,
       cantidad: 0,     // 🚨 depósito = 0 bultos, local = 0 unidades
-      stockMin: 0,
-      stockMax: 0,
+      // NULL: la importación crea la fila, no configura límites. Ver
+      // `limitesConfiguradosAt` en el esquema.
+      stockMin: null,
+      stockMax: null,
     }));
 
     await prisma.stockLocal.createMany({
