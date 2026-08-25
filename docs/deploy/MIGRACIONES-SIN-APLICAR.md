@@ -16,8 +16,68 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción está al día: 101 migraciones en el árbol y 101 aplicadas,
-comprobado con `prisma migrate status` el 2026-08-23 después de desplegar
+### `20260824010000_stock_limites_configurados_at` — SIN APLICAR EN PRODUCCIÓN
+
+La introduce el **PR #11** (`feat/stock-movil-estado-del-stock`), la experiencia
+móvil de Stock por local y su resumen de estados.
+
+**Dónde está aplicada y dónde no:**
+
+- aplicada **únicamente en `erpazul_dev`**;
+- **NO aplicada en producción.** Producción sigue en
+  `03e41244a751842210e17c6ae6a5093a022fe52f`, con **101 migraciones aplicadas**;
+- después del merge del PR #11, el **árbol tiene 102**. Ese desnivel —102 en el
+  árbol contra 101 en producción— es lo que el próximo despliegue tiene que
+  cerrar, y es exactamente lo que el conteo del contenedor descartable compara.
+
+**Qué hace, y por qué se puede desplegar por el flujo normal:**
+
+Es **aditiva**. Agrega `limitesConfiguradosAt` a `StockLocal` como columna
+**nullable y sin default**, así que la versión anterior del código sigue
+funcionando sobre el esquema nuevo durante toda la ventana entre migrar y
+recrear: no la lee y no la necesita.
+
+Además hace dos cosas que conviene tener presentes antes de correrla:
+
+- **ejecuta un backfill**, en dos pasadas: primero desde `AuditoriaStock` con
+  `accion = 'LIMITES'` —tomando la fecha de la auditoría más reciente por
+  producto—, y después una red que marca las filas con `stockMin` o `stockMax`
+  mayores que cero aunque no tengan auditoría. La segunda no tiene filas que la
+  ejerzan en `erpazul_dev` y sí puede tenerlas en otra base;
+- **crea el índice parcial** `StockLocal_localId_limitesSinAjustar_idx` sobre
+  `("localId") WHERE "limitesConfiguradosAt" IS NULL`. No lo usa la consulta del
+  resumen —ahí el planificador elige `Seq Scan`, que a este tamaño es correcto—
+  pero **sí lo usa el filtro del listado**, comprobado con `EXPLAIN` y con
+  `idx_scan` en `pg_stat_user_indexes`.
+
+**Qué necesita el próximo despliegue, y no se saltea:**
+
+1. **backup validado** con los cuatro chequeos —esta migración toca datos, así
+   que el backup no es formalidad—;
+2. **clasificación de la migración** con `node scripts/clasificar-migraciones.mjs --vps`,
+   con la base tomada de la imagen que atiende;
+3. **`migrate deploy`** en un contenedor descartable de la imagen NUEVA, y
+   comparar el CONTEO que informa —tiene que decir **102**, no 101— contra el del
+   árbol. Un "No pending migrations to apply" con 101 significa que la imagen no
+   conoce esta migración, no que esté aplicada;
+4. **verificación posterior de los cuatro casos del backfill**, contra la base y
+   en solo lectura: `0/0` con auditoría queda **configurado**; valor positivo sin
+   auditoría queda **configurado**; `0/0` sin auditoría queda **sin configurar**;
+   `null/null` sin auditoría queda **sin configurar**. En `erpazul_dev` dieron 1,
+   0, 125 y 3.820 sobre 4.008 filas.
+
+**No borrar esta entrada hasta que producción confirme la migración aplicada** —
+o sea, hasta que `prisma migrate status` contra producción informe 102 y
+"Database schema is up to date!". Este archivo es una lista viva y su único
+trabajo es contestar qué falta.
+
+---
+
+### Estado de producción al momento de escribir esto
+
+Producción está al día **con lo que tiene desplegado**: 101 migraciones en el
+árbol de ese commit y 101 aplicadas, comprobado con `prisma migrate status` el
+2026-08-23 después de desplegar
 `03e41244a751842210e17c6ae6a5093a022fe52f` — la coordinación de carga de
 Productos (el listado primero, los contadores de "Para revisar" después) más la
 corrección de la sonda que la vigila. **Solo código.**
