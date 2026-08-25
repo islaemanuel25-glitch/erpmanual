@@ -16,71 +16,60 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260824010000_stock_limites_configurados_at` — SIN APLICAR EN PRODUCCIÓN
+**Ninguna.** Producción está al día: **102 migraciones en el árbol y 102
+aplicadas**, comprobado con `prisma migrate status` el 2026-08-25 después de
+desplegar `1e1ad11fe8d60f2d2d667d1089b3231b942a930b` — la experiencia móvil de
+Stock por local y su resumen de estados, con la migración
+`20260824010000_stock_limites_configurados_at` **aplicada**.
 
-La introduce el **PR #11** (`feat/stock-movil-estado-del-stock`), la experiencia
-móvil de Stock por local y su resumen de estados.
+La entrada de esa migración se borra acá porque se cumplió la condición que ella
+misma fijaba: `migrate status` contra producción informa 102 y "Database schema
+is up to date!".
 
-**Dónde está aplicada y dónde no:**
+### Lo que dejó el backfill, medido y no supuesto
 
-- aplicada **únicamente en `erpazul_dev`**;
-- **NO aplicada en producción.** Producción sigue en
-  `03e41244a751842210e17c6ae6a5093a022fe52f`, con **101 migraciones aplicadas**;
-- después del merge del PR #11, el **árbol tiene 102**. Ese desnivel —102 en el
-  árbol contra 101 en producción— es lo que el próximo despliegue tiene que
-  cerrar, y es exactamente lo que el conteo del contenedor descartable compara.
+Fue una migración de DATOS, así que se comprobó contra la base **antes y después**
+y se cruzaron los **ids**, no los totales. Sobre 11.647 filas de `StockLocal`:
 
-**Qué hace, y por qué se puede desplegar por el flujo normal:**
+- `0/0` **con** auditoría → configurado: esperadas 5, quedaron 5, ninguna mal;
+- valor positivo **sin** auditoría → configurado: esperadas 0, quedaron 0. **Esa
+  segunda pasada del backfill no tuvo ni una fila que ejercerla**, igual que en
+  desarrollo. No es un problema, pero significa que ese caso se verificó como
+  "cero y sigue cero", no como una comprobación positiva;
+- `0/0` **sin** auditoría → sin configurar: esperadas 56, quedaron 56;
+- `null/null` **sin** auditoría → sin configurar: esperadas 9.068, quedaron 9.068.
 
-Es **aditiva**. Agrega `limitesConfiguradosAt` a `StockLocal` como columna
-**nullable y sin default**, así que la versión anterior del código sigue
-funcionando sobre el esquema nuevo durante toda la ventana entre migrar y
-recrear: no la lee y no la necesita.
+**El cruce de ids cerró por los dos lados**: 2.523 filas esperadas configuradas y
+2.523 configuradas, con **cero** de la lista sin tocar y **cero** tocadas fuera de
+la lista. Un conteo global que coincide puede tapar unas de más y otras de menos;
+esto no.
 
-Además hace dos cosas que conviene tener presentes antes de correrla:
+Un desnivel que conviene conocer para que no se lea mal más adelante: hay **2.524**
+`productoLocalId` con auditoría de LIMITES y **2.523** filas configuradas. Es un
+producto auditado cuya fila de `StockLocal` ya no existe, no una fila que el
+backfill se haya salteado. El mismo desnivel de uno estaba en desarrollo.
 
-- **ejecuta un backfill**, en dos pasadas: primero desde `AuditoriaStock` con
-  `accion = 'LIMITES'` —tomando la fecha de la auditoría más reciente por
-  producto—, y después una red que marca las filas con `stockMin` o `stockMax`
-  mayores que cero aunque no tengan auditoría. La segunda no tiene filas que la
-  ejerzan en `erpazul_dev` y sí puede tenerlas en otra base;
-- **crea el índice parcial** `StockLocal_localId_limitesSinAjustar_idx` sobre
-  `("localId") WHERE "limitesConfiguradosAt" IS NULL`. No lo usa la consulta del
-  resumen —ahí el planificador elige `Seq Scan`, que a este tamaño es correcto—
-  pero **sí lo usa el filtro del listado**, comprobado con `EXPLAIN` y con
-  `idx_scan` en `pg_stat_user_indexes`.
+El índice parcial `StockLocal_localId_limitesSinAjustar_idx` quedó creado y la
+columna es nullable, comprobado contra `pg_indexes` e `information_schema`.
 
-**Qué necesita el próximo despliegue, y no se saltea:**
+Corte de **4 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` healthy y **no recreado**, logs sin errores, `/login` en
+200 y el árbol del VPS limpio.
 
-1. **backup validado** con los cuatro chequeos —esta migración toca datos, así
-   que el backup no es formalidad—;
-2. **clasificación de la migración** con `node scripts/clasificar-migraciones.mjs --vps`,
-   con la base tomada de la imagen que atiende;
-3. **`migrate deploy`** en un contenedor descartable de la imagen NUEVA, y
-   comparar el CONTEO que informa —tiene que decir **102**, no 101— contra el del
-   árbol. Un "No pending migrations to apply" con 101 significa que la imagen no
-   conoce esta migración, no que esté aplicada;
-4. **verificación posterior de los cuatro casos del backfill**, contra la base y
-   en solo lectura: `0/0` con auditoría queda **configurado**; valor positivo sin
-   auditoría queda **configurado**; `0/0` sin auditoría queda **sin configurar**;
-   `null/null` sin auditoría queda **sin configurar**. En `erpazul_dev` dieron 1,
-   0, 125 y 3.820 sobre 4.008 filas.
-
-**No borrar esta entrada hasta que producción confirme la migración aplicada** —
-o sea, hasta que `prisma migrate status` contra producción informe 102 y
-"Database schema is up to date!". Este archivo es una lista viva y su único
-trabajo es contestar qué falta.
+**El backup previo lleva su quinto chequeo**, que en una migración de datos no es
+opcional: se comprobó que el dump contiene las 11.647 filas de `StockLocal` con
+sus `stockMin`/`stockMax` viejos, las 5 filas del caso que solo la auditoría
+rescata, y 3.112 filas de `AuditoriaStock` con `LIMITES`. Está en
+`/srv/produccion/backups/pre-1e1ad11f_20260825_025750.sql.gz`.
 
 ---
 
-### Estado de producción al momento de escribir esto
+### Antes de este despliegue
 
-Producción está al día **con lo que tiene desplegado**: 101 migraciones en el
-árbol de ese commit y 101 aplicadas, comprobado con `prisma migrate status` el
-2026-08-23 después de desplegar
-`03e41244a751842210e17c6ae6a5093a022fe52f` — la coordinación de carga de
-Productos (el listado primero, los contadores de "Para revisar" después) más la
-corrección de la sonda que la vigila. **Solo código.**
+Producción estuvo en `03e41244a751842210e17c6ae6a5093a022fe52f` con 101
+migraciones — la coordinación de carga de Productos (el listado primero, los
+contadores de "Para revisar" después) más la corrección de la sonda que la
+vigila. **Solo código.**
 
 Corte de **2 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
 reinicios**, `erpazul_db` healthy y **no recreado** —todo el despliegue fue con
