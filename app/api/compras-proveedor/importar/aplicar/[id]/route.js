@@ -5,7 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { pedidoEnAlcance } from "@/lib/compras/scope";
 import { esComboBase } from "@/lib/combos/guards";
-import { sumarCantidadesImportadas, costoParaUnidad } from "@/lib/compras-proveedor/importacion/merge";
+import { sumarCantidadesImportadas, datosDetalleNuevo } from "@/lib/compras-proveedor/importacion/merge";
 
 export async function POST(req, { params }) {
   try {
@@ -116,22 +116,12 @@ export async function POST(req, { params }) {
           });
           salida.push(actualizado);
         } else {
-          // Una línea nueva también tiene que quedar en la escala de SU unidad:
-          // el importador manda el costo maestro y acá se lo baja a unitario si
-          // la línea queda en UNIDAD y el producto es PACK.
-          const costo = costoParaUnidad({
-            costoMaestro: item.precioCosto ?? base?.precio_costo ?? null,
-            unidad: item.unidad,
-            producto: productoParaCosto,
-          });
+          // El detalle nuevo lo arma la pieza, no esta ruta: el maestro sale de
+          // la BASE y el `precioCosto` del cuerpo se ignora. El modal ya manda el
+          // costo convertido a la escala de la línea, así que usarlo como maestro
+          // lo dividía por segunda vez.
           const creado = await tx.pedidoProveedorDetalle.create({
-            data: {
-              pedidoId,
-              productoLocalId,
-              cantidad: Number(item.cantidad),
-              unidad: item.unidad,
-              precioCosto: costo,
-            },
+            data: datosDetalleNuevo({ pedidoId, productoLocalId, item, base }),
           });
           salida.push(creado);
         }

@@ -35,6 +35,7 @@ import {
   permiteToggleUnidad,
   convertirUnidadPedido,
 } from "@/lib/compras-proveedor/calculoPedido";
+import { costoVisibleDeDetalle } from "@/lib/compras-proveedor/importacion/merge";
 import {
   recibeHoy,
   formatDiaLabel,
@@ -987,9 +988,13 @@ export default function NuevaCompraProveedorPage() {
             unidadPedido: detalle.unidad,
             unidad_medida: producto.unidad_medida,
             cantidad: Number(detalle.cantidad),
-            precioCosto:
-              anterior?.precioCosto ??
-              (Number(detalle.precioCosto) || Number(producto.precio_costo) || 0),
+            // El servidor acaba de reconciliar la línea: si devolvió un costo, ése
+            // es el que vale. Antes ganaba el anterior, así que la escala corregida
+            // se guardaba en la base y la pantalla seguía mostrando la vieja.
+            // El servidor acaba de reconciliar la línea: si devolvió un costo, ése
+            // es el que vale. Antes ganaba el anterior, así que la escala corregida
+            // se guardaba en la base y la pantalla seguía mostrando la vieja.
+            precioCosto: costoVisibleDeDetalle({ detalle, anterior, producto }),
             factorPack: Number(producto.factor_pack) || 1,
             sugerido: producto.sugerido,
             sinParametros: producto.sinParametros,

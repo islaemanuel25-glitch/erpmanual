@@ -201,6 +201,45 @@ const FALSO = {
       { descripcion: "Producto Que No Existe En El Catalogo Con Nombre Deliberadamente Largo Para Ver Si Se Corta", cantidad: 3, unidad: "UNIDAD", codigo: "" },
     ],
   },
+
+  // ── EL ESCENARIO DE CONTINUACIÓN ─────────────────────────────────────────
+  //
+  // Un borrador que YA tiene 2 BULTO del pack a un costo NEGOCIADO de 2.520 —no
+  // el maestro, que es 2.100— y encima se importan 5 unidades. La suma da 47
+  // UNIDAD y el costo tiene que ser 2.520/21 = 120, no 2.100/21 = 100.
+  //
+  // Los tres números están elegidos para que no se puedan confundir: 120 sale del
+  // negociado, 100 del maestro, y 2.520 es el viejo sin convertir.
+  pedido: {
+    id: 999001,
+    estado: "BORRADOR",
+    notas: null,
+    proveedor: { id: 4242, nombre: "Distribuidora Ejemplo SRL" },
+    detalles: [
+      {
+        id: 5001,
+        productoLocalId: 9004,
+        cantidad: 2,
+        unidad: "BULTO",
+        precioCosto: 2520,
+        producto: {
+          base: {
+            id: 8004, nombre: "Pack Sintetico x21", sku: "SINT-021",
+            unidad_medida: "unidad", factor_pack: 21,
+            modoCompraProveedor: "BULTO", precio_costo: 2100, pesoReferenciaKg: null,
+          },
+        },
+      },
+    ],
+  },
+  documentoContinuar: {
+    numeroPedido: "SINTETICO-002",
+    lineas: [{ descripcion: "Pack Sintetico x21", cantidad: 5, unidad: "UNIDAD", codigo: "SINT-021" }],
+  },
+  // Lo que el servidor DEVUELVE tras reconciliar: la línea ya corregida.
+  detalleReconciliado: {
+    id: 5001, productoLocalId: 9004, cantidad: 47, unidad: "UNIDAD", precioCosto: 120,
+  },
 };
 
 // ── EL INTERCEPTOR FALLA CERRADO ───────────────────────────────────────────
@@ -223,6 +262,9 @@ const INTERCEPTOR = `
   window.__cuerpos = {};
   window.__fugas = [];
   const LECTURA = ["/api/compras-proveedor/productos", "/api/compras-proveedor/obtener"];
+  // Que documento devuelve analizar: el del pedido nuevo o el de continuacion.
+  // (Sin acentos graves: este bloque vive dentro de un template literal.)
+  window.__escenario = "nuevo";
 
   window.fetch = async (entrada, opciones) => {
     const url = typeof entrada === "string" ? entrada : (entrada && entrada.url) || "";
@@ -245,9 +287,13 @@ const INTERCEPTOR = `
     if (url.includes("/api/compras-proveedor/productos")) {
       return responder({ ok: true, items: D.productos, productos: D.productos, data: D.productos });
     }
+    if (url.includes("/api/compras-proveedor/obtener")) {
+      return responder({ ok: true, item: D.pedido });
+    }
     if (url.includes("/api/compras-proveedor/importar/analizar")) {
       await new Promise((r) => setTimeout(r, 500));
-      return responder({ ok: true, documento: D.documento });
+      const doc = window.__escenario === "continuar" ? D.documentoContinuar : D.documento;
+      return responder({ ok: true, documento: doc });
     }
     // Las DOS salidas de "Crear borrador": pedido nuevo y continuación de uno.
     if (url.includes("/api/compras-proveedor/crear")) {
@@ -256,7 +302,10 @@ const INTERCEPTOR = `
     }
     if (url.includes("/api/compras-proveedor/importar/aplicar")) {
       guardar("aplicar");
-      return responder({ ok: true, pedidoId: 999001, detalles: [] });
+      // Se devuelve la línea YA RECONCILIADA, que es lo que el servidor arreglado
+      // manda: 47 UNIDAD a 120. Si la pantalla la ignora y conserva el costo
+      // viejo, se ve acá y no en producción.
+      return responder({ ok: true, pedidoId: 999001, detalles: [D.detalleReconciliado] });
     }
 
     // Cualquier otra cosa de Compras que ESCRIBA: se rechaza y se anota.
@@ -672,6 +721,126 @@ const morir = (motivo) => {
     tipoRevisar === "inerte" && trasVeloRevisar === "revisar",
     "en `revisar` el velo es inerte y NO cierra",
     `el velo era '${tipoRevisar}' y el modal quedó en '${trasVeloRevisar}'`
+  );
+
+  // ══ ESCENARIO 2: CONTINUAR UN BORRADOR QUE YA TIENE LA LÍNEA ══════════════
+  //
+  // El primer escenario solo recorre el pedido NUEVO, así que nunca ejerce la
+  // reconciliación: el camino donde el servidor corrige la escala y la pantalla
+  // tiene que adoptarla. Éste sí.
+  console.log("\n── continuar un borrador: el costo negociado y su escala ───────");
+  await evaluar(`window.__cuerpos = {}; window.__escenario = "continuar"; true`);
+  // `importar=1` es la vía real: el botón de continuar navega a esa URL y la
+  // pantalla abre el modal sola al leerla.
+  await navegar(`${BASE}/modulos/compras-proveedor/nueva?pedidoId=999001&importar=1`);
+  if (!(await esperarA(`window.__sintetico === true`, 20000))) morir("el interceptor no quedó instalado al continuar");
+  await evaluar(`window.__escenario = "continuar"; true`);
+
+  const cargo = await esperarA(`[...document.querySelectorAll('*')].some((e)=>/Pack Sintetico x21/.test(e.textContent||""))`, 25000);
+  if (!cargo) morir("el borrador sintético no se cargó (¿/obtener no quedó interceptado?)");
+
+  // El estado ANTES: 2 BULTO a 2.520, tal como lo devolvió /obtener.
+  const leerLinea = () => evaluar(`JSON.stringify((() => {
+    const filas = [...document.querySelectorAll('tr, li, div')].filter(
+      (e) => /Pack Sintetico x21/.test(e.textContent || "") && e.querySelectorAll('input').length >= 1
+    );
+    const fila = filas[filas.length - 1];
+    if (!fila) return { hay: false };
+    const inputs = [...fila.querySelectorAll('input')].map((i) => i.value);
+    return { hay: true, texto: (fila.innerText || "").replace(/\\s+/g, " ").trim().slice(0, 160), inputs };
+  })())`);
+
+  const antes = JSON.parse(await leerLinea());
+  console.log("     antes  : " + (antes.hay ? antes.inputs.join(" | ") : "(no se pudo leer la fila)"));
+
+  if (!(await esperarA(`!!document.querySelector('[role="dialog"]')`, 20000))) {
+    await evaluar(`[...document.querySelectorAll('button')].find((b)=>/desde foto, PDF o Excel|Continuar borrador/i.test(b.innerText||""))?.click()`);
+    if (!(await esperarA(`!!document.querySelector('[role="dialog"]')`, 15000))) morir("el modal no abrió al continuar");
+  }
+  await evaluar(`(() => {
+    const inp = document.querySelector('[role="dialog"] input[type="file"]');
+    if (!inp) return false;
+    const f = new File(["pedido inventado"], "suma-sintetica.pdf", { type: "application/pdf" });
+    const dt = new DataTransfer(); dt.items.add(f);
+    Object.defineProperty(inp, "files", { value: dt.files, configurable: true });
+    inp.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  if (!(await esperarA(`(() => {
+    const c = document.querySelector('[role="dialog"]');
+    return !!c && !c.querySelector('input[type="file"]') && !c.querySelector('.animate-spin');
+  })()`, 25000))) morir("no se llegó a `revisar` al continuar");
+
+  await evaluar(`(() => {
+    const capa = document.querySelector('[role="dialog"]');
+    [...capa.querySelectorAll('button')].filter((b) => /^Confirmar$/.test((b.innerText || "").trim())).forEach((b) => b.click());
+    return true;
+  })()`);
+  await sleep(600);
+  await evaluar(`[...document.querySelector('[role="dialog"]').querySelectorAll('button')].find((x)=>/^Crear borrador$/.test((x.innerText||"").trim()))?.click()`);
+  await sleep(1800);
+
+  const cuerposC = JSON.parse(await evaluar(`JSON.stringify(window.__cuerpos || {})`));
+  const fugasC = JSON.parse(await evaluar(`JSON.stringify(window.__fugas || [])`));
+  afirmar(fugasC.length === 0, "continuar · ningún endpoint de escritura se escapó", JSON.stringify(fugasC));
+  afirmar(!!cuerposC.aplicar, "continuar · se llamó a `importar/aplicar` y se capturó el cuerpo", JSON.stringify(Object.keys(cuerposC)));
+  if (cuerposC.aplicar) {
+    const it = (cuerposC.aplicar.items || [])[0];
+    console.log("     enviado: productoLocalId " + it?.productoLocalId + " · " + it?.cantidad + " " + it?.unidad);
+  }
+
+  const despues = JSON.parse(await leerLinea());
+  console.log("     después: " + (despues.hay ? despues.inputs.join(" | ") : "(no se pudo leer la fila)"));
+  console.log("     fila   : " + (despues.texto || "(vacía)"));
+  const valores = (despues.inputs || []).map((v) => Number(String(v).replace(/[^\d.,-]/g, "").replace(/\./g, "").replace(",", ".")));
+  const texto = despues.texto || "";
+
+  afirmar(
+    valores.includes(47) || /\b47\b/.test(texto),
+    "continuar · la pantalla adopta la CANTIDAD del servidor (47)",
+    `inputs=${JSON.stringify(despues.inputs)} texto=${texto}`
+  );
+  afirmar(
+    valores.includes(120) || /\b120\b/.test(texto),
+    "continuar · la pantalla adopta el COSTO del servidor (120)",
+    `inputs=${JSON.stringify(despues.inputs)} texto=${texto}`
+  );
+  // ── EL COSTO VIEJO SE BUSCA EN EL TEXTO CRUDO ──────────────────────────
+  //
+  // La fila muestra la cantidad en un campo y el costo como TEXTO: "$2520.00/u".
+  // Dos versiones de esta afirmación no servían y las dos daban verde con el
+  // defecto puesto —que es la única forma de descubrirlo—: mirar solo los inputs,
+  // porque el costo no está en ninguno; y "desformatear" quitando los puntos,
+  // que convertía 2520.00 en 252000 y hacía fallar el borde de palabra.
+  //
+  // Se busca el número como token, sobre el texto tal como se lee.
+  // OJO CON QUÉ NÚMERO SE BUSCA. La fila muestra el costo POR UNIDAD y su
+  // equivalente POR BULTO: con el arreglo puesto dice "$120.00/u · $2520.00/bulto".
+  // O sea que 2.520 aparece igual, y correctamente —es 120 × 21—. Una afirmación
+  // de "2.520 no está" se pone roja sobre el resultado BUENO: no distingue el
+  // costo viejo del equivalente legítimo, porque son el mismo número.
+  //
+  // Lo que sí distingue es a qué escala está pegado: con el defecto era
+  // "$2520.00/u"; arreglado es "$120.00/u". Y el subtotal, que no es ambiguo.
+  afirmar(
+    /120[.,]00\/u/.test(texto),
+    "continuar · el costo POR UNIDAD es 120",
+    `la escala del costo unitario no es la corregida — fila: ${texto}`
+  );
+  afirmar(
+    !/2520[.,]00\/u/.test(texto),
+    "continuar · el costo por unidad ya no es 2.520 (el del bulto sin convertir)",
+    `sigue mostrando el costo del bulto como unitario — fila: ${texto}`
+  );
+  afirmar(
+    /5[.,]640/.test(texto) && !/118[.,]440/.test(texto),
+    "continuar · el subtotal es 5.640 y no 118.440",
+    `la línea sigue valorizada con el costo viejo — fila: ${texto}`
+  );
+  afirmar(
+    !valores.includes(100),
+    "continuar · no se usó el maestro (100) en lugar del negociado (120)",
+    `inputs=${JSON.stringify(despues.inputs)}`
   );
 
   console.log("\ncapturas (fuera del repo):");
