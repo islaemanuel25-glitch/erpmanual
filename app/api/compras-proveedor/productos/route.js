@@ -54,6 +54,7 @@ export async function GET(req) {
       select: {
         productoBaseId: true,
         codigoInterno: true,
+        descripcionProveedor: true,
         productoBase: { select: { nombre: true } },
       },
     });
@@ -62,10 +63,16 @@ export async function GET(req) {
     // Código interno del proveedor por base (el primero si hubiera más de uno).
     // Solo para mostrar como columna; no afecta la búsqueda ni la resolución.
     const codigoInternoPorBase = new Map();
+    const vinculosPorBase = new Map();
     for (const v of vinculos) {
       if (!codigoInternoPorBase.has(v.productoBaseId)) {
         codigoInternoPorBase.set(v.productoBaseId, v.codigoInterno);
       }
+      if (!vinculosPorBase.has(v.productoBaseId)) vinculosPorBase.set(v.productoBaseId, []);
+      vinculosPorBase.get(v.productoBaseId).push({
+        codigoInterno: v.codigoInterno,
+        descripcionProveedor: v.descripcionProveedor || null,
+      });
     }
 
     // Match por código interno del proveedor.
@@ -212,6 +219,8 @@ export async function GET(req) {
         codigo_barra: pl.base.codigo_barra,
         codigo_barra_secundario: pl.base.codigo_barra_secundario || null,
         codigoInterno: codigoInternoPorBase.get(pl.base.id) || null,
+        codigosInternos: (vinculosPorBase.get(pl.base.id) || []).map((v) => v.codigoInterno),
+        aliasesProveedor: vinculosPorBase.get(pl.base.id) || [],
         categoriaId: pl.base.categoria?.id ?? null,
         categoriaNombre: pl.base.categoria?.nombre ?? null,
         unidad_medida: pl.base.unidad_medida,
