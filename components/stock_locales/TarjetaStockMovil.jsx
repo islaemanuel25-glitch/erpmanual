@@ -8,6 +8,7 @@ import SunmiProductoCard, {
 } from "@/components/sunmi/SunmiProductoCard";
 import { Pencil, SlidersHorizontal } from "lucide-react";
 import {
+  esPackDeposito,
   formatLimiteStock,
   getUnidadDeposito,
   getUnidadLocal,
@@ -59,7 +60,12 @@ import {
 function textoLimite(valor, configurados, item, esDeposito) {
   if (!configurados) return "Sin ajustar";
   if (valor === null || valor === undefined) return "—";
-  return formatLimiteStock(valor, item, esDeposito);
+  // Solo el depósito pack necesita cambiar de escala. En locales y en los
+  // productos sueltos se conserva el texto corto que ya tenía la card.
+  if (esPackDeposito(item, esDeposito)) {
+    return formatLimiteStock(valor, item, esDeposito);
+  }
+  return Number(valor).toLocaleString("es-AR");
 }
 
 export default function TarjetaStockMovil({
