@@ -2348,7 +2348,7 @@ export default function NuevaCompraProveedorPage() {
             <>
               {botonImportar(true)}
               {avisoImportacion && (
-                <div className="rounded-lg border px-2.5 py-1.5 mb-2 text-[11px] sunmi-text-accent sunmi-divider">
+                <div className="rounded-lg border px-2.5 py-1.5 mb-2 text-sm2 sunmi-text-accent sunmi-divider">
                   {avisoImportacion}
                 </div>
               )}

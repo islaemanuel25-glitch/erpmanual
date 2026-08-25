@@ -13,6 +13,25 @@ import {
   recalcularLineaConProducto,
 } from "@/lib/compras-proveedor/importacion/prepararLineas";
 
+// ── LOS `text-[12px]` QUE QUEDAN NO SON UN OLVIDO ──────────────────────────
+//
+// El resto de las medidas escritas a mano de este modal se cambiaron por el
+// token del kit que vale EXACTAMENTE lo mismo, medido contra la hoja
+// construida: 11px es `text-sm2`, 10px es `text-xs2`, 14px es `text-base` y
+// 10,5px es `text-xs` —esa última sorprende, pero `text-xs` es `0.75rem` sobre
+// una raíz de 14px, así que da 10,5 y no 12—.
+//
+// Para 12px NO hay token. El candidato obvio, `text-sm`, es `0.875rem` = 12,25px
+// sobre esa misma raíz: no vale lo mismo, y `lib/hardcodeo/contador.js` no lo
+// ofrece justamente por eso —solo ofrece las que están definidas en px—.
+// Ponerlo sería cambiar el tamaño y encima decir que no cambió.
+//
+// Los cinco que quedan acá rotulan texto secundario denso: el subtítulo de la
+// zona de carga, el error de lectura, el nombre del archivo en la cabecera de
+// revisión, la descripción de cada línea y el error del pie. Son 12px porque en
+// el repo eso es lo normal —304 usos en `main`—, no porque este modal lo haya
+// inventado. El día que el kit tenga un token de 12px se cambian los 304 juntos.
+
 export default function ModalImportarPedido({ open, onClose, productos = [], onAplicar }) {
   const inputRef = useRef(null);
   const [estado, setEstado] = useState("elegir");
@@ -119,14 +138,13 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
       destructivo={estado === "revisar"}
       forma="hoja-o-centrado"
       maxWidth="max-w-4xl"
-      alto="max-h-[94dvh] sm:max-h-[90vh]"
       z={9999}
       espacioCuerpo=""
       espacioPie="mt-2"
       footer={
         estado === "revisar" ? (
           <div className="w-full flex items-center gap-2">
-            <span className="text-[11px] sunmi-text-muted mr-auto">
+            <span className="text-sm2 sunmi-text-muted mr-auto">
               {pendientes ? `${pendientes} línea${pendientes === 1 ? "" : "s"} por revisar` : `${listas.length} listas`}
             </span>
             <SunmiButton color="slate" type="button" onClick={cerrar} disabled={aplicando}>
@@ -152,14 +170,14 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="w-full min-h-[150px] rounded-xl border-2 border-dashed sunmi-divider sunmi-control flex flex-col items-center justify-center gap-3 px-5"
+              className="w-full min-h-44 rounded-xl border-2 border-dashed sunmi-divider sunmi-control flex flex-col items-center justify-center gap-3 px-5"
             >
               <Upload size={30} style={{ color: "var(--pos-link)" }} />
-              <span className="text-[14px] font-semibold sunmi-text-strong">Elegir archivo</span>
+              <span className="text-base font-semibold sunmi-text-strong">Elegir archivo</span>
               <span className="text-[12px] sunmi-text-muted text-center">
                 Foto del pedido, PDF, Excel XLSX o XLS · máximo 15 MB
               </span>
-              <span className="flex items-center gap-3 text-[11px] sunmi-text-muted">
+              <span className="flex items-center gap-3 text-sm2 sunmi-text-muted">
                 <span className="flex items-center gap-1"><ImageIcon size={14} /> Foto / PDF</span>
                 <span className="flex items-center gap-1"><FileSpreadsheet size={14} /> Excel</span>
               </span>
@@ -171,8 +189,8 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
         {estado === "analizando" && (
           <div className="py-16 text-center">
             <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-current border-t-transparent animate-spin sunmi-text-accent" />
-            <p className="text-[13px] font-semibold sunmi-text-strong">Leyendo {archivo?.name}</p>
-            <p className="text-[11px] sunmi-text-muted mt-1">En una foto puede tardar hasta 45 segundos.</p>
+            <p className="text-base font-semibold sunmi-text-strong">Leyendo {archivo?.name}</p>
+            <p className="text-sm2 sunmi-text-muted mt-1">En una foto puede tardar hasta 45 segundos.</p>
           </div>
         )}
 
@@ -182,9 +200,9 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[12px] font-semibold sunmi-text-strong truncate">{archivo?.name}</span>
                 {documento?.numeroPedido && <SunmiPill color="slate">Pedido {documento.numeroPedido}</SunmiPill>}
-                <span className="text-[11px] sunmi-text-muted ml-auto">{incluidas.length} líneas incluidas</span>
+                <span className="text-sm2 sunmi-text-muted ml-auto">{incluidas.length} líneas incluidas</span>
               </div>
-              <p className="text-[11px] sunmi-text-muted mt-1">
+              <p className="text-sm2 sunmi-text-muted mt-1">
                 Se usan productos y costos actuales del catálogo. El precio del papel no modifica el costo maestro.
               </p>
             </div>
@@ -202,12 +220,12 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
                 return (
                   <div key={linea.id} className={`rounded-lg border sunmi-divider p-2.5 ${incluida ? "sunmi-surface" : "opacity-60 sunmi-control"}`}>
                     <div className="flex items-start gap-2">
-                      <span className="w-6 h-6 rounded-full sunmi-control flex items-center justify-center text-[10px] font-bold shrink-0">{indice + 1}</span>
+                      <span className="w-6 h-6 rounded-full sunmi-control flex items-center justify-center text-xs2 font-bold shrink-0">{indice + 1}</span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start gap-2">
                           <div className="min-w-0 flex-1">
                             <p className="text-[12px] font-semibold sunmi-text-strong leading-tight">{linea.descripcion}</p>
-                            <p className="text-[10.5px] sunmi-text-muted mt-0.5">
+                            <p className="text-xs sunmi-text-muted mt-0.5">
                               {linea.codigo ? `Cód. ${linea.codigo} · ` : ""}{linea.cantidad ?? "?"} {linea.unidad || "sin unidad"}
                               {linea.precioUnitario != null ? ` · precio impreso $${linea.precioUnitario}` : ""}
                             </p>
@@ -251,9 +269,9 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
                                   inputMode="numeric"
                                   value={linea.cantidadPedido}
                                   onChange={(e) => cambiar(linea.id, { cantidadPedido: e.target.value.replace(/[^\d]/g, "") })}
-                                  className="w-[82px] !py-1 text-center tabular-nums"
+                                  className="w-24 !py-1 text-center tabular-nums"
                                 />
-                                <div className="w-[120px]">
+                                <div className="w-36">
                                   <SunmiSelectAdv
                                     value={linea.unidadPedido}
                                     onChange={(v) => cambiar(linea.id, { unidadPedido: v })}
@@ -262,19 +280,19 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
                                     <SunmiSelectOption value="UNIDAD">Unidad</SunmiSelectOption>
                                   </SunmiSelectAdv>
                                 </div>
-                                {linea.equivalencia && <span className="text-[10.5px] sunmi-text-accent">{linea.equivalencia}</span>}
+                                {linea.equivalencia && <span className="text-xs sunmi-text-accent">{linea.equivalencia}</span>}
                               </div>
                             )}
 
                             {linea.requiereRevision && !linea.confirmada && (
                               <div className="mt-2 rounded-md px-2 py-1.5 bg-amber-500/10 flex items-start gap-1.5">
                                 <AlertTriangle size={13} className="text-amber-500 shrink-0 mt-0.5" />
-                                <span className="text-[10.5px] sunmi-text-warning flex-1">{linea.motivoRevision}</span>
+                                <span className="text-xs sunmi-text-warning flex-1">{linea.motivoRevision}</span>
                                 {producto && Number(linea.cantidadPedido) >= 1 && (
                                   <button
                                     type="button"
                                     onClick={() => setLineas((prev) => prev.map((l) => l.id === linea.id ? { ...l, confirmada: true } : l))}
-                                    className="text-[10.5px] font-bold sunmi-text-accent shrink-0"
+                                    className="text-xs font-bold sunmi-text-accent shrink-0"
                                   >
                                     Confirmar
                                   </button>
@@ -282,7 +300,7 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
                               </div>
                             )}
                             {linea.confirmada && linea.requiereRevision && (
-                              <p className="mt-1.5 text-[10.5px] sunmi-text-accent flex items-center gap-1"><Check size={12} /> Revisada</p>
+                              <p className="mt-1.5 text-xs sunmi-text-accent flex items-center gap-1"><Check size={12} /> Revisada</p>
                             )}
                           </>
                         )}
