@@ -5,7 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { pedidoEnAlcance } from "@/lib/compras/scope";
 import { esComboBase } from "@/lib/combos/guards";
-import { sumarCantidadesImportadas } from "@/lib/compras-proveedor/importacion/merge";
+import { sumarCantidadesImportadas, costoParaUnidad } from "@/lib/compras-proveedor/importacion/merge";
 
 export async function POST(req, { params }) {
   try {
@@ -51,9 +51,25 @@ export async function POST(req, { params }) {
     if (ids.length !== items.length || ids.some((id) => !Number.isInteger(id) || id < 1)) {
       return NextResponse.json({ ok: false, error: "Hay productos repetidos o inválidos." }, { status: 400 });
     }
+    // El costo maestro y la naturaleza del producto se traen ACÁ y no se toman
+    // del cuerpo del pedido: si la escala del costo saliera de lo que manda el
+    // navegador, el defecto que esto arregla se podría volver a producir desde
+    // afuera. `unidad_medida` y `modoCompraProveedor` son lo que `naturalezaLinea`
+    // necesita para saber si el factor entra o no en el dinero.
     const productos = await prisma.productoLocal.findMany({
       where: { id: { in: ids }, localId: pedido.depositoId, activo: true },
-      select: { id: true, base: { select: { factor_pack: true, es_combo: true } } },
+      select: {
+        id: true,
+        base: {
+          select: {
+            factor_pack: true,
+            es_combo: true,
+            precio_costo: true,
+            unidad_medida: true,
+            modoCompraProveedor: true,
+          },
+        },
+      },
     });
     if (productos.length !== ids.length || productos.some((p) => esComboBase(p.base))) {
       return NextResponse.json({ ok: false, error: "Uno de los productos no pertenece al depósito o no se puede comprar." }, { status: 400 });
@@ -66,25 +82,55 @@ export async function POST(req, { params }) {
       for (const item of items) {
         const productoLocalId = Number(item.productoLocalId);
         const existente = existentes.get(productoLocalId);
+        const base = porProducto.get(productoLocalId)?.base ?? null;
+        const productoParaCosto = base
+          ? {
+              factor_pack: base.factor_pack,
+              unidad_medida: base.unidad_medida,
+              modoCompraProveedor: base.modoCompraProveedor,
+              precio_costo: base.precio_costo,
+            }
+          : null;
+
         if (existente) {
+          // La suma decide cantidad, unidad Y costo en una sola operación. Antes
+          // acá se escribían solo las dos primeras: una línea de 2 BULTO a $2.100
+          // que pasaba a 47 UNIDAD se quedaba con el costo del bulto y valía
+          // 98.700 en vez de 4.700.
           const suma = sumarCantidadesImportadas({
             actual: existente,
             importada: item,
-            factorPack: porProducto.get(productoLocalId)?.base?.factor_pack,
+            factorPack: base?.factor_pack,
+            producto: productoParaCosto,
+            costoMaestro: base?.precio_costo ?? null,
           });
           const actualizado = await tx.pedidoProveedorDetalle.update({
             where: { id: existente.id },
-            data: { cantidad: suma.cantidad, unidad: suma.unidad },
+            data: {
+              cantidad: suma.cantidad,
+              unidad: suma.unidad,
+              // Si la unidad no cambió, `suma.precioCosto` es el que ya tenía, así
+              // que esta escritura lo deja igual y no pisa un costo negociado.
+              precioCosto: suma.precioCosto,
+            },
           });
           salida.push(actualizado);
         } else {
+          // Una línea nueva también tiene que quedar en la escala de SU unidad:
+          // el importador manda el costo maestro y acá se lo baja a unitario si
+          // la línea queda en UNIDAD y el producto es PACK.
+          const costo = costoParaUnidad({
+            costoMaestro: item.precioCosto ?? base?.precio_costo ?? null,
+            unidad: item.unidad,
+            producto: productoParaCosto,
+          });
           const creado = await tx.pedidoProveedorDetalle.create({
             data: {
               pedidoId,
               productoLocalId,
               cantidad: Number(item.cantidad),
               unidad: item.unidad,
-              precioCosto: item.precioCosto == null ? null : Number(item.precioCosto),
+              precioCosto: costo,
             },
           });
           salida.push(creado);

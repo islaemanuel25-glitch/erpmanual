@@ -178,9 +178,15 @@ async function capturar(nombre) {
 const FALSO = {
   proveedores: [{ id: 4242, nombre: "Distribuidora Ejemplo SRL", activo: true }],
   productos: [
-    { productoLocalId: 9001, baseId: 8001, nombre: "Galletita Sintetica Vainilla 120g", codigoInterno: "SINT-001", unidad_medida: "pack", factor_pack: 12, modoCompra: "BULTO", precioCosto: 1200 },
-    { productoLocalId: 9002, baseId: 8002, nombre: "Jugo Ficticio Naranja 1L", codigoInterno: "SINT-002", unidad_medida: "unidad", factor_pack: 6, modoCompra: "BULTO", precioCosto: 900 },
-    { productoLocalId: 9003, baseId: 8003, nombre: "Arroz Imaginario Largo Fino 1kg", codigoInterno: "SINT-003", unidad_medida: "unidad", factor_pack: 1, modoCompra: "UNIDAD", precioCosto: 1500 },
+    { productoLocalId: 9001, baseId: 8001, nombre: "Galletita Sintetica Vainilla 120g", codigoInterno: "SINT-001", unidad_medida: "pack", factor_pack: 12, modoCompra: "BULTO", precio_costo: 1200, precioCosto: 1200 },
+    { productoLocalId: 9002, baseId: 8002, nombre: "Jugo Ficticio Naranja 1L", codigoInterno: "SINT-002", unidad_medida: "unidad", factor_pack: 6, modoCompra: "BULTO", precio_costo: 900, precioCosto: 900 },
+    { productoLocalId: 9003, baseId: 8003, nombre: "Arroz Imaginario Largo Fino 1kg", codigoInterno: "SINT-003", unidad_medida: "unidad", factor_pack: 1, modoCompra: "UNIDAD", precio_costo: 1500, precioCosto: 1500 },
+    // EL CASO ECONÓMICO, con los números de la revisión: un PACK de 21 cuyo
+    // bulto vale 2.100. Se piden 40 unidades, que no son bultos enteros, así que
+    // la línea queda en UNIDAD y su costo TIENE que ser 100 — no 2.100. Es la
+    // única línea del escenario cuyo costo cambia de escala, y por eso es la que
+    // la sonda mira en el cuerpo que se manda a crear.
+    { productoLocalId: 9004, baseId: 8004, nombre: "Pack Sintetico x21", codigoInterno: "SINT-021", unidad_medida: "unidad", factor_pack: 21, modoCompra: "BULTO", precio_costo: 2100, precioCosto: 2100 },
   ],
   documento: {
     numeroPedido: "SINTETICO-001",
@@ -188,6 +194,8 @@ const FALSO = {
       { descripcion: "Galletita Sintetica Vainilla 120g", cantidad: 4, unidad: "BULTO", codigo: "SINT-001" },
       { descripcion: "Jugo Ficticio Naranja 1L", cantidad: 12, unidad: "UNIDAD", codigo: "SINT-002" },
       { descripcion: "Arroz Imaginario Largo Fino 1kg", cantidad: 6, unidad: "UNIDAD", codigo: "SINT-003" },
+      // 40 no es múltiplo de 21: la línea se queda en UNIDAD y su costo baja a 100.
+      { descripcion: "Pack Sintetico x21", cantidad: 40, unidad: "UNIDAD", codigo: "SINT-021" },
       // La cuarta NO vincula a propósito: ejerce el camino de revisión manual y,
       // con un nombre deliberadamente largo, el ajuste del texto.
       { descripcion: "Producto Que No Existe En El Catalogo Con Nombre Deliberadamente Largo Para Ver Si Se Corta", cantidad: 3, unidad: "UNIDAD", codigo: "" },
@@ -195,22 +203,42 @@ const FALSO = {
   },
 };
 
-// Los CUATRO endpoints. `analizar` se responde de mentira, así que el modelo no
-// se llama nunca; `aplicar` se corta para que no se cree ningún pedido aunque
-// alguien toque el botón del pie.
+// ── EL INTERCEPTOR FALLA CERRADO ───────────────────────────────────────────
+//
+// La primera versión listaba los endpoints que conocía y mandaba todo lo demás
+// al `fetch` original. Eso dejó un agujero real: el escenario abre un pedido
+// NUEVO, y ahí "Crear borrador" no llama a `importar/aplicar` sino a
+// `compras-proveedor/crear` — que no estaba en la lista y **habría escrito de
+// verdad**. La sonda decía "no toca nada real" y no era cierto.
+//
+// Ahora cualquier ruta de escritura de Compras que no esté reconocida se
+// RECHAZA y se anota: si mañana aparece un endpoint nuevo, la sonda se pone roja
+// en vez de escribir en la base. Enumerar lo permitido es lo único que sobrevive
+// a que el código crezca; enumerar lo prohibido, no.
 const INTERCEPTOR = `
 (() => {
   const D = ${JSON.stringify(FALSO)};
   const original = window.fetch;
   window.__intercepciones = [];
+  window.__cuerpos = {};
+  window.__fugas = [];
+  const LECTURA = ["/api/compras-proveedor/productos", "/api/compras-proveedor/obtener"];
+
   window.fetch = async (entrada, opciones) => {
     const url = typeof entrada === "string" ? entrada : (entrada && entrada.url) || "";
+    const ruta = url.split("?")[0];
+    const metodo = String((opciones && opciones.method) || "GET").toUpperCase();
     const responder = (cuerpo) => {
-      window.__intercepciones.push(url.split("?")[0]);
+      window.__intercepciones.push(ruta);
       return new Response(JSON.stringify(cuerpo), {
         status: 200, headers: { "Content-Type": "application/json" },
       });
     };
+    const guardar = (clave) => {
+      try { window.__cuerpos[clave] = JSON.parse((opciones && opciones.body) || "null"); }
+      catch { window.__cuerpos[clave] = "(cuerpo no era JSON)"; }
+    };
+
     if (url.includes("/api/proveedores/listar")) {
       return responder({ ok: true, items: D.proveedores, proveedores: D.proveedores, data: D.proveedores });
     }
@@ -221,8 +249,24 @@ const INTERCEPTOR = `
       await new Promise((r) => setTimeout(r, 500));
       return responder({ ok: true, documento: D.documento });
     }
+    // Las DOS salidas de "Crear borrador": pedido nuevo y continuación de uno.
+    if (url.includes("/api/compras-proveedor/crear")) {
+      guardar("crear");
+      return responder({ ok: true, item: { id: 999001 } });
+    }
     if (url.includes("/api/compras-proveedor/importar/aplicar")) {
-      return responder({ ok: false, error: "SONDA: no se crean pedidos de verdad." });
+      guardar("aplicar");
+      return responder({ ok: true, pedidoId: 999001, detalles: [] });
+    }
+
+    // Cualquier otra cosa de Compras que ESCRIBA: se rechaza y se anota.
+    const esCompras = ruta.includes("/api/compras-proveedor") || ruta.includes("/api/compras");
+    const escribe = metodo !== "GET" && metodo !== "HEAD";
+    if (esCompras && escribe && !LECTURA.includes(ruta)) {
+      window.__fugas.push(metodo + " " + ruta);
+      return new Response(JSON.stringify({ ok: false, error: "SONDA: endpoint de escritura no reconocido" }), {
+        status: 403, headers: { "Content-Type": "application/json" },
+      });
     }
     return original(entrada, opciones);
   };
@@ -281,9 +325,29 @@ const superpuestos = () => evaluar(`JSON.stringify((() => {
   const capa = document.querySelector('[role="dialog"]');
   if (!capa) return [];
   const velos = new Set(capa.querySelectorAll(':scope > button.absolute.inset-0'));
+
+  // ── LO QUE ESTÁ SCROLLEADO FUERA DEL CUERPO NO CUENTA ──────────────────
+  //
+  // El pie del modal está pegado abajo y el cuerpo scrollea POR DEBAJO de él:
+  // con suficientes líneas, la última siempre queda tapada por el pie. Eso es
+  // cómo funciona un pie pegajoso, no un defecto — se scrollea y aparece.
+  //
+  // Sin esta acotación el control daba rojo por el largo de la lista y no por
+  // un problema de dibujo, que es justo lo contrario de lo que tiene que medir.
+  // Se acota al RECTÁNGULO VISIBLE del cuerpo scrolleable, así que un control
+  // realmente tapado DENTRO de la zona visible se sigue detectando.
+  const cuerpo = capa.querySelector('[class*="overflow-y-auto"]');
+  const zona = cuerpo ? cuerpo.getBoundingClientRect() : null;
+  const visibleEnElCuerpo = (e) => {
+    if (!zona || !cuerpo.contains(e)) return true; // el pie y la cabecera no scrollean
+    const r = e.getBoundingClientRect();
+    return r.top >= zona.top - 1 && r.bottom <= zona.bottom + 1;
+  };
+
   const ctr = [...capa.querySelectorAll('button, input, select, [role="button"]')]
     .filter((e) => !velos.has(e))
     .filter((e) => e.offsetParent !== null)
+    .filter(visibleEnElCuerpo)
     .map((e) => ({ r: e.getBoundingClientRect(), t: (e.innerText || e.value || e.tagName).trim().slice(0, 22) }))
     .filter((x) => x.r.width > 0 && x.r.height > 0);
   const choques = [];
@@ -493,7 +557,113 @@ const morir = (motivo) => {
     afirmar(p && p.hay && p.dentro && p.alcanzable, `revisar · ${w}×${h} · el pie entra en la ventana y se puede tocar`, JSON.stringify(p));
   }
 
+  // ── EL CUERPO QUE SE MANDA A CREAR ────────────────────────────────────────
+  //
+  // Es la afirmación económica de la sonda: no alcanza con que la pantalla se
+  // vea bien, tiene que MANDAR los números correctos. Se confirman a mano las
+  // líneas que quedaron en revisión —igual que haría una persona— y se toca el
+  // botón del pie.
+  console.log("\n── el cuerpo que viaja a crear ─────────────────────────────────");
+  await medidas(1366, 900);
+  const confirmadas = await evaluar(`(() => {
+    const capa = document.querySelector('[role="dialog"]');
+    const botones = [...capa.querySelectorAll('button')].filter((b) => /^Confirmar$/.test((b.innerText || "").trim()));
+    botones.forEach((b) => b.click());
+    return botones.length;
+  })()`);
+  await sleep(600);
+  console.log("     líneas confirmadas a mano: " + confirmadas);
+
+  // Las que no tienen producto vinculado no se pueden confirmar: se sacan, que
+  // es lo que haría una persona con una línea que el archivo trajo de más.
+  await evaluar(`(() => {
+    const capa = document.querySelector('[role="dialog"]');
+    const quitar = [...capa.querySelectorAll('button')].filter((b) => {
+      const fila = b.closest('div');
+      return (b.getAttribute('aria-label') || "").includes('Quitar') || (b.innerText || "").trim() === "×";
+    });
+    return quitar.length;
+  })()`);
+  await evaluar(`(() => {
+    const capa = document.querySelector('[role="dialog"]');
+    // Cada tarjeta de línea sin producto elegido tiene su botón de sacar arriba a
+    // la derecha; se identifican por el select que sigue diciendo "Elegir producto".
+    const sinVincular = [...capa.querySelectorAll('*')].filter((e) => /Elegir producto/.test(e.textContent || "") && e.children.length < 4);
+    for (const nodo of sinVincular) {
+      const tarjeta = nodo.closest('div[class*="rounded"]') || nodo.parentElement;
+      const x = tarjeta && [...tarjeta.querySelectorAll('button')].find((b) => (b.innerText || "").trim() === "" && b.querySelector('svg'));
+      if (x) x.click();
+    }
+    return true;
+  })()`);
+  await sleep(600);
+
+  const pie2 = JSON.parse(await pie());
+  const habilitado = await evaluar(`(() => {
+    const capa = document.querySelector('[role="dialog"]');
+    const b = [...capa.querySelectorAll('button')].find((x) => /^Crear borrador$/.test((x.innerText || "").trim()));
+    return b ? !b.disabled : false;
+  })()`);
+  afirmar(pie2.hay && habilitado, "el botón `Crear borrador` quedó habilitado", `pie=${JSON.stringify(pie2)} habilitado=${habilitado}`);
+
+  if (habilitado) {
+    await evaluar(`[...document.querySelector('[role="dialog"]').querySelectorAll('button')].find((x)=>/^Crear borrador$/.test((x.innerText||"").trim())).click()`);
+    await sleep(1500);
+  }
+
+  const cuerpos = JSON.parse(await evaluar(`JSON.stringify(window.__cuerpos || {})`));
+  const fugas = JSON.parse(await evaluar(`JSON.stringify(window.__fugas || [])`));
+
+  afirmar(fugas.length === 0, "ningún endpoint de escritura de Compras se escapó al fetch real", JSON.stringify(fugas));
+  afirmar(
+    !!(cuerpos.crear || cuerpos.aplicar),
+    "se capturó el cuerpo que la pantalla manda al guardar",
+    "no se registró ninguna llamada a crear ni a aplicar: el botón no llegó a disparar"
+  );
+
+  const enviado = cuerpos.crear || cuerpos.aplicar || null;
+  if (enviado) {
+    const items = enviado.items || [];
+    console.log("     endpoint usado : " + (cuerpos.crear ? "/api/compras-proveedor/crear" : "/api/compras-proveedor/importar/aplicar"));
+    console.log("     items enviados : " + items.length);
+    for (const it of items) {
+      console.log("       productoLocalId " + it.productoLocalId + " · " + it.cantidad + " " + it.unidad + " · costo " + it.precioCosto);
+    }
+    // EL CASO PACK -> UNIDAD, que es la razón de todo esto.
+    const pack = items.find((i) => Number(i.productoLocalId) === 9004);
+    afirmar(!!pack, "el PACK x21 viaja en el cuerpo", "no está la línea 9004");
+    if (pack) {
+      afirmar(pack.unidad === "UNIDAD", "PACK x21: 40 unidades quedan en UNIDAD", `llegó ${pack.unidad}`);
+      afirmar(Number(pack.cantidad) === 40, "PACK x21: la cantidad es 40", `llegó ${pack.cantidad}`);
+      afirmar(
+        Number(pack.precioCosto) === 100,
+        "PACK x21: el costo viaja UNITARIO (100), no el del bulto (2.100)",
+        `llegó ${pack.precioCosto} — si es 2100, la conversión de escala no está ocurriendo`
+      );
+      afirmar(
+        Number(pack.cantidad) * Number(pack.precioCosto) === 4000,
+        "PACK x21: la línea vale 4.000",
+        `da ${Number(pack.cantidad) * Number(pack.precioCosto)}`
+      );
+    }
+  }
+
   console.log("\n── contraprueba del velo, segunda mitad ────────────────────────");
+  await evaluar(`[...document.querySelectorAll('button')].find((b)=>/desde foto, PDF o Excel|Continuar borrador/i.test(b.innerText||""))?.click()`);
+  await esperarA(`!!document.querySelector('[role="dialog"]')`, 15000);
+  await evaluar(`(() => {
+    const inp = document.querySelector('[role="dialog"] input[type="file"]');
+    if (!inp) return false;
+    const f = new File(["pedido inventado"], "pedido-sintetico.pdf", { type: "application/pdf" });
+    const dt = new DataTransfer(); dt.items.add(f);
+    Object.defineProperty(inp, "files", { value: dt.files, configurable: true });
+    inp.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  await esperarA(`(() => {
+    const c = document.querySelector('[role="dialog"]');
+    return !!c && !c.querySelector('input[type="file"]') && !c.querySelector('.animate-spin');
+  })()`, 25000);
   await medidas(1366, 900);
   const tipoRevisar = await tocarVelo();
   await sleep(700);

@@ -12,6 +12,8 @@ import {
   prepararLineasImportadas,
   recalcularLineaConProducto,
 } from "@/lib/compras-proveedor/importacion/prepararLineas";
+import { costoParaUnidad, baseDeProducto } from "@/lib/compras-proveedor/importacion/merge";
+import { naturalezaLinea, permiteToggleUnidad } from "@/lib/compras-proveedor/calculoPedido";
 
 // ── LOS `text-[12px]` QUE QUEDAN NO SON UN OLVIDO ──────────────────────────
 //
@@ -271,15 +273,31 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
                                   onChange={(e) => cambiar(linea.id, { cantidadPedido: e.target.value.replace(/[^\d]/g, "") })}
                                   className="w-24 !py-1 text-center tabular-nums"
                                 />
-                                <div className="w-36">
-                                  <SunmiSelectAdv
-                                    value={linea.unidadPedido}
-                                    onChange={(v) => cambiar(linea.id, { unidadPedido: v })}
-                                  >
-                                    <SunmiSelectOption value="BULTO">Bulto</SunmiSelectOption>
-                                    <SunmiSelectOption value="UNIDAD">Unidad</SunmiSelectOption>
-                                  </SunmiSelectAdv>
-                                </div>
+                                {/* SOLO EL PACK ALTERNA. Un fiambre se pide por
+                                    pieza y un producto por kilo se pide en kilos:
+                                    ofrecerles "Bulto / Unidad" era ofrecer una
+                                    elección que no existe. La decisión sale de
+                                    `permiteToggleUnidad`, la misma que usa la
+                                    pantalla de Compras. */}
+                                {permiteToggleUnidad(baseDeProducto(producto)) ? (
+                                  <div className="w-36">
+                                    <SunmiSelectAdv
+                                      value={linea.unidadPedido}
+                                      onChange={(v) => cambiar(linea.id, { unidadPedido: v })}
+                                    >
+                                      <SunmiSelectOption value="BULTO">Bulto</SunmiSelectOption>
+                                      <SunmiSelectOption value="UNIDAD">Unidad</SunmiSelectOption>
+                                    </SunmiSelectAdv>
+                                  </div>
+                                ) : (
+                                  <span className="w-36 text-xs sunmi-text-muted">
+                                    {naturalezaLinea(baseDeProducto(producto)) === "FIAMBRE"
+                                      ? "Pieza"
+                                      : naturalezaLinea(baseDeProducto(producto)) === "KG"
+                                      ? "Kg"
+                                      : "Unidad"}
+                                  </span>
+                                )}
                                 {linea.equivalencia && <span className="text-xs sunmi-text-accent">{linea.equivalencia}</span>}
                               </div>
                             )}
@@ -329,6 +347,12 @@ function lineaLista(linea) {
   );
 }
 
+// EL COSTO SIGUE A LA UNIDAD, TAMBIÉN ACÁ.
+//
+// Este consolidado arma el cuerpo que se manda a crear o a aplicar, así que si
+// deja el costo del bulto en una línea que quedó en UNIDAD, el borrador nace mal
+// aunque el servidor esté bien. Se usa `costoParaUnidad`, la misma pieza que usa
+// la ruta, para que las dos superficies no puedan divergir.
 function consolidarLineas(lineas, productosPorId) {
   const salida = new Map();
   for (const linea of lineas) {
@@ -337,7 +361,11 @@ function consolidarLineas(lineas, productosPorId) {
       productoLocalId: Number(linea.productoLocalId),
       cantidad: Number(linea.cantidadPedido),
       unidad: linea.unidadPedido,
-      precioCosto: Number(producto?.precio_costo) || null,
+      precioCosto: costoParaUnidad({
+        costoMaestro: producto?.precio_costo ?? null,
+        unidad: linea.unidadPedido,
+        producto,
+      }),
     };
     const anterior = salida.get(item.productoLocalId);
     if (!anterior) {
@@ -351,6 +379,13 @@ function consolidarLineas(lineas, productosPorId) {
         (anterior.unidad === "BULTO" ? anterior.cantidad * factor : anterior.cantidad) +
         (item.unidad === "BULTO" ? item.cantidad * factor : item.cantidad);
       anterior.unidad = "UNIDAD";
+      // Al fusionar dos líneas del mismo producto la unidad cae a UNIDAD, así que
+      // el costo tiene que bajar con ella.
+      anterior.precioCosto = costoParaUnidad({
+        costoMaestro: producto?.precio_costo ?? null,
+        unidad: "UNIDAD",
+        producto,
+      });
     }
   }
   return [...salida.values()];
