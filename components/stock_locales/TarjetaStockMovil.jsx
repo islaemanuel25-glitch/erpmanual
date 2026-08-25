@@ -7,7 +7,12 @@ import SunmiProductoCard, {
   RotuloBloqueValor,
 } from "@/components/sunmi/SunmiProductoCard";
 import { Pencil, SlidersHorizontal } from "lucide-react";
-import { formatCantidad } from "@/lib/stock/presentacion";
+import {
+  formatLimiteStock,
+  getUnidadDeposito,
+  getUnidadLocal,
+  presentacionCantidadStock,
+} from "@/lib/stock/presentacion";
 
 // LA TARJETA DE UN PRODUCTO EN STOCK, PARA EL CELULAR.
 //
@@ -51,10 +56,10 @@ import { formatCantidad } from "@/lib/stock/presentacion";
 // tener más de uno y hay que elegir cuál—.
 
 /** El alfa de "no hay dato" se decide acá y no en cada renglón. */
-function textoLimite(valor, configurados) {
+function textoLimite(valor, configurados, item, esDeposito) {
   if (!configurados) return "Sin ajustar";
   if (valor === null || valor === undefined) return "—";
-  return Number(valor).toLocaleString("es-AR");
+  return formatLimiteStock(valor, item, esDeposito);
 }
 
 export default function TarjetaStockMovil({
@@ -66,8 +71,13 @@ export default function TarjetaStockMovil({
   onAjustar,
   onLimites,
   puedeAjustar = true,
+  localEsDeposito = false,
 }) {
   const stock = Number(item?.stock ?? 0);
+  const presentacion = presentacionCantidadStock(item, localEsDeposito);
+  const unidad = localEsDeposito
+    ? getUnidadDeposito(item || {})
+    : getUnidadLocal(item || {});
   const configurados = item?.limitesConfigurados === true;
   const negativo = stock < 0;
   // `faltante` lo calcula el servidor con la MISMA regla que cuenta la card de
@@ -83,21 +93,21 @@ export default function TarjetaStockMovil({
       codigoInterno={false}
       marca={
         <span className="text-[10.5px] sunmi-text-muted whitespace-nowrap">
-          mín {textoLimite(item?.stockMin, configurados)}
+          mín {textoLimite(item?.stockMin, configurados, item, localEsDeposito)}
           {" · "}
-          máx {textoLimite(item?.stockMax, configurados)}
+          máx {textoLimite(item?.stockMax, configurados, item, localEsDeposito)}
         </span>
       }
       valor={
         <BloqueValorTarjeta className="flex-col justify-center">
           <RotuloBloqueValor className="sunmi-text-muted">
-            STOCK · {item?.unidadMedida || "u"}
+            STOCK · {unidad}
           </RotuloBloqueValor>
-          {/* El número grande es lo que la persona vino a ver. `formatCantidad`
-              es la MISMA pieza que usa la tabla de escritorio, así que kilos,
-              unidades y fiambre se leen igual en las dos vistas. */}
+          {/* El número grande es lo que la persona vino a ver. La presentación
+              es la MISMA pieza que usa la tabla de escritorio: en depósito un
+              Pack x10 con 45 unidades se lee "4 bultos + 5 uds". */}
           <NumeroBloqueValor className={negativo ? "sunmi-text-danger" : ""}>
-            {formatCantidad(stock, item?.unidadMedida)}
+            {presentacion.texto}
           </NumeroBloqueValor>
         </BloqueValorTarjeta>
       }
