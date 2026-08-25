@@ -11,7 +11,7 @@ import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
-import { Search, Trash2, ShoppingCart, ChevronUp } from "lucide-react";
+import { Search, Trash2, ShoppingCart, ChevronUp, FileUp } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -19,6 +19,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCodigo";
 import ModalEnviarPedido from "@/components/compras-proveedor/ModalEnviarPedido";
 import CarritoPedido from "@/components/compras-proveedor/CarritoPedido";
+import ModalImportarPedido from "@/components/compras-proveedor/ModalImportarPedido";
 import {
   ORIGENES,
   CLAVE_PEDIDO_EN_CURSO,
@@ -34,6 +35,7 @@ import {
   permiteToggleUnidad,
   convertirUnidadPedido,
 } from "@/lib/compras-proveedor/calculoPedido";
+import { costoVisibleDeDetalle } from "@/lib/compras-proveedor/importacion/merge";
 import {
   recibeHoy,
   formatDiaLabel,
@@ -76,6 +78,9 @@ export default function NuevaCompraProveedorPage() {
 
   // Productos del proveedor (ProductoLocal del depósito)
   const [productos, setProductos] = useState([]);
+  // Copia sin filtro para el revisor de archivos. Buscar en el catálogo cambia
+  // `productos`, pero no debe hacer desaparecer opciones del documento abierto.
+  const [productosCompletos, setProductosCompletos] = useState([]);
   const [search, setSearch] = useState("");
   const [loadingProds, setLoadingProds] = useState(false);
 
@@ -92,6 +97,7 @@ export default function NuevaCompraProveedorPage() {
   // Proveedor para el que ya se sembraron los sugeridos (evita re-sembrar y que
   // un sugerido quitado vuelva solo en la misma sesión).
   const autofillRef = useRef(null);
+  const importacionAutomaticaRef = useRef(false);
   // Se arma en el primer render: si venimos de editar un producto, la carga del
   // catálogo tiene que restaurar el pedido en vez de arrancar vacía.
   const restaurarRef = useRef(debeReabrirPedido(searchParams));
@@ -150,6 +156,8 @@ export default function NuevaCompraProveedorPage() {
   const [pedidoEnvio, setPedidoEnvio] = useState(null);
 
   const [saving, setSaving] = useState(false);
+  const [importarOpen, setImportarOpen] = useState(false);
+  const [avisoImportacion, setAvisoImportacion] = useState("");
 
   // Detección de pedido BORRADOR existente para el proveedor seleccionado.
   const [borradorExistente, setBorradorExistente] = useState(null);
@@ -242,6 +250,7 @@ export default function NuevaCompraProveedorPage() {
   // Al cambiar el proveedor, chequear si ya hay BORRADOR pendiente para él.
   useEffect(() => {
     setBorradorExistente(null); // reset en cada cambio de proveedor
+    setAvisoImportacion("");
     setDraftCant({}); // limpiar borradores de cantidad al cambiar de proveedor
     setCategoriaFilter("");
     setSoloPedido(false);
@@ -295,6 +304,7 @@ export default function NuevaCompraProveedorPage() {
       const data = await res.json();
       if (data.ok) {
         setProductos(data.items || []);
+        if (!search) setProductosCompletos(data.items || []);
         setAvisoSinDeposito(data.codigosSinDeposito || []);
 
         // Sugeridos por stock bajo/faltante = ítems PRECARGADOS del pedido (no
@@ -423,6 +433,23 @@ export default function NuevaCompraProveedorPage() {
     const timer = setTimeout(cargarProductos, 300);
     return () => clearTimeout(timer);
   }, [cargarProductos]);
+
+  // Al tocar "Continuar borrador e importar" se navega al borrador y se abre
+  // el revisor apenas está disponible el catálogo completo.
+  useEffect(() => {
+    if (esContinuar && searchParams.get("importado") === "1") {
+      setAvisoImportacion(`Borrador #${pedidoIdParam} creado desde el archivo.`);
+    }
+    if (
+      esContinuar &&
+      searchParams.get("importar") === "1" &&
+      productosCompletos.length > 0 &&
+      !importacionAutomaticaRef.current
+    ) {
+      importacionAutomaticaRef.current = true;
+      setImportarOpen(true);
+    }
+  }, [esContinuar, pedidoIdParam, productosCompletos.length, searchParams]);
 
   // ── Carga de un producto al pedido ─────────────────────────────────────
   // modoCompra es la ÚNICA fuente de verdad: "BULTO" (depósito) o "UNIDAD" (fiambre)
@@ -842,6 +869,7 @@ export default function NuevaCompraProveedorPage() {
     setProveedorNombre("");
     setNotas("");
     setProductos([]);
+    setProductosCompletos([]);
     setSearch("");
     setAvisoSinDeposito([]);
     setVincularOpen(false);
@@ -858,6 +886,8 @@ export default function NuevaCompraProveedorPage() {
     setModalEnvioOpen(false);
     setPedidoEnvio(null);
     setBorradorExistente(null);
+    setImportarOpen(false);
+    setAvisoImportacion("");
     router.replace("/modulos/compras-proveedor/nueva");
   }, [router]);
 
@@ -921,6 +951,80 @@ export default function NuevaCompraProveedorPage() {
     } catch {
       alert("Error de conexión al cargar el pedido");
     }
+  };
+
+  // El archivo ya llega revisado: esta etapa usa los endpoints normales de
+  // PedidoProveedor. Nuevo → crea un BORRADOR. Continuar → suma atómicamente al
+  // mismo borrador; nunca abre un segundo pedido por detrás.
+  const aplicarImportacion = async (lineas) => {
+    if (esContinuar) {
+      const res = await fetch(`/api/compras-proveedor/importar/aplicar/${pedidoIdParam}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: lineas }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "No se pudo actualizar el borrador.");
+
+      const porProducto = new Map(productosCompletos.map((p) => [p.productoLocalId, p]));
+      setItems((prev) => {
+        const mapa = new Map(prev.map((item) => [item.productoLocalId, item]));
+        for (const detalle of data.detalles || []) {
+          const producto = porProducto.get(detalle.productoLocalId);
+          if (!producto) continue;
+          const anterior = mapa.get(detalle.productoLocalId);
+          mapa.set(detalle.productoLocalId, {
+            ...anterior,
+            detalleId: detalle.id,
+            productoLocalId: producto.productoLocalId,
+            baseId: producto.baseId ?? null,
+            costoCatalogo: Number(producto.precio_costo) || 0,
+            nombre: producto.nombre,
+            sku: producto.sku,
+            codigo_barra: producto.codigo_barra,
+            codigoInterno: producto.codigoInterno || null,
+            modoCompra: producto.modoCompra || "BULTO",
+            unidadPedido: detalle.unidad,
+            unidad_medida: producto.unidad_medida,
+            cantidad: Number(detalle.cantidad),
+            // El servidor acaba de reconciliar la línea: si devolvió un costo, ése
+            // es el que vale. Antes ganaba el anterior, así que la escala corregida
+            // se guardaba en la base y la pantalla seguía mostrando la vieja.
+            // El servidor acaba de reconciliar la línea: si devolvió un costo, ése
+            // es el que vale. Antes ganaba el anterior, así que la escala corregida
+            // se guardaba en la base y la pantalla seguía mostrando la vieja.
+            precioCosto: costoVisibleDeDetalle({ detalle, anterior, producto }),
+            factorPack: Number(producto.factor_pack) || 1,
+            sugerido: producto.sugerido,
+            sinParametros: producto.sinParametros,
+            pesoRefKg: producto.pesoRefKg,
+          });
+        }
+        return [...mapa.values()];
+      });
+      setModo("manual");
+      setVista("todos");
+      setAvisoImportacion(`Se sumaron ${lineas.length} productos al borrador #${pedidoIdParam}.`);
+      return;
+    }
+
+    const res = await fetch("/api/compras-proveedor/crear", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        proveedorId: Number(proveedorId),
+        notas: notas || null,
+        items: lineas,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "No se pudo crear el borrador.");
+    setModo("manual");
+    setVista("todos");
+    setAvisoImportacion(`Borrador #${data.item.id} creado desde el archivo.`);
+    router.replace(`/modulos/compras-proveedor/nueva?pedidoId=${data.item.id}&importado=1`);
   };
 
   // ── Derivados de render ────────────────────────────────────────────────
@@ -1346,6 +1450,27 @@ export default function NuevaCompraProveedorPage() {
         </span>
       </div>
     );
+
+  const botonImportar = (compact = false) => (
+    <div className={compact ? "mb-2" : "mb-3"}>
+      <SunmiButton
+        color="primary"
+        type="button"
+        className={compact ? "w-full py-1.5 text-[12px]" : "px-3 py-1.5 text-[12px]"}
+        disabled={!proveedorId || loadingProds || productosCompletos.length === 0}
+        onClick={() => {
+          if (borradorExistente) {
+            router.push(`/modulos/compras-proveedor/nueva?pedidoId=${borradorExistente.id}&importar=1`);
+            return;
+          }
+          setImportarOpen(true);
+        }}
+      >
+        <FileUp size={14} />
+        {borradorExistente ? "Continuar borrador e importar" : "Crear borrador desde foto, PDF o Excel"}
+      </SunmiButton>
+    </div>
+  );
 
   // Valor visible del costo: el costo se guarda a full precisión (para no perder
   // exactitud al alternar Pack/Unidad). Acá se redondea SOLO para mostrar/editar,
@@ -1937,6 +2062,13 @@ export default function NuevaCompraProveedorPage() {
 
         {/* Selector de modo (debajo del proveedor) */}
         {proveedorId && selectorModo()}
+        {proveedorId && botonImportar()}
+
+        {avisoImportacion && (
+          <div className="rounded-lg border px-3 py-2 mb-3 text-[12px] sunmi-text-accent sunmi-divider">
+            {avisoImportacion}
+          </div>
+        )}
 
         {/* Warning informativo: hoy no es día válido para este proveedor */}
         {mostrarWarningDia && (
@@ -2219,6 +2351,12 @@ export default function NuevaCompraProveedorPage() {
 
           {proveedorId && (
             <>
+              {botonImportar(true)}
+              {avisoImportacion && (
+                <div className="rounded-lg border px-2.5 py-1.5 mb-2 text-sm2 sunmi-text-accent sunmi-divider">
+                  {avisoImportacion}
+                </div>
+              )}
               {/* Contador + sección */}
               <div className="flex items-center justify-between gap-2 mb-2">
                 <span className="text-[11px] sunmi-text-muted truncate">
@@ -2317,6 +2455,15 @@ export default function NuevaCompraProveedorPage() {
 
       {/* Confirmación al cambiar de modo con productos cargados */}
       {modalConfirmModo}
+
+      {importarOpen && (
+        <ModalImportarPedido
+          open
+          onClose={() => setImportarOpen(false)}
+          productos={productosCompletos}
+          onAplicar={aplicarImportacion}
+        />
+      )}
 
       {/* Confirmación de conversión Unidad→Pack no exacta */}
       {modalConvUnidad}

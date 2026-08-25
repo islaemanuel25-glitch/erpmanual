@@ -443,7 +443,7 @@ test("ESCAPE CIERRA EL DE ARRIBA, NO LOS DOS", () => {
   assert.match(SRC, /PILA\.splice\(i, 1\)/, "la pila no se limpia al cerrar");
 });
 
-test("`espacioCuerpo` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
+test("`espacioCuerpo` NO TIENE DEFAULT, y los 23 modales lo declaran", () => {
   // ── POR QUÉ SE LE SACÓ ────────────────────────────────────────────────────
   //
   // Tenía `"mt-2 gap-3"`. La tabla de declaraciones mostró que 17 de los 22 lo
@@ -471,7 +471,7 @@ test("`espacioCuerpo` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
   );
 });
 
-test("`z` NO TIENE DEFAULT, y los 22 modales lo declaran", () => {
+test("`z` NO TIENE DEFAULT, y los 23 modales lo declaran", () => {
   // Misma forma que el de `espacioCuerpo`, y por un motivo más caro: un modal
   // que se quede sin `z` no se ve raro — se ve bien hasta el día que algo de
   // afuera se le pone encima.
@@ -712,6 +712,29 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/productos/HojaMasAcciones.jsx": false,
     "components/productos/HojaPersonalizarTarjeta.jsx": false,
     "app/modulos/productos/page.jsx": false,
+    // ── UNA POLÍTICA QUE NO ES DEL ARCHIVO SINO DEL PASO ───────────────────
+    //
+    // Los 22 de arriba contestan una vez y para siempre, porque en un archivo o
+    // hay algo escrito o no lo hay. Éste tiene TRES pasos y la respuesta cambia
+    // entre ellos: en `elegir` y `analizando` no hay nada que perder —se eligió
+    // un archivo, se está leyendo—, y en `revisar` ya están las líneas leídas y
+    // corregidas a mano, que es justo lo que cuesta rehacer.
+    //
+    // Las dos respuestas fijas serían mentiras cómodas: con `true` el modal
+    // dejaría de cerrar cuando todavía no hay nada cargado, y con `false` un
+    // toque al costado tiraría la revisión entera. El criterio de este candado
+    // —el velo no cierra cuando cerrar PIERDE algo— no cambia; lo que cambia es
+    // que acá se aplica por paso y no por archivo.
+    //
+    // Por eso se registra la expresión EXACTA que el archivo tiene que pasar.
+    // No es "se acepta cualquier expresión": es ésta y ninguna otra. El regex de
+    // los literales queda como estaba, así que un `destructivo={loQueSea}` sigue
+    // sin poder colarse como si fuera una decisión tomada.
+    "components/compras-proveedor/ModalImportarPedido.jsx": {
+      expresion: 'destructivo={estado === "revisar"}',
+      protegeSolo: "revisar",
+      sinProteger: ["elegir", "analizando"],
+    },
   };
 
   // Que la lista sea TODOS los que usan la pieza, no los que alguien recordó.
@@ -727,6 +750,38 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     const texto = fs.readFileSync(path.join(RAIZ, ruta), "utf8");
     // Se busca el prop pasado a la pieza, no la palabra suelta.
     const loPasa = /\n\s*destructivo(\s*=\s*\{?(true|false)\}?)?\s*\n/.test(texto);
+
+    // ── EL QUE PROTEGE POR PASO SE COMPRUEBA APARTE ────────────────────────
+    //
+    // Va en su propia rama justamente para NO tocar el regex de arriba: ése
+    // sigue aceptando solo literales, que es lo que hace que una expresión
+    // cualquiera no pase por decisión tomada. Acá la comparación es contra el
+    // texto exacto que se registró, no contra un patrón que lo generalice.
+    if (typeof esperado === "object") {
+      assert.equal(
+        loPasa,
+        false,
+        `${ruta} tiene una política por paso registrada y además pasa un literal: o cambió el modal o sobra la política`
+      );
+      assert.ok(
+        texto.includes(esperado.expresion),
+        `${ruta} no pasa exactamente \`${esperado.expresion}\`, así que la política registrada no es la que el modal aplica`
+      );
+      // Y que los pasos EXISTAN. Sin esto la expresión podría nombrar un estado
+      // que el modal no alcanza nunca —un typo alcanza— y el velo protegería
+      // siempre o nunca, con el candado igual de verde. Lo que hace que esto
+      // afirme "solo protege en revisar" no es la expresión: es que los otros
+      // dos pasos se comprueben reales.
+      for (const paso of [esperado.protegeSolo, ...esperado.sinProteger]) {
+        assert.match(
+          texto,
+          new RegExp(`setEstado\\("${paso}"\\)`),
+          `${ruta} nombra el paso "${paso}" pero nada lo pone: la política habla de un estado que no ocurre`
+        );
+      }
+      continue;
+    }
+
     assert.equal(
       loPasa,
       esperado,
