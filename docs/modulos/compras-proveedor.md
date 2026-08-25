@@ -28,6 +28,31 @@ propia: consume `GET /api/compras-proveedor/resumen` y exige `compras.ver`.
 `agregar-item/[id]`, `editar-item/[id]`, `eliminar-item/[id]`, `confirmar/[id]`,
 `marcar-enviado/[id]`, `recibir/[id]`, `anular/[id]`.
 
+## Crear un borrador desde foto, PDF o Excel
+
+Desde `nueva` se puede elegir el proveedor y abrir **Crear borrador desde foto,
+PDF o Excel**. Es un flujo de pedido, no de recepción ni de comprobantes:
+
+1. `POST /api/compras-proveedor/importar/analizar` lee una foto/PDF con la misma
+   configuración de Gemini que usa el sistema, o un XLSX/XLS de forma
+   determinista con `xlsx`.
+2. La pantalla muestra código, descripción, cantidad y unidad crudos. El precio
+   del papel es solo informativo: la línea usa el costo actual del catálogo y no
+   modifica el costo maestro.
+3. Solo un código de proveedor o alias exacto selecciona un producto sin
+   preguntar. La búsqueda por nombre ordena sugerencias, pero exige confirmación
+   humana.
+4. `UN` se convierte a `BULTO` únicamente cuando `cantidad / factor_pack` es
+   entero. Una división no exacta queda en unidades y exige revisión; `DI`, una
+   unidad ausente o una cantidad no entera también bloquean hasta revisar.
+5. Al confirmar, un pedido nuevo entra por el endpoint normal `crear` y queda en
+   `BORRADOR`. Si ya se abrió un borrador, `importar/aplicar/[id]` suma las líneas
+   al mismo pedido en una transacción, sin crear otro.
+
+La primera versión no persiste el archivo fuente: lo usa para armar la revisión
+y lo descarta. Tampoco toca stock, recepción, recetas fiscales, impuestos,
+envío ni producción.
+
 ## Modelos
 
 `PedidoProveedor`, `PedidoProveedorDetalle`, `ProductoBase`, `ProductoLocal`,
@@ -72,7 +97,12 @@ los dos módulos.
 
 ## Candados
 
-`lib/compras/scope.test.mjs`, 6 tests. **Y nada más.**
+La importación agrega `lib/compras-proveedor/importacion/*.test.mjs` para el
+parser tabular, el contrato del lector visual, los vínculos exactos, la
+conversión de cantidades y la suma sobre un borrador existente.
+
+`lib/compras/scope.test.mjs` cubre el alcance. El resto del armado histórico aún
+mantiene la deuda indicada abajo.
 
 `calculoPedido.js`, `costoMaestro.js` y `textoPedido.js` **no tienen tests
 propios**. La única cobertura es indirecta: `lib/precios/margenNoSeDeforma.test.mjs`

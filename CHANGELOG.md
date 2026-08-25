@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-08-25] - Actualización: stock
+
+### Modificado
+- **stock**: fix(stock): mostrar packs y unidades en movil (#12)
+
+
 ## [2026-08-22] - Actualización: productos
 
 ### Modificado
