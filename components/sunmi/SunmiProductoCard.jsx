@@ -68,6 +68,7 @@
 // catálogo. Quedan los dos que SÍ marcan qué es cada renglón.
 // `Tag` se fue con la franja de equivalencia: era el ícono que la marcaba como
 // "esto es la escala del precio". La escala ahora viaja pegada al número.
+import { useState } from "react";
 import { Barcode, TriangleAlert } from "lucide-react";
 
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
@@ -82,6 +83,107 @@ import {
 // prototipo, sin clase arbitraria. Los 13 px del eje horizontal no tienen
 // equivalente en la escala, así que ése sí va escrito.
 const PADDING = "px-[13px] pt-3.5 pb-3";
+
+// EL BLOQUE SOMBREADO DEL VALOR TAMBIÉN ES DEL KIT.
+//
+// Nació en la tarjeta del catálogo como el bloque del precio. Stock necesita la
+// misma caja para la existencia: si cada pantalla copiara ancho, alto, fondo y
+// área táctil, las dos tarjetas serían iguales solo hasta el próximo cambio.
+// Se extrajo sin cambiar una clase ni un nodo del consumidor original.
+const ALTO_BLOQUE_VALOR = "min-h-[51.5px]";
+
+export function BloqueValorTarjeta({
+  className = "",
+  children,
+  esControl = false,
+  alTocar = null,
+  etiqueta = null,
+  activo = false,
+  ...resto
+}) {
+  const clases = `flex w-[202px] max-w-full rounded-xl px-2.5 py-2 [background:var(--hover-bg)] ${ALTO_BLOQUE_VALOR} ${className}`;
+  if (!esControl) {
+    return (
+      <span data-cara-precio className={clases} {...resto}>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      data-cara-precio
+      data-cara-precio-alterna
+      onClick={alTocar ?? undefined}
+      aria-label={etiqueta ?? undefined}
+      aria-pressed={activo}
+      className={`${clases} text-left`}
+      {...resto}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Tipografía compartida dentro del bloque. Productos aporta el precio y Stock
+// la existencia; el tamaño, el ritmo y las cifras tabulares son de la pieza.
+export function RotuloBloqueValor({ children, className = "", style = undefined, ...resto }) {
+  return (
+    <span
+      data-cara-presentacion
+      className={`mb-1 text-[9px] font-bold whitespace-nowrap ${className}`}
+      style={style}
+      {...resto}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function NumeroBloqueValor({ children, atenuado = false, className = "", ...resto }) {
+  return (
+    <span
+      data-cara-importe
+      className={`text-[25px] font-semibold whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em] ${
+        atenuado ? "sunmi-text-muted" : "sunmi-text-strong"
+      } ${className}`}
+      {...resto}
+    >
+      {children}
+    </span>
+  );
+}
+
+// LA FOTO ES DEL PRODUCTO, NO DEL CATÁLOGO.
+//
+// Stock recibe la misma `imagenUrl`, así que la miniatura vive junto a la card.
+// La implementación es exactamente la que ya funcionaba en Productos: si la URL
+// está rota se retira, y `contain` evita recortar la etiqueta del envase.
+const LADO_MINIATURA = "w-[44px] h-[44px]";
+
+export function MiniaturaProductoTarjeta({ url }) {
+  const [fallo, setFallo] = useState(false);
+
+  const alMontarLaImagen = (img) => {
+    if (img && img.complete && img.naturalWidth === 0) setFallo(true);
+  };
+
+  if (fallo || !url) return null;
+
+  return (
+    <img
+      ref={alMontarLaImagen}
+      data-tarjeta-foto
+      src={url}
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      decoding="async"
+      onError={() => setFallo(true)}
+      className={`${LADO_MINIATURA} shrink-0 rounded-lg object-contain`}
+    />
+  );
+}
 
 /**
  * Lo que dice el pie cuando el producto no tiene código de barras.

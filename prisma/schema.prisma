@@ -523,6 +523,31 @@ model StockLocal {
   // en 2 decimales, alineados con AuditoriaStock.stockMin*/stockMax*.
   stockMin   Decimal? @db.Decimal(12, 2)
   stockMax   Decimal? @db.Decimal(12, 2)
+  // ── QUÉ DISTINGUE "SIN AJUSTAR" DE "AJUSTADO EN CERO" ────────────────────
+  //
+  // Un límite en 0 es un valor CONFIGURADO válido, así que los VALORES no
+  // alcanzan para contestar si alguien los ajustó alguna vez. Y el null tampoco:
+  // cinco rutas creaban la fila con `stockMin: 0, stockMax: 0` mientras otras
+  // tres la creaban en null, así que el mismo "nunca configurado" quedaba escrito
+  // de dos formas. La peor era `stock_locales/listar`: ABRIR la pantalla creaba
+  // filas con ceros.
+  //
+  // Medido en erpazul_dev antes de esta tanda, sobre 4.008 filas: 3.820 en null,
+  // 126 en 0/0 —de las cuales UNA tenía auditoría de LIMITES, o sea un cero
+  // puesto a propósito— y 62 con algún valor positivo. Esas 126 eran
+  // indistinguibles entre sí mirando los valores.
+  //
+  // Por eso esto es una columna y no un predicado: es un HECHO propio —cuándo se
+  // ajustaron los límites— y no algo derivable de otros datos. Regla 3 del
+  // proyecto.
+  //
+  // LA ESCRIBE `/api/stock_locales/ajustar` con `modo: "limites"`, que es la
+  // ruta que los dos modales usan de verdad. `/api/stock_locales/limites` es una
+  // duplicada que HOY NO SE CONSUME —lo dice su propio encabezado— y se mantiene
+  // coherente por si alguien la conecta, pero no es la única escritora ni la
+  // principal. Decirlo importa: la especificación de la tanda apuntaba a esa
+  // ruta, y sellar solo ahí habría dejado esta columna en null para siempre.
+  limitesConfiguradosAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

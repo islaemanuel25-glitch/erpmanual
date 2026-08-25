@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import CarruselControles from "@/components/productos/CarruselControles";
+import { useResumenStock } from "@/hooks/useResumenStock";
 import FiltrosStock from "@/components/stock_locales/FiltrosStock";
 import TablaStock from "@/components/stock_locales/TablaStock";
 import ModalAjuste from "@/components/stock_locales/ModalAjuste";
@@ -20,13 +22,86 @@ export default function StockLocalesPage() {
   const [filtro, setFiltro] = useState({});
   const [page, setPage] = useState(1);
 
+  // ── LA CARD ACTIVA VIVE EN EL FILTRO, NO AL LADO ─────────────────────────
+  //
+  // Se guarda dentro de `filtro` y no en un estado paralelo para que no puedan
+  // desincronizarse: el listado lee `filtro`, así que si la card viviera aparte
+  // habría dos verdades sobre qué se está mostrando.
+  const estadoActivo = filtro.estado || null;
+
+  const alTocarCard = useCallback((id) => {
+    setPage(1);
+    setFiltro((prev) => {
+      // Tocar la card activa la apaga. Solo una puede estar prendida.
+      if (prev.estado === id) {
+        const { estado, ...resto } = prev;
+        return resto;
+      }
+      return { ...prev, estado: id };
+    });
+  }, []);
+
+  // ── LA CARD SOBREVIVE A BUSCAR Y FILTRAR ─────────────────────────────────
+  //
+  // `FiltrosStock` emite el juego COMPLETO de sus filtros, así que pasarle
+  // `setFiltro` directo reemplazaba el objeto entero y se llevaba puesto
+  // `estado` —la card activa— apenas se escribía en el buscador o se elegía una
+  // categoría. La card se apagaba sola y el listado volvía a traer todo.
+  //
+  // Acá se FUSIONA: los filtros normales pisan lo suyo y `estado` se conserva.
+  // El pedido del listado lleva los dos a la vez, que es lo que se pidió.
+  //
+  // La card solo se apaga por las dos vías previstas: tocarla de nuevo, o
+  // Limpiar —que sí borra todo, incluida ella—.
+  const alCambiarFiltros = useCallback((nuevos) => {
+    setPage(1);
+    setFiltro((prev) => (prev.estado ? { ...nuevos, estado: prev.estado } : nuevos));
+  }, []);
+
+  const alLimpiar = useCallback(() => {
+    setPage(1);
+    setFiltro({});
+  }, []);
+
+  // ── EL CATÁLOGO SE PIDE UNA SOLA VEZ ─────────────────────────────────────
+  //
+  // Acá había un `fetch` propio a `/api/catalogos/proveedores`, y `FiltrosStock`
+  // ya lo traía por su lado: dos pedidos idénticos en cada entrada a la pantalla.
+  // Ahora lo informa el componente que lo carga y esta pantalla solo lo recibe.
+  //
+  // `useCallback` no es prolijidad: el efecto de `FiltrosStock` que dispara el
+  // filtrado tiene `onFiltroChange` entre sus dependencias, y una función inline
+  // se recrea en cada render. Lo mismo vale para este handler.
+  const [proveedoresPorId, setProveedoresPorId] = useState({});
+  const alCargarCatalogos = useCallback(({ proveedores }) => {
+    const mapa = {};
+    for (const p of proveedores || []) mapa[p.id] = p.nombre;
+    setProveedoresPorId(mapa);
+  }, []);
+
+  // Lo que el listado le informa a los contadores: cuándo terminó su primera
+  // carga y para qué ubicación. Es la puerta de `ordenDeCargaProductos`.
+  const [listadoListo, setListadoListo] = useState(null);
+
+  // Se declara ACÁ y no más abajo porque el resumen depende de él: después de
+  // ajustar o de tocar límites los conteos cambiaron y hay que volver a pedirlos.
+  const [refrescar, setRefrescar] = useState(false);
+
+  const localSeleccionadoParaResumen = contexto?.localId || null;
+  const {
+    estados,
+    cargando: cargandoResumen,
+    error: errorResumen,
+  } = useResumenStock({
+    localSeleccionado: localSeleccionadoParaResumen,
+    listadoListo,
+  });
+
   const [openAjuste, setOpenAjuste] = useState(false);
   const [productoAjuste, setProductoAjuste] = useState(null);
 
   const [openLimites, setOpenLimites] = useState(false);
   const [productoLimites, setProductoLimites] = useState(null);
-
-  const [refrescar, setRefrescar] = useState(false);
 
   const abrirAjuste = (producto) => {
     setProductoAjuste(producto);
@@ -71,12 +146,30 @@ export default function StockLocalesPage() {
           label={`Stock${localActual.nombre ? ` — ${localActual.nombre}` : ""}`}
         />
 
+        {/* ── ESTADO DEL STOCK: VA ARRIBA DEL BUSCADOR ────────────────────
+            Es el orden del diseño aprobado. Las cards filtran el listado y no
+            tocan datos: son controles de revisión, y por eso se superponen
+            entre sí en vez de repartir el catálogo. */}
+        <CarruselControles
+          titulo="Estado del stock"
+          controles={estados}
+          activo={estadoActivo}
+          onSelect={alTocarCard}
+          cargando={cargandoResumen}
+        />
+        {errorResumen && (
+          <p className="text-xs sunmi-text-danger" role="status">
+            {errorResumen}
+          </p>
+        )}
+
         {/* FILTROS compactos */}
         <FiltrosStock
           compact
           localSeleccionado={localSeleccionado}
-          onFiltroChange={setFiltro}
-          onReset={() => setFiltro({})}
+          onFiltroChange={alCambiarFiltros}
+          onReset={alLimpiar}
+          onCatalogos={alCargarCatalogos}
         />
 
         <SunmiSeparator label="Listado" />
@@ -93,6 +186,8 @@ export default function StockLocalesPage() {
           setRefrescar={setRefrescar}
           onAjustar={abrirAjuste}
           onEditarLimites={abrirLimites}
+          proveedoresPorId={proveedoresPorId}
+          onPrimeraCarga={setListadoListo}
         />
 
       </SunmiCard>

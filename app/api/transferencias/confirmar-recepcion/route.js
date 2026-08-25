@@ -259,8 +259,10 @@ export async function POST(req) {
               localId: transferencia.destinoId,
               productoId: productoDestino.id,
               cantidad: 0,
-              stockMin: 0,
-              stockMax: 0,
+              // NULL: recibir una transferencia crea la fila si falta, pero no
+              // configura límites. Ver `limitesConfiguradosAt` en el esquema.
+              stockMin: null,
+              stockMax: null,
             },
           });
         }

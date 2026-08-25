@@ -27,6 +27,11 @@ const FUENTE = fs
   .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/\/\/[^\n]*/g, "");
+const FUENTE_KIT = fs
+  .readFileSync(path.join(RAIZ, "components/sunmi/SunmiProductoCard.jsx"), "utf8")
+  .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/\/\/[^\n]*/g, "");
 
 const render = (props) =>
   renderToStaticMarkup(
@@ -323,8 +328,8 @@ test("G5e. UNA FOTO ROTA SE ESCONDE, no deja el ícono de imagen rota", () => {
   // No se puede ejercer el error acá —esto no monta un navegador— así que se
   // afirma que los dos caminos ESTÁN y que apagan el dibujo. Que la tarjeta no
   // se rompa lo cubre la sonda, abriendo la pantalla con una url rota.
-  assert.match(FUENTE, /onError=\{\(\) => setFallo\(true\)\}/, "la foto no maneja el error de carga");
-  assert.match(FUENTE, /if \(fallo\) return null;/, "al fallar la foto deja algo dibujado");
+  assert.match(FUENTE_KIT, /onError=\{\(\) => setFallo\(true\)\}/, "la foto no maneja el error de carga");
+  assert.match(FUENTE_KIT, /if \(fallo \|\| !url\) return null;/, "al fallar la foto deja algo dibujado");
 
   // ── Y EL SEGUNDO CAMINO, QUE ES EL QUE DE VERDAD PASA ──────────────────
   //
@@ -337,7 +342,7 @@ test("G5e. UNA FOTO ROTA SE ESCONDE, no deja el ícono de imagen rota", () => {
   // "redundante": el manejador de error queda, todo compila, y la foto rota
   // vuelve a quedarse en la tarjeta sin que ningún candado de la suite lo vea.
   assert.match(
-    FUENTE,
+    FUENTE_KIT,
     /img\.complete && img\.naturalWidth === 0/,
     "se fue la comprobación de la imagen que YA falló antes de hidratar"
   );

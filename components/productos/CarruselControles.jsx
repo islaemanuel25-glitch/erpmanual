@@ -99,6 +99,16 @@ export default function CarruselControles({
   cargando = false,
   truncado = false,
   techo = null,
+  // ── EL RÓTULO ES UN PARÁMETRO, CON EL DE PRODUCTOS COMO DEFAULT ─────────
+  //
+  // Stock reusa esta pieza y su bloque se llama "Estado del stock", no "Para
+  // revisar". Escribir un carrusel parecido al lado habría sido la salida fácil
+  // y la equivocada: el día que uno cambie, el otro se queda viejo.
+  //
+  // El default conserva Productos EXACTAMENTE como estaba —no pasa el prop, así
+  // que sigue diciendo "Para revisar"—, que es la prueba de que la pieza salió
+  // bien: la pantalla de donde se sacó no se movió.
+  titulo = "Para revisar",
 }) {
   const paginas = enPaginas(controles);
   const [paginaVisible, setPaginaVisible] = useState(0);
@@ -123,7 +133,7 @@ export default function CarruselControles({
     <section aria-labelledby={etiquetaId} className="w-full">
       <div className="flex items-center justify-between mb-1.5">
         <h2 id={etiquetaId} className="text-[12px] font-semibold sunmi-text-strong">
-          Para revisar
+          {titulo}
         </h2>
         {cargando && (
           <span className="text-[10.5px] sunmi-text-muted">calculando…</span>

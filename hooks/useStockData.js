@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Fetch + estado del listado de Stock Locales. Extraído de TablaStock.jsx SIN
 // cambiar comportamiento: mismos params, mismo endpoint, misma dependencia de
@@ -26,9 +26,29 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
     if (filtro.sinStock) params.set("sinStock", "true");
     if (filtro.faltantes) params.set("faltantes", "true");
     if (filtro.negativo) params.set("negativo", "true");
+    // El estado que viene de tocar una card de "Estado del stock". El servidor
+    // lo valida contra la lista del dominio: si llega cualquier otra cosa, lo
+    // ignora en vez de devolver una lista vacía sin explicación.
+    if (filtro.estado) params.set("estado", filtro.estado);
 
     return params.toString();
   };
+
+  // ── `refrescar` DISPARABA DOS LISTADOS POR CADA GUARDADO ─────────────────
+  //
+  // Está en las dependencias del efecto y hace un viaje de ida y vuelta: lo
+  // prende quien guarda, y el `finally` de acá abajo lo devuelve a false. Las
+  // DOS transiciones re-ejecutaban el efecto, así que cada Ajustar o Límites
+  // pedía el listado dos veces.
+  //
+  // No rompía nada —el segundo pedido traía lo mismo— y por eso llevaba ahí
+  // desde antes de esta tanda. Lo destapó medir la secuencia de red: el segundo
+  // listado arrancaba DESPUÉS del resumen y se solapaba con él, justo lo que la
+  // coordinación existe para evitar.
+  //
+  // Ahora se pide cuando cambió algo de verdad —ubicación, filtros o página— o
+  // cuando alguien PRENDIÓ el refresco. La vuelta a false no dispara nada.
+  const claveRef = useRef(null);
 
   useEffect(() => {
     if (!localSeleccionado) {
@@ -37,6 +57,10 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
       setTotalPages(1);
       return;
     }
+
+    const clave = `${localSeleccionado}|${JSON.stringify(filtro)}|${page}`;
+    if (!refrescar && claveRef.current === clave) return;
+    claveRef.current = clave;
 
     let cancelado = false;
     const debeLimpiar = refrescar;

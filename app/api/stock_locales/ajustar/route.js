@@ -33,6 +33,11 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import {
+  esConfiguracion,
+  interpretarLimite,
+  valorAGuardar,
+} from "@/lib/stock/limites";
 
 const TEXTO_SIN_AUDITORIA =
   "No se puede registrar el ajuste porque no se pudo determinar el grupo de la " +
@@ -73,10 +78,16 @@ export async function POST(req) {
     const cantidad =
       body.cantidad !== undefined ? Number(body.cantidad) : null;
 
-    const nuevoMin =
-      body.nuevoMin !== undefined ? Number(body.nuevoMin) : null;
-    const nuevoMax =
-      body.nuevoMax !== undefined ? Number(body.nuevoMax) : null;
+    // ── TRES RAMAS, NO DOS ──────────────────────────────────────────────────
+    //
+    // No vino / vino vacío / vino un número. `Number(null)` y `Number("")` dan 0,
+    // así que "sacá el límite" y "poné el límite en cero" terminaban escritos
+    // igual — y desde que el 0 es un valor configurado válido, esa confusión es
+    // justo la que hay que cerrar. Ver `lib/stock/limites.js`.
+    const minPedido = interpretarLimite(body.nuevoMin);
+    const maxPedido = interpretarLimite(body.nuevoMax);
+    const nuevoMin = minPedido.valor;
+    const nuevoMax = maxPedido.valor;
 
     // ======================================================
     // 2) RESOLVER localId REAL SEGÚN PROTOCOLO
@@ -186,8 +197,11 @@ export async function POST(req) {
           localId,
           productoId: productoLocalId,
           cantidad: 0,
-          stockMin: 0,
-          stockMax: 0,
+          // NULL, no 0: crear la fila para poder ajustar cantidad no configura
+          // límites. Los ajusta `/api/stock_locales/limites`, que además sella
+          // `limitesConfiguradosAt`.
+          stockMin: null,
+          stockMax: null,
         },
       });
     }
@@ -267,8 +281,11 @@ export async function POST(req) {
     // 7) MODO LIMITES
     // ======================================================
     if (modo === "limites") {
-      const minAnterior = Number(stock.stockMin || 0);
-      const maxAnterior = Number(stock.stockMax || 0);
+      // El anterior conserva su null: con `Number(null || 0)` la auditoría decía
+      // "antes valía cero" sobre un límite que no existía, y esa fila de
+      // auditoría es la que después usa el backfill para decidir.
+      const minAnterior = stock.stockMin === null ? null : Number(stock.stockMin);
+      const maxAnterior = stock.stockMax === null ? null : Number(stock.stockMax);
 
       // Mismo criterio que el ajuste: sin rastro no se escribe.
       if (!grupoId) {
@@ -282,8 +299,25 @@ export async function POST(req) {
         const upd = await tx.stockLocal.update({
           where: { localId_productoId: { localId, productoId: productoLocalId } },
           data: {
-            stockMin: nuevoMin ?? stock.stockMin ?? 0,
-            stockMax: nuevoMax ?? stock.stockMax ?? 0,
+            // Lo que no vino no se toca; lo que vino vacío se borra; lo que vino
+            // como número se guarda, cero incluido.
+            stockMin: valorAGuardar(minPedido, minAnterior),
+            stockMax: valorAGuardar(maxPedido, maxAnterior),
+            // ── ACÁ SE SELLA LA MARCA, Y ES EL ÚNICO LUGAR QUE LO HACE ──────
+            //
+            // Pasar por Límites ES configurar, aunque lo guardado sea un cero o
+            // un borrado: lo que se registra es que hubo una decisión, no el
+            // valor. Si registrara el valor volveríamos a no poder distinguir un
+            // cero puesto a propósito de una fila recién creada.
+            //
+            // OJO, y es lo que casi se nos escapa: la especificación de esta
+            // tanda pedía sellar en `/api/stock_locales/limites`, pero ESA RUTA
+            // NO SE USA — los dos modales llaman acá. Sellar solo allá habría
+            // dejado la marca en null para siempre y la card "Límites sin
+            // ajustar" mostrando el catálogo entero.
+            ...(esConfiguracion(minPedido, maxPedido)
+              ? { limitesConfiguradosAt: new Date() }
+              : {}),
           },
         });
         await tx.auditoriaStock.create({
@@ -294,9 +328,9 @@ export async function POST(req) {
             userId: session.id,
             accion: "LIMITES",
             stockMinAnterior: minAnterior,
-            stockMinNuevo: Number(upd.stockMin || 0),
+            stockMinNuevo: upd.stockMin === null ? null : Number(upd.stockMin),
             stockMaxAnterior: maxAnterior,
-            stockMaxNuevo: Number(upd.stockMax || 0),
+            stockMaxNuevo: upd.stockMax === null ? null : Number(upd.stockMax),
             motivo: motivo || null,
           },
         });
@@ -310,8 +344,9 @@ export async function POST(req) {
           localId: actualizado.localId,
           productoId: actualizado.productoId,
           cantidad: Number(actualizado.cantidad || 0),
-          stockMin: Number(actualizado.stockMin || 0),
-          stockMax: Number(actualizado.stockMax || 0),
+          stockMin: actualizado.stockMin === null ? null : Number(actualizado.stockMin),
+          stockMax: actualizado.stockMax === null ? null : Number(actualizado.stockMax),
+          limitesConfigurados: actualizado.limitesConfiguradosAt !== null,
         },
       });
     }
