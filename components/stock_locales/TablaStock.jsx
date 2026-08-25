@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { fromUnidades, kgToPiezas } from "@/lib/conversiones/stock";
+import { kgToPiezas } from "@/lib/conversiones/stock";
 import { useStockData } from "@/hooks/useStockData";
 import { useColumnasVisibles } from "@/hooks/useColumnasVisibles";
 import ColumnPicker from "@/components/stock_locales/ColumnPicker";
@@ -9,12 +9,12 @@ import TarjetaStockMovil from "@/components/stock_locales/TarjetaStockMovil";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import {
-  formatCantidad,
-  esPackDeposito,
   getUnidadDeposito,
   getUnidadLocal,
   getPresentacionDeposito,
   esFiambreFijoItem,
+  presentacionCantidadStock,
+  formatLimiteStock,
 } from "@/lib/stock/presentacion";
 
 // ── Componente ──────────────────────────────────────────────────────────
@@ -113,12 +113,10 @@ export default function TablaStock({
   const { isVisible, toggleCol, visibleCount, COLUMN_DEFS } = useColumnasVisibles();
 
   // ── Render helpers por columna ────────────────────────────────────────
-  const renderCellStock = (p, fmtOpts, isFiambreFijo) => {
-    if (esPackDeposito(p, localEsDeposito)) {
-      const { bultos, sueltas } = fromUnidades({
-        unidades: Number(p.stock || 0),
-        factorPack: p.factorPack,
-      });
+  const renderCellStock = (p, isFiambreFijo) => {
+    const presentacion = presentacionCantidadStock(p, localEsDeposito);
+    if (presentacion.esDesglose) {
+      const { bultos, sueltas } = presentacion;
       // Un stock NEGATIVO se lee igual que uno positivo, con el signo adelante.
       //
       // Antes la condición era `bultos > 0 || sueltas > 0`, así que con un
@@ -127,20 +125,17 @@ export default function TablaStock({
       // desglose se perdía justo en las filas que más hay que mirar. Estaba
       // protegido por accidente, no por diseño: sin esa condición habría
       // mostrado el par roto que devolvía fromUnidades con negativos.
-      if (bultos !== 0 || sueltas !== 0) {
-        return (
-          <span>
-            {bultos !== 0 && <strong>{bultos} bultos</strong>}
-            {bultos !== 0 && sueltas !== 0 && " + "}
-            {sueltas !== 0 && `${sueltas} uds`}
-          </span>
-        );
-      }
-      return <span>{formatCantidad(p.stock, p.unidadMedida, fmtOpts)}</span>;
+      return (
+        <span>
+          {bultos !== 0 && <strong>{bultos} bultos</strong>}
+          {bultos !== 0 && sueltas !== 0 && " + "}
+          {sueltas !== 0 && `${sueltas} uds`}
+        </span>
+      );
     }
     return (
       <span>
-        {formatCantidad(p.stock, p.unidadMedida, fmtOpts)}
+        {presentacion.texto}
         {p.unidadMedida === "kg" && p.modoCompraProveedor === "UNIDAD" && p.pesoReferenciaKg > 0 && !isFiambreFijo && (
           <span className="block text-[10px] sunmi-text-muted">
             ≈ {kgToPiezas(Number(p.stock || 0), p.pesoReferenciaKg)} pzs
@@ -196,6 +191,7 @@ export default function TablaStock({
             onAjustar={onAjustar}
             onLimites={onEditarLimites}
             puedeAjustar={puedeAjustar}
+            localEsDeposito={localEsDeposito}
           />
         ))}
         </SunmiListaProductoCards>
@@ -235,7 +231,6 @@ export default function TablaStock({
             {items.map((p) => {
               const presentacionDep = getPresentacionDeposito(p);
               const isFiambreFijo = esFiambreFijoItem(p);
-              const fmtOpts = { esFiambreFijo: isFiambreFijo, esDeposito: localEsDeposito };
               return (
                 <tr key={p.id} className="hover:bg-[var(--table-row-hover)]">
                   {isVisible("producto") && (
@@ -262,21 +257,21 @@ export default function TablaStock({
                   )}
                   {isVisible("stock") && (
                     <td className="px-2 py-1 text-right">
-                      {renderCellStock(p, fmtOpts, isFiambreFijo)}
+                      {renderCellStock(p, isFiambreFijo)}
                     </td>
                   )}
                   {isVisible("min") && (
                     <td className="px-2 py-1 text-right">
-                      {esPackDeposito(p, localEsDeposito) && p.stockMin != null
-                        ? fromUnidades({ unidades: Number(p.stockMin), factorPack: p.factorPack }).bultos
-                        : p.stockMin != null ? formatCantidad(p.stockMin, p.unidadMedida, fmtOpts) : "-"}
+                      {p.stockMin != null
+                        ? formatLimiteStock(p.stockMin, p, localEsDeposito)
+                        : "-"}
                     </td>
                   )}
                   {isVisible("max") && (
                     <td className="px-2 py-1 text-right">
-                      {esPackDeposito(p, localEsDeposito) && p.stockMax != null
-                        ? fromUnidades({ unidades: Number(p.stockMax), factorPack: p.factorPack }).bultos
-                        : p.stockMax != null ? formatCantidad(p.stockMax, p.unidadMedida, fmtOpts) : "-"}
+                      {p.stockMax != null
+                        ? formatLimiteStock(p.stockMax, p, localEsDeposito)
+                        : "-"}
                     </td>
                   )}
                   {isVisible("costo") && (

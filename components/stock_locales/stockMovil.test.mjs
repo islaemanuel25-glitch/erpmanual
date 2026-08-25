@@ -80,10 +80,14 @@ test("MOV5. SE USA EL KIT, no botones ni paginadores a mano", () => {
 });
 
 test("MOV6. LA CANTIDAD SE FORMATEA CON LA MISMA PIEZA QUE LA TABLA", () => {
-  // Un `toLocaleString` escrito al lado haría que kilos, unidades y fiambre se
-  // leyeran distinto en móvil y en escritorio para el mismo producto.
-  assert.match(TARJETA, /formatCantidad/, "la tarjeta formatea la cantidad por su cuenta");
-  assert.match(TABLA, /formatCantidad/);
+  // Un formateador escrito al lado haría que packs, kilos, unidades y fiambre
+  // se leyeran distinto en móvil y escritorio para el mismo producto.
+  assert.match(
+    TARJETA,
+    /presentacionCantidadStock/,
+    "la tarjeta formatea la cantidad por su cuenta"
+  );
+  assert.match(TABLA, /presentacionCantidadStock/);
 });
 
 test("MOV7. LAS CARDS VAN ARRIBA DEL BUSCADOR Y REUSAN EL CARRUSEL", () => {
@@ -148,4 +152,23 @@ test("MOV11. LA TABLA DE ESCRITORIO NO SE REDISEÑÓ", () => {
   assert.match(TABLA, /<table/, "desapareció la tabla de escritorio");
   assert.match(TABLA, /ColumnPicker/, "desapareció el selector de columnas");
   assert.match(TABLA, /isVisible\("producto"\)/, "cambiaron las columnas de la tabla");
+});
+
+test("MOV12. LA CARD RECIBE LA UBICACIÓN Y COMPARTE LA ESCALA CON ESCRITORIO", () => {
+  // Sin `localEsDeposito`, la tarjeta no puede saber que 45 unidades físicas de
+  // un Pack x10 se leen como 4 bultos + 5 uds. Ese fue el defecto observado en
+  // producción inmediatamente después de desplegar la vista móvil.
+  assert.match(
+    TABLA,
+    /localEsDeposito=\{localEsDeposito\}/,
+    "TablaStock no le informa a la card si la ubicación es depósito"
+  );
+  assert.match(TARJETA, /presentacionCantidadStock\(item, localEsDeposito\)/);
+  assert.match(TARJETA, /getUnidadDeposito/);
+  assert.match(TARJETA, /formatLimiteStock/);
+  assert.doesNotMatch(
+    TARJETA,
+    /formatCantidad\(stock/,
+    "la card volvió al formateador genérico que muestra unidades crudas"
+  );
 });
