@@ -19,7 +19,8 @@
 //      teléfono. Eso es lo que convirtió un problema de lectura en cinco
 //      intentos.
 //
-// Lo que se puede afirmar leyendo: que los dos `try` estén separados, que cada
+// La importación ahora vive en una página dedicada, no en un modal. Lo que se
+// puede afirmar leyendo sigue siendo: que los dos `try` estén separados, que cada
 // uno diga lo suyo, que el mensaje del servidor se conserve, y que el archivo
 // sobreviva al fallo. Lo que NO se puede afirmar acá —que el botón se vea y se
 // pueda tocar a 390 px— lo mide la sonda.
@@ -33,7 +34,7 @@ const RAIZ = path.resolve(import.meta.dirname, "../..");
 // Se sacan los comentarios ANTES de mirar: si no, un texto nombrado en una
 // explicación cuenta como si estuviera en el código y el candado afirma nada.
 const SRC = fs
-  .readFileSync(path.join(RAIZ, "components/compras-proveedor/ModalImportarPedido.jsx"), "utf8")
+  .readFileSync(path.join(RAIZ, "components/compras-proveedor/ImportarPedidoDesdeArchivo.jsx"), "utf8")
   .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/\/\/[^\n]*/g, "");
@@ -42,17 +43,19 @@ const CORTE = "Se cortó la conexión mientras se analizaba. Mantené esta panta
 const NO_JSON = "El servidor devolvió una respuesta inválida. Reintentá.";
 
 test("ERR1. el `fetch` y el `json()` tienen CADA UNO su try/catch", () => {
+  const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
+  assert.ok(analisis.length > 0, "no se pudo delimitar la función de análisis");
   // El defecto era un solo try alrededor de los dos. Se cuenta que haya al menos
   // dos bloques try en la función de análisis.
-  const bloques = SRC.match(/try\s*\{/g) || [];
+  const bloques = analisis.match(/try\s*\{/g) || [];
   assert.ok(bloques.length >= 2, `hay ${bloques.length} bloques try: los dos modos de fallar volvieron a compartir uno`);
 
   // Y que el `fetch` no esté dentro del mismo try que el `json()`: entre uno y
   // otro tiene que haber un `catch` que cierre el primero.
-  const iFetch = SRC.indexOf("await fetch(");
-  const iJson = SRC.indexOf(".json()");
+  const iFetch = analisis.indexOf("await fetch(");
+  const iJson = analisis.indexOf(".json()");
   assert.ok(iFetch > 0 && iJson > iFetch, "no se encontró el orden fetch → json");
-  const entre = SRC.slice(iFetch, iJson);
+  const entre = analisis.slice(iFetch, iJson);
   assert.match(entre, /catch/, "el fetch y el json siguen dentro del mismo try");
 });
 
@@ -98,9 +101,9 @@ test("ERR4. el archivo sobrevive al fallo y hay cómo reintentar", () => {
     "el análisis toca el archivo elegido: si lo borra al fallar, reintentar obliga a volver a la galería"
   );
 
-  // Pero sí se limpia al CERRAR el modal, que es otra cosa: ahí sí corresponde.
+  // Pero sí se limpia al cambiar de proveedor, que reinicia el flujo completo.
   const borrados = SRC.match(/setArchivo\(null\)/g) || [];
-  assert.ok(borrados.length >= 1, "el archivo no se limpia nunca, ni siquiera al cerrar el modal");
+  assert.ok(borrados.length >= 1, "el archivo no se limpia nunca, ni siquiera al cambiar de proveedor");
 
   // Y existe el reintento, que reusa el MISMO archivo del estado.
   assert.match(SRC, /const reintentar = async/, "no hay función de reintento");

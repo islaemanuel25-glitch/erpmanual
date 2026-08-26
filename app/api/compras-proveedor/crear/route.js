@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
+import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
 
 export async function POST(req) {
   try {
@@ -60,6 +61,21 @@ export async function POST(req) {
           { status: 400 }
         );
       }
+      if (!["BULTO", "UNIDAD"].includes(it.unidad || "BULTO")) {
+        return NextResponse.json(
+          { ok: false, error: `unidad inválida (productoLocalId: ${it.productoLocalId})` },
+          { status: 400 }
+        );
+      }
+      if (it.precioCosto !== null && it.precioCosto !== undefined && it.precioCosto !== "") {
+        const costo = Number(it.precioCosto);
+        if (!Number.isFinite(costo) || costo < 0) {
+          return NextResponse.json(
+            { ok: false, error: `precioCosto inválido (productoLocalId: ${it.productoLocalId})` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Validar proveedor
@@ -73,58 +89,100 @@ export async function POST(req) {
       );
     }
 
-    // Los combos no se compran a proveedor: se compran sus componentes.
-    const productosLocales = await prisma.productoLocal.findMany({
-      where: { id: { in: items.map((i) => Number(i.productoLocalId)) } },
-      select: { id: true, base: { select: { es_combo: true } } },
-    });
-    if (productosLocales.some((pl) => esComboBase(pl.base))) {
+    const ids = [...new Set(items.map((item) => Number(item.productoLocalId)))];
+    if (ids.length !== items.length || ids.some((id) => !Number.isInteger(id) || id < 1)) {
       return NextResponse.json(
-        { ok: false, error: "Los combos no se compran a proveedor; se compran sus componentes." },
+        { ok: false, error: "Hay productos repetidos o inválidos." },
         { status: 400 }
       );
     }
 
-    const pedido = await prisma.pedidoProveedor.create({
-      data: {
-        grupoId,
-        depositoId: depId,
-        // Ubicación DUEÑA del pedido = contexto activo (server-authoritative, no
-        // del body). Aísla la compra a la ubicación que la creó.
-        creadoEnLocalId: localId,
-        proveedorId: Number(proveedorId),
-        notas: notas || null,
-        creadoPorId: session.id,
-        detalles: {
-          create: items.map((it) => ({
-            productoLocalId: Number(it.productoLocalId),
-            cantidad: Number(it.cantidad || 1),
-            unidad: it.unidad || "BULTO",
-            precioCosto: it.precioCosto ? Number(it.precioCosto) : null,
-          })),
+    // Los combos no se compran a proveedor: se compran sus componentes. Los
+    // productos salen del depósito autorizado; un id de otro local en el cuerpo
+    // no puede crear una línea ni una memoria de proveedor fuera de alcance.
+    const productosLocales = await prisma.productoLocal.findMany({
+      where: { id: { in: ids }, localId: depId, activo: true },
+      select: { id: true, baseId: true, base: { select: { id: true, es_combo: true } } },
+    });
+    if (productosLocales.length !== ids.length || productosLocales.some((pl) => esComboBase(pl.base))) {
+      return NextResponse.json(
+        { ok: false, error: "Uno de los productos no pertenece al depósito o no se puede comprar." },
+        { status: 400 }
+      );
+    }
+
+    const productosPorLocal = new Map(productosLocales.map((p) => [p.id, p]));
+    const aliases = aliasesDeImportacion({
+      items,
+      productosPorLocal,
+      grupoId,
+      proveedorId: Number(proveedorId),
+    });
+
+    const pedido = await prisma.$transaction(async (tx) => {
+      const creado = await tx.pedidoProveedor.create({
+        data: {
+          grupoId,
+          depositoId: depId,
+          // Ubicación DUEÑA del pedido = contexto activo (server-authoritative,
+          // no del body). Aísla la compra a la ubicación que la creó.
+          creadoEnLocalId: localId,
+          proveedorId: Number(proveedorId),
+          notas: notas || null,
+          creadoPorId: session.id,
+          detalles: {
+            create: items.map((it) => ({
+              productoLocalId: Number(it.productoLocalId),
+              cantidad: Number(it.cantidad || 1),
+              unidad: it.unidad || "BULTO",
+              precioCosto:
+                it.precioCosto === null || it.precioCosto === undefined || it.precioCosto === ""
+                  ? null
+                  : Number(it.precioCosto),
+            })),
+          },
         },
-      },
-      include: {
-        detalles: {
-          include: {
-            producto: {
-              include: {
-                base: {
-                  select: {
-                    id: true,
-                    nombre: true,
-                    factor_pack: true,
-                    modoCompraProveedor: true,
-                    unidad_medida: true,
+        include: {
+          detalles: {
+            include: {
+              producto: {
+                include: {
+                  base: {
+                    select: {
+                      id: true,
+                      nombre: true,
+                      factor_pack: true,
+                      modoCompraProveedor: true,
+                      unidad_medida: true,
+                    },
                   },
                 },
               },
             },
           },
+          proveedor: { select: { id: true, nombre: true } },
+          deposito: { select: { id: true, nombre: true } },
         },
-        proveedor: { select: { id: true, nombre: true } },
-        deposito: { select: { id: true, nombre: true } },
-      },
+      });
+
+      for (const alias of aliases) {
+        await tx.productoCodigoProveedor.upsert({
+          where: {
+            codigo_interno_unico_por_proveedor: {
+              grupoId: alias.grupoId,
+              proveedorId: alias.proveedorId,
+              codigoInterno: alias.codigoInterno,
+            },
+          },
+          update: {
+            productoBaseId: alias.productoBaseId,
+            descripcionProveedor: alias.descripcionProveedor,
+            activo: true,
+          },
+          create: alias,
+        });
+      }
+      return creado;
     });
 
     // Acá se propagaba el costo de cada línea al costo maestro del producto.
@@ -147,10 +205,9 @@ export async function POST(req) {
     //
     // ── O ENTRA TODO O NO ENTRA NADA ──────────────────────────────────────────
     //
-    // Al sacar la propagación, esta ruta quedó con UNA sola escritura: el create
-    // del pedido con sus detalles anidados, que Prisma ejecuta en su propia
-    // transacción. No hay ningún `await` después, así que el mensaje de error del
-    // catch dice la verdad: si falla, no quedó un pedido existiendo.
+    // El pedido y los alias confirmados se guardan en LA MISMA transacción. Si
+    // falla cualquiera, no queda un borrador sin memoria ni una memoria sin el
+    // borrador que la justificó.
     //
     // Antes NO era así. El pedido se creaba acá y después un bucle propagaba el
     // costo línea por línea, sin transacción: si fallaba en la tercera de cinco,
@@ -158,8 +215,8 @@ export async function POST(req) {
     // decía "Error interno al crear pedido". Quien lo veía asumía que no había
     // pasado nada.
     //
-    // Si alguna vez se agrega otra escritura después de este create, hay que
-    // envolver las dos en `prisma.$transaction` o el mensaje vuelve a mentir.
+    // Si alguna vez se agrega otra escritura, entra en esta misma transacción o
+    // el mensaje vuelve a mentir.
 
     return NextResponse.json({ ok: true, item: pedido });
   } catch (err) {

@@ -30,24 +30,35 @@ propia: consume `GET /api/compras-proveedor/resumen` y exige `compras.ver`.
 
 ## Crear un borrador desde foto, PDF o Excel
 
-Desde `nueva` se puede elegir el proveedor y abrir **Crear borrador desde foto,
-PDF o Excel**. Es un flujo de pedido, no de recepción ni de comprobantes:
+Desde `nueva` se elige el proveedor y se navega a la pantalla dedicada
+`/modulos/compras-proveedor/importar`, que crea un borrador desde una foto, PDF,
+XLSX o XLS. No es la pantalla de recepción ni modifica ese circuito:
 
 1. `POST /api/compras-proveedor/importar/analizar` lee una foto/PDF con la misma
    configuración de Gemini que usa el sistema, o un XLSX/XLS de forma
    determinista con `xlsx`.
-2. La pantalla muestra código, descripción, cantidad y unidad crudos. El precio
-   del papel es solo informativo: la línea usa el costo actual del catálogo y no
-   modifica el costo maestro.
-3. Solo un código de proveedor o alias exacto selecciona un producto sin
-   preguntar. La búsqueda por nombre ordena sugerencias, pero exige confirmación
-   humana.
-4. `UN` se convierte a `BULTO` únicamente cuando `cantidad / factor_pack` es
+2. La pantalla muestra código, descripción, cantidad y unidad crudos, el costo
+   vigente del sistema y el precio leído del papel en la misma escala. Si son
+   distintos, exige elegir explícitamente cuál usar antes de crear el borrador;
+   el valor sigue siendo revisable.
+3. El vínculo intenta, en orden, un código o alias aprendido exacto y luego una
+   terminación única del código (de mayor a menor precisión, hasta cuatro
+   dígitos). Si el código aproximado es ambiguo no elige. El nombre solo ordena
+   sugerencias y siempre exige confirmación humana.
+4. Cada producto confirmado guarda para ese proveedor el código del papel y un
+   alias normalizado de la descripción. Así una factura futura puede reconocer
+   incluso un renglón sin código. Se recuerda el producto y la escala del precio,
+   no se congela el importe numérico del catálogo.
+5. `UN` se convierte a `BULTO` únicamente cuando `cantidad / factor_pack` es
    entero. Una división no exacta queda en unidades y exige revisión; `DI`, una
    unidad ausente o una cantidad no entera también bloquean hasta revisar.
-5. Al confirmar, un pedido nuevo entra por el endpoint normal `crear` y queda en
+6. Al confirmar, un pedido nuevo entra por el endpoint normal `crear` y queda en
    `BORRADOR`. Si ya se abrió un borrador, `importar/aplicar/[id]` suma las líneas
    al mismo pedido en una transacción, sin crear otro.
+
+La recepción de un pedido ya enviado conserva otra regla: compara el comprobante
+solo con las líneas de ese pedido. La importación de esta sección arma o amplía
+un borrador y, por eso, busca dentro del catálogo autorizado del proveedor.
 
 La primera versión no persiste el archivo fuente: lo usa para armar la revisión
 y lo descarta. Tampoco toca stock, recepción, recetas fiscales, impuestos,
@@ -98,8 +109,11 @@ los dos módulos.
 ## Candados
 
 La importación agrega `lib/compras-proveedor/importacion/*.test.mjs` para el
-parser tabular, el contrato del lector visual, los vínculos exactos, la
-conversión de cantidades y la suma sobre un borrador existente.
+parser tabular, el contrato del lector visual, los vínculos exactos y por sufijo,
+los alias persistentes, la elección entre ambos precios, la conversión de
+cantidades y la suma sobre un borrador existente. La sonda
+`scripts/sonda-importar-pedido-desde-archivo.mjs` recorre la pantalla dedicada en
+escritorio y celular con datos sintéticos y bloquea escrituras no interceptadas.
 
 `lib/compras/scope.test.mjs` cubre el alcance. El resto del armado histórico aún
 mantiene la deuda indicada abajo.

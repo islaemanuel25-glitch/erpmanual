@@ -6,6 +6,7 @@ import { checkPerm } from "@/lib/authorize";
 import { pedidoEnAlcance } from "@/lib/compras/scope";
 import { esComboBase } from "@/lib/combos/guards";
 import { sumarCantidadesImportadas, datosDetalleNuevo } from "@/lib/compras-proveedor/importacion/merge";
+import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
 
 export async function POST(req, { params }) {
   try {
@@ -60,6 +61,7 @@ export async function POST(req, { params }) {
       where: { id: { in: ids }, localId: pedido.depositoId, activo: true },
       select: {
         id: true,
+        baseId: true,
         base: {
           select: {
             factor_pack: true,
@@ -76,6 +78,12 @@ export async function POST(req, { params }) {
     }
 
     const porProducto = new Map(productos.map((p) => [p.id, p]));
+    const aliases = aliasesDeImportacion({
+      items,
+      productosPorLocal: porProducto,
+      grupoId: ctx.grupoId,
+      proveedorId: pedido.proveedorId,
+    });
     const existentes = new Map(pedido.detalles.map((d) => [d.productoLocalId, d]));
     const resultados = await prisma.$transaction(async (tx) => {
       const salida = [];
@@ -103,6 +111,7 @@ export async function POST(req, { params }) {
             factorPack: base?.factor_pack,
             producto: productoParaCosto,
             costoMaestro: base?.precio_costo ?? null,
+            usarCostoImportado: item.origenPrecio === "PAPEL",
           });
           const actualizado = await tx.pedidoProveedorDetalle.update({
             where: { id: existente.id },
@@ -116,15 +125,31 @@ export async function POST(req, { params }) {
           });
           salida.push(actualizado);
         } else {
-          // El detalle nuevo lo arma la pieza, no esta ruta: el maestro sale de
-          // la BASE y el `precioCosto` del cuerpo se ignora. El modal ya manda el
-          // costo convertido a la escala de la línea, así que usarlo como maestro
-          // lo dividía por segunda vez.
+          // El detalle nuevo lo arma la pieza, no esta ruta. Si se eligió el
+          // papel acepta ese costo ya convertido; en otro caso el maestro sale
+          // de la BASE y no se vuelve a dividir el valor del cuerpo.
           const creado = await tx.pedidoProveedorDetalle.create({
             data: datosDetalleNuevo({ pedidoId, productoLocalId, item, base }),
           });
           salida.push(creado);
         }
+      }
+      for (const alias of aliases) {
+        await tx.productoCodigoProveedor.upsert({
+          where: {
+            codigo_interno_unico_por_proveedor: {
+              grupoId: alias.grupoId,
+              proveedorId: alias.proveedorId,
+              codigoInterno: alias.codigoInterno,
+            },
+          },
+          update: {
+            productoBaseId: alias.productoBaseId,
+            descripcionProveedor: alias.descripcionProveedor,
+            activo: true,
+          },
+          create: alias,
+        });
       }
       return salida;
     });
