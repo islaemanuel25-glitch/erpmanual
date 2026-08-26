@@ -122,8 +122,13 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
 
   // El archivo se guarda ANTES de analizar y NO se borra al fallar: reintentar
   // desde un celular no puede obligar a volver a la galería a buscar la misma
-  // foto. Es el mismo `File` en memoria, así que no se vuelve a subir desde cero
-  // ni se puede elegir otro por accidente.
+  // foto.
+  //
+  // Lo que se evita es esa búsqueda, NO la subida: cada reintento vuelve a
+  // enviar el archivo completo por la red, porque cada `fetch` manda su propio
+  // `FormData`. Decir "no se vuelve a subir desde cero" sería falso y llevaría a
+  // creer que reintentar es gratis en datos móviles — con 254 kB no molesta,
+  // pero con un PDF de varios MB sí.
   const seleccionarArchivo = async (seleccionado) => {
     if (!seleccionado) return;
     setArchivo(seleccionado);
@@ -258,7 +263,14 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
           <div className="py-16 text-center">
             <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-current border-t-transparent animate-spin sunmi-text-accent" />
             <p className="text-base font-semibold sunmi-text-strong">Leyendo {archivo?.name}</p>
-            <p className="text-sm2 sunmi-text-muted mt-1">En una foto puede tardar hasta 45 segundos.</p>
+            {/* EL NÚMERO TIENE QUE SER VERDAD. Decía "hasta 45 segundos", que era
+                el timeout de UNA lectura. Ahora puede haber dos, con un
+                presupuesto total de 50 s más lo que tarda subir el archivo y
+                armar la respuesta: prometer 45 sería quedarse corto justo cuando
+                la persona está mirando el reloj y decidiendo si abandonar. */}
+            <p className="text-sm2 sunmi-text-muted mt-1">
+              Puede tardar cerca de un minuto. Mantené esta pantalla abierta.
+            </p>
           </div>
         )}
 

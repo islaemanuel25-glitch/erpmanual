@@ -261,6 +261,8 @@ const INTERCEPTOR = `
   window.__intercepciones = [];
   window.__cuerpos = {};
   window.__fugas = [];
+  window.__analisis = [];
+  window.__fallarPrimerAnalisis = false;
   const LECTURA = ["/api/compras-proveedor/productos", "/api/compras-proveedor/obtener"];
   // Que documento devuelve analizar: el del pedido nuevo o el de continuacion.
   // (Sin acentos graves: este bloque vive dentro de un template literal.)
@@ -291,7 +293,25 @@ const INTERCEPTOR = `
       return responder({ ok: true, item: D.pedido });
     }
     if (url.includes("/api/compras-proveedor/importar/analizar")) {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 300));
+      // Se registra QUE archivo viajo, para poder afirmar que el reintento manda
+      // el mismo y no uno nuevo elegido a mano.
+      try {
+        const f = (opciones && opciones.body && opciones.body.get)
+          ? opciones.body.get("archivo") : null;
+        window.__analisis.push(f ? { nombre: f.name, tam: f.size } : { nombre: null, tam: null });
+      } catch { window.__analisis.push({ nombre: null, tam: null }); }
+
+      // EL PRIMER ANALISIS FALLA A PROPOSITO. Sin esto la sonda nunca veia la
+      // pantalla de error, y por lo tanto nunca veia el boton de reintentar:
+      // afirmaba sobre un estado que su propio guion no producia.
+      if (window.__fallarPrimerAnalisis && window.__analisis.length === 1) {
+        window.__intercepciones.push(ruta);
+        return new Response(JSON.stringify({
+          ok: false, codigo: "SIN_LINEAS",
+          error: "No encontre lineas de productos en el archivo.",
+        }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
       const doc = window.__escenario === "continuar" ? D.documentoContinuar : D.documento;
       return responder({ ok: true, documento: doc });
     }
@@ -552,6 +572,100 @@ const morir = (motivo) => {
     afirmar(c.length === 0, `elegir · ${w}×${h} · sin texto cortado`, JSON.stringify(c));
     afirmar(s.length === 0, `elegir · ${w}×${h} · sin controles superpuestos`, JSON.stringify(s));
   }
+
+  // ══ EL REINTENTO, A 390 px ═══════════════════════════════════════════════
+  //
+  // El primer análisis devuelve SIN_LINEAS con 400 —el caso REAL del 2026-08-25,
+  // que se dio tres veces seguidas— y el segundo el documento. Sin esto la sonda
+  // nunca veía la pantalla de error y por lo tanto nunca veía el botón: afirmaba
+  // sobre un estado que su propio guion no producía.
+  console.log("\n── reintentar sin volver a la galería ──────────────────────────");
+  await medidas(390, 844);
+  await evaluar(`window.__fallarPrimerAnalisis = true; window.__analisis = []; true`);
+  await evaluar(`(() => {
+    const inp = document.querySelector('[role="dialog"] input[type="file"]');
+    if (!inp) return false;
+    const f = new File(["pedido inventado que no se lee la primera vez"], "reintento-sintetico.pdf", { type: "application/pdf" });
+    const dt = new DataTransfer(); dt.items.add(f);
+    Object.defineProperty(inp, "files", { value: dt.files, configurable: true });
+    inp.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  if (!(await esperarA(`(window.__analisis || []).length >= 1`, 20000))) morir("el primer análisis del reintento no salió");
+  await sleep(900);
+
+  const pantallaError = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const capa = document.querySelector('[role="dialog"]');
+    if (!capa) return { hay: false };
+    const t = (capa.innerText || "").replace(/\\s+/g, " ");
+    const boton = [...capa.querySelectorAll('button')].find((b) => /Reintentar an/i.test(b.innerText || ""));
+    if (!boton) return { hay: true, texto: t.slice(0, 200), boton: false };
+    const r = boton.getBoundingClientRect();
+    const centro = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return {
+      hay: true, texto: t.slice(0, 200), boton: true,
+      dentro: r.top >= -1 && r.bottom <= innerHeight + 1,
+      alcanzable: !!centro && (centro === boton || boton.contains(centro)),
+    };
+  })())`));
+
+  afirmar(pantallaError.hay, "reintento · el modal sigue abierto tras el fallo", JSON.stringify(pantallaError));
+  afirmar(
+    /No encontr. lineas de productos/i.test(pantallaError.texto || ""),
+    "reintento · se muestra el mensaje ESPECÍFICO del servidor",
+    `texto: ${pantallaError.texto}`
+  );
+  afirmar(
+    /reintento-sintetico\.pdf/.test(pantallaError.texto || ""),
+    "reintento · el nombre del archivo elegido sigue a la vista",
+    `texto: ${pantallaError.texto}`
+  );
+  afirmar(pantallaError.boton === true, "reintento · aparece el botón `Reintentar análisis`", JSON.stringify(pantallaError));
+  afirmar(
+    pantallaError.boton && pantallaError.dentro && pantallaError.alcanzable,
+    "reintento · el botón entra en la ventana de 390×844 y se puede tocar",
+    JSON.stringify(pantallaError)
+  );
+
+  const superpuestosError = JSON.parse(await superpuestos());
+  afirmar(superpuestosError.length === 0, "reintento · sin controles superpuestos en la pantalla de error", JSON.stringify(superpuestosError));
+
+  capturas.push(await capturar("reintento-390x844.png"));
+
+  // SE TOCA EL BOTÓN, sin volver a elegir archivo.
+  if (pantallaError.boton) {
+    await evaluar(`[...document.querySelector('[role="dialog"]').querySelectorAll('button')].find((b)=>/Reintentar an/i.test(b.innerText||"")).click()`);
+  }
+  const llegoARevisar = await esperarA(`(() => {
+    const c = document.querySelector('[role="dialog"]');
+    return !!c && !c.querySelector('input[type="file"]') && !c.querySelector('.animate-spin');
+  })()`, 25000);
+  afirmar(llegoARevisar, "reintento · el segundo análisis llega a revisión", "se quedó en la pantalla de error");
+
+  const analisis = JSON.parse(await evaluar(`JSON.stringify(window.__analisis || [])`));
+  afirmar(
+    analisis.length === 2,
+    `reintento · hubo EXACTAMENTE dos llamadas a analizar (${analisis.length})`,
+    JSON.stringify(analisis)
+  );
+  afirmar(
+    analisis.length === 2 && analisis[0].nombre === analisis[1].nombre && analisis[0].tam === analisis[1].tam,
+    "reintento · las dos llamadas llevaron el MISMO archivo (nombre y tamaño)",
+    JSON.stringify(analisis)
+  );
+  if (analisis.length === 2) {
+    console.log(`     archivo enviado dos veces: ${analisis[0].nombre} · ${analisis[0].tam} bytes`);
+  }
+
+  const fugasReintento = JSON.parse(await evaluar(`JSON.stringify(window.__fugas || [])`));
+  afirmar(fugasReintento.length === 0, "reintento · ninguna escritura real se escapó", JSON.stringify(fugasReintento));
+
+  // Se apaga el guion de fallo y se vuelve al estado de `elegir` para lo que sigue.
+  await evaluar(`window.__fallarPrimerAnalisis = false; true`);
+  await evaluar(`[...document.querySelector('[role="dialog"]').querySelectorAll('button')].find((b)=>/^Cancelar$/.test((b.innerText||"").trim()))?.click()`);
+  await sleep(700);
+  await evaluar(`[...document.querySelectorAll('button')].find((b)=>/desde foto, PDF o Excel|Continuar borrador/i.test(b.innerText||""))?.click()`);
+  await esperarA(`!!document.querySelector('[role="dialog"]')`, 15000);
 
   console.log("\n── contraprueba del velo, primera mitad ────────────────────────");
   await medidas(1366, 900);
