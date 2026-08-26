@@ -61,37 +61,83 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
     onClose?.();
   };
 
-  const seleccionarArchivo = async (seleccionado) => {
+  // ── TRES FALLAS DISTINTAS, TRES MENSAJES DISTINTOS ────────────────────────
+  //
+  // Antes un solo `try` envolvía el `fetch` Y el `json()`, así que "se cortó la
+  // conexión" y "el servidor devolvió HTML" caían en el mismo texto. Pasó de
+  // verdad: un 499 —el cliente se fue antes de que la respuesta saliera— mostró
+  // "No se pudo conectar" y parecía que el servidor estaba caído.
+  //
+  // Van separados a propósito, y el `catch` de cada uno solo cubre su línea:
+  //   · el `fetch` falla        → no hubo respuesta;
+  //   · el `json()` falla       → hubo respuesta pero no era JSON (nginx cortando
+  //                               con su página de error, por ejemplo);
+  //   · llega JSON con ok:false → el servidor SÍ explicó qué pasó, y ese mensaje
+  //                               es mejor que cualquiera que escribamos acá.
+  const analizar = async (seleccionado) => {
     if (!seleccionado) return;
-    setArchivo(seleccionado);
     setEstado("analizando");
     setError("");
+
+    const form = new FormData();
+    form.append("archivo", seleccionado);
+
+    let respuesta;
     try {
-      const form = new FormData();
-      form.append("archivo", seleccionado);
-      const respuesta = await fetch("/api/compras-proveedor/importar/analizar", {
+      respuesta = await fetch("/api/compras-proveedor/importar/analizar", {
         method: "POST",
         credentials: "include",
         body: form,
       });
-      const data = await respuesta.json();
-      if (!data.ok) {
-        setError(data.error || "No se pudo leer el archivo.");
-        setEstado("elegir");
-        return;
-      }
-      setDocumento(data.documento);
-      setLineas(
-        prepararLineasImportadas({ lineas: data.documento.lineas, productos }).map((l) => ({
-          ...l,
-          incluida: true,
-        }))
-      );
-      setEstado("revisar");
     } catch {
-      setError("No se pudo conectar para analizar el archivo.");
+      setError("Se cortó la conexión mientras se analizaba. Mantené esta pantalla abierta y tocá Reintentar.");
       setEstado("elegir");
+      return;
     }
+
+    let data;
+    try {
+      data = await respuesta.json();
+    } catch {
+      setError("El servidor devolvió una respuesta inválida. Reintentá.");
+      setEstado("elegir");
+      return;
+    }
+
+    if (!data.ok) {
+      setError(data.error || "No se pudo leer el archivo.");
+      setEstado("elegir");
+      return;
+    }
+
+    setDocumento(data.documento);
+    setLineas(
+      prepararLineasImportadas({ lineas: data.documento.lineas, productos }).map((l) => ({
+        ...l,
+        incluida: true,
+      }))
+    );
+    setEstado("revisar");
+  };
+
+  // El archivo se guarda ANTES de analizar y NO se borra al fallar: reintentar
+  // desde un celular no puede obligar a volver a la galería a buscar la misma
+  // foto.
+  //
+  // Lo que se evita es esa búsqueda, NO la subida: cada reintento vuelve a
+  // enviar el archivo completo por la red, porque cada `fetch` manda su propio
+  // `FormData`. Decir "no se vuelve a subir desde cero" sería falso y llevaría a
+  // creer que reintentar es gratis en datos móviles — con 254 kB no molesta,
+  // pero con un PDF de varios MB sí.
+  const seleccionarArchivo = async (seleccionado) => {
+    if (!seleccionado) return;
+    setArchivo(seleccionado);
+    await analizar(seleccionado);
+  };
+
+  const reintentar = async () => {
+    if (!archivo || estado === "analizando") return;
+    await analizar(archivo);
   };
 
   const cambiarProducto = (idLinea, productoLocalId) => {
@@ -184,7 +230,32 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
                 <span className="flex items-center gap-1"><FileSpreadsheet size={14} /> Excel</span>
               </span>
             </button>
-            {error && <p className="mt-3 text-[12px] sunmi-text-danger text-center">{error}</p>}
+            {error && (
+              <div className="mt-3">
+                <p className="text-[12px] sunmi-text-danger text-center">{error}</p>
+                {/* REINTENTAR NO VUELVE A LA GALERÍA. El `File` sigue en memoria,
+                    así que se reanaliza el MISMO archivo. Sin esto, cada fallo
+                    obligaba a buscar la foto otra vez en el teléfono — que es lo
+                    que convirtió un problema de lectura en cinco intentos. */}
+                {archivo && (
+                  <div className="mt-3 flex flex-col items-center gap-2">
+                    <span className="text-sm2 sunmi-text-muted text-center truncate max-w-full">
+                      {archivo.name}
+                    </span>
+                    <SunmiButton type="button" onClick={reintentar}>
+                      Reintentar análisis
+                    </SunmiButton>
+                    <button
+                      type="button"
+                      onClick={() => inputRef.current?.click()}
+                      className="text-sm2 sunmi-text-muted underline"
+                    >
+                      Elegir otro archivo
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -192,7 +263,14 @@ export default function ModalImportarPedido({ open, onClose, productos = [], onA
           <div className="py-16 text-center">
             <div className="mx-auto mb-3 h-8 w-8 rounded-full border-2 border-current border-t-transparent animate-spin sunmi-text-accent" />
             <p className="text-base font-semibold sunmi-text-strong">Leyendo {archivo?.name}</p>
-            <p className="text-sm2 sunmi-text-muted mt-1">En una foto puede tardar hasta 45 segundos.</p>
+            {/* EL NÚMERO TIENE QUE SER VERDAD. Decía "hasta 45 segundos", que era
+                el timeout de UNA lectura. Ahora puede haber dos, con un
+                presupuesto total de 50 s más lo que tarda subir el archivo y
+                armar la respuesta: prometer 45 sería quedarse corto justo cuando
+                la persona está mirando el reloj y decidiendo si abandonar. */}
+            <p className="text-sm2 sunmi-text-muted mt-1">
+              Puede tardar cerca de un minuto. Mantené esta pantalla abierta.
+            </p>
           </div>
         )}
 
