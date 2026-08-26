@@ -406,6 +406,53 @@ const morir = (motivo) => {
   const continuar = JSON.parse(await evaluar(`JSON.stringify(window.__cuerpos)`));
   afirmar(!!continuar.aplicar, "continuar usa importar/aplicar y no crea otro pedido");
 
+  // ── EL PIE CONTRA LA BARRA INFERIOR DEL TELÉFONO ──────────────────────────
+  //
+  // El menú tiene tres modos y "topbar" monta una BottomNav `fixed bottom-0
+  // z-40` de 56 px en mobile. El default es "sidebarLeft", que no la monta: con
+  // el default TODAS las mediciones de arriba dan verde aunque el pie quede
+  // tapado, porque no hay nada que lo tape.
+  //
+  // Y "visible" no alcanza: el botón seguía dentro de la ventana, con su
+  // rectángulo intacto. Lo que cambiaba era quién contesta al tocarlo. Por eso
+  // se pregunta por TRES puntos con `elementFromPoint` y no por la geometría.
+  console.log("\n── el pie contra la barra inferior (modo topbar) ──────────────");
+  await medidas(390, 844);
+  await evaluar(`localStorage.setItem("erpazul_layout", JSON.stringify({ menuMode: "topbar" })); true`);
+  await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+  if (!(await esperarA(`document.body.innerText.includes("1. Proveedor")`, 20000))) morir("no abrió la página en modo topbar");
+  await evaluar(`window.__fallarPrimero = false; true`);
+  await seleccionarArchivo("topbar-sintetico.pdf");
+  if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) morir("no llegó a revisión en modo topbar");
+  await dormir(400);
+  const conBarra = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const nav = document.querySelector('nav.fixed.bottom-0');
+    const boton = [...document.querySelectorAll('button')].find((b) => /^Crear borrador$/.test((b.innerText || "").trim()));
+    if (!nav || !boton) return { hayBarra: !!nav, hayBoton: !!boton };
+    const r = boton.getBoundingClientRect();
+    // El indicador de Next vive en un <nextjs-portal> y SOLO existe en el
+    // servidor de desarrollo, que es justo donde corre esta sonda. Se descarta
+    // POR IDENTIDAD —el elemento que es— y no por tamaño ni por posición: un
+    // filtro "lo que sea muy chico" también taparía un botón real encimado.
+    const puntos = [[0.2, 0.5], [0.5, 0.5], [0.8, 0.5]].map(([fx, fy]) => {
+      const pila = document.elementsFromPoint(r.left + r.width * fx, r.top + r.height * fy);
+      const el = pila.find((n) => !n.closest || !n.closest("nextjs-portal"));
+      return el === boton || boton.contains(el) ? "propio" : (el?.tagName || "?");
+    });
+    const nr = nav.getBoundingClientRect();
+    return { hayBarra: true, hayBoton: true, seSuperponen: r.bottom > nr.top && r.top < nr.bottom, puntos };
+  })())`));
+  // Que la barra ESTÉ es parte de la medición: sin ella este caso no se ejerció
+  // y un verde diría que se probó algo que no se probó.
+  afirmar(conBarra.hayBarra && conBarra.hayBoton, "el modo topbar monta la barra inferior y el pie", JSON.stringify(conBarra));
+  afirmar(
+    conBarra.puntos?.every((p) => p === "propio"),
+    "la barra inferior no le roba el toque a la acción final",
+    JSON.stringify(conBarra)
+  );
+  capturas.push(await capturar("revisar-topbar-390x844.png"));
+  await evaluar(`localStorage.removeItem("erpazul_layout"); true`);
+
   console.log("\ncapturas temporales:");
   for (const ruta of capturas) console.log(`  ${ruta}`);
   if (fallas.length) {

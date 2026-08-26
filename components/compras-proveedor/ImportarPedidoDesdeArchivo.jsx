@@ -659,7 +659,15 @@ export default function ImportarPedidoDesdeArchivo() {
               )}
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 z-30 border-t sunmi-divider sunmi-surface shadow-lg">
+            {/*
+              z-40, el MISMO que usa el pie de "Nuevo pedido". No es un número
+              elegido: con `z-30` la BottomNav del modo topbar —`fixed bottom-0
+              z-40`, 56 px de alto— quedaba ENCIMA, y a 390 px los tres puntos
+              del botón "Crear borrador" devolvían el enlace de la barra. O sea
+              que en ese modo el borrador no se podía crear desde el teléfono:
+              cada toque navegaba a otra pantalla.
+            */}
+            <div className="fixed bottom-0 left-0 right-0 z-40 border-t sunmi-divider sunmi-surface shadow-lg">
               <div className="max-w-6xl mx-auto p-3 flex flex-wrap items-center gap-3">
                 <div className="mr-auto min-w-0">
                   <p className="text-sm2 sunmi-text-muted">
