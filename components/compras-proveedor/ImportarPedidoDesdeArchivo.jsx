@@ -25,10 +25,15 @@ import { naturalezaLinea, permiteToggleUnidad } from "@/lib/compras-proveedor/ca
 import { baseDeProducto } from "@/lib/compras-proveedor/importacion/merge";
 import { consolidarLineasImportadas } from "@/lib/compras-proveedor/importacion/payload";
 import {
+  TEXTO_ORIGEN_PAPEL,
+  verificarSumaDeSubtotales,
+} from "@/lib/compras-proveedor/importacion/precioDelPapel";
+import {
   prepararLineasImportadas,
   recalcularLineaConProducto,
+  recalcularPrecioDeLinea,
 } from "@/lib/compras-proveedor/importacion/prepararLineas";
-import { ORIGEN_PRECIO, preciosComparables } from "@/lib/compras-proveedor/importacion/precios";
+import { ORIGEN_PRECIO } from "@/lib/compras-proveedor/importacion/precios";
 
 const NF_MONEDA = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 2,
@@ -46,6 +51,11 @@ const dinero = (valor) =>
 
 const normalizarDecimal = (valor) => String(valor ?? "").replace(",", ".").replace(/[^\d.]/g, "");
 
+const porcentaje = (valor) =>
+  valor === null || valor === undefined || !Number.isFinite(Number(valor))
+    ? null
+    : `${NF_PORCENTAJE.format(Number(valor))}%`;
+
 function lineaLista(linea) {
   const cantidad = Number(linea.cantidadPedido);
   return Boolean(
@@ -54,7 +64,12 @@ function lineaLista(linea) {
       cantidad >= 1 &&
       ["BULTO", "UNIDAD"].includes(linea.unidadPedido) &&
       linea.confirmada &&
-      linea.precioConfirmado
+      linea.precioConfirmado &&
+      // Un renglón cuyo precio del papel no se pudo resolver —hay subtotal y la
+      // cantidad no sirve para dividir, o hay bonificación sin precio— no puede
+      // guardarse en silencio. No se inventa cero ni se cae al precio de lista:
+      // se pide que alguien lo mire.
+      !linea.papelRequiereRevision
   );
 }
 
@@ -184,11 +199,28 @@ export default function ImportarPedidoDesdeArchivo() {
     () => new Map(productos.map((producto) => [String(producto.productoLocalId), producto])),
     [productos]
   );
+  // `!== false` y no `Boolean(...)`: el lector puede no haber contestado, y
+  // "no sé" se trata como "no hay columna" a propósito. Ver `prepararLineas`.
+  const hayColumnaSubtotal = documento?.hayColumnaSubtotal === true;
   const incluidas = lineas.filter((linea) => linea.incluida !== false);
   const listas = incluidas.filter(lineaLista);
   const pendientes = incluidas.length - listas.length;
   const diferencias = incluidas.filter((linea) => linea.diferentes && !linea.precioConfirmado).length;
   const sinVinculo = incluidas.filter((linea) => !linea.productoLocalId).length;
+  const sinPrecioResuelto = incluidas.filter((linea) => linea.papelRequiereRevision).length;
+
+  // La suma de los subtotales impresos contra el total del documento. Informa,
+  // no bloquea: una diferencia de centavos no puede frenar a quien está
+  // revisando renglón por renglón.
+  const cuadre = useMemo(
+    () =>
+      verificarSumaDeSubtotales({
+        subtotales: (documento?.lineas || []).map((linea) => linea.subtotal),
+        totalDocumento: documento?.totalDocumento,
+        hayTotalImpreso: documento?.hayTotalImpreso,
+      }),
+    [documento]
+  );
   const total = incluidas.reduce((suma, linea) => {
     const costo = linea.origenPrecio === ORIGEN_PRECIO.PAPEL ? linea.precioPapel : linea.precioSistema;
     return suma + (Number(linea.cantidadPedido) || 0) * (Number(costo) || 0);
@@ -251,6 +283,7 @@ export default function ImportarPedidoDesdeArchivo() {
         lineas: data.documento.lineas,
         productos,
         facturaPor,
+        hayColumnaSubtotal: data.documento.hayColumnaSubtotal,
       }).map((linea) => ({ ...linea, incluida: true }))
     );
     setFiltro("todas");
@@ -273,32 +306,40 @@ export default function ImportarPedidoDesdeArchivo() {
     setLineas((previas) =>
       previas.map((linea) =>
         linea.id === idLinea
-          ? recalcularLineaConProducto(linea, producto, { facturaPor })
+          ? recalcularLineaConProducto(linea, producto, { facturaPor, hayColumnaSubtotal })
           : linea
       )
     );
   };
 
-  const cambiarLinea = (idLinea, patch, { recalcularPrecio = false } = {}) => {
+  const cambiarLinea = (idLinea, patch, { recalcularPrecio = false, papelManual = null } = {}) => {
     setLineas((previas) =>
       previas.map((linea) => {
         if (linea.id !== idLinea) return linea;
         const siguiente = { ...linea, ...patch };
         if (!recalcularPrecio) return siguiente;
         const producto = productosPorId.get(String(siguiente.productoLocalId));
-        const precios = preciosComparables({
-          precioPapel: siguiente.precioUnitario,
+        // El recálculo NO se hace acá: lo hace la misma pieza que preparó las
+        // líneas. Si la pantalla armara su propia versión, el día que la regla
+        // de prioridad cambie mostraría un precio y guardaría otro.
+        return recalcularPrecioDeLinea(siguiente, producto, {
           facturaPor,
-          unidadPedido: siguiente.unidadPedido,
-          producto,
+          hayColumnaSubtotal,
+          papelManual,
         });
-        return {
-          ...siguiente,
-          ...precios,
-          precioConfirmado: !precios.diferentes,
-        };
       })
     );
+  };
+
+  /**
+   * El precio final escrito a mano gana sobre el calculado, y queda marcado.
+   *
+   * Se pasa la cadena vacía —y no `null`— cuando el campo se borra: `null`
+   * significa "no opino, conservá lo que había" y dejaría el valor viejo pegado
+   * para siempre. La cadena vacía significa "volvé a calcularlo del papel".
+   */
+  const escribirPrecioPapel = (idLinea, crudo) => {
+    cambiarLinea(idLinea, {}, { recalcularPrecio: true, papelManual: normalizarDecimal(crudo) });
   };
 
   const confirmarProducto = (idLinea) => {
@@ -472,6 +513,18 @@ export default function ImportarPedidoDesdeArchivo() {
                   </SunmiButton>
                 ))}
               </div>
+              {/*
+                EL CUADRE DEL DOCUMENTO. Informa y no bloquea: el botón de
+                guardar no lo mira. `cierra === null` es un tercer estado y se
+                dice distinto — "no se pudo comparar" no es "cierra".
+              */}
+              {cuadre.cierra !== null && (
+                <p className={`mt-2 text-sm2 ${cuadre.cierra ? "sunmi-text-muted" : "sunmi-text-warning"}`}>
+                  {cuadre.cierra
+                    ? `Los subtotales suman ${dinero(cuadre.suma)} y cierran con el total del documento.`
+                    : `Los subtotales suman ${dinero(cuadre.suma)} contra un total de ${dinero(cuadre.total)}: ${dinero(Math.abs(cuadre.diferencia))} de diferencia. Revisá los renglones antes de guardar.`}
+                </p>
+              )}
             </SunmiPanel>
 
             <div className="space-y-3">
@@ -597,23 +650,58 @@ export default function ImportarPedidoDesdeArchivo() {
                                 </div>
                               </div>
 
+                              {/*
+                                EL DESGLOSE DE DÓNDE SALIÓ EL PRECIO DEL PAPEL.
+                                No es decoración: con bonificación, la columna de
+                                precio es la de LISTA y lo que se paga sale del
+                                importe del renglón. Sin ver los tres números,
+                                un precio final más bajo que el impreso parece un
+                                error de lectura.
+                              */}
+                              <div className="mt-3 rounded-lg border sunmi-divider px-3 py-2">
+                                <p className="text-sm2 font-semibold sunmi-text-muted mb-1">Cómo se calculó el precio del papel</p>
+                                <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm2">
+                                  <dt className="sunmi-text-muted min-w-0">Precio impreso</dt>
+                                  <dd className="text-right tabular-nums sunmi-text-strong">{dinero(linea.precioUnitario)}</dd>
+                                  <dt className="sunmi-text-muted min-w-0">Bonificación</dt>
+                                  <dd className="text-right tabular-nums sunmi-text-strong">{porcentaje(linea.bonificacionPct) ?? "Sin bonificación"}</dd>
+                                  <dt className="sunmi-text-muted min-w-0">Subtotal del renglón</dt>
+                                  <dd className="text-right tabular-nums sunmi-text-strong">{dinero(linea.subtotal)}</dd>
+                                  <dt className="sunmi-text-muted min-w-0">Cantidad del papel</dt>
+                                  <dd className="text-right tabular-nums sunmi-text-strong">
+                                    {linea.cantidad ?? "?"} {linea.unidad || ""}
+                                  </dd>
+                                </dl>
+                                {linea.origenPrecioPapel && (
+                                  <p className="mt-2 text-xs sunmi-text-accent">
+                                    {TEXTO_ORIGEN_PAPEL[linea.origenPrecioPapel]}
+                                  </p>
+                                )}
+                                {linea.precioPapelEditado && (
+                                  <p className="mt-2 text-xs sunmi-text-accent">Precio escrito a mano</p>
+                                )}
+                              </div>
+
                               <label className="block mt-3">
                                 <span className="block text-sm2 font-semibold sunmi-text-muted mb-1">
-                                  Precio leído del archivo por {facturaPor === "BULTO" ? "bulto" : "unidad"}
+                                  Precio final del papel por {facturaPor === "BULTO" ? "bulto" : "unidad"}
                                 </span>
                                 <SunmiInput
                                   type="text"
                                   inputMode="decimal"
-                                  value={linea.precioUnitario ?? ""}
-                                  onChange={(e) => cambiarLinea(
-                                    linea.id,
-                                    { precioUnitario: normalizarDecimal(e.target.value) },
-                                    { recalcularPrecio: true }
-                                  )}
-                                  placeholder="Sin precio impreso"
+                                  value={linea.precioFinalPapelCrudo ?? ""}
+                                  onChange={(e) => escribirPrecioPapel(linea.id, e.target.value)}
+                                  placeholder="Sin precio en el papel"
                                   className="tabular-nums"
                                 />
                               </label>
+
+                              {linea.papelRequiereRevision && (
+                                <div className="mt-3 rounded-lg border sunmi-divider sunmi-control px-3 py-2 flex items-start gap-2">
+                                  <AlertTriangle size={15} className="sunmi-text-warning shrink-0 mt-0.5" />
+                                  <p className="text-sm2 sunmi-text-warning min-w-0 flex-1">{linea.papelMotivoRevision}</p>
+                                </div>
+                              )}
 
                               {linea.diferentes && (
                                 <div className="mt-3 rounded-lg border sunmi-divider sunmi-control px-3 py-2">
@@ -673,6 +761,7 @@ export default function ImportarPedidoDesdeArchivo() {
                   <p className="text-sm2 sunmi-text-muted">
                     {pendientes ? `${pendientes} por revisar` : `${listas.length} líneas listas`}
                     {diferencias ? ` · ${diferencias} precios sin decidir` : ""}
+                    {sinPrecioResuelto ? ` · ${sinPrecioResuelto} sin precio del papel` : ""}
                   </p>
                   <p className="text-lg font-bold sunmi-text-strong">Total del borrador: {dinero(total)}</p>
                 </div>

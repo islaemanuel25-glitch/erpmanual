@@ -161,21 +161,52 @@ const FALSO = {
       aliasesProveedor: [{ codigoInterno: "SINT-021", descripcionProveedor: null }],
       unidad_medida: "unidad", factor_pack: 21, modoCompra: "BULTO", precio_costo: 2100,
     },
+    // El producto del renglón con bonificación. Su costo maestro está por BULTO
+    // de 12, que es lo que hace que la escala importe: el papel cobra por unidad.
+    {
+      productoLocalId: 9005, baseId: 8005,
+      nombre: "Bonificado Sintético x12",
+      codigoInterno: "SINT-012", codigosInternos: ["SINT-012"],
+      aliasesProveedor: [{ codigoInterno: "SINT-012", descripcionProveedor: null }],
+      unidad_medida: "unidad", factor_pack: 12, modoCompra: "BULTO", precio_costo: 90000,
+    },
   ],
   documento: {
     numeroPedido: "SINTETICO-001",
+    // El documento declara sus columnas. Es la observación que no se puede
+    // calcular, y sin ella el subtotal no se usa.
+    hayColumnaSubtotal: true,
+    hayColumnaBonificacion: true,
+    hayTotalImpreso: true,
+    // La suma de los cuatro subtotales es 95.845,75 y el total impreso dice
+    // 95.845,73: DOS CENTAVOS de diferencia, del redondeo que hace el proveedor
+    // renglón por renglón. Está puesto a propósito para ejercer que una
+    // diferencia de centavos NO bloquea — con un total exacto, esa regla no se
+    // probaría nunca y el candado diría que sí.
+    totalDocumento: 95845.73,
     lineas: [
       {
         descripcion: "Nombre que no coincide con el catálogo",
         cantidad: 2, unidad: "UNIDAD", codigo: "991234567", precioUnitario: 500,
+        bonificacionPct: null, subtotal: 1000,
       },
       {
         descripcion: "CHESTERFIELD 10",
         cantidad: 1, unidad: "UNIDAD", codigo: null, precioUnitario: 3000,
+        bonificacionPct: null, subtotal: 3000,
       },
       {
         descripcion: "Pack Sintético x21",
         cantidad: 40, unidad: "UNIDAD", codigo: "SINT-021", precioUnitario: 120,
+        bonificacionPct: null, subtotal: 4800,
+      },
+      // EL RENGLÓN DEL DEFECTO. 12 a 8.168,94 con 14 % cierran en 87.045,75, o
+      // sea 7.253,81 por unidad. Los números son sintéticos: reproducen la
+      // aritmética del caso sin traer ninguna factura al repo.
+      {
+        descripcion: "Bonificado Sintético x12",
+        cantidad: 12, unidad: "UNIDAD", codigo: "SINT-012", precioUnitario: 8168.94,
+        bonificacionPct: 14, subtotal: 87045.75,
       },
     ],
   },
@@ -249,6 +280,29 @@ const seleccionarArchivo = (nombre = "pedido-sintetico.pdf") => evaluar(`(() => 
   return true;
 })()`);
 
+/**
+ * Espera a que el catálogo del proveedor esté cargado.
+ *
+ * ── POR QUÉ HACE FALTA, Y POR QUÉ NO SE VE ────────────────────────────────
+ *
+ * `analizar` sale en silencio si `productos` todavía está vacío. En la pantalla
+ * eso no se nota porque el botón "Elegir archivo" está deshabilitado hasta que
+ * el catálogo llega; la sonda, en cambio, dispara el `change` del input a mano
+ * y se saltea esa guarda.
+ *
+ * El síntoma era intermitente y engañoso: la sonda moría con "no llegó a
+ * revisión", que suena a que el análisis falló, cuando en realidad nunca había
+ * empezado. Tres de cada diez corridas. Se esperaba a que el TEXTO de la
+ * pantalla apareciera, y ese texto se dibuja antes que el catálogo.
+ *
+ * Lo que se espera ahora es la condición real: que el botón esté habilitado.
+ */
+const esperarCatalogo = (cuanto = 25000) =>
+  esperarA(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /^Elegir archivo$/.test((x.innerText || "").trim()));
+    return !!b && !b.disabled;
+  })()`, cuanto);
+
 const estado = () => evaluar(`(() => {
   if (document.querySelector('.animate-spin')) return "analizando";
   if (document.body.innerText.includes("Precio del sistema")) return "revisar";
@@ -321,6 +375,7 @@ const morir = (motivo) => {
   await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
   if (!(await esperarA(`window.__sonda === true`))) morir("no quedó instalado el interceptor");
   if (!(await esperarA(`document.body.innerText.includes("1. Proveedor")`))) morir("no abrió la página dedicada");
+  if (!(await esperarCatalogo())) morir("el catálogo del proveedor no terminó de cargar");
   afirmar(!(await evaluar(`!!document.querySelector('[role="dialog"]')`)), "la importación no vive dentro de un modal");
   afirmar(await estado() === "elegir", "el flujo empieza en elegir archivo");
 
@@ -351,15 +406,79 @@ const morir = (motivo) => {
     return !!b && b.disabled;
   })()`);
   afirmar(crearDeshabilitado, "el borrador no se crea mientras falta decidir un precio");
+
+  // ── EL RENGLÓN CON BONIFICACIÓN, EN LA PANTALLA ───────────────────────────
+  //
+  // Los candados prueban la aritmética. Acá se mide lo único que ellos no
+  // pueden: que los cuatro números estén A LA VISTA. Sin el desglose, un precio
+  // final más bajo que el impreso parece un error de lectura y alguien lo
+  // "corrige" a mano hacia el precio de lista, que es el defecto original
+  // reintroducido por una persona en vez de por el código.
+  console.log("\n── el renglón con bonificación ───────────────────────────────");
+  const bonificado = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const tarjeta = ${tarjetaCon("Bonificado Sintético x12")};
+    if (!tarjeta) return { hay: false };
+    const t = tarjeta.innerText || "";
+    // El campo se busca POR SU ETIQUETA y no por "el primer input con un
+    // número": así agarraba el de Cantidad, que también tiene un número, y la
+    // sonda comparaba 7.253,81 contra un 1.
+    const etiqueta = [...tarjeta.querySelectorAll('label')].find((l) => /Precio final del papel/i.test(l.innerText || ""));
+    const campo = etiqueta?.querySelector('input');
+    return {
+      hay: true,
+      texto: t,
+      impreso: t.includes("8.168,94"),
+      bonificacion: /14,0\\s*%/.test(t),
+      subtotal: t.includes("87.045,75"),
+      sistema: t.includes("90.000,00"),
+      finalEnElCampo: (campo?.value || "").replace(",", "."),
+      origen: t.includes("Subtotal ÷ cantidad"),
+      diferencia: t.includes("2.954,28"),
+      porcentaje: /-3,3\\s*%/.test(t),
+    };
+  })())`));
+  afirmar(bonificado.hay, "la tarjeta del renglón bonificado se dibujó");
+  afirmar(bonificado.impreso, "el precio impreso 8.168,94 está a la vista", bonificado.texto?.slice(0, 300));
+  afirmar(bonificado.bonificacion, "la bonificación del 14 % está a la vista", bonificado.texto?.slice(0, 300));
+  afirmar(bonificado.subtotal, "el subtotal 87.045,75 del renglón está a la vista", bonificado.texto?.slice(0, 300));
+  afirmar(bonificado.sistema, "el precio actual del sistema está a la vista");
+  afirmar(bonificado.origen, "dice que el precio final salió de subtotal ÷ cantidad");
+  afirmar(
+    Number(bonificado.finalEnElCampo) === 7253.81,
+    "el precio final del papel es 87.045,75 ÷ 12",
+    JSON.stringify(bonificado.finalEnElCampo)
+  );
+  afirmar(
+    Number(bonificado.finalEnElCampo) !== 8168.94,
+    "el precio final NO es el de lista",
+    JSON.stringify(bonificado.finalEnElCampo)
+  );
+  afirmar(bonificado.diferencia && bonificado.porcentaje, "la diferencia contra el sistema se muestra en pesos y en porcentaje");
+
+  // El cuadre del documento: dos centavos de redondeo se informan como que
+  // CIERRA, y no frenan el botón de guardar.
+  const cuadre = await evaluar(`document.body.innerText.includes("cierran con el total del documento")`);
+  afirmar(cuadre, "dos centavos de redondeo NO frenan el documento");
+
+  // Una foto del renglón que da nombre a la tanda, a 390. El desglose es lo que
+  // hay que poder mirar cuando el precio final es menor que el impreso.
+  await evaluar(`${tarjetaCon("Bonificado Sintético x12")}?.scrollIntoView({ block: "center" })`);
+  await dormir(350);
+  const fotoBonificado = await capturar("bonificado-390x844.png");
+
   await evaluar(`(() => {
-    const tarjeta = ${tarjetaCon("Pack Sintético x21")};
-    [...tarjeta.querySelectorAll('button')].find((b) => /Confirmar producto/.test(b.innerText || ""))?.click();
-    [...tarjeta.querySelectorAll('button')].find((b) => /Usar precio del papel/.test(b.innerText || ""))?.click();
+    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12"]) {
+      const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes(nombre));
+      const tarjeta = titulo?.closest('[data-sunmi-panel]');
+      if (!tarjeta) continue;
+      [...tarjeta.querySelectorAll('button')].find((b) => /Confirmar producto/.test(b.innerText || ""))?.click();
+      [...tarjeta.querySelectorAll('button')].find((b) => /Usar precio del papel/.test(b.innerText || ""))?.click();
+    }
     return true;
   })()`);
   await dormir(400);
 
-  const capturas = [];
+  const capturas = [fotoBonificado];
   for (const [ancho, alto] of [[390, 844], [1366, 900]]) {
     await medidas(ancho, alto);
     const medicion = JSON.parse(await medirPantalla());
@@ -387,17 +506,37 @@ const morir = (motivo) => {
   afirmar(Number(pack?.precioCosto) === 120 && pack?.origenPrecio === "PAPEL", "el precio elegido del papel viaja como 120 por unidad", JSON.stringify(pack));
   afirmar(Array.isArray(pack?.aliases) && pack.aliases.some((alias) => alias.codigoProveedor === "SINT-021"), "el cuerpo lleva la memoria a guardar", JSON.stringify(pack?.aliases));
 
+  // Y el renglón bonificado, que es el que da nombre a la tanda: 12 unidades de
+  // un pack de 12 son un bulto, y el costo que viaja es 7.253,81 × 12.
+  const bonif = cuerpos.crear?.items?.find((item) => Number(item.productoLocalId) === 9005);
+  afirmar(bonif?.unidad === "BULTO" && Number(bonif?.cantidad) === 1, "el renglón bonificado viaja como 1 BULTO", JSON.stringify(bonif));
+  afirmar(
+    Number(bonif?.precioCosto) === 87045.72 && bonif?.origenPrecio === "PAPEL",
+    "el borrador recibe el precio efectivo, 7.253,81 × 12",
+    JSON.stringify(bonif)
+  );
+  afirmar(
+    Number(bonif?.precioCosto) !== 8168.94 * 12,
+    "el borrador NO recibe el precio de lista por bulto",
+    JSON.stringify(bonif)
+  );
+
   console.log("\n── continuación de borrador ──────────────────────────────────");
   await evaluar(`window.__cuerpos = {}; sessionStorage.setItem("__sonda_cuerpos", "{}"); window.__analisis = []; true`);
   await navegar(`${BASE}/modulos/compras-proveedor/importar?pedidoId=999001`);
   if (!(await esperarA(`document.body.innerText.includes("Continúa borrador #999001")`, 20000))) morir("no abrió la continuación");
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó al continuar el borrador");
   await evaluar(`window.__fallarPrimero = false; true`);
   await seleccionarArchivo("continuacion-sintetica.pdf");
   if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) morir("no llegó a revisión al continuar");
   await evaluar(`(() => {
-    const tarjeta = ${tarjetaCon("Pack Sintético x21")};
-    [...tarjeta.querySelectorAll('button')].find((b) => /Confirmar producto/.test(b.innerText || ""))?.click();
-    [...tarjeta.querySelectorAll('button')].find((b) => /Usar precio del papel/.test(b.innerText || ""))?.click();
+    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12"]) {
+      const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes(nombre));
+      const tarjeta = titulo?.closest('[data-sunmi-panel]');
+      if (!tarjeta) continue;
+      [...tarjeta.querySelectorAll('button')].find((b) => /Confirmar producto/.test(b.innerText || ""))?.click();
+      [...tarjeta.querySelectorAll('button')].find((b) => /Usar precio del papel/.test(b.innerText || ""))?.click();
+    }
     return true;
   })()`);
   await dormir(300);
@@ -421,6 +560,7 @@ const morir = (motivo) => {
   await evaluar(`localStorage.setItem("erpazul_layout", JSON.stringify({ menuMode: "topbar" })); true`);
   await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
   if (!(await esperarA(`document.body.innerText.includes("1. Proveedor")`, 20000))) morir("no abrió la página en modo topbar");
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó en modo topbar");
   await evaluar(`window.__fallarPrimero = false; true`);
   await seleccionarArchivo("topbar-sintetico.pdf");
   if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) morir("no llegó a revisión en modo topbar");
