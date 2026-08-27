@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   FileUp,
   Image as ImageIcon,
+  MessageSquareText,
   RefreshCw,
   SearchCheck,
   X,
@@ -21,6 +22,7 @@ import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiSelect from "@/components/sunmi/SunmiSelect";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
 import { naturalezaLinea, permiteToggleUnidad } from "@/lib/compras-proveedor/calculoPedido";
 import { baseDeProducto } from "@/lib/compras-proveedor/importacion/merge";
 import { consolidarLineasImportadas } from "@/lib/compras-proveedor/importacion/payload";
@@ -37,6 +39,10 @@ import {
 } from "@/lib/compras-proveedor/importacion/prepararLineas";
 import { ORIGEN_PRECIO } from "@/lib/compras-proveedor/importacion/precios";
 import { lineasQueNoCierran } from "@/lib/compras-proveedor/importacion/coherenciaDeLinea";
+import {
+  LARGO_MAXIMO_EXPLICACION,
+  parametrosDeLectura,
+} from "@/lib/compras-proveedor/importacion/recetaDeLectura";
 import { TEXTO_MOTIVO_CANDIDATO } from "@/lib/proveedores/identidad/motorCandidatos";
 
 const NF_MONEDA = new Intl.NumberFormat("es-AR", {
@@ -118,6 +124,24 @@ export default function ImportarPedidoDesdeArchivo() {
   const [productos, setProductos] = useState([]);
   const [facturaPor, setFacturaPor] = useState("UNIDAD");
   const [tieneReceta, setTieneReceta] = useState(false);
+  // ── LA RECETA DE LECTURA, QUE ES OTRA COSA QUE LA DE IMPUESTOS ──────────
+  //
+  // `facturaPor` y `tieneReceta` de arriba salen de la receta de impuestos, que
+  // es UNA por proveedor. Éstas son las de LECTURA: varias por proveedor, una
+  // por formato, y dicen cómo está armada la tabla del papel.
+  const [recetasLectura, setRecetasLectura] = useState([]);
+  const [recetaElegidaId, setRecetaElegidaId] = useState("");
+  // La receta que se está usando AHORA. Puede venir de una guardada o de una
+  // explicación de "usar solo esta vez", que no se guarda en ningún lado.
+  const [recetaEnUso, setRecetaEnUso] = useState(null);
+  const [recetaSoloEstaVez, setRecetaSoloEstaVez] = useState(false);
+  const [explicando, setExplicando] = useState(false);
+  const [explicacion, setExplicacion] = useState("");
+  const [vistaPrevia, setVistaPrevia] = useState(null);
+  const [interpretando, setInterpretando] = useState(false);
+  const [errorReceta, setErrorReceta] = useState("");
+  const [nombreVariante, setNombreVariante] = useState("");
+  const [guardandoReceta, setGuardandoReceta] = useState(false);
   const [estado, setEstado] = useState("elegir");
   const [archivo, setArchivo] = useState(null);
   const [documento, setDocumento] = useState(null);
@@ -178,12 +202,16 @@ export default function ImportarPedidoDesdeArchivo() {
     setError("");
     (async () => {
       try {
-        const [respuestaProductos, respuestaReceta] = await Promise.all([
+        const [respuestaProductos, respuestaReceta, respuestaLectura] = await Promise.all([
           fetch(`/api/compras-proveedor/productos?proveedorId=${proveedorId}`, {
             credentials: "include",
             cache: "no-store",
           }),
           fetch(`/api/compras-proveedor/recetas/obtener?proveedorId=${proveedorId}`, {
+            credentials: "include",
+            cache: "no-store",
+          }),
+          fetch(`/api/compras-proveedor/recetas-lectura/listar?proveedorId=${proveedorId}`, {
             credentials: "include",
             cache: "no-store",
           }),
@@ -197,6 +225,13 @@ export default function ImportarPedidoDesdeArchivo() {
         } catch {
           // La receta ayuda a interpretar el precio, pero no bloquea la carga.
         }
+        let dataLectura = null;
+        try {
+          dataLectura = await respuestaLectura.json();
+        } catch {
+          // Las recetas de lectura ayudan, pero no bloquean la carga: sin
+          // ninguna el importador funciona como funcionaba antes.
+        }
         if (!vigente) return;
         setProductos(dataProductos.items || []);
         if (dataReceta?.ok) {
@@ -206,6 +241,16 @@ export default function ImportarPedidoDesdeArchivo() {
           setFacturaPor("UNIDAD");
           setTieneReceta(false);
         }
+        const variantes = dataLectura?.ok ? dataLectura.items || [] : [];
+        setRecetasLectura(variantes);
+        // Con UNA sola variante se elige sola: no hay ambigüedad que resolver.
+        // Con varias NO se elige ninguna, y esa ausencia es deliberada — adivinar
+        // el formato significa leer las columnas cambiadas de lugar, y el error
+        // se ve como un producto mal machado, no como un formato equivocado.
+        const unica = variantes.length === 1 ? variantes[0] : null;
+        setRecetaElegidaId(unica ? String(unica.id) : "");
+        setRecetaEnUso(unica ? unica.receta : null);
+        setRecetaSoloEstaVez(false);
       } catch (e) {
         if (vigente) {
           setProductos([]);
@@ -224,9 +269,26 @@ export default function ImportarPedidoDesdeArchivo() {
     () => new Map(productos.map((producto) => [String(producto.productoLocalId), producto])),
     [productos]
   );
+  // ── LOS PARÁMETROS QUE APORTA LA RECETA DE LECTURA ─────────────────────
+  //
+  // Antes de esta tanda, `cantidadEn` y `presentacionesConfirmadas` no se
+  // pasaban NUNCA desde acá, así que los escalones 1 y 2 de la prioridad de
+  // `resolverUnidadDelPapel` —la receta y la presentación confirmada— estaban
+  // escritos y no corrían jamás en producción. Es la tercera defensa de este
+  // módulo escrita y sin alcanzar; las otras dos están anotadas en CLAUDE.md.
+  const lectura = useMemo(() => parametrosDeLectura(recetaEnUso), [recetaEnUso]);
+  const nombreDeLaReceta =
+    recetasLectura.find((r) => String(r.id) === String(recetaElegidaId))?.nombre ?? "sin nombre";
+
   // `!== false` y no `Boolean(...)`: el lector puede no haber contestado, y
   // "no sé" se trata como "no hay columna" a propósito. Ver `prepararLineas`.
-  const hayColumnaSubtotal = documento?.hayColumnaSubtotal === true;
+  //
+  // La receta MANDA sobre lo que contestó el lector cuando opina: quien la
+  // escribió tenía el papel en la mano. Pero un `null` de la receta significa
+  // que no opina, y entonces sigue mandando el lector — por eso es `?? ` y no
+  // `||`, que convertiría un `false` de la receta en "preguntale al lector".
+  const hayColumnaSubtotal =
+    (lectura.hayColumnaSubtotal ?? documento?.hayColumnaSubtotal) === true;
   const incluidas = lineas.filter((linea) => linea.incluida !== false);
   const listas = incluidas.filter(lineaLista);
   const pendientes = incluidas.length - listas.length;
@@ -310,12 +372,167 @@ export default function ImportarPedidoDesdeArchivo() {
       prepararLineasImportadas({
         lineas: data.documento.lineas,
         productos,
-        facturaPor,
-        hayColumnaSubtotal: data.documento.hayColumnaSubtotal,
+        // La receta de LECTURA le gana a la de impuestos en la escala del
+        // precio: aquélla contesta por el proveedor entero y ésta por el formato
+        // que se tiene delante, que es más específico.
+        facturaPor: recetaEnUso?.facturaPor ?? facturaPor,
+        hayColumnaSubtotal:
+          (lectura.hayColumnaSubtotal ?? data.documento.hayColumnaSubtotal) === true,
+        // Los dos escalones que hasta ahora no se pasaban nunca.
+        cantidadEn: lectura.cantidadEn,
+        toleranciaEscalaPct: lectura.toleranciaEscalaPct,
       }).map((linea) => ({ ...linea, incluida: true }))
     );
     setFiltro("todas");
     setEstado("revisar");
+  };
+
+  /**
+   * VUELVE A ARMAR LAS LÍNEAS CON OTRA RECETA, SIN VOLVER A LEER EL ARCHIVO.
+   *
+   * ── POR QUÉ NO SE REANALIZA DE VERDAD ─────────────────────────────────
+   *
+   * Lo que la receta cambia es cómo se INTERPRETA lo leído —qué significa la
+   * cantidad, en qué escala está el precio, si hay columna de importe—, no qué
+   * dice el papel. Volver a subir el archivo gastaría otra lectura del modelo
+   * para obtener exactamente los mismos renglones, y encima tardaría treinta
+   * segundos cada vez que alguien prueba una explicación.
+   *
+   * `documento` conserva lo leído tal cual, así que probar una receta es
+   * instantáneo y gratis. Es lo que hace usable el paso de "corregir la
+   * explicación": si cada intento costara una lectura, nadie iteraría.
+   *
+   * La receta llega por parámetro y no del estado porque React todavía no lo
+   * actualizó cuando esto se llama: leerlo daría la receta anterior.
+   */
+  const repreparar = (receta) => {
+    if (!documento?.lineas?.length) return;
+    const params = parametrosDeLectura(receta);
+    setLineas(
+      prepararLineasImportadas({
+        lineas: documento.lineas,
+        productos,
+        facturaPor: receta?.facturaPor ?? facturaPor,
+        hayColumnaSubtotal:
+          (params.hayColumnaSubtotal ?? documento.hayColumnaSubtotal) === true,
+        cantidadEn: params.cantidadEn,
+        toleranciaEscalaPct: params.toleranciaEscalaPct,
+      }).map((linea) => ({ ...linea, incluida: true }))
+    );
+    setFiltro("todas");
+  };
+
+  // ── EL FLUJO DE "EXPLICAR CÓMO LEER ESTE DOCUMENTO" ────────────────────
+  //
+  //   1. escribir  →  2. interpretar (sin escribir nada)  →  3. vista previa
+  //   4. corregir la explicación   5. usar solo esta vez   6. confirmar y recordar
+  //
+  // Los pasos 4 y 5 son los que hacen que valga la pena: probar una explicación
+  // sin comprometerse. Por eso interpretar y guardar son dos rutas distintas, y
+  // la de interpretar no tiene ninguna escritura.
+
+  const interpretar = async () => {
+    if (!explicacion.trim() || interpretando) return;
+    setInterpretando(true);
+    setErrorReceta("");
+    try {
+      const respuesta = await fetch("/api/compras-proveedor/recetas-lectura/interpretar", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ explicacion, proveedorNombre }),
+      });
+      const data = await respuesta.json();
+      if (!data.ok) throw new Error(data.error || "No se pudo interpretar la explicación.");
+      if (!data.aporta) {
+        throw new Error(
+          "No se entendió ninguna columna ni ninguna regla. Probá diciendo qué columna es cada una."
+        );
+      }
+      setVistaPrevia(data);
+    } catch (e) {
+      setVistaPrevia(null);
+      setErrorReceta(e?.message || "No se pudo interpretar la explicación.");
+    } finally {
+      setInterpretando(false);
+    }
+  };
+
+  /**
+   * USAR SOLO ESTA VEZ: se aplica y NO se guarda en ningún lado.
+   *
+   * Si ya había un documento analizado, se vuelve a analizar con la receta
+   * puesta. No alcanza con recalcular las líneas: la receta puede cambiar qué
+   * significa la cantidad, y eso se resuelve al preparar, no después.
+   */
+  const usarSoloEstaVez = async () => {
+    if (!vistaPrevia?.receta) return;
+    setRecetaEnUso(vistaPrevia.receta);
+    setRecetaSoloEstaVez(true);
+    setRecetaElegidaId("");
+    setExplicando(false);
+    repreparar(vistaPrevia.receta);
+  };
+
+  const confirmarYRecordar = async () => {
+    if (!vistaPrevia?.receta || guardandoReceta) return;
+    const nombre = nombreVariante.trim();
+    if (!nombre) {
+      setErrorReceta(
+        "Poné un nombre para este formato, por ejemplo Consumidor Final. Es lo que después " +
+          "distingue una variante de la otra."
+      );
+      return;
+    }
+    setGuardandoReceta(true);
+    setErrorReceta("");
+    try {
+      const respuesta = await fetch("/api/compras-proveedor/recetas-lectura/guardar", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proveedorId: Number(proveedorId),
+          nombre,
+          receta: vistaPrevia.receta,
+          explicacion,
+        }),
+      });
+      const data = await respuesta.json();
+      if (!data.ok) throw new Error(data.error || "No se pudo guardar la receta.");
+
+      const guardada = {
+        id: data.receta.id,
+        nombre: data.receta.nombre,
+        receta: vistaPrevia.receta,
+        enCastellano: vistaPrevia.enCastellano,
+        explicacion,
+        version: data.receta.version,
+      };
+      setRecetasLectura((previas) => [
+        ...previas.filter((r) => r.id !== guardada.id),
+        guardada,
+      ]);
+      setRecetaElegidaId(String(guardada.id));
+      setRecetaEnUso(guardada.receta);
+      setRecetaSoloEstaVez(false);
+      setExplicando(false);
+      setVistaPrevia(null);
+      repreparar(guardada.receta);
+    } catch (e) {
+      setErrorReceta(e?.message || "No se pudo guardar la receta.");
+    } finally {
+      setGuardandoReceta(false);
+    }
+  };
+
+  /** Elegir una variante ya guardada, y releer el documento con ella. */
+  const elegirVariante = (id) => {
+    setRecetaElegidaId(id);
+    setRecetaSoloEstaVez(false);
+    const elegida = recetasLectura.find((r) => String(r.id) === String(id)) || null;
+    setRecetaEnUso(elegida?.receta ?? null);
+    repreparar(elegida?.receta ?? null);
   };
 
   const seleccionarArchivo = async (seleccionado) => {
@@ -539,6 +756,154 @@ export default function ImportarPedidoDesdeArchivo() {
                   <SunmiPill color={tieneReceta ? "cyan" : "slate"}>
                     Precio del papel por {facturaPor === "BULTO" ? "bulto" : "unidad"}
                   </SunmiPill>
+                  {recetaEnUso && (
+                    <SunmiPill color="cyan">
+                      {recetaSoloEstaVez ? "Formato: solo esta vez" : `Formato: ${nombreDeLaReceta}`}
+                    </SunmiPill>
+                  )}
+                </div>
+              )}
+
+              {/*
+                EXPLICAR CÓMO SE LEE ESTE DOCUMENTO.
+                Vive acá y no en una pantalla de configuración aparte porque el
+                momento en que alguien se da cuenta de que el formato se lee mal
+                es MIRANDO el resultado, con el papel en la mano. Mandarlo a otra
+                pantalla es pedirle que se acuerde después.
+              */}
+              {proveedorId && (
+                <div className="mt-4 pt-3 border-t sunmi-divider">
+                  {recetasLectura.length > 0 && (
+                    <label className="block mb-3">
+                      <span className="block text-sm2 font-semibold sunmi-text-muted mb-1">
+                        Formato del documento
+                      </span>
+                      <SunmiSelect
+                        value={recetaElegidaId}
+                        onChange={(e) => elegirVariante(e.target.value)}
+                      >
+                        {/*
+                          Sin opción elegida por defecto cuando hay varias: el
+                          sistema no puede saber cuál papel tenés en la mano, y
+                          adivinar significa leer las columnas cambiadas de lugar.
+                        */}
+                        <option value="">Sin receta: se lee como venga</option>
+                        {recetasLectura.map((variante) => (
+                          <option key={variante.id} value={variante.id}>
+                            {variante.nombre}
+                          </option>
+                        ))}
+                      </SunmiSelect>
+                    </label>
+                  )}
+
+                  {!explicando ? (
+                    <SunmiButton color="slate" type="button" onClick={() => setExplicando(true)}>
+                      <MessageSquareText size={15} />
+                      Explicar cómo leer este documento
+                    </SunmiButton>
+                  ) : (
+                    <div>
+                      <label className="block">
+                        <span className="block text-sm2 font-semibold sunmi-text-muted mb-1">
+                          Contá cómo está armada la tabla
+                        </span>
+                        <SunmiTextarea
+                          value={explicacion}
+                          onChange={(e) => setExplicacion(e.target.value)}
+                          rows={4}
+                          maxLength={LARGO_MAXIMO_EXPLICACION}
+                          placeholder="Ej: la primera columna es la cantidad enviada en unidades. Si está vacía, el producto no fue enviado. Después viene el nombre, el precio unitario y el total del renglón."
+                          className="text-sm2"
+                        />
+                      </label>
+                      <p className="text-xs sunmi-text-muted mt-1">
+                        Se traduce a reglas de lectura. Cantidades, importes y descuentos se
+                        vuelven a leer de cada archivo: no se guarda ningún número de esta factura.
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <SunmiButton
+                          type="button"
+                          onClick={interpretar}
+                          disabled={interpretando || !explicacion.trim()}
+                        >
+                          {interpretando ? "Interpretando..." : vistaPrevia ? "Corregir explicación" : "Ver cómo quedaría"}
+                        </SunmiButton>
+                        <SunmiButton
+                          color="slate"
+                          type="button"
+                          onClick={() => {
+                            setExplicando(false);
+                            setVistaPrevia(null);
+                            setErrorReceta("");
+                          }}
+                        >
+                          Cancelar
+                        </SunmiButton>
+                      </div>
+
+                      {errorReceta && (
+                        <p className="mt-2 text-sm2 sunmi-text-danger">{errorReceta}</p>
+                      )}
+
+                      {/* LA VISTA PREVIA: lo que se ENTENDIÓ, antes de aplicar nada. */}
+                      {vistaPrevia && (
+                        <div className="mt-3 rounded-lg border sunmi-divider sunmi-control px-3 py-2">
+                          <p className="text-sm2 font-semibold sunmi-text-strong mb-1">
+                            Así se va a leer
+                          </p>
+                          <ul className="text-sm2 sunmi-text-muted space-y-1">
+                            {vistaPrevia.enCastellano.map((linea) => (
+                              <li key={linea}>· {linea}</li>
+                            ))}
+                          </ul>
+
+                          {/*
+                            Lo que NO entró se muestra SIEMPRE que haya algo. Sin
+                            esto, alguien confirmaría una receta creyendo que dice
+                            algo que no dice.
+                          */}
+                          {Boolean(vistaPrevia.descartados?.length) && (
+                            <div className="mt-2 pt-2 border-t sunmi-divider">
+                              <p className="text-sm2 font-semibold sunmi-text-warning">
+                                Esto no se pudo usar
+                              </p>
+                              <ul className="text-sm2 sunmi-text-muted space-y-1 mt-1">
+                                {vistaPrevia.descartados.map((item) => (
+                                  <li key={item}>· {item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          <div className="mt-3 flex flex-wrap items-end gap-2">
+                            <SunmiButton color="slate" type="button" onClick={usarSoloEstaVez}>
+                              Usar solo esta vez
+                            </SunmiButton>
+                            <label className="min-w-0">
+                              <span className="block text-xs sunmi-text-muted mb-1">
+                                Nombre del formato
+                              </span>
+                              <SunmiInput
+                                value={nombreVariante}
+                                onChange={(e) => setNombreVariante(e.target.value)}
+                                placeholder="Consumidor Final"
+                                className="w-44"
+                              />
+                            </label>
+                            <SunmiButton
+                              type="button"
+                              onClick={confirmarYRecordar}
+                              disabled={guardandoReceta}
+                            >
+                              {guardandoReceta ? "Guardando..." : "Confirmar y recordar"}
+                            </SunmiButton>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </SunmiPanel>

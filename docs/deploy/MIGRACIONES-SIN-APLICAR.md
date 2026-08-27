@@ -16,7 +16,35 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción está al día: **103 migraciones en el árbol y 103
+### `20260828010000_receta_lectura_proveedor` — SIN DESPLEGAR
+
+Está en la rama `feat/candados-magnitud-y-recetas-de-lectura`, **no en `main`**.
+Se anota acá igual para que el próximo despliegue que la incluya lo sepa desde el
+paso 0 y no lo descubra a mitad de camino.
+
+**Qué hace:** crea la tabla `RecetaLecturaProveedor`, que guarda cómo se lee cada
+formato de documento de un proveedor —qué columna es cuál, cómo se sabe si un
+renglón fue enviado, qué significa la cantidad—. Son varias por proveedor, una
+por variante: Consumidor Final, Responsable Inscripto.
+
+**Qué NO toca:** ninguna tabla existente. Ni `RecetaProveedor` —la de impuestos,
+que sigue siendo una por proveedor— ni `ProductoCodigoProveedor`, que sigue
+siendo la única memoria de identidad del proveedor.
+
+**Aditiva pura:** `CREATE TABLE` de algo que no existía, más su índice único y su
+clave foránea. No bloquea escrituras sobre ninguna tabla en uso porque la tabla
+que se bloquea es la que se está creando, y está vacía. No hay backfill.
+
+**El quinto chequeo del backup NO aplica**: no es una migración de datos, no
+borra ni transforma nada, así que no hay ningún valor que comprobar dentro del
+dump. Los cuatro de siempre sí.
+
+**Al aplicarla, el árbol pasa de 103 a 104 migraciones**, y ése es el número que
+tiene que informar el contenedor descartable.
+
+---
+
+Antes de ésta, producción estaba al día: **103 migraciones en el árbol y 103
 aplicadas**, comprobado el 2026-08-27 después de desplegar
 `4434cbb65b3c5938802a1d024125c072703406c3` — la marca por raíz en el motor de
 candidatos y la separación entre la unidad del papel y la del pedido. **Solo

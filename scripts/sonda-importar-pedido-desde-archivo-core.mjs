@@ -263,6 +263,59 @@ const FALSO = {
       },
     ],
   },
+  // ── LAS RECETAS DE LECTURA DEL PROVEEDOR ────────────────────────────────
+  //
+  // Dos variantes del MISMO proveedor, que es el caso que el pedido nombra. La
+  // primera lee bien; la segunda lee la cantidad en bultos y por eso rompe la
+  // aritmética de un renglón — que es exactamente para lo que sirve el candado
+  // de magnitud, y la manera honesta de llegar a verlo sin fabricar una fila.
+  recetasLectura: [
+    {
+      id: 71,
+      nombre: "Consumidor Final",
+      receta: {
+        nombre: "Consumidor Final",
+        columnas: { cantidad: { encabezado: null, posicion: 0 } },
+        enviado: { criterio: "CANTIDAD_PRESENTE", columna: null },
+        cantidadEn: "UNIDAD",
+        facturaPor: "UNIDAD",
+        subtotal: { hayColumna: true, incluyeBonificacion: true },
+        variante: { pistas: ["CONSUMIDOR FINAL"] },
+        toleranciaEscalaPct: null,
+      },
+      enCastellano: ["La cantidad está expresada en unidades sueltas"],
+      explicacion: null,
+      version: 1,
+    },
+    {
+      id: 72,
+      nombre: "Responsable Inscripto",
+      receta: {
+        nombre: "Responsable Inscripto",
+        columnas: { cantidad: { encabezado: "BULTOS", posicion: null } },
+        enviado: { criterio: "TODOS", columna: null },
+        cantidadEn: "BULTO",
+        facturaPor: "UNIDAD",
+        subtotal: { hayColumna: true, incluyeBonificacion: true },
+        variante: { pistas: ["RESPONSABLE INSCRIPTO"] },
+        toleranciaEscalaPct: null,
+      },
+      enCastellano: ["La cantidad está expresada en bultos"],
+      explicacion: null,
+      version: 1,
+    },
+  ],
+  /** Lo que devolvería la interpretación del ejemplo textual del pedido. */
+  recetaInterpretada: {
+    nombre: null,
+    columnas: { cantidad: { encabezado: null, posicion: 0 } },
+    enviado: { criterio: "CANTIDAD_PRESENTE", columna: null },
+    cantidadEn: "UNIDAD",
+    facturaPor: null,
+    subtotal: { hayColumna: true, incluyeBonificacion: null },
+    variante: { pistas: [] },
+    toleranciaEscalaPct: null,
+  },
   pedido: {
     id: 999001,
     estado: "BORRADOR",
@@ -279,6 +332,7 @@ const INTERCEPTOR = `
   window.__analisis = [];
   window.__cuerpos = JSON.parse(sessionStorage.getItem("__sonda_cuerpos") || "{}");
   window.__fugas = [];
+  window.__interpretaciones = [];
   window.__fallarPrimero = true;
   const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
     status, headers: { "Content-Type": "application/json" },
@@ -291,6 +345,34 @@ const INTERCEPTOR = `
     if (url.includes("/api/compras-proveedor/productos")) return json({ ok: true, items: D.productos });
     if (url.includes("/api/compras-proveedor/recetas/obtener")) {
       return json({ ok: true, tieneReceta: true, respuestas: { facturaPor: "UNIDAD" } });
+    }
+    // ── LAS DOS VARIANTES DE FORMATO DEL MISMO PROVEEDOR ────────────────
+    //
+    // La segunda lee la cantidad en BULTOS, y con eso el renglón de 50 a
+    // $3.360 pasa a 500 unidades y deja de cerrar contra sus $168.000. Es la
+    // forma real de llegar al bloqueo: una receta equivocada, no un dato
+    // fabricado para que la captura salga linda.
+    if (url.includes("/api/compras-proveedor/recetas-lectura/listar")) {
+      return json({ ok: true, items: D.recetasLectura });
+    }
+    if (url.includes("/api/compras-proveedor/recetas-lectura/interpretar")) {
+      window.__interpretaciones.push(JSON.parse(opciones.body || "null"));
+      return json({
+        ok: true,
+        aporta: true,
+        receta: D.recetaInterpretada,
+        enCastellano: [
+          "La cantidad sale de la columna 1",
+          "Si la cantidad está vacía, el producto no fue enviado",
+          "La cantidad está expresada en unidades sueltas",
+        ],
+        descartados: ["la escala de cantidad \\"CAJONES\\""],
+      });
+    }
+    if (url.includes("/api/compras-proveedor/recetas-lectura/guardar")) {
+      window.__cuerpos.receta = JSON.parse(opciones.body || "null");
+      sessionStorage.setItem("__sonda_cuerpos", JSON.stringify(window.__cuerpos));
+      return json({ ok: true, receta: { id: 77, nombre: "Consumidor Final", version: 1 }, creada: true });
     }
     if (url.includes("/api/compras-proveedor/obtener")) return json({ ok: true, item: D.pedido });
     if (url.includes("/api/compras-proveedor/importar/analizar")) {
@@ -700,6 +782,113 @@ const morir = (motivo) => {
     capturas.push(await capturar(`revisar-${ancho}x${alto}.png`));
   }
 
+  // ── EL CANDADO DE MAGNITUD, EJERCIDO EN LA PANTALLA ──────────────────────
+  //
+  // Se elige la variante que lee la cantidad en BULTOS. Con eso el renglón de
+  // 50 a $3.360 pasa a valer $1.680.000 contra los $168.000 que dice el papel, y
+  // la línea tiene que bloquearse. Es la manera honesta de llegar al caso: una
+  // receta equivocada, que es como pasa de verdad.
+  console.log("\n── candado de magnitud ───────────────────────────────────────");
+  await medidas(1366, 900);
+  const antesDelBloqueo = await evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /^Crear borrador$/.test((x.innerText || "").trim()));
+    return !!b && !b.disabled;
+  })()`);
+  afirmar(antesDelBloqueo, "antes de la receta mala, el borrador se podía crear");
+
+  await evaluar(`(() => {
+    const select = [...document.querySelectorAll('select')].find((s) =>
+      [...s.options].some((o) => /Responsable Inscripto/.test(o.textContent || "")));
+    if (!select) return false;
+    const opcion = [...select.options].find((o) => /Responsable Inscripto/.test(o.textContent || ""));
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+    setter.call(select, opcion.value);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await dormir(500);
+
+  const bloqueo = JSON.parse(await evaluar(`(() => {
+    const texto = document.body.innerText || "";
+    const boton = [...document.querySelectorAll('button')].find((x) => /^Crear borrador$/.test((x.innerText || "").trim()));
+    const opciones = [...document.querySelectorAll('button')]
+      .map((b) => (b.innerText || "").trim())
+      .filter((t) => /×/.test(t) && /\\$/.test(t));
+    return JSON.stringify({
+      cartel: texto.includes("no cierra contra el importe del papel"),
+      interpretacion: /Se interpretó que el papel dice 50 bultos de 10/.test(texto),
+      cuenta: texto.includes("1.680.000") && texto.includes("168.000"),
+      asiSiCierra: texto.includes("Así sí cierra"),
+      contador: /no cierran contra el papel/.test(texto),
+      botonBloqueado: !!boton && boton.disabled,
+      opciones,
+    });
+  })()`));
+  afirmar(bloqueo.cartel, "la línea avisa que no cierra contra el importe del papel");
+  afirmar(bloqueo.interpretacion, "dice QUÉ interpretación produjo la diferencia");
+  afirmar(bloqueo.cuenta, "muestra los dos importes: el calculado y el del papel");
+  afirmar(bloqueo.asiSiCierra, "ofrece las representaciones que sí cierran");
+  afirmar(bloqueo.opciones.length >= 1, "las representaciones ofrecidas son botones", JSON.stringify(bloqueo.opciones));
+  afirmar(bloqueo.contador, "el pie cuenta las líneas que no cierran");
+  afirmar(bloqueo.botonBloqueado, "CREAR BORRADOR queda bloqueado con una línea incoherente");
+  capturas.push(await capturar("magnitud-bloqueada.png"));
+
+  // Y corregir la lectura desde el cartel tiene que desbloquear. Si no
+  // desbloqueara, el cartel estaría ofreciendo una salida que no funciona.
+  //
+  // La receta mala rompe VARIOS renglones a la vez —es una receta, no un dato
+  // suelto— así que se corrigen todos y recién ahí se mira si quedó alguno.
+  const bloqueadasAntes = Number(await evaluar(`(() => {
+    return [...document.querySelectorAll('p')].filter((p) => /no cierra contra el importe del papel/.test(p.innerText || "")).length;
+  })()`));
+  afirmar(bloqueadasAntes >= 2, "una receta equivocada rompe varios renglones, no uno", String(bloqueadasAntes));
+
+  for (let vuelta = 0; vuelta < bloqueadasAntes + 2; vuelta += 1) {
+    const quedan = Number(await evaluar(`(() => {
+      const titulo = [...document.querySelectorAll('p')].find((p) => /no cierra contra el importe del papel/.test(p.innerText || ""));
+      if (!titulo) return 0;
+      const caja = titulo.closest('[data-sunmi-panel]');
+      const boton = [...(caja || document).querySelectorAll('button')].find((b) => /×/.test(b.innerText || "") && /\\$/.test(b.innerText || ""));
+      boton?.click();
+      return 1;
+    })()`));
+    if (!quedan) break;
+    await dormir(250);
+  }
+  await dormir(400);
+  const trasCorregir = JSON.parse(await evaluar(`(() => {
+    const texto = document.body.innerText || "";
+    return JSON.stringify({
+      sigueElCartel: texto.includes("no cierra contra el importe del papel"),
+      sigueElContador: /no cierran contra el papel/.test(texto),
+    });
+  })()`));
+  afirmar(!trasCorregir.sigueElCartel, "corregir la lectura desde el cartel desbloquea las líneas");
+  afirmar(!trasCorregir.sigueElContador, "y el contador del pie vuelve a cero");
+
+  // Se vuelve a la variante buena para seguir con el resto del recorrido.
+  await evaluar(`(() => {
+    const select = [...document.querySelectorAll('select')].find((s) =>
+      [...s.options].some((o) => /Consumidor Final/.test(o.textContent || "")));
+    const opcion = [...select.options].find((o) => /Consumidor Final/.test(o.textContent || ""));
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+    setter.call(select, opcion.value);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await dormir(500);
+  await evaluar(`(() => {
+    for (const nombre of ["Nombre que no coincide", "Pack Sintético x21", "Bonificado Sintético x12", "ZORTAMIL SINTETICO CONV 10", "ZORTAMELINDA 20 CONV BOX", "CHESTERFIELD 10"]) {
+      const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes(nombre));
+      const tarjeta = titulo?.closest('[data-sunmi-panel]');
+      if (!tarjeta) continue;
+      [...tarjeta.querySelectorAll('button')].find((b) => /Confirmar producto/.test(b.innerText || ""))?.click();
+      [...tarjeta.querySelectorAll('button')].find((b) => /Usar precio del papel/.test(b.innerText || ""))?.click();
+    }
+    return true;
+  })()`);
+  await dormir(400);
+
   const habilitado = await evaluar(`(() => {
     const b = [...document.querySelectorAll('button')].find((x) => /^Crear borrador$/.test((x.innerText || "").trim()));
     return !!b && !b.disabled;
@@ -732,6 +921,77 @@ const morir = (motivo) => {
     "el borrador NO recibe el precio de lista por bulto",
     JSON.stringify(bonif)
   );
+
+  // ── EXPLICAR CÓMO LEER ESTE DOCUMENTO ────────────────────────────────────
+  console.log("\n── receta conversacional ─────────────────────────────────────");
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Explicar cómo leer este documento/.test(b.innerText || ""))?.click()`);
+  await dormir(300);
+  const panelAbierto = JSON.parse(await evaluar(`(() => {
+    const area = document.querySelector('textarea');
+    return JSON.stringify({
+      hayCampo: !!area,
+      esDelKit: !!area && area.className.includes("sunmi-input"),
+      tope: area?.getAttribute("maxlength"),
+      dice: (document.body.innerText || "").includes("no se guarda ningún número de esta factura"),
+    });
+  })()`));
+  afirmar(panelAbierto.hayCampo, "se puede escribir la explicación");
+  afirmar(panelAbierto.esDelKit, "el campo es del kit y no un textarea suelto", panelAbierto.esDelKit);
+  afirmar(panelAbierto.tope === "2000", "el campo tiene tope de largo", String(panelAbierto.tope));
+  afirmar(panelAbierto.dice, "dice que no se guardan números de la factura");
+
+  // El ejemplo TEXTUAL del pedido, escrito tal cual.
+  await evaluar(`(() => {
+    const area = document.querySelector('textarea');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(area, "La primera columna es la cantidad enviada en unidades. Si está vacía, el producto no fue enviado. Después viene el nombre, el precio unitario y el total del renglón.");
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await dormir(200);
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Ver cómo quedaría/.test(b.innerText || ""))?.click()`);
+  await esperarA(`document.body.innerText.includes("Así se va a leer")`, 10000);
+
+  const previa = JSON.parse(await evaluar(`(() => {
+    const texto = document.body.innerText || "";
+    return JSON.stringify({
+      muestra: texto.includes("Así se va a leer"),
+      enCastellano: texto.includes("Si la cantidad está vacía, el producto no fue enviado"),
+      descartados: texto.includes("Esto no se pudo usar") && texto.includes("CAJONES"),
+      soloEstaVez: !![...document.querySelectorAll('button')].find((b) => /Usar solo esta vez/.test(b.innerText || "")),
+      confirmar: !![...document.querySelectorAll('button')].find((b) => /Confirmar y recordar/.test(b.innerText || "")),
+      corregir: !![...document.querySelectorAll('button')].find((b) => /Corregir explicación/.test(b.innerText || "")),
+    });
+  })()`));
+  afirmar(previa.muestra, "hay vista previa antes de aplicar nada");
+  afirmar(previa.enCastellano, "la vista previa dice en castellano lo que se ENTENDIÓ");
+  afirmar(previa.descartados, "y dice lo que NO se pudo usar");
+  afirmar(previa.corregir, "se puede corregir la explicación");
+  afirmar(previa.soloEstaVez, "se puede usar solo esta vez");
+  afirmar(previa.confirmar, "se puede confirmar y recordar");
+  capturas.push(await capturar("receta-vista-previa.png"));
+
+  // La interpretación NO escribe: se comprueba que no se llamó a guardar.
+  const trasPrevia = JSON.parse(await evaluar(`JSON.stringify({
+    interpretaciones: window.__interpretaciones.length,
+    guardo: !!window.__cuerpos.receta,
+    fugas: window.__fugas,
+  })`));
+  afirmar(trasPrevia.interpretaciones === 1, "la vista previa consultó una sola vez", String(trasPrevia.interpretaciones));
+  afirmar(!trasPrevia.guardo, "LA VISTA PREVIA NO GUARDÓ NADA");
+  afirmar(trasPrevia.fugas.length === 0, "y no se escapó ninguna escritura", JSON.stringify(trasPrevia.fugas));
+
+  // "Usar solo esta vez": se aplica y sigue sin guardar.
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Usar solo esta vez/.test(b.innerText || ""))?.click()`);
+  await dormir(500);
+  const soloEstaVez = JSON.parse(await evaluar(`JSON.stringify({
+    guardo: !!window.__cuerpos.receta,
+    pill: (document.body.innerText || "").includes("Formato: solo esta vez"),
+    analisis: window.__analisis.length,
+  })`));
+  afirmar(!soloEstaVez.guardo, "USAR SOLO ESTA VEZ no persiste la receta");
+  afirmar(soloEstaVez.pill, "y se ve que la receta está en uso sin estar guardada");
+  afirmar(soloEstaVez.analisis === 2, "reanalizar con otra receta NO vuelve a leer el archivo", String(soloEstaVez.analisis));
 
   console.log("\n── continuación de borrador ──────────────────────────────────");
   await evaluar(`window.__cuerpos = {}; sessionStorage.setItem("__sonda_cuerpos", "{}"); window.__analisis = []; true`);

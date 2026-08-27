@@ -283,6 +283,12 @@ model Proveedor {
   /// se ven varias aunque cada grupo tenga una sola. La unicidad real la
   /// garantiza @@unique([grupoId, proveedorId]) en RecetaProveedor.
   recetas      RecetaProveedor[]
+  /// Las recetas de LECTURA, que son varias por proveedor: un mismo proveedor
+  /// factura con formatos distintos —Consumidor Final, Responsable Inscripto— y
+  /// eso no cambia sus impuestos. Por eso son otra tabla y no un campo más de
+  /// `recetas`, que tiene @@unique([grupoId, proveedorId]) justamente porque la
+  /// receta de impuestos de un proveedor es UNA.
+  recetasLectura RecetaLecturaProveedor[]
   comprobantes ComprobanteProveedor[]
 
   dias_pedido DiaPedido[] @default([])
@@ -2840,6 +2846,55 @@ model RecetaProveedor {
   /// Una receta por proveedor y grupo: es lo que hace que "la receta del
   /// proveedor" sea una cosa y no un historial.
   @@unique([grupoId, proveedorId])
+  @@index([proveedorId])
+}
+
+/// CÓMO SE LEE UN FORMATO DE DOCUMENTO DE ESTE PROVEEDOR.
+///
+/// Es la receta ESTRUCTURAL —qué columna es cuál, cómo se sabe si un renglón fue
+/// enviado, qué significa la cantidad—, y es otra cosa que `RecetaProveedor`,
+/// que contesta por los impuestos. Se separaron porque un proveedor tiene VARIOS
+/// formatos y un solo esquema impositivo: meterlas juntas habría obligado a
+/// romper la unicidad de aquélla, que es lo que hace que "la receta del
+/// proveedor" sea una cosa y no un historial.
+///
+/// NO guarda identidad de productos. Códigos, alias, descripciones y
+/// presentaciones siguen en ProductoCodigoProveedor, que es lo que hace que
+/// Listas de precios y Facturas compartan lo que aprenden.
+model RecetaLecturaProveedor {
+  id          Int @id @default(autoincrement())
+  grupoId     Int
+  proveedorId Int
+
+  /// El nombre de la variante, y su discriminador: "Consumidor Final",
+  /// "Responsable Inscripto", "Remito".
+  nombre String
+
+  /// La receta validada, ya pasada por `recetaValida`. Json y no una columna por
+  /// campo porque el vocabulario va a crecer, se edita entera y nunca se
+  /// consulta un campo suelto. Lo que NO puede contener son valores de una
+  /// factura: cantidades, importes y porcentajes se leen de cada archivo.
+  receta Json
+
+  /// El texto que escribió la persona, tal como lo escribió. Es DOCUMENTACIÓN:
+  /// sirve para poder mostrar qué se quiso decir cuando esta receta se creó, y
+  /// no se vuelve a interpretar solo. Lo que se aplica es siempre `receta`.
+  explicacion String?
+
+  /// Sube cada vez que alguien la edita, igual que en RecetaProveedor.
+  version Int @default(1)
+
+  /// Quién la confirmó. Una receta que nadie confirmó no debería existir: la de
+  /// "usar solo esta vez" no se guarda.
+  confirmadaPorUsuarioId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
+
+  /// Varias por proveedor, una por nombre de variante.
+  @@unique([grupoId, proveedorId, nombre])
   @@index([proveedorId])
 }
 
