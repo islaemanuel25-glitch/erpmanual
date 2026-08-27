@@ -5,6 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
 import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
+import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
 
 export async function POST(req) {
   try {
@@ -117,6 +118,11 @@ export async function POST(req) {
       productosPorLocal,
       grupoId,
       proveedorId: Number(proveedorId),
+      // Quién firma, para los renglones donde una persona eligió el producto.
+      // El servidor pone el usuario y la hora: el cuerpo no puede declarar que
+      // lo confirmó otro ni cuándo.
+      confirmadaPorUsuarioId: session.id,
+      confirmadaEn: new Date(),
     });
 
     const pedido = await prisma.$transaction(async (tx) => {
@@ -165,23 +171,10 @@ export async function POST(req) {
         },
       });
 
-      for (const alias of aliases) {
-        await tx.productoCodigoProveedor.upsert({
-          where: {
-            codigo_interno_unico_por_proveedor: {
-              grupoId: alias.grupoId,
-              proveedorId: alias.proveedorId,
-              codigoInterno: alias.codigoInterno,
-            },
-          },
-          update: {
-            productoBaseId: alias.productoBaseId,
-            descripcionProveedor: alias.descripcionProveedor,
-            activo: true,
-          },
-          create: alias,
-        });
-      }
+      // La memoria del proveedor la escribe UNA sola pieza, compartida con
+      // Listas de precios. No es un upsert ciego: respeta lo que una persona
+      // confirmó y no deja que una deducción lo pise.
+      await persistirIdentidad(tx, aliases);
       return creado;
     });
 

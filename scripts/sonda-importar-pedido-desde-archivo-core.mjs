@@ -397,7 +397,23 @@ const morir = (motivo) => {
   console.log("\n── macheo y precios ───────────────────────────────────────────");
   const texto = await evaluar(`document.body.innerText`);
   afirmar(texto.includes("Código aproximado"), "el código bajó por terminación y vinculó");
-  afirmar(texto.includes("Aprendido para este proveedor"), "el nombre sin código reutilizó la memoria del proveedor");
+  // El motivo lo dice ahora el MOTOR COMPARTIDO, con el mismo vocabulario que
+  // usa Listas de precios: "Alias confirmado del proveedor". Antes era un texto
+  // propio del importador —"Aprendido para este proveedor"—, y tener dos formas
+  // de nombrar lo mismo es lo que hace que un módulo explique distinto que el
+  // otro la misma decisión.
+  afirmar(
+    texto.includes("Alias confirmado del proveedor"),
+    "el nombre sin código reutilizó la memoria del proveedor",
+    texto.slice(0, 400)
+  );
+  // Y que el motivo se muestre SIEMPRE, no solo cuando es alias: es lo que
+  // permite entender por qué se propuso cada candidato.
+  afirmar(
+    texto.includes("Código exacto") || texto.includes("Sugerencia por marca y presentación"),
+    "la pantalla no explica por qué eligió los demás candidatos",
+    texto.slice(0, 400)
+  );
   afirmar(texto.includes("Precio del sistema") && texto.includes("Precio del papel"), "los dos precios están visibles");
   afirmar(texto.includes("+20,0%") || texto.includes("+20.0%"), "la diferencia de precio se muestra en porcentaje");
 
