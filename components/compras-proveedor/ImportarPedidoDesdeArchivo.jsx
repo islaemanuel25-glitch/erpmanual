@@ -44,6 +44,7 @@ import {
   parametrosDeLectura,
 } from "@/lib/compras-proveedor/importacion/recetaDeLectura";
 import { TEXTO_MOTIVO_CANDIDATO } from "@/lib/proveedores/identidad/motorCandidatos";
+import { aplicarOrden } from "@/lib/proveedores/identidad/ordenIa";
 
 const NF_MONEDA = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 2,
@@ -142,6 +143,7 @@ export default function ImportarPedidoDesdeArchivo() {
   const [errorReceta, setErrorReceta] = useState("");
   const [nombreVariante, setNombreVariante] = useState("");
   const [guardandoReceta, setGuardandoReceta] = useState(false);
+  const [ordenandoId, setOrdenandoId] = useState(null);
   const [estado, setEstado] = useState("elegir");
   const [archivo, setArchivo] = useState(null);
   const [documento, setDocumento] = useState(null);
@@ -657,6 +659,52 @@ export default function ImportarPedidoDesdeArchivo() {
   };
 
   /**
+   * ORDENA LOS SUGERIDOS DE UNA LÍNEA CON AYUDA DEL MODELO.
+   *
+   * Manda los candidatos que el sistema ya eligió, y lo que vuelve pasa por
+   * `aplicarOrden`, que filtra contra esa misma lista. Son dos defensas para lo
+   * mismo a propósito: lo que se está ordenando termina en un vínculo que
+   * escribe costos maestros, y una sola defensa no alcanza para eso.
+   *
+   * No elige, no confirma y no toca una línea que ya decidió una persona: eso lo
+   * garantiza `aplicarOrden`, no esta función.
+   */
+  const ordenarSugeridos = async (idLinea) => {
+    const linea = lineas.find((l) => l.id === idLinea);
+    if (!linea || ordenandoId) return;
+    const candidatos = (linea.sugeridos || [])
+      .map((id) => productosPorId.get(String(id)))
+      .filter(Boolean)
+      .map((p) => ({ id: String(p.productoLocalId), nombre: p.nombre }));
+    if (candidatos.length < 2) return;
+
+    setOrdenandoId(idLinea);
+    try {
+      const respuesta = await fetch("/api/compras-proveedor/importar/ordenar-candidatos", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto: linea.textoOriginal || linea.descripcion, candidatos }),
+      });
+      const data = await respuesta.json();
+      if (!data.ok) throw new Error(data.error || "No se pudo ordenar.");
+      setLineas((previas) =>
+        previas.map((l) =>
+          l.id === idLinea
+            ? { ...aplicarOrden(l, data.orden), avisoOrden: data.aplicado ? null : data.porque }
+            : l
+        )
+      );
+    } catch (e) {
+      setLineas((previas) =>
+        previas.map((l) => (l.id === idLinea ? { ...l, avisoOrden: e?.message || "No se pudo ordenar." } : l))
+      );
+    } finally {
+      setOrdenandoId(null);
+    }
+  };
+
+  /**
    * El precio final escrito a mano gana sobre el calculado, y queda marcado.
    *
    * Se pasa la cadena vacía —y no `null`— cuando el campo se borra: `null`
@@ -1084,6 +1132,34 @@ export default function ImportarPedidoDesdeArchivo() {
                                     </SunmiSelectOption>
                                   ))}
                                 </SunmiSelectAdv>
+                                {/*
+                                  ORDENAR LOS SUGERIDOS CON AYUDA.
+                                  Solo aparece donde puede servir: sin producto
+                                  elegido y con más de un candidato. Ordena; no
+                                  elige, no confirma y no toca una línea que ya
+                                  decidió una persona.
+                                */}
+                                {!linea.productoLocalId && sugeridosOrdenados.length > 1 && (
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <SunmiButton
+                                      color="slate"
+                                      type="button"
+                                      onClick={() => ordenarSugeridos(linea.id)}
+                                      disabled={ordenandoId === linea.id}
+                                    >
+                                      <SearchCheck size={15} />
+                                      {ordenandoId === linea.id ? "Ordenando..." : "Ordenar sugerencias con ayuda"}
+                                    </SunmiButton>
+                                    {linea.ordenadoPorIa && (
+                                      <span className="text-xs sunmi-text-accent">
+                                        Orden sugerido. Elegí y confirmá vos.
+                                      </span>
+                                    )}
+                                    {linea.avisoOrden && (
+                                      <span className="text-xs sunmi-text-warning">{linea.avisoOrden}</span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
                               {producto && (
