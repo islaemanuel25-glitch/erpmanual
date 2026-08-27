@@ -22,6 +22,77 @@ Ninguna.
 
 Producción está al día en **104**, comprobado con `prisma migrate status` el
 2026-08-27 después de desplegar
+`de921481b56894433b9e2ff7e7cf1527a8764eb1` — el arreglo de los dos defectos que
+aparecieron con el importador en producción: el endpoint que devolvía una página
+HTML y la foto que no traía tabla cruda. **Solo código.**
+
+Corte de **2 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` healthy y **no recreado** —todo con `--no-deps app`—,
+logs sin un solo error, `/login` en 200, `APP_IMAGE` sin filtrarse dentro del
+contenedor y el árbol del VPS limpio. Rollback disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:a63b66e57b444139eaedd89b4bea965cb83f97ef`
+(imagen `sha256:44ec2ac076b5…`). No hizo falta.
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre en las últimas 20 líneas, **62 tablas**—:
+`/srv/produccion/backups/pre-de921481_20260827_212153.sql.gz`, 3,0 MB. El quinto
+no aplica: no hay migración de datos.
+
+Sin migraciones, comprobado de tres formas antes de tocar nada: el rango
+`a63b66e5..HEAD` no toca `prisma/`, el clasificador informó "Archivos a mirar: 0"
+con el rango tomado de la imagen que atendía, y este archivo ya decía que no
+había pendientes. El contenedor descartable contó **104**, el mismo número que el
+árbol — que es lo que distingue "estaba todo aplicado" de "la imagen no conoce la
+migración", porque las dos imprimen el mismo "No pending migrations to apply" con
+salida 0.
+
+### EL CÓDIGO VIAJÓ, COMPROBADO EN LOS DOS SENTIDOS
+
+El marcador es la cadena de interfaz `renglones que quedaron afuera`, del botón
+que estrena esta tanda para abrir la lista completa de omitidos. Es un literal y
+no un identificador —el build minifica los identificadores— y es **ASCII puro**,
+para que un acento roto al viajar por ssh no dé un vacío que se lea como "no
+llegó".
+
+Cero apariciones en **todo el árbol** del commit que estaba desplegado. En la
+imagen que atiende aparece en **2** archivos del build. El control
+`afuera por la receta` —que existía desde antes— aparece en los mismos dos, y una
+cadena inventada da vacío: la búsqueda encuentra lo que está y no devuelve
+cualquier cosa.
+
+Y la ruta nueva se comprobó por COMPORTAMIENTO, que es más fuerte que un grep:
+`/api/compras-proveedor/importar/transcribir` contesta **401 con
+`application/json`**. Que conteste JSON y no una página es, además, justo lo que
+esta tanda vino a arreglar.
+
+### LO QUE NO SE PUDO HACER, Y NO SE DA POR BUENO
+
+**No se abrió el importador en producción con una sesión real**, así que el
+camino completo —subir una foto, explicar cómo se lee y ver las 16 enviadas con
+las 15 omitidas— no se ejerció contra el sitio. No hay credenciales productivas
+en la máquina desde la que se desplegó.
+
+La verificación funcional está hecha contra desarrollo antes del corte: la sonda
+del importador con **135 afirmaciones y 0 rojas**, tres corridas idénticas, a
+390×844 y 1366×900, contra un build `next start` con sesión real del usuario de
+sonda. Y con sus dos contrapruebas: devuelto el `.json()` a ciegas la sonda
+reproduce el síntoma exacto de producción, y sacada la retranscripción frena
+diciendo que degradó en silencio. La cascada dio **verde contra producción**
+antes y después del corte.
+
+**Y LA CAUSA RAÍZ DEL HTML SIGUE SIN CONFIRMAR.** Lo que se desplegó no es el
+arreglo de la causa: es el arreglo de que la pantalla no podía distinguir. La
+próxima vez que pase, el mensaje va a decir la operación y el código en vez de
+`Unexpected token '<'`. Queda anotado como pendiente de diagnóstico.
+
+**Ninguna autorización manual de migraciones**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea de hoy; la última
+sigue siendo la del 2026-08-25.
+
+---
+
+Antes de éste, producción estaba al día en **104**, comprobado con
+`prisma migrate status` el 2026-08-27 después de desplegar
 `a63b66e57b444139eaedd89b4bea965cb83f97ef` — el merge de los candados de
 magnitud y las recetas de lectura del importador de pedidos, con la migración
 `20260828010000_receta_lectura_proveedor` **aplicada**.
