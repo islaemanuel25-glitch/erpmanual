@@ -192,6 +192,13 @@ const FALSO = {
       codigoInterno: null, codigosInternos: [], aliasesProveedor: [],
       unidad_medida: "unidad", factor_pack: 10, modoCompra: "BULTO", precio_costo: 33600,
     },
+    // El producto del caso de la RAÍZ: el papel lo nombra con la marca larga y
+    // el ERP con la corta. Sin reconocer la raíz, quedaba en negativo y afuera.
+    {
+      productoLocalId: 9104, baseId: 8104, nombre: "Zortamelin 20 mentolado box",
+      codigoInterno: null, codigosInternos: [], aliasesProveedor: [],
+      unidad_medida: "unidad", factor_pack: 20, modoCompra: "BULTO", precio_costo: 101000,
+    },
   ],
   documento: {
     numeroPedido: "SINTETICO-001",
@@ -207,7 +214,7 @@ const FALSO = {
     // renglón por renglón. Está puesto a propósito para ejercer que una
     // diferencia de centavos NO bloquea — con un total exacto, esa regla no se
     // probaría nunca y el candado diría que sí.
-    totalDocumento: 263845.73,
+    totalDocumento: 364845.73,
     lineas: [
       {
         descripcion: "Nombre que no coincide con el catálogo",
@@ -241,6 +248,18 @@ const FALSO = {
         descripcion: "ZORTAMIL SINTETICO CONV 10",
         cantidad: 50, unidad: null, codigo: null, precioUnitario: 3360,
         bonificacionPct: null, subtotal: 168000,
+      },
+      // EL RENGLÓN DE LA RAÍZ. El papel usa la marca larga —"ZORTAMELINDA"— y el
+      // catálogo la corta —"Zortamelin"—. Sin reconocer la raíz, este renglón no
+      // sugería nada y el selector caía al catálogo alfabético.
+      // La cantidad va en UNIDADES y el precio por unidad, coherente con la
+      // receta de este documento —`facturaPor: UNIDAD`—. Un renglón que dijera
+      // "1 bulto a $101.000 por UNIDAD" no cerraría consigo mismo: serían
+      // 2.020.000, y esa incoherencia sería del papel, no del motor.
+      {
+        descripcion: "ZORTAMELINDA 20 CONV BOX",
+        cantidad: 20, unidad: "UNIDAD", codigo: null, precioUnitario: 5050,
+        bonificacionPct: null, subtotal: 101000,
       },
     ],
   },
@@ -595,7 +614,62 @@ const morir = (motivo) => {
   // Una foto del desplegable ABIERTO, que es lo que hay que poder mirar cuando
   // alguien dice "el selector me muestra cualquier cosa".
   const fotoSelector = await capturar("selector-abierto-390x844.png");
-  await evaluar(`document.body.click()`);
+  // ── SE CIERRA CON `mousedown`, NO CON `.click()` ─────────────────────────
+  //
+  // El desplegable escucha `mousedown` en captura para cerrarse al tocar afuera.
+  // `element.click()` dispara SOLO el evento `click`, así que nunca lo cerraba:
+  // quedaba abierto, tapaba la medición de texto cortado y hacía que la lectura
+  // del selector siguiente devolviera las opciones del anterior. Los dos
+  // síntomas apuntaban a otro lado.
+  await evaluar(`document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+  await dormir(300);
+
+  // ── LA MARCA RECONOCIDA POR SU RAÍZ ───────────────────────────────────────
+  //
+  // El papel usa la marca larga y el catálogo la corta. Antes esto no sugería
+  // NADA —la marca contaba como contradicción y el candidato quedaba negativo—
+  // y el selector caía directo al catálogo alfabético.
+  console.log("\n── la marca por su raíz ──────────────────────────────────────");
+  const porRaiz = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes("ZORTAMELINDA 20 CONV BOX"));
+    const tarjeta = titulo?.closest('[data-sunmi-panel]');
+    if (!tarjeta) return { hay: false };
+    const etiqueta = [...tarjeta.querySelectorAll('label')].find((l) => /Producto del sistema/i.test(l.innerText || ""));
+    const boton = etiqueta?.parentElement?.querySelector('button');
+    if (!boton) return { hay: true, abrio: false };
+    tarjeta.scrollIntoView({ block: "center" });
+    boton.click();
+    return { hay: true, abrio: true };
+  })())`));
+  afirmar(porRaiz.hay && porRaiz.abrio, "se abrió el selector del renglón de la marca larga");
+  await dormir(500);
+
+  const opcionesRaiz = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const filas = [...document.querySelectorAll('body > div')]
+      .flatMap((d) => [...d.querySelectorAll('div')])
+      .map((d) => (d.childElementCount === 0 ? (d.innerText || "").trim() : ""))
+      .filter(Boolean);
+    return filas.slice(0, 14);
+  })())`));
+  const pos = (r) => opcionesRaiz.findIndex((o) => r.test(o));
+  const iSug = pos(/Sugeridos para esta l/i);
+  const iZortamelin = pos(/Zortamelin 20/i);
+  const iAgua2 = pos(/Agua Sint/i);
+  afirmar(iSug >= 0, "hay grupo de sugeridos para la marca larga", JSON.stringify(opcionesRaiz));
+  afirmar(iZortamelin >= 0, "el producto de la marca corta aparece", JSON.stringify(opcionesRaiz));
+  afirmar(
+    iZortamelin >= 0 && iZortamelin > iSug && (iAgua2 < 0 || iZortamelin < iAgua2),
+    "la marca reconocida por su raíz va en sugeridos y antes que los ajenos",
+    JSON.stringify(opcionesRaiz)
+  );
+  // ── SE CIERRA CON `mousedown`, NO CON `.click()` ─────────────────────────
+  //
+  // El desplegable escucha `mousedown` en captura para cerrarse al tocar afuera.
+  // `element.click()` dispara SOLO el evento `click`, así que nunca lo cerraba:
+  // quedaba abierto, tapaba la medición de texto cortado y hacía que la lectura
+  // del selector siguiente devolviera las opciones del anterior. Los dos
+  // síntomas apuntaban a otro lado.
+  await evaluar(`document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
   await dormir(300);
 
   // Una foto del renglón que da nombre a la tanda, a 390. El desglose es lo que
@@ -605,7 +679,7 @@ const morir = (motivo) => {
   const fotoBonificado = await capturar("bonificado-390x844.png");
 
   await evaluar(`(() => {
-    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12", "ZORTAMIL SINTETICO CONV 10"]) {
+    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12", "ZORTAMIL SINTETICO CONV 10", "ZORTAMELINDA 20 CONV BOX"]) {
       const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes(nombre));
       const tarjeta = titulo?.closest('[data-sunmi-panel]');
       if (!tarjeta) continue;
@@ -668,7 +742,7 @@ const morir = (motivo) => {
   await seleccionarArchivo("continuacion-sintetica.pdf");
   if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) morir("no llegó a revisión al continuar");
   await evaluar(`(() => {
-    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12", "ZORTAMIL SINTETICO CONV 10"]) {
+    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12", "ZORTAMIL SINTETICO CONV 10", "ZORTAMELINDA 20 CONV BOX"]) {
       const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes(nombre));
       const tarjeta = titulo?.closest('[data-sunmi-panel]');
       if (!tarjeta) continue;
