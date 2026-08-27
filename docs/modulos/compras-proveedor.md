@@ -115,6 +115,42 @@ cantidades y la suma sobre un borrador existente. La sonda
 `scripts/sonda-importar-pedido-desde-archivo.mjs` recorre la pantalla dedicada en
 escritorio y celular con datos sintéticos y bloquea escrituras no interceptadas.
 
+### Cómo se corre la sonda, sin credenciales de nadie
+
+La sonda hace login REAL contra `/api/login`: no firma tokens ni inyecta
+cookies, para que lo que mide sea la aplicación y no una maqueta. El usuario con
+el que entra es dedicado y se asegura antes de correrla:
+
+    DATABASE_URL=<la de desarrollo>  node scripts/usuario-de-sonda.mjs --clave <una generada al vuelo>
+    node scripts/sonda-importar-pedido-desde-archivo.mjs --base http://localhost:3111 \
+      --usuario sonda@local.test --clave <la misma>
+
+**El `.env` de desarrollo trae `?schema=` VACÍO.** Cuando el cliente de Prisma
+carga el archivo por su cuenta lo tolera, pero pasado como variable de entorno
+llega tal cual y Postgres contesta «un identificador delimitado tiene largo
+cero». Hay que sacar el parámetro vacío antes de exportarlo.
+
+**Contra desarrollo, nunca contra producción**: hace login y toca la interfaz.
+
+### Qué afirma, y qué encontró
+
+89 afirmaciones. Además del recorrido de siempre —reintento, macheo, los dos
+precios, el ranking del selector, los dos guardados— ejerce el panel
+conversacional entero, que la receta releyó las COLUMNAS y no solo las escalas,
+que el renglón sin cantidad aparece nombrado como no enviado, el bloqueo por
+importe incoherente con sus botones de corrección, y los dos anchos sobre esas
+dos formas nuevas.
+
+Encontró tres cosas que los 4.289 candados no veían:
+
+1. **La tolerancia de redondeo se calculaba sobre la cantidad del pedido.** Con
+   un pack, esa cantidad es más chica que la del papel y el margen quedaba corto:
+   una factura con bonificación se bloqueaba sola por tres centavos.
+2. **El panel del proveedor desaparecía al revisar**, y con él el control del
+   formato — justo cuando alguien se da cuenta de que se leyó mal.
+3. **Remapear sin mapear la columna de código** pierde el vínculo por código: una
+   línea que se machaba sola dejaba de macharse.
+
 `lib/compras/scope.test.mjs` cubre el alcance. El resto del armado histórico aún
 mantiene la deuda indicada abajo.
 
