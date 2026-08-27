@@ -16,31 +16,93 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260828010000_receta_lectura_proveedor` — SIN DESPLEGAR
+Ninguna.
 
-Está en la rama `feat/candados-magnitud-y-recetas-de-lectura`, **no en `main`**.
-Se anota acá igual para que el próximo despliegue que la incluya lo sepa desde el
-paso 0 y no lo descubra a mitad de camino.
+---
 
-**Qué hace:** crea la tabla `RecetaLecturaProveedor`, que guarda cómo se lee cada
-formato de documento de un proveedor —qué columna es cuál, cómo se sabe si un
-renglón fue enviado, qué significa la cantidad—. Son varias por proveedor, una
-por variante: Consumidor Final, Responsable Inscripto.
+Producción está al día en **104**, comprobado con `prisma migrate status` el
+2026-08-27 después de desplegar
+`a63b66e57b444139eaedd89b4bea965cb83f97ef` — el merge de los candados de
+magnitud y las recetas de lectura del importador de pedidos, con la migración
+`20260828010000_receta_lectura_proveedor` **aplicada**.
 
-**Qué NO toca:** ninguna tabla existente. Ni `RecetaProveedor` —la de impuestos,
-que sigue siendo una por proveedor— ni `ProductoCodigoProveedor`, que sigue
-siendo la única memoria de identidad del proveedor.
+La entrada de esa migración se borra de la lista de pendientes porque se cumplió
+la condición que ella misma fijaba: el árbol tiene 104 y `migrate status` informa
+104 y "Database schema is up to date!". Y se aplicó DE VERDAD, que es otra cosa:
+el contenedor descartable imprimió `Applying migration` y las aplicadas en la
+base subieron de **103 a 104** — un "No pending migrations to apply" con salida 0
+se ve igual y significa lo contrario.
 
-**Aditiva pura:** `CREATE TABLE` de algo que no existía, más su índice único y su
-clave foránea. No bloquea escrituras sobre ninguna tabla en uso porque la tabla
-que se bloquea es la que se está creando, y está vacía. No hay backfill.
+Aditiva pura, así que no hay ids que cruzar. Lo que sí se comprobó contra
+`information_schema`: la tabla `RecetaLecturaProveedor` **existe**, donde antes
+del corte la misma consulta devolvía cero. Ninguna tabla existente fue tocada.
 
-**El quinto chequeo del backup NO aplica**: no es una migración de datos, no
-borra ni transforma nada, así que no hay ningún valor que comprobar dentro del
-dump. Los cuatro de siempre sí.
+Corte de **2 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` healthy y **no recreado** —todo el despliegue con
+`--no-deps app`—, logs sin un solo error, `/login` en 200, `APP_IMAGE` sin
+filtrarse dentro del contenedor y el árbol del VPS limpio. Rollback disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:4434cbb65b3c5938802a1d024125c072703406c3`
+(imagen `sha256:0703c9eccce2…`). No hizo falta.
 
-**Al aplicarla, el árbol pasa de 103 a 104 migraciones**, y ése es el número que
-tiene que informar el contenedor descartable.
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre presente en las últimas 20 líneas, **61
+tablas**—: `/srv/produccion/backups/pre-a63b66e5_20260827_152429.sql.gz`, 3,0 MB.
+El quinto no aplica: no borra ni transforma ningún dato, así que no hay valor que
+buscar adentro del dump.
+
+El clasificador corrió **antes del backup**, con el rango tomado de la imagen que
+atendía —`4434cbb6..HEAD`—: un archivo, clasificado **aditiva**, salida 0. No es
+el caso degenerado ni el del archivo sin commitear: informó "Archivos a mirar: 1"
+y nombró la migración correcta.
+
+### EL CÓDIGO VIAJÓ, COMPROBADO EN LOS DOS SENTIDOS
+
+El marcador es la cadena de interfaz `Usar solo esta vez`, el botón que estrena
+el panel conversacional. Es un literal y no un identificador —el build de
+producción minifica los identificadores, así que no afirman nada— y es **ASCII
+puro**, que evita que un acento se rompa al viajar por ssh y dé un vacío que se
+lea como "no llegó".
+
+Cero apariciones en **todo el árbol** del commit que estaba desplegado, no solo
+en el archivo esperado. En la imagen que atiende aparece en **2** archivos del
+build, el chunk de servidor y el de cliente. El control `Sugeridos para esta`
+—que existía desde antes— aparece en los mismos dos, que es lo que prueba que la
+búsqueda funciona; y una cadena inventada da vacío, que es lo que prueba que no
+devuelve cualquier cosa.
+
+### UN TROPIEZO DEL MÉTODO QUE VALE ANOTAR: `cmd | tail` DEVUELVE EL CÓDIGO DE `tail`
+
+La suite se corrió con `… --test … | tail -18` y la corrida informó **salida 0**.
+Ese cero era del `tail`, no del runner: una tubería devuelve el estado del último
+comando. La suite podría haber estado en rojo y se habría leído como verde, y
+encima el `tail` se había comido las líneas del resumen, así que tampoco había
+totales para desmentirlo.
+
+Se volvió a correr redirigiendo a un archivo y leyendo el código del propio
+runner: **0**, con **4289 candados, 4288 en verde, 0 en rojo y 1 todo conocido**
+—el de `panelDecision`, que sigue anotado—. Es la misma familia que "el código de
+salida de `migrate deploy` no prueba que se aplicó nada": un cero puede venir de
+otro lado.
+
+### LO QUE NO SE PUDO HACER, Y NO SE DA POR BUENO
+
+**No se abrió el importador en producción con una sesión real**, así que ni el
+panel conversacional ni el bloqueo por importe incoherente se ejercieron contra
+el sitio. No hay credenciales productivas en la máquina desde la que se desplegó.
+
+La verificación funcional de este contenido está hecha contra desarrollo antes
+del corte: la sonda del importador con **100 afirmaciones y 0 rojas**, tres
+corridas idénticas, a 390×844 y 1366×900, y con su contraprueba —reintroducido el
+defecto de la tolerancia se pone roja sola—. La de cascada da **verde contra
+producción** después del corte.
+
+**Ninguna autorización manual de migraciones en este despliegue**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea con la fecha de hoy.
+La última sigue siendo la del 2026-08-25.
+
+Reapareció el warning `The "POSTGRES_PASSWORD" variable is not set`. Es el
+pendiente conocido y preexistente de interpolación, y es exactamente el motivo
+por el que nunca se recrea el servicio `db`.
 
 ---
 
