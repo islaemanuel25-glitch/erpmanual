@@ -201,6 +201,31 @@ const FALSO = {
     },
   ],
   documento: {
+    // ── LA TABLA CRUDA, QUE ES LO QUE PERMITE REINTERPRETAR ────────────────
+    //
+    // Encabezados y celdas tal como se leyeron. Sin esto, una receta solo puede
+    // aportar escalas: no puede corregir una columna mal mapeada ni traer de
+    // vuelta un renglón que la lectura descartó.
+    //
+    // El encabezado de la cantidad dice "ENVIADO" a propósito —el identificador
+    // automático no lo reconoce— y hay una columna "PEDIDO" que sí reconoce. Es
+    // el caso del ejemplo del pedido: la lectura toma la columna equivocada y la
+    // explicación de una persona la corrige.
+    //
+    // La última fila tiene la cantidad VACÍA: es el renglón que no fue enviado.
+    crudo: {
+      origen: "VISUAL",
+      encabezados: ["ENVIADO", "COD", "ARTICULO", "PEDIDO", "PRECIO", "TOTAL"],
+      filas: [
+        { indice: 2, celdas: ["2", "991234567", "Nombre que no coincide con el catálogo", "3", "500", "1000"] },
+        { indice: 3, celdas: ["1", "", "CHESTERFIELD 10", "1", "3000", "3000"] },
+        { indice: 4, celdas: ["40", "SINT-021", "Pack Sintético x21", "42", "120", "4800"] },
+        { indice: 5, celdas: ["12", "SINT-012", "Bonificado Sintético x12", "12", "8168.94", "87045.75"] },
+        { indice: 6, celdas: ["50", "", "ZORTAMIL SINTETICO CONV 10", "60", "3360", "168000"] },
+        { indice: 7, celdas: ["20", "", "ZORTAMELINDA 20 CONV BOX", "20", "5050", "101000"] },
+        { indice: 8, celdas: ["", "", "Yerba Sintética Sin Enviar", "10", "900", ""] },
+      ],
+    },
     numeroPedido: "SINTETICO-001",
     // El documento declara sus columnas. Es la observación que no se puede
     // calcular, y sin ella el subtotal no se usa.
@@ -275,7 +300,19 @@ const FALSO = {
       nombre: "Consumidor Final",
       receta: {
         nombre: "Consumidor Final",
-        columnas: { cantidad: { encabezado: null, posicion: 0 } },
+        // Mapea la cantidad a ENVIADO —la que el identificador automático NO
+        // reconoce— en vez de a PEDIDO, que es la que sí reconoce y no es lo
+        // que vino. Es la corrección que la explicación de una persona produce.
+        columnas: {
+          cantidad: { encabezado: "ENVIADO", posicion: 0 },
+          // El código va mapeado: sin él, remapear PIERDE el vínculo por código
+          // y una línea que se machaba sola deja de macharse. Lo encontró la
+          // sonda, con el botón de crear trabado y una sola línea pendiente.
+          codigo: { encabezado: "COD", posicion: 1 },
+          descripcion: { encabezado: "ARTICULO", posicion: 2 },
+          precioUnitario: { encabezado: "PRECIO", posicion: 4 },
+          subtotal: { encabezado: "TOTAL", posicion: 5 },
+        },
         enviado: { criterio: "CANTIDAD_PRESENTE", columna: null },
         cantidadEn: "UNIDAD",
         facturaPor: "UNIDAD",
@@ -292,7 +329,18 @@ const FALSO = {
       nombre: "Responsable Inscripto",
       receta: {
         nombre: "Responsable Inscripto",
-        columnas: { cantidad: { encabezado: "BULTOS", posicion: null } },
+        columnas: {
+          cantidad: { encabezado: "ENVIADO", posicion: 0 },
+          // El código va mapeado: sin él, remapear PIERDE el vínculo por código
+          // y una línea que se machaba sola deja de macharse. Lo encontró la
+          // sonda, con el botón de crear trabado y una sola línea pendiente.
+          codigo: { encabezado: "COD", posicion: 1 },
+          descripcion: { encabezado: "ARTICULO", posicion: 2 },
+          precioUnitario: { encabezado: "PRECIO", posicion: 4 },
+          subtotal: { encabezado: "TOTAL", posicion: 5 },
+        },
+        // TODOS a propósito: esta variante NO saca el renglón sin cantidad, así
+        // que se ve la diferencia contra la otra en la misma corrida.
         enviado: { criterio: "TODOS", columna: null },
         cantidadEn: "BULTO",
         facturaPor: "UNIDAD",
@@ -308,7 +356,13 @@ const FALSO = {
   /** Lo que devolvería la interpretación del ejemplo textual del pedido. */
   recetaInterpretada: {
     nombre: null,
-    columnas: { cantidad: { encabezado: null, posicion: 0 } },
+    columnas: {
+      cantidad: { encabezado: "ENVIADO", posicion: 0 },
+      codigo: { encabezado: "COD", posicion: 1 },
+      descripcion: { encabezado: "ARTICULO", posicion: 2 },
+      precioUnitario: { encabezado: "PRECIO", posicion: 4 },
+      subtotal: { encabezado: "TOTAL", posicion: 5 },
+    },
     enviado: { criterio: "CANTIDAD_PRESENTE", columna: null },
     cantidadEn: "UNIDAD",
     facturaPor: null,
@@ -790,16 +844,29 @@ const morir = (motivo) => {
   // receta equivocada, que es como pasa de verdad.
   console.log("\n── candado de magnitud ───────────────────────────────────────");
   await medidas(1366, 900);
-  const antesDelBloqueo = await evaluar(`(() => {
-    const b = [...document.querySelectorAll('button')].find((x) => /^Crear borrador$/.test((x.innerText || "").trim()));
-    return !!b && !b.disabled;
-  })()`);
-  afirmar(antesDelBloqueo, "antes de la receta mala, el borrador se podía crear");
+  // La precondición se mide sobre el CANDADO, no sobre el botón: el botón puede
+  // estar deshabilitado por otros motivos —falta confirmar un producto, falta
+  // decidir un precio— y afirmar sobre él mediría otra cosa. Fue el primer rojo
+  // de esta sección y era mío, no del código.
+  const antesDelBloqueo = JSON.parse(await evaluar(`(() => {
+    const texto = document.body.innerText || "";
+    return JSON.stringify({
+      sinCarteles: !texto.includes("no cierra contra el importe del papel"),
+      sinContador: !/no cierran contra el papel/.test(texto),
+    });
+  })()`));
+  afirmar(antesDelBloqueo.sinCarteles, "antes de la receta mala no hay ninguna línea incoherente");
+  afirmar(antesDelBloqueo.sinContador, "y el pie no cuenta ninguna");
 
   await evaluar(`(() => {
     const select = [...document.querySelectorAll('select')].find((s) =>
       [...s.options].some((o) => /Responsable Inscripto/.test(o.textContent || "")));
-    if (!select) return false;
+    // OJO: esto es el CUERPO DE UN TEMPLATE LITERAL. Nada de backticks acá
+    // adentro, ni siquiera en un comentario: cierran la cadena.
+    // Se LANZA el fallo en vez de tragárselo. La primera versión devolvía false
+    // y la corrida seguía midiendo una pantalla que nunca cambió de receta:
+    // cuatro afirmaciones dieron rojo por eso y ninguna era del código.
+    if (!select) throw new Error("no está el selector de formato en esta pantalla");
     const opcion = [...select.options].find((o) => /Responsable Inscripto/.test(o.textContent || ""));
     const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
     setter.call(select, opcion.value);
@@ -831,7 +898,18 @@ const morir = (motivo) => {
   afirmar(bloqueo.opciones.length >= 1, "las representaciones ofrecidas son botones", JSON.stringify(bloqueo.opciones));
   afirmar(bloqueo.contador, "el pie cuenta las líneas que no cierran");
   afirmar(bloqueo.botonBloqueado, "CREAR BORRADOR queda bloqueado con una línea incoherente");
-  capturas.push(await capturar("magnitud-bloqueada.png"));
+  // El cartel del bloqueo también se mide en los dos anchos: tiene la cuenta con
+  // dos importes y una fila de botones con precios adentro, que a 390 es
+  // justamente lo que se corta.
+  for (const [ancho, alto] of [[390, 844], [1366, 900]]) {
+    await medidas(ancho, alto);
+    await dormir(250);
+    const m = JSON.parse(await medirPantalla());
+    afirmar(m.anchoDocumento <= m.anchoVentana + 1, `bloqueo ${ancho}px · sin desborde horizontal`, JSON.stringify(m));
+    afirmar(m.cortados.length === 0, `bloqueo ${ancho}px · sin texto cortado`, JSON.stringify(m.cortados));
+    capturas.push(await capturar(`magnitud-bloqueada-${ancho}x${alto}.png`));
+  }
+  await medidas(1366, 900);
 
   // Y corregir la lectura desde el cartel tiene que desbloquear. Si no
   // desbloqueara, el cartel estaría ofreciendo una salida que no funciona.
@@ -870,6 +948,7 @@ const morir = (motivo) => {
   await evaluar(`(() => {
     const select = [...document.querySelectorAll('select')].find((s) =>
       [...s.options].some((o) => /Consumidor Final/.test(o.textContent || "")));
+    if (!select) throw new Error("no está el selector de formato al volver a la variante buena");
     const opcion = [...select.options].find((o) => /Consumidor Final/.test(o.textContent || ""));
     const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
     setter.call(select, opcion.value);
@@ -893,7 +972,22 @@ const morir = (motivo) => {
     const b = [...document.querySelectorAll('button')].find((x) => /^Crear borrador$/.test((x.innerText || "").trim()));
     return !!b && !b.disabled;
   })()`);
-  afirmar(habilitado, "el botón se habilita después de revisar producto y precio");
+  // El detalle no es adorno: cuando esto se puso rojo, el mensaje pelado no
+  // decía QUÉ faltaba y hubo que adivinar. Ahora dice el contador del pie y qué
+  // tarjetas siguen pidiendo algo.
+  const porQueNo = await evaluar(`(() => {
+    const pie = [...document.querySelectorAll('p')].map((p) => (p.innerText || "").trim())
+      .filter((t) => /por revisar|líneas listas/.test(t))[0] || "(sin pie)";
+    // Se mira si quedan BOTONES, no si el texto aparece en algún lado: "Usar
+    // precio del papel" también es un rótulo del panel de precios y estaba
+    // marcando las seis tarjetas como pendientes.
+    const pendientes = [...document.querySelectorAll('[data-sunmi-panel]')]
+      .filter((t) => [...t.querySelectorAll('button')].some((b) =>
+        /^Confirmar producto$/.test((b.innerText || "").trim())))
+      .map((t) => (t.innerText || "").replace(/\\s+/g, " ").slice(0, 70));
+    return pie + " || " + JSON.stringify(pendientes);
+  })()`);
+  afirmar(habilitado, "el botón se habilita después de revisar producto y precio", porQueNo);
   if (habilitado) {
     await evaluar(`[...document.querySelectorAll('button')].find((x) => /^Crear borrador$/.test((x.innerText || "").trim()))?.click()`);
     await esperarA(`!!window.__cuerpos.crear`, 10000);
@@ -910,12 +1004,26 @@ const morir = (motivo) => {
   // Y el renglón bonificado, que es el que da nombre a la tanda: 12 unidades de
   // un pack de 12 son un bulto, y el costo que viaja es 7.253,81 × 12.
   const bonif = cuerpos.crear?.items?.find((item) => Number(item.productoLocalId) === 9005);
-  afirmar(bonif?.unidad === "BULTO" && Number(bonif?.cantidad) === 1, "el renglón bonificado viaja como 1 BULTO", JSON.stringify(bonif));
+  // ── LO QUE SE AFIRMA ES EL DINERO, NO LA FORMA ────────────────────────
+  //
+  // Antes esto exigía "1 BULTO a $87.045,72". Con una receta que no declara
+  // columna de unidad, la misma compra queda como "12 UNIDAD a $7.253,81" — y
+  // las dos son correctas: cobran lo mismo. Exigir la forma hacía que la
+  // afirmación se pusiera roja por un cambio que no rompe nada, que es la peor
+  // clase de candado: el que hay que aflojar cada vez.
   afirmar(
-    Number(bonif?.precioCosto) === 87045.72 && bonif?.origenPrecio === "PAPEL",
-    "el borrador recibe el precio efectivo, 7.253,81 × 12",
+    ["BULTO", "UNIDAD"].includes(bonif?.unidad) && Number(bonif?.cantidad) >= 1,
+    "el renglón bonificado viaja con una unidad y una cantidad válidas",
     JSON.stringify(bonif)
   );
+  const importeBonificado = Math.round(Number(bonif?.cantidad) * Number(bonif?.precioCosto) * 100) / 100;
+  afirmar(
+    Math.abs(importeBonificado - 87045.75) <= 0.1 && bonif?.origenPrecio === "PAPEL",
+    "el borrador recibe el precio EFECTIVO: cantidad × costo da el importe del papel",
+    `${importeBonificado} · ${JSON.stringify(bonif)}`
+  );
+  // Y el importe del papel viaja para que la ruta lo pueda volver a comprobar.
+  afirmar(Number(bonif?.subtotalPapel) === 87045.75, "el importe del papel viaja al servidor", JSON.stringify(bonif?.subtotalPapel));
   afirmar(
     Number(bonif?.precioCosto) !== 8168.94 * 12,
     "el borrador NO recibe el precio de lista por bulto",
@@ -923,7 +1031,21 @@ const morir = (motivo) => {
   );
 
   // ── EXPLICAR CÓMO LEER ESTE DOCUMENTO ────────────────────────────────────
+  //
+  // Se vuelve a abrir la pantalla desde cero: crear el borrador NAVEGA, así que
+  // acá ya no está la pantalla que se venía midiendo. La primera versión de
+  // esta sección medía sobre la página siguiente y daba rojos que no eran del
+  // código — el mismo error que el arnés de capturas cometió con la pantalla de
+  // login, y por eso el detalle de cada afirmación importa tanto.
   console.log("\n── receta conversacional ─────────────────────────────────────");
+  await evaluar(`window.__analisis = []; window.__interpretaciones = []; true`);
+  await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó al volver para la receta");
+  await evaluar(`window.__fallarPrimero = false; true`);
+  await seleccionarArchivo("receta-sintetica.pdf");
+  if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) {
+    morir("no llegó a revisión al volver para la receta");
+  }
   await evaluar(`[...document.querySelectorAll('button')].find((b) => /Explicar cómo leer este documento/.test(b.innerText || ""))?.click()`);
   await dormir(300);
   const panelAbierto = JSON.parse(await evaluar(`(() => {
@@ -969,7 +1091,20 @@ const morir = (motivo) => {
   afirmar(previa.corregir, "se puede corregir la explicación");
   afirmar(previa.soloEstaVez, "se puede usar solo esta vez");
   afirmar(previa.confirmar, "se puede confirmar y recordar");
-  capturas.push(await capturar("receta-vista-previa.png"));
+  // ── LA VISTA PREVIA, MEDIDA EN LOS DOS ANCHOS ─────────────────────────
+  //
+  // El panel conversacional es lo más nuevo de la pantalla y lo más largo: un
+  // campo de varias líneas, una lista de lo que se entendió, otra de lo que se
+  // descartó y tres botones. Es exactamente la forma que desborda a 390.
+  for (const [ancho, alto] of [[390, 844], [1366, 900]]) {
+    await medidas(ancho, alto);
+    await dormir(250);
+    const m = JSON.parse(await medirPantalla());
+    afirmar(m.anchoDocumento <= m.anchoVentana + 1, `receta ${ancho}px · sin desborde horizontal`, JSON.stringify(m));
+    afirmar(m.cortados.length === 0, `receta ${ancho}px · sin texto cortado`, JSON.stringify(m.cortados));
+    capturas.push(await capturar(`receta-${ancho}x${alto}.png`));
+  }
+  await medidas(1366, 900);
 
   // La interpretación NO escribe: se comprueba que no se llamó a guardar.
   const trasPrevia = JSON.parse(await evaluar(`JSON.stringify({
@@ -988,10 +1123,44 @@ const morir = (motivo) => {
     guardo: !!window.__cuerpos.receta,
     pill: (document.body.innerText || "").includes("Formato: solo esta vez"),
     analisis: window.__analisis.length,
+    remapeo: (document.body.innerText || "").includes("Columnas releídas del papel"),
+    descarte: (document.body.innerText || "").includes("Yerba Sintética Sin Enviar"),
+    dice: /renglón quedó afuera por la receta|renglones quedaron afuera por la receta/.test(document.body.innerText || ""),
   })`));
   afirmar(!soloEstaVez.guardo, "USAR SOLO ESTA VEZ no persiste la receta");
   afirmar(soloEstaVez.pill, "y se ve que la receta está en uso sin estar guardada");
-  afirmar(soloEstaVez.analisis === 2, "reanalizar con otra receta NO vuelve a leer el archivo", String(soloEstaVez.analisis));
+  // UNO solo: el contador se puso en cero al volver a abrir la pantalla, así que
+  // el único análisis es el de subir el archivo. Aplicar la receta no suma otro,
+  // que es lo que este número prueba — reinterpretar no vuelve a leer el papel.
+  afirmar(soloEstaVez.analisis === 1, "reanalizar con otra receta NO vuelve a leer el archivo", String(soloEstaVez.analisis));
+
+  // ── LO QUE DEMUESTRA QUE LA RECETA REINTERPRETA ────────────────────────
+  //
+  // No alcanza con que se aplique: tiene que poder CORREGIR lo que la lectura
+  // automática hizo mal. Acá corrige las dos cosas de una vez —la columna y el
+  // renglón descartado— y las dos se ven en la pantalla.
+  afirmar(soloEstaVez.remapeo, "la receta releyó las columnas del papel, no solo las escalas");
+  afirmar(soloEstaVez.dice, "y dice cuántos renglones quedaron afuera por la receta");
+  afirmar(
+    soloEstaVez.descarte,
+    "el renglón sin cantidad aparece nombrado como no enviado, en vez de desaparecer"
+  );
+
+  const cantidadesReleidas = JSON.parse(await evaluar(`(() => {
+    const titulo = [...document.querySelectorAll('p')].find((p) => /ZORTAMIL SINTETICO CONV 10/.test(p.innerText || ""));
+    const tarjeta = titulo?.closest('[data-sunmi-panel]');
+    const texto = tarjeta ? (tarjeta.innerText || "") : "";
+    return JSON.stringify({
+      hay: !!tarjeta,
+      // La columna ENVIADO dice 50; la columna PEDIDO —la que tomaba la lectura
+      // automática— dice 60. Si se ve 60, la receta no remapeó nada.
+      cincuenta: /\\b50\\b/.test(texto),
+      sesenta: /\\b60\\b/.test(texto),
+    });
+  })()`));
+  afirmar(cantidadesReleidas.hay, "la tarjeta del renglón releído está en pantalla");
+  afirmar(cantidadesReleidas.cincuenta, "la cantidad sale de la columna ENVIADO");
+  afirmar(!cantidadesReleidas.sesenta, "y NO de la columna PEDIDO, que es la que tomaba la lectura automática");
 
   console.log("\n── continuación de borrador ──────────────────────────────────");
   await evaluar(`window.__cuerpos = {}; sessionStorage.setItem("__sonda_cuerpos", "{}"); window.__analisis = []; true`);

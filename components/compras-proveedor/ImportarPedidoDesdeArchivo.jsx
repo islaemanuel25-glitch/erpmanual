@@ -43,6 +43,7 @@ import {
   LARGO_MAXIMO_EXPLICACION,
   parametrosDeLectura,
 } from "@/lib/compras-proveedor/importacion/recetaDeLectura";
+import { lineasDesdeElCrudo } from "@/lib/compras-proveedor/importacion/documentoCrudo";
 import { TEXTO_MOTIVO_CANDIDATO } from "@/lib/proveedores/identidad/motorCandidatos";
 import { aplicarOrden } from "@/lib/proveedores/identidad/ordenIa";
 
@@ -144,6 +145,11 @@ export default function ImportarPedidoDesdeArchivo() {
   const [nombreVariante, setNombreVariante] = useState("");
   const [guardandoReceta, setGuardandoReceta] = useState(false);
   const [ordenandoId, setOrdenandoId] = useState(null);
+  // Qué renglones dejó afuera la receta y por qué. Se muestran: una receta que
+  // descarta de más se ve idéntica a un papel con menos renglones, y esa es la
+  // clase de diferencia que nadie nota hasta que falta mercadería.
+  const [descartadasPorLaReceta, setDescartadasPorLaReceta] = useState([]);
+  const [remapeoAplicado, setRemapeoAplicado] = useState(false);
   const [estado, setEstado] = useState("elegir");
   const [archivo, setArchivo] = useState(null);
   const [documento, setDocumento] = useState(null);
@@ -327,7 +333,10 @@ export default function ImportarPedidoDesdeArchivo() {
 
   const cambiarProveedor = (valor) => {
     setProveedorId(valor);
-    setProveedorNombre("");
+    // El nombre se guarda al elegir y no solo al abrir un borrador: al revisar,
+    // el selector pasa a texto y ese texto sale de acá. Sin esto quedaba
+    // "Cargando proveedor..." para siempre en el camino normal.
+    setProveedorNombre(proveedores.find((p) => String(p.id) === String(valor))?.nombre || "");
     setArchivo(null);
     setDocumento(null);
     setLineas([]);
@@ -408,15 +417,35 @@ export default function ImportarPedidoDesdeArchivo() {
    * actualizó cuando esto se llama: leerlo daría la receta anterior.
    */
   const repreparar = (receta) => {
-    if (!documento?.lineas?.length) return;
+    if (!documento) return;
     const params = parametrosDeLectura(receta);
+
+    // ── LA RECETA SE APLICA SOBRE LA TABLA CRUDA, NO SOBRE LO YA LEÍDO ────
+    //
+    // Es lo que hace que reinterpretar sirva de algo. `documento.lineas` es UNA
+    // interpretación: la que salió de adivinar qué columna era cuál y de
+    // descartar los renglones sin cantidad. Si la receta se aplicara sobre eso,
+    // no podría corregir ni una columna mal mapeada ni traer de vuelta un
+    // renglón descartado — que son justamente los dos casos que alguien explica.
+    //
+    // Cuando la receta no mapea columnas, o cuando no hay tabla cruda —el modelo
+    // no la transcribió—, se sigue con las líneas ya leídas y la receta aporta
+    // solo las escalas. La pantalla lo dice; no se finge que puede más.
+    const reinterpretado = receta ? lineasDesdeElCrudo({ crudo: documento.crudo, receta }) : null;
+    const puedeRemapear = Boolean(reinterpretado && reinterpretado.lineas.length);
+    const lineasBase = puedeRemapear ? reinterpretado.lineas : documento.lineas || [];
+    if (!lineasBase.length) return;
+
+    setDescartadasPorLaReceta(puedeRemapear ? reinterpretado.descartadas : []);
+    setRemapeoAplicado(puedeRemapear);
+
     setLineas(
       prepararLineasImportadas({
-        lineas: documento.lineas,
+        lineas: lineasBase,
         productos,
         facturaPor: receta?.facturaPor ?? facturaPor,
         hayColumnaSubtotal:
-          (params.hayColumnaSubtotal ?? documento.hayColumnaSubtotal) === true,
+          (puedeRemapear ? reinterpretado.hayColumnaSubtotal : params.hayColumnaSubtotal ?? documento.hayColumnaSubtotal) === true,
         cantidadEn: params.cantidadEn,
         toleranciaEscalaPct: params.toleranciaEscalaPct,
       }).map((linea) => ({ ...linea, incluida: true }))
@@ -779,14 +808,34 @@ export default function ImportarPedidoDesdeArchivo() {
           onChange={(e) => seleccionarArchivo(e.target.files?.[0])}
         />
 
-        {estado !== "revisar" && (
-          <div className="grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3">
+        {/*
+          ── EL PANEL DEL PROVEEDOR NO DESAPARECE AL REVISAR ─────────────────
+          Antes esta grilla entera se ocultaba en cuanto se pasaba a revisar, y
+          con ella se iba el control del FORMATO. O sea que el botón "Explicar
+          cómo leer este documento" dejaba de existir exactamente en el momento
+          en que alguien se da cuenta de que el formato se leyó mal: mirando los
+          renglones, con el papel en la mano.
+          Lo encontró la sonda: la corrida elegía la variante de receta, no
+          encontraba el selector, seguía sin decir nada y las afirmaciones que
+          venían después medían otra cosa.
+          Lo que sí se oculta al revisar es la caja de subir archivo, que ya
+          cumplió, y el selector de proveedor pasa a texto: cambiarlo a mitad de
+          la revisión borra todas las líneas.
+        */}
+        <div
+          className={
+            estado === "revisar"
+              ? "grid gap-3"
+              : "grid lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3"
+          }
+        >
+          <>
             <SunmiPanel className="p-4">
               <p className="text-base font-semibold sunmi-text-strong mb-1">1. Proveedor</p>
               <p className="text-sm2 sunmi-text-muted mb-3">
                 La memoria de códigos y nombres queda separada por proveedor.
               </p>
-              {pedidoId ? (
+              {pedidoId || estado === "revisar" ? (
                 <div className="rounded-lg sunmi-control px-3 py-2 text-base font-semibold">
                   {proveedorNombre || "Cargando proveedor..."}
                 </div>
@@ -807,6 +856,11 @@ export default function ImportarPedidoDesdeArchivo() {
                   {recetaEnUso && (
                     <SunmiPill color="cyan">
                       {recetaSoloEstaVez ? "Formato: solo esta vez" : `Formato: ${nombreDeLaReceta}`}
+                    </SunmiPill>
+                  )}
+                  {recetaEnUso && (
+                    <SunmiPill color={remapeoAplicado ? "cyan" : "slate"}>
+                      {remapeoAplicado ? "Columnas releídas del papel" : "Solo escalas: no hay tabla cruda"}
                     </SunmiPill>
                   )}
                 </div>
@@ -956,6 +1010,8 @@ export default function ImportarPedidoDesdeArchivo() {
               )}
             </SunmiPanel>
 
+            {/* La caja de subir archivo ya cumplió una vez que hay renglones. */}
+            {estado !== "revisar" && (
             <SunmiPanel className="p-4">
               <p className="text-base font-semibold sunmi-text-strong mb-1">2. Archivo</p>
               <p className="text-sm2 sunmi-text-muted mb-3">
@@ -1002,8 +1058,9 @@ export default function ImportarPedidoDesdeArchivo() {
                 </div>
               )}
             </SunmiPanel>
-          </div>
-        )}
+            )}
+          </>
+        </div>
 
         {estado === "revisar" && (
           <>
@@ -1049,6 +1106,35 @@ export default function ImportarPedidoDesdeArchivo() {
                     ? `Los subtotales suman ${dinero(cuadre.suma)} y cierran con el total del documento.`
                     : `Los subtotales suman ${dinero(cuadre.suma)} contra un total de ${dinero(cuadre.total)}: ${dinero(Math.abs(cuadre.diferencia))} de diferencia. Revisá los renglones antes de guardar.`}
                 </p>
+              )}
+
+              {/*
+                LO QUE LA RECETA DEJÓ AFUERA, CON SU MOTIVO.
+                Un renglón que no se envió es información, no basura: quien
+                revisa tiene que poder ver que el proveedor mandó menos de lo
+                pedido. Y una receta que descarta de más se ve idéntica a un
+                papel con menos renglones si nadie lo cuenta.
+              */}
+              {descartadasPorLaReceta.length > 0 && (
+                <div className="mt-2 rounded-lg border sunmi-divider sunmi-control px-3 py-2">
+                  <p className="text-sm2 font-semibold sunmi-text-muted">
+                    {descartadasPorLaReceta.length}{" "}
+                    {descartadasPorLaReceta.length === 1 ? "renglón quedó" : "renglones quedaron"} afuera por la receta
+                  </p>
+                  <ul className="text-sm2 sunmi-text-muted space-y-1 mt-1">
+                    {descartadasPorLaReceta.slice(0, 8).map((d) => (
+                      <li key={`${d.fila}-${d.porque}`}>
+                        · Fila {d.fila}
+                        {d.producto ? ` · ${d.producto}` : ""} — {d.porque}
+                      </li>
+                    ))}
+                  </ul>
+                  {descartadasPorLaReceta.length > 8 && (
+                    <p className="text-xs sunmi-text-muted mt-1">
+                      y {descartadasPorLaReceta.length - 8} más.
+                    </p>
+                  )}
+                </div>
               )}
             </SunmiPanel>
 
