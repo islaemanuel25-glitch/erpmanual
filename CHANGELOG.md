@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-08-27] - Actualización: proveedores
+
+### Modificado
+- **proveedores**: feat(compras): Facturas y Listas escriben y leen la misma memoria del proveedor
+
+
 ## [2026-08-25] - Actualización: stock
 
 ### Modificado

@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-09 17:07
+**Última actualización:** 2026-08-27 09:55
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-08-27: feat(compras): Facturas y Listas escriben y leen la misma memoria del proveedor
 - 2026-08-09: feat(listas): TERMINADA cierra el trabajo sin cerrar la vuelta atrás
 - 2026-08-09: fix(listas): la tapa cuenta lo mismo que adentro, y en productos
 - 2026-08-09: feat(listas): deshacer una aplicacion, con la previa a la vista antes de confirmar
