@@ -40,45 +40,68 @@ const SRC = fs
   .replace(/\/\/[^\n]*/g, "");
 
 const CORTE = "Se cortó la conexión mientras se analizaba. Mantené esta pantalla abierta y tocá Reintentar.";
-const NO_JSON = "El servidor devolvió una respuesta inválida. Reintentá.";
 
-test("ERR1. el `fetch` y el `json()` tienen CADA UNO su try/catch", () => {
+// ── ESTOS TRES CAMBIARON DE CONTRATO A PROPÓSITO EL 2026-08-27 ─────────────
+//
+// Afirmaban la forma del arreglo de agosto: dos `try` separados y un `.json()`
+// a la vista, cada uno con su mensaje escrito ahí mismo. Esa forma se fue
+// cuando la lectura de respuestas pasó a `lib/red/leerJson.js`, porque el
+// `.json()` a ciegas era el defecto siguiente —una página de error salía como
+// "Unexpected token '<'"—.
+//
+// Lo que se defendía SIGUE EN PIE y es lo que estos candados afirman hoy: que
+// los modos de fallar no comparten mensaje. Lo que cambió es dónde vive la
+// distinción, no si existe. No se aflojaron: se reescribieron.
+
+test("ERR1. el corte de conexión se atrapa APARTE de leer el cuerpo", () => {
   const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
   assert.ok(analisis.length > 0, "no se pudo delimitar la función de análisis");
-  // El defecto era un solo try alrededor de los dos. Se cuenta que haya al menos
-  // dos bloques try en la función de análisis.
   const bloques = analisis.match(/try\s*\{/g) || [];
   assert.ok(bloques.length >= 2, `hay ${bloques.length} bloques try: los dos modos de fallar volvieron a compartir uno`);
 
-  // Y que el `fetch` no esté dentro del mismo try que el `json()`: entre uno y
-  // otro tiene que haber un `catch` que cierre el primero.
+  // Entre el `fetch` y la lectura del cuerpo tiene que haber un `catch` que
+  // cierre el primero. Con un 499 no hay respuesta que leer, y ese caso no puede
+  // terminar contado como "el servidor contestó cualquier cosa".
   const iFetch = analisis.indexOf("await fetch(");
-  const iJson = analisis.indexOf(".json()");
-  assert.ok(iFetch > 0 && iJson > iFetch, "no se encontró el orden fetch → json");
-  const entre = analisis.slice(iFetch, iJson);
-  assert.match(entre, /catch/, "el fetch y el json siguen dentro del mismo try");
+  const iLee = analisis.indexOf("jsonOrError(");
+  assert.ok(iFetch > 0, "ya no hay fetch en el análisis");
+  assert.ok(iLee > iFetch, "no se encontró el orden fetch → lectura del cuerpo");
+  assert.match(analisis.slice(iFetch, iLee), /catch/, "el fetch y la lectura siguen dentro del mismo try");
 });
 
 test("ERR2. corte de conexión y respuesta no JSON dicen cosas DISTINTAS", () => {
   assert.ok(SRC.includes(CORTE), "falta el mensaje del corte de conexión");
-  assert.ok(SRC.includes(NO_JSON), "falta el mensaje de la respuesta inválida");
-  assert.notEqual(CORTE, NO_JSON);
 
-  // Y el texto viejo, que confundía los dos casos, no puede volver.
+  // El otro mensaje ya no se escribe acá: lo arma el lector compartido, que le
+  // pone el código HTTP y la operación —"leer el archivo"— y tiene sus propios
+  // candados. Lo que este afirma es que la pantalla lo USA, porque si volviera a
+  // parsear a ciegas los dos casos volverían a confundirse.
+  const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
+  assert.match(analisis, /jsonOrError\(\s*respuesta\s*,\s*"leer el archivo"/, "el análisis no nombra su operación");
+  assert.doesNotMatch(analisis, /\w+\s*\.json\(\)/, "volvió el parseo a ciegas");
+
+  // Y los dos textos viejos que confundían casos no pueden volver.
   assert.doesNotMatch(
     SRC,
     /No se pudo conectar para analizar el archivo/,
     "volvió el mensaje único que hacía pasar un 499 por un servidor caído"
   );
+  assert.doesNotMatch(
+    SRC,
+    /El servidor devolvió una respuesta inválida\. Reintentá\./,
+    "volvió el texto que no dice ni el código ni la operación"
+  );
 });
 
 test("ERR3. si el servidor explicó qué pasó, ese mensaje se conserva", () => {
-  // `data.error` es el texto específico del lector —SIN_LINEAS, CUOTA_AGOTADA…—
-  // y siempre es mejor que uno escrito en la pantalla.
+  // El texto específico del lector —SIN_LINEAS, CUOTA_AGOTADA…— siempre es mejor
+  // que uno escrito en la pantalla. Ahora llega como el `message` del error que
+  // lanza `jsonOrError`, que propaga `data.error` tal cual.
+  const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
   assert.match(
-    SRC,
-    /setError\(\s*data\.error\s*\|\|/,
-    "la pantalla dejó de usar el mensaje que devuelve el servidor"
+    analisis,
+    /setError\(\s*e\?\.message\s*\|\|/,
+    "la pantalla dejó de mostrar el mensaje que viene del servidor"
   );
 });
 

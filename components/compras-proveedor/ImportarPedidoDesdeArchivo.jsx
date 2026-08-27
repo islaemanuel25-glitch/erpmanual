@@ -23,6 +23,7 @@ import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiSelect from "@/components/sunmi/SunmiSelect";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
+import { jsonOrError } from "@/lib/red/leerJson";
 import { naturalezaLinea, permiteToggleUnidad } from "@/lib/compras-proveedor/calculoPedido";
 import { baseDeProducto } from "@/lib/compras-proveedor/importacion/merge";
 import { consolidarLineasImportadas } from "@/lib/compras-proveedor/importacion/payload";
@@ -42,8 +43,9 @@ import { lineasQueNoCierran } from "@/lib/compras-proveedor/importacion/coherenc
 import {
   LARGO_MAXIMO_EXPLICACION,
   parametrosDeLectura,
+  recetaNecesitaTablaCruda,
 } from "@/lib/compras-proveedor/importacion/recetaDeLectura";
-import { lineasDesdeElCrudo } from "@/lib/compras-proveedor/importacion/documentoCrudo";
+import { crudoUtilizable, lineasDesdeElCrudo } from "@/lib/compras-proveedor/importacion/documentoCrudo";
 import { TEXTO_MOTIVO_CANDIDATO } from "@/lib/proveedores/identidad/motorCandidatos";
 import { aplicarOrden } from "@/lib/proveedores/identidad/ordenIa";
 
@@ -149,7 +151,11 @@ export default function ImportarPedidoDesdeArchivo() {
   // descarta de más se ve idéntica a un papel con menos renglones, y esa es la
   // clase de diferencia que nadie nota hasta que falta mercadería.
   const [descartadasPorLaReceta, setDescartadasPorLaReceta] = useState([]);
+  const [verTodasLasDescartadas, setVerTodasLasDescartadas] = useState(false);
   const [remapeoAplicado, setRemapeoAplicado] = useState(false);
+  // Volver a pedirle la tabla al lector tarda, y sin aviso la pantalla parece
+  // colgada justo cuando alguien acaba de tocar "usar solo esta vez".
+  const [retranscribiendo, setRetranscribiendo] = useState(false);
   const [estado, setEstado] = useState("elegir");
   const [archivo, setArchivo] = useState(null);
   const [documento, setDocumento] = useState(null);
@@ -166,10 +172,10 @@ export default function ImportarPedidoDesdeArchivo() {
         const respuesta = await fetch("/api/proveedores/listar?estado=activos&pageSize=200", {
           credentials: "include",
         });
-        const data = await respuesta.json();
-        if (vigente && data.ok) setProveedores(data.items || []);
-      } catch {
-        if (vigente) setError("No se pudieron cargar los proveedores.");
+        const data = await jsonOrError(respuesta, "cargar los proveedores");
+        if (vigente) setProveedores(data.items || []);
+      } catch (e) {
+        if (vigente) setError(e?.message || "No se pudieron cargar los proveedores.");
       }
     })();
     return () => {
@@ -198,9 +204,9 @@ export default function ImportarPedidoDesdeArchivo() {
         const respuesta = await fetch(`/api/compras-proveedor/obtener?id=${pedidoId}`, {
           credentials: "include",
         });
-        const data = await respuesta.json();
+        const data = await jsonOrError(respuesta, "abrir el borrador");
         if (!vigente) return;
-        if (!data.ok || !data.item) throw new Error(data.error || "No se pudo abrir el borrador.");
+        if (!data.item) throw new Error("No se pudo abrir el borrador.");
         if (data.item.estado !== "BORRADOR") throw new Error("Solo se puede importar sobre un borrador.");
         setProveedorId(String(data.item.proveedor?.id || ""));
         setProveedorNombre(data.item.proveedor?.nombre || "");
@@ -237,18 +243,20 @@ export default function ImportarPedidoDesdeArchivo() {
             cache: "no-store",
           }),
         ]);
-        const dataProductos = await respuestaProductos.json();
-        if (!dataProductos.ok) throw new Error(dataProductos.error || "No se pudo cargar el catálogo.");
+        const dataProductos = await jsonOrError(respuestaProductos, "cargar el catálogo del proveedor");
 
+        // Estas dos NO bloquean la carga, así que su error se traga a propósito
+        // — pero se lee con el mismo lector, para que una página de error no
+        // llegue a `JSON.parse` ni acá, donde el `catch` la haría invisible.
         let dataReceta = null;
         try {
-          dataReceta = await respuestaReceta.json();
+          dataReceta = await jsonOrError(respuestaReceta, "leer la receta de precios");
         } catch {
           // La receta ayuda a interpretar el precio, pero no bloquea la carga.
         }
         let dataLectura = null;
         try {
-          dataLectura = await respuestaLectura.json();
+          dataLectura = await jsonOrError(respuestaLectura, "listar los formatos guardados");
         } catch {
           // Las recetas de lectura ayudan, pero no bloquean la carga: sin
           // ninguna el importador funciona como funcionaba antes.
@@ -379,14 +387,9 @@ export default function ImportarPedidoDesdeArchivo() {
 
     let data;
     try {
-      data = await respuesta.json();
-    } catch {
-      setError("El servidor devolvió una respuesta inválida. Reintentá.");
-      setEstado("elegir");
-      return;
-    }
-    if (!data.ok) {
-      setError(data.error || "No se pudo leer el archivo.");
+      data = await jsonOrError(respuesta, "leer el archivo", "No se pudo leer el archivo.");
+    } catch (e) {
+      setError(e?.message || "No se pudo leer el archivo.");
       setEstado("elegir");
       return;
     }
@@ -429,9 +432,68 @@ export default function ImportarPedidoDesdeArchivo() {
    * La receta llega por parámetro y no del estado porque React todavía no lo
    * actualizó cuando esto se llama: leerlo daría la receta anterior.
    */
-  const repreparar = (receta) => {
+  /**
+   * ── LA TABLA CRUDA SE CONSIGUE, NO SE DA POR PERDIDA ──────────────────
+   *
+   * Si la receta mapea columnas o dice cuándo un renglón cuenta como enviado,
+   * necesita filas y celdas. En un Excel siempre están. En una foto puede que el
+   * modelo no las haya transcripto, y antes eso se informaba como "solo escalas"
+   * y se aplicaba media receta igual.
+   *
+   * Ahora se vuelve a pedir la transcripción del MISMO archivo, que sigue en
+   * memoria. Solo si eso tampoco alcanza se frena, con un texto que dice qué
+   * hacer. Devuelve la tabla, o `null` si no se pudo —y en ese caso ya dejó el
+   * mensaje puesto—.
+   */
+  const conseguirCrudo = async (receta) => {
+    if (!recetaNecesitaTablaCruda(receta)) return documento?.crudo ?? null;
+    if (crudoUtilizable(documento?.crudo)) return documento.crudo;
+
+    if (!archivo) {
+      setErrorReceta(
+        "Para releer las columnas hace falta el archivo, y ya no está en esta pantalla. " +
+          "Elegí de nuevo la foto o el PDF y volvé a aplicar el formato."
+      );
+      return null;
+    }
+
+    setRetranscribiendo(true);
+    setErrorReceta("");
+    try {
+      const form = new FormData();
+      form.append("archivo", archivo);
+      const respuesta = await fetch("/api/compras-proveedor/importar/transcribir", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      const data = await jsonOrError(respuesta, "transcribir la tabla del archivo");
+      if (!crudoUtilizable(data.crudo)) {
+        setErrorReceta(
+          "No se pudo transcribir la tabla de este archivo, así que no hay columnas que releer. " +
+            "Probá con una foto más nítida y derecha, con la tabla entera dentro del cuadro."
+        );
+        return null;
+      }
+      setDocumento((previo) => (previo ? { ...previo, crudo: data.crudo } : previo));
+      return data.crudo;
+    } catch (e) {
+      setErrorReceta(e?.message || "No se pudo transcribir la tabla del archivo.");
+      return null;
+    } finally {
+      setRetranscribiendo(false);
+    }
+  };
+
+  const repreparar = async (receta) => {
     if (!documento) return;
     const params = parametrosDeLectura(receta);
+
+    // Si la receta necesita la tabla y no la hay, esto la consigue o corta. No
+    // se sigue "con lo que haya": aplicar una receta de columnas sobre líneas ya
+    // interpretadas es exactamente el silencio que se está sacando.
+    const crudo = receta ? await conseguirCrudo(receta) : null;
+    if (receta && recetaNecesitaTablaCruda(receta) && !crudoUtilizable(crudo)) return;
 
     // ── LA RECETA SE APLICA SOBRE LA TABLA CRUDA, NO SOBRE LO YA LEÍDO ────
     //
@@ -444,7 +506,7 @@ export default function ImportarPedidoDesdeArchivo() {
     // Cuando la receta no mapea columnas, o cuando no hay tabla cruda —el modelo
     // no la transcribió—, se sigue con las líneas ya leídas y la receta aporta
     // solo las escalas. La pantalla lo dice; no se finge que puede más.
-    const reinterpretado = receta ? lineasDesdeElCrudo({ crudo: documento.crudo, receta }) : null;
+    const reinterpretado = receta ? lineasDesdeElCrudo({ crudo, receta }) : null;
     const puedeRemapear = Boolean(reinterpretado && reinterpretado.lineas.length);
     const lineasBase = puedeRemapear ? reinterpretado.lineas : documento.lineas || [];
     if (!lineasBase.length) return;
@@ -486,8 +548,11 @@ export default function ImportarPedidoDesdeArchivo() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ explicacion, proveedorNombre }),
       });
-      const data = await respuesta.json();
-      if (!data.ok) throw new Error(data.error || "No se pudo interpretar la explicación.");
+      const data = await jsonOrError(
+        respuesta,
+        "interpretar la explicación",
+        "No se pudo interpretar la explicación."
+      );
       if (!data.aporta) {
         throw new Error(
           "No se entendió ninguna columna ni ninguna regla. Probá diciendo qué columna es cada una."
@@ -515,7 +580,7 @@ export default function ImportarPedidoDesdeArchivo() {
     setRecetaSoloEstaVez(true);
     setRecetaElegidaId("");
     setExplicando(false);
-    repreparar(vistaPrevia.receta);
+    await repreparar(vistaPrevia.receta);
   };
 
   const confirmarYRecordar = async () => {
@@ -542,8 +607,7 @@ export default function ImportarPedidoDesdeArchivo() {
           explicacion,
         }),
       });
-      const data = await respuesta.json();
-      if (!data.ok) throw new Error(data.error || "No se pudo guardar la receta.");
+      const data = await jsonOrError(respuesta, "guardar el formato", "No se pudo guardar la receta.");
 
       const guardada = {
         id: data.receta.id,
@@ -562,7 +626,7 @@ export default function ImportarPedidoDesdeArchivo() {
       setRecetaSoloEstaVez(false);
       setExplicando(false);
       setVistaPrevia(null);
-      repreparar(guardada.receta);
+      await repreparar(guardada.receta);
     } catch (e) {
       setErrorReceta(e?.message || "No se pudo guardar la receta.");
     } finally {
@@ -571,12 +635,12 @@ export default function ImportarPedidoDesdeArchivo() {
   };
 
   /** Elegir una variante ya guardada, y releer el documento con ella. */
-  const elegirVariante = (id) => {
+  const elegirVariante = async (id) => {
     setRecetaElegidaId(id);
     setRecetaSoloEstaVez(false);
     const elegida = recetasLectura.find((r) => String(r.id) === String(id)) || null;
     setRecetaEnUso(elegida?.receta ?? null);
-    repreparar(elegida?.receta ?? null);
+    await repreparar(elegida?.receta ?? null);
   };
 
   const seleccionarArchivo = async (seleccionado) => {
@@ -728,8 +792,7 @@ export default function ImportarPedidoDesdeArchivo() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texto: linea.textoOriginal || linea.descripcion, candidatos }),
       });
-      const data = await respuesta.json();
-      if (!data.ok) throw new Error(data.error || "No se pudo ordenar.");
+      const data = await jsonOrError(respuesta, "ordenar los sugeridos", "No se pudo ordenar.");
       setLineas((previas) =>
         previas.map((l) =>
           l.id === idLinea
@@ -790,8 +853,11 @@ export default function ImportarPedidoDesdeArchivo() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ proveedorId: Number(proveedorId), items }),
       });
-      const data = await respuesta.json();
-      if (!data.ok) throw new Error(data.error || "No se pudo crear el borrador.");
+      const data = await jsonOrError(
+        respuesta,
+        pedidoId ? "sumar las líneas al borrador" : "crear el borrador",
+        "No se pudo crear el borrador."
+      );
       const idCreado = pedidoId || data.pedidoId || data.item?.id;
       router.push(`/modulos/compras-proveedor/nueva?pedidoId=${idCreado}&importado=1`);
     } catch (e) {
@@ -871,10 +937,23 @@ export default function ImportarPedidoDesdeArchivo() {
                       {recetaSoloEstaVez ? "Formato: solo esta vez" : `Formato: ${nombreDeLaReceta}`}
                     </SunmiPill>
                   )}
+                  {/*
+                    TRES CASOS, NO DOS. Antes decía "solo escalas: no hay tabla
+                    cruda" tanto cuando la receta NO pedía columnas —donde es la
+                    verdad— como cuando las pedía y no se podían aplicar —donde
+                    era una degradación silenciosa disfrazada de estado—.
+                  */}
                   {recetaEnUso && (
                     <SunmiPill color={remapeoAplicado ? "cyan" : "slate"}>
-                      {remapeoAplicado ? "Columnas releídas del papel" : "Solo escalas: no hay tabla cruda"}
+                      {remapeoAplicado
+                        ? "Columnas releídas del papel"
+                        : recetaNecesitaTablaCruda(recetaEnUso)
+                          ? "Sin columnas releídas"
+                          : "Este formato solo ajusta escalas"}
                     </SunmiPill>
+                  )}
+                  {retranscribiendo && (
+                    <SunmiPill color="amber">Transcribiendo la tabla del archivo...</SunmiPill>
                   )}
                 </div>
               )}
@@ -1147,8 +1226,16 @@ export default function ImportarPedidoDesdeArchivo() {
                     {descartadasPorLaReceta.length}{" "}
                     {descartadasPorLaReceta.length === 1 ? "renglón quedó" : "renglones quedaron"} afuera por la receta
                   </p>
+                  {/*
+                    EL TOPE DE 8 SE PUEDE ABRIR, Y ANTES NO.
+                    Decía "y 7 más" y ahí se terminaba: siete renglones que el
+                    papel tiene y el pedido no, sin fila ni motivo a la vista.
+                    Quien compara contra el papel necesita los quince, no ocho y
+                    un número. Se sigue mostrando de a ocho para que con una
+                    factura larga el panel no se coma la pantalla.
+                  */}
                   <ul className="text-sm2 sunmi-text-muted space-y-1 mt-1">
-                    {descartadasPorLaReceta.slice(0, 8).map((d) => (
+                    {(verTodasLasDescartadas ? descartadasPorLaReceta : descartadasPorLaReceta.slice(0, 8)).map((d) => (
                       <li key={`${d.fila}-${d.porque}`}>
                         · Fila {d.fila}
                         {d.producto ? ` · ${d.producto}` : ""} — {d.porque}
@@ -1156,9 +1243,15 @@ export default function ImportarPedidoDesdeArchivo() {
                     ))}
                   </ul>
                   {descartadasPorLaReceta.length > 8 && (
-                    <p className="text-xs sunmi-text-muted mt-1">
-                      y {descartadasPorLaReceta.length - 8} más.
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setVerTodasLasDescartadas((v) => !v)}
+                      className="text-xs sunmi-text-accent mt-1 underline"
+                    >
+                      {verTodasLasDescartadas
+                        ? "Ver menos"
+                        : `Ver los ${descartadasPorLaReceta.length} renglones que quedaron afuera`}
+                    </button>
                   )}
                 </div>
               )}
