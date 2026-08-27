@@ -7,6 +7,10 @@ import { pedidoEnAlcance } from "@/lib/compras/scope";
 import { esComboBase } from "@/lib/combos/guards";
 import { sumarCantidadesImportadas, datosDetalleNuevo } from "@/lib/compras-proveedor/importacion/merge";
 import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
+import {
+  itemQueNoCierra,
+  textoItemQueNoCierra,
+} from "@/lib/compras-proveedor/importacion/coherenciaDeLinea";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
 
 export async function POST(req, { params }) {
@@ -76,6 +80,21 @@ export async function POST(req, { params }) {
     });
     if (productos.length !== ids.length || productos.some((p) => esComboBase(p.base))) {
       return NextResponse.json({ ok: false, error: "Uno de los productos no pertenece al depósito o no se puede comprar." }, { status: 400 });
+    }
+
+    // ── EL CANDADO DE MAGNITUD, TAMBIÉN ACÁ ───────────────────────────────
+    //
+    // La pantalla ya lo comprueba y deshabilita el botón. Se vuelve a comprobar
+    // porque la pantalla no es la que escribe: esta ruta acepta un cuerpo JSON y
+    // cualquier otro camino —un reintento viejo, otra pantalla, un script—
+    // llegaría acá sin haber pasado por aquel control.
+    //
+    // Solo aplica cuando el costo que se va a guardar SALIÓ DEL PAPEL. Si
+    // alguien eligió el costo del sistema, `cantidad × costo` no tiene por qué
+    // dar el importe del renglón, y exigirlo frenaría una decisión legítima.
+    const noCierra = itemQueNoCierra(items);
+    if (noCierra) {
+      return NextResponse.json({ ok: false, error: textoItemQueNoCierra(noCierra) }, { status: 400 });
     }
 
     const porProducto = new Map(productos.map((p) => [p.id, p]));

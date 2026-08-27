@@ -29,12 +29,14 @@ import {
   verificarSumaDeSubtotales,
 } from "@/lib/compras-proveedor/importacion/precioDelPapel";
 import {
+  cambiarUnidadDelPapel,
   cambiarUnidadDeLinea,
   prepararLineasImportadas,
   recalcularLineaConProducto,
   recalcularPrecioDeLinea,
 } from "@/lib/compras-proveedor/importacion/prepararLineas";
 import { ORIGEN_PRECIO } from "@/lib/compras-proveedor/importacion/precios";
+import { lineasQueNoCierran } from "@/lib/compras-proveedor/importacion/coherenciaDeLinea";
 import { TEXTO_MOTIVO_CANDIDATO } from "@/lib/proveedores/identidad/motorCandidatos";
 
 const NF_MONEDA = new Intl.NumberFormat("es-AR", {
@@ -75,7 +77,14 @@ function lineaLista(linea) {
       // Y una conversión de unidad a medio hacer tampoco: la línea está en la
       // unidad vieja con una conversión pendiente, así que guardarla escribiría
       // la cantidad de una escala con el precio de la otra.
-      !linea.requiereConfirmacionDeUnidad
+      !linea.requiereConfirmacionDeUnidad &&
+      // ── Y EL CANDADO DE MAGNITUD, QUE ES EL ÚNICO QUE NO SE NEGOCIA ──────
+      //
+      // Los de arriba dicen que falta decidir algo. Éste dice que lo decidido
+      // cobra otra cosa que el papel, y eso no se arregla mirándolo: se arregla
+      // corrigiendo la interpretación. Por eso no hay forma de confirmarlo
+      // desde la pantalla, como sí la hay para una diferencia de precio.
+      !linea.coherencia?.bloquea
   );
 }
 
@@ -224,6 +233,9 @@ export default function ImportarPedidoDesdeArchivo() {
   const diferencias = incluidas.filter((linea) => linea.diferentes && !linea.precioConfirmado).length;
   const sinVinculo = incluidas.filter((linea) => !linea.productoLocalId).length;
   const sinPrecioResuelto = incluidas.filter((linea) => linea.papelRequiereRevision).length;
+  // Se cuenta con la MISMA función que usa la ruta al guardar. Si la pantalla
+  // tuviera su propio criterio, un cambio en uno dejaría al otro con el viejo.
+  const incoherentes = lineasQueNoCierran(incluidas).length;
 
   // La suma de los subtotales impresos contra el total del documento. Informa,
   // no bloquea: una diferencia de centavos no puede frenar a quien está
@@ -398,6 +410,36 @@ export default function ImportarPedidoDesdeArchivo() {
   };
 
   /**
+   * CORREGIR QUÉ SIGNIFICA LA CANTIDAD DEL PAPEL.
+   *
+   * Es la corrección de la LECTURA, no de cómo se guarda, y por eso recalcula la
+   * base: es el único punto donde la cantidad en unidades puede cambiar después
+   * del análisis. Todo lo demás deriva de ahí.
+   *
+   * Cada opción ofrecida trae SU lectura y SU unidad de pedido, calculadas por
+   * la misma pieza que decidió que cierran. La pantalla no vuelve a deducir
+   * nada: si dedujera, podría elegir una lectura distinta de la que se verificó.
+   */
+  const corregirLectura = (idLinea, opcion) => {
+    setLineas((previas) =>
+      previas.map((linea) => {
+        if (linea.id !== idLinea) return linea;
+        const producto = productosPorId.get(String(linea.productoLocalId));
+        const conLectura = cambiarUnidadDelPapel(linea, producto, {
+          unidadPapel: opcion.lectura,
+          facturaPor,
+          hayColumnaSubtotal,
+        });
+        return cambiarUnidadDeLinea(conLectura, producto, {
+          unidadDestino: opcion.unidad,
+          facturaPor,
+          hayColumnaSubtotal,
+        });
+      })
+    );
+  };
+
+  /**
    * El precio final escrito a mano gana sobre el calculado, y queda marcado.
    *
    * Se pasa la cadena vacía —y no `null`— cuando el campo se borra: `null`
@@ -427,7 +469,7 @@ export default function ImportarPedidoDesdeArchivo() {
   };
 
   const guardar = async () => {
-    if (pendientes || !incluidas.length || guardando) return;
+    if (pendientes || incoherentes || !incluidas.length || guardando) return;
     setGuardando(true);
     setError("");
     try {
@@ -815,6 +857,82 @@ export default function ImportarPedidoDesdeArchivo() {
                                 </div>
                               )}
 
+                              {/*
+                                EL CANDADO DE MAGNITUD.
+                                Cambiar de unidad reexpresa la misma compra: si
+                                `cantidad × precio` deja de dar el importe del
+                                renglón, hay un factor de más metido en la
+                                interpretación. Se dice cuál fue, con los dos
+                                números a la vista, y se ofrecen las maneras de
+                                escribirlo que sí cierran. El importe NUNCA se
+                                corrige solo: ajustarlo escondería la lectura
+                                equivocada dejándola adentro del pedido.
+                              */}
+                              {linea.coherencia?.bloquea && (
+                                <div className="mt-3 rounded-lg border sunmi-divider sunmi-control px-3 py-2">
+                                  <div className="flex items-start gap-2">
+                                    <AlertTriangle size={15} className="sunmi-text-danger shrink-0 mt-0.5" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm2 font-semibold sunmi-text-danger">
+                                        El renglón no cierra contra el importe del papel
+                                      </p>
+                                      <p className="text-sm2 sunmi-text-muted mt-1">
+                                        {linea.explicacionCoherencia?.comoSeLeyo}.
+                                      </p>
+                                      <p className="text-sm2 sunmi-text-strong mt-1">
+                                        {linea.explicacionCoherencia?.cuenta}
+                                      </p>
+                                      <p className="text-xs sunmi-text-muted mt-1">
+                                        Diferencia: {dinero(linea.coherencia.diferencia)}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {Boolean(linea.representacionesValidas?.length) && (
+                                    <div className="mt-2 pt-2 border-t sunmi-divider">
+                                      <p className="text-sm2 font-semibold sunmi-text-muted mb-1">
+                                        Así sí cierra
+                                      </p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {linea.representacionesValidas.map((opcion) => (
+                                          <SunmiButton
+                                            key={`${opcion.lectura}-${opcion.unidad}`}
+                                            color="slate"
+                                            type="button"
+                                            onClick={() => corregirLectura(linea.id, opcion)}
+                                          >
+                                            {opcion.cantidad} {opcion.unidad === "BULTO" ? "bulto" : "unidad"}
+                                            {opcion.cantidad === 1 ? "" : opcion.unidad === "BULTO" ? "s" : "es"}
+                                            {" × "}
+                                            {dinero(opcion.precio)}
+                                          </SunmiButton>
+                                        ))}
+                                      </div>
+                                      <p className="text-xs sunmi-text-muted mt-2">
+                                        También podés corregir el precio final más arriba, o elegir otro producto
+                                        si el bulto del sistema no es el de este proveedor.
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/*
+                                Otra cosa distinta, y por eso otro cartel: se está
+                                pidiendo una cantidad que no es la del papel. Es
+                                una decisión —faltaban tres, se piden tres menos—
+                                y no una lectura equivocada, así que avisa y no
+                                frena.
+                              */}
+                              {linea.cantidadDifiereDelPapel && !linea.coherencia?.bloquea && (
+                                <div className="mt-3 rounded-lg border sunmi-divider sunmi-control px-3 py-2 flex items-start gap-2">
+                                  <AlertTriangle size={15} className="sunmi-text-warning shrink-0 mt-0.5" />
+                                  <p className="text-sm2 sunmi-text-warning min-w-0 flex-1">
+                                    El papel trae {linea.cantidadSegunElPapel} y se va a pedir {linea.cantidadPedido}.
+                                  </p>
+                                </div>
+                              )}
+
                               {linea.diferentes && (
                                 <div className="mt-3 rounded-lg border sunmi-divider sunmi-control px-3 py-2">
                                   <p className="text-sm2 font-semibold sunmi-text-warning">
@@ -874,13 +992,24 @@ export default function ImportarPedidoDesdeArchivo() {
                     {pendientes ? `${pendientes} por revisar` : `${listas.length} líneas listas`}
                     {diferencias ? ` · ${diferencias} precios sin decidir` : ""}
                     {sinPrecioResuelto ? ` · ${sinPrecioResuelto} sin precio del papel` : ""}
+                    {incoherentes ? ` · ${incoherentes} no cierran contra el papel` : ""}
                   </p>
                   <p className="text-lg font-bold sunmi-text-strong">Total del borrador: {dinero(total)}</p>
                 </div>
                 <SunmiButton color="slate" type="button" onClick={() => router.back()} disabled={guardando}>
                   Cancelar
                 </SunmiButton>
-                <SunmiButton type="button" onClick={guardar} disabled={guardando || pendientes > 0 || !incluidas.length}>
+                {/*
+                  `incoherentes` va explícito además de `pendientes`, que hoy ya
+                  lo contiene: son dos motivos distintos para no poder guardar y
+                  el día que alguien afloje `lineaLista` —para poder confirmar un
+                  precio, por ejemplo— este candado tiene que seguir en pie solo.
+                */}
+                <SunmiButton
+                  type="button"
+                  onClick={guardar}
+                  disabled={guardando || pendientes > 0 || incoherentes > 0 || !incluidas.length}
+                >
                   {guardando ? "Creando..." : pedidoId ? "Agregar al borrador" : "Crear borrador"}
                 </SunmiButton>
               </div>

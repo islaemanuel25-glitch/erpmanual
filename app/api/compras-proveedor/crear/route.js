@@ -6,6 +6,10 @@ import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
 import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
+import {
+  itemQueNoCierra,
+  textoItemQueNoCierra,
+} from "@/lib/compras-proveedor/importacion/coherenciaDeLinea";
 
 export async function POST(req) {
   try {
@@ -96,6 +100,16 @@ export async function POST(req) {
         { ok: false, error: "Hay productos repetidos o inválidos." },
         { status: 400 }
       );
+    }
+
+    // ── EL CANDADO DE MAGNITUD, LA MISMA FUNCIÓN QUE USA `aplicar` ────────
+    //
+    // Esta ruta la usa también "Nuevo pedido", donde no hay ningún papel: en ese
+    // caso `subtotalPapel` no viene y la comprobación no aplica. Solo mira los
+    // items que dicen traer un importe del papel Y haber tomado el costo de ahí.
+    const noCierra = itemQueNoCierra(items);
+    if (noCierra) {
+      return NextResponse.json({ ok: false, error: textoItemQueNoCierra(noCierra) }, { status: 400 });
     }
 
     // Los combos no se compran a proveedor: se compran sus componentes. Los
