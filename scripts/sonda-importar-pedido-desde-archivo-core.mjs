@@ -134,6 +134,35 @@ async function capturar(nombre) {
   return ruta;
 }
 
+/**
+ * LAS 31 FILAS SINTÉTICAS: 16 ENVIADAS Y 15 NO.
+ *
+ * Inventadas de punta a punta. Los códigos son correlativos, los nombres son
+ * genéricos y los precios son redondos para que la aritmética se pueda seguir
+ * de cabeza. No sale de ningún papel real y no hay ningún binario committeado:
+ * la "foto" que la sonda entrega se fabrica en el momento.
+ *
+ * La forma sí imita la del problema: hay una columna PEDIDO —llena en los 31—
+ * y una ENVIADO —vacía en 15—. Quien lee la columna equivocada se lleva 31.
+ */
+function filasSinteticas() {
+  const filas = [];
+  for (let i = 0; i < 31; i += 1) {
+    const enviado = i % 2 === 0; // 16 pares, 15 impares
+    const pedido = 2 + (i % 5);
+    const precio = 100 + i * 10;
+    filas.push([
+      `A${String(100 + i)}`,
+      `Producto sintético ${i + 1}`,
+      String(pedido),
+      enviado ? String(pedido) : "",
+      String(precio),
+      enviado ? String(pedido * precio) : "",
+    ]);
+  }
+  return filas;
+}
+
 const FALSO = {
   proveedores: [{ id: 4242, nombre: "Distribuidora Ejemplo SRL", activo: true }],
   productos: [
@@ -376,6 +405,60 @@ const FALSO = {
     proveedor: { id: 4242, nombre: "Distribuidora Ejemplo SRL" },
     detalles: [],
   },
+
+  // ── EL CAMINO DE FOTO/PDF, QUE ES OTRO Y FALLA DISTINTO ───────────────────
+  //
+  // En un Excel la tabla cruda sale del archivo y siempre está. En una foto la
+  // transcribe el modelo, y el 2026-08-27 no la transcribió: la pantalla mostró
+  // "Solo escalas: no hay tabla cruda", se quedó con las líneas mal leídas y
+  // siguió como si eso fuera una elección.
+  //
+  // Este documento reproduce ESE estado: líneas leídas de la columna equivocada
+  // —la de PEDIDO, que está llena en los 31 renglones— y `crudo` en null.
+  fotoSinTabla: {
+    numeroPedido: "FOTO-SINTETICA-001",
+    hayColumnaSubtotal: true,
+    hayColumnaBonificacion: false,
+    hayTotalImpreso: false,
+    totalDocumento: null,
+    crudo: null,
+    lineas: filasSinteticas().map(([codigo, descripcion, pedido, , precio], i) => ({
+      filaOrigen: i + 1,
+      codigo,
+      descripcion,
+      // La lectura automática tomó PEDIDO: por eso entran los 31.
+      cantidad: Number(pedido),
+      unidad: "UN",
+      precioUnitario: Number(precio),
+      bonificacionPct: null,
+      subtotal: null,
+    })),
+  },
+
+  /** Lo que devuelve la RETRANSCRIPCIÓN: la tabla entera, 31 renglones. */
+  tablaDeLaFoto: {
+    origen: "VISUAL",
+    encabezados: ["COD", "DETALLE", "PEDIDO", "ENVIADO", "PRECIO", "IMPORTE"],
+    filas: filasSinteticas().map((celdas, i) => ({ indice: i + 2, celdas })),
+  },
+
+  /** La receta que corrige la foto: la cantidad sale de ENVIADO, no de PEDIDO. */
+  recetaDeLaFoto: {
+    nombre: null,
+    columnas: {
+      codigo: { encabezado: "COD", posicion: 0 },
+      descripcion: { encabezado: "DETALLE", posicion: 1 },
+      cantidad: { encabezado: "ENVIADO", posicion: 3 },
+      precioUnitario: { encabezado: "PRECIO", posicion: 4 },
+      subtotal: { encabezado: "IMPORTE", posicion: 5 },
+    },
+    enviado: { criterio: "CANTIDAD_PRESENTE", columna: null },
+    cantidadEn: "UNIDAD",
+    facturaPor: null,
+    subtotal: { hayColumna: true, incluyeBonificacion: null },
+    variante: { pistas: [] },
+    toleranciaEscalaPct: null,
+  },
 };
 
 const INTERCEPTOR = `
@@ -391,6 +474,20 @@ const INTERCEPTOR = `
   const json = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), {
     status, headers: { "Content-Type": "application/json" },
   });
+  // ── LOS DOS INTERRUPTORES DE ESTA TANDA ────────────────────────────────
+  //
+  // \`__modoFoto\`: el análisis devuelve un documento SIN tabla cruda, como el
+  // que devolvió la foto real. \`__interpretarDevuelveHtml\`: la ruta de
+  // interpretar contesta una PÁGINA en vez de json, que es exactamente lo que
+  // pasó en producción. El segundo es la contraprueba: con la pantalla vieja,
+  // el usuario veía "Unexpected token '<'".
+  window.__modoFoto = false;
+  window.__interpretarDevuelveHtml = false;
+  window.__transcripciones = [];
+  const pagina = (status = 500) => new Response(
+    '<!DOCTYPE html><html lang="es"><head><title>Error</title></head><body>pagina</body></html>',
+    { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
+  );
   window.fetch = async (entrada, opciones = {}) => {
     const url = typeof entrada === "string" ? entrada : entrada?.url || "";
     const ruta = url.split("?")[0];
@@ -411,6 +508,14 @@ const INTERCEPTOR = `
     }
     if (url.includes("/api/compras-proveedor/recetas-lectura/interpretar")) {
       window.__interpretaciones.push(JSON.parse(opciones.body || "null"));
+      // LA CONTRAPRUEBA DEL DEFECTO 1: una página en vez de datos.
+      if (window.__interpretarDevuelveHtml) return pagina(500);
+      if (window.__modoFoto) {
+        return json({ ok: true, aporta: true, receta: D.recetaDeLaFoto, enCastellano: [
+          "La cantidad sale de la columna ENVIADO",
+          "Si la cantidad está vacía, el producto no fue enviado",
+        ], descartados: [] });
+      }
       return json({
         ok: true,
         aporta: true,
@@ -436,7 +541,17 @@ const INTERCEPTOR = `
       if (window.__fallarPrimero && window.__analisis.length === 1) {
         return json({ ok: false, codigo: "SIN_LINEAS", error: "No encontré líneas de productos en el archivo." }, 400);
       }
+      if (window.__modoFoto) return json({ ok: true, documento: D.fotoSinTabla });
       return json({ ok: true, documento: D.documento });
+    }
+    // LA RETRANSCRIPCIÓN. Solo se llega acá si la receta necesita columnas y el
+    // documento no trae tabla: si la pantalla lo llamara siempre, gastaría una
+    // lectura por cada cambio de formato.
+    if (url.includes("/api/compras-proveedor/importar/transcribir")) {
+      const archivo = opciones.body?.get?.("archivo");
+      window.__transcripciones.push(archivo ? { nombre: archivo.name, tam: archivo.size } : null);
+      await new Promise((resolver) => setTimeout(resolver, 120));
+      return json({ ok: true, crudo: D.tablaDeLaFoto });
     }
     if (url.includes("/api/compras-proveedor/crear")) {
       window.__cuerpos.crear = JSON.parse(opciones.body || "null");
@@ -1233,6 +1348,225 @@ const morir = (motivo) => {
   await esperarA(`!!window.__cuerpos.aplicar`, 10000);
   const continuar = JSON.parse(await evaluar(`JSON.stringify(window.__cuerpos)`));
   afirmar(!!continuar.aplicar, "continuar usa importar/aplicar y no crea otro pedido");
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DEFECTO 1 · LA RUTA CONTESTA UNA PÁGINA Y LA PANTALLA LO DICE BIEN
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Es la CONTRAPRUEBA del arreglo. El 2026-08-27, en producción, "Ver cómo
+  // quedaría" mostró `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`:
+  // el error del parser del navegador, que no dice qué falló ni con qué código.
+  //
+  // Acá se fuerza exactamente eso —la ruta devuelve una página con 500— y se
+  // afirman las dos mitades: que el texto del motor NO aparece, y que sí
+  // aparece uno que nombra la operación y el código. Si alguien vuelve a poner
+  // un `.json()` a ciegas, esta sección se pone roja sola.
+  console.log("\n── el endpoint devuelve HTML (contraprueba del defecto 1) ──────");
+  await medidas(390, 844);
+  await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó para la contraprueba de HTML");
+  await evaluar(`window.__fallarPrimero = false; window.__interpretarDevuelveHtml = true; true`);
+  await seleccionarArchivo("html-sintetico.pdf");
+  if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) {
+    morir("no llegó a revisión para la contraprueba de HTML");
+  }
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Explicar cómo leer este documento/.test(b.innerText || ""))?.click()`);
+  await dormir(300);
+  await evaluar(`(() => {
+    const area = document.querySelector('textarea');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(area, "La columna ENVIADO es la cantidad enviada.");
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await dormir(200);
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Ver cómo quedaría/.test(b.innerText || ""))?.click()`);
+  await esperarA(`/no se pudo|no se guardó|servidor/i.test(document.body.innerText || "")`, 10000);
+  await dormir(300);
+  const anteHtml = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const texto = document.body.innerText || "";
+    return {
+      // Lo que NO puede estar: el mensaje del motor de JSON.
+      tokenCrudo: /Unexpected token/i.test(texto),
+      doctype: /DOCTYPE/i.test(texto),
+      etiqueta: /<html|<body/i.test(texto),
+      // Lo que SÍ tiene que estar.
+      nombraOperacion: /interpretar la explicación/i.test(texto),
+      diceCodigo: /500/.test(texto),
+      diceQueNoSeGuardo: /no se guard/i.test(texto),
+      // Y la vista previa no puede haberse mostrado: no hubo receta.
+      hayVistaPrevia: texto.includes("Así se va a leer"),
+    };
+  })())`));
+  afirmar(!anteHtml.tokenCrudo, "NO sale 'Unexpected token' — que es el defecto que se arregló", JSON.stringify(anteHtml));
+  afirmar(!anteHtml.doctype && !anteHtml.etiqueta, "el HTML de la página no se filtra a la pantalla", JSON.stringify(anteHtml));
+  afirmar(anteHtml.nombraOperacion, "el mensaje dice QUÉ operación falló", JSON.stringify(anteHtml));
+  afirmar(anteHtml.diceCodigo, "el mensaje dice con qué código contestó el servidor", JSON.stringify(anteHtml));
+  afirmar(anteHtml.diceQueNoSeGuardo, "el mensaje aclara que no se guardó nada", JSON.stringify(anteHtml));
+  afirmar(!anteHtml.hayVistaPrevia, "no se muestra una vista previa que nunca llegó", JSON.stringify(anteHtml));
+  const fugasHtml = JSON.parse(await evaluar(`JSON.stringify(window.__fugas)`));
+  afirmar(fugasHtml.length === 0, "una respuesta HTML no dispara ninguna escritura", JSON.stringify(fugasHtml));
+  capturas.push(await capturar("endpoint-html-390x844.png"));
+  await evaluar(`window.__interpretarDevuelveHtml = false; true`);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DEFECTO 2 · UNA FOTO SIN TABLA CRUDA SE VUELVE A TRANSCRIBIR
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // El camino de foto es OTRO que el de Excel y falla distinto: la tabla la
+  // transcribe el modelo, y puede no transcribirla. Cuando eso pasaba, la
+  // pantalla decía "Solo escalas: no hay tabla cruda", se quedaba con las
+  // líneas mal leídas y seguía — que es fingir que la explicación puede
+  // corregir columnas cuando no tiene los datos.
+  //
+  // El documento de esta sección llega SIN tabla y con la cantidad leída de la
+  // columna equivocada: 31 renglones, incluidos los 15 que no se enviaron.
+  for (const [ancho, alto] of [[390, 844], [1366, 900]]) {
+    console.log(`\n── foto sin tabla cruda · ${ancho}x${alto} ────────────────────`);
+    await medidas(ancho, alto);
+    // `__cuerpos` VIVE EN sessionStorage y sobrevive a navegar. Sin limpiarlo,
+    // la afirmación de "esto no escribió" heredaría el `crear` de la sección
+    // anterior y daría rojo por algo que no pasó acá — o peor, daría verde
+    // sobre una escritura ajena si la comparación fuera al revés.
+    await evaluar(`sessionStorage.removeItem("__sonda_cuerpos"); true`);
+    await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+    if (!(await esperarCatalogo())) morir("el catálogo no cargó para la foto");
+    // LOS INTERRUPTORES VAN DESPUÉS DE NAVEGAR, NO ANTES. El interceptor se
+    // reinyecta en cada carga y los vuelve a poner en false: puestos antes, la
+    // sección medía el camino de Excel creyendo que medía el de la foto.
+    await evaluar(`window.__cuerpos = {}; window.__transcripciones = []; window.__modoFoto = true; window.__fallarPrimero = false; true`);
+
+    // El archivo se fabrica en el momento, con nombre y tipo de imagen. NO hay
+    // ningún binario real committeado ni ninguna foto de nadie.
+    const puso = await evaluar(`(() => {
+      const input = document.querySelector('input[type="file"]');
+      if (!input) return false;
+      const archivo = new File([new Uint8Array([255, 216, 255, 224, 0, 16, 74, 70, 73, 70])], "remito-sintetico.jpg", { type: "image/jpeg" });
+      const t = new DataTransfer();
+      t.items.add(archivo);
+      Object.defineProperty(input, "files", { value: t.files, configurable: true });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    })()`);
+    // Una sonda que se traga un fallo informa sobre otra cosa: si el campo no
+    // estaba, las afirmaciones de abajo medirían una pantalla que nunca cambió.
+    if (puso !== "true" && puso !== true) morir(`no se pudo entregar la foto sintética a ${ancho}`);
+    // NO se espera por "Precio del sistema": estos 31 renglones sintéticos no
+    // machean con ningún producto del catálogo, así que sus tarjetas no muestran
+    // ese rótulo. Y TAMPOCO por "hay algún panel": el SIDEBAR tiene paneles, así
+    // que esa condición se cumple sola con la pantalla vacía —la primera versión
+    // de esto midió el menú y dio un rojo que no era del código—.
+    //
+    // "Cantidad del papel" sí es exclusivo de una tarjeta de renglón.
+    if (!(await esperarA(`document.body.innerText.includes("Cantidad del papel")`, 25000))) {
+      morir(`la foto no llegó a revisión a ${ancho}`);
+    }
+    await dormir(700);
+
+    // ANTES de explicar: la lectura automática se llevó los 31.
+    // Solo las tarjetas de RENGLÓN. `[data-sunmi-panel]` a secas también cuenta
+    // los paneles del menú y los de la cabecera de la pantalla.
+    const CUENTA_RENGLONES = `[...document.querySelectorAll('[data-sunmi-panel]')].filter((t) => /Cantidad del papel/.test(t.innerText || "")).length`;
+    const antes = JSON.parse(await evaluar(`JSON.stringify((() => {
+      const tarjetas = ${CUENTA_RENGLONES};
+      const texto = (document.body.innerText || "").replace(/\\s+/g, " ");
+      // El detalle dice QUÉ hay en pantalla. Un rojo que solo diga "esperaba 31
+      // y hubo 2" obliga a adivinar; con el pie y el filtro se ve por qué.
+      const pie = [...document.querySelectorAll('p')].map((p) => (p.innerText || "").trim())
+        .filter((t) => /por revisar|líneas listas|renglones/.test(t))[0] || "(sin pie)";
+      return { tarjetas, pie, texto: texto.slice(0, 240) };
+    })())`));
+    afirmar(antes.tarjetas === 31, `la lectura automática de la foto trae los 31 renglones a ${ancho}`, JSON.stringify(antes));
+
+    // Se explica cómo se lee, y se aplica solo esta vez.
+    await evaluar(`[...document.querySelectorAll('button')].find((b) => /Explicar cómo leer este documento/.test(b.innerText || ""))?.click()`);
+    await dormir(300);
+    await evaluar(`(() => {
+      const area = document.querySelector('textarea');
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+      setter.call(area, "La cantidad enviada está en la columna ENVIADO, no en PEDIDO. Si ENVIADO está vacío, ese renglón no se envió.");
+      area.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()`);
+    await dormir(200);
+    await evaluar(`[...document.querySelectorAll('button')].find((b) => /Ver cómo quedaría/.test(b.innerText || ""))?.click()`);
+    if (!(await esperarA(`document.body.innerText.includes("Así se va a leer")`, 15000))) {
+      morir(`no salió la vista previa de la foto a ${ancho}`);
+    }
+    await evaluar(`[...document.querySelectorAll('button')].find((b) => /Usar solo esta vez/.test(b.innerText || ""))?.click()`);
+    // Acá es donde la pantalla tiene que ir a buscar la tabla que no tenía.
+    if (!(await esperarA(`window.__transcripciones.length > 0`, 20000))) {
+      morir(`la pantalla NO volvió a transcribir la foto a ${ancho}: degradó en silencio`);
+    }
+    await dormir(900);
+
+    const despues = JSON.parse(await evaluar(`JSON.stringify((() => {
+      const texto = document.body.innerText || "";
+      const tarjetas = ${CUENTA_RENGLONES};
+      // El panel de lo que se dejó afuera: fila y motivo de cada omitida.
+      const omitidas = (texto.match(/[Ff]ila \\d+/g) || []).length;
+      return {
+        tarjetas,
+        omitidas,
+        diceCuantasQuedaronAfuera: /15 renglones quedaron afuera por la receta/.test(texto),
+        // El rótulo tiene que decir que las columnas se releyeron.
+        releidas: /Columnas releídas del papel/.test(texto),
+        // Y NO puede seguir diciendo que no hay tabla.
+        sigueDiciendoSinTabla: /no hay tabla cruda/i.test(texto),
+        // El precio del primer renglón sintético: 2 × 100 = 200.
+        conservaPrecio: texto.includes("100") && texto.includes("200"),
+      };
+    })())`));
+
+    afirmar(despues.tarjetas === 16, `la explicación deja 16 enviadas a ${ancho}`, JSON.stringify(despues));
+    afirmar(despues.diceCuantasQuedaronAfuera, `el panel dice que quedaron 15 afuera a ${ancho}`, JSON.stringify(despues));
+
+    // ── Y LAS QUINCE SE PUEDEN VER, NO OCHO Y UN NÚMERO ────────────────
+    //
+    // El panel muestra ocho y ofrece abrir el resto. Antes decía "y 7 más" y
+    // ahí se terminaba: siete renglones que el papel tiene y el pedido no,
+    // sin fila ni motivo. Esta sonda lo encontró.
+    await evaluar(`[...document.querySelectorAll('button')].find((b) => /Ver los 15 renglones/.test(b.innerText || ""))?.click()`);
+    await dormir(400);
+    const todas = JSON.parse(await evaluar(`JSON.stringify((() => {
+      const texto = document.body.innerText || "";
+      const filas = [...new Set((texto.match(/Fila (\\d+)/g) || []))];
+      return { cuantas: filas.length, conMotivo: (texto.match(/Fila \\d+[^\\n]*—[^\\n]+/g) || []).length };
+    })())`));
+    afirmar(todas.cuantas === 15, `las 15 omitidas se pueden ver con su fila a ${ancho}`, JSON.stringify(todas));
+    afirmar(todas.conMotivo === 15, `las 15 dicen TAMBIÉN su motivo a ${ancho}`, JSON.stringify(todas));
+    afirmar(despues.releidas, `dice que las columnas se releyeron del papel a ${ancho}`, JSON.stringify(despues));
+    afirmar(!despues.sigueDiciendoSinTabla, `ya no dice "no hay tabla cruda" a ${ancho}`, JSON.stringify(despues));
+    afirmar(despues.conservaPrecio, `los precios y los importes del papel se conservan a ${ancho}`, JSON.stringify(despues));
+
+    // La transcripción se pidió con EL MISMO archivo, y una sola vez.
+    const trans = JSON.parse(await evaluar(`JSON.stringify(window.__transcripciones)`));
+    afirmar(trans.length === 1, `se vuelve a transcribir UNA vez, no una por línea a ${ancho}`, JSON.stringify(trans));
+    afirmar(trans[0]?.nombre === "remito-sintetico.jpg", `se retranscribe el MISMO archivo a ${ancho}`, JSON.stringify(trans));
+
+    // Y nada de esto escribió.
+    const fugasFoto = JSON.parse(await evaluar(`JSON.stringify(window.__fugas)`));
+    const cuerposFoto = JSON.parse(await evaluar(`JSON.stringify(window.__cuerpos)`));
+    afirmar(fugasFoto.length === 0, `ninguna escritura se escapó en el camino de la foto a ${ancho}`, JSON.stringify(fugasFoto));
+    afirmar(!cuerposFoto.crear && !cuerposFoto.aplicar, `reinterpretar una foto no crea ni aplica nada a ${ancho}`, JSON.stringify(Object.keys(cuerposFoto)));
+
+    // Y no se desborda ni se corta con 31 renglones y el panel de omitidas.
+    const anchoDoc = JSON.parse(await evaluar(`JSON.stringify((() => ({
+      scroll: document.documentElement.scrollWidth,
+      cliente: document.documentElement.clientWidth,
+      cortados: [...document.querySelectorAll('[data-sunmi-panel] *')]
+        .filter((n) => n.children.length === 0 && (n.innerText || "").trim())
+        .filter((n) => n.scrollWidth > n.clientWidth + 1).length,
+    }))())`));
+    afirmar(
+      anchoDoc.scroll <= anchoDoc.cliente + 1,
+      `la foto reinterpretada no desborda a ${ancho}`,
+      JSON.stringify(anchoDoc)
+    );
+    afirmar(anchoDoc.cortados === 0, `ningún texto queda cortado a ${ancho}`, JSON.stringify(anchoDoc));
+    capturas.push(await capturar(`foto-reinterpretada-${ancho}x${alto}.png`));
+  }
+  await evaluar(`window.__modoFoto = false; true`);
 
   // ── EL PIE CONTRA LA BARRA INFERIOR DEL TELÉFONO ──────────────────────────
   //
