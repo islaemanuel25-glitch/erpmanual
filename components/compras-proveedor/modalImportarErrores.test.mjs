@@ -41,6 +41,33 @@ const SRC = fs
 
 const CORTE = "Se cortó la conexión mientras se analizaba. Mantené esta pantalla abierta y tocá Reintentar.";
 
+/**
+ * EL CUERPO DE `analizar`, DELIMITADO POR LLAVES Y NO POR "HASTA EL SIGUIENTE
+ * NOMBRE QUE CONOZCO".
+ *
+ * Antes se cortaba desde `const analizar` hasta `const seleccionarArchivo`, y
+ * eso funcionaba de casualidad: el día que apareció una función en el medio
+ * —la que restaura la sesión guardada, que sí toca `setArchivo`— la ventana se
+ * tragó código ajeno y el candado dio ROJO por algo que no afirma.
+ *
+ * Un candado que se pone rojo por dónde está escrito el código de al lado no
+ * está midiendo lo que dice medir.
+ */
+function cuerpoDeAnalizar() {
+  const i = SRC.indexOf("const analizar = async");
+  if (i < 0) return "";
+  let nivel = 0;
+  let visto = false;
+  for (let j = i; j < SRC.length; j += 1) {
+    if (SRC[j] === "{") { nivel += 1; visto = true; }
+    else if (SRC[j] === "}") {
+      nivel -= 1;
+      if (visto && nivel === 0) return SRC.slice(i, j + 1);
+    }
+  }
+  return "";
+}
+
 // ── ESTOS TRES CAMBIARON DE CONTRATO A PROPÓSITO EL 2026-08-27 ─────────────
 //
 // Afirmaban la forma del arreglo de agosto: dos `try` separados y un `.json()`
@@ -54,7 +81,7 @@ const CORTE = "Se cortó la conexión mientras se analizaba. Mantené esta panta
 // distinción, no si existe. No se aflojaron: se reescribieron.
 
 test("ERR1. el corte de conexión se atrapa APARTE de leer el cuerpo", () => {
-  const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
+  const analisis = cuerpoDeAnalizar();
   assert.ok(analisis.length > 0, "no se pudo delimitar la función de análisis");
   const bloques = analisis.match(/try\s*\{/g) || [];
   assert.ok(bloques.length >= 2, `hay ${bloques.length} bloques try: los dos modos de fallar volvieron a compartir uno`);
@@ -76,7 +103,7 @@ test("ERR2. corte de conexión y respuesta no JSON dicen cosas DISTINTAS", () =>
   // pone el código HTTP y la operación —"leer el archivo"— y tiene sus propios
   // candados. Lo que este afirma es que la pantalla lo USA, porque si volviera a
   // parsear a ciegas los dos casos volverían a confundirse.
-  const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
+  const analisis = cuerpoDeAnalizar();
   assert.match(analisis, /jsonOrError\(\s*respuesta\s*,\s*"leer el archivo"/, "el análisis no nombra su operación");
   assert.doesNotMatch(analisis, /\w+\s*\.json\(\)/, "volvió el parseo a ciegas");
 
@@ -97,7 +124,7 @@ test("ERR3. si el servidor explicó qué pasó, ese mensaje se conserva", () => 
   // El texto específico del lector —SIN_LINEAS, CUOTA_AGOTADA…— siempre es mejor
   // que uno escrito en la pantalla. Ahora llega como el `message` del error que
   // lanza `jsonOrError`, que propaga `data.error` tal cual.
-  const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
+  const analisis = cuerpoDeAnalizar();
   assert.match(
     analisis,
     /setError\(\s*e\?\.message\s*\|\|/,
@@ -116,7 +143,7 @@ test("ERR4. el archivo sobrevive al fallo y hay cómo reintentar", () => {
   // ventana después de cada `catch`: el archivo se puede perder en un `catch`,
   // en la rama de `ok:false` o en cualquier retorno temprano, y los tres dejan al
   // usuario buscando la foto otra vez.
-  const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
+  const analisis = cuerpoDeAnalizar();
   assert.ok(analisis.length > 0, "no se pudo delimitar la función de análisis");
   assert.doesNotMatch(
     analisis,
@@ -150,7 +177,7 @@ test("ERR5. reintentar NO crea nada ni duplica líneas", () => {
 test("ERR6. nada se guarda hasta confirmar: el análisis no escribe", () => {
   // La regla de la tanda. El único camino que escribe es `aplicar`, y sale del
   // botón del pie, no del análisis.
-  const analisis = SRC.slice(SRC.indexOf("const analizar = async"), SRC.indexOf("const seleccionarArchivo"));
+  const analisis = cuerpoDeAnalizar();
   assert.ok(analisis.length > 0);
   assert.ok(!analisis.includes("onAplicar"), "el análisis llama a onAplicar: eso escribiría sin confirmar");
   assert.match(analisis, /importar\/analizar/, "el análisis dejó de llamar al endpoint de análisis");

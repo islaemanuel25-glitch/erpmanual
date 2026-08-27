@@ -96,6 +96,48 @@ test("los errores dicen QUÉ pasó, no 'Error interno'", () => {
   }
 });
 
+test("NINGUNA ruta de IA contesta 502 — un 5xx del origen lo puede reemplazar un proxy", () => {
+  // ── DE DÓNDE SALIÓ ──────────────────────────────────────────────────────
+  //
+  // El 2026-08-27, después del primer arreglo, la pantalla informó «el servidor
+  // contestó una página en vez de datos (código 502)». La ruta de interpretar
+  // devolvía 502 con JSON cuando el proveedor fallaba, y lo que llegó al
+  // navegador empezaba con `<`: alguien entre el origen y el navegador —nginx o
+  // Cloudflare— reemplazó el cuerpo.
+  //
+  // Y el 502 además era falso: la aplicación no es un gateway roto. Que el
+  // proveedor esté sin cuota o sobrecargado es un RESULTADO de la vista previa.
+  // Va con 200 y `ok:false`, que la pantalla ya sabe leer.
+  for (const rel of RUTAS) {
+    const codigo = soloCodigo(rel);
+    assert.doesNotMatch(
+      codigo,
+      /status:\s*502/,
+      `${rel}: contesta 502, y un 5xx del origen es lo que un proxy reemplaza por una página`
+    );
+  }
+});
+
+test("las rutas de IA llevan traza con requestId, de entrada y de salida", () => {
+  // Sin esto, un pedido que falla por el camino previsto no deja ni una línea, y
+  // la ausencia de log no distingue "no llegó al handler" de "llegó y salió por
+  // la puerta de al lado". Esa ambigüedad dejó el diagnóstico a medias dos veces.
+  for (const rel of ["app/api/compras-proveedor/recetas-lectura/interpretar/route.js",
+                     "app/api/compras-proveedor/importar/transcribir/route.js"]) {
+    const codigo = soloCodigo(rel);
+    assert.match(codigo, /crearTraza\(/, `${rel}: no abre traza`);
+    assert.match(codigo, /traza\.fin\(/, `${rel}: no cierra traza`);
+    assert.match(codigo, /CABECERA_REQUEST_ID/, `${rel}: no devuelve el identificador en el encabezado`);
+
+    // Y TODA salida tiene que cerrarla. Un `return` sin `traza.fin` deja un
+    // pedido con línea de entrada y sin línea de salida, que se lee como "se
+    // colgó adentro del handler" — un diagnóstico falso.
+    const returns = (codigo.match(/return\s+NextResponse\.json/g) || []).length;
+    const fines = (codigo.match(/traza\.fin\(/g) || []).length;
+    assert.equal(fines, returns, `${rel}: ${returns} salidas y ${fines} cierres de traza`);
+  }
+});
+
 test("transcribir NO escribe: no toca prisma ni ningún create/update", () => {
   // Es la ruta nueva, y la promesa de "ver cómo quedaría sin comprometerse"
   // depende de que no escriba. Se afirma sobre el archivo, igual que en

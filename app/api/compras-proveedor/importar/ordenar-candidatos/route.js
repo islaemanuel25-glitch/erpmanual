@@ -73,10 +73,15 @@ export async function POST(req) {
       timeoutMs: 20_000,
     });
     if (!respuesta.ok) {
-      return NextResponse.json(
-        { ok: false, motivo: respuesta.motivo, error: textoMotivoIa(respuesta.motivo) },
-        { status: 502 }
-      );
+      // Con 200 y `ok:false`, por lo mismo que interpretar: un 5xx del origen es
+      // lo que un proxy puede reemplazar por una página de error, y acá encima
+      // sería doblemente falso — que el modelo no ordene los candidatos no
+      // impide nada. La pantalla se queda con el orden del sistema y sigue.
+      return NextResponse.json({
+        ok: false,
+        motivo: respuesta.motivo,
+        error: textoMotivoIa(respuesta.motivo),
+      });
     }
 
     const propuesto = Array.isArray(respuesta.datos?.orden) ? respuesta.datos.orden : [];
