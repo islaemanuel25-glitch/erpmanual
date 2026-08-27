@@ -170,6 +170,28 @@ const FALSO = {
       aliasesProveedor: [{ codigoInterno: "SINT-012", descripcionProveedor: null }],
       unidad_medida: "unidad", factor_pack: 12, modoCompra: "BULTO", precio_costo: 90000,
     },
+    // ── LOS TRES DEL CASO DEL RANKING ────────────────────────────────────
+    //
+    // Dos alfabéticos sin ninguna relación y el producto correcto. Van en este
+    // orden a propósito: es el que devuelve la API, y es el que se veía en el
+    // selector cuando el ranking se perdía.
+    {
+      productoLocalId: 9101, baseId: 8101, nombre: "Agua Sintética Oxigenada",
+      codigoInterno: null, codigosInternos: [], aliasesProveedor: [],
+      unidad_medida: "unidad", factor_pack: 1, modoCompra: "UNIDAD", precio_costo: 500,
+    },
+    {
+      productoLocalId: 9102, baseId: 8102, nombre: "Alfajor Sintético Triple",
+      codigoInterno: null, codigosInternos: [], aliasesProveedor: [],
+      unidad_medida: "unidad", factor_pack: 1, modoCompra: "UNIDAD", precio_costo: 300,
+    },
+    // El del renglón que además ejerce la conversión: bulto de 10, costo por
+    // bulto, y el papel cotiza por unidad.
+    {
+      productoLocalId: 9103, baseId: 8103, nombre: "Zortamel Sintético 10",
+      codigoInterno: null, codigosInternos: [], aliasesProveedor: [],
+      unidad_medida: "unidad", factor_pack: 10, modoCompra: "BULTO", precio_costo: 33600,
+    },
   ],
   documento: {
     numeroPedido: "SINTETICO-001",
@@ -178,12 +200,14 @@ const FALSO = {
     hayColumnaSubtotal: true,
     hayColumnaBonificacion: true,
     hayTotalImpreso: true,
+    // 1.000 + 3.000 + 4.800 + 87.045,75 + 168.000 = 263.845,75; el papel dice
+    // dos centavos menos, que es el redondeo del proveedor.
     // La suma de los cuatro subtotales es 95.845,75 y el total impreso dice
     // 95.845,73: DOS CENTAVOS de diferencia, del redondeo que hace el proveedor
     // renglón por renglón. Está puesto a propósito para ejercer que una
     // diferencia de centavos NO bloquea — con un total exacto, esa regla no se
     // probaría nunca y el candado diría que sí.
-    totalDocumento: 95845.73,
+    totalDocumento: 263845.73,
     lineas: [
       {
         descripcion: "Nombre que no coincide con el catálogo",
@@ -207,6 +231,16 @@ const FALSO = {
         descripcion: "Bonificado Sintético x12",
         cantidad: 12, unidad: "UNIDAD", codigo: "SINT-012", precioUnitario: 8168.94,
         bonificacionPct: 14, subtotal: 87045.75,
+      },
+      // EL RENGLÓN DEL RANKING Y DE LA CONVERSIÓN, en uno solo.
+      //
+      // SIN código y SIN unidad, que es la forma del papel real: obliga al motor
+      // de texto a elegir entre los alfabéticos y el correcto, y obliga a asumir
+      // la escala de la cantidad. 50 × 3.360 tienen que seguir siendo 168.000.
+      {
+        descripcion: "ZORTAMIL SINTETICO CONV 10",
+        cantidad: 50, unidad: null, codigo: null, precioUnitario: 3360,
+        bonificacionPct: null, subtotal: 168000,
       },
     ],
   },
@@ -476,6 +510,94 @@ const morir = (motivo) => {
   const cuadre = await evaluar(`document.body.innerText.includes("cierran con el total del documento")`);
   afirmar(cuadre, "dos centavos de redondeo NO frenan el documento");
 
+  // ── EL RANKING DENTRO DEL SELECTOR ────────────────────────────────────────
+  //
+  // Es lo único que los candados no pueden mirar: que el orden del motor llegue
+  // hasta las opciones que se ven al abrir el desplegable. El defecto vivía
+  // exactamente en ese último tramo, y con todos los candados en verde.
+  // ── LA CONVERSIÓN, EN LA PANTALLA ─────────────────────────────────────────
+  //
+  // Va ANTES de tocar el selector: el primer botón de la tarjeta es la X de
+  // excluir, y un clic ahí colapsa la línea entera. Medir primero y tocar
+  // después evita confundir "el subtotal está mal" con "lo escondí yo".
+  console.log("\n── la conversión de unidad, en la pantalla ───────────────────");
+  const antes = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes("ZORTAMIL SINTETICO CONV 10"));
+    const t = titulo?.closest('[data-sunmi-panel]');
+    if (!t) return { hay: false };
+    return { hay: true, texto: t.innerText || "" };
+  })())`));
+  afirmar(antes.hay, "la tarjeta del renglón sin unidad está en pantalla");
+  afirmar(
+    antes.texto.includes("$168.000,00"),
+    "el subtotal del renglón es el del papel, $168.000",
+    antes.texto?.slice(0, 400)
+  );
+  afirmar(
+    !antes.texto.includes("$1.680.000,00"),
+    "NO aparece el subtotal inflado por diez",
+    antes.texto?.slice(0, 400)
+  );
+  afirmar(
+    /50\s+Unidad|Unidad[\s\S]{0,40}50/.test(antes.texto) || antes.texto.includes("50"),
+    "la cantidad se muestra como la leyó el papel",
+    antes.texto?.slice(0, 400)
+  );
+
+  console.log("\n── el ranking dentro del selector ────────────────────────────");
+  const abierto = await evaluar(`(() => {
+    const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes("ZORTAMIL SINTETICO CONV 10"));
+    const tarjeta = titulo?.closest('[data-sunmi-panel]');
+    if (!tarjeta) return false;
+    // El disparador del desplegable, POR SU ETIQUETA. El primer botón de la
+    // tarjeta es la X de excluir y tocarlo colapsa la línea.
+    const etiqueta = [...tarjeta.querySelectorAll('label')].find((l) => /Producto del sistema/i.test(l.innerText || ""));
+    const boton = etiqueta?.parentElement?.querySelector('button');
+    if (!boton) return false;
+    // Se acerca la tarjeta ANTES de abrir. El desplegable se dibuja en un portal
+    // posicionado sobre el disparador: con la página en el tope, la lista queda
+    // fuera de la ventana y la foto sale del encabezado.
+    tarjeta.scrollIntoView({ block: "center" });
+    boton.click();
+    return true;
+  })()`);
+  afirmar(abierto, "se pudo abrir el selector del renglón sin código");
+  await dormir(500);
+
+  const opciones = JSON.parse(await evaluar(`JSON.stringify((() => {
+    // El desplegable se dibuja en un portal, al final del body.
+    const filas = [...document.querySelectorAll('body > div')]
+      .flatMap((d) => [...d.querySelectorAll('div')])
+      .map((d) => (d.childElementCount === 0 ? (d.innerText || "").trim() : ""))
+      .filter(Boolean);
+    return filas.slice(0, 14);
+  })())`));
+  const posicion = (r) => opciones.findIndex((o) => r.test(o));
+  const iSugeridos = posicion(/Sugeridos para esta l/i);
+  const iZortamel = posicion(/Zortamel/i);
+  const iAgua = posicion(/Agua Sint/i);
+  const iAlfajor = posicion(/Alfajor Sint/i);
+  const iTodos = posicion(/Todos los productos/i);
+
+  afirmar(iSugeridos >= 0, "el selector muestra el grupo Sugeridos para esta línea", JSON.stringify(opciones));
+  afirmar(iTodos >= 0, "el selector muestra el grupo Todos los productos", JSON.stringify(opciones));
+  afirmar(iZortamel >= 0, "el producto correcto aparece entre las opciones", JSON.stringify(opciones));
+  afirmar(
+    iZortamel >= 0 && (iAgua < 0 || iZortamel < iAgua) && (iAlfajor < 0 || iZortamel < iAlfajor),
+    "el producto de la marca correcta va ANTES que los alfabéticos ajenos",
+    JSON.stringify(opciones)
+  );
+  afirmar(
+    iSugeridos >= 0 && iZortamel > iSugeridos && (iTodos < 0 || iZortamel < iTodos),
+    "el producto correcto está DENTRO del grupo de sugeridos",
+    JSON.stringify(opciones)
+  );
+  // Una foto del desplegable ABIERTO, que es lo que hay que poder mirar cuando
+  // alguien dice "el selector me muestra cualquier cosa".
+  const fotoSelector = await capturar("selector-abierto-390x844.png");
+  await evaluar(`document.body.click()`);
+  await dormir(300);
+
   // Una foto del renglón que da nombre a la tanda, a 390. El desglose es lo que
   // hay que poder mirar cuando el precio final es menor que el impreso.
   await evaluar(`${tarjetaCon("Bonificado Sintético x12")}?.scrollIntoView({ block: "center" })`);
@@ -483,7 +605,7 @@ const morir = (motivo) => {
   const fotoBonificado = await capturar("bonificado-390x844.png");
 
   await evaluar(`(() => {
-    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12"]) {
+    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12", "ZORTAMIL SINTETICO CONV 10"]) {
       const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes(nombre));
       const tarjeta = titulo?.closest('[data-sunmi-panel]');
       if (!tarjeta) continue;
@@ -494,7 +616,7 @@ const morir = (motivo) => {
   })()`);
   await dormir(400);
 
-  const capturas = [fotoBonificado];
+  const capturas = [fotoBonificado, fotoSelector];
   for (const [ancho, alto] of [[390, 844], [1366, 900]]) {
     await medidas(ancho, alto);
     const medicion = JSON.parse(await medirPantalla());
@@ -546,7 +668,7 @@ const morir = (motivo) => {
   await seleccionarArchivo("continuacion-sintetica.pdf");
   if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) morir("no llegó a revisión al continuar");
   await evaluar(`(() => {
-    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12"]) {
+    for (const nombre of ["Pack Sintético x21", "Bonificado Sintético x12", "ZORTAMIL SINTETICO CONV 10"]) {
       const titulo = [...document.querySelectorAll('p')].find((p) => (p.innerText || "").includes(nombre));
       const tarjeta = titulo?.closest('[data-sunmi-panel]');
       if (!tarjeta) continue;

@@ -33,8 +33,12 @@ export default function SunmiSelectAdv({
 
   const optionList = Children.toArray(children).filter((c) => isValidElement(c));
 
+  // Al buscar se sacan los ENCABEZADOS: un título de grupo sobre una lista ya
+  // filtrada no agrupa nada, y puede quedar un título con cero opciones abajo,
+  // que se lee como si el grupo estuviera vacío.
   const filteredOptions = searchable && search
     ? optionList.filter((c) => {
+        if (c.props.encabezado) return false;
         const text = typeof c.props.children === "string" ? c.props.children : "";
         return text.toLowerCase().includes(search.toLowerCase());
       })
@@ -167,6 +171,20 @@ export default function SunmiSelectAdv({
             const val = child.props.value;
             const selected = isSelected(val);
 
+            // TÍTULO DE GRUPO: no se elige y no se toca. Sin el `return` de
+            // acá, un encabezado con `value` vacío sería seleccionable y
+            // borraría el producto ya elegido de un toque.
+            if (child.props.encabezado) {
+              return (
+                <div
+                  key={idx}
+                  className="px-3 pt-3 pb-1 text-xs2 font-bold uppercase tracking-wide sunmi-text-muted"
+                >
+                  {child.props.children}
+                </div>
+              );
+            }
+
             return (
               <div
                 key={idx}
@@ -258,6 +276,18 @@ export default function SunmiSelectAdv({
   );
 }
 
-export function SunmiSelectOption({ value, children }) {
-  return <div value={value}>{children}</div>;
+/**
+ * Una opción del desplegable.
+ *
+ * `encabezado` la convierte en un TÍTULO DE GRUPO: no se puede elegir y no se
+ * puede tocar. Se agregó al kit —y no a la pantalla que lo necesitaba— porque
+ * agrupar opciones es una necesidad del desplegable, no de un módulo: el día que
+ * otra pantalla quiera separar "sugeridos" de "todos", ya está.
+ *
+ * Los encabezados desaparecen al escribir en el buscador. Un título de grupo
+ * sobre una lista ya filtrada no agrupa nada, y peor: puede quedar un título con
+ * cero opciones abajo, que se lee como si el grupo estuviera vacío.
+ */
+export function SunmiSelectOption({ value, children, encabezado = false }) {
+  return <div value={value} data-encabezado={encabezado ? "" : undefined}>{children}</div>;
 }
