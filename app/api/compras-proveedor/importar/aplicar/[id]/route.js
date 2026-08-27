@@ -7,6 +7,7 @@ import { pedidoEnAlcance } from "@/lib/compras/scope";
 import { esComboBase } from "@/lib/combos/guards";
 import { sumarCantidadesImportadas, datosDetalleNuevo } from "@/lib/compras-proveedor/importacion/merge";
 import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
+import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
 
 export async function POST(req, { params }) {
   try {
@@ -83,6 +84,9 @@ export async function POST(req, { params }) {
       productosPorLocal: porProducto,
       grupoId: ctx.grupoId,
       proveedorId: pedido.proveedorId,
+      // El usuario y la hora los pone el servidor, nunca el cuerpo.
+      confirmadaPorUsuarioId: ctx.session?.id ?? null,
+      confirmadaEn: new Date(),
     });
     const existentes = new Map(pedido.detalles.map((d) => [d.productoLocalId, d]));
     const resultados = await prisma.$transaction(async (tx) => {
@@ -134,23 +138,10 @@ export async function POST(req, { params }) {
           salida.push(creado);
         }
       }
-      for (const alias of aliases) {
-        await tx.productoCodigoProveedor.upsert({
-          where: {
-            codigo_interno_unico_por_proveedor: {
-              grupoId: alias.grupoId,
-              proveedorId: alias.proveedorId,
-              codigoInterno: alias.codigoInterno,
-            },
-          },
-          update: {
-            productoBaseId: alias.productoBaseId,
-            descripcionProveedor: alias.descripcionProveedor,
-            activo: true,
-          },
-          create: alias,
-        });
-      }
+      // La misma pieza que usa `crear` y que va a usar Listas de precios. Estaba
+      // escrito dos veces, igual, y era el bucle que decide si una deducción
+      // puede pisar lo que una persona confirmó.
+      await persistirIdentidad(tx, aliases);
       return salida;
     });
     return NextResponse.json({ ok: true, pedidoId, detalles: resultados });

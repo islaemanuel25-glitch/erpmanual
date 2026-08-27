@@ -16,7 +16,39 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción está al día: **102 migraciones en el árbol y 102
+### `20260827010000_identidad_compartida_proveedor`
+
+**Qué hace.** Agrega SEIS columnas a `ProductoCodigoProveedor`
+—`metodoDeteccion`, `descripcionNormalizada`, `presentacionProveedor`,
+`unidadesPorPresentacion`, `confirmadaPorUsuarioId`, `confirmadaEn`— y un índice
+sobre `(grupoId, proveedorId, descripcionNormalizada)`. Es la identidad
+compartida del producto por proveedor, que usan Listas de precios y Facturas.
+
+**Qué dijo el clasificador.** `aditiva`, salida 0, sin coincidencias. Corrido
+con `--desde 7fbb541e8179c502ee0e03ffe31609ec5d1f8253`.
+
+**Compatibilidad hacia atrás.** Las seis son NULLABLE, no tienen default
+calculado y **ninguna consulta de la versión anterior las nombra**, así que la
+app vieja sigue leyendo y escribiendo esa tabla igual durante la ventana entre
+migrar y recrear.
+
+**El quinto chequeo del backup NO aplica.** No es una migración de datos: no
+borra ni reescribe ninguna fila. Los vínculos existentes quedan con las seis
+columnas en NULL, a propósito — de ellos no consta por qué camino entraron, y
+completarlos sería inventar justamente el dato que las columnas registran.
+
+**Cómo se verificó antes de desplegar.** El DDL y las consultas que lo usan se
+corrieron contra Postgres local dentro de una transacción abortada —en
+PostgreSQL el DDL es transaccional— y después se comprobó que la columna no
+quedó. Con contraprueba: sin la migración, las mismas consultas dan rojo.
+
+**Qué mirar después de aplicarla.** Que `migrate status` informe **103** y
+"Database schema is up to date!". No hay filas que cruzar: el conteo de
+migraciones es toda la verificación que corresponde acá.
+
+---
+
+Antes de ésta, producción estaba al día: **102 migraciones en el árbol y 102
 aplicadas**, comprobado con `prisma migrate status` el 2026-08-25 después de
 desplegar `1e1ad11fe8d60f2d2d667d1089b3231b942a930b` — la experiencia móvil de
 Stock por local y su resumen de estados, con la migración

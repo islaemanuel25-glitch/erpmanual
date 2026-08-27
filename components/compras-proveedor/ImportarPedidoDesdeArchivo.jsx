@@ -34,6 +34,7 @@ import {
   recalcularPrecioDeLinea,
 } from "@/lib/compras-proveedor/importacion/prepararLineas";
 import { ORIGEN_PRECIO } from "@/lib/compras-proveedor/importacion/precios";
+import { TEXTO_MOTIVO_CANDIDATO } from "@/lib/proveedores/identidad/motorCandidatos";
 
 const NF_MONEDA = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 2,
@@ -73,7 +74,17 @@ function lineaLista(linea) {
   );
 }
 
+/**
+ * Por qué se propuso este producto.
+ *
+ * Los cuatro primeros son los del motor compartido; los tres de abajo son los
+ * del macheador de código del módulo de comprobante, que sigue resolviendo la
+ * escalera por terminación. Los dos vocabularios conviven porque son dos
+ * preguntas distintas —texto y código— y unificarlos borraría la diferencia.
+ */
 function textoOrigenVinculo(origen) {
+  const compartido = TEXTO_MOTIVO_CANDIDATO[origen];
+  if (compartido) return compartido;
   if (origen === "CODIGO_PROVEEDOR") return "Código exacto";
   if (origen === "CODIGO_APROXIMADO") return "Código aproximado";
   if (origen === "ALIAS_DESCRIPCION") return "Aprendido para este proveedor";
@@ -306,7 +317,13 @@ export default function ImportarPedidoDesdeArchivo() {
     setLineas((previas) =>
       previas.map((linea) =>
         linea.id === idLinea
-          ? recalcularLineaConProducto(linea, producto, { facturaPor, hayColumnaSubtotal })
+          ? // `productoElegidoAMano` es lo que después distingue, en la memoria
+            // del proveedor, una decisión de una deducción. Se marca acá porque
+            // acá es donde una persona eligió, y en ningún otro lado consta.
+            {
+              ...recalcularLineaConProducto(linea, producto, { facturaPor, hayColumnaSubtotal }),
+              productoElegidoAMano: true,
+            }
           : linea
       )
     );
@@ -344,7 +361,11 @@ export default function ImportarPedidoDesdeArchivo() {
 
   const confirmarProducto = (idLinea) => {
     setLineas((previas) =>
-      previas.map((linea) => (linea.id === idLinea ? { ...linea, confirmada: true } : linea))
+      previas.map((linea) =>
+        linea.id === idLinea
+          ? { ...linea, confirmada: true, productoElegidoAMano: true }
+          : linea
+      )
     );
   };
 

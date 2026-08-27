@@ -23,6 +23,27 @@
 
 import { NextResponse } from "next/server";
 
+import { normalizarTexto } from "@/lib/productos/busquedaFuzzyProducto";
+import { METODO_DETECCION } from "@/lib/proveedores/identidad/servicioIdentidad";
+
+/**
+ * Cuántas unidades del ERP trae la presentación que cotiza el proveedor.
+ *
+ * ── SOLO `cantidadPresentacion`, Y NUNCA `unidadesPorBulto` ────────────────
+ *
+ * Son dos cosas distintas y confundirlas ya costó caro en este módulo: UxBU es
+ * un nivel LOGÍSTICO del proveedor —cuántos envases entran en un bulto de
+ * transporte— y no dice nada sobre cuántas unidades tiene el envase. Usarlo como
+ * multiplicador fue lo que valuó un display de $5.678 en $71.545.
+ *
+ * `cantidadPresentacion` es el dato del envase, confirmado a mano en esta misma
+ * pantalla. Si no está, no se inventa: se guarda null y Facturas va a preguntar.
+ */
+function unidadesDeLaFila(fila) {
+  const n = Number(fila?.cantidadPresentacion);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
@@ -180,10 +201,24 @@ export async function POST(req, context) {
             // La descripción del proveedor, tal como vino en el Excel: es lo que
             // permite reconocer después con qué nombre lo llama él.
             descripcionProveedor: fila.descripcionProveedor ?? null,
+            descripcionNormalizada: fila.descripcionProveedor
+              ? normalizarTexto(fila.descripcionProveedor)
+              : null,
             activo: true,
             // Lo eligió una persona en esta pantalla. Queda distinguido del que
             // deduce el motor al aplicar una fila.
             origenAlta: ORIGEN_ALTA_VINCULO.VINCULACION_MANUAL,
+            // ── LO QUE HACE QUE FACTURAS LO VEA ──────────────────────────
+            //
+            // Sin estas tres columnas, el importador de facturas encontraba el
+            // vínculo pero no sabía POR QUÉ camino se había creado ni con qué
+            // presentación cotiza el proveedor, así que volvía a preguntar el
+            // armado que acá alguien ya contestó.
+            metodoDeteccion: METODO_DETECCION.MANUAL,
+            presentacionProveedor: fila.unidadProveedor ?? null,
+            unidadesPorPresentacion: unidadesDeLaFila(fila),
+            confirmadaPorUsuarioId: session.id,
+            confirmadaEn: new Date(),
           },
           select: { id: true },
         });
@@ -196,9 +231,17 @@ export async function POST(req, context) {
             activo: true,
             productoBaseId,
             descripcionProveedor: fila.descripcionProveedor ?? null,
+            descripcionNormalizada: fila.descripcionProveedor
+              ? normalizarTexto(fila.descripcionProveedor)
+              : null,
             // Reactivar y reapuntar es una decisión de una persona: el vínculo
             // pasa a ser suyo aunque antes lo hubiera deducido el motor.
             origenAlta: ORIGEN_ALTA_VINCULO.VINCULACION_MANUAL,
+            metodoDeteccion: METODO_DETECCION.MANUAL,
+            presentacionProveedor: fila.unidadProveedor ?? null,
+            unidadesPorPresentacion: unidadesDeLaFila(fila),
+            confirmadaPorUsuarioId: session.id,
+            confirmadaEn: new Date(),
           },
         });
       }
