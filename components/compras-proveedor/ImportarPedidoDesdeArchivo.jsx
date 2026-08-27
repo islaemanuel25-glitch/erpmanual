@@ -35,6 +35,13 @@ import {
   leerSesion,
   sesionUtilizable,
 } from "@/lib/compras-proveedor/importacion/sesionDeImportacion";
+import {
+  VERSION_LECTURA,
+  huellaDeArchivo,
+  lecturaReutilizable,
+  marcaDeLectura,
+} from "@/lib/compras-proveedor/importacion/huellaDeArchivo";
+import { TEXTO_VA_A_CONSUMIR, textoDeConsumo } from "@/lib/ia/limiteDiario";
 import { naturalezaLinea, permiteToggleUnidad } from "@/lib/compras-proveedor/calculoPedido";
 import { baseDeProducto } from "@/lib/compras-proveedor/importacion/merge";
 import { consolidarLineasImportadas } from "@/lib/compras-proveedor/importacion/payload";
@@ -186,6 +193,62 @@ export default function ImportarPedidoDesdeArchivo() {
   // guardarlo pisaría la sesión que se está por leer. Es la carrera clásica de
   // esta clase de mecanismo y se ve como "se perdió igual".
   const restaurando = useRef(true);
+
+  // ── EL CONSUMO DE IA, A LA VISTA ───────────────────────────────────────
+  //
+  // Veinte consultas por día. Sin el número en pantalla, nadie puede decidir si
+  // le conviene gastar una en explicar el formato o guardarla para leer el
+  // remito de la tarde.
+  const [consumoIa, setConsumoIa] = useState(null);
+  // La lectura ya hecha, con su huella: volver a abrir el MISMO archivo no
+  // puede costar otra consulta.
+  const [lecturaGuardada, setLecturaGuardada] = useState(null);
+  const [reusoLectura, setReusoLectura] = useState(false);
+  // ── CONTRA EL DOBLE TOQUE ──────────────────────────────────────────────
+  //
+  // Un `useState` no alcanza: entre el primer toque y el re-render hay una
+  // ventana en la que el segundo toque ve el estado viejo y sale igual. Con una
+  // referencia, el bloqueo es inmediato. Cada operación tiene la suya: bloquear
+  // todas juntas impediría explicar mientras se analiza, que es legítimo.
+  const enVuelo = useRef({});
+
+  const tomarElTurno = (operacion) => {
+    if (enVuelo.current[operacion]) return false;
+    enVuelo.current[operacion] = true;
+    return true;
+  };
+  const soltarElTurno = (operacion) => {
+    enVuelo.current[operacion] = false;
+  };
+
+  const refrescarConsumo = async () => {
+    try {
+      const r = await fetch("/api/ia/consumo", { credentials: "include", cache: "no-store" });
+      const data = await jsonOrError(r, "leer el consumo de IA");
+      setConsumoIa({ usadas: data.usadas, limite: data.limite, quedan: data.quedan, puede: data.puede });
+    } catch {
+      // Que no se pueda leer el contador no puede frenar el trabajo. Se muestra
+      // sin número, que es la verdad, en vez de inventar uno.
+      setConsumoIa(null);
+    }
+  };
+
+  useEffect(() => {
+    refrescarConsumo();
+  }, []);
+
+  /**
+   * Confirma una acción que gasta una consulta.
+   *
+   * Se pregunta ANTES y se dice cuántas quedan: gastar la anteúltima consulta
+   * del día no es lo mismo que gastar la tercera, y quien decide tiene que
+   * poder verlo.
+   */
+  const confirmarGasto = (queHace) => {
+    if (typeof window === "undefined") return true;
+    const restantes = consumoIa ? ` Quedan ${consumoIa.quedan} de ${consumoIa.limite} hoy.` : "";
+    return window.confirm(`${TEXTO_VA_A_CONSUMIR} ${queHace}.${restantes}`);
+  };
   const [estado, setEstado] = useState("elegir");
   const [archivo, setArchivo] = useState(null);
   const [documento, setDocumento] = useState(null);
@@ -395,8 +458,60 @@ export default function ImportarPedidoDesdeArchivo() {
     setError("");
   };
 
-  const analizar = async (seleccionado) => {
+  /**
+   * ── ANALIZAR: UNA CONSULTA, Y SOLO SI HACE FALTA ───────────────────────
+   *
+   * Tres candados antes de gastar:
+   *
+   *   1. `tomarElTurno` — un doble toque no manda dos veces. Con veinte por día,
+   *      un doble toque cuesta el diez por ciento del presupuesto.
+   *   2. la HUELLA — si es el mismo archivo, con el mismo proveedor y la misma
+   *      versión del lector, se reusa lo ya leído y no se llama a nadie.
+   *   3. `forzar` — volver a analizar el mismo archivo es una decisión
+   *      explícita, con su aviso de que gasta una consulta.
+   */
+  const analizar = async (seleccionado, { forzar = false } = {}) => {
     if (!seleccionado || !proveedorId || !productos.length) return;
+    if (!tomarElTurno("analizar")) return;
+    try {
+      await analizarDeVerdad(seleccionado, { forzar });
+    } finally {
+      soltarElTurno("analizar");
+    }
+  };
+
+  const analizarDeVerdad = async (seleccionado, { forzar = false } = {}) => {
+    const huella = await huellaDeArchivo(seleccionado);
+
+    // ── REUSO: CERO CONSULTAS ────────────────────────────────────────────
+    if (!forzar) {
+      const puedeReusar = lecturaReutilizable({
+        guardada: lecturaGuardada,
+        huella,
+        proveedorId,
+        version: VERSION_LECTURA,
+      });
+      if (puedeReusar.sirve) {
+        setDocumento(lecturaGuardada.documento);
+        setLineas(
+          prepararLineasImportadas({
+            lineas: lecturaGuardada.documento.lineas,
+            productos,
+            facturaPor: recetaEnUso?.facturaPor ?? facturaPor,
+            hayColumnaSubtotal:
+              (lectura.hayColumnaSubtotal ?? lecturaGuardada.documento.hayColumnaSubtotal) === true,
+            cantidadEn: lectura.cantidadEn,
+            toleranciaEscalaPct: lectura.toleranciaEscalaPct,
+          }).map((linea) => ({ ...linea, incluida: true }))
+        );
+        setFiltro("todas");
+        setEstado("revisar");
+        setReusoLectura(true);
+        return;
+      }
+    }
+
+    setReusoLectura(false);
     setEstado("analizando");
     setError("");
     const form = new FormData();
@@ -425,6 +540,10 @@ export default function ImportarPedidoDesdeArchivo() {
     }
 
     setDocumento(data.documento);
+    // Se guarda con su huella para que volver a abrir el MISMO archivo no
+    // cueste otra consulta.
+    setLecturaGuardada(marcaDeLectura({ huella, proveedorId, documento: data.documento }));
+    refrescarConsumo();
     setLineas(
       prepararLineasImportadas({
         lineas: data.documento.lineas,
@@ -487,6 +606,21 @@ export default function ImportarPedidoDesdeArchivo() {
       return null;
     }
 
+    // ── NO SE RETRANSCRIBE EN SILENCIO ───────────────────────────────────
+    //
+    // Antes se hacía sola cuando faltaba la tabla: era correcto para la
+    // funcionalidad y caro para la cuota. Ahora se pide, diciendo lo que gasta.
+    // Si no se acepta, la receta no se aplica — y eso es mejor que aplicar
+    // media receta, que es lo que se corrigió el día anterior.
+    if (!confirmarGasto("Hace falta volver a transcribir la tabla de la foto")) {
+      setErrorReceta(
+        "No se aplicó el formato: para releer las columnas hay que volver a transcribir la foto, " +
+          "y eso usa una consulta de IA. Podés intentarlo de nuevo cuando quieras."
+      );
+      return null;
+    }
+    if (!tomarElTurno("transcribir")) return null;
+
     setRetranscribiendo(true);
     setErrorReceta("");
     try {
@@ -512,6 +646,8 @@ export default function ImportarPedidoDesdeArchivo() {
       return null;
     } finally {
       setRetranscribiendo(false);
+      soltarElTurno("transcribir");
+      refrescarConsumo();
     }
   };
 
@@ -603,6 +739,9 @@ export default function ImportarPedidoDesdeArchivo() {
       setRecetaSoloEstaVez(s.recetaSoloEstaVez === true);
       setExplicando(s.panelAbierto === true);
       setPeticionInterrumpida(s.peticionInterrumpida ?? null);
+      // La lectura con su huella vuelve también: sin ella, volver a elegir el
+      // mismo archivo después de recargar costaría otra consulta.
+      if (s.lecturaGuardada) setLecturaGuardada(s.lecturaGuardada);
       setRecuperada({ cuando: s.actualizadaEn });
       setGuardadoEn(s.actualizadaEn);
       restaurando.current = false;
@@ -657,6 +796,7 @@ export default function ImportarPedidoDesdeArchivo() {
         panelAbierto: explicando,
         desplazamiento: typeof window === "undefined" ? 0 : window.scrollY,
         peticionInterrumpida,
+        lecturaGuardada,
       });
       const r = await guardarSesion(sesion);
       if (r.ok) {
@@ -675,6 +815,7 @@ export default function ImportarPedidoDesdeArchivo() {
   }, [
     usuarioId, localId, pedidoId, archivo, proveedorId, proveedorNombre, documento, lineas,
     explicacion, recetaEnUso, recetaSoloEstaVez, estado, explicando, peticionInterrumpida,
+    lecturaGuardada,
   ]);
 
   /** Descartar la importación entera. Pregunta antes: se pierde trabajo real. */
@@ -709,6 +850,11 @@ export default function ImportarPedidoDesdeArchivo() {
 
   const interpretar = async () => {
     if (!explicacion.trim() || interpretando) return;
+    // El aviso va ANTES de gastar, y dice cuántas quedan.
+    if (!confirmarGasto("Se va a traducir la explicación a reglas de lectura")) return;
+    // Y el turno, que es lo que impide que un doble toque mande dos veces: el
+    // `interpretando` de arriba tarda un render en verse.
+    if (!tomarElTurno("interpretar")) return;
     setInterpretando(true);
     setErrorReceta("");
     // Se anota ANTES de salir. Si el teléfono descarta la pestaña en el medio,
@@ -744,6 +890,8 @@ export default function ImportarPedidoDesdeArchivo() {
       setPeticionInterrumpida(null);
     } finally {
       setInterpretando(false);
+      soltarElTurno("interpretar");
+      refrescarConsumo();
     }
   };
 
@@ -829,9 +977,28 @@ export default function ImportarPedidoDesdeArchivo() {
     await analizar(seleccionado);
   };
 
+  /**
+   * REINTENTAR es una decisión, y gasta.
+   *
+   * Se pregunta antes. Si la lectura anterior falló no hay nada que reusar, así
+   * que va con `forzar`: reusar una lectura que no existe sería no hacer nada y
+   * dejar la pantalla igual, que se lee como que el botón no anda.
+   */
   const reintentar = async () => {
     if (!archivo || estado === "analizando") return;
-    await analizar(archivo);
+    if (!confirmarGasto("Se va a volver a leer el archivo")) return;
+    await analizar(archivo, { forzar: true });
+  };
+
+  /**
+   * VOLVER A ANALIZAR el mismo archivo, cuando la lectura anterior SÍ sirvió
+   * pero no convence. Es lo único que saltea el reuso por huella, y por eso es
+   * un botón aparte y no un efecto de algo.
+   */
+  const volverAAnalizar = async () => {
+    if (!archivo || estado === "analizando") return;
+    if (!confirmarGasto("Se va a volver a leer el archivo desde cero")) return;
+    await analizar(archivo, { forzar: true });
   };
 
   const cambiarProducto = (idLinea, productoLocalId) => {
@@ -1124,6 +1291,36 @@ export default function ImportarPedidoDesdeArchivo() {
         {(guardadoEn || avisoGuardado) && (
           <p className={`text-xs mb-2 ${avisoGuardado ? "sunmi-text-danger" : "sunmi-text-muted"}`}>
             {avisoGuardado || `Guardado en este dispositivo · ${hace(guardadoEn)}`}
+          </p>
+        )}
+
+        {/*
+          EL CONTADOR DE IA.
+          Veinte por día. Sin el número a la vista nadie puede decidir si le
+          conviene gastar una en explicar el formato o guardarla para el remito
+          de la tarde. Se muestra SIEMPRE que se pudo leer, no solo cuando
+          quedan pocas: enterarse recién al final es enterarse tarde.
+        */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {consumoIa && (
+            <SunmiPill color={consumoIa.quedan === 0 ? "amber" : consumoIa.quedan <= 5 ? "amber" : "slate"}>
+              {textoDeConsumo({ usadas: consumoIa.usadas, limite: consumoIa.limite })}
+            </SunmiPill>
+          )}
+          {reusoLectura && (
+            <SunmiPill color="cyan">Se reusó la lectura de este archivo · 0 consultas</SunmiPill>
+          )}
+          {estado === "revisar" && archivo && (
+            <SunmiButton color="slate" type="button" onClick={volverAAnalizar}>
+              Volver a analizar (usa 1 consulta)
+            </SunmiButton>
+          )}
+        </div>
+
+        {consumoIa && consumoIa.quedan === 0 && (
+          <p className="text-sm2 sunmi-text-warning mb-3">
+            Se alcanzó el límite diario. Vas a poder volver a usar la IA cuando se renueve la cuota.
+            Mientras tanto el pedido se puede cargar a mano — esto no es un problema del archivo.
           </p>
         )}
 

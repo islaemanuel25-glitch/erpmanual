@@ -14,6 +14,29 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
 
+// ── NINGUNA PRUEBA LLAMA A LA IA DE VERDAD ────────────────────────────────
+//
+// El plan de Gemini es de VEINTE consultas por día. Una suite que por descuido
+// salga a la red se come la cuota de la jornada de trabajo: el 2026-08-27 una
+// tanda de mediciones gastó dieciséis de veinte y el importador quedó
+// inservible hasta la medianoche del huso de California.
+//
+// Se hace acá porque es el único lugar por el que pasan TODAS las pruebas. Un
+// archivo que se acuerde de prohibirla cubre ese archivo; esto cubre la suite,
+// incluida la que alguien escriba mañana sin leer esto.
+//
+// Dos candados, no uno:
+//   · `IA_PROHIBIR_RED=1` hace que la puerta LANCE si nadie inyectó un doble.
+//   · la clave se BORRA del entorno, así que aunque alguien esquive la puerta y
+//     escriba su propio `fetch`, no tiene con qué autenticarse.
+//
+// Se pisan sin preguntar y sin permitir desactivarlas desde una prueba: una
+// excepción que se pueda apagar desde el archivo que la molesta no es una
+// excepción.
+process.env.IA_PROHIBIR_RED = "1";
+delete process.env.GEMINI_API_KEY;
+delete process.env.GROQ_API_KEY;
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // ESM exige extensión explícita; el alias del proyecto se escribe sin ella.
 const EXTENSIONES = ["", ".js", ".mjs", ".jsx", path.join("", "index.js")];

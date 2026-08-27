@@ -53,19 +53,48 @@ const CORTE = "Se cortó la conexión mientras se analizaba. Mantené esta panta
  * Un candado que se pone rojo por dónde está escrito el código de al lado no
  * está midiendo lo que dice medir.
  */
-function cuerpoDeAnalizar() {
-  const i = SRC.indexOf("const analizar = async");
-  if (i < 0) return "";
+/**
+ * El cuerpo de una función flecha, balanceando llaves DESDE LA FLECHA.
+ *
+ * No desde el nombre: los parámetros traen su propio par de llaves cuando hay
+ * destructuring —`async (x, { forzar = false } = {}) =>`— y el balanceo se
+ * cerraba ahí, devolviendo la firma en vez del cuerpo. El candado quedaba
+ * mirando cuatro líneas sin nada adentro y decía "hay 0 bloques try", que es
+ * verdad sobre lo que miraba y falso sobre lo que quería mirar.
+ */
+function cuerpoDe(nombre) {
+  const decl = SRC.indexOf(`const ${nombre} = async`);
+  if (decl < 0) return "";
+  const flecha = SRC.indexOf("=>", decl);
+  const inicio = SRC.indexOf("{", flecha);
+  if (flecha < 0 || inicio < 0) return "";
   let nivel = 0;
-  let visto = false;
-  for (let j = i; j < SRC.length; j += 1) {
-    if (SRC[j] === "{") { nivel += 1; visto = true; }
+  for (let j = inicio; j < SRC.length; j += 1) {
+    if (SRC[j] === "{") nivel += 1;
     else if (SRC[j] === "}") {
       nivel -= 1;
-      if (visto && nivel === 0) return SRC.slice(i, j + 1);
+      if (nivel === 0) return SRC.slice(decl, j + 1);
     }
   }
   return "";
+}
+
+/**
+ * EL ANÁLISIS SON DOS FUNCIONES DESDE EL 2026-08-27, Y EL CANDADO MIRA LAS DOS.
+ *
+ * `analizar` quedó como una envoltura fina que toma el turno —contra el doble
+ * toque, que con veinte consultas por día cuesta el diez por ciento del
+ * presupuesto— y `analizarDeVerdad` hace el trabajo.
+ *
+ * Mirar solo la primera dejaría al candado afirmando sobre cuatro líneas que no
+ * hacen nada: pasaría siempre, y por eso no afirmaría nada. Es el mismo error de
+ * mirar la ventana equivocada que ya se corrigió una vez en este archivo.
+ */
+function cuerpoDeAnalizar() {
+  const envoltura = cuerpoDe("analizar");
+  const trabajo = cuerpoDe("analizarDeVerdad");
+  if (!trabajo) return envoltura;
+  return `${envoltura}\n${trabajo}`;
 }
 
 // ── ESTOS TRES CAMBIARON DE CONTRATO A PROPÓSITO EL 2026-08-27 ─────────────
@@ -157,7 +186,11 @@ test("ERR4. el archivo sobrevive al fallo y hay cómo reintentar", () => {
 
   // Y existe el reintento, que reusa el MISMO archivo del estado.
   assert.match(SRC, /const reintentar = async/, "no hay función de reintento");
-  assert.match(SRC, /analizar\(archivo\)/, "el reintento no reutiliza el archivo ya elegido");
+  // El reintento reusa el ARCHIVO del estado —eso no cambió— y desde el
+  // 2026-08-27 va con `forzar`: una lectura que falló no dejó nada que reusar,
+  // y el reuso por huella dejaría la pantalla igual, que se lee como que el
+  // botón no anda. Gasta una consulta y por eso pregunta antes.
+  assert.match(SRC, /analizar\(archivo,\s*\{\s*forzar:\s*true\s*\}\)/, "el reintento no reutiliza el archivo ya elegido");
   assert.match(SRC, /Reintentar análisis/, "no hay botón de reintentar en la pantalla");
 });
 

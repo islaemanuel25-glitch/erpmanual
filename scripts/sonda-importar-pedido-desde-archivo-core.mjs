@@ -517,6 +517,14 @@ const INTERCEPTOR = `
   window.__modoFoto = false;
   window.__interpretarDevuelveHtml = false;
   window.__transcripciones = [];
+  // CUÁNTAS CONSULTAS DE IA se pidieron. Las tres rutas que consumen suman acá.
+  window.__consultasIa = 0;
+  // Las acciones que gastan preguntan antes. La sonda acepta por defecto para
+  // poder recorrer el flujo; hay una sección que RECHAZA a propósito, para
+  // comprobar que rechazar no gasta.
+  window.__confirmaciones = [];
+  window.confirm = (texto) => { window.__confirmaciones.push(String(texto || "")); return window.__aceptarGasto !== false; };
+  window.__aceptarGasto = true;
   const pagina = (status = 500) => new Response(
     '<!DOCTYPE html><html lang="es"><head><title>Error</title></head><body>pagina</body></html>',
     { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
@@ -539,8 +547,12 @@ const INTERCEPTOR = `
     if (url.includes("/api/compras-proveedor/recetas-lectura/listar")) {
       return json({ ok: true, items: D.recetasLectura });
     }
+    if (url.includes("/api/ia/consumo")) {
+      return json({ ok: true, usadas: window.__consultasIa, limite: 20, quedan: 20 - window.__consultasIa, puede: window.__consultasIa < 20 });
+    }
     if (url.includes("/api/compras-proveedor/recetas-lectura/interpretar")) {
       window.__interpretaciones.push(JSON.parse(opciones.body || "null"));
+      window.__consultasIa += 1;
       // LA CONTRAPRUEBA DEL DEFECTO 1: una página en vez de datos.
       if (window.__interpretarDevuelveHtml) return pagina(500);
       if (window.__modoFoto) {
@@ -570,6 +582,7 @@ const INTERCEPTOR = `
     if (url.includes("/api/compras-proveedor/importar/analizar")) {
       const archivo = opciones.body?.get?.("archivo");
       window.__analisis.push(archivo ? { nombre: archivo.name, tam: archivo.size } : null);
+      window.__consultasIa += 1;
       await new Promise((resolver) => setTimeout(resolver, 250));
       if (window.__fallarPrimero && window.__analisis.length === 1) {
         return json({ ok: false, codigo: "SIN_LINEAS", error: "No encontré líneas de productos en el archivo." }, 400);
@@ -583,6 +596,7 @@ const INTERCEPTOR = `
     if (url.includes("/api/compras-proveedor/importar/transcribir")) {
       const archivo = opciones.body?.get?.("archivo");
       window.__transcripciones.push(archivo ? { nombre: archivo.name, tam: archivo.size } : null);
+      window.__consultasIa += 1;
       await new Promise((resolver) => setTimeout(resolver, 120));
       return json({ ok: true, crudo: D.tablaDeLaFoto });
     }
@@ -1204,7 +1218,13 @@ const morir = (motivo) => {
   await evaluar(`window.__analisis = []; window.__interpretaciones = []; true`);
   await limpiarSesionGuardada();
   await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
-  if (!(await esperarCatalogo())) morir("el catálogo no cargó al volver para la receta");
+  if (!(await esperarCatalogo())) {
+    const que = await evaluar(`(() => {
+      const botones = [...document.querySelectorAll('button')].map((b) => (b.innerText || "").trim() + (b.disabled ? "[off]" : "")).filter(Boolean);
+      return JSON.stringify({ botones: botones.slice(0, 10), url: location.pathname + location.search });
+    })()`);
+    morir(`el catálogo no cargó al volver para la receta · ${que}`);
+  }
   await evaluar(`window.__fallarPrimero = false; true`);
   await seleccionarArchivo("receta-sintetica.pdf");
   if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) {
@@ -1784,6 +1804,116 @@ const morir = (motivo) => {
     "NO se restaura la sesión de otro usuario",
     String(ajena)
   );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CUÁNTAS CONSULTAS DE IA GASTA CADA COSA
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // El plan es de VEINTE por día. Cada consulta que se gasta sola —un doble
+  // toque, una retranscripción silenciosa, volver a abrir el mismo archivo— es
+  // una que le falta a alguien a la tarde.
+  //
+  // Esta sección no mira la pantalla: mira el CONTADOR. Es la única forma de
+  // afirmar "esto gastó cero" en vez de suponerlo porque no se vio nada raro.
+  console.log("\n── cuánto gasta cada acción ───────────────────────────────────");
+  await medidas(390, 844);
+  await limpiarSesionGuardada();
+  await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó para el conteo de consultas");
+  await evaluar(`window.__fallarPrimero = false; window.__consultasIa = 0; true`);
+
+  // ── 1. UNA IMPORTACIÓN NORMAL: EXACTAMENTE UNA ────────────────────────
+  await seleccionarArchivo("consumo-sintetico.pdf");
+  if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) {
+    morir("no llegó a revisión en el conteo");
+  }
+  await dormir(400);
+  const trasLeer = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasLeer === 1, "una importación normal gasta EXACTAMENTE 1 consulta", String(trasLeer));
+
+  // ── 2. CORREGIR PRODUCTOS, CANTIDADES Y PRECIOS: CERO ─────────────────
+  await evaluar(`(() => {
+    const tarjeta = document.querySelector('[data-sunmi-panel]');
+    const inputs = [...document.querySelectorAll('input')].filter((i) => i.type !== "file");
+    if (inputs[0]) {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(inputs[0], "7");
+      inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    // Y se tocan los botones de confirmar que haya.
+    for (const b of [...document.querySelectorAll('button')].filter((x) => /^Confirmar producto$/.test((x.innerText||"").trim())).slice(0, 2)) b.click();
+    return !!tarjeta;
+  })()`);
+  await dormir(600);
+  const gastoTrasCorregir = Number(await evaluar(`window.__consultasIa`));
+  afirmar(gastoTrasCorregir === 1, "corregir productos, cantidades y precios gasta CERO", String(gastoTrasCorregir));
+
+  // ── 3. EXPLICAR: EXACTAMENTE UNA MÁS ──────────────────────────────────
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Explicar cómo leer este documento/.test(b.innerText || ""))?.click()`);
+  await dormir(300);
+  await evaluar(`(() => {
+    const area = document.querySelector('textarea');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(area, "La columna ENVIADO es la cantidad enviada.");
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await dormir(200);
+
+  // ── 4. Y EL DOBLE TOQUE GASTA UNA SOLA ────────────────────────────────
+  //
+  // Los dos clics van SIN esperar en el medio, que es lo que hace un dedo
+  // impaciente en un teléfono. Con un `useState` como único candado, el segundo
+  // clic ve el estado viejo y sale igual.
+  await evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /Ver cómo quedaría/.test(x.innerText || ""));
+    b?.click(); b?.click(); b?.click();
+    return true;
+  })()`);
+  await esperarA(`document.body.innerText.includes("Así se va a leer")`, 15000);
+  await dormir(600);
+  const trasExplicar = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasExplicar === 2, "explicar gasta EXACTAMENTE 1 más, y tres toques no gastan tres", String(trasExplicar));
+
+  // Y que se haya PREGUNTADO antes de gastar.
+  const preguntas = JSON.parse(await evaluar(`JSON.stringify(window.__confirmaciones)`));
+  afirmar(
+    preguntas.some((t) => /utilizar[áa] 1 consulta de IA/i.test(t)),
+    "se avisa ANTES de gastar, con esas palabras",
+    JSON.stringify(preguntas).slice(0, 200)
+  );
+
+  // ── 5. VOLVER A ABRIR EL MISMO ARCHIVO: CERO ──────────────────────────
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /^Cancelar$/.test((b.innerText||"").trim()))?.click()`);
+  await dormir(300);
+  await seleccionarArchivo("consumo-sintetico.pdf");
+  await dormir(1200);
+  const trasReabrir = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasReabrir === 2, "volver a elegir el MISMO archivo gasta CERO", String(trasReabrir));
+  const dijoQueReuso = await evaluar(`/Se reusó la lectura de este archivo/.test(document.body.innerText || "")`);
+  afirmar(dijoQueReuso === "true" || dijoQueReuso === true, "y la pantalla lo dice, en vez de disimularlo");
+
+  // ── 6. RECARGAR Y RESTAURAR: CERO ─────────────────────────────────────
+  await esperarA(`/Guardado en este dispositivo/.test(document.body.innerText || "")`, 15000);
+  await recargar();
+  if (!(await esperarA(`document.body.innerText.includes("Importación recuperada")`, 25000))) {
+    morir("no se recuperó la importación en el conteo de consultas");
+  }
+  await dormir(900);
+  const trasRecargar = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasRecargar === 0, "restaurar tras recargar gasta CERO consultas", String(trasRecargar));
+
+  // ── 7. RECHAZAR EL AVISO NO GASTA ─────────────────────────────────────
+  await evaluar(`window.__aceptarGasto = false; window.__consultasIa = 0; true`);
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Volver a analizar/.test(b.innerText || ""))?.click()`);
+  await dormir(800);
+  const trasRechazar = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasRechazar === 0, "decir que NO al aviso no gasta ninguna consulta", String(trasRechazar));
+  await evaluar(`window.__aceptarGasto = true; true`);
+
+  // ── 8. EL CONTADOR SE VE ──────────────────────────────────────────────
+  const seVe = await evaluar(`/IA utilizada hoy: \\d+ de 20/.test(document.body.innerText || "")`);
+  afirmar(seVe === "true" || seVe === true, "el contador 'IA utilizada hoy: X de 20' está a la vista");
 
   // ── EL PIE CONTRA LA BARRA INFERIOR DEL TELÉFONO ──────────────────────────
   //
