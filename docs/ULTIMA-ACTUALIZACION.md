@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-08-25 22:14
+**Fecha:** 2026-08-27 11:19
 
 ## Módulos modificados recientemente
 
-### stock
-- fix(stock): mostrar packs y unidades en movil (#12)
-- Archivos: 3 modificados (3 total)
+### proveedores
+- feat(compras): Facturas y Listas escriben y leen la misma memoria del proveedor
+- Archivos: 1 modificados (1 total)
 
 
 
