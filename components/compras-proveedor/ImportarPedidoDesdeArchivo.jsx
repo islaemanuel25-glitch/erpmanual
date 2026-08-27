@@ -29,6 +29,7 @@ import {
   verificarSumaDeSubtotales,
 } from "@/lib/compras-proveedor/importacion/precioDelPapel";
 import {
+  cambiarUnidadDeLinea,
   prepararLineasImportadas,
   recalcularLineaConProducto,
   recalcularPrecioDeLinea,
@@ -70,7 +71,11 @@ function lineaLista(linea) {
       // cantidad no sirve para dividir, o hay bonificación sin precio— no puede
       // guardarse en silencio. No se inventa cero ni se cae al precio de lista:
       // se pide que alguien lo mire.
-      !linea.papelRequiereRevision
+      !linea.papelRequiereRevision &&
+      // Y una conversión de unidad a medio hacer tampoco: la línea está en la
+      // unidad vieja con una conversión pendiente, así que guardarla escribiría
+      // la cantidad de una escala con el precio de la otra.
+      !linea.requiereConfirmacionDeUnidad
   );
 }
 
@@ -349,6 +354,50 @@ export default function ImportarPedidoDesdeArchivo() {
   };
 
   /**
+   * CAMBIAR DE UNIDAD CONVIERTE CANTIDAD Y PRECIO JUNTOS.
+   *
+   * Antes esto era `cambiarLinea(..., { unidadPedido }, { recalcularPrecio })`,
+   * que convertía el PRECIO y dejaba la cantidad donde estaba. Con el renglón
+   * real de 50 unidades a $3.360 eso daba 50 bultos a $33.600 — diez veces el
+   * subtotal del papel. La conversión es una sola operación y por eso vive en
+   * una sola función.
+   */
+  const cambiarUnidad = (idLinea, unidadDestino) => {
+    setLineas((previas) =>
+      previas.map((linea) => {
+        if (linea.id !== idLinea) return linea;
+        const producto = productosPorId.get(String(linea.productoLocalId));
+        return cambiarUnidadDeLinea(linea, producto, {
+          unidadDestino,
+          facturaPor,
+          hayColumnaSubtotal,
+        });
+      })
+    );
+  };
+
+  /**
+   * Confirma una conversión que no da entera, redondeando hacia arriba.
+   *
+   * No se hace sola: 47 unidades no son ni 4 ni 5 bultos, y elegir por el
+   * usuario cambia lo que se le pide al proveedor.
+   */
+  const confirmarConversion = (idLinea) => {
+    setLineas((previas) =>
+      previas.map((linea) => {
+        if (linea.id !== idLinea || !linea.conversionPendiente) return linea;
+        const producto = productosPorId.get(String(linea.productoLocalId));
+        return cambiarUnidadDeLinea(linea, producto, {
+          unidadDestino: linea.conversionPendiente.hacia,
+          facturaPor,
+          hayColumnaSubtotal,
+          redondear: true,
+        });
+      })
+    );
+  };
+
+  /**
    * El precio final escrito a mano gana sobre el calculado, y queda marcado.
    *
    * Se pasa la cadena vacía —y no `null`— cuando el campo se borra: `null`
@@ -552,10 +601,28 @@ export default function ImportarPedidoDesdeArchivo() {
               {visibles.map((linea, indiceVisible) => {
                 const producto = productosPorId.get(String(linea.productoLocalId));
                 const incluida = linea.incluida !== false;
-                const sugeridos = new Set(linea.candidatos || []);
-                const opciones = [...productos].sort(
-                  (a, b) => Number(sugeridos.has(b.productoLocalId)) - Number(sugeridos.has(a.productoLocalId))
-                );
+                // ── EL ORDEN DEL MOTOR SE RESPETA, NO SE RECALCULA ─────────
+                //
+                // Acá estaba el defecto. Se armaba un `Set` con
+                // `linea.candidatos` y se ordenaba el catálogo por PERTENENCIA a
+                // ese conjunto. Pero `candidatos` trae el catálogo ENTERO
+                // puntuado —hace falta puntuarlo todo para poder ordenarlo—, así
+                // que la pertenencia daba `true` para los 2.600 productos y el
+                // `sort` era un no-op. Quedaba el orden en que venían de la API,
+                // que es alfabético.
+                //
+                // Medido con "PHILIPS MORRIS CONV 10": el motor devolvía Philips
+                // 10 con 124 puntos y Agua Oxigenada con −188, y el selector
+                // mostraba Agua Oxigenada, Alcohol, Alfajor, y recién cuarto el
+                // Philips. El ranking se calculaba entero y se tiraba.
+                //
+                // Ahora `sugeridos` es una lista CORTA y ORDENADA, y el resto va
+                // abajo en su propio grupo.
+                const sugeridosOrdenados = (linea.sugeridos || [])
+                  .map((id) => productosPorId.get(String(id)))
+                  .filter(Boolean);
+                const idsSugeridos = new Set(sugeridosOrdenados.map((p) => p.productoLocalId));
+                const resto = productos.filter((p) => !idsSugeridos.has(p.productoLocalId));
                 const origenTexto = textoOrigenVinculo(linea.origenVinculo);
                 const numeroReal = lineas.indexOf(linea) + 1;
                 return (
@@ -595,9 +662,18 @@ export default function ImportarPedidoDesdeArchivo() {
                                 <label className="block text-sm2 font-semibold sunmi-text-muted mb-1">Producto del sistema</label>
                                 <SunmiSelectAdv value={linea.productoLocalId} onChange={(valor) => cambiarProducto(linea.id, valor)} searchable>
                                   <SunmiSelectOption value="">Elegir producto...</SunmiSelectOption>
-                                  {opciones.map((opcion) => (
+                                  {sugeridosOrdenados.length > 0 && (
+                                    <SunmiSelectOption value="" encabezado>Sugeridos para esta línea</SunmiSelectOption>
+                                  )}
+                                  {sugeridosOrdenados.map((opcion) => (
+                                    <SunmiSelectOption key={`sug-${opcion.productoLocalId}`} value={String(opcion.productoLocalId)}>
+                                      {`${opcion.codigoInterno ? `${opcion.codigoInterno} · ` : ""}${opcion.nombre}`}
+                                    </SunmiSelectOption>
+                                  ))}
+                                  <SunmiSelectOption value="" encabezado>Todos los productos</SunmiSelectOption>
+                                  {resto.map((opcion) => (
                                     <SunmiSelectOption key={opcion.productoLocalId} value={String(opcion.productoLocalId)}>
-                                      {`${sugeridos.has(opcion.productoLocalId) ? "Sugerido · " : ""}${opcion.codigoInterno ? `${opcion.codigoInterno} · ` : ""}${opcion.nombre}`}
+                                      {`${opcion.codigoInterno ? `${opcion.codigoInterno} · ` : ""}${opcion.nombre}`}
                                     </SunmiSelectOption>
                                   ))}
                                 </SunmiSelectAdv>
@@ -620,7 +696,7 @@ export default function ImportarPedidoDesdeArchivo() {
                                       <span className="block text-sm2 font-semibold sunmi-text-muted mb-1">Unidad de pedido</span>
                                       <SunmiSelect
                                         value={linea.unidadPedido}
-                                        onChange={(e) => cambiarLinea(linea.id, { unidadPedido: e.target.value }, { recalcularPrecio: true })}
+                                        onChange={(e) => cambiarUnidad(linea.id, e.target.value)}
                                       >
                                         <option value="BULTO">Bulto</option>
                                         <option value="UNIDAD">Unidad</option>
@@ -639,6 +715,21 @@ export default function ImportarPedidoDesdeArchivo() {
                                     </div>
                                   )}
                                   {linea.equivalencia && <span className="text-sm2 sunmi-text-accent">{linea.equivalencia}</span>}
+                                  {linea.requiereConfirmacionDeUnidad && linea.conversionPendiente && (
+                                    <div className="w-full rounded-lg border sunmi-divider sunmi-control px-3 py-2 flex items-start gap-2">
+                                      <AlertTriangle size={15} className="sunmi-text-warning shrink-0 mt-0.5" />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm2 sunmi-text-warning">
+                                          {linea.conversionPendiente.unidades} unidades no dan bultos enteros de{" "}
+                                          {linea.conversionPendiente.factor}. Serían {linea.conversionPendiente.bultos} bultos,
+                                          o sea más de lo que dice el papel.
+                                        </p>
+                                        <SunmiButton className="mt-2" type="button" onClick={() => confirmarConversion(linea.id)}>
+                                          Pedir {linea.conversionPendiente.bultos} bultos
+                                        </SunmiButton>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
 
