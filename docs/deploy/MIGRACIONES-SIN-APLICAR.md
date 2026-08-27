@@ -16,41 +16,45 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260827010000_identidad_compartida_proveedor`
+**Ninguna.** Producción está al día: **103 migraciones en el árbol y 103
+aplicadas**, comprobado con `prisma migrate status` el 2026-08-27 después de
+desplegar `671a76297d09c3cdec398b35c44aafcb4b5862b1` — la identidad compartida
+del producto por proveedor, con la migración
+`20260827010000_identidad_compartida_proveedor` **aplicada**.
 
-**Qué hace.** Agrega SEIS columnas a `ProductoCodigoProveedor`
-—`metodoDeteccion`, `descripcionNormalizada`, `presentacionProveedor`,
-`unidadesPorPresentacion`, `confirmadaPorUsuarioId`, `confirmadaEn`— y un índice
-sobre `(grupoId, proveedorId, descripcionNormalizada)`. Es la identidad
-compartida del producto por proveedor, que usan Listas de precios y Facturas.
+La entrada de esa migración se borra acá porque se cumplió la condición que ella
+misma fijaba: `migrate status` contra producción informa 103 y "Database schema
+is up to date!". Y se aplicó DE VERDAD, que es otra cosa: el contenedor
+descartable imprimió "Applying migration" y el conteo subió de 102 a 103 — un
+"No pending migrations to apply" con salida 0 se ve igual y significa lo
+contrario.
 
-**Qué dijo el clasificador.** `aditiva`, salida 0, sin coincidencias. Corrido
-con `--desde 7fbb541e8179c502ee0e03ffe31609ec5d1f8253`.
+### El efecto, comprobado contra la base
 
-**Compatibilidad hacia atrás.** Las seis son NULLABLE, no tienen default
-calculado y **ninguna consulta de la versión anterior las nombra**, así que la
-app vieja sigue leyendo y escribiendo esa tabla igual durante la ventana entre
-migrar y recrear.
+No era una migración de datos, así que no hay ids que cruzar. Lo que sí se
+comprobó, leyendo producción desde un contenedor descartable:
 
-**El quinto chequeo del backup NO aplica.** No es una migración de datos: no
-borra ni reescribe ninguna fila. Los vínculos existentes quedan con las seis
-columnas en NULL, a propósito — de ellos no consta por qué camino entraron, y
-completarlos sería inventar justamente el dato que las columnas registran.
+- **las seis columnas existen y se pueden consultar** con la API de Prisma;
+- sobre 593 filas de `ProductoCodigoProveedor`, **cero tienen `metodoDeteccion`**.
+  Ese cero es el resultado esperado y no un descuido: la migración no rellena
+  nada, porque de los vínculos viejos no consta por qué camino entraron.
 
-**Cómo se verificó antes de desplegar.** El DDL y las consultas que lo usan se
-corrieron contra Postgres local dentro de una transacción abortada —en
-PostgreSQL el DDL es transaccional— y después se comprobó que la columna no
-quedó. Con contraprueba: sin la migración, las mismas consultas dan rojo.
+### LA TABLA DE MIGRACIONES TIENE 104 FILAS Y NO ES UN PROBLEMA
 
-**Qué mirar después de aplicarla.** Que `migrate status` informe **103** y
-"Database schema is up to date!". No hay filas que cruzar: el conteo de
-migraciones es toda la verificación que corresponde acá.
+Conviene saberlo antes de que alguien lo mire de apuro y crea que falta algo.
+`_prisma_migrations` tiene **104 filas para 103 migraciones**, porque
+`20241202000000_add_venta_campos` aparece dos veces: un intento marcado como
+revertido el 2026-04-27 y el aplicado con éxito **seis milisegundos después**,
+el mismo día.
+
+Prisma cuenta por nombre distinto no revertido, y ahí da 103. La forma correcta
+de preguntarlo es `COUNT(DISTINCT migration_name) WHERE finished_at IS NOT NULL
+AND rolled_back_at IS NULL`; contar filas a secas da 104 y asusta sin motivo.
 
 ---
 
-Antes de ésta, producción estaba al día: **102 migraciones en el árbol y 102
-aplicadas**, comprobado con `prisma migrate status` el 2026-08-25 después de
-desplegar `1e1ad11fe8d60f2d2d667d1089b3231b942a930b` — la experiencia móvil de
+Antes de ésta, producción estaba al día en **102**, comprobado el 2026-08-25
+después de desplegar `1e1ad11fe8d60f2d2d667d1089b3231b942a930b` — la experiencia móvil de
 Stock por local y su resumen de estados, con la migración
 `20260824010000_stock_limites_configurados_at` **aplicada**.
 
