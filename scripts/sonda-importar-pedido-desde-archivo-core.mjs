@@ -1062,6 +1062,16 @@ const morir = (motivo) => {
   afirmar(panelAbierto.tope === "2000", "el campo tiene tope de largo", String(panelAbierto.tope));
   afirmar(panelAbierto.dice, "dice que no se guardan números de la factura");
 
+  // El nombre del proveedor, que al revisar es TEXTO y no un selector. Se
+  // afirma porque se vio mal en una captura: entrando por URL quedaba
+  // "Cargando proveedor..." para siempre, y una captura con ese texto es una
+  // captura de algo que no anda.
+  const nombreProveedor = await evaluar(`(() => {
+    const texto = document.body.innerText || "";
+    return texto.includes("Distribuidora Ejemplo SRL") && !texto.includes("Cargando proveedor");
+  })()`);
+  afirmar(nombreProveedor, "el proveedor se ve por su nombre, no como Cargando...");
+
   // El ejemplo TEXTUAL del pedido, escrito tal cual.
   await evaluar(`(() => {
     const area = document.querySelector('textarea');
@@ -1091,6 +1101,44 @@ const morir = (motivo) => {
   afirmar(previa.corregir, "se puede corregir la explicación");
   afirmar(previa.soloEstaVez, "se puede usar solo esta vez");
   afirmar(previa.confirmar, "se puede confirmar y recordar");
+
+  // ── LOS TRES BOTONES TIENEN QUE VERSE COMO BOTONES ────────────────────
+  //
+  // Se vio en una captura: "Usar solo esta vez" quedaba como texto suelto
+  // porque un botón slate sobre una superficie `sunmi-control` tiene el mismo
+  // fondo que su caja. Una acción que no parece una acción es una acción que
+  // nadie usa — y ésta es la mitad del flujo que se está construyendo.
+  //
+  // Se MIDE el fondo calculado contra el del contenedor en vez de mirarlo: a
+  // ojo, en una captura chica, esto se pasa por alto.
+  const contraste = JSON.parse(await evaluar(`(() => {
+    const boton = [...document.querySelectorAll('button')].find((b) => /Usar solo esta vez/.test(b.innerText || ""));
+    if (!boton) return JSON.stringify({ hay: false });
+    const caja = boton.closest('div');
+    const fondo = (el) => {
+      let actual = el;
+      while (actual) {
+        const c = getComputedStyle(actual).backgroundColor;
+        if (c && c !== "rgba(0, 0, 0, 0)" && c !== "transparent") return c;
+        actual = actual.parentElement;
+      }
+      return "(ninguno)";
+    };
+    const propio = getComputedStyle(boton).backgroundColor;
+    return JSON.stringify({
+      hay: true,
+      propio,
+      contenedor: fondo(caja),
+      // Un borde también alcanza para que se lea como botón.
+      borde: getComputedStyle(boton).borderTopWidth,
+    });
+  })()`));
+  afirmar(contraste.hay, "el botón de usar solo esta vez existe");
+  afirmar(
+    contraste.propio !== contraste.contenedor || parseFloat(contraste.borde) > 0,
+    "USAR SOLO ESTA VEZ se distingue de su fondo: no queda como texto suelto",
+    JSON.stringify(contraste)
+  );
   // ── LA VISTA PREVIA, MEDIDA EN LOS DOS ANCHOS ─────────────────────────
   //
   // El panel conversacional es lo más nuevo de la pantalla y lo más largo: un

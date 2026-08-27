@@ -177,6 +177,19 @@ export default function ImportarPedidoDesdeArchivo() {
     };
   }, []);
 
+  // ── EL NOMBRE DEL PROVEEDOR, VENGA POR DONDE VENGA ─────────────────────
+  //
+  // Al revisar, el selector pasa a texto y ese texto sale de `proveedorNombre`.
+  // Se llenaba solo en dos caminos —abrir un borrador, o elegirlo a mano— y
+  // faltaba el tercero: entrar con `?proveedorId=` en la URL, que es como se
+  // llega desde la pantalla de compras. Ahí quedaba "Cargando proveedor..."
+  // para siempre. Se vio en una captura de la sonda, no leyendo el código.
+  useEffect(() => {
+    if (!proveedorId || proveedorNombre) return;
+    const encontrado = proveedores.find((p) => String(p.id) === String(proveedorId));
+    if (encontrado) setProveedorNombre(encontrado.nombre);
+  }, [proveedores, proveedorId, proveedorNombre]);
+
   useEffect(() => {
     if (!pedidoId) return;
     let vigente = true;
@@ -951,6 +964,7 @@ export default function ImportarPedidoDesdeArchivo() {
 
                       {/* LA VISTA PREVIA: lo que se ENTENDIÓ, antes de aplicar nada. */}
                       {vistaPrevia && (
+                        <>
                         <div className="mt-3 rounded-lg border sunmi-divider sunmi-control px-3 py-2">
                           <p className="text-sm2 font-semibold sunmi-text-strong mb-1">
                             Así se va a leer
@@ -979,6 +993,18 @@ export default function ImportarPedidoDesdeArchivo() {
                             </div>
                           )}
 
+                          </div>
+
+                          {/*
+                            LAS ACCIONES VAN FUERA DE LA CAJA, Y NO ES ESTÉTICA.
+                            Adentro, el botón slate queda sobre una superficie
+                            `sunmi-control` del mismo color: medido, rgb(51,65,85)
+                            sobre rgb(51,65,85) y sin borde. "Usar solo esta vez"
+                            se leía como texto suelto, y es la mitad del flujo —el
+                            camino de probar sin comprometerse—.
+                            Se vio en una captura y se confirmó midiendo el fondo
+                            calculado, no a ojo.
+                          */}
                           <div className="mt-3 flex flex-wrap items-end gap-2">
                             <SunmiButton color="slate" type="button" onClick={usarSoloEstaVez}>
                               Usar solo esta vez
@@ -1002,7 +1028,7 @@ export default function ImportarPedidoDesdeArchivo() {
                               {guardandoReceta ? "Guardando..." : "Confirmar y recordar"}
                             </SunmiButton>
                           </div>
-                        </div>
+                        </>
                       )}
                     </div>
                   )}
