@@ -80,11 +80,23 @@ export async function POST(req) {
       );
     }
 
+    // ── `Proveedor` NO TIENE `grupoId`, Y ES A PROPÓSITO ─────────────────
+    //
+    // Es compartido entre grupos; las tablas que cuelgan de él llevan el suyo.
+    // Este chequeo pedía `grupoId` en el select y Prisma lo rechazaba con
+    // "Unknown field", o sea que la ruta se caía entera al guardar la primera
+    // receta. Ni el build ni los candados lo veían: el proyecto es JavaScript y
+    // los candados son funciones puras. Lo encontró ejercer la consulta contra
+    // Postgres, que es para lo que está esa regla.
+    //
+    // Lo que acota el grupo es el `grupoId` de la fila que se crea, que sale de
+    // `ctx` y no del cuerpo, más la clave única compuesta. Es lo mismo que hace
+    // la ruta de la receta de impuestos, que solo comprueba que exista.
     const proveedor = await prisma.proveedor.findUnique({
       where: { id: proveedorId },
-      select: { id: true, nombre: true, grupoId: true },
+      select: { id: true, nombre: true },
     });
-    if (!proveedor || proveedor.grupoId !== ctx.grupoId) {
+    if (!proveedor) {
       return NextResponse.json({ ok: false, error: "No existe ese proveedor." }, { status: 404 });
     }
 
