@@ -422,6 +422,42 @@ model ProductoCodigoProveedor {
   /// dónde salieron, y suponer que todos fueron manuales sería inventar el dato
   /// que la columna existe para registrar. Un nulo se deja en paz.
   origenAlta           String?
+  /// CÓMO se encontró: CODIGO_EXACTO | ALIAS_CONFIRMADO | NOMBRE_EXACTO |
+  /// APROXIMADO | MANUAL. Los mismos nombres que devuelve el motor de
+  /// candidatos, para que no haya dos vocabularios para la misma pregunta.
+  ///
+  /// Es OTRA pregunta que `origenAlta` y por eso es otra columna. Aquélla dice
+  /// si hubo una persona; ésta, por qué camino se llegó al producto. El caso más
+  /// común las necesita a las dos: el motor lo dedujo por terminación y después
+  /// alguien lo confirmó, y el día que las deducciones por terminación salgan
+  /// mal hay que poder buscarlas sin tocar las que alguien miró.
+  ///
+  /// NULO en los vínculos anteriores. No se rellenan: no consta por dónde
+  /// entraron, y suponerlo sería inventar el dato que la columna registra.
+  metodoDeteccion      String?
+  /// La descripción normalizada, para machear un alias sin volver a normalizar
+  /// las 2.600 fichas en cada lectura. Es una copia derivada de
+  /// `descripcionProveedor` y se reescribe con ella.
+  descripcionNormalizada String?
+  /// ── LA PRESENTACIÓN DEL PROVEEDOR ──────────────────────────────────────
+  ///
+  /// Cómo cotiza el proveedor: "x6", "DISPLAY 12", "caja". Texto libre porque es
+  /// lo que dice el papel, y el papel no tiene enum.
+  presentacionProveedor String?
+  /// CUÁNTAS UNIDADES DEL ERP trae esa presentación. En "Gancia x6" son 6.
+  ///
+  /// El FACTOR DE CONVERSIÓN NO SE GUARDA: sale de dividir el `factor_pack` del
+  /// producto por este número —24 ÷ 6 = 4—. Guardar el 4 lo dejaría podrido el
+  /// día que el pack del ERP pase de 24 a 12, multiplicando por cuatro un pack
+  /// que ya vale dos. Se guarda lo único que el ERP no puede saber.
+  unidadesPorPresentacion Int?
+  /// SI alguien la miró y dijo que sí, y quién. Tercer hecho, tercera columna.
+  ///
+  /// Sin esto, "confirmada" habría que deducirla de `origenAlta`, y eso hace
+  /// imposible el caso de arriba: una deducción confirmada después quedaría
+  /// indistinguible de una vinculación hecha a mano desde cero.
+  confirmadaPorUsuarioId Int?
+  confirmadaEn           DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -431,6 +467,7 @@ model ProductoCodigoProveedor {
 
   @@unique([grupoId, proveedorId, codigoInterno], name: "codigo_interno_unico_por_proveedor")
   @@index([grupoId, proveedorId, codigoInterno])
+  @@index([grupoId, proveedorId, descripcionNormalizada])
   @@index([productoBaseId])
   @@index([proveedorId])
 }
