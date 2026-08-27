@@ -17,7 +17,62 @@ Si la lista está vacía, el despliegue es solo de código.
 ## Pendientes
 
 **Ninguna.** Producción está al día: **103 migraciones en el árbol y 103
-aplicadas**, comprobado con `prisma migrate status` el 2026-08-27 después de
+aplicadas**, comprobado el 2026-08-27 después de desplegar
+`4434cbb65b3c5938802a1d024125c072703406c3` — la marca por raíz en el motor de
+candidatos y la separación entre la unidad del papel y la del pedido. **Solo
+código.**
+
+Corte de **2 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` healthy y **no recreado** —todo el despliegue con
+`--no-deps app`—, logs sin un solo error, `/login` en 200 y el árbol del VPS
+limpio. Rollback disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:4d8a1b4a83aee69ab950c03fdd0532a3ac74ba39`
+(imagen `sha256:1dfd4696dfd9…`). No hizo falta.
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre presente en las últimas 20 líneas, **61
+tablas**—: `/srv/produccion/backups/pre-4434cbb6_20260827_111729.sql.gz`,
+3.071.869 bytes. El quinto no aplica: no hay migración de datos.
+
+Sin migraciones, comprobado de tres formas antes de tocar nada: el rango
+`4d8a1b4a..4434cbb6` no toca `prisma/`, el clasificador informó "Archivos a
+mirar: 0" con el rango tomado de la imagen que atendía, y este archivo ya decía
+que no había pendientes. El contenedor descartable contó **103**, el mismo
+número que el árbol — que es lo que distingue "no había nada que aplicar" de "la
+imagen no conoce la migración".
+
+### EL CÓDIGO VIAJÓ, COMPROBADO EN LOS DOS SENTIDOS
+
+El marcador es la cadena de interfaz `expresado en`, de la pregunta que esta
+tanda estrena —"La factura dice 10. ¿Está expresado en?"—. Es un literal y no un
+identificador, que el build minifica y por lo tanto no afirma nada.
+
+En la imagen que atiende aparece en **2** archivos del build; en la imagen vieja,
+corrida en un contenedor descartable, en **0**. El control `Producto del sistema`
+—que existía desde antes— da **2 en las dos**, que es lo que prueba que la
+búsqueda funciona y no que el grep esté fallando.
+
+### LO QUE NO SE PUDO HACER, Y NO SE DA POR BUENO
+
+**No se abrió el importador en producción con una sesión real.** No hay
+credenciales productivas en la máquina desde la que se desplegó. Lo que sí se
+comprobó sin sesión: `/modulos/compras-proveedor/importar`, `nueva`, `recepcion`
+y `/modulos/productos` contestan 200; `comprobantes/listar` contesta 401 e
+`importar/analizar` contesta 405 —existe y es POST—; los logs no tienen un solo
+error después de pedirlas; y la sonda de cascada contra producción da verde.
+
+La verificación funcional de este contenido está hecha contra desarrollo antes
+del corte: la sonda del importador con **54 afirmaciones y 0 rojas**, cuatro
+corridas, a 390×844 y 1366×900.
+
+**Ninguna autorización manual de migraciones en este despliegue**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea con la fecha de hoy.
+La última es del 2026-08-25.
+
+---
+
+Antes de éste, producción estaba al día en **103**, comprobado con
+`prisma migrate status` el 2026-08-27 después de
 desplegar `671a76297d09c3cdec398b35c44aafcb4b5862b1` — la identidad compartida
 del producto por proveedor, con la migración
 `20260827010000_identidad_compartida_proveedor` **aplicada**.
