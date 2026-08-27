@@ -10,16 +10,28 @@
 import { NextResponse } from "next/server";
 
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { checkPerm } from "@/lib/authorize";
 import { estadoDeConsumo } from "@/lib/ia/contadorDeIa";
 import { desdeCuandoSeCuenta } from "@/lib/ia/limiteDiario";
 
 export async function GET(req) {
   try {
-    // Pide sesión pero NO un permiso de compras: el número lo mira cualquiera
-    // que pueda usar la IA desde cualquier módulo, y atarlo a `compras.crear`
-    // haría que el lector de comprobantes tenga que pedir un permiso ajeno.
     const ctx = await resolveLocalAndGrupo(req);
     if (ctx.error) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
+
+    // ── EL PERMISO ES `compras.ver`, Y NO ES UN TRÁMITE ────────────────
+    //
+    // La primera versión pedía solo sesión, con el argumento de que el contador
+    // es compartido y atarlo a un módulo sería raro. El candado del censo la
+    // frenó, y tenía razón: los DOS consumidores de hoy —el importador de
+    // pedidos y el lector de comprobantes— viven en compras, así que
+    // `compras.ver` no es un permiso ajeno para ninguno.
+    //
+    // El día que la IA se use desde otro módulo, esto se mira de nuevo. Lo que
+    // no se hace es inventar un permiso nuevo ni pedir una excepción para no
+    // tener que elegir.
+    const perm = checkPerm(ctx.session, "compras.ver");
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const estado = await estadoDeConsumo();
     const { huso } = desdeCuandoSeCuenta();
