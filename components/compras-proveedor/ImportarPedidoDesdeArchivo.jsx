@@ -652,14 +652,14 @@ export default function ImportarPedidoDesdeArchivo() {
   };
 
   const repreparar = async (receta) => {
-    if (!documento) return;
+    if (!documento) return false;
     const params = parametrosDeLectura(receta);
 
     // Si la receta necesita la tabla y no la hay, esto la consigue o corta. No
     // se sigue "con lo que haya": aplicar una receta de columnas sobre líneas ya
     // interpretadas es exactamente el silencio que se está sacando.
     const crudo = receta ? await conseguirCrudo(receta) : null;
-    if (receta && recetaNecesitaTablaCruda(receta) && !crudoUtilizable(crudo)) return;
+    if (receta && recetaNecesitaTablaCruda(receta) && !crudoUtilizable(crudo)) return false;
 
     // ── LA RECETA SE APLICA SOBRE LA TABLA CRUDA, NO SOBRE LO YA LEÍDO ────
     //
@@ -675,7 +675,7 @@ export default function ImportarPedidoDesdeArchivo() {
     const reinterpretado = receta ? lineasDesdeElCrudo({ crudo, receta }) : null;
     const puedeRemapear = Boolean(reinterpretado && reinterpretado.lineas.length);
     const lineasBase = puedeRemapear ? reinterpretado.lineas : documento.lineas || [];
-    if (!lineasBase.length) return;
+    if (!lineasBase.length) return false;
 
     setDescartadasPorLaReceta(puedeRemapear ? reinterpretado.descartadas : []);
     setRemapeoAplicado(puedeRemapear);
@@ -692,6 +692,7 @@ export default function ImportarPedidoDesdeArchivo() {
       }).map((linea) => ({ ...linea, incluida: true }))
     );
     setFiltro("todas");
+    return true;
   };
 
   // ── RESTAURAR AL ENTRAR ────────────────────────────────────────────────
@@ -907,8 +908,14 @@ export default function ImportarPedidoDesdeArchivo() {
     setRecetaEnUso(vistaPrevia.receta);
     setRecetaSoloEstaVez(true);
     setRecetaElegidaId("");
-    setExplicando(false);
-    await repreparar(vistaPrevia.receta);
+    // ── EL PANEL SE CIERRA SOLO SI SE APLICÓ ─────────────────────────────
+    //
+    // Antes se cerraba siempre, antes de aplicar. Cuando aplicar no se podía
+    // —hace falta retranscribir y la persona dijo que no— el mensaje que
+    // explica por qué quedaba escrito adentro de un panel ya cerrado: invisible.
+    // Se veía como que el botón no hizo nada.
+    const aplicada = await repreparar(vistaPrevia.receta);
+    if (aplicada) setExplicando(false);
   };
 
   const confirmarYRecordar = async () => {
