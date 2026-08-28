@@ -24,6 +24,24 @@ import SunmiSelect from "@/components/sunmi/SunmiSelect";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
 import { jsonOrError } from "@/lib/red/leerJson";
+import { useUser } from "@/app/context/UserContext";
+import useContextoActivo from "@/hooks/useContextoActivo";
+import {
+  armarSesion,
+  borrarSesion,
+  guardarSesion,
+  hace,
+  hayAlmacenamiento,
+  leerSesion,
+  sesionUtilizable,
+} from "@/lib/compras-proveedor/importacion/sesionDeImportacion";
+import {
+  VERSION_LECTURA,
+  huellaDeArchivo,
+  lecturaReutilizable,
+  marcaDeLectura,
+} from "@/lib/compras-proveedor/importacion/huellaDeArchivo";
+import { TEXTO_VA_A_CONSUMIR, textoDeConsumo } from "@/lib/ia/limiteDiario";
 import { naturalezaLinea, permiteToggleUnidad } from "@/lib/compras-proveedor/calculoPedido";
 import { baseDeProducto } from "@/lib/compras-proveedor/importacion/merge";
 import { consolidarLineasImportadas } from "@/lib/compras-proveedor/importacion/payload";
@@ -156,6 +174,81 @@ export default function ImportarPedidoDesdeArchivo() {
   // Volver a pedirle la tabla al lector tarda, y sin aviso la pantalla parece
   // colgada justo cuando alguien acaba de tocar "usar solo esta vez".
   const [retranscribiendo, setRetranscribiendo] = useState(false);
+
+  // ── LA SESIÓN GUARDADA EN EL DISPOSITIVO ──────────────────────────────
+  //
+  // En Android alcanza con cambiar de aplicación para mandar una captura: al
+  // volver, la pestaña se descartó y se perdía todo. Esto lo conserva en
+  // IndexedDB —hace falta IndexedDB y no localStorage porque hay que guardar el
+  // ARCHIVO— y lo restaura al volver.
+  const { perfil } = useUser();
+  const { contexto } = useContextoActivo();
+  const usuarioId = perfil?.id ?? null;
+  const localId = contexto?.localId ?? null;
+  const [guardadoEn, setGuardadoEn] = useState(null);
+  const [avisoGuardado, setAvisoGuardado] = useState("");
+  const [recuperada, setRecuperada] = useState(null);
+  const [peticionInterrumpida, setPeticionInterrumpida] = useState(null);
+  // Mientras se restaura NO se guarda: el primer render tiene el estado vacío y
+  // guardarlo pisaría la sesión que se está por leer. Es la carrera clásica de
+  // esta clase de mecanismo y se ve como "se perdió igual".
+  const restaurando = useRef(true);
+
+  // ── EL CONSUMO DE IA, A LA VISTA ───────────────────────────────────────
+  //
+  // Veinte consultas por día. Sin el número en pantalla, nadie puede decidir si
+  // le conviene gastar una en explicar el formato o guardarla para leer el
+  // remito de la tarde.
+  const [consumoIa, setConsumoIa] = useState(null);
+  // La lectura ya hecha, con su huella: volver a abrir el MISMO archivo no
+  // puede costar otra consulta.
+  const [lecturaGuardada, setLecturaGuardada] = useState(null);
+  const [reusoLectura, setReusoLectura] = useState(false);
+  // ── CONTRA EL DOBLE TOQUE ──────────────────────────────────────────────
+  //
+  // Un `useState` no alcanza: entre el primer toque y el re-render hay una
+  // ventana en la que el segundo toque ve el estado viejo y sale igual. Con una
+  // referencia, el bloqueo es inmediato. Cada operación tiene la suya: bloquear
+  // todas juntas impediría explicar mientras se analiza, que es legítimo.
+  const enVuelo = useRef({});
+
+  const tomarElTurno = (operacion) => {
+    if (enVuelo.current[operacion]) return false;
+    enVuelo.current[operacion] = true;
+    return true;
+  };
+  const soltarElTurno = (operacion) => {
+    enVuelo.current[operacion] = false;
+  };
+
+  const refrescarConsumo = async () => {
+    try {
+      const r = await fetch("/api/ia/consumo", { credentials: "include", cache: "no-store" });
+      const data = await jsonOrError(r, "leer el consumo de IA");
+      setConsumoIa({ usadas: data.usadas, limite: data.limite, quedan: data.quedan, puede: data.puede });
+    } catch {
+      // Que no se pueda leer el contador no puede frenar el trabajo. Se muestra
+      // sin número, que es la verdad, en vez de inventar uno.
+      setConsumoIa(null);
+    }
+  };
+
+  useEffect(() => {
+    refrescarConsumo();
+  }, []);
+
+  /**
+   * Confirma una acción que gasta una consulta.
+   *
+   * Se pregunta ANTES y se dice cuántas quedan: gastar la anteúltima consulta
+   * del día no es lo mismo que gastar la tercera, y quien decide tiene que
+   * poder verlo.
+   */
+  const confirmarGasto = (queHace) => {
+    if (typeof window === "undefined") return true;
+    const restantes = consumoIa ? ` Quedan ${consumoIa.quedan} de ${consumoIa.limite} hoy.` : "";
+    return window.confirm(`${TEXTO_VA_A_CONSUMIR} ${queHace}.${restantes}`);
+  };
   const [estado, setEstado] = useState("elegir");
   const [archivo, setArchivo] = useState(null);
   const [documento, setDocumento] = useState(null);
@@ -365,8 +458,60 @@ export default function ImportarPedidoDesdeArchivo() {
     setError("");
   };
 
-  const analizar = async (seleccionado) => {
+  /**
+   * ── ANALIZAR: UNA CONSULTA, Y SOLO SI HACE FALTA ───────────────────────
+   *
+   * Tres candados antes de gastar:
+   *
+   *   1. `tomarElTurno` — un doble toque no manda dos veces. Con veinte por día,
+   *      un doble toque cuesta el diez por ciento del presupuesto.
+   *   2. la HUELLA — si es el mismo archivo, con el mismo proveedor y la misma
+   *      versión del lector, se reusa lo ya leído y no se llama a nadie.
+   *   3. `forzar` — volver a analizar el mismo archivo es una decisión
+   *      explícita, con su aviso de que gasta una consulta.
+   */
+  const analizar = async (seleccionado, { forzar = false } = {}) => {
     if (!seleccionado || !proveedorId || !productos.length) return;
+    if (!tomarElTurno("analizar")) return;
+    try {
+      await analizarDeVerdad(seleccionado, { forzar });
+    } finally {
+      soltarElTurno("analizar");
+    }
+  };
+
+  const analizarDeVerdad = async (seleccionado, { forzar = false } = {}) => {
+    const huella = await huellaDeArchivo(seleccionado);
+
+    // ── REUSO: CERO CONSULTAS ────────────────────────────────────────────
+    if (!forzar) {
+      const puedeReusar = lecturaReutilizable({
+        guardada: lecturaGuardada,
+        huella,
+        proveedorId,
+        version: VERSION_LECTURA,
+      });
+      if (puedeReusar.sirve) {
+        setDocumento(lecturaGuardada.documento);
+        setLineas(
+          prepararLineasImportadas({
+            lineas: lecturaGuardada.documento.lineas,
+            productos,
+            facturaPor: recetaEnUso?.facturaPor ?? facturaPor,
+            hayColumnaSubtotal:
+              (lectura.hayColumnaSubtotal ?? lecturaGuardada.documento.hayColumnaSubtotal) === true,
+            cantidadEn: lectura.cantidadEn,
+            toleranciaEscalaPct: lectura.toleranciaEscalaPct,
+          }).map((linea) => ({ ...linea, incluida: true }))
+        );
+        setFiltro("todas");
+        setEstado("revisar");
+        setReusoLectura(true);
+        return;
+      }
+    }
+
+    setReusoLectura(false);
     setEstado("analizando");
     setError("");
     const form = new FormData();
@@ -395,6 +540,10 @@ export default function ImportarPedidoDesdeArchivo() {
     }
 
     setDocumento(data.documento);
+    // Se guarda con su huella para que volver a abrir el MISMO archivo no
+    // cueste otra consulta.
+    setLecturaGuardada(marcaDeLectura({ huella, proveedorId, documento: data.documento }));
+    refrescarConsumo();
     setLineas(
       prepararLineasImportadas({
         lineas: data.documento.lineas,
@@ -457,6 +606,21 @@ export default function ImportarPedidoDesdeArchivo() {
       return null;
     }
 
+    // ── NO SE RETRANSCRIBE EN SILENCIO ───────────────────────────────────
+    //
+    // Antes se hacía sola cuando faltaba la tabla: era correcto para la
+    // funcionalidad y caro para la cuota. Ahora se pide, diciendo lo que gasta.
+    // Si no se acepta, la receta no se aplica — y eso es mejor que aplicar
+    // media receta, que es lo que se corrigió el día anterior.
+    if (!confirmarGasto("Hace falta volver a transcribir la tabla de la foto")) {
+      setErrorReceta(
+        "No se aplicó el formato: para releer las columnas hay que volver a transcribir la foto, " +
+          "y eso usa una consulta de IA. Podés intentarlo de nuevo cuando quieras."
+      );
+      return null;
+    }
+    if (!tomarElTurno("transcribir")) return null;
+
     setRetranscribiendo(true);
     setErrorReceta("");
     try {
@@ -482,18 +646,20 @@ export default function ImportarPedidoDesdeArchivo() {
       return null;
     } finally {
       setRetranscribiendo(false);
+      soltarElTurno("transcribir");
+      refrescarConsumo();
     }
   };
 
   const repreparar = async (receta) => {
-    if (!documento) return;
+    if (!documento) return false;
     const params = parametrosDeLectura(receta);
 
     // Si la receta necesita la tabla y no la hay, esto la consigue o corta. No
     // se sigue "con lo que haya": aplicar una receta de columnas sobre líneas ya
     // interpretadas es exactamente el silencio que se está sacando.
     const crudo = receta ? await conseguirCrudo(receta) : null;
-    if (receta && recetaNecesitaTablaCruda(receta) && !crudoUtilizable(crudo)) return;
+    if (receta && recetaNecesitaTablaCruda(receta) && !crudoUtilizable(crudo)) return false;
 
     // ── LA RECETA SE APLICA SOBRE LA TABLA CRUDA, NO SOBRE LO YA LEÍDO ────
     //
@@ -509,7 +675,7 @@ export default function ImportarPedidoDesdeArchivo() {
     const reinterpretado = receta ? lineasDesdeElCrudo({ crudo, receta }) : null;
     const puedeRemapear = Boolean(reinterpretado && reinterpretado.lineas.length);
     const lineasBase = puedeRemapear ? reinterpretado.lineas : documento.lineas || [];
-    if (!lineasBase.length) return;
+    if (!lineasBase.length) return false;
 
     setDescartadasPorLaReceta(puedeRemapear ? reinterpretado.descartadas : []);
     setRemapeoAplicado(puedeRemapear);
@@ -526,6 +692,152 @@ export default function ImportarPedidoDesdeArchivo() {
       }).map((linea) => ({ ...linea, incluida: true }))
     );
     setFiltro("todas");
+    return true;
+  };
+
+  // ── RESTAURAR AL ENTRAR ────────────────────────────────────────────────
+  //
+  // Corre una sola vez, cuando ya se sabe QUIÉN está y en qué local: sin esos
+  // dos datos no se puede comprobar de quién es la sesión, y restaurar la de
+  // otro sería peor que no restaurar nada.
+  useEffect(() => {
+    if (usuarioId === null || localId === null) return;
+    if (restaurando.current === false) return;
+    let vigente = true;
+    (async () => {
+      if (!hayAlmacenamiento()) {
+        if (vigente) {
+          setAvisoGuardado(
+            "Este navegador no permite guardar el avance en el dispositivo. Si salís de la pantalla, se pierde."
+          );
+          restaurando.current = false;
+        }
+        return;
+      }
+      const leida = await leerSesion();
+      if (!vigente) return;
+      const veredicto = sesionUtilizable({ sesion: leida.sesion, usuarioId, localId, pedidoId });
+      if (!veredicto.ok) {
+        // No se borra lo que es de otro: puede estar a mitad de su trabajo. Lo
+        // que sí se descarta es lo vencido y lo de otra versión, que ya no le
+        // sirve a nadie.
+        if (["OTRA_VERSION", "VENCIDA", "INCOMPLETA"].includes(veredicto.motivo)) await borrarSesion();
+        restaurando.current = false;
+        return;
+      }
+
+      const s = leida.sesion;
+      if (s.proveedorId) setProveedorId(String(s.proveedorId));
+      if (s.proveedorNombre) setProveedorNombre(s.proveedorNombre);
+      if (s.archivo) setArchivo(s.archivo);
+      if (s.documento) setDocumento(s.documento);
+      if (Array.isArray(s.lineas) && s.lineas.length) {
+        setLineas(s.lineas);
+        setEstado("revisar");
+      }
+      setExplicacion(s.explicacion || "");
+      setRecetaEnUso(s.recetaEnUso ?? null);
+      setRecetaSoloEstaVez(s.recetaSoloEstaVez === true);
+      setExplicando(s.panelAbierto === true);
+      setPeticionInterrumpida(s.peticionInterrumpida ?? null);
+      // La lectura con su huella vuelve también: sin ella, volver a elegir el
+      // mismo archivo después de recargar costaría otra consulta.
+      if (s.lecturaGuardada) setLecturaGuardada(s.lecturaGuardada);
+      setRecuperada({ cuando: s.actualizadaEn });
+      setGuardadoEn(s.actualizadaEn);
+      restaurando.current = false;
+
+      // La posición se restaura DESPUÉS de pintar, porque antes la página
+      // todavía no tiene el alto necesario y el desplazamiento queda en cero.
+      if (s.desplazamiento > 0) {
+        setTimeout(() => window.scrollTo({ top: s.desplazamiento, behavior: "auto" }), 120);
+      }
+    })();
+    return () => {
+      vigente = false;
+    };
+  }, [usuarioId, localId, pedidoId]);
+
+  // ── GUARDAR SOLO, CADA VEZ QUE ALGO CAMBIA ─────────────────────────────
+  //
+  // Con un respiro de medio segundo: sin él, escribir la explicación dispararía
+  // una escritura por tecla, cada una copiando el Blob de la foto.
+  //
+  // El indicador dice "guardado" SOLO cuando la transacción terminó, no cuando
+  // se pidió. Un cartel que miente sobre esto es peor que no tenerlo: alguien
+  // se va tranquilo y pierde el trabajo igual.
+  useEffect(() => {
+    if (restaurando.current) return;
+    if (!archivo && !lineas.length) return;
+    // SIN DUEÑO NO SE GUARDA, Y SE DICE. Una sesión sin usuario o sin local no
+    // se podría recuperar nunca —el dueño se compara por los dos— así que
+    // guardarla sería escribir algo que no sirve. Callarlo sería peor: alguien
+    // se iría de la pantalla creyendo que el avance quedó a salvo.
+    if (usuarioId === null || localId === null) {
+      setAvisoGuardado(
+        "El avance no se está guardando en este dispositivo porque falta el contexto de trabajo. Si salís de la pantalla, se pierde."
+      );
+      return;
+    }
+
+    const t = setTimeout(async () => {
+      const sesion = armarSesion({
+        usuarioId,
+        localId,
+        pedidoId,
+        archivo,
+        proveedorId,
+        proveedorNombre,
+        documento,
+        lineas,
+        explicacion,
+        recetaEnUso,
+        recetaSoloEstaVez,
+        paso: estado,
+        panelAbierto: explicando,
+        desplazamiento: typeof window === "undefined" ? 0 : window.scrollY,
+        peticionInterrumpida,
+        lecturaGuardada,
+      });
+      const r = await guardarSesion(sesion);
+      if (r.ok) {
+        setGuardadoEn(r.en);
+        setAvisoGuardado("");
+      } else {
+        setGuardadoEn(null);
+        setAvisoGuardado(
+          r.motivo === "SIN_ESPACIO"
+            ? "No se pudo guardar el avance: el dispositivo no tiene espacio. Si salís de la pantalla, se pierde."
+            : "No se pudo guardar el avance en este dispositivo. Si salís de la pantalla, se pierde."
+        );
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [
+    usuarioId, localId, pedidoId, archivo, proveedorId, proveedorNombre, documento, lineas,
+    explicacion, recetaEnUso, recetaSoloEstaVez, estado, explicando, peticionInterrumpida,
+    lecturaGuardada,
+  ]);
+
+  /** Descartar la importación entera. Pregunta antes: se pierde trabajo real. */
+  const descartarImportacion = async () => {
+    const seguro = typeof window === "undefined"
+      ? true
+      : window.confirm("¿Descartar esta importación? Se pierde el archivo y todo lo revisado.");
+    if (!seguro) return;
+    await borrarSesion();
+    setArchivo(null);
+    setDocumento(null);
+    setLineas([]);
+    setExplicacion("");
+    setRecetaEnUso(null);
+    setRecetaSoloEstaVez(false);
+    setExplicando(false);
+    setVistaPrevia(null);
+    setRecuperada(null);
+    setGuardadoEn(null);
+    setPeticionInterrumpida(null);
+    setEstado("elegir");
   };
 
   // ── EL FLUJO DE "EXPLICAR CÓMO LEER ESTE DOCUMENTO" ────────────────────
@@ -539,8 +851,18 @@ export default function ImportarPedidoDesdeArchivo() {
 
   const interpretar = async () => {
     if (!explicacion.trim() || interpretando) return;
+    // El aviso va ANTES de gastar, y dice cuántas quedan.
+    if (!confirmarGasto("Se va a traducir la explicación a reglas de lectura")) return;
+    // Y el turno, que es lo que impide que un doble toque mande dos veces: el
+    // `interpretando` de arriba tarda un render en verse.
+    if (!tomarElTurno("interpretar")) return;
     setInterpretando(true);
     setErrorReceta("");
+    // Se anota ANTES de salir. Si el teléfono descarta la pestaña en el medio,
+    // al volver la pantalla dice que esto quedó a mitad de camino en vez de
+    // hacer como si nada — y NO lo reintenta sola: hoy la cuota del modelo son
+    // 20 consultas por día y gastarle una a alguien sin que la pida es caro.
+    setPeticionInterrumpida("interpretar");
     try {
       const respuesta = await fetch("/api/compras-proveedor/recetas-lectura/interpretar", {
         method: "POST",
@@ -559,11 +881,18 @@ export default function ImportarPedidoDesdeArchivo() {
         );
       }
       setVistaPrevia(data);
+      setPeticionInterrumpida(null);
     } catch (e) {
       setVistaPrevia(null);
       setErrorReceta(e?.message || "No se pudo interpretar la explicación.");
+      // La petición TERMINÓ, aunque haya terminado mal: ya no está interrumpida.
+      // Y la sesión NO se borra — un 502 no puede llevarse el trabajo puesto,
+      // que es justamente lo que hay que poder reintentar.
+      setPeticionInterrumpida(null);
     } finally {
       setInterpretando(false);
+      soltarElTurno("interpretar");
+      refrescarConsumo();
     }
   };
 
@@ -579,8 +908,14 @@ export default function ImportarPedidoDesdeArchivo() {
     setRecetaEnUso(vistaPrevia.receta);
     setRecetaSoloEstaVez(true);
     setRecetaElegidaId("");
-    setExplicando(false);
-    await repreparar(vistaPrevia.receta);
+    // ── EL PANEL SE CIERRA SOLO SI SE APLICÓ ─────────────────────────────
+    //
+    // Antes se cerraba siempre, antes de aplicar. Cuando aplicar no se podía
+    // —hace falta retranscribir y la persona dijo que no— el mensaje que
+    // explica por qué quedaba escrito adentro de un panel ya cerrado: invisible.
+    // Se veía como que el botón no hizo nada.
+    const aplicada = await repreparar(vistaPrevia.receta);
+    if (aplicada) setExplicando(false);
   };
 
   const confirmarYRecordar = async () => {
@@ -649,9 +984,28 @@ export default function ImportarPedidoDesdeArchivo() {
     await analizar(seleccionado);
   };
 
+  /**
+   * REINTENTAR es una decisión, y gasta.
+   *
+   * Se pregunta antes. Si la lectura anterior falló no hay nada que reusar, así
+   * que va con `forzar`: reusar una lectura que no existe sería no hacer nada y
+   * dejar la pantalla igual, que se lee como que el botón no anda.
+   */
   const reintentar = async () => {
     if (!archivo || estado === "analizando") return;
-    await analizar(archivo);
+    if (!confirmarGasto("Se va a volver a leer el archivo")) return;
+    await analizar(archivo, { forzar: true });
+  };
+
+  /**
+   * VOLVER A ANALIZAR el mismo archivo, cuando la lectura anterior SÍ sirvió
+   * pero no convence. Es lo único que saltea el reuso por huella, y por eso es
+   * un botón aparte y no un efecto de algo.
+   */
+  const volverAAnalizar = async () => {
+    if (!archivo || estado === "analizando") return;
+    if (!confirmarGasto("Se va a volver a leer el archivo desde cero")) return;
+    await analizar(archivo, { forzar: true });
   };
 
   const cambiarProducto = (idLinea, productoLocalId) => {
@@ -859,6 +1213,10 @@ export default function ImportarPedidoDesdeArchivo() {
         "No se pudo crear el borrador."
       );
       const idCreado = pedidoId || data.pedidoId || data.item?.id;
+      // El borrador quedó creado: recién ACÁ la sesión del dispositivo deja de
+      // tener sentido. Se borra antes de navegar para que volver atrás no
+      // ofrezca recuperar una importación que ya se aplicó.
+      await borrarSesion();
       router.push(`/modulos/compras-proveedor/nueva?pedidoId=${idCreado}&importado=1`);
     } catch (e) {
       setError(e?.message || "No se pudo crear el borrador.");
@@ -901,6 +1259,78 @@ export default function ImportarPedidoDesdeArchivo() {
           cumplió, y el selector de proveedor pasa a texto: cambiarlo a mitad de
           la revisión borra todas las líneas.
         */}
+        {/*
+          LO QUE SE RECUPERÓ DEL DISPOSITIVO.
+          Va arriba de todo y no adentro de un panel: es lo primero que hay que
+          entender al volver a la pantalla, antes de mirar ninguna línea.
+        */}
+        {recuperada && (
+          <SunmiPanel className="p-3 mb-3">
+            <div className="flex flex-wrap items-center gap-2 justify-between">
+              <div>
+                <p className="text-sm2 font-semibold sunmi-text-strong">
+                  Importación recuperada
+                </p>
+                <p className="text-xs sunmi-text-muted">
+                  Se había guardado en este dispositivo {hace(recuperada.cuando)}. Seguí donde estabas.
+                </p>
+                {peticionInterrumpida && (
+                  <p className="text-xs sunmi-text-warning mt-1">
+                    Quedó a medias: {peticionInterrumpida === "interpretar"
+                      ? "no se llegó a interpretar la explicación"
+                      : "quedó una consulta sin terminar"}. Volvé a tocar el botón cuando quieras — no se
+                    reintenta solo.
+                  </p>
+                )}
+              </div>
+              <SunmiButton color="slate" type="button" onClick={descartarImportacion}>
+                Descartar importación
+              </SunmiButton>
+            </div>
+          </SunmiPanel>
+        )}
+
+        {/*
+          EL INDICADOR DE GUARDADO. Dice "guardado" SOLO cuando la escritura
+          terminó de verdad: un cartel que se adelanta hace que alguien se vaya
+          tranquilo y pierda el trabajo igual.
+        */}
+        {(guardadoEn || avisoGuardado) && (
+          <p className={`text-xs mb-2 ${avisoGuardado ? "sunmi-text-danger" : "sunmi-text-muted"}`}>
+            {avisoGuardado || `Guardado en este dispositivo · ${hace(guardadoEn)}`}
+          </p>
+        )}
+
+        {/*
+          EL CONTADOR DE IA.
+          Veinte por día. Sin el número a la vista nadie puede decidir si le
+          conviene gastar una en explicar el formato o guardarla para el remito
+          de la tarde. Se muestra SIEMPRE que se pudo leer, no solo cuando
+          quedan pocas: enterarse recién al final es enterarse tarde.
+        */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {consumoIa && (
+            <SunmiPill color={consumoIa.quedan === 0 ? "amber" : consumoIa.quedan <= 5 ? "amber" : "slate"}>
+              {textoDeConsumo({ usadas: consumoIa.usadas, limite: consumoIa.limite })}
+            </SunmiPill>
+          )}
+          {reusoLectura && (
+            <SunmiPill color="cyan">Se reusó la lectura de este archivo · 0 consultas</SunmiPill>
+          )}
+          {estado === "revisar" && archivo && (
+            <SunmiButton color="slate" type="button" onClick={volverAAnalizar}>
+              Volver a analizar (usa 1 consulta)
+            </SunmiButton>
+          )}
+        </div>
+
+        {consumoIa && consumoIa.quedan === 0 && (
+          <p className="text-sm2 sunmi-text-warning mb-3">
+            Se alcanzó el límite diario. Vas a poder volver a usar la IA cuando se renueve la cuota.
+            Mientras tanto el pedido se puede cargar a mano — esto no es un problema del archivo.
+          </p>
+        )}
+
         <div
           className={
             estado === "revisar"

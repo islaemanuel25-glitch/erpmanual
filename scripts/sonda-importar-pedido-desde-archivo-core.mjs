@@ -21,7 +21,17 @@ const CLAVE = arg("clave");
 const SALIDA = arg("salida", path.join(os.tmpdir(), "sonda-importar-pedido-pagina"));
 const PUERTO = Number(arg("puerto-cdp", "9411"));
 const EDGE = arg("edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
-const PERFIL = path.join(os.tmpdir(), "sonda-importar-pedido-pagina-perfil");
+// ── EL PERFIL SE PUEDE PEDIR LIMPIO ───────────────────────────────────────
+//
+// El perfil por defecto es PERSISTENTE y eso conviene para el uso normal: no
+// hay que volver a instalar nada entre corridas. Pero un perfil que sobrevive
+// arrastra IndexedDB, cookies y caché, así que una corrida puede medir lo que
+// dejó la anterior — ya pasó, y el rojo apareció cinco secciones más allá de la
+// causa.
+//
+// Con `--perfil <ruta>` cada corrida usa el suyo, que es lo que hace falta para
+// comprobar que diez arranques nuevos dan verde y no que uno calienta al otro.
+const PERFIL = arg("perfil", path.join(os.tmpdir(), "sonda-importar-pedido-pagina-perfil"));
 const LOCALES = new Set(["localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"]);
 
 let anfitrion;
@@ -100,6 +110,69 @@ async function navegar(url) {
   }
   throw new Error(`No terminó de cargar ${url}`);
 }
+
+/**
+ * RECARGAR DE VERDAD, que no es lo mismo que volver a navegar.
+ *
+ * `Page.navigate` a la misma URL puede resolverse desde la caché sin desmontar
+ * nada; `Page.reload` con `ignoreCache` tira el documento y vuelve a construir
+ * todo, que es lo que hace Android cuando descarta una pestaña. La diferencia
+ * importa: con una navegación normal, un estado que sobrevive en memoria daría
+ * verde sin que IndexedDB haya hecho nada.
+ */
+async function recargar() {
+  await enviar("Page.reload", { ignoreCache: true });
+  for (let intento = 0; intento < 120; intento++) {
+    await dormir(200);
+    if (await evaluar(`document.readyState === "complete"`)) return;
+  }
+  throw new Error("no terminó de recargar");
+}
+
+/**
+ * BORRA LA SESIÓN GUARDADA EN EL DISPOSITIVO.
+ *
+ * Cada sección que sube un archivo nuevo es un escenario independiente y tiene
+ * que arrancar con la pantalla vacía. Sin esto, la sesión que dejó la sección
+ * anterior se restaura sola y la siguiente mide otra cosa — pasó dos veces
+ * mientras se escribía esto, y las dos el rojo apareció a varias secciones de
+ * distancia de la causa.
+ *
+ * La ÚNICA sección que no llama a esto es la de recuperación, que justamente
+ * necesita que la sesión sobreviva.
+ */
+// ── Y SE BORRA EL REGISTRO, NO LA BASE ────────────────────────────────────
+//
+// La primera versión llamaba a `indexedDB.deleteDatabase` sin esperar el
+// resultado. Eso falla en silencio: si la página tiene la base abierta, el
+// borrado queda BLOQUEADO —`onblocked`— y nunca ocurre. La sonda seguía como si
+// hubiera limpiado.
+//
+// Se vio en 1 de 10 arranques nuevos, y el rojo apareció en la sección de la
+// receta, tres secciones más allá de la limpieza que no había limpiado. Que
+// dependa de si la página todavía tiene la conexión abierta explica por qué
+// pasaba a veces: es una carrera, no una ruta fría.
+//
+// Borrar el REGISTRO con una transacción no se bloquea nunca, y se espera a que
+// termine de verdad.
+const limpiarSesionGuardada = () =>
+  evaluar(`(async () => {
+    try {
+      const db = await new Promise((r, x) => {
+        const p = indexedDB.open("erpazul.importacion", 1);
+        p.onupgradeneeded = () => { if (!p.result.objectStoreNames.contains("sesiones")) p.result.createObjectStore("sesiones"); };
+        p.onsuccess = () => r(p.result);
+        p.onerror = () => x(p.error);
+      });
+      await new Promise((r) => {
+        const tx = db.transaction("sesiones", "readwrite");
+        tx.objectStore("sesiones").delete("actual");
+        tx.oncomplete = r; tx.onerror = r; tx.onabort = r;
+      });
+      db.close();
+      return true;
+    } catch { return false; }
+  })()`);
 
 async function esperarA(expresion, cuanto = 30000) {
   const limite = Date.now() + cuanto;
@@ -484,6 +557,19 @@ const INTERCEPTOR = `
   window.__modoFoto = false;
   window.__interpretarDevuelveHtml = false;
   window.__transcripciones = [];
+  // CUÁNTAS CONSULTAS DE IA se pidieron. Las tres rutas que consumen suman acá.
+  // El contador sobrevive a navegar: se guarda en sessionStorage. Sin esto, un
+  // valor forzado antes de navegar se perdia al reinyectarse el interceptor y
+  // la sección del límite medía una pantalla con el contador en cero — el mismo
+  // tropiezo del flag reseteado que ya costó dos diagnósticos.
+  window.__consultasIa = Number(sessionStorage.getItem("__sonda_ia") || "0");
+  window.__fijarConsultas = (n) => { window.__consultasIa = n; sessionStorage.setItem("__sonda_ia", String(n)); };
+  // Las acciones que gastan preguntan antes. La sonda acepta por defecto para
+  // poder recorrer el flujo; hay una sección que RECHAZA a propósito, para
+  // comprobar que rechazar no gasta.
+  window.__confirmaciones = [];
+  window.confirm = (texto) => { window.__confirmaciones.push(String(texto || "")); return window.__aceptarGasto !== false; };
+  window.__aceptarGasto = true;
   const pagina = (status = 500) => new Response(
     '<!DOCTYPE html><html lang="es"><head><title>Error</title></head><body>pagina</body></html>',
     { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
@@ -506,8 +592,12 @@ const INTERCEPTOR = `
     if (url.includes("/api/compras-proveedor/recetas-lectura/listar")) {
       return json({ ok: true, items: D.recetasLectura });
     }
+    if (url.includes("/api/ia/consumo")) {
+      return json({ ok: true, usadas: window.__consultasIa, limite: 20, quedan: 20 - window.__consultasIa, puede: window.__consultasIa < 20 });
+    }
     if (url.includes("/api/compras-proveedor/recetas-lectura/interpretar")) {
       window.__interpretaciones.push(JSON.parse(opciones.body || "null"));
+      window.__fijarConsultas(window.__consultasIa + 1);
       // LA CONTRAPRUEBA DEL DEFECTO 1: una página en vez de datos.
       if (window.__interpretarDevuelveHtml) return pagina(500);
       if (window.__modoFoto) {
@@ -537,6 +627,7 @@ const INTERCEPTOR = `
     if (url.includes("/api/compras-proveedor/importar/analizar")) {
       const archivo = opciones.body?.get?.("archivo");
       window.__analisis.push(archivo ? { nombre: archivo.name, tam: archivo.size } : null);
+      window.__fijarConsultas(window.__consultasIa + 1);
       await new Promise((resolver) => setTimeout(resolver, 250));
       if (window.__fallarPrimero && window.__analisis.length === 1) {
         return json({ ok: false, codigo: "SIN_LINEAS", error: "No encontré líneas de productos en el archivo." }, 400);
@@ -550,6 +641,7 @@ const INTERCEPTOR = `
     if (url.includes("/api/compras-proveedor/importar/transcribir")) {
       const archivo = opciones.body?.get?.("archivo");
       window.__transcripciones.push(archivo ? { nombre: archivo.name, tam: archivo.size } : null);
+      window.__fijarConsultas(window.__consultasIa + 1);
       await new Promise((resolver) => setTimeout(resolver, 120));
       return json({ ok: true, crudo: D.tablaDeLaFoto });
     }
@@ -672,10 +764,66 @@ const morir = (motivo) => {
   await enviar("Page.enable");
   await enviar("Runtime.enable");
   await prepararSesion({ navegar, evaluar, base: BASE, usuario: USUARIO, clave: CLAVE, log: (m) => console.log(m) });
+  // ── EL SERVIDOR TIENE QUE ESTAR LISTO DE VERDAD ────────────────────────
+  //
+  // Que `/login` conteste 200 solo prueba que el layout raíz renderiza. Con
+  // `next start` cada ruta carga sus módulos la primera vez que alguien la
+  // pide, así que la PRIMERA visita a la pantalla del importador puede tardar
+  // varios segundos más que las siguientes.
+  //
+  // Eso produjo un rojo que no era del código: la sonda llegó a una sección con
+  // el servidor arriba pero esa ruta todavía fría, el catálogo no cargó dentro
+  // del tiempo de espera y la corrida murió. Se atribuyó a "ruta fría" sin
+  // medirlo, que es exactamente lo que no hay que hacer.
+  //
+  // Acá se mide: se piden LAS RUTAS QUE LA SONDA VA A USAR hasta que contestan.
+  // Un 401 cuenta como lista —la ruta existe, cargó y rechaza por sesión, que es
+  // lo que tiene que hacer—; lo que no cuenta es que no conteste.
+  //
+  // Y esto NO es calentar por afuera de la medición: es la condición de arranque.
+  // Sin ella, lo que se mide incluye cuánto tarda Node en abrir un archivo.
+  {
+    const rutas = [
+      { url: `${BASE}/modulos/compras-proveedor/importar`, esperados: [200] },
+      { url: `${BASE}/api/proveedores/listar?estado=activos&pageSize=1`, esperados: [200, 401, 403, 409] },
+      { url: `${BASE}/api/ia/consumo`, esperados: [200, 401, 403, 409] },
+    ];
+    const arranque = Date.now();
+    for (const { url, esperados } of rutas) {
+      let lista = false;
+      for (let i = 0; i < 120 && !lista; i += 1) {
+        try {
+          const r = await fetch(url, { redirect: "manual" });
+          lista = esperados.includes(r.status) || (r.status >= 300 && r.status < 400);
+        } catch {
+          lista = false;
+        }
+        if (!lista) await dormir(250);
+      }
+      if (!lista) morir(`el servidor no quedó listo: ${url} no contesta`);
+    }
+    console.log(`servidor listo en ${Date.now() - arranque} ms`);
+  }
+
   await enviar("Page.addScriptToEvaluateOnNewDocument", { source: INTERCEPTOR });
+
+  // ── CADA CORRIDA EMPIEZA LIMPIA, Y NO ES PROLIJIDAD ─────────────────────
+  //
+  // El perfil del navegador es PERSISTENTE —vive en el temporal entre corridas—
+  // así que la sesión de importación que guarda IndexedDB sobrevive de una
+  // corrida a la siguiente. Sin borrarla, la corrida N mide un estado que dejó
+  // la N-1: eso ya se vio, y se vio como un rojo en la sección de continuación
+  // de borrador, a cinco secciones de distancia de donde estaba la causa.
+  //
+  // Y rompe lo que hace que esta sonda valga: tres corridas idénticas dejan de
+  // probar que no hay ruido si cada una arranca donde terminó la anterior.
+  await navegar(`${BASE}/modulos/compras-proveedor/importar`);
+  await evaluar(`(() => { try { indexedDB.deleteDatabase("erpazul.importacion"); } catch {} return true; })()`);
+  await dormir(400);
 
   console.log("\n── página dedicada y reintento ────────────────────────────────");
   await medidas(390, 844);
+  await limpiarSesionGuardada();
   await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
   if (!(await esperarA(`window.__sonda === true`))) morir("no quedó instalado el interceptor");
   if (!(await esperarA(`document.body.innerText.includes("1. Proveedor")`))) morir("no abrió la página dedicada");
@@ -1154,8 +1302,15 @@ const morir = (motivo) => {
   // login, y por eso el detalle de cada afirmación importa tanto.
   console.log("\n── receta conversacional ─────────────────────────────────────");
   await evaluar(`window.__analisis = []; window.__interpretaciones = []; true`);
+  await limpiarSesionGuardada();
   await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
-  if (!(await esperarCatalogo())) morir("el catálogo no cargó al volver para la receta");
+  if (!(await esperarCatalogo())) {
+    const que = await evaluar(`(() => {
+      const botones = [...document.querySelectorAll('button')].map((b) => (b.innerText || "").trim() + (b.disabled ? "[off]" : "")).filter(Boolean);
+      return JSON.stringify({ botones: botones.slice(0, 10), url: location.pathname + location.search });
+    })()`);
+    morir(`el catálogo no cargó al volver para la receta · ${que}`);
+  }
   await evaluar(`window.__fallarPrimero = false; true`);
   await seleccionarArchivo("receta-sintetica.pdf");
   if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) {
@@ -1327,9 +1482,18 @@ const morir = (motivo) => {
 
   console.log("\n── continuación de borrador ──────────────────────────────────");
   await evaluar(`window.__cuerpos = {}; sessionStorage.setItem("__sonda_cuerpos", "{}"); window.__analisis = []; true`);
+  await limpiarSesionGuardada();
   await navegar(`${BASE}/modulos/compras-proveedor/importar?pedidoId=999001`);
   if (!(await esperarA(`document.body.innerText.includes("Continúa borrador #999001")`, 20000))) morir("no abrió la continuación");
-  if (!(await esperarCatalogo())) morir("el catálogo no cargó al continuar el borrador");
+  if (!(await esperarCatalogo())) {
+    // El detalle no es adorno: un "no cargó" pelado obliga a adivinar. Se dice
+    // qué botones hay y qué texto muestra la pantalla.
+    const que = await evaluar(`(() => {
+      const botones = [...document.querySelectorAll('button')].map((b) => (b.innerText || "").trim() + (b.disabled ? "[off]" : "")).filter(Boolean);
+      return JSON.stringify({ botones: botones.slice(0, 12), texto: (document.body.innerText || "").replace(/\\s+/g, " ").slice(0, 300) });
+    })()`);
+    morir(`el catálogo no cargó al continuar el borrador · ${que}`);
+  }
   await evaluar(`window.__fallarPrimero = false; true`);
   await seleccionarArchivo("continuacion-sintetica.pdf");
   if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) morir("no llegó a revisión al continuar");
@@ -1363,6 +1527,7 @@ const morir = (motivo) => {
   // un `.json()` a ciegas, esta sección se pone roja sola.
   console.log("\n── el endpoint devuelve HTML (contraprueba del defecto 1) ──────");
   await medidas(390, 844);
+  await limpiarSesionGuardada();
   await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
   if (!(await esperarCatalogo())) morir("el catálogo no cargó para la contraprueba de HTML");
   await evaluar(`window.__fallarPrimero = false; window.__interpretarDevuelveHtml = true; true`);
@@ -1429,6 +1594,7 @@ const morir = (motivo) => {
     // anterior y daría rojo por algo que no pasó acá — o peor, daría verde
     // sobre una escritura ajena si la comparación fuera al revés.
     await evaluar(`sessionStorage.removeItem("__sonda_cuerpos"); true`);
+    await limpiarSesionGuardada();
     await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
     if (!(await esperarCatalogo())) morir("el catálogo no cargó para la foto");
     // LOS INTERRUPTORES VAN DESPUÉS DE NAVEGAR, NO ANTES. El interceptor se
@@ -1568,6 +1734,388 @@ const morir = (motivo) => {
   }
   await evaluar(`window.__modoFoto = false; true`);
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // DEFECTO 3 · LA IMPORTACIÓN SOBREVIVE A QUE SE DESCARTE LA PESTAÑA
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // El caso real es de Android: se carga la foto, se escribe la explicación, se
+  // cambia de aplicación para mandar una captura, y al volver Android descartó
+  // la pestaña. Se perdía todo.
+  //
+  // Se ejerce a 390 px porque es donde pasa, y con `Page.reload` de verdad — no
+  // con una navegación, que puede resolverse de la caché sin desmontar nada y
+  // daría verde por un estado que sobrevivió en memoria.
+  console.log("\n── la importación sobrevive a una recarga (390x844) ───────────");
+  await medidas(390, 844);
+  await limpiarSesionGuardada();
+  await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó para la recuperación");
+
+  // El contexto operativo tiene que estar: sin local, la sesión no tiene dueño y
+  // la pantalla avisa que NO está guardando. Se pone acá y no en el interceptor
+  // para que lo que se mida sea el camino real.
+  await evaluar(`document.cookie = 'erpazul_contexto_activo=' + encodeURIComponent(JSON.stringify({localId:1,esDeposito:true})) + '; path=/'; true`);
+  await evaluar(`window.__fallarPrimero = false; true`);
+  await seleccionarArchivo("recuperable-sintetico.pdf");
+  if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) {
+    morir("no llegó a revisión para la recuperación");
+  }
+
+  // Se escribe la explicación y se deja el panel abierto: es exactamente el
+  // momento en que suena el teléfono.
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Explicar cómo leer este documento/.test(b.innerText || ""))?.click()`);
+  await dormir(300);
+  const LO_ESCRITO = "La cantidad enviada esta en la columna ENVIADO y no en PEDIDO.";
+  await evaluar(`(() => {
+    const area = document.querySelector('textarea');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(area, ${JSON.stringify(LO_ESCRITO)});
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+
+  // El guardado tiene medio segundo de respiro, y la escritura del Blob tarda.
+  // Se espera al INDICADOR, que solo aparece cuando la transacción terminó — no
+  // a un tiempo fijo, que sería adivinar.
+  const seGuardo = await esperarA(`/Guardado en este dispositivo/.test(document.body.innerText || "")`, 15000);
+  afirmar(seGuardo, "dice 'Guardado en este dispositivo' recién cuando la escritura terminó");
+
+  const antesDeRecargar = JSON.parse(await evaluar(`JSON.stringify((() => ({
+    tarjetas: [...document.querySelectorAll('[data-sunmi-panel]')].filter((t) => /Cantidad del papel/.test(t.innerText || "")).length,
+    escrito: (document.querySelector('textarea') || {}).value || "",
+  }))())`));
+  afirmar(antesDeRecargar.tarjetas > 0, "había líneas antes de recargar", JSON.stringify(antesDeRecargar));
+  afirmar(antesDeRecargar.escrito === LO_ESCRITO, "la explicación estaba escrita", antesDeRecargar.escrito);
+
+  // ── Y ACÁ SE TIRA LA PESTAÑA ────────────────────────────────────────────
+  await recargar();
+  if (!(await esperarA(`document.body.innerText.includes("Importación recuperada")`, 25000))) {
+    morir("la importación NO se recuperó después de recargar");
+  }
+  await dormir(700);
+
+  const despuesDeRecargar = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const texto = document.body.innerText || "";
+    return {
+      dice: /Importación recuperada/.test(texto),
+      cuando: /Se había guardado en este dispositivo/.test(texto),
+      tarjetas: [...document.querySelectorAll('[data-sunmi-panel]')].filter((t) => /Cantidad del papel/.test(t.innerText || "")).length,
+      escrito: (document.querySelector('textarea') || {}).value || "",
+      panelAbierto: !!document.querySelector('textarea'),
+      hayDescartar: [...document.querySelectorAll('button')].some((b) => /Descartar importación/.test(b.innerText || "")),
+      // NO puede haberse disparado ninguna consulta al modelo al restaurar.
+      analisis: (window.__analisis || []).length,
+      interpretaciones: (window.__interpretaciones || []).length,
+      transcripciones: (window.__transcripciones || []).length,
+      // Ni ninguna escritura.
+      fugas: (window.__fugas || []).length,
+      cuerpos: Object.keys(window.__cuerpos || {}),
+    };
+  })())`));
+
+  afirmar(despuesDeRecargar.dice, "después de recargar dice 'Importación recuperada'", JSON.stringify(despuesDeRecargar));
+  afirmar(despuesDeRecargar.cuando, "y dice cuándo se había guardado", JSON.stringify(despuesDeRecargar));
+  afirmar(
+    despuesDeRecargar.tarjetas === antesDeRecargar.tarjetas,
+    "vuelven TODAS las líneas que había",
+    `antes ${antesDeRecargar.tarjetas} / después ${despuesDeRecargar.tarjetas}`
+  );
+  afirmar(despuesDeRecargar.escrito === LO_ESCRITO, "vuelve la explicación escrita, tal cual", despuesDeRecargar.escrito);
+  afirmar(despuesDeRecargar.panelAbierto, "el panel vuelve abierto, como estaba");
+  afirmar(despuesDeRecargar.hayDescartar, "hay cómo descartar la importación recuperada");
+
+  // LO QUE NO PUEDE PASAR AL RESTAURAR. Es la mitad que importa: restaurar tiene
+  // que ser gratis. Con la cuota del modelo en 20 consultas por día, una lectura
+  // disparada sola por recargar sería cara de verdad.
+  afirmar(despuesDeRecargar.analisis === 0, "restaurar NO vuelve a leer el archivo", String(despuesDeRecargar.analisis));
+  afirmar(despuesDeRecargar.interpretaciones === 0, "restaurar NO vuelve a interpretar", String(despuesDeRecargar.interpretaciones));
+  afirmar(despuesDeRecargar.transcripciones === 0, "restaurar NO vuelve a transcribir", String(despuesDeRecargar.transcripciones));
+  afirmar(despuesDeRecargar.fugas === 0, "restaurar no escribe nada", JSON.stringify(despuesDeRecargar.fugas));
+  afirmar(
+    !despuesDeRecargar.cuerpos.includes("crear") && !despuesDeRecargar.cuerpos.includes("aplicar"),
+    "restaurar NO crea ni aplica ningún pedido",
+    JSON.stringify(despuesDeRecargar.cuerpos)
+  );
+
+  // EL BLOB VOLVIÓ, y eso se comprueba usándolo: se aplica una receta que
+  // necesita columnas, que es lo que obliga a retranscribir el archivo. Si el
+  // archivo no hubiera sobrevivido, esto pediría elegirlo de nuevo.
+  await evaluar(`window.__modoFoto = false; true`);
+  const hayArchivo = await evaluar(`(() => {
+    const t = document.body.innerText || "";
+    return !/Eleg[íi] de nuevo la foto/.test(t);
+  })()`);
+  afirmar(hayArchivo === "true" || hayArchivo === true, "no pide volver a elegir el archivo: el Blob sobrevivió");
+
+  capturas.push(await capturar("recuperada-390x844.png"));
+
+  // ── DESCARTAR BORRA LA SESIÓN ──────────────────────────────────────────
+  await evaluar(`window.confirm = () => true; true`);
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Descartar importación/.test(b.innerText || ""))?.click()`);
+  await dormir(800);
+  await recargar();
+  await dormir(1500);
+  const trasDescartar = await evaluar(`/Importación recuperada/.test(document.body.innerText || "")`);
+  afirmar(
+    trasDescartar === "false" || trasDescartar === false,
+    "después de descartar y recargar YA NO ofrece recuperar nada",
+    String(trasDescartar)
+  );
+
+  // ── UNA SESIÓN DE OTRO USUARIO NO SE RESTAURA ──────────────────────────
+  //
+  // Se escribe a mano una sesión con OTRO dueño y se recarga. En un mostrador el
+  // dispositivo se comparte, así que esto no es teórico: sin el chequeo, el
+  // siguiente que entra ve el trabajo del anterior.
+  await evaluar(`(async () => {
+    const db = await new Promise((r) => { const p = indexedDB.open("erpazul.importacion", 1); p.onsuccess = () => r(p.result); });
+    await new Promise((r) => {
+      const tx = db.transaction("sesiones", "readwrite");
+      tx.objectStore("sesiones").put({
+        version: 1, usuarioId: 999999, localId: 1,
+        lineas: [{ id: "ajena" }], archivo: null, explicacion: "de otro",
+        actualizadaEn: Date.now(),
+      }, "actual");
+      tx.oncomplete = r; tx.onerror = r; tx.onabort = r;
+    });
+    db.close();
+    return true;
+  })()`);
+  await dormir(600);
+  await recargar();
+  await dormir(1800);
+  const ajena = await evaluar(`/Importación recuperada|de otro/.test(document.body.innerText || "")`);
+  afirmar(
+    ajena === "false" || ajena === false,
+    "NO se restaura la sesión de otro usuario",
+    String(ajena)
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // CUÁNTAS CONSULTAS DE IA GASTA CADA COSA
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // El plan es de VEINTE por día. Cada consulta que se gasta sola —un doble
+  // toque, una retranscripción silenciosa, volver a abrir el mismo archivo— es
+  // una que le falta a alguien a la tarde.
+  //
+  // Esta sección no mira la pantalla: mira el CONTADOR. Es la única forma de
+  // afirmar "esto gastó cero" en vez de suponerlo porque no se vio nada raro.
+  console.log("\n── cuánto gasta cada acción ───────────────────────────────────");
+  await medidas(390, 844);
+  await limpiarSesionGuardada();
+  await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó para el conteo de consultas");
+  await evaluar(`window.__fallarPrimero = false; window.__fijarConsultas(0); true`);
+
+  // ── 1. UNA IMPORTACIÓN NORMAL: EXACTAMENTE UNA ────────────────────────
+  await seleccionarArchivo("consumo-sintetico.pdf");
+  if (!(await esperarA(`document.body.innerText.includes("Precio del sistema")`, 20000))) {
+    morir("no llegó a revisión en el conteo");
+  }
+  await dormir(400);
+  const trasLeer = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasLeer === 1, "una importación normal gasta EXACTAMENTE 1 consulta", String(trasLeer));
+
+  // ── 2. CORREGIR PRODUCTOS, CANTIDADES Y PRECIOS: CERO ─────────────────
+  await evaluar(`(() => {
+    const tarjeta = document.querySelector('[data-sunmi-panel]');
+    const inputs = [...document.querySelectorAll('input')].filter((i) => i.type !== "file");
+    if (inputs[0]) {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(inputs[0], "7");
+      inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    // Y se tocan los botones de confirmar que haya.
+    for (const b of [...document.querySelectorAll('button')].filter((x) => /^Confirmar producto$/.test((x.innerText||"").trim())).slice(0, 2)) b.click();
+    return !!tarjeta;
+  })()`);
+  await dormir(600);
+  const gastoTrasCorregir = Number(await evaluar(`window.__consultasIa`));
+  afirmar(gastoTrasCorregir === 1, "corregir productos, cantidades y precios gasta CERO", String(gastoTrasCorregir));
+
+  // ── 3. EXPLICAR: EXACTAMENTE UNA MÁS ──────────────────────────────────
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Explicar cómo leer este documento/.test(b.innerText || ""))?.click()`);
+  await dormir(300);
+  await evaluar(`(() => {
+    const area = document.querySelector('textarea');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(area, "La columna ENVIADO es la cantidad enviada.");
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await dormir(200);
+
+  // ── 4. Y EL DOBLE TOQUE GASTA UNA SOLA ────────────────────────────────
+  //
+  // Los dos clics van SIN esperar en el medio, que es lo que hace un dedo
+  // impaciente en un teléfono. Con un `useState` como único candado, el segundo
+  // clic ve el estado viejo y sale igual.
+  await evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')].find((x) => /Ver cómo quedaría/.test(x.innerText || ""));
+    b?.click(); b?.click(); b?.click();
+    return true;
+  })()`);
+  await esperarA(`document.body.innerText.includes("Así se va a leer")`, 15000);
+  await dormir(600);
+  const trasExplicar = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasExplicar === 2, "explicar gasta EXACTAMENTE 1 más, y tres toques no gastan tres", String(trasExplicar));
+
+  // Y que se haya PREGUNTADO antes de gastar.
+  const preguntas = JSON.parse(await evaluar(`JSON.stringify(window.__confirmaciones)`));
+  afirmar(
+    preguntas.some((t) => /utilizar[áa] 1 consulta de IA/i.test(t)),
+    "se avisa ANTES de gastar, con esas palabras",
+    JSON.stringify(preguntas).slice(0, 200)
+  );
+
+  // ── 5. VOLVER A ABRIR EL MISMO ARCHIVO: CERO ──────────────────────────
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /^Cancelar$/.test((b.innerText||"").trim()))?.click()`);
+  await dormir(300);
+  await seleccionarArchivo("consumo-sintetico.pdf");
+  await dormir(1200);
+  const trasReabrir = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasReabrir === 2, "volver a elegir el MISMO archivo gasta CERO", String(trasReabrir));
+  const dijoQueReuso = await evaluar(`/Se reusó la lectura de este archivo/.test(document.body.innerText || "")`);
+  afirmar(dijoQueReuso === "true" || dijoQueReuso === true, "y la pantalla lo dice, en vez de disimularlo");
+
+  // ── 6. RECARGAR Y RESTAURAR: CERO ─────────────────────────────────────
+  //
+  // Se compara ANTES contra DESPUÉS y no contra cero: el contador sobrevive a la
+  // recarga a propósito —igual que el de verdad, que vive en la base— así que
+  // exigir cero probaría que el contador se borró, no que restaurar no gastó.
+  await esperarA(`/Guardado en este dispositivo/.test(document.body.innerText || "")`, 15000);
+  const antesDeRecargarIa = Number(await evaluar(`window.__consultasIa`));
+  await recargar();
+  if (!(await esperarA(`document.body.innerText.includes("Importación recuperada")`, 25000))) {
+    morir("no se recuperó la importación en el conteo de consultas");
+  }
+  await dormir(900);
+  const trasRecargar = Number(await evaluar(`window.__consultasIa`));
+  afirmar(
+    trasRecargar === antesDeRecargarIa,
+    "restaurar tras recargar gasta CERO consultas",
+    `antes ${antesDeRecargarIa} / después ${trasRecargar}`
+  );
+  // Y el contador que se VE tiene que ser el mismo, no reiniciarse con la página.
+  const contadorTrasRecargar = await evaluar(`(document.body.innerText.match(/IA utilizada hoy: (\\d+) de/) || [])[1] || "?"`);
+  afirmar(
+    String(contadorTrasRecargar) === String(antesDeRecargarIa),
+    "restaurar CONSERVA el contador que se ve",
+    `se ve ${contadorTrasRecargar}, se esperaba ${antesDeRecargarIa}`
+  );
+
+  // ── 7. RECHAZAR EL AVISO NO GASTA ─────────────────────────────────────
+  await evaluar(`window.__aceptarGasto = false; window.__fijarConsultas(0); true`);
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Volver a analizar/.test(b.innerText || ""))?.click()`);
+  await dormir(800);
+  const trasRechazar = Number(await evaluar(`window.__consultasIa`));
+  afirmar(trasRechazar === 0, "decir que NO al aviso no gasta ninguna consulta", String(trasRechazar));
+  await evaluar(`window.__aceptarGasto = true; true`);
+
+  // ── 8. EL CONTADOR SE VE ──────────────────────────────────────────────
+  const seVe = await evaluar(`/IA utilizada hoy: \\d+ de 20/.test(document.body.innerText || "")`);
+  afirmar(seVe === "true" || seVe === true, "el contador 'IA utilizada hoy: X de 20' está a la vista");
+
+  // ── 9. CADA ACCIÓN QUE GASTA PREGUNTA ANTES ───────────────────────────
+  //
+  // Se ejerce una por una y se mira QUÉ preguntó, no solo que haya preguntado:
+  // un aviso genérico no deja decidir. Con `__aceptarGasto` en false ninguna
+  // llega a gastar, así que esta parte cuesta cero consultas.
+  await evaluar(`window.__aceptarGasto = false; window.__confirmaciones = []; window.__fijarConsultas(0); true`);
+
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Volver a analizar/.test(b.innerText || ""))?.click()`);
+  await dormir(400);
+  const preguntoVolver = JSON.parse(await evaluar(`JSON.stringify(window.__confirmaciones)`));
+  afirmar(
+    preguntoVolver.some((t) => /utilizar[áa] 1 consulta de IA/i.test(t) && /volver a leer/i.test(t)),
+    "VOLVER A ANALIZAR pregunta antes, y dice que gasta una",
+    JSON.stringify(preguntoVolver)
+  );
+
+  // Reintentar: se llega desde un análisis fallido.
+  await evaluar(`window.__confirmaciones = []; true`);
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Reintentar análisis/.test(b.innerText || ""))?.click()`);
+  await dormir(400);
+  const preguntoReintentar = JSON.parse(await evaluar(`JSON.stringify(window.__confirmaciones)`));
+  // El botón solo existe cuando hubo un fallo; si no está, no se afirma de más.
+  const hayReintentar = await evaluar(`[...document.querySelectorAll('button')].some((b) => /Reintentar análisis/.test(b.innerText || ""))`);
+  if (hayReintentar === "true" || hayReintentar === true) {
+    afirmar(
+      preguntoReintentar.some((t) => /utilizar[áa] 1 consulta de IA/i.test(t)),
+      "REINTENTAR pregunta antes, y dice que gasta una",
+      JSON.stringify(preguntoReintentar)
+    );
+  }
+
+  // Retranscribir: se llega aplicando una receta que pide columnas sobre una
+  // lectura SIN tabla cruda, que es el camino de la foto.
+  await evaluar(`window.__confirmaciones = []; window.__modoFoto = true; true`);
+  await limpiarSesionGuardada();
+  await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó para el aviso de retranscribir");
+  await evaluar(`window.__modoFoto = true; window.__fallarPrimero = false; window.__aceptarGasto = true; window.__fijarConsultas(0); true`);
+  await seleccionarArchivo("aviso-retranscribir.jpg");
+  if (!(await esperarA(`document.body.innerText.includes("Cantidad del papel")`, 25000))) {
+    morir("la foto no llegó a revisión para el aviso de retranscribir");
+  }
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Explicar cómo leer este documento/.test(b.innerText || ""))?.click()`);
+  await dormir(300);
+  await evaluar(`(() => {
+    const area = document.querySelector('textarea');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(area, "La cantidad está en la columna ENVIADO.");
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await dormir(200);
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Ver cómo quedaría/.test(b.innerText || ""))?.click()`);
+  await esperarA(`document.body.innerText.includes("Así se va a leer")`, 15000);
+  await evaluar(`window.__confirmaciones = []; window.__aceptarGasto = false; true`);
+  await evaluar(`[...document.querySelectorAll('button')].find((b) => /Usar solo esta vez/.test(b.innerText || ""))?.click()`);
+  await dormir(900);
+  const avisoTranscribir = JSON.parse(await evaluar(`JSON.stringify({
+    preguntas: window.__confirmaciones,
+    transcripciones: (window.__transcripciones || []).length,
+    dice: /no se aplicó el formato/i.test(document.body.innerText || ""),
+  })`));
+  afirmar(
+    avisoTranscribir.preguntas.some((t) => /utilizar[áa] 1 consulta de IA/i.test(t) && /transcribir/i.test(t)),
+    "RETRANSCRIBIR pregunta antes, y dice que gasta una",
+    JSON.stringify(avisoTranscribir.preguntas)
+  );
+  afirmar(avisoTranscribir.transcripciones === 0, "decir que NO al aviso no transcribe nada", String(avisoTranscribir.transcripciones));
+  afirmar(avisoTranscribir.dice, "y la pantalla explica que el formato no se aplicó, en vez de aplicar medio");
+  await evaluar(`window.__aceptarGasto = true; window.__modoFoto = false; true`);
+
+  // ── 10. CON EL LÍMITE AGOTADO, LA PANTALLA BLOQUEA Y LO DICE ──────────
+  //
+  // El stub del consumo informa 20 de 20. Lo que se afirma es que la pantalla lo
+  // DICE con las palabras del límite y no como un error del archivo, que es la
+  // confusión que había que evitar.
+  await evaluar(`window.__fijarConsultas(20); true`);
+  await limpiarSesionGuardada();
+  await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
+  if (!(await esperarCatalogo())) morir("el catálogo no cargó con el límite agotado");
+  await dormir(600);
+  const agotado = JSON.parse(await evaluar(`JSON.stringify((() => {
+    const t = document.body.innerText || "";
+    return {
+      loDice: /Se alcanzó el límite diario/i.test(t),
+      diceCuando: /cuando se renueve la cuota/i.test(t),
+      ofreceAMano: /a mano/i.test(t),
+      noCulpaAlArchivo: !/no se pudo leer el archivo|el archivo no/i.test(t),
+      contador: /IA utilizada hoy: 20 de 20/.test(t),
+    };
+  })())`));
+  afirmar(agotado.loDice, "con el límite agotado la pantalla lo dice", JSON.stringify(agotado));
+  afirmar(agotado.diceCuando, "y dice que se va a poder cuando se renueve la cuota", JSON.stringify(agotado));
+  afirmar(agotado.ofreceAMano, "y ofrece seguir a mano", JSON.stringify(agotado));
+  afirmar(agotado.noCulpaAlArchivo, "y NO lo presenta como un problema del archivo", JSON.stringify(agotado));
+  afirmar(agotado.contador, "el contador muestra 20 de 20", JSON.stringify(agotado));
+  capturas.push(await capturar("limite-agotado-390x844.png"));
+  await evaluar(`window.__fijarConsultas(0); true`);
+
   // ── EL PIE CONTRA LA BARRA INFERIOR DEL TELÉFONO ──────────────────────────
   //
   // El menú tiene tres modos y "topbar" monta una BottomNav `fixed bottom-0
@@ -1581,6 +2129,7 @@ const morir = (motivo) => {
   console.log("\n── el pie contra la barra inferior (modo topbar) ──────────────");
   await medidas(390, 844);
   await evaluar(`localStorage.setItem("erpazul_layout", JSON.stringify({ menuMode: "topbar" })); true`);
+  await limpiarSesionGuardada();
   await navegar(`${BASE}/modulos/compras-proveedor/importar?proveedorId=4242`);
   if (!(await esperarA(`document.body.innerText.includes("1. Proveedor")`, 20000))) morir("no abrió la página en modo topbar");
   if (!(await esperarCatalogo())) morir("el catálogo no cargó en modo topbar");

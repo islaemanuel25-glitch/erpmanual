@@ -21,30 +21,52 @@ import { NextResponse } from "next/server";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { transcribirTablaDelArchivo } from "@/lib/compras-proveedor/importacion/lectorArchivo";
+import { CABECERA_REQUEST_ID, crearTraza } from "@/lib/ia/trazaDePedido";
 
 export async function POST(req) {
+  const traza = crearTraza({ ruta: "importar/transcribir" });
+  const cabecera = { [CABECERA_REQUEST_ID]: traza.requestId };
   try {
     const ctx = await resolveLocalAndGrupo(req);
-    if (ctx.error) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
+    if (ctx.error) {
+      traza.fin({ clase: `rechazo:${ctx.status}` });
+      return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
+    }
     const perm = checkPerm(ctx.session, "compras.crear");
-    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+    if (!perm.ok) {
+      traza.fin({ clase: `rechazo:${perm.status}` });
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+    }
 
     const form = await req.formData();
     const archivo = form.get("archivo");
+    traza.etapa("archivo-recibido");
+
     const resultado = await transcribirTablaDelArchivo({ archivo });
-    if (!resultado.ok) return NextResponse.json(resultado, { status: 400 });
-    return NextResponse.json({ ok: true, crudo: resultado.crudo });
+    traza.etapa("proveedor", { estadoProveedor: resultado.estadoProveedor ?? null });
+
+    if (!resultado.ok) {
+      // 400 y no 502: acá también es un RESULTADO de la lectura, no una falla
+      // del transporte. Un 5xx del origen es lo que un proxy puede reemplazar
+      // por una página, y eso ya pasó una vez en este mismo módulo.
+      traza.fin({ clase: `lectura:${resultado.codigo}` });
+      return NextResponse.json({ ...resultado, requestId: traza.requestId }, { status: 400, headers: cabecera });
+    }
+    traza.fin({ clase: "ok" });
+    return NextResponse.json({ ok: true, crudo: resultado.crudo, requestId: traza.requestId }, { headers: cabecera });
   } catch (error) {
-    console.error("Error compras-proveedor/importar/transcribir:", error);
+    traza.fin({ clase: `excepcion:${error?.name || "Error"}` });
+    console.error(`[importador] req=${traza.requestId} excepción en importar/transcribir:`, error);
     // JSON también acá. Un `catch` que devolviera una página convertiría este
     // error en el mismo "Unexpected token '<'" que motivó toda esta tanda.
     return NextResponse.json(
       {
         ok: false,
+        requestId: traza.requestId,
         error:
           "No se pudo transcribir la tabla del archivo. No se guardó nada: esto solo vuelve a leer el papel.",
       },
-      { status: 500 }
+      { status: 500, headers: cabecera }
     );
   }
 }
