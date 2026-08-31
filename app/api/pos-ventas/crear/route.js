@@ -757,7 +757,17 @@ export async function POST(req) {
       grupoId
     );
 
-    // Transaccion: crear venta + descontar stock + movimiento CC si fiado
+    // Transaccion: crear venta + descontar stock + movimiento CC si fiado.
+    //
+    // Una venta interna también crea su transferencia acá adentro para conservar
+    // la atomicidad. En producción, el 2026-08-31, una venta de 151 líneas llegó
+    // a procesar 137 y Prisma la revirtió por superar apenas su default implícito
+    // de 5 s (P2028, 5071 ms). El tiempo por línea medido varió entre 17 y 57 ms
+    // según la carga de PostgreSQL: no existe un umbral seguro de cantidad.
+    //
+    // Treinta segundos no aceleran los viajes seriales, pero dan margen al flujo
+    // actual sin sacar la transferencia de esta misma transacción. maxWait limita
+    // por separado cuánto puede esperar Prisma antes de conseguir una transacción.
     const txResult = await prisma.$transaction(async (tx) => {
       // Lock a nivel de transacción para evitar concurrencia en número de venta
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${Number(localId)})`;
@@ -1035,6 +1045,9 @@ export async function POST(req) {
       }
 
       return { venta: nuevaVenta, allowNegativeStockUsed, transferenciaVenta };
+    }, {
+      maxWait: 10_000,
+      timeout: 30_000,
     });
 
     const venta = txResult.venta;
