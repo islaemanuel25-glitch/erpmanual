@@ -16,54 +16,103 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260831150000_mostrar_stock_pos_por_local` — SIN DESPLEGAR
-
-Está en `main` desde el merge del PR #21.
-
-**Qué hace:** agrega la columna `mostrarStockPos` a `ConfiguracionLocal`, que
-decide si el POS de ese local le muestra el stock al cajero. Es la misma tabla
-donde ya viven las otras nueve opciones por local.
-
-**Qué NO toca:** ninguna tabla existente y ninguna columna existente. No hay
-backfill, no hay dato que se pierda y no hay `UPDATE`.
-
-**Aditiva pura:** `ADD COLUMN "mostrarStockPos" BOOLEAN` nullable y sin default.
-En PostgreSQL 11 y posteriores eso no reescribe las filas, así que no bloquea
-escrituras sobre `ConfiguracionLocal` mientras se aplica.
-
-**Compatible hacia atrás durante la ventana:** el código viejo que sigue
-atendiendo entre migrar y recrear no conoce la columna y no la selecciona, así
-que le da igual que exista. Es el caso que la regla de la ventana pide.
-
-**El quinto chequeo del backup NO aplica**: no es una migración de datos, no
-borra ni transforma nada, así que no hay ningún valor que comprobar dentro del
-dump. Los cuatro de siempre sí.
-
-**Al aplicarla, el árbol pasa de 104 a 105 migraciones**, y ése es el número que
-tiene que informar el contenedor descartable.
+Ninguna.
 
 ---
 
-### ⚠️ Y ESTE DESPLIEGUE CAMBIA LO QUE VE EL CAJERO, EN TODOS LOS LOCALES
+Producción está al día en **105**, comprobado con `prisma migrate status` el
+2026-09-01 después de desplegar
+`b13e748e3a79064f931b7086a7f8956c888dc7a3` — el merge del PR #21, que hace
+configurable por local si el POS le muestra el stock al cajero, con la migración
+`20260831150000_mostrar_stock_pos_por_local` **aplicada**.
 
-No es un efecto de la migración sino del código que viaja con ella, pero se
-anota acá porque es lo que hay que saber ANTES de arrancar, y este archivo es lo
-que el paso 0 lee.
+La entrada de esa migración se borra de la lista de pendientes porque se cumplió
+la condición que ella misma fijaba: el árbol tiene 105 y el contenedor
+descartable informó "105 migrations found" y "Database schema is up to date!". Y
+se aplicó DE VERDAD, que es otra cosa: imprimió `Applying migration` y las
+aplicadas en la base subieron de **104 a 105** — un "No pending migrations to
+apply" con salida 0 se ve igual y significa lo contrario.
 
-Hoy el POS **muestra** el stock. La columna nace en `null`, y `null` significa
-apagado, así que **al recrear la app el stock deja de verse en todos los
-locales** hasta que alguien lo encienda uno por uno desde
-Configuración → POS Ventas.
+### EL EFECTO, COMPROBADO CONTRA `information_schema` EN LOS DOS SENTIDOS
 
-Es intencional y está pedido. Lo que conviene es avisarle a los locales antes
-del corte, en vez de que lo descubran con gente en el mostrador.
+Antes de migrar, la columna `mostrarStockPos` de `ConfiguracionLocal` daba **0**
+filas en `information_schema.columns`; después da **1**, `boolean`, `is_nullable
+= YES` y **sin default**, que es exactamente lo que la migración pedía. Y las
+filas que quedaron con valor son **0**: no hubo backfill, como estaba escrito.
+Ninguna tabla existente fue tocada.
 
-No es el patrón de `exigirOperador` ni el de `arqueoCajaActivo`, donde `null`
-conserva lo que ya pasaba: acá `null` estrena el comportamiento nuevo.
+### ⚠️ Y ESTE DESPLIEGUE CAMBIÓ LO QUE VE EL CAJERO, EN TODOS LOS LOCALES
+
+Era el efecto buscado y está anotado desde antes del corte, pero conviene que
+quede escrito acá también, porque es lo que alguien va a ir a buscar cuando
+pregunte por qué el POS se ve distinto.
+
+Todas las filas de `ConfiguracionLocal` quedaron con la columna en `null`, y
+`null` significa apagado: **el stock dejó de verse en el POS de todos los
+locales**, hasta que alguien lo encienda uno por uno desde
+Configuración → POS Ventas. No es el patrón de `exigirOperador` ni el de
+`arqueoCajaActivo`, donde `null` conserva lo que ya pasaba.
+
+Corte de **4 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` **no recreado** —arrancado el 2026-08-17 y sigue con
+ese mismo arranque, todo el despliegue con `--no-deps app`—, logs sin un solo
+error, `/modulos/pos-ventas` en 200, `/api/config/pos-ventas-cliente` en 401
+—existe y pide sesión, no 500— y el árbol del VPS limpio. Rollback disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:da20d21cd6f7b14919304788628eafe7cec77480`
+(imagen `sha256:d2f5a9ce07c5…`). No hizo falta.
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre en las últimas 20 líneas, **62 tablas**—:
+`/srv/produccion/backups/pre-b13e748e_20260901_030730.sql.gz`, 3,3 MB. El quinto
+no aplica: es aditiva pura, no borra ni transforma ningún dato, así que no hay
+valor que buscar adentro del dump.
+
+El clasificador corrió **antes del backup**, con el rango tomado de la imagen que
+atendía —`da20d21c..HEAD`—: informó "Archivos a mirar: 1", clasificó **aditiva** y
+salió con 0. No es el caso degenerado: nombró la migración correcta.
+
+### EL CÓDIGO VIAJÓ, COMPROBADO EN LOS DOS SENTIDOS
+
+El marcador es la cadena de interfaz `Mostrar stock en POS Ventas`, el rótulo del
+interruptor que estrena esta tanda. Es un literal y no un identificador —el build
+minifica los identificadores— y es **ASCII puro**, para que un acento roto al
+viajar por ssh no dé un vacío que se lea como "no llegó".
+
+En la imagen que atiende aparece en **2** archivos del build; en la imagen vieja,
+corrida en un contenedor descartable, en **0**. El control
+`Exigir operario para operar el POS` —que existía desde antes— da **2 en las
+dos**, que es lo que prueba que la búsqueda funciona y no que el grep esté
+fallando en la imagen vieja.
+
+La sonda de cascada dio **verde contra producción** antes y después del corte.
+
+### LO QUE NO SE PUDO HACER, Y NO SE DA POR BUENO
+
+**No se abrió el POS en producción con una sesión real**, así que el interruptor
+no se tocó contra el sitio: no se vio el stock apagarse ni encenderse desde
+Configuración → POS Ventas. No hay credenciales productivas en la máquina desde
+la que se desplegó, y el pedido de esta tanda fue expresamente no extraerlas del
+almacén.
+
+Lo que sí se comprobó sin sesión: la pantalla del POS contesta 200, la ruta de
+configuración contesta 401 —o sea que vive y pide sesión—, los logs no tienen un
+solo error después de pedirlas, y la columna existe con la forma correcta. La
+verificación del comportamiento está en los **16 candados** de
+`components/pos-ventas/stockNoVisible.test.mjs`, corridos contra el commit
+—no contra el escritorio— dentro de una suite de **4433 candados, 4432 en verde,
+0 en rojo y 1 todo conocido**.
+
+**Queda pendiente, y lo puede hacer cualquiera con sesión en diez segundos:**
+abrir un local, encender el interruptor, y confirmar que el stock vuelve a verse
+en el POS de ESE local y sigue oculto en los otros.
+
+**Ninguna autorización manual de migraciones**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea de hoy.
 
 ---
 
-Producción está al día en **104**, comprobado con `prisma migrate status` el
+Antes de éste, producción estaba al día en **104**, comprobado con
+`prisma migrate status` el
 2026-08-27 después de desplegar
 `de921481b56894433b9e2ff7e7cf1527a8764eb1` — el arreglo de los dos defectos que
 aparecieron con el importador en producción: el endpoint que devolvía una página
