@@ -16,7 +16,50 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna.
+### `20260831150000_mostrar_stock_pos_por_local` — SIN DESPLEGAR
+
+Está en `main` desde el merge del PR #21.
+
+**Qué hace:** agrega la columna `mostrarStockPos` a `ConfiguracionLocal`, que
+decide si el POS de ese local le muestra el stock al cajero. Es la misma tabla
+donde ya viven las otras nueve opciones por local.
+
+**Qué NO toca:** ninguna tabla existente y ninguna columna existente. No hay
+backfill, no hay dato que se pierda y no hay `UPDATE`.
+
+**Aditiva pura:** `ADD COLUMN "mostrarStockPos" BOOLEAN` nullable y sin default.
+En PostgreSQL 11 y posteriores eso no reescribe las filas, así que no bloquea
+escrituras sobre `ConfiguracionLocal` mientras se aplica.
+
+**Compatible hacia atrás durante la ventana:** el código viejo que sigue
+atendiendo entre migrar y recrear no conoce la columna y no la selecciona, así
+que le da igual que exista. Es el caso que la regla de la ventana pide.
+
+**El quinto chequeo del backup NO aplica**: no es una migración de datos, no
+borra ni transforma nada, así que no hay ningún valor que comprobar dentro del
+dump. Los cuatro de siempre sí.
+
+**Al aplicarla, el árbol pasa de 104 a 105 migraciones**, y ése es el número que
+tiene que informar el contenedor descartable.
+
+---
+
+### ⚠️ Y ESTE DESPLIEGUE CAMBIA LO QUE VE EL CAJERO, EN TODOS LOS LOCALES
+
+No es un efecto de la migración sino del código que viaja con ella, pero se
+anota acá porque es lo que hay que saber ANTES de arrancar, y este archivo es lo
+que el paso 0 lee.
+
+Hoy el POS **muestra** el stock. La columna nace en `null`, y `null` significa
+apagado, así que **al recrear la app el stock deja de verse en todos los
+locales** hasta que alguien lo encienda uno por uno desde
+Configuración → POS Ventas.
+
+Es intencional y está pedido. Lo que conviene es avisarle a los locales antes
+del corte, en vez de que lo descubran con gente en el mostrador.
+
+No es el patrón de `exigirOperador` ni el de `arqueoCajaActivo`, donde `null`
+conserva lo que ya pasaba: acá `null` estrena el comportamiento nuevo.
 
 ---
 
