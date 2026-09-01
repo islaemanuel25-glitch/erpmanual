@@ -47,8 +47,20 @@ import { descuentoPorPuntos } from "@/lib/pos-ventas/puntos";
 const MENSAJE_CANTIDAD_NO_DISPONIBLE =
   "No se pudo completar la venta con la cantidad solicitada. Actualizá el carrito e intentá nuevamente.";
 
-function mensajeErrorVenta(data, fallback) {
-  if (data?.limitante || data?.error?.includes("Stock insuficiente")) {
+/**
+ * EL TEXTO DEL RECHAZO, SEGÚN LO QUE ESTE LOCAL DEJA VER.
+ *
+ * Con el stock OCULTO, un rechazo por cantidad se traduce a un mensaje que no
+ * revela existencias: decir "quedan 3" por el error sería contarlo por la puerta
+ * de atrás, y entonces ocultarlo en el buscador no serviría de nada.
+ *
+ * Con el stock VISIBLE, gana la explicación del backend, que es más útil: dice
+ * qué producto y cuánto hay.
+ *
+ * En los DOS casos la venta se rechaza igual. Esto elige palabras, no permisos.
+ */
+function mensajeErrorVenta(data, fallback, mostrarStock = false) {
+  if (!mostrarStock && (data?.limitante || data?.error?.includes("Stock insuficiente"))) {
     return MENSAJE_CANTIDAD_NO_DISPONIBLE;
   }
   return data?.error || fallback;
@@ -105,7 +117,18 @@ export default function PosVentasPage() {
   const [posVentasConfig, setPosVentasConfig] = useState({
     exigirClienteVentasDeposito: false,
     exigirClienteVentasLocal: false,
+    // Oculto hasta que el servidor diga lo contrario. Arrancar en `true` haría
+    // parpadear el stock en el instante previo a la respuesta, que es justo lo
+    // que un local que lo apagó no quiere ver.
+    mostrarStockPos: false,
   });
+
+  // ── UNA SOLA DECISIÓN PARA TODA LA PANTALLA ─────────────────────────────
+  //
+  // Móvil, escritorio, buscador, avisos y el texto del rechazo salen de esta
+  // misma variable. Si cada superficie leyera el estado por su cuenta, alcanzaría
+  // con que una se olvidara para que el stock se filtrara por ahí.
+  const mostrarStockPos = posVentasConfig.mostrarStockPos === true;
   
   // Estado offline
   const [offlineMode, setOfflineMode] = useState(false);
@@ -262,19 +285,34 @@ export default function PosVentasPage() {
   // Cargar config "cliente obligatorio" del POS (feedback preventivo;
   // la autoridad final es el backend en /api/pos-ventas/crear).
   // ---------------------------------------------------------------------------
+  // ── LA CONFIGURACIÓN DEL LOCAL, CON GUARDA DE CARRERA ────────────────────
+  //
+  // Al cambiar de ubicación este efecto vuelve a salir, y la respuesta ANTERIOR
+  // puede llegar después: sin `vigente`, la configuración de un local pisaría la
+  // del que está activo, y el cajero vería el stock de una decisión ajena.
+  //
+  // Y se compara el `localId` que devuelve el servidor contra el del contexto:
+  // el `vigente` cubre el desmontaje, esto cubre una respuesta que llega para
+  // otro local aunque el efecto siga vivo. Son dos fallas distintas.
   useEffect(() => {
     if (!localActual) return;
+    let vigente = true;
     fetch("/api/config/pos-ventas-cliente", { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
-        if (data.ok) {
-          setPosVentasConfig({
-            exigirClienteVentasDeposito: data.exigirClienteVentasDeposito ?? false,
-            exigirClienteVentasLocal: data.exigirClienteVentasLocal ?? false,
-          });
-        }
+        if (!vigente || !data.ok) return;
+        if (data.localId != null && String(data.localId) !== String(localActual)) return;
+        setPosVentasConfig({
+          exigirClienteVentasDeposito: data.exigirClienteVentasDeposito ?? false,
+          exigirClienteVentasLocal: data.exigirClienteVentasLocal ?? false,
+          // `=== true`: un `null` del local que nunca lo configuró queda apagado.
+          mostrarStockPos: data.mostrarStockPos === true,
+        });
       })
       .catch(() => {});
+    return () => {
+      vigente = false;
+    };
   }, [localActual]);
 
   // ---------------------------------------------------------------------------
@@ -591,7 +629,18 @@ export default function PosVentasPage() {
     }
     setPreviousCarrito([...state.carrito]);
     dispatch({ type: ActionTypes.ADD_ITEM, payload: { producto } });
-  }, [state.carrito]);
+
+    // Aviso de stock bajo: solo si el local muestra stock. El producto se agrega
+    // igual en los dos casos — esto avisa, no bloquea.
+    if (mostrarStockPos) {
+      const enCarrito = state.carrito.find((i) => i.productoBaseId === producto.productoBaseId);
+      const cantidadResultante = enCarrito ? enCarrito.cantidad + 1 : 1;
+      const stockDisponible = producto.stock ?? Infinity;
+      if (stockDisponible !== Infinity && cantidadResultante >= stockDisponible) {
+        showError(`Stock bajo: "${producto.nombre}" tiene ${stockDisponible} en stock`);
+      }
+    }
+  }, [state.carrito, mostrarStockPos]);
 
   // ---------------------------------------------------------------------------
   // Editar cantidad
@@ -933,10 +982,13 @@ export default function PosVentasPage() {
           dequeueById(ventaPendiente.clientVentaId);
           procesadas++;
           showSuccess(`Venta procesada #${data.numero || "N/A"}`);
+          if (mostrarStockPos && data.allowNegativeStockUsed) {
+            setSuccessMsg((prev) => (prev ? `${prev} — ` : "") + "Advertencia: venta con stock negativo (carga inicial).");
+          }
         } else {
           // Error → cortar procesamiento
           errores++;
-          const msg = mensajeErrorVenta(data, "Error al procesar venta pendiente");
+          const msg = mensajeErrorVenta(data, "Error al procesar venta pendiente", mostrarStockPos);
           showError(msg);
           setErrorMsg(`Error procesando cola: ${msg}`);
           break; // Cortar y dejar el resto
@@ -958,7 +1010,7 @@ export default function PosVentasPage() {
       showSuccess(`${procesadas} venta(s) procesada(s) correctamente`);
       setSuccessMsg(`${procesadas} venta(s) procesada(s). ${nuevaLongitud} pendiente(s)`);
     }
-  }, [offlineMode, procesandoCola, turnoActual, turnoVencido]);
+  }, [offlineMode, procesandoCola, turnoActual, turnoVencido, mostrarStockPos]);
 
   // ---------------------------------------------------------------------------
   // Gestión de pendientes offline (modal)
@@ -1393,6 +1445,10 @@ export default function PosVentasPage() {
         // Mostrar modal de ticket
         dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalTicket", data: ventaTicket } });
 
+        if (mostrarStockPos && data.allowNegativeStockUsed) {
+          setSuccessMsg("Advertencia: esta venta se registró con stock negativo (carga inicial).");
+        }
+
         // Limpiar carrito
         dispatch({ type: ActionTypes.CLEAR_CART });
         localStorage.removeItem("posVentasCarritoEnCurso_v1");
@@ -1402,7 +1458,7 @@ export default function PosVentasPage() {
       } else {
         // Manejar errores específicos
         if (res.status === 409) {
-          const msg = mensajeErrorVenta(data, "Error de concurrencia. Intenta nuevamente.");
+          const msg = mensajeErrorVenta(data, "Error de concurrencia. Intenta nuevamente.", mostrarStockPos);
           setErrorMsg(msg);
           showError(msg);
         } else {
@@ -1850,7 +1906,7 @@ export default function PosVentasPage() {
               clienteId={state.clienteSeleccionado?.id ?? null}
               onAgregar={handleAgregar}
               esDeposito={contexto?.esDeposito === true}
-              mostrarStock={false}
+              mostrarStock={mostrarStockPos}
             />
             <div className="flex-1 min-h-0 lg:overflow-auto">
               <CarritoVenta
@@ -1866,6 +1922,7 @@ export default function PosVentasPage() {
                 onAbrirCliente={handleAbrirPickerCliente}
                 esDeposito={contexto?.esDeposito === true}
                 onModoVentaChange={handleModoVentaChange}
+                mostrarStock={mostrarStockPos}
               />
             </div>
           </div>
@@ -2029,6 +2086,15 @@ export default function PosVentasPage() {
                 subtotalFijado,
               },
             });
+            // Aviso de stock bajo (kg), con la misma condición que el de unidades.
+            if (mostrarStockPos) {
+              const enCarrito = state.carrito.find((i) => i.productoBaseId === productoKgPendiente.productoBaseId);
+              const cantResultante = (enCarrito ? enCarrito.cantidad : 0) + cantidadKg;
+              const stockKg = productoKgPendiente.stock ?? Infinity;
+              if (stockKg !== Infinity && cantResultante >= stockKg) {
+                showError(`Stock bajo: "${productoKgPendiente.nombre}" tiene ${stockKg} kg en stock`);
+              }
+            }
             setProductoKgPendiente(null);
           }}
           onCancelar={() => setProductoKgPendiente(null)}

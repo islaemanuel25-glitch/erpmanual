@@ -4,6 +4,7 @@ import { memo, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import { fromUnidades } from "@/lib/conversiones/stock";
 import { subtotalLinea } from "@/lib/pos-ventas/lineaPorImporte";
 
 function formatPrecio(n) {
@@ -11,6 +12,76 @@ function formatPrecio(n) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+// ── EL STOCK DEL CARRITO SE DIBUJA SOLO SI EL LOCAL LO PIDIÓ ───────────────
+//
+// Todo lo de este bloque es DISPLAY. Ninguna de estas funciones decide cuánto
+// se puede vender: eso lo hace `item.stockMax`, que sigue limitando el stepper
+// esté el stock visible o no.
+//
+// Volvieron tal cual estaban antes de ocultarlas, sin reescribirlas: la versión
+// activada tiene que verse exactamente como se veía, y una reescritura "parecida"
+// mueve píxeles que nadie pidió mover.
+
+// Etiqueta del formato según unidad de medida (display descriptivo de stock — desktop)
+function labelFormato(unidad) {
+  switch (unidad) {
+    case "cajon": return "cajones";
+    case "pack": return "packs";
+    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
+    default: return "formatos";
+  }
+}
+
+// Letra compacta del formato (chip de stock mobile): cajon→c, pack→p
+function letraFormato(unidad) {
+  switch (unidad) {
+    case "cajon": return "c";
+    case "pack": return "p";
+    default: return "f";
+  }
+}
+
+// Texto compacto del chip de stock (mobile). Stock real en unidades (stockMax).
+// Positivo → "Stock: 2p + 10u". Negativo → "Stock: -13u" (sin desglose en bultos).
+function stockChipText(item) {
+  const factor = Number(item.factorPack) || 1;
+  const total = Number(item.stockMax) || 0;
+  if (total < 0) return `Stock: ${total}u`;
+  const { bultos, sueltas } = fromUnidades({ unidades: total, factorPack: factor });
+  return `Stock: ${bultos}${letraFormato(item.unidadMedida)} + ${sueltas}u`;
+}
+
+// ¿Mostrar desglose de stock para esta línea? Solo depósito, pack real (>1),
+// excluyendo kg. Usa el stock real (stockMax = unidades) que ya trae la línea.
+//
+// `mostrarStock` va PRIMERO y corta: si el local no muestra stock, no hay
+// desglose que evaluar. Ponerlo al final funcionaría igual y leería peor.
+function mostrarStockDeposito(item, esDeposito, mostrarStock) {
+  return (
+    mostrarStock === true &&
+    esDeposito === true &&
+    Number(item.factorPack) > 1 &&
+    item.unidadMedida !== "kg"
+  );
+}
+
+// Línea descriptiva de stock (DESKTOP). Negativo → solo unidades (sin "-2 cajones + -1 uds").
+function StockDeposito({ item }) {
+  const factor = Number(item.factorPack) || 1;
+  const total = Number(item.stockMax) || 0;
+  if (total < 0) {
+    return (
+      <div className="text-[10px] pos-text-muted mt-0.5">Stock disponible: {total} uds</div>
+    );
+  }
+  const { bultos, sueltas } = fromUnidades({ unidades: total, factorPack: factor });
+  return (
+    <div className="text-[10px] pos-text-muted mt-0.5">
+      Stock disponible: {bultos} {labelFormato(item.unidadMedida)} x{factor} + {sueltas} uds
+    </div>
+  );
 }
 
 /* ── Stepper de cantidad (− input +) ── */
@@ -127,10 +198,12 @@ function admiteRemanente(item, esDeposito) {
   );
 }
 
-/* ── Fila horizontal scrolleable de chips (MOBILE): selector Formato/Unidad. ── */
-function ChipsRowMobile({ item, idx, esDeposito, onModoVentaChange }) {
+/* ── Fila horizontal scrolleable de chips (MOBILE): selector Formato/Unidad +
+      chip de stock compacto cuando el local lo muestra. ── */
+function ChipsRowMobile({ item, idx, esDeposito, onModoVentaChange, mostrarStock = false }) {
   const mostrarToggle = admiteRemanente(item, esDeposito) && !!onModoVentaChange;
-  if (!mostrarToggle) return null;
+  const conStock = mostrarStockDeposito(item, esDeposito, mostrarStock);
+  if (!mostrarToggle && !conStock) return null;
 
   const factor = Number(item.factorPack) || 1;
   const modo = item.modoVentaLinea || "NORMAL";
@@ -159,6 +232,9 @@ function ChipsRowMobile({ item, idx, esDeposito, onModoVentaChange }) {
           </button>
         </>
       )}
+      {conStock && (
+        <span className={`${chip} pos-text-muted border-dashed`}>{stockChipText(item)}</span>
+      )}
     </div>
   );
 }
@@ -176,6 +252,9 @@ function CarritoVenta({
   onAbrirCliente,
   esDeposito = false,
   onModoVentaChange,
+  // Solo VISUAL. El tope de cantidad sale de `item.stockMax` y no mira esto:
+  // apagarlo oculta el número, no levanta el límite.
+  mostrarStock = false,
 }) {
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false);
   if (items.length === 0) {
@@ -316,8 +395,9 @@ function CarritoVenta({
                   />
                 </div>
 
-                {/* Fila 3: selector Formato/Unidad */}
+                {/* Fila 3: selector Formato/Unidad + stock compacto si se muestra */}
                 <ChipsRowMobile
+                  mostrarStock={mostrarStock}
                   item={item}
                   idx={idx}
                   esDeposito={esDeposito}
@@ -361,6 +441,9 @@ function CarritoVenta({
                         idx={idx}
                         onModoVentaChange={onModoVentaChange}
                       />
+                    )}
+                    {mostrarStockDeposito(item, esDeposito, mostrarStock) && (
+                      <StockDeposito item={item} />
                     )}
                   </>
                 )}
