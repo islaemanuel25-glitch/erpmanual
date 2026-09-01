@@ -7,19 +7,25 @@ import { showError } from "@/components/sunmi/SunmiToast";
 import { fromUnidades } from "@/lib/conversiones/stock";
 import { rankearProductos } from "@/lib/pos-ventas/rankearProductos";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
-const SIN_STOCK_MSG = "Producto sin stock disponible";
+const NO_DISPONIBLE_MSG = "Producto no disponible para la venta";
 
-// Etiqueta del formato según unidad de medida (solo display de stock en depósito)
 function labelFormato(unidad) {
   switch (unidad) {
     case "cajon": return "cajones";
     case "pack": return "packs";
-    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
     default: return "formatos";
   }
 }
 
-function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDeposito = false, wrapCard = true }) {
+function BuscadorProductos({
+  localId,
+  clienteId = null,
+  onAgregar,
+  apiPath,
+  esDeposito = false,
+  wrapCard = true,
+  mostrarStock = true,
+}) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -75,7 +81,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
                 items[0].codigoBarraPropio.toLowerCase() === queryLower));
           if (matchCodigoExacto) {
             if (items[0].disponibleParaVenta === false) {
-              showError(SIN_STOCK_MSG);
+              showError(NO_DISPONIBLE_MSG);
               setResultados(items);
               return;
             }
@@ -90,7 +96,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
           // Auto-agregar si se pidió (scanner Enter) y hay resultado único
           if (autoAdd && items.length === 1) {
             if (items[0].disponibleParaVenta === false) {
-              showError(SIN_STOCK_MSG);
+              showError(NO_DISPONIBLE_MSG);
               setResultados(items);
               return;
             }
@@ -162,7 +168,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
       // Enter normal: agregar primer resultado o buscar
       if (resultados.length > 0) {
         if (resultados[0].disponibleParaVenta === false) {
-          showError(SIN_STOCK_MSG);
+          showError(NO_DISPONIBLE_MSG);
           scanBuffer.current = "";
           return;
         }
@@ -208,7 +214,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
   // Agregar producto y limpiar
   const handleAgregar = (producto) => {
     if (producto?.disponibleParaVenta === false) {
-      showError(SIN_STOCK_MSG);
+      showError(NO_DISPONIBLE_MSG);
       return;
     }
     onAgregar(producto);
@@ -249,24 +255,23 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
         <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
           {resultados.map((p) => {
             const noDisponible = p.disponibleParaVenta === false;
-            // Desglose de stock "X formatos x{factor} + Y uds": solo en depósito,
-            // para productos con pack real (factorPack > 1), excluyendo kg/fiambre.
-            // Usa el stock real en unidades que ya viene de la API (no recalcula).
-            const factorPack = Number(p.factorPack) || 1;
-            const mostrarDesglose =
-              esDeposito && factorPack > 1 && p.unidadMedida !== "kg" && !p.esFiambreFijo;
-            let stockNode;
-            if (p.sinStock && p.disponibleParaVenta === false) {
-              stockNode = <span className="pos-text-danger font-semibold">Sin stock</span>;
-            } else if (mostrarDesglose) {
-              const { bultos, sueltas } = fromUnidades({ unidades: Number(p.stock), factorPack });
-              stockNode = (
-                <span>Stock: {bultos} {labelFormato(p.unidadMedida)} x{factorPack} + {sueltas} uds</span>
-              );
-            } else {
-              stockNode = (
-                <span>Stock: {p.unidadMedida === "kg" ? `${Number(p.stock).toFixed(3)} kg` : p.stock}</span>
-              );
+            let stockNode = null;
+            if (mostrarStock) {
+              const factorPack = Number(p.factorPack) || 1;
+              const mostrarDesglose =
+                esDeposito && factorPack > 1 && p.unidadMedida !== "kg" && !p.esFiambreFijo;
+              if (p.sinStock && p.disponibleParaVenta === false) {
+                stockNode = <span className="pos-text-danger font-semibold">Sin stock</span>;
+              } else if (mostrarDesglose) {
+                const { bultos, sueltas } = fromUnidades({ unidades: Number(p.stock), factorPack });
+                stockNode = (
+                  <span>Stock: {bultos} {labelFormato(p.unidadMedida)} x{factorPack} + {sueltas} uds</span>
+                );
+              } else {
+                stockNode = (
+                  <span>Stock: {p.unidadMedida === "kg" ? `${Number(p.stock).toFixed(3)} kg` : p.stock}</span>
+                );
+              }
             }
             return (
               <div
@@ -278,7 +283,7 @@ function BuscadorProductos({ localId, clienteId = null, onAgregar, apiPath, esDe
                   <div className="text-sm font-medium truncate">{p.nombre}</div>
                   <div className="text-[11px] pos-text-muted">
                     {p.codigoBarra && (
-                      <span className="mr-3">Cod: {p.codigoBarra}</span>
+                      <span className={mostrarStock ? "mr-3" : undefined}>Cod: {p.codigoBarra}</span>
                     )}
                     {stockNode}
                   </div>

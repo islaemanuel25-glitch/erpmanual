@@ -139,6 +139,31 @@ model ConfiguracionLocal {
   // Distinta de la preferencia personal por navegador (localStorage).
   aparienciaJson     Json?
 
+  /// ¿EL POS LE MUESTRA EL STOCK AL CAJERO? (config_local.pos)
+  ///
+  /// Solo cambia lo que se VE. Ocultar el stock no modifica las reglas, los
+  /// permisos ni las validaciones de stock existentes: el descuento, el tope de
+  /// `stockMax`, `allowNegativeStock` y la validación del backend siguen
+  /// exactamente como estaban. Hay candados que lo comprueban.
+  ///
+  /// VA COMO COLUMNA por el mismo motivo medido que las de la tarjeta, unas
+  /// líneas más abajo: el PUT de apariencia pisa `aparienciaJson` entero, así
+  /// que guardar el tema borraría esto sin aviso. Nueve de las diez opciones de
+  /// este modelo ya son columnas sueltas; el JSON es la excepción.
+  ///
+  /// NULLABLE, Y `null` SIGNIFICA APAGADO.
+  ///
+  /// ESTO SÍ CAMBIA LO QUE SE VE HOY, Y ES A PROPÓSITO. En producción el POS
+  /// muestra el stock. Al desplegar, todos los locales quedan con la columna en
+  /// `null` —o sea, en apagado— así que el stock deja de verse en todos hasta
+  /// que alguien lo encienda, local por local, desde Configuración → POS Ventas.
+  ///
+  /// No es el patrón de `exigirOperador` ni el de `arqueoCajaActivo`, donde
+  /// `null` conserva lo que ya pasaba. Acá `null` estrena un comportamiento
+  /// nuevo, y por eso conviene avisarlo antes del despliegue en vez de que
+  /// aparezca como una sorpresa en el mostrador.
+  mostrarStockPos    Boolean?
+
   // Arqueos parciales de caja (config_local.alertas). Todo nullable: un local
   // sin fila conserva el comportamiento histórico (sin alertas), y por eso el
   // default efectivo de `arqueoCajaActivo` es false — activar esto en producción

@@ -1,0 +1,39 @@
+-- ¿EL POS LE MUESTRA EL STOCK AL CAJERO? UNA DECISIÓN POR LOCAL.
+--
+-- Una sola columna nullable sobre una tabla que ya existe. Es aditiva pura: no
+-- hay backfill, no hay dato que se pierda y no bloquea escrituras — `ADD COLUMN`
+-- sin default no reescribe las filas en PostgreSQL 11 y posteriores.
+--
+-- POR QUÉ COLUMNA Y NO DENTRO DE `aparienciaJson`
+--
+-- Porque el PUT de apariencia pisa ese JSON entero —`update: { aparienciaJson: … }`
+-- con lo que venga—, así que guardar el tema del local borraría esta preferencia
+-- sin que nadie se entere. Está medido y escrito en el esquema, al lado de las
+-- dos columnas de la tarjeta de producto que existen por el mismo motivo. Nueve
+-- de las diez opciones de `ConfiguracionLocal` ya son columnas sueltas: el JSON
+-- es la excepción, no la regla.
+--
+-- POR QUÉ NULLABLE, Y QUÉ SIGNIFICA `null`
+--
+-- `null` es APAGADO: el stock no se muestra.
+--
+-- ⚠️ ESTA MIGRACIÓN SÍ CAMBIA LO QUE VE EL CAJERO, Y ES A PROPÓSITO.
+--
+-- Hoy el POS de producción MUESTRA el stock. Al aplicar esto todos los locales
+-- quedan con la columna en `null`, o sea en apagado, así que el stock deja de
+-- verse EN TODOS hasta que alguien lo encienda uno por uno desde
+-- Configuración → POS Ventas.
+--
+-- Conviene decirlo antes de desplegar. No es el patrón de `exigirOperador` ni
+-- el de `arqueoCajaActivo` —donde `null` conserva lo que ya pasaba—: acá `null`
+-- estrena el comportamiento nuevo, y quien mire el mostrador después del corte
+-- va a ver una pantalla distinta.
+--
+-- LO QUE ESTA COLUMNA NO HACE
+--
+-- Ocultar el stock no modifica las reglas, los permisos ni las validaciones de
+-- stock existentes. El descuento, el tope de `stockMax`, `allowNegativeStock` y
+-- la validación del backend siguen exactamente como estaban: esta columna solo
+-- decide qué ve el cajero en pantalla.
+
+ALTER TABLE "ConfiguracionLocal" ADD COLUMN "mostrarStockPos" BOOLEAN;

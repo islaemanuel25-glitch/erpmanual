@@ -14,6 +14,16 @@ function formatPrecio(n) {
   });
 }
 
+// ── EL STOCK DEL CARRITO SE DIBUJA SOLO SI EL LOCAL LO PIDIÓ ───────────────
+//
+// Todo lo de este bloque es DISPLAY. Ninguna de estas funciones decide cuánto
+// se puede vender: eso lo hace `item.stockMax`, que sigue limitando el stepper
+// esté el stock visible o no.
+//
+// Volvieron tal cual estaban antes de ocultarlas, sin reescribirlas: la versión
+// activada tiene que verse exactamente como se veía, y una reescritura "parecida"
+// mueve píxeles que nadie pidió mover.
+
 // Etiqueta del formato según unidad de medida (display descriptivo de stock — desktop)
 function labelFormato(unidad) {
   switch (unidad) {
@@ -24,7 +34,7 @@ function labelFormato(unidad) {
   }
 }
 
-// Letra compacta del formato (chip de stock mobile): cajon→c, pack→p, caja→cj, carton→ct
+// Letra compacta del formato (chip de stock mobile): cajon→c, pack→p
 function letraFormato(unidad) {
   switch (unidad) {
     case "cajon": return "c";
@@ -45,8 +55,12 @@ function stockChipText(item) {
 
 // ¿Mostrar desglose de stock para esta línea? Solo depósito, pack real (>1),
 // excluyendo kg. Usa el stock real (stockMax = unidades) que ya trae la línea.
-function mostrarStockDeposito(item, esDeposito) {
+//
+// `mostrarStock` va PRIMERO y corta: si el local no muestra stock, no hay
+// desglose que evaluar. Ponerlo al final funcionaría igual y leería peor.
+function mostrarStockDeposito(item, esDeposito, mostrarStock) {
   return (
+    mostrarStock === true &&
     esDeposito === true &&
     Number(item.factorPack) > 1 &&
     item.unidadMedida !== "kg"
@@ -185,12 +199,11 @@ function admiteRemanente(item, esDeposito) {
 }
 
 /* ── Fila horizontal scrolleable de chips (MOBILE): selector Formato/Unidad +
-      chip de stock compacto. Compacta la altura del card. Solo display/selector,
-      no toca cálculo de venta/precio/stock. ── */
-function ChipsRowMobile({ item, idx, esDeposito, onModoVentaChange }) {
+      chip de stock compacto cuando el local lo muestra. ── */
+function ChipsRowMobile({ item, idx, esDeposito, onModoVentaChange, mostrarStock = false }) {
   const mostrarToggle = admiteRemanente(item, esDeposito) && !!onModoVentaChange;
-  const mostrarStock = mostrarStockDeposito(item, esDeposito);
-  if (!mostrarToggle && !mostrarStock) return null;
+  const conStock = mostrarStockDeposito(item, esDeposito, mostrarStock);
+  if (!mostrarToggle && !conStock) return null;
 
   const factor = Number(item.factorPack) || 1;
   const modo = item.modoVentaLinea || "NORMAL";
@@ -219,7 +232,7 @@ function ChipsRowMobile({ item, idx, esDeposito, onModoVentaChange }) {
           </button>
         </>
       )}
-      {mostrarStock && (
+      {conStock && (
         <span className={`${chip} pos-text-muted border-dashed`}>{stockChipText(item)}</span>
       )}
     </div>
@@ -239,6 +252,9 @@ function CarritoVenta({
   onAbrirCliente,
   esDeposito = false,
   onModoVentaChange,
+  // Solo VISUAL. El tope de cantidad sale de `item.stockMax` y no mira esto:
+  // apagarlo oculta el número, no levanta el límite.
+  mostrarStock = false,
 }) {
   const [confirmarLimpiar, setConfirmarLimpiar] = useState(false);
   if (items.length === 0) {
@@ -379,8 +395,9 @@ function CarritoVenta({
                   />
                 </div>
 
-                {/* Fila 3: chips scrolleables (selector Formato/Unidad + stock compacto) */}
+                {/* Fila 3: selector Formato/Unidad + stock compacto si se muestra */}
                 <ChipsRowMobile
+                  mostrarStock={mostrarStock}
                   item={item}
                   idx={idx}
                   esDeposito={esDeposito}
@@ -425,7 +442,9 @@ function CarritoVenta({
                         onModoVentaChange={onModoVentaChange}
                       />
                     )}
-                    {mostrarStockDeposito(item, esDeposito) && <StockDeposito item={item} />}
+                    {mostrarStockDeposito(item, esDeposito, mostrarStock) && (
+                      <StockDeposito item={item} />
+                    )}
                   </>
                 )}
               </td>
