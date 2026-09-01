@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-08-31 10:07
+**Última actualización:** 2026-09-01 09:01
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-09-01: fix(pos): ocultar stock de la venta
 - 2026-08-31: fix(pos): ampliar el tiempo de la venta interna medida
 - 2026-08-05: fix(caja): ningún proceso de caja pendiente queda oculto
 - 2026-08-05: fix(caja): ningún proceso de caja pendiente queda oculto

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-09-01] - Actualización: pos-ventas
+
+### Modificado
+- **pos-ventas**: fix(pos): ocultar stock de la venta
+- **pos-ventas**: fix(pos): ampliar el tiempo de la venta interna medida
+
+
 ## [2026-08-31] - Actualización: pos-ventas, proveedores
 
 ### Modificado
