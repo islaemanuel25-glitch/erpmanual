@@ -1,0 +1,33 @@
+-- ¿EL POS LE MUESTRA EL STOCK AL CAJERO? UNA DECISIÓN POR LOCAL.
+--
+-- Una sola columna nullable sobre una tabla que ya existe. Es aditiva pura: no
+-- hay backfill, no hay dato que se pierda y no bloquea escrituras — `ADD COLUMN`
+-- sin default no reescribe las filas en PostgreSQL 11 y posteriores.
+--
+-- POR QUÉ COLUMNA Y NO DENTRO DE `aparienciaJson`
+--
+-- Porque el PUT de apariencia pisa ese JSON entero —`update: { aparienciaJson: … }`
+-- con lo que venga—, así que guardar el tema del local borraría esta preferencia
+-- sin que nadie se entere. Está medido y escrito en el esquema, al lado de las
+-- dos columnas de la tarjeta de producto que existen por el mismo motivo. Nueve
+-- de las diez opciones de `ConfiguracionLocal` ya son columnas sueltas: el JSON
+-- es la excepción, no la regla.
+--
+-- POR QUÉ NULLABLE, Y QUÉ SIGNIFICA `null`
+--
+-- `null` es APAGADO: el stock no se muestra. Es el comportamiento con el que
+-- esta tanda llega a producción, así que ningún local cambia de aspecto el día
+-- del despliegue — el cambio lo hace una persona, local por local, entrando a
+-- Configuración → POS Ventas.
+--
+-- Es el mismo criterio que ya usan `exigirOperador` y `arqueoCajaActivo`, y el
+-- que declara el encabezado del modelo: "un local sin fila conserva el
+-- comportamiento histórico".
+--
+-- LO QUE ESTA COLUMNA NO HACE
+--
+-- No afloja ningún control. El POS sigue descontando stock, `stockMax` sigue
+-- limitando la cantidad que se puede cargar y el backend sigue validando contra
+-- la base. Solo decide qué ve el cajero en pantalla.
+
+ALTER TABLE "ConfiguracionLocal" ADD COLUMN "mostrarStockPos" BOOLEAN;

@@ -139,6 +139,23 @@ model ConfiguracionLocal {
   // Distinta de la preferencia personal por navegador (localStorage).
   aparienciaJson     Json?
 
+  /// ¿EL POS LE MUESTRA EL STOCK AL CAJERO? (config_local.pos)
+  ///
+  /// Solo cambia lo que se VE. El POS sigue descontando, `stockMax` sigue
+  /// limitando la cantidad y el backend sigue validando contra la base: apagar
+  /// esto no afloja ningún control, y hay candados que lo comprueban.
+  ///
+  /// VA COMO COLUMNA por el mismo motivo medido que las de la tarjeta, unas
+  /// líneas más abajo: el PUT de apariencia pisa `aparienciaJson` entero, así
+  /// que guardar el tema borraría esto sin aviso. Nueve de las diez opciones de
+  /// este modelo ya son columnas sueltas; el JSON es la excepción.
+  ///
+  /// NULLABLE, Y `null` SIGNIFICA APAGADO. Es el comportamiento con el que esta
+  /// tanda llega a producción: el stock queda oculto hasta que alguien lo
+  /// encienda a propósito, local por local. Un local que nunca entre a la
+  /// pantalla de configuración no cambia de comportamiento al desplegar.
+  mostrarStockPos    Boolean?
+
   // Arqueos parciales de caja (config_local.alertas). Todo nullable: un local
   // sin fila conserva el comportamiento histórico (sin alertas), y por eso el
   // default efectivo de `arqueoCajaActivo` es false — activar esto en producción
