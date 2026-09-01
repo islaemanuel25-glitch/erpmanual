@@ -51,9 +51,13 @@ const ESQUEMA = fs.readFileSync(path.join(RAIZ, "prisma/schema.prisma"), "utf8")
 // ══════════════════════════════════════════════════════════════════════════
 
 test("POS0. EL DEFAULT ES FALSE: sin configurar, el stock NO se muestra", () => {
-  // Es la condición del despliegue: ningún local cambia de aspecto el día que
-  // esto sale. `null` es lo que tiene una fila que nadie tocó, y `undefined` lo
-  // que tiene un local sin fila.
+  // `null` es lo que tiene una fila que nadie tocó, y `undefined` lo que tiene
+  // un local sin fila. Los dos apagan.
+  //
+  // Y eso CAMBIA lo que se ve hoy, a propósito: en producción el POS muestra el
+  // stock, así que al desplegar deja de verse en todos los locales hasta que
+  // alguien lo encienda uno por uno. El default no conserva el comportamiento
+  // actual — lo reemplaza.
   assert.equal(mostrarStockEnPos(null), false);
   assert.equal(mostrarStockEnPos(undefined), false);
   assert.equal(mostrarStockEnPos(false), false);
@@ -69,9 +73,9 @@ test("POS0b. NADA QUE NO SEA `true` ENCIENDE EL STOCK", () => {
 });
 
 test("POS0c. LA COLUMNA ES NULLABLE Y VIVE EN LA CONFIGURACIÓN DEL LOCAL", () => {
-  // Nullable a propósito: `null` = apagado = comportamiento histórico. Si
-  // alguien le pusiera un default en la base, un local que nunca la tocó pasaría
-  // a mostrar stock sin que nadie lo decida.
+  // Nullable a propósito: `null` = apagado. Si alguien le pusiera un default en
+  // la base, un local que nunca la tocó pasaría a mostrar stock sin que nadie lo
+  // decida — que es justo lo contrario de lo que esta opción viene a permitir.
   assert.match(ESQUEMA, /mostrarStockPos\s+Boolean\?/);
   assert.doesNotMatch(ESQUEMA, /mostrarStockPos\s+Boolean\?\s*@default/);
   // Y va dentro de ConfiguracionLocal, no en una tabla nueva al lado.
@@ -253,8 +257,14 @@ test("POS9. LA OPCIÓN ESTÁ EN CONFIGURACIÓN → POS VENTAS, CON SU NOMBRE EXA
   // Con las piezas del kit, no con un input nativo.
   assert.match(CONFIG_PANTALLA, /<SunmiToggle/);
   assert.doesNotMatch(CONFIG_PANTALLA, /<input(?![^>]*type="hidden")/);
-  // Y la descripción aclara que el control interno sigue.
-  assert.match(CONFIG_PANTALLA, /descuenta stock/i);
+  // Y la descripción aclara que ocultar no afloja nada, con una formulación que
+  // no promete de más: la primera decía que el POS "no deja cargar más de lo que
+  // hay", y eso es falso en un local con `allowNegativeStock` encendido.
+  assert.match(
+    CONFIG_PANTALLA,
+    /no modifica las reglas, los permisos ni las validaciones de stock existentes/i
+  );
+  assert.doesNotMatch(CONFIG_PANTALLA, /no deja cargar más de lo que hay/i);
 });
 
 test("POS10. EL CAJERO NO PUEDE CAMBIARLA DESDE EL POS", () => {

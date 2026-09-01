@@ -15,19 +15,25 @@
 --
 -- POR QUÉ NULLABLE, Y QUÉ SIGNIFICA `null`
 --
--- `null` es APAGADO: el stock no se muestra. Es el comportamiento con el que
--- esta tanda llega a producción, así que ningún local cambia de aspecto el día
--- del despliegue — el cambio lo hace una persona, local por local, entrando a
+-- `null` es APAGADO: el stock no se muestra.
+--
+-- ⚠️ ESTA MIGRACIÓN SÍ CAMBIA LO QUE VE EL CAJERO, Y ES A PROPÓSITO.
+--
+-- Hoy el POS de producción MUESTRA el stock. Al aplicar esto todos los locales
+-- quedan con la columna en `null`, o sea en apagado, así que el stock deja de
+-- verse EN TODOS hasta que alguien lo encienda uno por uno desde
 -- Configuración → POS Ventas.
 --
--- Es el mismo criterio que ya usan `exigirOperador` y `arqueoCajaActivo`, y el
--- que declara el encabezado del modelo: "un local sin fila conserva el
--- comportamiento histórico".
+-- Conviene decirlo antes de desplegar. No es el patrón de `exigirOperador` ni
+-- el de `arqueoCajaActivo` —donde `null` conserva lo que ya pasaba—: acá `null`
+-- estrena el comportamiento nuevo, y quien mire el mostrador después del corte
+-- va a ver una pantalla distinta.
 --
 -- LO QUE ESTA COLUMNA NO HACE
 --
--- No afloja ningún control. El POS sigue descontando stock, `stockMax` sigue
--- limitando la cantidad que se puede cargar y el backend sigue validando contra
--- la base. Solo decide qué ve el cajero en pantalla.
+-- Ocultar el stock no modifica las reglas, los permisos ni las validaciones de
+-- stock existentes. El descuento, el tope de `stockMax`, `allowNegativeStock` y
+-- la validación del backend siguen exactamente como estaban: esta columna solo
+-- decide qué ve el cajero en pantalla.
 
 ALTER TABLE "ConfiguracionLocal" ADD COLUMN "mostrarStockPos" BOOLEAN;

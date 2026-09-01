@@ -37,7 +37,7 @@ const TOGGLES = [
     key: "mostrarStockPos",
     label: "Mostrar stock en POS Ventas",
     descripcion:
-      "Cambia solo lo que ve el cajero en la pantalla de venta: las existencias en el buscador y en el carrito, y los avisos de stock bajo o negativo. El control interno sigue igual — el POS descuenta stock, no deja cargar más de lo que hay y el servidor valida cada venta contra la base. No afecta al editor de combos.",
+      "Cambia solo lo que ve el cajero en la pantalla de venta: las existencias en el buscador y en el carrito, y los avisos de stock bajo o negativo. Ocultar el stock no modifica las reglas, los permisos ni las validaciones de stock existentes: siguen aplicándose igual que hasta ahora, con la configuración que tenga este local. No afecta al editor de combos.",
     icon: Boxes,
     onLabel: "Visible",
     offLabel: "Oculto",
