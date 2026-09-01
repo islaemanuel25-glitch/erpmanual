@@ -27,7 +27,7 @@ export async function GET(req) {
     }
     const { localId, grupoId } = scope;
 
-    const [{ exigirClienteVenta, exigirOperador }, cg] = await Promise.all([
+    const [{ exigirClienteVenta, exigirOperador, mostrarStockPos }, cg] = await Promise.all([
       getConfigLocalEfectiva(localId, grupoId),
       prisma.configuracionGrupo.findUnique({
         where: { grupoId },
@@ -39,6 +39,14 @@ export async function GET(req) {
       ok: true,
       exigirClienteVenta,
       exigirOperador,
+      // Lo lee la pantalla de configuración Y el propio POS. Por eso el permiso
+      // de este GET es el par `config_local.pos` + `pos.usar`: si fuera solo el
+      // primero, la caja no podría preguntar qué tiene que dibujar.
+      //
+      // Va SIEMPRE con el localId del scope, nunca del body: el server decide de
+      // qué local es la respuesta.
+      mostrarStockPos,
+      localId,
       // Legacy (grupo) — sólo lectura, para compatibilidad transitoria.
       exigirClienteVentasDeposito: cg?.exigirClienteVentasDeposito ?? false,
       exigirClienteVentasLocal: cg?.exigirClienteVentasLocal ?? false,
@@ -99,6 +107,12 @@ export async function POST(req) {
       data.exigirOperador = !!body.exigirOperador;
     }
 
+    // Mostrar el stock en el POS de este local. Solo cambia lo VISIBLE: el
+    // descuento, el tope de cantidad y la validación del backend no lo miran.
+    if (body.mostrarStockPos !== undefined) {
+      data.mostrarStockPos = !!body.mostrarStockPos;
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { ok: false, error: "Nada para actualizar" },
@@ -112,8 +126,9 @@ export async function POST(req) {
       create: { localId, ...data },
     });
 
-    const { exigirClienteVenta, exigirOperador } = await getConfigLocalEfectiva(localId, grupoId);
-    return NextResponse.json({ ok: true, exigirClienteVenta, exigirOperador });
+    const { exigirClienteVenta, exigirOperador, mostrarStockPos } =
+      await getConfigLocalEfectiva(localId, grupoId);
+    return NextResponse.json({ ok: true, exigirClienteVenta, exigirOperador, mostrarStockPos });
   } catch (error) {
     console.error("Error actualizando config pos-ventas-cliente:", error);
     return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });

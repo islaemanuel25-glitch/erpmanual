@@ -7,7 +7,7 @@ import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { Store, UserCheck } from "lucide-react";
+import { Boxes, Store, UserCheck } from "lucide-react";
 
 // Reglas de POS PER LOCAL (config_local.pos): un toggle canónico por regla.
 const TOGGLES = [
@@ -33,6 +33,17 @@ const TOGGLES = [
     msgOn: "Operario obligatorio activado en este local",
     msgOff: "Operario ahora es opcional en este local",
   },
+  {
+    key: "mostrarStockPos",
+    label: "Mostrar stock en POS Ventas",
+    descripcion:
+      "Cambia solo lo que ve el cajero en la pantalla de venta: las existencias en el buscador y en el carrito, y los avisos de stock bajo o negativo. El control interno sigue igual — el POS descuenta stock, no deja cargar más de lo que hay y el servidor valida cada venta contra la base. No afecta al editor de combos.",
+    icon: Boxes,
+    onLabel: "Visible",
+    offLabel: "Oculto",
+    msgOn: "El POS de este local vuelve a mostrar el stock",
+    msgOff: "El POS de este local deja de mostrar el stock",
+  },
 ];
 
 export default function ConfigPosVentasPage() {
@@ -40,6 +51,11 @@ export default function ConfigPosVentasPage() {
   const [config, setConfig] = useState({
     exigirClienteVenta: false,
     exigirOperador: true, // default histórico: operario obligatorio
+    // Apagado, igual que resuelve el servidor. El default se escribe en los dos
+    // lados a propósito: si acá fuera `true`, la pantalla mostraría el toggle
+    // encendido durante el instante previo a que llegue la respuesta, y eso se
+    // lee como que el local ya lo tenía así.
+    mostrarStockPos: false,
   });
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(null);
@@ -58,6 +74,9 @@ export default function ConfigPosVentasPage() {
           setConfig({
             exigirClienteVenta: data.exigirClienteVenta ?? false,
             exigirOperador: data.exigirOperador ?? true,
+            // `=== true` y no `?? false`: un `null` de un local que nunca lo
+            // configuró tiene que quedar apagado, no heredar nada.
+            mostrarStockPos: data.mostrarStockPos === true,
           });
         }
       })
