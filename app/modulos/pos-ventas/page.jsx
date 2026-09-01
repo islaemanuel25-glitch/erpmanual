@@ -44,6 +44,16 @@ import AvisoVentaInterna from "@/components/pos-ventas/AvisoVentaInterna";
 import { ClipboardList, Printer, Undo2 } from "lucide-react";
 import { descuentoPorPuntos } from "@/lib/pos-ventas/puntos";
 
+const MENSAJE_CANTIDAD_NO_DISPONIBLE =
+  "No se pudo completar la venta con la cantidad solicitada. Actualizá el carrito e intentá nuevamente.";
+
+function mensajeErrorVenta(data, fallback) {
+  if (data?.limitante || data?.error?.includes("Stock insuficiente")) {
+    return MENSAJE_CANTIDAD_NO_DISPONIBLE;
+  }
+  return data?.error || fallback;
+}
+
 export default function PosVentasPage() {
   const router = useRouter();
   const { perfil: perfilCtx, cargando: cargandoCtx } = useUser();
@@ -581,14 +591,6 @@ export default function PosVentasPage() {
     }
     setPreviousCarrito([...state.carrito]);
     dispatch({ type: ActionTypes.ADD_ITEM, payload: { producto } });
-
-    // Alerta de stock bajo
-    const enCarrito = state.carrito.find((i) => i.productoBaseId === producto.productoBaseId);
-    const cantidadResultante = enCarrito ? enCarrito.cantidad + 1 : 1;
-    const stockDisponible = producto.stock ?? Infinity;
-    if (stockDisponible !== Infinity && cantidadResultante >= stockDisponible) {
-      showError(`Stock bajo: "${producto.nombre}" tiene ${stockDisponible} en stock`);
-    }
   }, [state.carrito]);
 
   // ---------------------------------------------------------------------------
@@ -931,13 +933,10 @@ export default function PosVentasPage() {
           dequeueById(ventaPendiente.clientVentaId);
           procesadas++;
           showSuccess(`Venta procesada #${data.numero || "N/A"}`);
-          if (data.allowNegativeStockUsed) {
-            setSuccessMsg((prev) => (prev ? `${prev} — ` : "") + "Advertencia: venta con stock negativo (carga inicial).");
-          }
         } else {
           // Error → cortar procesamiento
           errores++;
-          const msg = data.error || "Error al procesar venta pendiente";
+          const msg = mensajeErrorVenta(data, "Error al procesar venta pendiente");
           showError(msg);
           setErrorMsg(`Error procesando cola: ${msg}`);
           break; // Cortar y dejar el resto
@@ -1394,10 +1393,6 @@ export default function PosVentasPage() {
         // Mostrar modal de ticket
         dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalTicket", data: ventaTicket } });
 
-        if (data.allowNegativeStockUsed) {
-          setSuccessMsg("Advertencia: esta venta se registró con stock negativo (carga inicial).");
-        }
-
         // Limpiar carrito
         dispatch({ type: ActionTypes.CLEAR_CART });
         localStorage.removeItem("posVentasCarritoEnCurso_v1");
@@ -1407,8 +1402,7 @@ export default function PosVentasPage() {
       } else {
         // Manejar errores específicos
         if (res.status === 409) {
-          // Stock insuficiente o concurrencia
-          const msg = data.error || "Error de concurrencia. Intenta nuevamente.";
+          const msg = mensajeErrorVenta(data, "Error de concurrencia. Intenta nuevamente.");
           setErrorMsg(msg);
           showError(msg);
         } else {
@@ -1856,6 +1850,7 @@ export default function PosVentasPage() {
               clienteId={state.clienteSeleccionado?.id ?? null}
               onAgregar={handleAgregar}
               esDeposito={contexto?.esDeposito === true}
+              mostrarStock={false}
             />
             <div className="flex-1 min-h-0 lg:overflow-auto">
               <CarritoVenta
@@ -2034,13 +2029,6 @@ export default function PosVentasPage() {
                 subtotalFijado,
               },
             });
-            // Alerta de stock bajo (kg)
-            const enCarrito = state.carrito.find((i) => i.productoBaseId === productoKgPendiente.productoBaseId);
-            const cantResultante = (enCarrito ? enCarrito.cantidad : 0) + cantidadKg;
-            const stockKg = productoKgPendiente.stock ?? Infinity;
-            if (stockKg !== Infinity && cantResultante >= stockKg) {
-              showError(`Stock bajo: "${productoKgPendiente.nombre}" tiene ${stockKg} kg en stock`);
-            }
             setProductoKgPendiente(null);
           }}
           onCancelar={() => setProductoKgPendiente(null)}
