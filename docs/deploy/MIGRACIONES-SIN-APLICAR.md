@@ -22,6 +22,75 @@ Ninguna.
 
 Producción está al día en **105**, comprobado con `prisma migrate status` el
 2026-09-02 después de desplegar
+`81541c3727262cd5172057b9200174ceffd6ef0d` — el merge de
+`fix/productos-restaurar-posicion`: volver de editar deja al mismo producto
+donde estaba. **Solo código.**
+
+Corte de **4 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` **no recreado** —sigue con el arranque del 2026-08-17,
+todo con `--no-deps app`—, logs sin un solo error, `APP_IMAGE` sin filtrarse
+dentro del contenedor y el árbol del VPS limpio. Rollback disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:78ae684dd74fb5f63843f829324eb76b8106b48d`
+(imagen `sha256:8a05a03ecac3…`). No hizo falta.
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre en las últimas 20 líneas, **62 tablas**—:
+`/srv/produccion/backups/pre-81541c37_20260902_232105.sql.gz`, 3,4 MB. El quinto
+no aplica: no hay migración.
+
+Sin migraciones: el rango `78ae684d..81541c37` no toca `prisma/`, el clasificador
+informó "Archivos a mirar: 0" con el rango tomado de la imagen que atendía, y
+este archivo ya decía que no había pendientes. Los cuatro conteos dieron **105**
+—árbol local, árbol del VPS, aplicadas en la base y el contenedor descartable—.
+
+### EL ÁRBOL DEL MERGE ES EL DE LA RAMA PROBADA
+
+Comprobado antes del corte y no después: el merge `81541c37` tiene dos padres
+—`c12de2c7` y `299ed958`—, su árbol es `53244b93`, **el mismo** que el de la
+punta de la rama, y el diff entre los dos está vacío. Lo que se desplegó es
+exactamente lo que se probó.
+
+### EL CÓDIGO VIAJÓ, COMPROBADO EN LOS DOS SENTIDOS
+
+Dos marcadores, los dos cadenas y no identificadores: `data-ancla` —el atributo
+con el que se encuentra una card o una fila al volver— y el rótulo `Último
+editado`.
+
+En la imagen que atiende aparecen en **47** y **3** archivos del build; en la
+imagen vieja, corrida en un contenedor descartable, en **0** los dos. El control
+`Para revisar` da **4 en las dos**, que es lo que prueba que la búsqueda funciona
+en ambas, y una cadena inventada da 0.
+
+### EL CONTROL POSTERIOR
+
+`/modulos/productos` en **200**, y también con la query completa
+—`?page=2&q=a&sortKey=precioVenta&sortDir=desc`—. El editor de producto
+`/modulos/productos/1176/editar?page=2` en **200** y el de combo
+`/modulos/productos/editar-combo/6550?tipo=combos` en **200**, que son los dos
+caminos que esta tanda arregla. `/api/productos/listar` en **401** —vive y pide
+sesión— y `/login` en 200. Logs sin un solo error después de pedirlas. Cascada
+**verde** antes y después del corte.
+
+### LO QUE NO SE EJERCIÓ CONTRA PRODUCCIÓN
+
+**No se abrió el listado con una sesión real**, así que el ciclo de editar y
+volver no se recorrió contra el sitio. La verificación funcional está hecha
+contra un servidor de desarrollo con datos reales antes del corte, con las tres
+sondas en verde: la del retorno con **79 afirmaciones** a 390×844 y a 1366×900
+—los cuatro caminos de vuelta, el combo, la entrada por otra URL con un estado
+pendiente, volver de la ficha, y la comparación de altura con 12 px de
+tolerancia—, la del carrusel con 51, y la de la tarjeta.
+
+Un caso queda anotado como **NO ALCANZABLE** y no como aprobado: con dos combos
+en la lista, el contenedor llega a su tope —83 de 83 px de sobrante— y no existe
+scroll que ponga el segundo a media pantalla.
+
+**Ninguna autorización manual de migraciones**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea de hoy.
+
+---
+
+Antes de éste, producción estuvo en
 `78ae684dd74fb5f63843f829324eb76b8106b48d` — el merge de
 `hotfix/carrusel-unico`, que corrige un defecto de interpretación del despliegue
 anterior: las ocho modalidades vuelven al MISMO carrusel de "Para revisar", en
