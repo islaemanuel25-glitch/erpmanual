@@ -30,10 +30,15 @@ const {
   SELECT_CONTROLES_LOCAL,
   contarDesdePrisma,
   filaMarcadaPor,
+  contarPresentacionesDesdePrisma,
+  filaMarcadaPorPresentacion,
   opcionesDelTecho,
   TECHO_CONTROL,
 } = await import("../lib/productos/controlesDesdePrisma.js");
 const { IDS_CONTROL } = await import("../lib/productos/controlesCalidad.js");
+const { IDS_PRESENTACION, IDS_VENTA, IDS_COMPRA } = await import(
+  "../lib/productos/presentaciones.js"
+);
 
 let fallas = 0;
 const paso = (nombre, detalle = "") => console.log(`  OK   ${nombre}${detalle ? ` — ${detalle}` : ""}`);
@@ -151,7 +156,94 @@ await ejercer("updateMany de precio revisado (sin tocar filas)", async () => {
   return "0 filas, argumentos válidos";
 });
 
+// ── LAS PRESENTACIONES, SOBRE LAS MISMAS FILAS ─────────────────────────────
+//
+// Los cinco campos que agrega esta clasificación —`modo_envio`,
+// `modoCompraProveedor`, `pesoEsFijo`, `modoVentaDeposito` y `es_combo`— viajan
+// en el MISMO select, así que si alguno no existiera en la base la consulta de
+// arriba ya habría fallado. Lo que estos pasos agregan es lo que un select
+// válido no prueba: que la clasificación conteste sobre filas reales, y que el
+// contador y el filtro den el mismo número.
+
+// 8. La ubicación de prueba: `es_deposito` es un argumento más y se valida igual.
+let esDeposito = false;
+await ejercer("es_deposito de la ubicación, tal cual lo pide la ruta", async () => {
+  const l = await prisma.local.findUnique({
+    where: { id: localId },
+    select: { es_deposito: true },
+  });
+  esDeposito = l?.es_deposito === true;
+  return esDeposito ? "es depósito" : "es local (o no existe)";
+});
+
+// 9. Clasificar filas REALES. Un campo que no viaje llega `undefined` y la
+//    clasificación contesta con confianza una respuesta equivocada — que es
+//    exactamente cómo se rompió el fiambre de pieza fija en este repo.
+await ejercer("clasificar las presentaciones de las filas traídas", () => {
+  const conteo = contarPresentacionesDesdePrisma(filas, esDeposito);
+  const faltantes = IDS_PRESENTACION.filter((id) => typeof conteo[id] !== "number");
+  if (faltantes.length > 0) throw new Error(`el conteo no trajo: ${faltantes.join(", ")}`);
+  const venta = IDS_VENTA.map((id) => `${id}=${conteo[id]}`).join(" ");
+  const compra = IDS_COMPRA.map((id) => `${id}=${conteo[id]}`).join(" ");
+  return `${venta} · ${compra}`;
+});
+
+// 10. Contador y filtro, fila por fila. Es el criterio del pedido —el número de
+//     la card tiene que ser el total de la lista que abre— comprobado sobre datos
+//     reales y no por construcción.
+await ejercer("el filtro de presentación coincide con el contador, fila por fila", () => {
+  const conteo = contarPresentacionesDesdePrisma(filas, esDeposito);
+  const desacuerdos = [];
+  for (const id of IDS_PRESENTACION) {
+    const porFiltro = filas.filter((f) => filaMarcadaPorPresentacion(id, f, esDeposito)).length;
+    if (porFiltro !== conteo[id]) {
+      desacuerdos.push(`${id}: filtro ${porFiltro} vs contador ${conteo[id]}`);
+    }
+  }
+  if (desacuerdos.length > 0) throw new Error(desacuerdos.join("; "));
+  return "las ocho coinciden";
+});
+
+// 11. NINGÚN PRODUCTO CAE EN DOS CARDS DEL MISMO GRUPO. Si pasara, la suma de las
+//     cards superaría el catálogo y ninguna diría la verdad sobre su lista.
+await ejercer("cada fila cae en una sola card por grupo", () => {
+  let dobles = 0;
+  for (const f of filas) {
+    if (IDS_VENTA.filter((id) => filaMarcadaPorPresentacion(id, f, esDeposito)).length > 1) dobles += 1;
+    if (IDS_COMPRA.filter((id) => filaMarcadaPorPresentacion(id, f, esDeposito)).length > 1) dobles += 1;
+  }
+  if (dobles > 0) throw new Error(`${dobles} filas caen en más de una card de su grupo`);
+  return `${filas.length} filas, ninguna repetida`;
+});
+
+// 12. LA UBICACIÓN CAMBIA LA RESPUESTA, o no está llegando. Se clasifica el mismo
+//     conjunto como depósito y como local: si el fiambre de pieza fija existe en
+//     los datos, los dos conteos tienen que diferir. Si no existe, se DICE — un
+//     caso que no ocurre en la base de prueba pasa en verde igual, y este repo ya
+//     pagó eso una vez con los combos.
+await ejercer("la ubicación cambia la clasificación de venta", () => {
+  const comoDeposito = contarPresentacionesDesdePrisma(filas, true);
+  const comoLocal = contarPresentacionesDesdePrisma(filas, false);
+  const difieren = IDS_VENTA.filter((id) => comoDeposito[id] !== comoLocal[id]);
+  if (difieren.length > 0) return `difieren en ${difieren.join(", ")} — la ubicación llega`;
+  return "NO EJERCIDO: en estos datos ningún producto cambia de escala entre depósito y local";
+});
+
+// 13. El `where` del filtro por presentación en el listado, con ids reales.
+await ejercer("where del filtro por presentación en el listado", async () => {
+  const ids = filas
+    .filter((f) => filaMarcadaPorPresentacion(IDS_VENTA[1], f, esDeposito))
+    .slice(0, 50)
+    .map((f) => f.id);
+  const n = await prisma.productoBase.count({ where: { AND: [{ activo: true }, { id: { in: ids } }] } });
+  return `${n} de ${ids.length} marcados por ${IDS_VENTA[1]}`;
+});
+
 await prisma.$disconnect();
 
-console.log(fallas === 0 ? "\nVERDE: las 8 consultas corren contra Postgres.\n" : `\nROJO: ${fallas} de 8.\n`);
+console.log(
+  fallas === 0
+    ? "\nVERDE: las 13 consultas corren contra Postgres.\n"
+    : `\nROJO: ${fallas} de 13.\n`
+);
 process.exit(fallas === 0 ? 0 : 1);
