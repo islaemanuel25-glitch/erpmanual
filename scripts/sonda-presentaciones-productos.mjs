@@ -1,9 +1,18 @@
-// SONDA: el bloque Presentaciones, ejercido en un navegador de verdad.
+// SONDA: el carrusel del catálogo, ejercido en un navegador de verdad.
+//
+// Un solo bloque de doce cards en tres páginas: los cuatro controles de "Para
+// revisar", las cuatro modalidades de venta y las cuatro de compra.
 //
 // ── POR QUÉ ESTA SONDA Y NO MÁS CANDADOS ───────────────────────────────────
 //
-// Los dos defectos que motivaron esta tanda son de los que un candado de texto
-// NO puede ver:
+// Los tres defectos que motivaron estas tandas son de los que un candado de
+// texto NO puede ver:
+//
+//   0. **Hubo DOS bloques donde tenía que haber uno.** Un candado de render
+//      mira lo que se le pasa al componente; no mira cuántas veces la pantalla
+//      lo dibuja. Acá se cuentan los carruseles del documento, que es la única
+//      forma de contestar esa pregunta — y se cuentan otra vez al final, después
+//      de haber tocado todo, por si el segundo apareciera recién con un filtro.
 //
 //   1. **Atrás no deshacía.** Un candado que busca `router.push` comprueba que la
 //      llamada esté escrita. No comprueba que el historial reciba una entrada, ni
@@ -81,10 +90,23 @@ fs.mkdirSync(PERFIL, { recursive: true });
 fs.mkdirSync(SALIDA, { recursive: true });
 
 const fallas = [];
+
+// ── LA NUMERACIÓN LA PONE EL ARNÉS, NO EL QUE ESCRIBE ─────────────────────
+//
+// Estaba escrita a mano en cada título, y al insertar afirmaciones en el medio
+// —esta tanda agregó dieciséis al principio— la lista quedaba con números
+// repetidos. Un informe con dos "14." es un informe que no se puede citar.
+//
+// Se saca el prefijo viejo si lo tiene, así los títulos ya escritos no hay que
+// tocarlos uno por uno para que la cuenta salga bien.
+let cuenta = 0;
 const afirmar = (ok, titulo, detalle = "") => {
-  console.log(`  ${ok ? "OK  " : "ROJO"}  ${titulo}${ok && detalle ? ` — ${detalle}` : ""}`);
+  cuenta += 1;
+  const limpio = String(titulo).replace(/^\s*\d+(-\w+)?\.\s*/, "");
+  const linea = `${cuenta}. ${limpio}`;
+  console.log(`  ${ok ? "OK  " : "ROJO"}  ${linea}${ok && detalle ? ` — ${detalle}` : ""}`);
   if (!ok) {
-    fallas.push({ titulo, detalle });
+    fallas.push({ titulo: linea, detalle });
     console.log(`        ${detalle}`);
   }
 };
@@ -142,12 +164,36 @@ async function esperarDatos(intentos = 80) {
   return false;
 }
 
-/** El estado que interesa, leído de la pantalla en un solo viaje. */
+/**
+ * El estado que interesa, leído de la pantalla en un solo viaje.
+ *
+ * ── SE BUSCA EL CARRUSEL, NO UN TÍTULO ────────────────────────────────────
+ *
+ * La versión anterior de esta sonda buscaba una sección titulada
+ * "Presentaciones", que era el segundo bloque —el defecto de interpretación que
+ * este arreglo saca—. Ahora hay UN carrusel, y se lo identifica por su
+ * estructura: la sección que tiene una pista horizontal con cards.
+ *
+ * `carruseles` viaja aparte y a propósito: es el dato con el que se afirma que
+ * hay uno solo. Contarlos es lo único que distingue "el bloque está bien" de
+ * "hay dos y estoy mirando el primero".
+ */
 const LEER_ESTADO = `(() => {
-  const seccion = [...document.querySelectorAll("section")].find(
-    (s) => s.querySelector("h2") && s.querySelector("h2").textContent.trim() === "Presentaciones"
+  const secciones = [...document.querySelectorAll("section")].filter(
+    (s) => s.querySelector("[class*='overflow-x-auto']") && s.querySelector("button[aria-pressed]")
   );
-  if (!seccion) return JSON.stringify({ hay: false });
+  const titulos = [...document.querySelectorAll("h2")].map((h) => h.textContent.trim());
+  const base = {
+    carruseles: secciones.length,
+    titulos,
+    url: location.pathname + location.search,
+    historial: history.length,
+    total: window.__listado ? window.__listado.total : null,
+    desborde: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  };
+  const seccion = secciones[0];
+  if (!seccion) return JSON.stringify({ ...base, hay: false });
+
   const pista = seccion.querySelector("[class*='overflow-x-auto']");
   const botones = [...seccion.querySelectorAll("button[aria-pressed]")];
   const activos = botones
@@ -161,18 +207,27 @@ const LEER_ESTADO = `(() => {
       return r.left >= rp.left - 1 && r.right <= rp.right + 1;
     })
     .map((b) => (b.getAttribute("aria-label") || "").split(":")[0].trim());
-  const cinta = [...seccion.querySelectorAll("[role='status'] span")].map((s) => s.textContent.trim());
+  const cinta = [...seccion.querySelectorAll("[role='status'] span")]
+    .map((s) => s.textContent.trim())
+    .filter(Boolean);
+
+  // ── DÓNDE EMPIEZA EL BUSCADOR ────────────────────────────────────────────
+  // El número que contesta si el bloque empujó la pantalla hacia abajo. Se mide
+  // el borde superior del campo, en coordenadas del documento.
+  const campo = document.querySelector('input[type="search"], input[placeholder*="uscar"], input[placeholder*="ombre"]');
+  const yBuscador = campo ? Math.round(campo.getBoundingClientRect().top + window.scrollY) : null;
+
   return JSON.stringify({
+    ...base,
     hay: true,
     activos,
     visibles,
     cinta,
+    cards: botones.length,
+    yBuscador,
+    puntos: [...seccion.querySelectorAll('button[aria-label^="Página"]')].length,
     pagina: pista && pista.clientWidth ? Math.round(pista.scrollLeft / pista.clientWidth) : null,
     paginas: pista ? pista.children.length : 0,
-    url: location.pathname + location.search,
-    historial: history.length,
-    total: window.__listado ? window.__listado.total : null,
-    desborde: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   });
 })()`;
 
@@ -194,29 +249,23 @@ async function leerEstado() {
   const e = JSON.parse(await evaluar(LEER_ESTADO));
   if (e.hay) return e;
   return {
+    ...e,
     hay: false,
     activos: [],
     visibles: [],
     cinta: [],
+    cards: 0,
+    yBuscador: null,
+    puntos: 0,
     pagina: null,
     paginas: 0,
-    url: await evaluar("location.pathname + location.search"),
-    historial: await evaluar("history.length"),
-    total: null,
-    desborde: 0,
   };
 }
 
-/** Toca la card de una presentación por su id, usando su rótulo del dominio. */
-async function tocarCard(idPresentacion) {
-  const p = PRESENTACIONES.find((x) => x.id === idPresentacion);
-  const etiqueta = `${p.titulo} ${p.detalle}`;
+/** Toca una card por su rótulo, esté en la página que esté. */
+async function tocarPorEtiqueta(etiqueta) {
   const ok = await evaluar(`(() => {
-    const seccion = [...document.querySelectorAll("section")].find(
-      (s) => s.querySelector("h2") && s.querySelector("h2").textContent.trim() === "Presentaciones"
-    );
-    if (!seccion) return false;
-    const b = [...seccion.querySelectorAll("button[aria-pressed]")].find((x) =>
+    const b = [...document.querySelectorAll("section button[aria-pressed]")].find((x) =>
       (x.getAttribute("aria-label") || "").startsWith(${JSON.stringify(etiqueta)} + ":")
     );
     if (!b) return false;
@@ -227,6 +276,22 @@ async function tocarCard(idPresentacion) {
   await sleep(250);
   await esperarDatos(40);
   return etiqueta;
+}
+
+/** Toca la card de una presentación por su id, usando su rótulo del dominio. */
+async function tocarCard(idPresentacion) {
+  const p = PRESENTACIONES.find((x) => x.id === idPresentacion);
+  return tocarPorEtiqueta(`${p.titulo} ${p.detalle}`);
+}
+
+/** Lleva el carrusel a una página, como lo haría un dedo sobre el puntito. */
+async function irAPagina(indice) {
+  await evaluar(`(() => {
+    const b = document.querySelector('section button[aria-label="Página ${indice + 1} de 3"]');
+    if (b) b.click();
+    return !!b;
+  })()`);
+  await sleep(700);
 }
 
 async function capturar(nombre, url) {
@@ -325,31 +390,72 @@ try {
   if (!(await esperarDatos())) morir("el listado o los contadores no contestaron");
 
   let e = await leerEstado();
-  afirmar(e.hay, "1. el bloque Presentaciones existe en la pantalla", e.hay ? "" : "no se encontró la sección");
-  if (!e.hay) morir("sin el bloque no hay nada que medir");
+  afirmar(e.hay, "1. hay un carrusel de cards en la pantalla", e.hay ? "" : "no se encontró ninguno");
+  if (!e.hay) morir("sin el carrusel no hay nada que medir");
+
+  // ── LAS DOS AFIRMACIONES DEL DEFECTO DE INTERPRETACIÓN ──────────────────
+  //
+  // La tanda anterior creó un SEGUNDO bloque con su propio título. Estas dos son
+  // las que se ponen rojas si eso vuelve, y por eso van primero: si hay dos
+  // carruseles, todo lo que se mida después está mirando uno de los dos.
+  afirmar(
+    e.carruseles === 1,
+    "2. UN SOLO CARRUSEL EN LA PANTALLA",
+    `hay ${e.carruseles} — con dos, la pantalla vuelve a tener dos bloques`
+  );
+  afirmar(
+    !e.titulos.includes("Presentaciones"),
+    "3. NO EXISTE EL ENCABEZADO 'Presentaciones'",
+    `títulos=${e.titulos.join(" | ")}`
+  );
+  afirmar(
+    e.titulos.includes("Para revisar"),
+    "4. y el encabezado del bloque sigue siendo el de siempre",
+    `títulos=${e.titulos.join(" | ")}`
+  );
 
   afirmar(
-    e.paginas === 2,
-    "2. dos páginas de cuatro cards",
-    `páginas=${e.paginas} (esperado 2 para ${PRESENTACIONES.length} cards de a ${POR_PAGINA_ESPERADO})`
+    e.cards === 12,
+    "5. DOCE CARDS EN EL MISMO CARRUSEL",
+    `cards=${e.cards} (4 controles + ${PRESENTACIONES.length} modalidades)`
   );
+  afirmar(
+    e.paginas === 3,
+    "6. TRES PÁGINAS de cuatro cards",
+    `páginas=${e.paginas} · por página ${POR_PAGINA_ESPERADO}`
+  );
+  afirmar(e.puntos === 3, "7. TRES INDICADORES", `puntos=${e.puntos}`);
   afirmar(
     e.visibles.length === POR_PAGINA_ESPERADO,
-    "3. en la primera página se ven cuatro cards",
+    "8. en la primera página se ven cuatro cards",
     `visibles=${e.visibles.join(" | ")}`
   );
-  const nombresVenta = IDS_VENTA.map((i) => {
-    const p = PRESENTACIONES.find((x) => x.id === i);
-    return `${p.titulo} ${p.detalle}`;
-  });
   afirmar(
-    nombresVenta.every((n) => e.visibles.includes(n)),
-    "4. la primera página son las CUATRO de Venta",
+    e.visibles.some((v) => v.startsWith("Precios")) && !e.visibles.some((v) => v.startsWith("Venta por")),
+    "9. LA PÁGINA 1 ES 'PARA REVISAR', no las modalidades",
     `visibles=${e.visibles.join(" | ")}`
   );
-  afirmar(e.activos.length === 0, "5. sin filtro no hay ninguna card encendida", `activos=${e.activos.join(", ")}`);
-  afirmar(e.cinta.length === 0, "6. sin filtro no hay cinta", `cinta=${e.cinta.join(" | ")}`);
-  afirmar(e.desborde <= 0, `7. sin desborde horizontal a ${ANCHO} px`, `sobra ${e.desborde} px`);
+  afirmar(e.activos.length === 0, "10. sin filtro no hay ninguna card encendida", `activos=${e.activos.join(", ")}`);
+  afirmar(e.cinta.length === 0, "11. sin filtro no hay cinta", `cinta=${e.cinta.join(" | ")}`);
+  afirmar(e.desborde <= 0, `12. sin desborde horizontal a ${ANCHO} px`, `sobra ${e.desborde} px`);
+
+  // ── DÓNDE QUEDÓ EL BUSCADOR ─────────────────────────────────────────────
+  //
+  // El número se informa siempre y se compara contra un tope que se pasa por
+  // parámetro. Sin `--y-buscador-max` no se afirma nada: **medir no es afirmar**,
+  // y un tope inventado acá adentro sería una referencia que nadie eligió.
+  const Y_MAX = arg("y-buscador-max") ? Number(arg("y-buscador-max")) : null;
+  if (Y_MAX === null) {
+    console.log(`  ----  13. el buscador arranca en y=${e.yBuscador} px — SIN TOPE: no se afirma nada`);
+  } else {
+    afirmar(
+      e.yBuscador !== null && e.yBuscador <= Y_MAX,
+      "13. EL BUSCADOR NO BAJÓ MÁS QUE CON EL CARRUSEL ORIGINAL",
+      `y=${e.yBuscador} px · tope=${Y_MAX} px`
+    );
+  }
+
+  const yBuscadorLimpio = e.yBuscador;
 
   const totalSinFiltro = e.total;
   const historialInicial = e.historial;
@@ -359,7 +465,40 @@ try {
   const CANTIDAD = Object.fromEntries(JSON.parse(conteos));
   console.log(`        catálogo sin filtro: ${totalSinFiltro} productos`);
   console.log(`        conteos: ${Object.entries(CANTIDAD).map(([k, v]) => `${k}=${v}`).join("  ")}`);
-  await capturar("01-bloque-presentaciones", URL_LIMPIA);
+  await capturar("01-carrusel-unico-pagina-1", URL_LIMPIA);
+
+  // ── LAS TRES PÁGINAS SE RECORREN DE VERDAD, TOCANDO LOS PUNTITOS ────────
+  //
+  // No alcanza con contar tres `<div>` en la pista: hay que ver que cada página
+  // muestre las cuatro cards que le tocan. Es la diferencia entre "el carrusel
+  // dice que tiene tres páginas" y "las tres páginas están donde se espera".
+  await irAPagina(1);
+  const p2 = await leerEstado();
+  afirmar(
+    p2.visibles.length === 4 && p2.visibles.every((v) => v.startsWith("Venta por")),
+    "LA PÁGINA 2 SON LAS CUATRO DE VENTA",
+    `visibles=${p2.visibles.join(" | ")}`
+  );
+  afirmar(p2.desborde <= 0, "sin desborde en la página de Venta", `sobra ${p2.desborde} px`);
+  await capturar("02-pagina-2-venta", `${BASE}${p2.url}`);
+
+  await irAPagina(2);
+  const p3 = await leerEstado();
+  afirmar(
+    p3.visibles.length === 4 && p3.visibles.every((v) => v.startsWith("Compra por")),
+    "LA PÁGINA 3 SON LAS CUATRO DE COMPRA",
+    `visibles=${p3.visibles.join(" | ")}`
+  );
+  afirmar(p3.desborde <= 0, "sin desborde en la página de Compra", `sobra ${p3.desborde} px`);
+  afirmar(
+    p3.yBuscador === yBuscadorLimpio,
+    "EL BUSCADOR NO SE MUEVE AL CAMBIAR DE PÁGINA",
+    `página 1 y=${yBuscadorLimpio} · página 3 y=${p3.yBuscador}`
+  );
+  await capturar("03-pagina-3-compra", `${BASE}${p3.url}`);
+
+  await irAPagina(0);
+  e = await leerEstado();
 
   // Se eligen cards CON productos: una card en cero también filtra bien, pero no
   // deja comprobar que el total del listado sea el número de la card.
@@ -388,9 +527,24 @@ try {
     "11. LA SELECCIÓN CREÓ UNA ENTRADA DE HISTORIAL",
     `historial ${historialInicial} → ${e.historial}: con replace no crecería y Atrás no la desharía`
   );
-  afirmar(e.cinta.some((c) => c === etiquetaVenta), "12. la cinta nombra lo que está filtrando", `cinta=${e.cinta.join(" | ")}`);
+  // ── ACÁ NO VA CINTA, Y ES LO CORRECTO ──────────────────────────────────
+  //
+  // Esta afirmación decía "la cinta nombra lo que está filtrando" y era del
+  // diseño de DOS bloques, donde la cinta salía siempre. Con el carrusel único
+  // la regla es otra: la cinta nombra lo que está encendido **y no se ve**, y
+  // acá el carrusel acaba de llevar a la página de la card tocada — así que la
+  // card está a la vista, encendida, y repetirla arriba sería decir dos veces lo
+  // mismo.
+  //
+  // Se reescribe por lo que el diseño afirma HOY en vez de aflojarla: se exige
+  // que la card esté VISIBLE y encendida, y que por eso no haya cinta.
+  afirmar(
+    e.visibles.includes(etiquetaVenta) && e.cinta.length === 0,
+    "12. LA CARD TOCADA QUEDA A LA VISTA, así que no hace falta cinta",
+    `visibles=${e.visibles.join(" | ")} · cinta=${e.cinta.join(" | ") || "(ninguna)"}`
+  );
   afirmar(e.desborde <= 0, "13. sin desborde con una card activa", `sobra ${e.desborde} px`);
-  await capturar("02-venta-activa", `${BASE}${e.url}`);
+  await capturar("04-venta-activa", `${BASE}${e.url}`);
   const historialConVenta = e.historial;
   const totalVenta = e.total;
 
@@ -418,7 +572,7 @@ try {
     `antes=${totalSinFiltro} ahora=${e.total}`
   );
   afirmar(e.cinta.length === 0, "17. Atrás también saca la cinta", `cinta=${e.cinta.join(" | ")}`);
-  await capturar("03-despues-de-atras", `${BASE}${e.url}`);
+  await capturar("05-despues-de-atras", `${BASE}${e.url}`);
 
   // ── 4 · ADELANTE ─────────────────────────────────────────────────────────
   await evaluar("history.forward()");
@@ -443,18 +597,37 @@ try {
     "23. LA COMBINACIÓN ES UNA INTERSECCIÓN",
     `venta=${CANTIDAD[VENTA]} compra=${CANTIDAD[COMPRA]} listado=${e.total}`
   );
+  // ── LAS DOS SIGUEN SIENDO RECONOCIBLES, CADA UNA POR SU CAMINO ─────────
+  //
+  // Esta afirmación pedía que la cinta mostrara LAS DOS, y era del diseño de dos
+  // bloques. Con el carrusel único la regla es "la cinta nombra lo encendido que
+  // no se ve", así que acá cubre a una y la otra se anuncia sola, encendida en la
+  // página que está a la vista.
+  //
+  // Lo que hay que exigir es lo que el requisito pide de verdad: que NINGUNA
+  // selección activa quede sin señal. Se comprueba que la unión de "lo visible y
+  // encendido" con "lo que nombra la cinta" sean las dos, sin que sobre ninguna.
+  const senaladas = new Set([
+    ...e.visibles.filter((v) => e.activos.includes(v)),
+    ...e.cinta,
+  ]);
   afirmar(
-    e.cinta.includes(etiquetaVenta) && e.cinta.includes(etiquetaCompra),
-    "24. LA CINTA MUESTRA LAS DOS, que es lo único que puede",
-    `cinta=${e.cinta.join(" | ")} — las dos cards están en páginas distintas`
+    e.activos.every((a) => senaladas.has(a)) && senaladas.size === e.activos.length,
+    "24. NINGUNA SELECCIÓN ACTIVA QUEDA SIN SEÑAL",
+    `activas=${e.activos.join(" | ")} · a la vista=${e.visibles.filter((v) => e.activos.includes(v)).join(" | ") || "(ninguna)"} · en la cinta=${e.cinta.join(" | ") || "(ninguna)"}`
   );
   afirmar(
     e.visibles.length === POR_PAGINA_ESPERADO && e.visibles.filter((v) => e.activos.includes(v)).length < 2,
     "25. y en efecto NO se pueden ver las dos cards a la vez",
     `visibles=${e.visibles.join(" | ")}`
   );
+  afirmar(
+    e.cinta.length > 0,
+    "25-bis. la que quedó fuera de pantalla SÍ está en la cinta",
+    `cinta=${e.cinta.join(" | ") || "(ninguna)"}`
+  );
   afirmar(e.desborde <= 0, "26. sin desborde con las dos activas", `sobra ${e.desborde} px`);
-  await capturar("04-venta-mas-compra", `${BASE}${e.url}`);
+  await capturar("06-venta-mas-compra", `${BASE}${e.url}`);
   const totalCruce = e.total;
 
   // ── 6 · RECARGAR UN ENLACE SOLO DE COMPRA ────────────────────────────────
@@ -468,9 +641,9 @@ try {
   e = await leerEstado();
   afirmar(e.activos.includes(etiquetaCompra), "27. el enlace enciende la card de Compra", `activos=${e.activos.join(", ")}`);
   afirmar(
-    e.pagina === 1,
+    e.pagina === 2,
     "28. EL CARRUSEL ABRE EN LA PÁGINA DE LA CARD ACTIVA",
-    `página visible=${e.pagina} (esperada la 1, la de Compra)`
+    `página visible=${e.pagina} (esperada la 2, la de Compra: con el carrusel único la 0 es Para revisar)`
   );
   afirmar(
     e.visibles.includes(etiquetaCompra),
@@ -482,8 +655,8 @@ try {
     "30. y el listado es el de esa card",
     `card=${CANTIDAD[COMPRA]} listado=${e.total}`
   );
-  afirmar(e.desborde <= 0, "31. sin desborde en la segunda página", `sobra ${e.desborde} px`);
-  await capturar("05-recarga-compra-pagina-visible", URL_COMPRA);
+  afirmar(e.desborde <= 0, "31. sin desborde en la página de Compra", `sobra ${e.desborde} px`);
+  await capturar("07-recarga-compra-pagina-visible", URL_COMPRA);
 
   // ── 7 · RECARGAR EL CRUCE ────────────────────────────────────────────────
   const URL_CRUCE = `${BASE}/modulos/productos?presVenta=${VENTA}&presCompra=${COMPRA}`;
@@ -502,7 +675,7 @@ try {
     "34. y la cinta las nombra a las dos",
     `cinta=${e.cinta.join(" | ")}`
   );
-  await capturar("06-recarga-cruce", URL_CRUCE);
+  await capturar("08-recarga-cruce", URL_CRUCE);
 
   // ── 8 · EL BUSCADOR NO LLENA EL HISTORIAL ────────────────────────────────
   //
@@ -532,23 +705,24 @@ try {
     `entradas creadas=${creadas} por ${LETRAS.length} teclas (se admite 1: la transición que apagó la card)`
   );
   afirmar(e.desborde <= 0, "36. sin desborde con el buscador escrito", `sobra ${e.desborde} px`);
-  await capturar("07-buscador-sin-llenar-historial", `${BASE}${e.url}`);
+  await capturar("09-buscador-sin-llenar-historial", `${BASE}${e.url}`);
 
-  // ── 9 · "PARA REVISAR" SIGUE ESTANDO ─────────────────────────────────────
-  const paraRevisar = await evaluar(`(() => {
-    const s = [...document.querySelectorAll("section h2")].map((h) => h.textContent.trim());
-    return JSON.stringify(s);
-  })()`);
-  const titulos = JSON.parse(paraRevisar);
+  // ── 9 · Y AL FINAL, OTRA VEZ: SIGUE HABIENDO UN SOLO BLOQUE ──────────────
+  //
+  // Se vuelve a preguntar DESPUÉS de haber tocado todo —cards, Atrás, Adelante,
+  // recargas y el buscador—, no solo al entrar. Un segundo carrusel que
+  // apareciera recién con un filtro puesto no lo vería una comprobación hecha
+  // únicamente sobre la pantalla limpia.
+  e = await leerEstado();
   afirmar(
-    titulos.includes("Para revisar") && titulos.includes("Presentaciones"),
-    "37. los DOS bloques conviven",
-    `títulos=${titulos.join(" | ")}`
+    e.carruseles === 1,
+    "37. DESPUÉS DE TOCAR TODO, SIGUE HABIENDO UN SOLO CARRUSEL",
+    `carruseles=${e.carruseles}`
   );
   afirmar(
-    titulos.indexOf("Para revisar") < titulos.indexOf("Presentaciones"),
-    "38. Para revisar sigue arriba",
-    `orden=${titulos.join(" → ")}`
+    !e.titulos.includes("Presentaciones") && e.titulos.includes("Para revisar"),
+    "38. y el único encabezado sigue siendo 'Para revisar'",
+    `títulos=${e.titulos.join(" | ")}`
   );
 } catch (err) {
   morir(err?.message || String(err));
@@ -556,7 +730,7 @@ try {
 
 console.log("");
 if (fallas.length === 0) {
-  console.log("VERDE · el bloque Presentaciones, Atrás/Adelante y la página visible andan.");
+  console.log("VERDE · un solo carrusel de doce cards, Atrás/Adelante y la página visible andan.");
 } else {
   console.log(`ROJO · ${fallas.length} afirmaciones fallaron:`);
   for (const f of fallas) console.log(`  · ${f.titulo}`);
