@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-02 17:38
+**Fecha:** 2026-09-02 19:35
 
 ## Módulos modificados recientemente
 
 ### productos
-- fix(productos): un solo carrusel de doce cards, y no dos bloques, fix(productos): la card encendida se ve, aunque esté en la otra página, fix(productos): Atrás deshace una card, y el buscador no llena el historial
-- Archivos: 5 modificados (5 total)
+- fix(productos): volver de editar deja al mismo producto donde estaba, fix(productos): un solo carrusel de doce cards, y no dos bloques, fix(productos): la card encendida se ve, aunque esté en la otra página
+- Archivos: 9 modificados (9 total)
 
 
 
