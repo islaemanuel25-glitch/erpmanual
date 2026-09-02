@@ -28,9 +28,7 @@ import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import TarjetaProductoMovil from "@/components/productos/TarjetaProductoMovil";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
-import CarruselControles, {
-  VARIANTE_CLASIFICACION,
-} from "@/components/productos/CarruselControles";
+import CarruselControles from "@/components/productos/CarruselControles";
 import HojaMasAcciones from "@/components/productos/HojaMasAcciones";
 import HojaPersonalizarTarjeta from "@/components/productos/HojaPersonalizarTarjeta";
 // `Eye` se fue con el botón "Ver": la tarjeta del celular deja Editar como única
@@ -1443,6 +1441,34 @@ export default function ProductosPage() {
     setFiltros(nuevos);
   };
 
+  // ── LAS DOCE CARDS DEL CARRUSEL, EN UN SOLO ARREGLO ─────────────────────
+  //
+  // Un bloque y un carrusel: página 1 los cuatro controles de "Para revisar",
+  // página 2 las cuatro modalidades de venta, página 3 las cuatro de compra. El
+  // orden lo da esta concatenación y el corte de a cuatro lo hace el carrusel,
+  // así que las tres páginas salen parejas sin que nadie las reparta a mano.
+  //
+  // Los dos arreglos vienen de la MISMA respuesta del servidor —es el mismo
+  // universo clasificado en la misma pasada—, así que llegan juntos y no hay un
+  // estado intermedio donde el carrusel tenga cuatro cards y después doce.
+  const cardsDelCarrusel = [...controles, ...cardsPresentacion];
+
+  // ── UNA SOLA PUERTA DE ENTRADA, QUE REPARTE POR EL ID ───────────────────
+  //
+  // El carrusel es uno, así que su `onSelect` es uno. Quién atiende cada toque
+  // sale del id, que ya lleva su grupo adelante —`venta-pack`, `compra-kg`— y
+  // por eso no hace falta una tabla acá: se le pregunta al dominio.
+  //
+  // Los dos manejadores de abajo NO se tocaron. Este solo elige, que es lo que
+  // hace que las cuatro cards de "Para revisar" se comporten exactamente igual
+  // que antes: su toque termina en el mismo `alternarControl` de siempre.
+  const alTocarCard = (id) => {
+    if (grupoDePresentacion(id) !== null) return alternarPresentacion(id);
+    if (esControlValido(id)) return alternarControl(id);
+    // Un id que no es de ninguno de los dos no hace nada. No puede pasar con las
+    // cards que el servidor manda, y quedarse callado es mejor que adivinar.
+  };
+
   // El buscador del celular, en un solo lugar: lo usan la ranura de teclear y
   // la de dictar, que acá tienen que hacer exactamente lo mismo. Pasar dos
   // funciones "iguales" escritas al lado es cómo empiezan a no serlo.
@@ -1951,38 +1977,9 @@ export default function ProductosPage() {
                   —escribir un nombre— y nadie lo vería nunca. */}
               <div className="md:hidden">
                 <CarruselControles
-                  controles={controles}
-                  activo={control}
-                  onSelect={alternarControl}
-                  cargando={cargandoControles}
-                  truncado={controlesTruncado}
-                  techo={techoControles}
-                />
-              </div>
-
-              {/* ── 2-bis · PRESENTACIONES ───────────────────────────────────
-                  Un bloque INDEPENDIENTE debajo de "Para revisar", con la misma
-                  pieza y la variante de clasificación: sus cards no son alertas,
-                  así que un cero no se pinta de verde ni lleva tilde.
-
-                  Ocho cards en dos páginas de cuatro —venta primero, compra
-                  después— y no ocho apiladas: el carrusel pagina solo, así que
-                  el bloque ocupa el mismo alto que el de arriba y el buscador no
-                  se va al fondo de la pantalla.
-
-                  `activo` va como ARREGLO porque acá pueden estar encendidas
-                  dos: una de venta y una de compra, que juntas son una
-                  intersección.
-
-                  Va en el mismo `md:hidden` que "Para revisar" —es un bloque del
-                  celular— y por eso escritorio no cambia. */}
-              <div className="md:hidden mt-2">
-                <CarruselControles
-                  titulo="Presentaciones"
-                  variante={VARIANTE_CLASIFICACION}
-                  controles={cardsPresentacion}
-                  activo={[presentaciones.venta, presentaciones.compra]}
-                  onSelect={alternarPresentacion}
+                  controles={cardsDelCarrusel}
+                  activo={[control, presentaciones.venta, presentaciones.compra]}
+                  onSelect={alTocarCard}
                   cargando={cargandoControles}
                   truncado={controlesTruncado}
                   techo={techoControles}

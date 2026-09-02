@@ -33,31 +33,40 @@ function enPaginas(items) {
   return paginas;
 }
 
-// ── LAS DOS VARIANTES DE CARD, Y NO SON UN DETALLE DE COLOR ────────────────
-//
-// `alerta` es lo que esta pieza siempre hizo: la card cuenta trabajo pendiente,
-// así que un cero es una buena noticia y se dice — verde, tilde, y el texto
-// cambia a "al día" o "sin pendientes". Es el default, y por eso "Para revisar"
-// y "Estado del stock" no pasan el prop y siguen exactamente igual.
-//
-// `clasificacion` es la card que reparte el catálogo en categorías. Ahí un cero
-// no es un logro ni un problema: "0 productos vendidos por kg" es un dato, y
-// pintarlo de verde con un tilde afirmaría algo que nadie dijo — que ese cero
-// está bien—. Tampoco tiene `detalleSano`, porque no hay una segunda cosa que
-// decir cuando no hay ninguno.
-//
-// Lo que las dos comparten sin excepción es el ESTADO ACTIVO: el acento del
-// theme, el anillo y el tinte del fondo salen del mismo lugar. Escribir un
-// resaltado parecido para el bloque nuevo habría sido la forma de que un día se
-// separen.
-export const VARIANTE_ALERTA = "alerta";
-export const VARIANTE_CLASIFICACION = "clasificacion";
+/**
+ * ── QUÉ CARD AFIRMA SALUD EN CERO, Y CÓMO SE DECIDE ───────────────────────
+ *
+ * Hay dos clases de card en el mismo carrusel y se comportan distinto en cero:
+ *
+ *   · las de MANTENIMIENTO cuentan trabajo pendiente, así que un cero es una
+ *     buena noticia y se dice — verde, tilde, y el texto cambia a "al día" o
+ *     "sin pendientes";
+ *   · las de CLASIFICACIÓN reparten el catálogo en categorías, y ahí un cero no
+ *     es un logro ni un problema: "0 productos vendidos por kg" es un dato.
+ *     Pintarlo de verde con un tilde afirmaría algo que nadie dijo.
+ *
+ * ── POR QUÉ NO ES UN PROP Y SALE DEL DATO ─────────────────────────────────
+ *
+ * Porque el carrusel es UNO SOLO y lleva las dos clases adentro: un prop del
+ * bloque no puede decidir por cada card. Se podría haber puesto una marca en
+ * cada entrada del catálogo, pero esa marca ya existe y es `detalleSano`: es
+ * literalmente el texto que la card dice cuando no hay ninguno. Una card que no
+ * tiene nada que decir en cero es, por definición, una card que en cero no
+ * afirma nada.
+ *
+ * Así no hay dos cosas que mantener sincronizadas, y agregar una card nueva no
+ * obliga a acordarse de un segundo campo.
+ *
+ * Comprobado que no mueve lo que ya existía: los cuatro controles de "Para
+ * revisar" y los cuatro estados de Stock declaran `detalleSano` —hay un candado
+ * en `lib/stock/estadosDeStock.test.mjs` que lo exige—, así que las dos
+ * pantallas se dibujan exactamente igual que antes.
+ */
+const afirmaSaludEnCero = (control) =>
+  control?.detalleSano !== undefined && control?.detalleSano !== null;
 
-function CardControl({ control, activo, onSelect, truncado = false, variante = VARIANTE_ALERTA }) {
-  // Solo la variante de alerta afirma salud. En clasificación, `sano` es siempre
-  // falso, así que el color cae en `control.rol` —que estas cards no traen— y de
-  // ahí al neutro, sin ninguna rama de color escrita aparte.
-  const sano = variante === VARIANTE_ALERTA && !truncado && control.cantidad === 0;
+function CardControl({ control, activo, onSelect, truncado = false }) {
+  const sano = afirmaSaludEnCero(control) && !truncado && control.cantidad === 0;
   const color = truncado
     ? colorDe("neutro")
     : sano
@@ -133,21 +142,18 @@ export default function CarruselControles({
   // que sigue diciendo "Para revisar"—, que es la prueba de que la pieza salió
   // bien: la pantalla de donde se sacó no se movió.
   titulo = "Para revisar",
-  // La variante de las cards. El default es la de siempre, así que las dos
-  // pantallas que ya usaban esta pieza no cambian ni un píxel.
-  variante = VARIANTE_ALERTA,
 }) {
   const paginas = enPaginas(controles);
 
   // ── `activo` ACEPTA UNO O VARIOS, Y ESO ES LO QUE PERMITE COMBINAR ────────
   //
-  // "Para revisar" y "Estado del stock" encienden una card por vez y siguen
-  // pasando un id suelto. Presentaciones enciende hasta dos —una de venta y una
-  // de compra, que son una intersección— y pasa un arreglo.
+  // "Estado del stock" enciende una card por vez y sigue pasando un id suelto.
+  // El catálogo de Productos puede tener hasta dos encendidas —una modalidad de
+  // venta y una de compra, que son una intersección— y pasa un arreglo.
   //
-  // Se resuelve acá y no en cada llamador: la alternativa era que el bloque nuevo
-  // trajera su propio carrusel para poder marcar dos, que es exactamente la copia
-  // al lado que esta pieza existe para no tener.
+  // Se resuelve acá y no en cada llamador: la alternativa era un segundo carrusel
+  // para poder marcar dos, que es exactamente la copia al lado que esta pieza
+  // existe para no tener. Y fue el error de la tanda anterior.
   const encendidos = Array.isArray(activo) ? activo : [activo];
   const estaActivo = (id) => encendidos.includes(id);
 
@@ -161,6 +167,12 @@ export default function CarruselControles({
   // viene del dominio. Escribir los nombres otra vez acá sería tener la
   // clasificación en dos lugares — y el día que un rótulo cambie, la cinta diría
   // una cosa y la card otra.
+  const indiceDe = (id) => controles.findIndex((c) => c.id === id);
+  const paginaDe = (id) => {
+    const i = indiceDe(id);
+    return i < 0 ? null : Math.floor(i / POR_PAGINA);
+  };
+
   const activas = encendidos
     .filter(Boolean)
     .map((id) => controles.find((c) => c.id === id))
@@ -175,10 +187,7 @@ export default function CarruselControles({
   //
   // Y con ninguna encendida no se toca nada: llevar a la página 1 sin motivo le
   // movería la pantalla a alguien que no pidió nada.
-  const paginaDeLaActiva =
-    activas.length === 1
-      ? Math.floor(controles.findIndex((c) => c.id === activas[0].id) / POR_PAGINA)
-      : null;
+  const paginaDeLaActiva = activas.length === 1 ? paginaDe(activas[0].id) : null;
 
   // La primera vez va sin animación —es la posición de partida, no un
   // movimiento— y de ahí en adelante sí, que es lo que hace legible un Atrás.
@@ -207,6 +216,11 @@ export default function CarruselControles({
 
   if (controles.length === 0) return null;
 
+  // Las encendidas que quedaron en otra página. Se calcula DESPUÉS del early
+  // return porque necesita `paginaVisible`, que es estado, y antes de dibujar el
+  // encabezado, que es donde se muestran.
+  const fueraDeVista = activas.filter((c) => paginaDe(c.id) !== paginaVisible);
+
   const alDesplazar = (e) => {
     const ancho = e.currentTarget.clientWidth || 1;
     const indice = Math.round(e.currentTarget.scrollLeft / ancho);
@@ -226,21 +240,28 @@ export default function CarruselControles({
           {titulo}
         </h2>
 
-        {/* ── LA CINTA DE LO QUE ESTÁ FILTRANDO ──────────────────────────────
-            El problema que resuelve: con una sola card encendida el carrusel ya
-            lleva a su página, pero con DOS —una de venta y una de compra— están
-            en páginas distintas y no hay ninguna que las muestre juntas. Sin
-            esto, la pantalla filtra por algo que no se ve.
+        {/* ── LA CINTA DE LO QUE ESTÁ FILTRANDO Y NO SE VE ───────────────────
+            El problema que resuelve: el carrusel tiene tres páginas y solo una a
+            la vista. Con una card encendida en otra página, la pantalla filtra
+            por algo que no se ve — y con DOS encendidas, una de venta y una de
+            compra, no existe ninguna página que las muestre juntas.
 
-            Va solo en la variante de clasificación: "Para revisar" enciende una
-            card por vez y siempre está a la vista, así que no le hace falta — y
-            agregársela le movería píxeles a una pantalla que no cambió.
+            ── POR QUÉ SOLO LAS QUE NO SE VEN ──────────────────────────────
+            Porque una card que está a la vista ya se anuncia sola: tiene el
+            anillo y el tinte del acento. Nombrarla otra vez arriba sería decir
+            dos veces lo mismo y, sobre todo, le agregaría un renglón a "Para
+            revisar" —que enciende una card por vez, siempre en la primera
+            página— cuando esa pantalla no cambió.
 
-            Los nombres salen de `activas`, o sea del catálogo del dominio. Acá
+            En la práctica: con un control activo y la página 1 a la vista, acá no
+            hay nada, y el bloque se dibuja idéntico a como se dibujaba antes de
+            que existieran las otras dos páginas.
+
+            Los nombres salen de `controles`, o sea del catálogo del dominio. Acá
             no se escribe ni un rótulo. */}
-        {variante === VARIANTE_CLASIFICACION && activas.length > 0 && (
+        {fueraDeVista.length > 0 && (
           <span className="flex items-center gap-1 min-w-0 flex-wrap justify-end" role="status">
-            {activas.map((c) => (
+            {fueraDeVista.map((c) => (
               <SunmiPill key={c.id} color="amber">
                 {c.titulo} {c.detalle}
               </SunmiPill>
@@ -286,7 +307,6 @@ export default function CarruselControles({
                   activo={estaActivo(control.id)}
                   onSelect={onSelect}
                   truncado={truncado}
-                  variante={variante}
                 />
               ))}
             </div>
