@@ -9,7 +9,14 @@ import { checkPerm } from "@/lib/authorize";
 import { evaluarEstructuraCombo } from "@/lib/combos/service";
 import { ubicacionVendeAlCosto } from "@/lib/precios/ubicacionVendeAlCosto";
 import { esControlValido } from "@/lib/productos/controlesCalidad";
-import { filaMarcadaPor } from "@/lib/productos/controlesDesdePrisma";
+import {
+  filaMarcadaPor,
+  filaMarcadaPorPresentacion,
+} from "@/lib/productos/controlesDesdePrisma";
+import {
+  esPresentacionDeVenta,
+  esPresentacionDeCompra,
+} from "@/lib/productos/presentaciones";
 import { traerFilasParaControles } from "@/lib/productos/sqlControles";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
@@ -258,11 +265,61 @@ export async function GET(req) {
     const control = esControlValido(controlPedido) ? controlPedido : null;
     let truncadoPorControl = false;
 
+    // ── Y EL FILTRO POR PRESENTACIÓN, CON EL MISMO MECANISMO ───────────────
+    //
+    // Dos parámetros y no uno, porque son dos preguntas independientes que se
+    // combinan: `?presVenta=venta-pack&presCompra=compra-unidad` son "los que se
+    // venden por pack" INTERSECTADO con "los que se compran por unidad". Un solo
+    // parámetro con una lista obligaría a deducir a qué grupo pertenece cada
+    // valor y a decidir qué hacer con dos del mismo grupo; así cada uno se valida
+    // contra su grupo y no hay nada que deducir.
+    //
+    // La validación es por GRUPO y no solo por existencia: `?presVenta=compra-kg`
+    // es un id válido en el grupo equivocado, y aceptarlo dejaría el listado
+    // vacío en silencio —ninguna fila puede tener una presentación de compra como
+    // presentación de venta—. Se descarta, que es lo mismo que hace `control` con
+    // un id inventado.
+    const presVenta = esPresentacionDeVenta(searchParams.get("presVenta"))
+      ? searchParams.get("presVenta")
+      : null;
+    const presCompra = esPresentacionDeCompra(searchParams.get("presCompra"))
+      ? searchParams.get("presCompra")
+      : null;
+
+    // La presentación de venta depende de la ubicación —un fiambre sale por pieza
+    // en el depósito y por kilo en un local—, así que hay que saber dónde está
+    // parado el que pregunta. UNA consulta por pedido, y solo cuando hay un filtro
+    // de venta puesto: sin él, nadie la usa.
+    let esDeposito = false;
+    if (presVenta) {
+      const local = await prisma.local.findUnique({
+        where: { id: localId },
+        select: { es_deposito: true },
+      });
+      esDeposito = local?.es_deposito === true;
+    }
+
+    // ── UNA SOLA PASADA PARA LOS TRES FILTROS QUE CLASIFICAN EN MEMORIA ────
+    //
+    // Control y presentaciones no pueden estar puestos a la vez —la pantalla
+    // sostiene ese invariante y la URL se normaliza al entrar—, pero el servidor
+    // no da eso por hecho: si llegaran los tres, se aplican los tres como una
+    // intersección. Es la respuesta correcta en cualquier caso y no hay una
+    // combinación que deje la ruta sin saber qué contestar.
+    //
+    // Lo que NO se hace es una consulta por filtro: se trae el universo una vez y
+    // se le pregunta lo que haga falta. Con tres consultas, tres muestras
+    // distintas por encima del techo.
+    const predicados = [];
+    if (control) predicados.push((p) => filaMarcadaPor(control, p));
+    if (presVenta) predicados.push((p) => filaMarcadaPorPresentacion(presVenta, p, esDeposito));
+    if (presCompra) predicados.push((p) => filaMarcadaPorPresentacion(presCompra, p, esDeposito));
+
     // Se resuelven los IDS marcados y se acotan con un `id: { in }` sobre el
     // mismo `where`. Así el conteo, el orden, la paginación, el map y el resto
-    // del flujo siguen siendo los de siempre: el control agrega una condición,
+    // del flujo siguen siendo los de siempre: el filtro agrega una condición,
     // no una segunda ruta paralela que después se desincroniza.
-    if (control) {
+    if (predicados.length > 0) {
       // El techo, el orden y el corte salen de `traerFilasParaControles`, LA
       // MISMA función que usa el contador de las cards. Sin eso —dos consultas
       // escritas al lado— con más de 5.000 productos podían cortar por lugares
@@ -276,7 +333,7 @@ export async function GET(req) {
 
       truncadoPorControl = truncado;
       const idsMarcados = candidatos
-        .filter((p) => filaMarcadaPor(control, p))
+        .filter((p) => predicados.every((cumple) => cumple(p)))
         .map((p) => p.id);
 
       where.AND.push({ id: { in: idsMarcados } });
@@ -422,6 +479,12 @@ export async function GET(req) {
       // limpiarlo. `truncadoPorControl` avisa cuando el catálogo supera el techo
       // de clasificación: un reporte parcial se dice, no se disimula.
       control,
+      // Las presentaciones vuelven igual que el control, y por el mismo motivo: la
+      // pantalla tiene que poder mostrar qué está filtrando y ofrecer quitarlo.
+      // Vuelven ya VALIDADAS, así que un valor inventado en la URL se ve acá como
+      // `null` en vez de dejar la pantalla marcando una card que no existe.
+      presVenta,
+      presCompra,
       truncadoPorControl,
       // ── PARA QUÉ UBICACIÓN SE CONTESTÓ ──────────────────────────────────
       //

@@ -1,7 +1,20 @@
 // app/api/productos/controles/route.js
 //
-// LOS CONTADORES DE "PARA REVISAR". Devuelve cuántos productos marca cada control
-// en la ubicación activa.
+// LOS CONTADORES DE LOS DOS BLOQUES DE CARDS. Devuelve cuántos productos marca
+// cada control de "Para revisar" y cuántos caen en cada una de las ocho
+// presentaciones, en la ubicación activa.
+//
+// ── LOS DOS BLOQUES VIAJAN JUNTOS, Y NO ES UNA COMODIDAD ───────────────────
+//
+// Los dos preguntan sobre el MISMO universo —el catálogo activo de la ubicación—
+// y clasifican EN MEMORIA sobre las mismas filas. Partirlo en dos rutas
+// duplicaría la consulta cara —traer el catálogo entero hasta el techo— para
+// contestar dos preguntas sobre el mismo arreglo, y abriría la puerta a que las
+// dos cortaran por lugares distintos el día que una supere el techo.
+//
+// Ocho consultas separadas, una por card, habrían sido la salida obvia y la
+// equivocada por la misma razón: ocho recorridos del catálogo para contestar lo
+// que un solo recorrido contesta.
 //
 // ── EL MISMO SCOPE QUE PRODUCTOS, Y NO UNO PARECIDO ────────────────────────
 //
@@ -50,7 +63,12 @@ import { filtrosBaseDelCatalogo } from "@/lib/productos/whereCatalogo";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { CONTROLES } from "@/lib/productos/controlesCalidad";
-import { contarDesdePrisma, TECHO_CONTROL } from "@/lib/productos/controlesDesdePrisma";
+import {
+  contarDesdePrisma,
+  contarPresentacionesDesdePrisma,
+  TECHO_CONTROL,
+} from "@/lib/productos/controlesDesdePrisma";
+import { PRESENTACIONES } from "@/lib/productos/presentaciones";
 import { traerFilasParaControles } from "@/lib/productos/sqlControles";
 
 export async function GET(req) {
@@ -121,13 +139,45 @@ export async function GET(req) {
 
     const conteo = contarDesdePrisma(filas);
 
+    // ── LA UBICACIÓN, PARA PODER CLASIFICAR LA VENTA ──────────────────────
+    //
+    // La presentación de venta DEPENDE de dónde está parado el que mira: un
+    // fiambre de pieza fija sale por pieza en el depósito y por kilo en un local.
+    // `resolveScope` devuelve `localId` y `grupoId` y no este dato, así que hay
+    // que preguntarlo — UNA consulta por pedido y no una por fila, porque es un
+    // predicado sobre la ubicación y no sobre el producto.
+    //
+    // Es la misma forma que ya usan otras seis rutas, entre ellas
+    // `config/pos-ventas-cliente`. Se resuelve DESPUÉS de traer las filas para no
+    // sumarle latencia a la consulta que manda: son independientes.
+    const local = await prisma.local.findUnique({
+      where: { id: localId },
+      select: { es_deposito: true },
+    });
+    const esDeposito = local?.es_deposito === true;
+
+    // Las ocho salen de la MISMA pasada de filas que los cuatro controles. No hay
+    // ocho consultas ni un N+1: el universo ya está en memoria y clasificarlo
+    // cuesta un recorrido más sobre el mismo arreglo.
+    const conteoPresentaciones = contarPresentacionesDesdePrisma(filas, esDeposito);
+
     return NextResponse.json({
       ok: true,
       // La definición de las cards viaja con los números: la pantalla no tiene
       // que saber cuáles son los controles ni en qué orden van. Agregar un quinto
       // es agregarlo al array del dominio.
       controles: CONTROLES.map((c) => ({ ...c, cantidad: conteo[c.id] ?? 0 })),
+      // Y las ocho de presentaciones, con el mismo criterio y en el orden del
+      // catálogo: las cuatro de venta primero, las cuatro de compra después, que
+      // es lo que hace que el carrusel las pagine en dos páginas parejas.
+      presentaciones: PRESENTACIONES.map((p) => ({
+        ...p,
+        cantidad: conteoPresentaciones[p.id] ?? 0,
+      })),
       localId,
+      // Viaja para que la pantalla no tenga que adivinar por qué un fiambre está
+      // en "por pieza" acá y en "por kg" en la otra ubicación.
+      esDeposito,
       truncado,
       // El techo viaja con el flag. Sin él la pantalla tendría que escribir 5.000
       // a mano para poder decir sobre cuántos se contó, y ese número quedaría
