@@ -618,6 +618,126 @@ try {
   afirmar(fresca.desborde <= 0, "ENTRADA FRESCA: sin desborde", `sobra ${fresca.desborde} px`);
   await capturar("07-entrada-fresca", `${BASE}/modulos/productos`);
 
+  // ── 6-bis · ENTRAR POR OTRA URL CON UN ESTADO PENDIENTE ────────────────
+  //
+  // ── EL DEFECTO QUE ESTE BLOQUE FIJA ────────────────────────────────────
+  //
+  // El estado guardaba la URL del listado y nadie la comparaba: solo se
+  // validaban la forma y el vencimiento. Así, con el editor abandonado sin
+  // volver, entrar a Productos por OTRA URL dentro de la media hora movía el
+  // scroll y marcaba un producto que no tenía nada que ver.
+  //
+  // Se ejerce el camino completo: se abre el editor desde la página 2 con
+  // filtros —lo que deja el estado escrito—, se abandona navegando a otro lado,
+  // y se entra al listado limpio.
+  await navegar(`${BASE}${URL_LISTADO}`);
+  await esperarLista();
+  await esperarPantallaAsentada();
+  const previo = await leer();
+  const anclaPrevia = previo.anclas[Math.min(19, previo.cantidad - 1)];
+  await evaluar(
+    `[...document.querySelectorAll('[data-ancla="${anclaPrevia}"]')].find(${VISIBLE}).scrollIntoView({block:"center"})`
+  );
+  await sleep(400);
+  await tocarEditarDe(anclaPrevia, previo.url);
+  if (!(await esperarEditor())) morir("abandono: el editor no se montó");
+
+  const conEstado = await evaluar(
+    `(() => { try { return !!sessionStorage.getItem(${JSON.stringify(CLAVE_ESTADO_RETORNO)}); } catch (e) { return null; } })()`
+  );
+  afirmar(conEstado === true, "ABANDONO: al abrir el editor quedó un estado pendiente", `retenido=${conEstado}`);
+
+  // Se abandona el editor sin volver por ninguno de sus botones.
+  await navegar(`${BASE}/inicio`);
+  await sleep(600);
+  // Y se entra al listado por OTRA URL.
+  await navegar(`${BASE}/modulos/productos`);
+  await esperarLista();
+  await esperarPantallaAsentada();
+  await sleep(600);
+  const otra = await leer();
+
+  afirmar(
+    otra.marcados.length === 0,
+    "OTRA URL: NO SE MARCA NINGÚN PRODUCTO",
+    `marcados=${otra.marcados.join(", ") || "(ninguno)"} — el estado era de ${anclaPrevia}`
+  );
+  afirmar(!otra.textoMarca, `OTRA URL: no aparece "${TEXTO_ULTIMO_EDITADO}"`);
+  const scrollOtra = await evaluar(`(() => {
+    const m = document.querySelector("main");
+    return m ? Math.round(m.scrollTop) : -1;
+  })()`);
+  afirmar(
+    scrollOtra === 0,
+    "OTRA URL: EL SCROLL NO SE MOVIÓ (queda en 0)",
+    `main.scrollTop=${scrollOtra}`
+  );
+  afirmar(
+    otra.retenido === false,
+    "OTRA URL: el estado incompatible quedó CONSUMIDO",
+    `retenido=${otra.retenido} — si quedara, saltaría en la próxima entrada`
+  );
+  afirmar(otra.desborde <= 0, "OTRA URL: sin desborde", `sobra ${otra.desborde} px`);
+  await capturar("09-entrada-por-otra-url", `${BASE}/modulos/productos`);
+
+  // ── 6-ter · VER NO ES EDITAR ───────────────────────────────────────────
+  //
+  // `abrirVer` guardaba el estado de edición, así que abrir la ficha y volver
+  // habría dejado el producto rotulado "Último editado" sin que nadie lo hubiera
+  // editado.
+  //
+  // ── LO QUE ESTE BLOQUE EJERCE, Y LO QUE NO ─────────────────────────────
+  //
+  // **`abrirVer` NO TIENE NINGÚN LLAMADOR.** Comprobado con `git grep`: la
+  // función existe y ninguna superficie la invoca — la tarjeta del celular solo
+  // tiene "Editar" y la tabla tiene "Ver composición", que es otra cosa. O sea
+  // que ese defecto estaba en el código y no se podía alcanzar desde la
+  // pantalla.
+  //
+  // Por eso acá NO se toca un botón: no hay ninguno que llegue. Se entra a la
+  // ficha por su URL, que es a donde `abrirVer` llevaría, y se comprueba el
+  // comportamiento visible: volver de mirar una ficha no marca nada.
+  //
+  // Lo que sí ata la función es el candado R30, que lee el código. Se dice acá
+  // para que nadie lea estas tres afirmaciones como "se ejerció el camino de
+  // Ver": no se ejerció, porque el camino no existe.
+  nota("VER: `abrirVer` no tiene llamadores; se ejerce la ficha por su URL, no un botón");
+  await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
+  await navegar(`${BASE}${URL_LISTADO}`);
+  await esperarLista();
+  await esperarPantallaAsentada();
+  const antesDeVer = await leer();
+  const anclaVer = antesDeVer.anclas[Math.min(19, antesDeVer.cantidad - 1)];
+  const idVer = anclaVer.split(":")[1];
+
+  // Se entra a la ficha por su ruta, que es a donde lleva `abrirVer`.
+  await navegar(`${BASE}/modulos/productos/${idVer}?${URL_LISTADO.split("?")[1]}`);
+  await sleep(1500);
+  const trasAbrirLaFicha = await evaluar(
+    `(() => { try { return !!sessionStorage.getItem(${JSON.stringify(CLAVE_ESTADO_RETORNO)}); } catch (e) { return null; } })()`
+  );
+  afirmar(
+    trasAbrirLaFicha === false,
+    "VER: entrar a la ficha por su URL no deja estado de edición",
+    `retenido=${trasAbrirLaFicha}`
+  );
+
+  await navegar(`${BASE}${URL_LISTADO}`);
+  await esperarLista();
+  await esperarPantallaAsentada();
+  await sleep(600);
+  const trasVolverDeVer = await leer();
+  afirmar(
+    trasVolverDeVer.marcados.length === 0,
+    "VER: volver de la ficha NO marca nada",
+    `marcados=${trasVolverDeVer.marcados.join(", ") || "(ninguno)"}`
+  );
+  afirmar(
+    !trasVolverDeVer.textoMarca,
+    `VER: y no aparece "${TEXTO_ULTIMO_EDITADO}" — nadie editó nada`
+  );
+  await capturar("10-volver-de-ver-sin-marca", `${BASE}${trasVolverDeVer.url}`);
+
   // ── 7 · ESCRITORIO A 1366 ──────────────────────────────────────────────
   await send("Emulation.setDeviceMetricsOverride", {
     width: 1366, height: 900, deviceScaleFactor: 1, mobile: false,
