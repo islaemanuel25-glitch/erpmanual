@@ -10,8 +10,6 @@ import CarruselControles, {
   TINTE_ACTIVO_PCT,
   ACENTO_ACTIVO,
   enPaginas,
-  VARIANTE_ALERTA,
-  VARIANTE_CLASIFICACION,
 } from "@/components/productos/CarruselControles";
 import { CONTROLES } from "@/lib/productos/controlesCalidad";
 import {
@@ -25,6 +23,19 @@ import {
 const render = (props) =>
   renderToStaticMarkup(createElement(CarruselControles, props));
 const conCantidad = (n) => CONTROLES.map((c) => ({ ...c, cantidad: n }));
+
+/**
+ * ── LAS DOCE CARDS DEL CARRUSEL DE PRODUCTOS ──────────────────────────────
+ *
+ * Un solo bloque: los cuatro controles primero y las ocho modalidades después,
+ * que es exactamente lo que la pantalla concatena. Se arma acá con las mismas
+ * constantes del dominio para que un cambio de orden en el catálogo ponga rojos
+ * estos candados en vez de pasar desapercibido.
+ */
+const doce = (n = 5) => [
+  ...CONTROLES.map((c) => ({ ...c, cantidad: n })),
+  ...PRESENTACIONES.map((p) => ({ ...p, cantidad: n })),
+];
 
 test("G1. en cero y con conteo completo, la card dice que está sana", () => {
   const html = render({ controles: conCantidad(0) });
@@ -124,146 +135,198 @@ test("G13. la semántica de salud no sale de tokens del POS", () => {
   }
 });
 
-// ── LA VARIANTE DE CLASIFICACIÓN ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// UN SOLO CARRUSEL, DOCE CARDS, TRES PÁGINAS
+// ══════════════════════════════════════════════════════════════════════════
 //
-// Las ocho cards de "Presentaciones" reparten el catálogo en categorías; no
-// cuentan trabajo pendiente. La diferencia no es de color: es de qué afirma la
-// pantalla cuando el número es cero.
+// La tanda anterior interpretó mal el pedido y creó un SEGUNDO bloque con su
+// propio título. Lo pedido era un único carrusel: página 1 los cuatro controles
+// de mantenimiento, página 2 las cuatro modalidades de venta, página 3 las
+// cuatro de compra.
+//
+// Estos candados fijan las dos mitades del arreglo: que las doce vivan en un
+// bloque solo, y que las cuatro de siempre no hayan cambiado al mudarse ahí.
 
-const clasif = (n) => PRESENTACIONES.map((p) => ({ ...p, cantidad: n }));
-const renderClasif = (props) =>
-  render({ titulo: "Presentaciones", variante: VARIANTE_CLASIFICACION, ...props });
+test("G14. DOCE CARDS, TRES PÁGINAS DE CUATRO, TRES INDICADORES", () => {
+  const html = render({ controles: doce() });
+  assert.equal(doce().length, 12, "no son doce cards");
+  assert.equal(enPaginas(doce()).length, 3, "no quedaron tres páginas");
+  assert.equal(POR_PAGINA, 4);
 
-test("G14. EL DEFAULT NO SE MOVIÓ: 'Para revisar' se dibuja idéntico con y sin el prop", () => {
-  // ── EL CANDADO QUE PRUEBA QUE LA PIEZA SALIÓ BIEN ────────────────────────
-  //
-  // La regla del proyecto es que la pantalla de donde se extendió una pieza tiene
-  // que quedar IDÉNTICA. Acá se compara el HTML completo, byte a byte, contra el
-  // de pasar la variante explícita: si extender hubiera movido algo, esto lo dice
-  // sin depender de que alguien mire una captura.
-  const props = { controles: conCantidad(0) };
-  assert.equal(
-    render(props),
-    render({ ...props, variante: VARIANTE_ALERTA }),
-    "el default dejó de ser la variante de alerta"
-  );
-  const conProblemas = { controles: conCantidad(7), activo: CONTROLES[0].id };
-  assert.equal(render(conProblemas), render({ ...conProblemas, variante: VARIANTE_ALERTA }));
+  // El reparto, página por página, con los ids del dominio.
+  const paginas = enPaginas(doce()).map((p) => p.map((c) => c.id));
+  assert.deepEqual(paginas[0], CONTROLES.map((c) => c.id), "la página 1 no son los cuatro controles");
+  assert.deepEqual(paginas[1], IDS_VENTA, "la página 2 no son las cuatro de Venta");
+  assert.deepEqual(paginas[2], IDS_COMPRA, "la página 3 no son las cuatro de Compra");
+
+  // Tres indicadores, ni dos ni cuatro.
+  assert.match(html, /Página 1 de 3/);
+  assert.match(html, /Página 2 de 3/);
+  assert.match(html, /Página 3 de 3/);
+  assert.doesNotMatch(html, /Página 4 de/);
+
+  // Y las doce se dibujan de verdad.
+  for (const c of doce()) {
+    assert.ok(html.includes(c.titulo), `falta la card de ${c.id}`);
+  }
 });
 
-test("G15. EN CERO, UNA CARD DE CLASIFICACIÓN NO SE DECLARA SANA", () => {
+test("G15. UN SOLO BLOQUE: una sección y un solo encabezado", () => {
+  // El candado del defecto. Si alguien volviera a partirlo en dos, esto lo dice
+  // sin depender de mirar una captura.
+  const html = render({ controles: doce() });
+  assert.equal((html.match(/<section/g) || []).length, 1, "hay más de una sección");
+  assert.equal((html.match(/<h2/g) || []).length, 1, "hay más de un encabezado");
+  assert.equal((html.match(/>Para revisar</g) || []).length, 1);
+  assert.doesNotMatch(html, />Presentaciones</, "volvió el título del segundo bloque");
+});
+
+test("G16. LAS CUATRO DE SIEMPRE NO CAMBIARON AL MUDARSE", () => {
+  // ── EL CANDADO QUE PRUEBA QUE LA MUDANZA SALIÓ BIEN ─────────────────────
+  //
+  // La regla del proyecto es que la pantalla de donde se saca una pieza tiene que
+  // quedar IDÉNTICA. Acá el equivalente es la primera página: las cuatro cards
+  // tienen que dibujarse byte a byte igual estén solas o dentro de las doce.
+  //
+  // Se compara el bloque de la primera página, que es el primer hijo de la pista.
+  const soloCuatro = render({ controles: conCantidad(0) });
+  const conLasDoce = render({ controles: doce(0) });
+
+  // Se corta en el ÚLTIMO `</button>` de la página, no en el borde del `<div>`.
+  // Con cuatro cards ese borde cierra la pista y la sección —`</div></div></div>
+  // </section>`— y con doce abre la página siguiente. Esa diferencia es
+  // estructural y esperada: lo que este candado afirma es que las CARDS se
+  // dibujan igual, no que el carrusel tenga una sola página.
+  const CIERRE = "</button>";
+  const cardsDeLaPrimeraPagina = (html) => {
+    const i = html.indexOf('class="shrink-0 w-full snap-start pr-px"');
+    assert.notEqual(i, -1, "cambió la clase de la página: reanclar este candado");
+    const j = html.indexOf('class="shrink-0 w-full snap-start pr-px"', i + 1);
+    const pagina = j === -1 ? html.slice(i) : html.slice(i, j);
+    const fin = pagina.lastIndexOf(CIERRE);
+    assert.notEqual(fin, -1, "la página no tiene cards: reanclar este candado");
+    return pagina.slice(0, fin + CIERRE.length);
+  };
+
+  const a = cardsDeLaPrimeraPagina(soloCuatro);
+  const b = cardsDeLaPrimeraPagina(conLasDoce);
+  assert.equal(
+    (a.match(/<button/g) || []).length,
+    CONTROLES.length,
+    "el ancla no está agarrando las cuatro cards"
+  );
+  assert.equal(
+    a,
+    b,
+    "las cuatro cards de Para revisar se dibujan distinto dentro del carrusel de doce"
+  );
+});
+
+test("G17. EN CERO, UNA CARD DE CLASIFICACIÓN NO SE DECLARA SANA", () => {
   // Cero productos vendidos por kg no es un logro. Verde y tilde afirmarían algo
-  // que nadie dijo — y en la variante de alerta, con el mismo cero, sí se afirma.
-  const html = renderClasif({ controles: clasif(0) });
+  // que nadie dijo.
+  const html = render({ controles: PRESENTACIONES.map((p) => ({ ...p, cantidad: 0 })) });
   assert.doesNotMatch(html, /var\(--success-fg\)/, "pintó el cero de verde");
   assert.doesNotMatch(html, /sin pendientes|al día|todas cargadas/, "usó un texto de card sana");
-  // El tilde se dibuja como un <svg>; en la variante de clasificación no va
-  // ninguno, porque el único que este componente dibuja es el de "sano".
   assert.doesNotMatch(html, /<svg/, "dibujó el tilde de sano");
-  // Y el número sigue estando: no mostrarlo sería otro problema.
-  assert.match(html, />0</);
+  assert.match(html, />0</, "y el número tiene que seguir estando");
 });
 
-test("G16. contraprueba de G15: con la MISMA cantidad, la variante de alerta SÍ se declara sana", () => {
-  // Sin esto, G15 pasaría en verde aunque el componente hubiera dejado de pintar
-  // el tilde en las dos variantes — o sea, rompiendo "Para revisar".
+test("G18. contraprueba de G17: con la MISMA cantidad, un control SÍ se declara sano", () => {
+  // Sin esto, G17 pasaría en verde aunque el componente hubiera dejado de pintar
+  // el tilde para todos — o sea, rompiendo "Para revisar".
   const html = render({ controles: conCantidad(0) });
   assert.match(html, /var\(--success-fg\)/);
   assert.match(html, /<svg/);
   assert.match(html, /sin pendientes/);
 });
 
-test("G17. las ocho cards se dibujan, en dos páginas de cuatro", () => {
-  const html = renderClasif({ controles: clasif(3) });
-  assert.equal(enPaginas(PRESENTACIONES).length, 2, "no quedaron dos páginas parejas");
-  // Las cuatro de venta primero, las cuatro de compra después.
-  assert.deepEqual(enPaginas(PRESENTACIONES)[0].map((p) => p.id), IDS_VENTA);
-  assert.deepEqual(enPaginas(PRESENTACIONES)[1].map((p) => p.id), IDS_COMPRA);
-  // Los ocho rótulos están, y los puntitos del paginado también.
-  assert.equal((html.match(/>Venta</g) || []).length, 4);
-  assert.equal((html.match(/>Compra</g) || []).length, 4);
-  assert.match(html, /Página 1 de 2/);
-  assert.match(html, /Página 2 de 2/);
-  assert.match(html, /Presentaciones/);
+test("G19. LAS DOS CLASES CONVIVEN EN EL MISMO CARRUSEL, en cero", () => {
+  // El caso que importa del bloque único: los cuatro controles en cero dicen que
+  // están sanos y las ocho modalidades en cero no dicen nada, todo en el mismo
+  // render. Un `variante` de bloque no podía expresar esto.
+  const html = render({ controles: doce(0) });
+  // Los cuatro textos de "sano" están, uno por control.
+  for (const c of CONTROLES) assert.ok(html.includes(c.detalleSano), `falta "${c.detalleSano}"`);
+  // Cuatro tildes y no doce.
+  assert.equal((html.match(/<svg/g) || []).length, CONTROLES.length, "el tilde se dibujó de más o de menos");
+  // Y los ocho detalles de las modalidades siguen diciendo su modalidad.
+  for (const p of PRESENTACIONES) assert.ok(html.includes(p.detalle), `falta "${p.detalle}"`);
 });
 
-test("G18. DOS CARDS ENCENDIDAS A LA VEZ, una por grupo", () => {
-  // Es lo que hace posible el cruce Venta + Compra. `activo` acepta un arreglo, y
-  // el resaltado sale del MISMO acento del theme que usa "Para revisar".
-  const html = renderClasif({
-    controles: clasif(5),
-    activo: [PRESENTACION.VENTA_PACK, PRESENTACION.COMPRA_UNIDAD],
+test("G20. QUIÉN AFIRMA SALUD SALE DEL DATO, no de un prop del bloque", () => {
+  // Es lo que hace posible el carrusel único: la decisión es por card. Y la marca
+  // no se inventó — es `detalleSano`, que ya era el texto que la card dice en
+  // cero. Una card sin nada que decir en cero no afirma nada.
+  const fuente = fs
+    .readFileSync(path.join(process.cwd(), "components", "productos", "CarruselControles.jsx"), "utf8")
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.match(fuente, /afirmaSaludEnCero/, "se fue la regla");
+  assert.match(fuente, /detalleSano !== undefined/, "la regla dejó de salir de detalleSano");
+  assert.doesNotMatch(fuente, /variante/, "volvió un prop de variante por bloque");
+
+  // Y se ejerce: una card con detalleSano en cero afirma; la misma sin él, no.
+  const conTexto = render({ controles: [{ id: "x", titulo: "X", detalle: "d", detalleSano: "sano-x", cantidad: 0 }] });
+  const sinTexto = render({ controles: [{ id: "x", titulo: "X", detalle: "d", cantidad: 0 }] });
+  assert.match(conTexto, /sano-x/);
+  assert.match(conTexto, /var\(--success-fg\)/);
+  assert.doesNotMatch(sinTexto, /var\(--success-fg\)/);
+});
+
+test("G21. DOS CARDS ENCENDIDAS A LA VEZ, una de venta y una de compra", () => {
+  const html = render({
+    controles: doce(),
+    activo: [null, PRESENTACION.VENTA_PACK, PRESENTACION.COMPRA_UNIDAD],
   });
   const fondoActivo = `color-mix(in srgb, ${ACENTO_ACTIVO} ${TINTE_ACTIVO_PCT}%, var(--card-bg))`;
   const veces = (s) => (html.match(new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
   assert.equal(veces(fondoActivo), 2, "no quedaron dos cards encendidas");
   assert.equal((html.match(/ring-2/g) || []).length, 2);
-  assert.equal((html.match(/border-color:var\(--pos-accent\)/g) || []).length, 2);
-  assert.equal(veces("background:var(--card-bg)"), PRESENTACIONES.length - 2);
+  assert.equal(veces("background:var(--card-bg)"), 12 - 2);
 });
 
-test("G19. un arreglo con las dos ranuras vacías no enciende nada", () => {
-  // Es lo que la pantalla pasa cuando no hay ninguna presentación puesta:
-  // `[null, null]`. Si `includes` marcara algo ahí, todas las cards de una lista
-  // sin id quedarían encendidas.
-  const html = renderClasif({ controles: clasif(5), activo: [null, null] });
+test("G22. un arreglo con las tres ranuras vacías no enciende nada", () => {
+  // Es lo que la pantalla pasa sin nada puesto: `[null, null, null]`.
+  const html = render({ controles: doce(), activo: [null, null, null] });
   assert.doesNotMatch(html, /ring-2/);
   assert.doesNotMatch(html, /border-color:var\(--pos-accent\)/);
 });
 
-test("G20. la variante de clasificación tampoco escribe colores a mano", () => {
-  const html = renderClasif({ controles: clasif(3), truncado: true, techo: 5000 });
-  assert.deepEqual(html.match(/#[0-9a-fA-F]{3,8}\b/g) || [], []);
-  assert.deepEqual(html.match(/rgba?\([^)]*\)/g) || [], []);
-});
+// ── LA SELECCIÓN QUE QUEDA EN OTRA PÁGINA ────────────────────────────────
 
-test("G21. el contrato accesible se conserva en las dos variantes", () => {
-  // `aria-pressed` y un `aria-label` que diga el número son lo que hace usable
-  // este bloque con lector de pantalla. Una variante que los perdiera sería una
-  // regresión invisible en la captura.
-  const alerta = render({ controles: conCantidad(7), activo: CONTROLES[0].id });
-  const clasificacion = renderClasif({ controles: clasif(7), activo: [PRESENTACION.VENTA_PACK] });
-  for (const [nombre, html] of [["alerta", alerta], ["clasificación", clasificacion]]) {
-    assert.match(html, /aria-pressed="true"/, `${nombre}: se perdió aria-pressed`);
-    assert.match(html, /Tocá para quitar el filtro/, `${nombre}: no dice cómo quitar el filtro`);
-    assert.match(html, /Tocá para filtrar/, `${nombre}: no dice que se puede filtrar`);
-    assert.match(html, /aria-labelledby/, `${nombre}: la sección perdió su rótulo`);
-  }
-  // Y el rótulo de la card de clasificación nombra el grupo: "Venta por pack: 7".
-  assert.match(clasificacion, /Venta por pack: 7/);
-});
-
-// ── QUE LA SELECCIÓN ACTIVA NO QUEDE INVISIBLE ────────────────────────────
-//
-// El defecto: al recargar un enlace con `presCompra`, el carrusel arranca en la
-// página de Venta mientras la card encendida está en la de Compra. La pantalla
-// filtra por algo que no se ve.
-
-test("G23. LA CINTA DICE QUÉ ESTÁ FILTRANDO, con los nombres del catálogo", () => {
-  const html = renderClasif({
-    controles: clasif(5),
-    activo: [PRESENTACION.VENTA_PACK, PRESENTACION.COMPRA_UNIDAD],
+test("G23. LA CINTA NOMBRA LO ENCENDIDO QUE NO SE VE", () => {
+  // Con la página 1 a la vista, una modalidad encendida está en la 2 o en la 3:
+  // la pantalla filtra por algo fuera de pantalla, y esto es lo que lo dice.
+  const html = render({
+    controles: doce(),
+    activo: [null, PRESENTACION.VENTA_PACK, PRESENTACION.COMPRA_UNIDAD],
   });
-  // Los dos nombres, tal como los escribe el dominio.
   const pack = PRESENTACIONES.find((p) => p.id === PRESENTACION.VENTA_PACK);
   const unidad = PRESENTACIONES.find((p) => p.id === PRESENTACION.COMPRA_UNIDAD);
   assert.match(html, new RegExp(`${pack.titulo} ${pack.detalle}`));
   assert.match(html, new RegExp(`${unidad.titulo} ${unidad.detalle}`));
-  // Y va en una región que un lector de pantalla anuncia al cambiar.
-  assert.match(html, /role="status"/);
+  assert.match(html, /role="status"/, "no hay región que un lector anuncie");
 });
 
-test("G24. contraprueba de G23: sin nada encendido no hay cinta", () => {
-  // Sin esto, G23 pasaría en verde aunque la cinta se dibujara siempre — y una
-  // cinta vacía permanente ocuparía lugar arriba del buscador sin decir nada.
-  const html = renderClasif({ controles: clasif(5), activo: [null, null] });
+test("G24. UN CONTROL ACTIVO EN LA PÁGINA VISIBLE NO SACA CINTA", () => {
+  // ── EL CANDADO DE "PARA REVISAR NO CAMBIÓ" ──────────────────────────────
+  //
+  // El carrusel abre en la página 1. Con un control encendido ahí, la card ya se
+  // anuncia sola con su anillo, así que no hay nada que agregar arriba — y
+  // agregarlo le movería un renglón a una pantalla que este pedido dice que no
+  // tiene que cambiar.
+  const html = render({ controles: doce(), activo: [CONTROLES[0].id, null, null] });
+  assert.doesNotMatch(html, /role="status"/, "apareció una cinta sobre una card que ya se ve");
+  assert.match(html, /ring-2/, "y la card sí tiene que estar encendida");
+});
+
+test("G25. contraprueba de G24: sin nada encendido tampoco hay cinta", () => {
+  const html = render({ controles: doce(), activo: [null, null, null] });
   assert.doesNotMatch(html, /role="status"/);
 });
 
-test("G25. LA CINTA NO ESCRIBE LOS NOMBRES: los saca de las cards que recibe", () => {
-  // Es el pedido explícito de no duplicar la clasificación en la pantalla. Si el
-  // componente tuviera los rótulos escritos adentro, cambiar uno en el dominio
-  // dejaría la cinta diciendo otra cosa que la card.
+test("G26. LA CINTA NO ESCRIBE LOS NOMBRES: los saca de las cards que recibe", () => {
   const fuente = fs
     .readFileSync(path.join(process.cwd(), "components", "productos", "CarruselControles.jsx"), "utf8")
     .replace(/\/\/[^\n]*/g, "")
@@ -275,37 +338,20 @@ test("G25. LA CINTA NO ESCRIBE LOS NOMBRES: los saca de las cards que recibe", (
       `el componente escribe "${nombre}" y tendría que sacarlo del catálogo`
     );
   }
-  // Y sí los busca en la lista que recibe.
-  assert.match(fuente, /controles\.find\(/);
-
-  // Con rótulos inventados, la cinta muestra ESOS: la prueba de que no hay una
-  // tabla escondida adentro del componente.
-  const raros = PRESENTACIONES.map((p) => ({ ...p, titulo: "Zzz", detalle: "qqq", cantidad: 1 }));
-  const html = renderClasif({ controles: raros, activo: [PRESENTACION.VENTA_KG] });
+  // Con rótulos inventados, la cinta muestra ESOS.
+  const raros = doce().map((c) => ({ ...c, titulo: "Zzz", detalle: "qqq" }));
+  const html = render({ controles: raros, activo: [null, PRESENTACION.VENTA_KG, null] });
   assert.match(html, /Zzz qqq/);
 });
 
-test("G26. la cinta NO aparece en la variante de alerta", () => {
-  // "Para revisar" enciende una card por vez y siempre está a la vista. Ponerle
-  // una cinta le movería píxeles a una pantalla que esta tanda no cambia.
-  const html = render({ controles: conCantidad(7), activo: CONTROLES[0].id });
-  assert.doesNotMatch(html, /role="status"/);
-  // Y sigue siendo idéntica a la de antes del prop.
-  assert.equal(html, render({ controles: conCantidad(7), activo: CONTROLES[0].id, variante: VARIANTE_ALERTA }));
-});
-
-test("G27. LA PÁGINA DE LA CARD ACTIVA SE CALCULA, y solo cuando hay UNA", () => {
-  // El cálculo vive en el componente y se ejerce de verdad en el navegador —un
-  // `scrollTo` no se puede afirmar desde un render a texto—. Lo que sí se puede
-  // fijar acá es la REGLA, que es donde estaba el defecto: con una encendida hay
-  // página a la que ir, con dos no existe ninguna que las muestre juntas.
-  const paginaDe = (id) => Math.floor(IDS_PRESENTACION.indexOf(id) / POR_PAGINA);
-  assert.equal(paginaDe(PRESENTACION.VENTA_PACK), 0);
-  assert.equal(paginaDe(PRESENTACION.VENTA_PIEZA), 0);
-  assert.equal(paginaDe(PRESENTACION.COMPRA_PACK), 1, "la primera de compra cae en la segunda página");
-  assert.equal(paginaDe(PRESENTACION.COMPRA_PIEZA), 1);
-  // Las dos de una combinación están en páginas distintas: por eso hace falta la
-  // cinta y no alcanza con llevar el carrusel.
+test("G27. LA PÁGINA DE LA CARD ACTIVA SE CALCULA sobre las DOCE", () => {
+  // El `scrollTo` no se puede afirmar desde un render a texto; se ejerce en la
+  // sonda de navegador. Lo que se fija acá es la regla y el reparto.
+  const ids = doce().map((c) => c.id);
+  const paginaDe = (id) => Math.floor(ids.indexOf(id) / POR_PAGINA);
+  assert.equal(paginaDe(CONTROLES[0].id), 0);
+  assert.equal(paginaDe(PRESENTACION.VENTA_PACK), 1, "Venta no cae en la segunda página");
+  assert.equal(paginaDe(PRESENTACION.COMPRA_PACK), 2, "Compra no cae en la tercera");
   assert.notEqual(paginaDe(PRESENTACION.VENTA_PACK), paginaDe(PRESENTACION.COMPRA_UNIDAD));
 
   const fuente = fs
@@ -313,13 +359,31 @@ test("G27. LA PÁGINA DE LA CARD ACTIVA SE CALCULA, y solo cuando hay UNA", () =
     .replace(/\/\/[^\n]*/g, "")
     .replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(fuente, /paginaDeLaActiva/, "no se calcula a qué página llevar");
-  assert.match(fuente, /activas\.length === 1/, "lleva el carrusel con dos encendidas, y no hay página que las muestre");
+  assert.match(fuente, /activas\.length === 1/, "lleva el carrusel con dos encendidas");
   assert.match(fuente, /scrollTo\(/, "calcula la página y no va");
 });
 
-test("G22. un conteo parcial tampoco se declara sano en clasificación", () => {
-  const html = renderClasif({ controles: clasif(0), truncado: true, techo: 5000 });
+test("G28. un conteo parcial no se declara sano en ninguna de las dos clases", () => {
+  const html = render({ controles: doce(0), truncado: true, techo: 5000 });
   assert.match(html, /\+0/);
   assert.match(html, /Conteo parcial/);
   assert.doesNotMatch(html, /var\(--success-fg\)/);
+  assert.doesNotMatch(html, /<svg viewBox/, "el tilde no va con un conteo parcial");
 });
+
+test("G29. el contrato accesible se conserva en las doce", () => {
+  const html = render({ controles: doce(7), activo: [CONTROLES[0].id, PRESENTACION.VENTA_PACK, null] });
+  assert.equal((html.match(/aria-pressed/g) || []).length, 12, "no todas las cards son botones anunciables");
+  assert.match(html, /aria-pressed="true"/);
+  assert.match(html, /Tocá para quitar el filtro/);
+  assert.match(html, /Tocá para filtrar/);
+  assert.match(html, /aria-labelledby/);
+  assert.match(html, /Venta por pack: 7/, "el rótulo de la modalidad no nombra su grupo");
+});
+
+test("G30. sin colores escritos a mano, con las doce", () => {
+  const html = render({ controles: doce(3), truncado: true, techo: 5000 });
+  assert.deepEqual(html.match(/#[0-9a-fA-F]{3,8}\b/g) || [], []);
+  assert.deepEqual(html.match(/rgba?\([^)]*\)/g) || [], []);
+});
+
