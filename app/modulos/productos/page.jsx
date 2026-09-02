@@ -28,7 +28,9 @@ import SunmiTablaProductos from "@/components/productos/SunmiTablaProductos";
 import TarjetaProductoMovil from "@/components/productos/TarjetaProductoMovil";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
-import CarruselControles from "@/components/productos/CarruselControles";
+import CarruselControles, {
+  VARIANTE_CLASIFICACION,
+} from "@/components/productos/CarruselControles";
 import HojaMasAcciones from "@/components/productos/HojaMasAcciones";
 import HojaPersonalizarTarjeta from "@/components/productos/HojaPersonalizarTarjeta";
 // `Eye` se fue con el botón "Ver": la tarjeta del celular deja Editar como única
@@ -67,8 +69,16 @@ import {
   mismosFiltros,
   hayFiltrosPuestos,
   normalizarEstadoDeUrl,
+  presentacionesNeutras,
+  hayPresentacionesPuestas,
   CLAVES_DE_FILTRO,
 } from "@/lib/productos/filtrosCatalogo";
+import {
+  GRUPO,
+  esPresentacionDeVenta,
+  esPresentacionDeCompra,
+  grupoDePresentacion,
+} from "@/lib/productos/presentaciones";
 // `REGION` y `camposVisiblesDe` se fueron con el reordenamiento: la
 // personalización pasó a ser prender y apagar, y la posición la define el diseño.
 import {
@@ -129,6 +139,20 @@ const GANANCIA_CLASE = "text-xs [font-variant-numeric:tabular-nums] whitespace-n
 function controlDeLaUrl(sp) {
   const pedido = sp.get("control");
   return esControlValido(pedido) ? pedido : null;
+}
+
+// Las dos ranuras de presentación, VALIDADAS CONTRA SU GRUPO. Un id del grupo
+// equivocado —`?presVenta=compra-kg`— es sintácticamente un id que existe y
+// semánticamente imposible: ninguna fila puede tener una presentación de compra
+// como presentación de venta, así que aceptarlo dejaría el listado vacío con una
+// card encendida que nadie tocó. Se descarta, igual que un control inventado.
+function presentacionesDeLaUrl(sp) {
+  const venta = sp.get("presVenta");
+  const compra = sp.get("presCompra");
+  return {
+    venta: esPresentacionDeVenta(venta) ? venta : null,
+    compra: esPresentacionDeCompra(compra) ? compra : null,
+  };
 }
 
 function filtrosDeLaUrl(sp) {
@@ -293,12 +317,26 @@ export default function ProductosPage() {
   if (inicialRef.current === null) {
     inicialRef.current = normalizarEstadoDeUrl({
       control: controlDeLaUrl(searchParams),
+      presentaciones: presentacionesDeLaUrl(searchParams),
       filtros: filtrosDeLaUrl(searchParams),
     });
   }
 
   const [control, setControl] = useState(inicialRef.current.control);
   const [controles, setControles] = useState([]);
+
+  // ── LAS PRESENTACIONES ACTIVAS ──────────────────────────────────────────
+  //
+  // Dos ranuras —una de venta, una de compra— y no una lista, porque dentro de
+  // cada grupo solo puede haber una: tocar otra modalidad de venta REEMPLAZA la
+  // anterior. Con una lista habría que buscar y sacar la del mismo grupo en cada
+  // toque, que es la misma regla escrita de una forma que se puede olvidar.
+  //
+  // Salen del mismo estado inicial normalizado que el control, por el mismo
+  // motivo: leídas en su propio inicializador, nunca se mirarían junto con el
+  // control ni con los filtros, y por ahí entra el caso de la URL con los dos.
+  const [presentaciones, setPresentaciones] = useState(inicialRef.current.presentaciones);
+  const [cardsPresentacion, setCardsPresentacion] = useState([]);
   const [cargandoControles, setCargandoControles] = useState(true);
   // El conteo puede ser PARCIAL: el servidor clasifica en memoria con un techo.
   // Se guarda para poder decirlo, porque un 0 parcial no significa "no hay
@@ -405,9 +443,13 @@ export default function ProductosPage() {
     // El control filtrando viaja en la URL como un filtro más: así el botón de
     // atrás lo deshace y el enlace se puede compartir.
     if (control) params.set("control", control);
+    // Y las presentaciones, con el mismo criterio: viven en la URL para que Atrás
+    // deshaga el filtro, recargar lo conserve y el enlace se pueda mandar.
+    if (presentaciones.venta) params.set("presVenta", presentaciones.venta);
+    if (presentaciones.compra) params.set("presCompra", presentaciones.compra);
     const qs = params.toString();
     return qs ? `/modulos/productos?${qs}` : "/modulos/productos";
-  }, [page, sortKey, sortDir, filtros, control]);
+  }, [page, sortKey, sortDir, filtros, control, presentaciones]);
 
   const urlSyncRef = useRef(false);
   useEffect(() => {
@@ -666,8 +708,8 @@ export default function ProductosPage() {
   const tokenControlesRef = useRef(0);
 
   const claveDelPedido = useMemo(
-    () => JSON.stringify({ page, pageSize, sortKey, sortDir, filtros, control }),
-    [page, pageSize, sortKey, sortDir, filtros, control]
+    () => JSON.stringify({ page, pageSize, sortKey, sortDir, filtros, control, presentaciones }),
+    [page, pageSize, sortKey, sortDir, filtros, control, presentaciones]
   );
 
   const fetchProductos = async () => {
@@ -703,6 +745,12 @@ export default function ProductosPage() {
       // manda el texto "null", que el servidor descartaría por inválido pero
       // dejaría la intención sin registrar en la URL del pedido.
       if (control) params.set("control", control);
+      // Las presentaciones van igual que el control y por el mismo motivo: solo
+      // si hay una. `URLSearchParams` con un `null` manda el texto "null", que el
+      // servidor descartaría por inválido pero dejaría la petición diciendo algo
+      // que no es cierto.
+      if (presentaciones.venta) params.set("presVenta", presentaciones.venta);
+      if (presentaciones.compra) params.set("presCompra", presentaciones.compra);
 
       const res = await fetch(`/api/productos/listar?${params.toString()}`, {
         credentials: "include",
@@ -833,6 +881,12 @@ export default function ProductosPage() {
           localIdRespondido: Number(data.localId) || null,
         };
         setControles(data.controles || []);
+        // Las ocho de presentaciones vienen en la MISMA respuesta: es el mismo
+        // universo clasificado en la misma pasada. Un servidor viejo no manda el
+        // campo y el bloque no se dibuja —`CarruselControles` con una lista vacía
+        // devuelve `null`—, que es lo correcto: mejor sin bloque que con ocho
+        // ceros afirmando que el catálogo no tiene ninguna presentación.
+        setCardsPresentacion(data.presentaciones || []);
         // ── EL CONTEO PARCIAL SE PROPAGA, NO SE DESCARTA ────────────────
         //
         // El servidor ya mandaba `truncado` y esta pantalla lo tiraba. Con un
@@ -844,6 +898,7 @@ export default function ProductosPage() {
       } else {
         controlesRef.current = null;
         setControles([]);
+        setCardsPresentacion([]);
         setControlesTruncado(false);
         console.error("productos/controles:", data.error);
       }
@@ -861,6 +916,7 @@ export default function ProductosPage() {
       if (vigente()) {
         controlesRef.current = null;
         setControles([]);
+        setCardsPresentacion([]);
         setControlesTruncado(false);
       }
       console.error("Error cargando controles:", err);
@@ -1201,6 +1257,53 @@ export default function ProductosPage() {
       filtrosAntesDelControlRef.current = filtros;
     }
     setControl(id);
+    // Y las presentaciones se apagan: los dos bloques cuentan sobre el catálogo
+    // entero, así que encendidos juntos las dos cards prometerían poblaciones que
+    // el listado —que mostraría el cruce— no tiene. Es el mismo invariante que
+    // limpia los filtros, aplicado al otro bloque.
+    if (hayPresentacionesPuestas(presentaciones)) setPresentaciones(presentacionesNeutras());
+    if (hayFiltrosPuestos(filtros)) setFiltros(filtrosNeutros());
+  };
+
+  // ── TOCAR UNA CARD DE PRESENTACIÓN ──────────────────────────────────────
+  //
+  // Tres reglas, y las tres salen de que la card no puede prometer una población
+  // distinta de la lista que abre:
+  //
+  //   · dentro del mismo grupo REEMPLAZA. Tocar "Venta por unidad" con "Venta
+  //     por pack" puesto deja solo la nueva: un producto tiene UNA presentación
+  //     de venta, así que dos encendidas del mismo grupo darían siempre cero.
+  //   · entre grupos SE COMBINA. Venta y compra son una intersección, y el total
+  //     del listado puede ser menor que cualquiera de las dos cards — que es lo
+  //     que las dos, juntas, están prometiendo.
+  //   · tocar la que ya está encendida la apaga.
+  //
+  // Y como cualquier card de los dos bloques: apaga el control y neutraliza los
+  // filtros, para que el número y la lista cierren.
+  //
+  // Los filtros guardados NO se reponen al apagar una presentación, a diferencia
+  // de `alternarControl`. El motivo es que las presentaciones se combinan: apagar
+  // una puede dejar la otra encendida, y reponer los filtros ahí rompería el
+  // invariante justo cuando todavía hay una card prometiendo una población.
+  // Quien las apaga todas queda en el catálogo completo, que es lo que la
+  // pantalla estaba mostrando sin filtros.
+  const alternarPresentacion = (id) => {
+    const grupo = grupoDePresentacion(id);
+    if (grupo === null) return;
+
+    const clave = grupo === GRUPO.VENTA ? "venta" : "compra";
+    const apagando = presentaciones[clave] === id;
+
+    setPage(1);
+    setPresentaciones({ ...presentaciones, [clave]: apagando ? null : id });
+
+    if (apagando) return;
+
+    // Se enciende una: el otro bloque se apaga y los filtros vuelven al default.
+    if (control !== null) {
+      setControl(null);
+      filtrosAntesDelControlRef.current = null;
+    }
     if (hayFiltrosPuestos(filtros)) setFiltros(filtrosNeutros());
   };
 
@@ -1228,6 +1331,11 @@ export default function ProductosPage() {
       setControl(null);
       filtrosAntesDelControlRef.current = null;
     }
+    // Y las presentaciones, por lo mismo: con una card encendida y un proveedor
+    // elegido, la card seguiría contando el catálogo entero mientras el listado
+    // pasa a ser un subconjunto. Escribir en el buscador vuelve al catálogo
+    // completo, que es lo que esa persona está pidiendo al escribir.
+    if (hayPresentacionesPuestas(presentaciones)) setPresentaciones(presentacionesNeutras());
     setFiltros(nuevos);
   };
 
@@ -1742,6 +1850,35 @@ export default function ProductosPage() {
                   controles={controles}
                   activo={control}
                   onSelect={alternarControl}
+                  cargando={cargandoControles}
+                  truncado={controlesTruncado}
+                  techo={techoControles}
+                />
+              </div>
+
+              {/* ── 2-bis · PRESENTACIONES ───────────────────────────────────
+                  Un bloque INDEPENDIENTE debajo de "Para revisar", con la misma
+                  pieza y la variante de clasificación: sus cards no son alertas,
+                  así que un cero no se pinta de verde ni lleva tilde.
+
+                  Ocho cards en dos páginas de cuatro —venta primero, compra
+                  después— y no ocho apiladas: el carrusel pagina solo, así que
+                  el bloque ocupa el mismo alto que el de arriba y el buscador no
+                  se va al fondo de la pantalla.
+
+                  `activo` va como ARREGLO porque acá pueden estar encendidas
+                  dos: una de venta y una de compra, que juntas son una
+                  intersección.
+
+                  Va en el mismo `md:hidden` que "Para revisar" —es un bloque del
+                  celular— y por eso escritorio no cambia. */}
+              <div className="md:hidden mt-2">
+                <CarruselControles
+                  titulo="Presentaciones"
+                  variante={VARIANTE_CLASIFICACION}
+                  controles={cardsPresentacion}
+                  activo={[presentaciones.venta, presentaciones.compra]}
+                  onSelect={alternarPresentacion}
                   cargando={cargandoControles}
                   truncado={controlesTruncado}
                   techo={techoControles}

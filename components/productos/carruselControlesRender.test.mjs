@@ -10,8 +10,16 @@ import CarruselControles, {
   TINTE_ACTIVO_PCT,
   ACENTO_ACTIVO,
   enPaginas,
+  VARIANTE_ALERTA,
+  VARIANTE_CLASIFICACION,
 } from "@/components/productos/CarruselControles";
 import { CONTROLES } from "@/lib/productos/controlesCalidad";
+import {
+  PRESENTACIONES,
+  PRESENTACION,
+  IDS_VENTA,
+  IDS_COMPRA,
+} from "@/lib/productos/presentaciones";
 
 const render = (props) =>
   renderToStaticMarkup(createElement(CarruselControles, props));
@@ -113,4 +121,120 @@ test("G13. la semántica de salud no sale de tokens del POS", () => {
   for (const prohibido of ["--pos-success", "--pos-warning", "--pos-danger"]) {
     assert.doesNotMatch(html, new RegExp(prohibido.replace(/-/g, "\\-")));
   }
+});
+
+// ── LA VARIANTE DE CLASIFICACIÓN ──────────────────────────────────────────
+//
+// Las ocho cards de "Presentaciones" reparten el catálogo en categorías; no
+// cuentan trabajo pendiente. La diferencia no es de color: es de qué afirma la
+// pantalla cuando el número es cero.
+
+const clasif = (n) => PRESENTACIONES.map((p) => ({ ...p, cantidad: n }));
+const renderClasif = (props) =>
+  render({ titulo: "Presentaciones", variante: VARIANTE_CLASIFICACION, ...props });
+
+test("G14. EL DEFAULT NO SE MOVIÓ: 'Para revisar' se dibuja idéntico con y sin el prop", () => {
+  // ── EL CANDADO QUE PRUEBA QUE LA PIEZA SALIÓ BIEN ────────────────────────
+  //
+  // La regla del proyecto es que la pantalla de donde se extendió una pieza tiene
+  // que quedar IDÉNTICA. Acá se compara el HTML completo, byte a byte, contra el
+  // de pasar la variante explícita: si extender hubiera movido algo, esto lo dice
+  // sin depender de que alguien mire una captura.
+  const props = { controles: conCantidad(0) };
+  assert.equal(
+    render(props),
+    render({ ...props, variante: VARIANTE_ALERTA }),
+    "el default dejó de ser la variante de alerta"
+  );
+  const conProblemas = { controles: conCantidad(7), activo: CONTROLES[0].id };
+  assert.equal(render(conProblemas), render({ ...conProblemas, variante: VARIANTE_ALERTA }));
+});
+
+test("G15. EN CERO, UNA CARD DE CLASIFICACIÓN NO SE DECLARA SANA", () => {
+  // Cero productos vendidos por kg no es un logro. Verde y tilde afirmarían algo
+  // que nadie dijo — y en la variante de alerta, con el mismo cero, sí se afirma.
+  const html = renderClasif({ controles: clasif(0) });
+  assert.doesNotMatch(html, /var\(--success-fg\)/, "pintó el cero de verde");
+  assert.doesNotMatch(html, /sin pendientes|al día|todas cargadas/, "usó un texto de card sana");
+  // El tilde se dibuja como un <svg>; en la variante de clasificación no va
+  // ninguno, porque el único que este componente dibuja es el de "sano".
+  assert.doesNotMatch(html, /<svg/, "dibujó el tilde de sano");
+  // Y el número sigue estando: no mostrarlo sería otro problema.
+  assert.match(html, />0</);
+});
+
+test("G16. contraprueba de G15: con la MISMA cantidad, la variante de alerta SÍ se declara sana", () => {
+  // Sin esto, G15 pasaría en verde aunque el componente hubiera dejado de pintar
+  // el tilde en las dos variantes — o sea, rompiendo "Para revisar".
+  const html = render({ controles: conCantidad(0) });
+  assert.match(html, /var\(--success-fg\)/);
+  assert.match(html, /<svg/);
+  assert.match(html, /sin pendientes/);
+});
+
+test("G17. las ocho cards se dibujan, en dos páginas de cuatro", () => {
+  const html = renderClasif({ controles: clasif(3) });
+  assert.equal(enPaginas(PRESENTACIONES).length, 2, "no quedaron dos páginas parejas");
+  // Las cuatro de venta primero, las cuatro de compra después.
+  assert.deepEqual(enPaginas(PRESENTACIONES)[0].map((p) => p.id), IDS_VENTA);
+  assert.deepEqual(enPaginas(PRESENTACIONES)[1].map((p) => p.id), IDS_COMPRA);
+  // Los ocho rótulos están, y los puntitos del paginado también.
+  assert.equal((html.match(/>Venta</g) || []).length, 4);
+  assert.equal((html.match(/>Compra</g) || []).length, 4);
+  assert.match(html, /Página 1 de 2/);
+  assert.match(html, /Página 2 de 2/);
+  assert.match(html, /Presentaciones/);
+});
+
+test("G18. DOS CARDS ENCENDIDAS A LA VEZ, una por grupo", () => {
+  // Es lo que hace posible el cruce Venta + Compra. `activo` acepta un arreglo, y
+  // el resaltado sale del MISMO acento del theme que usa "Para revisar".
+  const html = renderClasif({
+    controles: clasif(5),
+    activo: [PRESENTACION.VENTA_PACK, PRESENTACION.COMPRA_UNIDAD],
+  });
+  const fondoActivo = `color-mix(in srgb, ${ACENTO_ACTIVO} ${TINTE_ACTIVO_PCT}%, var(--card-bg))`;
+  const veces = (s) => (html.match(new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+  assert.equal(veces(fondoActivo), 2, "no quedaron dos cards encendidas");
+  assert.equal((html.match(/ring-2/g) || []).length, 2);
+  assert.equal((html.match(/border-color:var\(--pos-accent\)/g) || []).length, 2);
+  assert.equal(veces("background:var(--card-bg)"), PRESENTACIONES.length - 2);
+});
+
+test("G19. un arreglo con las dos ranuras vacías no enciende nada", () => {
+  // Es lo que la pantalla pasa cuando no hay ninguna presentación puesta:
+  // `[null, null]`. Si `includes` marcara algo ahí, todas las cards de una lista
+  // sin id quedarían encendidas.
+  const html = renderClasif({ controles: clasif(5), activo: [null, null] });
+  assert.doesNotMatch(html, /ring-2/);
+  assert.doesNotMatch(html, /border-color:var\(--pos-accent\)/);
+});
+
+test("G20. la variante de clasificación tampoco escribe colores a mano", () => {
+  const html = renderClasif({ controles: clasif(3), truncado: true, techo: 5000 });
+  assert.deepEqual(html.match(/#[0-9a-fA-F]{3,8}\b/g) || [], []);
+  assert.deepEqual(html.match(/rgba?\([^)]*\)/g) || [], []);
+});
+
+test("G21. el contrato accesible se conserva en las dos variantes", () => {
+  // `aria-pressed` y un `aria-label` que diga el número son lo que hace usable
+  // este bloque con lector de pantalla. Una variante que los perdiera sería una
+  // regresión invisible en la captura.
+  const alerta = render({ controles: conCantidad(7), activo: CONTROLES[0].id });
+  const clasificacion = renderClasif({ controles: clasif(7), activo: [PRESENTACION.VENTA_PACK] });
+  for (const [nombre, html] of [["alerta", alerta], ["clasificación", clasificacion]]) {
+    assert.match(html, /aria-pressed="true"/, `${nombre}: se perdió aria-pressed`);
+    assert.match(html, /Tocá para quitar el filtro/, `${nombre}: no dice cómo quitar el filtro`);
+    assert.match(html, /Tocá para filtrar/, `${nombre}: no dice que se puede filtrar`);
+    assert.match(html, /aria-labelledby/, `${nombre}: la sección perdió su rótulo`);
+  }
+  // Y el rótulo de la card de clasificación nombra el grupo: "Venta por pack: 7".
+  assert.match(clasificacion, /Venta por pack: 7/);
+});
+
+test("G22. un conteo parcial tampoco se declara sano en clasificación", () => {
+  const html = renderClasif({ controles: clasif(0), truncado: true, techo: 5000 });
+  assert.match(html, /\+0/);
+  assert.match(html, /Conteo parcial/);
+  assert.doesNotMatch(html, /var\(--success-fg\)/);
 });

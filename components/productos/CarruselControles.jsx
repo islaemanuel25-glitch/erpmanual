@@ -32,8 +32,31 @@ function enPaginas(items) {
   return paginas;
 }
 
-function CardControl({ control, activo, onSelect, truncado = false }) {
-  const sano = !truncado && control.cantidad === 0;
+// ── LAS DOS VARIANTES DE CARD, Y NO SON UN DETALLE DE COLOR ────────────────
+//
+// `alerta` es lo que esta pieza siempre hizo: la card cuenta trabajo pendiente,
+// así que un cero es una buena noticia y se dice — verde, tilde, y el texto
+// cambia a "al día" o "sin pendientes". Es el default, y por eso "Para revisar"
+// y "Estado del stock" no pasan el prop y siguen exactamente igual.
+//
+// `clasificacion` es la card que reparte el catálogo en categorías. Ahí un cero
+// no es un logro ni un problema: "0 productos vendidos por kg" es un dato, y
+// pintarlo de verde con un tilde afirmaría algo que nadie dijo — que ese cero
+// está bien—. Tampoco tiene `detalleSano`, porque no hay una segunda cosa que
+// decir cuando no hay ninguno.
+//
+// Lo que las dos comparten sin excepción es el ESTADO ACTIVO: el acento del
+// theme, el anillo y el tinte del fondo salen del mismo lugar. Escribir un
+// resaltado parecido para el bloque nuevo habría sido la forma de que un día se
+// separen.
+export const VARIANTE_ALERTA = "alerta";
+export const VARIANTE_CLASIFICACION = "clasificacion";
+
+function CardControl({ control, activo, onSelect, truncado = false, variante = VARIANTE_ALERTA }) {
+  // Solo la variante de alerta afirma salud. En clasificación, `sano` es siempre
+  // falso, así que el color cae en `control.rol` —que estas cards no traen— y de
+  // ahí al neutro, sin ninguna rama de color escrita aparte.
+  const sano = variante === VARIANTE_ALERTA && !truncado && control.cantidad === 0;
   const color = truncado
     ? colorDe("neutro")
     : sano
@@ -109,8 +132,24 @@ export default function CarruselControles({
   // que sigue diciendo "Para revisar"—, que es la prueba de que la pieza salió
   // bien: la pantalla de donde se sacó no se movió.
   titulo = "Para revisar",
+  // La variante de las cards. El default es la de siempre, así que las dos
+  // pantallas que ya usaban esta pieza no cambian ni un píxel.
+  variante = VARIANTE_ALERTA,
 }) {
   const paginas = enPaginas(controles);
+
+  // ── `activo` ACEPTA UNO O VARIOS, Y ESO ES LO QUE PERMITE COMBINAR ────────
+  //
+  // "Para revisar" y "Estado del stock" encienden una card por vez y siguen
+  // pasando un id suelto. Presentaciones enciende hasta dos —una de venta y una
+  // de compra, que son una intersección— y pasa un arreglo.
+  //
+  // Se resuelve acá y no en cada llamador: la alternativa era que el bloque nuevo
+  // trajera su propio carrusel para poder marcar dos, que es exactamente la copia
+  // al lado que esta pieza existe para no tener.
+  const encendidos = Array.isArray(activo) ? activo : [activo];
+  const estaActivo = (id) => encendidos.includes(id);
+
   const [paginaVisible, setPaginaVisible] = useState(0);
   const pistaRef = useRef(null);
   const etiquetaId = useId();
@@ -170,9 +209,10 @@ export default function CarruselControles({
                 <CardControl
                   key={control.id}
                   control={control}
-                  activo={activo === control.id}
+                  activo={estaActivo(control.id)}
                   onSelect={onSelect}
                   truncado={truncado}
+                  variante={variante}
                 />
               ))}
             </div>
