@@ -71,6 +71,7 @@ import {
   normalizarEstadoDeUrl,
   presentacionesNeutras,
   hayPresentacionesPuestas,
+  laSeleccionDeCardsCambio,
   CLAVES_DE_FILTRO,
 } from "@/lib/productos/filtrosCatalogo";
 import {
@@ -451,6 +452,21 @@ export default function ProductosPage() {
     return qs ? `/modulos/productos?${qs}` : "/modulos/productos";
   }, [page, sortKey, sortDir, filtros, control, presentaciones]);
 
+  // ── LA ÚLTIMA URL QUE ESCRIBIÓ ESTA PANTALLA ────────────────────────────
+  //
+  // Es lo que distingue "la URL cambió porque yo la cambié" de "la URL cambió
+  // porque alguien tocó Atrás". Sin esa distinción los dos efectos se muerden la
+  // cola: el de abajo escribe la URL desde el estado y el de más abajo lee el
+  // estado desde la URL.
+  const ultimaUrlEscritaRef = useRef(null);
+
+  // Y la última selección de cards que se escribió, para saber si la que viene
+  // es una transición deshacible. Ver `laSeleccionDeCardsCambio`.
+  const ultimaSeleccionRef = useRef({
+    control: inicialRef.current.control,
+    presentaciones: inicialRef.current.presentaciones,
+  });
+
   const urlSyncRef = useRef(false);
   useEffect(() => {
     // ── LA URL EN MODO MODAL NO ES DEL LISTADO, ASÍ QUE NO SE PISA ──────────
@@ -481,10 +497,98 @@ export default function ProductosPage() {
     // dependencias de `buildListingUrl` cambiara con el modal abierto.
     if (editarId || nuevo === "1") return;
 
-    // Saltar el primer render (la URL ya tiene los params correctos)
-    if (!urlSyncRef.current) { urlSyncRef.current = true; return; }
-    router.replace(buildListingUrl(), { scroll: false });
-  }, [buildListingUrl, editarId, nuevo]);
+    const url = buildListingUrl();
+
+    // Saltar el primer render (la URL ya tiene los params correctos). Se anota
+    // igual: es la referencia contra la que se compara todo lo que venga después.
+    if (!urlSyncRef.current) {
+      urlSyncRef.current = true;
+      ultimaUrlEscritaRef.current = url;
+      return;
+    }
+
+    // Si la URL que tocaría escribir es la que ya está, no se escribe. Pasa al
+    // volver de un Atrás: el efecto de abajo puso el estado, este efecto corre
+    // por el cambio de estado, y sin este corte empujaría otra vez la misma URL
+    // —dejando una entrada de historial por cada Atrás, o sea Atrás que no
+    // avanza—.
+    if (ultimaUrlEscritaRef.current === url) return;
+
+    // ── ATRÁS TIENE QUE DESHACER LA CARD, Y NO SEIS TECLAS ─────────────────
+    //
+    // `replace` no crea entrada, así que tocar una card no se podía deshacer:
+    // ése era el defecto. Y cambiar todo a `push` sin mirar habría creado una
+    // entrada POR TECLA en el buscador, que es el defecto opuesto y peor de
+    // usar en un celular.
+    //
+    // Quién decide: `laSeleccionDeCardsCambio`, una función pura del dominio.
+    // No se pregunta qué manejador corrió —eso dejaría afuera al cuarto camino
+    // que aparezca— sino si cambió lo que la persona espera poder deshacer.
+    const seleccion = { control, presentaciones };
+    const apilar = laSeleccionDeCardsCambio(ultimaSeleccionRef.current, seleccion);
+
+    ultimaUrlEscritaRef.current = url;
+    ultimaSeleccionRef.current = seleccion;
+
+    if (apilar) router.push(url, { scroll: false });
+    else router.replace(url, { scroll: false });
+  }, [buildListingUrl, editarId, nuevo, control, presentaciones]);
+
+  // ── Y EL CAMINO DE VUELTA: LA URL MANDA CUANDO LA CAMBIA OTRO ───────────
+  //
+  // Sin esto, `push` sola no arregla nada. El botón Atrás cambia la URL, pero el
+  // estado de React se leyó UNA vez en `inicialRef` y no se vuelve a mirar: la
+  // barra de direcciones mostraría la URL vieja y la pantalla seguiría filtrando
+  // por la card nueva. Un Atrás que cambia la URL y no cambia la pantalla es peor
+  // que no tener Atrás, porque parece que anduvo.
+  //
+  // `useSearchParams` de Next se actualiza con la navegación del navegador, así
+  // que este efecto es el que ve el Atrás y el Adelante.
+  //
+  // CÓMO SE EVITA EL BUCLE: se compara la URL entrante contra la última que ESTA
+  // pantalla escribió. Si son la misma, es el eco de la escritura propia y no se
+  // toca nada. Si difieren, vino de afuera —Atrás, Adelante, o un enlace pegado—
+  // y ahí sí manda la URL.
+  //
+  // Y entra NORMALIZADA, por la misma puerta que el estado inicial: un Atrás a
+  // una entrada con control y filtros juntos tiene que resolverse igual que
+  // abrir ese enlace, o la pantalla se comportaría distinto según cómo se llegó.
+  const aplicarEstadoDeLaUrl = useCallback(
+    (sp) => {
+      const estado = normalizarEstadoDeUrl({
+        control: controlDeLaUrl(sp),
+        presentaciones: presentacionesDeLaUrl(sp),
+        filtros: filtrosDeLaUrl(sp),
+      });
+      ultimaSeleccionRef.current = {
+        control: estado.control,
+        presentaciones: estado.presentaciones,
+      };
+      setControl(estado.control);
+      setPresentaciones(estado.presentaciones);
+      setFiltros(estado.filtros);
+      // Lo guardado se descarta: quien vuelve atrás no está apagando una card,
+      // está yendo a otro punto del historial, y reponerle unos filtros de antes
+      // sería la sorpresa al revés.
+      filtrosAntesDelControlRef.current = null;
+
+      const p = Number(sp.get("page"));
+      setPage(Number.isFinite(p) && p > 0 ? p : 1);
+      setSortKey(sp.get("sortKey") || "nombre");
+      setSortDir(sp.get("sortDir") === "desc" ? "desc" : "asc");
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (editarId || nuevo === "1") return;
+    const qs = searchParams.toString();
+    const url = qs ? `/modulos/productos?${qs}` : "/modulos/productos";
+    // El eco de lo que escribimos nosotros. No hay nada que aplicar.
+    if (ultimaUrlEscritaRef.current === url) return;
+    ultimaUrlEscritaRef.current = url;
+    aplicarEstadoDeLaUrl(searchParams);
+  }, [searchParams, editarId, nuevo, aplicarEstadoDeLaUrl]);
 
   const allColumns = [
     { key: "imagenUrl", label: "Imagen" },
