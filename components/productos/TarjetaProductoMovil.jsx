@@ -10,6 +10,8 @@ import SunmiProductoCard, {
   NumeroBloqueValor,
   RotuloBloqueValor,
 } from "@/components/sunmi/SunmiProductoCard";
+import SunmiPill from "@/components/sunmi/SunmiPill";
+import { TEXTO_ULTIMO_EDITADO } from "@/lib/productos/estadoDeRetorno";
 import { hayEquivalenciaDeBulto, nombreCortoDe } from "@/lib/productos/carasDeTarjeta";
 import { formatearMoneda } from "@/lib/moneda";
 
@@ -192,6 +194,16 @@ export default function TarjetaProductoMovil({
   muestraCosto = true,
   imagenUrl = null,
   onEditar,
+  // ── LO QUE FALTABA PARA PODER VOLVER AL MISMO LUGAR ─────────────────────
+  //
+  // Esta tarjeta no recibía NINGUNA identidad. Por eso, al volver de editar, no
+  // había forma de encontrarla en el DOM: ni para llevarle el scroll ni para
+  // marcarla. Los dos síntomas del defecto salían de esta línea que no existía.
+  //
+  // `ancla` es la clave estable —`producto:12`, `combo:12`— que arma el dominio.
+  // No es el id pelado a propósito: las dos numeraciones se pisan.
+  ancla = null,
+  ultimoEditado = false,
 }) {
   const [enLaOtraEscala, setEnLaOtraEscala] = useState(false);
 
@@ -235,6 +247,14 @@ export default function TarjetaProductoMovil({
   // estaba dibujado ahora se lee.
   return (
     <SunmiProductoCard
+      ancla={ancla}
+      // El rótulo sale de una constante compartida con la tabla de escritorio y
+      // con la sonda: si mañana cambia, cambia en los tres a la vez. Escrito acá
+      // a mano, la sonda seguiría buscando el viejo y pasaría en verde sobre una
+      // pantalla que dice otra cosa.
+      destacado={
+        ultimoEditado ? <SunmiPill color="amber">{TEXTO_ULTIMO_EDITADO}</SunmiPill> : null
+      }
       nombre={nombre}
       empresa={empresa}
       codigoBarra={hayIdentificacion ? codigoBarra : false}

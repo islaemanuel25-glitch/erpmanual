@@ -89,6 +89,19 @@ import {
 } from "@/lib/productos/camposTarjeta";
 import { carasDeTarjeta } from "@/lib/productos/carasDeTarjeta";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import { contenedorDeScrollDe } from "@/lib/productos/contenedorDeScroll";
+import {
+  identidadDeFila,
+  claveDeAncla,
+  crearEstadoDeRetorno,
+  guardarEstadoDeRetorno,
+  leerEstadoDeRetorno,
+  consumirEstadoDeRetorno,
+  sePuedeRestaurarAca,
+  scrollParaDejarloA,
+  TIPO_PRODUCTO,
+  TIPO_COMBO,
+} from "@/lib/productos/estadoDeRetorno";
 
 // =========================================================
 // TABS
@@ -174,11 +187,47 @@ function filtrosDeLaUrl(sp) {
   };
 }
 
-// Contenedor scrolleable de la lista: con header sticky el scroll vive en
-// #productos-scroll (la tabla). Fallback al <main> de LayoutBase.
+// ── EL CONTENEDOR DE SCROLL LO RESUELVE EL DOMINIO ────────────────────────
+//
+// Acá vivía el defecto. Decía:
+//
+//     document.getElementById("productos-scroll") || document.querySelector("main")
+//
+// y `#productos-scroll` es el contenedor de la TABLA DE ESCRITORIO, que en el
+// celular está adentro de un `hidden md:block`: existe en el DOM —así que el
+// `getElementById` lo devuelve— y está oculto —así que su `scrollTop` es 0—. El
+// `||` preguntaba si el elemento EXISTE, no si SIRVE.
+//
+// La decisión se mudó a `lib/productos/contenedorDeScroll.js`, donde se puede
+// ejercer ese caso exacto sin navegador. Acá queda una línea que no decide nada.
 function getProductosScrollEl() {
   if (typeof document === "undefined") return null;
-  return document.getElementById("productos-scroll") || document.querySelector("main");
+  return contenedorDeScrollDe(document);
+}
+
+/** `sessionStorage` cuando lo hay. En el servidor no existe y no es un error. */
+function almacenDeSesion() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dónde está un elemento DENTRO de su contenedor de scroll, en píxeles.
+ *
+ * Se mide con rectángulos y no con `offsetTop`: `offsetTop` es relativo al
+ * ancestro posicionado más cercano, que no tiene por qué ser el contenedor que
+ * scrollea —y en esta pantalla no lo es—. La resta de rectángulos da la
+ * distancia real, sin depender de cómo esté armado el árbol.
+ */
+function posicionDentroDelContenedor(elemento, contenedor) {
+  if (!elemento || !contenedor) return null;
+  const re = elemento.getBoundingClientRect();
+  const rc = contenedor.getBoundingClientRect();
+  return Math.round(re.top - rc.top);
 }
 
 export default function ProductosPage() {
@@ -367,22 +416,28 @@ export default function ProductosPage() {
   // Selección persistente de fila + restauración de scroll al volver de editar.
   // El contenedor scrolleable es el <main> de LayoutBase (no window).
   const restoredScrollRef = useRef(false);
+  // La identidad del último producto editado, `{ tipo, id }` o `null`. De acá
+  // salen la marca visual y `aria-current`, en las dos superficies.
+  const [ultimoEditado, setUltimoEditado] = useState(null);
   // Acá vivía `tarjetaAbierta`, el estado de qué tarjeta tenía la capa abierta.
   // Se fue con la capa: los botones están a la vista, así que no hay nada que
   // abrir y la tarjeta dejó de tener estado.
-  const [selectedProductId, setSelectedProductId] = useState(() => {
-    if (typeof window === "undefined") return null;
-    // Conservar la selección SOLO si venimos de editar (hay scroll guardado).
-    // En una entrada fresca al módulo, arrancar sin selección.
-    if (sessionStorage.getItem("productos:scrollY") == null) return null;
-    const v = sessionStorage.getItem("productos:selectedProductId");
-    return v ? Number(v) : null;
-  });
+  // ── LA SELECCIÓN POR CLIC YA NO SE GUARDA APARTE ────────────────────────
+  //
+  // Leía `productos:selectedProductId` y `productos:scrollY`, las dos claves
+  // sueltas que este arreglo unifica. Eran dos estados que se borraban por
+  // separado: uno podía sobrevivir al otro y dejar la pantalla marcando algo sin
+  // saber a dónde llevar el scroll.
+  //
+  // Ahora arranca en `null` siempre, y quién estaba abierto lo dice el estado de
+  // retorno —que además distingue producto de combo, cosa que este número no
+  // podía—. El tinte de la fila al hacer clic sigue igual: es de esta sesión de
+  // pantalla y no tiene por qué sobrevivir a una navegación.
+  const [selectedProductId, setSelectedProductId] = useState(null);
 
-  // Click en una fila (fuera de los botones) → marca persistente.
+  // Click en una fila (fuera de los botones) → marca de esta pantalla.
   const handleSelectProducto = useCallback((id) => {
     setSelectedProductId(id);
-    try { sessionStorage.setItem("productos:selectedProductId", String(id)); } catch {}
   }, []);
 
   // ── LA PAGINACIÓN, DEFINIDA UNA SOLA VEZ ─────────────────────────────────
@@ -1137,29 +1192,179 @@ export default function ProductosPage() {
     setEditing(null);
   }, [nuevo, editarId, localId]);
 
-  // Al volver de editar (hay scroll guardado): restaurar la posición de scroll y
-  // CONSERVAR la selección. En una entrada fresca: limpiar la selección residual.
-  // Se ejecuta una sola vez, cuando terminó el loading y la lista ya está en el DOM.
+  // ── VOLVER AL MISMO LUGAR ────────────────────────────────────────────────
+  //
+  // ── QUÉ HACÍA ANTES, Y POR QUÉ NO ALCANZABA ─────────────────────────────
+  //
+  // Leía un `scrollTop` guardado y se lo fijaba al contenedor. Tres problemas, y
+  // los tres están arreglados acá:
+  //
+  //   1. el contenedor era el equivocado en el celular (ver `getProductosScrollEl`);
+  //   2. restaurar por scroll solo falla en cuanto la fila se movió —un cambio de
+  //      nombre con orden por nombre alcanza—, y deja a la persona mirando otro
+  //      producto con total confianza;
+  //   3. borraba el estado ANTES de saber si había podido restaurar, así que un
+  //      intento temprano se llevaba puesta la única copia.
+  //
+  // ── EL ORDEN, QUE ES LO QUE HACE QUE FUNCIONE ───────────────────────────
+  //
+  // Primero el ELEMENTO: se lo busca por su ancla y se lo deja a la misma altura
+  // que tenía. El `scrollTop` es el RESPALDO, y solo se usa cuando el elemento
+  // ya no está en esta página —porque cambió el nombre, el filtro o el orden—.
+  //
+  // Y el estado se consume DESPUÉS del intento, pase lo que pase.
+  //
+  // ── SIN TIMEOUTS ────────────────────────────────────────────────────────
+  //
+  // La condición de entrada no es un tiempo: es que el pedido haya terminado
+  // —`loading` en false— y que la lista tenga filas montadas. El doble
+  // `requestAnimationFrame` no es una espera arbitraria sino el mecanismo del
+  // navegador para correr después del layout: sin él las alturas todavía no
+  // existen y cualquier medición da cero.
+  const intentarRestaurar = useCallback((estado) => {
+    // El elemento se busca ENTRE LOS VISIBLES. La pantalla dibuja las dos
+    // superficies siempre —la lista de tarjetas y la tabla—, y a 390 px la tabla
+    // está en el DOM y oculta. Un `querySelector` a secas puede devolver la fila
+    // oculta, cuyo rectángulo mide cero: se restauraría contra un elemento que
+    // nadie ve. Es el mismo defecto del contenedor, un nivel más abajo.
+    const clave = claveDeAncla({ tipo: estado.tipo, id: estado.id });
+    const elemento = clave
+      ? [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find((el) => el.offsetParent !== null)
+      : null;
+
+    const contenedor = getProductosScrollEl();
+    if (!contenedor) return false;
+
+    if (elemento && estado.offset !== null && estado.offset !== undefined) {
+      const objetivo = scrollParaDejarloA({
+        scrollTopActual: contenedor.scrollTop,
+        posicionActual: posicionDentroDelContenedor(elemento, contenedor),
+        offset: estado.offset,
+        maximo: contenedor.scrollHeight - contenedor.clientHeight,
+      });
+      contenedor.scrollTop = objetivo;
+
+      // ── Y DESPUÉS, EL SEGUNDO CONTENEDOR ────────────────────────────────
+      //
+      // En escritorio desplazan DOS: el de la tabla y el `<main>` de la página.
+      // Con el primero restaurado, lo que falta para que el producto quede a la
+      // altura que tenía se le pide al segundo. Se mide contra la VENTANA, que
+      // es lo que la persona ve y no depende de cuántos contenedores haya.
+      if (estado.offsetVentana !== null && estado.offsetVentana !== undefined) {
+        const principal = document.querySelector("main");
+        if (principal && principal !== contenedor) {
+          const falta = Math.round(elemento.getBoundingClientRect().top) - estado.offsetVentana;
+          if (falta !== 0) {
+            const tope = principal.scrollHeight - principal.clientHeight;
+            principal.scrollTop = Math.max(0, Math.min(tope, principal.scrollTop + falta));
+          }
+        }
+        // La condición de salida es la altura REAL contra la ventana, no que el
+        // `scrollTop` haya aceptado el número: es lo único que contesta la
+        // pregunta que se está haciendo.
+        return Math.abs(Math.round(elemento.getBoundingClientRect().top) - estado.offsetVentana) <= 2;
+      }
+
+      // Se informa si QUEDÓ donde se pidió. El contenedor puede no haber
+      // terminado de crecer —las tarjetas cargan su foto, la tabla su ancho— y
+      // en ese momento el máximo es más chico de lo que va a ser: el navegador
+      // acepta el valor y lo recorta. Devolver `true` ahí sería dar por
+      // restaurado un scroll que quedó en otro lado.
+      return Math.abs(contenedor.scrollTop - objetivo) <= 1;
+    }
+
+    if (elemento) {
+      // Está pero no se sabe a qué altura estaba: al menos que se vea.
+      elemento.scrollIntoView({ block: "center", behavior: "auto" });
+      return true;
+    }
+
+    // RESPALDO: el producto ya no está en esta página —cambió el nombre, el
+    // filtro o el orden—. El scroll guardado es una aproximación, no la posición
+    // del producto.
+    const respaldo = Number(estado.scrollTop) || 0;
+    contenedor.scrollTop = respaldo;
+    return Math.abs(contenedor.scrollTop - respaldo) <= 1;
+  }, []);
+
+  // ── SE REINTENTA HASTA QUE QUEDE, NO DURANTE UN TIEMPO ──────────────────
+  //
+  // ── QUÉ SE MIDIÓ, Y POR QUÉ HACE FALTA ─────────────────────────────────
+  //
+  // Con un solo intento después de dos `requestAnimationFrame`, la restauración
+  // andaba en el celular con una lista larga y NO andaba en dos casos:
+  //
+  //   · el listado de combos, donde el contenedor tiene 83 px de sobrante;
+  //   · escritorio a 1366, donde el que scrollea es el de la tabla.
+  //
+  // En los dos el contenedor terminaba en `scrollTop = 0`. La sonda lo mostró
+  // comparando el sobrante antes y después: al momento de escribir, el
+  // contenedor todavía no había crecido, así que el navegador recortaba el valor
+  // pedido y quedaba en cero. No es un problema de "esperar más": es que había
+  // que comprobar si QUEDÓ.
+  //
+  // Por eso esto no es un temporizador. La condición de salida es que el scroll
+  // haya quedado donde se pidió; el tope de cuadros es una red para no girar
+  // para siempre si el contenedor nunca llega a tener sobrante —que es un caso
+  // real: una lista que entra entera en la pantalla—.
+  const restaurarPosicion = useCallback(
+    (estado, cuadrosRestantes = 20) => {
+      if (intentarRestaurar(estado)) return;
+      if (cuadrosRestantes <= 0) return;
+      requestAnimationFrame(() => restaurarPosicion(estado, cuadrosRestantes - 1));
+    },
+    [intentarRestaurar]
+  );
+
   useEffect(() => {
     if (loading || restoredScrollRef.current) return;
+    // La lista tiene que estar montada: con cero filas no hay nada que buscar y
+    // medir daría cero. No es una espera por tiempo, es una condición.
+    if (rows.length === 0) return;
     restoredScrollRef.current = true;
-    let savedY = null;
-    try { savedY = sessionStorage.getItem("productos:scrollY"); } catch {}
-    if (savedY != null) {
-      const y = Number(savedY) || 0;
-      // Doble rAF: esperar layout/paint para que la altura de la lista ya exista.
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          const sc = getProductosScrollEl();
-          if (sc) sc.scrollTop = y;
-        })
-      );
-      try { sessionStorage.removeItem("productos:scrollY"); } catch {}
-    } else {
-      // Entrada fresca al módulo: no conservar selección de sesiones previas.
-      try { sessionStorage.removeItem("productos:selectedProductId"); } catch {}
+
+    const almacen = almacenDeSesion();
+    const guardado = leerEstadoDeRetorno(almacen, Date.now());
+
+    // ── Y ADEMÁS: ¿ES DE ESTE LISTADO? ────────────────────────────────────
+    //
+    // Faltaba esta pregunta. El estado guardaba la URL y nadie la miraba: solo
+    // se comprobaban la forma y el vencimiento. Con el editor abandonado sin
+    // volver, entrar a Productos por otra URL dentro de la media hora movía el
+    // scroll y marcaba un producto de otra pantalla.
+    //
+    // Se compara contra `buildListingUrl()`, que es la MISMA función con la que
+    // se guardó. Comparar contra `location.search` habría metido una segunda
+    // forma de escribir la URL, y dos formas se separan.
+    const estado =
+      guardado &&
+      sePuedeRestaurarAca({ estado: guardado, urlActual: buildListingUrl(), ahora: Date.now() })
+        ? guardado
+        : null;
+
+    if (!estado) {
+      // ENTRADA FRESCA, y también el caso de arriba: no se marca nada, no se
+      // mueve nada, y el estado incompatible SE CONSUME. Dejarlo lo haría volver
+      // a intentar en la próxima entrada, que es el mismo defecto una pantalla
+      // más tarde.
+      setUltimoEditado(null);
+      consumirEstadoDeRetorno(almacen);
+      return;
     }
-  }, [loading]);
+
+    setUltimoEditado({ tipo: estado.tipo, id: estado.id });
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        try {
+          restaurarPosicion(estado);
+        } finally {
+          // Se consume DESPUÉS del intento y pase lo que pase: si quedara, la
+          // próxima entrada al módulo volvería a saltar sola.
+          consumirEstadoDeRetorno(almacen);
+        }
+      })
+    );
+  }, [loading, rows.length, restaurarPosicion]);
 
   const cerrarModal = () => {
     setModalOpen(false);
@@ -1259,9 +1464,18 @@ export default function ProductosPage() {
     router.push("/modulos/productos/nuevo-combo");
   };
 
+  // ── EL COMBO PERDÍA TODO EL CONTEXTO, Y ERA ACÁ ─────────────────────────
+  //
+  // Empujaba a `/modulos/productos/editar-combo/<id>` **sin la query**, así que
+  // el editor no tenía a dónde volver y su botón de guardar mandaba a
+  // `/modulos/productos?tipo=combos`: otra página, otro filtro, otro orden y sin
+  // scroll. Ahora hace lo mismo que `abrirEditar`, con la identidad del combo
+  // —que es `ProductoLocal.id` y nunca el del producto base—.
   const abrirEditarCombo = (productoLocalId) => {
     if (!productoLocalId) return;
-    router.push(`/modulos/productos/editar-combo/${productoLocalId}`);
+    guardarDondeEstaba({ tipo: TIPO_COMBO, id: Number(productoLocalId) });
+    const qs = queryDelListado();
+    router.push(`/modulos/productos/editar-combo/${productoLocalId}${qs ? `?${qs}` : ""}`);
   };
 
   const abrirVerComposicion = (row) => {
@@ -1530,8 +1744,77 @@ export default function ProductosPage() {
       alert("Error: ID de producto inválido");
       return;
     }
-    const qs = buildListingUrl().split("?")[1] || "";
+    // ── VER NO GUARDA ESTADO DE EDICIÓN, Y ES A PROPÓSITO ─────────────────
+    //
+    // Acá había un `guardarDondeEstaba` que agregué en la tanda anterior con el
+    // argumento de que "la ficha también es salir del listado". Estaba mal, y el
+    // efecto se veía: abrir Ver y volver dejaba el producto rotulado **Último
+    // editado** sin que nadie lo hubiera editado. La pantalla afirmaba algo
+    // falso.
+    //
+    // El estado de retorno es de EDICIÓN: lo escriben `abrirEditar` y
+    // `abrirEditarCombo`, que son los dos caminos donde algo se puede haber
+    // cambiado. Ver es mirar.
+    //
+    // Y no se reemplaza por un segundo estado "de lectura": nadie lo pidió y no
+    // hay evidencia de que haga falta. La query del listado sí sigue viajando en
+    // la URL de la ficha, así que volver de ahí conserva página y filtros — que
+    // es lo que esta pantalla ya hacía antes de que yo tocara nada.
+    const qs = queryDelListado();
     router.push(`/modulos/productos/${Number(id)}${qs ? `?${qs}` : ""}`);
+  };
+
+  // ── GUARDAR DÓNDE ESTABA, ANTES DE ABRIR CUALQUIER EDITOR ───────────────
+  //
+  // Una sola función para los cuatro caminos —editar producto, editar combo, ver
+  // ficha, y el que aparezca mañana—. Antes cada uno guardaba lo suyo, o no
+  // guardaba nada: `abrirEditarCombo` no guardaba, y por eso volver de un combo
+  // caía en `/modulos/productos?tipo=combos` sin scroll, sin página y sin
+  // filtros.
+  //
+  // Lo que se guarda y por qué está en `lib/productos/estadoDeRetorno.js`. Acá lo
+  // único propio es MEDIR: qué contenedor scrollea de verdad y a qué altura está
+  // el elemento adentro.
+  const guardarDondeEstaba = (identidad) => {
+    const clave = claveDeAncla(identidad);
+    if (!clave) return;
+    const contenedor = getProductosScrollEl();
+    let offset = null;
+    let offsetVentana = null;
+    {
+      const el = [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find(
+        (x) => x.offsetParent !== null
+      );
+      if (el) offsetVentana = Math.round(el.getBoundingClientRect().top);
+    }
+    if (contenedor) {
+      // El elemento se busca por su ancla, que es el mismo atributo que la card
+      // y la fila dibujan. Si no está —porque la lista todavía no se pintó— el
+      // offset queda en `null` y la restauración cae al scroll, que es el
+      // respaldo. `null` NO es 0: ver el candado R5.
+      const el = [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find(
+        (x) => x.offsetParent !== null
+      );
+      offset = posicionDentroDelContenedor(el, contenedor);
+    }
+    guardarEstadoDeRetorno(
+      almacenDeSesion(),
+      crearEstadoDeRetorno({
+        url: buildListingUrl(),
+        identidad,
+        scrollTop: contenedor ? contenedor.scrollTop : 0,
+        offset,
+        offsetVentana,
+        ahora: Date.now(),
+      })
+    );
+    setUltimoEditado(identidad);
+  };
+
+  /** La query del listado, para que el editor sepa a dónde volver. */
+  const queryDelListado = () => {
+    const url = buildListingUrl();
+    return url.includes("?") ? url.split("?")[1] : "";
   };
 
   const abrirEditar = (id) => {
@@ -1539,19 +1822,10 @@ export default function ProductosPage() {
       alert("Error: ID de producto inválido");
       return;
     }
-    // Marcar el producto abierto y guardar la posición de scroll (del <main>),
-    // para restaurar el contexto al volver del editor. La página viaja en la URL.
     setSelectedProductId(Number(id));
-    try {
-      const sc = getProductosScrollEl();
-      sessionStorage.setItem("productos:scrollY", String(sc ? sc.scrollTop : 0));
-      sessionStorage.setItem("productos:selectedProductId", String(Number(id)));
-    } catch {}
-    // Pasar query del listado para poder volver al mismo contexto
-    const listingUrl = buildListingUrl();
-    const qs = listingUrl.includes("?") ? listingUrl.split("?")[1] : "";
-    const editUrl = `/modulos/productos/${Number(id)}/editar${qs ? `?${qs}` : ""}`;
-    router.push(editUrl);
+    guardarDondeEstaba({ tipo: TIPO_PRODUCTO, id: Number(id) });
+    const qs = queryDelListado();
+    router.push(`/modulos/productos/${Number(id)}/editar${qs ? `?${qs}` : ""}`);
   };
 
   // ── A DÓNDE LLEVA "EDITAR" DE LA CARD DEL CELULAR ─────────────────────────
@@ -2296,6 +2570,17 @@ export default function ProductosPage() {
                   return (
                   <TarjetaProductoMovil
                     key={p.id ?? p.localProductoId}
+                    // ── EL ANCLA, QUE ES LO QUE FALTABA ──────────────────
+                    //
+                    // Sale del dominio y no de `p.id`: un combo se identifica
+                    // por su `ProductoLocal.id`, y las dos numeraciones se
+                    // pisan. Sin esto, al volver de editar no hay forma de
+                    // encontrar esta card ni para el scroll ni para la marca.
+                    ancla={claveDeAncla(identidadDeFila(p)) ?? undefined}
+                    ultimoEditado={
+                      ultimoEditado !== null &&
+                      claveDeAncla(identidadDeFila(p)) === claveDeAncla(ultimoEditado)
+                    }
                     nombre={p.nombre}
                     // `false` es "esta pantalla no lo muestra" y `null` es "no
                     // hay dato": la tarjeta los dibuja al revés —el segundo deja
@@ -2446,6 +2731,7 @@ export default function ProductosPage() {
                     loading={loading || loadingEditar}
                     selectedProductId={selectedProductId}
                     onSelectProducto={handleSelectProducto}
+                    ultimoEditado={ultimoEditado}
                   />
               </div>
 
