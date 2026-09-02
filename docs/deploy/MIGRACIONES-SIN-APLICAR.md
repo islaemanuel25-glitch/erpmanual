@@ -21,6 +21,90 @@ Ninguna.
 ---
 
 Producción está al día en **105**, comprobado con `prisma migrate status` el
+2026-09-02 después de desplegar
+`f7e2d7c3a55f5d7deb876c7cb1296475e6cf09db` — el merge del PR #23, el bloque
+Presentaciones del catálogo. **Solo código.**
+
+Corte de **2 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` **no recreado** —sigue con el arranque del 2026-08-17,
+todo con `--no-deps app`—, logs sin un solo error, `/login` en 200, `APP_IMAGE`
+sin filtrarse dentro del contenedor y el árbol del VPS limpio. Rollback
+disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:b13e748e3a79064f931b7086a7f8956c888dc7a3`
+(imagen `sha256:ca4889bb7732…`). No hizo falta.
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre en las últimas 20 líneas, **62 tablas**—:
+`/srv/produccion/backups/pre-f7e2d7c3_20260902_195933.sql.gz`, 3,4 MB. El quinto
+no aplica: no hay migración.
+
+Sin migraciones, comprobado de tres formas antes de tocar nada: el rango
+`b13e748e..f7e2d7c3` no toca `prisma/`, el clasificador informó "Archivos a
+mirar: 0" con el rango tomado de la imagen que atendía, y este archivo ya decía
+que no había pendientes. El contenedor descartable contó **105**, el mismo número
+que el árbol y que las aplicadas en la base — que es lo que distingue "estaba
+todo aplicado" de "la imagen no conoce la migración", porque las dos imprimen el
+mismo "No pending migrations to apply" con salida 0.
+
+### EL CÓDIGO VIAJÓ, COMPROBADO EN LOS DOS SENTIDOS Y CON DOS MARCADORES
+
+`presVenta` —el parámetro de URL que estrena el filtro por presentación— y
+`venta-pieza` —uno de los ocho identificadores del catálogo—. Los dos son
+literales y no identificadores, y los dos son ASCII puro.
+
+En la imagen que atiende aparecen en **3** archivos del build cada uno; en la
+imagen vieja, corrida en un contenedor descartable, en **0**. Los controles
+—`Falta regla`, que da 3 en las dos, y `por pieza`, que da 36 y 31— prueban que
+la búsqueda funciona en las dos imágenes, y una cadena inventada da 0, que prueba
+que no devuelve cualquier cosa.
+
+**Y UN MARCADOR SE DESCARTÓ, QUE ES LO QUE VALE ANOTAR.** El primero elegido fue
+`Compra por pieza`, el rótulo de una card. Dio **0 en las dos imágenes**, y eso
+NO era que el código no viajó: en el catálogo `titulo` y `detalle` son dos
+cadenas separadas que la card une como **dos hijos de JSX**, así que esa frase
+entera no existe en ningún archivo del build. Es la misma familia que la regla de
+no juntar dos hijos de JSX en una cadena: lo que se ve junto en pantalla puede no
+estar junto en el código. El marcador se descartó entero en vez de buscarle una
+explicación.
+
+### LO QUE SE EJERCIÓ CONTRA PRODUCCIÓN, Y LO QUE NO
+
+Sin sesión: `/modulos/productos` en 200, y también con `?presVenta=venta-pack` y
+con el cruce `?presVenta=venta-pack&presCompra=compra-kg` — o sea que la pantalla
+renderiza con los parámetros nuevos. `/api/productos/controles` y
+`/api/productos/listar?presVenta=venta-pack` contestan **401**: viven y piden
+sesión en vez de romperse. Los logs no tienen un solo error después de pedirlas.
+El andamio de la tarjeta contesta **404** y `/inicio` **200**, así que el guardia
+de entorno sigue puesto. Cascada **verde** antes y después del corte.
+
+**No se abrió el bloque en producción con una sesión real**, así que las ocho
+cards no se tocaron contra el sitio. La verificación funcional está hecha contra
+un servidor local con datos reales antes del corte: la sonda de presentaciones
+con **39 afirmaciones y 0 rojas** a 390 px —tocar, Atrás, Adelante, recargar el
+enlace de compra, recargar el cruce, escribir en el buscador y medir el desborde
+en cinco momentos—, la sonda de la tarjeta en verde, y la de Postgres con **13 de
+13** contra `erpazul_dev`.
+
+### UN ROJO DEL ARNÉS QUE NO ERA UN DEFECTO, Y CÓMO SE DISTINGUIÓ
+
+La sonda de la tarjeta frenó con "el andamio no dibujó ninguna cara". No era la
+tanda: se la había apuntado a un servidor levantado con `next start`, o sea
+entorno de producción, donde `app/andamio-producto-card` contesta 404 **por su
+guardia de entorno** —el comportamiento comprobado y documentado el 2026-08-15—.
+El control lo separó de un servidor caído: `/inicio` contestaba 200 en el mismo
+servidor. Vuelta a correr contra un servidor de desarrollo, **verde**.
+
+Vale como recordatorio de que el criterio "si no puede medir es rojo y frena" es
+el correcto: frenó, se miró por qué, y recién ahí se siguió.
+
+**Ninguna autorización manual de migraciones**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea de hoy; la última
+sigue siendo la del 2026-08-25.
+
+---
+
+Antes de éste, producción estaba al día en **105**, comprobado con
+`prisma migrate status` el
 2026-09-01 después de desplegar
 `b13e748e3a79064f931b7086a7f8956c888dc7a3` — el merge del PR #21, que hace
 configurable por local si el POS le muestra el stock al cajero, con la migración
