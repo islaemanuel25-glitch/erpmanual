@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-09-02 15:22
+**Última actualización:** 2026-09-02 16:14
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,8 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-09-02: fix(productos): la card encendida se ve, aunque esté en la otra página
+- 2026-09-02: fix(productos): Atrás deshace una card, y el buscador no llena el historial
 - 2026-09-02: feat(productos): en qué presentación se vende y en cuál se compra cada producto
 - 2026-08-22: refactor(productos): alinear el carrusel con el Figma aprobado
 - 2026-08-22: test(productos): la sonda del navegador mide las dos caras, no la franja
