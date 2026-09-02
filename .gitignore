@@ -178,3 +178,8 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+
+# Capturas de las sondas de navegador. Se sacan para mirarlas y adjuntarlas, no
+# para versionarlas: son PNG de varios cientos de KB que cambian en cada corrida
+# y engordarían el repo sin decir nada que el informe no diga.
+capturas-presentaciones/

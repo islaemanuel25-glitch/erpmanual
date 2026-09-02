@@ -18,8 +18,20 @@
 // NO es motivo para no correr esto: cuesta segundos y encuentra exactamente lo
 // mismo. Por eso la sonda informa cuántas filas vio pero no exige ninguna.
 //
+// ── EL CARGADOR DE ALIAS NO ES OPCIONAL ─────────────────────────────────────
+//
+// Esta sonda importa `controlesDesdePrisma`, que importa `controlesCalidad`, que
+// importa `@/lib/precios/reglaDeGanancia`. Node no sabe nada del alias `@/` de
+// `jsconfig.json`: sin el cargador, el `await import(...)` de abajo revienta con
+// "Cannot find package '@/lib'".
+//
+// El encabezado decía `node scripts/...` a secas, y ese comando NO PODÍA
+// FUNCIONAR NUNCA. No se notaba porque el abort por falta de `DATABASE_URL`
+// ocurre ANTES del import: quien la corriera sin la URL veía el mensaje correcto
+// y se iba convencido de que el resto andaba.
+//
 // Uso:
-//   DATABASE_URL=... node scripts/sonda-controles-productos.mjs
+//   DATABASE_URL=... node --import ./scripts/alias-loader.mjs scripts/sonda-controles-productos.mjs
 
 import { crearClientePrisma, LECTURA } from "./lib/clientePrisma.mjs";
 
