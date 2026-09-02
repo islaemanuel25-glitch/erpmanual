@@ -1,7 +1,8 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Check, TriangleAlert } from "lucide-react";
+import SunmiPill from "@/components/sunmi/SunmiPill";
 
 const POR_PAGINA = 4;
 const TINTE_ACTIVO_PCT = 12;
@@ -154,6 +155,56 @@ export default function CarruselControles({
   const pistaRef = useRef(null);
   const etiquetaId = useId();
 
+  // ── LAS CARDS ENCENDIDAS, CON SUS NOMBRES DEL CATÁLOGO ───────────────────
+  //
+  // Se buscan en `controles`, que es el mismo arreglo que dibuja las cards y que
+  // viene del dominio. Escribir los nombres otra vez acá sería tener la
+  // clasificación en dos lugares — y el día que un rótulo cambie, la cinta diría
+  // una cosa y la card otra.
+  const activas = encendidos
+    .filter(Boolean)
+    .map((id) => controles.find((c) => c.id === id))
+    .filter(Boolean);
+
+  // ── A QUÉ PÁGINA HAY QUE LLEVAR ──────────────────────────────────────────
+  //
+  // Solo cuando hay UNA encendida. Con dos —una de venta y una de compra— están
+  // en páginas distintas y no existe una página que las muestre a las dos: ese
+  // caso lo resuelve la cinta de arriba, no un scroll que elija una y esconda la
+  // otra.
+  //
+  // Y con ninguna encendida no se toca nada: llevar a la página 1 sin motivo le
+  // movería la pantalla a alguien que no pidió nada.
+  const paginaDeLaActiva =
+    activas.length === 1
+      ? Math.floor(controles.findIndex((c) => c.id === activas[0].id) / POR_PAGINA)
+      : null;
+
+  // La primera vez va sin animación —es la posición de partida, no un
+  // movimiento— y de ahí en adelante sí, que es lo que hace legible un Atrás.
+  const yaLlevoRef = useRef(false);
+  useEffect(() => {
+    if (paginaDeLaActiva === null) return;
+    const pista = pistaRef.current;
+    if (!pista) return;
+
+    const llevar = () => {
+      const ancho = pista.clientWidth;
+      // Sin ancho todavía no hay a dónde ir: el navegador no terminó de
+      // maquetar. Se reintenta en el cuadro siguiente en vez de calcular sobre
+      // un cero, que dejaría la card activa fuera de la vista sin ningún error.
+      if (!ancho) {
+        if (typeof requestAnimationFrame === "function") requestAnimationFrame(llevar);
+        return;
+      }
+      const suave = yaLlevoRef.current;
+      yaLlevoRef.current = true;
+      pista.scrollTo({ left: paginaDeLaActiva * ancho, behavior: suave ? "smooth" : "auto" });
+      setPaginaVisible(paginaDeLaActiva);
+    };
+    llevar();
+  }, [paginaDeLaActiva, controles.length]);
+
   if (controles.length === 0) return null;
 
   const alDesplazar = (e) => {
@@ -170,12 +221,35 @@ export default function CarruselControles({
 
   return (
     <section aria-labelledby={etiquetaId} className="w-full">
-      <div className="flex items-center justify-between mb-1.5">
-        <h2 id={etiquetaId} className="text-[12px] font-semibold sunmi-text-strong">
+      <div className="flex items-center justify-between gap-1.5 mb-1.5">
+        <h2 id={etiquetaId} className="text-[12px] font-semibold sunmi-text-strong shrink-0">
           {titulo}
         </h2>
+
+        {/* ── LA CINTA DE LO QUE ESTÁ FILTRANDO ──────────────────────────────
+            El problema que resuelve: con una sola card encendida el carrusel ya
+            lleva a su página, pero con DOS —una de venta y una de compra— están
+            en páginas distintas y no hay ninguna que las muestre juntas. Sin
+            esto, la pantalla filtra por algo que no se ve.
+
+            Va solo en la variante de clasificación: "Para revisar" enciende una
+            card por vez y siempre está a la vista, así que no le hace falta — y
+            agregársela le movería píxeles a una pantalla que no cambió.
+
+            Los nombres salen de `activas`, o sea del catálogo del dominio. Acá
+            no se escribe ni un rótulo. */}
+        {variante === VARIANTE_CLASIFICACION && activas.length > 0 && (
+          <span className="flex items-center gap-1 min-w-0 flex-wrap justify-end" role="status">
+            {activas.map((c) => (
+              <SunmiPill key={c.id} color="amber">
+                {c.titulo} {c.detalle}
+              </SunmiPill>
+            ))}
+          </span>
+        )}
+
         {cargando && (
-          <span className="text-[10.5px] sunmi-text-muted">calculando…</span>
+          <span className="text-[10.5px] sunmi-text-muted shrink-0">calculando…</span>
         )}
       </div>
 

@@ -19,6 +19,7 @@ import {
   PRESENTACION,
   IDS_VENTA,
   IDS_COMPRA,
+  IDS_PRESENTACION,
 } from "@/lib/productos/presentaciones";
 
 const render = (props) =>
@@ -230,6 +231,90 @@ test("G21. el contrato accesible se conserva en las dos variantes", () => {
   }
   // Y el rótulo de la card de clasificación nombra el grupo: "Venta por pack: 7".
   assert.match(clasificacion, /Venta por pack: 7/);
+});
+
+// ── QUE LA SELECCIÓN ACTIVA NO QUEDE INVISIBLE ────────────────────────────
+//
+// El defecto: al recargar un enlace con `presCompra`, el carrusel arranca en la
+// página de Venta mientras la card encendida está en la de Compra. La pantalla
+// filtra por algo que no se ve.
+
+test("G23. LA CINTA DICE QUÉ ESTÁ FILTRANDO, con los nombres del catálogo", () => {
+  const html = renderClasif({
+    controles: clasif(5),
+    activo: [PRESENTACION.VENTA_PACK, PRESENTACION.COMPRA_UNIDAD],
+  });
+  // Los dos nombres, tal como los escribe el dominio.
+  const pack = PRESENTACIONES.find((p) => p.id === PRESENTACION.VENTA_PACK);
+  const unidad = PRESENTACIONES.find((p) => p.id === PRESENTACION.COMPRA_UNIDAD);
+  assert.match(html, new RegExp(`${pack.titulo} ${pack.detalle}`));
+  assert.match(html, new RegExp(`${unidad.titulo} ${unidad.detalle}`));
+  // Y va en una región que un lector de pantalla anuncia al cambiar.
+  assert.match(html, /role="status"/);
+});
+
+test("G24. contraprueba de G23: sin nada encendido no hay cinta", () => {
+  // Sin esto, G23 pasaría en verde aunque la cinta se dibujara siempre — y una
+  // cinta vacía permanente ocuparía lugar arriba del buscador sin decir nada.
+  const html = renderClasif({ controles: clasif(5), activo: [null, null] });
+  assert.doesNotMatch(html, /role="status"/);
+});
+
+test("G25. LA CINTA NO ESCRIBE LOS NOMBRES: los saca de las cards que recibe", () => {
+  // Es el pedido explícito de no duplicar la clasificación en la pantalla. Si el
+  // componente tuviera los rótulos escritos adentro, cambiar uno en el dominio
+  // dejaría la cinta diciendo otra cosa que la card.
+  const fuente = fs
+    .readFileSync(path.join(process.cwd(), "components", "productos", "CarruselControles.jsx"), "utf8")
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const nombre of ["Venta", "Compra", "por pack", "por unidad", "por kg", "por pieza"]) {
+    assert.doesNotMatch(
+      fuente,
+      new RegExp(`["'\`]${nombre}`),
+      `el componente escribe "${nombre}" y tendría que sacarlo del catálogo`
+    );
+  }
+  // Y sí los busca en la lista que recibe.
+  assert.match(fuente, /controles\.find\(/);
+
+  // Con rótulos inventados, la cinta muestra ESOS: la prueba de que no hay una
+  // tabla escondida adentro del componente.
+  const raros = PRESENTACIONES.map((p) => ({ ...p, titulo: "Zzz", detalle: "qqq", cantidad: 1 }));
+  const html = renderClasif({ controles: raros, activo: [PRESENTACION.VENTA_KG] });
+  assert.match(html, /Zzz qqq/);
+});
+
+test("G26. la cinta NO aparece en la variante de alerta", () => {
+  // "Para revisar" enciende una card por vez y siempre está a la vista. Ponerle
+  // una cinta le movería píxeles a una pantalla que esta tanda no cambia.
+  const html = render({ controles: conCantidad(7), activo: CONTROLES[0].id });
+  assert.doesNotMatch(html, /role="status"/);
+  // Y sigue siendo idéntica a la de antes del prop.
+  assert.equal(html, render({ controles: conCantidad(7), activo: CONTROLES[0].id, variante: VARIANTE_ALERTA }));
+});
+
+test("G27. LA PÁGINA DE LA CARD ACTIVA SE CALCULA, y solo cuando hay UNA", () => {
+  // El cálculo vive en el componente y se ejerce de verdad en el navegador —un
+  // `scrollTo` no se puede afirmar desde un render a texto—. Lo que sí se puede
+  // fijar acá es la REGLA, que es donde estaba el defecto: con una encendida hay
+  // página a la que ir, con dos no existe ninguna que las muestre juntas.
+  const paginaDe = (id) => Math.floor(IDS_PRESENTACION.indexOf(id) / POR_PAGINA);
+  assert.equal(paginaDe(PRESENTACION.VENTA_PACK), 0);
+  assert.equal(paginaDe(PRESENTACION.VENTA_PIEZA), 0);
+  assert.equal(paginaDe(PRESENTACION.COMPRA_PACK), 1, "la primera de compra cae en la segunda página");
+  assert.equal(paginaDe(PRESENTACION.COMPRA_PIEZA), 1);
+  // Las dos de una combinación están en páginas distintas: por eso hace falta la
+  // cinta y no alcanza con llevar el carrusel.
+  assert.notEqual(paginaDe(PRESENTACION.VENTA_PACK), paginaDe(PRESENTACION.COMPRA_UNIDAD));
+
+  const fuente = fs
+    .readFileSync(path.join(process.cwd(), "components", "productos", "CarruselControles.jsx"), "utf8")
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.match(fuente, /paginaDeLaActiva/, "no se calcula a qué página llevar");
+  assert.match(fuente, /activas\.length === 1/, "lleva el carrusel con dos encendidas, y no hay página que las muestre");
+  assert.match(fuente, /scrollTo\(/, "calcula la página y no va");
 });
 
 test("G22. un conteo parcial tampoco se declara sano en clasificación", () => {
