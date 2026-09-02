@@ -1820,22 +1820,68 @@ try {
   // con el motivo escrito.
   await esperarBloqueDeControles("antes de leer las cards de Para revisar");
 
-  const cards = await evaluar(`(() => {
+  // ── EL BLOQUE YA NO TIENE CUATRO CARDS: TIENE DOCE, EN TRES PÁGINAS ──────
+  //
+  // Esta lectura devolvía las cards del bloque y 14a exigía que fueran CUATRO.
+  // Desde que las ocho modalidades de venta y compra se incorporaron al mismo
+  // carrusel, el bloque lleva doce y la afirmación se puso roja.
+  //
+  // No se afloja el número: se reescribe sabiendo qué cambió. Lo que 14a quería
+  // decir —"los cuatro controles de mantenimiento se dibujan enteros a 390 px"—
+  // sigue teniendo sentido y ahora es sobre la PRIMERA PÁGINA. Las otras dos
+  // tienen su propia sonda, `sonda-presentaciones-productos.mjs`.
+  //
+  // Las páginas están todas en el DOM y en orden, así que los primeros cuatro
+  // botones son la página 1. Eso no se supone: se comprueba abajo que esos
+  // cuatro NO sean modalidades, que es lo que distingue "la página 1 son los
+  // controles" de "agarré cuatro botones cualesquiera".
+  const bloque = await evaluar(`(() => {
     const seccion = [...document.querySelectorAll('section')]
       .find((s) => /Para revisar/.test(s.textContent || ""));
     if (!seccion) return null;
     const botones = [...seccion.querySelectorAll('button[aria-pressed]')];
-    return botones.map((b) => ({
+    const leer = (b) => ({
       texto: b.innerText.replace(/\\s+/g, " ").trim(),
       cantidad: Number((b.innerText.match(/\\d+/) || [0])[0]),
       visible: b.getBoundingClientRect().height > 0,
-    }));
+    });
+    return {
+      total: botones.length,
+      paginas: seccion.querySelector("[class*='overflow-x-auto']")?.children.length ?? 0,
+      cards: botones.slice(0, 4).map(leer),
+      resto: botones.slice(4).map((b) => b.innerText.replace(/\\s+/g, " ").trim()),
+    };
   })()`);
+
+  const cards = bloque ? bloque.cards : null;
 
   afirmar(
     Array.isArray(cards) && cards.length === 4 && cards.every((c) => c.visible),
-    `14a · "Para revisar" dibuja sus cuatro cards a 390 px`,
+    `14a · la PRIMERA PÁGINA del bloque son los cuatro controles, enteros a 390 px`,
     cards ? `vinieron ${cards.length}: ${cards.map((c) => c.texto).join(" | ")}` : "no está el bloque"
+  );
+
+  // ── 14a-cero · Y LOS CUATRO PRIMEROS SON LOS CONTROLES, NO CUALQUIERA ────
+  //
+  // Sin esto, 14a pasaría igual si el orden de las páginas se diera vuelta y la
+  // primera fuera la de Venta: serían cuatro cards enteras lo mismo. Lo que lo
+  // distingue es que ninguna de las cuatro sea una modalidad.
+  const esModalidad = (t) => /^(Venta|Compra) por /.test(t);
+  afirmar(
+    Array.isArray(cards) && cards.every((c) => !esModalidad(c.texto)),
+    `14a-cero · ninguna de las cuatro primeras es una modalidad de venta o compra`,
+    cards ? cards.map((c) => c.texto).join(" | ") : "no está el bloque"
+  );
+
+  // ── 14a-doce · EL BLOQUE ES UNO SOLO Y LLEVA LAS DOCE ────────────────────
+  //
+  // Es la otra mitad, y va acá porque este es el arnés que mira el bloque de
+  // "Para revisar": si alguien volviera a partirlo en dos, esta sección tendría
+  // cuatro cards otra vez y una página sola.
+  afirmar(
+    bloque && bloque.total === 12 && bloque.paginas === 3,
+    `14a-doce · el bloque lleva las doce cards en tres páginas`,
+    bloque ? `cards=${bloque.total} páginas=${bloque.paginas} · resto=${bloque.resto.join(" | ")}` : "no está el bloque"
   );
 
   // ── 14a-bis · Y ES UNA GRILLA 2×2, NO UN RIEL ───────────────────────────
