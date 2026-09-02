@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-09-02] - Actualización: productos
+
+### Modificado
+- **productos**: feat(productos): en qué presentación se vende y en cuál se compra cada producto
+
+
 ## [2026-09-01] - Actualización: pos-ventas
 
 ### Modificado
