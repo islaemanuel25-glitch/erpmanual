@@ -97,6 +97,7 @@ import {
   guardarEstadoDeRetorno,
   leerEstadoDeRetorno,
   consumirEstadoDeRetorno,
+  sePuedeRestaurarAca,
   scrollParaDejarloA,
   TIPO_PRODUCTO,
   TIPO_COMBO,
@@ -1323,11 +1324,29 @@ export default function ProductosPage() {
     restoredScrollRef.current = true;
 
     const almacen = almacenDeSesion();
-    const estado = leerEstadoDeRetorno(almacen, Date.now());
+    const guardado = leerEstadoDeRetorno(almacen, Date.now());
+
+    // ── Y ADEMÁS: ¿ES DE ESTE LISTADO? ────────────────────────────────────
+    //
+    // Faltaba esta pregunta. El estado guardaba la URL y nadie la miraba: solo
+    // se comprobaban la forma y el vencimiento. Con el editor abandonado sin
+    // volver, entrar a Productos por otra URL dentro de la media hora movía el
+    // scroll y marcaba un producto de otra pantalla.
+    //
+    // Se compara contra `buildListingUrl()`, que es la MISMA función con la que
+    // se guardó. Comparar contra `location.search` habría metido una segunda
+    // forma de escribir la URL, y dos formas se separan.
+    const estado =
+      guardado &&
+      sePuedeRestaurarAca({ estado: guardado, urlActual: buildListingUrl(), ahora: Date.now() })
+        ? guardado
+        : null;
 
     if (!estado) {
-      // ENTRADA FRESCA: no se marca nada y no se mueve nada. Es lo que pide que
-      // la marca se borre al entrar de cero al módulo.
+      // ENTRADA FRESCA, y también el caso de arriba: no se marca nada, no se
+      // mueve nada, y el estado incompatible SE CONSUME. Dejarlo lo haría volver
+      // a intentar en la próxima entrada, que es el mismo defecto una pantalla
+      // más tarde.
       setUltimoEditado(null);
       consumirEstadoDeRetorno(almacen);
       return;
@@ -1725,9 +1744,22 @@ export default function ProductosPage() {
       alert("Error: ID de producto inválido");
       return;
     }
-    // La ficha también es "salir del listado": si desde ahí se toca Editar y se
-    // guarda, el retorno tiene que llevar al mismo lugar.
-    guardarDondeEstaba({ tipo: TIPO_PRODUCTO, id: Number(id) });
+    // ── VER NO GUARDA ESTADO DE EDICIÓN, Y ES A PROPÓSITO ─────────────────
+    //
+    // Acá había un `guardarDondeEstaba` que agregué en la tanda anterior con el
+    // argumento de que "la ficha también es salir del listado". Estaba mal, y el
+    // efecto se veía: abrir Ver y volver dejaba el producto rotulado **Último
+    // editado** sin que nadie lo hubiera editado. La pantalla afirmaba algo
+    // falso.
+    //
+    // El estado de retorno es de EDICIÓN: lo escriben `abrirEditar` y
+    // `abrirEditarCombo`, que son los dos caminos donde algo se puede haber
+    // cambiado. Ver es mirar.
+    //
+    // Y no se reemplaza por un segundo estado "de lectura": nadie lo pidió y no
+    // hay evidencia de que haga falta. La query del listado sí sigue viajando en
+    // la URL de la ficha, así que volver de ahí conserva página y filtros — que
+    // es lo que esta pantalla ya hacía antes de que yo tocara nada.
     const qs = queryDelListado();
     router.push(`/modulos/productos/${Number(id)}${qs ? `?${qs}` : ""}`);
   };
