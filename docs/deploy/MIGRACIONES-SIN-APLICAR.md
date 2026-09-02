@@ -22,6 +22,90 @@ Ninguna.
 
 Producción está al día en **105**, comprobado con `prisma migrate status` el
 2026-09-02 después de desplegar
+`78ae684dd74fb5f63843f829324eb76b8106b48d` — el merge de
+`hotfix/carrusel-unico`, que corrige un defecto de interpretación del despliegue
+anterior: las ocho modalidades vuelven al MISMO carrusel de "Para revisar", en
+vez de vivir en un segundo bloque. **Solo código.**
+
+Corte de **2 segundos**. Cinco valores coincidentes, `erpazul_app` con **cero
+reinicios**, `erpazul_db` **no recreado** —sigue con el arranque del 2026-08-17,
+todo con `--no-deps app`—, logs sin un solo error, `/login` en 200, `APP_IMAGE`
+sin filtrarse dentro del contenedor y el árbol del VPS limpio. Rollback
+disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:f7e2d7c3a55f5d7deb876c7cb1296475e6cf09db`
+(imagen `sha256:ee1fa790ae98…`). No hizo falta.
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre en las últimas 20 líneas, **62 tablas**—:
+`/srv/produccion/backups/pre-78ae684d_20260902_211544.sql.gz`, 3,4 MB. El quinto
+no aplica: no hay migración.
+
+Sin migraciones: el rango `f7e2d7c3..78ae684d` no toca `prisma/`, el clasificador
+informó "Archivos a mirar: 0" con el rango tomado de la imagen que atendía, y
+este archivo ya decía que no había pendientes. Los cuatro conteos dieron **105**
+—árbol local, árbol del VPS, aplicadas en la base y el contenedor descartable—,
+que es lo que distingue "estaba todo aplicado" de "la imagen no conoce la
+migración".
+
+### EL CÓDIGO VIAJÓ, Y ACÁ EL MARCADOR ES DE DESAPARICIÓN
+
+Esta tanda SACA un bloque, así que el marcador es al revés: algo que tiene que
+haber dejado de estar. Es la cadena `"Presentaciones"` con sus comillas —el
+título del segundo bloque—, anclada así porque suelta matchearía
+`setPresentaciones` y `contarPresentacionesDesdePrisma`, que siguen existiendo
+como identificadores.
+
+En la imagen vieja aparece en **2** archivos del build; en la que atiende, en
+**0**. El control `"Para revisar"` da **4 en las dos**, que es lo que prueba que
+la búsqueda funciona en las dos imágenes, y una cadena inventada da 0.
+
+### UNA COMPROBACIÓN QUE SE DESCARTÓ ENTERA, Y POR QUÉ
+
+Se intentó confirmarlo también por comportamiento, buscando `Presentaciones` en
+el HTML que produccción sirve para `/modulos/productos`. Dio **0** — y no
+significa nada: el **control dio 0 también**. La pantalla es un componente de
+cliente detrás de sesión, así que lo que se sirve sin credenciales es una cáscara
+de 10 KB donde no está ninguna de las dos palabras.
+
+Se descartó la comprobación entera en vez de quedarse con el cero que
+convenía. Es la regla del skill: si el control de un marcador da vacío, el
+marcador no contestó la pregunta.
+
+### UN ROJO QUE FRENÓ EL DESPLIEGUE, Y ESTA VEZ ERA DE VERDAD
+
+La sonda de la tarjeta se puso roja antes del corte: su afirmación 14a exigía que
+el bloque de "Para revisar" dibujara CUATRO cards, y con el carrusel único el
+bloque lleva doce. No se aflojó el número — se reescribió sabiendo qué cambió:
+ahora afirma sobre la PRIMERA PÁGINA, y se le agregaron dos mitades que faltaban
+(que ninguna de las cuatro primeras sea una modalidad, y que el bloque lleve las
+doce en tres páginas). Va en el commit `78ae684d`.
+
+### LO QUE SE EJERCIÓ CONTRA PRODUCCIÓN, Y LO QUE NO
+
+Sin sesión: `/modulos/productos` en 200, también con `?presVenta=venta-pack` y
+con el cruce; `/api/productos/controles` y `/api/productos/listar` en **401**
+—viven y piden sesión—; logs sin un solo error. Cascada **verde** antes y después
+del corte.
+
+**No se abrió el carrusel en producción con una sesión real.** La verificación
+funcional está hecha contra un servidor de desarrollo con datos reales antes del
+corte: la sonda del carrusel con **51 afirmaciones y 0 rojas** a 390 px —un solo
+carrusel, tres páginas, tres indicadores, Atrás, Adelante, recargas, el cruce y
+el desborde en cinco momentos— y la sonda de la tarjeta en verde.
+
+**Los 26 px del buscador están medidos y aceptados.** A 390 px el campo arranca
+en y=294 con el carrusel original de cuatro cards, en y=499 con los dos bloques
+que estaban desplegados, y en **y=320** con esto. La diferencia contra el
+original es la fila de tres indicadores, que el pedido pide expresamente y que el
+carrusel de cuatro cards no tenía porque no había más de una página. Emanuel la
+aprobó explícitamente.
+
+**Ninguna autorización manual de migraciones**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea de hoy.
+
+---
+
+Antes de éste, producción estuvo en
 `f7e2d7c3a55f5d7deb876c7cb1296475e6cf09db` — el merge del PR #23, el bloque
 Presentaciones del catálogo. **Solo código.**
 
