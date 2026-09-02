@@ -366,6 +366,34 @@ export default function SunmiProductoCard({
   // posición de cada dato la define el diseño. El código de barras va primero
   // porque es el que crece —lleva ícono y valor largo— y el del proveedor va
   // segundo porque no encoge.
+  // ── EL ANCLA: CÓMO SE ENCUENTRA ESTA TARJETA DESPUÉS ────────────────────
+  //
+  // Un identificador que viaja al DOM como `data-ancla` y no se dibuja. Existe
+  // porque volver de editar necesita ENCONTRAR la tarjeta, y hasta ahora no
+  // había forma: la lista del celular no llevaba el id a ningún lado, así que
+  // al volver no se la podía ni buscar ni marcar.
+  //
+  // Va en el kit y no envuelto en un `<div>` por la pantalla porque un
+  // envoltorio nuevo alrededor de la tarjeta rompe el `h-full` con el que la
+  // lista iguala alturas. La pieza ya tiene el nodo; lo único que faltaba era
+  // poder nombrarlo.
+  ancla = null,
+  // ── LA MARCA DE "ÚLTIMO EDITADO" ────────────────────────────────────────
+  //
+  // Una ranura más, con la misma regla que `marca` y `aviso`: la pieza sabe
+  // DÓNDE va y con qué tamaño, no sabe qué significa ni cuándo corresponde.
+  //
+  // ── Y VA POSICIONADA, QUE ES LO QUE LA HACE POSIBLE ─────────────────────
+  //
+  // `aviso` no servía para esto: dibuja un renglón con `mt-1.5`, así que pasar
+  // contenido donde había `null` haría CRECER la tarjeta. Con veinticinco en
+  // pantalla a 390 px, unos pocos píxeles por tarjeta corren el listado entero
+  // y la comparación de "quedó a la misma altura" deja de cerrar.
+  //
+  // El contenedor ya es `relative`, así que un nodo absoluto no ocupa alto: la
+  // tarjeta mide exactamente lo mismo con y sin marca. Hay un candado que lo
+  // compara.
+  destacado = null,
   className = "",
 }) {
   const padding = paddingQueSobrevive(PADDING, className);
@@ -401,7 +429,28 @@ export default function SunmiProductoCard({
       // Va primero para que, si la pantalla declara su propio alto, el suyo mande.
       className={["h-full", className].filter(Boolean).join(" ")}
     >
-      <div className={contenedor}>
+      <div
+        className={contenedor}
+        // El ancla se dibuja solo si la hay: una tarjeta sin identidad no lleva
+        // el atributo, en vez de llevarlo vacío y hacer que la búsqueda del
+        // retorno matchee la primera que encuentre.
+        data-ancla={ancla ?? undefined}
+        // `aria-current` es lo que un lector de pantalla anuncia. Va en la
+        // tarjeta entera y no en la píldora porque lo que está destacado es el
+        // producto, no el rótulo.
+        aria-current={destacado ? "true" : undefined}
+      >
+        {destacado && (
+          // ── ABSOLUTO A PROPÓSITO: NO OCUPA ALTO ───────────────────────────
+          //
+          // Abajo a la derecha, sobre la franja de la acción, que es la única
+          // zona de la tarjeta que está vacía en las 10.521 filas —"Editar" va
+          // centrado—. Arriba a la derecha se pisaría con los nombres largos,
+          // que son mayoría y envuelven.
+          <span className="absolute bottom-2 right-2 z-10 pointer-events-none">
+            {destacado}
+          </span>
+        )}
         {/* 1 · NOMBRE. Envuelve, nunca se corta: los reales son largos y a veces
             en mayúsculas, y recortarlos esconde justo lo que distingue un
             producto de otro.

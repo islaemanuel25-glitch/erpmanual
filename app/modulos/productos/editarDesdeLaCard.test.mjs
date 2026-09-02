@@ -64,8 +64,23 @@ test("C2. CARD DEL CELULAR + COMBO → EDITAR-COMBO CON `localProductoId`", () =
     "el combo no se despacha a abrirEditarCombo con localProductoId"
   );
 
-  // Y `abrirEditarCombo` lleva a la pantalla que YA existe, no a una nueva.
-  assert.match(PAGINA, /router\.push\(`\/modulos\/productos\/editar-combo\/\$\{productoLocalId\}`\)/);
+  // ── Y AHORA LLEVA TAMBIÉN LA QUERY DEL LISTADO ──────────────────────────
+  //
+  // Este candado fijaba la línea exacta `router.push(\`…/${productoLocalId}\`)`,
+  // y se puso rojo al agregarle la query. No se afloja: se reescribe sabiendo
+  // qué cambió, y de paso pasa a afirmar MÁS.
+  //
+  // Lo que cambió y por qué: `abrirEditarCombo` empujaba sin query, así que el
+  // editor no tenía a dónde volver y mandaba a `/modulos/productos?tipo=combos`
+  // —otra página, otro filtro, otro orden—. Ahora la query viaja, que es lo que
+  // permite volver al mismo listado.
+  assert.match(
+    PAGINA,
+    /router\.push\(\s*`\/modulos\/productos\/editar-combo\/\$\{productoLocalId\}\$\{qs \? `\?\$\{qs\}` : ""\}`\s*\)/,
+    "el combo dejó de llevar la query del listado al editor"
+  );
+  // Y el id que viaja sigue siendo el del ProductoLocal, que era el punto de C2.
+  assert.match(PAGINA, /editar-combo\/\$\{productoLocalId\}/);
   assert.ok(
     fs.existsSync(path.join(RAIZ, "app/modulos/productos/editar-combo/[productoLocalId]/page.jsx")),
     "la ruta de editar combo no existe"
@@ -75,6 +90,46 @@ test("C2. CARD DEL CELULAR + COMBO → EDITAR-COMBO CON `localProductoId`", () =
   const pantalla = leer("app/modulos/productos/editar-combo/[productoLocalId]/page.jsx");
   assert.match(pantalla, /import FormCombo from "@\/components\/productos\/FormCombo"/);
   assert.match(pantalla, /<FormCombo/);
+});
+
+test("C2-bis. LAS TRES SALIDAS DEL EDITOR DE COMBO VUELVEN A LA MISMA URL", () => {
+  // ── EL DEFECTO ──────────────────────────────────────────────────────────
+  //
+  // Guardar iba a `/modulos/productos?tipo=combos`; cancelar y el botón de atrás,
+  // a `/modulos/productos` pelado. Tres destinos escritos a mano, ninguno con la
+  // página, la búsqueda, el filtro ni el orden de donde se venía.
+  //
+  // Se exige que sean UNA sola constante: con tres literales, la que alguien se
+  // olvide de actualizar es la que rompe el retorno, y no se nota hasta usarla.
+  const pantalla = leer("app/modulos/productos/editar-combo/[productoLocalId]/page.jsx");
+  const sinComentarios = pantalla.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  assert.match(sinComentarios, /const urlDeVuelta =/, "no hay una URL de vuelta única");
+  assert.match(sinComentarios, /useSearchParams\(\)/, "el editor no recibe la query del listado");
+
+  // Guardar, cancelar y el botón de atrás, los tres.
+  assert.match(sinComentarios, /router\.push\(urlDeVuelta\)/);
+  assert.match(sinComentarios, /onCancel=\{\(\) => router\.push\(urlDeVuelta\)\}/);
+  assert.match(sinComentarios, /<SunmiBackButton href=\{urlDeVuelta\}/);
+
+  // Y NINGUNA salida escrita a mano. Es la contracara: la constante puede estar
+  // perfecta y un literal suelto en otro lado seguir rompiendo el retorno.
+  // Los dos únicos admitidos son las DOS RAMAS de la propia constante: con query
+  // y sin ella. Cualquier tercero es un destino escrito a mano en otro lado.
+  const literales = [...sinComentarios.matchAll(/["'`]\/modulos\/productos[^"'`]*["'`]/g)].map(
+    (m) => m[0]
+  );
+  assert.deepEqual(
+    literales.sort(),
+    ['"/modulos/productos"', "`/modulos/productos?${qs}`"].sort(),
+    `quedaron destinos escritos a mano: ${literales.join(", ")}`
+  );
+  // Y los dos están en la línea de `urlDeVuelta`, no sueltos por ahí.
+  const linea = sinComentarios
+    .split("\n")
+    .find((l) => l.includes("const urlDeVuelta ="));
+  assert.ok(linea.includes("/modulos/productos?${qs}"), "la rama con query no está en la constante");
+  assert.ok(linea.includes('"/modulos/productos"'), "la rama sin query no está en la constante");
 });
 
 test("C3. JAMÁS SE IDENTIFICA UN COMBO CON `ProductoBase.id`", () => {

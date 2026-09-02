@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
@@ -13,8 +13,24 @@ import useContextoActivo from "@/hooks/useContextoActivo";
 export default function EditarComboPage({ params }) {
   const { productoLocalId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { loading: loadingCtx, contexto, needsContexto } = useContextoActivo();
   const localId = contexto?.localId || 0;
+
+  // ── A DÓNDE SE VUELVE, Y POR QUÉ ESTABA MAL ─────────────────────────────
+  //
+  // Los tres caminos de salida estaban escritos a mano y ninguno conservaba
+  // nada: guardar iba a `/modulos/productos?tipo=combos`, cancelar y el botón de
+  // atrás a `/modulos/productos` pelado. Editar un combo de la página 3, con una
+  // búsqueda y un orden puestos, devolvía a la página 1 del catálogo con otro
+  // filtro. Es el mismo defecto que el editor de producto ya no tenía: aquél
+  // arma su `returnUrl` desde la query, y éste no la recibía siquiera.
+  //
+  // Ahora la query llega desde el listado —`abrirEditarCombo` la manda— y de acá
+  // salen las tres salidas. Es UNA sola constante para que no puedan volver a
+  // separarse: la que se olvide de actualizar es la que rompe el retorno.
+  const qs = searchParams.toString();
+  const urlDeVuelta = qs ? `/modulos/productos?${qs}` : "/modulos/productos";
 
   const [initial, setInitial] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +103,7 @@ export default function EditarComboPage({ params }) {
     if (!res.ok || !data?.ok) {
       throw new Error(data?.error || "No se pudo guardar el combo.");
     }
-    router.push("/modulos/productos?tipo=combos");
+    router.push(urlDeVuelta);
   };
 
   if (loadingCtx) return null;
@@ -101,7 +117,7 @@ export default function EditarComboPage({ params }) {
       <SunmiCard>
         <div className="flex items-center justify-between mb-3">
           <SunmiHeader title="Editar combo" />
-          <SunmiBackButton href="/modulos/productos" />
+          <SunmiBackButton href={urlDeVuelta} />
         </div>
         <div className="p-1">
           {loading ? (
@@ -118,7 +134,7 @@ export default function EditarComboPage({ params }) {
               localNombre={contexto?.nombre}
               esDeposito={contexto?.esDeposito === true}
               onSubmit={handleSubmit}
-              onCancel={() => router.push("/modulos/productos")}
+              onCancel={() => router.push(urlDeVuelta)}
               submitLabel="Guardar combo"
             />
           ) : null}
