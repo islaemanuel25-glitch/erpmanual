@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-09-02 19:35
+**Última actualización:** 2026-09-02 20:08
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-09-02: fix(productos): el estado de retorno solo restaura en el listado del que salió
 - 2026-09-02: fix(productos): volver de editar deja al mismo producto donde estaba
 - 2026-09-02: fix(productos): un solo carrusel de doce cards, y no dos bloques
 - 2026-09-02: fix(productos): la card encendida se ve, aunque esté en la otra página
