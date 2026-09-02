@@ -11,15 +11,6 @@ import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 
 import { Pencil, Trash2, Warehouse, Eye, Power, PowerOff } from "lucide-react";
 
-import {
-  claveDeAncla,
-  identidadDeFila,
-  TEXTO_ULTIMO_EDITADO,
-} from "@/lib/productos/estadoDeRetorno";
-
-/** En qué columna se dibuja la marca de "Último editado". */
-const COLUMNA_DE_LA_MARCA = "nombre";
-
 // Campos que se pueden ordenar desde el backend
 const SORTABLE_KEYS = [
   "nombre", "codigoBarra", "precioCosto", "precioVenta",
@@ -51,10 +42,6 @@ export default function SunmiTablaProductos({
   catalogos,
   selectedProductId = null,
   onSelectProducto,
-  // La identidad del último producto editado —`{ tipo, id }`— o `null`. La marca
-  // visual y `aria-current` salen de acá, y NO de `selectedProductId`: aquél es
-  // la fila que alguien tocó, que es otra cosa y sigue funcionando igual.
-  ultimoEditado = null,
 }) {
   const CAT = Object.fromEntries(
     (catalogos?.CATEGORIAS ?? []).map((c) => [String(c.id), c.nombre])
@@ -273,19 +260,9 @@ export default function SunmiTablaProductos({
           rows.map((row) => {
             const isSelected =
               selectedProductId != null && row.id === selectedProductId;
-            // ── LA IDENTIDAD SALE DEL DOMINIO, NO DE `row.id` ────────────────
-            //
-            // `row.id` es `ProductoBase.id` también para un combo, y un combo se
-            // identifica por su `ProductoLocal.id`. Usarlo acá haría que volver
-            // de editar un combo marcara el producto que tenga ese número.
-            const ancla = claveDeAncla(identidadDeFila(row));
-            const esUltimoEditado =
-              ancla !== null && ultimoEditado !== null && ancla === claveDeAncla(ultimoEditado);
             return (
             <SunmiTableRow
               key={row.id}
-              ancla={ancla ?? undefined}
-              destacada={esUltimoEditado}
               onClick={onSelectProducto ? () => onSelectProducto(row.id) : undefined}
               // El tinte de la fila elegida sale del acento del theme y el hover
               // se compone encima. Antes era `!bg-amber-400/30`: un color fijo
@@ -302,17 +279,6 @@ export default function SunmiTablaProductos({
                   title={c.titleKey ? String(row[c.titleKey] ?? "") : undefined}
                 >
                   {c.render ? c.render(row[c.key], row) : row[c.key] ?? "-"}
-                  {/* ── LA MARCA VA AL LADO DEL NOMBRE, Y NO EN OTRA COLUMNA ──
-                      Una columna nueva correría las once que ya hay y le
-                      cambiaría el ancho a la tabla entera. Al lado del nombre
-                      entra en la caja de línea que la celda ya reserva: la
-                      píldora mide menos que el renglón de 12 px, así que la fila
-                      no crece. Hay un candado que compara el alto con y sin. */}
-                  {esUltimoEditado && c.key === COLUMNA_DE_LA_MARCA && (
-                    <span className="ml-1.5 align-middle">
-                      <SunmiPill color="amber">{TEXTO_ULTIMO_EDITADO}</SunmiPill>
-                    </span>
-                  )}
                 </td>
               ))}
 

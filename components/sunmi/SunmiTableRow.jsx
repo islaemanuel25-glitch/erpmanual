@@ -63,23 +63,9 @@ export default function SunmiTableRow({
   tono = null,
   /** "ambiente" | "fuerte". Ambiente es lo de siempre. */
   intensidad = "ambiente",
-  // ── EL ANCLA, CON LA MISMA FORMA QUE LA DE LA TARJETA DEL CELULAR ────────
-  //
-  // `data-ancla` es cómo se encuentra una fila para volver al mismo lugar
-  // después de editar. Es el MISMO atributo que dibuja `SunmiProductoCard`, y
-  // eso es lo que permite que la restauración sea una sola función para las dos
-  // superficies en vez de una por cada una.
-  //
-  // Sin esto, escritorio tendría que buscarse de otra forma —por índice de fila,
-  // que es justo lo que no sirve— o quedarse sin restaurar.
-  ancla = null,
-  /** Marca de lector de pantalla. La visual la pone quien dibuja la celda. */
-  destacada = false,
 }) {
   return (
     <tr
-      data-ancla={ancla ?? undefined}
-      aria-current={destacada ? "true" : undefined}
       // MARCA INERTE PARA EL ARNÉS. No dibuja nada: deja recortar fila por fila
       // en vez de fotografiar pantallas enteras. Con 29 archivos consumidores es
       // lo único que vuelve manejable la verificación.

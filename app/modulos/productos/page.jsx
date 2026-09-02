@@ -1778,25 +1778,37 @@ export default function ProductosPage() {
   const guardarDondeEstaba = (identidad) => {
     const clave = claveDeAncla(identidad);
     if (!clave) return;
+
+    // ── SOLO SE GUARDA SI SE SALIÓ DESDE UNA CARD DEL CELULAR ─────────────
+    //
+    // La restauración de posición es de la vista MÓVIL y de ninguna otra. La
+    // tabla de escritorio queda exactamente como estaba: sin ancla, sin marca y
+    // sin que su scroll se toque.
+    //
+    // ── Y NO SE DECIDE POR EL ANCHO DE LA PANTALLA ───────────────────────
+    //
+    // Preguntar por un `matchMedia` sería suponer que "angosto" y "hay cards"
+    // son lo mismo. No lo son: las dos superficies se dibujan siempre y quién
+    // está visible lo decide el CSS, que puede cambiar. Lo que se pregunta es el
+    // hecho: ¿existe la card de este producto y se ve?
+    //
+    // El ancla ahora la dibuja SOLO `TarjetaProductoMovil`, así que encontrarla
+    // visible es exactamente "se salió desde una card móvil". Sin ella no se
+    // guarda nada, y el editor se abre igual: navegar no depende de esto.
+    const card = [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find(
+      (x) => x.offsetParent !== null
+    );
+    if (!card) return;
+
     const contenedor = getProductosScrollEl();
-    let offset = null;
-    let offsetVentana = null;
-    {
-      const el = [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find(
-        (x) => x.offsetParent !== null
-      );
-      if (el) offsetVentana = Math.round(el.getBoundingClientRect().top);
-    }
-    if (contenedor) {
-      // El elemento se busca por su ancla, que es el mismo atributo que la card
-      // y la fila dibujan. Si no está —porque la lista todavía no se pintó— el
-      // offset queda en `null` y la restauración cae al scroll, que es el
-      // respaldo. `null` NO es 0: ver el candado R5.
-      const el = [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find(
-        (x) => x.offsetParent !== null
-      );
-      offset = posicionDentroDelContenedor(el, contenedor);
-    }
+    const offsetVentana = Math.round(card.getBoundingClientRect().top);
+    // La MISMA card que ya se encontró arriba: se busca una sola vez. Buscarla
+    // dos veces abría la puerta a que las dos búsquedas se separaran y una
+    // midiera un elemento distinto del que decidió que había que guardar.
+    //
+    // Sin contenedor el offset queda en `null`, y la restauración cae al scroll
+    // guardado. `null` NO es 0: ver el candado R5.
+    const offset = contenedor ? posicionDentroDelContenedor(card, contenedor) : null;
     guardarEstadoDeRetorno(
       almacenDeSesion(),
       crearEstadoDeRetorno({
@@ -2731,7 +2743,6 @@ export default function ProductosPage() {
                     loading={loading || loadingEditar}
                     selectedProductId={selectedProductId}
                     onSelectProducto={handleSelectProducto}
-                    ultimoEditado={ultimoEditado}
                   />
               </div>
 
