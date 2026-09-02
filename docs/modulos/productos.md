@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-09-02 16:14
+**Última actualización:** 2026-09-02 17:38
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-09-02: fix(productos): un solo carrusel de doce cards, y no dos bloques
 - 2026-09-02: fix(productos): la card encendida se ve, aunque esté en la otra página
 - 2026-09-02: fix(productos): Atrás deshace una card, y el buscador no llena el historial
 - 2026-09-02: feat(productos): en qué presentación se vende y en cuál se compra cada producto
