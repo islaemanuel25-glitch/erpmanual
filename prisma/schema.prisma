@@ -34,6 +34,7 @@ model Grupo {
   listasPrecio    ListaPrecio[]
   codigosProveedor ProductoCodigoProveedor[]
   importacionesLista ImportacionListaProveedor[]
+  proveedoresLocales ProveedorLocal[]
 }
 
 model GrupoDeposito {
@@ -88,6 +89,9 @@ model Local {
   listasPrecio          ListaPrecio[]
   productosCreados      ProductoBase[]  @relation("ProductoBaseCreador")
   proveedoresCreados    Proveedor[]     @relation("ProveedorCreador")
+  /// Proveedores habilitados EXPLÍCITAMENTE en esta ubicación. Es otra cosa que
+  /// `proveedoresCreados`, que dice dónde se dieron de alta. Ver `ProveedorLocal`.
+  proveedoresAsociados  ProveedorLocal[]
   productos             ProductoLocal[]
   stock                 StockLocal[]
   transferenciasDestino Transferencia[] @relation("destino")
@@ -339,8 +343,63 @@ model Proveedor {
   pedidosProveedor  PedidoProveedor[]
   codigosProveedor  ProductoCodigoProveedor[]
   importacionesLista ImportacionListaProveedor[]
+  /// Con qué ubicaciones está asociado explícitamente. Ver `ProveedorLocal`.
+  localesAsociados  ProveedorLocal[]
 
   @@index([creadoEnLocalId])
+}
+
+/// QUÉ UBICACIÓN USA A QUÉ PROVEEDOR, DICHO EXPLÍCITAMENTE.
+///
+/// ── POR QUÉ UNA TABLA Y NO UN CAMPO EN `Proveedor` ─────────────────────────
+///
+/// Porque la relación es de muchos a muchos y ya se pagó el precio de no tenerla.
+/// `Proveedor` es GLOBAL —no tiene `grupoId`, y `cuit` es único en toda la base,
+/// ver el comentario del modelo— así que el mismo proveedor puede servir a varias
+/// ubicaciones de varios grupos. Un campo en `Proveedor` obligaría a elegir una
+/// sola, y duplicar la fila para la segunda choca contra el único del CUIT.
+///
+/// ── POR QUÉ NO ALCANZA `Proveedor.creadoEnLocalId` ────────────────────────
+///
+/// Porque dice OTRA COSA: dónde se dio de alta. Es un hecho de origen, no una
+/// autorización de uso, y ya tiene un consumidor —el fallback de
+/// `proveedorVisibleWhere` para el proveedor que todavía no tiene productos—.
+/// Reusarlo como "qué ubicaciones lo usan" le daría dos significados a la misma
+/// columna: un proveedor asociado a tres locales solo podría declarar uno, y
+/// desasociarlo de uno le borraría el origen. Un hecho, una columna.
+///
+/// ── LO QUE ESTA TABLA NO HACE ─────────────────────────────────────────────
+///
+/// No reemplaza la Regla B ni la desactiva. La visibilidad derivada de los
+/// productos sigue funcionando igual y esta asociación se SUMA con un OR: un
+/// proveedor sin ninguna fila acá se comporta exactamente como antes de que la
+/// tabla existiera, y por eso no hace falta backfill.
+model ProveedorLocal {
+  id          Int      @id @default(autoincrement())
+  grupoId     Int
+  localId     Int
+  proveedorId Int
+  /// Desasociar sin perder la evidencia de que la asociación existió. Un borrado
+  /// duro dejaría un proveedor invisible sin rastro de quién lo había habilitado.
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  grupo     Grupo     @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  local     Local     @relation(fields: [localId], references: [id], onDelete: Cascade)
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+
+  /// LA GARANTÍA DURA CONTRA LA ASOCIACIÓN DOBLE.
+  ///
+  /// Es la base la que la sostiene, no la aplicación: dos pedidos simultáneos
+  /// para asociar el mismo proveedor al mismo local chocan acá, y la ruta
+  /// convierte ese choque en una respuesta idempotente en vez de en un error.
+  /// El `grupoId` va en la clave porque el mismo local podría —hoy no pasa—
+  /// pertenecer a más de un grupo, y la asociación es del par grupo+local.
+  @@unique([grupoId, localId, proveedorId], name: "proveedor_unico_por_ubicacion")
+  /// El índice que sirve al predicado de visibilidad, que filtra por los tres.
+  @@index([grupoId, localId, activo])
+  @@index([proveedorId])
 }
 
 model AreaFisica {
