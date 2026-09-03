@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-09-02 20:08
+**Última actualización:** 2026-09-02 22:05
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,9 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-09-02: fix(productos): el combo de escritorio vuelve a donde volvía, y el celular no
+- 2026-09-02: fix(productos): escritorio recupera su retorno, que el hotfix anterior le sacó
+- 2026-09-02: fix(productos): la restauración de posición es de la vista móvil y de ninguna otra
 - 2026-09-02: fix(productos): el estado de retorno solo restaura en el listado del que salió
 - 2026-09-02: fix(productos): volver de editar deja al mismo producto donde estaba
 - 2026-09-02: fix(productos): un solo carrusel de doce cards, y no dos bloques

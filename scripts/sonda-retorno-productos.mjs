@@ -738,15 +738,256 @@ try {
   );
   await capturar("10-volver-de-ver-sin-marca", `${BASE}${trasVolverDeVer.url}`);
 
-  // ── 7 · ESCRITORIO A 1366 ──────────────────────────────────────────────
+  // ── 7 · ESCRITORIO A 1366: NO SE RESTAURA, Y ESO ES LO CORRECTO ────────
+  //
+  // ── QUÉ AFIRMABA ANTES ESTE BLOQUE, Y POR QUÉ AHORA AFIRMA LO CONTRARIO ─
+  //
+  // Corría el mismo ciclo que en el celular y exigía que el producto volviera a
+  // la misma altura. Eso era del alcance equivocado: la restauración de posición
+  // es de la vista MÓVIL, y la tabla de escritorio estaba aprobada y tiene que
+  // quedar como estaba.
+  //
+  // Se invierte en vez de borrarse, por el mismo motivo de siempre: sin nada que
+  // mire escritorio, volver a agregarle la marca o el ancla no pondría nada rojo.
+  // Ahora se exige que NO haya ancla, que NO se marque, que NO se guarde estado
+  // y que el scroll NO se toque.
   await send("Emulation.setDeviceMetricsOverride", {
     width: 1366, height: 900, deviceScaleFactor: 1, mobile: false,
   });
-  const rEsc = await ciclo({
-    nombre: "escritorio 1366", urlListado: URL_LISTADO, indice: INDICE, salir: cancelar,
-    capturaPrefijo: "08-escritorio-1366",
-  });
-  if (rEsc.salteado) nota(`escritorio: NO EJERCIDO — ${rEsc.salteado}`);
+  await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
+  await navegar(`${BASE}${URL_LISTADO}`);
+
+  // No se puede esperar por anclas: en escritorio no tiene que haber ninguna.
+  // Se espera por la TABLA con filas de datos, que es lo que se dibuja ahí.
+  let tablaLista = false;
+  for (let i = 0; i < 120; i++) {
+    await sleep(250);
+    tablaLista = await evaluar(
+      `[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`
+    );
+    if (tablaLista) break;
+  }
+  if (!tablaLista) morir("escritorio: la tabla no llegó a tener filas de datos");
+  await sleep(1000);
+
+  const esc = await leer();
+  afirmar(
+    esc.cantidad === 0,
+    "ESCRITORIO: la tabla NO tiene anclas de restauración",
+    `anclas visibles=${esc.cantidad}`
+  );
+  afirmar(esc.marcados.length === 0, "ESCRITORIO: no hay nada marcado", `marcados=${esc.marcados.join(", ") || "(ninguno)"}`);
+  afirmar(!esc.textoMarca, `ESCRITORIO: no aparece "${TEXTO_ULTIMO_EDITADO}"`);
+
+  // ── SE DESPLAZA LA TABLA DE VERDAD, Y ESA ES LA CORRECCIÓN ─────────────
+  //
+  // La versión anterior de este bloque medía el scroll de la tabla en 0 antes y
+  // en 0 después: nunca la desplazaba. Comparaba dos ceros y daba verde sobre
+  // una regresión —escritorio había perdido su restauración— sin decir nada.
+  //
+  // Ahora se la lleva a más de 200 px y se elige una fila de la MITAD de lo
+  // visible, que es lo único que hace que la comparación signifique algo.
+  const cicloEscritorio = async (nombreSalida, salir) => {
+    await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
+    await navegar(`${BASE}${URL_LISTADO}`);
+    for (let i = 0; i < 120; i++) {
+      await sleep(250);
+      if (await evaluar(`[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`)) break;
+    }
+    await sleep(1000);
+
+    const desplazo = await evaluar(`(() => {
+      const c = document.getElementById("productos-scroll");
+      if (!c) return -1;
+      const objetivo = Math.min(300, Math.max(0, c.scrollHeight - c.clientHeight));
+      c.scrollTop = objetivo;
+      return Math.round(c.scrollTop);
+    })()`);
+    afirmar(
+      desplazo > 200,
+      `ESCRITORIO · ${nombreSalida}: la tabla se desplazó de verdad`,
+      `scrollTop=${desplazo} — con 0 la comparación no significaría nada`
+    );
+    if (desplazo <= 200) return;
+    await sleep(400);
+
+    // Una fila de la MITAD de lo que se ve, no la primera.
+    const elegida = JSON.parse(await evaluar(`(() => {
+      const c = document.getElementById("productos-scroll");
+      const rc = c.getBoundingClientRect();
+      const filas = [...document.querySelectorAll("table tbody tr")].filter((f) => {
+        if (f.children.length <= 1) return false;
+        const r = f.getBoundingClientRect();
+        return r.top >= rc.top && r.bottom <= rc.bottom;
+      });
+      if (filas.length === 0) return JSON.stringify({ hay: false });
+      const f = filas[Math.floor(filas.length / 2)];
+      const b = [...f.querySelectorAll("button")].find((x) =>
+        /editar/i.test((x.getAttribute("aria-label") || "") + " " + (x.getAttribute("title") || ""))
+      );
+      if (!b) return JSON.stringify({ hay: false });
+      f.setAttribute("data-sonda-elegida", "1");
+      return JSON.stringify({ hay: true, visibles: filas.length, texto: (f.innerText || "").split("\\n")[0].slice(0, 30) });
+    })()`));
+    afirmar(elegida.hay, `ESCRITORIO · ${nombreSalida}: hay una fila visible de la mitad con Editar`,
+      elegida.hay ? `${elegida.visibles} filas visibles · ${elegida.texto}` : "ninguna");
+    if (!elegida.hay) return;
+
+    const scrollAntes = await evaluar(`Math.round(document.getElementById("productos-scroll").scrollTop)`);
+    const urlAntes = await evaluar("location.pathname + location.search");
+    await evaluar(`(() => {
+      const f = document.querySelector('[data-sonda-elegida]');
+      const b = [...f.querySelectorAll("button")].find((x) =>
+        /editar/i.test((x.getAttribute("aria-label") || "") + " " + (x.getAttribute("title") || ""))
+      );
+      b.click();
+      return true;
+    })()`);
+    await esperarUrlDistintaDe(urlAntes);
+
+    const enEditor = await evaluar("location.pathname + location.search");
+    afirmar(
+      enEditor.includes("/editar"),
+      `ESCRITORIO · ${nombreSalida}: EDITAR ABRE IGUAL`,
+      enEditor
+    );
+    const estadoMovil = await evaluar(
+      `(() => { try { return !!sessionStorage.getItem(${JSON.stringify(CLAVE_ESTADO_RETORNO)}); } catch (e) { return null; } })()`
+    );
+    afirmar(
+      estadoMovil === false,
+      `ESCRITORIO · ${nombreSalida}: NO se guardó el estado MÓVIL`,
+      `retenido=${estadoMovil} — desde la tabla va el mecanismo de escritorio`
+    );
+    const legacy = JSON.parse(await evaluar(`(() => {
+      try {
+        return JSON.stringify({
+          scroll: sessionStorage.getItem("productos:scrollY"),
+          seleccion: sessionStorage.getItem("productos:selectedProductId"),
+        });
+      } catch (e) { return JSON.stringify({ scroll: null, seleccion: null }); }
+    })()`));
+    afirmar(
+      legacy.scroll !== null && legacy.seleccion !== null,
+      `ESCRITORIO · ${nombreSalida}: SÍ se guardó el retorno de escritorio`,
+      `productos:scrollY=${legacy.scroll} · productos:selectedProductId=${legacy.seleccion}`
+    );
+
+    if (!(await esperarEditor())) morir(`escritorio ${nombreSalida}: el editor no se montó`);
+    await salir();
+    for (let i = 0; i < 120; i++) {
+      await sleep(250);
+      if (await evaluar(`[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`)) break;
+    }
+    await sleep(1200);
+
+    const volvio = await leer();
+    const scrollDespues = await evaluar(`Math.round(document.getElementById("productos-scroll").scrollTop)`);
+    const dif = Math.abs(scrollDespues - scrollAntes);
+    afirmar(
+      dif <= 2,
+      `ESCRITORIO · ${nombreSalida}: EL SCROLL DE LA TABLA VUELVE (tolerancia 2 px)`,
+      `antes=${scrollAntes} después=${scrollDespues} · diferencia=${dif} px`
+    );
+
+    // La clase la compone `claseDeFila`: con `tono="atencion"` la fila lleva
+    // `sunmi-fila-atencion`. Se busca ESA y no una inventada — un selector que
+    // no matchea nunca daría cero y el candado se leería como "se perdió la
+    // selección" sobre una pantalla correcta.
+    const seleccionada = await evaluar(`(() => {
+      return [...document.querySelectorAll("table tbody tr")].filter(
+        (x) => (x.className || "").includes("sunmi-fila-atencion")
+      ).length;
+    })()`);
+    afirmar(
+      seleccionada >= 1,
+      `ESCRITORIO · ${nombreSalida}: LA FILA SIGUE SELECCIONADA`,
+      `filas con tinte=${seleccionada}`
+    );
+    afirmar(
+      volvio.cantidad === 0 && volvio.marcados.length === 0 && !volvio.textoMarca,
+      `ESCRITORIO · ${nombreSalida}: sin ancla, sin aria-current y sin píldora`,
+      `anclas=${volvio.cantidad} marcados=${volvio.marcados.length}`
+    );
+    afirmar(volvio.desborde <= 0, `ESCRITORIO · ${nombreSalida}: sin desborde a 1366`, `sobra ${volvio.desborde} px`);
+    await capturar(`08-escritorio-1366-${nombreSalida}`, `${BASE}${URL_LISTADO}`);
+  };
+
+  await cicloEscritorio("cancelar", cancelar);
+  // Guardar SIN tocar ningún campo: los valores quedan como estaban.
+  await cicloEscritorio("guardar", guardar);
+
+  // ── 8 · EL COMBO DE ESCRITORIO NO GANA NADA ────────────────────────────
+  //
+  // En `c12de2c7`, desde la tabla, el editor de combo se abría SIN query y sus
+  // tres salidas iban a destinos fijos: guardar a `?tipo=combos`, cancelar y
+  // atrás a `/modulos/productos`. Al arreglar el retorno del celular eso se
+  // unificó y escritorio ganó un comportamiento que no tenía.
+  //
+  // Acá se comprueban los cinco puntos, uno por uno.
+  const comboEscritorio = async (nombreSalida, salir, destinoEsperado) => {
+    await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
+    await navegar(`${BASE}/modulos/productos?tipo=combos`);
+    for (let i = 0; i < 120; i++) {
+      await sleep(250);
+      if (await evaluar(`[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`)) break;
+    }
+    await sleep(1000);
+
+    const urlAntes = await evaluar("location.pathname + location.search");
+    const toco = await evaluar(`(() => {
+      const fila = [...document.querySelectorAll("table tbody tr")].find((f) => f.children.length > 1);
+      if (!fila) return false;
+      const b = [...fila.querySelectorAll("button")].find((x) =>
+        /editar/i.test((x.getAttribute("aria-label") || "") + " " + (x.getAttribute("title") || ""))
+      );
+      if (!b) return false;
+      b.click();
+      return true;
+    })()`);
+    afirmar(toco, `COMBO ESCRITORIO · ${nombreSalida}: se pudo abrir un combo desde la tabla`);
+    if (!toco) return;
+    await esperarUrlDistintaDe(urlAntes);
+
+    const enEditor = await evaluar("location.pathname + location.search");
+    afirmar(
+      enEditor.includes("/editar-combo/"),
+      `COMBO ESCRITORIO · ${nombreSalida}: abrió el editor de combo`,
+      enEditor
+    );
+    afirmar(
+      !enEditor.includes("?"),
+      `COMBO ESCRITORIO · ${nombreSalida}: EL EDITOR NO LLEVA QUERY DE RETORNO`,
+      `${enEditor} — en c12de2c7 se abría pelado`
+    );
+    afirmar(
+      !enEditor.includes("origen="),
+      `COMBO ESCRITORIO · ${nombreSalida}: no lleva el marcador de origen móvil`,
+      enEditor
+    );
+    const estadoMovil = await evaluar(
+      `(() => { try { return !!sessionStorage.getItem(${JSON.stringify(CLAVE_ESTADO_RETORNO)}); } catch (e) { return null; } })()`
+    );
+    afirmar(
+      estadoMovil === false,
+      `COMBO ESCRITORIO · ${nombreSalida}: NO se escribió estado móvil`,
+      `retenido=${estadoMovil}`
+    );
+
+    if (!(await esperarEditor())) morir(`combo escritorio ${nombreSalida}: el editor no se montó`);
+    await salir();
+    await sleep(1500);
+    const destino = await evaluar("location.pathname + location.search");
+    afirmar(
+      destino === destinoEsperado,
+      `COMBO ESCRITORIO · ${nombreSalida}: VUELVE AL DESTINO DE c12de2c7`,
+      `esperado=${destinoEsperado} · obtenido=${destino}`
+    );
+    await capturar(`11-combo-escritorio-${nombreSalida}`, `${BASE}${destino}`);
+  };
+
+  await comboEscritorio("cancelar", cancelar, "/modulos/productos");
+  await comboEscritorio("guardar", guardar, "/modulos/productos?tipo=combos");
 } catch (err) {
   morir(err?.message || String(err));
 }

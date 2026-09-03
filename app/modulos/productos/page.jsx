@@ -91,6 +91,15 @@ import { carasDeTarjeta } from "@/lib/productos/carasDeTarjeta";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import { contenedorDeScrollDe } from "@/lib/productos/contenedorDeScroll";
 import {
+  contenedorDeLaTabla,
+  guardarRetornoEscritorio,
+  leerScrollEscritorio,
+  seleccionInicialEscritorio,
+  recordarSeleccionEscritorio,
+  consumirScrollEscritorio,
+  limpiarSeleccionEscritorio,
+} from "@/lib/productos/retornoEscritorio";
+import {
   identidadDeFila,
   claveDeAncla,
   crearEstadoDeRetorno,
@@ -98,6 +107,7 @@ import {
   leerEstadoDeRetorno,
   consumirEstadoDeRetorno,
   sePuedeRestaurarAca,
+  conMarcaDeOrigenMovil,
   scrollParaDejarloA,
   TIPO_PRODUCTO,
   TIPO_COMBO,
@@ -433,11 +443,24 @@ export default function ProductosPage() {
   // retorno —que además distingue producto de combo, cosa que este número no
   // podía—. El tinte de la fila al hacer clic sigue igual: es de esta sesión de
   // pantalla y no tiene por qué sobrevivir a una navegación.
-  const [selectedProductId, setSelectedProductId] = useState(null);
+  // ── LA SELECCIÓN DE LA TABLA VUELVE A SOBREVIVIR AL IR Y VOLVER ─────────
+  //
+  // Es la mitad del mecanismo de escritorio, y la regla es la de antes tal cual:
+  // se conserva SOLO si se viene de editar —o sea, si hay scroll guardado—. En
+  // una entrada fresca al módulo se arranca sin selección, aunque la clave haya
+  // quedado de una sesión anterior.
+  //
+  // Se había pasado a `useState(null)` al unificar los dos retornos, y con eso
+  // el tinte de la fila dejó de volver. La regla vive ahora en
+  // `lib/productos/retornoEscritorio.js`, con sus candados.
+  const [selectedProductId, setSelectedProductId] = useState(() =>
+    seleccionInicialEscritorio(almacenDeSesion())
+  );
 
-  // Click en una fila (fuera de los botones) → marca de esta pantalla.
+  // Click en una fila (fuera de los botones) → marca persistente, como antes.
   const handleSelectProducto = useCallback((id) => {
     setSelectedProductId(id);
+    recordarSeleccionEscritorio(almacenDeSesion(), id);
   }, []);
 
   // ── LA PAGINACIÓN, DEFINIDA UNA SOLA VEZ ─────────────────────────────────
@@ -1343,12 +1366,39 @@ export default function ProductosPage() {
         : null;
 
     if (!estado) {
-      // ENTRADA FRESCA, y también el caso de arriba: no se marca nada, no se
-      // mueve nada, y el estado incompatible SE CONSUME. Dejarlo lo haría volver
-      // a intentar en la próxima entrada, que es el mismo defecto una pantalla
-      // más tarde.
+      // Sin estado móvil aplicable: no se marca nada y el incompatible SE
+      // CONSUME. Dejarlo lo haría reintentar en la próxima entrada, que es el
+      // mismo defecto una pantalla más tarde.
       setUltimoEditado(null);
       consumirEstadoDeRetorno(almacen);
+
+      // ── Y ACÁ ENTRA EL CAMINO DE ESCRITORIO ─────────────────────────────
+      //
+      // El mecanismo que la tabla tenía antes de `81541c37`: se restaura SU
+      // scroll y se conserva el tinte de la fila. No marca nada y no toca las
+      // cards — son dos caminos que no se cruzan, y por eso las claves son
+      // distintas.
+      //
+      // `null` y 0 no son lo mismo: `null` es "no se viene de editar" y 0 es "se
+      // venía del principio de la lista". La versión anterior ya distinguía y se
+      // conserva.
+      const scrollEscritorio = leerScrollEscritorio(almacen);
+      if (scrollEscritorio === null) {
+        // Entrada fresca de verdad: tampoco se arrastra la selección de una
+        // sesión anterior. Es la regla de antes.
+        limpiarSeleccionEscritorio(almacen);
+        return;
+      }
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          try {
+            const tabla = contenedorDeLaTabla(document);
+            if (tabla) tabla.scrollTop = scrollEscritorio;
+          } finally {
+            consumirScrollEscritorio(almacen);
+          }
+        })
+      );
       return;
     }
 
@@ -1473,9 +1523,31 @@ export default function ProductosPage() {
   // —que es `ProductoLocal.id` y nunca el del producto base—.
   const abrirEditarCombo = (productoLocalId) => {
     if (!productoLocalId) return;
-    guardarDondeEstaba({ tipo: TIPO_COMBO, id: Number(productoLocalId) });
-    const qs = queryDelListado();
-    router.push(`/modulos/productos/editar-combo/${productoLocalId}${qs ? `?${qs}` : ""}`);
+
+    // ── LOS DOS ORÍGENES, TAMBIÉN ACÁ ─────────────────────────────────────
+    //
+    // Desde una card del celular: se guarda el estado, la query viaja y se marca
+    // el origen para que el editor sepa a dónde volver.
+    //
+    // Desde la tabla de escritorio: **sin query y sin marcador**, exactamente
+    // como en `c12de2c7`. Escritorio no tenía retorno de combo y no lo gana:
+    // sumarlo sería una función nueva, no una restauración. Sus tres salidas
+    // vuelven a donde volvían — guardar a `?tipo=combos`, cancelar y atrás a
+    // `/modulos/productos`—.
+    //
+    // El marcador es EXPLÍCITO y no se deduce de "hay query": un listado móvil
+    // sin filtros tampoco tiene query y sí necesita restauración, así que
+    // deducirlo mandaría el caso más común por el camino equivocado.
+    const identidad = { tipo: TIPO_COMBO, id: Number(productoLocalId) };
+    const ruta = `/modulos/productos/editar-combo/${productoLocalId}`;
+
+    if (!cardMovilVisibleDe(identidad)) {
+      router.push(ruta);
+      return;
+    }
+
+    guardarDondeEstaba(identidad);
+    router.push(`${ruta}?${conMarcaDeOrigenMovil(queryDelListado())}`);
   };
 
   const abrirVerComposicion = (row) => {
@@ -1775,28 +1847,57 @@ export default function ProductosPage() {
   // Lo que se guarda y por qué está en `lib/productos/estadoDeRetorno.js`. Acá lo
   // único propio es MEDIR: qué contenedor scrollea de verdad y a qué altura está
   // el elemento adentro.
+  /**
+   * La card del celular de este producto, si está y se ve.
+   *
+   * Es lo que separa los dos caminos. El ancla la dibuja SOLO
+   * `TarjetaProductoMovil`, así que encontrarla visible es exactamente "la
+   * acción salió de una card móvil". No se mira el ancho de la pantalla: eso
+   * supondría que "angosto" y "hay cards" son lo mismo, y quién está visible lo
+   * decide el CSS.
+   */
+  const cardMovilVisibleDe = (identidad) => {
+    const clave = claveDeAncla(identidad);
+    if (!clave) return null;
+    return (
+      [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find(
+        (x) => x.offsetParent !== null
+      ) ?? null
+    );
+  };
+
   const guardarDondeEstaba = (identidad) => {
     const clave = claveDeAncla(identidad);
     if (!clave) return;
+
+    // ── SOLO SE GUARDA SI SE SALIÓ DESDE UNA CARD DEL CELULAR ─────────────
+    //
+    // La restauración de posición es de la vista MÓVIL y de ninguna otra. La
+    // tabla de escritorio queda exactamente como estaba: sin ancla, sin marca y
+    // sin que su scroll se toque.
+    //
+    // ── Y NO SE DECIDE POR EL ANCHO DE LA PANTALLA ───────────────────────
+    //
+    // Preguntar por un `matchMedia` sería suponer que "angosto" y "hay cards"
+    // son lo mismo. No lo son: las dos superficies se dibujan siempre y quién
+    // está visible lo decide el CSS, que puede cambiar. Lo que se pregunta es el
+    // hecho: ¿existe la card de este producto y se ve?
+    //
+    // El ancla ahora la dibuja SOLO `TarjetaProductoMovil`, así que encontrarla
+    // visible es exactamente "se salió desde una card móvil". Sin ella no se
+    // guarda nada, y el editor se abre igual: navegar no depende de esto.
+    const card = cardMovilVisibleDe(identidad);
+    if (!card) return;
+
     const contenedor = getProductosScrollEl();
-    let offset = null;
-    let offsetVentana = null;
-    {
-      const el = [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find(
-        (x) => x.offsetParent !== null
-      );
-      if (el) offsetVentana = Math.round(el.getBoundingClientRect().top);
-    }
-    if (contenedor) {
-      // El elemento se busca por su ancla, que es el mismo atributo que la card
-      // y la fila dibujan. Si no está —porque la lista todavía no se pintó— el
-      // offset queda en `null` y la restauración cae al scroll, que es el
-      // respaldo. `null` NO es 0: ver el candado R5.
-      const el = [...document.querySelectorAll(`[data-ancla="${clave}"]`)].find(
-        (x) => x.offsetParent !== null
-      );
-      offset = posicionDentroDelContenedor(el, contenedor);
-    }
+    const offsetVentana = Math.round(card.getBoundingClientRect().top);
+    // La MISMA card que ya se encontró arriba: se busca una sola vez. Buscarla
+    // dos veces abría la puerta a que las dos búsquedas se separaran y una
+    // midiera un elemento distinto del que decidió que había que guardar.
+    //
+    // Sin contenedor el offset queda en `null`, y la restauración cae al scroll
+    // guardado. `null` NO es 0: ver el candado R5.
+    const offset = contenedor ? posicionDentroDelContenedor(card, contenedor) : null;
     guardarEstadoDeRetorno(
       almacenDeSesion(),
       crearEstadoDeRetorno({
@@ -1823,7 +1924,31 @@ export default function ProductosPage() {
       return;
     }
     setSelectedProductId(Number(id));
-    guardarDondeEstaba({ tipo: TIPO_PRODUCTO, id: Number(id) });
+
+    // ── LOS DOS CAMINOS, SEPARADOS Y SIN CRUZARSE ─────────────────────────
+    //
+    // Si la acción salió de una card del celular, se guarda el estado nuevo:
+    // identidad con tipo, altura del elemento y la marca "Último editado".
+    //
+    // Si no —o sea, salió de la tabla de escritorio—, se ejecuta el mecanismo
+    // que escritorio YA TENÍA antes de `81541c37`: las dos claves sueltas, el
+    // scroll de la tabla y el tinte de la fila. **Sin marca y sin ancla.**
+    //
+    // Esto es lo que se había perdido. La condición nueva —exigir card móvil
+    // visible— dejó a escritorio sin ninguno de los dos: ni el viejo, que se
+    // había borrado, ni el nuevo, que no aplica. Una función que existía
+    // desapareció, y la sonda no lo vio porque comparaba dos ceros.
+    const identidad = { tipo: TIPO_PRODUCTO, id: Number(id) };
+    if (cardMovilVisibleDe(identidad)) {
+      guardarDondeEstaba(identidad);
+    } else {
+      const tabla = contenedorDeLaTabla(document);
+      guardarRetornoEscritorio(almacenDeSesion(), {
+        scrollTop: tabla ? tabla.scrollTop : 0,
+        id: Number(id),
+      });
+    }
+
     const qs = queryDelListado();
     router.push(`/modulos/productos/${Number(id)}/editar${qs ? `?${qs}` : ""}`);
   };
@@ -2731,7 +2856,6 @@ export default function ProductosPage() {
                     loading={loading || loadingEditar}
                     selectedProductId={selectedProductId}
                     onSelectProducto={handleSelectProducto}
-                    ultimoEditado={ultimoEditado}
                   />
               </div>
 
