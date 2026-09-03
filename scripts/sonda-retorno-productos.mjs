@@ -787,6 +787,14 @@ try {
   //
   // Ahora se la lleva a más de 200 px y se elige una fila de la MITAD de lo
   // visible, que es lo único que hace que la comparación signifique algo.
+  //
+  // ── Y AHORA EL QUE SE DESPLAZA ES EL `<main>`, NO LA TABLA ─────────────
+  //
+  // La tabla dejó de tener scroll vertical propio: crece con sus 25 filas y el
+  // único desplazamiento vertical de la pantalla es el de la página. Si esto
+  // siguiera midiendo `#productos-scroll` mediría un contenedor cuyo `scrollTop`
+  // vale 0 siempre — o sea, volvería a comparar dos ceros, que es exactamente el
+  // defecto que este bloque existe para no repetir.
   const cicloEscritorio = async (nombreSalida, salir) => {
     await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
     await navegar(`${BASE}${URL_LISTADO}`);
@@ -797,7 +805,7 @@ try {
     await sleep(1000);
 
     const desplazo = await evaluar(`(() => {
-      const c = document.getElementById("productos-scroll");
+      const c = document.querySelector("main");
       if (!c) return -1;
       const objetivo = Math.min(300, Math.max(0, c.scrollHeight - c.clientHeight));
       c.scrollTop = objetivo;
@@ -805,15 +813,16 @@ try {
     })()`);
     afirmar(
       desplazo > 200,
-      `ESCRITORIO · ${nombreSalida}: la tabla se desplazó de verdad`,
-      `scrollTop=${desplazo} — con 0 la comparación no significaría nada`
+      `ESCRITORIO · ${nombreSalida}: LA PÁGINA se desplazó de verdad`,
+      `main.scrollTop=${desplazo} — con 0 la comparación no significaría nada`
     );
     if (desplazo <= 200) return;
     await sleep(400);
 
-    // Una fila de la MITAD de lo que se ve, no la primera.
+    // Una fila de la MITAD de lo que se ve, no la primera. Lo que se ve lo
+    // define ahora el `<main>`, que es el que recorta.
     const elegida = JSON.parse(await evaluar(`(() => {
-      const c = document.getElementById("productos-scroll");
+      const c = document.querySelector("main");
       const rc = c.getBoundingClientRect();
       const filas = [...document.querySelectorAll("table tbody tr")].filter((f) => {
         if (f.children.length <= 1) return false;
@@ -833,7 +842,7 @@ try {
       elegida.hay ? `${elegida.visibles} filas visibles · ${elegida.texto}` : "ninguna");
     if (!elegida.hay) return;
 
-    const scrollAntes = await evaluar(`Math.round(document.getElementById("productos-scroll").scrollTop)`);
+    const scrollAntes = await evaluar(`Math.round(document.querySelector("main").scrollTop)`);
     const urlAntes = await evaluar("location.pathname + location.search");
     await evaluar(`(() => {
       const f = document.querySelector('[data-sonda-elegida]');
@@ -882,12 +891,23 @@ try {
     await sleep(1200);
 
     const volvio = await leer();
-    const scrollDespues = await evaluar(`Math.round(document.getElementById("productos-scroll").scrollTop)`);
+    const scrollDespues = await evaluar(`Math.round(document.querySelector("main").scrollTop)`);
     const dif = Math.abs(scrollDespues - scrollAntes);
     afirmar(
       dif <= 2,
-      `ESCRITORIO · ${nombreSalida}: EL SCROLL DE LA TABLA VUELVE (tolerancia 2 px)`,
-      `antes=${scrollAntes} después=${scrollDespues} · diferencia=${dif} px`
+      `ESCRITORIO · ${nombreSalida}: EL SCROLL DE LA PÁGINA VUELVE (tolerancia 2 px)`,
+      `main antes=${scrollAntes} después=${scrollDespues} · diferencia=${dif} px`
+    );
+    // Y la tabla NO se quedó con nada: si volviera a tener scroll propio, el de
+    // la página podría restaurarse bien y la lista igual aparecer en otro lugar.
+    const internoAlVolver = await evaluar(`(() => {
+      const c = document.getElementById("productos-scroll");
+      return c ? Math.round(c.scrollHeight - c.clientHeight) : -1;
+    })()`);
+    afirmar(
+      internoAlVolver === 0,
+      `ESCRITORIO · ${nombreSalida}: la tabla sigue sin scroll vertical propio`,
+      `sobrante interno=${internoAlVolver} px`
     );
 
     // La clase la compone `claseDeFila`: con `tono="atencion"` la fila lleva
@@ -988,6 +1008,370 @@ try {
 
   await comboEscritorio("cancelar", cancelar, "/modulos/productos");
   await comboEscritorio("guardar", guardar, "/modulos/productos?tipo=combos");
+
+  // ── 9 · UN SOLO SCROLL VERTICAL EN LA PANTALLA ─────────────────────────
+  //
+  // La tabla tenía `max-h-[70dvh]` y su propio `overflow-auto`, así que había
+  // DOS barras verticales: la de la tabla y la de la página. Ahora la tabla
+  // crece con sus filas y la única que desplaza es la página.
+  //
+  // Se miden las tres cosas por separado porque fallan por separado: que la
+  // tabla no tenga sobrante vertical, que el que se mueve sea el `<main>`, y que
+  // el desplazamiento LATERAL siga estando —que es lo que se perdería si alguien
+  // "arreglara" esto sacándole el overflow al envoltorio—.
+  await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
+  await navegar(`${BASE}${URL_LISTADO}`);
+  for (let i = 0; i < 120; i++) {
+    await sleep(250);
+    if (await evaluar(`[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`)) break;
+  }
+  await sleep(1200);
+
+  const ejes = JSON.parse(await evaluar(`(() => {
+    const c = document.getElementById("productos-scroll");
+    const m = document.querySelector("main");
+    const t = document.querySelector("table");
+    const th = t ? t.querySelector("thead") : null;
+    const cs = c ? getComputedStyle(c) : null;
+    return JSON.stringify({
+      hayEnvoltorio: !!c,
+      internoVertical: c ? Math.round(c.scrollHeight - c.clientHeight) : -1,
+      internoHorizontal: c ? Math.round(c.scrollWidth - c.clientWidth) : -1,
+      maxHeight: cs ? cs.maxHeight : null,
+      overflowX: cs ? cs.overflowX : null,
+      paginaVertical: m ? Math.round(m.scrollHeight - m.clientHeight) : -1,
+      filas: t ? t.querySelectorAll("tbody tr").length : 0,
+      altoTabla: t ? Math.round(t.getBoundingClientRect().height) : 0,
+      posicionThead: th ? getComputedStyle(th).position : null,
+      desborde: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    });
+  })()`));
+
+  afirmar(ejes.hayEnvoltorio, "SCROLL ÚNICO: el envoltorio de la tabla sigue existiendo", "#productos-scroll");
+  afirmar(
+    ejes.internoVertical === 0,
+    "SCROLL ÚNICO: LA TABLA NO TIENE DESPLAZAMIENTO VERTICAL INTERNO",
+    `sobrante interno=${ejes.internoVertical} px · max-height=${ejes.maxHeight}`
+  );
+  afirmar(
+    ejes.maxHeight === "none",
+    "SCROLL ÚNICO: no quedó ningún tope de alto",
+    `max-height=${ejes.maxHeight}`
+  );
+  afirmar(
+    ejes.paginaVertical > 0,
+    "SCROLL ÚNICO: EL QUE DESPLAZA ES LA PÁGINA",
+    `sobrante del <main>=${ejes.paginaVertical} px · la tabla mide ${ejes.altoTabla} px con ${ejes.filas} filas`
+  );
+  afirmar(
+    ejes.internoHorizontal > 0 && ejes.overflowX === "auto",
+    "SCROLL ÚNICO: EL DESPLAZAMIENTO LATERAL SIGUE DISPONIBLE",
+    `sobrante lateral=${ejes.internoHorizontal} px · overflow-x=${ejes.overflowX}`
+  );
+  afirmar(ejes.desborde <= 0, "SCROLL ÚNICO: sin desborde a 1366", `sobra ${ejes.desborde} px`);
+  nota(
+    `el encabezado ya no queda fijo: position del thead = ${ejes.posicionThead}. ` +
+      `Es la consecuencia declarada de conservar el overflow lateral.`
+  );
+
+  // Y se comprueba MOVIENDO: el que cambia de scrollTop tiene que ser el <main>.
+  const quienSeMueve = JSON.parse(await evaluar(`(() => {
+    const c = document.getElementById("productos-scroll");
+    const m = document.querySelector("main");
+    const antes = { c: Math.round(c.scrollTop), m: Math.round(m.scrollTop) };
+    m.scrollTop = 250;
+    c.scrollTop = 250;
+    return JSON.stringify({
+      antes,
+      despues: { c: Math.round(c.scrollTop), m: Math.round(m.scrollTop) },
+    });
+  })()`));
+  afirmar(
+    quienSeMueve.despues.m > 200 && quienSeMueve.despues.c === 0,
+    "SCROLL ÚNICO: PEDIRLE SCROLL A LA TABLA NO HACE NADA; A LA PÁGINA SÍ",
+    `main ${quienSeMueve.antes.m}→${quienSeMueve.despues.m} · tabla ${quienSeMueve.antes.c}→${quienSeMueve.despues.c}`
+  );
+  await capturar("12-escritorio-scroll-unico", `${BASE}${URL_LISTADO}`);
+
+  // ── 10 · RECORRER LOS PRODUCTOS CON LAS FLECHAS ────────────────────────
+  //
+  // La fila que ya se teñía al tocarla es el cursor. Se ejerce la secuencia
+  // completa del pedido —tocar la 10, bajar tres veces, subir dos— comparando el
+  // NOMBRE de la fila teñida contra el de la fila que corresponde por posición.
+  //
+  // Comparar por nombre y no por "hay una fila teñida" es lo que distingue
+  // "avanzó una" de "avanzó dos" y de "no se movió": las tres dejan exactamente
+  // una fila teñida.
+  await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
+  await navegar(`${BASE}${URL_LISTADO}`);
+  for (let i = 0; i < 120; i++) {
+    await sleep(250);
+    if (await evaluar(`[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`)) break;
+  }
+  await sleep(1200);
+
+  // El texto de cada fila, en orden. Es la lista contra la que se compara todo.
+  //
+  // NO se usa el primer renglón: la primera celda es la miniatura, y sin foto
+  // dice "-" en todas. Con eso, comparar el nombre de la fila teñida contra el
+  // esperado comparaba "-" contra "-" y no distinguía una fila de otra — la
+  // afirmación se habría leído como fuerte y no lo era. Se usa la fila entera,
+  // que lleva nombre, códigos y precios.
+  const nombresDeFila = JSON.parse(await evaluar(`(() => {
+    return JSON.stringify(
+      [...document.querySelectorAll("table tbody tr")]
+        .filter((f) => f.children.length > 1)
+        .map((f) => (f.innerText || "").replace(/\\s+/g, " ").trim().slice(0, 60))
+    );
+  })()`));
+  afirmar(
+    new Set(nombresDeFila).size === nombresDeFila.length,
+    "FLECHAS: cada fila se distingue de las otras por su texto",
+    `${new Set(nombresDeFila).size} textos distintos sobre ${nombresDeFila.length} filas — si se repitieran, comparar por texto no afirmaría nada`
+  );
+  afirmar(
+    nombresDeFila.length >= 15,
+    "FLECHAS: hay filas suficientes para recorrer",
+    `${nombresDeFila.length} filas`
+  );
+
+  /** Cuál fila está teñida ahora, por índice y por nombre. */
+  const filaTenida = async () =>
+    JSON.parse(await evaluar(`(() => {
+      const filas = [...document.querySelectorAll("table tbody tr")].filter((f) => f.children.length > 1);
+      const i = filas.findIndex((f) => (f.className || "").includes("sunmi-fila-atencion"));
+      const cuantas = filas.filter((f) => (f.className || "").includes("sunmi-fila-atencion")).length;
+      return JSON.stringify({
+        indice: i,
+        cuantas,
+        nombre: i >= 0 ? (filas[i].innerText || "").replace(/\\s+/g, " ").trim().slice(0, 60) : null,
+      });
+    })()`));
+
+  /** Manda una flecha de verdad por CDP y dice si el navegador la dejó pasar. */
+  const flecha = async (tecla) => {
+    const codigo = tecla === "ArrowDown" ? 40 : 38;
+    await send("Input.dispatchKeyEvent", {
+      type: "rawKeyDown", key: tecla, code: tecla, windowsVirtualKeyCode: codigo, nativeVirtualKeyCode: codigo,
+    });
+    await send("Input.dispatchKeyEvent", {
+      type: "keyUp", key: tecla, code: tecla, windowsVirtualKeyCode: codigo, nativeVirtualKeyCode: codigo,
+    });
+    await sleep(260);
+  };
+
+  // Tocar la fila 10 (índice 9). Se toca una CELDA y no el `<tr>`: es lo que
+  // hace el dedo, y es lo que ejerce que el clic no caiga en un botón.
+  await evaluar(`(() => {
+    const filas = [...document.querySelectorAll("table tbody tr")].filter((f) => f.children.length > 1);
+    filas[9].querySelectorAll("td")[1].click();
+    return true;
+  })()`);
+  await sleep(400);
+
+  const trasTocar = await filaTenida();
+  afirmar(
+    trasTocar.indice === 9 && trasTocar.cuantas === 1,
+    "FLECHAS: TOCAR LA FILA 10 LA SELECCIONA",
+    `teñida la ${trasTocar.indice + 1} (${trasTocar.nombre}) · teñidas=${trasTocar.cuantas}`
+  );
+
+  // El foco tiene que haber quedado en la tabla: sin eso la primera flecha no
+  // llega al manejador y el resto del bloque mediría otra cosa.
+  const foco = await evaluar(`(() => {
+    const a = document.activeElement;
+    const t = document.querySelector("table");
+    if (!a || !t) return "ninguno";
+    return (a.tagName || "?") + (a.contains(t) ? " (contiene la tabla)" : " (fuera de la tabla)");
+  })()`);
+  afirmar(
+    /contiene la tabla/.test(foco),
+    "FLECHAS: LA TABLA CONSERVA EL FOCO DESPUÉS DE SELECCIONAR",
+    `activeElement=${foco}`
+  );
+
+  // ArrowDown tres veces: 11, 12 y 13, una por pulsación.
+  for (const esperado of [10, 11, 12]) {
+    await flecha("ArrowDown");
+    const ahora = await filaTenida();
+    afirmar(
+      ahora.indice === esperado && ahora.cuantas === 1 && ahora.nombre === nombresDeFila[esperado],
+      `FLECHAS: ArrowDown deja la fila ${esperado + 1} y NADA MÁS`,
+      `teñida la ${ahora.indice + 1} (${ahora.nombre}) · esperada la ${esperado + 1} (${nombresDeFila[esperado]}) · teñidas=${ahora.cuantas}`
+    );
+  }
+
+  // ArrowUp dos veces: 12 y después 11.
+  for (const esperado of [11, 10]) {
+    await flecha("ArrowUp");
+    const ahora = await filaTenida();
+    afirmar(
+      ahora.indice === esperado && ahora.cuantas === 1 && ahora.nombre === nombresDeFila[esperado],
+      `FLECHAS: ArrowUp deja la fila ${esperado + 1} y NADA MÁS`,
+      `teñida la ${ahora.indice + 1} (${ahora.nombre}) · esperada la ${esperado + 1} · teñidas=${ahora.cuantas}`
+    );
+  }
+
+  // ── LA FLECHA NO MUEVE LA PÁGINA POR SU CUENTA ─────────────────────────
+  //
+  // Es la contraprueba del `preventDefault`, y hay que montarla con cuidado: si
+  // la fila de destino está fuera de la pantalla, el `scrollIntoView` desplaza
+  // legítimamente y la medición no distingue una cosa de la otra.
+  //
+  // Por eso se elige un par de filas CONSECUTIVAS que ya se vean las dos
+  // enteras. Ahí el desplazamiento correcto es exactamente CERO: lo único que
+  // puede mover la página es la flecha sin atajar.
+  const parVisible = JSON.parse(await evaluar(`(() => {
+    const m = document.querySelector("main").getBoundingClientRect();
+    const filas = [...document.querySelectorAll("table tbody tr")].filter((f) => f.children.length > 1);
+    for (let i = 0; i < filas.length - 1; i++) {
+      const a = filas[i].getBoundingClientRect();
+      const b = filas[i + 1].getBoundingClientRect();
+      if (a.top >= m.top && b.bottom <= m.bottom) {
+        filas[i].querySelectorAll("td")[1].click();
+        return JSON.stringify({ hay: true, i });
+      }
+    }
+    return JSON.stringify({ hay: false });
+  })()`));
+  afirmar(
+    parVisible.hay,
+    "FLECHAS: hay dos filas consecutivas enteramente visibles para medir el atajo",
+    parVisible.hay ? `filas ${parVisible.i + 1} y ${parVisible.i + 2}` : "ninguna"
+  );
+  if (parVisible.hay) {
+    await sleep(350);
+    const antesDeLaFlecha = await evaluar(`Math.round(document.querySelector("main").scrollTop)`);
+    await flecha("ArrowDown");
+    const despuesDeLaFlecha = await evaluar(`Math.round(document.querySelector("main").scrollTop)`);
+    const movio = Math.abs(despuesDeLaFlecha - antesDeLaFlecha);
+    const dondeQuedo = await filaTenida();
+    afirmar(
+      movio === 0,
+      "FLECHAS: LA TECLA SE ATAJA — la página no se mueve sola",
+      `main ${antesDeLaFlecha}→${despuesDeLaFlecha} (${movio} px). ` +
+        `Las dos filas ya se veían enteras, así que traerla a la vista no desplaza: ` +
+        `sin preventDefault, acá el navegador scrollea su paso de línea`
+    );
+    afirmar(
+      dondeQuedo.indice === parVisible.i + 1,
+      "FLECHAS: y el cursor igual avanzó UNA fila",
+      `de la ${parVisible.i + 1} a la ${dondeQuedo.indice + 1}`
+    );
+  }
+
+  // La fila seleccionada queda a la vista. Se baja hasta el final y se comprueba
+  // en cada paso, que es donde la lista se va sin el `scrollIntoView`.
+  //
+  // Se arranca desde donde quedó el cursor y no desde un número escrito a mano:
+  // el bloque de arriba lo dejó donde le tocó, y una constante acá haría que
+  // este recorrido termine antes de la última fila sin que se note.
+  const desdeDonde = (await filaTenida()).indice;
+  let siempreVisible = true;
+  let peor = null;
+  for (let i = desdeDonde; i < nombresDeFila.length - 1; i++) {
+    await flecha("ArrowDown");
+    const v = JSON.parse(await evaluar(`(() => {
+      const filas = [...document.querySelectorAll("table tbody tr")].filter((f) => f.children.length > 1);
+      const f = filas.find((x) => (x.className || "").includes("sunmi-fila-atencion"));
+      if (!f) return JSON.stringify({ hay: false });
+      const m = document.querySelector("main").getBoundingClientRect();
+      const r = f.getBoundingClientRect();
+      return JSON.stringify({
+        hay: true,
+        dentro: r.top >= m.top - 1 && r.bottom <= m.bottom + 1,
+        arriba: Math.round(r.top - m.top),
+        abajo: Math.round(m.bottom - r.bottom),
+      });
+    })()`));
+    if (!v.hay || !v.dentro) {
+      siempreVisible = false;
+      peor = v;
+      break;
+    }
+  }
+  afirmar(
+    siempreVisible,
+    "FLECHAS: LA FILA SELECCIONADA NUNCA SE SALE DE LA PANTALLA",
+    siempreVisible
+      ? `recorridas ${nombresDeFila.length - 1 - desdeDonde} filas hasta la última, siempre dentro del <main>`
+      : `se salió: ${JSON.stringify(peor)}`
+  );
+
+  // En la última, ArrowDown no envuelve.
+  const enLaUltima = await filaTenida();
+  afirmar(
+    enLaUltima.indice === nombresDeFila.length - 1,
+    "FLECHAS: se llegó a la última fila",
+    `índice=${enLaUltima.indice} de ${nombresDeFila.length - 1}`
+  );
+  await flecha("ArrowDown");
+  const trasElBorde = await filaTenida();
+  afirmar(
+    trasElBorde.indice === nombresDeFila.length - 1,
+    "FLECHAS: EN LA ÚLTIMA, ArrowDown NO ENVUELVE",
+    `quedó en la ${trasElBorde.indice + 1} · envolver la habría llevado a la 1`
+  );
+
+  // Y en la primera, ArrowUp tampoco.
+  await evaluar(`(() => {
+    const filas = [...document.querySelectorAll("table tbody tr")].filter((f) => f.children.length > 1);
+    filas[0].querySelectorAll("td")[1].click();
+    return true;
+  })()`);
+  await sleep(400);
+  await flecha("ArrowUp");
+  const enLaPrimera = await filaTenida();
+  afirmar(
+    enLaPrimera.indice === 0,
+    "FLECHAS: EN LA PRIMERA, ArrowUp NO ENVUELVE",
+    `quedó en la ${enLaPrimera.indice + 1} · envolver la habría llevado a la ${nombresDeFila.length}`
+  );
+
+  // La página no cambia sola: para eso está el paginador.
+  const urlTrasLasFlechas = await evaluar("location.pathname + location.search");
+  afirmar(
+    mismaUrlDeListado(urlTrasLasFlechas, URL_LISTADO),
+    "FLECHAS: NO SE CAMBIA DE PÁGINA SOLA",
+    `${urlTrasLasFlechas}`
+  );
+
+  // ── LAS FLECHAS DEL BUSCADOR SON DEL BUSCADOR ──────────────────────────
+  //
+  // Es la novena comprobación del pedido, y la única que puede romper algo que
+  // hoy funciona: con el foco en un campo de texto la flecha mueve el cursor de
+  // escritura, y robarla dejaría el buscador sin poder recorrer lo escrito.
+  //
+  // El campo se busca por su PLACEHOLDER y no por `input[type="text"]`: el kit
+  // no le pone el atributo `type`, así que ese selector no matchea nunca — la
+  // primera corrida dio rojo por eso, sobre una pantalla que estaba bien.
+  const hayBuscador = await evaluar(`(() => {
+    const i = [...document.querySelectorAll("input")].find(
+      (x) => /buscar/i.test(x.getAttribute("placeholder") || "") && x.offsetParent !== null
+    );
+    if (!i) return false;
+    i.focus();
+    return document.activeElement === i;
+  })()`);
+  afirmar(hayBuscador, "FLECHAS: se pudo enfocar el buscador para la contraprueba");
+  if (hayBuscador) {
+    const antesDelBuscador = await filaTenida();
+    await flecha("ArrowDown");
+    await flecha("ArrowDown");
+    const despuesDelBuscador = await filaTenida();
+    afirmar(
+      despuesDelBuscador.indice === antesDelBuscador.indice,
+      "FLECHAS: CON EL FOCO EN EL BUSCADOR NO SE MUEVE LA SELECCIÓN",
+      `antes la ${antesDelBuscador.indice + 1}, después la ${despuesDelBuscador.indice + 1} — dos pulsaciones`
+    );
+    const sigueEnfocado = await evaluar(`(document.activeElement.tagName || "?")`);
+    afirmar(
+      sigueEnfocado === "INPUT",
+      "FLECHAS: el buscador conserva el foco",
+      `activeElement=${sigueEnfocado}`
+    );
+  }
+  await capturar("13-escritorio-flechas", `${BASE}${URL_LISTADO}`);
 } catch (err) {
   morir(err?.message || String(err));
 }

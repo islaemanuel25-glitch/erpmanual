@@ -53,6 +53,11 @@ const PERFIL = arg("perfil", path.join(os.tmpdir(), "medir-tabla"));
 const ETIQUETA = arg("etiqueta", BASE);
 const RUTA = arg("ruta", "/modulos/productos?page=2&q=a&sortKey=precioVenta&sortDir=desc");
 const SALIDA = arg("salida", null);
+// La foto de la MISMA pantalla que se está midiendo, en la misma corrida y con
+// la misma espera. Existe para que la comparación de antes y después no sea solo
+// una tabla de números: los números dicen que el sobrante pasó de 743 a 0, y la
+// foto muestra qué se ve cuando eso pasa.
+const CAPTURA = arg("captura", null);
 
 if (!USUARIO || !CLAVE) {
   console.error("Faltan --usuario y --clave. Sin sesión esto mide la pantalla de login.");
@@ -184,6 +189,43 @@ try {
           ? { top: Math.round(main.scrollTop), sobrante: Math.round(main.scrollHeight - main.clientHeight) }
           : null,
       },
+      // ── EL EJE HORIZONTAL, QUE ANTES NO SE MEDÍA ──────────────────────────
+      //
+      // Se agregó al sacarle a la tabla su scroll vertical propio. La pregunta
+      // que contesta es cuál de los dos contenedores se queda el desplazamiento
+      // lateral cuando las columnas no entran: sin esto, "conservar el scroll
+      // horizontal" es una afirmación sin número atrás.
+      //
+      // Va junto con el overflow calculado y con el position del thead, porque
+      // los tres se mueven a la vez: un contenedor que declara overflow en
+      // cualquier eje se vuelve el ámbito de lo pegajoso, y ahí el encabezado
+      // deja de seguir al scroll de la página.
+      //
+      // Y OJO CON LAS COMILLAS INVERTIDAS: esto es el cuerpo de un template
+      // literal, así que una sola en un comentario cierra la cadena y el archivo
+      // deja de parsear. Ya pasó al escribir este mismo bloque.
+      horizontal: {
+        contenedor: cont
+          ? { sobrante: Math.round(cont.scrollWidth - cont.clientWidth) }
+          : null,
+        main: main ? { sobrante: Math.round(main.scrollWidth - main.clientWidth) } : null,
+      },
+      // OJO: esto es el cuerpo de un template literal. Nada de interpolaciones
+      // acá adentro —se las comería Node antes de que el navegador las vea—, así
+      // que las cadenas se arman concatenando.
+      overflow: {
+        contenedor: cont
+          ? getComputedStyle(cont).overflowX + "/" + getComputedStyle(cont).overflowY
+          : null,
+        main: main
+          ? getComputedStyle(main).overflowX + "/" + getComputedStyle(main).overflowY
+          : null,
+        maxHeightContenedor: cont ? getComputedStyle(cont).maxHeight : null,
+      },
+      thead: (() => {
+        const th = tabla.querySelector("thead");
+        return th ? getComputedStyle(th).position : null;
+      })(),
       conAncla: tabla.querySelectorAll("[data-ancla]").length,
       conAriaCurrent: tabla.querySelectorAll('[aria-current]').length,
       conElRotulo: (tabla.innerText.match(/Último editado/g) || []).length,
@@ -205,6 +247,9 @@ try {
   console.log(`  altos de fila:     ${JSON.stringify(sinHtml.altosDeFila)}`);
   console.log(`  alto de la tabla:  ${sinHtml.altoDeLaTabla}`);
   console.log(`  scroll:            ${JSON.stringify(sinHtml.scroll)}`);
+  console.log(`  horizontal:        ${JSON.stringify(sinHtml.horizontal)}`);
+  console.log(`  overflow:          ${JSON.stringify(sinHtml.overflow)}`);
+  console.log(`  position del thead:${sinHtml.thead}`);
   console.log(`  con data-ancla:    ${sinHtml.conAncla}`);
   console.log(`  con aria-current:  ${sinHtml.conAriaCurrent}`);
   console.log(`  con el rótulo:     ${sinHtml.conElRotulo}`);
@@ -214,6 +259,13 @@ try {
   if (SALIDA) {
     fs.writeFileSync(SALIDA, JSON.stringify({ ...sinHtml, huella }, null, 2), "utf8");
     console.log(`  guardado en:       ${SALIDA}`);
+  }
+
+  if (CAPTURA) {
+    fs.mkdirSync(path.dirname(CAPTURA), { recursive: true });
+    const foto = await send("Page.captureScreenshot", { format: "png" });
+    fs.writeFileSync(CAPTURA, Buffer.from(foto.data, "base64"));
+    console.log(`  captura:           ${CAPTURA}`);
   }
 } catch (err) {
   morir(err?.message || String(err));

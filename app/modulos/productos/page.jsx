@@ -99,6 +99,7 @@ import {
   consumirScrollEscritorio,
   limpiarSeleccionEscritorio,
 } from "@/lib/productos/retornoEscritorio";
+import { seleccionQueSobrevive } from "@/lib/productos/navegacionPorFilas";
 import {
   identidadDeFila,
   claveDeAncla,
@@ -458,6 +459,8 @@ export default function ProductosPage() {
   );
 
   // Click en una fila (fuera de los botones) → marca persistente, como antes.
+  // También es por acá que entra el cursor movido con las flechas: es la misma
+  // selección y el mismo tono, así que es el mismo manejador.
   const handleSelectProducto = useCallback((id) => {
     setSelectedProductId(id);
     recordarSeleccionEscritorio(almacenDeSesion(), id);
@@ -1109,6 +1112,28 @@ export default function ProductosPage() {
   useEffect(() => {
     fetchCatalogos();
   }, []);
+
+  // ── EL CURSOR NO SOBREVIVE A UN LISTADO QUE YA NO LO CONTIENE ─────────────
+  //
+  // Si cambia la página, el filtro, la búsqueda o el orden y el producto que
+  // estaba seleccionado ya no está entre las filas, la selección se limpia.
+  // Dejarla puesta significaría un cursor apuntando a algo invisible: la
+  // primera flecha después de eso no tendría desde dónde moverse y el usuario
+  // apretaría sin que pasara nada, sin ninguna pista de por qué.
+  //
+  // La regla vive en `seleccionQueSobrevive`, que con la lista VACÍA no limpia
+  // nada. Esa mitad no es un detalle: una lista sin filas es lo que se ve
+  // mientras carga, y limpiar ahí borraría la selección que se acaba de
+  // restaurar al volver de editar, un frame antes de que lleguen los datos.
+  //
+  // Solo se toca el estado de la pantalla, no el almacén: la clave guardada ya
+  // está gobernada por su propia regla —se restaura únicamente si hay scroll
+  // guardado— y meterle mano acá sería un segundo dueño del mismo hecho.
+  useEffect(() => {
+    setSelectedProductId((actual) =>
+      seleccionQueSobrevive(rows.map((r) => r.id), actual)
+    );
+  }, [rows]);
 
   // La configuración de la tarjeta, después del primer render — ver el comentario
   // del `useState`. Se relee al cambiar de ubicación porque la clave es por local.

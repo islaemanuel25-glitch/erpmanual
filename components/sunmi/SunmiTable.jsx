@@ -58,7 +58,12 @@ import { useSunmiTheme } from "./SunmiThemeProvider";
 import SunmiTableRow from "./SunmiTableRow";
 import SunmiTableEmpty from "./SunmiTableEmpty";
 import { celdasDelPie } from "@/lib/sunmi/pieDeTabla";
-import { paddingQueSobrevive, declaraAlineacion, claseDeTabla } from "@/lib/sunmi/claseNegociada";
+import {
+  paddingQueSobrevive,
+  declaraAlineacion,
+  claseDeTabla,
+  scrollDeLaTabla,
+} from "@/lib/sunmi/claseNegociada";
 
 /** El padding de cada densidad. "normal" es exactamente el de siempre. */
 const DENSIDAD = {
@@ -115,6 +120,27 @@ export default function SunmiTable({
   stickyHeader = false,
   maxHeightClass = "max-h-[70dvh]",
   scrollId,
+  /**
+   * La tabla crece con su contenido: sin tope de alto y sin scroll vertical
+   * propio. El desplazamiento vertical se lo queda quien esté afuera, que en las
+   * pantallas del ERP es el `<main>` del layout.
+   *
+   * ── QUÉ SE PIERDE, Y POR QUÉ NO HAY FORMA DE NO PERDERLO ────────────────
+   *
+   * **El encabezado deja de quedar fijo.** No es una decisión de gusto: el
+   * envoltorio conserva `overflow-x` para que las columnas que no entran se
+   * puedan desplazar de costado, y un elemento con overflow en CUALQUIER eje se
+   * vuelve el ámbito de lo pegajoso. El `thead` quedaría pegado a un contenedor
+   * que ya no se desplaza, o sea quieto, que es lo mismo que no ser pegajoso
+   * pero mintiendo en el CSS. Por eso en este modo directamente no se declara.
+   *
+   * La única forma de conservarlo sería sacarle el `overflow-x` al envoltorio y
+   * dejar que el desplazamiento lateral se lo quede la página entera — y ahí se
+   * mueven de costado también la barra de filtros y el buscador, que es peor.
+   *
+   * Apagado por defecto: ninguna de las tablas que ya existen cambia.
+   */
+  altoLibre = false,
 
   // ── Modo por columnas. Todo opcional. ────────────────────────────────────
   /** [{ clave, titulo, align, render, ordenable, thClassName, tdClassName, title }] */
@@ -148,6 +174,10 @@ export default function SunmiTable({
   const { theme } = useSunmiTheme();
   const theadBase = theme.table?.headerClass || "sunmi-thead";
   const d = DENSIDAD[densidad] ?? DENSIDAD.normal;
+
+  // Las dos cadenas del scroll salen de una sola decisión, en el dominio. Ver
+  // `scrollDeLaTabla`: calcularlas por separado permite que se contradigan.
+  const scroll = scrollDeLaTabla({ stickyHeader, altoLibre, maxHeightClass });
 
   // `columnas` declara los ENCABEZADOS. Quién dibuja el CUERPO lo decide
   // `filas`: con filas lo dibuja la tabla, sin filas siguen mandando los hijos.
@@ -308,12 +338,19 @@ export default function SunmiTable({
       // La rama de `stickyHeader` NO lo lleva: ahí el scroll vertical es
       // deliberado —declara `overflow-auto` con su propio tope de alto— y
       // encogerse es parte de lo que hace.
-      className={stickyHeader ? `overflow-auto ${maxHeightClass}` : "overflow-x-auto shrink-0"}
+      //
+      // `altoLibre` cae en la rama de siempre y no en una tercera: pedir alto
+      // libre es pedir exactamente lo que hace el default —crecer con el
+      // contenido y desplazar solo de costado—, así que la respuesta correcta es
+      // la misma clase y no una parecida.
+      className={scroll.envoltorio}
     >
       <table className={claseDeTabla(className)}>
         {/* ===== HEADER ===== */}
+        {/* Lo pegajoso solo se declara cuando hay un contenedor que se desplaza
+            vertical debajo. Con `altoLibre` no lo hay: ver la prop. */}
         {encabezados.length > 0 && (
-          <thead className={stickyHeader ? `${theadBase} sticky top-0 z-20` : theadBase}>
+          <thead className={scroll.pegajoso ? `${theadBase} sticky top-0 z-20` : theadBase}>
             <tr>
               {encabezados.map((h, i) => {
                 const label = typeof h === "string" ? h : h.label;

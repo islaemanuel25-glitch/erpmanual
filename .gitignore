@@ -187,3 +187,7 @@ capturas-presentaciones/
 # Capturas de la sonda de retorno. Mismo criterio que las otras: se sacan para
 # mirarlas y adjuntarlas, no para versionarlas.
 capturas-retorno/
+
+# Las de la comparación de la tabla de escritorio (`medir-tabla-escritorio.mjs
+# --captura`). Mismo criterio: se sacan de a pares para comparar y adjuntar.
+capturas-productos-desktop/
