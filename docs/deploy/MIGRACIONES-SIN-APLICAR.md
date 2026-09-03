@@ -22,6 +22,85 @@ Ninguna.
 
 Producción está al día en **105**, comprobado con `prisma migrate status` el
 2026-09-03 después de desplegar
+`5c6074f5c9b97190f06240a619329dcf5262b891` — el merge del PR #24, Productos de
+escritorio: la tabla deja de tener scroll vertical propio y las filas se
+recorren con las flechas. **Solo código.**
+
+Corte de **7 segundos como máximo** —el reloj arrancó junto al `up -d` y ese
+número incluye la ida y vuelta del ssh, así que el corte real es menor—. Cinco
+valores coincidentes, `erpazul_app` con **cero reinicios**, `erpazul_db` **no
+recreado** —sigue con el arranque del 2026-08-17, todo con `--no-deps app`—,
+logs sin un solo error, `APP_IMAGE` sin filtrarse dentro del contenedor y el
+árbol del VPS limpio. Rollback disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:6eb3f36447e5aa08348ae203658a6039dea7c57f`
+(imagen `sha256:1c9e730b4e91…`). No hizo falta.
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre en las últimas 20 líneas, **62 tablas**—:
+`/srv/produccion/backups/pre-5c6074f5_20260903_032537.sql.gz`, 3.537.428 bytes.
+El quinto no aplica: no hay migración.
+
+Sin migraciones: el rango `6eb3f364..5c6074f5` no toca `prisma/`, el clasificador
+informó "Archivos a mirar: 0" con el rango tomado de la imagen que atendía, y
+este archivo ya decía que no había pendientes. Los cuatro conteos dieron **105**
+—árbol local, árbol del VPS, aplicadas en la base y el contenedor descartable—.
+
+### EL ÁRBOL DEL MERGE ES EL DE LA RAMA PROBADA
+
+Comprobado antes del corte: el merge `5c6074f5` tiene dos padres —`9bd63f39` y
+`f4da326a`—, su árbol es `f3f2ae13`, **el mismo** que el de la punta de la rama,
+y el diff entre los dos está vacío.
+
+### EL CÓDIGO VIAJÓ, Y ACÁ NO HAY MARCADOR DE DESAPARICIÓN
+
+De aparición hay dos, los dos cadenas y no identificadores —el build minifica los
+identificadores, así que `altoLibre` no habría afirmado nada—: el rol
+`spinbutton`, uno de los controles que la navegación por flechas se niega a
+interceptar, y el selector `tbody [data-sunmi-row]`, con el que la tabla
+encuentra la fila que tiene que traer a la vista. Los dos dan **0 archivos en la
+imagen vieja y 2 en la que atiende**. El control `productos-scroll` da **2 en las
+dos**, que es lo que prueba que la búsqueda funciona en ambas, y una cadena
+inventada da 0 en las dos.
+
+**De desaparición no hay ninguno, y eso hay que decirlo en vez de fabricar uno.**
+Lo que esta tanda saca de la tabla de Productos es el tope de alto y el
+encabezado pegajoso, pero `max-h-[70dvh]` sigue existiendo en el build porque
+`TablaCatalogo` la sigue usando —de hecho SUBIÓ, de 40 archivos a 56, por cómo se
+reparten los chunks—. La diferencia es por instancia y en tiempo de ejecución, no
+una cadena que se vaya del build: un marcador de desaparición acá habría dado
+falso.
+
+### EL CONTROL POSTERIOR
+
+`/modulos/productos` en **200**, y también con la query completa
+—`?page=2&q=a&sortKey=precioVenta&sortDir=desc`— y con `?tipo=combos`. El editor
+de producto y el de combo en **200**. `/api/productos/listar` en **401** —vive y
+pide sesión— y `/login` en 200. Logs sin un solo error después de pedirlas.
+Cascada **verde** antes y después del corte.
+
+### LO QUE NO SE EJERCIÓ CONTRA PRODUCCIÓN
+
+**No se abrió la tabla con una sesión real**, así que ni el scroll único ni las
+flechas se tocaron contra el sitio. La verificación funcional está hecha contra
+un servidor de desarrollo con datos reales antes del corte, sobre el mismo árbol
+que el merge: la sonda de retorno y navegación con **132 afirmaciones y 0 rojas**
+a 390×844 y a 1366×900, la sonda de la tarjeta con **64 en verde**, y la de
+cascada verde contra el build local.
+
+Y las cuatro contrapruebas del pedido están corridas y anotadas en la rama:
+sacado `altoLibre` se ponen rojas 5 afirmaciones más un candado; devuelto
+`#productos-scroll` en el retorno, 2 más otro candado; con paso de 2 en
+ArrowDown, 8 más cuatro candados; y sin `preventDefault`, 1 — la que mide que la
+página no se mueva sola, que hubo que agregar porque la sonda quedaba verde sin
+ella.
+
+**Ninguna autorización manual de migraciones**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea de hoy; la última
+sigue siendo la del 2026-08-25.
+
+---
+
+Antes de éste, producción estuvo en
 `6eb3f36447e5aa08348ae203658a6039dea7c57f` — el merge de
 `hotfix/productos-retorno-solo-mobile`: la restauración de posición es del
 celular, y el escritorio vuelve a donde volvía. **Solo código.**
