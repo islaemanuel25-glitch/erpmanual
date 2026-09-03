@@ -779,65 +779,143 @@ try {
   afirmar(esc.marcados.length === 0, "ESCRITORIO: no hay nada marcado", `marcados=${esc.marcados.join(", ") || "(ninguno)"}`);
   afirmar(!esc.textoMarca, `ESCRITORIO: no aparece "${TEXTO_ULTIMO_EDITADO}"`);
 
-  // Se toca Editar en una fila de la tabla y se comprueba que NO se guarde nada.
-  const scrollAntesEsc = await evaluar(`(() => {
-    const c = document.getElementById("productos-scroll");
-    return c ? Math.round(c.scrollTop) : -1;
-  })()`);
-  const urlAntesEsc = esc.url;
-  const seToco = await evaluar(`(() => {
-    const fila = [...document.querySelectorAll("table tbody tr")].find((f) => f.children.length > 1);
-    if (!fila) return false;
-    const b = [...fila.querySelectorAll("button")].find((x) =>
-      /editar/i.test((x.getAttribute("aria-label") || "") + " " + (x.getAttribute("title") || ""))
-    );
-    if (!b) return false;
-    b.click();
-    return true;
-  })()`);
-  afirmar(seToco, "ESCRITORIO: se pudo tocar Editar en una fila de la tabla");
-  if (seToco) {
-    await esperarUrlDistintaDe(urlAntesEsc);
-    const enEditor = await evaluar("location.pathname + location.search");
-    afirmar(
-      enEditor.includes("/editar") || enEditor.includes("/editar-combo/"),
-      "ESCRITORIO: EDITAR ABRE IGUAL — navegar no depende de la restauración",
-      enEditor
-    );
-    const retenidoEsc = await evaluar(
-      `(() => { try { return !!sessionStorage.getItem(${JSON.stringify(CLAVE_ESTADO_RETORNO)}); } catch (e) { return null; } })()`
-    );
-    afirmar(
-      retenidoEsc === false,
-      "ESCRITORIO: NO SE GUARDÓ NINGÚN ESTADO DE RETORNO",
-      `retenido=${retenidoEsc} — la restauración es de la vista móvil`
-    );
-
-    await esperarEditor();
-    await cancelar();
+  // ── SE DESPLAZA LA TABLA DE VERDAD, Y ESA ES LA CORRECCIÓN ─────────────
+  //
+  // La versión anterior de este bloque medía el scroll de la tabla en 0 antes y
+  // en 0 después: nunca la desplazaba. Comparaba dos ceros y daba verde sobre
+  // una regresión —escritorio había perdido su restauración— sin decir nada.
+  //
+  // Ahora se la lleva a más de 200 px y se elige una fila de la MITAD de lo
+  // visible, que es lo único que hace que la comparación signifique algo.
+  const cicloEscritorio = async (nombreSalida, salir) => {
+    await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
+    await navegar(`${BASE}${URL_LISTADO}`);
     for (let i = 0; i < 120; i++) {
       await sleep(250);
       if (await evaluar(`[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`)) break;
     }
     await sleep(1000);
-    const volvio = await leer();
-    afirmar(
-      volvio.marcados.length === 0 && !volvio.textoMarca,
-      "ESCRITORIO: al volver NO se marca ninguna fila",
-      `marcados=${volvio.marcados.join(", ") || "(ninguno)"}`
-    );
-    const scrollDespuesEsc = await evaluar(`(() => {
+
+    const desplazo = await evaluar(`(() => {
       const c = document.getElementById("productos-scroll");
-      return c ? Math.round(c.scrollTop) : -1;
+      if (!c) return -1;
+      const objetivo = Math.min(300, Math.max(0, c.scrollHeight - c.clientHeight));
+      c.scrollTop = objetivo;
+      return Math.round(c.scrollTop);
     })()`);
     afirmar(
-      scrollDespuesEsc === scrollAntesEsc,
-      "ESCRITORIO: EL SCROLL NO SE ALTERÓ",
-      `antes=${scrollAntesEsc} después=${scrollDespuesEsc}`
+      desplazo > 200,
+      `ESCRITORIO · ${nombreSalida}: la tabla se desplazó de verdad`,
+      `scrollTop=${desplazo} — con 0 la comparación no significaría nada`
     );
-    afirmar(volvio.desborde <= 0, "ESCRITORIO: sin desborde a 1366", `sobra ${volvio.desborde} px`);
-  }
-  await capturar("08-escritorio-1366-sin-restauracion", `${BASE}${URL_LISTADO}`);
+    if (desplazo <= 200) return;
+    await sleep(400);
+
+    // Una fila de la MITAD de lo que se ve, no la primera.
+    const elegida = JSON.parse(await evaluar(`(() => {
+      const c = document.getElementById("productos-scroll");
+      const rc = c.getBoundingClientRect();
+      const filas = [...document.querySelectorAll("table tbody tr")].filter((f) => {
+        if (f.children.length <= 1) return false;
+        const r = f.getBoundingClientRect();
+        return r.top >= rc.top && r.bottom <= rc.bottom;
+      });
+      if (filas.length === 0) return JSON.stringify({ hay: false });
+      const f = filas[Math.floor(filas.length / 2)];
+      const b = [...f.querySelectorAll("button")].find((x) =>
+        /editar/i.test((x.getAttribute("aria-label") || "") + " " + (x.getAttribute("title") || ""))
+      );
+      if (!b) return JSON.stringify({ hay: false });
+      f.setAttribute("data-sonda-elegida", "1");
+      return JSON.stringify({ hay: true, visibles: filas.length, texto: (f.innerText || "").split("\\n")[0].slice(0, 30) });
+    })()`));
+    afirmar(elegida.hay, `ESCRITORIO · ${nombreSalida}: hay una fila visible de la mitad con Editar`,
+      elegida.hay ? `${elegida.visibles} filas visibles · ${elegida.texto}` : "ninguna");
+    if (!elegida.hay) return;
+
+    const scrollAntes = await evaluar(`Math.round(document.getElementById("productos-scroll").scrollTop)`);
+    const urlAntes = await evaluar("location.pathname + location.search");
+    await evaluar(`(() => {
+      const f = document.querySelector('[data-sonda-elegida]');
+      const b = [...f.querySelectorAll("button")].find((x) =>
+        /editar/i.test((x.getAttribute("aria-label") || "") + " " + (x.getAttribute("title") || ""))
+      );
+      b.click();
+      return true;
+    })()`);
+    await esperarUrlDistintaDe(urlAntes);
+
+    const enEditor = await evaluar("location.pathname + location.search");
+    afirmar(
+      enEditor.includes("/editar"),
+      `ESCRITORIO · ${nombreSalida}: EDITAR ABRE IGUAL`,
+      enEditor
+    );
+    const estadoMovil = await evaluar(
+      `(() => { try { return !!sessionStorage.getItem(${JSON.stringify(CLAVE_ESTADO_RETORNO)}); } catch (e) { return null; } })()`
+    );
+    afirmar(
+      estadoMovil === false,
+      `ESCRITORIO · ${nombreSalida}: NO se guardó el estado MÓVIL`,
+      `retenido=${estadoMovil} — desde la tabla va el mecanismo de escritorio`
+    );
+    const legacy = JSON.parse(await evaluar(`(() => {
+      try {
+        return JSON.stringify({
+          scroll: sessionStorage.getItem("productos:scrollY"),
+          seleccion: sessionStorage.getItem("productos:selectedProductId"),
+        });
+      } catch (e) { return JSON.stringify({ scroll: null, seleccion: null }); }
+    })()`));
+    afirmar(
+      legacy.scroll !== null && legacy.seleccion !== null,
+      `ESCRITORIO · ${nombreSalida}: SÍ se guardó el retorno de escritorio`,
+      `productos:scrollY=${legacy.scroll} · productos:selectedProductId=${legacy.seleccion}`
+    );
+
+    if (!(await esperarEditor())) morir(`escritorio ${nombreSalida}: el editor no se montó`);
+    await salir();
+    for (let i = 0; i < 120; i++) {
+      await sleep(250);
+      if (await evaluar(`[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`)) break;
+    }
+    await sleep(1200);
+
+    const volvio = await leer();
+    const scrollDespues = await evaluar(`Math.round(document.getElementById("productos-scroll").scrollTop)`);
+    const dif = Math.abs(scrollDespues - scrollAntes);
+    afirmar(
+      dif <= 2,
+      `ESCRITORIO · ${nombreSalida}: EL SCROLL DE LA TABLA VUELVE (tolerancia 2 px)`,
+      `antes=${scrollAntes} después=${scrollDespues} · diferencia=${dif} px`
+    );
+
+    // La clase la compone `claseDeFila`: con `tono="atencion"` la fila lleva
+    // `sunmi-fila-atencion`. Se busca ESA y no una inventada — un selector que
+    // no matchea nunca daría cero y el candado se leería como "se perdió la
+    // selección" sobre una pantalla correcta.
+    const seleccionada = await evaluar(`(() => {
+      return [...document.querySelectorAll("table tbody tr")].filter(
+        (x) => (x.className || "").includes("sunmi-fila-atencion")
+      ).length;
+    })()`);
+    afirmar(
+      seleccionada >= 1,
+      `ESCRITORIO · ${nombreSalida}: LA FILA SIGUE SELECCIONADA`,
+      `filas con tinte=${seleccionada}`
+    );
+    afirmar(
+      volvio.cantidad === 0 && volvio.marcados.length === 0 && !volvio.textoMarca,
+      `ESCRITORIO · ${nombreSalida}: sin ancla, sin aria-current y sin píldora`,
+      `anclas=${volvio.cantidad} marcados=${volvio.marcados.length}`
+    );
+    afirmar(volvio.desborde <= 0, `ESCRITORIO · ${nombreSalida}: sin desborde a 1366`, `sobra ${volvio.desborde} px`);
+    await capturar(`08-escritorio-1366-${nombreSalida}`, `${BASE}${URL_LISTADO}`);
+  };
+
+  await cicloEscritorio("cancelar", cancelar);
+  // Guardar SIN tocar ningún campo: los valores quedan como estaban.
+  await cicloEscritorio("guardar", guardar);
 } catch (err) {
   morir(err?.message || String(err));
 }
