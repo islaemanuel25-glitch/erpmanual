@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
@@ -8,6 +10,15 @@ import SunmiPill from "@/components/sunmi/SunmiPill";
 // El pie de paginación se mudó acá: `useState`, `SunmiButton`, `SunmiInput` y
 // `SunmiPageSizer` se usaban SOLO para él, así que se fueron con la pieza.
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
+
+// Las cuatro reglas de las flechas viven en el dominio y se ejercen sin
+// navegador. Acá queda el cableado: quién tiene el foco y qué se desplaza.
+import {
+  esTeclaDeNavegacion,
+  esControlQueUsaLasFlechas,
+  indiceDeLaSeleccion,
+  siguienteSeleccion,
+} from "@/lib/productos/navegacionPorFilas";
 
 import { Pencil, Trash2, Warehouse, Eye, Power, PowerOff } from "lucide-react";
 
@@ -43,6 +54,70 @@ export default function SunmiTablaProductos({
   selectedProductId = null,
   onSelectProducto,
 }) {
+  // ── EL CURSOR DE LA TABLA ────────────────────────────────────────────────
+  //
+  // La fila que ya se teñía al tocarla pasa a ser también el cursor de las
+  // flechas. No hay color nuevo ni marca nueva: es el MISMO `selectedProductId`
+  // y el mismo tono. Lo único que se agrega es de dónde puede venir el cambio.
+  const contenedorRef = useRef(null);
+  const idsDeLasFilas = rows.map((r) => r.id);
+
+  /**
+   * Tocar una fila la selecciona y DEJA EL FOCO EN LA TABLA.
+   *
+   * Sin esto el foco se queda donde estuviera —el buscador, o el `<body>`— y la
+   * primera flecha después del clic no llega hasta acá: el usuario tocaría una
+   * fila, apretaría abajo y no pasaría nada.
+   *
+   * `preventScroll` porque enfocar desplaza al elemento enfocado por defecto, y
+   * el elemento enfocado es la tabla ENTERA: el navegador la traería a la vista
+   * y la lista saltaría sola justo cuando el usuario acaba de elegir dónde
+   * estaba mirando.
+   */
+  const seleccionarFila = (id) => {
+    onSelectProducto?.(id);
+    contenedorRef.current?.focus?.({ preventScroll: true });
+  };
+
+  /**
+   * Las flechas mueven el cursor una fila, y nada más.
+   *
+   * Tres decisiones que no se leen solas:
+   *
+   * · **La tabla solo se queda con la tecla si TIENE cursor.** Sin selección la
+   *   flecha es del navegador y la página se desplaza como siempre; robarla ahí
+   *   dejaría una pantalla donde la flecha no hace nada y tampoco scrollea.
+   * · **`preventDefault` va también en los bordes.** Es el caso que más se nota:
+   *   en la última fila, sin esto, la flecha no mueve el cursor pero SÍ desplaza
+   *   la página, así que la lista se va sola y el cursor queda atrás.
+   * · **La fila se trae a la vista con `block: "nearest"`**, que no mueve nada si
+   *   ya se ve entera. Recentrar en cada pulsación haría saltar la lista en
+   *   veinte filas de las veinticinco.
+   */
+  const manejarTecla = (e) => {
+    if (!esTeclaDeNavegacion(e.key)) return;
+    // El buscador, los botones de acción de la fila y el salto de página del pie
+    // necesitan las flechas para lo suyo.
+    if (esControlQueUsaLasFlechas(e.target)) return;
+    if (indiceDeLaSeleccion(idsDeLasFilas, selectedProductId) < 0) return;
+
+    e.preventDefault();
+
+    const destino = siguienteSeleccion(idsDeLasFilas, selectedProductId, e.key);
+    if (destino === null) return;
+
+    onSelectProducto?.(destino);
+
+    // La fila se busca por POSICIÓN dentro del cuerpo, que acá es exacta: esta
+    // tabla dibuja un `<tr>` por elemento de `rows`, en el mismo orden y sin
+    // filas de detalle intercaladas. No es el índice como identidad —eso sería
+    // guardar "la fila 10" y volver a ella después de un filtro—: es el índice
+    // de la lista que se está viendo en este mismo render.
+    const indice = indiceDeLaSeleccion(idsDeLasFilas, destino);
+    const filas = contenedorRef.current?.querySelectorAll?.("tbody [data-sunmi-row]");
+    filas?.[indice]?.scrollIntoView?.({ block: "nearest", behavior: "auto" });
+  };
+
   const CAT = Object.fromEntries(
     (catalogos?.CATEGORIAS ?? []).map((c) => [String(c.id), c.nombre])
   );
@@ -245,13 +320,40 @@ export default function SunmiTablaProductos({
   const colSpan = columnasTabla.length;
 
   return (
-    <div className="rounded-xl border sunmi-border overflow-hidden">
+    <div
+      ref={contenedorRef}
+      // ── POR QUÉ `-1` Y NO `0` ──────────────────────────────────────────────
+      //
+      // `-1` es "se puede enfocar por código pero no con Tab". Con `0` la tabla
+      // entera se volvería una parada más del tabulador, delante de los botones
+      // de cada fila: una pantalla que hoy se recorre con Tab pasaría a tener un
+      // salto nuevo que nadie pidió. El foco lo da el clic en una fila, que es
+      // como el pedido dice que arranca el cursor.
+      //
+      // `outline-none` porque el anillo de foco de un div que ocupa la tabla
+      // entera es un borde nuevo alrededor de todo, y esta tanda no agrega
+      // marcas visuales.
+      tabIndex={-1}
+      onKeyDown={manejarTecla}
+      className="rounded-xl border sunmi-border overflow-hidden focus:outline-none"
+    >
       <SunmiTable
         columnas={columnasTabla}
         ordenClave={sortKey}
         ordenDir={sortDir}
         onSort={(clave) => onSort?.(clave)}
         stickyHeader
+        // ── UN SOLO SCROLL VERTICAL EN LA PANTALLA: EL DE LA PÁGINA ──────────
+        //
+        // La tabla crece con sus 25 filas y el `<main>` del layout se queda con
+        // todo el desplazamiento vertical. El envoltorio sigue existiendo —y
+        // sigue llamándose `productos-scroll`— porque conserva el horizontal:
+        // medido a 1366, las columnas se pasan 203 px del ancho disponible.
+        //
+        // Lo que se pierde está escrito en la prop: el encabezado deja de quedar
+        // fijo, y no hay forma de conservarlo sin que el desplazamiento lateral
+        // se lo lleve la página entera junto con el buscador y los filtros.
+        altoLibre
         scrollId="productos-scroll"
       >
         {rows.length === 0 ? (
@@ -263,7 +365,7 @@ export default function SunmiTablaProductos({
             return (
             <SunmiTableRow
               key={row.id}
-              onClick={onSelectProducto ? () => onSelectProducto(row.id) : undefined}
+              onClick={onSelectProducto ? () => seleccionarFila(row.id) : undefined}
               // El tinte de la fila elegida sale del acento del theme y el hover
               // se compone encima. Antes era `!bg-amber-400/30`: un color fijo
               // fuera del sistema de themes y un `!important` que además le
