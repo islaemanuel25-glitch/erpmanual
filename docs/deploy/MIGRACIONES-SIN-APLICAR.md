@@ -21,7 +21,115 @@ Ninguna.
 ---
 
 Producción está al día en **105**, comprobado con `prisma migrate status` el
-2026-09-02 después de desplegar
+2026-09-03 después de desplegar
+`6eb3f36447e5aa08348ae203658a6039dea7c57f` — el merge de
+`hotfix/productos-retorno-solo-mobile`: la restauración de posición es del
+celular, y el escritorio vuelve a donde volvía. **Solo código.**
+
+Corte de **9 segundos como máximo** —el reloj arrancó junto al `up -d` y ese
+número incluye la ida y vuelta del ssh, así que el corte real es menor—. Cinco
+valores coincidentes, `erpazul_app` con **cero reinicios**, `erpazul_db` **no
+recreado** —sigue con el arranque del 2026-08-17, todo con `--no-deps app`—,
+logs sin un solo error, `APP_IMAGE` sin filtrarse dentro del contenedor y el
+árbol del VPS limpio. Rollback disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:81541c3727262cd5172057b9200174ceffd6ef0d`
+(imagen `sha256:9032d7522dbc…`). No hizo falta.
+
+Backup previo validado con los cuatro chequeos —`pg_dump` con `pipefail` en 0,
+`gzip -t` limpio, marca de cierre en las últimas 20 líneas, **62 tablas**—:
+`/srv/produccion/backups/pre-6eb3f364_20260903_012730.sql.gz`, 3.532.270 bytes.
+El quinto no aplica: no hay migración.
+
+Sin migraciones: el rango `81541c37..6eb3f364` no toca `prisma/`, el clasificador
+informó "Archivos a mirar: 0" con el rango tomado de la imagen que atendía, y
+este archivo ya decía que no había pendientes. Los cuatro conteos dieron **105**
+—árbol local, árbol del VPS, aplicadas en la base y el contenedor descartable—.
+
+### EL ÁRBOL DEL MERGE ES EL DE LA RAMA PROBADA
+
+Comprobado antes del corte y no después: el merge `6eb3f364` tiene dos padres
+—`8a2e68f8` y `6e5e55cd`—, su árbol es `7283f315`, **el mismo** que el de la
+punta de la rama, y el diff entre los dos está vacío. Lo que se desplegó es
+exactamente lo que se probó.
+
+### EL ASUNTO DEL MERGE DICE `@`, Y NO SE CORRIGIÓ A PROPÓSITO
+
+En `git log --oneline` el merge `6eb3f364` aparece con el asunto `@`. No es un
+commit vacío ni un error de contenido: el mensaje entero está adentro, dos líneas
+más abajo. Lo que pasó es que el mensaje se pasó con la sintaxis de here-string de
+PowerShell —`@'…'@`— desde Bash, que no la conoce, así que los dos marcadores
+entraron como texto: uno arriba de todo y otro al final.
+
+**No se rehízo el merge, y ese es el punto.** Arreglar el asunto cambia el SHA, y
+ese SHA es el que quedó en la etiqueta de la imagen, en el `APP_BUILD_ID` y en
+`/api/version`: reescribirlo rompería los cinco valores por un renglón de
+cosmética. La corrección vale para el próximo mensaje, no para éste.
+
+### EL CÓDIGO VIAJÓ, Y ACÁ HAY MARCADOR EN LOS DOS SENTIDOS
+
+De aparición: la cadena `"movil"` con sus comillas, el valor del marcador de
+origen que estrena esta tanda. Es un literal y no un identificador —el build
+minifica los identificadores—, y es **ASCII puro**, para que un acento roto al
+viajar por ssh no dé un vacío que se lea como "no llegó". Sin comillas no sirve:
+`movil` suelto da 3 archivos en la imagen vieja, porque aparece adentro de otras
+palabras. En la imagen que atiende da **6** y en la vieja **0**; `"origen"` da lo
+mismo, 6 contra 0.
+
+De desaparición, que es la mitad que esta tanda vino a hacer: `data-ancla` —el
+atributo con el que se encuentra una fila o una card al volver— pasó de **47
+archivos a 8**. La marca dejó la tabla de escritorio y quedó solo donde
+corresponde, en la vista del celular.
+
+El control `"productos-scroll"` da **2 en las dos imágenes**, que es lo que
+prueba que la búsqueda funciona en ambas, y una cadena inventada da 0 en las dos.
+
+**Y UN PRIMER INTENTO DE CONTROL SE DESCARTÓ.** La primera medición usó
+`productos:selectedProductId` y dio 1 contra 0 — un resultado que parecía
+confirmar el viaje del código y no significaba nada, porque el control estaba
+midiendo mal: la comilla del comando se había comido en el camino por ssh. Con
+`grep -F` y el entrecomillado arreglado, el mismo control da 2 y 2. Es la regla
+del skill: si el control de un marcador no da positivo en las dos imágenes, el
+marcador no contestó la pregunta.
+
+### EL CONTROL POSTERIOR
+
+`/modulos/productos` en **200**, y también con la query completa
+—`?page=2&q=a&sortKey=precioVenta&sortDir=desc`— y con `?tipo=combos`. El editor
+de producto en **200** con y sin el marcador nuevo
+—`/modulos/productos/1176/editar?page=2&q=a&origen=movil`—, y el editor de combo
+en **200** con y sin query, que son los dos caminos que esta tanda separa.
+`/api/productos/listar` en **401** —vive y pide sesión— y `/login` en 200. Logs
+sin un solo error después de pedirlas. Cascada **verde** antes y después del
+corte.
+
+### LO QUE NO SE EJERCIÓ CONTRA PRODUCCIÓN
+
+**No se abrió el listado con una sesión real**, así que el ciclo de editar y
+volver no se recorrió contra el sitio. La verificación funcional está hecha
+contra un servidor de desarrollo con datos reales antes del corte: la sonda del
+retorno con **102 afirmaciones y 0 rojas** a 390×844 y a 1366×900 —los caminos de
+vuelta del celular, el retorno de escritorio con la tabla desplazada de verdad a
+300 px, y los dos destinos del combo de escritorio—, la sonda de la tarjeta en
+verde, y la de cascada verde contra el build local.
+
+### LAS DOS SONDAS ARRANCARON EN ROJO, Y NO ERA LA TANDA
+
+Vale anotarlo porque es la tercera vez que un arnés frena por su entorno y no por
+lo que mide. Las dos sondas de pantalla dijeron "no hay datos" de forma
+determinista. La causa: el servidor de desarrollo devolvía **500 en sus propios
+chunks**, porque en la sesión anterior se le borró el `.next` por debajo mientras
+corría. Lo que lo separó de un defecto real fue preguntar tres cosas distintas en
+vez de una: la API contestaba **200 con filas**, la pantalla quedaba en la cáscara
+sin hidratar, y **no había una sola excepción en la consola** — un defecto de
+render habría dejado rastro. Reiniciado el servidor limpio, las dos pasaron a
+verde sin tocar una línea de código.
+
+**Ninguna autorización manual de migraciones**:
+`.claude/migraciones-autorizadas.log` no tiene ninguna línea de hoy.
+
+---
+
+Antes de éste, producción estuvo en
 `81541c3727262cd5172057b9200174ceffd6ef0d` — el merge de
 `fix/productos-restaurar-posicion`: volver de editar deja al mismo producto
 donde estaba. **Solo código.**
