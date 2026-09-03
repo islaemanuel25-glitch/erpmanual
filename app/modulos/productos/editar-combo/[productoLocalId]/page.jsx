@@ -8,6 +8,10 @@ import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import FormCombo from "@/components/productos/FormCombo";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import {
+  vinoDeUnaCardMovil,
+  urlDeListadoSinMarca,
+} from "@/lib/productos/estadoDeRetorno";
 
 // Edición de COMBO — identificado por ProductoLocal.id (combo exacto del local).
 export default function EditarComboPage({ params }) {
@@ -17,20 +21,38 @@ export default function EditarComboPage({ params }) {
   const { loading: loadingCtx, contexto, needsContexto } = useContextoActivo();
   const localId = contexto?.localId || 0;
 
-  // ── A DÓNDE SE VUELVE, Y POR QUÉ ESTABA MAL ─────────────────────────────
+  // ── A DÓNDE SE VUELVE: DEPENDE DE DÓNDE SE VINO ─────────────────────────
   //
-  // Los tres caminos de salida estaban escritos a mano y ninguno conservaba
-  // nada: guardar iba a `/modulos/productos?tipo=combos`, cancelar y el botón de
-  // atrás a `/modulos/productos` pelado. Editar un combo de la página 3, con una
-  // búsqueda y un orden puestos, devolvía a la página 1 del catálogo con otro
-  // filtro. Es el mismo defecto que el editor de producto ya no tenía: aquél
-  // arma su `returnUrl` desde la query, y éste no la recibía siquiera.
+  // DESDE UNA CARD DEL CELULAR. Las tres salidas vuelven al listado EXACTO —su
+  // página, su búsqueda, sus filtros y su orden—, que es lo que permite
+  // restaurar la posición y marcar la card. Antes no era así y era un defecto:
+  // guardar mandaba a `?tipo=combos` y cancelar a `/modulos/productos` pelado,
+  // así que editar un combo de la página 3 con filtros devolvía a otro lado.
   //
-  // Ahora la query llega desde el listado —`abrirEditarCombo` la manda— y de acá
-  // salen las tres salidas. Es UNA sola constante para que no puedan volver a
-  // separarse: la que se olvide de actualizar es la que rompe el retorno.
+  // DESDE LA TABLA DE ESCRITORIO. Las tres salidas van exactamente a donde iban
+  // antes de `81541c37`: guardar a `?tipo=combos`, cancelar y atrás a
+  // `/modulos/productos`. Escritorio no tenía retorno de combo y no lo gana —
+  // dárselo sería una función nueva, no una restauración—.
+  //
+  // ── CÓMO SE DISTINGUE, Y CÓMO NO ────────────────────────────────────────
+  //
+  // Por un marcador EXPLÍCITO que la card pone y la tabla no. No por "tiene
+  // query": un listado móvil sin filtros tampoco la tiene y sí necesita
+  // restauración, así que deducirlo mandaría el caso más común por el camino
+  // equivocado. Tampoco por el ancho de la pantalla.
+  //
+  // Y el marcador NO vuelve al listado. Si volviera quedaría pegado en la barra
+  // de direcciones y —peor— entraría en la comparación que decide si el estado
+  // de retorno es de este listado: la URL guardada no lo tiene, así que nunca
+  // coincidirían y la restauración no ocurriría nunca. Lo saca
+  // `urlDeListadoSinMarca`, en un solo lugar.
   const qs = searchParams.toString();
-  const urlDeVuelta = qs ? `/modulos/productos?${qs}` : "/modulos/productos";
+  const desdeMovil = vinoDeUnaCardMovil(qs);
+
+  const urlDeVuelta = desdeMovil ? urlDeListadoSinMarca(qs) : "/modulos/productos";
+  // Guardar tenía su propio destino en escritorio y se conserva. En el celular
+  // es el mismo que las otras dos: el listado exacto.
+  const urlDespuesDeGuardar = desdeMovil ? urlDeVuelta : "/modulos/productos?tipo=combos";
 
   const [initial, setInitial] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -103,7 +125,7 @@ export default function EditarComboPage({ params }) {
     if (!res.ok || !data?.ok) {
       throw new Error(data?.error || "No se pudo guardar el combo.");
     }
-    router.push(urlDeVuelta);
+    router.push(urlDespuesDeGuardar);
   };
 
   if (loadingCtx) return null;

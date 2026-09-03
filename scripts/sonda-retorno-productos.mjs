@@ -916,6 +916,78 @@ try {
   await cicloEscritorio("cancelar", cancelar);
   // Guardar SIN tocar ningún campo: los valores quedan como estaban.
   await cicloEscritorio("guardar", guardar);
+
+  // ── 8 · EL COMBO DE ESCRITORIO NO GANA NADA ────────────────────────────
+  //
+  // En `c12de2c7`, desde la tabla, el editor de combo se abría SIN query y sus
+  // tres salidas iban a destinos fijos: guardar a `?tipo=combos`, cancelar y
+  // atrás a `/modulos/productos`. Al arreglar el retorno del celular eso se
+  // unificó y escritorio ganó un comportamiento que no tenía.
+  //
+  // Acá se comprueban los cinco puntos, uno por uno.
+  const comboEscritorio = async (nombreSalida, salir, destinoEsperado) => {
+    await evaluar(`try { sessionStorage.clear(); } catch (e) {}`);
+    await navegar(`${BASE}/modulos/productos?tipo=combos`);
+    for (let i = 0; i < 120; i++) {
+      await sleep(250);
+      if (await evaluar(`[...document.querySelectorAll("table tbody tr")].some((f) => f.children.length > 1)`)) break;
+    }
+    await sleep(1000);
+
+    const urlAntes = await evaluar("location.pathname + location.search");
+    const toco = await evaluar(`(() => {
+      const fila = [...document.querySelectorAll("table tbody tr")].find((f) => f.children.length > 1);
+      if (!fila) return false;
+      const b = [...fila.querySelectorAll("button")].find((x) =>
+        /editar/i.test((x.getAttribute("aria-label") || "") + " " + (x.getAttribute("title") || ""))
+      );
+      if (!b) return false;
+      b.click();
+      return true;
+    })()`);
+    afirmar(toco, `COMBO ESCRITORIO · ${nombreSalida}: se pudo abrir un combo desde la tabla`);
+    if (!toco) return;
+    await esperarUrlDistintaDe(urlAntes);
+
+    const enEditor = await evaluar("location.pathname + location.search");
+    afirmar(
+      enEditor.includes("/editar-combo/"),
+      `COMBO ESCRITORIO · ${nombreSalida}: abrió el editor de combo`,
+      enEditor
+    );
+    afirmar(
+      !enEditor.includes("?"),
+      `COMBO ESCRITORIO · ${nombreSalida}: EL EDITOR NO LLEVA QUERY DE RETORNO`,
+      `${enEditor} — en c12de2c7 se abría pelado`
+    );
+    afirmar(
+      !enEditor.includes("origen="),
+      `COMBO ESCRITORIO · ${nombreSalida}: no lleva el marcador de origen móvil`,
+      enEditor
+    );
+    const estadoMovil = await evaluar(
+      `(() => { try { return !!sessionStorage.getItem(${JSON.stringify(CLAVE_ESTADO_RETORNO)}); } catch (e) { return null; } })()`
+    );
+    afirmar(
+      estadoMovil === false,
+      `COMBO ESCRITORIO · ${nombreSalida}: NO se escribió estado móvil`,
+      `retenido=${estadoMovil}`
+    );
+
+    if (!(await esperarEditor())) morir(`combo escritorio ${nombreSalida}: el editor no se montó`);
+    await salir();
+    await sleep(1500);
+    const destino = await evaluar("location.pathname + location.search");
+    afirmar(
+      destino === destinoEsperado,
+      `COMBO ESCRITORIO · ${nombreSalida}: VUELVE AL DESTINO DE c12de2c7`,
+      `esperado=${destinoEsperado} · obtenido=${destino}`
+    );
+    await capturar(`11-combo-escritorio-${nombreSalida}`, `${BASE}${destino}`);
+  };
+
+  await comboEscritorio("cancelar", cancelar, "/modulos/productos");
+  await comboEscritorio("guardar", guardar, "/modulos/productos?tipo=combos");
 } catch (err) {
   morir(err?.message || String(err));
 }

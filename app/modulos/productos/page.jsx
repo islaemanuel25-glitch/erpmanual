@@ -107,6 +107,7 @@ import {
   leerEstadoDeRetorno,
   consumirEstadoDeRetorno,
   sePuedeRestaurarAca,
+  conMarcaDeOrigenMovil,
   scrollParaDejarloA,
   TIPO_PRODUCTO,
   TIPO_COMBO,
@@ -1522,9 +1523,31 @@ export default function ProductosPage() {
   // —que es `ProductoLocal.id` y nunca el del producto base—.
   const abrirEditarCombo = (productoLocalId) => {
     if (!productoLocalId) return;
-    guardarDondeEstaba({ tipo: TIPO_COMBO, id: Number(productoLocalId) });
-    const qs = queryDelListado();
-    router.push(`/modulos/productos/editar-combo/${productoLocalId}${qs ? `?${qs}` : ""}`);
+
+    // ── LOS DOS ORÍGENES, TAMBIÉN ACÁ ─────────────────────────────────────
+    //
+    // Desde una card del celular: se guarda el estado, la query viaja y se marca
+    // el origen para que el editor sepa a dónde volver.
+    //
+    // Desde la tabla de escritorio: **sin query y sin marcador**, exactamente
+    // como en `c12de2c7`. Escritorio no tenía retorno de combo y no lo gana:
+    // sumarlo sería una función nueva, no una restauración. Sus tres salidas
+    // vuelven a donde volvían — guardar a `?tipo=combos`, cancelar y atrás a
+    // `/modulos/productos`—.
+    //
+    // El marcador es EXPLÍCITO y no se deduce de "hay query": un listado móvil
+    // sin filtros tampoco tiene query y sí necesita restauración, así que
+    // deducirlo mandaría el caso más común por el camino equivocado.
+    const identidad = { tipo: TIPO_COMBO, id: Number(productoLocalId) };
+    const ruta = `/modulos/productos/editar-combo/${productoLocalId}`;
+
+    if (!cardMovilVisibleDe(identidad)) {
+      router.push(ruta);
+      return;
+    }
+
+    guardarDondeEstaba(identidad);
+    router.push(`${ruta}?${conMarcaDeOrigenMovil(queryDelListado())}`);
   };
 
   const abrirVerComposicion = (row) => {

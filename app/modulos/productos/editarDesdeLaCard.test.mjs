@@ -23,6 +23,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
+// Las funciones del marcador de origen salen del dominio: escritas de nuevo acá,
+// el candado probaría una copia y no lo que la pantalla usa.
+import {
+  conMarcaDeOrigenMovil,
+  vinoDeUnaCardMovil,
+  urlDeListadoSinMarca,
+} from "@/lib/productos/estadoDeRetorno";
+
 const RAIZ = path.resolve(import.meta.dirname, "../../..");
 
 // Los comentarios se sacan ANTES de mirar: este archivo explica el defecto con
@@ -74,10 +82,29 @@ test("C2. CARD DEL CELULAR + COMBO → EDITAR-COMBO CON `localProductoId`", () =
   // editor no tenía a dónde volver y mandaba a `/modulos/productos?tipo=combos`
   // —otra página, otro filtro, otro orden—. Ahora la query viaja, que es lo que
   // permite volver al mismo listado.
+  // ── AHORA SON DOS DESTINOS, SEGÚN DE DÓNDE SE VINO ──────────────────────
+  //
+  // Este candado exigía UNA sola forma: la ruta con la query pegada. Se puso
+  // rojo al separar los dos orígenes, y se reescribe sabiendo qué cambió.
+  //
+  // Desde la card del celular la query viaja CON un marcador de origen, para que
+  // el editor sepa volver al listado exacto. Desde la tabla de escritorio se
+  // empuja la ruta PELADA, como en `c12de2c7`: escritorio no tenía retorno de
+  // combo y no lo gana.
   assert.match(
     PAGINA,
-    /router\.push\(\s*`\/modulos\/productos\/editar-combo\/\$\{productoLocalId\}\$\{qs \? `\?\$\{qs\}` : ""\}`\s*\)/,
-    "el combo dejó de llevar la query del listado al editor"
+    /const ruta = `\/modulos\/productos\/editar-combo\/\$\{productoLocalId\}`/,
+    "se fue la ruta base del editor de combo"
+  );
+  assert.match(
+    PAGINA,
+    /router\.push\(ruta\);/,
+    "el camino de escritorio dejó de empujar la ruta pelada"
+  );
+  assert.match(
+    PAGINA,
+    /router\.push\(`\$\{ruta\}\?\$\{conMarcaDeOrigenMovil\(queryDelListado\(\)\)\}`\)/,
+    "el camino móvil dejó de llevar la query con su marcador de origen"
   );
   // Y el id que viaja sigue siendo el del ProductoLocal, que era el punto de C2.
   assert.match(PAGINA, /editar-combo\/\$\{productoLocalId\}/);
@@ -92,44 +119,87 @@ test("C2. CARD DEL CELULAR + COMBO → EDITAR-COMBO CON `localProductoId`", () =
   assert.match(pantalla, /<FormCombo/);
 });
 
-test("C2-bis. LAS TRES SALIDAS DEL EDITOR DE COMBO VUELVEN A LA MISMA URL", () => {
-  // ── EL DEFECTO ──────────────────────────────────────────────────────────
+test("C2-bis. EL EDITOR DE COMBO TIENE DOS SALIDAS, SEGÚN DE DÓNDE SE VINO", () => {
+  // ── QUÉ AFIRMABA ANTES, Y POR QUÉ AHORA AFIRMA OTRA COSA ────────────────
   //
-  // Guardar iba a `/modulos/productos?tipo=combos`; cancelar y el botón de atrás,
-  // a `/modulos/productos` pelado. Tres destinos escritos a mano, ninguno con la
-  // página, la búsqueda, el filtro ni el orden de donde se venía.
+  // Exigía que las TRES salidas fueran una sola constante, para arreglar que
+  // cada una tuviera su destino escrito a mano. Eso resolvió el defecto del
+  // celular y de paso le dio a ESCRITORIO un comportamiento que no tenía: sus
+  // combos volvían a `?tipo=combos` al guardar y a `/modulos/productos` al
+  // cancelar, y pasaron a volver al listado filtrado.
   //
-  // Se exige que sean UNA sola constante: con tres literales, la que alguien se
-  // olvide de actualizar es la que rompe el retorno, y no se nota hasta usarla.
+  // Ahora se afirma la regla completa: dos orígenes, dos comportamientos.
   const pantalla = leer("app/modulos/productos/editar-combo/[productoLocalId]/page.jsx");
   const sinComentarios = pantalla.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
 
-  assert.match(sinComentarios, /const urlDeVuelta =/, "no hay una URL de vuelta única");
-  assert.match(sinComentarios, /useSearchParams\(\)/, "el editor no recibe la query del listado");
+  // El origen se decide por un marcador EXPLÍCITO, no por tener query.
+  assert.match(sinComentarios, /vinoDeUnaCardMovil\(qs\)/, "el editor no mira el marcador de origen");
+  assert.match(sinComentarios, /useSearchParams\(\)/, "el editor no recibe la query");
 
-  // Guardar, cancelar y el botón de atrás, los tres.
-  assert.match(sinComentarios, /router\.push\(urlDeVuelta\)/);
+  // ── ESCRITORIO: LOS TRES DESTINOS DE `c12de2c7`, TEXTUALES ─────────────
+  assert.match(
+    sinComentarios,
+    /const urlDeVuelta = desdeMovil \? urlDeListadoSinMarca\(qs\) : "\/modulos\/productos"/,
+    "cancelar y atrás dejaron de volver a /modulos/productos en escritorio"
+  );
+  assert.match(
+    sinComentarios,
+    /const urlDespuesDeGuardar = desdeMovil \? urlDeVuelta : "\/modulos\/productos\?tipo=combos"/,
+    "guardar dejó de volver a ?tipo=combos en escritorio"
+  );
+
+  // Las tres salidas siguen saliendo de las constantes y no de literales.
+  assert.match(sinComentarios, /router\.push\(urlDespuesDeGuardar\)/, "guardar no usa su constante");
   assert.match(sinComentarios, /onCancel=\{\(\) => router\.push\(urlDeVuelta\)\}/);
   assert.match(sinComentarios, /<SunmiBackButton href=\{urlDeVuelta\}/);
 
-  // Y NINGUNA salida escrita a mano. Es la contracara: la constante puede estar
-  // perfecta y un literal suelto en otro lado seguir rompiendo el retorno.
-  // Los dos únicos admitidos son las DOS RAMAS de la propia constante: con query
-  // y sin ella. Cualquier tercero es un destino escrito a mano en otro lado.
+  // Y NINGÚN destino escrito a mano fuera de esas dos líneas. Es la contracara:
+  // las constantes pueden estar perfectas y un literal suelto seguir rompiendo.
   const literales = [...sinComentarios.matchAll(/["'`]\/modulos\/productos[^"'`]*["'`]/g)].map(
     (m) => m[0]
   );
   assert.deepEqual(
     literales.sort(),
-    ['"/modulos/productos"', "`/modulos/productos?${qs}`"].sort(),
+    ['"/modulos/productos"', '"/modulos/productos?tipo=combos"'].sort(),
     `quedaron destinos escritos a mano: ${literales.join(", ")}`
   );
-  // Y los dos están en la línea de `urlDeVuelta`, no sueltos por ahí.
-  const linea = sinComentarios
-    .split("\n")
-    .find((l) => l.includes("const urlDeVuelta ="));
-  assert.ok(linea.includes("/modulos/productos?${qs}"), "la rama con query no está en la constante");
-  assert.ok(linea.includes('"/modulos/productos"'), "la rama sin query no está en la constante");
+  const lineas = sinComentarios.split("\n");
+  const laDeVuelta = lineas.find((l) => l.includes("const urlDeVuelta ="));
+  const laDeGuardar = lineas.find((l) => l.includes("const urlDespuesDeGuardar ="));
+  assert.ok(laDeVuelta.includes('"/modulos/productos"'), "el literal de cancelar no está en su constante");
+  assert.ok(
+    laDeGuardar.includes('"/modulos/productos?tipo=combos"'),
+    "el literal de guardar no está en su constante"
+  );
+});
+
+test("C2-ter. EL MARCADOR DE ORIGEN NO VUELVE AL LISTADO", () => {
+  // ── POR QUÉ IMPORTA ─────────────────────────────────────────────────────
+  //
+  // Si volviera, quedaría pegado en la barra de direcciones y —peor— entraría en
+  // la comparación que decide si el estado de retorno es de este listado: la URL
+  // guardada no lo tiene, así que nunca coincidirían y la restauración no
+  // ocurriría NUNCA. Un marcador que se olvida de irse apaga la función que
+  // vino a habilitar.
+  const qsConMarca = conMarcaDeOrigenMovil("page=2&q=aceite");
+  assert.equal(vinoDeUnaCardMovil(qsConMarca), true);
+  const vuelta = urlDeListadoSinMarca(qsConMarca);
+  assert.equal(vuelta, "/modulos/productos?page=2&q=aceite");
+  assert.equal(vinoDeUnaCardMovil(vuelta.split("?")[1]), false, "el marcador volvió al listado");
+
+  // Y sin marcador, es escritorio — aunque haya query.
+  assert.equal(vinoDeUnaCardMovil("page=2&q=aceite"), false);
+  assert.equal(vinoDeUnaCardMovil(""), false);
+  assert.equal(vinoDeUnaCardMovil(null), false);
+
+  // ── Y UN LISTADO MÓVIL SIN FILTROS TAMBIÉN ES MÓVIL ───────────────────
+  //
+  // El caso que prohíbe deducir el origen de "tiene query": entrar al catálogo
+  // sin filtrar nada y editar el primero que se ve es lo más común, y con esa
+  // deducción se iría por el camino de escritorio.
+  const sinFiltros = conMarcaDeOrigenMovil("");
+  assert.equal(vinoDeUnaCardMovil(sinFiltros), true);
+  assert.equal(urlDeListadoSinMarca(sinFiltros), "/modulos/productos");
 });
 
 test("C3. JAMÁS SE IDENTIFICA UN COMBO CON `ProductoBase.id`", () => {
