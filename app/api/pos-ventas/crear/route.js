@@ -627,6 +627,58 @@ export async function POST(req) {
       );
     }
 
+    // ── LA PANTALLA DIJO UN NÚMERO Y ACÁ SALIÓ OTRO ─────────────────────────
+    //
+    // El POS manda `totalPantalla`: el importe que el cajero acaba de ver en el
+    // botón que apretó, y que probablemente ya le dijo en voz alta al cliente.
+    // Si la cuenta de acá no coincide, la venta NO se registra.
+    //
+    // Sin esto el desenlace es silencioso y es el peor de los dos posibles: con
+    // un solo medio el backend arma el tender con SU total, así que la venta
+    // entra por $8.300, la pantalla pidió $8.100, y nadie se entera hasta el
+    // arqueo — donde aparece una diferencia sin explicación y sin forma de saber
+    // de qué venta salió. Con pago dividido el error al menos se ve, porque los
+    // importes no suman.
+    //
+    // Se responde con el total bueno y su desglose para que el POS pueda
+    // refrescar y volver a confirmar CON EL NÚMERO NUEVO A LA VISTA, en vez de
+    // reintentar solo y cobrar algo que nadie miró.
+    //
+    // La cola offline queda afuera a propósito: una venta encolada se cobró hace
+    // rato, no aplica ofertas ni recargos (ver arriba) y su total es el que
+    // efectivamente entró al cajón. Compararlo contra el de hoy la rechazaría
+    // por estar bien.
+    const totalPantalla = Number(body?.totalPantalla);
+    if (!esReplayOffline && Number.isFinite(totalPantalla) && totalPantalla > 0) {
+      const difiere = Math.round(totalPantalla * 100) !== Math.round(total * 100);
+      if (difiere) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "TOTAL_DESACTUALIZADO",
+            error:
+              `El total cambió: la pantalla mostraba $${totalPantalla} y ahora son $${total}. ` +
+              `Puede haber empezado o terminado una oferta, o haber cambiado un recargo. ` +
+              `Revisá el importe antes de cobrar.`,
+            totalEsperado: total,
+            totalPantalla,
+            breakdown: {
+              subtotal,
+              subtotalSinOferta: comercial.subtotalNormal,
+              descuentoPromocional,
+              descuentoTotal,
+              totalAntesRecargo,
+              recargoPagoPct: comercial.recargoPagoPct,
+              recargoPagoImporte: comercial.recargoPagoImporte,
+              recargoPagoMedio: comercial.recargoPagoMedio,
+              total,
+            },
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     // === PAGOS (pago dividido) ==========================================
     // Fuente: body.pagos[] (clientes nuevos) o compat legacy formaPago → 1 tender
     // por el total. Se recalcula TODO server-side: se valida Σ==total (exacto),
@@ -1196,7 +1248,11 @@ export async function POST(req) {
         });
       }
 
-      return { venta: nuevaVenta, allowNegativeStockUsed, transferenciaVenta };
+      // `lineasComerciales` sale de la transacción porque el TICKET se arma con
+      // ellas. Son exactamente las filas que se acaban de escribir en
+      // VentaDetalle: mismo precio, misma cantidad, mismo subtotal. Es la única
+      // forma de que el papel no pueda decir otra cosa que la base.
+      return { venta: nuevaVenta, allowNegativeStockUsed, transferenciaVenta, lineasComerciales };
     }, {
       maxWait: 10_000,
       timeout: 30_000,
@@ -1303,6 +1359,32 @@ export async function POST(req) {
         recargoPagoPct: comercial.recargoPagoPct,
         recargoPagoImporte: comercial.recargoPagoImporte,
         recargoPagoMedio: comercial.recargoPagoMedio,
+        // ── LAS LÍNEAS AUTORITATIVAS, PARA EL TICKET ────────────────────────
+        //
+        // El POS armaba el ticket con `state.carrito`, que tiene el precio
+        // NORMAL. Con una oferta eso imprime "9 × $1.000" arriba de un total de
+        // $8.100: un papel que no cierra, que el cliente mira y que no hay forma
+        // de defender en el mostrador.
+        //
+        // Estas son las líneas que se acaban de escribir en VentaDetalle.
+        // `precio` es lo COBRADO, así que cantidad × precio suma el subtotal, y
+        // `precioNormal` viaja al lado para poder decir cuánto se ahorró sin
+        // tener que restar nada en el navegador.
+        lineas: (txResult.lineasComerciales || []).map((l) => ({
+          nombre: l.nombre,
+          cantidad: l.cantidad,
+          precio: l.precio,
+          subtotal: l.subtotal,
+          precioNormal: l.oferta?.precioNormal ?? l.precio,
+          ofertaNombre: l.oferta?.ofertaNombre ?? null,
+          descuentoPromocional: l.oferta?.descuentoPromocional ?? 0,
+          // Snapshot del servicio de importe variable, para que el ticket pueda
+          // desglosar la carga y su recargo igual que en la reimpresión.
+          esServicio: l.tipo === "SERVICIO",
+          importeBaseServicio: l.servicio?.importeBaseServicio ?? null,
+          recargoServicioPct: l.servicio?.recargoServicioPct ?? null,
+          recargoServicioImporte: l.servicio?.recargoServicioImporte ?? null,
+        })),
         ofertasAplicadas: comercial.lineas
           .filter((l) => l.ofertaAplicada)
           .map((l) => ({

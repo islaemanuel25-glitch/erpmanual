@@ -358,10 +358,23 @@ export default function HistorialDia({
                         importeBaseServicio: d.importeBaseServicio,
                         recargoServicioPct: d.recargoServicioPct,
                         recargoServicioImporte: d.recargoServicioImporte,
+                        // Snapshot de la oferta de aquel día. `precio` ya es lo
+                        // cobrado, así que el papel cierra; esto deja decir
+                        // además cuánto se ahorró.
+                        precioNormal: d.precioNormal,
+                        ofertaNombre: d.ofertaNombre,
+                        descuentoPromocional: d.descuentoPromocional,
                       })),
                       subtotal: Number(detalle.subtotal),
                       descuento: Number(detalle.descuento),
                       total: Number(detalle.total),
+                      // La condición comercial CONGELADA de esa venta. No se
+                      // vuelve a resolver contra las ofertas vigentes hoy: la
+                      // reimpresión tiene que dar el mismo papel que el original.
+                      descuentoPromocional: Number(detalle.descuentoPromocional) || 0,
+                      recargoPagoPct: Number(detalle.recargoPagoPct) || 0,
+                      recargoPagoImporte: Number(detalle.recargoPagoImporte) || 0,
+                      recargoPagoMedio: detalle.recargoPagoMedio || null,
                       formaPago: detalle.formaPago,
                       // Snapshot de tenders para el desglose en la reimpresión.
                       pagos: Array.isArray(detalle.pagos) ? detalle.pagos : null,
