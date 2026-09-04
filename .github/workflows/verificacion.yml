@@ -156,10 +156,23 @@ jobs:
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/estructura.mjs
 
       - name: Comparar contra la estructura de producción
-        # Diferencia con el paso anterior: aquél comprueba una lista de objetos
-        # que se sabe que tienen que estar; éste compara TODO contra el retrato
-        # de producción y falla ante cualquier diferencia que no esté declarada
-        # con su motivo. Uno busca lo que se espera, el otro busca lo que sobra.
+        # ── SOLO EN LA RAMA DEL SANEAMIENTO, Y A PROPÓSITO ──────────────────
+        #
+        # `docs/deploy/estructura-produccion/` es una FOTOGRAFÍA del 2026-09-04,
+        # no un contrato. Sirvió para demostrar que la baseline reproduce lo que
+        # producción tenía en el momento del squash.
+        #
+        # Exigirla en todas las ramas sería pedir que ninguna migración nueva
+        # cambie nada hasta desplegarse, o sea convertir cada cambio de esquema
+        # en un rojo. A la tercera vez nadie miraría el chequeo, y ahí se pierde
+        # el que sí importa.
+        #
+        # Lo que sí se exige SIEMPRE, en todas las ramas, es la cadena de los
+        # pasos de arriba y abajo: migraciones → base vacía → schema.prisma. Eso
+        # no menciona a producción y no envejece.
+        #
+        # Ver el README de ese directorio.
+        if: github.ref_name == 'chore/sanear-historial-migraciones'
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/comparar-con-produccion.mjs
 
       - name: El schema y las migraciones dicen lo mismo
@@ -245,6 +258,21 @@ jobs:
           echo ""
           echo "Este paso NO decide el veredicto del job: es un informe para la"
           echo "tanda de despliegue. Por eso los comandos llevan '|| true'."
+
+      # ── EL CONTRATO HACIA ADELANTE ────────────────────────────────────────
+      #
+      # Todo lo anterior comprueba el estado de HOY. Esto comprueba el de mañana:
+      # que sobre el escenario real de producción —105 filas sin archivo más la
+      # baseline aplicada— Prisma detecte una migración nueva como pendiente y
+      # aplique SOLO ésa.
+      #
+      # Si se plantara por las filas sin archivo, o intentara reaplicar la
+      # baseline sobre una base que ya tiene todo, el próximo despliegue del ERP
+      # se caería. Conviene saberlo acá y no esa noche.
+      #
+      # Éste SÍ decide el veredicto: no lleva `|| true`.
+      - name: Contraprueba — una migración posterior se aplica sola
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contraprueba-migracion-nueva.mjs
 
       - name: Resumen
         if: always()
