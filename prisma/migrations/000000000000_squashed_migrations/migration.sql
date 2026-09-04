@@ -2453,6 +2453,13 @@ CREATE UNIQUE INDEX "ListaPrecio_default_unico_por_grupo" ON public."ListaPrecio
 -- El único de los ocho que NO es único: es de rendimiento, para la pantalla que
 -- lista lo que falta configurar. Va igual, porque la baseline tiene que
 -- construir la misma base, no una equivalente.
+--
+-- La marca `limitesConfiguradosAt` la escribe la ruta
+-- `/api/stock_locales/ajustar con modo "limites"`, y NO
+-- `/api/stock_locales/limites`, que no se consume. Esta aclaración venía en el
+-- SQL de aquella migración y se trae acá a propósito: un comentario que apunta a
+-- código muerto manda al próximo lector al lugar equivocado, y el squash no
+-- puede ser la excusa para perderlo.
 CREATE INDEX "StockLocal_localId_limitesSinAjustar_idx" ON public."StockLocal" USING btree ("localId") WHERE ("limitesConfiguradosAt" IS NULL);
 
 -- ── Un combo y su componente son del MISMO local ───────────────────────────

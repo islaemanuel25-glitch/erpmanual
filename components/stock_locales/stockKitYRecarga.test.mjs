@@ -179,8 +179,13 @@ test("DOC1. LA DOCUMENTACIÓN DICE DÓNDE SE SELLA DE VERDAD", () => {
   // los saca. Con el archivo limpiado, este candado daba rojo sobre un schema
   // correcto — y peor, habría dado verde si alguien borraba el comentario.
   const schema = fs.readFileSync(path.join(RAIZ, "prisma/schema.prisma"), "utf8");
+  // Antes se leía `20260824010000_stock_limites_configurados_at`. El 2026-09-04
+  // el historial se saneó y esa migración dejó de existir como archivo: su
+  // índice parcial y su aclaración viven ahora en el bloque de SQL manual del
+  // final de la baseline. El candado apunta ahí, que es donde está la verdad
+  // hoy, en vez de darse por vencido.
   const migracion = fs.readFileSync(
-    path.join(RAIZ, "prisma/migrations/20260824010000_stock_limites_configurados_at/migration.sql"),
+    path.join(RAIZ, "prisma/migrations/000000000000_squashed_migrations/migration.sql"),
     "utf8"
   );
   assert.doesNotMatch(
