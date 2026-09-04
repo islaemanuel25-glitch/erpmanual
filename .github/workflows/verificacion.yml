@@ -232,6 +232,12 @@ jobs:
           else
             echo "No hay scripts/pruebas-db/ofertas.mjs en esta rama: nada que correr."
           fi
+          if [ -f scripts/pruebas-db/alertas.mjs ]; then
+            echo ""
+            node --import ./scripts/alias-loader.mjs scripts/pruebas-db/alertas.mjs
+          else
+            echo "No hay scripts/pruebas-db/alertas.mjs en esta rama: nada que correr."
+          fi
 
       # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
       #

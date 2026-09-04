@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
+import { ejecutarBarrido } from "@/lib/ofertas/barrido";
 import {
   MEDIOS_CON_RECARGO,
   MEDIO_RECARGO_LABEL,
@@ -24,13 +25,47 @@ export async function GET(req) {
   try {
     const scope = await resolveLocalAndGrupo(req);
     if (scope.error) return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
-    const { localId, session } = scope;
+    const { grupoId, localId, session } = scope;
 
     // Se lee con el permiso de configurarlos O con el de usar el POS: el cajero
     // necesita saber cuánto se le suma a cada medio ANTES de cobrar, y negárselo
     // sería esconderle el número que le va a pedir al cliente.
     const perm = checkPerm(session, ["config_local.recargos_pago", "pos.usar"]);
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
+    // ── EL AVISO DE VENCIMIENTO SE CUELGA DE ACÁ ─────────────────────────────
+    //
+    // Un vencimiento es tiempo, no un evento del sistema: nada lo dispara solo.
+    // Sin planificador, la única forma de avisar es engancharlo a una superficie
+    // que se abre todos los días, y ésta es la que el POS pide al montar. No se
+    // agrega ni un request: el POS ya llamaba a esta ruta para saber los
+    // recargos, que es lo más cercano a Ofertas que consulta.
+    //
+    // Corre en `after()`, DESPUÉS de responder: abrir la caja no puede tardar
+    // más porque además haya que revisar ofertas. Y va acelerado —una corrida
+    // cada 15 minutos por ubicación, `MINUTOS_ENTRE_BARRIDOS`— así que abrir y
+    // cerrar la pantalla no lo dispara cada vez. El costo de cada corrida lo fija
+    // la cantidad de líneas de ofertas VIVAS del local, no el catálogo.
+    //
+    // ── QUE LO DISPARE UN CAJERO NO LE DA NINGÚN PERMISO ────────────────────
+    //
+    // Esto NO pide `ofertas.ver` y no tiene que pedirlo: no le devuelve nada a
+    // quien lo dispara. Todo lo que produce son filas de `Notificacion` con
+    // `alcance: "LOCAL"` y `permisoRequerido: "ofertas.ver"`, así que el cajero
+    // que las provocó no ve una sola. Quién dispara y quién ve son dos preguntas
+    // distintas, y acá se contestan por separado.
+    try {
+      after(async () => {
+        try {
+          await ejecutarBarrido(prisma, { grupoId, localIds: [localId] });
+        } catch (e) {
+          console.error("[ofertas] barrido desde la apertura del POS:", e?.message);
+        }
+      });
+    } catch {
+      // `after()` fuera de un request (una prueba llamando al handler directo).
+      // Que no haya aviso no puede impedir que el POS sepa sus recargos.
+    }
 
     const filas = await prisma.recargoPagoLocal.findMany({
       where: { localId },
