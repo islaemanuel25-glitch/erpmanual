@@ -21,6 +21,7 @@ import ModalProveedor from "@/components/proveedores/ModalProveedor";
 import ModalCodigosProveedor from "@/components/proveedores/ModalCodigosProveedor";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import { usePermisos } from "@/hooks/usePermisos";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { recibeHoy, formatDiaLabel } from "@/lib/proveedores/diasPedido";
 
@@ -32,6 +33,25 @@ export default function ProveedoresPage() {
 
   const { perfil } = useUser();
   const { loading: loadingCtx, needsContexto } = useContextoActivo();
+
+  // ── QUÉ PUEDE HACER QUIEN ESTÁ MIRANDO ────────────────────────────────
+  //
+  // Una capacidad por pregunta, con el helper del proyecto. `hasAnyPermission`
+  // ya contempla el comodín de administrador, así que acá no se compara `"*"`.
+  //
+  // `puedeVer` reproduce EXACTAMENTE lo que aceptan `proveedores/listar` y
+  // `proveedores/opciones` —`compras.ver` o `proveedores.ver`—; si la pantalla
+  // pidiera menos, mostraría una lista que el servidor no va a devolver, y si
+  // pidiera más, cerraría la puerta a alguien que la API deja pasar.
+  //
+  // Y editar/eliminar siguen pidiendo ADMINISTRADOR en el backend en esta
+  // tanda. Por eso sus botones se muestran solo a un admin: ofrecerlos a alguien
+  // que después recibe un 403 es prometer algo que no se puede cumplir.
+  const { isAdmin, hasAnyPermission, hasPermission } = usePermisos();
+  const puedeVer = hasAnyPermission(["compras.ver", "proveedores.ver"]);
+  const puedeCrearProveedor = hasPermission("proveedores.crear");
+  const puedeComprar = hasPermission("compras.crear");
+  const puedeAdministrarFicha = isAdmin;
 
   const nuevo = searchParams.get("nuevo");
   const editarId = searchParams.get("editar");
@@ -201,9 +221,18 @@ export default function ProveedoresPage() {
   if (!perfil || loadingCtx) return null;
   if (needsContexto) { router.push("/inicio"); return null; }
 
-  const permisosP = perfil?.permisos || [];
-  const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
-  if (!esAdminP && !permisosP.includes("proveedores.ver")) return <SinPermisos />;
+  // ── LA PANTALLA PIDE LO MISMO QUE PIDE LA API ─────────────────────────
+  //
+  // Exigía `proveedores.ver` a secas, y las rutas de `listar` y `opciones`
+  // aceptan `compras.ver` O `proveedores.ver` desde el arreglo del INC-0007. Un
+  // ENCARGADO con `compras.ver` recibía la pantalla de "sin permisos" mientras
+  // la API le habría contestado perfecto: la puerta de la UI estaba más cerrada
+  // que la del servidor, y eso es tan defecto como al revés.
+  //
+  // Los permisos se preguntan con `usePermisos`, que es la fuente de verdad de
+  // la UI y ya resuelve el comodín de administrador. No se compara `"*"` a mano
+  // acá: eso era una segunda implementación de la misma regla.
+  if (!puedeVer) return <SinPermisos />;
 
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
@@ -273,12 +302,16 @@ export default function ProveedoresPage() {
               Limpiar
             </SunmiButton>
 
-            <SunmiButton
-             
-              onClick={() => router.push("/modulos/proveedores?nuevo=1")}
-            >
-              ＋ Nuevo
-            </SunmiButton>
+            {/* Dar de alta pide `proveedores.crear`, que es lo mismo que pide
+                la ruta. Sin el permiso el botón no está: mostrarlo sería ofrecer
+                un formulario que termina en 403 al guardar. */}
+            {puedeCrearProveedor && (
+              <SunmiButton
+                onClick={() => router.push("/modulos/proveedores?nuevo=1")}
+              >
+                ＋ Nuevo
+              </SunmiButton>
+            )}
           </div>
         </div>
 
@@ -359,15 +392,19 @@ export default function ProveedoresPage() {
                     )}
                   </td>
 
-                  {/* BOTÓN COMPRAS */}
+                  {/* BOTÓN COMPRAS — pide `compras.crear`, el mismo permiso que
+                      exige `compras-proveedor/crear`. La celda se dibuja
+                      siempre para no correr las columnas de la tabla. */}
                   <td className="px-3 py-2 text-center">
-                    <SunmiButton
-                      onClick={() =>
-                        router.push(`/modulos/compras-proveedor/nueva?proveedorId=${item.id}`)
-                      }
-                    >
-                      Nuevo pedido
-                    </SunmiButton>
+                    {puedeComprar ? (
+                      <SunmiButton
+                        onClick={() =>
+                          router.push(`/modulos/compras-proveedor/nueva?proveedorId=${item.id}`)
+                        }
+                      >
+                        Nuevo pedido
+                      </SunmiButton>
+                    ) : null}
                   </td>
 
                   {/* Estado */}
@@ -388,21 +425,32 @@ export default function ProveedoresPage() {
                         🔗
                       </button>
 
-                      <button
-                        onClick={() =>
-                          router.push(`/modulos/proveedores?editar=${item.id}`)
-                        }
-                        className="sunmi-link-accent"
-                      >
-                        ✏️
-                      </button>
+                      {/* EDITAR Y ELIMINAR SIGUEN SIENDO DE ADMINISTRADOR.
+                          `proveedores/editar` y `proveedores/eliminar` piden
+                          `requireAdmin`, y esta tanda NO los abre: los datos de
+                          `Proveedor` son globales, así que editarlos desde un
+                          local se los cambiaría a todas las ubicaciones que lo
+                          usan. Mientras eso siga así, ofrecer los botones a un
+                          no-admin es prometer un 403. */}
+                      {puedeAdministrarFicha && (
+                        <>
+                          <button
+                            onClick={() =>
+                              router.push(`/modulos/proveedores?editar=${item.id}`)
+                            }
+                            className="sunmi-link-accent"
+                          >
+                            ✏️
+                          </button>
 
-                      <button
-                        onClick={() => eliminar(item.id)}
-                        className="sunmi-link-danger"
-                      >
-                        🗑️
-                      </button>
+                          <button
+                            onClick={() => eliminar(item.id)}
+                            className="sunmi-link-danger"
+                          >
+                            🗑️
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </SunmiTableRow>
