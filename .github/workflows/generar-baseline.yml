@@ -1,0 +1,132 @@
+# TEMPORAL — GENERA LA BASELINE Y RETRATA LO QUE CONSTRUYE.
+#
+# ── POR QUÉ EXISTE Y POR QUÉ SE BORRA DESPUÉS ───────────────────────────────
+#
+# El historial de migraciones no se puede reproducir desde cero: ninguna
+# migración crea `Venta`, `VentaDetalle`, `Cliente` ni `Turno`, y 19 hacen ALTER
+# sobre tablas que nadie creó. Producción funciona porque su base ya existía
+# cuando el historial empezó a escribirse — de hecho `20241202000000` también
+# falló ALLÁ, el 2026-03-21, y el 2026-04-27 se la marcó resuelta a mano.
+#
+# La reparación elegida es una baseline deliberada. Para escribirla hace falta
+# correr `prisma migrate diff`, y la máquina donde se trabaja es el VPS de
+# producción: sin node_modules, con Node 18 y con la única base que está
+# cobrando. Así que se genera acá.
+#
+# Este workflow NO decide nada y NO modifica el repo: produce dos artefactos
+# para mirar. Se borra en cuanto la baseline esté commiteada.
+#
+# ── EL SEGUNDO ARTEFACTO ES EL QUE IMPORTA ──────────────────────────────────
+#
+# Además del SQL, aplica la baseline a la base efímera y saca el inventario de
+# tablas, columnas y enums con LAS MISMAS CONSULTAS que se corrieron contra
+# producción. Así la comparación es exacta y no "parecida": se diffean dos
+# listas producidas por el mismo comando.
+#
+# No se usa `pg_dump` a propósito: su salida depende de la versión del cliente
+# del runner, y una diferencia de formato se leería como una diferencia de
+# estructura.
+
+name: TEMPORAL — generar baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [chore/sanear-historial-migraciones]
+
+permissions:
+  contents: read
+
+jobs:
+  generar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erpazul
+          POSTGRES_PASSWORD: erpazul_ci
+          POSTGRES_DB: erpazul_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erpazul -d erpazul_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://erpazul:erpazul_ci@127.0.0.1:5432/erpazul_ci
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+
+      - name: prisma generate
+        run: npx prisma generate
+
+      # ── LA BASELINE ───────────────────────────────────────────────────────
+      #
+      # DESDE VACÍO Y HACIA EL SCHEMA DE ESTA RAMA, que sale de main y por lo
+      # tanto NO tiene Oferta, OfertaLinea, RecargoPagoLocal ni los snapshots de
+      # la venta. Eso es deliberado: si la baseline incluyera esas estructuras y
+      # después se la marcara como aplicada en producción, Prisma daría por
+      # existente algo que todavía no se desplegó.
+      - name: Generar la baseline desde vacío
+        run: |
+          set -euo pipefail
+          mkdir -p salida
+          npx prisma migrate diff \
+            --from-empty \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script > salida/000000000000_squashed_migrations.sql
+          echo "líneas: $(wc -l < salida/000000000000_squashed_migrations.sql)"
+
+      # ── QUÉ CONSTRUYE, EN LA FORMA COMPARABLE CON PRODUCCIÓN ──────────────
+      - name: Aplicar la baseline a la base efímera
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f salida/000000000000_squashed_migrations.sql
+          echo "aplicada sin errores"
+
+      - name: Retratar tablas, columnas y enums
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -tA -c \
+            "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1;" \
+            | sed '/^$/d' > salida/tablas.txt
+          psql "$DATABASE_URL" -tA -F'.' -c \
+            "SELECT table_name, column_name FROM information_schema.columns
+             WHERE table_schema='public' AND table_name <> '_prisma_migrations' ORDER BY 1,2;" \
+            | sed '/^$/d' | sort > salida/columnas.txt
+          psql "$DATABASE_URL" -tA -c \
+            "SELECT t.typname || ':' || string_agg(e.enumlabel, ',' ORDER BY e.enumsortorder)
+             FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
+             JOIN pg_namespace n ON n.oid = t.typnamespace AND n.nspname='public'
+             GROUP BY t.typname ORDER BY 1;" \
+            | sed '/^$/d' > salida/enums.txt
+          # Índices y constraints, que la comparación anterior todavía no cubría.
+          psql "$DATABASE_URL" -tA -c \
+            "SELECT tablename || ' :: ' || indexdef FROM pg_indexes
+             WHERE schemaname='public' ORDER BY 1;" \
+            | sed '/^$/d' > salida/indices.txt
+          psql "$DATABASE_URL" -tA -c \
+            "SELECT conrelid::regclass || ' :: ' || conname || ' :: ' || pg_get_constraintdef(oid)
+             FROM pg_constraint WHERE connamespace='public'::regnamespace ORDER BY 1,2;" \
+            | sed '/^$/d' > salida/constraints.txt
+          wc -l salida/*.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baseline
+          path: salida/
+          retention-days: 5
