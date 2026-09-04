@@ -168,11 +168,34 @@ jobs:
         # rojo en vez de imprimir el diff y seguir en verde.
         run: |
           set -euo pipefail
+          # Prisma NO crea la base sombra: la exige existente y aborta con P1003
+          # si no está. `--if-not-exists` para que el paso sea repetible.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE erpazul_ci_shadow' \
+            || echo "la sombra ya existía"
+
+          # ── POR QUÉ NO SE EXIGE DIFERENCIA CERO ──────────────────────────
+          #
+          # La baseline crea NUEVE objetos que `schema.prisma` no puede
+          # describir: ocho índices parciales y un CHECK. `migrate diff` compara
+          # lo que producen las migraciones contra lo que declara el schema, así
+          # que SIEMPRE va a ver esos nueve de más y proponer borrarlos. Con
+          # `--exit-code` a secas, este paso quedaría rojo para siempre y
+          # dejaría de informar sobre la deriva de verdad.
+          #
+          # Entonces se mira el CONTENIDO: se exige que lo único que el diff
+          # proponga sea borrar esos nueve. Cualquier otra cosa —una columna, una
+          # tabla, un enum— es deriva real y pone el paso en rojo.
           npx prisma migrate diff \
             --from-migrations ./prisma/migrations \
             --to-schema-datamodel ./prisma/schema.prisma \
             --shadow-database-url "$SHADOW_DATABASE_URL" \
-            --exit-code
+            --script > /tmp/deriva.sql
+
+          echo "── lo que migrate diff propone ────────────────────────────────"
+          cat /tmp/deriva.sql
+          echo "───────────────────────────────────────────────────────────────"
+
+          node scripts/pruebas-db/revisar-deriva.mjs /tmp/deriva.sql
 
       # ── LAS PRUEBAS QUE NECESITAN BASE ─────────────────────────────────────
       #
