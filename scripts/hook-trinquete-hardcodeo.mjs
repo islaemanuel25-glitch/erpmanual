@@ -43,7 +43,12 @@ import { fileURLToPath } from "node:url";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
-const CONTADOR = path.join(AQUI, "hardcodeo.mjs");
+// El contador real. La variable de entorno existe SOLO para que el candado
+// pueda inyectar uno falso y ejercer los cuatro desenlaces —contó y subió, contó
+// y no subió, se cayó, abortó—. Sin esa costura no hay forma de probar el hook
+// más que rompiendo el repo a propósito para que un número suba, y una rama
+// defensiva que no se puede ejercer es una rama que nadie sabe si corre.
+const CONTADOR = process.env.ERPAZUL_CONTADOR_HARDCODEO || path.join(AQUI, "hardcodeo.mjs");
 
 const ME_IMPORTA = /^(app|components)\/.*\.jsx$/;
 
@@ -102,9 +107,29 @@ process.stdin.on("end", () => {
     timeout: 60_000,
   });
 
-  // El trinquete se rompió: se deja pasar, pero se dice. Un contador roto que
-  // calla se confunde con un contador que no encontró nada.
-  if (r.status !== 0 && r.status !== 1) {
+  // ── ROTO Y "SUBIÓ" SALEN LOS DOS CON CÓDIGO 1 ────────────────────────────
+  //
+  // El contador devuelve 1 cuando el hardcodeo subió. Node TAMBIÉN devuelve 1
+  // cuando el script se cae solo —una excepción sin atrapar sale con 1—, así que
+  // mirar únicamente el código confunde las dos cosas y el hook informaba
+  // "este cambio hizo subir el conteo" sobre un contador que nunca llegó a
+  // contar nada. Un aviso que no distingue un veredicto de un choque es un aviso
+  // que no se puede creer en ninguna de las dos direcciones.
+  //
+  // Se ve todos los días en cuanto el intérprete no es el que la herramienta
+  // necesita: `lib/hardcodeo/contador.js` es ESM en un archivo `.js` y el
+  // `package.json` no declara `"type": "module"`, así que en Node 18 el import
+  // explota con `Named export 'ETIQUETAS' not found` — código 1, cero bytes de
+  // salida, y el hook lo contaba como un aumento.
+  //
+  // Lo que los separa es la MARCA que el contador imprime cuando de verdad
+  // comparó. Sin esa marca no hubo veredicto, haya salido con el código que haya
+  // salido.
+  const MARCA_VEREDICTO = "TRINQUETE: subió el hardcodeo.";
+  const salidaCompleta = `${r.stdout || ""}\n${r.stderr || ""}`;
+  const huboVeredicto = salidaCompleta.includes(MARCA_VEREDICTO);
+
+  if (r.status !== 0 && !huboVeredicto) {
     responder(
       "El trinquete de hardcodeo no pudo correr, así que este cambio NO fue " +
         "revisado. No bloquea nada, pero conviene arreglarlo:\n" +
