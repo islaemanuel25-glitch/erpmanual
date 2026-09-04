@@ -1,0 +1,294 @@
+# Verificación de una rama: candados, esquema y migraciones contra un PostgreSQL
+# EFÍMERO que vive y muere dentro del runner.
+#
+# ── POR QUÉ EXISTE ──────────────────────────────────────────────────────────
+#
+# CLAUDE.md dice, con su caso de origen al lado, que una consulta de Prisma no la
+# prueba ni el build ni los candados: hay que ejercerla contra Postgres. El
+# 2026-08-12 tres rutas pedían una relación que no existe, el build compiló, los
+# 3.071 candados quedaron en verde y la pantalla de comprobantes se cayó en
+# producción.
+#
+# Hasta hoy no había dónde correr eso. La única base a mano era la de producción,
+# y contra ésa no se prueba nada. Este workflow levanta una base descartable en
+# el runner de GitHub, aplica las 107 migraciones desde cero y corre las pruebas
+# ahí. Al terminar el job, el contenedor se destruye con el runner: no hay nada
+# que limpiar ni nada que se pueda quedar prendido.
+#
+# ── LO QUE NO TIENE, Y ES A PROPÓSITO ───────────────────────────────────────
+#
+# NO usa ningún secreto. La `DATABASE_URL` apunta al service container y está
+# escrita en claro acá abajo porque no protege nada: es una base vacía que dura
+# tres minutos dentro de una máquina que se apaga. Un secreto de producción en un
+# workflow que corre en cada push a cada rama es exactamente el agujero que este
+# archivo no puede abrir.
+#
+# NO despliega, NO publica imagen y NO toca el VPS. Eso es `build-imagen.yml`,
+# que corre solo en `main`. Éste corre en las ramas de trabajo y lo único que
+# produce es un veredicto.
+
+name: Verificación (candados + base efímera)
+
+on:
+  push:
+    # En `main` ya corre `build-imagen.yml`. Acá interesan las ramas de trabajo,
+    # que es donde el error todavía se puede arreglar barato.
+    branches-ignore: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Una corrida por rama: un push encima de otro cancela la anterior, que ya no
+  # informa sobre nada que exista.
+  group: verificacion-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        # La MISMA versión mayor que corre en producción (postgres:16). Probar
+        # contra otra convertiría un verde acá en una promesa que la base real no
+        # necesariamente cumple.
+        image: postgres:16
+        env:
+          POSTGRES_USER: erpazul
+          POSTGRES_PASSWORD: erpazul_ci
+          POSTGRES_DB: erpazul_ci
+        ports:
+          - 5432:5432
+        # Sin el health check, los pasos arrancan antes de que Postgres acepte
+        # conexiones y fallan por una carrera en vez de por el código.
+        options: >-
+          --health-cmd "pg_isready -U erpazul -d erpazul_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # Host local por partida doble: es lo que el runner expone, y es lo que
+      # `scripts/lib/clientePrisma.mjs` exige para el nivel ESCRITURA. Un script
+      # de datos apuntando a un host remoto aborta con código 2, y así queremos
+      # que siga siendo.
+      DATABASE_URL: postgresql://erpazul:erpazul_ci@127.0.0.1:5432/erpazul_ci
+      # Base aparte para la sombra de `migrate diff`: comparar el historial de
+      # migraciones contra el schema necesita una base propia que Prisma crea y
+      # destruye.
+      SHADOW_DATABASE_URL: postgresql://erpazul:erpazul_ci@127.0.0.1:5432/erpazul_ci_shadow
+      # NO es production, y el candado de la fábrica lo comprueba: con
+      # NODE_ENV=production el nivel ESCRITURA aborta.
+      NODE_ENV: test
+      # Las rutas verifican la sesión con un JWT firmado. Este valor NO es un
+      # secreto de nada: firma cookies de una base que dura tres minutos. Ponerlo
+      # en `secrets` daría la falsa impresión de que protege algo real.
+      AUTH_SECRET: secreto-de-ci-sin-valor-fuera-del-runner
+
+    steps:
+      - name: Traer el código de ESTA rama
+        uses: actions/checkout@v4
+
+      - name: Node 20 (el mismo del Dockerfile)
+        uses: actions/setup-node@v4
+        with:
+          # El Dockerfile construye con node:20-alpine. Y hay un motivo más
+          # concreto: los módulos de `lib/` son ESM escritos en archivos `.js` y
+          # el `package.json` no declara `"type": "module"`, así que la suite
+          # depende de que Node detecte el módulo solo. Eso está disponible desde
+          # 20.19; en Node 18 la suite entera falla al instanciar, diciendo que
+          # un módulo "no exporta" algo que sí exporta.
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # ── PRISMA: generar, validar, aplicar ──────────────────────────────────
+      #
+      # `generate` va PRIMERO y no es ceremonia: CLAUDE.md tiene una regla entera
+      # sobre esto. El cliente se genera aparte de la migración, y un cliente
+      # viejo pasa el build y pasa los candados —son funciones puras que no tocan
+      # la base— y recién falla contra Postgres, con un mensaje que apunta a otro
+      # lado.
+      - name: prisma generate
+        run: npx prisma generate
+
+      - name: prisma validate
+        run: npx prisma validate
+
+      # ── LOS CANDADOS VAN ANTES DE LA BASE ──────────────────────────────────
+      #
+      # No es cosmético. Un paso que falla corta el job, así que con la suite
+      # detrás de las migraciones un problema del historial de migraciones deja
+      # sin ejecutar los 3.000 candados y la corrida no informa sobre ellos. Los
+      # candados son funciones puras: no tocan Postgres y no tienen por qué
+      # esperar a que la base esté armada.
+      #
+      # Se descubrió en la primera corrida real: `migrate deploy` se cayó en la
+      # segunda migración y no se supo nada del resto.
+      - name: Suite de candados
+        run: npm test
+
+      - name: Aplicar las migraciones DESDE CERO
+        # El mismo comando que corre el despliegue, sobre una base vacía. Desde
+        # el saneamiento del historial hay UNA sola migración —la baseline— y
+        # esto tiene que quedar en verde: si vuelve a ponerse rojo, el historial
+        # dejó de ser reproducible otra vez.
+        #
+        # NO se reemplaza por `db push` en ningún caso. `db push` construye una
+        # base parecida por otro camino, y entonces el job diría que el camino
+        # real anda cuando lo que anda es otro.
+        run: npx prisma migrate deploy
+
+      - name: Comprobar la estructura, con los 9 objetos escritos a mano
+        # Lo que ningún candado puede ver: que la base construida tenga los ocho
+        # índices parciales CON SU PREDICADO y el CHECK de combos, que son los
+        # objetos que Prisma no sabe expresar y que viven en un bloque de SQL
+        # manual al final de la baseline. Si alguien regenera la baseline y se
+        # olvida de ese bloque, la base sale sin sus invariantes y todo lo demás
+        # sigue en verde.
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/estructura.mjs
+
+      - name: Comparar contra la estructura de producción
+        # ── SOLO EN LA RAMA DEL SANEAMIENTO, Y A PROPÓSITO ──────────────────
+        #
+        # `docs/deploy/estructura-produccion/` es una FOTOGRAFÍA del 2026-09-04,
+        # no un contrato. Sirvió para demostrar que la baseline reproduce lo que
+        # producción tenía en el momento del squash.
+        #
+        # Exigirla en todas las ramas sería pedir que ninguna migración nueva
+        # cambie nada hasta desplegarse, o sea convertir cada cambio de esquema
+        # en un rojo. A la tercera vez nadie miraría el chequeo, y ahí se pierde
+        # el que sí importa.
+        #
+        # Lo que sí se exige SIEMPRE, en todas las ramas, es la cadena de los
+        # pasos de arriba y abajo: migraciones → base vacía → schema.prisma. Eso
+        # no menciona a producción y no envejece.
+        #
+        # Ver el README de ese directorio.
+        if: github.ref_name == 'chore/sanear-historial-migraciones'
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/comparar-con-produccion.mjs
+
+      - name: El schema y las migraciones dicen lo mismo
+        # Detecta la deriva: un cambio escrito en schema.prisma que nadie migró.
+        # `--exit-code` devuelve 2 cuando hay diferencia, así el paso se pone en
+        # rojo en vez de imprimir el diff y seguir en verde.
+        run: |
+          set -euo pipefail
+          # Prisma NO crea la base sombra: la exige existente y aborta con P1003
+          # si no está. `--if-not-exists` para que el paso sea repetible.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE erpazul_ci_shadow' \
+            || echo "la sombra ya existía"
+
+          # ── SE EXIGE DERIVA CERO, Y SE IMPRIME EL DIFF ───────────────────
+          #
+          # Se esperaba que el diff propusiera borrar los nueve objetos del
+          # bloque manual de la baseline, porque `schema.prisma` no puede
+          # declararlos. Se midió y NO es así: sale vacío. Prisma no ve los
+          # índices parciales ni los CHECK en ninguno de los dos lados, así que
+          # no los reporta.
+          #
+          # Por eso se puede exigir cero de verdad. Y por eso mismo este paso NO
+          # protege esos nueve: de ésos se ocupa `estructura.mjs`, que los busca
+          # en la base ya construida y compara sus predicados.
+          #
+          # Se imprime el diff aunque esté vacío: cuando algún día no lo esté, lo
+          # primero que se quiere ver es qué propone.
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema-datamodel ./prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --script > /tmp/deriva.sql
+
+          echo "── lo que migrate diff propone ────────────────────────────────"
+          cat /tmp/deriva.sql
+          echo "───────────────────────────────────────────────────────────────"
+
+          node scripts/pruebas-db/revisar-deriva.mjs /tmp/deriva.sql
+
+      # ── LAS PRUEBAS QUE NECESITAN BASE ─────────────────────────────────────
+      #
+      # Esto es lo que ningún candado puede hacer: ejercer las consultas contra
+      # Postgres de verdad. Corre después de la suite a propósito —si una función
+      # pura está rota, el error se lee mejor allá que acá.
+      - name: Pruebas de base (ofertas y recargos)
+        # Con el mismo cargador que usa la suite: el script importa handlers de
+        # rutas, y esas rutas resuelven el alias `@/…` que Node no conoce.
+        #
+        # El `if` NO es para saltear un fallo: es porque este archivo vive en la
+        # rama de Ofertas y en `main` todavía no existe. Saltearlo cuando no está
+        # es lo correcto; saltearlo cuando está sería taparlo, y por eso la
+        # condición mira el archivo y no el resultado.
+        run: |
+          set -euo pipefail
+          if [ -f scripts/pruebas-db/ofertas.mjs ]; then
+            node --import ./scripts/alias-loader.mjs scripts/pruebas-db/ofertas.mjs
+          else
+            echo "No hay scripts/pruebas-db/ofertas.mjs en esta rama: nada que correr."
+          fi
+
+      # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
+      #
+      # Producción conserva sus 105 migraciones viejas en `_prisma_migrations` y
+      # el directorio activo ahora tiene una sola. ¿Qué hace `migrate deploy`
+      # cuando la base tiene filas que ya no existen como archivo?
+      #
+      # Se contesta MIDIÉNDOLO acá, sobre una base descartable, en vez de
+      # deducirlo de la documentación. Es lo que hay que saber antes de tocar
+      # producción, y es barato: se siembran las filas viejas y se mira.
+      #
+      # Va ÚLTIMO a propósito: ensucia `_prisma_migrations` de la base efímera y
+      # no tiene por qué influir en ningún paso anterior.
+      - name: Simular el historial de producción y ver qué diría el despliegue
+        run: |
+          set -uo pipefail
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/simular-historial-produccion.mjs
+          echo ""
+          echo "── prisma migrate status ──────────────────────────────────────"
+          npx prisma migrate status || true
+          echo ""
+          echo "── prisma migrate deploy ──────────────────────────────────────"
+          npx prisma migrate deploy || true
+          echo ""
+          echo "Este paso NO decide el veredicto del job: es un informe para la"
+          echo "tanda de despliegue. Por eso los comandos llevan '|| true'."
+
+      # ── EL CONTRATO HACIA ADELANTE ────────────────────────────────────────
+      #
+      # Todo lo anterior comprueba el estado de HOY. Esto comprueba el de mañana:
+      # que sobre el escenario real de producción —105 filas sin archivo más la
+      # baseline aplicada— Prisma detecte una migración nueva como pendiente y
+      # aplique SOLO ésa.
+      #
+      # Si se plantara por las filas sin archivo, o intentara reaplicar la
+      # baseline sobre una base que ya tiene todo, el próximo despliegue del ERP
+      # se caería. Conviene saberlo acá y no esa noche.
+      #
+      # Éste SÍ decide el veredicto: no lleva `|| true`.
+      - name: Contraprueba — una migración posterior se aplica sola
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contraprueba-migracion-nueva.mjs
+
+      - name: Resumen
+        if: always()
+        run: |
+          # Las comillas invertidas van ESCAPADAS. Dentro de comillas dobles, una
+          # comilla invertida sin escapar abre una sustitución de comando: bash
+          # intenta EJECUTAR lo que hay adentro. Sin las barras, la línea de las
+          # migraciones corría `prisma migrate deploy` de verdad —otra vez, y sin
+          # npx— y las otras dos ejecutaban el nombre de la rama y la versión de
+          # Node como si fueran comandos.
+          {
+            echo "### Verificación de \`${{ github.ref_name }}\`"
+            echo ""
+            echo "- Node: \`$(node -v)\`"
+            echo "- Base: PostgreSQL 16 efímera del runner (destruida al terminar el job)"
+            echo "- Migraciones aplicadas desde cero: \`prisma migrate deploy\`"
+            echo ""
+            echo "Sin secretos y sin contacto con producción."
+          } >> "$GITHUB_STEP_SUMMARY"
