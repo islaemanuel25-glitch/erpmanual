@@ -112,6 +112,37 @@ o finalizar. **[DECISIÓN]**
 La ventana es **semiabierta**: `[inicioEn, finEn)`. En el instante `finEn` la
 oferta ya no rige. **[VERIFICADO]**
 
+### Los seis, contra el código
+
+Cotejado el 2026-09-04 contra `lib/ofertas/estados.js`. El enum `ESTADO_OFERTA`
+tiene exactamente estas seis claves y ninguna más, y `estadoOferta()` las
+pregunta **en este orden, que ES la regla**:
+
+1. **FINALIZADA** — hay `finalizadaEn`. Una decisión humana gana sobre cualquier
+   fecha.
+2. **BORRADOR** — no hay `publicadaEn`. No rige aunque sus fechas ya hayan
+   pasado.
+3. **VENCIDA** — pasó `finEn` y nadie la finalizó. (También cae acá una oferta
+   publicada sin ventana, que es un dato roto: se falla hacia "no cobra
+   distinto".)
+4. **PROGRAMADA** — todavía no llegó `inicioEn`.
+5. **REVISAR** — está rigiendo y hay una línea con `revisionPendienteDesde`.
+6. **ACTIVA** — está rigiendo y no hay nada que mirar.
+
+**REVISAR va antes que ACTIVA a propósito.** Una oferta marcada sigue
+aplicándose —eso lo decide `ofertaVigente`, no esto—, así que preguntando ACTIVA
+primero REVISAR sería inalcanzable y el aviso no aparecería nunca.
+
+**El sexto es VENCIDA, es derivado y no estaba en la especificación original.**
+No es un estado implícito ni un accidente: sin él, una oferta cuya fecha final
+pasó y que nadie bajó se vería ACTIVA —mintiendo, porque ya no se aplica— o
+desaparecería de la vista. Es exactamente donde hay que decidir entre renovar,
+modificar o finalizar. Los cinco de la lista pedida —BORRADOR, PROGRAMADA,
+ACTIVA, REVISAR, FINALIZADA— están los cinco y significan lo que decía el pedido.
+
+`ESTADOS_OPERATIVOS` son los cinco del trabajo diario; `ESTADOS_ARCHIVADOS` es
+solo FINALIZADA. **[VERIFICADO]**
+
 ---
 
 ## El precio de oferta: una sola fuente
@@ -233,34 +264,98 @@ cualquier otro y su precio es manual, sin lista. **[VERIFICADO]** — caso 16 bi
 
 ---
 
+## La pantalla de cobro: un total por medio de pago
+
+Con ofertas y recargos **el total deja de ser un número**. El mismo carrito vale
+$8.100 en efectivo y $9.450 con débito, así que el panel de cobro muestra el
+importe de **cada medio antes de que el cajero toque ninguno**. **[DECISIÓN]**
+
+El ejemplo, con 9 "Nueve de Oro" a $1.000, oferta de solo efectivo a $900 y el
+local con débito 5 %, crédito 10 % y Mercado Pago 5 %:
+
+- Efectivo $8.100 — la oferta entra, no hay recargo.
+- Débito $9.450 — la oferta se pierde, y $9.000 + 5 %.
+- Crédito $9.900 — $9.000 + 10 %.
+- Mercado Pago $9.450 — $9.000 + 5 %.
+
+Los cuatro salen de `lib/ofertas/previewPos.js`, que **no calcula nada**: llama a
+`calcularVentaComercial` una vez por medio. Es el mismo motor que corre en
+`pos-ventas/crear`. Una segunda matemática al lado del motor no se rompe el día
+que se escribe: se rompe el día que el motor cambia y ella no. **[VERIFICADO]** —
+hay un candado que calcula el mismo caso por los dos caminos y exige que den
+idéntico.
+
+**El precio normal NO se reemplaza por el de oferta en la línea del carrito.** Se
+muestra `$1.000 · Oferta efectivo $900`. Hasta saber cómo se paga, el promocional
+es una posibilidad; prometer $900 y después cobrar $1.000 porque el cliente sacó
+la tarjeta es peor que no haberlo mostrado. **[DECISIÓN]**
+
+**Sin ofertas en el carrito y sin recargos configurados los cuatro dan lo mismo y
+el panel queda exactamente como estaba**: un total grande arriba y cuatro
+botones. Es el caso de casi todas las ventas, y hay un candado que lo fija.
+
+### Pago dividido
+
+El panel recalcula el total **cuando cambia el conjunto de medios**, no cuando
+cambian los importes: agregar débito a un pago en efectivo puede perder una
+oferta de solo efectivo *y* sumar un recargo. Los importes tipeados tienen que
+sumar ese total nuevo. **[VERIFICADO]**
+
+El aviso —"Pago combinado. Se aplicará la condición más alta… Las ofertas
+exclusivas de efectivo no aplican."— sale de `avisoPagoCombinado`, el mismo texto
+que usa el backend, para que los dos digan lo mismo.
+
+### Cuando la pantalla y el servidor no coinciden
+
+El POS manda `totalPantalla`: el importe que el cajero vio en el botón que
+apretó. Si la cuenta del servidor da otra cosa, **la venta se rechaza** con
+`TOTAL_DESACTUALIZADO` y no se registra nada. **[DECISIÓN]**
+
+Sin esto el desenlace era silencioso, que es el peor de los dos: con un solo
+medio el backend armaba el tender con SU total, la venta entraba por $8.300, la
+pantalla había pedido $8.100, y el faltante aparecía recién en el arqueo sin
+forma de saber de qué venta salió.
+
+**No hay reintento automático**: se muestran los dos números y el cajero vuelve a
+elegir el medio. Reintentar solo sería cobrar un importe que nadie miró.
+
+La cola offline queda afuera del control a propósito: una venta encolada se cobró
+hace rato, no aplica ofertas ni recargos, y su total es el que entró al cajón.
+
+---
+
+## El ticket
+
+**El ticket se arma con las líneas que devuelve el backend, nunca con el
+carrito.** `pos-ventas/crear` devuelve `breakdown.lineas`, que son las filas
+recién escritas en `VentaDetalle`: `precio` ya es lo COBRADO. **[DECISIÓN]**
+
+Con el carrito como fuente, una venta con oferta imprimía `9 × $1.000` arriba de
+un total de $8.100 — un papel que no cierra y que el cliente mira. Ahora
+cantidad × precio suma el subtotal impreso.
+
+Para que además se pueda **leer** por qué el total no es la suma de los precios
+de lista, el papel agrega dos renglones, y solo cuando corresponde:
+
+- `Ahorro por ofertas −$900`
+- `Recargo Débito 5 % +$450` — **nombra el medio que impuso la condición**, que
+  en un pago combinado puede no ser con el que se pagó más. "Recargo: $450" a
+  secas se lee como un cargo arbitrario.
+
+El ahorro va como un renglón y no como una columna por línea: el papel tiene
+58 mm y una segunda columna de precios tachados lo vuelve ilegible.
+
+**La reimpresión sale de los snapshots persistidos**, no de las ofertas vigentes
+hoy. Recalcular daría otro papel para la misma operación, y el que quedó en la
+mano del cliente sería el falso. **[VERIFICADO]** — `VentaDetalle` congela
+`precio`, `precioNormal`, `ofertaNombre` y `descuentoPromocional`, y `ofertaId`
+va con `SetNull` para que el nombre sobreviva a que la oferta se borre.
+
+---
+
 ## Lo que falta, y por qué
 
-### 1. La pantalla de cobro del POS — **el bloqueante**
-
-**Publicar una oferta está enclavado** en `lib/ofertas/integracionPos.js`. Todo
-lo demás del módulo funciona; lo único que no se puede es poner una oferta a
-cobrar. **[DECISIÓN]**
-
-El POS calcula su total como `subtotal − descuentos`, sin mirar ofertas ni
-recargos. Con una oferta publicada quedarían dos números para la misma venta:
-
-- con **un solo medio**, el backend arma el tender con su total, la venta entra
-  por $900 y la pantalla le pidió $1.000 al cliente — falta plata en el arqueo y
-  nadie sabe por qué;
-- con **pago dividido**, la venta se rechaza con gente esperando.
-
-El silencioso es el peligroso.
-
-No se hizo porque no es enchufar el motor en la pantalla: con ofertas y recargos
-**el total deja de ser un número y pasa a ser uno por medio de pago**. El mismo
-carrito vale $900 en efectivo y $1.050 con débito, y decidir cómo se dibuja eso
-—¿el carrito muestra los dos precios?, ¿el precio de la línea cambia al elegir el
-medio?, ¿qué imprime el ticket?— es una decisión de negocio. Además toca
-`FormaPago`, `CarritoVenta`, el modal de efectivo, la cola offline y el ticket.
-
-El archivo del enclavamiento tiene las tres condiciones para levantarlo.
-
-### 2. El sello "OFERTA" en Productos
+### 1. El sello "OFERTA" en Productos
 
 La API ya lo devuelve: `/api/productos/listar` trae `item.oferta` con el nombre,
 el precio y la condición. **[SIN VERIFICAR]**
@@ -269,19 +364,85 @@ el precio y la condición. **[SIN VERIFICAR]**
 un sello mueve píxeles y esa pantalla se acaba de rehacer; sin el arnés de
 capturas no hay forma de comprobar que no se corrió nada.
 
-### 3. El barrido depende de que alguien entre
+### 2. Quién ejecuta el barrido: **nadie**
 
-La comparación de costos corre cuando se abre la pantalla de Ofertas, porque el
-proyecto no tiene planificador y un script suelto en el VPS es lo que las reglas
-prohíben. **Si nadie entra en tres días, no se marca ni se avisa nada.**
-**[DECISIÓN]** — límite conocido de la v1.
+Es la pregunta que faltaba contestar, y la respuesta relevada el 2026-09-04 es
+que **no hay ningún proceso automático**. Los dos avisos son **oportunistas**.
 
-### 4. Nada se ejerció contra Postgres
+Cómo se enumeró, porque el conteo es parte de la afirmación:
 
-**[SIN VERIFICAR]** Ninguna consulta de Prisma de esta tanda se corrió contra una
-base, y el cliente no se regeneró. Es la familia exacta del incidente del
-2026-08-12. Antes de mergear hay que aplicar la migración contra una base de
-prueba y ejercer las diez rutas.
+- `git grep -n "ofertas/barrido"` → **un solo llamador**:
+  `app/modulos/ofertas/page.jsx:93`. El barrido corre cuando alguien abre la
+  pantalla de Ofertas, y en ningún otro momento.
+- `git ls-files .github/` → antes de esta tanda había **un** workflow, y solo
+  construye la imagen.
+- `grep "cron\|agenda\|bull\|queue" package.json` → **ninguna dependencia** de
+  planificación.
+- Los servicios de `docker-compose.prod.yml` son `db`, `app`,
+  `erpazul_comprobantes` y `erpazul_fotos_productos`. **No hay contenedor de
+  tareas.**
+- `git ls-files app/api | grep -iE "cron|tarea|job|scheduler"` → nada.
+
+Entonces, con nombre y apellido:
+
+**A. Cambio de costo → REVISAR: OPORTUNISTA.** Si nadie abre la pantalla de
+Ofertas, la línea no se marca y la notificación no se emite. La oferta **sigue
+cobrándose al precio publicado** mientras tanto —eso es correcto y deliberado—,
+pero nadie se entera de que el margen cambió.
+
+**B. Próximo vencimiento: OPORTUNISTA, y es el más frágil.** El aviso se emite
+dentro de la ventana de 24 h previas al final. Si el local pasa esas 24 h sin
+abrir la pantalla, **la ventana se cierra y el aviso no llega nunca**: la oferta
+vence sin que nadie lo haya visto venir.
+
+**No se construyó infraestructura nueva** para arreglarlo, a propósito. Las
+alternativas mínimas, con su costo, para decidir:
+
+- **Para (A), disparar por evento en vez de por reloj.** El cambio de costo es un
+  hecho puntual, no una condición que haya que ir a mirar: se podría llamar al
+  barrido —o solo a `planDeRevision` para el producto tocado— donde el costo se
+  escribe. `git grep -l "precio_costo" -- 'app/api/**/route.js'` da 48 archivos,
+  de los cuales unos 14 escriben de verdad (edición de producto, importación,
+  aplicación de listas de proveedor, recepción de transferencias, sincronización
+  de grupo). Es la solución correcta y **no necesita ningún planificador**, pero
+  toca catorce rutas de cinco módulos y es una tanda propia.
+- **Para (B) no hay forma sin un reloj.** Un vencimiento es tiempo, no un evento
+  del sistema. Lo mínimo sería un workflow de GitHub Actions con `schedule:`
+  pegándole a un endpoint del VPS, y eso **sí es infraestructura nueva**: exige
+  exponer una ruta, un secreto compartido y decidir qué pasa si el runner no
+  corre. No se hizo sin que se decida.
+- **Lo barato y parcial**, si se quiere tapar el agujero ya: llamar al barrido
+  también al abrir el POS. No es automático —sigue dependiendo de que alguien
+  entre—, pero el POS se abre todos los días en cada local y la pantalla de
+  Ofertas no.
+
+**Mientras tanto, no se puede decir que el módulo tenga alertas automáticas.**
+Tiene alertas que se calculan bien cuando alguien las va a buscar.
+
+### 3. La verificación, y qué quedó sin ejercer
+
+**[SIN VERIFICAR]** El 2026-09-04 se escribió
+`.github/workflows/verificacion.yml`: un job que levanta un PostgreSQL efímero en
+el runner, aplica las 107 migraciones desde cero, comprueba que el schema no
+derivó, corre la suite y después `scripts/pruebas-db/ofertas.mjs`, que ejerce las
+consultas llamando a los handlers reales de las rutas.
+
+**Ese workflow no se pudo subir.** La clave con la que el repo empuja no tiene
+alcance `workflow`, así que GitHub rechaza los archivos de
+`.github/workflows` — por SSH con "refusing to allow an OAuth App to create or
+update workflow … without workflow scope", y por la API de contenidos con un 404.
+El commit existe local y sin empujar.
+
+Consecuencia, y conviene que esté escrita: **nada de esta tanda corrió**. Ni los
+candados nuevos, ni las pruebas de base, ni el build. La máquina donde se trabajó
+es el VPS de producción: Node 18, sin `node_modules`, y la única base es la que
+está cobrando.
+
+Lo que falta ejercer, en orden de riesgo: la migración contra una base limpia,
+las consultas de las diez rutas, y **abrir el POS con datos reales**. Esa última
+es la que CLAUDE.md nombra con cinco casos: cinco defectos del módulo de
+comprobante que ningún candado encontró y que los cinco aparecieron al abrir la
+pantalla.
 
 ---
 
