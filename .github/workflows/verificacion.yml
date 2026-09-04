@@ -17,21 +17,21 @@
 #
 # ── LO QUE NO TIENE, Y ES A PROPÓSITO ───────────────────────────────────────
 #
-# NO usa ningún secreto. La \`DATABASE_URL\` apunta al service container y está
+# NO usa ningún secreto. La `DATABASE_URL` apunta al service container y está
 # escrita en claro acá abajo porque no protege nada: es una base vacía que dura
 # tres minutos dentro de una máquina que se apaga. Un secreto de producción en un
 # workflow que corre en cada push a cada rama es exactamente el agujero que este
 # archivo no puede abrir.
 #
-# NO despliega, NO publica imagen y NO toca el VPS. Eso es \`build-imagen.yml\`,
-# que corre solo en \`main\`. Éste corre en las ramas de trabajo y lo único que
+# NO despliega, NO publica imagen y NO toca el VPS. Eso es `build-imagen.yml`,
+# que corre solo en `main`. Éste corre en las ramas de trabajo y lo único que
 # produce es un veredicto.
 
 name: Verificación (candados + base efímera)
 
 on:
   push:
-    # En \`main\` ya corre \`build-imagen.yml\`. Acá interesan las ramas de trabajo,
+    # En `main` ya corre `build-imagen.yml`. Acá interesan las ramas de trabajo,
     # que es donde el error todavía se puede arreglar barato.
     branches-ignore: [main]
   pull_request:
@@ -41,7 +41,7 @@ on:
 concurrency:
   # Una corrida por rama: un push encima de otro cancela la anterior, que ya no
   # informa sobre nada que exista.
-  group: verificacion-\${{ github.ref }}
+  group: verificacion-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -74,11 +74,11 @@ jobs:
 
     env:
       # Host local por partida doble: es lo que el runner expone, y es lo que
-      # \`scripts/lib/clientePrisma.mjs\` exige para el nivel ESCRITURA. Un script
+      # `scripts/lib/clientePrisma.mjs` exige para el nivel ESCRITURA. Un script
       # de datos apuntando a un host remoto aborta con código 2, y así queremos
       # que siga siendo.
       DATABASE_URL: postgresql://erpazul:erpazul_ci@127.0.0.1:5432/erpazul_ci
-      # Base aparte para la sombra de \`migrate diff\`: comparar el historial de
+      # Base aparte para la sombra de `migrate diff`: comparar el historial de
       # migraciones contra el schema necesita una base propia que Prisma crea y
       # destruye.
       SHADOW_DATABASE_URL: postgresql://erpazul:erpazul_ci@127.0.0.1:5432/erpazul_ci_shadow
@@ -87,7 +87,7 @@ jobs:
       NODE_ENV: test
       # Las rutas verifican la sesión con un JWT firmado. Este valor NO es un
       # secreto de nada: firma cookies de una base que dura tres minutos. Ponerlo
-      # en \`secrets\` daría la falsa impresión de que protege algo real.
+      # en `secrets` daría la falsa impresión de que protege algo real.
       AUTH_SECRET: secreto-de-ci-sin-valor-fuera-del-runner
 
     steps:
@@ -98,8 +98,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           # El Dockerfile construye con node:20-alpine. Y hay un motivo más
-          # concreto: los módulos de \`lib/\` son ESM escritos en archivos \`.js\` y
-          # el \`package.json\` no declara \`"type": "module"\`, así que la suite
+          # concreto: los módulos de `lib/` son ESM escritos en archivos `.js` y
+          # el `package.json` no declara `"type": "module"`, así que la suite
           # depende de que Node detecte el módulo solo. Eso está disponible desde
           # 20.19; en Node 18 la suite entera falla al instanciar, diciendo que
           # un módulo "no exporta" algo que sí exporta.
@@ -111,7 +111,7 @@ jobs:
 
       # ── PRISMA: generar, validar, aplicar ──────────────────────────────────
       #
-      # \`generate\` va PRIMERO y no es ceremonia: CLAUDE.md tiene una regla entera
+      # `generate` va PRIMERO y no es ceremonia: CLAUDE.md tiene una regla entera
       # sobre esto. El cliente se genera aparte de la migración, y un cliente
       # viejo pasa el build y pasa los candados —son funciones puras que no tocan
       # la base— y recién falla contra Postgres, con un mensaje que apunta a otro
@@ -123,14 +123,14 @@ jobs:
         run: npx prisma validate
 
       - name: Aplicar las migraciones DESDE CERO
-        # \`migrate deploy\` sobre una base vacía aplica las 107 en orden. Es el
+        # `migrate deploy` sobre una base vacía aplica las 107 en orden. Es el
         # mismo comando que corre el despliegue, así que lo que se prueba acá es
-        # el camino real y no una reconstrucción parecida con \`db push\`.
+        # el camino real y no una reconstrucción parecida con `db push`.
         run: npx prisma migrate deploy
 
       - name: El schema y las migraciones dicen lo mismo
         # Detecta la deriva: un cambio escrito en schema.prisma que nadie migró.
-        # \`--exit-code\` devuelve 2 cuando hay diferencia, así el paso se pone en
+        # `--exit-code` devuelve 2 cuando hay diferencia, así el paso se pone en
         # rojo en vez de imprimir el diff y seguir en verde.
         run: |
           set -euo pipefail
@@ -151,19 +151,19 @@ jobs:
       # pura está rota, el error se lee mejor allá que acá.
       - name: Pruebas de base (ofertas y recargos)
         # Con el mismo cargador que usa la suite: el script importa handlers de
-        # rutas, y esas rutas resuelven el alias \`@/…\` que Node no conoce.
+        # rutas, y esas rutas resuelven el alias `@/…` que Node no conoce.
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/ofertas.mjs
 
       - name: Resumen
         if: always()
         run: |
           {
-            echo "### Verificación de \`\${{ github.ref_name }}\`"
+            echo "### Verificación de `${{ github.ref_name }}`"
             echo ""
-            echo "- Node: \`$(node -v)\`"
+            echo "- Node: `$(node -v)`"
             echo "- Base: PostgreSQL 16 efímera del runner (destruida al terminar el job)"
             echo ""
-            echo "- Migraciones aplicadas desde cero: \`prisma migrate deploy\`"
+            echo "- Migraciones aplicadas desde cero: `prisma migrate deploy`"
             echo ""
             echo "Sin secretos y sin contacto con producción."
           } >> "$GITHUB_STEP_SUMMARY"
