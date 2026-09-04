@@ -76,12 +76,16 @@ const morir = (motivo) => {
 // devolvía el primer local. Un frasco que acumula convierte una sonda en una
 // máquina de diagnósticos falsos.
 const frasco = new Map();
-const encabezadoDeCookies = () =>
-  [...frasco.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
+const encabezadoDeCookies = (jar) =>
+  [...jar.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
 
-async function pedir(metodo, ruta, cuerpo = null) {
+// Cada sesión lleva SU frasco. Sin eso, entrar como un segundo usuario pisaría
+// la cookie del primero y las dos mitades de la prueba medirían a la misma
+// persona — que es la versión con dos usuarios del defecto que ya tuvo esta
+// sonda con el contexto.
+async function pedir(metodo, ruta, cuerpo = null, jar = frasco) {
   const headers = { "Content-Type": "application/json" };
-  if (frasco.size) headers.Cookie = encabezadoDeCookies();
+  if (jar.size) headers.Cookie = encabezadoDeCookies(jar);
   const res = await fetch(`${BASE}${ruta}`, {
     method: metodo,
     headers,
@@ -98,7 +102,7 @@ async function pedir(metodo, ruta, cuerpo = null) {
   for (const linea of crudas) {
     const par = String(linea).split(";")[0];
     const corte = par.indexOf("=");
-    if (corte > 0) frasco.set(par.slice(0, corte).trim(), par.slice(corte + 1));
+    if (corte > 0) jar.set(par.slice(0, corte).trim(), par.slice(corte + 1));
   }
   const texto = await res.text();
   let datos = null;
@@ -366,6 +370,98 @@ afirmar(
   buscadorLocal.status === 200,
   "BUSCADOR: contesta en la ubicación activa",
   `status ${buscadorLocal.status} · ${buscadorLocal.items.length} productos`
+);
+
+// ── 6 · EL ALCANCE: UN NO-ADMIN SIN ÁMBITO NO CREA NADA ───────────────────
+//
+// Es el defecto que encontró la revisión. `resolveLocalAndGrupo` falla cerrado
+// para un no-admin, y la ruta convertía ese 403 en `null` para seguir creando un
+// Proveedor GLOBAL. Acá se ejerce con un usuario de verdad, no con una maqueta:
+// se le da `proveedores.crear` —o sea que el permiso NO es lo que lo frena— y se
+// lo deja SIN local. Lo único que puede rechazarlo es el alcance.
+await fijarContexto(local);
+
+const sufijo = `${sello}`;
+const rolSinAlcance = await pedir("POST", "/api/roles/crear", {
+  nombre: `SONDA_SIN_ALCANCE_${sufijo}`,
+  permisos: ["proveedores.crear", "compras.ver"],
+});
+const claveSonda = `sonda-${sufijo}-Aa1!`;
+const usuarioSinAlcance = `sonda-sin-alcance-${sufijo}@sonda.local`;
+const altaUsuario = await pedir("POST", "/api/usuarios/crear", {
+  nombre: "Sonda sin alcance",
+  email: usuarioSinAlcance,
+  password: claveSonda,
+  rolId: rolSinAlcance.datos?.item?.id ?? rolSinAlcance.datos?.id,
+  localId: null,
+});
+afirmar(
+  rolSinAlcance.status < 400 && altaUsuario.status < 400,
+  "ALCANCE: se pudo preparar un usuario con el permiso y SIN local",
+  `rol ${rolSinAlcance.status} · usuario ${altaUsuario.status} ${altaUsuario.datos?.error || ""}`
+);
+
+if (rolSinAlcance.status < 400 && altaUsuario.status < 400) {
+  const otroFrasco = new Map();
+  const login2 = await pedir(
+    "POST",
+    "/api/login",
+    { email: usuarioSinAlcance, password: claveSonda },
+    otroFrasco
+  );
+  afirmar(login2.status === 200, "ALCANCE: el usuario de prueba puede iniciar sesión", `status ${login2.status}`);
+
+  if (login2.status === 200) {
+    const cuantosAntes = (await pedir("GET", "/api/proveedores/opciones")).datos?.items?.length ?? 0;
+
+    const sinAlcance = await pedir(
+      "POST",
+      "/api/proveedores/crear",
+      { nombre: `SONDA sin alcance ${sufijo}`, cuit: `SONDA-SINALCANCE-${sufijo}` },
+      otroFrasco
+    );
+    afirmar(
+      sinAlcance.status === 403 || sinAlcance.status === 409,
+      "ALCANCE: un no-admin SIN local recibe el error del scope, no un 200",
+      `status ${sinAlcance.status} · ${sinAlcance.datos?.error || ""}`
+    );
+    afirmar(
+      sinAlcance.datos?.ok !== true,
+      "ALCANCE: y la respuesta no dice que se creó nada",
+      `ok=${sinAlcance.datos?.ok}`
+    );
+
+    // Y NO quedó ningún Proveedor nuevo: es la mitad que importa. Un 403 que
+    // igual escribe es peor que un 200.
+    const cuantosDespues = (await pedir("GET", "/api/proveedores/opciones")).datos?.items?.length ?? 0;
+    afirmar(
+      cuantosDespues === cuantosAntes,
+      "ALCANCE: NO se creó ningún Proveedor global",
+      `antes ${cuantosAntes} · después ${cuantosDespues}`
+    );
+  }
+}
+
+// ── 7 · ADMIN SIN CONTEXTO: EL CAMINO LEGACY, Y SOLO ESE ──────────────────
+//
+// Antes de esta tanda un admin sin ubicación seleccionada creaba un proveedor
+// global. Ese camino se conserva tal cual, y acá se comprueba que sigue vivo: se
+// borra la cookie de contexto y se da de alta. Tiene que crear el proveedor y NO
+// asociarlo a ninguna ubicación, porque no hay ninguna elegida.
+frasco.delete("erpazul_contexto_activo");
+const global = await pedir("POST", "/api/proveedores/crear", {
+  nombre: `SONDA global ${sufijo}`,
+  cuit: `SONDA-GLOBAL-${sufijo}`,
+});
+afirmar(
+  global.status === 200 && global.datos?.ok === true && global.datos?.proveedorCreado === true,
+  "ADMIN SIN CONTEXTO: el alta global legacy sigue funcionando",
+  `status ${global.status} · ${global.datos?.error || ""}`
+);
+afirmar(
+  global.datos?.asociadoAUbicacion === false && global.datos?.asociacion === null,
+  "ADMIN SIN CONTEXTO: y NO se asocia a ninguna ubicación",
+  `asociacion=${JSON.stringify(global.datos?.asociacion)}`
 );
 
 console.log("");
