@@ -67,7 +67,7 @@
       "Read(**/.env.*)"
     ],
     "ask": [],
-    "defaultMode": "dontAsk"
+    "defaultMode": "bypassPermissions"
   },
   "hooks": {
     "PreToolUse": [
