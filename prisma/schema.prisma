@@ -499,9 +499,18 @@ model ProductoCodigoProveedor {
   productoBase ProductoBase @relation(fields: [productoBaseId], references: [id], onDelete: Cascade)
   proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
 
-  @@unique([grupoId, proveedorId, codigoInterno], name: "codigo_interno_unico_por_proveedor")
+  /// `name` NO se toca: es el alias con el que Prisma Client arma la clave
+  /// compuesta, y cinco lugares del código lo usan como
+  /// `where: { codigo_interno_unico_por_proveedor: … }`. `map` es otra cosa —el
+  /// nombre físico del índice— y se agrega para que una base creada desde cero
+  /// use el mismo que ya tiene producción.
+  @@unique([grupoId, proveedorId, codigoInterno], name: "codigo_interno_unico_por_proveedor", map: "codigo_interno_unico_por_proveedor")
   @@index([grupoId, proveedorId, codigoInterno])
-  @@index([grupoId, proveedorId, descripcionNormalizada])
+  /// El nombre físico de producción quedó cortado en los 63 caracteres que
+  /// permite Postgres, y Prisma trunca distinto. Se fija el de producción tal
+  /// cual, sin "arreglarlo": el objetivo es que las dos bases coincidan, no que
+  /// el nombre quede lindo.
+  @@index([grupoId, proveedorId, descripcionNormalizada], map: "ProductoCodigoProveedor_grupoId_proveedorId_descripcionNorma_id")
   @@index([productoBaseId])
   @@index([proveedorId])
 }
@@ -580,6 +589,9 @@ model ProductoLocal {
   @@unique([localId, codigo_barra_propio])
   @@index([localId])
   @@index([baseId])
+  /// Existe en producción desde `20260821030000_producto_local_precio_revisado`,
+  /// creado por SQL crudo y nunca declarado acá.
+  @@index([precioRevisadoAt])
 }
 
 model StockLocal {
@@ -2818,11 +2830,20 @@ model ImportacionListaFila {
   productoBase ProductoBase?             @relation(fields: [productoBaseId], references: [id], onDelete: SetNull)
 
   /// Una fila física del Excel no puede entrar dos veces en la misma importación.
-  @@unique([importacionId, hojaNombre, filaExcel], name: "fila_unica_por_importacion")
+  /// `name` es el alias de Prisma Client; `map` es el nombre FÍSICO en la base.
+  /// Son dos cosas distintas y solo la segunda renombra el índice: sin `map`,
+  /// Prisma crea `ImportacionListaFila_importacionId_hojaNombre_filaExcel_key`
+  /// mientras producción tiene `fila_unica_por_importacion`, que puso el SQL
+  /// crudo de su migración. Se agrega `map` para que una base nueva use el mismo
+  /// nombre físico y las dos instalaciones sean comparables.
+  @@unique([importacionId, hojaNombre, filaExcel], name: "fila_unica_por_importacion", map: "fila_unica_por_importacion")
   @@index([importacionId, estado])
   @@index([importacionId, codigoNormalizado])
   @@index([productoBaseId])
   @@index([importacionId, filaExcel])
+  /// Existe en producción desde `20260808120000_resultado_interpretacion_fila`,
+  /// creado por SQL crudo y nunca declarado acá.
+  @@index([importacionId, resultadoInterpretacion])
 }
 
 // ===========================================================================
@@ -3132,6 +3153,9 @@ model ComprobanteProveedor {
   @@index([grupoId, proveedorId, puntoVenta, numero])
   @@index([grupoId, pedidoId])
   @@index([grupoId, estado])
+  /// Existe en producción desde `20260811200000_comprobante_subida_antes_de_leer`,
+  /// creado por SQL crudo y nunca declarado acá.
+  @@index([grupoId, estado, createdAt])
   /// Para el barrido diario: las que vencieron y todavía tienen imagen.
   @@index([venceEn, imagenBorradaEn])
 }
@@ -3244,6 +3268,11 @@ model ComprobanteLinea {
   @@index([comprobanteId, orden])
   @@index([productoLocalId])
   @@index([pedidoDetalleId])
+  /// Existe en producción desde `20260811230000_comprobante_linea_codigo_proveedor`,
+  /// creado por SQL crudo y nunca declarado acá. Se declara ahora para que el
+  /// schema describa la estructura REAL: sin esto, una base construida desde el
+  /// schema sale sin el índice y `migrate diff` propone borrarlo de producción.
+  @@index([codigoProveedor])
 }
 
 /// Una fila por LLAMADA al modelo de lectura, haya salido bien o mal.
