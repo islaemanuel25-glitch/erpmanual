@@ -15,7 +15,7 @@ export async function GET(req) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -44,7 +44,22 @@ export async function GET(req) {
       );
     }
 
-    const depositoId = gd.localId;
+    // ── EL BUSCADOR MUESTRA EL CATÁLOGO DE LA UBICACIÓN ACTIVA ────────────
+    //
+    // Este endpoint alimenta el armado de un pedido, así que tiene que ofrecer
+    // exactamente lo que `crear` va a aceptar: si mostrara el catálogo del
+    // depósito y `crear` exigiera el del local, el usuario elegiría productos
+    // que el servidor después rechaza — y al revés, un producto comprable del
+    // local no aparecería nunca.
+    //
+    // Para el depósito, la ubicación activa ES el depósito, así que su listado,
+    // su visibilidad y su stock salen idénticos a como salían.
+    //
+    // La búsqueda del depósito del grupo de arriba se conserva a propósito
+    // aunque su id ya no se use para filtrar: sigue siendo el guard que frena a
+    // un grupo sin depósito, y sacarla habría cambiado un caso de error que esta
+    // tanda no viene a tocar.
+    const ubicacionActiva = localId;
 
     // Vínculos activos de códigos internos para este proveedor (Etapa 4).
     // Amplían el universo comprable y permiten buscar por código interno.
@@ -106,8 +121,10 @@ export async function GET(req) {
         { proveedor3_id: proveedorId },
         ...(baseIdsVinculados.length ? [{ id: { in: baseIdsVinculados } }] : []),
       ],
-      // Regla A: el depósito no arma pedidos con productos creados por un local.
-      ...productoVisibleWhere(depositoId),
+      // Regla A, evaluada en la ubicación que compra: el depósito no arma
+      // pedidos con productos creados por un local, y un local solo ve los suyos
+      // y los que bajan del depósito. Es el MISMO predicado que aplica `crear`.
+      ...productoVisibleWhere(ubicacionActiva),
       // Los combos no se compran a proveedor: se compran sus componentes.
       es_combo: false,
     };
@@ -128,7 +145,7 @@ export async function GET(req) {
 
     const productosLocal = await prisma.productoLocal.findMany({
       where: {
-        localId: depositoId,
+        localId: ubicacionActiva,
         activo: true,
         base: baseWhere,
       },
@@ -154,7 +171,10 @@ export async function GET(req) {
           },
         },
         stock: {
-          where: { localId: depositoId },
+          // El stock que se muestra es el de la ubicación que compra: quien
+          // arma el pedido necesita ver lo que tiene ÉL, no lo que tiene el
+          // depósito. Para el depósito son el mismo número.
+          where: { localId: ubicacionActiva },
           select: {
             cantidad: true,
             stockMin: true,

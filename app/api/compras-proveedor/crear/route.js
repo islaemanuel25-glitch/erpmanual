@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
 import {
@@ -112,16 +113,43 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: textoItemQueNoCierra(noCierra) }, { status: 400 });
     }
 
-    // Los combos no se compran a proveedor: se compran sus componentes. Los
-    // productos salen del depósito autorizado; un id de otro local en el cuerpo
-    // no puede crear una línea ni una memoria de proveedor fuera de alcance.
+    // ── EL CATÁLOGO ES EL DE LA UBICACIÓN QUE COMPRA, NO EL DEL DEPÓSITO ──
+    //
+    // Decía `localId: depId`, y ese era el bloqueo real de la compra propia de
+    // un local: solo se podía pedir un producto que existiera en el catálogo del
+    // DEPÓSITO, aunque el pedido —y el stock que después entra— fueran de otra
+    // ubicación. Un local no podía comprarle a su panadería un producto suyo.
+    //
+    // Ahora el catálogo sigue a `localId`, la ubicación activa, que es la MISMA
+    // que se graba como `creadoEnLocalId` doce líneas más abajo y la misma que
+    // `ownerLocalIdDePedido` va a devolver al recibir. Para el depósito
+    // `localId` ES `depId`, así que su comportamiento no cambia en nada.
+    //
+    // ── Y EL ALCANCE SE COMPRUEBA CON DOS CANDADOS, NO CON UNO ────────────
+    //
+    // 1. `localId: ubicacionDeCompra` — un `ProductoLocal` pertenece a UNA sola
+    //    ubicación, así que pasar por el cuerpo el id de otro local no matchea y
+    //    la línea se rechaza. Es lo que impide saltarse el alcance por API.
+    // 2. `base: productoVisibleWhere(...)` — la Regla A, con el MISMO predicado
+    //    que usa el resto del sistema. Sin esto, una fila de `ProductoLocal` que
+    //    apunte a una base creada por otro local seguiría siendo comprable: la
+    //    primera condición mira de quién es la fila, no de quién es el producto.
+    //    No se escribe una regla nueva acá; se reusa la que ya existe.
+    //
+    // Los combos no se compran a proveedor: se compran sus componentes.
+    const ubicacionDeCompra = localId;
     const productosLocales = await prisma.productoLocal.findMany({
-      where: { id: { in: ids }, localId: depId, activo: true },
+      where: {
+        id: { in: ids },
+        localId: ubicacionDeCompra,
+        activo: true,
+        base: productoVisibleWhere(ubicacionDeCompra),
+      },
       select: { id: true, baseId: true, base: { select: { id: true, es_combo: true } } },
     });
     if (productosLocales.length !== ids.length || productosLocales.some((pl) => esComboBase(pl.base))) {
       return NextResponse.json(
-        { ok: false, error: "Uno de los productos no pertenece al depósito o no se puede comprar." },
+        { ok: false, error: "Uno de los productos no pertenece a esta ubicación o no se puede comprar." },
         { status: 400 }
       );
     }

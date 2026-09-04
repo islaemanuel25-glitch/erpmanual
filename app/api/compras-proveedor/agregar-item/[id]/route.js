@@ -4,7 +4,8 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
-import { pedidoEnAlcance } from "@/lib/compras/scope";
+import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 
 export async function POST(req, { params }) {
   try {
@@ -67,9 +68,30 @@ export async function POST(req, { params }) {
       );
     }
 
-    // Verificar que el ProductoLocal existe y pertenece al depósito del pedido
-    const pl = await prisma.productoLocal.findUnique({
-      where: { id: Number(productoLocalId) },
+    // ── EL PRODUCTO TIENE QUE SER DE LA UBICACIÓN DUEÑA DEL PEDIDO ────────
+    //
+    // Comparaba contra `pedido.depositoId`, así que a un pedido de un local solo
+    // se le podían agregar productos del DEPÓSITO. Es el mismo bloqueo que en
+    // `crear`, una pantalla más tarde.
+    //
+    // Ahora se compara contra `ownerLocalIdDePedido(pedido)`, que es la función
+    // que YA decide de quién es el pedido y dónde va a entrar el stock al
+    // recibir. Se la LEE, no se la cambia: usar otra cosa acá dejaría que se
+    // agregue una línea de un catálogo distinto del que va a recibir.
+    //
+    // Para un pedido del depósito el dueño ES `depositoId`, así que el
+    // comportamiento anterior se conserva exacto.
+    //
+    // La segunda condición es la Regla A, con el predicado compartido: sin ella
+    // una fila de `ProductoLocal` de esta ubicación que apunte a una base creada
+    // por otro local seguiría siendo agregable.
+    const ubicacionDelPedido = ownerLocalIdDePedido(pedido);
+    const pl = await prisma.productoLocal.findFirst({
+      where: {
+        id: Number(productoLocalId),
+        localId: ubicacionDelPedido,
+        base: productoVisibleWhere(ubicacionDelPedido),
+      },
       include: {
         base: {
           select: { modoCompraProveedor: true, es_combo: true },
@@ -77,9 +99,9 @@ export async function POST(req, { params }) {
       },
     });
 
-    if (!pl || pl.localId !== pedido.depositoId) {
+    if (!pl) {
       return NextResponse.json(
-        { ok: false, error: "Producto no pertenece al depósito del pedido" },
+        { ok: false, error: "Producto no pertenece a la ubicación del pedido" },
         { status: 400 }
       );
     }
