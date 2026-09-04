@@ -119,9 +119,11 @@ jobs:
             "SELECT tablename || ' :: ' || indexdef FROM pg_indexes
              WHERE schemaname='public' ORDER BY 1;" \
             | sed '/^$/d' > salida/indices.txt
+          # La consulta proyecta UNA columna concatenada, así que `ORDER BY 1,2`
+          # no existe: la posición 2 no está en la lista. Se ordena por la única.
           psql "$DATABASE_URL" -tA -c \
             "SELECT conrelid::regclass || ' :: ' || conname || ' :: ' || pg_get_constraintdef(oid)
-             FROM pg_constraint WHERE connamespace='public'::regnamespace ORDER BY 1,2;" \
+             FROM pg_constraint WHERE connamespace='public'::regnamespace ORDER BY 1;" \
             | sed '/^$/d' > salida/constraints.txt
           wc -l salida/*.txt
 
