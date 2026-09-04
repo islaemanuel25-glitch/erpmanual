@@ -122,10 +122,32 @@ jobs:
       - name: prisma validate
         run: npx prisma validate
 
+      # ── LOS CANDADOS VAN ANTES DE LA BASE ──────────────────────────────────
+      #
+      # No es cosmético. Un paso que falla corta el job, así que con la suite
+      # detrás de las migraciones un problema del historial de migraciones deja
+      # sin ejecutar los 3.000 candados y la corrida no informa sobre ellos. Los
+      # candados son funciones puras: no tocan Postgres y no tienen por qué
+      # esperar a que la base esté armada.
+      #
+      # Se descubrió en la primera corrida real: `migrate deploy` se cayó en la
+      # segunda migración y no se supo nada del resto.
+      - name: Suite de candados
+        run: npm test
+
       - name: Aplicar las migraciones DESDE CERO
-        # `migrate deploy` sobre una base vacía aplica las 107 en orden. Es el
+        # `migrate deploy` sobre una base vacía aplica las 106 en orden. Es el
         # mismo comando que corre el despliegue, así que lo que se prueba acá es
         # el camino real y no una reconstrucción parecida con `db push`.
+        #
+        # HOY ESTO FALLA, Y NO ES UN PROBLEMA DE ESTA RAMA. El historial no se
+        # puede reproducir desde cero: ninguna migración crea la tabla `Venta`, y
+        # la segunda —`20241202000000_add_venta_campos`, de diciembre de 2024—
+        # le hace ALTER. Falta la migración de base. Producción funciona porque
+        # su base ya existía cuando el historial empezó a escribirse.
+        #
+        # Queda a propósito en rojo y sin tocar. Taparlo con `db push` haría que
+        # el job diga que el camino real anda, cuando lo que andaría es otro.
         run: npx prisma migrate deploy
 
       - name: El schema y las migraciones dicen lo mismo
@@ -140,10 +162,6 @@ jobs:
             --shadow-database-url "$SHADOW_DATABASE_URL" \
             --exit-code
 
-      # ── LOS CANDADOS ───────────────────────────────────────────────────────
-      - name: Suite de candados
-        run: npm test
-
       # ── LAS PRUEBAS QUE NECESITAN BASE ─────────────────────────────────────
       #
       # Esto es lo que ningún candado puede hacer: ejercer las consultas contra
@@ -157,13 +175,18 @@ jobs:
       - name: Resumen
         if: always()
         run: |
+          # Las comillas invertidas van ESCAPADAS. Dentro de comillas dobles, una
+          # comilla invertida sin escapar abre una sustitución de comando: bash
+          # intenta EJECUTAR lo que hay adentro. Sin las barras, la línea de las
+          # migraciones corría `prisma migrate deploy` de verdad —otra vez, y sin
+          # npx— y las otras dos ejecutaban el nombre de la rama y la versión de
+          # Node como si fueran comandos.
           {
-            echo "### Verificación de `${{ github.ref_name }}`"
+            echo "### Verificación de \`${{ github.ref_name }}\`"
             echo ""
-            echo "- Node: `$(node -v)`"
+            echo "- Node: \`$(node -v)\`"
             echo "- Base: PostgreSQL 16 efímera del runner (destruida al terminar el job)"
-            echo ""
-            echo "- Migraciones aplicadas desde cero: `prisma migrate deploy`"
+            echo "- Migraciones aplicadas desde cero: \`prisma migrate deploy\`"
             echo ""
             echo "Sin secretos y sin contacto con producción."
           } >> "$GITHUB_STEP_SUMMARY"
