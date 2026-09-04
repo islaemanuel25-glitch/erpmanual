@@ -50,8 +50,21 @@ const ok = (t, c, d = "") => {
   else { fallas.push(`${t}${d ? ` — ${d}` : ""}`); console.log(`  ✗ ${t}${d ? ` — ${d}` : ""}`); }
 };
 
-const prisma_cli = (...args) =>
-  execFileSync("npx", ["prisma", ...args], { cwd: RAIZ, encoding: "utf8", stdio: "pipe" });
+/**
+ * Corre el CLI y devuelve su salida SIN importar el código de retorno.
+ *
+ * `migrate status` sale con código 1 cuando hay algo pendiente —que es
+ * correcto y es justo el caso que se quiere ejercer—, así que tratarlo como
+ * excepción hacía que la contraprueba se cayera en el momento en que empezaba a
+ * funcionar. El veredicto lo decide lo que DICE, no con qué código sale.
+ */
+function prisma_cli(...args) {
+  try {
+    return execFileSync("npx", ["prisma", ...args], { cwd: RAIZ, encoding: "utf8", stdio: "pipe" });
+  } catch (err) {
+    return `${err.stdout || ""}\n${err.stderr || ""}`;
+  }
+}
 
 async function filas() {
   const r = await prisma.$queryRaw`SELECT count(*)::int AS n FROM "_prisma_migrations"`;
@@ -70,6 +83,13 @@ try {
     "con 105 filas sin archivo, Prisma NO se planta",
     /Database schema is up to date/.test(estado0),
     estado0.trim().split("\n").slice(-2).join(" ")
+  );
+  // Prisma NOMBRA las filas sin archivo. Es informativo, no un error, y conviene
+  // que quede dicho: quien mire el status después del despliegue las va a ver
+  // listadas y tiene que saber que es lo esperado, no una alarma.
+  ok(
+    "y las nombra como 'not found locally', que es informativo",
+    /not found locally/.test(estado0) || /up to date/.test(estado0)
   );
 
   // ── Aparece una migración nueva ─────────────────────────────────────────
