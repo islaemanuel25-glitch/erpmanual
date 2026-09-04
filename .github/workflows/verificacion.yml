@@ -173,18 +173,20 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE erpazul_ci_shadow' \
             || echo "la sombra ya existía"
 
-          # ── POR QUÉ NO SE EXIGE DIFERENCIA CERO ──────────────────────────
+          # ── SE EXIGE DERIVA CERO, Y SE IMPRIME EL DIFF ───────────────────
           #
-          # La baseline crea NUEVE objetos que `schema.prisma` no puede
-          # describir: ocho índices parciales y un CHECK. `migrate diff` compara
-          # lo que producen las migraciones contra lo que declara el schema, así
-          # que SIEMPRE va a ver esos nueve de más y proponer borrarlos. Con
-          # `--exit-code` a secas, este paso quedaría rojo para siempre y
-          # dejaría de informar sobre la deriva de verdad.
+          # Se esperaba que el diff propusiera borrar los nueve objetos del
+          # bloque manual de la baseline, porque `schema.prisma` no puede
+          # declararlos. Se midió y NO es así: sale vacío. Prisma no ve los
+          # índices parciales ni los CHECK en ninguno de los dos lados, así que
+          # no los reporta.
           #
-          # Entonces se mira el CONTENIDO: se exige que lo único que el diff
-          # proponga sea borrar esos nueve. Cualquier otra cosa —una columna, una
-          # tabla, un enum— es deriva real y pone el paso en rojo.
+          # Por eso se puede exigir cero de verdad. Y por eso mismo este paso NO
+          # protege esos nueve: de ésos se ocupa `estructura.mjs`, que los busca
+          # en la base ya construida y compara sus predicados.
+          #
+          # Se imprime el diff aunque esté vacío: cuando algún día no lo esté, lo
+          # primero que se quiere ver es qué propone.
           npx prisma migrate diff \
             --from-migrations ./prisma/migrations \
             --to-schema-datamodel ./prisma/schema.prisma \
