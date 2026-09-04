@@ -73,10 +73,24 @@ async function filas() {
 
 try {
   // ── Punto de partida: el historial de producción ────────────────────────
+  // Cuántas migraciones tiene el directorio activo AHORA. No se fija un número:
+  // la primera versión decía `antes === 106` —105 históricas más la baseline— y
+  // se puso en rojo en cuanto la rama de Ofertas agregó la suya, que es
+  // exactamente lo que una rama tiene derecho a hacer. El invariante no es
+  // cuántas hay: es que las históricas no estorben y que lo nuevo se aplique.
+  const enDisco = fs
+    .readdirSync(path.join(RAIZ, "prisma", "migrations"), { withFileTypes: true })
+    .filter((e) => e.isDirectory()).length;
+  const HISTORICAS = 105;
+
   const antes = await filas();
   console.log(`\n── Punto de partida ${"─".repeat(50)}`);
-  console.log(`   _prisma_migrations: ${antes} filas`);
-  ok("hay 105 históricas + la baseline", antes === 106, `hay ${antes}`);
+  console.log(`   migraciones en disco: ${enDisco} · _prisma_migrations: ${antes} filas`);
+  ok(
+    `hay ${HISTORICAS} históricas + las ${enDisco} del directorio activo`,
+    antes === HISTORICAS + enDisco,
+    `esperaba ${HISTORICAS + enDisco}, hay ${antes}`
+  );
 
   const estado0 = prisma_cli("migrate", "status");
   ok(
