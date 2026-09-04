@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useReducer, useRef } from "react";
+import { useEffect, useState, useCallback, useReducer, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { useUser } from "@/app/context/UserContext";
@@ -19,6 +19,8 @@ import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalImporteServicio from "@/components/pos-ventas/ModalImporteServicio";
 import { sumarTotalServicios, componerCobroSimple } from "@/lib/pos-ventas/servicios";
+import { totalesPorMedio, hayOfertaSoloEfectivoEnCarrito } from "@/lib/ofertas/previewPos";
+import { normalizarRecargos } from "@/lib/recargos-pago/recargoPago";
 import { itemsCrearPayload } from "@/lib/pos-ventas/payloadVenta";
 import { sumarSubtotales } from "@/lib/pos-ventas/lineaPorImporte";
 import ModalTicket from "@/components/pos-ventas/ModalTicket";
@@ -109,8 +111,19 @@ export default function PosVentasPage() {
   const [servicioPendiente, setServicioPendiente] = useState(null);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [comisiones, setComisiones] = useState(null);
+  // Recargo comercial por medio de pago, del local activo. Arranca en el mapa
+  // NEUTRO —todos en cero— y no en null: un carrito que se dibuja antes de que
+  // llegue la respuesta muestra el precio SIN recargo, que es de menos y nunca
+  // de más. Lo contrario le haría pedir plata de más al cliente durante un
+  // instante. Y la ausencia de configuración significa cero de verdad, así que
+  // el estado inicial y "el local no configuró nada" son el mismo valor.
+  const [recargosPorMedio, setRecargosPorMedio] = useState(() => normalizarRecargos([]));
   const [creditoInfo, setCreditoInfo] = useState(null); // { limiteCredito, saldoActual }
   const [ultimoBreakdown, setUltimoBreakdown] = useState(null);
+  // Venta rechazada porque el total de la pantalla ya no era el que corresponde.
+  // No es un error de red ni del cajero: es el aviso de que hay que mirar el
+  // importe nuevo antes de volver a cobrar.
+  const [refrescoDeTotal, setRefrescoDeTotal] = useState(null);
   const [datosPagoEfectivo, setDatosPagoEfectivo] = useState(null); // { pagaCon, vuelto }
   const [puntosActivo, setPuntosActivo] = useState(false);
   const [puntosConfig, setPuntosConfig] = useState(null);
@@ -279,6 +292,35 @@ export default function PosVentasPage() {
         if (data.ok) setComisiones(data.comisiones);
       })
       .catch(() => {});
+  }, [localActual]);
+
+  // ---------------------------------------------------------------------------
+  // Recargo comercial por medio de pago (del local activo)
+  // ---------------------------------------------------------------------------
+  //
+  // El cajero necesita saber cuánto se le suma a cada medio ANTES de cobrar, así
+  // que la ruta acepta `pos.usar` además del permiso de configurarlos.
+  //
+  // Con la misma guarda de carrera que el resto de la configuración del local:
+  // al cambiar de ubicación la respuesta anterior puede llegar después, y sin
+  // esto el POS mostraría el recargo de otra boca. Si la lectura falla se queda
+  // en el mapa neutro: cobrar de menos es un problema; cobrarle de más a un
+  // cliente por un recargo que su local no configuró es otro.
+  useEffect(() => {
+    if (!localActual) return;
+    let vigente = true;
+    fetch(`/api/recargos-pago?localId=${localActual}`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!vigente) return;
+        if (data.ok && Number(data.localId) === Number(localActual)) {
+          setRecargosPorMedio(normalizarRecargos(
+            Object.entries(data.recargos || {}).map(([medio, porcentaje]) => ({ medio, porcentaje }))
+          ));
+        }
+      })
+      .catch(() => {});
+    return () => { vigente = false; };
   }, [localActual]);
 
   // ---------------------------------------------------------------------------
@@ -747,6 +789,35 @@ export default function PosVentasPage() {
 
   // Mínimo a cubrir en efectivo por los servicios de importe variable del carrito.
   const minEfectivoServicios = sumarTotalServicios(state.carrito);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CONDICIÓN COMERCIAL: UN TOTAL POR MEDIO DE PAGO
+  // ─────────────────────────────────────────────────────────────────────────
+  //
+  // Con ofertas y recargos el mismo carrito vale distinto según cómo se cobre, y
+  // el cajero tiene que poder decírselo al cliente ANTES de apretar un botón.
+  // Los cuatro números salen de `totalesPorMedio`, que por dentro llama al MISMO
+  // motor que corre en `pos-ventas/crear`. Acá no se calcula ningún importe.
+  //
+  // Sin ofertas en el carrito y sin recargos configurados los cuatro dan lo
+  // mismo, y el panel se dibuja exactamente como se venía dibujando.
+  const previewPorMedio = useMemo(
+    () =>
+      totalesPorMedio({
+        carrito: state.carrito,
+        recargosPorMedio,
+        descuentos: {
+          // El descuento automático del cliente ya viene resuelto a importe en
+          // `state.descuento`: se pasa como manual para no aplicarlo dos veces.
+          manual: state.descuento,
+          porPuntos: state.descuentoPorPuntos,
+        },
+        subtotalServicios: minEfectivoServicios,
+      }),
+    [state.carrito, state.descuento, state.descuentoPorPuntos, recargosPorMedio, minEfectivoServicios]
+  );
+
+  const hayOfertaSoloEfectivo = hayOfertaSoloEfectivoEnCarrito(state.carrito);
 
   // ---------------------------------------------------------------------------
   // Descuento
@@ -1221,7 +1292,11 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   // Cobrar desde FormaPago (redirige a iniciarCobro)
   // ---------------------------------------------------------------------------
-  const handleCobrar = async ({ formaPago: fp, total: tot, pagos }) => {
+  // `totalPantalla` viaja intacto hasta el body de la venta: es el importe que el
+  // cajero vio en el botón. Pasa por el modal de efectivo sin que nadie lo
+  // recalcule — si se recalculara acá dejaría de ser "lo que se mostró" y el
+  // control del servidor se estaría comparando contra sí mismo.
+  const handleCobrar = async ({ formaPago: fp, total: tot, pagos, totalPantalla }) => {
     // Bloquear cobro sin turno abierto (excepto offline que guarda pendiente)
     if (!turnoActual?.id && !offlineMode) {
       showError("Abrí turno para registrar ventas");
@@ -1260,14 +1335,14 @@ export default function PosVentasPage() {
     if (Array.isArray(pagos) && pagos.length > 0) {
       const efectivoTender = pagos.find((p) => p.medio === "efectivo");
       if (efectivoTender) {
-        dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalEfectivo", data: { total: tot, montoEfectivo: Number(efectivoTender.monto), formaPago: fp, pagos } } });
+        dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalEfectivo", data: { total: tot, montoEfectivo: Number(efectivoTender.monto), formaPago: fp, pagos, totalPantalla } } });
       } else {
-        ejecutarCobro({ formaPago: fp, total: tot, pagos });
+        ejecutarCobro({ formaPago: fp, total: tot, pagos, totalPantalla });
       }
     } else if (fp === "efectivo") {
-      dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalEfectivo", data: { total: tot, formaPago: fp } } });
+      dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalEfectivo", data: { total: tot, formaPago: fp, totalPantalla } } });
     } else {
-      ejecutarCobro({ formaPago: fp, total: tot });
+      ejecutarCobro({ formaPago: fp, total: tot, totalPantalla });
     }
   };
 
@@ -1345,6 +1420,7 @@ export default function PosVentasPage() {
     setErrorMsg("");
     setSuccessMsg("");
     setUltimoBreakdown(null);
+    setRefrescoDeTotal(null);
     dispatch({ type: ActionTypes.SET_COBRANDO, payload: true });
 
     // Generar clientTxnId para idempotencia
@@ -1363,6 +1439,10 @@ export default function PosVentasPage() {
           clienteId: state.clienteSeleccionado?.id || null,
           turnoId: turnoActual?.id || null,
           formaPago: datos.formaPago,
+          // EL NÚMERO QUE VIO EL CAJERO. El backend recalcula el suyo contra la
+          // base y, si no coinciden, RECHAZA la venta en vez de registrar otro
+          // total en silencio. Nunca se usa para cobrar: solo para comparar.
+          totalPantalla: datos.totalPantalla,
           // Pago dividido: si el panel entrega tenders, el backend los usa y
           // recalcula todo. Sin `pagos`, cae al compat legacy (1 tender por formaPago).
           pagos: Array.isArray(datos.pagos) && datos.pagos.length > 0 ? datos.pagos : undefined,
@@ -1406,15 +1486,49 @@ export default function PosVentasPage() {
         // vencimiento del intervalo: se refresca el estado del arqueo.
         arqueo.refrescar();
 
+        // ── EL TICKET SE ARMA CON LO QUE DEVOLVIÓ EL BACKEND ────────────────
+        //
+        // `state.carrito` NO puede ser la fuente: tiene el precio NORMAL, y con
+        // una oferta el papel saldría "9 × $1.000" con un total de $8.100. Las
+        // líneas de `bd.lineas` son las que se acaban de escribir en
+        // VentaDetalle, con el precio realmente cobrado, así que cantidad ×
+        // precio suma el subtotal impreso.
+        //
+        // El carrito queda de respaldo para una venta sin breakdown —la cola
+        // offline, o un backend viejo durante un despliegue—, donde no hay
+        // ofertas ni recargos y las dos fuentes dicen lo mismo.
+        const lineasTicket = Array.isArray(bd?.lineas) && bd.lineas.length > 0
+          ? bd.lineas.map((l) => ({
+              nombre: l.nombre,
+              precio: l.precio,
+              cantidad: l.cantidad,
+              // Lo que habría costado sin oferta. El ticket lo usa para decir
+              // cuánto se ahorró; si no hubo oferta viene igual al precio.
+              precioNormal: l.precioNormal,
+              ofertaNombre: l.ofertaNombre,
+              descuentoPromocional: l.descuentoPromocional,
+              esServicio: l.esServicio,
+              importeBaseServicio: l.importeBaseServicio,
+              recargoServicioPct: l.recargoServicioPct,
+              recargoServicioImporte: l.recargoServicioImporte,
+            }))
+          : state.carrito.map((item) => ({
+              nombre: item.nombre,
+              precio: item.precio,
+              cantidad: item.cantidad,
+            }));
+
         // Preparar datos del ticket
         const ventaTicket = {
           numero: data.numero,
           fecha: new Date().toISOString(),
-          items: state.carrito.map((item) => ({
-            nombre: item.nombre,
-            precio: item.precio,
-            cantidad: item.cantidad,
-          })),
+          items: lineasTicket,
+          // Condición comercial, para que el papel pueda explicar por qué el
+          // subtotal y el total no coinciden.
+          descuentoPromocional: bd?.descuentoPromocional ?? 0,
+          recargoPagoPct: bd?.recargoPagoPct ?? 0,
+          recargoPagoImporte: bd?.recargoPagoImporte ?? 0,
+          recargoPagoMedio: bd?.recargoPagoMedio ?? null,
           subtotal: bd ? bd.subtotal : subtotal,
           descuento: bd ? bd.descuentoTotal : state.descuento,
           descuentoAutomatico: bd ? bd.descuentoAutomatico : 0,
@@ -1455,6 +1569,23 @@ export default function PosVentasPage() {
         dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
         setDatosPagoEfectivo(null);
         dispatch({ type: ActionTypes.SET_SALDO_PUNTOS, payload: 0 });
+      } else if (data.code === "TOTAL_DESACTUALIZADO") {
+        // ── LA PANTALLA ESTABA VIEJA ────────────────────────────────────────
+        //
+        // El backend no registró nada: entre que se armó el carrito y se apretó
+        // cobrar cambió una oferta, un precio o un recargo. NO se reintenta solo
+        // —eso cobraría un importe que nadie miró—: se muestra el total nuevo, se
+        // refresca el breakdown y el cajero vuelve a confirmar sabiendo cuánto
+        // pedir. El carrito queda intacto.
+        setUltimoBreakdown(data.breakdown || null);
+        setRefrescoDeTotal({
+          totalPantalla: data.totalPantalla,
+          totalEsperado: data.totalEsperado,
+          breakdown: data.breakdown || null,
+        });
+        const msg = data.error || "El total cambió. Revisá el importe antes de cobrar.";
+        setErrorMsg(msg);
+        showError(msg);
       } else {
         // Manejar errores específicos
         if (res.status === 409) {
@@ -1929,6 +2060,23 @@ export default function PosVentasPage() {
 
           {/* Derecha: Panel de pago */}
           <div className="lg:flex-[2] lg:min-w-[360px] lg:max-w-[520px] shrink-0">
+            {/* ── EL TOTAL CAMBIÓ ENTRE QUE SE MOSTRÓ Y SE QUISO COBRAR ──────
+                No se registró ninguna venta. El cajero ve los dos números y
+                vuelve a apretar el medio: no hay reintento automático, porque
+                cobrar un importe que nadie miró es justo lo que esto evita. */}
+            {refrescoDeTotal && (
+              <div className="mb-2 px-3 py-2 rounded-lg text-xs text-center pos-text-danger"
+                style={{ background: "color-mix(in srgb, var(--pos-danger) 12%, transparent)" }}>
+                <div className="font-bold">La venta NO se registró: el total cambió.</div>
+                <div className="mt-1">
+                  La pantalla mostraba <b className="tabular-nums">${Number(refrescoDeTotal.totalPantalla).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>
+                  {" y ahora corresponde "}
+                  <b className="tabular-nums">${Number(refrescoDeTotal.totalEsperado).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b>.
+                </div>
+                <div className="mt-1">Confirmá el importe con el cliente y volvé a elegir el medio.</div>
+              </div>
+            )}
+
             <FormaPago
               subtotal={subtotal}
               descuento={state.descuento}
@@ -1945,6 +2093,9 @@ export default function PosVentasPage() {
               comisiones={comisiones}
               clienteSeleccionado={state.clienteSeleccionado}
               minEfectivoServicios={minEfectivoServicios}
+              previewPorMedio={previewPorMedio}
+              recargosPorMedio={recargosPorMedio}
+              hayOfertaSoloEfectivo={hayOfertaSoloEfectivo}
             />
             {/* Mensaje offline */}
             {offlineMode && (

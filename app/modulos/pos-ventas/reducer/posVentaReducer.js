@@ -95,9 +95,27 @@ export function posVentaReducer(state, action) {
         carrito: [
           {
             productoBaseId: producto.productoBaseId,
+            // ── EL ID DE LA UBICACIÓN, QUE ES POR EL QUE SE PREGUNTAN LAS OFERTAS ──
+            //
+            // El carrito venía trabajando solo con `productoBaseId` porque el
+            // backend hacía la traducción. Una oferta es de UN local sobre UN
+            // ProductoLocal, así que el preview de la pantalla no puede
+            // resolverla sin este id: sin él tendría que adivinar la ubicación,
+            // que es exactamente cómo se termina mostrando el precio de otra
+            // boca. Lo devuelve `pos-ventas/buscar-producto`.
+            productoLocalId: producto.productoLocalId ?? null,
             nombre: producto.nombre,
             precio: producto.precioVenta,
             cantidad: cantAdd,
+            // ── LA OFERTA VIGENTE AL MOMENTO DE AGREGAR ────────────────────
+            //
+            // Snapshot informativo: sirve para MOSTRAR el precio promocional y
+            // para calcular el preview por medio de pago. NO es lo que se cobra
+            // —eso lo resuelve el servidor contra la base al registrar— y puede
+            // quedar viejo si la oferta vence con el carrito abierto. Ese caso
+            // no queda en silencio: el backend rechaza la venta con
+            // TOTAL_DESACTUALIZADO y la pantalla se refresca.
+            oferta: producto.oferta ?? null,
             stockMax: producto.stock,
             modoSalida: producto.modoSalidaDefault || "UNIDAD",
             precioVentaUnitario: producto.precioVentaUnitario ?? producto.precioVenta,

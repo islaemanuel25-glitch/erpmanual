@@ -7,6 +7,8 @@ import { IconoMedio } from "@/components/pos-ventas/IconosMedios";
 import { showError } from "@/components/sunmi/SunmiToast";
 import { aCentavos } from "@/lib/pos-ventas/pagos";
 import { componerCobroSimple, evaluarDivisionPago } from "@/lib/pos-ventas/servicios";
+import { avisoPagoCombinado, recargoDeVenta } from "@/lib/recargos-pago/recargoPago";
+import { aMedioEnum } from "@/lib/ofertas/previewPos";
 
 const COMISION_DEFAULT = 7;
 
@@ -57,9 +59,49 @@ function FormaPago({
   comisiones = null,
   clienteSeleccionado = null,
   minEfectivoServicios = 0,
+  // ── CONDICIÓN COMERCIAL: EL TOTAL DEJÓ DE SER UN NÚMERO ───────────────────
+  //
+  // `previewPorMedio` es la salida de `totalesPorMedio` (lib/ofertas/previewPos):
+  // un total por cada medio, más `__paraMedios(medios[])` para el panel dividido,
+  // donde el conjunto lo arma la persona. Todos esos números los produjo el MISMO
+  // motor que corre en el servidor al cobrar; acá no se calcula ninguno.
+  //
+  // Cuando llega `null` —modo offline, o una pantalla que todavía no lo pasa—
+  // este componente se comporta EXACTAMENTE como antes, usando `subtotal` y los
+  // descuentos. Esa rama no se tocó a propósito: es el camino por donde entra la
+  // plata todos los días.
+  previewPorMedio = null,
+  recargosPorMedio = null,
+  hayOfertaSoloEfectivo = false,
 }) {
   const base = subtotal - descuento - descuentoPorPuntos;
-  const total = base; // Cliente paga subtotal - descuentos, SIN comisión
+
+  // El total de un conjunto de medios. Sin preview, el de siempre.
+  const totalDe = (medios) => {
+    if (!previewPorMedio) return base;
+    if (medios.length === 1) {
+      const p = previewPorMedio[aMedioEnum(medios[0])];
+      if (p) return p.total;
+    }
+    return previewPorMedio.__paraMedios ? previewPorMedio.__paraMedios(medios).total : base;
+  };
+
+  // ── ¿HACE FALTA MOSTRAR UN NÚMERO POR BOTÓN? ─────────────────────────────
+  //
+  // Solo cuando los cuatro NO dan lo mismo. Sin ofertas y sin recargos —que es
+  // casi todo el día en casi todos los locales— los cuatro coinciden y el panel
+  // queda idéntico a como estaba: un total grande arriba y cuatro botones. Poner
+  // el mismo número cuatro veces no informa, ocupa lugar y desplaza los botones.
+  const totalesMedios = previewPorMedio
+    ? MEDIOS_COBRO.map((m) => aCentavos(previewPorMedio[aMedioEnum(m.key)]?.total ?? base))
+    : [];
+  const totalPorMedioDifiere =
+    totalesMedios.length > 0 && new Set(totalesMedios).size > 1;
+
+  // El total "sin elegir medio". Con los cuatro iguales es ese valor común (que
+  // ya puede incluir una oferta de cualquier medio); si difieren, no existe un
+  // único total honesto y el número grande se reemplaza por los de cada botón.
+  const total = previewPorMedio && !totalPorMedioDifiere ? totalDe(["efectivo"]) : base;
 
   // ── Servicios de importe variable: mínimo a cubrir en EFECTIVO ────────────
   const minEf = Math.max(0, Number(minEfectivoServicios) || 0);
@@ -86,18 +128,44 @@ function FormaPago({
   }
 
   // ── Cobro SIMPLE: un medio → componer payload server-authoritative ─────────
+  //
+  // El total que se manda es el DE ESE MEDIO, no el de la pantalla: es el mismo
+  // número que el cajero acaba de ver en el botón que apretó. Viaja además como
+  // `totalPantalla` para que el servidor pueda rechazar la venta si su cuenta da
+  // otra cosa, en vez de registrar un total distinto del que se le pidió al
+  // cliente.
   const cobrarSimple = (medio) => {
     if (!puedeVender) return;
     if (medio === "fiado" && hayServicios) {
       return showError("No se puede fiar una venta que contiene servicios");
     }
-    onCobrar(componerCobroSimple({ medio, total, minEfectivoServicios: minEf }));
+    const totalMedio = totalDe([medio]);
+    onCobrar({
+      ...componerCobroSimple({ medio, total: totalMedio, minEfectivoServicios: minEf }),
+      totalPantalla: totalMedio,
+    });
   };
 
   // ── Modo AVANZADO: editor de filas (medio + importe). Lógica en helper puro. ──
-  const div = evaluarDivisionPago({ filas, total, minEfectivoServicios: minEf });
-  const puedeCobrarDividido = puedeVender && div.puedeCobrar;
+  //
+  // El total del panel dividido SE RECALCULA con el conjunto de medios elegido:
+  // agregar débito a un pago en efectivo puede perder una oferta de solo efectivo
+  // Y sumar un recargo, y las dos cosas mueven el número que el cajero tiene que
+  // cobrar. Los importes que se tipean abajo tienen que sumar ESE total.
   const mediosUsados = filas.map((f) => f.medio);
+  const totalDividido = totalDe(mediosUsados);
+  const div = evaluarDivisionPago({ filas, total: totalDividido, minEfectivoServicios: minEf });
+  const puedeCobrarDividido = puedeVender && div.puedeCobrar;
+
+  // Aviso del pago combinado. El texto lo arma `recargoPago.js` para que el POS y
+  // el backend digan exactamente lo mismo; acá solo se lo muestra.
+  const avisoCombinado = recargosPorMedio
+    ? avisoPagoCombinado({
+        mediosUsados: mediosUsados.map(aMedioEnum),
+        recargo: recargoDeVenta(mediosUsados.map(aMedioEnum), recargosPorMedio),
+        hayOfertaSoloEfectivoEnCarrito: hayOfertaSoloEfectivo,
+      })
+    : null;
 
   // Opciones de medio para una fila: su propio medio + los aún no usados (evita duplicados).
   const opcionesPara = (idx) =>
@@ -130,7 +198,7 @@ function FormaPago({
     if (!puedeCobrarDividido) return;
     const pagos = div.pagos;
     const fp = pagos.length === 1 ? pagos[0].medio : "mixto";
-    onCobrar({ formaPago: fp, total, pagos });
+    onCobrar({ formaPago: fp, total: totalDividido, pagos, totalPantalla: totalDividido });
   };
 
   const BTN_PRIMARIO = "sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md";
@@ -139,10 +207,10 @@ function FormaPago({
   // Texto/estado del botón de cobro del modo dividido.
   let textoCobrarDiv;
   if (cobrando) textoCobrarDiv = "Procesando...";
-  else if (puedeCobrarDividido) textoCobrarDiv = `COBRAR $${formatPrecio(total)}`;
+  else if (puedeCobrarDividido) textoCobrarDiv = `COBRAR $${formatPrecio(totalDividido)}`;
   else if (div.estado === "falta") textoCobrarDiv = `FALTAN $${formatPrecio(div.restante)}`;
   else if (div.estado === "excedente") textoCobrarDiv = `SOBRAN $${formatPrecio(div.excedente)}`;
-  else textoCobrarDiv = `COBRAR $${formatPrecio(total)}`;
+  else textoCobrarDiv = `COBRAR $${formatPrecio(totalDividido)}`;
 
   return (
     <SunmiCard className="p-3 lg:p-4 flex flex-col gap-3">
@@ -158,8 +226,20 @@ function FormaPago({
 
           <div className="text-center">
             <span className="text-xs pos-text-muted">Total: </span>
-            <span className="text-xl font-black pos-text-accent tabular-nums">${formatPrecio(total)}</span>
+            <span className="text-xl font-black pos-text-accent tabular-nums">${formatPrecio(totalDividido)}</span>
           </div>
+
+          {/* El cajero tiene que conocer el total NUEVO antes de registrar, no
+              después: con dos medios puede haberse perdido una oferta de solo
+              efectivo y haberse sumado el recargo más alto. */}
+          {avisoCombinado && (
+            <div className="px-2 py-1.5 rounded-lg text-xs text-center font-medium pos-text-accent"
+              style={{ background: "color-mix(in srgb, var(--pos-accent) 12%, transparent)" }}>
+              {avisoCombinado.split("\n").map((linea, i) => (
+                <div key={i}>{linea}</div>
+              ))}
+            </div>
+          )}
 
           {hayServicios && (
             <div className="text-xs text-center pos-text-muted">
@@ -209,7 +289,7 @@ function FormaPago({
 
           {/* Resumen */}
           <div className="flex flex-col gap-0.5 text-sm pt-1 border-t border-[var(--app-border)]">
-            <div className="flex justify-between"><span className="pos-text-muted">Total</span><b className="tabular-nums">${formatPrecio(total)}</b></div>
+            <div className="flex justify-between"><span className="pos-text-muted">Total</span><b className="tabular-nums">${formatPrecio(totalDividido)}</b></div>
             <div className="flex justify-between"><span className="pos-text-muted">Pagado</span><b className="tabular-nums">${formatPrecio(div.pagado)}</b></div>
             {div.estado === "excedente" ? (
               <div className="flex justify-between pos-text-danger"><span>Excedente</span><b className="tabular-nums">${formatPrecio(div.excedente)}</b></div>
@@ -235,12 +315,27 @@ function FormaPago({
       ) : (
         /* ═══════════════ COBRO SIMPLE ═══════════════ */
         <>
-          {/* 1) TOTAL */}
+          {/* 1) TOTAL
+              Cuando los cuatro medios NO dan lo mismo, no hay un total único que
+              sea verdad, y un número grande arriba sería falso en tres de los
+              cuatro casos. En vez de inventar uno se dice el rango y el importe
+              real vive en cada botón. Con los cuatro iguales —que es casi todo el
+              día— esto queda exactamente como estaba. */}
           <div className="text-center py-1">
-            <div className="text-[11px] pos-text-muted uppercase tracking-widest font-medium">Total a cobrar</div>
-            <div className="text-4xl lg:text-5xl font-black pos-text-accent mt-1 tabular-nums tracking-tight">
-              ${formatPrecio(total)}
+            <div className="text-[11px] pos-text-muted uppercase tracking-widest font-medium">
+              {totalPorMedioDifiere ? "Total según el medio" : "Total a cobrar"}
             </div>
+            {totalPorMedioDifiere ? (
+              <div className="text-2xl lg:text-3xl font-black pos-text-accent mt-1 tabular-nums tracking-tight">
+                ${formatPrecio(Math.min(...MEDIOS_COBRO.map((m) => totalDe([m.key]))))}
+                {" – "}
+                ${formatPrecio(Math.max(...MEDIOS_COBRO.map((m) => totalDe([m.key]))))}
+              </div>
+            ) : (
+              <div className="text-4xl lg:text-5xl font-black pos-text-accent mt-1 tabular-nums tracking-tight">
+                ${formatPrecio(total)}
+              </div>
+            )}
           </div>
 
           {offlineMode ? (
@@ -278,16 +373,39 @@ function FormaPago({
               )}
 
               <div className="text-sm font-medium text-center pos-text-muted-strong">
-                {hayServicios ? `Elegí cómo pagar $${formatPrecio(resto)}` : "Elegí cómo cobrar"}
+                {hayServicios
+                  ? `Elegí cómo pagar $${formatPrecio(resto)}`
+                  : totalPorMedioDifiere
+                  ? "Elegí cómo cobrar — el total cambia según el medio"
+                  : "Elegí cómo cobrar"}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 {MEDIOS_COBRO.map((m) => (
                   <button key={m.key} type="button" onClick={() => cobrarSimple(m.key)} disabled={!puedeVender}
-                    className={`${BTN_MEDIO} flex items-center justify-center gap-2 whitespace-nowrap`}>
+                    className={`${BTN_MEDIO} ${
+                      totalPorMedioDifiere
+                        ? "flex flex-col items-center justify-center gap-0 py-1"
+                        : "flex items-center justify-center gap-2 whitespace-nowrap"
+                    }`}>
                     {/* El logo de MP es un óvalo (más ancho): se achica lo mínimo para que
                         "Mercado Pago" entre en una sola línea, sin deformarlo. */}
-                    <IconoMedio medio={m.key} size={m.key === "mercadopago" ? 19 : 22} /> {m.label}
+                    {totalPorMedioDifiere ? (
+                      <>
+                        <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+                          <IconoMedio medio={m.key} size={m.key === "mercadopago" ? 16 : 18} /> {m.label}
+                        </span>
+                        {/* EL NÚMERO QUE EL CAJERO NECESITA ANTES DE TOCAR NADA.
+                            Sale del mismo motor que va a cobrar el servidor. */}
+                        <span className="text-base font-black pos-text-accent tabular-nums leading-tight">
+                          ${formatPrecio(totalDe([m.key]))}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <IconoMedio medio={m.key} size={m.key === "mercadopago" ? 19 : 22} /> {m.label}
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
