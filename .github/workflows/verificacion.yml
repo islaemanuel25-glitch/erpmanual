@@ -136,19 +136,31 @@ jobs:
         run: npm test
 
       - name: Aplicar las migraciones DESDE CERO
-        # `migrate deploy` sobre una base vacía aplica las 106 en orden. Es el
-        # mismo comando que corre el despliegue, así que lo que se prueba acá es
-        # el camino real y no una reconstrucción parecida con `db push`.
+        # El mismo comando que corre el despliegue, sobre una base vacía. Desde
+        # el saneamiento del historial hay UNA sola migración —la baseline— y
+        # esto tiene que quedar en verde: si vuelve a ponerse rojo, el historial
+        # dejó de ser reproducible otra vez.
         #
-        # HOY ESTO FALLA, Y NO ES UN PROBLEMA DE ESTA RAMA. El historial no se
-        # puede reproducir desde cero: ninguna migración crea la tabla `Venta`, y
-        # la segunda —`20241202000000_add_venta_campos`, de diciembre de 2024—
-        # le hace ALTER. Falta la migración de base. Producción funciona porque
-        # su base ya existía cuando el historial empezó a escribirse.
-        #
-        # Queda a propósito en rojo y sin tocar. Taparlo con `db push` haría que
-        # el job diga que el camino real anda, cuando lo que andaría es otro.
+        # NO se reemplaza por `db push` en ningún caso. `db push` construye una
+        # base parecida por otro camino, y entonces el job diría que el camino
+        # real anda cuando lo que anda es otro.
         run: npx prisma migrate deploy
+
+      - name: Comprobar la estructura, con los 9 objetos escritos a mano
+        # Lo que ningún candado puede ver: que la base construida tenga los ocho
+        # índices parciales CON SU PREDICADO y el CHECK de combos, que son los
+        # objetos que Prisma no sabe expresar y que viven en un bloque de SQL
+        # manual al final de la baseline. Si alguien regenera la baseline y se
+        # olvida de ese bloque, la base sale sin sus invariantes y todo lo demás
+        # sigue en verde.
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/estructura.mjs
+
+      - name: Comparar contra la estructura de producción
+        # Diferencia con el paso anterior: aquél comprueba una lista de objetos
+        # que se sabe que tienen que estar; éste compara TODO contra el retrato
+        # de producción y falla ante cualquier diferencia que no esté declarada
+        # con su motivo. Uno busca lo que se espera, el otro busca lo que sobra.
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/comparar-con-produccion.mjs
 
       - name: El schema y las migraciones dicen lo mismo
         # Detecta la deriva: un cambio escrito en schema.prisma que nadie migró.
@@ -170,7 +182,44 @@ jobs:
       - name: Pruebas de base (ofertas y recargos)
         # Con el mismo cargador que usa la suite: el script importa handlers de
         # rutas, y esas rutas resuelven el alias `@/…` que Node no conoce.
-        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/ofertas.mjs
+        #
+        # El `if` NO es para saltear un fallo: es porque este archivo vive en la
+        # rama de Ofertas y en `main` todavía no existe. Saltearlo cuando no está
+        # es lo correcto; saltearlo cuando está sería taparlo, y por eso la
+        # condición mira el archivo y no el resultado.
+        run: |
+          set -euo pipefail
+          if [ -f scripts/pruebas-db/ofertas.mjs ]; then
+            node --import ./scripts/alias-loader.mjs scripts/pruebas-db/ofertas.mjs
+          else
+            echo "No hay scripts/pruebas-db/ofertas.mjs en esta rama: nada que correr."
+          fi
+
+      # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
+      #
+      # Producción conserva sus 105 migraciones viejas en `_prisma_migrations` y
+      # el directorio activo ahora tiene una sola. ¿Qué hace `migrate deploy`
+      # cuando la base tiene filas que ya no existen como archivo?
+      #
+      # Se contesta MIDIÉNDOLO acá, sobre una base descartable, en vez de
+      # deducirlo de la documentación. Es lo que hay que saber antes de tocar
+      # producción, y es barato: se siembran las filas viejas y se mira.
+      #
+      # Va ÚLTIMO a propósito: ensucia `_prisma_migrations` de la base efímera y
+      # no tiene por qué influir en ningún paso anterior.
+      - name: Simular el historial de producción y ver qué diría el despliegue
+        run: |
+          set -uo pipefail
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/simular-historial-produccion.mjs
+          echo ""
+          echo "── prisma migrate status ──────────────────────────────────────"
+          npx prisma migrate status || true
+          echo ""
+          echo "── prisma migrate deploy ──────────────────────────────────────"
+          npx prisma migrate deploy || true
+          echo ""
+          echo "Este paso NO decide el veredicto del job: es un informe para la"
+          echo "tanda de despliegue. Por eso los comandos llevan '|| true'."
 
       - name: Resumen
         if: always()

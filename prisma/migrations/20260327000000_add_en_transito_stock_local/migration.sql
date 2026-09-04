@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE "StockLocal" ADD COLUMN "enTransito" DECIMAL(12,2) NOT NULL DEFAULT 0;

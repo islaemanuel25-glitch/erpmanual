@@ -1,0 +1,186 @@
+"AreaFisica" :: AreaFisica_pkey :: PRIMARY KEY (id)
+"ArqueoCaja" :: ArqueoCaja_cajaMovimientoRetiroId_fkey :: FOREIGN KEY ("cajaMovimientoRetiroId") REFERENCES "CajaMovimiento"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ArqueoCaja" :: ArqueoCaja_entregadoPorId_fkey :: FOREIGN KEY ("entregadoPorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ArqueoCaja" :: ArqueoCaja_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ArqueoCaja" :: ArqueoCaja_operadorId_fkey :: FOREIGN KEY ("operadorId") REFERENCES "OperadorLocal"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ArqueoCaja" :: ArqueoCaja_pkey :: PRIMARY KEY (id)
+"ArqueoCaja" :: ArqueoCaja_postergadoPorId_fkey :: FOREIGN KEY ("postergadoPorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ArqueoCaja" :: ArqueoCaja_realizadoPorId_fkey :: FOREIGN KEY ("realizadoPorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ArqueoCaja" :: ArqueoCaja_turnoId_fkey :: FOREIGN KEY ("turnoId") REFERENCES "Turno"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ArqueoCaja" :: ArqueoCaja_usuarioId_fkey :: FOREIGN KEY ("usuarioId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ArqueoPostergacion" :: ArqueoPostergacion_autorizadoPorId_fkey :: FOREIGN KEY ("autorizadoPorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ArqueoPostergacion" :: ArqueoPostergacion_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ArqueoPostergacion" :: ArqueoPostergacion_pkey :: PRIMARY KEY (id)
+"ArqueoPostergacion" :: ArqueoPostergacion_postergadoPorId_fkey :: FOREIGN KEY ("postergadoPorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ArqueoPostergacion" :: ArqueoPostergacion_turnoId_fkey :: FOREIGN KEY ("turnoId") REFERENCES "Turno"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"AuditoriaBitacora" :: AuditoriaBitacora_pkey :: PRIMARY KEY (id)
+"AuditoriaStock" :: AuditoriaStock_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"AuditoriaStock" :: AuditoriaStock_pkey :: PRIMARY KEY (id)
+"AuditoriaStock" :: AuditoriaStock_userId_fkey :: FOREIGN KEY ("userId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"CajaMovimiento" :: CajaMovimiento_pkey :: PRIMARY KEY (id)
+"CajaMovimiento" :: CajaMovimiento_turnoId_fkey :: FOREIGN KEY ("turnoId") REFERENCES "Turno"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"CajaMovimiento" :: CajaMovimiento_usuarioId_fkey :: FOREIGN KEY ("usuarioId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"CambioPendiente" :: CambioPendiente_cierrePreparacionId_fkey :: FOREIGN KEY ("cierrePreparacionId") REFERENCES "CierrePreparacion"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"CambioPendiente" :: CambioPendiente_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"CambioPendiente" :: CambioPendiente_pkey :: PRIMARY KEY (id)
+"CambioPendiente" :: CambioPendiente_turnoDestinoId_fkey :: FOREIGN KEY ("turnoDestinoId") REFERENCES "Turno"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"CambioPendiente" :: CambioPendiente_turnoOrigenId_fkey :: FOREIGN KEY ("turnoOrigenId") REFERENCES "Turno"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"Categoria" :: Categoria_pkey :: PRIMARY KEY (id)
+"CierrePreparacion" :: CierrePreparacion_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"CierrePreparacion" :: CierrePreparacion_pkey :: PRIMARY KEY (id)
+"CierrePreparacion" :: CierrePreparacion_turnoId_fkey :: FOREIGN KEY ("turnoId") REFERENCES "Turno"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"Cliente" :: Cliente_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"Cliente" :: Cliente_listaPrecioId_fkey :: FOREIGN KEY ("listaPrecioId") REFERENCES "ListaPrecio"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Cliente" :: Cliente_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Cliente" :: Cliente_localVinculadoId_fkey :: FOREIGN KEY ("localVinculadoId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Cliente" :: Cliente_pkey :: PRIMARY KEY (id)
+"ClientePuntoMovimiento" :: ClientePuntoMovimiento_clienteId_fkey :: FOREIGN KEY ("clienteId") REFERENCES "Cliente"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ClientePuntoMovimiento" :: ClientePuntoMovimiento_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ClientePuntoMovimiento" :: ClientePuntoMovimiento_pkey :: PRIMARY KEY (id)
+"ClientePuntoMovimiento" :: ClientePuntoMovimiento_userId_fkey :: FOREIGN KEY ("userId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ClientePuntoMovimiento" :: ClientePuntoMovimiento_ventaId_fkey :: FOREIGN KEY ("ventaId") REFERENCES "Venta"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ClienteTag" :: ClienteTag_clienteId_fkey :: FOREIGN KEY ("clienteId") REFERENCES "Cliente"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ClienteTag" :: ClienteTag_pkey :: PRIMARY KEY ("clienteId", "tagId")
+"ClienteTag" :: ClienteTag_tagId_fkey :: FOREIGN KEY ("tagId") REFERENCES "TagCliente"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ComboComponente" :: ComboComponente_comboPL_fkey :: FOREIGN KEY ("comboProductoLocalId", "comboLocalId") REFERENCES "ProductoLocal"(id, "localId") ON UPDATE CASCADE ON DELETE CASCADE
+"ComboComponente" :: ComboComponente_componentePL_fkey :: FOREIGN KEY ("componenteProductoLocalId", "componenteLocalId") REFERENCES "ProductoLocal"(id, "localId") ON UPDATE CASCADE ON DELETE RESTRICT
+"ComboComponente" :: ComboComponente_mismo_local_check :: CHECK (("comboLocalId" = "componenteLocalId"))
+"ComboComponente" :: ComboComponente_pkey :: PRIMARY KEY (id)
+"ComprobanteArchivo" :: ComprobanteArchivo_comprobanteId_fkey :: FOREIGN KEY ("comprobanteId") REFERENCES "ComprobanteProveedor"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ComprobanteArchivo" :: ComprobanteArchivo_pkey :: PRIMARY KEY (id)
+"ComprobanteLinea" :: ComprobanteLinea_comprobanteId_fkey :: FOREIGN KEY ("comprobanteId") REFERENCES "ComprobanteProveedor"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ComprobanteLinea" :: ComprobanteLinea_pkey :: PRIMARY KEY (id)
+"ComprobanteProveedor" :: ComprobanteProveedor_pkey :: PRIMARY KEY (id)
+"ComprobanteProveedor" :: ComprobanteProveedor_proveedorId_fkey :: FOREIGN KEY ("proveedorId") REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ConfiguracionGrupo" :: ConfiguracionGrupo_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ConfiguracionGrupo" :: ConfiguracionGrupo_pkey :: PRIMARY KEY (id)
+"ConfiguracionLocal" :: ConfiguracionLocal_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ConfiguracionLocal" :: ConfiguracionLocal_pkey :: PRIMARY KEY (id)
+"Grupo" :: Grupo_pkey :: PRIMARY KEY (id)
+"GrupoDeposito" :: GrupoDeposito_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"GrupoDeposito" :: GrupoDeposito_listaPrecioDefaultId_fkey :: FOREIGN KEY ("listaPrecioDefaultId") REFERENCES "ListaPrecio"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"GrupoDeposito" :: GrupoDeposito_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"GrupoDeposito" :: GrupoDeposito_pkey :: PRIMARY KEY (id)
+"GrupoLocal" :: GrupoLocal_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"GrupoLocal" :: GrupoLocal_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"GrupoLocal" :: GrupoLocal_pkey :: PRIMARY KEY (id)
+"ImportacionListaFila" :: ImportacionListaFila_importacionId_fkey :: FOREIGN KEY ("importacionId") REFERENCES "ImportacionListaProveedor"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ImportacionListaFila" :: ImportacionListaFila_pkey :: PRIMARY KEY (id)
+"ImportacionListaFila" :: ImportacionListaFila_productoBaseId_fkey :: FOREIGN KEY ("productoBaseId") REFERENCES "ProductoBase"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ImportacionListaProveedor" :: ImportacionListaProveedor_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ImportacionListaProveedor" :: ImportacionListaProveedor_pkey :: PRIMARY KEY (id)
+"ImportacionListaProveedor" :: ImportacionListaProveedor_proveedorId_fkey :: FOREIGN KEY ("proveedorId") REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ImportacionListaProveedor" :: ImportacionListaProveedor_usuarioId_fkey :: FOREIGN KEY ("usuarioId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ListaPrecio" :: ListaPrecio_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ListaPrecio" :: ListaPrecio_grupoId_nombre_key :: UNIQUE ("grupoId", nombre)
+"ListaPrecio" :: ListaPrecio_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ListaPrecio" :: ListaPrecio_pkey :: PRIMARY KEY (id)
+"LlamadaLector" :: LlamadaLector_pkey :: PRIMARY KEY (id)
+"Local" :: Local_pkey :: PRIMARY KEY (id)
+"MovimientoCuenta" :: MovimientoCuenta_clienteId_fkey :: FOREIGN KEY ("clienteId") REFERENCES "Cliente"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"MovimientoCuenta" :: MovimientoCuenta_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"MovimientoCuenta" :: MovimientoCuenta_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"MovimientoCuenta" :: MovimientoCuenta_pkey :: PRIMARY KEY (id)
+"MovimientoCuenta" :: MovimientoCuenta_userId_fkey :: FOREIGN KEY ("userId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"MovimientoCuenta" :: MovimientoCuenta_ventaId_fkey :: FOREIGN KEY ("ventaId") REFERENCES "Venta"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Notificacion" :: Notificacion_pkey :: PRIMARY KEY (id)
+"NotificacionLectura" :: NotificacionLectura_notificacionId_fkey :: FOREIGN KEY ("notificacionId") REFERENCES "Notificacion"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"NotificacionLectura" :: NotificacionLectura_pkey :: PRIMARY KEY (id)
+"OperadorEnLocal" :: OperadorEnLocal_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"OperadorEnLocal" :: OperadorEnLocal_operadorId_fkey :: FOREIGN KEY ("operadorId") REFERENCES "OperadorLocal"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"OperadorEnLocal" :: OperadorEnLocal_pkey :: PRIMARY KEY ("operadorId", "localId")
+"OperadorLocal" :: OperadorLocal_pkey :: PRIMARY KEY (id)
+"PedidoProveedor" :: PedidoProveedor_depositoId_fkey :: FOREIGN KEY ("depositoId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PedidoProveedor" :: PedidoProveedor_pkey :: PRIMARY KEY (id)
+"PedidoProveedor" :: PedidoProveedor_proveedorId_fkey :: FOREIGN KEY ("proveedorId") REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PedidoProveedorDetalle" :: PedidoProveedorDetalle_pedidoId_fkey :: FOREIGN KEY ("pedidoId") REFERENCES "PedidoProveedor"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"PedidoProveedorDetalle" :: PedidoProveedorDetalle_pkey :: PRIMARY KEY (id)
+"PedidoProveedorDetalle" :: PedidoProveedorDetalle_productoLocalId_fkey :: FOREIGN KEY ("productoLocalId") REFERENCES "ProductoLocal"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PosTransferencia" :: PosTransferencia_destinoId_fkey :: FOREIGN KEY ("destinoId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PosTransferencia" :: PosTransferencia_origenId_fkey :: FOREIGN KEY ("origenId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PosTransferencia" :: PosTransferencia_pkey :: PRIMARY KEY (id)
+"PosTransferencia" :: PosTransferencia_solicitadoPorUserId_fkey :: FOREIGN KEY ("solicitadoPorUserId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"PosTransferencia" :: PosTransferencia_usuarioId_fkey :: FOREIGN KEY ("usuarioId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PosTransferenciaDetalle" :: PosTransferenciaDetalle_pkey :: PRIMARY KEY (id)
+"PosTransferenciaDetalle" :: PosTransferenciaDetalle_posTransferenciaId_fkey :: FOREIGN KEY ("posTransferenciaId") REFERENCES "PosTransferencia"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"PosTransferenciaDetalle" :: PosTransferenciaDetalle_productoId_fkey :: FOREIGN KEY ("productoId") REFERENCES "ProductoLocal"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PosVentaCounter" :: PosVentaCounter_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PosVentaCounter" :: PosVentaCounter_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PosVentaCounter" :: PosVentaCounter_pkey :: PRIMARY KEY (id)
+"PrecioUpdate" :: PrecioUpdate_pkey :: PRIMARY KEY (id)
+"PrecioUpdateItem" :: PrecioUpdateItem_pkey :: PRIMARY KEY (id)
+"PrecioUpdateItem" :: PrecioUpdateItem_precioUpdateId_fkey :: FOREIGN KEY ("precioUpdateId") REFERENCES "PrecioUpdate"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ProductoBase" :: ProductoBase_area_fisica_id_fkey :: FOREIGN KEY (area_fisica_id) REFERENCES "AreaFisica"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ProductoBase" :: ProductoBase_categoria_id_fkey :: FOREIGN KEY (categoria_id) REFERENCES "Categoria"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ProductoBase" :: ProductoBase_creadoEnLocalId_fkey :: FOREIGN KEY ("creadoEnLocalId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ProductoBase" :: ProductoBase_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ProductoBase" :: ProductoBase_pkey :: PRIMARY KEY (id)
+"ProductoBase" :: ProductoBase_proveedor2_id_fkey :: FOREIGN KEY (proveedor2_id) REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ProductoBase" :: ProductoBase_proveedor3_id_fkey :: FOREIGN KEY (proveedor3_id) REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ProductoBase" :: ProductoBase_proveedor_id_fkey :: FOREIGN KEY (proveedor_id) REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"ProductoCodigoProveedor" :: ProductoCodigoProveedor_grupoId_fkey :: FOREIGN KEY ("grupoId") REFERENCES "Grupo"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ProductoCodigoProveedor" :: ProductoCodigoProveedor_pkey :: PRIMARY KEY (id)
+"ProductoCodigoProveedor" :: ProductoCodigoProveedor_productoBaseId_fkey :: FOREIGN KEY ("productoBaseId") REFERENCES "ProductoBase"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ProductoCodigoProveedor" :: ProductoCodigoProveedor_proveedorId_fkey :: FOREIGN KEY ("proveedorId") REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ProductoListaPrecio" :: ProductoListaPrecio_baseId_fkey :: FOREIGN KEY ("baseId") REFERENCES "ProductoBase"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ProductoListaPrecio" :: ProductoListaPrecio_listaPrecioId_fkey :: FOREIGN KEY ("listaPrecioId") REFERENCES "ListaPrecio"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"ProductoListaPrecio" :: ProductoListaPrecio_pkey :: PRIMARY KEY (id)
+"ProductoLocal" :: ProductoLocal_baseId_fkey :: FOREIGN KEY ("baseId") REFERENCES "ProductoBase"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ProductoLocal" :: ProductoLocal_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"ProductoLocal" :: ProductoLocal_pkey :: PRIMARY KEY (id)
+"Proveedor" :: Proveedor_creadoEnLocalId_fkey :: FOREIGN KEY ("creadoEnLocalId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Proveedor" :: Proveedor_pkey :: PRIMARY KEY (id)
+"PuntosConfigLocal" :: PuntosConfigLocal_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"PuntosConfigLocal" :: PuntosConfigLocal_pkey :: PRIMARY KEY (id)
+"PushSubscription" :: PushSubscription_pkey :: PRIMARY KEY (id)
+"RecetaLecturaProveedor" :: RecetaLecturaProveedor_pkey :: PRIMARY KEY (id)
+"RecetaLecturaProveedor" :: RecetaLecturaProveedor_proveedorId_fkey :: FOREIGN KEY ("proveedorId") REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"RecetaProveedor" :: RecetaProveedor_pkey :: PRIMARY KEY (id)
+"RecetaProveedor" :: RecetaProveedor_proveedorId_fkey :: FOREIGN KEY ("proveedorId") REFERENCES "Proveedor"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"RetiroPreparacion" :: RetiroPreparacion_arqueoCajaId_fkey :: FOREIGN KEY ("arqueoCajaId") REFERENCES "ArqueoCaja"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"RetiroPreparacion" :: RetiroPreparacion_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"RetiroPreparacion" :: RetiroPreparacion_pkey :: PRIMARY KEY (id)
+"RetiroPreparacion" :: RetiroPreparacion_turnoId_fkey :: FOREIGN KEY ("turnoId") REFERENCES "Turno"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"Rol" :: Rol_pkey :: PRIMARY KEY (id)
+"StockLocal" :: StockLocal_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"StockLocal" :: StockLocal_pkey :: PRIMARY KEY (id)
+"StockLocal" :: StockLocal_productoId_fkey :: FOREIGN KEY ("productoId") REFERENCES "ProductoLocal"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"TagCliente" :: TagCliente_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"TagCliente" :: TagCliente_pkey :: PRIMARY KEY (id)
+"TicketConfig" :: TicketConfig_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"TicketConfig" :: TicketConfig_pkey :: PRIMARY KEY (id)
+"Transferencia" :: Transferencia_destinoId_fkey :: FOREIGN KEY ("destinoId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"Transferencia" :: Transferencia_origenId_fkey :: FOREIGN KEY ("origenId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"Transferencia" :: Transferencia_pkey :: PRIMARY KEY (id)
+"Transferencia" :: Transferencia_posTransferenciaId_fkey :: FOREIGN KEY ("posTransferenciaId") REFERENCES "PosTransferencia"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Transferencia" :: Transferencia_ventaId_fkey :: FOREIGN KEY ("ventaId") REFERENCES "Venta"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"TransferenciaDetalle" :: TransferenciaDetalle_confirmadoPorId_fkey :: FOREIGN KEY ("confirmadoPorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"TransferenciaDetalle" :: TransferenciaDetalle_pkey :: PRIMARY KEY (id)
+"TransferenciaDetalle" :: TransferenciaDetalle_productoId_fkey :: FOREIGN KEY ("productoId") REFERENCES "ProductoLocal"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"TransferenciaDetalle" :: TransferenciaDetalle_transferenciaId_fkey :: FOREIGN KEY ("transferenciaId") REFERENCES "Transferencia"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"Turno" :: Turno_cerradoPorId_fkey :: FOREIGN KEY ("cerradoPorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Turno" :: Turno_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"Turno" :: Turno_operadorId_fkey :: FOREIGN KEY ("operadorId") REFERENCES "OperadorLocal"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Turno" :: Turno_pkey :: PRIMARY KEY (id)
+"Turno" :: Turno_vendedorId_fkey :: FOREIGN KEY ("vendedorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"Usuario" :: Usuario_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Usuario" :: Usuario_pkey :: PRIMARY KEY (id)
+"Usuario" :: Usuario_rolId_fkey :: FOREIGN KEY ("rolId") REFERENCES "Rol"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"Venta" :: Venta_clienteId_fkey :: FOREIGN KEY ("clienteId") REFERENCES "Cliente"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Venta" :: Venta_listaPrecioId_fkey :: FOREIGN KEY ("listaPrecioId") REFERENCES "ListaPrecio"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Venta" :: Venta_localId_fkey :: FOREIGN KEY ("localId") REFERENCES "Local"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"Venta" :: Venta_operadorId_fkey :: FOREIGN KEY ("operadorId") REFERENCES "OperadorLocal"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Venta" :: Venta_pkey :: PRIMARY KEY (id)
+"Venta" :: Venta_turnoId_fkey :: FOREIGN KEY ("turnoId") REFERENCES "Turno"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"Venta" :: Venta_vendedorId_fkey :: FOREIGN KEY ("vendedorId") REFERENCES "Usuario"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"VentaCorreccion" :: VentaCorreccion_pkey :: PRIMARY KEY (id)
+"VentaDetalle" :: VentaDetalle_listaPrecioId_fkey :: FOREIGN KEY ("listaPrecioId") REFERENCES "ListaPrecio"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"VentaDetalle" :: VentaDetalle_pkey :: PRIMARY KEY (id)
+"VentaDetalle" :: VentaDetalle_productoBaseId_fkey :: FOREIGN KEY ("productoBaseId") REFERENCES "ProductoBase"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"VentaDetalle" :: VentaDetalle_ventaId_fkey :: FOREIGN KEY ("ventaId") REFERENCES "Venta"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"VentaDetalleComponente" :: VentaDetalleComponente_pkey :: PRIMARY KEY (id)
+"VentaDetalleComponente" :: VentaDetalleComponente_productoBaseId_fkey :: FOREIGN KEY ("productoBaseId") REFERENCES "ProductoBase"(id) ON UPDATE CASCADE ON DELETE RESTRICT
+"VentaDetalleComponente" :: VentaDetalleComponente_productoLocalId_fkey :: FOREIGN KEY ("productoLocalId") REFERENCES "ProductoLocal"(id) ON UPDATE CASCADE ON DELETE SET NULL
+"VentaDetalleComponente" :: VentaDetalleComponente_ventaDetalleId_fkey :: FOREIGN KEY ("ventaDetalleId") REFERENCES "VentaDetalle"(id) ON UPDATE CASCADE ON DELETE CASCADE
+"VentaPago" :: VentaPago_pkey :: PRIMARY KEY (id)
+"VentaPago" :: VentaPago_ventaId_fkey :: FOREIGN KEY ("ventaId") REFERENCES "Venta"(id) ON UPDATE CASCADE ON DELETE CASCADE
