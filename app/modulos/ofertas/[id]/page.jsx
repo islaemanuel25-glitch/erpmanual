@@ -122,7 +122,7 @@ export default function DetalleOfertaPage() {
       <div className="w-full min-h-full">
         <SunmiCard>
           <div className="flex items-center gap-2">
-            <SunmiBackButton onClick={() => router.push("/modulos/ofertas")} />
+            <SunmiBackButton href="/modulos/ofertas" />
             <SunmiCardHeader title="Oferta" />
           </div>
           <div className="sunmi-panel rounded-lg p-3 text-sm sunmi-text-danger">{error}</div>
@@ -138,7 +138,7 @@ export default function DetalleOfertaPage() {
     <div className="w-full min-h-full">
       <SunmiCard>
         <div className="flex items-center gap-2 mb-1">
-          <SunmiBackButton onClick={() => router.push("/modulos/ofertas")} />
+          <SunmiBackButton href="/modulos/ofertas" />
           <SunmiCardHeader title={oferta.nombre} />
         </div>
 

@@ -101,7 +101,7 @@ export default function NuevaOfertaPage() {
     <div className="w-full min-h-full">
       <SunmiCard>
         <div className="flex items-center gap-2 mb-1">
-          <SunmiBackButton onClick={() => router.push("/modulos/ofertas")} />
+          <SunmiBackButton href="/modulos/ofertas" />
           <SunmiCardHeader
             title="Nueva oferta"
             subtitle="Se guarda como borrador. Publicarla es un paso aparte."
