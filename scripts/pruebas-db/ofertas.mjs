@@ -189,6 +189,18 @@ async function montarFixtures() {
   for (const [clave, datos] of Object.entries({
     nueveDeOro: { nombre: "Nueve de Oro", venta: 1000, costo: 700 },
     otro: { nombre: "Producto sin oferta", venta: 500, costo: 300 },
+    // ── UN PRODUCTO QUE NO ESTÁ EN NINGUNA OTRA OFERTA ──────────────────
+    //
+    // La primera corrida real falló acá y el defecto era del fixture: la oferta
+    // programada se creaba sobre un producto que YA estaba en la oferta
+    // principal, publicada y vigente. Con las dos vigentes,
+    // `ofertasVigentesPorProductoLocal` devuelve la MÁS BARATA —que es lo que
+    // corresponde— y por eso no devolvía la programada.
+    //
+    // Ese solapamiento la aplicación lo IMPIDE (`conflictoDeCarga`), y yo lo
+    // esquivé escribiendo directo en la base. Un fixture que fabrica un estado
+    // que el sistema no permite no prueba el sistema: prueba otra cosa.
+    soloProgramada: { nombre: "Producto de la programada", venta: 800, costo: 500 },
   })) {
     const base = await prisma.productoBase.create({
       data: {
@@ -262,6 +274,9 @@ async function correr(f) {
   const { grupo, localA, localB, usuario, productos, turno, sesionA, sesionB } = f;
   const P1 = productos.nueveDeOro;
   const P2 = productos.otro;
+  // P3 no está en ninguna otra oferta: es el único producto sobre el que las
+  // afirmaciones de la ventana de vigencia significan lo que dicen.
+  const P3 = productos.soloProgramada;
 
   // ─────────────────────────────────────────────────────────────────────────
   seccion("Ciclo de vida de una oferta");
@@ -379,11 +394,11 @@ async function correr(f) {
       publicadaEn: new Date(),
       lineas: {
         create: {
-          productoLocalId: P2.productoLocalId,
-          productoBaseId: P2.baseId,
-          precioOferta: 450,
-          precioNormalReferencia: 500,
-          costoReferencia: 300,
+          productoLocalId: P3.productoLocalId,
+          productoBaseId: P3.baseId,
+          precioOferta: 700,
+          precioNormalReferencia: 800,
+          costoReferencia: 500,
         },
       },
     },
@@ -393,20 +408,23 @@ async function correr(f) {
 
   const antesDeEmpezar = await ofertasVigentesPorProductoLocal(prisma, {
     localId: localA.id,
-    productoLocalIds: [P2.productoLocalId],
+    productoLocalIds: [P3.productoLocalId],
     ahora: enHoras(1),
   });
+  // Sobre P3 no hay ninguna otra oferta, así que "no hay NADA vigente" es una
+  // afirmación más fuerte que "no es ésta": distingue el caso de que la ventana
+  // todavía no empezó del de que ganó otra oferta.
   ok(
     "una oferta programada NO aplica antes de su inicio",
-    antesDeEmpezar[P2.productoLocalId]?.ofertaId !== programada.id
+    antesDeEmpezar[P3.productoLocalId] == null
   );
 
   const yaEmpezada = await ofertasVigentesPorProductoLocal(prisma, {
     localId: localA.id,
-    productoLocalIds: [P2.productoLocalId],
+    productoLocalIds: [P3.productoLocalId],
     ahora: enHoras(25),
   });
-  ok("y sí aplica una vez que empezó", yaEmpezada[P2.productoLocalId]?.ofertaId === programada.id);
+  ok("y sí aplica una vez que empezó", yaEmpezada[P3.productoLocalId]?.ofertaId === programada.id);
 
   // El extremo final es ABIERTO: [inicio, fin). Se prueban los dos lados del
   // instante exacto, que es donde una comparación con <= se equivocaría.
@@ -415,19 +433,19 @@ async function correr(f) {
 
   const casiVencida = await ofertasVigentesPorProductoLocal(prisma, {
     localId: localA.id,
-    productoLocalIds: [P2.productoLocalId],
+    productoLocalIds: [P3.productoLocalId],
     ahora: unMsAntes,
   });
-  ok("un milisegundo antes del final la oferta todavía aplica", casiVencida[P2.productoLocalId]?.ofertaId === programada.id);
+  ok("un milisegundo antes del final la oferta todavía aplica", casiVencida[P3.productoLocalId]?.ofertaId === programada.id);
 
   const vencida = await ofertasVigentesPorProductoLocal(prisma, {
     localId: localA.id,
-    productoLocalIds: [P2.productoLocalId],
+    productoLocalIds: [P3.productoLocalId],
     ahora: enElInstanteFinal,
   });
   ok(
     "en el instante EXACTO del final deja de aplicar",
-    vencida[P2.productoLocalId]?.ofertaId !== programada.id
+    vencida[P3.productoLocalId] == null
   );
   igual(
     "y su estado pasa a VENCIDA",
