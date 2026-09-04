@@ -51,11 +51,47 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
-    // Regla B: marcar el local que da de alta el proveedor (fallback de
-    // visibilidad hasta que tenga productos). Admin sin contexto activo → null.
+    // ── UN ERROR DE ALCANCE NO SE DEGRADA A "ALTA GLOBAL" ─────────────────
+    //
+    // Esto decía `scope.error ? null : …` para los dos campos, y era peligroso.
+    // `resolveLocalAndGrupo` falla CERRADO para un no-admin: sin local
+    // autorizado devuelve 403, y un `localId` ajeno explícito en la query
+    // devuelve 403 también (lib/grupos.js:52-67). Con aquel ternario, los dos
+    // 403 se convertían en `null` y la ruta seguía creando un `Proveedor`
+    // GLOBAL. Un problema de alcance terminaba en una escritura que ningún
+    // alcance autorizaba, y sin dejar rastro de que algo había fallado.
+    //
+    // ── LOS TRES CAMINOS, SEPARADOS A PROPÓSITO ──────────────────────────
+    //
+    // 1. NO-ADMIN con cualquier error de alcance → se devuelve ESE error y no
+    //    se escribe nada. Sin excepciones: no hay ningún caso en que un
+    //    no-admin deba dar de alta un proveedor global.
+    // 2. Alcance resuelto (admin o no) → se crea o asocia en ESA ubicación.
+    // 3. ADMIN sin contexto operativo seleccionado → alta GLOBAL sin asociación.
+    //    Es el comportamiento que la ruta ya tenía y se conserva tal cual.
+    //
+    // El caso 3 se reconoce por `needsContexto`, que es la ÚNICA forma en que
+    // `resolveLocalAndGrupo` expresa "admin que todavía no eligió dónde está
+    // parado" (lib/grupos.js:68-76). Cualquier OTRO error de un admin —no se
+    // pudo determinar el grupo, contexto inválido— se devuelve como error: son
+    // fallas reales y convertirlas en un alta global sería el mismo defecto de
+    // antes, una rama más adentro.
     const scope = await resolveLocalAndGrupo(req);
-    const grupoId = scope.error ? null : scope.grupoId ?? null;
-    const localId = scope.error ? null : scope.localId ?? null;
+    const altaGlobalDeAdmin = Boolean(
+      scope.error && session.esAdmin && scope.needsContexto === true
+    );
+    if (scope.error && !altaGlobalDeAdmin) {
+      return NextResponse.json(
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto === true },
+        { status: scope.status || 403 }
+      );
+    }
+
+    // Regla B: marcar el local que da de alta el proveedor (fallback de
+    // visibilidad hasta que tenga productos). En el alta global de admin no hay
+    // ubicación que marcar y queda en null, como antes.
+    const grupoId = altaGlobalDeAdmin ? null : scope.grupoId ?? null;
+    const localId = altaGlobalDeAdmin ? null : scope.localId ?? null;
     const creadoEnLocalId = localId;
 
     const body = await req.json();
