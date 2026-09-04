@@ -282,7 +282,10 @@ async function correr(f) {
     )
   );
   ok("crear oferta responde ok", creacion.ok === true, creacion.error);
-  const ofertaId = creacion.oferta?.id ?? creacion.id;
+  // Las rutas devuelven `ofertaId`, no un objeto `oferta`. Lo comprobé leyendo
+  // cada `NextResponse.json` después de que la primera corrida real fallara acá:
+  // el script se escribió sin poder ejecutarlo y adiviné la forma.
+  const ofertaId = creacion.ofertaId;
   ok("la oferta creada tiene id", Number.isInteger(ofertaId), JSON.stringify(creacion));
 
   const filaCreada = await prisma.oferta.findUnique({
@@ -558,7 +561,8 @@ async function correr(f) {
       pedido(`http://ci/api/ofertas/${ofertaId}/revisar`, {
         metodo: "POST",
         sesion: sesionA,
-        cuerpo: { ofertaLineaId: lineaMarcada.id },
+        // La ruta espera `lineaIds` (array), no `ofertaLineaId`.
+        cuerpo: { lineaIds: [lineaMarcada.id] },
       }),
       params(ofertaId)
     )
@@ -840,7 +844,7 @@ async function correr(f) {
       })
     )
   );
-  const idNuncaUsada = nuncaUsada.oferta?.id ?? nuncaUsada.id;
+  const idNuncaUsada = nuncaUsada.ofertaId;
   const borrada = await leer(
     await rutaOfertaDetalle.DELETE(
       pedido(`http://ci/api/ofertas/${idNuncaUsada}`, { metodo: "DELETE", sesion: sesionA }),
@@ -883,7 +887,7 @@ async function correr(f) {
     )
   );
   ok("renovar responde ok", renovada.ok === true, renovada.error);
-  const idRenovada = renovada.oferta?.id ?? renovada.id;
+  const idRenovada = renovada.ofertaId;
   const filaRenovada = await prisma.oferta.findUnique({ where: { id: idRenovada }, include: { lineas: true } });
   igual("la renovación apunta a la original", filaRenovada?.renovadaDesdeId, ofertaId);
   ok("y nace como borrador", filaRenovada?.publicadaEn == null);
