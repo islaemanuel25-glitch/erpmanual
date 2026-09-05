@@ -118,13 +118,24 @@ test("crear muestra su título, el orden sugerido y Crear medio", () => {
   assert.ok(html.includes('value="5"'), "el orden sugerido tiene que estar cargado");
 });
 
-test("los tipos y procesadores que se ofrecen son los que llegaron por props", () => {
-  // No hay ninguna lista escrita en el JSX: si la API deja de mandar un tipo,
-  // deja de ofrecerse. FIADO no aparece porque el servidor no lo manda.
+test("los dos selectores se dibujan, y sin elegir nada dicen 'Elegir'", () => {
+  // La primera versión de este candado buscaba las etiquetas de las opciones en
+  // el markup, y se puso en rojo: `SunmiSelectAdv` dibuja SOLO lo elegido y abre
+  // la lista al tocarlo. O sea que la afirmación era falsa, no el componente.
+  // Lo que sí se puede exigir es que los dos selectores estén, y eso alcanza para
+  // atrapar el `SunmiSelectOption` sin importar, que es el defecto que deja la
+  // pantalla en blanco.
   const html = dibujar({ modo: "alta", ordenSugerido: 1 });
-  assert.ok(html.includes("Débito"));
-  assert.ok(html.includes("Banco"));
-  assert.equal(html.includes("Fiado"), false, "FIADO no es un medio de cobro");
+  const elegir = html.match(/Elegir/g) || [];
+  assert.equal(elegir.length, 2, "faltan el selector de tipo contable o el de procesador");
+});
+
+test("lo YA elegido se muestra en cada selector", () => {
+  const html = dibujar({ modo: "editar", medio: MEDIO_HEREDADO });
+  // Tipo MERCADOPAGO y procesador MERCADOPAGO: la etiqueta legible sale de lo
+  // que mandó la API, no de una traducción escrita en el JSX.
+  assert.ok(html.includes("Mercado Pago"));
+  assert.equal(html.includes("Elegir"), false, "un medio ya clasificado no pide elegir nada");
 });
 
 // ══════════════════════════════════════════════════════════════════════════
