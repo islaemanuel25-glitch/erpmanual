@@ -131,10 +131,21 @@ jobs:
       - name: Traer el código de ESTA rama
         uses: actions/checkout@v4
 
-      - name: Node 20 (el mismo del Dockerfile)
+      # ── ACÁ VA NODE 22 Y NO 20, Y NO ES UN DESCUIDO ─────────────────────────
+      #
+      # El resto del CI usa 20, que es el del Dockerfile, y está bien que siga
+      # así: eso mide lo que se despliega. Pero el arnés habla con el navegador
+      # por CDP con `new WebSocket(...)`, y el WebSocket global recién existe
+      # desde Node 22. Con 20 la primera captura muere con "WebSocket is not
+      # defined" —lo dijo la primera corrida real, no una suposición—.
+      #
+      # La alternativa era agregarle al arnés una dependencia de `ws` para un
+      # solo consumidor. Se prefirió mover el Node de ESTE job, que no produce
+      # nada que se despliegue: produce imágenes.
+      - name: Node 22 (el arnés necesita el WebSocket global)
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Instalar dependencias
