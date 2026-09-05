@@ -5,7 +5,8 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { IconoMedio } from "@/components/pos-ventas/IconosMedios";
 import { showError } from "@/components/sunmi/SunmiToast";
-import { aCentavos } from "@/lib/pos-ventas/pagos";
+import { aCentavos, MEDIO_LABEL } from "@/lib/pos-ventas/pagos";
+import { MEDIOS_POR_DEFECTO } from "@/lib/pos-ventas/mediosCobro";
 import { componerCobroSimple, evaluarDivisionPago } from "@/lib/pos-ventas/servicios";
 import { avisoPagoCombinado, recargoDeVenta } from "@/lib/recargos-pago/recargoPago";
 import { aMedioEnum } from "@/lib/ofertas/previewPos";
@@ -20,27 +21,63 @@ const FORMAS_PAGO = [
   { key: "fiado", label: "Fiado", tieneComision: false },
 ];
 
-// Medios grandes del cobro simple (fiado se muestra aparte, solo sin servicios).
-const MEDIOS_COBRO = [
-  { key: "efectivo", label: "Efectivo" },
-  { key: "debito", label: "Débito" },
-  { key: "credito", label: "Crédito" },
-  { key: "mercadopago", label: "Mercado Pago" },
-];
+// ── LOS BOTONES SALEN DE LA CONFIGURACIÓN DEL LOCAL ────────────────────────
+//
+// Antes había acá una lista fija de cuatro. Ahora los medios se configuran por
+// local —cuáles, cómo se llaman y en qué orden— y llegan por props desde
+// `/api/medios-cobro`.
+//
+// El respaldo NO es otra lista escrita al lado: sale de `MEDIOS_POR_DEFECTO`,
+// que es la MISMA constante que usa el servidor cuando un local no configuró
+// nada. Una segunda lista acá se separaría de aquélla el día que una cambie, y
+// el POS mostraría botones distintos de los que el backend cobra.
+//
+// Se usa cuando no llega configuración: modo offline, o una pantalla que todavía
+// no la pasa.
+function mediosDesdeDefaults() {
+  return MEDIOS_POR_DEFECTO.map((d) => ({
+    key: d.tipoContable.toLowerCase(),
+    label: MEDIO_LABEL[d.tipoContable] || d.tipoContable,
+    tipoContable: d.tipoContable,
+  }));
+}
 
-// Medios del "Dividir pago" (sin fiado: fiado es tender único, va en el modo simple).
-const MEDIOS_DIVIDIR = MEDIOS_COBRO;
+/**
+ * De la configuración a lo que dibuja el botón.
+ *
+ * `key` en minúscula porque es lo que espera `IconoMedio` y lo que viaja como
+ * `formaPago` en el payload —que es el contrato de hoy y no se toca—. `label` es
+ * el nombre configurado, que puede ser "MP Débito". `tipoContable` es lo que
+ * decide todo lo comercial y lo que la venta congela.
+ */
+function aBotones(mediosCobro) {
+  if (!Array.isArray(mediosCobro) || mediosCobro.length === 0) return mediosDesdeDefaults();
+  return mediosCobro
+    .filter((m) => m.activo !== false)
+    .map((m) => ({
+      key: String(m.tipoContable).toLowerCase(),
+      label: m.nombre,
+      tipoContable: m.tipoContable,
+    }));
+}
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Filas iniciales del "Dividir pago": efectivo + débito, importes vacíos.
-function filasIniciales() {
-  return [
-    { medio: "efectivo", monto: "" },
-    { medio: "debito", monto: "" },
-  ];
+/**
+ * Filas iniciales del "Dividir pago": los DOS PRIMEROS medios del local, con los
+ * importes vacíos.
+ *
+ * Antes eran efectivo y débito fijos. Con medios configurables eso se rompe solo:
+ * un local que no cobra con débito abriría el panel con una fila de un medio que
+ * no tiene, y al confirmar el backend rechazaría la venta.
+ *
+ * Si el local tiene un solo medio, se abre con una fila: dividir entre uno no
+ * tiene sentido, pero tampoco lo tiene inventar un segundo medio.
+ */
+function filasIniciales(medios) {
+  return medios.slice(0, 2).map((m) => ({ medio: m.key, monto: "" }));
 }
 
 function FormaPago({
@@ -73,7 +110,16 @@ function FormaPago({
   previewPorMedio = null,
   recargosPorMedio = null,
   hayOfertaSoloEfectivo = false,
+  // Los medios configurados del local, de `/api/medios-cobro`. Sin esto —modo
+  // offline, o una pantalla que todavía no los pasa— se usan los defaults, que
+  // son la MISMA constante que usa el servidor.
+  mediosCobro = null,
 }) {
+  // Los botones del cobro simple y del pago dividido salen de la configuración.
+  // Fiado no está: es tender único y se dibuja aparte, con sus propias
+  // condiciones.
+  const MEDIOS_COBRO = aBotones(mediosCobro);
+  const MEDIOS_DIVIDIR = MEDIOS_COBRO;
   const base = subtotal - descuento - descuentoPorPuntos;
 
   // El total de un conjunto de medios. Sin preview, el de siempre.
@@ -101,7 +147,16 @@ function FormaPago({
   // El total "sin elegir medio". Con los cuatro iguales es ese valor común (que
   // ya puede incluir una oferta de cualquier medio); si difieren, no existe un
   // único total honesto y el número grande se reemplaza por los de cada botón.
-  const total = previewPorMedio && !totalPorMedioDifiere ? totalDe(["efectivo"]) : base;
+  //
+  // Se pregunta por el PRIMER medio del local y no por "efectivo": desde que los
+  // medios se configuran, un local puede no tener efectivo, y pedir el total de
+  // un medio que no cobra devolvería un número que no corresponde a ningún botón.
+  // En esta rama los totales son todos iguales, así que cuál se pregunte no
+  // cambia el número — cambia que el número exista.
+  const total =
+    previewPorMedio && !totalPorMedioDifiere && MEDIOS_COBRO.length > 0
+      ? totalDe([MEDIOS_COBRO[0].key])
+      : base;
 
   // ── Servicios de importe variable: mínimo a cubrir en EFECTIVO ────────────
   const minEf = Math.max(0, Number(minEfectivoServicios) || 0);
@@ -115,7 +170,7 @@ function FormaPago({
 
   // ── Modo: simple (por defecto) o avanzado (Dividir pago) ──────────────────
   const [modo, setModo] = useState("simple");
-  const [filas, setFilas] = useState(filasIniciales); // [{ medio, monto:string }]
+  const [filas, setFilas] = useState(() => filasIniciales(MEDIOS_COBRO)); // [{ medio, monto:string }]
 
   // Recalcular ante cambios del carrito: si cambió el total o el mínimo de servicios,
   // resetear las filas del "Dividir pago" para no arrastrar importes obsoletos.
@@ -124,7 +179,7 @@ function FormaPago({
   const [prevCarritoKey, setPrevCarritoKey] = useState(carritoKey);
   if (carritoKey !== prevCarritoKey) {
     setPrevCarritoKey(carritoKey);
-    setFilas(filasIniciales());
+    setFilas(filasIniciales(MEDIOS_COBRO));
   }
 
   // ── Cobro SIMPLE: un medio → componer payload server-authoritative ─────────
@@ -187,12 +242,12 @@ function FormaPago({
   const quitarFila = (idx) =>
     setFilas((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
   const abrirDividir = () => {
-    setFilas(filasIniciales());
+    setFilas(filasIniciales(MEDIOS_COBRO));
     setModo("avanzado");
   };
   const volverSimple = () => {
     setModo("simple");
-    setFilas(filasIniciales());
+    setFilas(filasIniciales(MEDIOS_COBRO));
   };
   const cobrarDividido = () => {
     if (!puedeCobrarDividido) return;

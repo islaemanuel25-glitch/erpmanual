@@ -16,7 +16,9 @@ import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
-import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta, normalizarMedio } from "@/lib/pos-ventas/pagos";
+import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta, normalizarMedio, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
+import { mediosDelLocal } from "@/lib/pos-ventas/mediosCobroServidor";
+import { comisionesDeMedios } from "@/lib/pos-ventas/mediosCobro";
 import { calcularVentaComercial } from "@/lib/ofertas/motorVenta";
 import { ofertasVigentesPorProductoLocal, recargosDelLocal } from "@/lib/ofertas/servidor";
 import { verificarDescuentoPuntos, textoDescuentoPuntosInvalido } from "@/lib/pos-ventas/puntos";
@@ -721,18 +723,27 @@ export async function POST(req) {
       );
     }
 
-    // % de comisión por medio digital, resueltos de la config del grupo (no hardcode).
+    // ── % DE COMISIÓN POR MEDIO ──────────────────────────────────────────────
+    //
+    // Sale de la configuración de medios del local, que compone dos fuentes: la
+    // comisión propia del medio si alguien la definió, y la del GRUPO
+    // (`ConfiguracionGrupo`) cuando no. Ver `lib/pos-ventas/mediosCobro.js`.
+    //
+    // Un local que nunca configuró nada da EXACTAMENTE los mismos números que
+    // antes de esta tanda: los medios por defecto tienen `comisionPct` en null y
+    // heredan del grupo, con el mismo 7 de respaldo. Ese es el requisito de no
+    // regresión y por eso la fuente se cambió acá y no el cálculo, que sigue
+    // siendo `aplicarComisiones` sin tocar.
+    //
+    // NO se rechaza un tender cuyo medio no esté configurado o esté apagado, y es
+    // deliberado: la configuración puede cambiar entre que el cajero abrió el POS
+    // y apretó cobrar, y una venta offline llega con el medio con el que se cobró
+    // hace rato. Rechazarla sería perder una venta que ya ocurrió. Lo que protege
+    // el dato es la validación contra el enum canónico, que sigue intacta.
     let comisionPctPorMedio = {};
-    if (consolidado.pagos.some((p) => ["MERCADOPAGO", "DEBITO", "CREDITO"].includes(p.medio))) {
-      const comCfg = await prisma.configuracionGrupo.findUnique({
-        where: { grupoId },
-        select: { comisionDebito: true, comisionCredito: true, comisionMercadopago: true },
-      });
-      comisionPctPorMedio = {
-        DEBITO: Number(comCfg?.comisionDebito ?? 7),
-        CREDITO: Number(comCfg?.comisionCredito ?? 7),
-        MERCADOPAGO: Number(comCfg?.comisionMercadopago ?? 7),
-      };
+    if (consolidado.pagos.some((p) => MEDIOS_CON_COMISION.includes(p.medio))) {
+      const mediosDelPos = await mediosDelLocal(prisma, { localId, grupoId });
+      comisionPctPorMedio = comisionesDeMedios(mediosDelPos);
     }
 
     const pagosConComision = aplicarComisiones(consolidado.pagos, comisionPctPorMedio);

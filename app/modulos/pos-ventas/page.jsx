@@ -118,6 +118,12 @@ export default function PosVentasPage() {
   // instante. Y la ausencia de configuración significa cero de verdad, así que
   // el estado inicial y "el local no configuró nada" son el mismo valor.
   const [recargosPorMedio, setRecargosPorMedio] = useState(() => normalizarRecargos([]));
+  // Los medios de cobro configurados del local. Arranca en `null` —no en una
+  // lista vacía— porque `null` significa "todavía no llegó" y hace que el panel
+  // use los defaults, que son los cuatro botones de siempre. Una lista vacía
+  // significaría "este local no cobra con nada" y dejaría el POS sin botones
+  // durante el instante que tarda la respuesta.
+  const [mediosCobro, setMediosCobro] = useState(null);
   const [creditoInfo, setCreditoInfo] = useState(null); // { limiteCredito, saldoActual }
   const [ultimoBreakdown, setUltimoBreakdown] = useState(null);
   // Venta rechazada porque el total de la pantalla ya no era el que corresponde.
@@ -317,6 +323,30 @@ export default function PosVentasPage() {
           setRecargosPorMedio(normalizarRecargos(
             Object.entries(data.recargos || {}).map(([medio, porcentaje]) => ({ medio, porcentaje }))
           ));
+        }
+      })
+      .catch(() => {});
+    return () => { vigente = false; };
+  }, [localActual]);
+
+  // ---------------------------------------------------------------------------
+  // Medios de cobro configurados del local
+  // ---------------------------------------------------------------------------
+  //
+  // Con la misma guarda de carrera que el resto de la configuración: al cambiar
+  // de ubicación la respuesta anterior puede llegar después, y sin esto el POS
+  // mostraría los botones de otra boca. Si la lectura falla se queda en `null` y
+  // el panel usa los defaults — que un local no pueda leer su configuración no
+  // puede dejarlo sin poder cobrar.
+  useEffect(() => {
+    if (!localActual) return;
+    let vigente = true;
+    fetch(`/api/medios-cobro?localId=${localActual}`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!vigente) return;
+        if (data.ok && Number(data.localId) === Number(localActual) && Array.isArray(data.medios)) {
+          setMediosCobro(data.medios);
         }
       })
       .catch(() => {});
@@ -813,8 +843,15 @@ export default function PosVentasPage() {
           porPuntos: state.descuentoPorPuntos,
         },
         subtotalServicios: minEfectivoServicios,
+        // Solo los tipos contables que este local cobra: calcular el total de un
+        // botón que no existe es trabajo tirado, y un número que nadie debería
+        // llegar a ver. Sin configuración, `undefined` deja los cuatro de
+        // siempre.
+        medios: mediosCobro
+          ? mediosCobro.filter((m) => m.activo).map((m) => m.tipoContable)
+          : undefined,
       }),
-    [state.carrito, state.descuento, state.descuentoPorPuntos, recargosPorMedio, minEfectivoServicios]
+    [state.carrito, state.descuento, state.descuentoPorPuntos, recargosPorMedio, minEfectivoServicios, mediosCobro]
   );
 
   const hayOfertaSoloEfectivo = hayOfertaSoloEfectivoEnCarrito(state.carrito);
@@ -2096,6 +2133,7 @@ export default function PosVentasPage() {
               previewPorMedio={previewPorMedio}
               recargosPorMedio={recargosPorMedio}
               hayOfertaSoloEfectivo={hayOfertaSoloEfectivo}
+              mediosCobro={mediosCobro}
             />
             {/* Mensaje offline */}
             {offlineMode && (
