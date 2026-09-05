@@ -34,7 +34,20 @@ unicidad y **la venta se cae en la caja, con gente esperando**. La alternativa
 era cambiar la clave de `VentaPago`, que es la verdad de esas 14.226 ventas. No
 se cambió: se prohíbe la combinación que la rompería.
 
-La prohibición está escrita dos veces a propósito, y no es redundancia:
+Y la segunda tiene una hermana que salió de la primera revisión: **después de
+cualquier alta, edición o baja tiene que quedar al menos un medio activo.** Un
+local sin medios activos es un POS que no puede cobrar.
+
+Las dos reglas viven juntas en `validarMedios`, que recibe el estado
+**resultante** —cómo quedaría el local— y no el cambio. Los tres verbos arman ese
+resultado y preguntan ahí. No es estética: la primera versión tenía la regla del
+último medio activo escrita dentro del DELETE, con un `count` propio, y el PATCH
+no la tenía escrita en ningún lado, así que apagar el único medio activo dejaba
+el POS sin botones por un camino y no por el otro. **Una regla escrita dos veces
+es una regla que va a estar en un solo lado.**
+
+La prohibición del tipo duplicado está escrita dos veces a propósito, y eso sí es
+deliberado:
 
 - `validarMedios` en `lib/pos-ventas/mediosCobro.js` la explica antes de escribir,
   diciendo la consecuencia y no la restricción.
@@ -71,6 +84,52 @@ creado dentro de cinco años.
 Materializar los cuatro antes de aplicar el cambio no es un detalle: sin eso,
 apagar "Crédito" dejaría al local con una sola fila —la de Crédito, apagada— y el
 POS se quedaría sin los otros tres botones.
+
+## Cómo se pide editar algo que todavía no existe
+
+Un default no tiene fila, así que no tiene id. La primera versión de la API
+dejaba que la pantalla mandara un id inventado y resolvía mirando el
+`tipoContable` del cuerpo. Andaba, y era **una regla oculta**: la pantalla tenía
+que saber que un default se pide con un número que no existe. Ese es exactamente
+el conocimiento que la UI no tiene por qué tener.
+
+Ahora cada medio viaja con una `claveEdicion` que el GET arma y la pantalla
+devuelve tal cual. Para un medio materializado es su id; para un default es
+`defecto:` más el tipo del que salió, que es lo único estable que tiene antes de
+existir. La pantalla no la construye, no la interpreta y no la parsea.
+
+Va con prefijo y no como valor centinela —0, -1, "nuevo"— porque **un centinela
+es un número mágico que alguien tiene que recordar, y un prefijo se lee**.
+
+Dos detalles que se decidieron explícitamente: resolver un id **no** materializa
+nada, porque escribir cuatro filas como efecto de una búsqueda que va a fallar
+deja rastro de algo que no pasó; y una clave de default sobre un local que ya
+tiene configuración se contesta con "no existe" en vez de adivinar por tipo,
+porque dos medios pueden compartir tipo —uno activo y otro no— y se editaría el
+que no era.
+
+## Un solo "Guardar", una sola transacción
+
+La pantalla de un medio edita el nombre, la visibilidad, el orden, el tipo, el
+procesador, la comisión **y el recargo** en la misma superficie, con un botón. Si
+mandara dos requests, uno podría entrar y el otro fallar, y el local quedaría con
+el medio renombrado y el recargo viejo sin que nadie se entere.
+
+Entonces la ruta del medio es la **fachada** de los dos: acepta `recargoPct` y
+escribe las dos cosas en la misma transacción. Lo que no hace es copiar el número:
+hace el mismo upsert sobre `RecargoPagoLocal` que hace `PUT /api/recargos-pago`,
+con la misma validación y la misma autoría, escrito una sola vez.
+
+Hay una consecuencia de no duplicar la fuente que se resolvió explícitamente
+porque no se puede evitar: **el recargo es del tipo contable, no del botón.**
+`RecargoPagoLocal` está indexado por `(localId, medio)`. Si un medio cambia de
+tipo, el recargo no viaja con él; lo que llega se escribe sobre el tipo con el que
+el medio queda, y el del tipo anterior no se toca porque no es de este medio. Dos
+medios del mismo tipo comparten un solo recargo.
+
+Por eso el GET devuelve además `recargosPorTipo`: sin ese mapa, una pantalla que
+cambia el tipo en el formulario y guarda escribiría sobre el tipo nuevo el
+porcentaje que se había cargado para el viejo.
 
 ## La comisión se hereda, y "heredada" es un dato
 
@@ -136,7 +195,7 @@ comisión se contrata por tipo, no por procesador. Está probado.
 - `app/api/medios-cobro/` — leer con `pos.usar`, escribir con
   `config_local.medios_cobro`
 - `components/pos-ventas/FormaPago.jsx` — los botones salen de la configuración
-- `scripts/pruebas-db/mediosCobro.mjs` — 60 afirmaciones contra Postgres
+- `scripts/pruebas-db/mediosCobro.mjs` — 96 afirmaciones contra Postgres
 
 ## Lo que queda pendiente
 
