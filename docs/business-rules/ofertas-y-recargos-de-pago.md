@@ -364,10 +364,58 @@ el precio y la condición. **[SIN VERIFICAR]**
 un sello mueve píxeles y esa pantalla se acaba de rehacer; sin el arnés de
 capturas no hay forma de comprobar que no se corrió nada.
 
-### 2. Quién ejecuta el barrido: **nadie**
+### 2. Quién ejecuta el barrido — RESUELTO el 2026-09-05
 
-Es la pregunta que faltaba contestar, y la respuesta relevada el 2026-09-04 es
-que **no hay ningún proceso automático**. Los dos avisos son **oportunistas**.
+**El cambio de costo pasó a ser por EVENTO. El vencimiento sigue siendo
+oportunista, pero ahora se cuelga del POS y no de la pantalla de Ofertas.**
+
+**Cambio de costo.** Cuando una escritura cambia un `precio_costo` de verdad, la
+oferta queda en REVISAR y sale la notificación **sin que nadie abra nada**.
+**[VERIFICADO]** — 57 afirmaciones contra PostgreSQL en
+`scripts/pruebas-db/alertas.mjs`.
+
+No se puso un llamado en cada endpoint: ya existía una costura por la que pasan
+TODAS las escrituras. `lib/prisma.js` extiende el cliente con
+`auditoriaExtension`, que lee el "antes", escribe y deja los dos estados en un
+buffer por request, incluso dentro de transacciones. `lib/ofertas/disparadorCosto.js`
+no detecta nada por su cuenta: **lee ese buffer** y contesta una sola pregunta —
+¿algún `precio_costo` quedó distinto de como estaba?—. Se registra una vez, al
+lado del flush de auditoría en `lib/auth.js`, y corre en `after()`: un request
+que no toca costos no paga nada.
+
+Alcanza con saber **qué ubicación**, no qué productos. El barrido compara el
+costo congelado de cada línea de oferta viva contra el de hoy, así que su costo
+lo fija la cantidad de líneas vivas —decenas—, no el catálogo. Eso lo hace
+inmune al tope de 500 filas del buffer: con ver 500 basta para saber que hubo un
+cambio, y el barrido después mira todas las líneas igual.
+
+**Vencimiento.** Se dispara al abrir el POS, colgado de `/api/recargos-pago`, que
+es la ruta de condición comercial que el POS ya pedía al montar. **Cero requests
+nuevos.** Corre en `after()` —abrir la caja no tarda más— y está acelerado a una
+corrida cada `MINUTOS_ENTRE_BARRIDOS` (15) por ubicación. **[DECISIÓN]**
+
+No se agregó cron, ni workflow con `schedule`, ni ruta pública, ni secreto
+compartido. Sigue siendo oportunista: si el local no abre el POS en las 24 horas
+previas, el aviso no llega. La diferencia es que **el POS se abre todos los días
+y la pantalla de Ofertas no**.
+
+**Que lo dispare un cajero no le da ningún permiso.** El barrido corre
+server-side y no le devuelve nada a quien lo provocó; todo lo que produce son
+`Notificacion` con `alcance: "LOCAL"` y `permisoRequerido: "ofertas.ver"`. Un
+cajero con solo `pos.usar` lo dispara técnicamente, no ve una sola de esas
+notificaciones, recibe 403 al listar ofertas y 403 al llamar al barrido por su
+ruta. **[VERIFICADO]** — es el caso 12 de las pruebas.
+
+**La ventana server-side sigue mandando.** Una oferta vencida NO se aplica
+aunque nunca se haya emitido su aviso: son dos cosas independientes y la de
+cobrar no depende de la de avisar. **[VERIFICADO]** — caso 13.
+
+Lo que sigue abajo es el relevamiento que llevó a esto, y se conserva porque
+explica por qué se eligió esta costura y no otra.
+
+### 2 bis. El relevamiento del 2026-09-04
+
+**No hay ningún proceso automático.** Los dos avisos eran **oportunistas**.
 
 Cómo se enumeró, porque el conteo es parte de la afirmación:
 
