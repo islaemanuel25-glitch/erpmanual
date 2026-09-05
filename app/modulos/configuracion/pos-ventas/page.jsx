@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftRight, Check, Contrast, DollarSign } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -9,7 +8,8 @@ import SunmiListItem from "@/components/sunmi/SunmiListItem";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
-import { puedeVerConfigLocal, puedeVerSeccion, PERMISOS_CONFIG_POS } from "@/lib/config/acceso";
+import { puedeVerConfigLocal, puedeVerSeccion } from "@/lib/config/acceso";
+import { SECCIONES_POS } from "@/lib/config/seccionesPos";
 
 // CONFIGURACIÓN POS — la portada del módulo.
 //
@@ -33,41 +33,6 @@ import { puedeVerConfigLocal, puedeVerSeccion, PERMISOS_CONFIG_POS } from "@/lib
 // Una sección sin permiso NO se dibuja, que es la convención del resto del
 // sistema: el menú hace exactamente lo mismo.
 
-const SECCIONES = [
-  {
-    key: "cobros",
-    label: "Cobros",
-    descripcion: "Medios de pago, recargos, comisiones e integraciones",
-    href: "/modulos/configuracion/pos-ventas/cobros",
-    icon: DollarSign,
-    permiso: "config_local.medios_cobro",
-  },
-  {
-    key: "reglas",
-    label: "Reglas de venta",
-    descripcion: "Cliente, operador, descuentos, fiado y cierre",
-    href: "/modulos/configuracion/pos-ventas/reglas",
-    icon: Check,
-    permiso: "config_local.pos",
-  },
-  {
-    key: "integraciones",
-    label: "Integraciones",
-    descripcion: "Conexiones con procesadores y conciliación",
-    href: "/modulos/configuracion/pos-ventas/integraciones",
-    icon: ArrowLeftRight,
-    permisos: PERMISOS_CONFIG_POS,
-  },
-  {
-    label: "Apariencia",
-    key: "apariencia",
-    descripcion: "Themes y distribución del POS",
-    href: "/modulos/configuracion/apariencia",
-    icon: Contrast,
-    permiso: "config_local.apariencia",
-  },
-];
-
 export default function ConfiguracionPosPage() {
   const { perfil, cargando } = useUser();
   const { contexto } = useContextoActivo();
@@ -75,7 +40,7 @@ export default function ConfiguracionPosPage() {
   if (cargando) return null;
   if (!puedeVerConfigLocal(perfil)) return <SinPermisos />;
 
-  const visibles = SECCIONES.filter((s) => puedeVerSeccion(perfil, s));
+  const visibles = SECCIONES_POS.filter((s) => puedeVerSeccion(perfil, s));
   if (visibles.length === 0) return <SinPermisos />;
 
   return (
