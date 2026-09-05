@@ -57,9 +57,9 @@ test("el formulario compartido y el hook de datos también", async () => {
 
 // CANDADOS DEL REDISEÑO MOBILE APROBADO EN FIGMA.
 //
-// La portada tiene permiso para cambiar su composición, pero NO para crear una
-// paleta paralela ni medidas arbitrarias. Los valores visuales tienen que salir
-// del kit/tokens Sunmi y de la escala Tailwind ya existente.
+// La portada puede cambiar su contenido, pero debe vivir DENTRO del shell global
+// del ERP: el Header y el título mobile los sigue poniendo LayoutBase, igual que
+// en Productos y el resto de los módulos.
 test("la portada mobile usa tokens del sistema y no hardcodea colores ni px arbitrarios", () => {
   const portada = readFileSync(new URL("./page.jsx", import.meta.url), "utf8");
 
@@ -74,31 +74,37 @@ test("la portada mobile usa tokens del sistema y no hardcodea colores ni px arbi
     "la portada introdujo una medida arbitraria en px"
   );
 
-  assert.match(portada, /useSunmiTheme/);
   assert.match(portada, /sunmi-badge-accent/);
   assert.match(portada, /sunmi-btn-accent-soft/);
   assert.match(portada, /var\(--success-fg\)/);
 });
 
-test("el chrome inmersivo queda limitado a la portada mobile de Configuración POS", () => {
+test("Configuración POS conserva el header y el título mobile globales del ERP", () => {
+  const portada = readFileSync(new URL("./page.jsx", import.meta.url), "utf8");
   const layout = readFileSync(
     new URL("../../../../components/LayoutBase.jsx", import.meta.url),
     "utf8"
   );
 
-  assert.match(
+  assert.doesNotMatch(
     layout,
-    /pathname === "\/modulos\/configuracion\/pos-ventas"/,
-    "la excepción debe depender de la ruta exacta, no de un startsWith que afecte subpantallas"
+    /configuracionPosMobile/,
+    "LayoutBase no debe tener una excepción de chrome para Configuración POS"
   );
   assert.match(
     layout,
-    /configuracionPosMobile \? "hidden md:block" : ""/,
-    "el Header debe ocultarse solo en mobile y seguir presente en desktop"
+    /<Header onOpenMobileMenu=\{headerMobileHandler\} \/>/,
+    "el Header global debe renderizarse normalmente"
   );
   assert.match(
     layout,
-    /!configuracionPosMobile/,
-    "el título mobile global debe omitirse en la portada que ya trae título propio"
+    /<div className="md:hidden px-4 py-3 text-xl font-semibold">[\s\S]*\{tituloMobile\}/,
+    "el título mobile global debe seguir activo"
+  );
+
+  assert.doesNotMatch(
+    portada,
+    /ArrowLeft|theme\.header|<h1[^>]*>Configuración POS<\/h1>|<h2[^>]*>[\s\S]*Configuración POS[\s\S]*<\/h2>/,
+    "la portada no debe inventar un header o un título paralelo"
   );
 });
