@@ -137,11 +137,23 @@ async function montar() {
   creado.grupoId = grupo.id;
   await prisma.configuracionGrupo.create({ data: { grupoId: grupo.id } });
 
-  const localA = await prisma.local.create({ data: { nombre: `${marca}-A` } });
-  const localB = await prisma.local.create({ data: { nombre: `${marca}-B` } });
+  // ── LOCAL A ES EL DEPÓSITO, Y NO ES UN DETALLE ─────────────────────────
+  //
+  // El COSTO MAESTRO se administra desde el depósito: `resolverRutaEdicion`
+  // manda a `override` a cualquier ubicación que no lo sea, y entonces
+  // `productos/editar` rechaza el cambio de ficha maestra con un 403.
+  //
+  // La primera corrida real falló justo ahí, con las tres afirmaciones del
+  // cambio de costo en rojo. El fixture tenía dos locales comunes y ningún
+  // depósito, o sea un grupo que en el sistema real no existe: nadie podía
+  // tocar un costo. Se corrige montando el grupo como se monta de verdad —un
+  // depósito que administra el catálogo y un local que vende— en vez de
+  // esquivar el permiso escribiendo el costo directo en la base.
+  const localA = await prisma.local.create({ data: { nombre: `${marca}-deposito`, es_deposito: true } });
+  const localB = await prisma.local.create({ data: { nombre: `${marca}-local` } });
   creado.localAId = localA.id;
   creado.localBId = localB.id;
-  await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: localA.id } });
+  await prisma.grupoDeposito.create({ data: { grupoId: grupo.id, localId: localA.id } });
   await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: localB.id } });
   for (const localId of [localA.id, localB.id]) {
     await prisma.configuracionLocal.create({ data: { localId, exigirOperador: false } });
@@ -173,17 +185,13 @@ async function montar() {
         precio_costo: datos.costo,
         precio_venta: datos.venta,
         redondeo_100: false,
-        // ── EL DUEÑO DEL COSTO ─────────────────────────────────────────
+        // ── EL DUEÑO DEL COSTO ES EL DEPÓSITO ──────────────────────────
         //
-        // `productos/editar` solo deja tocar el costo al DUEÑO del producto:
-        // el depósito para los de depósito, el local creador para los
-        // exclusivos (`lib/productos/propiedadCosto.js`). Sin esto la ruta
-        // contesta 403 y la prueba mediría el permiso en vez de la alerta.
-        //
-        // Se marca a cada producto como creado en SU local, que es un estado
-        // legítimo del sistema y no un rodeo: así el escritor real de costo
-        // que se ejerce es el que una persona usaría de verdad.
-        creadoEnLocalId: datos.local,
+        // Todos son productos DEL DEPÓSITO (catálogo compartido), que es el
+        // caso normal: `lib/productos/propiedadCosto.js` dice que el costo de
+        // un producto de depósito solo lo administra el depósito. Por eso las
+        // ediciones de costo de estas pruebas van con la sesión de local A.
+        creadoEnLocalId: localA.id,
       },
     });
     const pl = await prisma.productoLocal.create({
@@ -224,8 +232,12 @@ async function montar() {
     productos,
     ofertaA: await ofertaSobre(productos.conOfertaA, { nombre: "Oferta del local A" }),
     ofertaB: await ofertaSobre(productos.conOfertaB, { nombre: "Oferta del local B" }),
-    // Termina dentro de las 24 h: es la que tiene que producir el aviso.
-    ofertaPorVencer: await ofertaSobre(productos.porVencer, { nombre: "Por vencer", fin: 10 }),
+    // Nace LEJOS del vencimiento (48 h). La sección 9 le corre el `finEn` a
+    // dentro de las 24 h, que es lo que pasa en la vida real cuando el tiempo
+    // avanza. Si naciera "por vencer", los barridos de las secciones 1 a 8 ya
+    // habrían emitido su aviso y la sección 9 no podría afirmar nada sobre el
+    // momento en que se emite — la primera corrida real falló exactamente ahí.
+    ofertaPorVencer: await ofertaSobre(productos.porVencer, { nombre: "Por vencer", fin: 48 }),
     ofertaFinalizada: await ofertaSobre(productos.finalizada, { nombre: "Finalizada", finalizada: true }),
     sesionA: token(usuario.id, localA.id, grupo.id),
     sesionCajero: token(cajero.id, localA.id, grupo.id, ["pos.usar"]),
@@ -392,7 +404,12 @@ async function correr(f) {
   seccion("9. Vencimiento: el POS lo dispara al abrir");
 
   _reiniciarAcelerador();
-  igual("todavía no hay aviso de vencimiento", await avisos(TIPO_POR_VENCER, ofertaPorVencer.id), 0);
+  igual("mientras faltan 48 h no hay aviso", await avisos(TIPO_POR_VENCER, ofertaPorVencer.id), 0);
+
+  // Pasa el tiempo: ahora termina dentro de las 24 h. Se corre `finEn` en vez de
+  // mover el reloj porque el barrido consulta la base con `now()` y un reloj
+  // falso no llegaría hasta el WHERE.
+  await prisma.oferta.update({ where: { id: ofertaPorVencer.id }, data: { finEn: enHoras(10) } });
 
   const barridoPos = await ejecutarBarrido(prisma, { grupoId: grupo.id, localIds: [localA.id] });
   ok("el barrido del POS corre", barridoPos.salteado !== true);
