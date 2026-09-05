@@ -16,6 +16,7 @@ import {
   estadoInicialDeMedio,
   formatearPct,
   textoOrigenComision,
+  SIN_PROCESADOR,
 } from "@/lib/pos-ventas/mediosCobroPantalla";
 
 // EDITAR O CREAR UN MEDIO DE COBRO. Un solo formulario para las dos cosas.
@@ -125,7 +126,7 @@ export default function FormularioMedio({
           description="Apaga o muestra este botón al cajero."
           right={<SunmiToggle value={form.activo} onChange={(v) => set("activo", v)} />}
         />
-        <SunmiSeparator className="my-1" />
+        <SunmiSeparator />
         <SunmiListItem
           label="Nombre en el POS"
           description="Texto visible"
@@ -139,7 +140,7 @@ export default function FormularioMedio({
             />
           }
         />
-        <SunmiSeparator className="my-1" />
+        <SunmiSeparator />
         <SunmiListItem
           label="Orden"
           description="Posición del botón"
@@ -172,7 +173,7 @@ export default function FormularioMedio({
             </>
           }
         />
-        <SunmiSeparator className="my-1" />
+        <SunmiSeparator />
         <SunmiListItem
           label="Comisión / costo"
           description={medio ? textoOrigenComision(medio) : "Heredada del grupo · editable"}
@@ -220,7 +221,7 @@ export default function FormularioMedio({
             </SunmiSelectAdv>
           }
         />
-        <SunmiSeparator className="my-1" />
+        <SunmiSeparator />
         <SunmiListItem
           label="Procesador"
           description="Integraciones"
@@ -231,7 +232,7 @@ export default function FormularioMedio({
               onChange={(v) => set("procesador", v)}
               placeholder="Elegir"
             >
-              <SunmiSelectOption value="">Sin procesador</SunmiSelectOption>
+              <SunmiSelectOption value={SIN_PROCESADOR}>Sin procesador</SunmiSelectOption>
               {procesadores.map((p) => (
                 <SunmiSelectOption key={p.valor} value={p.valor}>
                   {p.label}
@@ -253,7 +254,7 @@ export default function FormularioMedio({
             <span className="text-xs sunmi-text-muted">{esAlta ? "Sin configurar" : "No conectado"}</span>
           }
         />
-        <SunmiSeparator className="my-1" />
+        <SunmiSeparator />
         <SunmiListItem
           label="Conciliación automática"
           description="Disponible al conectar el procesador"

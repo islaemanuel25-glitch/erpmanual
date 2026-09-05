@@ -44,7 +44,7 @@ export default function IntegracionesPosPage() {
           description="Se registran a mano en el POS"
           right={<span className="text-xs sunmi-text-muted">Manual</span>}
         />
-        <SunmiSeparator className="my-1" />
+        <SunmiSeparator />
         <SunmiListItem
           label="Conciliación automática"
           description="Todavía no está disponible"
