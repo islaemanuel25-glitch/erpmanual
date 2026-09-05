@@ -55,23 +55,41 @@ export default function ConfiguracionPosPage() {
       </p>
 
       <div className="flex flex-col gap-3">
-        {visibles.map((s) => (
-          <Link key={s.key} href={s.href}>
-            <SunmiCard className="p-3">
+        {visibles.map((s) => {
+          // Una sección que TODAVÍA NO EXISTE se muestra apagada y sin envolver
+          // en un `Link`. No alcanza con apagarla visualmente: sin quitar el
+          // enlace seguiría navegando, y estaría llevando a otro lado del que
+          // promete. Ver el comentario de `apariencia` en `seccionesPos.js`.
+          const disponible = s.disponible !== false;
+
+          const tarjeta = (
+            <SunmiCard className={`p-3 ${disponible ? "" : "opacity-60"}`}>
               <SunmiListItem
-                clickable
+                clickable={disponible}
                 label={s.label}
-                description={s.descripcion}
+                description={s.nota ? `${s.descripcion} · ${s.nota}` : s.descripcion}
                 left={
-                  <span className="sunmi-badge-accent flex h-9 w-9 items-center justify-center rounded-lg">
+                  <span
+                    className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                      disponible ? "sunmi-badge-accent" : "sunmi-badge-muted"
+                    }`}
+                  >
                     <s.icon size={18} />
                   </span>
                 }
                 right={<span className="sunmi-text-muted">›</span>}
               />
             </SunmiCard>
-          </Link>
-        ))}
+          );
+
+          return disponible ? (
+            <Link key={s.key} href={s.href}>
+              {tarjeta}
+            </Link>
+          ) : (
+            <div key={s.key}>{tarjeta}</div>
+          );
+        })}
       </div>
     </div>
   );
