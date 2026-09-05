@@ -3,8 +3,14 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { MEDIO_LABEL } from "@/lib/pos-ventas/pagos";
-import { PROCESADORES, TIPOS_COBRABLES, normalizarEntrada } from "@/lib/pos-ventas/mediosCobro";
-import { mediosDelLocal, materializarDefaults, validarCambioDeMedio } from "@/lib/pos-ventas/mediosCobroServidor";
+import { normalizarRecargos } from "@/lib/recargos-pago/recargoPago";
+import { PROCESADORES, TIPOS_COBRABLES, claveEdicionDe, normalizarEntrada } from "@/lib/pos-ventas/mediosCobro";
+import {
+  guardarRecargoDeTipo,
+  materializarDefaults,
+  mediosDelLocal,
+  validarCambioDeMedio,
+} from "@/lib/pos-ventas/mediosCobroServidor";
 
 // MEDIOS DE COBRO DEL POS — qué botones ve el cajero y con qué condición.
 //
@@ -34,12 +40,22 @@ export async function GET(req) {
     const perm = checkPerm(session, ["config_local.medios_cobro", "pos.usar"]);
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
-    const medios = await mediosDelLocal(prisma, { localId, grupoId });
+    const [medios, filasRecargo] = await Promise.all([
+      mediosDelLocal(prisma, { localId, grupoId }),
+      prisma.recargoPagoLocal.findMany({ where: { localId }, select: { medio: true, porcentaje: true } }),
+    ]);
 
     return NextResponse.json({
       ok: true,
       localId,
       medios,
+      // EL RECARGO ES DEL TIPO CONTABLE, no del botón: `RecargoPagoLocal` está
+      // indexado por (local, medio). La pantalla necesita el mapa completo, no
+      // solo el del medio que edita, porque si alguien cambia el tipo en el
+      // formulario tiene que mostrarle el recargo del tipo NUEVO. Sin esto, un
+      // "Guardar" después de cambiar el tipo escribiría sobre el tipo nuevo el
+      // porcentaje que se había cargado para el viejo.
+      recargosPorTipo: normalizarRecargos(filasRecargo),
       // `true` mientras el local no configuró nada y está usando los defaults.
       // La pantalla lo necesita para poder decirlo en vez de mostrar cuatro filas
       // que parecen decisiones de alguien.
@@ -81,18 +97,18 @@ export async function POST(req) {
     const creado = await prisma.$transaction(async (tx) => {
       await materializarDefaults(tx, { localId });
 
-      const choque = await validarCambioDeMedio(tx, {
+      const control = await validarCambioDeMedio(tx, {
         localId,
         medioId: null,
         cambios: { nombre: datos.nombre, activo: datos.activo, tipoContable: datos.tipoContable },
       });
-      if (!choque.valido) {
-        const e = new Error(choque.error);
-        e.esChoqueDeTipo = true;
+      if (!control.valido) {
+        const e = new Error(control.error);
+        e.conflicto = true;
         throw e;
       }
 
-      return tx.medioCobroLocal.create({
+      const medio = await tx.medioCobroLocal.create({
         data: {
           localId,
           nombre: datos.nombre,
@@ -103,11 +119,23 @@ export async function POST(req) {
           comisionPct: datos.comisionPct,
         },
       });
+
+      // Un medio nuevo puede traer su recargo en el mismo formulario, y va en la
+      // misma transacción por lo mismo que en el PATCH: si el recargo fallara
+      // después, el medio quedaría creado con un recargo que nadie eligió.
+      await guardarRecargoDeTipo(tx, {
+        localId,
+        tipoContable: medio.tipoContable,
+        recargoPct: datos.recargoPct,
+        usuarioId: session.id,
+      });
+
+      return medio;
     });
 
-    return NextResponse.json({ ok: true, medioId: creado.id });
+    return NextResponse.json({ ok: true, medioId: creado.id, claveEdicion: claveEdicionDe(creado) });
   } catch (err) {
-    if (err.esChoqueDeTipo) {
+    if (err.conflicto) {
       return NextResponse.json({ ok: false, error: err.message }, { status: 409 });
     }
     console.error("Error creando medio de cobro:", err);

@@ -2,10 +2,22 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { materializarDefaults, validarCambioDeMedio } from "@/lib/pos-ventas/mediosCobroServidor";
-import { normalizarEntrada } from "@/lib/pos-ventas/mediosCobro";
+import {
+  aplicarCambioDeMedio,
+  resolverMedioParaEditar,
+  validarCambioDeMedio,
+} from "@/lib/pos-ventas/mediosCobroServidor";
+import { claveEdicionDe, normalizarEntrada } from "@/lib/pos-ventas/mediosCobro";
 
 // EDITAR O BORRAR UN MEDIO DE COBRO.
+//
+// ── EL SEGMENTO DE LA URL ES LA CLAVE DE EDICIÓN, NO SIEMPRE UN ID ─────────
+//
+// Un local sin configurar recibe defaults, que no tienen fila. El GET le da a
+// cada medio una `claveEdicion` y la pantalla la devuelve tal cual: para un medio
+// materializado es su id, para un default es de qué tipo salió. La pantalla no la
+// arma ni la interpreta, así que no tiene ninguna regla escondida del tipo "si el
+// id es null mandá otra cosa". Ver `claveEdicionDe` en el kit.
 //
 // ── EL `localId` DEL WHERE NO ES DECORATIVO ────────────────────────────────
 //
@@ -13,6 +25,15 @@ import { normalizarEntrada } from "@/lib/pos-ventas/mediosCobro";
 // defensa barata que usa el resto del sistema contra un id de otra ubicación
 // colado en la URL: sin eso, un encargado podría apagarle un medio de cobro a
 // otra boca escribiendo el número a mano.
+//
+// ── UN SOLO "GUARDAR", UNA SOLA TRANSACCIÓN ────────────────────────────────
+//
+// La pantalla edita el medio y su recargo en la misma superficie con un botón.
+// Si mandara dos requests, uno podría entrar y el otro fallar. Entonces esta ruta
+// es la fachada de los dos: `aplicarCambioDeMedio` escribe el medio y hace el
+// upsert de `RecargoPagoLocal` dentro de la MISMA transacción. Todo o nada.
+//
+// El recargo NO se copia a `MedioCobroLocal`: se escribe donde vive.
 
 export async function PATCH(req, { params }) {
   try {
@@ -24,55 +45,51 @@ export async function PATCH(req, { params }) {
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const { id } = await params;
-    const medioId = Number(id);
 
     const body = await req.json();
     const datos = normalizarEntrada(body, { parcial: true });
     if (!datos.valido) return NextResponse.json({ ok: false, error: datos.error }, { status: 400 });
-    const { valido, ...cambios } = datos;
+    // `recargoPct` sale acá a propósito: no es una columna del medio y no puede
+    // viajar de contrabando dentro del `data` del update.
+    const { valido, recargoPct, ...cambios } = datos;
 
     const actualizado = await prisma.$transaction(async (tx) => {
-      // Si el local venía con los defaults, la PRIMERA edición tiene que
-      // materializarlos: sin eso, apagar "Crédito" dejaría al local con una sola
-      // fila y el POS se quedaría sin los otros tres botones.
-      //
-      // Y como los defaults no tienen id, el que llegó por la URL no existe
-      // todavía. Se materializa primero y se resuelve el medio por su TIPO, que
-      // es lo único estable entre un default y su fila.
-      const materializado = await materializarDefaults(tx, { localId });
-
-      let objetivo = await tx.medioCobroLocal.findFirst({
-        where: { id: medioId, localId },
-        select: { id: true },
-      });
-
-      if (!objetivo && materializado.materializados > 0 && body?.tipoContable) {
-        objetivo = await tx.medioCobroLocal.findFirst({
-          where: { localId, tipoContable: String(body.tipoContable).toUpperCase() },
-          select: { id: true },
-        });
-      }
-
+      // Si el local venía con los defaults, esto materializa LOS CUATRO antes de
+      // resolver: sin eso, apagar "Crédito" dejaría al local con una sola fila y
+      // el POS se quedaría sin los otros tres botones.
+      const objetivo = await resolverMedioParaEditar(tx, { localId, clave: id });
       if (!objetivo) {
         const e = new Error("Ese medio de cobro no existe en este local.");
         e.noEncontrado = true;
         throw e;
       }
 
-      const choque = await validarCambioDeMedio(tx, { localId, medioId: objetivo.id, cambios });
-      if (!choque.valido) {
-        const e = new Error(choque.error);
-        e.esChoqueDeTipo = true;
+      const control = await validarCambioDeMedio(tx, { localId, medioId: objetivo.id, cambios });
+      if (!control.valido) {
+        const e = new Error(control.error);
+        e.conflicto = true;
         throw e;
       }
 
-      return tx.medioCobroLocal.update({ where: { id: objetivo.id }, data: cambios });
+      return aplicarCambioDeMedio(tx, {
+        localId,
+        medioId: objetivo.id,
+        cambios,
+        recargoPct,
+        usuarioId: session.id,
+      });
     });
 
-    return NextResponse.json({ ok: true, medioId: actualizado.id });
+    // La clave se devuelve resuelta: si la pantalla acaba de editar un default,
+    // la próxima vez ya lo pide por id sin tener que recargar.
+    return NextResponse.json({
+      ok: true,
+      medioId: actualizado.id,
+      claveEdicion: claveEdicionDe(actualizado),
+    });
   } catch (err) {
     if (err.noEncontrado) return NextResponse.json({ ok: false, error: err.message }, { status: 404 });
-    if (err.esChoqueDeTipo) return NextResponse.json({ ok: false, error: err.message }, { status: 409 });
+    if (err.conflicto) return NextResponse.json({ ok: false, error: err.message }, { status: 409 });
     console.error("Error editando medio de cobro:", err);
     return NextResponse.json(
       { ok: false, error: `No se pudo guardar el medio de cobro: ${err.message}` },
@@ -89,8 +106,14 @@ export async function PATCH(req, { params }) {
  * diciendo DEBITO aunque el botón que la produjo ya no exista. Es la misma razón
  * por la que el nombre visible no es la identidad.
  *
- * Lo que sí se impide es dejar al local sin ningún medio activo: un POS sin
- * botones no puede cobrar, y eso se descubriría en la caja.
+ * Lo que sí se impide es dejar al local sin ningún medio activo, y se impide con
+ * la MISMA regla que usa el PATCH. Antes esto tenía su propio `count` y el PATCH
+ * no tenía nada, así que apagar el único medio activo dejaba el POS sin botones
+ * por un camino y no por el otro.
+ *
+ * Tampoco se borra la fila de `RecargoPagoLocal` del tipo: el recargo es del tipo
+ * contable y no de este botón, así que puede tener otro medio detrás —o el que se
+ * cree mañana—. Borrar un medio no es decidir que ese tipo deja de tener recargo.
  */
 export async function DELETE(req, { params }) {
   try {
@@ -102,26 +125,19 @@ export async function DELETE(req, { params }) {
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const { id } = await params;
-    const medioId = Number(id);
 
     await prisma.$transaction(async (tx) => {
-      const medio = await tx.medioCobroLocal.findFirst({
-        where: { id: medioId, localId },
-        select: { id: true, activo: true },
-      });
+      const medio = await resolverMedioParaEditar(tx, { localId, clave: id });
       if (!medio) {
         const e = new Error("Ese medio de cobro no existe en este local.");
         e.noEncontrado = true;
         throw e;
       }
 
-      const activos = await tx.medioCobroLocal.count({ where: { localId, activo: true } });
-      if (medio.activo && activos <= 1) {
-        const e = new Error(
-          "Es el único medio de cobro activo del local. Si se borra, el POS queda sin botones y " +
-            "no se puede cobrar. Agregá otro antes de borrar éste."
-        );
-        e.dejariaSinMedios = true;
+      const control = await validarCambioDeMedio(tx, { localId, medioId: medio.id, borrar: true });
+      if (!control.valido) {
+        const e = new Error(control.error);
+        e.conflicto = true;
         throw e;
       }
 
@@ -131,7 +147,7 @@ export async function DELETE(req, { params }) {
     return NextResponse.json({ ok: true, eliminado: true });
   } catch (err) {
     if (err.noEncontrado) return NextResponse.json({ ok: false, error: err.message }, { status: 404 });
-    if (err.dejariaSinMedios) return NextResponse.json({ ok: false, error: err.message }, { status: 409 });
+    if (err.conflicto) return NextResponse.json({ ok: false, error: err.message }, { status: 409 });
     console.error("Error borrando medio de cobro:", err);
     return NextResponse.json(
       { ok: false, error: `No se pudo borrar el medio de cobro: ${err.message}` },

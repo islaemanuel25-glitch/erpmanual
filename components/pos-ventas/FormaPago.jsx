@@ -11,16 +11,6 @@ import { componerCobroSimple, evaluarDivisionPago } from "@/lib/pos-ventas/servi
 import { avisoPagoCombinado, recargoDeVenta } from "@/lib/recargos-pago/recargoPago";
 import { aMedioEnum } from "@/lib/ofertas/previewPos";
 
-const COMISION_DEFAULT = 7;
-
-const FORMAS_PAGO = [
-  { key: "efectivo", label: "Efectivo", tieneComision: false },
-  { key: "mercadopago", label: "MercadoPago", tieneComision: true },
-  { key: "debito", label: "Debito", tieneComision: true },
-  { key: "credito", label: "Credito", tieneComision: true },
-  { key: "fiado", label: "Fiado", tieneComision: false },
-];
-
 // ── LOS BOTONES SALEN DE LA CONFIGURACIÓN DEL LOCAL ────────────────────────
 //
 // Antes había acá una lista fija de cuatro. Ahora los medios se configuran por
@@ -514,4 +504,3 @@ function FormaPago({
 }
 
 export default memo(FormaPago);
-export { COMISION_DEFAULT, FORMAS_PAGO };

@@ -19,7 +19,8 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 const jwt = (await import("jsonwebtoken")).default;
 
-const { mediosDelLocal, materializarDefaults } = await import("../../lib/pos-ventas/mediosCobroServidor.js");
+const { mediosDelLocal, materializarDefaults, aplicarCambioDeMedio } =
+  await import("../../lib/pos-ventas/mediosCobroServidor.js");
 const { MEDIOS_POR_DEFECTO, COMISION_PCT_DEFAULT, comisionesDeMedios, recargosDeMedios } =
   await import("../../lib/pos-ventas/mediosCobro.js");
 const { aplicarComisiones } = await import("../../lib/pos-ventas/pagos.js");
@@ -143,6 +144,7 @@ async function correr(f) {
   const nuevo = await prisma.local.create({ data: { nombre: `${marca}-nuevo` } });
   creado.localNuevoId = nuevo.id;
   await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: nuevo.id } });
+  const sesionNuevo = token(creado.usuarioId, nuevo.id, grupo.id);
 
   const delNuevo = await mediosDelLocal(prisma, { localId: nuevo.id, grupoId: grupo.id });
   igual("arranca con los mismos cuatro medios, sin que nadie haya hecho nada",
@@ -158,16 +160,27 @@ async function correr(f) {
   ok("la ruta responde ok", listado.ok === true, listado.error);
   ok("y avisa que está usando defaults", listado.usandoDefaults === true);
 
+  // ── EL CONTRATO QUE VA A USAR LA PANTALLA, TAL CUAL ─────────────────────
+  //
+  // Se toma la `claveEdicion` que vino en el GET y se manda de vuelta. No se
+  // construye ningún id, no se manda `tipoContable` para ayudar a resolver, y no
+  // hay ninguna regla del tipo "si el id es null mandá un 0". Si esto pasa, la
+  // pantalla puede hacer exactamente lo mismo.
   const debitoA = listado.medios.find((m) => m.tipoContable === "DEBITO");
+  igual("un default se direcciona por su tipo, no por un id inventado",
+    debitoA.claveEdicion, "defecto:DEBITO");
+  igual("y su id sigue siendo null: no existe todavía", debitoA.id, null);
+
   const apagado = await leer(
     await rutaMedio.PATCH(
-      pedido(`http://ci/api/medios-cobro/${debitoA.id ?? 0}`, {
-        metodo: "PATCH", sesion: sesionA, cuerpo: { activo: false, tipoContable: "DEBITO" },
+      pedido(`http://ci/api/medios-cobro/${debitoA.claveEdicion}`, {
+        metodo: "PATCH", sesion: sesionA, cuerpo: { activo: false },
       }),
-      params(debitoA.id ?? 0)
+      params(debitoA.claveEdicion)
     )
   );
   ok("apagar débito responde ok", apagado.ok === true, apagado.error);
+  ok("y devuelve la clave ya resuelta a un id", /^\d+$/.test(String(apagado.claveEdicion)), apagado.claveEdicion);
 
   igual("la primera edición materializó los CUATRO defaults",
     await prisma.medioCobroLocal.count({ where: { localId: localA.id } }), MEDIOS_POR_DEFECTO.length);
@@ -318,6 +331,252 @@ async function correr(f) {
       WHERE table_name='MedioCobroLocal' AND column_name ILIKE '%recargo%'`.then((r) => r[0].n), 0);
 
   // ─────────────────────────────────────────────────────────────────────────
+  seccion("Guardar el medio y su recargo con un solo botón");
+
+  // La pantalla tiene un solo "Guardar cambios" y edita las dos cosas. Si hiciera
+  // dos requests, uno podría entrar y el otro fallar.
+  const resetNuevo = async () => {
+    await prisma.medioCobroLocal.deleteMany({ where: { localId: creado.localNuevoId } });
+    await prisma.recargoPagoLocal.deleteMany({ where: { localId: creado.localNuevoId } });
+    await materializarDefaults(prisma, { localId: creado.localNuevoId });
+    return prisma.medioCobroLocal.findMany({ where: { localId: creado.localNuevoId } });
+  };
+  const porTipo = (filas, tipo) => filas.find((f) => f.tipoContable === tipo);
+  const recargoDe = async (localId, medio) =>
+    prisma.recargoPagoLocal
+      .findUnique({ where: { localId_medio: { localId, medio } } })
+      .then((f) => (f ? Number(f.porcentaje) : null));
+
+  let filasNuevo = await resetNuevo();
+  const debNuevo = porTipo(filasNuevo, "DEBITO");
+
+  const unSoloGuardar = await leer(
+    await rutaMedio.PATCH(
+      pedido(`http://ci/api/medios-cobro/${debNuevo.id}`, {
+        metodo: "PATCH", sesion: sesionNuevo, cuerpo: { nombre: "Débito Posnet", recargoPct: 3 },
+      }),
+      params(debNuevo.id)
+    )
+  );
+  ok("un solo pedido guarda el medio y el recargo", unSoloGuardar.ok === true, unSoloGuardar.error);
+  igual("el nombre quedó en MedioCobroLocal",
+    await prisma.medioCobroLocal.findUnique({ where: { id: debNuevo.id } }).then((f) => f.nombre),
+    "Débito Posnet");
+  igual("y el recargo quedó en RecargoPagoLocal, que sigue siendo la única fuente",
+    await recargoDe(creado.localNuevoId, "DEBITO"), 3);
+  igual("con la autoría de quien lo guardó, igual que por la ruta de recargos",
+    await prisma.recargoPagoLocal
+      .findUnique({ where: { localId_medio: { localId: creado.localNuevoId, medio: "DEBITO" } } })
+      .then((f) => f.actualizadoPorId),
+    creado.usuarioId);
+
+  // No mencionar el recargo no es lo mismo que ponerlo en 0.
+  await rutaMedio.PATCH(
+    pedido(`http://ci/api/medios-cobro/${debNuevo.id}`, {
+      metodo: "PATCH", sesion: sesionNuevo, cuerpo: { nombre: "Débito" },
+    }),
+    params(debNuevo.id)
+  );
+  igual("un pedido que no habla del recargo no lo toca",
+    await recargoDe(creado.localNuevoId, "DEBITO"), 3);
+
+  await rutaMedio.PATCH(
+    pedido(`http://ci/api/medios-cobro/${debNuevo.id}`, {
+      metodo: "PATCH", sesion: sesionNuevo, cuerpo: { recargoPct: 0 },
+    }),
+    params(debNuevo.id)
+  );
+  igual("ponerlo en 0 sí se guarda: es una decisión, no una ausencia",
+    await recargoDe(creado.localNuevoId, "DEBITO"), 0);
+
+  // ─── EL RECARGO ES DEL TIPO, NO DEL BOTÓN ───
+  //
+  // `RecargoPagoLocal` está indexado por (local, medio). Si un medio cambia de
+  // tipo, el recargo no viaja con él. Se resuelve explícitamente: lo que llega se
+  // escribe sobre el tipo con el que el medio QUEDA, y el del tipo anterior no se
+  // toca porque no es de este medio.
+  await rutaMedio.PATCH(
+    pedido(`http://ci/api/medios-cobro/${debNuevo.id}`, {
+      metodo: "PATCH", sesion: sesionNuevo, cuerpo: { recargoPct: 3, activo: false },
+    }),
+    params(debNuevo.id)
+  );
+  const cambioDeTipo = await leer(
+    await rutaMedio.PATCH(
+      pedido(`http://ci/api/medios-cobro/${debNuevo.id}`, {
+        metodo: "PATCH", sesion: sesionNuevo,
+        cuerpo: { tipoContable: "CREDITO", recargoPct: 12 },
+      }),
+      params(debNuevo.id)
+    )
+  );
+  ok("cambiar el tipo y el recargo a la vez responde ok", cambioDeTipo.ok === true, cambioDeTipo.error);
+  igual("el recargo se escribió sobre el tipo NUEVO",
+    await recargoDe(creado.localNuevoId, "CREDITO"), 12);
+  igual("y el del tipo anterior quedó intacto: no era de este medio",
+    await recargoDe(creado.localNuevoId, "DEBITO"), 3);
+
+  // ─── CONTRAPRUEBA DE ROLLBACK ───
+  //
+  // Un candado que dice "es transaccional" sin ejercer la falla no afirma nada.
+  // Acá se rompe a propósito la SEGUNDA mitad y se comprueba que la primera
+  // tampoco quedó. La falla se inyecta en el upsert del recargo, ya adentro de la
+  // transacción, que es donde el problema realmente ocurriría.
+  filasNuevo = await resetNuevo();
+  const paraRomper = porTipo(filasNuevo, "MERCADOPAGO");
+  const nombreAntes = paraRomper.nombre;
+
+  let exploto = false;
+  try {
+    await prisma.$transaction(async (tx) => {
+      const txRoto = new Proxy(tx, {
+        get(objetivo, prop) {
+          if (prop !== "recargoPagoLocal") return objetivo[prop];
+          return new Proxy(objetivo.recargoPagoLocal, {
+            get(delegado, metodo) {
+              if (metodo === "upsert") {
+                return async () => { throw new Error("falla inyectada en el recargo"); };
+              }
+              const v = delegado[metodo];
+              return typeof v === "function" ? v.bind(delegado) : v;
+            },
+          });
+        },
+      });
+
+      await aplicarCambioDeMedio(txRoto, {
+        localId: creado.localNuevoId,
+        medioId: paraRomper.id,
+        cambios: { nombre: "NO DEBERÍA QUEDAR" },
+        recargoPct: 9,
+        usuarioId: creado.usuarioId,
+      });
+    });
+  } catch {
+    exploto = true;
+  }
+
+  ok("la falla inyectada efectivamente rompió el guardado", exploto);
+  igual("el nombre del medio NO quedó aplicado: la transacción volvió atrás",
+    await prisma.medioCobroLocal.findUnique({ where: { id: paraRomper.id } }).then((f) => f.nombre),
+    nombreAntes);
+  igual("y tampoco quedó el recargo", await recargoDe(creado.localNuevoId, "MERCADOPAGO"), null);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  seccion("A, B, C, D. Nunca cero medios activos");
+
+  filasNuevo = await resetNuevo();
+  const activosDe = (localId) => prisma.medioCobroLocal.count({ where: { localId, activo: true } });
+
+  // Dejar uno solo activo, apagando los otros tres de a uno por la ruta.
+  for (const tipo of ["DEBITO", "CREDITO", "MERCADOPAGO"]) {
+    const f = porTipo(filasNuevo, tipo);
+    const r = await leer(
+      await rutaMedio.PATCH(
+        pedido(`http://ci/api/medios-cobro/${f.id}`, { metodo: "PATCH", sesion: sesionNuevo, cuerpo: { activo: false } }),
+        params(f.id)
+      )
+    );
+    ok(`apagar ${tipo} se permite mientras quede otro activo`, r.ok === true, r.error);
+  }
+  igual("queda exactamente uno activo", await activosDe(creado.localNuevoId), 1);
+
+  // ─── A: apagar el ÚNICO activo ───
+  const ultimoActivo = porTipo(filasNuevo, "EFECTIVO");
+  const apagarUltimo = await leer(
+    await rutaMedio.PATCH(
+      pedido(`http://ci/api/medios-cobro/${ultimoActivo.id}`, {
+        metodo: "PATCH", sesion: sesionNuevo, cuerpo: { activo: false },
+      }),
+      params(ultimoActivo.id)
+    )
+  );
+  igual("apagar el ÚNICO medio activo se rechaza", apagarUltimo.ok, false);
+  igual("con 409: es un conflicto funcional, no un error del servidor", apagarUltimo.status, 409);
+  ok("y explica que el POS quedaría sin con qué cobrar",
+    /sin botones|no hay con qué cobrar/.test(apagarUltimo.error || ""), apagarUltimo.error);
+
+  // ─── C: borrar el ÚNICO activo ───
+  const borrarUltimo = await leer(
+    await rutaMedio.DELETE(
+      pedido(`http://ci/api/medios-cobro/${ultimoActivo.id}`, { metodo: "DELETE", sesion: sesionNuevo }),
+      params(ultimoActivo.id)
+    )
+  );
+  igual("borrar el ÚNICO medio activo se rechaza", borrarUltimo.ok, false);
+  igual("también con 409", borrarUltimo.status, 409);
+  ok("y con el MISMO mensaje que apagarlo: es la misma regla",
+    borrarUltimo.error === apagarUltimo.error,
+    `apagar: ${apagarUltimo.error} / borrar: ${borrarUltimo.error}`);
+
+  // ─── D: después de los dos intentos, sigue habiendo uno ───
+  igual("después de intentar apagarlo y borrarlo, sigue habiendo un medio activo",
+    await activosDe(creado.localNuevoId), 1);
+
+  // ─── B: con dos activos, apagar uno se permite ───
+  const reactivado = await leer(
+    await rutaMedio.PATCH(
+      pedido(`http://ci/api/medios-cobro/${porTipo(filasNuevo, "DEBITO").id}`, {
+        metodo: "PATCH", sesion: sesionNuevo, cuerpo: { activo: true },
+      }),
+      params(porTipo(filasNuevo, "DEBITO").id)
+    )
+  );
+  ok("volver a prender un segundo medio se permite", reactivado.ok === true, reactivado.error);
+  igual("ahora hay dos activos", await activosDe(creado.localNuevoId), 2);
+
+  const apagarConDos = await leer(
+    await rutaMedio.PATCH(
+      pedido(`http://ci/api/medios-cobro/${ultimoActivo.id}`, {
+        metodo: "PATCH", sesion: sesionNuevo, cuerpo: { activo: false },
+      }),
+      params(ultimoActivo.id)
+    )
+  );
+  ok("con dos activos, apagar uno YA se permite", apagarConDos.ok === true, apagarConDos.error);
+  igual("y nunca se llegó a cero", await activosDe(creado.localNuevoId), 1);
+
+  const borrarConDos = await leer(
+    await rutaMedio.DELETE(
+      pedido(`http://ci/api/medios-cobro/${ultimoActivo.id}`, { metodo: "DELETE", sesion: sesionNuevo }),
+      params(ultimoActivo.id)
+    )
+  );
+  ok("y borrar uno INACTIVO se permite", borrarConDos.ok === true, borrarConDos.error);
+  igual("sigue habiendo un activo", await activosDe(creado.localNuevoId), 1);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  seccion("Claves de edición que no direccionan nada");
+
+  for (const [caso, clave] of [
+    ["un id que no existe", "999999"],
+    ["un cero, que era el número mágico de antes", "0"],
+    ["un tipo que no se puede cobrar", "defecto:FIADO"],
+    ["un tipo inventado", "defecto:CRIPTO"],
+    ["cualquier cosa", "abc"],
+  ]) {
+    const r = await leer(
+      await rutaMedio.PATCH(
+        pedido(`http://ci/api/medios-cobro/${clave}`, { metodo: "PATCH", sesion: sesionNuevo, cuerpo: { nombre: "X" } }),
+        params(clave)
+      )
+    );
+    ok(`se rechaza ${caso}`, r.ok === false && r.status === 404, `status ${r.status}: ${r.error}`);
+  }
+
+  // Una clave de default sobre un local que YA tiene configuración viene de una
+  // pantalla vieja: se contesta que no existe en vez de adivinar cuál era.
+  const claveVieja = await leer(
+    await rutaMedio.PATCH(
+      pedido("http://ci/api/medios-cobro/defecto:EFECTIVO", {
+        metodo: "PATCH", sesion: sesionNuevo, cuerpo: { nombre: "X" },
+      }),
+      params("defecto:EFECTIVO")
+    )
+  );
+  igual("una clave de default sobre un local ya configurado no resuelve", claveVieja.status, 404);
+
+  // ─────────────────────────────────────────────────────────────────────────
   seccion("17 y 18. Permisos y entradas inválidas");
 
   const cajeroLee = await leer(await rutaMedios.GET(pedido(`http://ci/api/medios-cobro?localId=${localA.id}`, { sesion: sesionCajero })));
@@ -358,24 +617,6 @@ async function correr(f) {
   const bIntacto = await prisma.medioCobroLocal.findUnique({ where: { id: debB.id }, select: { nombre: true } });
   igual("el medio ajeno quedó intacto", bIntacto.nombre, "MP Débito");
 
-  // ─────────────────────────────────────────────────────────────────────────
-  seccion("No quedarse sin medios");
-
-  await prisma.medioCobroLocal.deleteMany({ where: { localId: creado.localNuevoId } });
-  await materializarDefaults(prisma, { localId: creado.localNuevoId });
-  const delNuevoFilas = await prisma.medioCobroLocal.findMany({ where: { localId: creado.localNuevoId } });
-  await prisma.medioCobroLocal.updateMany({
-    where: { localId: creado.localNuevoId, id: { not: delNuevoFilas[0].id } },
-    data: { activo: false },
-  });
-  const ultimo = await leer(
-    await rutaMedio.DELETE(
-      pedido(`http://ci/api/medios-cobro/${delNuevoFilas[0].id}`, { metodo: "DELETE", sesion: token(creado.usuarioId, creado.localNuevoId, grupo.id) }),
-      params(delNuevoFilas[0].id)
-    )
-  );
-  igual("borrar el ÚNICO medio activo se rechaza", ultimo.ok, false);
-  ok("y explica que el POS quedaría sin botones", /sin botones/.test(ultimo.error || ""), ultimo.error);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
