@@ -452,14 +452,47 @@ async function correr(f) {
   // ─────────────────────────────────────────────────────────────────────────
   seccion("11. Renovar: la vigencia nueva puede volver a avisar");
 
-  // Se corre la ventana de la oferta: es lo que hace una renovación. El aviso
-  // viejo quedó fuera de la ventana nueva, así que no la bloquea.
-  const nuevoFin = enHoras(20);
+  // ── PRIMERO EL BORDE, QUE ES EL QUE SE ENTIENDE MAL ────────────────────
+  //
+  // Estirar el final unas horas NO vuelve a avisar, y es deliberado: la ventana
+  // de aviso son las 24 h previas, así que la del final nuevo todavía contiene
+  // el aviso que ya se emitió. Avisar dos veces de lo mismo en la misma tarde es
+  // cómo se enseña a ignorar la campanita.
+  //
+  // Esto se descubrió corriéndolo: la primera versión de esta prueba renovaba de
+  // +10 h a +20 h y esperaba un aviso nuevo. No es una renovación, es una
+  // extensión dentro del mismo día.
   await prisma.oferta.update({
     where: { id: ofertaPorVencer.id },
-    data: { inicioEn: enHoras(-1), finEn: nuevoFin },
+    data: { inicioEn: enHoras(-1), finEn: enHoras(20) },
   });
-  const traRenovar = await ejecutarBarrido(prisma, { grupoId: grupo.id, localIds: [localA.id], forzar: true });
+  await ejecutarBarrido(prisma, { grupoId: grupo.id, localIds: [localA.id], forzar: true });
+  igual(
+    "estirar el final unas horas NO vuelve a avisar (la ventana se solapa)",
+    await avisos(TIPO_POR_VENCER, ofertaPorVencer.id),
+    1
+  );
+
+  // ── Y AHORA UNA RENOVACIÓN DE VERDAD ───────────────────────────────────
+  //
+  // La oferta se renueva por cinco días. Hoy no hay nada que avisar —falta
+  // mucho—, así que el aviso nuevo aparece recién cuando el tiempo se acerca al
+  // final nuevo. Se simula pasándole `ahora` al barrido en vez de esperar cuatro
+  // días: el barrido consulta con ese instante, no con el reloj del proceso.
+  //
+  // Para entonces el aviso viejo quedó lejos de la ventana nueva y ya no la
+  // bloquea, que es exactamente lo que tiene que pasar.
+  await prisma.oferta.update({
+    where: { id: ofertaPorVencer.id },
+    data: { finEn: enHoras(120) },
+  });
+  const dentroDeLaVentanaNueva = new Date(Date.now() + 100 * 60 * 60 * 1000);
+  const traRenovar = await ejecutarBarrido(prisma, {
+    grupoId: grupo.id,
+    localIds: [localA.id],
+    forzar: true,
+    ahora: dentroDeLaVentanaNueva,
+  });
   igual("la vigencia nueva produce un aviso nuevo", await avisos(TIPO_POR_VENCER, ofertaPorVencer.id), 2);
   ok("el barrido lo informa", traRenovar.avisos >= 1, JSON.stringify(traRenovar));
 
