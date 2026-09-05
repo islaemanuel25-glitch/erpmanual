@@ -106,6 +106,20 @@ async function avisos(tipo, ofertaId) {
  * que hace `lib/auth.js` con `seedAuditoria` al principio de cada handler.
  */
 async function editarCostoPorLaRuta({ baseId, costo, sesion, grupoId, localId }) {
+  // ── SE MANDA LA FICHA ENTERA, COMO EL FORMULARIO ─────────────────────────
+  //
+  // `productos/editar` es el PUT del formulario de producto: arma la ficha
+  // completa con `splitUiToDb(payload)` y pone en NULL todo lo que no venga. Con
+  // un cuerpo mínimo `{precio_costo}` deja `nombre` y `precio_venta` en null y
+  // Prisma rechaza el update por columnas no nulables.
+  //
+  // La primera corrida real dio 500 por eso, y el mensaje que llegó fue "Error
+  // interno" —el mismo agujero que CLAUDE.md tiene anotado—: hubo que ir al
+  // stderr del runner para ver el PrismaClientValidationError.
+  //
+  // Así que se lee el producto y se reenvía tal cual, cambiando SOLO el costo.
+  // Es lo que hace una persona: abre el producto, corrige el costo y guarda.
+  const actual = await prisma.productoBase.findUnique({ where: { id: baseId } });
   const store = seedAuditoria({ usuarioId: creado.usuarioId, grupoId, localId });
   store.__auditBuffer = new Map();
   const r = await leer(
@@ -113,7 +127,14 @@ async function editarCostoPorLaRuta({ baseId, costo, sesion, grupoId, localId })
       pedido(`http://ci/api/productos/editar/${baseId}`, {
         metodo: "PUT",
         sesion,
-        cuerpo: { precio_costo: costo },
+        cuerpo: {
+          nombre: actual.nombre,
+          unidad_medida: actual.unidad_medida,
+          precio_venta: Number(actual.precio_venta),
+          precio_costo: costo,
+          redondeo_100: actual.redondeo_100,
+          activo: actual.activo,
+        },
       }),
       params(baseId)
     )

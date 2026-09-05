@@ -366,8 +366,13 @@ export async function PUT(req, context) {
     return resp;
   } catch (e) {
     console.error("ERROR productos/editar:", e);
+    // "Error interno" no le dice nada a nadie. Es la deuda que CLAUDE.md tiene
+    // anotada, y acá se cobró: una prueba de base recibió este texto por un
+    // `PrismaClientValidationError` y hubo que ir al stderr del runner para
+    // saber qué campo faltaba. Quien está editando un producto y no puede
+    // guardarlo necesita saber por qué.
     return NextResponse.json(
-      { ok: false, error: "Error interno" },
+      { ok: false, error: `No se pudo guardar el producto: ${e.message}` },
       { status: 500 }
     );
   }
