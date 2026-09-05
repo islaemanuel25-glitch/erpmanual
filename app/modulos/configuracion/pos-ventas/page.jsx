@@ -1,16 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ChevronRight,
-  Lightbulb,
-  Store,
-  UserRound,
-} from "lucide-react";
+import { Lightbulb } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiListItem from "@/components/sunmi/SunmiListItem";
+import SunmiNavCard from "@/components/sunmi/SunmiNavCard";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -36,78 +32,35 @@ export default function ConfiguracionPosPage() {
   const visibles = SECCIONES_POS.filter((s) => puedeVerSeccion(perfil, s));
   if (visibles.length === 0) return <SinPermisos />;
 
-  const rolVisible = perfil?.esAdmin
-    ? "Administrador"
-    : perfil?.rolNombre || "Usuario";
-
   return (
     <>
       {/* MOBILE — contenido aprobado, dentro del shell normal del ERP */}
       <section className="md:hidden min-h-full">
         <div className="space-y-5">
-          <div className="flex flex-wrap gap-2">
-            <span className="sunmi-btn-accent-soft inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold">
-              <Store className="size-4" aria-hidden="true" />
-              {contexto?.nombre ? `Local: ${contexto.nombre}` : "Local activo"}
-            </span>
-
-            <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--success-fg)] bg-[color:var(--success-bg-hover)] px-3 py-2 text-sm font-semibold text-[color:var(--success-fg)]">
-              <UserRound className="size-4" aria-hidden="true" />
-              {rolVisible}
-            </span>
-          </div>
-
+          {/* Acá vivían dos chips con el local y el rol. Se fueron porque el
+              Header global del ERP ya muestra las dos cosas, arriba y en todas
+              las pantallas: repetirlas dos centímetros más abajo no agrega un
+              dato, agrega ruido y hace que ésta se vea distinta del resto. */}
           <p className="text-sm sunmi-text-muted">
             Configurá cómo funciona la venta en este local.
           </p>
 
           <div className="flex flex-col gap-3">
-            {visibles.map((s) => {
-              const disponible = s.disponible !== false;
-
-              const tarjeta = (
-                <SunmiCard
-                  className={`flex items-center gap-3 p-4 ${disponible ? "" : "opacity-60"}`}
-                >
-                  <span
-                    className={`flex size-12 shrink-0 items-center justify-center rounded-xl ${
-                      disponible ? "sunmi-badge-accent" : "sunmi-badge-muted"
-                    }`}
-                  >
-                    <s.icon className="size-6" aria-hidden="true" />
-                  </span>
-
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-semibold sunmi-text-strong">
-                      {s.label}
-                    </h3>
-                    <p className="mt-1 text-sm leading-snug sunmi-text-muted">
-                      {s.descripcion}
-                    </p>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2">
-                    {!disponible && (
-                      <span className="sunmi-badge-muted rounded-full px-3 py-1 text-xs">
-                        Próximamente
-                      </span>
-                    )}
-                    <ChevronRight
-                      className="size-5 sunmi-text-muted"
-                      aria-hidden="true"
-                    />
-                  </div>
-                </SunmiCard>
-              );
-
-              return disponible ? (
-                <Link key={s.key} href={s.href} className="block">
-                  {tarjeta}
-                </Link>
-              ) : (
-                <div key={s.key}>{tarjeta}</div>
-              );
-            })}
+            {visibles.map((s) => (
+              <SunmiNavCard
+                key={s.key}
+                icon={s.icon}
+                label={s.label}
+                descripcion={s.descripcion}
+                // Sin `href` la tarjeta no navega Y no dibuja la flecha: las dos
+                // cosas las decide la pieza a partir del mismo dato, así que no
+                // pueden quedar en desacuerdo. Una sección futura no tiene
+                // destino, y `seccionesPos` tiene un candado que lo exige.
+                href={s.href}
+                atenuado={s.disponible === false}
+                estado={s.disponible === false ? "Próximamente" : null}
+              />
+            ))}
           </div>
 
           <div className="sunmi-btn-accent-soft flex items-start gap-3 rounded-2xl p-4">

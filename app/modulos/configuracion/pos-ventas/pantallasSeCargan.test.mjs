@@ -76,7 +76,43 @@ test("la portada mobile usa tokens del sistema y no hardcodea colores ni px arbi
 
   assert.match(portada, /sunmi-badge-accent/);
   assert.match(portada, /sunmi-btn-accent-soft/);
-  assert.match(portada, /var\(--success-fg\)/);
+
+  // ── LA AFIRMACIÓN DE `var(--success-fg)` SE FUE, Y SE FUE A PROPÓSITO ────
+  //
+  // Esa variable solo la usaba el chip verde con el rol del usuario. Ese chip y
+  // el del local se sacaron: el Header global del ERP ya muestra las dos cosas
+  // arriba, en todas las pantallas, y repetirlas dos centímetros más abajo hacía
+  // que ésta se viera distinta del resto sin agregar un dato.
+  //
+  // Exigirla ahora dejaría el candado pidiendo que vuelva algo que decidimos
+  // sacar. Lo que sí se sigue exigiendo —arriba— es que no aparezca un color
+  // literal ni una medida arbitraria, que es lo que el candado cuida de verdad.
+  // Se prohíben los INGREDIENTES de los chips, no la palabra "Local:". La
+  // primera versión de esta línea también prohibía esa cadena y se puso en rojo
+  // sola: el bloque DESKTOP la usa legítimamente, en el subtítulo de
+  // `SunmiHeader`. Pedía algo que la pantalla nunca prometió.
+  assert.doesNotMatch(
+    portada,
+    /rolNombre|UserRound/,
+    "los chips de local y rol volvieron: eso ya lo muestra el Header global"
+  );
+});
+
+// LA TARJETA DE SECCIÓN ES UNA PIEZA DEL KIT, NO JSX SUELTO EN LA PÁGINA.
+//
+// Antes el tamaño del redondel, el relleno, el radio, el estado atenuado y el
+// tratamiento del icono estaban escritos adentro de la portada. La segunda
+// pantalla que quisiera una lista de secciones los habría escrito de nuevo, y
+// ahí empiezan las diferencias entre pantallas que muestran lo mismo.
+test("la portada consume SunmiNavCard en vez de dibujar la tarjeta a mano", () => {
+  const portada = readFileSync(new URL("./page.jsx", import.meta.url), "utf8");
+
+  assert.match(portada, /SunmiNavCard/);
+  assert.doesNotMatch(
+    portada,
+    /size-12 shrink-0 items-center/,
+    "el redondel del icono volvió a la página: va en la pieza"
+  );
 });
 
 test("Configuración POS conserva el header y el título mobile globales del ERP", () => {
