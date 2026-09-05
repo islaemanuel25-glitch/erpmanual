@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  ArrowLeft,
   ChevronRight,
   Lightbulb,
   Store,
@@ -12,7 +11,6 @@ import {
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiListItem from "@/components/sunmi/SunmiListItem";
-import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -21,10 +19,9 @@ import { SECCIONES_POS } from "@/lib/config/seccionesPos";
 
 // CONFIGURACIÓN POS — portada del módulo.
 //
-// La versión mobile sigue el diseño aprobado en Figma y usa exclusivamente
-// piezas/tokens Sunmi: ninguna paleta paralela y ningún color literal.
-// Desktop conserva la portada anterior para no mover una superficie que no fue
-// parte de esta tanda.
+// Mobile conserva el chrome GLOBAL del ERP (Header + título mobile de LayoutBase),
+// igual que Productos y el resto de los módulos. El rediseño aprobado vive
+// solamente dentro del contenido de la página.
 //
 // El gating no cambia: cada sección se filtra con puedeVerSeccion y una sección
 // futura sigue sin Link real aunque se vea en la portada.
@@ -32,7 +29,6 @@ import { SECCIONES_POS } from "@/lib/config/seccionesPos";
 export default function ConfiguracionPosPage() {
   const { perfil, cargando } = useUser();
   const { contexto } = useContextoActivo();
-  const { theme } = useSunmiTheme();
 
   if (cargando) return null;
   if (!puedeVerConfigLocal(perfil)) return <SinPermisos />;
@@ -46,22 +42,9 @@ export default function ConfiguracionPosPage() {
 
   return (
     <>
-      {/* MOBILE — diseño aprobado en Figma */}
-      <section className="md:hidden min-h-full sunmi-surface">
-        <div
-          className={`flex items-center gap-3 border-b px-4 py-4 ${theme.header.bg} ${theme.header.border} ${theme.header.text}`}
-        >
-          <Link
-            href="/modulos/configuracion"
-            className="flex min-h-11 min-w-11 items-center justify-center rounded-xl transition hover:bg-[color:var(--hover-bg)]"
-            aria-label="Volver a Configuración"
-          >
-            <ArrowLeft className="size-5" aria-hidden="true" />
-          </Link>
-          <h1 className="text-xl font-semibold">Configuración POS</h1>
-        </div>
-
-        <div className="space-y-5 px-4 py-5">
+      {/* MOBILE — contenido aprobado, dentro del shell normal del ERP */}
+      <section className="md:hidden min-h-full">
+        <div className="space-y-5">
           <div className="flex flex-wrap gap-2">
             <span className="sunmi-btn-accent-soft inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold">
               <Store className="size-4" aria-hidden="true" />
@@ -74,14 +57,9 @@ export default function ConfiguracionPosPage() {
             </span>
           </div>
 
-          <div className="space-y-1.5">
-            <h2 className="text-3xl font-bold sunmi-text-strong">
-              Configuración POS
-            </h2>
-            <p className="text-sm sunmi-text-muted">
-              Configurá cómo funciona la venta en este local.
-            </p>
-          </div>
+          <p className="text-sm sunmi-text-muted">
+            Configurá cómo funciona la venta en este local.
+          </p>
 
           <div className="flex flex-col gap-3">
             {visibles.map((s) => {
