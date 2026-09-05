@@ -146,9 +146,19 @@ test("una comisión heredada deja el campo vacío y lo explica", () => {
   const html = dibujar({ modo: "editar", medio: MEDIO_HEREDADO });
   assert.match(html, /Heredada del grupo/);
   assert.match(html, /usa la comisión del grupo/);
-  // El número del grupo se muestra como marca de agua, NO como valor cargado:
-  // cargado, el primer Guardar lo convertiría en override.
-  assert.ok(html.includes('placeholder="7"'), "falta el 7 heredado como marca de agua");
+
+  // ── LA MARCA DE AGUA ES UNA PALABRA, NO EL NÚMERO ────────────────────────
+  //
+  // La primera versión ponía el 7 del grupo de marca de agua, y este candado lo
+  // exigía. Se vio en la captura: un número gris en la caja se lee igual que uno
+  // cargado, así que el campo que significa "no hay nada decidido acá" parecía
+  // tener un valor. El número sigue estando, en el renglón de abajo.
+  assert.ok(html.includes('placeholder="Heredada"'));
+  assert.equal(html.includes('placeholder="7"'), false, "el número no puede ir en la caja");
+
+  // Y sobre todo: el 7 NO puede estar cargado como valor. Cargado, el primer
+  // Guardar lo convertiría en override y el local dejaría de seguir al grupo.
+  assert.equal(html.includes('value="7"'), false, "la comisión heredada no se carga en el campo");
 });
 
 test("una comisión propia se muestra cargada y dice cómo volver a heredar", () => {

@@ -163,7 +163,7 @@ export default function FormularioMedio({
           right={
             <>
               <SunmiInput
-                className="w-16 text-right"
+                className="w-24 text-right"
                 type="number"
                 inputMode="decimal"
                 value={form.recargoPct}
@@ -179,12 +179,20 @@ export default function FormularioMedio({
           description={medio ? textoOrigenComision(medio) : "Heredada del grupo · editable"}
           right={
             <>
+              {/* ── LA MARCA DE AGUA DICE "HEREDADA", NUNCA EL NÚMERO ──────
+                  La primera versión ponía el porcentaje del grupo de marca de
+                  agua. Al mirar la captura se vio el problema: un "5" gris en la
+                  caja se lee igual que un 5 cargado, y entonces el campo que
+                  significa "no hay nada decidido acá" parecía tener un valor.
+                  El número no se pierde: está en el renglón de abajo, dicho como
+                  lo que es. Y el ancho subió a w-24 porque en w-16 la palabra
+                  salía cortada —"Hered.."— a los tres anchos. */}
               <SunmiInput
-                className="w-16 text-right"
+                className="w-24 text-right"
                 type="number"
                 inputMode="decimal"
                 value={form.comisionPct}
-                placeholder={pctHeredado != null ? String(pctHeredado) : "Heredada"}
+                placeholder="Heredada"
                 onChange={(e) => set("comisionPct", e.target.value)}
               />
               <span className="text-xs sunmi-text-muted">%</span>
